@@ -314,6 +314,7 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_power_irq);
 	TIMER_CALLBACK_MEMBER(timer_keypad);
 	TIMER_CALLBACK_MEMBER(timer_mad2_soft_reset);
+	TIMER_CALLBACK_MEMBER(timer_dsp_service);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	uint16_t ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask);
@@ -417,6 +418,7 @@ private:
 	emu_timer * m_timer_power_irq;
 	emu_timer * m_timer_keypad;
 	emu_timer * m_timer_mad2_soft_reset;
+	emu_timer * m_timer_dsp_service;
 
 	// CCONT
 	struct nokia_ccont
@@ -674,6 +676,7 @@ void noki3310_state::machine_start()
 	m_timer_power_irq = timer_alloc(FUNC(noki3310_state::timer_power_irq), this);
 	m_timer_keypad = timer_alloc(FUNC(noki3310_state::timer_keypad), this);
 	m_timer_mad2_soft_reset = timer_alloc(FUNC(noki3310_state::timer_mad2_soft_reset), this);
+	m_timer_dsp_service = timer_alloc(FUNC(noki3310_state::timer_dsp_service), this);
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -808,6 +811,7 @@ void noki3310_state::machine_reset()
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
 	m_timer_fiq8->adjust(attotime::from_hz(fiq8_hz), 0, attotime::from_hz(fiq8_hz));
 	m_timer_mbus->adjust(attotime::never);
+	m_timer_dsp_service->adjust(attotime::never);
 	m_timer_power_irq->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_POWER_IRQ_MS", 1000)));
 	m_timer_keypad->adjust(attotime::from_hz(200), 0, attotime::from_hz(200));
 
@@ -1421,6 +1425,7 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_mad2_soft_reset)
 	m_keypad_irq_state = 0xff;
 	m_power_irq_count = 0;
 	m_timer_mbus->adjust(attotime::never);
+	m_timer_dsp_service->adjust(attotime::never);
 	m_timer_power_irq->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_POWER_IRQ_MS", 1000)));
 	update_fiq_line();
 	update_irq_line();
@@ -1890,6 +1895,27 @@ void noki3310_state::eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 }
 
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
+{
+	// The modelled DSP processes the queued lower-service work: drain the pending counter
+	// for real (so the service_ready gate at 0x291096 reads 0 honestly, with no read-time
+	// hack) and raise the service interrupt (MAD2 IRQ line 4).
+	//
+	// Then keep ticking. The firmware resets service_ready at the top of every startup
+	// phase (0x2a90d6) and only sets it back from inside the IRQ-4 service path, so it
+	// needs the interrupt to recur within each phase window — which is exactly how a
+	// continuously-running DSP behaves (a periodic per-frame service tick), not a single
+	// completion. Re-arm at the service-tick rate to model that. This replaces the blind
+	// wall-clock-gated EXPERIMENT_DSP_IRQ4 pulse, now causally anchored to the DSP being
+	// given work and draining real DSP RAM. See docs/service_bootstrap.md.
+	m_dsp_ram[DSP_SVC_PENDING_COUNTER_OFF >> 1] = 0;
+	assert_irq(MAD2_IRQ_LINE_DSP_SERVICE);
+	if (nokia_env_u32("NOKI3210_TRACE_DSP", 0) != 0)
+		logerror("dsp_service: tick; drained [0e4]=0, asserted IRQ4  t=%.4f\n",
+				machine().time().as_double());
+	m_timer_dsp_service->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", 5)));
+}
+
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
 	// DSP-handshake probe (opt-in): log distinct (byte-offset, pc) reads — placed
@@ -1941,8 +1967,25 @@ void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 			logerror("dspwr: off=%03x data=%04x pc=%08x t=%.4f\n",
 					(offset & 0x7ff) << 1, data, pc, machine().time().as_double());
 		}
+		// Targeted (un-deduped): the lower-service pending counter at byte 0xe4 is read
+		// 0x0002 by the service_ready gate (0x291096) yet never appears in the deduped
+		// dspwr stream (the 0xe00 program upload saturates it). Log every write here so
+		// the DSP-handshake model can anchor to the real "work queued" event.
+		if ((offset & 0x7ff) == (DSP_SVC_PENDING_COUNTER_OFF >> 1))
+			logerror("dspwr-pending: off=0e4 data=%04x pc=%08x t=%.4f\n",
+					data, m_maincpu->pc(), machine().time().as_double());
 	}
 	COMBINE_DATA(&m_dsp_ram[offset & 0x7ff]);
+
+	// DSP service-completion model (opt-in): when the MCU queues lower-service work by
+	// writing a non-zero count to the pending counter (byte 0xe4, pc 0x290c98), the real
+	// MAD2 DSP processes it and signals completion by draining the counter and raising
+	// IRQ line 4. Model that: schedule a completion after a short processing delay. This
+	// is the faithful replacement for the EXPERIMENT_DSP_IRQ4 force (blind periodic pulse
+	// + read-time fake-zero). See docs/service_bootstrap.md.
+	if (nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0 &&
+			(offset & 0x7ff) == (DSP_SVC_PENDING_COUNTER_OFF >> 1) && data != 0)
+		m_timer_dsp_service->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", 5)));
 }
 
 // ============================================================================

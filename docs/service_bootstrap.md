@@ -82,7 +82,8 @@ model must too):
    locks), config `0x120..0x243` (+cksum `0x244/245`). Config checksum **done**; tune/security
    need real data + checksums (donor image or synthesis).
 2. **DSP service handshake** — MAD2 IRQ line 4 (the DSP service-completion interrupt) + the
-   DSP-shared pending counter `0x100e4` draining to 0. Currently *forced* by `EXPERIMENT_DSP_IRQ4`.
+   DSP-shared pending counter `0x100e4` draining to 0. **MODELLED** (`NOKI3210_MODEL_DSP_SERVICE`,
+   opt-in) — replaces the `EXPERIMENT_DSP_IRQ4` force; see "DONE — DSP service handshake modelled".
 3. **D9 watchdog ack heartbeat** (`0x11fedb`). Currently *forced* by `EXPERIMENT_FORCE_ACK`.
 4. **Service-channel open** — a checksum-validated config *message* that sets the channel node
    (`0x11fee4`) + the 0x20-byte registration (`0x2b140a`). Not modelled.
@@ -662,6 +663,35 @@ pulse + read-time drain. The other offsets already read `0` (the "empty/OK" valu
 
 This supersedes the MBUS-transport framing for the *final* gate: the MBUS D0 work was real and
 correct, but `service_ready` ultimately waits on the DSP, not the MBUS bus.
+
+### DONE — DSP service handshake modelled (`NOKI3210_MODEL_DSP_SERVICE`, replaces the IRQ-4 force)
+
+Fix path #1 above is now a real, opt-in **model** (`dsp_ram_w` + `timer_dsp_service`), validated
+against the oracle. It is the honest replacement for the `EXPERIMENT_DSP_IRQ4` force (blind 200 Hz
+pulse + read-time fake-zero of `[0x100e4]`).
+
+**Trigger found (un-deduped `dspwr-pending` probe).** The MCU queues lower-service work by writing
+the pending counter itself: `[0x100e4] = 0x0002` at **pc `0x290c98`, t≈0.170** (after clearing it
+to 0 at `0x290ba6`, t≈0.164). It is never re-queued in a 20 s boot. The earlier "counter is
+naturally 0" reading was wrong — the deduped `dspwr` trace saturates during the 256-byte `0xe00`
+DSP-program upload, hiding this write; the raw RAM holds `0x0002`, so the read-hack was load-bearing.
+
+**The model.** On the MCU writing a non-zero pending count, after a short processing delay
+(`MODEL_DSP_SERVICE_DELAY_MS`, default 5) the modelled DSP **drains `[0x100e4]` → 0 for real** and
+**raises IRQ line 4** — then re-arms at a service-tick rate (`MODEL_DSP_SERVICE_TICK_MS`, default 5).
+No read-hack; the gate at `0x291096` reads the genuinely-drained `0x0000`.
+
+**Why recurring, not one-shot (a finding).** A single completion at t≈0.175 fires *too early*: the
+firmware resets `service_ready` at the top of every startup phase (`0x2a90d6`) and only re-sets it
+from inside the IRQ-4 path, so the phase that consumes it (~t≈0.255) sees 0 unless IRQ-4 recurs
+*within that phase window*. One-shot → setter runs 0×; recurring → setter runs each phase and
+`ready[0x110c2c]=01`, matching the force. This is physically right: a booted DSP raises a periodic
+per-frame service interrupt, it does not signal once.
+
+**Measured.** `MODEL_DSP_SERVICE=1` alone: setter runs, `ready=01`, **oracle frame stays `d8a9a7`**
+(still CONTACT SERVICE — the D9 ack heartbeat `0x11fedb` is still genuinely absent; that is the next
+force to model, requirement #3). Default boot (model off) is byte-identical to baseline. *Next:*
+verify against the full structural-marker set, then promote to default and retire `EXPERIMENT_DSP_IRQ4`.
 
 ## CORRECTION (deep dispatch + ready-byte trace): the dispatch is NOT the ready setter
 
