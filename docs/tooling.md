@@ -38,6 +38,6 @@ and is likewise **not redistributed** here.
 
 ## MAME
 
-The driver `mame/nokia_3310.cpp` is overlaid onto an upstream
+The driver `driver/nokia_3310.cpp` is overlaid onto an upstream
 [MAME](https://github.com/mamedev/mame) checkout (pinned commit in the Makefile);
 MAME is not vendored. See `LICENSE` for the licensing split.

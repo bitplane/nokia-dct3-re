@@ -22,7 +22,7 @@ and symbol map won't line up.
 ## Layout
 
 ```
-mame/nokia_3310.cpp     the MAME driver (BSD-3-Clause; overlaid onto a fresh MAME clone at build)
+driver/nokia_3310.cpp     the MAME driver (BSD-3-Clause; overlaid onto a fresh MAME clone at build)
 tools/                  Thumb-disasm / xref helpers (capstone); the MAME input-exerciser Lua
 ghidra/scripts/         headless Ghidra naming/export scripts
 ghidra/symbols/3210.csv address -> name -> kind, exported from the naming script (use without Ghidra)
@@ -58,12 +58,18 @@ experiment scaffolding used to run the boot "as-if-provisioned" are documented i
 
 ## Reproducing
 
-Three things pin reproducibility anywhere: the **MAME commit** (in the Makefile), the
-**firmware SHA-256** (`roms/README.md`), and the **oracle frame hash** the default boot
-must reach (a regression check). The Makefile orchestrates building MAME with the driver
-overlaid and running traced boots; the disassembly/Ghidra tooling regenerates analysis
-from your image. (The build orchestration is being shaken out for this repo layout —
-see issues/TODO.)
+Three things pin reproducibility anywhere: the **MAME commit** (`MAME_COMMIT` in the
+Makefile), the **firmware SHA-256** (`roms/README.md`), and the **oracle frame hash**
+(`d8a9a7…`) the boot must reach. Once your dump is in `roms/` (see `roms/README.md`):
+
+```
+make build      # clone MAME at the pin, overlay driver/nokia_3310.cpp, build
+make verify     # boot to CONTACT SERVICE, check the LCD frame SHA == the oracle
+make swap16     # derive the halfword-swapped image the static tools/Ghidra use
+```
+
+Every `NOKI3210_*` knob the driver reads is overridable on the command line
+(`make run NOKI3210_TRACE_PM=1`); the canonical oracle profile is baked into `make run`.
 
 ## License
 

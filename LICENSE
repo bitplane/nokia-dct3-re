@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ---
 
-Note on the MAME driver (mame/nokia_3310.cpp):
+Note on the MAME driver (driver/nokia_3310.cpp):
 
 That file is part of the MAME project and is licensed BSD-3-Clause, copyright
 Sandro Ronco and contributors (including this project's contributors for the

@@ -24,7 +24,7 @@ ghidra/decompiled*/
 *.lst
 
 # ── Generated build / analysis state ──
-mame-build/
+mame/
 .venv/
 venv/
 run_*/
