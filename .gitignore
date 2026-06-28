@@ -1,0 +1,39 @@
+# ── Copyrighted firmware / dumps — NEVER commit (bring your own; see roms/README.md) ──
+*.fls
+*.bin
+*.rom
+roms/**
+!roms/README.md
+# swap16 / extracted firmware images
+*swap16*
+
+# ── Third-party proprietary tools / their reverse-engineering — do not redistribute ──
+NokTool*.exe
+nok.exe
+noktool*.zip
+noktool-src/
+*.rar
+idr/
+
+# ── Derived-from-firmware artifacts (decompiled output is a derivative work) ──
+ghidra_out/
+ghidra/decompiled*/
+**/decompiled*/
+*.idc
+*.idp
+*.lst
+
+# ── Generated build / analysis state ──
+mame-build/
+.venv/
+venv/
+run_*/
+progress_latest_frame.*
+*.pgm
+scratchpad/
+/tmp/
+
+# ── Editor / OS noise ──
+__pycache__/
+*.pyc
+.DS_Store

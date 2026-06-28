@@ -1,0 +1,3276 @@
+// license:BSD-3-Clause
+// copyright-holders:Sandro Ronco
+/*
+    Driver for Nokia phones based on Texas Instrument MAD2WD1 (ARM7TDMI + DSP)
+
+    Driver based on documentations found here:
+        http://nokix.sourceforge.net/help/blacksphere/sub_050main.htm
+        http://tudor.rdslink.ro/MADos/
+
+*/
+
+// if anybody has solid information to aid in the emulation of this (or other phones) please contribute.
+
+#include "emu.h"
+
+#include <optional>
+
+#include "cpu/arm7/arm7.h"
+#include "machine/intelfsh.h"
+#include "video/pcd8544.h"
+
+#include "debugger.h"
+#include "emupal.h"
+#include "screen.h"
+
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
+
+#define LOG_MAD2_REGISTER_ACCESS    (1U << 1)
+#define LOG_CCONT_REGISTER_ACCESS   (1U << 2)
+
+#define VERBOSE (0)
+#include "logmacro.h"
+
+namespace {
+
+static unsigned nokia_env_u32(const char *name, unsigned fallback);
+
+constexpr offs_t NOKIA_RAM_BASE = 0x100000;
+constexpr offs_t NOKIA_RAM_END = 0x180000;
+constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
+constexpr offs_t NOKIA_FLASH2_BASE = 0x00600000;
+constexpr offs_t NOKIA_FLASH_END = 0x00a00000;
+constexpr uint32_t NOKIA_FLASH_ENTRY = 0x200040;
+
+enum mad2_reg : uint8_t
+{
+	MAD2_MCU_RESET_CTRL = 0x01,
+	MAD2_WATCHDOG = 0x03,
+	MAD2_TIMER1_COUNTER_MSB = 0x04,
+	MAD2_TIMER1_COUNTER_LSB = 0x05,
+	MAD2_TIMER1_COMPARE_MSB = 0x06,
+	MAD2_TIMER1_COMPARE_LSB = 0x07,
+	MAD2_FIQ_STATUS = 0x08,
+	MAD2_IRQ_STATUS = 0x09,
+	MAD2_FIQ_MASK = 0x0a,
+	MAD2_IRQ_MASK = 0x0b,
+	MAD2_IRQ_CTRL = 0x0c,
+	MAD2_TIMER0_DIVIDER = 0x0f,
+	MAD2_TIMER0_COUNTER_MSB = 0x10,
+	MAD2_TIMER0_COUNTER_LSB = 0x11,
+	MAD2_TIMER0_COMPARE_MSB = 0x12,
+	MAD2_TIMER0_COMPARE_LSB = 0x13,
+	MAD2_FIQ8_CTRL = 0x16,
+	MAD2_MBUS_CTRL = 0x18,
+	MAD2_MBUS_STATUS = 0x19,
+	MAD2_CCONT_WRITE = 0x2c,
+	MAD2_LCD_DATA = 0x2e,
+	MAD2_KEYBOARD_ROWS = 0x28,
+	MAD2_KEYBOARD_COLS = 0x2a,
+	MAD2_CCONT_READ = 0x6c,
+	MAD2_LCD_COMMAND = 0x6e,
+	MAD2_SIM_TXD = 0x36,
+	MAD2_SIM_RXD = 0x37,
+	MAD2_SIM_IIR = 0x38,
+	MAD2_SIM_CONTROL = 0x39,
+	MAD2_SIM_CLOCK = 0x3a,
+	MAD2_SIM_RX_FILL = 0x3c,
+	MAD2_SIM_RX_FLAGS = 0x3d,
+	MAD2_SIM_TX_FLAGS = 0x3e,
+	MAD2_SIM_TX_FILL = 0x3f
+};
+
+enum ccont_reg : uint8_t
+{
+	CCONT_ADC_CTRL = 0x0,
+	CCONT_ADC_LSB = 0x2,
+	CCONT_ADC_MSB = 0x3,
+	CCONT_WATCHDOG = 0x5,
+	CCONT_IRQ_STATUS = 0x0e,
+	CCONT_IRQ_MASK = 0x0f
+};
+
+enum ccont_adc_channel : uint8_t
+{
+	CCONT_ADC_ACCESSORY = 0,
+	CCONT_ADC_RSSI = 1,
+	CCONT_ADC_BATTERY_VOLTAGE = 2,
+	CCONT_ADC_BATTERY_TYPE = 3,
+	CCONT_ADC_BATTERY_TEMP = 4,
+	CCONT_ADC_CHARGER_VOLTAGE = 5,
+	CCONT_ADC_VCXO_TEMP = 6,
+	CCONT_ADC_CHARGING_CURRENT = 7
+};
+
+// MAD2 interrupt and MBUS control bits observed during the 3210 boot path.
+constexpr uint16_t MAD2_LINE_EXTENDED = 0x100;
+constexpr uint8_t MAD2_IRQ_CTRL_FIQ_ENABLE = 0x01;
+constexpr uint8_t MAD2_IRQ_CTRL_IRQ_ENABLE = 0x04;
+constexpr uint8_t MAD2_IRQ_CTRL_EXT_IRQ_MASK = 0x40;
+constexpr uint8_t MAD2_FIQ8_MASKED = 0x04;
+constexpr uint8_t MAD2_MBUS_BUSY_MASK = 0x60;
+constexpr uint8_t MAD2_MBUS_DONE_FLAGS = 0xc0;
+constexpr uint8_t MAD2_MBUS_TX_READY = 0x10;
+constexpr uint8_t MAD2_MBUS_RX_READY = 0x20;
+constexpr uint8_t MAD2_MBUS_TX_ENABLE = 0x20;
+constexpr uint8_t MAD2_MBUS_RX_ENABLE = 0x40;
+constexpr uint16_t MAD2_FIQ_TIMER0_COMPARE = 0x04;
+constexpr uint16_t MAD2_FIQ_MBUS_MASK = 0x0c;
+
+// CCONT serial command/status bits used by the current charger/battery model.
+constexpr uint8_t CCONT_BOOT_IRQ_DEFAULT = 0x08;
+constexpr uint8_t CCONT_CMD_READ = 0x04;
+constexpr uint8_t CCONT_CMD_ADDR_SHIFT = 3;
+
+// Firmware RAM locations used only by focused diagnostics and scoped boot shims.
+constexpr offs_t FW_CURRENT_TASK_ID = 0x100002;
+constexpr offs_t FW_SCHED_STATE = 0x100020;
+constexpr offs_t FW_SCHED_RUNNING_TASK_ID = 0x100022;
+constexpr offs_t FW_SCHED_DELAY_HEAD = 0x10004c;
+constexpr offs_t FW_SCHED_POST_STATE_BASE = 0x1093bc;
+constexpr offs_t FW_SCHED_POST_TASK3_STATE = FW_SCHED_POST_STATE_BASE + (3 * 0x10);
+constexpr offs_t FW_SCHED_POST_TASK3_WAIT_STATE = FW_SCHED_POST_TASK3_STATE + 0x0d;
+constexpr offs_t FW_SCHED_TASK_TABLE = 0x2e2878;
+constexpr offs_t FW_TASK_CONTEXT_BASE = 0x101484;
+constexpr offs_t FW_TASK1_QUEUE_BASE = FW_TASK_CONTEXT_BASE + 0x1c;
+constexpr offs_t FW_TASK1_QUEUE_PUT = 0x1014b0;
+constexpr offs_t FW_TASK3_QUEUE_BASE = FW_TASK_CONTEXT_BASE + (3 * 0x1c);
+constexpr offs_t FW_TASK3_QUEUE_PUT = FW_TASK3_QUEUE_BASE + 0x10;
+constexpr offs_t FW_TASK5_QUEUE_BASE = FW_TASK_CONTEXT_BASE + (5 * 0x1c);
+constexpr offs_t FW_TASK5_STATUS_STATE = 0x110f14;
+constexpr offs_t FW_TASK5_STATUS_SEQUENCE = 0x110f28;
+constexpr offs_t FW_TASK7_QUEUE_BASE = 0x100e68;
+constexpr offs_t FW_TASK14_TCB = 0x1094a8;
+constexpr offs_t FW_TASK14_QUEUE_SUSPECT = 0x1014f8;
+constexpr offs_t FW_STARTUP_SERVICE_BUFFER = 0x110c2c;
+constexpr offs_t FW_STARTUP_STATUS_WORD = 0x112448;
+// Service-ready / DSP-handshake chain (the CONTACT SERVICE root cause; see
+// docs/service_bootstrap.md). The startup service-ready byte (0x110c2c) is set =1 by
+// the setter 0x291068 iff the DSP-shared pending counter (DSP RAM byte 0xe4) == 0; the
+// setter only runs when MAD2 IRQ line 4 (the DSP service-completion interrupt) fires.
+// The extended-task resume (incl. task 0x14, batch 2) also gates on the startup phase
+// byte (FW_STARTUP_STATUS_WORD+1 = 0x112449) being in {0,2}.
+constexpr offs_t FW_STARTUP_SERVICE_READY = FW_STARTUP_SERVICE_BUFFER;  // ready byte, gate input
+constexpr offs_t FW_STARTUP_SERVICE_STATUS = 0x110c2e;                  // service-startup status word (-> 0x8002)
+constexpr offs_t FW_STARTUP_PHASE = 0x112449;                          // startup phase byte (batch-2/task14 gate)
+constexpr unsigned DSP_SVC_PENDING_COUNTER_OFF = 0x0e4;                // DSP-shared RAM byte: lower-service pending count
+constexpr int MAD2_IRQ_LINE_DSP_SERVICE = 4;                          // IRQ line 4 = DSP service-completion interrupt
+constexpr offs_t FW_POWER_STATE = 0x1100d0;
+constexpr offs_t FW_BATTERY_RECORD = 0x110434;
+constexpr offs_t FW_BATTERY_LEVEL_PERCENT = 0x110434;
+constexpr offs_t FW_BATTERY_STATE = 0x110436;
+constexpr offs_t FW_BATTERY_CLASSIFIER_FLAGS = 0x110438;
+constexpr offs_t FW_BATTERY_CLASSIFIER_PREV_FLAGS = 0x110439;
+constexpr offs_t FW_BATTERY_AVERAGED_ADC = 0x11043a;
+constexpr offs_t FW_BATTERY_INIT_MODE = 0x11043d;
+constexpr offs_t FW_BATTERY_ADC_PHASE = 0x11043e;
+constexpr offs_t FW_BATTERY_FAST_VBAT_READS = 0x110464;
+constexpr offs_t FW_BATTERY_CLASSIFIER_LOW_THRESHOLDS = 0x11048a;
+constexpr offs_t FW_BATTERY_CLASSIFIER_HIGH_THRESHOLDS = 0x110494;
+constexpr offs_t FW_BATTERY_SOURCE_STATE = 0x111458;
+constexpr offs_t FW_BATTERY_SOURCE_SELECTOR_TABLE = 0x11145a;
+constexpr offs_t FW_BATTERY_SOURCE_TABLE = 0x111488;
+constexpr offs_t FW_BATTERY_SOURCE_WEIGHT_TABLE = 0x111d5c;
+constexpr offs_t FW_BATTERY_SOURCE_REGION_END = 0x111d7f;
+constexpr offs_t FW_BATTERY_HW_MODE_LATCH = 0x11fe52;
+constexpr offs_t FW_STARTUP_WAIT_STATUS = 0x112398;
+constexpr offs_t FW_POST74_KEYPAD_FALLBACK_FLAG = 0x11239d;
+constexpr offs_t FW_STARTUP_MODE4_FLAG_RADIO = 0x112390;
+constexpr offs_t FW_STARTUP_MODE4_FLAG_INITIAL = 0x112391;
+constexpr offs_t FW_STARTUP_MODE4_FLAG_DISPLAY = 0x112392;
+constexpr offs_t FW_STARTUP_MODE4_FLAG_SERVICE = 0x112393;
+constexpr offs_t FW_STARTUP_MODE4_FLAG_BATTERY = 0x112394;
+constexpr offs_t FW_STARTUP_MODE4_FLAG_UI = 0x112395;
+constexpr offs_t FW_STARTUP_DISPATCH_STATE = 0x1123ec;
+constexpr offs_t FW_STARTUP_EVENT = 0x1123ee;
+constexpr offs_t FW_STARTUP_MODE = 0x1123f0;
+constexpr offs_t FW_STARTUP_READY_TIMER_BASE = 0x1122c4;
+constexpr offs_t FW_STARTUP_READY_TIMER_STATE = 0x1122c8;
+constexpr offs_t FW_STARTUP_READY_GATE_FLAG = 0x100024;
+constexpr offs_t FW_POST74_EVENT_GATE = 0x112368;
+constexpr offs_t FW_POST74_EVENT_GATE_READY = FW_POST74_EVENT_GATE + 4;
+constexpr offs_t FW_POST74_EVENT_GATE_FLAGS = FW_POST74_EVENT_GATE + 6;
+constexpr offs_t FW_SCHED_ACTIVE_DELAY_HEAD = 0x100048;
+constexpr offs_t FW_STARTUP_READY_DELAY_RECORD = 0x10026c;
+constexpr offs_t FW_STARTUP_READY_SCHED_RECORD_A = 0x1126a0;
+constexpr offs_t FW_STARTUP_READY_SCHED_RECORD_B = 0x1126ac;
+constexpr offs_t FW_STARTUP_EVENT14_LATCH = 0x112424;
+constexpr offs_t FW_CCONT_CHARGER_EVENT = 0x1124c8;
+constexpr offs_t FW_CCONT_CHARGER_EVENT_VALUE = FW_CCONT_CHARGER_EVENT;
+constexpr offs_t FW_CCONT_CHARGER_EVENT_POST_VALUE = 0x1124ca;
+constexpr offs_t FW_CCONT_CHARGER_EVENT_LAST = 0x1124cc;
+constexpr offs_t FW_CCONT_CHARGER_EVENT_RETRY = 0x1124cd;
+constexpr offs_t FW_CCONT_STATE = 0x11ff6c;
+constexpr offs_t FW_TASK14_READY_FLAG = 0x111c93;
+constexpr offs_t FW_TASK14_HELPER_MODE_FLAG = 0x10d1c0;
+constexpr offs_t FW_TASK14_HELPER_READY_FLAG = 0x10dcae;
+constexpr offs_t FW_TASK14_FINAL_READY_FLAG = 0x10dcb0;
+constexpr offs_t FW_TASK14_STATE_BLOCK = 0x111eb4;
+
+// Contact-service state reached during the startup watchdog path. The firmware
+// uses this block to accumulate test/status results before normal UI startup.
+constexpr offs_t FW_CONTACT_SERVICE_STATE = 0x11fecc;
+constexpr offs_t FW_CONTACT_SERVICE_STATUS = 0x11fed0;
+constexpr offs_t FW_CONTACT_SERVICE_RESULT = 0x11fed4;
+constexpr offs_t FW_CONTACT_SERVICE_COUNTER = 0x11fed6;
+constexpr offs_t FW_CONTACT_SERVICE_SUBSTATE = 0x11feda;
+constexpr offs_t FW_CONTACT_SERVICE_ACK = 0x11fedb;
+constexpr offs_t FW_CONTACT_SERVICE_REASON = 0x11ff50;
+constexpr offs_t FW_RESOURCE_CHECK_STATUS_TABLE = 0x11fc60;
+constexpr offs_t FW_RESOURCE_CHECK_STATUS_INDEX = 0x11ff5a;
+
+// Service-channel/lower-service state used by the current startup transport model.
+constexpr offs_t FW_SERVICE_CHANNEL_READY_FLAGS = 0x111794;
+constexpr offs_t FW_SERVICE_CHANNEL_ENABLE_FLAGS = 0x11fee4;
+constexpr offs_t FW_SERVICE_CHANNEL_MASK_BASE = 0x11ff08;
+constexpr offs_t FW_SERVICE_LOWER_QUEUE_BLOCK = 0x110d30;
+constexpr offs_t FW_SERVICE_LOWER_TX_BLOCK = 0x10f4a8;
+constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_A = FW_SERVICE_LOWER_QUEUE_BLOCK;
+constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_B = 0x110d34;
+constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_C = FW_SERVICE_LOWER_TX_BLOCK;
+constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_D = 0x10f4ac;
+constexpr uint8_t FW_SERVICE_CHANNEL_READY_BOOT_BIT = 0x08;
+
+// Contact-service remote read (the deepest mapped layer; see docs/service_bootstrap.md).
+// The contact-service reads its command from PM logical address 0x5f00 via an async MBUS/PM
+// request message. The request's dest node ([msg+1]) is sourced from the channel-enable flag
+// FW_SERVICE_CHANNEL_ENABLE_FLAGS (0x11fee4) — which is 0 on a blank phone, so the read is
+// dropped (no request sent). The response, when one arrives, is dispatched by command at
+// 0x236dc6; command 0x05 completes the contact-service healthily. Request frame format:
+//   00 [node] 00 00 00 0a 00 01 [addr_hi] [addr_lo] [seq][seq] [ctr] [count] [data..]
+constexpr uint16_t PM_LOGICAL_CONTACT_COMMAND = 0x5f00;         // PM addr read for the command
+constexpr uint8_t  CONTACT_SVC_RESPONSE_CMD_HEALTHY = 0x05;     // response command that completes
+
+// EEPROM checksummed-block layout. Cross-validated between NokTool 1.8 (the
+// Delphi service tool: sub_0046AAA8 = 16-bit additive byte-sum, stored
+// big-endian at each block's end; TForm1.e2prom1Click validates the tune and
+// security blocks) and the 3210 firmware's own contact-service block check
+// (checksum routine 0x234588, compare at 0x234810). The blocks tile exactly:
+// each is data[start .. cksum-1] with a big-endian 16-bit sum at [cksum, cksum+1],
+// and the next block starts at cksum+2. See docs/eeprom_analysis.md.
+constexpr uint16_t FW_EEPROM_TUNE_BLOCK_START     = 0x0000;  // tune/calibration
+constexpr uint16_t FW_EEPROM_TUNE_BLOCK_CKSUM     = 0x003e;  // BE sum16 of [0x0000..0x003d]
+constexpr uint16_t FW_EEPROM_SECURITY_BLOCK_START = 0x0040;  // security/IMEI/locks
+constexpr uint16_t FW_EEPROM_SECURITY_BLOCK_CKSUM = 0x011e;  // BE sum16 of [0x0040..0x011d]
+constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_START   = 0x0120;  // contact-service config
+constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_CKSUM   = 0x0244;  // BE sum16(-corr) of [0x0120..0x0243]
+
+// Startup modes named from the traced charger/battery progression.
+constexpr uint16_t FW_STARTUP_MODE_CHARGER_WAIT = 0x000d;
+constexpr uint16_t FW_STARTUP_MODE_POST_CHARGER = 0x000b;
+constexpr uint16_t FW_STARTUP_MODE_POST_CHARGER_DONE = 0x000c;
+constexpr uint16_t FW_STARTUP_MODE_BATTERY_WAIT = 0x0009;
+constexpr uint16_t FW_STARTUP_MODE_POST_SELFTEST = 0x0004;
+constexpr uint16_t FW_STARTUP_MODE_READY_GATE = 0x0005;
+constexpr uint16_t FW_STARTUP_MODE_SERVICE_QUIESCE_GATE = 0x0006;
+constexpr uint16_t FW_STARTUP_MODE_BATTERY_READY_GATE = 0x0007;
+
+constexpr uint16_t FW_STARTUP_EVENT_CHARGER_PRESENT = 0x000e;
+constexpr uint16_t FW_STARTUP_EVENT_BATTERY_PRESENT = 0x0003;
+constexpr uint16_t FW_STARTUP_EVENT_BATTERY_READY = 0x0007;
+constexpr uint16_t FW_STARTUP_EVENT_CCONT_BATTERY_COMPLETE = 0x0015;
+constexpr uint16_t FW_STARTUP_EVENT_PHASE5_CONTINUE = 0x0003;
+
+class noki3310_state : public driver_device
+{
+public:
+	noki3310_state(const machine_config &mconfig, device_type type, const char *tag) :
+		driver_device(mconfig, type, tag),
+		m_maincpu(*this, "maincpu"),
+		m_flash(*this, "flash"),
+		m_pcd8544(*this, "pcd8544"),
+		m_keypad(*this, "COL.%u", 0),
+		m_pwr(*this, "PWR")
+	{ }
+
+	void noki3330(machine_config &config);
+	void noki3410(machine_config &config);
+	void noki7110(machine_config &config);
+	void noki6210(machine_config &config);
+	void noki3310(machine_config &config);
+
+	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
+
+private:
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
+
+	PCD8544_SCREEN_UPDATE(pcd8544_screen_update);
+
+	uint8_t mad2_io_r(offs_t offset);
+	void mad2_io_w(offs_t offset, uint8_t data);
+	uint8_t mad2_dspif_r(offs_t offset);
+	void mad2_dspif_w(offs_t offset, uint8_t data);
+	uint8_t mad2_mcuif_r(offs_t offset);
+	void mad2_mcuif_w(offs_t offset, uint8_t data);
+
+	TIMER_CALLBACK_MEMBER(timer0);
+	TIMER_CALLBACK_MEMBER(timer1);
+	TIMER_CALLBACK_MEMBER(timer_watchdog);
+	TIMER_CALLBACK_MEMBER(timer_fiq8);
+	TIMER_CALLBACK_MEMBER(timer_mbus);
+	TIMER_CALLBACK_MEMBER(timer_power_irq);
+	TIMER_CALLBACK_MEMBER(timer_keypad);
+	TIMER_CALLBACK_MEMBER(timer_mad2_soft_reset);
+
+	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
+	uint16_t ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask);
+	void ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	void ram_w_firmware_overrides(offs_t offset, uint16_t data, uint16_t mem_mask);
+	uint16_t eeprom_r(offs_t offset, uint16_t mem_mask = ~0);
+	void eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t dsp_ram_r(offs_t offset);
+	void dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t flash_r(offs_t offset, uint16_t mem_mask = ~0);
+	std::optional<uint16_t> flash_firmware_hooks(offs_t offset, u32 pc, u32 addr, uint16_t mem_mask);
+	void flash_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint32_t rom2_mirror_r(offs_t offset, uint32_t mem_mask = ~0);
+	void rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
+
+	void noki3310_map(address_map &map) ATTR_COLD;
+
+	void assert_fiq(int num);
+	void assert_irq(int num);
+	void ack_fiq(uint16_t mask);
+	void ack_irq(uint16_t mask);
+	void update_fiq_line();
+	void update_irq_line();
+	void ccont_update_irq_line();
+	void ccont_set_irq_status(uint8_t status, const char *reason);
+	uint8_t ccont_boot_status(unsigned pulse) const;
+	bool timer0_compare_due() const;
+	void update_timer0_compare();
+	void schedule_mbus_fiq(int num);
+	void signal_mbus_fiq(int num);
+	void complete_mbus_transfer();
+	bool mbus_generated_response_byte(unsigned index, uint8_t &out);
+	uint8_t keypad_irq_state() const;
+	uint8_t synthetic_keypad_state() const;
+	bool synthetic_key_active(uint8_t &row, uint8_t &mask) const;
+	uint16_t fw_word(offs_t address) const;
+	uint8_t fw_byte(offs_t address) const;
+	uint32_t fw_dword(offs_t address) const;
+	void fw_word_w(offs_t address, uint16_t data);
+	void fw_byte_w(offs_t address, uint8_t data);
+	uint16_t debug_ram_word(offs_t address) const { return fw_word(address); }
+	uint8_t debug_ram_byte(offs_t address) const { return fw_byte(address); }
+	void debug_ram_word_w(offs_t address, uint16_t data) { fw_word_w(address, data); }
+	void debug_ram_byte_w(offs_t address, uint8_t data) { fw_byte_w(address, data); }
+	void trace_state31_event_source(uint32_t pc, uint32_t addr, offs_t offset);
+	void complete_mbus_d0_startup_frame(const char *reason);
+	void nokia_ccont_w(uint8_t data);
+	uint8_t nokia_ccont_r();
+	void serial_eeprom_start();
+	void serial_eeprom_write_bit(uint8_t bit);
+	void serial_eeprom_accept_byte(uint8_t data);
+	void serial_eeprom_clock_read_bit();
+	uint8_t serial_eeprom_byte(uint16_t address) const;
+
+	required_device<cpu_device> m_maincpu;
+	required_device<intelfsh16_device> m_flash;
+	required_device<pcd8544_device> m_pcd8544;
+	required_ioport_array<5> m_keypad;
+	required_ioport m_pwr;
+
+	std::unique_ptr<uint16_t[]>   m_ram;
+	std::unique_ptr<uint16_t[]>   m_dsp_ram;
+
+	uint8_t       m_power_on;
+	uint16_t      m_fiq_status;
+	uint16_t      m_irq_status;
+	uint16_t      m_timer1_counter;
+	uint16_t      m_timer0_counter;
+	uint8_t       m_timer0_divider;
+	bool          m_timer0_compare_latched;
+	uint8_t       m_keypad_irq_state;
+	bool          m_startup_event15_posted;
+	bool          m_startup_latch_complete_seen;
+	bool          m_after_mad2_soft_reset;
+	bool          m_mbus_flow_d0_queued;
+	bool          m_mbus_flow_d0_phase8_queued;
+	bool          m_mbus_flow_d0_completed;
+	bool          m_mbus_rx_response_active;
+	unsigned      m_mbus_rx_byte_index;
+	unsigned      m_mbus_rx_pulses_remaining;
+	uint8_t       m_mbus_last_tx_command;
+	uint8_t       m_mbus_tx_frame[32];
+	unsigned      m_mbus_tx_len;
+	uint8_t       m_battery_startup_event_step;
+	uint8_t       m_battery_startup_event_step_mode9;
+	uint8_t       m_mode4_startup_completion_step;
+	uint8_t       m_post_charger_completion_step;
+	bool          m_post_charger_sequence_entered;
+	uint8_t       m_mode5_startup_event_step;
+	bool          m_mode5_ccont_event_sent;
+	bool          m_mode_d_startup_complete_forced;
+	bool          m_mode_d_late_startup_complete_forced;
+	uint32_t      m_power_irq_count;
+	attotime      m_startup_latch_complete_time;
+
+	emu_timer * m_timer0;
+	emu_timer * m_timer1;
+	emu_timer * m_timer_watchdog;
+	emu_timer * m_timer_fiq8;
+	emu_timer * m_timer_mbus;
+	emu_timer * m_timer_power_irq;
+	emu_timer * m_timer_keypad;
+	emu_timer * m_timer_mad2_soft_reset;
+
+	// CCONT
+	struct nokia_ccont
+	{
+		bool    dc;
+		uint8_t   cmd;
+		uint8_t   watchdog;
+		uint8_t   regs[0x10];
+		uint8_t   adc_request;
+		uint8_t   adc_channel;
+		uint16_t  adc_value;
+		uint32_t  adc_log_count;
+		uint8_t   irq_line;
+		uint8_t   boot_status;
+		bool      irq_asserted;
+	} m_ccont;
+
+	struct nokia_serial_eeprom
+	{
+		uint8_t write_shift;
+		uint8_t write_bits;
+		uint16_t address;
+		uint16_t address_temp;
+		uint8_t address_stage;
+		uint8_t read_byte;
+		uint8_t read_bits;
+		uint8_t read_latched_bit;
+		bool read_mode;
+	} m_serial_eeprom;
+
+	uint8_t       m_mad2_regs[0x100];
+};
+
+static const char * nokia_mad2_reg_desc(uint8_t offset)
+{
+	switch(offset)
+	{
+	case 0x00:  return "[CTSI] DCT3 ASIC version Primary hardware version (r)";
+	case 0x01:  return "[CTSI] MCU reset control register (rw)";
+	case 0x02:  return "[CTSI] DSP reset control register (rw)";
+	case 0x03:  return "[CTSI] ASIC watchdog write register (w)";
+	case 0x04:  return "[CTSI] Sleep clock counter (MSB) (r)";
+	case 0x05:  return "[CTSI] Sleep clock counter (LSB) (r)";
+	case 0x06:  return "[CTSI] ? (sleep) clock destination (LSB) (r)";
+	case 0x07:  return "[CTSI] ? (sleep) clock destination (MSB) (r)";
+	case 0x08:  return "[CTSI] FIQ lines active (rw)";
+	case 0x09:  return "[CTSI] IRQ lines active (rw)";
+	case 0x0A:  return "[CTSI] FIQ lines mask (rw)";
+	case 0x0B:  return "[CTSI] IRQ lines mask (rw)";
+	case 0x0C:  return "[CTSI] Interrupt control register (rw)";
+	case 0x0D:  return "[CTSI] Clock control register (rw)";
+	case 0x0E:  return "[CTSI] Interrupt trigger register (r)";
+	case 0x0F:  return "[CTSI] Programmable timer clock divider (rw)";
+	case 0x10:  return "[CTSI] Programmable timer counter (MSB) (r)";
+	case 0x11:  return "[CTSI] Programmable timer counter (LSB) (r)";
+	case 0x12:  return "[CTSI] Programmable timer destination (MSB) (rw)";
+	case 0x13:  return "[CTSI] Programmable timer destination (LSB) (rw)";
+	case 0x15:  return "[PUP] PUP control (rw)";
+	case 0x16:  return "[PUP] FIQ 8 (timer?) interrupt control (rw)";
+	case 0x18:  return "[PUP] MBUS control (rw)";
+	case 0x19:  return "[PUP] MBUS status (rw)";
+	case 0x1A:  return "[PUP] MBUS RX/TX (rw)";
+	case 0x1B:  return "[PUP] Vibrator (w)";
+	case 0x1C:  return "[PUP] Buzzer clock divider (w)";
+	case 0x1E:  return "[PUP] Buzzer volume (w)";
+	case 0x20:  return "[PUP] McuGenIO signal lines (rw)";
+	case 0x22:  return "[PUP] ? (?)";
+	case 0x24:  return "[PUP] McuGenIO I/O direction (rw)";
+	case 0x28:  return "[UIF/KBGPIO] Keyboard ROW signal lines (rw)";
+	case 0x29:  return "[UIF/KBGPIO] Keyboard ROW ?? (rw)";
+	case 0x2A:  return "[UIF/KBGPIO] Keyboard COL signal lines (rw)";
+	case 0x2B:  return "[UIF/KBGPIO] Keyboard COL ?? (rw)";
+	case 0x2C:  return "[UIF/GENSIO] CCont write (w)";
+	case 0x2D:  return "[UIF/GENSIO] GENSIO start transaction (w)";
+	case 0x2E:  return "[UIF/GENSIO] LCD data write (w)";
+	case 0x32:  return "[UIF] CTRL I/O 2 (rw)";
+	case 0x33:  return "[UIF] CTRL I/O 3 (rw)";
+	case 0x36:  return "[SIMI] SIM UART TxD (w)";
+	case 0x37:  return "[SIMI] SIM UART RxD (r)";
+	case 0x38:  return "[SIMI] SIM UART Interrupt Identification (r)";
+	case 0x39:  return "[SIMI] SIM Control (rw)";
+	case 0x3A:  return "[SIMI] SIM Clock Control (rw)";
+	case 0x3B:  return "[SIMI] SIM UART TxD Low Water Mark (?)";
+	case 0x3C:  return "[SIMI] SIM UART RxD queue fill (r)";
+	case 0x3D:  return "[SIMI] SIM RxD flags (?)";
+	case 0x3E:  return "[SIMI] SIM TxD flags (?)";
+	case 0x3F:  return "[SIMI] SIM UART TxD queue fill (r)";
+	case 0x68:  return "[UIF/KBGPIO] Keyboard ROW ?? 2 (rw)";
+	case 0x69:  return "[UIF/KBGPIO] Keyboard ROW interrupt (rw)";
+	case 0x6A:  return "[UIF/KBGPIO] Keyboard COL ?? 2 (rw)";
+	case 0x6B:  return "[UIF/KBGPIO] Keyboard COL interrupt mask (rw)";
+	case 0x6C:  return "[UIF/GENSIO] CCont read (r)";
+	case 0x6D:  return "[UIF/GENSIO] GENSIO status (r)";
+	case 0x6E:  return "[UIF/GENSIO] LCD command write (w)";
+	case 0x6F:  return "[UIF/GENSIO] GENSIO ?? (3/SELECT1) (?)";
+	case 0x70:  return "[UIF] CTRL I/O 0 I/O direction (1) (rw)";
+	case 0x71:  return "[UIF] CTRL I/O 1 I/O direction (1) (rw)";
+	case 0x72:  return "[UIF] CTRL I/O 2 I/O direction (1) (rw)";
+	case 0x73:  return "[UIF] CTRL I/O 3 I/O direction (1) (rw)";
+	case 0xA8:  return "[UIF/KBGPIO] Keyboard ROW I/O direction (rw)";
+	case 0xA9:  return "[UIF/KBGPIO] Keyboard ROW ?? 3 (rw)";
+	case 0xAA:  return "[UIF/KBGPIO] Keyboard COL I/O direction 0=in 1=out (rw)";
+	case 0xAB:  return "[UIF/KBGPIO] Keyboard COL ?? 3 (rw)";
+	case 0xAD:  return "[UIF/GENSIO] GENSIO ?? (1/SELECT2) (?)";
+	case 0xAE:  return "[UIF/GENSIO] GENSIO ?? (2/SELECT2) (?)";
+	case 0xAF:  return "[UIF/GENSIO] GENSIO ?? (3/SELECT2) (?)";
+	case 0xB0:  return "[UIF] CTRL I/O 0 I/O direction (2) (rw)";
+	case 0xB1:  return "[UIF] CTRL I/O 1 I/O direction (2) (rw)";
+	case 0xB2:  return "[UIF] CTRL I/O 2 I/O direction (2) (rw)";
+	case 0xB3:  return "[UIF] CTRL I/O 3 I/O direction (2) (rw)";
+	case 0xED:  return "[UIF/GENSIO] GENSIO ?? (1/SELECT3) (?)";
+	case 0xEE:  return "[UIF/GENSIO] GENSIO ?? (2/SELECT3) (?)";
+	case 0xEF:  return "[UIF/GENSIO] GENSIO ?? (3/SELECT3) (?)";
+	case 0xF0:  return "[UIF] CTRL I/O 0 input (r)";
+	case 0xF1:  return "[UIF] CTRL I/O 1 input (r)";
+	case 0xF2:  return "[UIF] CTRL I/O 2 input (r)";
+	case 0xF3:  return "[UIF] CTRL I/O 3 input (r)";
+	default:    return "<Unknown>";
+	}
+}
+
+static const char * nokia_ccont_reg_desc(uint8_t offset)
+{
+	switch(offset)
+	{
+	case 0x0:   return "Control register (w)";
+	case 0x1:   return "PWM (charger) (w)";
+	case 0x2:   return "A/D read (LSB) (r)";
+	case 0x3:   return "A/D read (MSB) (rw)";
+	case 0x4:   return "?";
+	case 0x5:   return "Watchdog (WDReg) (w)";
+	case 0x6:   return "RTC enabled (w)";
+	case 0x7:   return "RTC second (rw)";
+	case 0x8:   return "RTC minute (r)";
+	case 0x9:   return "RTC hour (r)";
+	case 0xA:   return "RTC day (rw)";
+	case 0xB:   return "RTC alarm minute (rw)";
+	case 0xC:   return "RTC alarm hour (rw)";
+	case 0xD:   return "RTC calibration value (rw)";
+	case 0xE:   return "Interrupt lines (rw)";
+	case 0xF:   return "Interrupt mask (rw)";
+	default:    return "<Unknown>";
+	}
+}
+
+static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
+{
+	char name[] = "NOKI3210_ADC0";
+	name[12] = '0' + (id & 0x07);
+
+	if (const char *value = std::getenv(name))
+	{
+		char *end = nullptr;
+		const unsigned long parsed = std::strtoul(value, &end, 0);
+		if (end != value)
+			return parsed & 0x03ff;
+	}
+
+	if (const char *profile = std::getenv("NOKI3210_ADC_PROFILE"))
+	{
+		if (!std::strcmp(profile, "sane") || !std::strcmp(profile, "charged"))
+		{
+			switch(id & 0x07)
+			{
+				case 0: return 0x000; // Accessory Detect: none
+				case 1: return 0x200; // RSSI: mid-scale
+				case 2: return 0x2d0; // Battery voltage: plausible charged pack
+				case 3: return 0x280; // Battery type
+				case 4: return 0x200; // Battery temperature
+				case 5: return std::strcmp(profile, "charged") ? 0x000 : 0x200; // Charger voltage
+				case 6: return 0x200; // VCXO temperature
+				case 7: return std::strcmp(profile, "charged") ? 0x000 : 0x120; // Charging current
+			}
+		}
+	}
+
+	return fallback;
+}
+
+static unsigned nokia_env_u32(const char *name, unsigned fallback)
+{
+	if (const char *value = std::getenv(name))
+	{
+		char *end = nullptr;
+		const unsigned long parsed = std::strtoul(value, &end, 0);
+		if (end != value)
+			return unsigned(parsed);
+	}
+
+	return fallback;
+}
+
+static bool nokia_env_nonempty(const char *name)
+{
+	const char *value = std::getenv(name);
+	return value != nullptr && *value != '\0';
+}
+
+static bool nokia_trace_mbus_flow()
+{
+	return nokia_env_u32("NOKI3210_TRACE_MBUS_FLOW", 0) != 0 ||
+			nokia_env_u32("NOKI3210_TRACE_SERVICE_LOWER", 0) != 0;
+}
+
+static unsigned nokia_mbus_d0_signal_num()
+{
+	const unsigned signal = nokia_env_u32("NOKI3210_MBUS_D0_SIGNAL", 0);
+	return signal == 2 || signal == 3 ? signal : 0;
+}
+
+static unsigned nokia_mbus_d0_phase8_signal_num()
+{
+	const unsigned signal = nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_SIGNAL", 0);
+	return signal == 2 || signal == 3 ? signal : 0;
+}
+
+static bool nokia_env_u8_at(const char *name, unsigned index, uint8_t &result)
+{
+	const char *value = std::getenv(name);
+	unsigned current = 0;
+	while (value && *value)
+	{
+		while (*value == ',' || *value == ' ' || *value == '\t')
+			value++;
+
+		char *end = nullptr;
+		const unsigned long parsed = std::strtoul(value, &end, 0);
+		if (end == value)
+			break;
+
+		if (current == index)
+		{
+			result = parsed & 0xff;
+			return true;
+		}
+
+		current++;
+		value = end;
+	}
+
+	return false;
+}
+
+void noki3310_state::machine_start()
+{
+	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
+	m_dsp_ram = std::make_unique<uint16_t[]>(0x800);      // DSP shared RAM
+
+	// allocate timers
+	m_timer0 = timer_alloc(FUNC(noki3310_state::timer0), this);
+	m_timer1 = timer_alloc(FUNC(noki3310_state::timer1), this);
+	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
+	m_timer_fiq8 = timer_alloc(FUNC(noki3310_state::timer_fiq8), this);
+	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
+	m_timer_power_irq = timer_alloc(FUNC(noki3310_state::timer_power_irq), this);
+	m_timer_keypad = timer_alloc(FUNC(noki3310_state::timer_keypad), this);
+	m_timer_mad2_soft_reset = timer_alloc(FUNC(noki3310_state::timer_mad2_soft_reset), this);
+}
+
+uint16_t noki3310_state::fw_word(offs_t address) const
+{
+	if (address < NOKIA_RAM_BASE || address >= NOKIA_RAM_END)
+		return 0xffff;
+
+	return m_ram[(address - NOKIA_RAM_BASE) >> 1];
+}
+
+uint8_t noki3310_state::fw_byte(offs_t address) const
+{
+	const uint16_t word = fw_word(address);
+	return BIT(address, 0) ? uint8_t(word & 0x00ff) : uint8_t(word >> 8);
+}
+
+void noki3310_state::fw_word_w(offs_t address, uint16_t data)
+{
+	if (address < NOKIA_RAM_BASE || address >= NOKIA_RAM_END)
+		return;
+
+	m_ram[(address - NOKIA_RAM_BASE) >> 1] = data;
+}
+
+void noki3310_state::fw_byte_w(offs_t address, uint8_t data)
+{
+	if (address < NOKIA_RAM_BASE || address >= NOKIA_RAM_END)
+		return;
+
+	uint16_t &word = m_ram[(address - NOKIA_RAM_BASE) >> 1];
+	if (BIT(address, 0))
+		word = (word & 0xff00) | data;
+	else
+		word = (word & 0x00ff) | (uint16_t(data) << 8);
+}
+
+void noki3310_state::trace_state31_event_source(uint32_t pc, uint32_t addr, offs_t offset)
+{
+	if (nokia_env_u32("NOKI3210_TRACE_SERVICE_TRANSPORT", 0) == 0 ||
+			pc != addr ||
+			!(addr == 0x002a6f1c || addr == 0x002a6f20 || addr == 0x002a6f82 ||
+			  addr == 0x002a6fb2 || addr == 0x002a6fd0 || addr == 0x002a6ff8 ||
+			  addr == 0x002a6ffc || addr == 0x002a7000 || addr == 0x002a7006 || addr == 0x002a701e ||
+			  addr == 0x002a7048 || addr == 0x002a70ac || addr == 0x002a710e ||
+			  addr == 0x002a7124))
+		return;
+
+	static unsigned state31_event_source_count = 0;
+	if (state31_event_source_count++ >= 320)
+		return;
+
+}
+
+void noki3310_state::complete_mbus_d0_startup_frame(const char *reason)
+{
+
+	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_A, 0);
+	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_B, 0);
+	debug_ram_byte_w(FW_SERVICE_LOWER_QUEUE_BLOCK + 0x02, 0);
+	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_C, 0);
+	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_D, 0);
+
+	m_mbus_flow_d0_completed = true;
+	m_mbus_flow_d0_queued = false;
+	m_mbus_rx_response_active = false;
+	m_mbus_rx_pulses_remaining = 0;
+
+}
+
+void noki3310_state::machine_reset()
+{
+	std::fill_n(m_ram.get(), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1, 0);
+	std::fill_n(m_dsp_ram.get(), 0x800, 0);
+
+	// according to the boot rom disassembly here http://www.nokix.pasjagsm.pl/help/blacksphere/sub_100hardware/sub_arm/sub_bootrom.htm
+	// flash entry point is at 0x200040, we can probably reassemble the above code, but for now this should be enough.
+	m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, NOKIA_FLASH_ENTRY);
+
+	memset(m_mad2_regs, 0, 0x100);
+	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
+	m_mad2_regs[MAD2_IRQ_CTRL] = 0x0a;         // disable FIQ and IRQ
+	m_mad2_regs[MAD2_WATCHDOG] = 0xff;         // disable MAD2 watchdog
+	for (uint8_t &reg : m_ccont.regs)
+		reg = 0;
+	m_ccont.watchdog  = 0;      // disable CCONT watchdog
+	m_ccont.dc  = false;
+	m_ccont.adc_request = 0;
+	m_ccont.adc_channel = 0;
+	m_ccont.adc_value = 0;
+	m_ccont.adc_log_count = 0;
+	m_ccont.irq_line = nokia_env_u32("NOKI3210_CCONT_IRQ_LINE", 6) & 0xff;
+	m_ccont.boot_status = nokia_env_u32("NOKI3210_CCONT_BOOT_STATUS", CCONT_BOOT_IRQ_DEFAULT) & 0xff;
+	m_ccont.irq_asserted = false;
+	m_serial_eeprom = {};
+
+	m_fiq_status = 0;
+	m_irq_status = 0;
+	m_timer1_counter = 0;
+	m_timer0_counter = 0;
+	m_timer0_divider = 255;
+	m_timer0_compare_latched = false;
+	m_keypad_irq_state = 0xff;
+	m_startup_event15_posted = false;
+	m_startup_latch_complete_seen = false;
+	m_after_mad2_soft_reset = false;
+	m_mbus_flow_d0_queued = false;
+	m_mbus_flow_d0_phase8_queued = false;
+	m_mbus_flow_d0_completed = false;
+	m_mbus_rx_response_active = false;
+	m_mbus_rx_byte_index = 0;
+	m_mbus_rx_pulses_remaining = 0;
+	m_mbus_last_tx_command = 0xff;
+	m_mbus_tx_len = 0;
+	m_battery_startup_event_step = 0;
+	m_battery_startup_event_step_mode9 = 0;
+	m_mode4_startup_completion_step = 0;
+	m_post_charger_completion_step = 0;
+	m_post_charger_sequence_entered = false;
+	m_mode5_startup_event_step = 0;
+	m_mode5_ccont_event_sent = false;
+	m_mode_d_startup_complete_forced = false;
+	m_mode_d_late_startup_complete_forced = false;
+	m_power_irq_count = 0;
+	m_startup_latch_complete_time = attotime::never;
+
+	const unsigned timer0_hz = nokia_env_u32("NOKI3210_TIMER0_HZ", 33055);
+	const unsigned timer1_hz = nokia_env_u32("NOKI3210_TIMER1_HZ", 1057);
+	const unsigned fiq8_hz = nokia_env_u32("NOKI3210_FIQ8_HZ", 1000);
+
+	m_timer0->adjust(attotime::from_hz(timer0_hz), 0, attotime::from_hz(timer0_hz));    // programmable divider through port 0x0f
+	m_timer1->adjust(attotime::from_hz(timer1_hz), 0, attotime::from_hz(timer1_hz));
+	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
+	m_timer_fiq8->adjust(attotime::from_hz(fiq8_hz), 0, attotime::from_hz(fiq8_hz));
+	m_timer_mbus->adjust(attotime::never);
+	m_timer_power_irq->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_POWER_IRQ_MS", 1000)));
+	m_timer_keypad->adjust(attotime::from_hz(200), 0, attotime::from_hz(200));
+
+	// simulate power-on input
+	if (machine().system().name[4] == '8' || machine().system().name[4] == '5')
+		m_power_on = ~0x10;
+	else if (!std::strcmp(machine().system().name, "noki3210"))
+		m_power_on = ~0x01;
+	else
+		m_power_on = ~0x04;
+}
+
+void noki3310_state::assert_fiq(int num)
+{
+	if (num < 8)
+		m_fiq_status |= 1 << num;
+	else
+		m_fiq_status |= MAD2_LINE_EXTENDED;
+
+	update_fiq_line();
+}
+
+void noki3310_state::update_fiq_line()
+{
+	bool active = false;
+
+	if (m_mad2_regs[MAD2_IRQ_CTRL] & MAD2_IRQ_CTRL_FIQ_ENABLE)
+	{
+		active = (m_fiq_status & ~m_mad2_regs[MAD2_FIQ_MASK] & 0xff) != 0;
+
+		if ((m_fiq_status & MAD2_LINE_EXTENDED) && !(m_mad2_regs[MAD2_FIQ8_CTRL] & MAD2_FIQ8_MASKED))
+			active = true;
+	}
+
+	m_maincpu->set_input_line(1, active ? ASSERT_LINE : CLEAR_LINE);
+}
+
+void noki3310_state::assert_irq(int num)
+{
+	if (num < 8)
+		m_irq_status |= 1 << num;
+	else
+		m_irq_status |= MAD2_LINE_EXTENDED;
+
+	update_irq_line();
+}
+
+void noki3310_state::update_irq_line()
+{
+	bool active = false;
+
+	if (m_mad2_regs[MAD2_IRQ_CTRL] & MAD2_IRQ_CTRL_IRQ_ENABLE)
+	{
+		active = (m_irq_status & ~m_mad2_regs[MAD2_IRQ_MASK] & 0xff) != 0;
+
+		if ((m_irq_status & MAD2_LINE_EXTENDED) && !(m_mad2_regs[MAD2_IRQ_CTRL] & MAD2_IRQ_CTRL_EXT_IRQ_MASK))
+			active = true;
+	}
+
+	m_maincpu->set_input_line(0, active ? ASSERT_LINE : CLEAR_LINE);
+}
+
+void noki3310_state::ccont_update_irq_line()
+{
+	const uint16_t irq_mask = (m_ccont.irq_line < 8) ? (uint16_t(1) << m_ccont.irq_line) : MAD2_LINE_EXTENDED;
+	const bool active = (m_ccont.regs[CCONT_IRQ_STATUS] & ~m_ccont.regs[CCONT_IRQ_MASK]) != 0;
+
+	if (active)
+	{
+		if (!m_ccont.irq_asserted)
+		{
+			m_irq_status |= irq_mask;
+			m_ccont.irq_asserted = true;
+		}
+	}
+	else if (m_ccont.irq_asserted)
+	{
+		m_irq_status &= ~irq_mask;
+		m_ccont.irq_asserted = false;
+	}
+
+	update_irq_line();
+}
+
+void noki3310_state::ccont_set_irq_status(uint8_t status, const char *reason)
+{
+	if (status == 0)
+		return;
+
+	m_ccont.regs[CCONT_IRQ_STATUS] |= status;
+	ccont_update_irq_line();
+}
+
+uint8_t noki3310_state::ccont_boot_status(unsigned pulse) const
+{
+	uint8_t status = m_ccont.boot_status;
+	if (nokia_env_nonempty("NOKI3210_CCONT_IRQ_SEQUENCE"))
+	{
+		if (!nokia_env_u8_at("NOKI3210_CCONT_IRQ_SEQUENCE", pulse, status))
+			return 0;
+		return status;
+	}
+
+	if (nokia_env_nonempty("NOKI3210_CCONT_IRQ_STATUS"))
+		return nokia_env_u32("NOKI3210_CCONT_IRQ_STATUS", status) & 0xff;
+
+	return (pulse == 0) ? status : 0;
+}
+
+uint8_t noki3310_state::keypad_irq_state() const
+{
+	uint8_t data = 0xff;
+
+	for (int i = 0; i < 5; i++)
+		data &= m_keypad[i]->read() | 0xe0;
+
+	data &= m_pwr->read() | 0xe0;
+	if (nokia_env_u32("NOKI3210_HOLD_POWER_KEY", 0) != 0)
+		data &= 0xfe;
+	data &= synthetic_keypad_state();
+	return data;
+}
+
+bool noki3310_state::synthetic_key_active(uint8_t &row, uint8_t &mask) const
+{
+	const char *key = std::getenv("NOKI3210_POST_READY_KEY");
+	if (key == nullptr || key[0] == '\0' || !m_startup_latch_complete_seen)
+		return false;
+
+	const unsigned delay_ms = nokia_env_u32("NOKI3210_POST_READY_KEY_DELAY_MS", 250);
+	const unsigned duration_ms = nokia_env_u32("NOKI3210_POST_READY_KEY_DURATION_MS", 750);
+	const unsigned period_ms = nokia_env_u32("NOKI3210_POST_READY_KEY_PERIOD_MS", 0);
+	const attotime start = m_startup_latch_complete_time + attotime::from_msec(delay_ms);
+	const attotime now = machine().time();
+	if (now < start)
+		return false;
+
+	if (period_ms == 0)
+	{
+		const attotime end = start + attotime::from_msec(duration_ms);
+		if (now >= end)
+			return false;
+	}
+	else
+	{
+		const unsigned elapsed_ms = (now - start).as_double() * 1000.0;
+		if ((elapsed_ms % period_ms) >= duration_ms)
+			return false;
+	}
+
+	if (!std::strcmp(key, "enter"))
+	{
+		row = 4;
+		mask = 0x08;
+		return true;
+	}
+	if (!std::strcmp(key, "up"))
+	{
+		row = 0;
+		mask = 0x02;
+		return true;
+	}
+	if (!std::strcmp(key, "down"))
+	{
+		row = 1;
+		mask = 0x02;
+		return true;
+	}
+	if (!std::strcmp(key, "0"))
+	{
+		row = 0;
+		mask = 0x04;
+		return true;
+	}
+	if (!std::strcmp(key, "1"))
+	{
+		row = 1;
+		mask = 0x10;
+		return true;
+	}
+	if (!std::strcmp(key, "2"))
+	{
+		row = 1;
+		mask = 0x08;
+		return true;
+	}
+	if (!std::strcmp(key, "3"))
+	{
+		row = 4;
+		mask = 0x02;
+		return true;
+	}
+	if (!std::strcmp(key, "4"))
+	{
+		row = 2;
+		mask = 0x10;
+		return true;
+	}
+	if (!std::strcmp(key, "5"))
+	{
+		row = 2;
+		mask = 0x08;
+		return true;
+	}
+	if (!std::strcmp(key, "6"))
+	{
+		row = 2;
+		mask = 0x04;
+		return true;
+	}
+	if (!std::strcmp(key, "7"))
+	{
+		row = 3;
+		mask = 0x10;
+		return true;
+	}
+	if (!std::strcmp(key, "8"))
+	{
+		row = 3;
+		mask = 0x08;
+		return true;
+	}
+	if (!std::strcmp(key, "9"))
+	{
+		row = 3;
+		mask = 0x04;
+		return true;
+	}
+	if (!std::strcmp(key, "del") || !std::strcmp(key, "c"))
+	{
+		row = 0;
+		mask = 0x10;
+		return true;
+	}
+	if (!std::strcmp(key, "minus"))
+	{
+		row = 4;
+		mask = 0x04;
+		return true;
+	}
+	if (!std::strcmp(key, "star"))
+	{
+		row = 4;
+		mask = 0x10;
+		return true;
+	}
+	if (!std::strcmp(key, "power"))
+	{
+		row = 0xff;
+		mask = 0x01;
+		return true;
+	}
+
+	return false;
+}
+
+uint8_t noki3310_state::synthetic_keypad_state() const
+{
+	uint8_t row = 0xff;
+	uint8_t mask = 0xff;
+	if (!synthetic_key_active(row, mask))
+		return 0xff;
+	return uint8_t(~mask) | 0xe0;
+}
+
+void noki3310_state::signal_mbus_fiq(int num)
+{
+	if (num == 2 && (m_mad2_regs[MAD2_MBUS_CTRL] & MAD2_MBUS_TX_ENABLE))
+		m_mad2_regs[MAD2_MBUS_STATUS] &= ~0x07;
+	m_mad2_regs[MAD2_MBUS_STATUS] |= MAD2_MBUS_DONE_FLAGS;
+	if (num == 2 && (m_mad2_regs[MAD2_MBUS_CTRL] & MAD2_MBUS_TX_ENABLE))
+		m_mad2_regs[MAD2_MBUS_STATUS] |= MAD2_MBUS_TX_READY;
+
+	if (num == 2 && !(m_mad2_regs[MAD2_MBUS_CTRL] & MAD2_MBUS_BUSY_MASK))
+	{
+		complete_mbus_transfer();
+		return;
+	}
+
+	assert_fiq(num);
+}
+
+void noki3310_state::schedule_mbus_fiq(int num)
+{
+	m_timer_mbus->adjust(attotime::from_msec(5), num);
+}
+
+// Model the lower-MBUS bus response to a frame the firmware just transmitted.
+// A transmitted frame is [0x1f][dest][src][cmd][len_hi][len_lo][data...][cksum];
+// the bus device answers with the same frame addressed back to the phone, i.e.
+// dest<->src swapped. The phone's RX state machine (0x2aae76) accepts the frame
+// only when byte[1] (dest) equals its own address at 0x111794 — which is exactly
+// the transmitted src — and then consumes len+2 trailing bytes before completing.
+// Derived from the captured TX frame, so it tracks real bus traffic rather than a
+// canned constant. Returns false (defer to any env feed) for non-D0 frames.
+bool noki3310_state::mbus_generated_response_byte(unsigned index, uint8_t &out)
+{
+	if (m_mbus_tx_len < 6 || m_mbus_tx_frame[0] != 0x1f || m_mbus_tx_frame[3] != 0xd0)
+		return false;
+
+	uint8_t resp[34];
+	unsigned n = m_mbus_tx_len;
+	for (unsigned i = 0; i < n; i++)
+		resp[i] = m_mbus_tx_frame[i];
+	resp[1] = m_mbus_tx_frame[2];   // dest := original src (answer addressed to the phone)
+	resp[2] = m_mbus_tx_frame[1];   // src  := original dest (the responder)
+	// The response carries two checksum/trailer bytes (the RX countdown reads len+2);
+	// pad so the state machine always has enough bytes to reach completion.
+	resp[n] = 0x00;
+	resp[n + 1] = 0x00;
+	n += 2;
+
+	out = (index < n) ? resp[index] : 0x00;
+	return true;
+}
+
+void noki3310_state::complete_mbus_transfer()
+{
+	m_mad2_regs[MAD2_MBUS_CTRL] &= ~MAD2_MBUS_BUSY_MASK;
+	m_mad2_regs[MAD2_FIQ_MASK] |= 0x08;
+	ack_fiq(MAD2_FIQ_MBUS_MASK);
+}
+
+void noki3310_state::ack_fiq(uint16_t mask)
+{
+	m_fiq_status &= ~mask;
+	update_fiq_line();
+}
+
+void noki3310_state::ack_irq(uint16_t mask)
+{
+	m_irq_status &= ~mask;
+	update_irq_line();
+}
+
+void noki3310_state::nokia_ccont_w(uint8_t data)
+{
+	if (m_ccont.dc == false)
+	{
+		LOGMASKED(LOG_CCONT_REGISTER_ACCESS, "CCONT command %s %x\n", data & CCONT_CMD_READ ? "R" : "W", data >> CCONT_CMD_ADDR_SHIFT);
+		m_ccont.cmd  = data;
+	}
+	else
+	{
+		uint8_t addr = (m_ccont.cmd >> CCONT_CMD_ADDR_SHIFT) & 0x0f;
+
+		switch(addr)
+		{
+			case CCONT_ADC_CTRL:
+			{
+					uint16_t ad_id = (data >> 4) & 0x07;
+				uint16_t ad_value = 0;
+				switch(ad_id)
+				{
+					case CCONT_ADC_ACCESSORY:         ad_value = nokia_adc_override(ad_id, 0x000);   break;
+					case CCONT_ADC_RSSI:              ad_value = nokia_adc_override(ad_id, 0x3ff);   break;
+					case CCONT_ADC_BATTERY_VOLTAGE:   ad_value = nokia_adc_override(ad_id, 0x3ff);   break;
+					case CCONT_ADC_BATTERY_TYPE:      ad_value = nokia_adc_override(ad_id, 0x280);   break;
+					case CCONT_ADC_BATTERY_TEMP:      ad_value = nokia_adc_override(ad_id, 0x200);   break;
+					case CCONT_ADC_CHARGER_VOLTAGE:   ad_value = nokia_adc_override(ad_id, 0x000);   break;
+					case CCONT_ADC_VCXO_TEMP:         ad_value = nokia_adc_override(ad_id, 0x200);   break;
+					case CCONT_ADC_CHARGING_CURRENT:  ad_value = nokia_adc_override(ad_id, 0x000);   break;
+				}
+				if (ad_id == CCONT_ADC_CHARGER_VOLTAGE && m_startup_latch_complete_seen && nokia_env_nonempty("NOKI3210_ADC5_AFTER_READY"))
+				{
+					const unsigned delay_ms = nokia_env_u32("NOKI3210_ADC5_AFTER_READY_DELAY_MS", 0);
+					if (machine().time() >= m_startup_latch_complete_time + attotime::from_msec(delay_ms))
+						ad_value = nokia_env_u32("NOKI3210_ADC5_AFTER_READY", ad_value) & 0x03ff;
+				}
+
+				m_ccont.regs[addr] = data;
+				m_ccont.regs[CCONT_ADC_LSB] = ad_value & 0xff;
+				m_ccont.regs[CCONT_ADC_MSB] = ((ad_value >> 8) & 0x03);
+				m_ccont.adc_request = data;
+				m_ccont.adc_channel = ad_id;
+				m_ccont.adc_value = ad_value;
+				m_ccont.adc_log_count++;
+				break;
+			}
+			case CCONT_WATCHDOG:
+				if (data == 0x20)
+					m_ccont.regs[addr] = data;
+				else if (data == 0x31)
+					m_ccont.watchdog = m_ccont.regs[addr];
+				else if (data == 0x3f)
+					m_ccont.watchdog = 0;
+				else if (data == 0)
+					printf("CCONT power-off\n");
+				break;
+
+			case CCONT_IRQ_STATUS:
+			{
+				m_ccont.regs[addr] &= ~data;
+				ccont_update_irq_line();
+				break;
+			}
+
+			default:
+				m_ccont.regs[addr] = data;
+				if (addr == CCONT_IRQ_MASK)
+					ccont_update_irq_line();
+				break;
+		}
+
+		LOGMASKED(LOG_CCONT_REGISTER_ACCESS, "CCONT W %02x = %02x %s\n", addr, data, nokia_ccont_reg_desc(addr));
+	}
+
+	m_ccont.dc = !m_ccont.dc;
+}
+
+uint8_t noki3310_state::nokia_ccont_r()
+{
+	uint8_t addr = (m_ccont.cmd >> CCONT_CMD_ADDR_SHIFT) & 0x0f;
+	uint8_t data = m_ccont.regs[addr];
+
+	system_time systime;
+	machine().current_datetime(systime);
+
+	switch(addr)
+	{
+		case CCONT_ADC_MSB: data = 0xb0 | (m_ccont.regs[addr] & 0x03);  break;
+		case 0x7:       data = systime.local_time.second;           break;
+		case 0x8:       data = systime.local_time.minute;           break;
+		case 0x9:       data = systime.local_time.hour;             break;
+		case 0xa:       data = systime.local_time.mday;             break;
+	}
+	if ((addr == CCONT_ADC_LSB || addr == CCONT_ADC_MSB) && m_ccont.adc_channel == CCONT_ADC_CHARGER_VOLTAGE &&
+			m_startup_latch_complete_seen && nokia_env_nonempty("NOKI3210_ADC5_AFTER_READY"))
+	{
+		const unsigned delay_ms = nokia_env_u32("NOKI3210_ADC5_AFTER_READY_DELAY_MS", 0);
+		if (machine().time() >= m_startup_latch_complete_time + attotime::from_msec(delay_ms))
+		{
+			const uint16_t value = nokia_env_u32("NOKI3210_ADC5_AFTER_READY", m_ccont.adc_value) & 0x03ff;
+			data = (addr == CCONT_ADC_LSB) ? (value & 0xff) : (0xb0 | ((value >> 8) & 0x03));
+			m_ccont.adc_value = value;
+		}
+	}
+
+	m_ccont.dc = !m_ccont.dc;
+
+	LOGMASKED(LOG_CCONT_REGISTER_ACCESS, "CCONT R %02x = %02x %s\n", addr, data, nokia_ccont_reg_desc(addr));
+	return data;
+}
+
+PCD8544_SCREEN_UPDATE(noki3310_state::pcd8544_screen_update)
+{
+	for (int r = 0; r < 6; r++)
+		for (int x = 0; x < 84; x++)
+		{
+			uint8_t gfx = vram[r*84 + x];
+
+			for (int y = 0; y < 8; y++)
+			{
+				int p = BIT(gfx, y);
+				bitmap.pix(r*8 + y, x) = p ^ inv;
+			}
+		}
+}
+
+bool noki3310_state::timer0_compare_due() const
+{
+	const uint16_t compare = (uint16_t(m_mad2_regs[0x12]) << 8) | m_mad2_regs[0x13];
+	if (compare == 0)
+		return false;
+
+	if (nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 0) == 0)
+		return m_timer0_counter == compare;
+
+	return int16_t(m_timer0_counter - compare) >= 0;
+}
+
+void noki3310_state::update_timer0_compare()
+{
+	if (m_timer0_compare_latched || !timer0_compare_due())
+		return;
+
+	m_timer0_compare_latched = true;
+
+	if (!(m_fiq_status & 0x04))
+		assert_fiq(4);
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer0)
+{
+	if (m_mad2_regs[0x0f] != 0)
+	{
+		m_mad2_regs[0x0f]--;
+		return;
+	}
+
+	m_mad2_regs[0x0f] = m_timer0_divider;
+
+	m_timer0_counter++;
+	update_timer0_compare();
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer1)
+{
+	m_timer1_counter++;
+
+	if (m_timer1_counter == 0x8000)
+	{
+		assert_fiq(5);
+		m_timer1_counter = 0;
+	}
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_fiq8)
+{
+	if (m_mad2_regs[0x16] & 0x01)
+		assert_fiq(8);
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_mbus)
+{
+	if (param == 2 && m_mbus_rx_pulses_remaining != 0)
+	{
+		m_mad2_regs[MAD2_MBUS_STATUS] &= ~0x07;
+		if (m_mad2_regs[MAD2_MBUS_CTRL] & MAD2_MBUS_TX_ENABLE)
+		{
+		}
+		else
+		{
+			m_mad2_regs[MAD2_MBUS_STATUS] |= MAD2_MBUS_RX_READY;
+			m_mad2_regs[MAD2_MBUS_CTRL] |= MAD2_MBUS_RX_ENABLE;
+			m_mbus_rx_pulses_remaining--;
+		}
+	}
+
+	signal_mbus_fiq(param);
+
+	if (param == 2 && m_mbus_rx_pulses_remaining != 0)
+	{
+		const unsigned delay_ms = nokia_env_u32("NOKI3210_MBUS_RX_PULSE_DELAY_MS", 5);
+		m_timer_mbus->adjust(attotime::from_msec(delay_ms), param);
+	}
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_power_irq)
+{
+	const unsigned pulse = m_power_irq_count++;
+	const bool assert_power_irq = nokia_env_u32("NOKI3210_POWER_IRQ_ASSERT", 1) != 0;
+	if (assert_power_irq)
+		assert_irq(0);
+
+	const uint8_t ccont_status = ccont_boot_status(pulse);
+	if (m_ccont.irq_line < 9 && ccont_status != 0)
+	{
+		ccont_set_irq_status(ccont_status, "boot");
+	}
+	else
+	{
+	}
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_keypad)
+{
+	const uint8_t state = keypad_irq_state();
+	const uint8_t falling = m_keypad_irq_state & ~state & 0x1f;
+
+	if (falling != 0)
+	{
+		assert_irq(6);
+	}
+
+	m_keypad_irq_state = state;
+
+	// EXPERIMENT (opt-in): the lower-service / service_ready poll is driven by MAD2
+	// IRQ line 4, which in real hardware is raised by the (un-emulated) MAD2 DSP on
+	// work completion. Nothing in the driver ever asserts it, so the service_ready
+	// setter 0x291068 never runs. Simulate the DSP completion interrupt by pulsing
+	// IRQ 4 periodically (200 Hz here) once past early init, to test whether it lets
+	// the service come up and clear CONTACT SERVICE. See docs/service_bootstrap.md.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_DSP_IRQ4", 0) != 0 &&
+			machine().time().as_double() >= nokia_env_u32("NOKI3210_EXPERIMENT_DSP_IRQ4_AFTER_MS", 250) / 1000.0)
+		assert_irq(MAD2_IRQ_LINE_DSP_SERVICE);  // DSP service-completion interrupt (experiment)
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_mad2_soft_reset)
+{
+	uint8_t reset_reg = uint8_t(param & 0xff) & ~0x04;
+	const char *reset_reg_override = std::getenv("NOKI3210_MAD2_SOFT_RESET_REG");
+	if (reset_reg_override != nullptr && reset_reg_override[0] != '\0')
+		reset_reg = nokia_env_u32("NOKI3210_MAD2_SOFT_RESET_REG", reset_reg) & 0xff;
+	m_after_mad2_soft_reset = true;
+
+	m_maincpu->reset();
+	m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, 0x200040);
+
+	if (nokia_env_u32("NOKI3210_MAD2_SOFT_RESET_CLEAR_RAM", 0) != 0)
+	{
+		std::fill_n(m_ram.get(), 0x40000, 0);
+		std::fill_n(m_dsp_ram.get(), 0x800, 0);
+	}
+	else if (nokia_env_u32("NOKI3210_MAD2_SOFT_RESET_CLEAR_STARTUP_STATE", 0) != 0)
+	{
+		std::fill_n(&m_ram[(0x112390 - 0x100000) >> 1], 0x80 >> 1, 0);
+		std::fill_n(&m_ram[(0x11ff60 - 0x100000) >> 1], 0x40 >> 1, 0);
+	}
+
+	memset(m_mad2_regs, 0, 0x100);
+	m_mad2_regs[0x01] = reset_reg;
+	m_mad2_regs[0x0c] = 0x0a;
+	m_mad2_regs[0x03] = 0xff;
+	m_fiq_status = 0;
+	m_irq_status = 0;
+	m_timer1_counter = 0;
+	m_timer0_counter = 0;
+	m_timer0_divider = 255;
+	m_timer0_compare_latched = false;
+	m_keypad_irq_state = 0xff;
+	m_power_irq_count = 0;
+	m_timer_mbus->adjust(attotime::never);
+	m_timer_power_irq->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_POWER_IRQ_MS", 1000)));
+	update_fiq_line();
+	update_irq_line();
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
+{
+	// CCONT watchdog
+	if (m_ccont.watchdog != 0 && nokia_env_u32("NOKI3210_DISABLE_CCONT_WATCHDOG", 0) == 0)
+	{
+		m_ccont.watchdog--;
+
+		if (m_ccont.watchdog == 0)
+		{
+			m_maincpu->reset();
+			machine_reset();
+		}
+	}
+
+	// MAD2 watchdog
+	if (m_mad2_regs[0x03] != 0xff)
+	{
+		m_mad2_regs[0x03]--;
+		if (m_mad2_regs[0x03] == 0)
+		{
+			m_maincpu->reset();
+			machine_reset();
+			m_mad2_regs[0x01] |= 0x02;  // Last reset was by watchdog
+		}
+	}
+}
+
+// Hardware RAM read entry point (registered in the address map). The real
+// backing read plus all firmware-research forcing/traces live in the
+// quarantined ram_r_firmware_overrides below.
+uint16_t noki3310_state::ram_r(offs_t offset, uint16_t mem_mask)
+{
+	return ram_r_firmware_overrides(offset, mem_mask);
+}
+
+// ============================================================================
+// Firmware-research RAM-read path: backing read + forcing shims (which can
+// rewrite the returned value) + execution traces. NOT clean hardware
+// behaviour; should shrink as shims become real models.
+// ============================================================================
+uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask)
+{
+	uint16_t data = m_ram[offset];
+	const offs_t address = 0x100000 + (offset << 1);
+	const u32 pc = m_maincpu->pc();
+
+	if (pc >= 0x002b1e80 && pc <= 0x002b1f22 && address >= 0x11fc80 && address <= 0x11fc90)
+	{
+		// Boot-research shim: force the firmware-selected display type while
+		// the real board/NV source for this byte is still unidentified.
+		const unsigned display_type = nokia_env_u32("NOKI3210_DISPLAY_TYPE", 0xff) & 0xff;
+	if (display_type != 0xff && address == 0x11fc86 && mem_mask == 0x00ff)
+		data = (data & 0xff00) | display_type;
+	}
+
+	// EXPERIMENT (opt-in, diagnostic only): force the FW_STARTUP_SERVICE_BUFFER gate
+	// byte non-zero at the resume-sequence gate read (pc 0x2a9132) so the extended
+	// task batch — including task 14 — gets resumed. Used to map what lies behind
+	// task14_ready; NOT a real model. Mirrors the removed FORCE_STARTUP_SERVICE_READY.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_RESUME_TASK14", 0) != 0 &&
+			pc == 0x002a9132 && address == 0x00110c2c)
+		data |= 0x0101;
+
+	// EXPERIMENT (opt-in): force the D9 watchdog ack/heartbeat byte non-zero. The
+	// watchdog (0x237b2e) resets its counter whenever ack [0x11fedb] != 0, so forcing
+	// it keeps the counter from reaching the CONTACT SERVICE timeout. ack is the low
+	// byte of the word at 0x11feda. Tests whether the ack heartbeat is the last gate
+	// once the DSP/IRQ-4 model has set service_ready + bit 6.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_ACK", 0) != 0 && address == 0x0011feda &&
+			pc == 0x00237b42)
+		data |= 0x0001;
+
+	// EXPERIMENT: force the service-channel enable flag (0x11fee4, even byte = high byte)
+	// non-zero so PM reads are not dropped at 0x2b12b4 AND the post is not skipped inside
+	// 0x2b12dc. Paired with EXPERIMENT_FORCE_SVC_CHANNEL's validity-return force (0x2b13b0).
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_SVC_CHANNEL", 0) != 0 && address == 0x0011fee4)
+		data |= 0x0100;
+
+	// Boot-research shim: startup check 5 currently expects this event-14
+	// latch byte to be clear. Replace with the real producer.
+	if (offset == ((FW_STARTUP_EVENT14_LATCH - NOKIA_RAM_BASE) >> 1))
+		data &= 0xff00;
+
+	return data & mem_mask;
+}
+
+// Hardware RAM write entry point (registered in the address map). The backing
+// store plus all firmware-research forcing/traces live in the quarantined
+// ram_w_firmware_overrides below.
+void noki3310_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
+{
+	ram_w_firmware_overrides(offset, data, mem_mask);
+}
+
+// ============================================================================
+// Firmware-research RAM-write path: forcing shims (which can rewrite the stored
+// value) + execution traces, wrapping the real backing store (COMBINE_DATA).
+// NOT clean hardware behaviour; should shrink as shims become real models.
+// ============================================================================
+void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint16_t mem_mask)
+{
+	const offs_t address = 0x100000 + (offset << 1);
+	const u32 pc = m_maincpu->pc();
+
+	// FW_STARTUP_SERVICE_BUFFER (0x110c2c) write lifecycle (opt-in): the gate that
+	// defers task 14's resume reads byte [0x110c2c]; log who writes it (or never).
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
+			(address == 0x00110c2c || address == 0x00110c2e))
+	{
+		static unsigned svc_log = 0;
+		if (svc_log++ < 40)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("svcbuf_write: t=%.4f addr=%06x old=%04x new=%04x mask=%04x pc=%08x lr=%08x mode=%04x  r4=%08x r5=%08x r6=%08x r7=%08x [r6+4]=%04x\n",
+					machine().time().as_double(), address, m_ram[offset], data, mem_mask, pc, lr,
+					debug_ram_word(FW_STARTUP_MODE),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R4),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R5),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R6),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R7),
+					[&]{ u32 r6 = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
+					     return (r6 >= 0x100000 && r6 < 0x180000) ? debug_ram_word(r6 + 4) : 0xeeee; }());
+		}
+	}
+
+	// Task-dispatch set probe (opt-in): the scheduler current-task byte is 0x100022;
+	// log each distinct task id that ever runs, to see the full task structure and
+	// confirm whether task 0x14 is ever dispatched.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && address == 0x00100022 &&
+			(mem_mask & 0xff00) != 0)
+	{
+		static uint64_t disp_seen = 0;
+		const uint8_t nt = uint8_t((data >> 8) & 0x00ff);
+		if (nt < 64 && !(disp_seen & (uint64_t(1) << nt)))
+		{
+			disp_seen |= uint64_t(1) << nt;
+			logerror("task_dispatched: t=%.4f task=0x%02x pc=%08x %s\n", machine().time().as_double(),
+					nt, pc, nt == 0x14 ? "<-- TASK 14 RUNS" : "");
+		}
+	}
+
+	// Task14 ready-flag lifecycle probe (opt-in): does anything ever set the flags
+	// task14_ready_28ff14 needs? (0x111c93 READY, 0x10dcb0 FINAL_READY, 0x10d1c0
+	// HELPER_MODE, 0x10dcae HELPER_READY).
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
+			(address == 0x00111c92 || address == 0x0010dcb0 ||
+			 address == 0x0010d1c0 || address == 0x0010dcae))
+	{
+		static unsigned t14_log = 0;
+		if (t14_log++ < 40)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("t14_write: t=%.4f addr=%06x old=%04x new=%04x mask=%04x pc=%08x lr=%08x mode=%04x\n",
+					machine().time().as_double(), address, m_ram[offset], data, mem_mask, pc, lr,
+					debug_ram_word(FW_STARTUP_MODE));
+		}
+	}
+
+	// Lower-service transmit lifecycle probe (opt-in): log every write to the
+	// busy/ready bytes the idle check reads, to see who sets them (the TX queue)
+	// and whether anything ever clears them (the transmit completion).
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
+			(address == 0x00110d30 || address == 0x00110d34 ||
+			 address == 0x0010f4a8 || address == 0x0010f4ac || address == 0x00111794))
+	{
+		static unsigned ls_log = 0;
+		if (ls_log++ < 60)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			const char *nm =
+					address == 0x00110d30 ? "queue_block " :
+					address == 0x00110d34 ? "queue_block4" :
+					address == 0x0010f4a8 ? "tx_flags_a  " :
+					address == 0x0010f4ac ? "tx_busy_d   " : "ready_flags ";
+			logerror("ls_write: t=%.4f %s[%06x] old=%04x new=%04x mask=%04x pc=%08x lr=%08x\n",
+					machine().time().as_double(), nm, address, m_ram[offset], data, mem_mask, pc, lr);
+		}
+	}
+
+	// Contact-service state lifecycle probe (opt-in): log every write into the
+	// contact-service control block (0x11fecc..0x11fedb) and the reason byte, with
+	// PC and old->new, to see who initializes/acks it (or never does).
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
+			((address >= 0x0011fecc && address <= 0x0011fedc) || address == FW_CONTACT_SERVICE_REASON ||
+			 address == 0x0011fee4 || address == 0x0011ff12))
+	{
+		static unsigned cs_write_log = 0;
+		if (cs_write_log++ < 80)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("cs_write: t=%.4f addr=%06x old=%04x new=%04x mask=%04x pc=%08x lr=%08x mode=%04x\n",
+					machine().time().as_double(), address, m_ram[offset], data, mem_mask, pc, lr,
+					debug_ram_word(FW_STARTUP_MODE));
+		}
+	}
+
+	auto ram_byte = [this](offs_t addr) -> uint8_t
+	{
+		if (addr < 0x100000 || addr >= 0x180000)
+			return 0xff;
+
+		const uint16_t word = m_ram[(addr - 0x100000) >> 1];
+		return (addr & 1) ? uint8_t(word & 0x00ff) : uint8_t(word >> 8);
+	};
+	auto ram_word = [this](offs_t addr) -> uint16_t
+	{
+		if (addr < 0x100000 || addr >= 0x180000)
+			return 0xffff;
+		return m_ram[(addr - 0x100000) >> 1];
+	};
+	auto mem_byte = [this, &ram_byte](offs_t addr) -> uint8_t
+	{
+		if (addr >= 0x100000 && addr < 0x180000)
+			return ram_byte(addr);
+
+		if ((addr >= 0x00200000 && addr < 0x00600000) || (addr >= 0x00600000 && addr < 0x00a00000))
+		{
+			memory_region *flash = memregion("flash");
+			if (flash)
+			{
+				const offs_t base = (addr >= 0x00600000) ? 0x00600000 : 0x00200000;
+				return flash->base()[(addr - base) % flash->bytes()];
+			}
+		}
+
+		return 0xff;
+	};
+	static unsigned event_post_write_count = 0;
+	if (pc >= 0x002697aa && pc <= 0x002698da && event_post_write_count++ < 1000)
+	{
+		const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
+			const unsigned d9_timeout_delay = nokia_env_u32("NOKI3210_CONTACT_D9_TIMEOUT_DELAY", 0xffff) & 0xffff;
+			if (d9_timeout_delay != 0xffff &&
+					pc == 0x002697aa &&
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) == 0x00237b37 &&
+					r0 == 0x19 &&
+					r4 == 0xd9 &&
+					mem_byte(sp + 0) == 0x00 &&
+					mem_byte(sp + 1) == 0xd9)
+			{
+				m_maincpu->set_state_int(arm7_cpu_device::ARM7_R1, d9_timeout_delay);
+			}
+		if (pc == 0x002697aa && r0 == 0x15)
+		{
+			m_startup_event15_posted = true;
+		}
+	}
+
+	const unsigned startup_event15_delay_clamp = nokia_env_u32("NOKI3210_STARTUP_EVENT15_DELAY_CLAMP", 0xffff) & 0xffff;
+	if (startup_event15_delay_clamp != 0xffff &&
+			pc >= 0x002697aa && pc <= 0x00269bd0 &&
+			address == 0x100240)
+	{
+		data = (data & ~mem_mask) | (startup_event15_delay_clamp & mem_mask);
+	}
+		const char *battery_profile = std::getenv("NOKI3210_BATTERY_PROFILE");
+	if (battery_profile != nullptr &&
+				!std::strcmp(battery_profile, "charged") &&
+				pc >= 0x00270c80 && pc <= 0x00271230 &&
+				address == FW_STARTUP_EVENT &&
+				mem_mask == 0xffff &&
+				(ram_word(FW_STARTUP_MODE) == FW_STARTUP_MODE_CHARGER_WAIT ||
+						ram_word(FW_STARTUP_MODE) == FW_STARTUP_MODE_BATTERY_WAIT ||
+						ram_word(FW_STARTUP_MODE) == FW_STARTUP_MODE_POST_CHARGER))
+		{
+			uint16_t startup_mode = ram_word(FW_STARTUP_MODE);
+			uint8_t startup_event_step = (startup_mode == FW_STARTUP_MODE_BATTERY_WAIT) ? m_battery_startup_event_step_mode9 : m_battery_startup_event_step;
+			if (startup_mode == FW_STARTUP_MODE_POST_CHARGER &&
+					startup_event_step < 3 &&
+					ram_word(FW_CCONT_CHARGER_EVENT) != 0)
+			{
+				data = FW_STARTUP_EVENT_BATTERY_READY;
+				m_battery_startup_event_step = 3;
+			}
+			else if (startup_mode == FW_STARTUP_MODE_POST_CHARGER &&
+					startup_event_step >= 3 &&
+					!m_post_charger_sequence_entered)
+			{
+				data = FW_STARTUP_EVENT_BATTERY_READY;
+				m_post_charger_sequence_entered = true;
+			}
+			else if (startup_event_step < 3 && ram_word(FW_CCONT_CHARGER_EVENT) != 0)
+			{
+		static constexpr uint16_t charge_startup_events[] = {
+			FW_STARTUP_EVENT_CHARGER_PRESENT,
+			FW_STARTUP_EVENT_BATTERY_PRESENT,
+			FW_STARTUP_EVENT_BATTERY_READY
+			};
+			data = charge_startup_events[startup_event_step];
+			if (startup_mode == FW_STARTUP_MODE_BATTERY_WAIT)
+				m_battery_startup_event_step_mode9 = startup_event_step + 1;
+			else
+				m_battery_startup_event_step++;
+			}
+		}
+	if (nokia_env_u32("NOKI3210_CONTACT_DA_PRESERVE_READY_BIT", 0) != 0 &&
+			address == FW_CONTACT_SERVICE_STATUS &&
+			mem_mask == 0x00ff &&
+			(pc == 0x00237b04 || pc == 0x00237b0c) &&
+			(m_ram[offset] & 0x0040) != 0 &&
+			(data & 0x0040) == 0)
+	{
+		data |= 0x0040;
+	}
+	const uint16_t old_word = m_ram[offset];
+
+	COMBINE_DATA(&m_ram[offset]);
+
+	if (pc == 0x002b052e &&
+			m_mbus_flow_d0_queued &&
+			!m_mbus_flow_d0_completed &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 1 &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
+			debug_ram_byte(FW_SERVICE_LOWER_QUEUE_BLOCK + 0x02) >= 0x80 &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) == 8 &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) <= 1)
+		complete_mbus_d0_startup_frame("transport_complete");
+	if (pc == 0x002b052e &&
+			nokia_env_u32("NOKI3210_COMPLETE_MBUS_40_FRAME", 0) != 0 &&
+			m_mbus_last_tx_command == 0x40 &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 1 &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) == 8 &&
+			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) <= 1)
+		complete_mbus_d0_startup_frame("transport_complete_40");
+
+	if (nokia_trace_mbus_flow() &&
+			(address == FW_SERVICE_LOWER_BUSY_FLAGS_A ||
+			 address == FW_SERVICE_LOWER_BUSY_FLAGS_B ||
+			 address == FW_SERVICE_LOWER_BUSY_FLAGS_C ||
+			 address == FW_SERVICE_LOWER_BUSY_FLAGS_D ||
+			 (address >= FW_SERVICE_LOWER_QUEUE_BLOCK && address < FW_SERVICE_LOWER_QUEUE_BLOCK + 0x10) ||
+			 (address >= FW_SERVICE_LOWER_TX_BLOCK && address < FW_SERVICE_LOWER_TX_BLOCK + 0x10)))
+	{
+		const bool d0_tx_mark =
+				address == FW_SERVICE_LOWER_BUSY_FLAGS_D &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) != 0;
+		if (d0_tx_mark && !m_mbus_flow_d0_queued)
+		{
+			m_mbus_flow_d0_queued = true;
+			m_mbus_flow_d0_phase8_queued = false;
+			m_mbus_flow_d0_completed = false;
+			m_mbus_rx_response_active = false;
+			m_mbus_rx_byte_index = 0;
+			m_mbus_rx_pulses_remaining = 0;
+			const unsigned mbus_signal = nokia_mbus_d0_signal_num();
+			if (mbus_signal != 0)
+			{
+				const unsigned delay_ms = nokia_env_u32("NOKI3210_MBUS_D0_DELAY_MS", 5);
+				m_timer_mbus->adjust(attotime::from_msec(delay_ms), mbus_signal);
+			}
+			if (nokia_env_u32("NOKI3210_COMPLETE_MBUS_40_FRAME", 0) != 0 &&
+					m_mbus_last_tx_command == 0x40)
+				complete_mbus_d0_startup_frame("tx_busy_40");
+		}
+
+		const bool d0_phase8 =
+				address == FW_SERVICE_LOWER_TX_BLOCK &&
+				m_mbus_flow_d0_queued &&
+				debug_ram_byte(FW_SERVICE_LOWER_TX_BLOCK + 0x00) == 0x08;
+		const uint8_t old_byte = BIT(address, 0) ? uint8_t(old_word & 0x00ff) : uint8_t(old_word >> 8);
+		const bool d0_tx_complete =
+				address == FW_SERVICE_LOWER_BUSY_FLAGS_D &&
+				m_mbus_flow_d0_queued &&
+				old_byte != 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) == 0;
+		if ((d0_phase8 || d0_tx_complete) && !m_mbus_flow_d0_phase8_queued)
+		{
+			m_mbus_flow_d0_phase8_queued = true;
+			const unsigned mbus_signal = nokia_mbus_d0_phase8_signal_num();
+			if (mbus_signal != 0)
+			{
+				const unsigned delay_ms = nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_DELAY_MS", 5);
+				if (nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_RX_READY", 0) != 0)
+				{
+					m_mbus_rx_response_active = true;
+					m_mbus_rx_pulses_remaining = nokia_env_u32("NOKI3210_MBUS_RX_PULSES", 1);
+					if (nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_RX_RESTART_BYTES", 0) != 0)
+						m_mbus_rx_byte_index = 0;
+					if (nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_RX_RESET_STATE", 0) != 0)
+						debug_ram_byte_w(FW_SERVICE_LOWER_TX_BLOCK, 0);
+				}
+				m_timer_mbus->adjust(attotime::from_msec(delay_ms), mbus_signal);
+			}
+		}
+
+		const bool lower_queue_drained =
+				(address == FW_SERVICE_LOWER_BUSY_FLAGS_A ||
+				 address == FW_SERVICE_LOWER_BUSY_FLAGS_D) &&
+				m_mbus_flow_d0_queued &&
+				!m_mbus_flow_d0_completed &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_QUEUE_BLOCK + 0x02) == 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) != 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) == 0;
+		if (lower_queue_drained)
+		{
+			debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_C, 0);
+			m_mbus_flow_d0_completed = true;
+			m_mbus_flow_d0_queued = false;
+		}
+
+	}
+
+	if (startup_event15_delay_clamp != 0xffff &&
+			pc >= 0x002697aa && pc <= 0x00269bd0 &&
+			address == 0x100244 &&
+			(data & mem_mask & 0xff00) != 0 &&
+			ram_byte(0x100245) == 0x15 &&
+			ram_word(0x100240) > startup_event15_delay_clamp)
+	{
+		m_ram[(0x100240 - NOKIA_RAM_BASE) >> 1] = startup_event15_delay_clamp;
+	}
+
+	if (!m_startup_latch_complete_seen && address == 0x112398 && ((m_ram[offset] & 0x00ff) == 0x000f))
+	{
+		m_startup_latch_complete_seen = true;
+		m_startup_latch_complete_time = machine().time();
+	}
+
+	if (pc == 0x0026a3be &&
+			mem_mask == 0xffff &&
+			address >= 0x100000 && address < 0x180000)
+	{
+
+	}
+
+	if (nokia_env_u32("NOKI3210_SUPPRESS_SIM_CONTEXT_EVENTS", 0) != 0 &&
+			pc == 0x0026a3be &&
+			mem_mask == 0xffff &&
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R1) == 0x00100c70 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R4) == 0x37 ||
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R4) == 0x33) &&
+			(data == 0x0037 || data == 0x0033))
+	{
+		// Boot-research shim: useful negative test for SIM-context noise, but
+		// not a hardware model and not enabled by the default profile.
+		const uint8_t put = ram_byte(0x1014b0);
+		const uint8_t restored_put = (put == 0) ? 0x13 : (put - 1);
+		m_ram[offset] = old_word;
+		m_ram[(0x1014b0 - 0x100000) >> 1] =
+				(m_ram[(0x1014b0 - 0x100000) >> 1] & 0x00ff) | (uint16_t(restored_put) << 8);
+	}
+
+	}
+
+uint16_t noki3310_state::eeprom_r(offs_t offset, uint16_t mem_mask)
+{
+	memory_region *eeprom = memregion("eeprom");
+	uint16_t data = 0xffff;
+
+	if (eeprom && offset < (eeprom->bytes() / 2))
+		data = eeprom->as_u16(offset);
+
+	return data & mem_mask;
+}
+
+void noki3310_state::eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
+{
+}
+
+uint16_t noki3310_state::dsp_ram_r(offs_t offset)
+{
+	// DSP-handshake probe (opt-in): log distinct (byte-offset, pc) reads — placed
+	// before the hack so it captures the polled status offsets too.
+	if (nokia_env_u32("NOKI3210_TRACE_DSP", 0) != 0)
+	{
+		static uint32_t seen[512] = {}; static unsigned nseen = 0;
+		const u32 pc = m_maincpu->pc();
+		const uint32_t key = (pc << 9) ^ (offset & 0x1ff);
+		bool found = false;
+		for (unsigned i = 0; i < nseen; i++) if (seen[i] == key) { found = true; break; }
+		if (!found && nseen < 512)
+		{
+			seen[nseen++] = key;
+			logerror("dsprd: off=%03x val=%04x pc=%08x t=%.4f\n",
+					(offset & 0x7ff) << 1, m_dsp_ram[offset & 0x7ff], pc, machine().time().as_double());
+		}
+	}
+
+	// HACK: avoid hangs when ARM try to communicate with the DSP
+	if (offset <= 0x004 >> 1)   return 0x01;
+	if (offset == 0x0e0 >> 1)   return 0x00;
+	if (offset == 0x0fe >> 1)   return 0x01;
+	if (offset == 0x100 >> 1)   return 0x01;
+
+	// EXPERIMENT (opt-in): the lower-service "pending work" counter at DSP-shared
+	// RAM byte 0xe4 (word offset 0x72) is read by the service_ready setter 0x291068;
+	// ready is set only when it is 0. In real hardware the DSP drains it on
+	// completion. Simulate that drain so the setter (driven by the IRQ-4 pulse, see
+	// timer_keypad) can set service_ready. See docs/service_bootstrap.md.
+	if (offset == (DSP_SVC_PENDING_COUNTER_OFF >> 1) && nokia_env_u32("NOKI3210_EXPERIMENT_DSP_IRQ4", 0) != 0)
+		return 0x00;
+
+	return m_dsp_ram[offset & 0x7ff];
+}
+
+void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
+{
+	if (nokia_env_u32("NOKI3210_TRACE_DSP", 0) != 0)
+	{
+		static uint32_t seen[256] = {}; static unsigned nseen = 0;
+		const u32 pc = m_maincpu->pc();
+		const uint32_t key = (pc << 8) ^ (offset & 0xff);
+		bool found = false;
+		for (unsigned i = 0; i < nseen; i++) if (seen[i] == key) { found = true; break; }
+		if (!found && nseen < 256)
+		{
+			seen[nseen++] = key;
+			logerror("dspwr: off=%03x data=%04x pc=%08x t=%.4f\n",
+					(offset & 0x7ff) << 1, data, pc, machine().time().as_double());
+		}
+	}
+	COMBINE_DATA(&m_dsp_ram[offset & 0x7ff]);
+}
+
+// ============================================================================
+// Firmware-research hooks for flash fetches: forcing shims + execution traces.
+// This is NOT hardware behaviour. It returns an override fetch value, or
+// nullopt to let the real flash read proceed. It should shrink toward empty as
+// each shim is replaced by a real hardware/scheduler model.
+// ============================================================================
+std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 pc, u32 addr, uint16_t mem_mask)
+{
+	// Scheduler message/event BUS wiretap (opt-in): one consistent line per inter-task
+	// interaction, to reconstruct the whole startup state machine breadth-first.
+	//   post_task_message 0x26a204 / 0x26a354 (r0=target task, r1=msg ptr; msg[0..1]=id, [2]=a0,[3]=a1)
+	//   event_post 0x2697aa (r0=event id, r1=arg);  event2 0x2698e4 (r0=event id)
+	//   resume 0x269c6e (r0=task);  recv 0x26a458 (current task is waiting)
+	if (nokia_env_u32("NOKI3210_TRACE_BUS", 0) != 0 && pc == addr &&
+			(addr == 0x0026a204 || addr == 0x0026a354 || addr == 0x002697aa ||
+			 addr == 0x002698e4 || addr == 0x00269c6e || addr == 0x0026a458))
+	{
+		static unsigned bus_log = 0;
+		if (bus_log++ < 3000)
+		{
+			const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			const uint8_t cur = debug_ram_byte(0x00100022);
+			const uint16_t mode = debug_ram_word(FW_STARTUP_MODE);
+			auto msg = [&](u32 m) {
+				if (m < 0x100000 || m >= 0x180000) return;
+				logerror("bus: t=%.4f mode=%04x cur=%02x POST->task=%02x id=%04x a0=%02x a1=%02x lr=%08x\n",
+						machine().time().as_double(), mode, cur, r0 & 0xff,
+						debug_ram_word(m), debug_ram_byte(m + 2), debug_ram_byte(m + 3), lr); };
+			if (addr == 0x0026a204 || addr == 0x0026a354) msg(r1);
+			else if (addr == 0x002697aa)
+				logerror("bus: t=%.4f mode=%04x cur=%02x EVENT id=%02x arg=%04x lr=%08x\n",
+						machine().time().as_double(), mode, cur, r0 & 0xff, r1 & 0xffff, lr);
+			else if (addr == 0x002698e4)
+				logerror("bus: t=%.4f mode=%04x cur=%02x EVENT2 id=%02x lr=%08x\n",
+						machine().time().as_double(), mode, cur, r0 & 0xff, lr);
+			else if (addr == 0x00269c6e)
+				logerror("bus: t=%.4f mode=%04x cur=%02x RESUME task=%02x lr=%08x\n",
+						machine().time().as_double(), mode, cur, r0 & 0xff, lr);
+			else
+				logerror("bus: t=%.4f mode=%04x cur=%02x RECV(wait) lr=%08x\n",
+						machine().time().as_double(), mode, cur, lr);
+		}
+	}
+
+	// EXPERIMENT (opt-in, diagnostic only): force task14_ready_28ff14 to "pass" by
+	// setting R0=1 at the readiness-loop check (0x2a931e), to map what blocks the
+	// boot once task 14 is treated as ready. NOT a real model.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_TASK14_READY", 0) != 0 &&
+			pc == addr && addr == 0x002a931e)
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 1);
+
+	// EXPERIMENT (opt-in): force the PM read-validity check to pass for service reads.
+	// 0x2b13b0 is the return site of the validity check (r0 = valid, r5 = address); the
+	// reads are otherwise dropped because the channel enable flag 0x11fee4 is 0. Forcing
+	// r0=1 makes the request actually transmit, so we can see whether a provider answers
+	// (svc_response at 0x236dc6) or the node is genuinely absent. See docs/service_bootstrap.md.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_SVC_CHANNEL", 0) != 0 &&
+			pc == addr && addr == 0x002b13b0)
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 1);
+
+	// Task-resume batch-2 gate probe (opt-in): task 14's resume is in the second,
+	// conditionally-skipped batch of the startup resume sequence. Log the gate
+	// decision (0x2a9186) and whether task 14's resume (0x2a91dc) is reached.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr &&
+			(addr == 0x002a91ac || addr == 0x002a91f0 || addr == 0x002a9216 || addr == 0x002a91fe))
+	{
+		static unsigned rg_log = 0;
+		if (rg_log++ < 12)
+		{
+			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			const u32 r6 = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
+			const u32 r7 = m_maincpu->state_int(arm7_cpu_device::ARM7_R7);
+			auto rb = [&](u32 a) { return (a >= 0x100000 && a < 0x180000) ? debug_ram_byte(a) : 0xee; };
+			const char *where = addr == 0x002a91ac ? "BATCH-2 (resumes task 0x14)" :
+					addr == 0x002a91f0 ? "gate-SKIP (batch-1 only)" :
+					addr == 0x002a91fe ? "MINIMAL path (early divert, task 14 NOT resumed)" :
+					"SKIP-ALL";
+			(void)r4; (void)r6;
+			logerror("resume_gate: t=%.4f %s  [r7+1]=%02x [0x110c2c]=%02x  (divert if [r7+1]==5 or [110c2c]==0)  r7=%08x mode=%04x\n",
+					machine().time().as_double(), where, rb(r7 + 1), rb(0x00110c2c), r7,
+					debug_ram_word(FW_STARTUP_MODE));
+		}
+	}
+
+	// Ready-list insert probe (opt-in): 0x2699be(list, tcb) links a task into the
+	// scheduler ready list; r1=TCB, task id at [TCB+0xe]. Log the distinct set of
+	// tasks ever made runnable — if 0x14 never appears, task 14 is never created/resumed.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x002699be)
+	{
+		static uint64_t rdy_seen = 0;
+		const u32 tcb = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		if (tcb >= 0x100000 && tcb < 0x180000)
+		{
+			const uint8_t tid = debug_ram_byte(tcb + 0x0e);
+			if (tid < 64 && !(rdy_seen & (uint64_t(1) << tid)))
+			{
+				rdy_seen |= uint64_t(1) << tid;
+				const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+				logerror("ready_insert: t=%.4f task=0x%02x lr=%08x %s\n", machine().time().as_double(),
+						tid, lr, tid == 0x14 ? "<-- TASK 14 MADE READY" : "");
+			}
+		}
+	}
+
+	// Task-14 body probe (opt-in): scheduler current-task id is at 0x100022; when the
+	// recv loop (0x26a458) runs under task 0x14, log the caller (LR = task 14's body)
+	// and how far along it is. If this never fires, task 14 never runs its body.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x0026a458)
+	{
+		// Record the set of distinct task ids that reach the recv loop (bit per id).
+		static uint64_t tasks_seen = 0;
+		const uint8_t cur = debug_ram_byte(0x00100022);
+		if (cur < 64 && !(tasks_seen & (uint64_t(1) << cur)))
+		{
+			tasks_seen |= uint64_t(1) << cur;
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("task_recv_seen: t=%.4f task=0x%02x lr=%08x %s\n",
+					machine().time().as_double(), cur, lr, cur == 0x14 ? "<-- TASK 14" : "");
+		}
+	}
+
+	// Task-14 drive probe (opt-in): is the task-14 message ever posted (0x28ff38),
+	// and is its trigger handler (0x275ff8) reached? Shows whether task 14 is driven.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr &&
+			(addr == 0x0028ff38 || addr == 0x00275ffc || addr == 0x0028ff14))
+	{
+		static unsigned t14d_log = 0;
+		if (t14d_log++ < 40)
+		{
+			const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			if (addr == 0x0028ff14)
+			{
+				// compare task 0x14 TCB (0x1016b4, never runs) vs task 0x02 TCB
+				// (0x1014bc, runs) + scheduler state (0x100020), to see if task 14
+				// is created-but-suspended or never created. TCB = 0x1c bytes.
+				logerror("tcb14[1016b4]= %04x %04x %04x %04x %04x %04x %04x\n",
+						debug_ram_word(0x1016b4), debug_ram_word(0x1016b8), debug_ram_word(0x1016bc),
+						debug_ram_word(0x1016c0), debug_ram_word(0x1016c4), debug_ram_word(0x1016c8),
+						debug_ram_word(0x1016cc));
+				logerror("tcb02[1014bc]= %04x %04x %04x %04x %04x %04x %04x\n",
+						debug_ram_word(0x1014bc), debug_ram_word(0x1014c0), debug_ram_word(0x1014c4),
+						debug_ram_word(0x1014c8), debug_ram_word(0x1014cc), debug_ram_word(0x1014d0),
+						debug_ram_word(0x1014d4));
+				logerror("sched[100020]= %04x %04x %04x %04x  curtask=%02x\n",
+						debug_ram_word(0x100020), debug_ram_word(0x100024), debug_ram_word(0x100028),
+						debug_ram_word(0x10002c), debug_ram_byte(0x100022));
+			}
+			else
+				logerror("t14_drive: t=%.4f %s r0=%08x mode=%04x\n", machine().time().as_double(),
+						addr == 0x0028ff38 ? "POST-task14-msg(0x28ff38)" : "trigger-fn(0x275ffc)",
+						r0, debug_ram_word(FW_STARTUP_MODE));
+		}
+	}
+
+	// MBUS RX state-machine probe (opt-in): at the handler entry (0x2aae76) log the
+	// state (0x10f4a8), the RX-byte countdown (0x10f4ae), and the RX data reg; and
+	// flag whether service_transport_complete (0x2b052e) is ever actually called.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr &&
+			(addr == 0x002aae76 || addr == 0x002b052e || addr == 0x002aaf44 ||
+			 addr == 0x002b0554 || addr == 0x002b0590))
+	{
+		static unsigned rxsm_log = 0;
+		if (rxsm_log++ < 120)
+		{
+			if (addr == 0x002aaf44)
+				logerror("rx_sm: t=%.4f STATE-1 cmp: rx_byte[10f4ad]=%02x vs expected[111794]=%02x "
+						"(G[10f4b4]=%02x)  %s\n", machine().time().as_double(),
+						debug_ram_byte(0x0010f4ad), debug_ram_byte(0x00111794), debug_ram_byte(0x0010f4b4),
+						debug_ram_byte(0x0010f4ad) == debug_ram_byte(0x00111794) ? "match->state2" : "MISMATCH->abort(state8)");
+			else if (addr == 0x002b052e)
+			{
+				// Dump the inbound frame buffer (r0 = frame ptr) the router processes,
+				// plus the phone address it compares against, to see routing inputs.
+				const u32 fp = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+				if (fp >= 0x100000 && fp < 0x180000)
+					logerror("rx_sm: t=%.4f *** transport_complete_2b052e *** frame=%08x  "
+							"[%02x %02x %02x %02x %02x %02x %02x %02x]  ouraddr[111794]=%02x\n",
+							machine().time().as_double(), fp,
+							debug_ram_byte(fp+0), debug_ram_byte(fp+1), debug_ram_byte(fp+2), debug_ram_byte(fp+3),
+							debug_ram_byte(fp+4), debug_ram_byte(fp+5), debug_ram_byte(fp+6), debug_ram_byte(fp+7),
+							debug_ram_byte(0x00111794));
+				else
+					logerror("rx_sm: t=%.4f *** transport_complete_2b052e *** frame=%08x (non-RAM)\n",
+							machine().time().as_double(), fp);
+			}
+			else if (addr == 0x002b0554 || addr == 0x002b0590)
+				logerror("rx_sm: t=%.4f route_post_%s: 0x26aac0 returned r0=%08x (1=delivered to task7)\n",
+						machine().time().as_double(), addr == 0x002b0554 ? "A" : "B",
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R0));
+			else
+				logerror("rx_sm: t=%.4f state[10f4a8]=%02x count[10f4ae]=%04x rxreg=%02x "
+						"mbus_ctrl[18]=%02x mbus_stat[19]=%02x rx_active=%d\n",
+						machine().time().as_double(),
+						debug_ram_byte(0x0010f4a8), debug_ram_word(0x0010f4ae),
+						m_mad2_regs[0x1a], m_mad2_regs[0x18], m_mad2_regs[0x19],
+						m_mbus_rx_response_active ? 1 : 0);
+		}
+	}
+
+	// Service-startup dispatch probe (opt-in): at service_dispatch entry (0x290cf4) log
+	// the command + args and the live ready/status bytes, to map the bit-field state
+	// machine timeline and see what (if anything) reaches the completion that sets ready.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x00290cf4)
+	{
+		static unsigned disp_log = 0;
+		if (disp_log++ < 120)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("svc_disp: t=%.4f cmd=%02x arg1=%02x arg2=%02x  ready[110c2c]=%02x status[110c2e]=%04x  lr=%08x mode=%04x\n",
+					machine().time().as_double(),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xff,
+					debug_ram_byte(0x00110c2c), debug_ram_word(0x00110c2e), lr,
+					debug_ram_word(FW_STARTUP_MODE));
+		}
+	}
+
+	// PM / service-response trace (opt-in). The contact-service reads remote data
+	// (e.g. logical address 0x5f00) as MBUS request frames via 0x2b13a2
+	// (r0=count, r1=address, r2=dest), and dispatches the async response by command
+	// at 0x236dc6 (r0/r6 = command; 0x05 => healthy substate). See docs/service_bootstrap.md.
+	// PM read-validity probe: 0x2b12b4 returns 0 (drop, no request sent) unless the
+	// service-channel enable flags (0x11fee4) are set AND the address is "registered".
+	// 0x2b13b0 is the return site (r0 = validity, r5 = address).
+	if (nokia_env_u32("NOKI3210_TRACE_PM", 0) != 0 && pc == addr && addr == 0x002b13b0)
+	{
+		static unsigned pmv_log = 0;
+		const u32 addr_req = m_maincpu->state_int(arm7_cpu_device::ARM7_R5) & 0xffff;
+		if (addr_req == 0x5f00 && pmv_log++ < 8)
+			logerror("pm_valid: t=%.4f addr=%04x valid=%u (0=dropped) enable_flags[11fee4]=%02x\n",
+					machine().time().as_double(), addr_req,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0), debug_ram_byte(0x0011fee4));
+	}
+
+	// Request-message dump (opt-in): at the post site 0x2b0482 (r0 = message ptr), dump
+	// the request frame for the 0x5f00 read ([msg+8/9] = address) so the response format
+	// can be synthesised. Needs EXPERIMENT_FORCE_SVC_CHANNEL so the request is built.
+	if (nokia_env_u32("NOKI3210_TRACE_PM", 0) != 0 && pc == addr && addr == 0x002b0482)
+	{
+		static unsigned req_log = 0;
+		const u32 m = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (m >= 0x100000 && m < 0x180000 &&
+				debug_ram_byte(m + 8) == 0x5f && debug_ram_byte(m + 9) == 0x00 && req_log++ < 4)
+		{
+			char buf[64]; int n = 0;
+			for (int i = 0; i < 0x14; i++)
+				n += snprintf(buf + n, sizeof(buf) - n, "%02x ", debug_ram_byte(m + i));
+			logerror("pm_request: t=%.4f msg=%08x  [%s]\n", machine().time().as_double(), m, buf);
+		}
+	}
+
+	if (nokia_env_u32("NOKI3210_TRACE_PM", 0) != 0 && pc == addr &&
+			(addr == 0x002b13a2 || addr == 0x00236dc6))
+	{
+		static unsigned pm_log = 0;
+		if (pm_log++ < 200)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			if (addr == 0x002b13a2)
+				logerror("pm_read: t=%.4f addr=%04x count=%u dest=%02x lr=%08x\n",
+						machine().time().as_double(),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xff, lr);
+			else
+				logerror("svc_response: t=%.4f command=%02x lr=%08x %s\n",
+						machine().time().as_double(),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff, lr,
+						(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) == 0x05 ? "<-- HEALTHY" : "");
+		}
+	}
+
+	// service_ready setter probe (opt-in): the setter at 0x29109e writes ready[0x110c2c]=1
+	// iff the lower-service pending counter [0x100e4] (base 0x10000) is 0. Probe the
+	// branch target 0x2910a0 (just after the decision) to see if this function runs and
+	// whether ready got set; capture the gate halfword from r0 just-loaded paths.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x002910a0)
+	{
+		static unsigned setr_log = 0;
+		if (setr_log++ < 12)
+			logerror("svc_ready_setter: t=%.4f ran; ready[110c2c]=%02x  (set iff gate[100e4]==0)\n",
+					machine().time().as_double(), debug_ram_byte(0x00110c2c));
+	}
+
+	// Contact-service EEPROM-checksum probe (opt-in): at the return target after the
+	// EEPROM[0x244] read (0x2347fe), r4 = firmware-computed checksum of EEPROM[0x120..0x243]
+	// and [sp+4] = the stored checksum it compares against (0x234810). Log both so the
+	// exact value to write at EEPROM[0x244] is known.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x002347fe)
+	{
+		static unsigned cksum_log = 0;
+		if (cksum_log++ < 8)
+		{
+			const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
+			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			logerror("cs_cksum: t=%.4f computed_r4=%04x stored[sp+4]=%02x%02x (word=%04x)  match=%d\n",
+					machine().time().as_double(), r4 & 0xffff,
+					debug_ram_byte(sp+5), debug_ram_byte(sp+4), debug_ram_word(sp+4),
+					(r4 & 0xffff) == debug_ram_word(sp+4));
+		}
+	}
+
+	// Lower-service idle-byte probe (opt-in): at the idle test (0x2ad1e0) log the
+	// individual busy/ready bytes so the exact stuck transport state is visible.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x002b03e0)
+	{
+		static unsigned idle_log = 0;
+		if (idle_log++ < 8)
+			logerror("cs_idle: t=%.4f queue_block[110d30]=%02x tx_busy_d[10f4ac]=%02x "
+					"tx_flags_a[10f4a8]=%02x queue_block4[110d34]=%02x ready_flags[111794]=%02x\n",
+					machine().time().as_double(),
+					debug_ram_byte(0x00110d30), debug_ram_byte(0x0010f4ac),
+					debug_ram_byte(0x0010f4a8), debug_ram_byte(0x00110d34),
+					debug_ram_byte(0x00111794));
+	}
+
+	// Startup readiness-predicate probe (opt-in): at each cmp in the mode-0x000d
+	// readiness loop (0x2a92fc), log the predicate's result r0 so the one that
+	// fails (returns 0) — the real boot blocker the watchdog symptomatizes — is
+	// identified. Pure trace.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr &&
+			(addr == 0x002a930e || addr == 0x002a9316 || addr == 0x002a931e ||
+			 addr == 0x002a9326 || addr == 0x002a932e || addr == 0x002a9336 ||
+			 addr == 0x002b03e0 || addr == 0x002b03e8))
+	{
+		static unsigned pred_log = 0;
+		if (pred_log++ < 96)
+		{
+			const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			const char *name =
+					addr == 0x002a930e ? "service_context_ready_2b03d8" :
+					addr == 0x002a9316 ? "display_init_ready_2a2680" :
+					addr == 0x002a931e ? "task14_ready_28ff14" :
+					addr == 0x002a9326 ? "pred_2a6566" :
+					addr == 0x002a932e ? "pred_2a0ec4" :
+					addr == 0x002a9336 ? "pred_279282" :
+					addr == 0x002b03e0 ? "  └ service_lower_idle_check_2ad1c8" :
+					                     "  └ service_event_queue_empty_283dce";
+			logerror("cs_pred: t=%.4f %-34s r0=%u %s\n", machine().time().as_double(),
+					name, r0, r0 == 0 ? "<-- FAIL" : "");
+		}
+	}
+
+	// Contact-service input probe (opt-in): logs every command the contact-service
+	// task dispatches (0x237994, r0=command) and every frame-dispatch (0x23670c,
+	// r0=frame ptr, frame[8]=command byte). Shows the complete set of messages the
+	// task actually receives, to find whether anything besides the self-reposted
+	// 0xd9 watchdog ever drives it. Pure trace.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr &&
+			(addr == 0x00237994 || addr == 0x0023670c))
+	{
+		static unsigned disp_log = 0;
+		if (disp_log++ < 120)
+		{
+			const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			if (addr == 0x00237994)
+				logerror("cs_disp: t=%.4f cmd_dispatch r0=%04x lr=%08x mode=%04x\n",
+						machine().time().as_double(), r0 & 0xffff, lr, debug_ram_word(FW_STARTUP_MODE));
+			else
+			{
+				const uint8_t fcmd = (r0 >= 0x100000 && r0 < 0x180000) ? debug_ram_byte(r0 + 8) : 0xff;
+				logerror("cs_disp: t=%.4f frame_dispatch frame=%08x frame[8]=%02x lr=%08x\n",
+						machine().time().as_double(), r0, fcmd, lr);
+			}
+		}
+	}
+
+	// Contact-service commit probe (opt-in). Logs the first hits of the terminal
+	// handler (0x2b4dda) and the D9 watchdog timeout builder (0x236dc4) with the
+	// reason code, caller (LR), and contact-service state bytes, so the upstream
+	// decision that dooms the boot can be located. Pure trace, no state change.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr &&
+			(addr == 0x002b4dda || addr == 0x00236dc4))
+	{
+		static unsigned commit_log = 0;
+		if (commit_log++ < 48)
+		{
+			const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("contact_commit: t=%.4f site=%s r0=%u r1=%u lr=%08x mode=%04x event=%04x cs_state=%02x cs_status=%02x cs_substate=%02x cs_ack=%02x cs_reason=%02x\n",
+					machine().time().as_double(),
+					addr == 0x002b4dda ? "TERMINAL" : "D9TIMEOUT",
+					r0, r1, lr,
+					debug_ram_word(FW_STARTUP_MODE), debug_ram_word(FW_STARTUP_EVENT),
+					debug_ram_byte(FW_CONTACT_SERVICE_STATE), debug_ram_byte(FW_CONTACT_SERVICE_STATUS),
+					debug_ram_byte(FW_CONTACT_SERVICE_SUBSTATE), debug_ram_byte(FW_CONTACT_SERVICE_ACK),
+					debug_ram_byte(FW_CONTACT_SERVICE_REASON));
+		}
+	}
+
+	// VBAT pipeline probe: at the sample generator (0x27cc74) log the live float
+
+	if (nokia_env_u32("NOKI3210_SKIP_SERVICE_E2_REARM", 0) != 0 &&
+			addr == 0x002697aa &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0x00e2 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x0282 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0021e00e &&
+			debug_ram_word(FW_STARTUP_MODE) == 0x0007 &&
+			debug_ram_word(FW_STARTUP_EVENT) == 0x0074 &&
+			debug_ram_word(FW_CCONT_STATE) == 0x0500)
+	{
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 1);
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1));
+	}
+
+	if (nokia_env_u32("NOKI3210_TRACE_SERVICE_TRANSPORT", 0) != 0 &&
+			pc == addr &&
+			(addr == 0x002b12dc || addr == 0x002b132e || addr == 0x002b1382 ||
+			 addr == 0x002b1388 || addr == 0x002b1392 ||
+			 addr == 0x002b13a2 || addr == 0x002b13d4))
+	{
+		const u32 frame = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		const uint16_t channel = (uint16_t(debug_ram_byte(frame + 8)) << 8) | debug_ram_byte(frame + 9);
+		const u32 forced_service72_status = nokia_env_u32("NOKI3210_SERVICE72_RESPONSE_STATUS", 0xffffffff);
+		if (addr == 0x002b1388 && forced_service72_status <= 0xffff &&
+				(channel == 0x7206 || channel == 0x7207))
+		{
+			debug_ram_byte_w(frame + 0x0a, uint8_t(forced_service72_status >> 8));
+			debug_ram_byte_w(frame + 0x0b, uint8_t(forced_service72_status));
+		}
+	}
+		trace_state31_event_source(pc, addr, offset);
+
+	if (nokia_env_u32("NOKI3210_TRACE_STARTUP_BRANCHES", 0) != 0 &&
+			pc == addr &&
+			(addr == 0x002a930e || addr == 0x002a9316 || addr == 0x002a931e ||
+			 addr == 0x002a9326 || addr == 0x002a932e || addr == 0x002a9336 ||
+			 addr == 0x002a933a || addr == 0x002a934c ||
+			 addr == 0x002b03e0 || addr == 0x002b03e8 ||
+			 addr == 0x002ad1e0 || addr == 0x002ad1ea || addr == 0x002ad1f2 ||
+			 addr == 0x00283dd4 || addr == 0x00283dda))
+	{
+		if (addr == 0x002ad1e0 &&
+				m_mbus_flow_d0_queued &&
+				!m_mbus_flow_d0_completed &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) != 0 &&
+				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) == 0)
+		{
+			debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_C, 0);
+			m_mbus_flow_d0_completed = true;
+			m_mbus_flow_d0_queued = false;
+		}
+	}
+	const unsigned ccont_event15_delay = nokia_env_u32("NOKI3210_CCONT_EVENT15_DELAY", 0xffffffff);
+	if (ccont_event15_delay != 0xffffffff &&
+			pc >= 0x002b08fc && pc <= 0x002b0a12 &&
+			(addr == 0x002b0a40 || addr == 0x002b0a42))
+	{
+		// Boot-research shim: override the ROM literal used for the delayed
+		// CCONT/battery event15 record. This should become real timer/IRQ state.
+		const uint16_t data = (addr == 0x002b0a40) ? ((ccont_event15_delay >> 16) & 0xffff) : (ccont_event15_delay & 0xffff);
+		return data & mem_mask;
+	}
+
+	return std::nullopt;
+}
+
+uint16_t noki3310_state::flash_r(offs_t offset, uint16_t mem_mask)
+{
+	const u32 pc = m_maincpu->pc();
+	const u32 addr = 0x00200000 + (offset << 1);
+	if (const std::optional<uint16_t> ov = flash_firmware_hooks(offset, pc, addr, mem_mask))
+		return *ov;
+	return m_flash->read(offset) & mem_mask;
+}
+
+void noki3310_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
+{
+	static unsigned flash_write_log_count = 0;
+	const u32 pc = m_maincpu->pc();
+
+	if (flash_write_log_count < 200 || pc == 0x0026a648 || pc == 0x0026a64a)
+	{
+		flash_write_log_count++;
+	}
+
+	m_flash->write(offset, data);
+}
+
+uint32_t noki3310_state::rom2_mirror_r(offs_t offset, uint32_t mem_mask)
+{
+	memory_region *flash = memregion("flash");
+	if (!flash || flash->bytes() == 0)
+		return 0xffffffff;
+
+	const offs_t byte_addr = (offset << 2) % flash->bytes();
+	const uint8_t *base = flash->base();
+	const uint32_t b0 = base[(byte_addr + 0) % flash->bytes()];
+	const uint32_t b1 = base[(byte_addr + 1) % flash->bytes()];
+	const uint32_t b2 = base[(byte_addr + 2) % flash->bytes()];
+	const uint32_t b3 = base[(byte_addr + 3) % flash->bytes()];
+	return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+}
+
+void noki3310_state::rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_mask)
+{
+	// The ROM mirrors are also used by the firmware as a one-byte trace/status port.
+}
+
+void noki3310_state::serial_eeprom_start()
+{
+	m_serial_eeprom.write_shift = 0;
+	m_serial_eeprom.write_bits = 0;
+}
+
+void noki3310_state::serial_eeprom_write_bit(uint8_t bit)
+{
+	m_serial_eeprom.write_shift = (m_serial_eeprom.write_shift << 1) | (bit & 1);
+	m_serial_eeprom.write_bits++;
+	if (m_serial_eeprom.write_bits == 8)
+	{
+		serial_eeprom_accept_byte(m_serial_eeprom.write_shift);
+		m_serial_eeprom.write_shift = 0;
+		m_serial_eeprom.write_bits = 0;
+	}
+}
+
+void noki3310_state::serial_eeprom_accept_byte(uint8_t data)
+{
+	if (m_serial_eeprom.address_stage == 0 && (data & 0xf0) == 0xa0)
+	{
+		m_serial_eeprom.read_mode = BIT(data, 0);
+		m_serial_eeprom.read_bits = 0;
+		if (!m_serial_eeprom.read_mode)
+		{
+			m_serial_eeprom.address_temp = 0;
+			m_serial_eeprom.address_stage = 1;
+		}
+		return;
+	}
+
+	if (!m_serial_eeprom.read_mode)
+	{
+		if (m_serial_eeprom.address_stage == 1)
+		{
+			m_serial_eeprom.address_temp = uint16_t(data) << 8;
+			m_serial_eeprom.address_stage = 2;
+		}
+		else
+		{
+			m_serial_eeprom.address = uint16_t(m_serial_eeprom.address_temp | data);
+			m_serial_eeprom.address_stage = 0;
+			m_serial_eeprom.read_bits = 0;
+		}
+	}
+}
+
+void noki3310_state::serial_eeprom_clock_read_bit()
+{
+	if (!m_serial_eeprom.read_mode)
+		return;
+
+	if (m_serial_eeprom.read_bits == 0)
+	{
+		m_serial_eeprom.read_byte = serial_eeprom_byte(m_serial_eeprom.address);
+		// EEPROM field-map probe (opt-in): log every byte address the firmware reads
+		// and the value returned, to document which EEPROM regions matter.
+		if (nokia_env_u32("NOKI3210_TRACE_EEPROM", 0) != 0)
+		{
+			static unsigned ee_log = 0;
+			if (ee_log++ < 4000)
+				logerror("eeprd: addr=%04x val=%02x t=%.4f\n",
+						m_serial_eeprom.address, m_serial_eeprom.read_byte, machine().time().as_double());
+		}
+	}
+
+	m_serial_eeprom.read_latched_bit = BIT(m_serial_eeprom.read_byte, 7 - m_serial_eeprom.read_bits);
+	if (m_serial_eeprom.read_latched_bit)
+		m_mad2_regs[0x20] |= 0x01;
+	else
+		m_mad2_regs[0x20] &= ~0x01;
+	m_serial_eeprom.read_bits++;
+	if (m_serial_eeprom.read_bits == 8)
+	{
+		m_serial_eeprom.read_bits = 0;
+		m_serial_eeprom.address++;
+	}
+}
+
+uint8_t noki3310_state::serial_eeprom_byte(uint16_t address) const
+{
+	if (const char *profile = std::getenv("NOKI3210_EEPROM_PROFILE"))
+	{
+		if (!std::strcmp(profile, "selftest"))
+		{
+			// The bundled EEPROM file is erased. This overlay supplies the
+			// small set of NV defaults needed to expose later boot gates.
+			// Offsets are annotated with their checksummed block (see the
+			// FW_EEPROM_*_BLOCK_* map above and docs/eeprom_analysis.md).
+			switch (address)
+			{
+				// --- config block [0x0120..0x0243], checksum at FW_EEPROM_CONFIG_BLOCK_CKSUM ---
+				case 0x0170: return 0x01;
+				case 0x0171: return 0x00;
+				// Stored checksum (big-endian) for the config block, read at 0x234810.
+				// Firmware computes sum16(EEPROM[0x120..0x243]) minus a correction
+				// (EEPROM[0x154]+[0x155]) = 0x1ee1 for this overlay; high byte = 0x1e,
+				// low = 0xe1. (NokTool's tune/security blocks use a plain sum16; this
+				// firmware block additionally subtracts the [0x154] word.)
+				case FW_EEPROM_CONFIG_BLOCK_CKSUM:     return 0x1e;
+				case FW_EEPROM_CONFIG_BLOCK_CKSUM + 1: return 0xe1;
+				// --- blocks beyond config (RF/ADC profile records, [0x0394+], [0x048c+]) ---
+				case 0x048c: return 0x0a;
+				case 0x048d: return 0x00;
+				case 0x048e: return 0x0a;
+				case 0x048f: return 0x80;
+				case 0x0394: return 0x0a;
+				case 0x0395: return 0x00;
+				case 0x0396: return 0x0a;
+				case 0x0397: return 0x80;
+				case 0x0398: return 0x09;
+				case 0x0399: return 0x00;
+				case 0x039a: return 0x00;
+				case 0x039b: return 0x00;
+			}
+
+			// ADC monitor calibration/config records read by 0x2a7230. Erased
+			// 0xff bytes turn into invalid selector and weight tables at
+			// 0x11145a/0x111d3c/0x111d5c, causing the live source walker to
+			// accumulate implausible scores during startup mode 7.
+			if ((address >= 0x02e0 && address <= 0x02eb) ||
+					(address >= 0x0310 && address <= 0x0313) ||
+					(address >= 0x0330 && address <= 0x0337))
+				return 0x00;
+		}
+	}
+
+	memory_region *eeprom = memregion("eeprom");
+	if (!eeprom || eeprom->bytes() == 0)
+		return 0xff;
+
+	return eeprom->base()[address % eeprom->bytes()];
+}
+
+uint8_t noki3310_state::mad2_io_r(offs_t offset)
+{
+	uint8_t data = m_mad2_regs[offset];
+
+	switch(offset)
+	{
+		case 0x00:
+			data = 0x40;    // ASIC version
+			break;
+		case 0x04:
+			data = m_timer1_counter >> 8;
+			break;
+		case 0x05:
+			data = m_timer1_counter;
+			break;
+		case 0x06:
+			data = (m_timer1_counter + 0x40) >> 8;
+			break;
+		case 0x07:
+			data = m_timer1_counter + 0x40;
+			break;
+		case 0x08:
+			data = m_fiq_status & 0xff;
+			break;
+		case 0x09:
+			data = m_irq_status & 0xff;
+			break;
+		case 0x0c:
+			data = (data & (~0x20)) | ((m_irq_status >> 3) & 0x20);
+			break;
+		case 0x10:
+			data = m_timer0_counter >> 8;
+			break;
+		case 0x11:
+			data = m_timer0_counter;
+			break;
+		case 0x16:
+			data = (data & (~0x02)) | ((m_fiq_status >> 7) & 0x02);
+			break;
+		case 0x18:
+			data &= 0x7f;
+			break;
+		case 0x19:
+			data |= 0xc0;
+			break;
+		case 0x1a:
+			if (m_mbus_rx_response_active)
+			{
+				// Primary: bus response generated from the transmitted frame.
+				uint8_t rx_data = 0;
+				if (mbus_generated_response_byte(m_mbus_rx_byte_index, rx_data))
+				{
+					data = rx_data;
+					m_mbus_rx_byte_index++;
+				}
+				// Fallback: env-supplied bytes (non-D0 frames, e.g. the 0x40 command).
+				else if (nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES") ||
+						(m_mbus_last_tx_command == 0x40 && nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES_40")))
+				{
+					const char *rx_env = (m_mbus_last_tx_command == 0x40 &&
+							nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES_40")) ?
+							"NOKI3210_MBUS_RX_BYTES_40" : "NOKI3210_MBUS_RX_BYTES";
+					if (nokia_env_u8_at(rx_env, m_mbus_rx_byte_index, rx_data))
+					{
+						data = rx_data;
+						m_mbus_rx_byte_index++;
+					}
+				}
+			}
+			break;
+		case 0x2a:
+			data = 0xff;
+			for(int i=0; i<5; i++)
+				if (!(m_mad2_regs[0x28] & (1 <<i)))
+					data &= m_keypad[i]->read() | 0xe0;
+
+			data &= m_pwr->read() | 0xe0;
+			{
+				uint8_t synth_row = 0xff;
+				uint8_t synth_mask = 0xff;
+				const bool synth_active = synthetic_key_active(synth_row, synth_mask);
+				const bool synth_selected = synth_active && (synth_row == 0xff || !(m_mad2_regs[0x28] & (1 << synth_row)));
+				if (synth_active && !synth_selected)
+				{
+				}
+				if (synth_selected)
+				{
+					data &= uint8_t(~synth_mask) | 0xe0;
+				}
+			}
+
+			if (m_power_on)
+			{
+				data &= m_power_on;
+				m_power_on = 0;
+			}
+			if (nokia_env_u32("NOKI3210_HOLD_POWER_KEY", 0) != 0)
+				data &= 0xfe;
+			break;
+		case 0x37:  // SIM UART RxD
+			if (std::getenv("NOKI3210_SIM_PROFILE"))
+				data = nokia_env_u32("NOKI3210_SIM_RXD", 0xff) & 0xff;
+			break;
+		case 0x38:  // SIM UART interrupt identification
+			if (std::getenv("NOKI3210_SIM_PROFILE"))
+				data = nokia_env_u32("NOKI3210_SIM_IIR", 0x01) & 0xff;
+			break;
+		case 0x3c:  // SIM UART RxD queue fill
+			if (std::getenv("NOKI3210_SIM_PROFILE"))
+				data = nokia_env_u32("NOKI3210_SIM_RX_FILL", 0x00) & 0xff;
+			break;
+		case 0x3d:  // SIM RxD flags
+			if (std::getenv("NOKI3210_SIM_PROFILE"))
+				data = nokia_env_u32("NOKI3210_SIM_RX_FLAGS", 0x00) & 0xff;
+			break;
+		case 0x3e:  // SIM TxD flags
+			if (std::getenv("NOKI3210_SIM_PROFILE"))
+				data = nokia_env_u32("NOKI3210_SIM_TX_FLAGS", 0x20) & 0xff;
+			break;
+		case 0x3f:  // SIM UART TxD queue fill
+			if (std::getenv("NOKI3210_SIM_PROFILE"))
+				data = nokia_env_u32("NOKI3210_SIM_TX_FILL", 0x00) & 0xff;
+			break;
+		case 0x6c:
+			data = nokia_ccont_r();
+			break;
+		case 0x6d:
+			data = 0x07;    // GENSIO ready
+			break;
+	}
+
+	const u32 pc = m_maincpu->pc();
+	if (offset == 0x1a && (m_mad2_regs[MAD2_MBUS_STATUS] & MAD2_MBUS_RX_READY) != 0)
+	{
+		const unsigned old_mbus_rx_pulses = m_mbus_rx_pulses_remaining;
+		uint8_t next_rx_data = 0;
+		const char *rx_env = (m_mbus_last_tx_command == 0x40 &&
+				nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES_40")) ?
+				"NOKI3210_MBUS_RX_BYTES_40" : "NOKI3210_MBUS_RX_BYTES";
+		const bool keep_rx_response_active =
+				m_mbus_rx_response_active &&
+				old_mbus_rx_pulses != 0 &&
+				(mbus_generated_response_byte(m_mbus_rx_byte_index, next_rx_data) ||
+				 nokia_env_u8_at(rx_env, m_mbus_rx_byte_index, next_rx_data));
+		m_mad2_regs[MAD2_MBUS_STATUS] &= ~MAD2_MBUS_RX_READY;
+		m_mad2_regs[MAD2_MBUS_CTRL] &= ~MAD2_MBUS_RX_ENABLE;
+		if (!keep_rx_response_active)
+		{
+			m_mbus_rx_pulses_remaining = 0;
+			m_mbus_rx_response_active = false;
+		}
+
+	}
+
+	if (offset == 0x20 && pc >= 0x002b0188 && pc <= 0x002b0238)
+	{
+		// The EEPROM acknowledges by pulling SDA low after a byte write.
+		data &= 0xfe;
+	}
+	else if (offset == 0x20 && pc >= 0x002b024a && pc <= 0x002b0288)
+	{
+		data = (data & 0xfe) | (m_serial_eeprom.read_latched_bit & 1);
+	}
+
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
+	return data;
+}
+
+void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
+{
+	uint8_t old_data = m_mad2_regs[offset];
+	const u32 pc = m_maincpu->pc();
+	m_mad2_regs[offset] = data;
+
+	// MBUS transmit/control probe (opt-in): logs writes to the MAD2 MBUS
+	// control/status/data registers so the outbound D9 service path can be
+	// correlated against the contact-service watchdog window.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
+			(offset == 0x18 || offset == 0x19 || offset == 0x1a))
+	{
+		static unsigned mbusw_log = 0;
+		if (mbusw_log++ < 80)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("mbus_w: t=%.4f reg=%02x data=%02x pc=%08x lr=%08x rx_active=%d tx_cmd=%02x\n",
+					machine().time().as_double(), offset, data, pc, lr,
+					m_mbus_rx_response_active ? 1 : 0, m_mbus_last_tx_command);
+		}
+	}
+
+	// EEPROM I2C activity probe (opt-in): log distinct PCs writing the MAD2 EEPROM
+	// register (0x20), to see whether/where the firmware actually drives the bus.
+	if (nokia_env_u32("NOKI3210_TRACE_EEPROM", 0) != 0 && offset == 0x20)
+	{
+		static uint32_t seen[64] = {}; static unsigned nseen = 0;
+		bool found = false;
+		for (unsigned i = 0; i < nseen; i++) if (seen[i] == pc) { found = true; break; }
+		if (!found && nseen < 64)
+		{
+			seen[nseen++] = pc;
+			logerror("eepi2c_pc: pc=%08x data=%02x t=%.4f sda=%d\n", pc, data, machine().time().as_double(),
+					m_serial_eeprom.read_mode ? 1 : 0);
+		}
+	}
+
+	if (offset == 0x20 && pc >= 0x002b0318 && pc <= 0x002b0340)
+		serial_eeprom_start();
+	else if (offset == 0x20 && pc >= 0x002b01ac && pc <= 0x002b01c8)
+		serial_eeprom_write_bit(data & 1);
+	else if (offset == 0x20 && pc == 0x002b028e)
+		serial_eeprom_clock_read_bit();
+
+	if (offset == 0x01 && (data & 0x04) != 0 && (old_data & 0x04) == 0 &&
+			nokia_env_u32("NOKI3210_MAD2_SOFT_RESET", 0) != 0)
+	{
+		m_timer_mad2_soft_reset->adjust(attotime::zero, data);
+		return;
+	}
+
+	switch(offset)
+	{
+		case 0x02:
+			//printf("DSP %s\n", data & 1 ? "RUN" : "HOLD");
+			//if (data & 0x01)  machine().debug_break();
+			break;
+		case 0x08:
+			ack_fiq(data);
+			break;
+		case 0x09:
+			ack_irq(data);
+			break;
+		case 0x0a:
+			update_fiq_line();
+			break;
+		case 0x0b:
+			update_irq_line();
+			break;
+		case 0x0c:
+			ack_irq((data << 3) & 0x100);
+			update_fiq_line();
+			update_irq_line();
+			break;
+		case 0x0f:
+			m_timer0_divider = data;
+			break;
+		case 0x12:
+			m_timer0_compare_latched = false;
+			break;
+		case 0x13:
+			m_timer0_compare_latched = false;
+			if (nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 0) != 0 ||
+					m_timer0_counter == ((uint16_t(m_mad2_regs[0x12]) << 8) | m_mad2_regs[0x13]))
+				update_timer0_compare();
+			break;
+		case 0x16:
+			ack_fiq((data << 7) & 0x100);
+			update_fiq_line();
+			break;
+		case 0x18:
+			if (data & 0x20)
+				schedule_mbus_fiq(2);
+			else if ((old_data & 0x40) && !(data & 0x40))
+				schedule_mbus_fiq(2);
+			break;
+		case 0x19:
+			if (nokia_env_u32("NOKI3210_MBUS_STATUS_W1C", 0) != 0)
+				m_mad2_regs[offset] = old_data & ~data;
+			if ((data & 0x80) && !(old_data & 0x80))
+				schedule_mbus_fiq(3);
+			break;
+		case 0x1a:
+			// Accumulate the transmitted MBUS frame (starts with frame-id 0x1f) so
+			// the bus response can be generated from it; see mbus_generated_response_byte.
+			if (data == 0x1f)
+				m_mbus_tx_len = 0;
+			if (m_mbus_tx_len < sizeof(m_mbus_tx_frame))
+				m_mbus_tx_frame[m_mbus_tx_len++] = data;
+			m_mbus_last_tx_command = data;
+			schedule_mbus_fiq(2);
+			break;
+		case 0x2c:
+			nokia_ccont_w(data);
+			break;
+		case 0x2e:
+		case 0x6e:
+		{
+			static unsigned lcd_cmd_count = 0;
+			static unsigned lcd_data_count = 0;
+			static unsigned lcd_data_non_ff_count = 0;
+			static unsigned lcd_mirror_dump_count = 0;
+			static uint8_t lcd_mirror_vram[6 * 84] = { };
+			static uint8_t lcd_mirror_mode = 0x04;
+			static uint8_t lcd_mirror_control = 0x00;
+			static uint8_t lcd_mirror_x = 0;
+			static uint8_t lcd_mirror_y = 0;
+			const bool lcd_data = !(offset & 0x40);
+			const uint8_t old_lcd_mirror_x = lcd_mirror_x;
+			const uint8_t old_lcd_mirror_y = lcd_mirror_y;
+			if (lcd_data)
+			{
+				lcd_data_count++;
+				if (data != 0xff)
+					lcd_data_non_ff_count++;
+
+				lcd_mirror_vram[lcd_mirror_y * 84 + lcd_mirror_x] = data;
+				if (lcd_mirror_mode & 0x02)
+				{
+					lcd_mirror_y++;
+					if (lcd_mirror_y > 5)
+					{
+						lcd_mirror_y = 0;
+						lcd_mirror_x = (lcd_mirror_x + 1) % 84;
+					}
+				}
+				else
+				{
+					lcd_mirror_x++;
+					if (lcd_mirror_x > 83)
+					{
+						lcd_mirror_x = 0;
+						lcd_mirror_y = (lcd_mirror_y + 1) % 6;
+					}
+				}
+			}
+			else
+			{
+				lcd_cmd_count++;
+				if (lcd_mirror_mode & 0x01)
+				{
+					if (data & 0x20)
+						lcd_mirror_mode = data & 0x07;
+				}
+				else
+				{
+					if (data & 0x80)
+						lcd_mirror_x = (data & 0x7f) % 84;
+					else if (data & 0x40)
+						lcd_mirror_y = data & 0x07;
+					else if (data & 0x20)
+						lcd_mirror_mode = data & 0x07;
+					else if (data & 0x08)
+						lcd_mirror_control = ((data & 0x04) >> 1) | (data & 0x01);
+				}
+			}
+			unsigned lcd_mirror_zero = 0;
+			unsigned lcd_mirror_ff = 0;
+			unsigned lcd_mirror_other = 0;
+			for (uint8_t mirror_byte : lcd_mirror_vram)
+			{
+				if (mirror_byte == 0x00)
+					lcd_mirror_zero++;
+				else if (mirror_byte == 0xff)
+					lcd_mirror_ff++;
+				else
+					lcd_mirror_other++;
+			}
+			if (lcd_data && old_lcd_mirror_x == 83 && old_lcd_mirror_y == 5 && lcd_mirror_x == 0 && lcd_mirror_y == 0)
+			{
+				lcd_mirror_dump_count++;
+				const char *snapshot_dir = std::getenv("NOKI3210_SNAPSHOT_DIR");
+				if (!snapshot_dir || !*snapshot_dir)
+					snapshot_dir = ".";
+
+				char filename[512];
+				std::snprintf(filename, sizeof(filename), "%s/noki3210_lcdmirror_%04u_z%03u_ff%03u_o%03u.pgm",
+						snapshot_dir,
+						lcd_mirror_dump_count,
+						lcd_mirror_zero,
+						lcd_mirror_ff,
+						lcd_mirror_other);
+
+				if (FILE *file = std::fopen(filename, "wb"))
+				{
+					std::fprintf(file, "P5\n84 48\n255\n");
+					for (unsigned y = 0; y < 48; y++)
+					{
+						const unsigned row = y >> 3;
+						const unsigned bit = y & 7;
+						for (unsigned x = 0; x < 84; x++)
+						{
+							unsigned on = BIT(lcd_mirror_vram[row * 84 + x], bit);
+							if (lcd_mirror_control & 0x01)
+								on ^= 1;
+							const uint8_t pixel = on ? 0x00 : 0xff;
+							std::fwrite(&pixel, 1, 1, file);
+						}
+					}
+					std::fclose(file);
+				}
+			}
+			m_pcd8544->dc_w(lcd_data ? ASSERT_LINE : CLEAR_LINE);
+			for (int i=7; i>=0; i--)
+			{
+				m_pcd8544->sclk_w(CLEAR_LINE);
+				m_pcd8544->sdin_w(BIT(data, i));
+				m_pcd8544->sclk_w(ASSERT_LINE);
+			}
+			m_pcd8544->dc_w(ASSERT_LINE);
+			break;
+		}
+	}
+
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
+}
+
+uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
+{
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
+	return 0;
+}
+
+void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
+{
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
+}
+
+uint8_t noki3310_state::mad2_mcuif_r(offs_t offset)
+{
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x MCUIF\n", offset);
+	return 0;
+}
+
+void noki3310_state::mad2_mcuif_w(offs_t offset, uint8_t data)
+{
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x MCUIF\n", offset, data);
+}
+
+void noki3310_state::noki3310_map(address_map &map)
+{
+	map.global_mask(0x00ffffff);
+	map(0x00000000, 0x0000ffff).mirror(0x80000).rw(FUNC(noki3310_state::ram_r), FUNC(noki3310_state::ram_w));                // boot ROM / RAM
+	map(0x00010000, 0x00010fff).mirror(0x8f000).rw(FUNC(noki3310_state::dsp_ram_r), FUNC(noki3310_state::dsp_ram_w));        // DSP shared memory
+	map(0x00020000, 0x000200ff).mirror(0x8ff00).rw(FUNC(noki3310_state::mad2_io_r), FUNC(noki3310_state::mad2_io_w));         // IO (Primary I/O range, configures peripherals)
+	map(0x00030000, 0x00030003).mirror(0x8fffc).rw(FUNC(noki3310_state::mad2_dspif_r), FUNC(noki3310_state::mad2_dspif_w));   // DSPIF (API control register)
+	map(0x00040000, 0x00040003).mirror(0x8fffc).rw(FUNC(noki3310_state::mad2_mcuif_r), FUNC(noki3310_state::mad2_mcuif_w));   // MCUIF (Secondary I/O range, configures memory ranges)
+	map(0x00100000, 0x0017ffff).rw(FUNC(noki3310_state::ram_r), FUNC(noki3310_state::ram_w));                                   // RAMSelX
+	map(0x00200000, 0x005fffff).rw(FUNC(noki3310_state::flash_r), FUNC(noki3310_state::flash_w));     // ROM1SelX
+	map(0x00600000, 0x009fffff).rw(FUNC(noki3310_state::rom2_mirror_r), FUNC(noki3310_state::rom2_mirror_w));   // ROM2SelX mirror/window
+	map(0x00a00000, 0x00a03fff).rw(FUNC(noki3310_state::eeprom_r), FUNC(noki3310_state::eeprom_w));           // EEPROMSelX
+	map(0x00a04000, 0x00dfffff).unmaprw();                                                                   // EEPROMSelX
+	map(0x00e00000, 0x00ffffff).unmaprw();                                                                   // Reserved
+}
+
+INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
+{
+	if (!newval)    // TODO: COL/ROW IRQ mask
+		assert_irq(6);
+}
+
+static INPUT_PORTS_START( noki3310 )
+	PORT_START("COL.0")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_UP)       PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_0)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_DEL)      PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+
+	PORT_START("COL.1")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_DOWN)     PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_2)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_1)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+
+	PORT_START("COL.2")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_6)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_5)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_4)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+
+	PORT_START("COL.3")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_9)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_8)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_7)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+
+	PORT_START("COL.4")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_3)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_MINUS)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_ENTER)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+
+	PORT_START("PWR")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_SPACE)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x1e, IP_ACTIVE_LOW, IPT_UNUSED )
+INPUT_PORTS_END
+
+void noki3310_state::noki3310(machine_config &config)
+{
+	/* basic machine hardware */
+	ARM7_BE(config, m_maincpu, 26000000 / 2);  // MAD2WD1 13 MHz, clock internally supplied to ARM core can be divided by 2, in sleep mode a 32768 Hz clock is used
+	m_maincpu->set_addrmap(AS_PROGRAM, &noki3310_state::noki3310_map);
+
+	/* video hardware */
+	screen_device &screen(SCREEN(config, "screen", SCREEN_TYPE_LCD, rgb_t::white()));
+	screen.set_refresh_hz(60);
+	screen.set_vblank_time(ATTOSECONDS_IN_USEC(2500) /* not accurate */);
+	screen.set_size(84, 48);
+	screen.set_visarea(0, 84-1, 0, 48-1);
+	screen.set_screen_update("pcd8544", FUNC(pcd8544_device::screen_update));
+	screen.set_palette("palette");
+
+	PALETTE(config, "palette", palette_device::MONOCHROME_INVERTED);
+
+	PCD8544(config, m_pcd8544);
+	m_pcd8544->set_screen_update_cb(FUNC(noki3310_state::pcd8544_screen_update));
+
+	INTEL_TE28F160(config, "flash");
+}
+
+void noki3310_state::noki3330(machine_config &config)
+{
+	noki3310(config);
+
+	INTEL_TE28F320(config.replace(), "flash");
+}
+
+void noki3310_state::noki3410(machine_config &config)
+{
+	noki3330(config);
+
+	subdevice<screen_device>("screen")->set_size(96, 65);    // Philips OM6206
+}
+
+void noki3310_state::noki7110(machine_config &config)
+{
+	noki3330(config);
+
+	subdevice<screen_device>("screen")->set_size(96, 65);    // Epson SED1565
+}
+
+void noki3310_state::noki6210(machine_config &config)
+{
+	noki3330(config);
+
+	subdevice<screen_device>("screen")->set_size(96, 60);
+}
+
+// MAD2 internal ROMS
+#define MAD2_INTERNAL_ROMS \
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASE00 )    \
+	ROM_LOAD("boot_rom", 0x00000, 0x10000, CRC(deab7e4e) SHA1(472a55b0ba289b0f4e538bb4c8b826dede3a40bb)) \
+																\
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00 )         \
+	ROM_LOAD("dsp_prom" , 0x00000, 0xc000, CRC(485d974c) SHA1(eac8c1e0dbb6e17b60b2e7ef6685880d3fd85521)) \
+	ROM_LOAD("dsp_drom" , 0x0c000, 0x4000, CRC(690b37d3) SHA1(547372f1044a3442aa52fcd2b3546540aba59344)) \
+	ROM_LOAD("dsp_pdrom", 0x10000, 0x1000, CRC(f154670a) SHA1(e0c66649d1434eca3435033a32634cb90cef0f31))
+
+ROM_START( noki3210 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "600", "v6.00")  // A 03-10-2000
+	ROMX_LOAD("3210f600a.fls", 0x000000, 0x200000, CRC(6a978478) SHA1(6bdec2ec76aca15bc12b621be4402e455562454b), ROM_BIOS(0))
+
+	ROM_REGION16_BE(0x04000, "eeprom", 0 )
+	ROM_LOAD("3210 virgin eeprom,24c128.bin", 0x00000, 0x04000, CRC(690b37d3) SHA1(547372f1044a3442aa52fcd2b3546540aba59344))
+ROM_END
+
+ROM_START( noki3310 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "607", "v6.07")  // C 17-06-2003
+	ROM_SYSTEM_BIOS(1, "579", "v5.79")  // N 11-11-2002
+	ROM_SYSTEM_BIOS(2, "513", "v5.13")  // C 11-01-2002
+	ROMX_LOAD("3310_607_ppm_c.fls", 0x000000, 0x200000, CRC(5743f6ba) SHA1(0e80b5f1698909c9850be770c1289566582aa77a), ROM_BIOS(0))
+	ROMX_LOAD("3310 nr1 v5.79.fls", 0x000000, 0x200000, CRC(26b4f0df) SHA1(649de05ed88205a080693b918cd1295ac691dff1), ROM_BIOS(1))
+	ROMX_LOAD("3310 v. 5.13 c.fls", 0x000000, 0x1d0000, CRC(0f66d256) SHA1(04d8dabe2c454d6a1161f352d85c69c409895000), ROM_BIOS(2))
+	ROM_LOAD("3310 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(8393b1f7) SHA1(ab6c05bfa54ecd7c2acbd172009ffe6c7f130cb8))
+
+	// these 2 are apparently the 6.39 update firmware data
+	ROM_REGION(0x0200000, "misc", 0 )
+	ROM_LOAD( "nhm5ny06.390",   0x000000, 0x0131161, CRC(5dfb1af7) SHA1(3a8ad82dc239b0cd18be60f537c4d0e07881155d) )
+	ROM_LOAD( "nhm5ny06.39i",   0x000000, 0x0090288, CRC(ec214ee4) SHA1(f5b3b9ceaa7280d5246dd70d5696f8f6983122fc) )
+ROM_END
+
+ROM_START( noki3330 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "450", "v4.50")  // C 12-10-2001
+	ROMX_LOAD("3330f450c.fls", 0x000000, 0x350000, CRC(259313e7) SHA1(88bcc39d9358fd8a8562fe3a0280f0ce82f5897f), ROM_BIOS(0))
+	ROM_LOAD("3330 virgin eeprom 005f0000.fls", 0x3f0000, 0x010000, CRC(23459c10) SHA1(68481effb39d90a1639e8f261009c66e97d3e668))
+ROM_END
+
+ROM_START( noki3410 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "506", "v5.06")  // C 29-11-2002
+	ROMX_LOAD("3410_5-06c.fls", 0x000000, 0x370000, CRC(1483e094) SHA1(ef26026297c779de7b01923a364ded822e720c38), ROM_BIOS(0))
+ROM_END
+
+ROM_START( noki5210 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "540", "v5.40")  // C 11-10-2003
+	ROM_SYSTEM_BIOS(1, "525", "v5.25")  // C 26-02-2003
+	ROM_SYSTEM_BIOS(2, "520", "v5.20")  // C 12-08-2002
+	ROMX_LOAD("5210_5.40_ppm_c.fls", 0x000000, 0x380000, CRC(e37d5beb) SHA1(726f000780dd67750b7d2859687f846ce17a1bf7), ROM_BIOS(0))
+	ROMX_LOAD("5210_5.25_ppm_c.fls", 0x000000, 0x380000, CRC(13bba458) SHA1(3b5244244743fba48f9061e158f95fc46b86446e), ROM_BIOS(1))
+	ROMX_LOAD("5210_520_c.fls", 0x000000, 0x380000, CRC(38648cd3) SHA1(9210e15e6bd780f86c467bec33ef54d6393abe5a), ROM_BIOS(2))
+ROM_END
+
+ROM_START( noki6210 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "556", "v5.56")  // C 25-01-2002
+	ROMX_LOAD("6210_556c.fls", 0x000000, 0x3a0000, CRC(203fb962) SHA1(3d9ea319503e78ec69b60d72cda23e461e118ea9), ROM_BIOS(0))
+	ROM_LOAD("6210 virgin eeprom 005fa000.fls", 0x3fa000, 0x006000, CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
+ROM_END
+
+ROM_START( noki6250 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "503", "v5.03")  // C 06-12-2001
+	ROMX_LOAD("6250-503mcuppmc.fls", 0x000000, 0x3a0000, CRC(8dffb91b) SHA1(95607ce39c383bda75f1e6aeae67a214b787b0a1), ROM_BIOS(0))
+	ROM_LOAD("6250 virgin eeprom 005fa000.fls", 0x3fa000, 0x006000, CRC(6087ce70) SHA1(57c29c8387caf864603d94a22bfb63ace427b7f9))
+ROM_END
+
+ROM_START( noki7110 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "501", "v5.01")  // C 08-12-2000
+	ROMX_LOAD("7110f501_ppmc.fls", 0x000000, 0x390000, CRC(919ac753) SHA1(53af8324919f455ba8199d2c05f7a921cfb811d5), ROM_BIOS(0))
+	ROM_LOAD("7110 virgin eeprom 005fa000.fls", 0x3fa000, 0x006000, CRC(78e7d8c1) SHA1(8b4dd782fc9d1306268ba63124ee463ac646912b))
+ROM_END
+
+ROM_START( noki8210 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "531", "v5.31")  // C 08-03-2002
+	ROMX_LOAD("8210_5.31ppm_c.fls", 0x000000, 0x1d0000, CRC(927022b1) SHA1(c1a0fe95cedb89a92b19654208cc4855e1a4988e), ROM_BIOS(0))
+	ROM_LOAD("8210 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(37fddeea) SHA1(1c01ad3948ff9919890498a84f31052369d93e1d))
+ROM_END
+
+ROM_START( noki8250 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "502", "v5.02")  // K 28-01-2002
+	ROMX_LOAD("8250-502mcuppmk.fls", 0x000000, 0x1d0000, CRC(2c58e48b) SHA1(f26c98ffcfffbbd5714889e10cfa41c5f6dd2529), ROM_BIOS(0))
+	ROM_LOAD("8250 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(7ca585e0) SHA1(a974fb5fddcd0438ac4aaf32b431f1453e8d923c))
+ROM_END
+
+ROM_START( noki8850 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "531", "v5.31")  // C 08-03-2002
+	ROMX_LOAD("8850v531.fls", 0x000000, 0x1d0000, CRC(8864fcb3) SHA1(9f966787403b68a09530680ad911302403eb1521), ROM_BIOS(0))
+	ROM_LOAD("8850 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(4823f27e) SHA1(b09455302d98fbedf35072c9ecfd7721a04924b0))
+ROM_END
+
+ROM_START( noki8890 )
+	MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_SYSTEM_BIOS(0, "1220", "v12.20")    // C 19-03-2001
+	ROMX_LOAD("8890_12.20_ppmc.fls", 0x000000, 0x1d0000, CRC(77206f78) SHA1(a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed), ROM_BIOS(0))
+	ROM_LOAD("8890 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(1d8ef3b5) SHA1(cc0924cfd4c0ce796fca157c640fc3183c2b5f2c))
+ROM_END
+
+} // anonymous namespace
+
+//    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
+SYST( 1999, noki3210, 0,      0,      noki3310, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 3210", MACHINE_NO_SOUND )
+SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, noki8210, 0,      0,      noki3310, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, noki8850, 0,      0,      noki3310, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki6210, 0,      0,      noki6210, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki6250, 0,      0,      noki6210, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki8250, 0,      0,      noki3310, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 8250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki8890, 0,      0,      noki3310, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2002, noki3410, 0,      0,      noki3410, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2002, noki5210, 0,      0,      noki3330, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
