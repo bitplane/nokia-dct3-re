@@ -693,6 +693,34 @@ per-frame service interrupt, it does not signal once.
 force to model, requirement #3). Default boot (model off) is byte-identical to baseline. *Next:*
 verify against the full structural-marker set, then promote to default and retire `EXPERIMENT_DSP_IRQ4`.
 
+### Bit-6 gate investigated — the ack is confirmed a red herring; real gate is the service-channel array
+
+Pursuing "model the D9 ack" (`EXPERIMENT_FORCE_ACK`) confirmed the ack `0x11fedb` is **not
+modellable** — it has no firmware producer; `FORCE_ACK` is a brute-force watchdog bypass. The
+real lever for leaving CONTACT SERVICE is **service-present bit 6** (in the word at `0x11fed0`),
+which the contact-service init clears via **two** paths, both now characterised at runtime:
+
+1. **`service_ready != 1`** (getter `0x2a8fec` at `0x2347a8` → clear `0x2347b2`). With the new
+   `MODEL_DSP_SERVICE` on, the init reads **`r0=1`** here (probe `bit6_svcready_check`) — this
+   path no longer fires. ✅ (the DSP model pays off).
+2. **Dirty service-channel status array** — a 24-entry array at **`0x11fc60`** (loop `0x23487e..
+   0x2348a2`): bit 6 is cleared if any entry `[0x11fc60+i]` (i≠11) is not `0x00/0xfe/0xff`. Probe
+   `bit6_clear` finds **two dirty on a blank phone: idx6 `[0x11fc66]=0xfd`, idx18 `[0x11fc72]=0x12`**
+   — service modules reporting "present but not OK". Writers logged (`svcchan_write`): bulk-init at
+   `0x29645c`, then per-module init routines (`0x2962d6`, `0x295edc`, `0x295eb4`, `0x2347a2`, …).
+
+**Open (next pass).** Forcing just those two entries to read clean (`EXPERIMENT_CLEAN_SVCCHAN`,
+high byte — the array is big-endian) did **not** clear CONTACT SERVICE: bit 6 still ends clear and
+the D9 watchdog still times out. So the service-channel array is **not** trivially the last gate —
+the contact-service init runs in **multiple passes** (svcready check at t≈0.415, the clearing loop
+at t≈0.460), and either more entries go dirty across passes or another clear participates. Untangling
+the multi-pass init (and the exact per-entry byte lanes) is the next step. This maps directly onto
+provisioning requirements #4/#5 (service-channel open + per-node responses) — the **fan-out** the
+plan flagged: each dirty module (idx6, idx18, …) is a service whose "OK" status must be modelled.
+
+Tools added this pass: `bit6_clear`, `bit6_svcready_check`, `svcchan_write` probes (all under
+`TRACE_CONTACT_COMMIT`) and the `EXPERIMENT_CLEAN_SVCCHAN` diagnostic lever.
+
 ## CORRECTION (deep dispatch + ready-byte trace): the dispatch is NOT the ready setter
 
 A full runtime trace of the service-startup dispatcher (`svc_disp:` probe at `0x290cf4`)

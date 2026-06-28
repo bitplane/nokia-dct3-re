@@ -1509,6 +1509,19 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_SVC_CHANNEL", 0) != 0 && address == 0x0011fee4)
 		data |= 0x0100;
 
+	// EXPERIMENT (opt-in, diagnostic — like FORCE_ACK, not a model): the contact-service
+	// bit-6 loop (0x23487e) clears service-present bit 6 unless every service-channel status
+	// byte [0x11fc60+i] (i != 11) reads 0x00/0xfe/0xff. Two are dirty on a blank phone
+	// ([0x11fc66]=0xfd idx6, [0x11fc72]=0x12 idx18 — service modules reporting "not OK").
+	// Force them to read 0xff ("absent") to test whether a clean service-channel array is
+	// the real gate that keeps bit 6 set and clears CONTACT SERVICE (the ack 0x11fedb is a
+	// red herring — never written non-zero anywhere reachable).
+	// idx6=0x11fc66, idx18=0x11fc72 are even addresses = the HIGH byte of their 16-bit word
+	// (big-endian: ROM_REGION16_BE), so force bits 15..8, not 7..0.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_CLEAN_SVCCHAN", 0) != 0 &&
+			(address == 0x0011fc66 || address == 0x0011fc72))
+		data |= 0xff00;
+
 	// Boot-research shim: startup check 5 currently expects this event-14
 	// latch byte to be clear. Replace with the real producer.
 	if (offset == ((FW_STARTUP_EVENT14_LATCH - NOKIA_RAM_BASE) >> 1))
@@ -1554,6 +1567,19 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 					[&]{ u32 r6 = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
 					     return (r6 >= 0x100000 && r6 < 0x180000) ? debug_ram_word(r6 + 4) : 0xeeee; }());
 		}
+	}
+
+	// Service-channel status-array writer probe (opt-in): the contact-service bit-6 loop
+	// (0x23487e) clears service-present bit 6 if any of the 24 status bytes [0x11fc60+i]
+	// (i != 11) is not 0x00/0xfe/0xff. Two are dirty on a blank phone ([0x11fc66]=0xfd,
+	// [0x11fc72]=0x12). Log every write to the array so the producer of each is identified.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
+			address >= 0x0011fc60 && address <= 0x0011fc77)
+	{
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		logerror("svcchan_write: t=%.4f addr=%06x idx=%u old=%02x new=%02x mask=%04x pc=%08x lr=%08x\n",
+				machine().time().as_double(), address, unsigned(address - 0x0011fc60),
+				debug_ram_byte(address), data & 0xff, mem_mask, pc, lr);
 	}
 
 	// Task-dispatch set probe (opt-in): the scheduler current-task byte is 0x100022;
@@ -2291,6 +2317,35 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					debug_ram_byte(sp+5), debug_ram_byte(sp+4), debug_ram_word(sp+4),
 					(r4 & 0xffff) == debug_ram_word(sp+4));
 		}
+	}
+
+	// bit-6 service_ready check probe (opt-in): the contact-service init reads service_ready
+	// via the getter 0x2a8fec; if r0 != 1 at the return (0x2347a8) it clears bit 6 at
+	// 0x2347b2 — a clear path independent of the service-channel array loop. Log what the
+	// init actually sees, to tell whether service_ready is 1 at this instant (t~0.46).
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x002347a8)
+	{
+		static unsigned srchk_log = 0;
+		if (srchk_log++ < 8)
+			logerror("bit6_svcready_check: t=%.4f r0=%u ready[110c2c]=%02x  (bit6 cleared at 0x2347b2 unless r0==1)\n",
+					machine().time().as_double(), m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+					debug_ram_byte(0x00110c2c));
+	}
+
+	// bit-6 service-channel clear probe (opt-in): the loop 0x23487e..0x2348a2 clears the
+	// service-present bit 6 (0x11fed0 &= 0xbf) if any of 24 service-channel status bytes
+	// [sb+i] (i != 11) is not "clean/absent" (0x00/0xfe/0xff). Log which entry trips it —
+	// the real condition behind CONTACT SERVICE once checksum + service_ready are satisfied.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x0023487e)
+	{
+		const u32 idx = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 entry = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const u8 v = debug_ram_byte(entry);
+		const bool dirty = (v != 0x00 && v != 0xfe && v != 0xff && idx != 0x0b);
+		static unsigned bit6_log = 0;
+		if (dirty && bit6_log++ < 24)
+			logerror("bit6_clear: t=%.4f idx=%u entry=%08x val=%02x  -> clears service-present bit6\n",
+					machine().time().as_double(), idx, entry, v);
 	}
 
 	// Lower-service idle-byte probe (opt-in): at the idle test (0x2ad1e0) log the
