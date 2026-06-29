@@ -35,7 +35,7 @@ The real device models — `nokia_ccont_*`, `mad2_io_*`, `eeprom_*`,
   models `NOKI3210_MODEL_DSP_SERVICE` (DSP lower-service handshake), `NOKI3210_MODEL_CCONT_PRESENT`
   (CCONT present-status bit), and the `EEPROM_PROFILE=selftest` checksums. Each preserves the
   oracle and replaces an `EXPERIMENT_*` force. The remaining `EXPERIMENT_*` knobs are diagnostic
-  only. See `service_bootstrap.md` (Executive summary) for the full stack and the one open gate.
+  only. See `service_bootstrap.md` (Status & model stack) for the full stack and the one open gate.
 
 ## Regression oracle
 

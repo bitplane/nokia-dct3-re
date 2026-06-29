@@ -153,7 +153,7 @@ The EEPROM transport is fully understood. Two corrections over the earlier write
    a hand-built overlay (~16 bytes + three zeroed ranges in §4/§5); the other ~1188
    addresses still read 0xFF.
 
-> **⚠️ Updated — see `service_bootstrap.md` Executive summary.** The "ack `0x11fedb` is the root"
+> **⚠️ Updated — see `service_bootstrap.md` Status & model stack.** The "ack `0x11fedb` is the root"
 > wording below is **superseded**: the ack is a red herring (never written by firmware). The real
 > gate is service-present **bit 6**, and the EEPROM is **not** "secondary/redundant" — it is one of
 > bit 6's direct gates. **Two** EEPROM checksums clear bit 6 and are now modelled in the `selftest`
