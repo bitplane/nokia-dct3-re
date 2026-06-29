@@ -1576,10 +1576,19 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
 			address >= 0x0011fc60 && address <= 0x0011fc77)
 	{
-		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-		logerror("svcchan_write: t=%.4f addr=%06x idx=%u old=%02x new=%02x mask=%04x pc=%08x lr=%08x\n",
-				machine().time().as_double(), address, unsigned(address - 0x0011fc60),
-				debug_ram_byte(address), data & 0xff, mem_mask, pc, lr);
+		// big-endian array: even byte address = HIGH byte of its 16-bit word. Log the full
+		// word transition + both resolved bytes so the writer of a dirty entry is visible
+		// (e.g. byte 0x11fc66 = (new >> 8), byte 0x11fc67 = (new & 0xff)).
+		const u16 oldw = m_ram[offset];
+		const u16 neww = (oldw & ~mem_mask) | (data & mem_mask);
+		if (oldw != neww)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			logerror("svcchan_write: t=%.4f word@%06x (idx%u hi=%02x idx%u lo=%02x) old=%04x new=%04x pc=%08x lr=%08x\n",
+					machine().time().as_double(), address,
+					unsigned(address - 0x0011fc60), (neww >> 8) & 0xff,
+					unsigned(address - 0x0011fc60 + 1), neww & 0xff, oldw, neww, pc, lr);
+		}
 	}
 
 	// Task-dispatch set probe (opt-in): the scheduler current-task byte is 0x100022;

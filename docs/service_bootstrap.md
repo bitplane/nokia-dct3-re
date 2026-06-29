@@ -709,14 +709,29 @@ which the contact-service init clears via **two** paths, both now characterised 
    — service modules reporting "present but not OK". Writers logged (`svcchan_write`): bulk-init at
    `0x29645c`, then per-module init routines (`0x2962d6`, `0x295edc`, `0x295eb4`, `0x2347a2`, …).
 
-**Open (next pass).** Forcing just those two entries to read clean (`EXPERIMENT_CLEAN_SVCCHAN`,
-high byte — the array is big-endian) did **not** clear CONTACT SERVICE: bit 6 still ends clear and
-the D9 watchdog still times out. So the service-channel array is **not** trivially the last gate —
-the contact-service init runs in **multiple passes** (svcready check at t≈0.415, the clearing loop
-at t≈0.460), and either more entries go dirty across passes or another clear participates. Untangling
-the multi-pass init (and the exact per-entry byte lanes) is the next step. This maps directly onto
-provisioning requirements #4/#5 (service-channel open + per-node responses) — the **fan-out** the
-plan flagged: each dirty module (idx6, idx18, …) is a service whose "OK" status must be modelled.
+**The two dirty entries traced to their gating checks (fan-out = 2, both known subsystems).**
+The `svcchan_write` probe (big-endian-correct) + disassembly pin each dirty status to one
+availability check; the value is `0x00` (clean) iff the check passes, else `0xfd`:
+
+- **idx6 `[0x11fc66]`** ← `0x295ebe: bl 0x2afb44` (ghidra `ccont_reg_read_2afb44`). Decoded: reads
+  **CCONT register 1, masks `0x90`**; clean iff `(ccont_reg[1] & 0x90) != 0`. So idx6 is a
+  **CCONT / power-management ASIC** state dependency — modellable via the existing CCONT emulation
+  (supply the right register-1 bits).
+- **idx18 `[0x11fc72]`** ← `0x295ea4: bl 0x264c56`, which reads **EEPROM near `0x11c`/`0x120`**
+  (the security/config block boundary) and compares — an **EEPROM-validity** check. (The contact-
+  service init re-runs the same check at `0x234796` and stamps `0x12` when it fails.) This is the
+  **EEPROM provisioning** axis (requirement #1).
+
+So the cascade-vs-fan-out question, for this gate, resolves to **two well-understood subsystems**
+(CCONT register state + EEPROM validity) — not an unbounded explosion. Both are already on the
+provisioning list.
+
+**Open (next pass).** (1) Model CCONT register 1 bits `0x90` so idx6 reports clean; (2) satisfy the
+`0x264c56` EEPROM check so idx18 reports clean. Then re-test bit 6 — noting the contact-service init
+runs in **multiple passes** (svcready check at t≈0.415, clearing loop at t≈0.460), so confirm the
+dirty set doesn't change across passes. Forcing the two entries' *reads* clean
+(`EXPERIMENT_CLEAN_SVCCHAN`, high byte) did **not** alone clear CONTACT SERVICE, so the honest fix is
+to satisfy the underlying checks (CCONT + EEPROM), not mask the symptom.
 
 Tools added this pass: `bit6_clear`, `bit6_svcready_check`, `svcchan_write` probes (all under
 `TRACE_CONTACT_COMMIT`) and the `EXPERIMENT_CLEAN_SVCCHAN` diagnostic lever.
