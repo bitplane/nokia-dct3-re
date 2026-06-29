@@ -153,9 +153,16 @@ The EEPROM transport is fully understood. Two corrections over the earlier write
    a hand-built overlay (~16 bytes + three zeroed ranges in §4/§5); the other ~1188
    addresses still read 0xFF.
 
-**Resolved (see `service_bootstrap.md`):** the EEPROM is **not** the root of the CONTACT
-SERVICE halt — that is `ack 0x11fedb` never being set (MBUS service response) — but there
-**is** a real, secondary EEPROM gate that I initially missed and then verified:
+> **⚠️ Updated — see `service_bootstrap.md` Executive summary.** The "ack `0x11fedb` is the root"
+> wording below is **superseded**: the ack is a red herring (never written by firmware). The real
+> gate is service-present **bit 6**, and the EEPROM is **not** "secondary/redundant" — it is one of
+> bit 6's direct gates. **Two** EEPROM checksums clear bit 6 and are now modelled in the `selftest`
+> overlay: the config checksum (`0x244`, below) **and** the tune/security checksum (`sum16[0..0x11b]`
+> == word `0x11c`, the idx18 service-channel gate). Read the rest of this section as "the EEPROM
+> config checksum mechanism", not "a redundant secondary gate".
+
+**(Earlier framing, kept for the mechanism):** the EEPROM is **not** the *sole* root of the CONTACT
+SERVICE halt — but there **is** a real EEPROM gate that I initially missed and then verified:
 
 ### EEPROM checksum gate on the contact-service present bit (`0x234588`/`0x234810`)
 

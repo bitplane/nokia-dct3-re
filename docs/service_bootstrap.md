@@ -1,22 +1,47 @@
 # Service-startup bootstrap — message-bus map
 
-## Executive summary (status: mapping phase COMPLETE)
+## Executive summary (status: MODELLING phase — 4 models landed, 1 gate remains)
 
-CONTACT SERVICE is the firmware's correct response to a blank/un-provisioned 3210. The whole
-chain is now mapped end-to-end and experimentally validated; what remains is a modelling build,
-not more investigation. The causal chain, outermost symptom to root:
+CONTACT SERVICE is the firmware's correct response to a blank/un-provisioned 3210. The chain is
+mapped end-to-end and four faithful models now clear most of it; **one gate remains**.
+
+> **Reading guide.** This summary and the sections explicitly tagged **DONE/MODELLED** (e.g.
+> "DONE — DSP service handshake modelled", "Bit-6 gate investigated", the channel-open
+> CORRECTION) are the current truth. The other sections below are the **chronological
+> investigation** and contain earlier conclusions that were later corrected — where they conflict
+> with this summary, the summary wins. The biggest superseded turns are flagged inline with
+> **⚠️ SUPERSEDED**.
+
+**Corrected causal chain** (symptom → root), with the model that satisfies each gate:
 
 ```
 CONTACT SERVICE screen
-  ← D9 watchdog counter 0x11fed6 hits 0x0f          (0x237b2e; ack 0x11fedb never set)
-  ← watchdog armed because bit6 of 0x11fed1 is clear (service-present)
-  ← bit6 cleared unless service_ready==1 AND EEPROM config checksum passes
-  ← service_ready 0x110c2c never set: its setter 0x291068 runs only on MAD2 IRQ line 4
-    (the DSP service-completion interrupt) with DSP pending-counter 0x100e4 == 0
-  ← AND the contact-service never *completes*: it reads its command from PM logical addr
-    0x5f00 via an async request whose dest node = [0x11fee4]; every read is DROPPED because
-    the channel-enable flag 0x11fee4 == 0 (so no request is ever sent / no response dispatched).
+  ← D9 watchdog (0x237b2e) arms because service-present bit6 of 0x11fed0 is cleared, OR the
+    contact-service never completes (needs an async cmd-0x05 response, see last gate)
+  ← bit6 is cleared by the contact-service init if ANY of:
+     (a) service_ready 0x110c2c != 1   → MODEL_DSP_SERVICE  (drains DSP ctr 0x100e4 + raises IRQ4)
+     (b) EEPROM config checksum fails   → EEPROM selftest overlay (cksum at 0x244)
+     (c) any of 24 service-channel status bytes [0x11fc60+i] (i!=11) not 0x00/0xfe/0xff:
+           - idx6 [0x11fc66]  ← CCONT reg 0xe bit 0   → MODEL_CCONT_PRESENT
+           - idx18 [0x11fc72] ← EEPROM sum16[0..0x11b] == word[0x11c] → EEPROM selftest (0x11c)
+  ← with (a),(b),(c) all satisfied, the service-channel array is clean and bit6 SURVIVES the
+    init; the D9 watchdog no longer times out once the service channel is enabled (0x11fee4).
+  ← REMAINING: the contact-service still shows CONTACT SERVICE until it *completes* — it must
+    receive a service response (cmd 0x05 → dispatcher 0x236dc6). The 0x5f00 reads go to node
+    0x18, which never answers; and the channel-open (0x2b140a, writes 0x11fee4) is itself
+    reached only by processing an incoming service message. Both need a node-0x18 responder.
 ```
+
+**Model stack (all opt-in; oracle frame stays `d8a9a7` with each, default boot byte-identical):**
+- `NOKI3210_MODEL_DSP_SERVICE` — DSP lower-service handshake (sets `service_ready`). [DONE]
+- `NOKI3210_MODEL_CCONT_PRESENT` — CCONT present-status bit (idx6). [DONE]
+- `EEPROM_PROFILE=selftest` overlay — config checksum (0x244) + tune/security checksum (0x11c, idx18). [DONE]
+- **Remaining:** a **node-`0x18` service-message responder** — the single gate left (see the
+  channel-open CORRECTION and the `0x5f00` sections).
+
+The original symptom-side detail (watchdog counter `0x11fed6`, ack `0x11fedb`) is below, but note
+**the ack is a red herring** (never written by firmware — see "Bit-6 gate investigated"); the real
+linchpin is **bit 6**, above.
 
 > **Correction (this session):** an earlier note said the dest node was `0x18`. That was a
 > probe artefact — `pm_read` logged the dest *buffer* address (low byte `0x18`), not the node.
@@ -78,32 +103,40 @@ single coherent (if multi-part) modelling project: **emulate a provisioned servi
 model must too):
 
 1. **EEPROM blocks** with valid additive checksums (`docs/eeprom_analysis.md`):
-   tune `0x00..0x3d` (+cksum `0x3e/3f`), security `0x40..0x11d` (+cksum `0x11e/11f`, IMEI + SIM
-   locks), config `0x120..0x243` (+cksum `0x244/245`). Config checksum **done**; tune/security
-   need real data + checksums (donor image or synthesis).
-2. **DSP service handshake** — MAD2 IRQ line 4 (the DSP service-completion interrupt) + the
-   DSP-shared pending counter `0x100e4` draining to 0. **MODELLED** (`NOKI3210_MODEL_DSP_SERVICE`,
-   opt-in) — replaces the `EXPERIMENT_DSP_IRQ4` force; see "DONE — DSP service handshake modelled".
-3. **D9 watchdog ack heartbeat** (`0x11fedb`). Currently *forced* by `EXPERIMENT_FORCE_ACK`.
-4. **Service-channel open** — a checksum-validated config *message* that sets the channel node
-   (`0x11fee4`) + the 0x20-byte registration (`0x2b140a`). Not modelled.
-5. **Service-node responses** — answer the firmware's PM/service reads (e.g. node-`[0x11fee4]`
-   addr `0x5f00` → a response dispatching to command `0x05` at `0x236dc6`) with the values a
-   provisioned phone returns. Not modelled. Request frame format captured (see below).
+   tune `0x00..0x3d`, security `0x40..0x11d`, config `0x120..0x243`. ✅ **MODELLED** via the
+   `EEPROM_PROFILE=selftest` overlay: config checksum (`0x244`) and the tune+security checksum
+   (`0x11c`, the idx18 gate). The block *data* is still erased (only the checksums are made
+   consistent) — sufficient for the checksum gates; real calibration data is a later concern.
+2. **DSP service handshake** — MAD2 IRQ line 4 + the DSP-shared pending counter `0x100e4` draining
+   to 0. ✅ **MODELLED** (`NOKI3210_MODEL_DSP_SERVICE`) — replaces the `EXPERIMENT_DSP_IRQ4` force;
+   sets `service_ready`. See "DONE — DSP service handshake modelled".
+3. ~~**D9 watchdog ack heartbeat** (`0x11fedb`).~~ ❌ **RED HERRING** — the ack is never written by
+   firmware; not a real requirement. The watchdog is gated by **bit 6**, not the ack. The CCONT
+   present-status (idx6) is ✅ **MODELLED** (`NOKI3210_MODEL_CCONT_PRESENT`).
+4. **Service-channel open** (`0x11fee4` + the 0x20-byte registration, `0x2b140a`). ⏳ **NOT a local
+   write** — it is reached only by processing an incoming service *message* (response-driven, see
+   the channel-open CORRECTION). Collapses into #5.
+5. **Service-node responses** — answer the firmware's reads to node `0x18` (e.g. addr `0x5f00` →
+   a response dispatching to command `0x05` at `0x236dc6`). ⏳ **THE REMAINING GATE.** Needs an
+   injected internal response message (registration → opens the channel; `0x5f00` reply → completes
+   the contact-service). Request frame format captured (see below).
 
 **Approach — incremental, against the live boot.** The `EXPERIMENT_*` forces run the boot
 *as-if-provisioned* (each forces one gate). Build one real model (e.g. a service-node responder),
 replace the corresponding force, measure how far the boot advances, repeat. This keeps the boot
 runnable at every step so progress is always measurable.
 
-**The key unknown the project answers first: cascade vs fan-out.** How many distinct
-config/response items does the firmware need before it proceeds? Unknown until the first responder
-is built — could be a handful (cascade) or a dozen+ (fan-out). That single measurement should
-gate how much effort to commit.
+**The key unknown — cascade vs fan-out — is now ANSWERED (favourably).** The service-channel
+array gate fanned out to just **two** subsystems (CCONT register `0xe` bit 0; the EEPROM
+tune/security checksum), both already-known provisioning axes — not a dozen. Four models cleared
+the whole bit-6 gate, leaving a **single** remaining gate (the node-`0x18` responder). So the
+effort is bounded.
 
-**Tools/scaffolding available:** forces (`EXPERIMENT_DSP_IRQ4`/`_AFTER_MS`, `FORCE_ACK`,
-`FORCE_SVC_CHANNEL`, `RESUME_TASK14`, `FORCE_TASK14_READY`); traces (`TRACE_PM`, `TRACE_DSP`,
-`TRACE_CONTACT_COMMIT`, `TRACE_BUS`); the captured request frame format; Ghidra-named functions
+**Tools/scaffolding available:** models (`MODEL_DSP_SERVICE`, `MODEL_CCONT_PRESENT`,
+`EEPROM_PROFILE=selftest`); diagnostic forces (`EXPERIMENT_FORCE_SVC_CHANNEL`, `EXPERIMENT_DSP_IRQ4`,
+`FORCE_ACK`, `EXPERIMENT_CLEAN_SVCCHAN`); traces (`TRACE_PM`, `TRACE_DSP`, `TRACE_CONTACT_COMMIT`,
+`TRACE_CCONT_READ`, `TRACE_BUS`) and their probes (`bit6_clear`, `idx6_ccont_check`, `idx18_cksum`,
+`chan_open`, …); the captured request frame format; Ghidra-named functions
 (`ExportNokiaFunctions.java`) and driver `FW_*` constants.
 
 ---
@@ -167,6 +200,12 @@ spinning while they wait for the (never-resumed) extended tasks. This matches th
 resume-gate finding exactly, now seen end-to-end on the bus.
 
 ## RESOLVED: it's hypothesis B (bootstrap ordering), NOT the EEPROM
+
+> **⚠️ SUPERSEDED.** The "NOT the EEPROM" conclusion was wrong. The EEPROM is a genuine gate:
+> the config-block checksum (`0x244`) and the tune/security checksum (`0x11c`, idx18) both clear
+> bit 6 when invalid — now handled by the `EEPROM_PROFILE=selftest` overlay. See the Executive
+> summary and "COMPLETE CHAIN: bit 6 is the linchpin". Bootstrap ordering was *also* real, but it
+> is not "instead of" the EEPROM.
 
 The discriminating experiment (5 passes, static + runtime) settles A-vs-B decisively in
 favour of **B: a service-transport / bootstrap-completion problem, independent of the
@@ -265,6 +304,11 @@ was not. Verifying at runtime before re-concluding is what kept this honest.
 
 ## Implementation path — #1 and #2 are ONE fix (runtime-proven)
 
+> **⚠️ SUPERSEDED.** This section is built on the `ack 0x11fedb` framing, which is a **red herring**
+> (the firmware never writes the ack non-zero anywhere reachable). The real linchpin is **bit 6**,
+> cleared by `service_ready`, the EEPROM checksums, and the service-channel array — see the
+> Executive summary and "Bit-6 gate investigated".
+
 **Decisive experiment** (`EXPERIMENT_RESUME_TASK14=1` + `TRACE_CONTACT_COMMIT`/`TRACE_BUS`):
 forcing the resume gate brings the extended tasks up — **task 8 (lower-service) now runs**,
 along with 3,4,1,0x13,0x16,9,2,6,5 — yet **`ack 0x11fedb` and `ready 0x110c2c` are still
@@ -300,6 +344,11 @@ Complete the **MBUS receive path** so a D0 service response becomes a task-08 me
 exact reply frame shape (command, payload) it expects — that defines what the RX model emits.
 
 ## ROOT FOUND: `service_ready` waits on MAD2 IRQ line 4 (the DSP/lower-service interrupt)
+
+> **⚠️ PARTLY SUPERSEDED.** This is correct *and now modelled* (`MODEL_DSP_SERVICE` drains the DSP
+> counter `0x100e4` and raises IRQ 4 — see "DONE — DSP service handshake modelled"). But it is **one
+> of three** bit-6 gates, not the sole root: the EEPROM checksums and the CCONT/EEPROM service-channel
+> entries (idx6/idx18) clear bit 6 independently. Treat "ROOT" as "one root". See the Executive summary.
 
 Tracing the `service_ready` setter to the hardware (via the driver's memory map) reaches the
 bottom of the whole investigation:
@@ -359,6 +408,12 @@ Repro: `make run-boot-progress EXPERIMENT_DSP_IRQ4=1 [EXPERIMENT_DSP_IRQ4_AFTER_
 Oracle unaffected (both knobs env-gated, frame stays `d8a9a7`).
 
 ### BREAKTHROUGH — DSP/IRQ-4 model + ack clears CONTACT SERVICE (`EXPERIMENT_DSP_IRQ4=1 EXPERIMENT_FORCE_ACK=1`)
+
+> **⚠️ SUPERSEDED (forces, not a model).** `EXPERIMENT_FORCE_ACK` brute-forces the ack, which is a
+> red herring; this "clear" only makes the boot *limp* (the contact-service never genuinely
+> completes). The faithful replacement is the model stack (`MODEL_DSP_SERVICE` + `MODEL_CCONT_PRESENT`
+> + EEPROM selftest), which makes bit 6 survive honestly. The genuine completion still needs the
+> node-`0x18` responder. See the Executive summary.
 
 Combining the DSP/IRQ-4 model (sets `service_ready` + bit 6) with forcing the D9-watchdog
 `ack` heartbeat non-zero (read shim at the watchdog's own `ldrb`, pc `0x237b42`) **clears

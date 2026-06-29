@@ -1,6 +1,13 @@
 # Static Branch Map: Boot Service Gates
 
-Generated from Thumb disassembly of `ghidra_out/3210f600a_swap16.bin`. The purpose is to keep the next two boot branches explicit so runtime experiments can target known pass/fail conditions instead of rediscovering the same path.
+Generated from Thumb disassembly of the swap16 firmware image. The purpose is to keep the next two boot branches explicit so runtime experiments can target known pass/fail conditions instead of rediscovering the same path.
+
+> **⚠️ Read `docs/service_bootstrap.md` first (its Executive summary).** This file frames the D9
+> watchdog around the **ack `0x11fedb`**. The ack is real *mechanism* (the watchdog counts up while
+> `ack==0`) but a **red herring as a fix target** — the firmware never writes the ack, and the
+> watchdog is gated **earlier by service-present bit 6** of `0x11fed0`. Keeping bit 6 set (via
+> `MODEL_DSP_SERVICE` + `MODEL_CCONT_PRESENT` + the EEPROM `selftest` checksums) stops the watchdog
+> arming at all, so the ack never matters. Trust the bit-6 chain over any "ack is the gate" wording here.
 
 ---
 

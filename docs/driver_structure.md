@@ -31,6 +31,11 @@ The real device models — `nokia_ccont_*`, `mad2_io_*`, `eeprom_*`,
   helpers now hold only non-force research shims (NV/display-source stubs, trace
   taps). Do **not** re-introduce result forcing; model the missing hardware/NV state
   instead.
+- **Update:** the "model the missing state" work is now underway — opt-in faithful
+  models `NOKI3210_MODEL_DSP_SERVICE` (DSP lower-service handshake), `NOKI3210_MODEL_CCONT_PRESENT`
+  (CCONT present-status bit), and the `EEPROM_PROFILE=selftest` checksums. Each preserves the
+  oracle and replaces an `EXPERIMENT_*` force. The remaining `EXPERIMENT_*` knobs are diagnostic
+  only. See `service_bootstrap.md` (Executive summary) for the full stack and the one open gate.
 
 ## Regression oracle
 
