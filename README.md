@@ -44,6 +44,8 @@ derived from the firmware (Ghidra decompiled listings) are git-ignored.
   additive-checksum algorithm (cross-validated with NokTool).
 - [`docs/driver_structure.md`](docs/driver_structure.md) — how the driver is organised
   (thin hardware handlers + quarantined research hooks/traces).
+- [`docs/driver_vision.md`](docs/driver_vision.md) — the per-peripheral target shape and
+  the knob→model retirement map (turning the bring-up scaffolding into a clean driver).
 - [`docs/battery_classifier_analysis.md`](docs/battery_classifier_analysis.md),
   [`docs/static_branch_map.md`](docs/static_branch_map.md),
   [`docs/firmware_code_maps.md`](docs/firmware_code_maps.md) — supporting analysis.
