@@ -1227,6 +1227,22 @@ uint8_t noki3310_state::nokia_ccont_r()
 	uint8_t addr = (m_ccont.cmd >> CCONT_CMD_ADDR_SHIFT) & 0x0f;
 	uint8_t data = m_ccont.regs[addr];
 
+	// CCONT register-1 read probe (opt-in): the idx6 service-channel check tests a cached
+	// CCONT value at index 1 & 0x90. Confirm whether the firmware actually serial-reads
+	// hardware register 1, and what the emulation returns (0 currently — write-only PWM reg).
+	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0)
+	{
+		static unsigned cr_log = 0;
+		if (cr_log++ < 60)
+			logerror("ccont_r reg=%x returns=%02x t=%.4f\n", addr, data, machine().time().as_double());
+	}
+
+	// EXPERIMENT (opt-in, diagnostic): the idx6 service-channel check reads the CCONT
+	// IRQ-status shadow [0x11238c] & 0x90 (reg 0xe). Force those bits into the reg-0xe read
+	// to validate the chain idx6 <- CCONT reg-0xe & 0x90 (does idx6 go clean?).
+	if (addr == CCONT_IRQ_STATUS && nokia_env_u32("NOKI3210_EXPERIMENT_CCONT_SVCBIT", 0) != 0)
+		data |= 0x90;
+
 	system_time systime;
 	machine().current_datetime(systime);
 
@@ -1477,6 +1493,17 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
 
+	// ccont_reg_read (0x2afb44) table probe (opt-in): log the RAM the idx6 availability
+	// check reads, to locate the "CCONT status" table it indexes (index 1 & 0x90) and what
+	// populates it — the firmware never serial-reads hardware reg 1, so the source is RAM.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc >= 0x002afb44 && pc <= 0x002afbcc)
+	{
+		static unsigned t_log = 0;
+		if (t_log++ < 16)
+			logerror("ccont_read_tbl: pc=%08x reads [%06x]=%02x t=%.4f\n",
+					pc, address, debug_ram_byte(address), machine().time().as_double());
+	}
+
 	if (pc >= 0x002b1e80 && pc <= 0x002b1f22 && address >= 0x11fc80 && address <= 0x11fc90)
 	{
 		// Boot-research shim: force the firmware-selected display type while
@@ -1567,6 +1594,20 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 					[&]{ u32 r6 = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
 					     return (r6 >= 0x100000 && r6 < 0x180000) ? debug_ram_word(r6 + 4) : 0xeeee; }());
 		}
+	}
+
+	// CCONT status-shadow writer probe (opt-in): the idx6 availability check reads the CCONT
+	// register shadow at [0x11238c] & 0x90 (currently 0). Log writers of the shadow block
+	// 0x112380..0x11238f to find what populates it (and thus what real CCONT state idx6 needs).
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
+			address >= 0x00112380 && address <= 0x0011238f)
+	{
+		const u16 oldw = m_ram[offset];
+		const u16 neww = (oldw & ~mem_mask) | (data & mem_mask);
+		if (oldw != neww)
+			logerror("ccont_shadow_write: [%06x] %04x->%04x pc=%08x lr=%08x t=%.4f\n",
+					address, oldw, neww, pc, m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+					machine().time().as_double());
 	}
 
 	// Service-channel status-array writer probe (opt-in): the contact-service bit-6 loop
@@ -2326,6 +2367,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					debug_ram_byte(sp+5), debug_ram_byte(sp+4), debug_ram_word(sp+4),
 					(r4 & 0xffff) == debug_ram_word(sp+4));
 		}
+	}
+
+	// idx6 CCONT-check result probe (opt-in): after the idx6 routine's availability call
+	// (0x295ebe: bl 0x2afb44 = ccont_reg_read, reads cache index 1 & 0x90), r0 at the return
+	// 0x295ec2 is the masked value; non-zero => idx6 clean. Log what it actually reads.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x00295ec2)
+	{
+		static unsigned idx6_log = 0;
+		if (idx6_log++ < 8)
+			logerror("idx6_ccont_check: t=%.4f r0=%02x  (idx6 clean iff r0 & 0x90 != 0)\n",
+					machine().time().as_double(), m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff);
 	}
 
 	// bit-6 service_ready check probe (opt-in): the contact-service init reads service_ready
