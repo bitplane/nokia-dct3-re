@@ -6,10 +6,12 @@ driver with disassembly tools, headless Ghidra scripts, a symbol map, and detail
 analysis docs — enough to boot the firmware in emulation and reason about why it does
 what it does.
 
-The headline result so far: a complete, validated reverse-engineering of why a
-**blank/un-provisioned 3210 halts at the CONTACT SERVICE screen**, traced end-to-end
-from the symptom down to the root (the phone is unprovisioned and the service
-bring-up correctly refuses to complete). See `docs/service_bootstrap.md`.
+The headline result: **CONTACT SERVICE is cleared.** A blank/un-provisioned 3210 halts at
+the CONTACT SERVICE screen because it is unprovisioned and the service bring-up correctly
+refuses to complete — and the whole chain, from the watchdog symptom down to the root, is now
+not only reverse-engineered end-to-end but **emulated by five faithful, opt-in models** that
+make the boot complete the service layer and leave the CONTACT SERVICE screen. See
+`docs/service_bootstrap.md`.
 
 ## ⚠️ No firmware here — bring your own
 
@@ -50,11 +52,17 @@ derived from the firmware (Ghidra decompiled listings) are git-ignored.
 
 ## Status
 
-The investigation/mapping phase is **complete** — the boot stall is fully understood.
-The next phase is a *modelling* project: emulate a provisioned service environment so
-the firmware finishes service bring-up naturally. The plan, scope, and the env-gated
-experiment scaffolding used to run the boot "as-if-provisioned" are documented in
-`docs/service_bootstrap.md`.
+**Phase 1 — CONTACT SERVICE — is complete.** The boot stall is fully understood *and* cleared
+by five faithful, opt-in models (DSP service handshake, CCONT present-bit, EEPROM config +
+tune/security checksums, and the node-`0x18` service responder). With them on, the boot completes
+the contact-service and leaves the CONTACT SERVICE screen; with them off, the default boot still
+reproduces the regression oracle (`make verify` → frame `d8a9a7`). The full chain and every model
+are documented in `docs/service_bootstrap.md` (start at "Status & model stack").
+
+**Phase 2 — the rest of the boot — is scouted but not started.** Past CONTACT SERVICE the boot
+holds at startup **mode `000d`** (the charger/startup state machine, `0x270xxx`), cycling a
+white/black display-init pattern. That is a fresh, sizeable subsystem; it is characterised at its
+base in `docs/service_bootstrap.md` ("Beyond the gate") but deliberately left for later.
 
 ## Reproducing
 
