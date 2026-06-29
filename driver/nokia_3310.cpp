@@ -1816,6 +1816,21 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 				m_battery_startup_event_step++;
 			}
 		}
+	// EXPERIMENT (opt-in, diagnostic): mode-000d advance-gate confirmation. The handler
+	// (0x270e22) completes the flag byte [0x112399] only when events 0x14/0x15/0x16/0x17 all
+	// arrive as FW_STARTUP_EVENT; 0x15/0x16 never get dequeued from the RTOS mailbox, so the
+	// flag stalls at 0x08-0x09. Inject the missing events at the dispatch write (0x270e20) to
+	// prove the gate is sufficient. NOT faithful — replace with a real CCONT measurement model.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_000D_EVENTS", 0) != 0 &&
+			pc == 0x00270e20 &&
+			address == FW_STARTUP_EVENT &&
+			mem_mask == 0xffff &&
+			ram_word(FW_STARTUP_MODE) == FW_STARTUP_MODE_CHARGER_WAIT)
+	{
+		const uint8_t flag = debug_ram_byte(0x00112399);
+		if ((flag & 0x02) == 0)        data = 0x16;   // bit 1
+		else if ((flag & 0x04) == 0)   data = 0x15;   // bit 2
+	}
 	if (nokia_env_u32("NOKI3210_CONTACT_DA_PRESERVE_READY_BIT", 0) != 0 &&
 			address == FW_CONTACT_SERVICE_STATUS &&
 			mem_mask == 0x00ff &&
@@ -2575,12 +2590,26 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// mode-000d advance gate: at the dispatch top (0x270e22) log the event the handler sees
 	// plus the two gate bytes — flag accumulator [0x112399] (needs low nibble 0xf = all of
 	// 0x14/0x15/0x16/0x17 seen) and FW_CCONT_STATE [0x11ff6c] (needs low nibble 6).
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x00270e22)
+	// mode-trajectory tracker (opt-in): log FW_STARTUP_MODE whenever it changes, sampled at
+	// the frequently-run cksum loop 0x21c4a0 — shows the full mode progression compactly.
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0021c4a0)
+	{
+		static uint16_t last_mode = 0xffff;
+		const uint16_t m = debug_ram_word(0x001123f0);
+		if (m != last_mode)
+		{
+			logerror("limp2_mode: %04x -> %04x  flag[112399]=%02x ccont_state[11ff6c]=%02x t=%.5f\n",
+					last_mode, m, debug_ram_byte(0x00112399), debug_ram_byte(0x0011ff6c),
+					machine().time().as_double());
+			last_mode = m;
+		}
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x00270e24)
 	{
 		static unsigned e4 = 0;
-		if (e4++ < 40)
+		if (e4++ < 50)
 			logerror("limp2_000dgate: ev=%02x flag[112399]=%02x ccont_state[11ff6c]=%02x t=%.5f\n",
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
+					debug_ram_word(0x001123ee) & 0xffff,
 					debug_ram_byte(0x00112399), debug_ram_byte(0x0011ff6c),
 					machine().time().as_double());
 	}

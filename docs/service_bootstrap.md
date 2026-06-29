@@ -195,13 +195,28 @@ the `0x15`/`0x16` delivery gap is the whole blocker. The charger latch (`0x1124c
 flag byte *worse*, `0x08`). Note `0x15` = `FW_STARTUP_EVENT_CCONT_BATTERY_COMPLETE`; the driver
 already has partial `CCONT_EVENT15_DELAY` / `m_startup_event15_posted` scaffolding for it.
 
-**Open (the faithful fix):** find what produces message ids `0x14`/`0x17` into the startup mailbox
-(they arrive) versus `0x15`/`0x16` (they don't) — the asymmetry is the unmodelled **CCONT
-battery-measurement-complete** signal. Model that (as with `MODEL_CCONT_PRESENT`) so `0x26ff14`
-returns `0x15` and `0x16`, completing the flag byte → mode `000d` advances. Reproduce the diagnosis
-with `NOKI3210_TRACE_LIMP2=1` (probes at `0x2697aa`, `0x2b09f2`, the charger-post sites, and the
-`0x270e22` gate). (Earlier notes here were superseded: the boot does **not** wait at `0x27124e`, and
-the readiness loop `0x2a92fc` is a *later* state — `000d` never gets that far.)
+**Gate confirmed (`EXPERIMENT_FORCE_000D_EVENTS`).** Injecting `0x16` then `0x15` at the dispatch
+write (`0x270e20`) completes the flag byte to `0x0f` and **mode `000d` advances → `0004`
+(POST_SELFTEST)** at t≈0.39 — the LCD leaves the white/black limp and renders the **battery-present
+idle screen** (frame `4235fa`: battery indicator top-right, no network/SIM). So `000d` is cleared in
+principle; **`0004` is the next gate.** (The injection is a *diagnostic scaffold*, not a faithful
+model — opt-in, oracle-preserving.)
+
+**Producer found, fix is routing.** The events `0x15`/`0x16` are posted by the **CCONT interrupt
+service routine `0x2b08c6`**: it reads the CCONT interrupt-status register (`ccont_reg_read 0x2afb44`),
+masks the active bits, and posts `0x15` (any bit) / `0x16` (charger bit) via `0x2697aa`. They *are*
+posted during `000d` — but never reach the startup task. The RTOS event router (`0x2697aa` enqueue /
+`0x26a458` dequeue) routes per-event via a runtime record table (`≈0x100140`, RAM); events `0x15`/`0x16`
+are routed away from the startup task while `0x17` reaches it. The translator `0x26ff14` has faithful
+identity cases for all of `0x14/0x15/0x16/0x17`, so the gap is purely delivery, not translation.
+
+**Open (the faithful fix):** model the missing routing/subscription so the CCONT-ISR's `0x15`/`0x16`
+posts reach the startup task's mailbox (needs runtime inspection of the per-event router records at
+`≈0x100140` — why `0x17` is delivered but `0x15`/`0x16` are not). Reproduce with `NOKI3210_TRACE_LIMP2=1`
+(probes at `0x2697aa`, `0x2b09f2`, the charger-post sites, the `0x270e24` gate, and a `limp2_mode`
+trajectory tracker) and `NOKI3210_EXPERIMENT_FORCE_000D_EVENTS=1` (the confirmed gate scaffold).
+(Earlier notes here were superseded: the boot does **not** wait at `0x27124e`, and the readiness loop
+`0x2a92fc` is a *later* state — `000d` never gets that far.)
 
 ## Reference
 
