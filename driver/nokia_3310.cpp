@@ -1237,10 +1237,15 @@ uint8_t noki3310_state::nokia_ccont_r()
 			logerror("ccont_r reg=%x returns=%02x t=%.4f\n", addr, data, machine().time().as_double());
 	}
 
-	// EXPERIMENT (opt-in, diagnostic): the idx6 service-channel availability check does a live
-	// CCONT read of register 0xe (IRQ status) masked 0x01 (ccont_reg_read(0x9001), cmd 0x74).
-	// idx6 is clean iff bit 0 is set. Force bit 0 into the reg-0xe read to confirm the lever.
-	if (addr == CCONT_IRQ_STATUS && nokia_env_u32("NOKI3210_EXPERIMENT_CCONT_SVCBIT", 0) != 0)
+	// MODEL (opt-in): CCONT register 0xe (the interrupt register) bit 0 is a persistent
+	// present/status bit, NOT a serviced interrupt — the firmware's own CCONT IRQ dispatcher
+	// (0x2b08c6) masks bits 0..2 off (`and #0xf8`) before handling. The service-channel scan
+	// reads it *live* as "is the CCONT service present?" (idx6, via ccont_reg_read(0x9001) =>
+	// CCONT cmd 0x74 => reg 0xe & 0x01). A functional CCONT reports it set on any phone (blank
+	// or provisioned); the emulation otherwise never sets it, so idx6 wrongly reads the CCONT
+	// as absent. Report it set (read-time only, so it does not perturb the IRQ-line latch).
+	// See docs/service_bootstrap.md. (Open: confirm bit-0 semantics vs a CCONT register map.)
+	if (addr == CCONT_IRQ_STATUS && nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0)
 		data |= 0x01;
 
 	system_time systime;

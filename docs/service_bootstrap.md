@@ -736,16 +736,21 @@ it sends CCONT command `0x04 | 0x70 = 0x74` → CCONT address `(0x74>>3)&0xf = 0
 
 > **idx6 is clean ⟺ bit 0 (`0x01`) of CCONT register `0xe` (IRQ status), read *live* at t≈0.0135.**
 
-Being a live read, there is **no timing wall** — a reset/early CCONT value reaches it. Confirmed by
-`EXPERIMENT_CCONT_SVCBIT` (OR `0x01` into the reg-`0xe` read): `idx6_ccont_check` flips `0x00 → 0x01`,
-**idx6 goes clean**, and the bit-6 clear loop then lists **only idx18**. (Frame stays `d8a9a7` because
-idx18 still blocks — see below.)
+Being a live read, there is **no timing wall** — a reset/early CCONT value reaches it. With the model
+(OR `0x01` into the reg-`0xe` read), `idx6_ccont_check` flips `0x00 → 0x01`, **idx6 goes clean**, and
+with `MODEL_DSP_SERVICE` also on, the bit-6 clear loop lists **only idx18** (idx14/idx15 need the DSP
+model too). Frame stays `d8a9a7` because idx18 still blocks — see below.
 
-**Open — faithfulness.** The emulated CCONT only ever sets IRQ-status to `0x08` (bit 3, the boot IRQ);
-**bit 0 is never produced**. What real CCONT condition sets IRQ-status bit 0 (and whether the emulated
-chip should report it) needs CCONT register semantics — that's the one remaining unknown for a faithful
-idx6 model (vs. the validated `EXPERIMENT_CCONT_SVCBIT` force). Bit 0 of the CCONT interrupt register
-is the lever; identifying its real source is the next step.
+**MODELLED (`NOKI3210_MODEL_CCONT_PRESENT`).** Bit 0 is a **persistent present/status bit, not a
+serviced interrupt** — proven by the firmware's *own* CCONT IRQ dispatcher (`0x2b08c6`), which masks
+bits 0..2 off (`and #0xf8`) before handling. And structurally, idx6's CCONT check is a **fallback**: the
+service-6 scan (`0x297540`) first tries a primary config-struct detector and only consults CCONT reg
+`0xe` bit 0 when that's absent. So on **any** functional phone (blank or provisioned) the CCONT reports
+this bit set; the emulation otherwise never sets it, so idx6 wrongly reads the CCONT as *absent*. The
+model reports it set (read-time only — it does not perturb the IRQ-line latch, and the dispatcher
+ignores it anyway). Validated: idx6 flips clean, **oracle frame stays `d8a9a7`**, no spurious CCONT
+interrupt, default boot byte-identical. *(Residual: confirm bit-0's exact name against a CCONT register
+map — but the "functional CCONT reports present" reading is well-supported.)*
 
 **Open — idx18.** Still the `0x264c56` **EEPROM-validity** check (reads `~0x11c/0x120`). With idx6
 modelled, idx18 is the **last** dirty service-channel entry; satisfying it should let bit 6 stay set
@@ -755,7 +760,7 @@ honest fix satisfies the underlying CCONT + EEPROM checks.
 
 Tools added: `bit6_clear`, `bit6_svcready_check`, `svcchan_write`, `idx6_ccont_check`, `ccont_read_tbl`,
 `ccont_shadow_write`, `ccont_reg_read`/`ccont_path` (`TRACE_CCONT_READ`) probes, plus the
-`EXPERIMENT_CLEAN_SVCCHAN` and `EXPERIMENT_CCONT_SVCBIT` (reg-0xe bit-0) diagnostic levers.
+`EXPERIMENT_CLEAN_SVCCHAN` and `MODEL_CCONT_PRESENT` (reg-0xe bit-0, idx6) model levers.
 
 ## CORRECTION (deep dispatch + ready-byte trace): the dispatch is NOT the ready setter
 
