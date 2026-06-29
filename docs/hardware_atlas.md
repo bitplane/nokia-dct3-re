@@ -135,8 +135,14 @@ MBUS, CCONT (power/ADC/RTC), LCD, keypad, CTRL-I/O, and the DSP interface (stubb
 yet touch: the **SIM** (`SIMI`), and — necessarily, since they come after the limp — the **RF/synth**
 (likely on a GENSIO SELECT line) and the **audio codec** (DSP). So the realistic phase-2 target is
 **"boots to idle, no SIM / no network"**; the open strategic question is how much of the DSP/RF/SIM
-the firmware *insists* on before idle vs *degrades* past. The DSP interface is both the biggest stub
-and the most likely next blocker — hence the deep-dive next.
+the firmware *insists* on before idle vs *degrades* past.
+
+**The limp gate is now diagnosed to a single CCONT signal** (see `service_bootstrap.md` "Beyond the
+gate"). Mode `000d` advances only when the flag byte `[0x112399]` reaches `0xf` (all four startup
+sub-events `0x14/0x15/0x16/0x17` delivered) **and** `FW_CCONT_STATE [0x11ff6c]` low nibble `== 6`
+(already met). It stalls because **CCONT battery-measurement events `0x15`/`0x16` are queued but never
+dequeued to the `000d` handler** — an unmodelled CCONT measurement-complete signal. That makes CCONT
+(not the DSP) the **immediate next blocker**; the DSP deep-dive still waits behind the limp.
 
 ## Knob
 

@@ -173,20 +173,35 @@ predicates, not more of the contact-service chain. (Note: long runs with the res
 emulate because this re-run is checksum-heavy; short windows complete and show the `94a2dc`/`4aab13`
 fills.)
 
-**Characterised — the limp is mode `000d` (charger phase) not advancing (`TRACE_LIMP`).** The
-**readiness loop `0x2a92fc` is never reached** *and* the charger-absent **event-wait `0x27124e` is
-never reached** either. The mode stays **`000d`** throughout. Dominant activity is a **periodic
-record-updater** (`0x220a04`, called every ~1 ms) that rewrites a 130-byte record at `[0x11fde0]` and
-refreshes its checksum via `0x21c4a0` (the `sum16` hot loop), plus the white/black display fills —
-this is just the mode-`000d` UI/state spinning, **not** the blocker. `charger_present_check`
-(`0x2b084c`) *does* run early (~t=0.33), reading **CCONT ADC channel 5** (charger voltage) `= 0` →
-"absent". So the boot detects "no charger" but **mode `000d` never advances** to the next mode
-(`000b`/`0009`/`0004`…). The advance goes through `startup_mode_set 0x2a936e` (13 callers) and the
-**mode state machine at `0x270xxx`** (a big switch keyed on a startup state byte). **Open:** find
-the exact condition that advances mode `000d` and why it is unmet — this is the next frontier (a new,
-sizeable subsystem: the startup mode / charger / battery state machine), distinct from the
-contact-service chain. (An earlier note here claimed the boot waits at `0x27124e` for event `7`; that
-was wrong — `0x27124e` is not reached.)
+**Diagnosed precisely — the mode-`000d` advance gate (`TRACE_LIMP2`).** The boot is **not frozen**:
+the startup/charger state machine runs a live loop every ~80 ms. The mode dispatcher is a **14-entry
+jump table** keyed on `FW_STARTUP_MODE`: the struct base `r4 = FW_STARTUP_DISPATCH_STATE (0x1123ec)`,
+so `[r4+2] = FW_STARTUP_EVENT (0x1123ee)` and `[r4+4] = FW_STARTUP_MODE (0x1123f0)`; mode `000d`
+dispatches to **`0x270e22`**. That branch is a **flag-accumulator wait**: it reads `FW_STARTUP_EVENT`
+(computed by the message→event translator `0x26ff14`, then written at `0x270e20` — the point the
+`BATTERY_PROFILE` model hooks) and, for events `0x14/0x16/0x15/0x17`, OR-s bits `1/2/4/8` into the
+**flag byte `[0x112399]`**. Mode `000d` **advances** (`0x270edc`) only when **both** hold:
+
+1. `FW_CCONT_STATE [0x11ff6c]` low nibble `== 6` — **satisfied** (always `06`).
+2. flag byte `[0x112399]` low nibble `== 0xf` — i.e. all four sub-events `0x14/0x15/0x16/0x17`
+   delivered as `FW_STARTUP_EVENT` — **stuck at `0x08`–`0x09`**.
+
+Root cause: **events `0x15` and `0x16` are posted to the event queue** (seen as `ev=21`/`ev=22` via
+`0x2697aa`) **but `0x26ff14` never dequeues them back to the `000d` handler**, so bits 1 & 2 never
+set. Events `0x14` and `0x17` *do* arrive (their bits set), so the path works for two of the four —
+the `0x15`/`0x16` delivery gap is the whole blocker. The charger latch (`0x1124c8`) **is** set
+(`0x2b09f2` writes it in mode `0001`), `charger_present_check 0x2b084c` runs (CCONT ADC ch5 = 0 →
+"absent"), and the `BATTERY_PROFILE=charged` model is **not** the saboteur (disabling it makes the
+flag byte *worse*, `0x08`). Note `0x15` = `FW_STARTUP_EVENT_CCONT_BATTERY_COMPLETE`; the driver
+already has partial `CCONT_EVENT15_DELAY` / `m_startup_event15_posted` scaffolding for it.
+
+**Open (the faithful fix):** find what produces message ids `0x14`/`0x17` into the startup mailbox
+(they arrive) versus `0x15`/`0x16` (they don't) — the asymmetry is the unmodelled **CCONT
+battery-measurement-complete** signal. Model that (as with `MODEL_CCONT_PRESENT`) so `0x26ff14`
+returns `0x15` and `0x16`, completing the flag byte → mode `000d` advances. Reproduce the diagnosis
+with `NOKI3210_TRACE_LIMP2=1` (probes at `0x2697aa`, `0x2b09f2`, the charger-post sites, and the
+`0x270e22` gate). (Earlier notes here were superseded: the boot does **not** wait at `0x27124e`, and
+the readiness loop `0x2a92fc` is a *later* state — `000d` never gets that far.)
 
 ## Reference
 
