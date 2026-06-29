@@ -111,9 +111,22 @@ and the DSP itself is unemulated. This is where GSM L1 and audio will land. What
   lower-service pending counter** (MCU writes `0x0002` at pc `0x290c98`; `MODEL_DSP_SERVICE` drains it
   + raises IRQ 4); `0xfe/0x100` ready flags.
 - **DSPIF `0x30000`** (stub → 0): written at boot (`pc 0x2001a4`) and during the service handshake
-  (`pc 0x29103c`, `DSPIF[1]=0x04`). Likely the command/status side of the DSP protocol — **not yet
-  reverse-engineered.** This is the next deep-dive: map the DSPIF register protocol + the shared-RAM
-  mailbox so the GSM/audio interactions have a model to talk to.
+  (`pc 0x29103c`, `DSPIF[1]=0x04`). Likely the command/status side of the DSP protocol.
+
+**Structural scope (deep-dive scout).** The DSP interface is **heavily referenced** in the firmware:
+**~287 references to DSPIF `0x30000`** and **~444 to the shared-RAM base `0x10000`**, clustered in a
+large driver layer at **`0x2b6xxx–0x2c8xxx`** — this is the **GSM-L1 / audio DSP driver**. Crucially,
+the **boot-to-limp only touches the tiny service-handshake corner** (`0x290xxx/0x291xxx`); the big
+driver layer is **not exercised until past the mode-`000d` limp**. So the DSP deep-dive has an
+**ordering dependency the atlas just surfaced**:
+- a *dynamic* deep-dive (trace the GSM/audio DSP protocol live) is **gated behind getting past the
+  limp** — the boot doesn't run that code yet;
+- a *static* deep-dive (RE the `0x2b6xxx+` driver layer cold) is possible now but is a **large,
+  multi-pass effort** (hundreds of references), and risks mapping code whose live behaviour we can't
+  yet confirm.
+Either way, the practical next move is to **get the boot past the limp first** (so the DSP driver
+actually runs and can be traced), *then* deep-dive the DSP dynamically. The shared-RAM mailbox layout
+and the service-handshake subset are already mapped (above + `service_bootstrap.md`).
 
 ## What the boot touches — and doesn't (the frontier)
 
