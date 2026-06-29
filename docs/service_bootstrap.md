@@ -123,10 +123,28 @@ the reads transmit and **stops the D9 watchdog timing out** (`D9TIMEOUT` 1→0, 
 gone) — but the frame stays `d8a9a7`: watchdog-satisfied ≠ completed. No local provider answers
 (`svc_response` count 0 in every configuration); node `0x18` is genuinely absent.
 
-**The build:** a **node-`0x18` service-message responder** — synthesise and post (a) a registration
-message so `0x2366c8`/`0x23670c` open the channel, and (b) a `0x5f00` reply whose command routes to
-`0x236dc6` with `r6==0x05` so the contact-service completes. Both are injected internal messages.
-`EXPERIMENT_FORCE_SVC_CHANNEL` remains a diagnostic stand-in for the *enable* only.
+**The build:** a **node-`0x18` service-message responder** — post the response message(s) the node
+would send. The RE is now complete; what remains is the injection engineering.
+
+**Response message spec (fully traced).** The contact-service task loop `0x237bb4` calls
+`recv 0x26a458` → `r4` = message, then dispatches on **`[msg+3]`**; `[msg+3]==0x40` →
+`0x237c70` → the sub-dispatcher **`0x237400`**, which dispatches on **`[msg+8]`**; `[msg+8]==0x64`
+→ `0x23785e` → **`0x236dc4([msg+9])`**; `[msg+9]==0x05` → result 5 → **substate 5 (HEALTHY)**. So a
+message `{[3]=0x40, [8]=0x64, [9]=0x05}` delivered to the contact-service task **completes it**. (The
+registration message that opens the channel is the same mechanism — a different `[msg+8]` command
+routing to `0x23670c`/`0x2366c8`, which checksums its payload `[msg+9..+0x40]`.)
+
+**Injection mechanism (mapped).** Messages are per-task: a TCB (stride `0x1c`) holds a ring of
+message **pointers** at `[TCB+0xc]` indexed by tail `[TCB+0x10]`. `alloc = 0x26afe0(size)`;
+`post = sched_post_task_message_26a204(task, msg)` (ring write at `0x26a2a2` + wake); `recv =
+0x26a458`. **Crucially, the contact-service frees the message after dispatch** (`0x26abf8(msg)` at
+`0x237c8e`), so an injected message must be a *real pool buffer*, not scratch RAM.
+
+**Therefore the faithful injection** is to drive the firmware's own machinery: allocate a real
+message (`0x26afe0`), fill `{[3]=0x40,[8]=0x64,[9]=0x05}`, and post it to the contact-service task
+(`0x26a204`) — e.g. by trampolining those calls from a driver hook at a safe scheduler point. That is
+the remaining build step; `EXPERIMENT_FORCE_SVC_CHANNEL` remains a diagnostic stand-in for the
+*enable* only.
 
 ## Beyond the gate (the "limp" frontier — what comes after)
 
