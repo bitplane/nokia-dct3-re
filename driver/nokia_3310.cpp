@@ -389,6 +389,11 @@ private:
 	bool          m_startup_event15_posted;
 	bool          m_startup_latch_complete_seen;
 	bool          m_after_mad2_soft_reset;
+
+	// Node-0x18 service-responder trampoline state (NOKI3210_MODEL_SVC_RESPONDER).
+	unsigned      m_svcresp_state;      // 0 idle, 1 await-alloc, 2 await-post, 3 done
+	uint32_t      m_svcresp_saved[16];  // R0..R14 + CPSR saved at the trigger point
+	uint32_t      m_svcresp_msg;        // allocated message pointer
 	bool          m_mbus_flow_d0_queued;
 	bool          m_mbus_flow_d0_phase8_queued;
 	bool          m_mbus_flow_d0_completed;
@@ -782,6 +787,8 @@ void noki3310_state::machine_reset()
 	m_startup_event15_posted = false;
 	m_startup_latch_complete_seen = false;
 	m_after_mad2_soft_reset = false;
+	m_svcresp_state = 0;
+	m_svcresp_msg = 0;
 	m_mbus_flow_d0_queued = false;
 	m_mbus_flow_d0_phase8_queued = false;
 	m_mbus_flow_d0_completed = false;
@@ -2077,6 +2084,91 @@ void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 // ============================================================================
 std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 pc, u32 addr, uint16_t mem_mask)
 {
+	// ========================================================================
+	// MODEL: node-0x18 service responder (opt-in, NOKI3210_MODEL_SVC_RESPONDER).
+	// The contact-service completes when it receives a message {[3]=0x40,[8]=0x64,
+	// [9]=0x05}; node 0x18 never answers, so we synthesise it by driving the
+	// firmware's OWN primitives — alloc 0x26afe0(size) -> fill -> post 0x26a204(task,
+	// msg) — trampolined from this instruction-fetch hook. We set PC reliably by
+	// overriding the fetched opcode with "BX r12" (after setting r12); the firmware
+	// function returns to a flash sentinel (LR=SENT|1) where the hook fires again.
+	// Trigger at the contact-service loop top 0x237bc6 (a safe point, not inside the
+	// scheduler). See docs/service_bootstrap.md.
+	if (nokia_env_u32("NOKI3210_MODEL_SVC_RESPONDER", 0) != 0 && pc == addr)
+	{
+		constexpr u32 SENT = 0x003ff000;     // unused flash addr used as a Thumb return sentinel
+		constexpr uint16_t BX_R12 = 0x4760;  // Thumb: BX r12
+		if (m_svcresp_state == 3 && nokia_env_u32("NOKI3210_SVC_RESPONDER_PCTRACE", 0) != 0)
+		{
+			static unsigned pctr = 0;
+			if (pctr < 60) { pctr++; logerror("svcresp_pc: %08x t=%.5f\n", addr, machine().time().as_double()); }
+		}
+		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
+		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
+
+		if (m_svcresp_state == 0 && addr == 0x00237bc6 &&
+				machine().time().as_double() >= nokia_env_u32("NOKI3210_SVC_RESPONDER_DELAY_MS", 450) / 1000.0)
+		{
+			for (int i = 0; i < 15; i++) m_svcresp_saved[i] = getr(i);
+			m_svcresp_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			if (nokia_env_u32("NOKI3210_MODEL_SVC_RESPONDER", 0) == 2)
+			{
+				// dry-run: save then immediately restore (tests the trampoline mechanism
+				// in isolation — should be a no-op and boot to d8a9a7).
+				for (int i = 0; i < 15; i++) setr(i, m_svcresp_saved[i]);
+				m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_svcresp_saved[15]);
+				setr(12, 0x00237bc6 | 1);
+				m_svcresp_state = 3;
+				logerror("svcresp: DRY-RUN save+restore at trigger t=%.4f\n", machine().time().as_double());
+				return BX_R12;
+			}
+			setr(0, nokia_env_u32("NOKI3210_SVC_RESPONDER_MSGSZ", 0x14));   // alloc size
+			setr(14, SENT | 1);                                            // LR -> sentinel
+			setr(12, 0x0026afe0 | 1);                                      // r12 -> alloc
+			m_svcresp_state = 1;
+			logerror("svcresp: trigger task=%02x t=%.4f -> alloc(%#x)\n",
+					debug_ram_byte(0x00100022), machine().time().as_double(),
+					nokia_env_u32("NOKI3210_SVC_RESPONDER_MSGSZ", 0x14));
+			return BX_R12;
+		}
+		if (m_svcresp_state == 1 && addr == SENT)
+		{
+			const u32 msg = getr(0);
+			if (msg >= 0x00100000 && msg < 0x00180000)
+			{
+				for (int i = 0; i < 0x14; i++) debug_ram_byte_w(msg + i, 0);
+				debug_ram_byte_w(msg + 3, nokia_env_u32("NOKI3210_SVC_RESPONDER_B3", 0x40));   // -> 0x237400 dispatch
+				debug_ram_byte_w(msg + 8, nokia_env_u32("NOKI3210_SVC_RESPONDER_B8", 0x64));   // -> response handler 0x236dc4
+				debug_ram_byte_w(msg + 9, nokia_env_u32("NOKI3210_SVC_RESPONDER_B9", 0x05));   // -> HEALTHY substate 5
+				const uint8_t task = debug_ram_byte(0x00100022);
+				setr(0, task);
+				setr(1, msg);
+				setr(14, SENT | 1);
+				setr(12, 0x0026a204 | 1);          // r12 -> post_task_message
+				m_svcresp_msg = msg;
+				m_svcresp_state = 2;
+				logerror("svcresp: alloc=%08x -> post(task=%02x msg{3=40,8=64,9=05})\n", msg, task);
+				return BX_R12;
+			}
+			// alloc failed: restore and bail
+			for (int i = 0; i < 15; i++) setr(i, m_svcresp_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_svcresp_saved[15]);
+			setr(12, 0x00237bc6 | 1);
+			m_svcresp_state = 3;
+			logerror("svcresp: alloc returned %08x (not RAM) — aborted\n", msg);
+			return BX_R12;
+		}
+		if (m_svcresp_state == 2 && addr == SENT)
+		{
+			for (int i = 0; i < 15; i++) setr(i, m_svcresp_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_svcresp_saved[15]);
+			setr(12, 0x00237bc6 | 1);              // resume the contact-service loop
+			m_svcresp_state = 3;
+			logerror("svcresp: posted; resuming contact-service loop t=%.4f\n", machine().time().as_double());
+			return BX_R12;
+		}
+	}
+
 	// Scheduler message/event BUS wiretap (opt-in): one consistent line per inter-task
 	// interaction, to reconstruct the whole startup state machine breadth-first.
 	//   post_task_message 0x26a204 / 0x26a354 (r0=target task, r1=msg ptr; msg[0..1]=id, [2]=a0,[3]=a1)

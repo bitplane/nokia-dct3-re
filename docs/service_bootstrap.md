@@ -11,21 +11,21 @@ map of that chain and the models that emulate a provisioned service environment.
 
 ## Status & model stack
 
-Four faithful models clear the entire **bit-6 / service-channel** gate; **one gate remains** —
-the node-`0x18` service responder. All models are opt-in, preserve the regression oracle
-(`make verify` → frame `d8a9a7`), and leave the default boot byte-identical.
+**CONTACT SERVICE is cleared.** Five faithful models clear the whole chain — the boot completes the
+contact-service and **leaves the CONTACT SERVICE screen** (advancing to the display-init "limp",
+see "Beyond the gate"). All models are opt-in, preserve the regression oracle (`make verify` → frame
+`d8a9a7`), and leave the default boot byte-identical.
 
 | model (env) | what it emulates | gate it clears |
 |---|---|---|
 | `NOKI3210_MODEL_DSP_SERVICE` | DSP lower-service handshake: drains pending counter `[0x100e4]`, raises IRQ 4 | `service_ready` |
 | `NOKI3210_MODEL_CCONT_PRESENT` | CCONT reg `0xe` bit 0 = present/status | service-channel idx6 |
 | `EEPROM_PROFILE=selftest` (overlay) | EEPROM config checksum (`0x244`) + tune/security checksum (`0x11c`) | EEPROM config gate + service-channel idx18 |
-| **remaining** | **node-`0x18` service responder** (registration + `0x5f00`→cmd-`0x05` reply) | channel-open + contact-service *completion* |
+| `NOKI3210_MODEL_SVC_RESPONDER` | node-`0x18` service responder — injects the healthy `0x5f00`→cmd-`0x05` reply | contact-service **completion** |
 
-With all three models on, the service-channel array is clean and bit 6 survives the
-contact-service init; enabling the channel additionally stops the D9 watchdog timing out. The
-phone still **shows** CONTACT SERVICE until the contact-service genuinely *completes* (the async
-cmd-`0x05` response), which needs the responder.
+The first three clear the **bit-6 / service-channel** gate (the array is clean and bit 6 survives the
+init). `MODEL_SVC_RESPONDER` then makes the contact-service genuinely **complete** by delivering the
+async response message the absent node `0x18` would send — so the phone leaves CONTACT SERVICE.
 
 ## How CONTACT SERVICE works (the bit-6 gate)
 
@@ -93,7 +93,18 @@ return) when the `0x5f00` read is **dropped** (channel disabled). Enabling the s
 removes this clear (and the watchdog timeout) — but completion still needs the response. This is
 the remaining gate, below.
 
-## The remaining gate: the node-`0x18` service responder
+## The node-`0x18` service responder — MODELLED (`NOKI3210_MODEL_SVC_RESPONDER`)
+
+> **DONE.** The responder injects the healthy reply node `0x18` would send, and the contact-service
+> completes — the boot leaves CONTACT SERVICE (reaches `94a2dc`/`4aab13`, the display-init limp).
+> **How it's built (trampoline):** at the contact-service loop top (`0x237bc6`, a safe point) the
+> driver's flash-fetch hook overrides the fetched opcode with `BX r12` to drive the firmware's *own*
+> primitives in sequence — `alloc 0x26afe0(0x14)` → fill `{[3]=0x40,[8]=0x64,[9]=0x05}` → `post
+> 0x26a204(contact-service task, msg)` — each call returning to a flash sentinel (`0x3ff000`) where
+> the hook fires again; finally the saved CPU state is restored and the loop resumes. The loop then
+> `recv`s the posted message and dispatches it (`[3]=0x40`→`0x237400`, `[8]=0x64`→`0x236dc4([9]=0x05)`
+> → substate 5, HEALTHY), which drives the lower-service completion (`0x2af3ca`→`0x291068`). Validated
+> end to end; default boot (responder off) unchanged. The analysis below is the pre-build map.
 
 The contact-service reads logical address **`0x5f00`** (count 2) from destination **node `0x18`**
 (`[0x11fee5]`) every ~9 ms (the D9 watchdog tick). Two things are missing, and **both reduce to
@@ -148,16 +159,19 @@ the remaining build step; `EXPERIMENT_FORCE_SVC_CHANNEL` remains a diagnostic st
 
 ## Beyond the gate (the "limp" frontier — what comes after)
 
-Running the boot *as-if-provisioned* with the diagnostic forces (`EXPERIMENT_DSP_IRQ4
-EXPERIMENT_FORCE_ACK`) clears the watchdog and advances the mode `0001 → 000d`, where it **holds**:
-the LCD cycles a white fill (`94a2dc`) / black fill (`4aab13`) display-init pattern, the
-contact-service substate `[0x11feda]` stays `0x03` (watchdog-active, never healthy), and the
-readiness loop `0x2a92fc` is never reached. PC sampler hot spots in this steady state: `memset`
-`0x2b65e4` (the fills), sum16 `0x2a41d0`, a render routine `0x25exxx` (4-bit type field at
+With the responder (and the model stack), the boot **leaves CONTACT SERVICE** and advances the mode
+`0001 → 000d`, where it currently **holds**: the LCD cycles a white fill (`94a2dc`) / black fill
+(`4aab13`) display-init pattern. (The diagnostic forces `EXPERIMENT_DSP_IRQ4 EXPERIMENT_FORCE_ACK`
+reach the same limp by brute force; the responder reaches it *faithfully*.) The post-injection PC
+trace runs `0x236dc4` → `0x2af3ca` → `0x291068` (service-completion) then grinds the **sum16 loop
+`0x2a41de`** heavily — the service-startup re-running. PC sampler hot spots: `memset` `0x2b65e4`
+(the fills), sum16 `0x2a41d0`/`0x2a41de`, a render routine `0x25exxx` (4-bit type field at
 `0x25e682`), service-startup `0x290a94`. Task 0x14 (batch-2) also needs the startup **phase byte
-`0x112449` ∈ {0,2}** (currently `01`). These are the threads *past* the responder gate — the forces
-prove the root-cause map but only let the boot "limp"; a genuine boot needs the responder (and,
-later, real calibration data / readiness predicates).
+`0x112449` ∈ {0,2}** (currently `01`). So the *next* frontier (past CONTACT SERVICE) is the
+display-init / readiness re-run — it likely needs real calibration data and/or further readiness
+predicates, not more of the contact-service chain. (Note: long runs with the responder are slow to
+emulate because this re-run is checksum-heavy; short windows complete and show the `94a2dc`/`4aab13`
+fills.)
 
 ## Reference
 
