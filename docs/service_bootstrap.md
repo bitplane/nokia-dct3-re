@@ -627,6 +627,37 @@ healthy reply. That is genuine modeling (message format + posting + the responde
 queried node), not a force — the natural stopping point of the "force/inject individual gates"
 approach. The map is complete; the build is the next phase.
 
+#### Re-assessed with the service-channel models on — channel-open now removes the D9 halt
+
+Re-running the `0x5f00` analysis *after* the DSP/CCONT/EEPROM models (service-channel array now
+fully clean, bit 6 survives the contact-service init) changes the picture from the pre-models notes
+above. Two distinct halves are now separable:
+
+- **D9 watchdog halt** — with the service channel *enabled* (`EXPERIMENT_FORCE_SVC_CHANNEL`, the
+  master flag `0x11fee4 != 0`) **plus the models**, the watchdog **no longer times out**
+  (`D9TIMEOUT` count `1 → 0`) and the second bit-6 clear at `0x237b04` (the dropped-PM-read path,
+  `lr=0x2b13b0`) **no longer fires**. So opening the channel removes the *halt* path. The doc's
+  earlier "channel-enable not sufficient" was true only pre-models.
+- **Contact-service completion** — even with the watchdog satisfied and bit 6 held, the **frame
+  stays `d8a9a7`**: the display only leaves CONTACT SERVICE on the *healthy completion* (async
+  command `0x05` via `0x236dc6`), which still needs the **response message**. Watchdog-satisfied ≠
+  completed.
+
+**Channel machinery mapped (ghidra-named).** `service_channel_lookup_2b12b4` (validity),
+`_build_request_2b12dc`, `_queue_request_2b1388`, `_request_if_enabled_2b13a2`, `_reset_2b13c0`
+(zeros the flags), and **`service_channel_startup_..._init_2abeb2`** — the channel registration
+(called from service bring-up at `0x270d48/0x270e02/0x27101e`; registers channels via `0x2b13d4`).
+The master enable byte `0x11fee4` is written from the function near `0x2b1470` (its literal pool at
+`0x2b1488`). So the channel-open is a *local* path gated on service bring-up state — a faithful
+model of "what opens the channel" is the tractable half; the async `0x05` responder (internal
+message synthesis + post) is the larger half.
+
+**Status:** this final gate is a genuine multi-pass build (the "build phase" above), now split into
+(1) **channel-open** — trace why `service_channel_startup`/the `0x11fee4` setter doesn't open the
+channel here and model it; and (2) **the `0x5f00`→cmd-`0x05` async responder** — synthesise and post
+the response message. No force was committed as a model; the `EXPERIMENT_FORCE_SVC_CHANNEL` lever
+remains diagnostic only.
+
 ### DSP service-area map (DSP shared RAM `0x10000`, `TRACE_DSP=1`)
 
 The MCU↔DSP service handshake lives in DSP shared RAM (mapped at `0x10000-0x10fff`; the DSP
