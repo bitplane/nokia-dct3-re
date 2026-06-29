@@ -647,16 +647,29 @@ above. Two distinct halves are now separable:
 `_build_request_2b12dc`, `_queue_request_2b1388`, `_request_if_enabled_2b13a2`, `_reset_2b13c0`
 (zeros the flags), and **`service_channel_startup_..._init_2abeb2`** — the channel registration
 (called from service bring-up at `0x270d48/0x270e02/0x27101e`; registers channels via `0x2b13d4`).
-The master enable byte `0x11fee4` is written from the function near `0x2b1470` (its literal pool at
-`0x2b1488`). So the channel-open is a *local* path gated on service bring-up state — a faithful
-model of "what opens the channel" is the tractable half; the async `0x05` responder (internal
-message synthesis + post) is the larger half.
+**CORRECTION — channel-open is NOT a separable "local" half; it is response-driven.** Traced the
+only writer of the master enable `0x11fee4`: function **`0x2b140a`** (`strb r1, [0x11fee4]` at
+`0x2b141c`; if `r1 != 0` it also copies the channel registration block and sets the channel-state
+bit 7). `0x2b140a` is called from exactly four sites — `0x2366f6`, `0x23672c`, `0x236e6c`, `0x236f10`
+— and **all four are contact-service message-command handlers**: `0x23670c` (caller `0x237816`) and
+`0x2366c8` (caller `0x23674a`) are *cases in the message-dispatch switch* at `0x2377fc..` (`adds
+r0,r5; bl <handler>; b 0x237890`), and they process a **received message struct** (`0x2366c8` checks
+`[r0+5] > 0x42` then checksums the payload `[r0+9..+0x40]`); `0x236e6c`/`0x236f10` are inside the
+response dispatcher `0x236dc6`. Probes `chan_open`/`chan_open_gate` confirm **none of them run** in
+our boot — `0x2b140a` is never reached, so `0x11fee4` is only ever *reset*, never set.
 
-**Status:** this final gate is a genuine multi-pass build (the "build phase" above), now split into
-(1) **channel-open** — trace why `service_channel_startup`/the `0x11fee4` setter doesn't open the
-channel here and model it; and (2) **the `0x5f00`→cmd-`0x05` async responder** — synthesise and post
-the response message. No force was committed as a model; the `EXPERIMENT_FORCE_SVC_CHANNEL` lever
-remains diagnostic only.
+So there is **no local init path** that opens the channel: a real phone opens it by **receiving a
+registration/config message from node `0x18`** (which `0x2366c8`/`0x23670c` then process). The earlier
+"channel-open is the tractable local half" split was wrong. **Channel-open and the `0x5f00` completion
+are one problem: model node `0x18`'s service responses.** Opening the channel needs the node's
+registration message; completing the contact-service needs its `0x5f00`→cmd-`0x05` reply — both are
+the same internal-message responder build. `EXPERIMENT_FORCE_SVC_CHANNEL` (which forces `0x11fee4`
+non-zero, removing the watchdog halt) remains the diagnostic stand-in for the *enable* only; it cannot
+supply the registration data or the response.
+
+**Status:** the final gate is one multi-pass build — a **node-`0x18` service-message responder**
+(registration message → channel opens; `0x5f00` reply with cmd `0x05` → contact-service completes),
+delivered as injected internal scheduler messages. No force committed as a model.
 
 ### DSP service-area map (DSP shared RAM `0x10000`, `TRACE_DSP=1`)
 

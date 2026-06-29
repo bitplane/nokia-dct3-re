@@ -2385,6 +2385,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	}
 
+	// channel-open gate probe (opt-in): 0x2366e0 is the cmp after sum16(block,0x40) (0x2a41d0);
+	// r0 = the checksum. If 0 -> enable arg = 0 (channel not opened). Then 0x2b140a is the
+	// channel-open: r1 = the master-enable value written to 0x11fee4. Log both to see the gate.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x002366e0)
+		logerror("chan_open_gate: sum16(block,0x40)=%04x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x002b140a)
+		logerror("chan_open: enable(r1)=%02x r0=%02x r2=%02x lr=%08x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+
 	// idx18 EEPROM-checksum probe (opt-in): 0x264c56 checks sum16(cache[0..0x11b]) == word[0x11c]
 	// (sum16 = 0x2a41d0 at 0x264c74). At its return site 0x264c78, r0 = the computed sum and
 	// r4 = the cache base. Log computed vs stored so the exact mismatch is known.
