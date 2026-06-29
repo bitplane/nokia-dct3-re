@@ -14,6 +14,7 @@
 #include "emu.h"
 
 #include <optional>
+#include <unordered_map>
 
 #include "cpu/arm7/arm7.h"
 #include "machine/intelfsh.h"
@@ -605,15 +606,26 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 
 static unsigned nokia_env_u32(const char *name, unsigned fallback)
 {
-	if (const char *value = std::getenv(name))
+	// Env vars don't change during a run, so memoise per name: flash_firmware_hooks
+	// fires this ~50x per instruction fetch, and an uncached getenv() there is the
+	// dominant cost of the whole emulation. Keyed by the literal pointer (every call
+	// site passes a string literal). See docs/driver_vision.md (hot-path config smell).
+	static std::unordered_map<const char *, std::optional<unsigned>> cache;
+	auto it = cache.find(name);
+	if (it == cache.end())
 	{
-		char *end = nullptr;
-		const unsigned long parsed = std::strtoul(value, &end, 0);
-		if (end != value)
-			return unsigned(parsed);
+		std::optional<unsigned> resolved;
+		if (const char *value = std::getenv(name))
+		{
+			char *end = nullptr;
+			const unsigned long parsed = std::strtoul(value, &end, 0);
+			if (end != value)
+				resolved = unsigned(parsed);
+		}
+		it = cache.emplace(name, resolved).first;
 	}
 
-	return fallback;
+	return it->second.value_or(fallback);
 }
 
 static bool nokia_env_nonempty(const char *name)
