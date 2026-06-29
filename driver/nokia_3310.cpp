@@ -2541,6 +2541,50 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (c3++ < 4) logerror("limp_chgadvance: event 7 -> post_charger_continue 0x271266 t=%.4f\n", machine().time().as_double());
 	}
 
+	// limp2 probes (opt-in): what drives the mode-000d startup task. 0x2697aa = post_startup_event
+	// (r0=event id); the three call sites of charger-detect+post 0x2b09f2; and 0x2b09f2 itself with
+	// the charger-event latch word [0x1124c8]. Shows whether ANY event reaches the task in 000d.
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x002697aa)
+	{
+		static unsigned e1 = 0;
+		if (e1++ < 60)
+			logerror("limp2_evpost: ev=%u arg=%u mode=%04x latch=%04x lr=%08x t=%.5f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
+					debug_ram_word(0x001123f0), debug_ram_word(0x001124c8),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+					machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x002b09f2)
+	{
+		static unsigned e2 = 0;
+		if (e2++ < 12)
+			logerror("limp2_chgdetect: 0x2b09f2 entry mode=%04x latch=%04x lr=%08x t=%.5f\n",
+					debug_ram_word(0x001123f0), debug_ram_word(0x001124c8),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+					machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr &&
+			(addr == 0x00270d54 || addr == 0x00270e0e || addr == 0x0027102a))
+	{
+		static unsigned e3 = 0;
+		if (e3++ < 12)
+			logerror("limp2_chgpost_site: pc=%08x reached mode=%04x t=%.5f\n",
+					pc, debug_ram_word(0x001123f0), machine().time().as_double());
+	}
+	// mode-000d advance gate: at the dispatch top (0x270e22) log the event the handler sees
+	// plus the two gate bytes — flag accumulator [0x112399] (needs low nibble 0xf = all of
+	// 0x14/0x15/0x16/0x17 seen) and FW_CCONT_STATE [0x11ff6c] (needs low nibble 6).
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x00270e22)
+	{
+		static unsigned e4 = 0;
+		if (e4++ < 40)
+			logerror("limp2_000dgate: ev=%02x flag[112399]=%02x ccont_state[11ff6c]=%02x t=%.5f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
+					debug_ram_byte(0x00112399), debug_ram_byte(0x0011ff6c),
+					machine().time().as_double());
+	}
+
 	// ccont_reg_read internal-path probe (opt-in): which branch the idx6 call (lr~0x295ec3)
 	// takes — cache (0x2afb60), live serial read (0x2afb76), or the return normaliser (0x2afbca).
 	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0 && pc == addr &&
