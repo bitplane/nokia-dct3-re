@@ -2510,19 +2510,35 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// limp probe (opt-in): the post-CONTACT-SERVICE loop grinds sum16 (0x2a41d0). Log its
 	// caller + (ptr,count) to see which block it re-validates, and whether the ADC monitor
 	// source walker (0x2a7230) is the loop.
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x002a41d0)
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x0021c4a0)
 	{
 		static unsigned l1 = 0;
-		if (l1++ < 30)
-			logerror("limp_sum16: ptr=%08x count=%04x lr=%08x t=%.4f\n",
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		if (l1++ < 24)
+			logerror("limp_loop: cksum_refresh caller lr=%08x mode=%04x t=%.5f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+					debug_ram_word(0x001123f0), machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x002a7230)
 	{
 		static unsigned l2 = 0;
 		if (l2++ < 8) logerror("limp_adcmon: 0x2a7230 reached t=%.4f\n", machine().time().as_double());
+	}
+	// charger-chain probes: does the detector run, and what event does the wait receive?
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x002b084c)
+	{
+		static unsigned c1 = 0;
+		if (c1++ < 6) logerror("limp_chgcheck: charger_present_check 0x2b084c runs t=%.4f\n", machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x00271252)
+	{
+		static unsigned c2 = 0;
+		if (c2++ < 12) logerror("limp_chgwait: recv event=%u (3=present,7=absent->go,0xe=followup) t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x00271266)
+	{
+		static unsigned c3 = 0;
+		if (c3++ < 4) logerror("limp_chgadvance: event 7 -> post_charger_continue 0x271266 t=%.4f\n", machine().time().as_double());
 	}
 
 	// ccont_reg_read internal-path probe (opt-in): which branch the idx6 call (lr~0x295ec3)

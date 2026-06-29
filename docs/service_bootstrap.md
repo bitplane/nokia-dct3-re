@@ -173,18 +173,20 @@ predicates, not more of the contact-service chain. (Note: long runs with the res
 emulate because this re-run is checksum-heavy; short windows complete and show the `94a2dc`/`4aab13`
 fills.)
 
-**Characterised — mode `000d` is the charger-detection wait (`TRACE_LIMP`).** The readiness loop
-`0x2a92fc` is **never reached**; the boot is stuck earlier, in the **charger phase**. It waits at
-`startup_charger_absent_event_wait` (`0x27124e`, via the event-recv `0x26ff14`) for a charger event:
-`3`=present, **`7`=absent → continue** (advance to `0x271266`), `0xe`=followup. The detector
-`charger_present_check` (`0x2b084c`) reads **CCONT ADC channel 5** (charger voltage) and compares to
-`0x64`; ours returns `0` → "absent". But the **charger event is never posted** — the CCONT
-charger-detect IRQ/event isn't modelled — so the boot waits forever, spinning the charger-wait UI
-(white/black fills) and a periodic 130-byte record checksum-refresh (`0x21c4a0`, the `sum16` hot
-loop on `[0x11fde0]`). **Next:** model the CCONT charger-absent event so the boot posts event `7` and
-advances past mode `000d` (functions: `startup_charger_*_event_wait_2711f6/27120e/27124e`,
-`startup_post_charger_*_271266/2712cc/271326`, `charger_present_check_2b084c`,
-`ccont_irq_charger_event16_2b0958`).
+**Characterised — the limp is mode `000d` (charger phase) not advancing (`TRACE_LIMP`).** The
+**readiness loop `0x2a92fc` is never reached** *and* the charger-absent **event-wait `0x27124e` is
+never reached** either. The mode stays **`000d`** throughout. Dominant activity is a **periodic
+record-updater** (`0x220a04`, called every ~1 ms) that rewrites a 130-byte record at `[0x11fde0]` and
+refreshes its checksum via `0x21c4a0` (the `sum16` hot loop), plus the white/black display fills —
+this is just the mode-`000d` UI/state spinning, **not** the blocker. `charger_present_check`
+(`0x2b084c`) *does* run early (~t=0.33), reading **CCONT ADC channel 5** (charger voltage) `= 0` →
+"absent". So the boot detects "no charger" but **mode `000d` never advances** to the next mode
+(`000b`/`0009`/`0004`…). The advance goes through `startup_mode_set 0x2a936e` (13 callers) and the
+**mode state machine at `0x270xxx`** (a big switch keyed on a startup state byte). **Open:** find
+the exact condition that advances mode `000d` and why it is unmet — this is the next frontier (a new,
+sizeable subsystem: the startup mode / charger / battery state machine), distinct from the
+contact-service chain. (An earlier note here claimed the boot waits at `0x27124e` for event `7`; that
+was wrong — `0x27124e` is not reached.)
 
 ## Reference
 
