@@ -218,6 +218,37 @@ trajectory tracker) and `NOKI3210_EXPERIMENT_FORCE_000D_EVENTS=1` (the confirmed
 (Earlier notes here were superseded: the boot does **not** wait at `0x27124e`, and the readiness loop
 `0x2a92fc` is a *later* state — `000d` never gets that far.)
 
+### The startup machine is a chain of event-gated modes (scaffold-march, `EXPERIMENT_SCAFFOLD_MARCH`)
+
+The mode dispatcher (`0x270c84`→jump table) is a state machine keyed on `FW_STARTUP_MODE`. Each mode's
+branch reads `FW_STARTUP_EVENT` and advances on a specific event:
+
+| mode | advances on |
+|---|---|
+| `000d` CHARGER_WAIT | flag-accumulate `0x14`+`0x15`+`0x16`+`0x17` |
+| `0004` POST_SELFTEST | `0x07` (BATTERY_READY) |
+| `000b` POST_CHARGER | `0x07` |
+| `0009` BATTERY_WAIT | `0x0e`/`0x02` |
+| `000c` | `0x04`/`0x06`/`0x0b`/`0x0d` (sub-states) |
+| `0005` READY_GATE | `0x06` |
+| `0006` SERVICE_QUIESCE_GATE | `0x03`/`0x11` |
+| `0007` BATTERY_READY_GATE | `0x07` to enter, then a **nested sub-loop** (`0x271392`) spins for `0x74` |
+
+`EXPERIMENT_SCAFFOLD_MARCH` injects each mode's advancing event at the dispatch write
+(`pc∈[0x270000,0x271600]`, `addr==FW_STARTUP_EVENT`). It marches the boot **`000d → 0004 → … → 0007`**
+(through the event-wait modes) — but **stalls at `0007`**: past the mode-level dispatch the handlers
+open **nested sub-state waits** for *specific* events at *specific* PCs (e.g. `0x74` at `0x271392`),
+and beyond those the boot stops posting startup events entirely (≤17 posts, all by t≈0.36), sitting in
+deeper subsystem-specific spins. The display falls back to the white/blank state (`94a2dc`).
+
+**Conclusion (end-of-phase finding):** the *early* startup modes are pure event-delivery gaps and are
+forceable; reaching idle is **not** cheaply scaffold-able — past `0007` it becomes an open-ended
+sequence of subsystem-completion signals (CCONT measurements, display-init readiness, the `0x74`
+completion, then the readiness predicates `0x2a92fc`). So "boots to idle" needs the **faithful
+subsystem event models**, not more scaffolding — that is the re-plan. The visual high-water mark so far
+is the **battery-present idle screen** (`4235fa`) reached at mode `0004`. `EXPERIMENT_SCAFFOLD_MARCH`
+is a rough diagnostic (some injected events are best-guesses), opt-in, oracle-preserving.
+
 ## Reference
 
 ### Key addresses

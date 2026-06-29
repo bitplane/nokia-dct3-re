@@ -1843,6 +1843,43 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		if ((flag & 0x02) == 0)        data = 0x16;   // bit 1
 		else if ((flag & 0x04) == 0)   data = 0x15;   // bit 2
 	}
+	// EXPERIMENT (opt-in, diagnostic): scaffold-march. Generalises FORCE_000D_EVENTS to the whole
+	// startup mode chain — at any dispatch write of FW_STARTUP_EVENT, inject the advancing event
+	// for the current mode (table from the per-mode dispatch disasm). Marches the boot through the
+	// charger/battery startup states to see how close idle is. NOT faithful — the real fix is a
+	// CCONT measurement-event model that produces this stream. See docs/service_bootstrap.md.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_SCAFFOLD_MARCH", 0) != 0 &&
+			address == FW_STARTUP_EVENT &&
+			mem_mask == 0xffff &&
+			pc >= 0x00270000 && pc <= 0x00271600)
+	{
+		// PC-specific nested sub-loop waits (take priority over the mode-level event)
+		if (pc == 0x00271392)   // mode-0007 tail spins until event 0x74
+		{
+			data = 0x74;
+		}
+		else
+		switch (ram_word(FW_STARTUP_MODE))
+		{
+		case 0x000d:   // flag accumulator: feed whichever of 0x14/0x16/0x15/0x17 is still missing
+		{
+			const uint8_t f = debug_ram_byte(0x00112399);
+			if      ((f & 0x01) == 0) data = 0x14;
+			else if ((f & 0x02) == 0) data = 0x16;
+			else if ((f & 0x04) == 0) data = 0x15;
+			else if ((f & 0x08) == 0) data = 0x17;
+			break;
+		}
+		case 0x0004:   data = 0x07;  break;   // POST_SELFTEST       -> BATTERY_READY
+		case 0x000b:   data = 0x07;  break;   // POST_CHARGER        -> BATTERY_READY
+		case 0x0007:   data = 0x07;  break;   // BATTERY_READY_GATE  -> BATTERY_READY
+		case 0x0005:   data = 0x06;  break;   // READY_GATE          -> event 6
+		case 0x0006:   data = 0x03;  break;   // SERVICE_QUIESCE_GATE-> event 3
+		case 0x0009:   data = 0x0e;  break;   // BATTERY_WAIT        -> CHARGER_PRESENT (try)
+		case 0x000c:   data = 0x04;  break;   // (sub-states)        -> try 0x04
+		default: break;
+		}
+	}
 	if (nokia_env_u32("NOKI3210_CONTACT_DA_PRESERVE_READY_BIT", 0) != 0 &&
 			address == FW_CONTACT_SERVICE_STATUS &&
 			mem_mask == 0x00ff &&
@@ -2574,7 +2611,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x002697aa)
 	{
 		static unsigned e1 = 0;
-		if (e1++ < 60)
+		if (e1++ < 800)
 			logerror("limp2_evpost: ev=%u arg=%u mode=%04x latch=%04x lr=%08x t=%.5f\n",
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
