@@ -752,15 +752,27 @@ ignores it anyway). Validated: idx6 flips clean, **oracle frame stays `d8a9a7`**
 interrupt, default boot byte-identical. *(Residual: confirm bit-0's exact name against a CCONT register
 map — but the "functional CCONT reports present" reading is well-supported.)*
 
-**Open — idx18.** Still the `0x264c56` **EEPROM-validity** check (reads `~0x11c/0x120`). With idx6
-modelled, idx18 is the **last** dirty service-channel entry; satisfying it should let bit 6 stay set
-(then re-test across the multi-pass init: svcready check t≈0.415, clearing loop t≈0.460). Forcing the
-entries' *reads* clean (`EXPERIMENT_CLEAN_SVCCHAN`) does **not** alone clear CONTACT SERVICE — the
-honest fix satisfies the underlying CCONT + EEPROM checks.
+**MODELLED — idx18 = EEPROM tune+security checksum (the `selftest` overlay).** `0x264c56` checks
+`sum16(EEPROM_cache[0x00..0x11b]) == word[0x11c]` (sum16 = `0x2a41d0`; the read is a **32-bit
+big-endian** word at `0x11c`). Probe `idx18_cksum`: computed **`0x1ae4`** (exactly `0x11c × 0xff` —
+the erased region) vs stored **`0xffff`** (virgin EEPROM, mismatch). A provisioned phone has a valid
+checksum there; the fix is to supply it in the `EEPROM_PROFILE=selftest` overlay — bytes
+`0x11c..0x11f = 00 00 1a e4` (outside the summed range, so they don't change the sum). Validated:
+idx18 reads clean and the **service-channel array is now entirely clean** (`bit6_clear` finds nothing).
+Oracle frame stays `d8a9a7` (default boot byte-identical).
+
+**New blocker found — a *second* bit-6 clear, beyond the service-channel array.** With the array
+clean, bit 6 (`0x11fed0`) now builds to `0xcc` and **survives the whole contact-service init**
+(`0x2346b2..0x2348xx`) — the array loop (`0x234896`) no longer clears it. But it is then cleared at a
+**different site, `0x237b04`** (t≈0.4625, `lr=0x2b13b0`), in the **D9 watchdog / service-response**
+path. `0x2b13b0` is the **PM service-read validity** return (the `0x5f00` service-node read) — so this
+is **requirement #5 (service-node responses)**: the firmware reads a service node, the read is dropped
+(node never answers), and that re-clears bit 6 → watchdog arms → CONTACT SERVICE. Clearing the
+service-channel array was **necessary but not sufficient**; the `0x5f00` PM responder is the next gate.
 
 Tools added: `bit6_clear`, `bit6_svcready_check`, `svcchan_write`, `idx6_ccont_check`, `ccont_read_tbl`,
-`ccont_shadow_write`, `ccont_reg_read`/`ccont_path` (`TRACE_CCONT_READ`) probes, plus the
-`EXPERIMENT_CLEAN_SVCCHAN` and `MODEL_CCONT_PRESENT` (reg-0xe bit-0, idx6) model levers.
+`ccont_shadow_write`, `ccont_reg_read`/`ccont_path`, `idx18_cksum` probes, plus the
+`EXPERIMENT_CLEAN_SVCCHAN` lever and the `MODEL_CCONT_PRESENT` (idx6) + EEPROM `selftest` (idx18) models.
 
 ## CORRECTION (deep dispatch + ready-byte trace): the dispatch is NOT the ready setter
 

@@ -2385,6 +2385,23 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	}
 
+	// idx18 EEPROM-checksum probe (opt-in): 0x264c56 checks sum16(cache[0..0x11b]) == word[0x11c]
+	// (sum16 = 0x2a41d0 at 0x264c74). At its return site 0x264c78, r0 = the computed sum and
+	// r4 = the cache base. Log computed vs stored so the exact mismatch is known.
+	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x00264c78)
+	{
+		static unsigned i18 = 0;
+		if (i18++ < 6)
+		{
+			const u32 base = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			const u32 computed = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
+			logerror("idx18_cksum: base=%08x computed=%04x stored[+0x11c]=%04x t=%.4f\n",
+					base, computed,
+					(base >= 0x100000 && base < 0x180000) ? debug_ram_word(base + 0x11c) : 0xeeee,
+					machine().time().as_double());
+		}
+	}
+
 	// ccont_reg_read internal-path probe (opt-in): which branch the idx6 call (lr~0x295ec3)
 	// takes — cache (0x2afb60), live serial read (0x2afb76), or the return normaliser (0x2afbca).
 	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0 && pc == addr &&
@@ -2742,6 +2759,17 @@ uint8_t noki3310_state::serial_eeprom_byte(uint16_t address) const
 				// firmware block additionally subtracts the [0x154] word.)
 				case FW_EEPROM_CONFIG_BLOCK_CKSUM:     return 0x1e;
 				case FW_EEPROM_CONFIG_BLOCK_CKSUM + 1: return 0xe1;
+				// --- tune+security region [0x00..0x11b] checksum, verified by idx18's
+				// service-channel availability check (0x264c56: sum16(EEPROM[0..0x11b]) ==
+				// 32-bit word[0x11c], big-endian). The erased region (all 0xff over 0x11c
+				// bytes) sums to 0x1ae4; store that big-endian at 0x11c..0x11f (these four
+				// bytes are outside the summed range, so they don't change the sum). A
+				// real provisioned phone has a matching checksum here; a virgin EEPROM
+				// leaves 0xffff (mismatch) — which is why idx18 reads the service absent.
+				case 0x011c: return 0x00;
+				case 0x011d: return 0x00;
+				case 0x011e: return 0x1a;
+				case 0x011f: return 0xe4;
 				// --- blocks beyond config (RF/ADC profile records, [0x0394+], [0x048c+]) ---
 				case 0x048c: return 0x0a;
 				case 0x048d: return 0x00;
