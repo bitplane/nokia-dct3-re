@@ -47,6 +47,9 @@ derived from the firmware (Ghidra decompiled listings) are git-ignored.
 - [`docs/battery_classifier_analysis.md`](docs/battery_classifier_analysis.md),
   [`docs/static_branch_map.md`](docs/static_branch_map.md),
   [`docs/firmware_code_maps.md`](docs/firmware_code_maps.md) — supporting analysis.
+- [`docs/hardware_atlas.md`](docs/hardware_atlas.md) — the firmware↔hardware boundary:
+  every MMIO region the firmware touches, tagged emulated/partial/**stub**, and what the
+  boot reaches vs not (the phase-2 map; the DSP interface is the next deep-dive).
 - [`docs/tooling.md`](docs/tooling.md) — the in-repo tools and external references
   (NokTool, IDR).
 

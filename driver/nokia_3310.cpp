@@ -2946,6 +2946,18 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 {
 	uint8_t data = m_mad2_regs[offset];
 
+	// Hardware-atlas breadth-first trace (opt-in): one line per distinct MAD2 I/O register
+	// the firmware reads, with its description + first PC. Builds docs/hardware_atlas.md.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
+	{
+		static uint16_t seen[512] = {}; static unsigned n = 0;
+		const uint16_t key = uint16_t(offset) | 0x8000;
+		bool f = false; for (unsigned i = 0; i < n; i++) if (seen[i] == key) { f = true; break; }
+		if (!f && n < 512) { seen[n++] = key;
+			logerror("mmio: R mad2[%02x] pc=%08x t=%.4f  %s\n", unsigned(offset), m_maincpu->pc(),
+					machine().time().as_double(), nokia_mad2_reg_desc(offset)); }
+	}
+
 	switch(offset)
 	{
 		case 0x00:
@@ -3115,6 +3127,16 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 	uint8_t old_data = m_mad2_regs[offset];
 	const u32 pc = m_maincpu->pc();
 	m_mad2_regs[offset] = data;
+
+	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
+	{
+		static uint16_t seen[512] = {}; static unsigned n = 0;
+		const uint16_t key = uint16_t(offset);
+		bool f = false; for (unsigned i = 0; i < n; i++) if (seen[i] == key) { f = true; break; }
+		if (!f && n < 512) { seen[n++] = key;
+			logerror("mmio: W mad2[%02x] pc=%08x t=%.4f  %s\n", unsigned(offset), pc,
+					machine().time().as_double(), nokia_mad2_reg_desc(offset)); }
+	}
 
 	// MBUS transmit/control probe (opt-in): logs writes to the MAD2 MBUS
 	// control/status/data registers so the outbound D9 service path can be
@@ -3350,23 +3372,31 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
+	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
+		logerror("mmio: R DSPIF[%x] pc=%08x t=%.4f  (STUB -> 0)\n", unsigned(offset), m_maincpu->pc(), machine().time().as_double());
 	return 0;
 }
 
 void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
+	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
+		logerror("mmio: W DSPIF[%x]=%02x pc=%08x t=%.4f  (STUB)\n", unsigned(offset), data, m_maincpu->pc(), machine().time().as_double());
 }
 
 uint8_t noki3310_state::mad2_mcuif_r(offs_t offset)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x MCUIF\n", offset);
+	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
+		logerror("mmio: R MCUIF[%x] pc=%08x t=%.4f  (STUB -> 0)\n", unsigned(offset), m_maincpu->pc(), machine().time().as_double());
 	return 0;
 }
 
 void noki3310_state::mad2_mcuif_w(offs_t offset, uint8_t data)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x MCUIF\n", offset, data);
+	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
+		logerror("mmio: W MCUIF[%x]=%02x pc=%08x t=%.4f  (STUB)\n", unsigned(offset), data, m_maincpu->pc(), machine().time().as_double());
 }
 
 void noki3310_state::noki3310_map(address_map &map)
