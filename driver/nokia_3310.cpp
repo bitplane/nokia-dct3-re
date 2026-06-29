@@ -1233,15 +1233,15 @@ uint8_t noki3310_state::nokia_ccont_r()
 	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0)
 	{
 		static unsigned cr_log = 0;
-		if (cr_log++ < 60)
+		if (cr_log++ < 4000)
 			logerror("ccont_r reg=%x returns=%02x t=%.4f\n", addr, data, machine().time().as_double());
 	}
 
-	// EXPERIMENT (opt-in, diagnostic): the idx6 service-channel check reads the CCONT
-	// IRQ-status shadow [0x11238c] & 0x90 (reg 0xe). Force those bits into the reg-0xe read
-	// to validate the chain idx6 <- CCONT reg-0xe & 0x90 (does idx6 go clean?).
+	// EXPERIMENT (opt-in, diagnostic): the idx6 service-channel availability check does a live
+	// CCONT read of register 0xe (IRQ status) masked 0x01 (ccont_reg_read(0x9001), cmd 0x74).
+	// idx6 is clean iff bit 0 is set. Force bit 0 into the reg-0xe read to confirm the lever.
 	if (addr == CCONT_IRQ_STATUS && nokia_env_u32("NOKI3210_EXPERIMENT_CCONT_SVCBIT", 0) != 0)
-		data |= 0x90;
+		data |= 0x01;
 
 	system_time systime;
 	machine().current_datetime(systime);
@@ -1499,7 +1499,7 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc >= 0x002afb44 && pc <= 0x002afbcc)
 	{
 		static unsigned t_log = 0;
-		if (t_log++ < 16)
+		if (t_log++ < 4000)
 			logerror("ccont_read_tbl: pc=%08x reads [%06x]=%02x t=%.4f\n",
 					pc, address, debug_ram_byte(address), machine().time().as_double());
 	}
@@ -2369,14 +2369,38 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 	}
 
+	// ccont_reg_read (0x2afb44) entry probe (opt-in): log arg r0 (packs reg-index<<8 | mask)
+	// and caller lr, so the idx6 call (lr~0x295ec3) and its early vs late behaviour is visible.
+	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0 && pc == addr && addr == 0x002afb44)
+	{
+		static unsigned e_log = 0;
+		if (e_log++ < 40)
+			logerror("ccont_reg_read: arg=%04x lr=%08x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
+
+	// ccont_reg_read internal-path probe (opt-in): which branch the idx6 call (lr~0x295ec3)
+	// takes — cache (0x2afb60), live serial read (0x2afb76), or the return normaliser (0x2afbca).
+	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0 && pc == addr &&
+			(addr == 0x002afb60 || addr == 0x002afb76 || addr == 0x002afbca))
+	{
+		const u32 lr2 = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		if (lr2 >= 0x00295ec0 && lr2 <= 0x00295ec4)
+			logerror("ccont_path: pc=%08x r4=%02x r5=%02x r6=%02x t=%.4f\n", pc,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R4) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R5) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xff, machine().time().as_double());
+	}
+
 	// idx6 CCONT-check result probe (opt-in): after the idx6 routine's availability call
-	// (0x295ebe: bl 0x2afb44 = ccont_reg_read, reads cache index 1 & 0x90), r0 at the return
-	// 0x295ec2 is the masked value; non-zero => idx6 clean. Log what it actually reads.
+	// (0x295ebe: bl 0x2afb44 = ccont_reg_read(0x9001) = index 0x10, mask 0x01), r0 at the
+	// return 0x295ec2 is the masked value; non-zero => idx6 clean. Log what it actually reads.
 	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 && pc == addr && addr == 0x00295ec2)
 	{
 		static unsigned idx6_log = 0;
 		if (idx6_log++ < 8)
-			logerror("idx6_ccont_check: t=%.4f r0=%02x  (idx6 clean iff r0 & 0x90 != 0)\n",
+			logerror("idx6_ccont_check: t=%.4f r0=%02x  (idx6 clean iff r0 != 0; reads CCONT reg 0xe bit0)\n",
 					machine().time().as_double(), m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff);
 	}
 

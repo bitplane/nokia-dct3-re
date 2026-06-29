@@ -726,31 +726,36 @@ So the cascade-vs-fan-out question, for this gate, resolves to **two well-unders
 (CCONT register state + EEPROM validity) — not an unbounded explosion. Both are already on the
 provisioning list.
 
-**idx6 traced to CCONT IRQ-status (reg 0xe) — blocked by boot ordering, not a missing value.**
-The idx6 availability check (`ccont_reg_read_2afb44`, arg `0x190` = index 1, mask `0x90`) reads the
-firmware's **CCONT register shadow** at RAM **`[0x11238c]`** (base ~`0x112380`, maintained by the
-CCONT serial-access routine `0x2afb10`, *not* a hardware reg-1 read — the firmware never serial-reads
-register 1). Correlating CCONT reads with shadow writes: `[0x11238c]` is fed by **CCONT register 0xe
-(IRQ status)**. Confirmed by `EXPERIMENT_CCONT_SVCBIT` (OR `0x90` into the reg-0xe read) — the `0x90`
-**propagates into the shadow** (`[0x11238c]` → `0x98`/`0x90`).
+**idx6 = CCONT register 0xe (IRQ status) bit 0 — validated (corrects an earlier decode error).**
+A 3-pass CCONT deep-dive nailed idx6 exactly. The earlier "index 1, mask `0x90`, boot-ordering wall"
+framing was a **static-decode error** (the literal was misread). The runtime arg to `ccont_reg_read`
+(`0x2afb44`) is **`0x9001`**, decoding to **index `0x10`, mask `0x01`**. Because the cached shadow
+byte `[0x11238c]` (= index `0x10`) is `0x70` (≠`0xff`), the helper takes the **live serial-read path**:
+it sends CCONT command `0x04 | 0x70 = 0x74` → CCONT address `(0x74>>3)&0xf = 0xe`, and returns
+**bit 0** of it. So:
 
-**But idx6 stays dirty**, because of *timing*: the idx6 service-channel status is computed **once at
-t≈0.0135**, and the CCONT shadow `[0x11238c]` is first written only at **t≈0.237** (reads `0` before
-that). So the CCONT "service" bits `0x90` must be present **from early boot**, before the service-
-channel scan — supplying them later (when reg 0xe is next read) is too late and idx6 is never
-recomputed. So "model CCONT register 1" resolves to: **establish CCONT IRQ-status bits `0x80`/`0x10`
-as an early/power-on condition** (what real state sets them, and whether the emulated CCONT should
-report them from reset, is the open question — likely a CCONT self-test/identification status).
+> **idx6 is clean ⟺ bit 0 (`0x01`) of CCONT register `0xe` (IRQ status), read *live* at t≈0.0135.**
 
-**Open (next pass).** (1) idx6: determine what real CCONT condition sets IRQ-status bits `0x90` at
-power-on and have the emulated CCONT report it before t≈0.013 (not a late force). (2) idx18: satisfy
-the `0x264c56` EEPROM check. Then re-test bit 6 across the **multi-pass** init (svcready check t≈0.415,
-clearing loop t≈0.460). Forcing the entries' *reads* clean (`EXPERIMENT_CLEAN_SVCCHAN`) does **not**
-alone clear CONTACT SERVICE — the honest fix satisfies the underlying CCONT + EEPROM checks at the
-right time, not the symptom.
+Being a live read, there is **no timing wall** — a reset/early CCONT value reaches it. Confirmed by
+`EXPERIMENT_CCONT_SVCBIT` (OR `0x01` into the reg-`0xe` read): `idx6_ccont_check` flips `0x00 → 0x01`,
+**idx6 goes clean**, and the bit-6 clear loop then lists **only idx18**. (Frame stays `d8a9a7` because
+idx18 still blocks — see below.)
 
-Tools added this pass: `bit6_clear`, `bit6_svcready_check`, `svcchan_write` probes (all under
-`TRACE_CONTACT_COMMIT`) and the `EXPERIMENT_CLEAN_SVCCHAN` diagnostic lever.
+**Open — faithfulness.** The emulated CCONT only ever sets IRQ-status to `0x08` (bit 3, the boot IRQ);
+**bit 0 is never produced**. What real CCONT condition sets IRQ-status bit 0 (and whether the emulated
+chip should report it) needs CCONT register semantics — that's the one remaining unknown for a faithful
+idx6 model (vs. the validated `EXPERIMENT_CCONT_SVCBIT` force). Bit 0 of the CCONT interrupt register
+is the lever; identifying its real source is the next step.
+
+**Open — idx18.** Still the `0x264c56` **EEPROM-validity** check (reads `~0x11c/0x120`). With idx6
+modelled, idx18 is the **last** dirty service-channel entry; satisfying it should let bit 6 stay set
+(then re-test across the multi-pass init: svcready check t≈0.415, clearing loop t≈0.460). Forcing the
+entries' *reads* clean (`EXPERIMENT_CLEAN_SVCCHAN`) does **not** alone clear CONTACT SERVICE — the
+honest fix satisfies the underlying CCONT + EEPROM checks.
+
+Tools added: `bit6_clear`, `bit6_svcready_check`, `svcchan_write`, `idx6_ccont_check`, `ccont_read_tbl`,
+`ccont_shadow_write`, `ccont_reg_read`/`ccont_path` (`TRACE_CCONT_READ`) probes, plus the
+`EXPERIMENT_CLEAN_SVCCHAN` and `EXPERIMENT_CCONT_SVCBIT` (reg-0xe bit-0) diagnostic levers.
 
 ## CORRECTION (deep dispatch + ready-byte trace): the dispatch is NOT the ready setter
 
