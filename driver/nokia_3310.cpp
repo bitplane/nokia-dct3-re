@@ -1191,12 +1191,6 @@ void noki3310_state::nokia_ccont_w(uint8_t data)
 				// instantaneous; the measurement state machine (next increment) will move
 				// the result + completion IRQ onto a timer.
 				uint16_t ad_value = m_ccont.adc_src[ad_id & 0x07];
-				if (ad_id == CCONT_ADC_CHARGER_VOLTAGE && m_startup_latch_complete_seen && nokia_env_nonempty("NOKI3210_ADC5_AFTER_READY"))
-				{
-					const unsigned delay_ms = nokia_env_u32("NOKI3210_ADC5_AFTER_READY_DELAY_MS", 0);
-					if (machine().time() >= m_startup_latch_complete_time + attotime::from_msec(delay_ms))
-						ad_value = nokia_env_u32("NOKI3210_ADC5_AFTER_READY", ad_value) & 0x03ff;
-				}
 
 				m_ccont.regs[addr] = data;
 				m_ccont.regs[CCONT_ADC_LSB] = ad_value & 0xff;
@@ -1274,17 +1268,6 @@ uint8_t noki3310_state::nokia_ccont_r()
 		case 0x8:       data = systime.local_time.minute;           break;
 		case 0x9:       data = systime.local_time.hour;             break;
 		case 0xa:       data = systime.local_time.mday;             break;
-	}
-	if ((addr == CCONT_ADC_LSB || addr == CCONT_ADC_MSB) && m_ccont.adc_channel == CCONT_ADC_CHARGER_VOLTAGE &&
-			m_startup_latch_complete_seen && nokia_env_nonempty("NOKI3210_ADC5_AFTER_READY"))
-	{
-		const unsigned delay_ms = nokia_env_u32("NOKI3210_ADC5_AFTER_READY_DELAY_MS", 0);
-		if (machine().time() >= m_startup_latch_complete_time + attotime::from_msec(delay_ms))
-		{
-			const uint16_t value = nokia_env_u32("NOKI3210_ADC5_AFTER_READY", m_ccont.adc_value) & 0x03ff;
-			data = (addr == CCONT_ADC_LSB) ? (value & 0xff) : (0xb0 | ((value >> 8) & 0x03));
-			m_ccont.adc_value = value;
-		}
 	}
 
 	m_ccont.dc = !m_ccont.dc;
