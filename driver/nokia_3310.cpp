@@ -437,6 +437,10 @@ private:
 		uint8_t   adc_channel;
 		uint16_t  adc_value;
 		uint32_t  adc_log_count;
+		// ADC source values (10-bit) the chip "measures", indexed by ccont_adc_channel.
+		// Populated from the power scenario at reset; the measurement path samples these.
+		// This is the ccont_device's "what the chip senses" model (replacing per-read knobs).
+		uint16_t  adc_src[8];
 		uint8_t   irq_line;
 		uint8_t   boot_status;
 		bool      irq_asserted;
@@ -784,6 +788,16 @@ void noki3310_state::machine_reset()
 	m_ccont.adc_channel = 0;
 	m_ccont.adc_value = 0;
 	m_ccont.adc_log_count = 0;
+	// Load the ADC source model from the power scenario. Per-channel defaults are the
+	// chip's "battery present, no charger" rest state; nokia_adc_override applies the
+	// NOKI3210_ADC_PROFILE / ADCn knobs on top, so values are identical to before (the
+	// override is constant for a run). The scenario will become a typed object later.
+	{
+		static const uint16_t adc_default[8] =
+				{ 0x000, 0x3ff, 0x3ff, 0x280, 0x200, 0x000, 0x200, 0x000 };
+		for (unsigned id = 0; id < 8; id++)
+			m_ccont.adc_src[id] = nokia_adc_override(id, adc_default[id]);
+	}
 	m_ccont.irq_line = nokia_env_u32("NOKI3210_CCONT_IRQ_LINE", 6) & 0xff;
 	m_ccont.boot_status = nokia_env_u32("NOKI3210_CCONT_BOOT_STATUS", CCONT_BOOT_IRQ_DEFAULT) & 0xff;
 	m_ccont.irq_asserted = false;
@@ -1182,18 +1196,10 @@ void noki3310_state::nokia_ccont_w(uint8_t data)
 			case CCONT_ADC_CTRL:
 			{
 					uint16_t ad_id = (data >> 4) & 0x07;
-				uint16_t ad_value = 0;
-				switch(ad_id)
-				{
-					case CCONT_ADC_ACCESSORY:         ad_value = nokia_adc_override(ad_id, 0x000);   break;
-					case CCONT_ADC_RSSI:              ad_value = nokia_adc_override(ad_id, 0x3ff);   break;
-					case CCONT_ADC_BATTERY_VOLTAGE:   ad_value = nokia_adc_override(ad_id, 0x3ff);   break;
-					case CCONT_ADC_BATTERY_TYPE:      ad_value = nokia_adc_override(ad_id, 0x280);   break;
-					case CCONT_ADC_BATTERY_TEMP:      ad_value = nokia_adc_override(ad_id, 0x200);   break;
-					case CCONT_ADC_CHARGER_VOLTAGE:   ad_value = nokia_adc_override(ad_id, 0x000);   break;
-					case CCONT_ADC_VCXO_TEMP:         ad_value = nokia_adc_override(ad_id, 0x200);   break;
-					case CCONT_ADC_CHARGING_CURRENT:  ad_value = nokia_adc_override(ad_id, 0x000);   break;
-				}
+				// Sample the ADC source model (the conversion result). Today this is
+				// instantaneous; the measurement state machine (next increment) will move
+				// the result + completion IRQ onto a timer.
+				uint16_t ad_value = m_ccont.adc_src[ad_id & 0x07];
 				if (ad_id == CCONT_ADC_CHARGER_VOLTAGE && m_startup_latch_complete_seen && nokia_env_nonempty("NOKI3210_ADC5_AFTER_READY"))
 				{
 					const unsigned delay_ms = nokia_env_u32("NOKI3210_ADC5_AFTER_READY_DELAY_MS", 0);
