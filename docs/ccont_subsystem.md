@@ -187,9 +187,37 @@ with `0x15`/`0x16` being a red-herring requirement on a blank unit? That is the 
 rather than forcing events.
 
 ⚠️ Several of these producer **bodies don't decompile cleanly** even in Ghidra ("bad instruction data" —
-a Thumb-decode issue), so we rely on the **names** + the clean caller-side disasm. Confirming the exact
-`0x15` post path (and whether a provisioned phone reaches flag `0x0f` via a different channel) is the
-remaining 🔴 — but it is now a **specific** question about `0x2b09f2`'s post mechanism, not a mystery.
+a Thumb-decode issue), so we rely on the **names** + the clean caller-side disasm.
+
+## Is `0x15`/`0x16` delivery provisioning-gated? — investigated: NO (but a bigger finding)
+
+Dumped, at `000d`, the per-event router records (`0x100140 + ev*0xc`) for all four sweep events and the
+channel-enable/provisioning flags. Result:
+
+```
+chan_enable[0x11fee4]=0000   mask[0x11ff08]=00000000
+ev=14 rec@100230: +6=01 +7=01 +8=01 +9=14 +a=00
+ev=15 rec@10023c: +6=01 +7=01 +8=01 +9=15 +a=00     ← byte-identical to 0x14/0x17
+ev=16 rec@100248: +6=01 +7=01 +8=01 +9=16 +a=00
+ev=17 rec@100254: +6=01 +7=01 +8=01 +9=17 +a=00
+```
+
+🟢 **Not provisioning-gated at the event level.** The records for `0x14/0x15/0x16/0x17` are byte-identical
+— nothing singles out `0x15`/`0x16`. The delivery asymmetry is purely **structural**: the producers use
+the *direct* primitives (`0x26a354`/`0x2a0fae`) for `0x14`/`0x17` and the *delayed* `0x2697aa` for
+`0x15`/`0x16`. Same firmware code on any phone — so a provisioned unit wouldn't deliver `0x15`/`0x16`
+differently *at this level*. (Probe: `limp2_prov`, opt-in under `TRACE_LIMP2`.)
+
+🟡 **The bigger finding — we reach `000d` in an artificial state.** The **channel-enable provisioning
+flags are still `0`** at `000d`. We cleared CONTACT SERVICE via the *responder trampoline* (faking the
+node-0x18 completion), **not** by provisioning those flags — so we are past CONTACT SERVICE with the
+provisioning state still absent. That means the whole post-CONTACT-SERVICE region (incl. the `000d`
+sweep) is reached in a state the real firmware never occupies, so its gates can't be reasoned about
+faithfully by pushing harder. **Strategic implication:** the clean path to idle is probably to clear
+CONTACT SERVICE *via real provisioning state* (set the channel-enable/EEPROM data) so subsequent gates
+inherit a consistent state — i.e. **provision, don't force**. This is the same emulation-vs-provisioning
+tension as CONTACT SERVICE, now recurring one layer down. The `000d` `0x15`/`0x16` incompleteness is
+likely a *symptom* of the forced clear, not an independently-modelable CCONT gate.
 
 ## Open questions (the mapping backlog)
 

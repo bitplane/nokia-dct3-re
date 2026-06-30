@@ -2623,6 +2623,25 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (dq++ < 200 && id != 0)
 			logerror("limp2_deq: msgid=%02x mode=%04x t=%.5f\n",
 					id, debug_ram_word(0x001123f0), machine().time().as_double());
+		// provisioning-gate check (one-shot at 000d): dump the channel-enable flags (the
+		// CONTACT-SERVICE provisioning state) and the per-event records at 0x100140+ev*0xc for the
+		// sweep events, to compare delivering (0x14/0x17) vs not (0x15/0x16).
+		static bool dumped = false;
+		if (!dumped && debug_ram_word(0x001123f0) == 0x000d)
+		{
+			dumped = true;
+			logerror("limp2_prov: chan_enable[11fee4]=%02x%02x mask[11ff08]=%02x%02x%02x%02x\n",
+					debug_ram_byte(0x0011fee4), debug_ram_byte(0x0011fee5),
+					debug_ram_byte(0x0011ff08), debug_ram_byte(0x0011ff09),
+					debug_ram_byte(0x0011ff0a), debug_ram_byte(0x0011ff0b));
+			for (uint8_t ev : { 0x14, 0x15, 0x16, 0x17 })
+			{
+				const offs_t r = 0x00100140 + ev * 0xc;
+				logerror("limp2_prov: ev=%02x rec@%06x: +6=%02x +7=%02x +8=%02x +9=%02x +a=%02x\n",
+						ev, r, debug_ram_byte(r+6), debug_ram_byte(r+7),
+						debug_ram_byte(r+8), debug_ram_byte(r+9), debug_ram_byte(r+0xa));
+			}
+		}
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x002b09f2)
 	{
