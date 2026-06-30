@@ -120,8 +120,9 @@ constexpr uint8_t MAD2_MBUS_RX_ENABLE = 0x40;
 constexpr uint16_t MAD2_FIQ_TIMER0_COMPARE = 0x04;
 constexpr uint16_t MAD2_FIQ_MBUS_MASK = 0x0c;
 
-// CCONT serial command/status bits used by the current charger/battery model.
-constexpr uint8_t CCONT_BOOT_IRQ_DEFAULT = 0x08;
+// CCONT serial command/status bits + fixed wiring (hardware constants, not configurable).
+constexpr uint8_t CCONT_BOOT_IRQ_DEFAULT = 0x08;  // IRQ status the CCONT raises at boot (pulse 0)
+constexpr uint8_t CCONT_IRQ_LINE_NUM = 6;         // MAD2 IRQ line the CCONT asserts
 constexpr uint8_t CCONT_CMD_READ = 0x04;
 constexpr uint8_t CCONT_CMD_ADDR_SHIFT = 3;
 
@@ -798,8 +799,8 @@ void noki3310_state::machine_reset()
 		for (unsigned id = 0; id < 8; id++)
 			m_ccont.adc_src[id] = nokia_adc_override(id, adc_default[id]);
 	}
-	m_ccont.irq_line = nokia_env_u32("NOKI3210_CCONT_IRQ_LINE", 6) & 0xff;
-	m_ccont.boot_status = nokia_env_u32("NOKI3210_CCONT_BOOT_STATUS", CCONT_BOOT_IRQ_DEFAULT) & 0xff;
+	m_ccont.irq_line = CCONT_IRQ_LINE_NUM;            // fixed hardware wiring (was CCONT_IRQ_LINE knob)
+	m_ccont.boot_status = CCONT_BOOT_IRQ_DEFAULT;     // fixed boot IRQ status (was CCONT_BOOT_STATUS knob)
 	m_ccont.irq_asserted = false;
 	m_serial_eeprom = {};
 
@@ -940,18 +941,8 @@ void noki3310_state::ccont_set_irq_status(uint8_t status, const char *reason)
 
 uint8_t noki3310_state::ccont_boot_status(unsigned pulse) const
 {
-	uint8_t status = m_ccont.boot_status;
-	if (nokia_env_nonempty("NOKI3210_CCONT_IRQ_SEQUENCE"))
-	{
-		if (!nokia_env_u8_at("NOKI3210_CCONT_IRQ_SEQUENCE", pulse, status))
-			return 0;
-		return status;
-	}
-
-	if (nokia_env_nonempty("NOKI3210_CCONT_IRQ_STATUS"))
-		return nokia_env_u32("NOKI3210_CCONT_IRQ_STATUS", status) & 0xff;
-
-	return (pulse == 0) ? status : 0;
+	// The CCONT raises its boot IRQ (status 0x08) once, on the first pulse.
+	return (pulse == 0) ? m_ccont.boot_status : 0;
 }
 
 uint8_t noki3310_state::keypad_irq_state() const
