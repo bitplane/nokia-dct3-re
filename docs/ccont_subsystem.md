@@ -208,16 +208,29 @@ the *direct* primitives (`0x26a354`/`0x2a0fae`) for `0x14`/`0x17` and the *delay
 `0x15`/`0x16`. Same firmware code on any phone — so a provisioned unit wouldn't deliver `0x15`/`0x16`
 differently *at this level*. (Probe: `limp2_prov`, opt-in under `TRACE_LIMP2`.)
 
-🟡 **The bigger finding — we reach `000d` in an artificial state.** The **channel-enable provisioning
-flags are still `0`** at `000d`. We cleared CONTACT SERVICE via the *responder trampoline* (faking the
-node-0x18 completion), **not** by provisioning those flags — so we are past CONTACT SERVICE with the
-provisioning state still absent. That means the whole post-CONTACT-SERVICE region (incl. the `000d`
-sweep) is reached in a state the real firmware never occupies, so its gates can't be reasoned about
-faithfully by pushing harder. **Strategic implication:** the clean path to idle is probably to clear
-CONTACT SERVICE *via real provisioning state* (set the channel-enable/EEPROM data) so subsequent gates
-inherit a consistent state — i.e. **provision, don't force**. This is the same emulation-vs-provisioning
-tension as CONTACT SERVICE, now recurring one layer down. The `000d` `0x15`/`0x16` incompleteness is
-likely a *symptom* of the forced clear, not an independently-modelable CCONT gate.
+🟡 **Observation:** the **channel-enable flags are still `0`** at `000d` — we cleared CONTACT SERVICE via
+the *responder trampoline* (faking node-0x18), not by provisioning those flags. This *looked* like it
+implied "provision, don't force" (clear CS via real provisioning state so later gates inherit
+consistency).
+
+⚠️ **That implication was TESTED and REFUTED (commit follows).** Ran two experiments:
+- **Provision the enable flag, drop the responder.** `0x11fee4` is **read-only from the firmware**
+  (it never *writes* it), so the existing `FORCE_SVC_CHANNEL` write-hook is **broken** — it never fires.
+  Forcing the *read* of `0x11fee4` non-zero (`EXPERIMENT_PROV_READ=0x0100`) + `CLEAN_SVCCHAN`, no
+  responder → **CONTACT SERVICE does NOT clear** (frame stays `d8a9a7`). So provisioning the enable flag
+  *alone* is insufficient; the service-node **response** is still required.
+- **Mode vs display are decoupled.** The startup mode machine reaches `000d` **regardless** of the
+  responder/CONTACT-SERVICE state — the responder only toggles the bit-6 *display* (CONTACT SERVICE
+  screen vs the limp), not the mode machine.
+
+**Corrected conclusion:** "provision instead of force" is a **false dichotomy**. (1) Clearing CONTACT
+SERVICE fundamentally requires *modelling the service-node response* — a runtime handshake even a
+provisioned phone performs — so the responder trampoline is **modelling a real response, not faking
+provisioning data**. (2) The `000d` `0x15`/`0x16` events are **startup events** (`sched_post_2697aa`), a
+**different subsystem** than the service-channel enable flags — so provisioning those flags **cannot**
+affect the `000d` gate. The `000d` blocker is **structural** (the delayed-channel `0x15`/`0x16`),
+**independent of provisioning**. The "reached in an artificial state" observation is true but does *not*
+gate `000d`. (Cleanup note: `EXPERIMENT_FORCE_SVC_CHANNEL` is a broken write-hook — a removal candidate.)
 
 ## Open questions (the mapping backlog)
 

@@ -1534,6 +1534,16 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 			pc == 0x00237b42)
 		data |= 0x0001;
 
+	// EXPERIMENT (opt-in): provision the service-channel enable flag at READ time. The firmware
+	// only READS 0x11fee4 (never writes it), so the write-hook FORCE_SVC_CHANNEL can't set it.
+	// Force the read to a provisioned value to test whether provisioning the enable flag (vs the
+	// responder trampoline) clears CONTACT SERVICE / changes the post-CS 000d state.
+	{
+		const unsigned prov_enable = nokia_env_u32("NOKI3210_EXPERIMENT_PROV_READ", 0);
+		if (prov_enable != 0 && address == 0x0011fee4)
+			data |= (prov_enable & mem_mask);
+	}
+
 	// EXPERIMENT: force the service-channel enable flag (0x11fee4, even byte = high byte)
 	// non-zero so PM reads are not dropped at 0x2b12b4 AND the post is not skipped inside
 	// 0x2b12dc. Paired with EXPERIMENT_FORCE_SVC_CHANNEL's validity-return force (0x2b13b0).
