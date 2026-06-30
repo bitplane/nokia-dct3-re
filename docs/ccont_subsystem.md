@@ -161,15 +161,30 @@ So the `000d` gate **= "wait for the CCONT power-on/charger sweep"** (charger-so
 charger-IRQ + ccont-init). That's the faithful name, and it makes the `ccont_device`'s role concrete:
 own these signals.
 
-🟡 **The surfacing asymmetry (mechanism — careful, partly inferred).** The `000d` handler *entry* calls
-**both** `0x2b09f2` (→`0x15`) and `0x2af086` (→`0x17`) right before the dispatch loop (clean disasm at
-`0x270e0e`/`0x270e18`). Yet `0x17` surfaces (bit 3) and `0x15` does not (bit 2). The difference is the
-**post channel**: `0x2af086` lands `0x17` directly in the task ring `sched_recv` returns, whereas the
-CCONT events `0x15`/`0x16` go via `sched_post_2697aa` — the **delayed/timer** channel (it schedules
-through the timer mechanism; that's why `0x2697aa` posts don't appear directly in the dequeue). They are
-reflected as a timer event (`0xd5`), and `0x26ff14`'s `0xd5` case *re-posts* `0x15` via `0x2697aa`
-again — a reflection that never lands a standalone `0x15` in the ring. (🟡 the loop is inferred from the
-structure, not yet directly traced; the producer identities and the two-channel split are 🟢.)
+🟢 **The surfacing asymmetry — confirmed at the producer level (per-event post channel).** The `000d`
+handler *entry* calls **both** `0x2b09f2` (→`0x15`) and `0x2af086` (→`0x17`) right before the dispatch
+loop (clean disasm `0x270e0e`/`0x270e18`), yet `0x17` surfaces (bit 3) and `0x15` does not (bit 2). The
+difference is the **post channel**, now read directly from each producer:
+
+| event | producer | posts via | channel | surfaces to `000d`? |
+|---|---|---|---|---|
+| `0x14` | `0x2abdc0`/`0x2abde4` | `startup_event14_latch_and_schedule 0x2a0fae` | direct schedule | ✅ |
+| `0x15` | `0x2b09f2` | `sched_post_2697aa` (`0x2b0a12`) | **delayed/timer** | ❌ |
+| `0x16` | `0x2b0958` | `sched_post_2697aa` | **delayed/timer** | ❌ |
+| `0x17` | `0x2af086` | `sched_context_post_message 0x26a354` | direct message | ✅ |
+
+So the two events that **never surface** (`0x15`/`0x16`) are exactly the two on the **delayed `0x2697aa`
+channel**; the two that surface (`0x14`/`0x17`) use **direct** channels (`0x26a354` / `0x2a0fae`). Runtime
+matches: the `limp2_evpost` trace shows `0x2697aa` called with `0x15`(`ev=21`)/`0x16`(`ev=22`) but never
+`0x14`/`0x17`. The `0x2697aa` posts schedule through the timer mechanism and reflect as the `0xd5` timer
+event (whose `0x26ff14` case re-posts `0x15` via `0x2697aa` again) — 🟡 that the reflection *never*
+lands a standalone `0x15` in the ring is the one inferred step; the per-event channel split itself is 🟢.
+
+**So the faithful question is now precise:** does a *provisioned* phone close the `000d` gate at all via
+`0x15`/`0x16` (delayed) — or does the gate only need `0x14`/`0x17` plus the `CCONT_STATE==6` condition,
+with `0x15`/`0x16` being a red-herring requirement on a blank unit? That is the next thing the
+`ccont_device` work must answer (likely by feeding real CCONT measurement values and watching the flag),
+rather than forcing events.
 
 ⚠️ Several of these producer **bodies don't decompile cleanly** even in Ghidra ("bad instruction data" —
 a Thumb-decode issue), so we rely on the **names** + the clean caller-side disasm. Confirming the exact
