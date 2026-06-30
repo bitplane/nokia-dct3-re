@@ -107,16 +107,29 @@ driver) to fill the message payloads — confirming these are CCONT measurement 
 them as task-message to task `03`** (the startup task) via `0x26a204`. Sequence built: a `0x13`
 message (with a CCONT read), then `0x14`, then a `0x15`/`0x16` message, then `0x16`/`0x1a`…
 
-🟡 **Two producers, two channels — and the `0x15` gap.** Mailbox messages (this emitter →
-`0x26a204` → task 3 → dequeued by `0x26a458`/`0x26ff14`) are a *different* channel from startup-events
-(`0x2697aa`). The `000d` handler reads the **mailbox**. Runtime dequeue at `0x26ff14` shows ids
-`0x14`, `0x16`, `0x17` arrive as mailbox messages — but **`0x15` never arrives as a dispatched id**:
-in the emitter it is written as a *payload sub-field* (`[msg+4]=0x15`) of a message whose routing id
-(`[msg+2]`) is `0x16`, so when dequeued the handler sees `0x16`, never standalone `0x15`. Hence flag
-bit 2 (= event `0x15`) never sets. Separately, the CCONT **ISR** `0x2b08c6` posts `0x15`/`0x16` only as
-`0x2697aa` *events* (wrong channel for `000d`) plus `0x77xx` PMM messages. 🟡 Exact dispatched-id
-offset (`[msg+2]` vs `[msg+4]`) and why bit 1 (`0x16`) also lagged in earlier runs are the remaining
-loose ends.
+🟢 **Message format and dispatched-id offset (measured).** The emitter posts task-3 messages with the
+header `00 02 [class] 70 [event] [param] …`, where **`[msg+2]` = class** and **`[msg+4]` = event**.
+The startup dispatcher's id (what `0x26ff14` returns to the `000d` handler) is **`[msg+4]`, gated by the
+class `[msg+2]`** — only certain classes pass their `[+4]` through. Measured (post header → raw dequeued id):
+
+| `[+2]` class | `[+4]` event | surfaced to `000d`? |
+|---|---|---|
+| `0x06` | `0x13` | no |
+| `0x0e` | `0x14` | **yes → `0x14`** |
+| `0x16` | `0x15` | no |
+| `0x1a` | `0x16` | **yes → `0x16`** |
+
+🟢 **The `0x15` gap (now exact).** `0x15` is the `[+4]` event of a message whose **class `[+2]=0x16`**,
+and that class is *not* passed through to the startup dispatch — so `0x15` is structurally trapped as the
+*parameter* of a `0x16`-class message and never surfaces as its own `000d` sub-event. Hence flag bit 2
+(= `0x15`) never sets. (Two channels confirmed: the `000d` handler reads this **mailbox**; the CCONT ISR
+`0x2b08c6` posts `0x15`/`0x16` only as `0x2697aa` *events* — a different channel — plus `0x77xx` PMM msgs.)
+
+🟡 **Implication for the fix.** The gate is a **message-class routing** issue, not a missing measurement:
+the emitter *does* produce a `0x15`, but as a class-`0x16` parameter the startup dispatch ignores. The
+faithful question for `ccont_device` is narrower still — feed the emitter the CCONT values that make it
+emit `0x15` as a pass-through class (or confirm real hardware reaches `0x0f` another way). 🔴 open: what
+distinguishes the classes the dispatch passes (`0x0e`/`0x1a`) from those it drops (`0x06`/`0x16`).
 
 🟢 **Naming (proven path):** the `000d` gate = "wait for the contact-service-init CCONT measurement
 report sweep (task-3 messages from emitter `0x264f30`) to deliver all four sub-events." The faithful
@@ -128,8 +141,10 @@ CCONT reads, not a missing interrupt.
 
 - 🟢 ~~Where are events `0x14`/`0x17` posted?~~ **Resolved:** emitter `0x264f30` (called once from
   contact-service init `0x2347c6`), reading CCONT, posting task-3 mailbox messages. See "The sweep emitter".
-- 🟡 Exact dispatched-id offset in the emitter's messages (`[msg+2]` vs `[msg+4]`) and the timing/mode
-  nuance for bit 1 (`0x16`).
+- 🟢 ~~Exact dispatched-id offset~~ **Resolved:** id = `[msg+4]` (event), class-gated by `[msg+2]`.
+  Measured post-header→dequeue table above.
+- 🔴 What distinguishes the message classes the startup dispatch passes through (`0x0e`/`0x1a`) from
+  those it drops (`0x06`/`0x16`) — the key to why `0x15` (a class-`0x16` param) never reaches the gate.
 - 🟡 Exact CCONT command-word encoding (the `0x90ff`/`0x11ff`/`0x9001` arg format → reg + mask).
 - 🟡 The result-selector byte at `0x1124d2`(?) and how `0x77xx` results map back to ADC channels.
 - 🟡 Which task subscribes to `0x77xx`, and why `0x15`/`0x16` reach (or don't reach) the startup task (the routing records `≈0x100140`).
