@@ -230,7 +230,30 @@ provisioning data**. (2) The `000d` `0x15`/`0x16` events are **startup events** 
 **different subsystem** than the service-channel enable flags — so provisioning those flags **cannot**
 affect the `000d` gate. The `000d` blocker is **structural** (the delayed-channel `0x15`/`0x16`),
 **independent of provisioning**. The "reached in an artificial state" observation is true but does *not*
-gate `000d`. (Cleanup note: `EXPERIMENT_FORCE_SVC_CHANNEL` is a broken write-hook — a removal candidate.)
+gate `000d`. (Cleanup note: `EXPERIMENT_FORCE_SVC_CHANNEL` was a broken write-hook — since removed.)
+
+## Trying to set the enable flags via a `0x70` channel-map response — traced, dead-end (probe `svc70`)
+
+Idea: make the firmware set `0x11fee4` itself by delivering a command-`0x70` (channel-map) response through
+the responder, instead of forcing the flag. Traced end-to-end (with `SVC_RESPONDER_B9=0x70`):
+
+- The responder's injected message routes **task 02 → `0x237400` (dispatch) → `0x236dc4` (response
+  handler)**, with `r0 = command`. Command `0x05` (the completion) is in `0x236dc4`'s **jump table for
+  commands `0..0xa`**; the responder works because `0x05 ≤ 0xa`.
+- 🟢 Command `0x70` (`> 0xa`) takes `0x236dc4`'s **generic high-command path `0x236e60`**, which calls the
+  config writer `0x2b140a` with **all-zero args (`r0=r1=r2=r3=0`)** — that's a **reset/clear**, not an
+  apply. So `0x70` via the responder *clears* the enable flags (they stay `0`), confirmed by the trace.
+- 🟢 The **real channel-map apply `0x2366c8`** (which reads the map from a message and sets `0x11fee4`) has
+  one caller, `0x23674a`, inside the **specific `0x70/0x71` handler `0x23670c`** — which is dispatched from
+  **`0x237816`** (the contact-service task's own command loop), a **different path** the responder never
+  uses.
+
+**Conclusion:** the responder can deliver the *completion* (`0x05`, jump-table) but **cannot** deliver the
+*channel-map* (`0x70`) — they go through different dispatches, and the responder's path routes `0x70` to a
+reset. Setting the enable flags faithfully would need injecting into the contact-service command path
+(`0x237816`/`0x23670c`) with the real `0x70` message format **and** the channel-map data (still unknown for
+a 3210 — the `0x2366c8` apply reads it from the message payload). So "model the `0x70` response" needs both
+a different injection point and the provisioned map data; the simple responder-extension does not reach it.
 
 ## Open questions (the mapping backlog)
 

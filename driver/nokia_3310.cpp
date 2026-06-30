@@ -2614,6 +2614,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	}
 	// startup-message dequeue probe: at 0x26ff1a (just after bl 0x26a458) log the raw message id
 	// r0 the translator received — the channel the 000d handler actually reads (vs 0x2697aa events).
+	// 0x70 channel-map response probes: does the 0x70/0x71 command handler (0x23670c) and/or the
+	// channel-map-apply (0x2366c8) run, with what enable flags? Tests delivering a 0x70 response via
+	// the responder (SVC_RESPONDER_B9=0x70) so the firmware sets 0x11fee4 itself.
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr &&
+			(addr == 0x00236dc4 || addr == 0x00236e60 || addr == 0x002b140a))
+	{
+		static unsigned ch70 = 0;
+		if (ch70++ < 24)
+			logerror("svc70: pc=%08x (236dc4=resp,236e60=high-cmd,2b140a=config-writer) r0=%02x r6=%02x enable[11fee4]=%02x%02x t=%.5f\n",
+					pc, m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xff,
+					debug_ram_byte(0x0011fee4), debug_ram_byte(0x0011fee5), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
 	{
 		static unsigned dq = 0;
