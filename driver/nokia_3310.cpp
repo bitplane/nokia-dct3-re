@@ -1535,20 +1535,15 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 		data |= 0x0001;
 
 	// EXPERIMENT (opt-in): provision the service-channel enable flag at READ time. The firmware
-	// only READS 0x11fee4 (never writes it), so the write-hook FORCE_SVC_CHANNEL can't set it.
-	// Force the read to a provisioned value to test whether provisioning the enable flag (vs the
-	// responder trampoline) clears CONTACT SERVICE / changes the post-CS 000d state.
+	// only READS 0x11fee4 (never writes it), so a write-side force can't set it — force the read.
+	// Used to test whether provisioning the enable flag (vs the responder trampoline) clears
+	// CONTACT SERVICE / changes the post-CS 000d state. Result: it does NOT (see ccont_subsystem.md).
 	{
 		const unsigned prov_enable = nokia_env_u32("NOKI3210_EXPERIMENT_PROV_READ", 0);
 		if (prov_enable != 0 && address == 0x0011fee4)
 			data |= (prov_enable & mem_mask);
 	}
 
-	// EXPERIMENT: force the service-channel enable flag (0x11fee4, even byte = high byte)
-	// non-zero so PM reads are not dropped at 0x2b12b4 AND the post is not skipped inside
-	// 0x2b12dc. Paired with EXPERIMENT_FORCE_SVC_CHANNEL's validity-return force (0x2b13b0).
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_SVC_CHANNEL", 0) != 0 && address == 0x0011fee4)
-		data |= 0x0100;
 
 	// EXPERIMENT (opt-in, diagnostic — like FORCE_ACK, not a model): the contact-service
 	// bit-6 loop (0x23487e) clears service-present bit 6 unless every service-channel status
@@ -2268,14 +2263,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			pc == addr && addr == 0x002a931e)
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 1);
 
-	// EXPERIMENT (opt-in): force the PM read-validity check to pass for service reads.
-	// 0x2b13b0 is the return site of the validity check (r0 = valid, r5 = address); the
-	// reads are otherwise dropped because the channel enable flag 0x11fee4 is 0. Forcing
-	// r0=1 makes the request actually transmit, so we can see whether a provider answers
-	// (svc_response at 0x236dc6) or the node is genuinely absent. See docs/service_bootstrap.md.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_SVC_CHANNEL", 0) != 0 &&
-			pc == addr && addr == 0x002b13b0)
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 1);
 
 	// Task-resume batch-2 gate probe (opt-in): task 14's resume is in the second,
 	// conditionally-skipped batch of the startup resume sequence. Log the gate
@@ -2454,7 +2441,8 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 
 	// Request-message dump (opt-in): at the post site 0x2b0482 (r0 = message ptr), dump
 	// the request frame for the 0x5f00 read ([msg+8/9] = address) so the response format
-	// can be synthesised. Needs EXPERIMENT_FORCE_SVC_CHANNEL so the request is built.
+	// can be synthesised. Only fires when the read actually transmits (i.e. the channel is
+	// enabled / the validity check passes) — on a blank phone the read is dropped.
 	if (nokia_env_u32("NOKI3210_TRACE_PM", 0) != 0 && pc == addr && addr == 0x002b0482)
 	{
 		static unsigned req_log = 0;
