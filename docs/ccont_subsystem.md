@@ -145,14 +145,36 @@ The translator `0x26ff14` is a big near-identity switch on that id; the **`0xd5`
 calls the **CCONT ISR `0x2b08c6`** then `sched_post_2697aa(0x15, …)` (so a dequeued `0xd5` re-emits
 event `0x15` on the `0x2697aa` channel — the wrong one for `000d`).
 
-🔴 **Narrowed open question.** The sweep ids `0x14`/`0x17` are **not** in the timer table (`0xc0+`), so they
-arrive via **ring A or B**. They are **not** posted by the two scheduler post primitives with a literal —
-`sched_post_2697aa` (the `0x2697aa` event channel) is never called with `0x14`/`0x17` (confirmed by the
-`limp2_evpost` trace), and `sched_post2_2698e4` only with `0xe1`. So the producer is either a
-variable-arg poster or the delay/timer-expiry path that writes a ring. Next: find what writes `0x14`/`0x17`
-into the task-3 ring (a `FindRefs` over the ring-buffer address, or trace the ring-write site). Note this
-is **RTOS-scheduler plumbing between CCONT and the startup machine** — the CCONT chip map itself (ISR,
-registers, ADC, `0x77xx` PMM) is solid and independent of resolving it.
+## The four `000d` sweep producers — RESOLVED (Ghidra named corpus)
+
+The ring-ref hunt found all four, already named by prior analysis, **all CCONT/charger** — which finally
+nails the `000d` gate's meaning:
+
+| event | producer (named) | addr | what it is |
+|---|---|---|---|
+| `0x14` | `startup_event14_source7_{absent,present}_producer` (+ `..latch_and_schedule_2a0fae`) | `0x2abdc0`/`0x2abde4` | 🟢 the **charger "source 7" present/absent** event (cf. the `7=absent->go` limp note) |
+| `0x15` | `ccont_battery_init_post_event15` | `0x2b09f2` | 🟢 CCONT **battery-init** (also writes the charger latch `0x1124c9`) |
+| `0x16` | `ccont_irq_charger_event16_payload6` | `0x2b0958` | 🟢 the CCONT **ISR charger** (bit-3) path |
+| `0x17` | `ccont_init_post_startup_event17` | `0x2af086` | 🟢 CCONT **init** startup event |
+
+So the `000d` gate **= "wait for the CCONT power-on/charger sweep"** (charger-source7 + battery-init +
+charger-IRQ + ccont-init). That's the faithful name, and it makes the `ccont_device`'s role concrete:
+own these signals.
+
+🟡 **The surfacing asymmetry (mechanism — careful, partly inferred).** The `000d` handler *entry* calls
+**both** `0x2b09f2` (→`0x15`) and `0x2af086` (→`0x17`) right before the dispatch loop (clean disasm at
+`0x270e0e`/`0x270e18`). Yet `0x17` surfaces (bit 3) and `0x15` does not (bit 2). The difference is the
+**post channel**: `0x2af086` lands `0x17` directly in the task ring `sched_recv` returns, whereas the
+CCONT events `0x15`/`0x16` go via `sched_post_2697aa` — the **delayed/timer** channel (it schedules
+through the timer mechanism; that's why `0x2697aa` posts don't appear directly in the dequeue). They are
+reflected as a timer event (`0xd5`), and `0x26ff14`'s `0xd5` case *re-posts* `0x15` via `0x2697aa`
+again — a reflection that never lands a standalone `0x15` in the ring. (🟡 the loop is inferred from the
+structure, not yet directly traced; the producer identities and the two-channel split are 🟢.)
+
+⚠️ Several of these producer **bodies don't decompile cleanly** even in Ghidra ("bad instruction data" —
+a Thumb-decode issue), so we rely on the **names** + the clean caller-side disasm. Confirming the exact
+`0x15` post path (and whether a provisioned phone reaches flag `0x0f` via a different channel) is the
+remaining 🔴 — but it is now a **specific** question about `0x2b09f2`'s post mechanism, not a mystery.
 
 ## Open questions (the mapping backlog)
 
