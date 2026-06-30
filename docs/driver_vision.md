@@ -115,7 +115,7 @@ on a GENSIO SELECT line; the SIM is a UART peer. Both are post-idle frontiers.
 |---|---|---|---|---|
 | 1 | **CCONT battery-measurement events** | `CCONT_EVENT15_DELAY`, `STARTUP_EVENT15_DELAY_CLAMP`, `ADC5_AFTER_READY*`, `BATTERY_PROFILE`(part) | the **limp** (mode `000d` → next) | **in progress** |
 | 2 | **MBUS service-bus peer** | the `MBUS_D0_*` / `MBUS_RX_*` family (~15 knobs) | service transport (D0/D9), node-0x18 | scoped |
-| 3 | **CCONT ADC state object** | `ADC_PROFILE`, `ADC0/5`, `CCONT_BOOT_STATUS`, `MODEL_CCONT_PRESENT` | folds into #1 | scoped |
+| 3 | **CCONT device** (`adc_src[]` model + constants) | ~~`ADC_PROFILE`/`ADC0-7`~~ (now feed `adc_src[]`), ~~`CCONT_IRQ_LINE`~~, ~~`CCONT_BOOT_STATUS`~~, ~~`CCONT_IRQ_SEQUENCE`~~, ~~`CCONT_IRQ_STATUS`~~, ~~`ADC5_AFTER_READY*`~~ (constants/removed); `MODEL_CCONT_PRESENT` (kept, opt-in) | folds into #1 | **in progress** — 6 knobs retired (commits `3476eb0`/`c50f368`/`e8b63b3`) |
 | 4 | **Startup machine self-advance** | `POST_READY_KEY*`, `CONTACT_*`, `SUPPRESS_SIM_CONTEXT_EVENTS`, `MODEL_SVC_RESPONDER` | falls out of #1+#2 | follows #1,#2 |
 | 5 | **DSP mailbox responder** | `MODEL_DSP_SERVICE`, `EXPERIMENT_DSP_IRQ4*` | DSP handshake → then GSM/audio | gated behind limp |
 | — | (keep) `TRACE_*` (13) | — | diagnostics, not debt | keep, opt-in |
