@@ -46,6 +46,9 @@ derived from the firmware (Ghidra decompiled listings) are git-ignored.
   (thin hardware handlers + quarantined research hooks/traces).
 - [`docs/driver_vision.md`](docs/driver_vision.md) — the per-peripheral target shape and
   the knob→model retirement map (turning the bring-up scaffolding into a clean driver).
+- [`docs/ccont_subsystem.md`](docs/ccont_subsystem.md) — the CCONT power-management subsystem:
+  confidence-tagged protocol map (serial regs, ADC, the interrupt→event/message fan-out) and
+  the target `ccont_device` component. The first subsystem to model faithfully.
 - [`docs/battery_classifier_analysis.md`](docs/battery_classifier_analysis.md),
   [`docs/static_branch_map.md`](docs/static_branch_map.md),
   [`docs/firmware_code_maps.md`](docs/firmware_code_maps.md) — supporting analysis.
