@@ -95,15 +95,41 @@ checks the channel is enabled via the flags at `0x11fee4`/`0x11ff08`, `0x2b12dc`
 is exactly why some results don't reach a given subscriber on a blank phone.
 
 🟡 **The startup-machine meaning of the gate events.** Mode `000d`'s four sub-events `0x14/0x15/0x16/0x17`
-(flag byte `0x112399`, see `service_bootstrap.md`) are **CCONT ADC-measurement completions**: a power-on
-sweep measures the battery/charger suite before proceeding, each completion posting one sub-event. The
-ISR is proven to post `0x15` (any) and `0x16` (charger, bit 3); 🔴 the posters of `0x14` and `0x17` (the
-other two completions — likely battery-V and BSI/temp) are not yet located. Closing that is the next
-proof step.
+(flag byte `0x112399`, see `service_bootstrap.md`) are **CCONT measurement reports** delivered to the
+startup task as a one-shot sequence (see "The sweep emitter" below).
+
+## The sweep emitter `0x264f30` — who posts `0x14/0x15/0x16/0x17` (traced)
+
+🟢 The `000d` sweep events are posted by a single emitter **`0x264f30`**, whose **only caller is
+`0x2347c6` — inside the contact-service init**. So they are emitted *once*, early, not on a repeating
+CCONT-interrupt loop. The emitter **reads CCONT** (`0x2b0a74` / `0x2b0c62`, in the `0x2b0xxx` CCONT
+driver) to fill the message payloads — confirming these are CCONT measurement reports — and **posts
+them as task-message to task `03`** (the startup task) via `0x26a204`. Sequence built: a `0x13`
+message (with a CCONT read), then `0x14`, then a `0x15`/`0x16` message, then `0x16`/`0x1a`…
+
+🟡 **Two producers, two channels — and the `0x15` gap.** Mailbox messages (this emitter →
+`0x26a204` → task 3 → dequeued by `0x26a458`/`0x26ff14`) are a *different* channel from startup-events
+(`0x2697aa`). The `000d` handler reads the **mailbox**. Runtime dequeue at `0x26ff14` shows ids
+`0x14`, `0x16`, `0x17` arrive as mailbox messages — but **`0x15` never arrives as a dispatched id**:
+in the emitter it is written as a *payload sub-field* (`[msg+4]=0x15`) of a message whose routing id
+(`[msg+2]`) is `0x16`, so when dequeued the handler sees `0x16`, never standalone `0x15`. Hence flag
+bit 2 (= event `0x15`) never sets. Separately, the CCONT **ISR** `0x2b08c6` posts `0x15`/`0x16` only as
+`0x2697aa` *events* (wrong channel for `000d`) plus `0x77xx` PMM messages. 🟡 Exact dispatched-id
+offset (`[msg+2]` vs `[msg+4]`) and why bit 1 (`0x16`) also lagged in earlier runs are the remaining
+loose ends.
+
+🟢 **Naming (proven path):** the `000d` gate = "wait for the contact-service-init CCONT measurement
+report sweep (task-3 messages from emitter `0x264f30`) to deliver all four sub-events." The faithful
+fix is therefore *not* "make the CCONT ISR fire more" — it is to make the emitter's sweep deliver a
+standalone `0x15` (or recognise the `0x15` payload), i.e. a **firmware-data/sequence** gap fed by
+CCONT reads, not a missing interrupt.
 
 ## Open questions (the mapping backlog)
 
-- 🔴 Where are events `0x14` and `0x17` posted? (the other two ADC completions) — needed to fully name the `000d` sweep.
+- 🟢 ~~Where are events `0x14`/`0x17` posted?~~ **Resolved:** emitter `0x264f30` (called once from
+  contact-service init `0x2347c6`), reading CCONT, posting task-3 mailbox messages. See "The sweep emitter".
+- 🟡 Exact dispatched-id offset in the emitter's messages (`[msg+2]` vs `[msg+4]`) and the timing/mode
+  nuance for bit 1 (`0x16`).
 - 🟡 Exact CCONT command-word encoding (the `0x90ff`/`0x11ff`/`0x9001` arg format → reg + mask).
 - 🟡 The result-selector byte at `0x1124d2`(?) and how `0x77xx` results map back to ADC channels.
 - 🟡 Which task subscribes to `0x77xx`, and why `0x15`/`0x16` reach (or don't reach) the startup task (the routing records `≈0x100140`).

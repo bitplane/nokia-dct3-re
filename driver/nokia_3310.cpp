@@ -2619,6 +2619,37 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					machine().time().as_double());
 	}
+	// task-message POST probe: at 0x26a204(r0=task, r1=msgptr) scan the message buffer for a
+	// sweep-event id (0x14/0x16/0x17); log offset, value, target task, and caller lr — finds the
+	// producers of the mailbox messages the 000d handler consumes.
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026a204)
+	{
+		static unsigned pp = 0;
+		const u32 task = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		const u32 msg  = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+			for (int off = 0; off < 10; off++)
+			{
+				const u8 v = debug_ram_byte(msg + off);
+				if ((v == 0x14 || v == 0x16 || v == 0x17) && pp++ < 30)
+				{
+					logerror("limp2_post: msg+%d=%02x task=%02x lr=%08x mode=%04x t=%.5f\n",
+							off, v, task, m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+							debug_ram_word(0x001123f0), machine().time().as_double());
+					break;
+				}
+			}
+	}
+	// startup-message dequeue probe: at 0x26ff1a (just after bl 0x26a458) log the raw message id
+	// r0 the translator received — the channel the 000d handler actually reads (vs 0x2697aa events).
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
+	{
+		static unsigned dq = 0;
+		const u32 id = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
+		if (dq++ < 200 && id != 0)
+			logerror("limp2_deq: msgid=%02x mode=%04x t=%.5f\n",
+					id, debug_ram_word(0x001123f0), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x002b09f2)
 	{
 		static unsigned e2 = 0;
