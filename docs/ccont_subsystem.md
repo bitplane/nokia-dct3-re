@@ -131,22 +131,28 @@ falsified all of that — recorded here so it isn't a future bum steer:**
 
 ## Corrected open question (the real lead)
 
-🔴 **What internal source inside `0x26a458` generates the surfaced `0x14`/`0x17`, and what should
-generate `0x15`?** These are scheduler-internal events, not message posts. Two results from the chase:
+**The dispatcher `0x26a458` — correct structure (Ghidra, after capstone desynced).** Decompiled locally
+(`ghidra_out/.../sched_recv_26a458.c`; Ghidra output is git-ignored — read, never commit). It is the
+per-task receive that returns the next event id, from **three queues** on the task record (`task*0x1c`):
 
-- 🟢 **Found a real id table at `0x2d71a8`** (used by `0x26a458`'s timer branch, indexed `[node+9]*8`,
-  8-byte entries). Decoded (halfword-unswapped) it maps index→id **`0xc0, 0xc1, 0xc3 … 0xd5, 0xd6, 0xd7`**
-  — the **timer/system message family** (the `0xc3` tick ×181, the `0xd5` CCONT event, etc.; these
-  dominate the dequeue trace). But the sweep ids `0x14`/`0x17` are **not** in this table (it's `0xc0+`),
-  so they come from a different path.
-- ⚠️ **Tooling limit reached.** Capstone's linear disassembly of `0x26a458` **desyncs** (a per-fetch
-  mechanism probe confirmed: entry `0x26a458` and epilogue `0x26a688` fire, but the supposed
-  `str [sp,#4]` sites `0x26a4ee`/`0x26a5ec`/`0x26a658` are *never executed* — they're phantom
-  instructions from a misaligned sweep). So the "three queues + str offsets" structure inferred here is
-  unreliable. **Use the repo's Ghidra tooling** (`ghidra/scripts/`) to get a correct CFG of `0x26a458`
-  before probing further — and note this is **RTOS-scheduler internals, somewhat tangential to CCONT**
-  proper (the chip-level map — ISR, registers, ADC, `0x77xx` PMM — is solid and independent of it).
-  **Do not** re-assert the emitter/offset/class model above without new evidence.
+1. 🟢 **Timer/delay queue** `[task+8]`: pops a delay node, returns `table[0x2d71a8 + [node+9]*8]`. That
+   table maps index→id **`0xc0…0xd7`** — the timer/system family (the `0xc3` tick, the `0xd5` CCONT
+   event). (My earlier `0x2d71a8` guess was right; the desync didn't reach it.)
+2. 🟢 **Ring A** `[task+0x14]` (head `[+0x19]`, tail `[+0x18]`): returns `ringA[idx]`.
+3. 🟢 **Ring B** `[task+0xc]` (head `[+0x11]`, tail `[+0x10]`), gated by `([task2+0xf] & 1)==0`: returns `ringB[idx]`.
+
+The translator `0x26ff14` is a big near-identity switch on that id; the **`0xd5` case** is special — it
+calls the **CCONT ISR `0x2b08c6`** then `sched_post_2697aa(0x15, …)` (so a dequeued `0xd5` re-emits
+event `0x15` on the `0x2697aa` channel — the wrong one for `000d`).
+
+🔴 **Narrowed open question.** The sweep ids `0x14`/`0x17` are **not** in the timer table (`0xc0+`), so they
+arrive via **ring A or B**. They are **not** posted by the two scheduler post primitives with a literal —
+`sched_post_2697aa` (the `0x2697aa` event channel) is never called with `0x14`/`0x17` (confirmed by the
+`limp2_evpost` trace), and `sched_post2_2698e4` only with `0xe1`. So the producer is either a
+variable-arg poster or the delay/timer-expiry path that writes a ring. Next: find what writes `0x14`/`0x17`
+into the task-3 ring (a `FindRefs` over the ring-buffer address, or trace the ring-write site). Note this
+is **RTOS-scheduler plumbing between CCONT and the startup machine** — the CCONT chip map itself (ISR,
+registers, ADC, `0x77xx` PMM) is solid and independent of resolving it.
 
 ## Open questions (the mapping backlog)
 
