@@ -113,9 +113,9 @@ on a GENSIO SELECT line; the SIM is a UART peer. Both are post-idle frontiers.
 
 | # | Model to build | Knobs it retires | Gate it clears | Status |
 |---|---|---|---|---|
-| 1 | **CCONT battery-measurement events** | `CCONT_EVENT15_DELAY`, `STARTUP_EVENT15_DELAY_CLAMP`, `ADC5_AFTER_READY*`, `BATTERY_PROFILE`(part) | the **limp** (mode `000d` → next) | **in progress** |
-| 2 | **MBUS service-bus peer** | the `MBUS_D0_*` / `MBUS_RX_*` family (~15 knobs) | service transport (D0/D9), node-0x18 | scoped |
-| 3 | **CCONT device** (`adc_src[]` model + constants) | ~~`ADC_PROFILE`/`ADC0-7`~~ (now feed `adc_src[]`), ~~`CCONT_IRQ_LINE`~~, ~~`CCONT_BOOT_STATUS`~~, ~~`CCONT_IRQ_SEQUENCE`~~, ~~`CCONT_IRQ_STATUS`~~, ~~`ADC5_AFTER_READY*`~~ (constants/removed); `MODEL_CCONT_PRESENT` (kept, opt-in) | folds into #1 | **in progress** — 6 knobs retired (commits `3476eb0`/`c50f368`/`e8b63b3`) |
+| 1 | ~~**CCONT battery-measurement events**~~ → **the `000d` limp is structural, not a missing model** | — | the **limp** (mode `000d`) | **reframed** — the gate needs `0x15`/`0x16` delivered, but they're posted on the *delayed* scheduler channel by design (not a missing measurement model); see `ccont_subsystem.md`. Blocked on provisioned data, not buildable here. |
+| 2 | **MBUS service-bus peer** | the `MBUS_D0_*` / `MBUS_RX_*` family (~15 knobs) | service transport (D0/D9), node-0x18 | scoped (also service-protocol/data-bound) |
+| 3 | **CCONT device** (`adc_src[]` model + constants) | ~~`ADC_PROFILE`/`ADC0-7`~~ (now feed `adc_src[]`), ~~`CCONT_IRQ_LINE`~~, ~~`CCONT_BOOT_STATUS`~~, ~~`CCONT_IRQ_SEQUENCE`~~, ~~`CCONT_IRQ_STATUS`~~, ~~`ADC5_AFTER_READY*`~~, ~~`FORCE_SVC_CHANNEL`~~ (constants/removed); `MODEL_CCONT_PRESENT` (kept, opt-in) | — | **largely done** — 7 knobs retired (`3476eb0`/`c50f368`/`e8b63b3`/`1dea8c2`). Measurement path confirmed *already faithful* (sync ADC + firmware timer-poll); no measurement SM to build for the boot. Async charger/RTC IRQs are post-idle. |
 | 4 | **Startup machine self-advance** | `POST_READY_KEY*`, `CONTACT_*`, `SUPPRESS_SIM_CONTEXT_EVENTS`, `MODEL_SVC_RESPONDER` | falls out of #1+#2 | follows #1,#2 |
 | 5 | **DSP mailbox responder** | `MODEL_DSP_SERVICE`, `EXPERIMENT_DSP_IRQ4*` | DSP handshake → then GSM/audio | gated behind limp |
 | — | (keep) `TRACE_*` (13) | — | diagnostics, not debt | keep, opt-in |
