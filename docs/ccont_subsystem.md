@@ -95,56 +95,54 @@ checks the channel is enabled via the flags at `0x11fee4`/`0x11ff08`, `0x2b12dc`
 is exactly why some results don't reach a given subscriber on a blank phone.
 
 🟡 **The startup-machine meaning of the gate events.** Mode `000d`'s four sub-events `0x14/0x15/0x16/0x17`
-(flag byte `0x112399`, see `service_bootstrap.md`) are **CCONT measurement reports** delivered to the
-startup task as a one-shot sequence (see "The sweep emitter" below).
+(flag byte `0x112399`, see `service_bootstrap.md`) are believed to be **CCONT measurement reports**, but
+their exact source is **open** — see the Correction section below (an earlier "they come from emitter
+`0x264f30`" conclusion was falsified; they appear to be scheduler-internal events from `0x26a458`).
 
-## The sweep emitter `0x264f30` — who posts `0x14/0x15/0x16/0x17` (traced)
+## ⚠️ Correction — the emitter `0x264f30` is NOT the source of the surfaced sweep ids (falsified)
 
-🟢 The `000d` sweep events are posted by a single emitter **`0x264f30`**, whose **only caller is
-`0x2347c6` — inside the contact-service init**. So they are emitted *once*, early, not on a repeating
-CCONT-interrupt loop. The emitter **reads CCONT** (`0x2b0a74` / `0x2b0c62`, in the `0x2b0xxx` CCONT
-driver) to fill the message payloads — confirming these are CCONT measurement reports — and **posts
-them as task-message to task `03`** (the startup task) via `0x26a204`. Sequence built: a `0x13`
-message (with a CCONT read), then `0x14`, then a `0x15`/`0x16` message, then `0x16`/`0x1a`…
+An earlier pass concluded the `000d` sweep events came from emitter `0x264f30` (called from
+contact-service init `0x2347c6`, reading CCONT, posting task-3 messages), with dispatched id `[msg+4]`
+class-gated by `[msg+2]` (classes `0x0e`/`0x1a` pass, `0x06`/`0x16` drop). **Two experiments + timing
+falsified all of that — recorded here so it isn't a future bum steer:**
 
-🟢 **Message format and dispatched-id offset (measured).** The emitter posts task-3 messages with the
-header `00 02 [class] 70 [event] [param] …`, where **`[msg+2]` = class** and **`[msg+4]` = event**.
-The startup dispatcher's id (what `0x26ff14` returns to the `000d` handler) is **`[msg+4]`, gated by the
-class `[msg+2]`** — only certain classes pass their `[+4]` through. Measured (post header → raw dequeued id):
+- 🟢 **Timing disproves the emitter as source.** The dispatched ids `0x17` (t≈0.337) and `0x14`
+  (t≈0.373) are dequeued **before** emitter `0x264f30` posts its messages (t≈0.41–0.42). The emitter's
+  own messages (which happen to *contain* the bytes `0x14`/`0x16`) are never dequeued as those ids — the
+  `[msg+4]` match was coincidental. `0x264f30` is real (it does post CCONT-filled task-3 messages) but
+  it is **not** what feeds the `000d` gate.
+- 🟢 **Class-rewrite disproves the class-gating model.** Rewriting the trapped `0x15`-message's class
+  `0x16 → 0x1e` (bit 3 set) *and* `0x16 → 0x1a` (a "known pass-through" class) at post time both left
+  `0x15` un-surfaced and the flag at `0x08`. So neither "bit 3 of class" nor "class membership" gates
+  surfacing. The whole `[msg+4]`/class model is withdrawn.
+- 🟢 **The surfaced ids aren't task-3 message posts at all.** With the mode filter removed, the task-3
+  posts before t≈0.38 carry classes/events like `0a 05 1e` and `50 51 22` — **none** with `[+4]=0x14`
+  or `0x17`. Yet `0x14`/`0x17` *are* dequeued. So `0x26a458` surfaces them from an **internal scheduler
+  source** (timer / system events), not from `0x26a204` message posts.
 
-| `[+2]` class | `[+4]` event | surfaced to `000d`? |
-|---|---|---|
-| `0x06` | `0x13` | no |
-| `0x0e` | `0x14` | **yes → `0x14`** |
-| `0x16` | `0x15` | no |
-| `0x1a` | `0x16` | **yes → `0x16`** |
+## What still stands (solid)
 
-🟢 **The `0x15` gap (now exact).** `0x15` is the `[+4]` event of a message whose **class `[+2]=0x16`**,
-and that class is *not* passed through to the startup dispatch — so `0x15` is structurally trapped as the
-*parameter* of a `0x16`-class message and never surfaces as its own `000d` sub-event. Hence flag bit 2
-(= `0x15`) never sets. (Two channels confirmed: the `000d` handler reads this **mailbox**; the CCONT ISR
-`0x2b08c6` posts `0x15`/`0x16` only as `0x2697aa` *events* — a different channel — plus `0x77xx` PMM msgs.)
+- 🟢 The `000d` flag (`0x112399`) stalls at `0x08`–`0x09`; event `0x15` **never** surfaces as a
+  dispatched id → bit 2 never sets. (Reproduced every run.)
+- 🟢 `0x17` reliably surfaces (bit 3); `0x14` surfaces intermittently (bit 0) — both from the scheduler
+  `0x26a458`, **before** t≈0.38, not via task-3 posts.
+- 🟢 The CCONT ISR `0x2b08c6` posts `0x15`/`0x16` only as `0x2697aa` *events* (a different channel from
+  the mailbox the `000d` handler reads) plus `0x77xx` PMM messages. (Unchanged.)
 
-🟡 **Implication for the fix.** The gate is a **message-class routing** issue, not a missing measurement:
-the emitter *does* produce a `0x15`, but as a class-`0x16` parameter the startup dispatch ignores. The
-faithful question for `ccont_device` is narrower still — feed the emitter the CCONT values that make it
-emit `0x15` as a pass-through class (or confirm real hardware reaches `0x0f` another way). 🔴 open: what
-distinguishes the classes the dispatch passes (`0x0e`/`0x1a`) from those it drops (`0x06`/`0x16`).
+## Corrected open question (the real lead)
 
-🟢 **Naming (proven path):** the `000d` gate = "wait for the contact-service-init CCONT measurement
-report sweep (task-3 messages from emitter `0x264f30`) to deliver all four sub-events." The faithful
-fix is therefore *not* "make the CCONT ISR fire more" — it is to make the emitter's sweep deliver a
-standalone `0x15` (or recognise the `0x15` payload), i.e. a **firmware-data/sequence** gap fed by
-CCONT reads, not a missing interrupt.
+🔴 **What internal source inside `0x26a458` generates the surfaced `0x14`/`0x17`, and what should
+generate `0x15`?** These are scheduler-internal events (likely timer/delay-driven), not message posts.
+The next step is to probe *inside* `0x26a458` at the point it forms the returned id for the sweep
+values — to find the internal table/timer that emits `0x14`/`0x17` and why no `0x15` is emitted. Only
+then is the CCONT↔gate relationship real rather than inferred. **Do not** re-assert the emitter/offset/
+class model above without new evidence.
 
 ## Open questions (the mapping backlog)
 
-- 🟢 ~~Where are events `0x14`/`0x17` posted?~~ **Resolved:** emitter `0x264f30` (called once from
-  contact-service init `0x2347c6`), reading CCONT, posting task-3 mailbox messages. See "The sweep emitter".
-- 🟢 ~~Exact dispatched-id offset~~ **Resolved:** id = `[msg+4]` (event), class-gated by `[msg+2]`.
-  Measured post-header→dequeue table above.
-- 🔴 What distinguishes the message classes the startup dispatch passes through (`0x0e`/`0x1a`) from
-  those it drops (`0x06`/`0x16`) — the key to why `0x15` (a class-`0x16` param) never reaches the gate.
+- 🔴 ~~emitter `0x264f30` / `[msg+4]` offset / class-gating~~ **Falsified** (see the Correction section)
+  — the surfaced sweep ids come from an internal scheduler source in `0x26a458`, not task-3 posts.
+- 🔴 What internal source in `0x26a458` emits the surfaced `0x14`/`0x17`, and why no `0x15`? (the real lead)
 - 🟡 Exact CCONT command-word encoding (the `0x90ff`/`0x11ff`/`0x9001` arg format → reg + mask).
 - 🟡 The result-selector byte at `0x1124d2`(?) and how `0x77xx` results map back to ADC channels.
 - 🟡 Which task subscribes to `0x77xx`, and why `0x15`/`0x16` reach (or don't reach) the startup task (the routing records `≈0x100140`).
