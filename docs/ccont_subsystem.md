@@ -132,11 +132,21 @@ falsified all of that — recorded here so it isn't a future bum steer:**
 ## Corrected open question (the real lead)
 
 🔴 **What internal source inside `0x26a458` generates the surfaced `0x14`/`0x17`, and what should
-generate `0x15`?** These are scheduler-internal events (likely timer/delay-driven), not message posts.
-The next step is to probe *inside* `0x26a458` at the point it forms the returned id for the sweep
-values — to find the internal table/timer that emits `0x14`/`0x17` and why no `0x15` is emitted. Only
-then is the CCONT↔gate relationship real rather than inferred. **Do not** re-assert the emitter/offset/
-class model above without new evidence.
+generate `0x15`?** These are scheduler-internal events, not message posts. Two results from the chase:
+
+- 🟢 **Found a real id table at `0x2d71a8`** (used by `0x26a458`'s timer branch, indexed `[node+9]*8`,
+  8-byte entries). Decoded (halfword-unswapped) it maps index→id **`0xc0, 0xc1, 0xc3 … 0xd5, 0xd6, 0xd7`**
+  — the **timer/system message family** (the `0xc3` tick ×181, the `0xd5` CCONT event, etc.; these
+  dominate the dequeue trace). But the sweep ids `0x14`/`0x17` are **not** in this table (it's `0xc0+`),
+  so they come from a different path.
+- ⚠️ **Tooling limit reached.** Capstone's linear disassembly of `0x26a458` **desyncs** (a per-fetch
+  mechanism probe confirmed: entry `0x26a458` and epilogue `0x26a688` fire, but the supposed
+  `str [sp,#4]` sites `0x26a4ee`/`0x26a5ec`/`0x26a658` are *never executed* — they're phantom
+  instructions from a misaligned sweep). So the "three queues + str offsets" structure inferred here is
+  unreliable. **Use the repo's Ghidra tooling** (`ghidra/scripts/`) to get a correct CFG of `0x26a458`
+  before probing further — and note this is **RTOS-scheduler internals, somewhat tangential to CCONT**
+  proper (the chip-level map — ISR, registers, ADC, `0x77xx` PMM — is solid and independent of it).
+  **Do not** re-assert the emitter/offset/class model above without new evidence.
 
 ## Open questions (the mapping backlog)
 
