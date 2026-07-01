@@ -177,8 +177,9 @@ So the two events that **never surface** (`0x15`/`0x16`) are exactly the two on 
 channel**; the two that surface (`0x14`/`0x17`) use **direct** channels (`0x26a354` / `0x2a0fae`). Runtime
 matches: the `limp2_evpost` trace shows `0x2697aa` called with `0x15`(`ev=21`)/`0x16`(`ev=22`) but never
 `0x14`/`0x17`. The `0x2697aa` posts schedule through the timer mechanism and reflect as the `0xd5` timer
-event (whose `0x26ff14` case re-posts `0x15` via `0x2697aa` again) — 🟡 that the reflection *never*
-lands a standalone `0x15` in the ring is the one inferred step; the per-event channel split itself is 🟢.
+event (whose `0x26ff14` case re-posts `0x15` via `0x2697aa` again). **That the reflection never lands a
+standalone `0x15` in the ring is now 🟢 confirmed** — see "The `000d` wall" below; it is no longer an
+inferred step.
 
 **So the faithful question is now precise:** does a *provisioned* phone close the `000d` gate at all via
 `0x15`/`0x16` (delayed) — or does the gate only need `0x14`/`0x17` plus the `CCONT_STATE==6` condition,
@@ -255,11 +256,60 @@ reset. Setting the enable flags faithfully would need injecting into the contact
 a 3210 — the `0x2366c8` apply reads it from the message payload). So "model the `0x70` response" needs both
 a different injection point and the provisioned map data; the simple responder-extension does not reach it.
 
+## The `000d` wall — CONFIRMED (ROM disasm + `limp2_ecb` trace, 2026-07)
+
+The `000d` advance is a **wall**, not a buildable model. Settled two ways.
+
+🟢 **The gate is a literal compare on the received code.** Mode-`000d` (`0x270e1c` loop → dispatch
+`0x270e22`) `cmp`s the code returned by the recv wrapper `0x26ff14` and ORs a bit into flag `[0x112399]`:
+`0x14→0x01, 0x16→0x02, 0x15→0x04, 0x17→0x08`; it advances (`0x270edc`) only when `[0x112399]&0xf==0xf`.
+Nothing else sets those low bits, and the recv wrapper passes `0x14–0x17` through **unchanged** (they're
+absent from its translate ladder). So the gate genuinely needs the startup task to **receive standalone
+`0x15` and `0x16`** — it is not satisfiable by CCONT state, a timer, or provisioning flags (all falsified;
+`c` and `b` below).
+
+🟢 **The firmware only ever posts `0x15`/`0x16` on the *delayed* primitive.** There are two post
+primitives: `0x2695f4` (immediate → pushes `{task,event,arg}` into the running task's mailbox, visible at
+`0x26a458`) and `0x2697aa` (delayed → inserts a per-TCB timer-wheel node with a delay: `0x15`→`0x20a1`=8353
+ticks, `0x16`→6). Event `0x14` (`0x2a0fae`) calls **both**; `0x17` (`0x2af086`) uses a direct message path
+and never touches `0x2697aa`. But `0x15` (`0x2b09f2`@`0x2b0a12`, `0x2b08c6`@`0x2b0900`) and `0x16`
+(`0x2b08c6`@`0x2b095c`) are **hardcoded delayed-only** — no CCONT register value routes them through the
+immediate primitive (option **(b)** refuted by scanning every BL in `0x2b0840–0x2b0a20`).
+
+🟢 **The delay-queue drain never re-injects the raw code.** `sched_delay_queue_service 0x269acc` (timer-tick
+driven, 17 scheduler-internal call sites) matures a wheel node and surfaces it as the generic `0xd5` poll;
+the `0xd5` case in `0x26ff14` (`0x26ff6a`) re-runs the CCONT dispatch and **re-posts `0x15` via delayed
+`0x2697aa` again** — a closed loop. So "just let it mature" (option **(a)**) does not turn `0x15`/`0x16`
+into raw ring codes. The delayed post *can* also wake a waiter immediately, but only via a gated branch
+(`0x2697f2: ands r2,r0; lsrs r2,#2; blo`) that needs the startup task **registered as a waiter** on the ECB
+**and** `(TCB.mask 0x100024 & ECB.flags +7) != 0`.
+
+🟢 **Runtime proof (`limp2_ecb`, deep boot, no forcing, 24s).** At every delayed post of `0x15`/`0x16`:
+`ECB.flags[+7]=0x01`, `TCB.mask=0x00000100` → `mask&flags = 0x100 & 0x01 = 0` (waiter branch never taken),
+and `waithead[+0]=ffffffff` (no task waiting). Dequeue trace: `0x14` (t=0.37), `0x17` (t=0.33) and even
+`0x16` (once, t=0.83) arrive as raw codes, but **`0x15` never dequeues — not once** — so `[0x112399]` never
+gains bit `0x04` and never reaches `0x0f`. This holds **even with `CCONT_EVENT15_DELAY=1`** shrinking the
+`0x15` delay to 1 tick: maturity still only reflects as `0xd5`, confirming the drain never re-injects.
+A 90s run likewise produced **no `4235fa`** (post-gate) frame — only the display-init limp `94a2dc`/`4aab13`.
+
+**Why it's a wall, not a model.** The one path that would deliver `0x15` is the delayed primitive's
+waiter branch, which requires runtime **subscription state** (the startup task registered as an ECB waiter
+and/or a TCB mask bit overlapping the ECB flag). A genuinely-provisioned boot establishes that state as it
+flows through the real service/subscription setup; our boot reaches `000d` in an **artificial state** (we
+cleared CONTACT SERVICE by faking the node-`0x18` response, not by provisioning), so that bookkeeping never
+runs. This is the **same class of boundary as the channel-map** (docs/service_bootstrap.md) — missing
+real-hardware runtime/provisioned state, one gate earlier — not a hardware peripheral we can faithfully
+model in the driver. `EXPERIMENT_FORCE_000D_EVENTS` injects codes the firmware **never** injects on this
+path; it is a **diagnostic preview** of post-gate boot, explicitly not faithful. Reproduce the evidence with
+`TRACE_LIMP2=1` (probes `limp2_ecb`/`limp2_deq`/`limp2_prov`).
+
 ## Open questions (the mapping backlog)
 
 - 🔴 ~~emitter `0x264f30` / `[msg+4]` offset / class-gating~~ **Falsified** (see the Correction section)
   — the surfaced sweep ids come from an internal scheduler source in `0x26a458`, not task-3 posts.
-- 🔴 What internal source in `0x26a458` emits the surfaced `0x14`/`0x17`, and why no `0x15`? (the real lead)
+- 🟢 ~~What internal source in `0x26a458` emits the surfaced `0x14`/`0x17`, and why no `0x15`?~~ **Answered**
+  (see "The `000d` wall"): the immediate primitive `0x2695f4` pushes `0x14`/`0x17` into the mailbox; `0x15`
+  is delayed-only and its waiter branch is gated off (`mask&flags=0`, empty waiter list) → wheel-only `0xd5`.
 - 🟡 Exact CCONT command-word encoding (the `0x90ff`/`0x11ff`/`0x9001` arg format → reg + mask).
 - 🟡 The result-selector byte at `0x1124d2`(?) and how `0x77xx` results map back to ADC channels.
 - 🟡 Which task subscribes to `0x77xx`, and why `0x15`/`0x16` reach (or don't reach) the startup task (the routing records `≈0x100140`).

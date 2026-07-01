@@ -1615,11 +1615,17 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 				m_battery_startup_event_step++;
 			}
 		}
-	// EXPERIMENT (opt-in, diagnostic): mode-000d advance-gate confirmation. The handler
-	// (0x270e22) completes the flag byte [0x112399] only when events 0x14/0x15/0x16/0x17 all
-	// arrive as FW_STARTUP_EVENT; 0x15/0x16 never get dequeued from the RTOS mailbox, so the
-	// flag stalls at 0x08-0x09. Inject the missing events at the dispatch write (0x270e20) to
-	// prove the gate is sufficient. NOT faithful — replace with a real CCONT measurement model.
+	// EXPERIMENT (opt-in, diagnostic): mode-000d advance-gate preview. The handler (0x270e22)
+	// completes flag [0x112399] only when it RECEIVES standalone codes 0x14/0x16/0x15/0x17
+	// (bits 0x01/0x02/0x04/0x08). Confirmed (ROM disasm + limp2_ecb trace): 0x15 is posted ONLY
+	// via the delayed primitive 0x2697aa, whose waiter-delivery branch (0x2697f2) needs
+	// (TCB.mask 0x100024 & ECB.flags 0x10023c+7) != 0 — but it is 0x100 & 0x01 = 0 here, and the
+	// ECB waiter list is empty (waithead=ffffffff), so the post is wheel-only and only ever
+	// reflects as the 0xd5 poll (never a raw 0x15). That waiter/subscription state is runtime
+	// state a genuinely-provisioned boot establishes and our blank+faked boot does not — a WALL,
+	// not a missing hardware model. This knob injects the codes the firmware never injects on
+	// this path, purely to preview post-gate boot (renders 4235fa). NOT faithful; see
+	// docs/ccont_subsystem.md ("the 000d wall").
 	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_000D_EVENTS", 0) != 0 &&
 			pc == 0x00270e20 &&
 			address == FW_STARTUP_EVENT &&
@@ -2266,6 +2272,27 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					debug_ram_word(0x001123f0), debug_ram_word(0x001124c8),
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					machine().time().as_double());
+		// ECB waiter-branch state at delayed-post time for the four 000d sweep events.
+		// The delayed primitive 0x2697aa only delivers a raw code to the startup task if the
+		// task is a registered WAITER (ECB +0 head non-null) and (TCB.mask 0x100024 & ECB.flags
+		// +7) passes the 0x2697f2 bit test. Dump waithead/count/flags/state/mask to see whether
+		// 0x15/0x16 can EVER reach the mailbox on this (blank+faked) boot, vs the wheel-only 0xd5.
+		const u32 ev = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
+		if (ev >= 0x14 && ev <= 0x17)
+		{
+			static unsigned ec = 0;
+			if (ec++ < 40)
+			{
+				const offs_t r = 0x00100140 + ev * 0xc;
+				const u32 waithead = debug_ram_word(r + 0) | (u32(debug_ram_word(r + 2)) << 16);
+				const u32 tcbmask  = debug_ram_word(0x00100024) | (u32(debug_ram_word(0x00100026)) << 16);
+				const uint8_t flags = debug_ram_byte(r + 7);
+				logerror("limp2_ecb: ev=%02x waithead[+0]=%08x cnt[+4]=%04x flags[+7]=%02x state[+8]=%02x tcbmask=%08x mask&flags=%02x mode=%04x t=%.5f\n",
+						ev, waithead, debug_ram_word(r + 4), flags, debug_ram_byte(r + 8),
+						tcbmask, tcbmask & flags,
+						debug_ram_word(0x001123f0), machine().time().as_double());
+			}
+		}
 	}
 	// task-message POST probe: at 0x26a204(r0=task, r1=msgptr) scan the message buffer for a
 	// sweep-event id (0x14/0x16/0x17); log offset, value, target task, and caller lr — finds the
@@ -2550,8 +2577,11 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			pc >= 0x002b08fc && pc <= 0x002b0a12 &&
 			(addr == 0x002b0a40 || addr == 0x002b0a42))
 	{
-		// Boot-research shim: override the ROM literal used for the delayed
-		// CCONT/battery event15 record. This should become real timer/IRQ state.
+		// Boot-research shim: override the ROM delay literal (0x20a1=8353 ticks) for the delayed
+		// event-15 post at 0x2b0a12. Shrinking it changes the 0xd5/wheel timing (hence deep-boot
+		// frame-set sensitivity), but even at 1 tick 0x15 never delivers a raw code to the startup
+		// task — the delayed post is wheel-only here (waiter branch gated off; see the 000d wall
+		// note above and docs/ccont_subsystem.md). Diagnostic, not a hardware model.
 		const uint16_t data = (addr == 0x002b0a40) ? ((ccont_event15_delay >> 16) & 0xffff) : (ccont_event15_delay & 0xffff);
 		return data & mem_mask;
 	}
