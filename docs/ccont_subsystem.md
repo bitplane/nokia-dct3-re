@@ -256,9 +256,13 @@ reset. Setting the enable flags faithfully would need injecting into the contact
 a 3210 — the `0x2366c8` apply reads it from the message payload). So "model the `0x70` response" needs both
 a different injection point and the provisioned map data; the simple responder-extension does not reach it.
 
-## The `000d` wall — CONFIRMED (ROM disasm + `limp2_ecb` trace, 2026-07)
+## The `000d` wall — a missing peer response, below corpus resolution (ROM disasm + runtime traces, 2026-07)
 
-The `000d` advance is a **wall**, not a buildable model. Settled two ways.
+The `000d` advance is **blocked, but not by hardware**: it waits on a request/response handshake
+(`task_285`) whose peer never answers on our blank+faked boot — architecturally like CONTACT SERVICE, so
+modellable *in principle*, but the exact peer/response/context sits below what the (garbage-decompiled)
+corpus can resolve, and every forced stand-in failed (details at the end of this section). The confirmed
+ROM mechanism, settled several ways:
 
 🟢 **The gate is a literal compare on the received code.** Mode-`000d` (`0x270e1c` loop → dispatch
 `0x270e22`) `cmp`s the code returned by the recv wrapper `0x26ff14` and ORs a bit into flag `[0x112399]`:
@@ -292,16 +296,40 @@ gains bit `0x04` and never reaches `0x0f`. This holds **even with `CCONT_EVENT15
 `0x15` delay to 1 tick: maturity still only reflects as `0xd5`, confirming the drain never re-injects.
 A 90s run likewise produced **no `4235fa`** (post-gate) frame — only the display-init limp `94a2dc`/`4aab13`.
 
-**Why it's a wall, not a model.** The one path that would deliver `0x15` is the delayed primitive's
-waiter branch, which requires runtime **subscription state** (the startup task registered as an ECB waiter
-and/or a TCB mask bit overlapping the ECB flag). A genuinely-provisioned boot establishes that state as it
-flows through the real service/subscription setup; our boot reaches `000d` in an **artificial state** (we
-cleared CONTACT SERVICE by faking the node-`0x18` response, not by provisioning), so that bookkeeping never
-runs. This is the **same class of boundary as the channel-map** (docs/service_bootstrap.md) — missing
-real-hardware runtime/provisioned state, one gate earlier — not a hardware peripheral we can faithfully
-model in the driver. `EXPERIMENT_FORCE_000D_EVENTS` injects codes the firmware **never** injects on this
-path; it is a **diagnostic preview** of post-gate boot, explicitly not faithful. Reproduce the evidence with
-`TRACE_LIMP2=1` (probes `limp2_ecb`/`limp2_deq`/`limp2_prov`).
+**What the `0xd5` poll actually is (deeper trace).** The `0xd5` is **not** a CCONT-IRQ poll — the CCONT
+status settles fast (reg `0xe` reads `0x08` once then `0x00`; `r4 = (status & ~mask) & 0xf8 = 0` almost
+immediately, measured via `TRACE_CCONT_READ`). It is a **request/response state machine** ("task_285",
+driver loop `0x285df4`, handler `0x2a9964`, control block `0x11228c`: `+1` retry, `+2` sub-state, `+4`
+retry-limit, `+0x16` done-flag). It fires a request, arms a `0xd5` timeout, retries on `0xd5`, and completes
+only when a **peer sends a terminal response opcode** (`0x0db3`/`0x0dc2`/`0x0dc3`/`0x0dc4`/`0x0daf`/`0x09ca`)
+into its mailbox — which sets `[0x11228c+0x16]` and stops re-arming. The `0xd5` handler (`0x26ff6a`)
+re-runs the CCONT dispatch and re-posts `0x15` at delay `[0x270168]=8353` **unconditionally** on every
+`0xd5`. So on our **peerless** boot the machine retries forever, flooding `0xd5` (~every 0.11 s) and
+re-arming `0x15` long. This is architecturally the **same shape as CONTACT SERVICE** — a missing peer
+response — i.e. modellable *in principle* (cf. the node-`0x18` responder), not a raw hardware limit.
+
+**But every lever that "should" advance it was tested and FAILED (2026-07).** The blocker is deeper than
+timing or the poll:
+- **Stop the `0xd5` re-post** (`EXPERIMENT_SUPPRESS_D5_REPOST`, since removed): `0x15` still never delivered.
+- **Force *every* `0x15` post to delay 1** (so a node matures instantly, defeating starvation entirely):
+  `0x15` **still never dequeues as a raw code**; boot stays at `000d`. So it is **conclusively not
+  starvation** — a maturing `0x15` node does not reach the startup task's mailbox regardless of delay.
+- **Force `task_285`'s done-flag** `[0x11228c+0x16]=1` during `000d`: no effect (the `0xd5` stream and stall
+  were unchanged), so either that control-block layout is wrong (bodies are Thumb-decode garbage) or the
+  flag is not the real gate.
+
+**Honest classification.** The delivery of a matured/pending `0x15` to the startup task depends on scheduler
+**context** (the owning task current with a matching mask, or a registered waiter — `mask&flags` was `0` and
+the waiter list empty at every observed post) that our blank+faked boot never reaches; the upstream cause is
+`task_285` never getting its peer response. **This is NOT proven to require live hardware** (that earlier
+claim is retracted). But the exact peer, response, and context sit **below the reliable resolution of the
+available corpus** — the scheduler-delivery and `task_285` bodies decompile to garbage, so we identified the
+*machine* but not the sender of the terminal `0x0dxx` response, and no forced stand-in advanced the boot.
+Closing this faithfully would need **cleaner decompilation of the scheduler/`task_285` path or a reference
+boot/RAM trace from a working, provisioned 3210** (to observe the real peer response and task context) — a
+*better reference*, not necessarily live silicon. `EXPERIMENT_FORCE_000D_EVENTS` injects codes the firmware
+**never** injects on this path; it is a **diagnostic preview** of post-gate boot, explicitly not faithful.
+Reproduce the evidence with `TRACE_LIMP2=1` / `TRACE_CCONT_READ=1` (probes `limp2_ecb`/`limp2_deq`/`ccont_r`).
 
 ## Open questions (the mapping backlog)
 
