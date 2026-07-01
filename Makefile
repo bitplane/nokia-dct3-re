@@ -24,13 +24,15 @@ FRAME_PNG ?= progress_latest_frame.png
 # A blank/un-provisioned 3210 deterministically reaches CONTACT SERVICE here.
 ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
 
-# Canonical "boot-progress" run profile — the knob values that drive the firmware
-# to the CONTACT SERVICE milestone the oracle frame captures. Every NOKI3210_* var
-# the driver reads is an env knob; override any on the command line. The forces here
-# are inert against the oracle (audited — docs/removed_forcing_knobs.md); the traces
-# are read-only. See docs/service_bootstrap.md for what each group does.
+# Canonical "boot-progress" run profile — the minimal knob set that reproduces the
+# CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/adc/
+# battery/eeprom), the CCONT watchdog guard, and CCONT_EVENT15_DELAY (needed by the
+# deeper MODEL_* boot). Every NOKI3210_* var the driver reads is an env knob; override
+# any on the command line — e.g. add MODEL_DSP_SERVICE/MODEL_CCONT_PRESENT/
+# MODEL_SVC_RESPONDER to clear CONTACT SERVICE, or any TRACE_* for diagnostics.
+# Trimmed 2026-07 (leave-one-out audit): removed 6 baked-in TRACE_* and the forcing
+# shims proven inert against both the oracle and the deep boot. See docs/driver_vision.md.
 BOOT_ENV := \
-	NOKI3210_DISABLE_CCONT_WATCHDOG=1 \
 	NOKI3210_DISPLAY_TYPE=4 \
 	NOKI3210_POWER_IRQ_MS=120 \
 	NOKI3210_POWER_IRQ_ASSERT=1 \
@@ -41,17 +43,7 @@ BOOT_ENV := \
 	NOKI3210_TIMER0_CATCHUP=1 \
 	NOKI3210_CCONT_EVENT15_DELAY=1 \
 	NOKI3210_EEPROM_PROFILE=selftest \
-	NOKI3210_SUPPRESS_SIM_CONTEXT_EVENTS=1 \
-	NOKI3210_CONTACT_STATUS65_FLAGS=0x48 \
-	NOKI3210_CONTACT_CHANNEL_MAP_FLAGS=0x100 \
-	NOKI3210_CONTACT_D9_TIMEOUT_DELAY=0xffff \
-	NOKI3210_STARTUP_EVENT15_DELAY_CLAMP=65535 \
-	NOKI3210_TRACE_STARTUP_BRANCHES=1 \
-	NOKI3210_TRACE_SCHED_EVENT15=1 \
-	NOKI3210_TRACE_CONTACT_SERVICE=1 \
-	NOKI3210_TRACE_CONTACT_RESPONSE=1 \
-	NOKI3210_TRACE_SERVICE_TRANSPORT=1 \
-	NOKI3210_TRACE_TASK14_READY=1 \
+	NOKI3210_DISABLE_CCONT_WATCHDOG=1 \
 	NOKI3210_LUA_QUIET=1 \
 	NOKI3210_INPUT_EXERCISER_PRESS=0
 

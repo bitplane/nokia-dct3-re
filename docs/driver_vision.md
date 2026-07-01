@@ -13,8 +13,9 @@ each quarantined cluster should become*.
 ## The one-number health gauge
 
 A clean driver should not need a wall of environment variables to reach its first
-screen. Today `make run` bakes in **24 `NOKI3210_*` knobs** (down from 32 after the
-MBUS injection cluster was retired). That count is the **hack-debt gauge** — each knob substitutes
+screen. Today `make run` bakes in **13 `NOKI3210_*` knobs** (down from 32: −8 MBUS,
+then −11 more via a leave-one-out audit that pulled the baked-in traces and the
+inert forcing shims). That count is the **hack-debt gauge** — each knob substitutes
 for hardware/firmware state we haven't modelled yet. The goal is to drive it down
 to a handful of genuine *configuration* (display variant, battery state, clock
 rates), deleting the rest as the gates they stand in for are modelled.
@@ -23,9 +24,9 @@ Current rough split of the ~3,500-line driver:
 - **~⅔ real hardware models** — CCONT serial protocol, MAD2 register file, I²C
   EEPROM, PCD8544 LCD, keypad matrix, timers, IRQ/FIQ controller. These read like
   a real MAME driver and stay.
-- **~¼ quarantined research scaffolding** (~880 lines, down from ~1,200 after the MBUS
-  injection deletion): `flash_firmware_hooks` (~725), `ram_w/r_firmware_overrides`
-  (~160), plus the forcing/experiment knobs. This is explicitly banner'd "NOT hardware
+- **~¼ quarantined research scaffolding** (~790 lines, down from ~1,200: −320 MBUS,
+  −90 forcing shims): `flash_firmware_hooks` (~725), `ram_w/r_firmware_overrides`
+  (~70), plus the forcing/experiment knobs. This is explicitly banner'd "NOT hardware
   behaviour" and is meant to **shrink to zero**.
 
 The discipline already exists (all `FORCE_*` result-forcing was audited out; three
@@ -92,9 +93,10 @@ all. It should simply **advance on its own once the hardware events it waits for
 real** (CCONT measurement events, MBUS frames). I.e. fixing CCONT + MBUS deletes the
 need to force the startup machine.
 **Retires:** `BATTERY_PROFILE` (shared with CCONT), `POST_READY_KEY*`,
-`CONTACT_STATUS65_FLAGS`, `CONTACT_CHANNEL_MAP_FLAGS`, `CONTACT_D9_TIMEOUT_DELAY`,
-`SUPPRESS_SIM_CONTEXT_EVENTS`, `SERVICE72_RESPONSE_STATUS`, `SKIP_SERVICE_E2_REARM`,
-`MODEL_SVC_RESPONDER` (once node 0x18 answers via a real transport).
+`SERVICE72_RESPONSE_STATUS`, `SKIP_SERVICE_E2_REARM`, `MODEL_SVC_RESPONDER` (once node
+0x18 answers via a real transport). Already **deleted** (leave-one-out audit, inert vs
+oracle + deep boot): `CONTACT_STATUS65_FLAGS`, `CONTACT_CHANNEL_MAP_FLAGS`,
+`CONTACT_D9_TIMEOUT_DELAY`, `SUPPRESS_SIM_CONTEXT_EVENTS`, `STARTUP_EVENT15_DELAY_CLAMP`.
 
 ### DSP — GSM L1 + audio (`dsp_ram_r/w`, `mad2_dspif_*`)
 **Today:** a `return 0` stub with a faked mailbox corner (`MODEL_DSP_SERVICE` for the
@@ -120,17 +122,17 @@ on a GENSIO SELECT line; the SIM is a UART peer. Both are post-idle frontiers.
 | 1 | ~~**CCONT battery-measurement events**~~ → **the `000d` limp is structural, not a missing model** | — | the **limp** (mode `000d`) | **reframed** — the gate needs `0x15`/`0x16` delivered, but they're posted on the *delayed* scheduler channel by design (not a missing measurement model); see `ccont_subsystem.md`. Blocked on provisioned data, not buildable here. |
 | 2 | ~~**MBUS service-bus peer**~~ → **deleted as dead injection** | ~~`MBUS_D0_*`/`MBUS_RX_*`/`COMPLETE_MBUS`/`TRACE_MBUS_FLOW`~~ (~15 knobs, 8 in `BOOT_ENV`; ~320 lines) | — | **done** — audited **inert** (oracle `d8a9a7` + deep-boot frame-set both byte-identical with it removed). A peer is moot until the resume-gate drains task 08 (data-blocked); real MBUS *controller* kept. |
 | 3 | **CCONT device** (`adc_src[]` model + constants) | ~~`ADC_PROFILE`/`ADC0-7`~~ (now feed `adc_src[]`), ~~`CCONT_IRQ_LINE`~~, ~~`CCONT_BOOT_STATUS`~~, ~~`CCONT_IRQ_SEQUENCE`~~, ~~`CCONT_IRQ_STATUS`~~, ~~`ADC5_AFTER_READY*`~~, ~~`FORCE_SVC_CHANNEL`~~ (constants/removed); `MODEL_CCONT_PRESENT` (kept, opt-in) | — | **largely done** — 7 knobs retired (`3476eb0`/`c50f368`/`e8b63b3`/`1dea8c2`). Measurement path confirmed *already faithful* (sync ADC + firmware timer-poll); no measurement SM to build for the boot. Async charger/RTC IRQs are post-idle. |
-| 4 | **Startup machine self-advance** | `POST_READY_KEY*`, `CONTACT_*`, `SUPPRESS_SIM_CONTEXT_EVENTS`, `MODEL_SVC_RESPONDER` | falls out of #1+#2 | follows #1,#2 |
+| 4 | **Startup machine self-advance** | ~~`CONTACT_STATUS65_FLAGS`/`CONTACT_CHANNEL_MAP_FLAGS`~~ (were 0-ref orphans), ~~`CONTACT_D9_TIMEOUT_DELAY`~~, ~~`SUPPRESS_SIM_CONTEXT_EVENTS`~~, ~~`STARTUP_EVENT15_DELAY_CLAMP`~~ (deleted); `POST_READY_KEY*`, `MODEL_SVC_RESPONDER` (kept) | falls out of #1+#2 | **partly done** — 5 forcing shims deleted after a leave-one-out audit proved them inert vs both the oracle and the deep boot; the remaining knobs wait on the boot self-advancing. `CCONT_EVENT15_DELAY` **kept** (deep-load-bearing). |
 | 5 | **DSP mailbox responder** | `MODEL_DSP_SERVICE`, `EXPERIMENT_DSP_IRQ4*` | DSP handshake → then GSM/audio | gated behind limp |
-| — | (keep) `TRACE_*` (13) | — | diagnostics, not debt | keep, opt-in |
-| — | (keep) `DISPLAY_TYPE`, `TIMER*_HZ`, `POWER_IRQ_*`, `SNAPSHOT_DIR` | — | genuine config | keep |
+| — | (keep) `TRACE_*` (13) | — | diagnostics, not debt | keep, opt-in — **pulled from `BOOT_ENV`** so they're actually opt-in (were 6 baked in) |
+| — | (keep) `DISPLAY_TYPE`, `TIMER*_HZ`, `POWER_IRQ_*`, `ADC_PROFILE`, `BATTERY_PROFILE`, `EEPROM_PROFILE`, `SNAPSHOT_DIR` | — | genuine config | keep |
 
 **Reading the map:** the retirements are *ordered by the boot* — #1 (the limp) unblocks
 the firmware path that makes #4 observable, which unblocks #5. "Make it nice" is not a
 separate refactor; it is the trail of deleted knobs left behind as each gate is cleared
-faithfully — or, as row #2 showed, the trail left when an audit proves a whole cluster was
-never load-bearing. The gauge to watch is the `make run` knob count: **24 today** (was 32
-before the MBUS deletion), and it should fall step-wise as the remaining rows land.
+faithfully — or, as rows #2 and #4 showed, the trail left when a leave-one-out audit proves
+knobs were never load-bearing. The gauge to watch is the `make run` knob count: **13 today**
+(was 32 — −8 MBUS, −11 traces+shims), and it should keep falling as the remaining rows land.
 
 ## Principles (carried from `best-practices.md` + this project's grain)
 

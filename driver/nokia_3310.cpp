@@ -380,7 +380,6 @@ private:
 	uint8_t       m_timer0_divider;
 	bool          m_timer0_compare_latched;
 	uint8_t       m_keypad_irq_state;
-	bool          m_startup_event15_posted;
 	bool          m_startup_latch_complete_seen;
 	bool          m_after_mad2_soft_reset;
 
@@ -727,7 +726,6 @@ void noki3310_state::machine_reset()
 	m_timer0_divider = 255;
 	m_timer0_compare_latched = false;
 	m_keypad_irq_state = 0xff;
-	m_startup_event15_posted = false;
 	m_startup_latch_complete_seen = false;
 	m_after_mad2_soft_reset = false;
 	m_svcresp_state = 0;
@@ -1571,68 +1569,13 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		}
 	}
 
-	auto ram_byte = [this](offs_t addr) -> uint8_t
-	{
-		if (addr < 0x100000 || addr >= 0x180000)
-			return 0xff;
-
-		const uint16_t word = m_ram[(addr - 0x100000) >> 1];
-		return (addr & 1) ? uint8_t(word & 0x00ff) : uint8_t(word >> 8);
-	};
 	auto ram_word = [this](offs_t addr) -> uint16_t
 	{
 		if (addr < 0x100000 || addr >= 0x180000)
 			return 0xffff;
 		return m_ram[(addr - 0x100000) >> 1];
 	};
-	auto mem_byte = [this, &ram_byte](offs_t addr) -> uint8_t
-	{
-		if (addr >= 0x100000 && addr < 0x180000)
-			return ram_byte(addr);
-
-		if ((addr >= 0x00200000 && addr < 0x00600000) || (addr >= 0x00600000 && addr < 0x00a00000))
-		{
-			memory_region *flash = memregion("flash");
-			if (flash)
-			{
-				const offs_t base = (addr >= 0x00600000) ? 0x00600000 : 0x00200000;
-				return flash->base()[(addr - base) % flash->bytes()];
-			}
-		}
-
-		return 0xff;
-	};
-	static unsigned event_post_write_count = 0;
-	if (pc >= 0x002697aa && pc <= 0x002698da && event_post_write_count++ < 1000)
-	{
-		const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
-		const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
-			const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
-			const unsigned d9_timeout_delay = nokia_env_u32("NOKI3210_CONTACT_D9_TIMEOUT_DELAY", 0xffff) & 0xffff;
-			if (d9_timeout_delay != 0xffff &&
-					pc == 0x002697aa &&
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) == 0x00237b37 &&
-					r0 == 0x19 &&
-					r4 == 0xd9 &&
-					mem_byte(sp + 0) == 0x00 &&
-					mem_byte(sp + 1) == 0xd9)
-			{
-				m_maincpu->set_state_int(arm7_cpu_device::ARM7_R1, d9_timeout_delay);
-			}
-		if (pc == 0x002697aa && r0 == 0x15)
-		{
-			m_startup_event15_posted = true;
-		}
-	}
-
-	const unsigned startup_event15_delay_clamp = nokia_env_u32("NOKI3210_STARTUP_EVENT15_DELAY_CLAMP", 0xffff) & 0xffff;
-	if (startup_event15_delay_clamp != 0xffff &&
-			pc >= 0x002697aa && pc <= 0x00269bd0 &&
-			address == 0x100240)
-	{
-		data = (data & ~mem_mask) | (startup_event15_delay_clamp & mem_mask);
-	}
-		const char *battery_profile = std::getenv("NOKI3210_BATTERY_PROFILE");
+	const char *battery_profile = std::getenv("NOKI3210_BATTERY_PROFILE");
 	if (battery_profile != nullptr &&
 				!std::strcmp(battery_profile, "charged") &&
 				pc >= 0x00270c80 && pc <= 0x00271230 &&
@@ -1733,19 +1676,8 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	{
 		data |= 0x0040;
 	}
-	const uint16_t old_word = m_ram[offset];
 
 	COMBINE_DATA(&m_ram[offset]);
-
-	if (startup_event15_delay_clamp != 0xffff &&
-			pc >= 0x002697aa && pc <= 0x00269bd0 &&
-			address == 0x100244 &&
-			(data & mem_mask & 0xff00) != 0 &&
-			ram_byte(0x100245) == 0x15 &&
-			ram_word(0x100240) > startup_event15_delay_clamp)
-	{
-		m_ram[(0x100240 - NOKIA_RAM_BASE) >> 1] = startup_event15_delay_clamp;
-	}
 
 	if (!m_startup_latch_complete_seen && address == 0x112398 && ((m_ram[offset] & 0x00ff) == 0x000f))
 	{
@@ -1753,29 +1685,6 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		m_startup_latch_complete_time = machine().time();
 	}
 
-	if (pc == 0x0026a3be &&
-			mem_mask == 0xffff &&
-			address >= 0x100000 && address < 0x180000)
-	{
-
-	}
-
-	if (nokia_env_u32("NOKI3210_SUPPRESS_SIM_CONTEXT_EVENTS", 0) != 0 &&
-			pc == 0x0026a3be &&
-			mem_mask == 0xffff &&
-			m_maincpu->state_int(arm7_cpu_device::ARM7_R1) == 0x00100c70 &&
-			(m_maincpu->state_int(arm7_cpu_device::ARM7_R4) == 0x37 ||
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R4) == 0x33) &&
-			(data == 0x0037 || data == 0x0033))
-	{
-		// Boot-research shim: useful negative test for SIM-context noise, but
-		// not a hardware model and not enabled by the default profile.
-		const uint8_t put = ram_byte(0x1014b0);
-		const uint8_t restored_put = (put == 0) ? 0x13 : (put - 1);
-		m_ram[offset] = old_word;
-		m_ram[(0x1014b0 - 0x100000) >> 1] =
-				(m_ram[(0x1014b0 - 0x100000) >> 1] & 0x00ff) | (uint16_t(restored_put) << 8);
-	}
 
 	}
 
