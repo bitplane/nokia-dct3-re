@@ -256,13 +256,13 @@ reset. Setting the enable flags faithfully would need injecting into the contact
 a 3210 — the `0x2366c8` apply reads it from the message payload). So "model the `0x70` response" needs both
 a different injection point and the provisioned map data; the simple responder-extension does not reach it.
 
-## The `000d` wall — a missing peer response, below corpus resolution (ROM disasm + runtime traces, 2026-07)
+## The `000d` wall — a missing service-transport peer reply (ROM disasm + runtime traces, 2026-07)
 
 The `000d` advance is **blocked, but not by hardware**: it waits on a request/response handshake
-(`task_285`) whose peer never answers on our blank+faked boot — architecturally like CONTACT SERVICE, so
-modellable *in principle*, but the exact peer/response/context sits below what the (garbage-decompiled)
-corpus can resolve, and every forced stand-in failed (details at the end of this section). The confirmed
-ROM mechanism, settled several ways:
+(`task_285` = the service-transport / node-`0x18` layer) whose peer never answers on our blank+faked boot —
+the *same* subsystem CONTACT SERVICE needed, so modellable via a `MODEL_SVC_RESPONDER`-class reply (peer
+identified; fix scoped at the end of this section; one causal link still untested). The confirmed ROM
+mechanism, settled several ways:
 
 🟢 **The gate is a literal compare on the received code.** Mode-`000d` (`0x270e1c` loop → dispatch
 `0x270e22`) `cmp`s the code returned by the recv wrapper `0x26ff14` and ORs a bit into flag `[0x112399]`:
@@ -318,18 +318,32 @@ timing or the poll:
   were unchanged), so either that control-block layout is wrong (bodies are Thumb-decode garbage) or the
   flag is not the real gate.
 
-**Honest classification.** The delivery of a matured/pending `0x15` to the startup task depends on scheduler
-**context** (the owning task current with a matching mask, or a registered waiter — `mask&flags` was `0` and
-the waiter list empty at every observed post) that our blank+faked boot never reaches; the upstream cause is
-`task_285` never getting its peer response. **This is NOT proven to require live hardware** (that earlier
-claim is retracted). But the exact peer, response, and context sit **below the reliable resolution of the
-available corpus** — the scheduler-delivery and `task_285` bodies decompile to garbage, so we identified the
-*machine* but not the sender of the terminal `0x0dxx` response, and no forced stand-in advanced the boot.
-Closing this faithfully would need **cleaner decompilation of the scheduler/`task_285` path or a reference
-boot/RAM trace from a working, provisioned 3210** (to observe the real peer response and task context) — a
-*better reference*, not necessarily live silicon. `EXPERIMENT_FORCE_000D_EVENTS` injects codes the firmware
-**never** injects on this path; it is a **diagnostic preview** of post-gate boot, explicitly not faithful.
-Reproduce the evidence with `TRACE_LIMP2=1` / `TRACE_CCONT_READ=1` (probes `limp2_ecb`/`limp2_deq`/`ccont_r`).
+**The peer, identified (raw-disasm map, 2026-07).** `task_285` is **not** a foreign server — it is the
+**service-transport / bus layer** (Contact-Service software) and its remote **node `0x18`**, the *same*
+subsystem `MODEL_SVC_RESPONDER` already answers for CONTACT SERVICE. Reads: the driver is
+`service_lower_event_bridge_283e1c` (among `service_transport_*` `0x2b0474/0x2b05a0/0x2b05b2`); `0xd5` is
+built by **`service_transport_build_d5_notify_2a594c`** — i.e. the "poll" is literally the transport's
+retry/notify. The request opcodes `0x0bbe`/`0x0db4` and the terminal responses `0x0db3`/`0x0dc2`/`0x0dc3`/
+`0x0dc4`/`0x0daf`/`0x09ca` are all built/compared **within the same subsystem**
+(`startup_status_no_bits_handler_29bd14` builds them at `0x29d240`+; `startup_mode_event1b_2a93c0` =
+`0x2a9964` compares them). The bridge gates on the service-enable byte **`[0x11213f]`**: at `0x283e6e`,
+`==0` routes to `service_transport_abort_2b05b2`, so on our boot the request is **never transmitted** → no
+reply → `0xd5` retries forever → starves `0x15`.
+
+**Classification: (b) a stubbed peer — modellable, same class as `MODEL_SVC_RESPONDER`.** The faithful fix
+is a **`task_285` responder**: when the machine is waiting (`0x2a9964` re-arming `0xd5`, ctrl block
+`0x11228c` not done), inject a reply message into its mailbox — opcode `0x0dc3`/`0x0dc4` at `[msg+0]`
+(halfword), `[msg+4]=(9|state<<4)`, `[msg+5]=0x10`, `[msg+6]=param` — via the firmware's own alloc
+(`0x26afe0`) + post (`0x26a204`) primitives (the existing responder trampoline). That drives `0x11228c` to
+done, stops the `0xd5` stream, and — *if* completion also supplies the scheduler context `0x15` delivery
+needs — lets the outstanding `0x15` mature into a raw code → bit `0x04` → `000d` clears. **UNTESTED / the
+open risk:** the delay-1 experiment proved a maturing `0x15` alone does *not* deliver (context-gated), so
+whether `task_285` completion supplies that context is the unvalidated link; and the terminal PDU may
+originate from a real node-`0x18` bus frame (inference, not read), so this could chain to the node-`0x18`
+frame details. **"Needs live hardware" stays retracted** — this is a driver-modellable peer reply; the
+remaining uncertainty is whether it chains, not whether we can build it. `EXPERIMENT_FORCE_000D_EVENTS`
+injects codes the firmware **never** injects on this path; it is a **diagnostic preview**, not faithful.
+Reproduce evidence with `TRACE_LIMP2=1` / `TRACE_CCONT_READ=1` (probes `limp2_ecb`/`limp2_deq`/`ccont_r`).
 
 ## Open questions (the mapping backlog)
 
