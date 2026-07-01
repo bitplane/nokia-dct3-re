@@ -227,12 +227,6 @@ constexpr offs_t FW_RESOURCE_CHECK_STATUS_INDEX = 0x11ff5a;
 constexpr offs_t FW_SERVICE_CHANNEL_READY_FLAGS = 0x111794;
 constexpr offs_t FW_SERVICE_CHANNEL_ENABLE_FLAGS = 0x11fee4;
 constexpr offs_t FW_SERVICE_CHANNEL_MASK_BASE = 0x11ff08;
-constexpr offs_t FW_SERVICE_LOWER_QUEUE_BLOCK = 0x110d30;
-constexpr offs_t FW_SERVICE_LOWER_TX_BLOCK = 0x10f4a8;
-constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_A = FW_SERVICE_LOWER_QUEUE_BLOCK;
-constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_B = 0x110d34;
-constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_C = FW_SERVICE_LOWER_TX_BLOCK;
-constexpr offs_t FW_SERVICE_LOWER_BUSY_FLAGS_D = 0x10f4ac;
 constexpr uint8_t FW_SERVICE_CHANNEL_READY_BOOT_BIT = 0x08;
 
 // Contact-service remote read (the deepest mapped layer; see docs/service_bootstrap.md).
@@ -348,7 +342,6 @@ private:
 	void schedule_mbus_fiq(int num);
 	void signal_mbus_fiq(int num);
 	void complete_mbus_transfer();
-	bool mbus_generated_response_byte(unsigned index, uint8_t &out);
 	uint8_t keypad_irq_state() const;
 	uint8_t synthetic_keypad_state() const;
 	bool synthetic_key_active(uint8_t &row, uint8_t &mask) const;
@@ -362,7 +355,6 @@ private:
 	void debug_ram_word_w(offs_t address, uint16_t data) { fw_word_w(address, data); }
 	void debug_ram_byte_w(offs_t address, uint8_t data) { fw_byte_w(address, data); }
 	void trace_state31_event_source(uint32_t pc, uint32_t addr, offs_t offset);
-	void complete_mbus_d0_startup_frame(const char *reason);
 	void nokia_ccont_w(uint8_t data);
 	uint8_t nokia_ccont_r();
 	void serial_eeprom_start();
@@ -396,15 +388,6 @@ private:
 	unsigned      m_svcresp_state;      // 0 idle, 1 await-alloc, 2 await-post, 3 done
 	uint32_t      m_svcresp_saved[16];  // R0..R14 + CPSR saved at the trigger point
 	uint32_t      m_svcresp_msg;        // allocated message pointer
-	bool          m_mbus_flow_d0_queued;
-	bool          m_mbus_flow_d0_phase8_queued;
-	bool          m_mbus_flow_d0_completed;
-	bool          m_mbus_rx_response_active;
-	unsigned      m_mbus_rx_byte_index;
-	unsigned      m_mbus_rx_pulses_remaining;
-	uint8_t       m_mbus_last_tx_command;
-	uint8_t       m_mbus_tx_frame[32];
-	unsigned      m_mbus_tx_len;
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -633,57 +616,6 @@ static unsigned nokia_env_u32(const char *name, unsigned fallback)
 	return it->second.value_or(fallback);
 }
 
-static bool nokia_env_nonempty(const char *name)
-{
-	const char *value = std::getenv(name);
-	return value != nullptr && *value != '\0';
-}
-
-static bool nokia_trace_mbus_flow()
-{
-	return nokia_env_u32("NOKI3210_TRACE_MBUS_FLOW", 0) != 0 ||
-			nokia_env_u32("NOKI3210_TRACE_SERVICE_LOWER", 0) != 0;
-}
-
-static unsigned nokia_mbus_d0_signal_num()
-{
-	const unsigned signal = nokia_env_u32("NOKI3210_MBUS_D0_SIGNAL", 0);
-	return signal == 2 || signal == 3 ? signal : 0;
-}
-
-static unsigned nokia_mbus_d0_phase8_signal_num()
-{
-	const unsigned signal = nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_SIGNAL", 0);
-	return signal == 2 || signal == 3 ? signal : 0;
-}
-
-static bool nokia_env_u8_at(const char *name, unsigned index, uint8_t &result)
-{
-	const char *value = std::getenv(name);
-	unsigned current = 0;
-	while (value && *value)
-	{
-		while (*value == ',' || *value == ' ' || *value == '\t')
-			value++;
-
-		char *end = nullptr;
-		const unsigned long parsed = std::strtoul(value, &end, 0);
-		if (end == value)
-			break;
-
-		if (current == index)
-		{
-			result = parsed & 0xff;
-			return true;
-		}
-
-		current++;
-		value = end;
-	}
-
-	return false;
-}
-
 void noki3310_state::machine_start()
 {
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
@@ -752,22 +684,6 @@ void noki3310_state::trace_state31_event_source(uint32_t pc, uint32_t addr, offs
 
 }
 
-void noki3310_state::complete_mbus_d0_startup_frame(const char *reason)
-{
-
-	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_A, 0);
-	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_B, 0);
-	debug_ram_byte_w(FW_SERVICE_LOWER_QUEUE_BLOCK + 0x02, 0);
-	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_C, 0);
-	debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_D, 0);
-
-	m_mbus_flow_d0_completed = true;
-	m_mbus_flow_d0_queued = false;
-	m_mbus_rx_response_active = false;
-	m_mbus_rx_pulses_remaining = 0;
-
-}
-
 void noki3310_state::machine_reset()
 {
 	std::fill_n(m_ram.get(), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1, 0);
@@ -816,14 +732,6 @@ void noki3310_state::machine_reset()
 	m_after_mad2_soft_reset = false;
 	m_svcresp_state = 0;
 	m_svcresp_msg = 0;
-	m_mbus_flow_d0_queued = false;
-	m_mbus_flow_d0_phase8_queued = false;
-	m_mbus_flow_d0_completed = false;
-	m_mbus_rx_response_active = false;
-	m_mbus_rx_byte_index = 0;
-	m_mbus_rx_pulses_remaining = 0;
-	m_mbus_last_tx_command = 0xff;
-	m_mbus_tx_len = 0;
 	m_battery_startup_event_step = 0;
 	m_battery_startup_event_step_mode9 = 0;
 	m_mode4_startup_completion_step = 0;
@@ -1123,35 +1031,6 @@ void noki3310_state::schedule_mbus_fiq(int num)
 	m_timer_mbus->adjust(attotime::from_msec(5), num);
 }
 
-// Model the lower-MBUS bus response to a frame the firmware just transmitted.
-// A transmitted frame is [0x1f][dest][src][cmd][len_hi][len_lo][data...][cksum];
-// the bus device answers with the same frame addressed back to the phone, i.e.
-// dest<->src swapped. The phone's RX state machine (0x2aae76) accepts the frame
-// only when byte[1] (dest) equals its own address at 0x111794 — which is exactly
-// the transmitted src — and then consumes len+2 trailing bytes before completing.
-// Derived from the captured TX frame, so it tracks real bus traffic rather than a
-// canned constant. Returns false (defer to any env feed) for non-D0 frames.
-bool noki3310_state::mbus_generated_response_byte(unsigned index, uint8_t &out)
-{
-	if (m_mbus_tx_len < 6 || m_mbus_tx_frame[0] != 0x1f || m_mbus_tx_frame[3] != 0xd0)
-		return false;
-
-	uint8_t resp[34];
-	unsigned n = m_mbus_tx_len;
-	for (unsigned i = 0; i < n; i++)
-		resp[i] = m_mbus_tx_frame[i];
-	resp[1] = m_mbus_tx_frame[2];   // dest := original src (answer addressed to the phone)
-	resp[2] = m_mbus_tx_frame[1];   // src  := original dest (the responder)
-	// The response carries two checksum/trailer bytes (the RX countdown reads len+2);
-	// pad so the state machine always has enough bytes to reach completion.
-	resp[n] = 0x00;
-	resp[n + 1] = 0x00;
-	n += 2;
-
-	out = (index < n) ? resp[index] : 0x00;
-	return true;
-}
-
 void noki3310_state::complete_mbus_transfer()
 {
 	m_mad2_regs[MAD2_MBUS_CTRL] &= ~MAD2_MBUS_BUSY_MASK;
@@ -1347,27 +1226,7 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_fiq8)
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_mbus)
 {
-	if (param == 2 && m_mbus_rx_pulses_remaining != 0)
-	{
-		m_mad2_regs[MAD2_MBUS_STATUS] &= ~0x07;
-		if (m_mad2_regs[MAD2_MBUS_CTRL] & MAD2_MBUS_TX_ENABLE)
-		{
-		}
-		else
-		{
-			m_mad2_regs[MAD2_MBUS_STATUS] |= MAD2_MBUS_RX_READY;
-			m_mad2_regs[MAD2_MBUS_CTRL] |= MAD2_MBUS_RX_ENABLE;
-			m_mbus_rx_pulses_remaining--;
-		}
-	}
-
 	signal_mbus_fiq(param);
-
-	if (param == 2 && m_mbus_rx_pulses_remaining != 0)
-	{
-		const unsigned delay_ms = nokia_env_u32("NOKI3210_MBUS_RX_PULSE_DELAY_MS", 5);
-		m_timer_mbus->adjust(attotime::from_msec(delay_ms), param);
-	}
 }
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_power_irq)
@@ -1878,103 +1737,6 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 
 	COMBINE_DATA(&m_ram[offset]);
 
-	if (pc == 0x002b052e &&
-			m_mbus_flow_d0_queued &&
-			!m_mbus_flow_d0_completed &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 1 &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
-			debug_ram_byte(FW_SERVICE_LOWER_QUEUE_BLOCK + 0x02) >= 0x80 &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) == 8 &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) <= 1)
-		complete_mbus_d0_startup_frame("transport_complete");
-	if (pc == 0x002b052e &&
-			nokia_env_u32("NOKI3210_COMPLETE_MBUS_40_FRAME", 0) != 0 &&
-			m_mbus_last_tx_command == 0x40 &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 1 &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) == 8 &&
-			debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) <= 1)
-		complete_mbus_d0_startup_frame("transport_complete_40");
-
-	if (nokia_trace_mbus_flow() &&
-			(address == FW_SERVICE_LOWER_BUSY_FLAGS_A ||
-			 address == FW_SERVICE_LOWER_BUSY_FLAGS_B ||
-			 address == FW_SERVICE_LOWER_BUSY_FLAGS_C ||
-			 address == FW_SERVICE_LOWER_BUSY_FLAGS_D ||
-			 (address >= FW_SERVICE_LOWER_QUEUE_BLOCK && address < FW_SERVICE_LOWER_QUEUE_BLOCK + 0x10) ||
-			 (address >= FW_SERVICE_LOWER_TX_BLOCK && address < FW_SERVICE_LOWER_TX_BLOCK + 0x10)))
-	{
-		const bool d0_tx_mark =
-				address == FW_SERVICE_LOWER_BUSY_FLAGS_D &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) != 0;
-		if (d0_tx_mark && !m_mbus_flow_d0_queued)
-		{
-			m_mbus_flow_d0_queued = true;
-			m_mbus_flow_d0_phase8_queued = false;
-			m_mbus_flow_d0_completed = false;
-			m_mbus_rx_response_active = false;
-			m_mbus_rx_byte_index = 0;
-			m_mbus_rx_pulses_remaining = 0;
-			const unsigned mbus_signal = nokia_mbus_d0_signal_num();
-			if (mbus_signal != 0)
-			{
-				const unsigned delay_ms = nokia_env_u32("NOKI3210_MBUS_D0_DELAY_MS", 5);
-				m_timer_mbus->adjust(attotime::from_msec(delay_ms), mbus_signal);
-			}
-			if (nokia_env_u32("NOKI3210_COMPLETE_MBUS_40_FRAME", 0) != 0 &&
-					m_mbus_last_tx_command == 0x40)
-				complete_mbus_d0_startup_frame("tx_busy_40");
-		}
-
-		const bool d0_phase8 =
-				address == FW_SERVICE_LOWER_TX_BLOCK &&
-				m_mbus_flow_d0_queued &&
-				debug_ram_byte(FW_SERVICE_LOWER_TX_BLOCK + 0x00) == 0x08;
-		const uint8_t old_byte = BIT(address, 0) ? uint8_t(old_word & 0x00ff) : uint8_t(old_word >> 8);
-		const bool d0_tx_complete =
-				address == FW_SERVICE_LOWER_BUSY_FLAGS_D &&
-				m_mbus_flow_d0_queued &&
-				old_byte != 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) == 0;
-		if ((d0_phase8 || d0_tx_complete) && !m_mbus_flow_d0_phase8_queued)
-		{
-			m_mbus_flow_d0_phase8_queued = true;
-			const unsigned mbus_signal = nokia_mbus_d0_phase8_signal_num();
-			if (mbus_signal != 0)
-			{
-				const unsigned delay_ms = nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_DELAY_MS", 5);
-				if (nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_RX_READY", 0) != 0)
-				{
-					m_mbus_rx_response_active = true;
-					m_mbus_rx_pulses_remaining = nokia_env_u32("NOKI3210_MBUS_RX_PULSES", 1);
-					if (nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_RX_RESTART_BYTES", 0) != 0)
-						m_mbus_rx_byte_index = 0;
-					if (nokia_env_u32("NOKI3210_MBUS_D0_PHASE8_RX_RESET_STATE", 0) != 0)
-						debug_ram_byte_w(FW_SERVICE_LOWER_TX_BLOCK, 0);
-				}
-				m_timer_mbus->adjust(attotime::from_msec(delay_ms), mbus_signal);
-			}
-		}
-
-		const bool lower_queue_drained =
-				(address == FW_SERVICE_LOWER_BUSY_FLAGS_A ||
-				 address == FW_SERVICE_LOWER_BUSY_FLAGS_D) &&
-				m_mbus_flow_d0_queued &&
-				!m_mbus_flow_d0_completed &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_QUEUE_BLOCK + 0x02) == 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) != 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) == 0;
-		if (lower_queue_drained)
-		{
-			debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_C, 0);
-			m_mbus_flow_d0_completed = true;
-			m_mbus_flow_d0_queued = false;
-		}
-
-	}
-
 	if (startup_event15_delay_clamp != 0xffff &&
 			pc >= 0x002697aa && pc <= 0x00269bd0 &&
 			address == 0x100244 &&
@@ -2395,11 +2157,10 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R0));
 			else
 				logerror("rx_sm: t=%.4f state[10f4a8]=%02x count[10f4ae]=%04x rxreg=%02x "
-						"mbus_ctrl[18]=%02x mbus_stat[19]=%02x rx_active=%d\n",
+						"mbus_ctrl[18]=%02x mbus_stat[19]=%02x\n",
 						machine().time().as_double(),
 						debug_ram_byte(0x0010f4a8), debug_ram_word(0x0010f4ae),
-						m_mad2_regs[0x1a], m_mad2_regs[0x18], m_mad2_regs[0x19],
-						m_mbus_rx_response_active ? 1 : 0);
+						m_mad2_regs[0x1a], m_mad2_regs[0x18], m_mad2_regs[0x19]);
 		}
 	}
 
@@ -2875,28 +2636,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	}
 		trace_state31_event_source(pc, addr, offset);
 
-	if (nokia_env_u32("NOKI3210_TRACE_STARTUP_BRANCHES", 0) != 0 &&
-			pc == addr &&
-			(addr == 0x002a930e || addr == 0x002a9316 || addr == 0x002a931e ||
-			 addr == 0x002a9326 || addr == 0x002a932e || addr == 0x002a9336 ||
-			 addr == 0x002a933a || addr == 0x002a934c ||
-			 addr == 0x002b03e0 || addr == 0x002b03e8 ||
-			 addr == 0x002ad1e0 || addr == 0x002ad1ea || addr == 0x002ad1f2 ||
-			 addr == 0x00283dd4 || addr == 0x00283dda))
-	{
-		if (addr == 0x002ad1e0 &&
-				m_mbus_flow_d0_queued &&
-				!m_mbus_flow_d0_completed &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_A) == 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_B) == 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_C) != 0 &&
-				debug_ram_byte(FW_SERVICE_LOWER_BUSY_FLAGS_D) == 0)
-		{
-			debug_ram_byte_w(FW_SERVICE_LOWER_BUSY_FLAGS_C, 0);
-			m_mbus_flow_d0_completed = true;
-			m_mbus_flow_d0_queued = false;
-		}
-	}
 	const unsigned ccont_event15_delay = nokia_env_u32("NOKI3210_CCONT_EVENT15_DELAY", 0xffffffff);
 	if (ccont_event15_delay != 0xffffffff &&
 			pc >= 0x002b08fc && pc <= 0x002b0a12 &&
@@ -3156,31 +2895,6 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		case 0x19:
 			data |= 0xc0;
 			break;
-		case 0x1a:
-			if (m_mbus_rx_response_active)
-			{
-				// Primary: bus response generated from the transmitted frame.
-				uint8_t rx_data = 0;
-				if (mbus_generated_response_byte(m_mbus_rx_byte_index, rx_data))
-				{
-					data = rx_data;
-					m_mbus_rx_byte_index++;
-				}
-				// Fallback: env-supplied bytes (non-D0 frames, e.g. the 0x40 command).
-				else if (nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES") ||
-						(m_mbus_last_tx_command == 0x40 && nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES_40")))
-				{
-					const char *rx_env = (m_mbus_last_tx_command == 0x40 &&
-							nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES_40")) ?
-							"NOKI3210_MBUS_RX_BYTES_40" : "NOKI3210_MBUS_RX_BYTES";
-					if (nokia_env_u8_at(rx_env, m_mbus_rx_byte_index, rx_data))
-					{
-						data = rx_data;
-						m_mbus_rx_byte_index++;
-					}
-				}
-			}
-			break;
 		case 0x2a:
 			data = 0xff;
 			for(int i=0; i<5; i++)
@@ -3243,28 +2957,6 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 	}
 
 	const u32 pc = m_maincpu->pc();
-	if (offset == 0x1a && (m_mad2_regs[MAD2_MBUS_STATUS] & MAD2_MBUS_RX_READY) != 0)
-	{
-		const unsigned old_mbus_rx_pulses = m_mbus_rx_pulses_remaining;
-		uint8_t next_rx_data = 0;
-		const char *rx_env = (m_mbus_last_tx_command == 0x40 &&
-				nokia_env_nonempty("NOKI3210_MBUS_RX_BYTES_40")) ?
-				"NOKI3210_MBUS_RX_BYTES_40" : "NOKI3210_MBUS_RX_BYTES";
-		const bool keep_rx_response_active =
-				m_mbus_rx_response_active &&
-				old_mbus_rx_pulses != 0 &&
-				(mbus_generated_response_byte(m_mbus_rx_byte_index, next_rx_data) ||
-				 nokia_env_u8_at(rx_env, m_mbus_rx_byte_index, next_rx_data));
-		m_mad2_regs[MAD2_MBUS_STATUS] &= ~MAD2_MBUS_RX_READY;
-		m_mad2_regs[MAD2_MBUS_CTRL] &= ~MAD2_MBUS_RX_ENABLE;
-		if (!keep_rx_response_active)
-		{
-			m_mbus_rx_pulses_remaining = 0;
-			m_mbus_rx_response_active = false;
-		}
-
-	}
-
 	if (offset == 0x20 && pc >= 0x002b0188 && pc <= 0x002b0238)
 	{
 		// The EEPROM acknowledges by pulling SDA low after a byte write.
@@ -3305,9 +2997,8 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		if (mbusw_log++ < 80)
 		{
 			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-			logerror("mbus_w: t=%.4f reg=%02x data=%02x pc=%08x lr=%08x rx_active=%d tx_cmd=%02x\n",
-					machine().time().as_double(), offset, data, pc, lr,
-					m_mbus_rx_response_active ? 1 : 0, m_mbus_last_tx_command);
+			logerror("mbus_w: t=%.4f reg=%02x data=%02x pc=%08x lr=%08x\n",
+					machine().time().as_double(), offset, data, pc, lr);
 		}
 	}
 
@@ -3386,19 +3077,13 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 				schedule_mbus_fiq(2);
 			break;
 		case 0x19:
-			if (nokia_env_u32("NOKI3210_MBUS_STATUS_W1C", 0) != 0)
-				m_mad2_regs[offset] = old_data & ~data;
 			if ((data & 0x80) && !(old_data & 0x80))
 				schedule_mbus_fiq(3);
 			break;
 		case 0x1a:
-			// Accumulate the transmitted MBUS frame (starts with frame-id 0x1f) so
-			// the bus response can be generated from it; see mbus_generated_response_byte.
-			if (data == 0x1f)
-				m_mbus_tx_len = 0;
-			if (m_mbus_tx_len < sizeof(m_mbus_tx_frame))
-				m_mbus_tx_frame[m_mbus_tx_len++] = data;
-			m_mbus_last_tx_command = data;
+			// Byte written to the MBUS TX register; the controller raises the
+			// TX-byte-sent FIQ. (No bus peer answers: the D0 lower-service reply
+			// is superseded by MODEL_DSP_SERVICE and task 08 is never resumed.)
 			schedule_mbus_fiq(2);
 			break;
 		case 0x2c:
