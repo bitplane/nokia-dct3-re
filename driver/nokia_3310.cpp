@@ -2400,14 +2400,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			case 0x0006: ev = 0x03; break;   // SERVICE_QUIESCE
 			case 0x0007: ev = 0x74; break;   // BATTERY_READY_GATE -> subsystem-ready
 			case 0x0009: ev = 0x0e; break;   // BATTERY_WAIT
-			case 0x000c:                     // flag accumulator (0x2712c0): flags 0x112390-0x112395
-				if      (debug_ram_byte(0x00112390) == 0) ev = 0x09;
-				else if (debug_ram_byte(0x00112391) == 0) ev = 0x0d;
-				else if (debug_ram_byte(0x00112392) == 0) ev = 0x0c;
-				else if (debug_ram_byte(0x00112393) == 0) ev = 0x0b;
-				else if (debug_ram_byte(0x00112394) == 0) ev = 0x0a;
-				else if (debug_ram_byte(0x00112395) == 0) ev = 0x1c;
-				break;
+			case 0x000c: break;              // 000c handled by EXPERIMENT_BOOTPATH (PC-specific, no derail)
 		}
 		if (ev != 0)
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, ev);
@@ -2424,6 +2417,48 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, fo & 0xff);
 			logerror("force_outcome: commit outcome=%u (was %u) t=%.4f\n",
 					fo & 0xff, was, machine().time().as_double());
+		}
+	}
+	// EXPERIMENT (opt-in, option C — hollow idle): the MMI main loop (0x297fc4) recv's messages, dispatches,
+	// and when idle-flag [0x11f81b]==1 calls display_idle (0x2a255c). TRACE_MMI shows whether that task runs
+	// in our stuck boot; FORCE_IDLE pins the flag at the recv (0x298008) so the idle redraw fires each loop.
+	if (nokia_env_u32("NOKI3210_TRACE_MMI", 0) != 0 && pc == addr &&
+		(addr == 0x00297fc4 || addr == 0x00298008 || addr == 0x002a255c))
+	{
+		static unsigned mc[3] = { 0, 0, 0 };
+		const int i = (addr == 0x00297fc4) ? 0 : (addr == 0x00298008) ? 1 : 2;
+		if (mc[i]++ < 4)
+			logerror("mmi: %06x (#%u) idleflag[11f81b]=%u t=%.4f\n",
+					addr, mc[i], debug_ram_byte(0x0011f81b), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_FORCE_IDLE", 0) != 0 && pc == addr && addr == 0x00298008)
+		debug_ram_byte_w(0x0011f81b, 1);   // pin MMI idle-redraw flag so display_idle fires
+	// EXPERIMENT (opt-in, option C): thread the enumerated normal-boot path to outcome 3, PC-specific so
+	// side effects stay coherent (no blunt event injection). Requires MARCH (feeds mode 4 -> event 7, which
+	// lands in the 000c post-charger accumulator at 0x2712c0). Chain: fill accumulator flags in RAM + feed
+	// event 0xd -> flag-check -> 0x271354([0x112398]==0) -> 0x271364 boot decision; charger_present_check
+	// (ADC ch5=0) -> normal boot -> wait 0x74 -> gate2 (0x2b2f90==0x80) + [0x11239d]==1 -> commit outcome 3.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_BOOTPATH", 0) != 0 && pc == addr)
+	{
+		if (addr == 0x002712ca)          // 000c recv return: pre-fill flags, feed event 0xd
+		{
+			for (offs_t f = 0x00112390; f <= 0x00112395; f++) debug_ram_byte_w(f, 1);
+			debug_ram_byte_w(0x00112398, 0);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0d);
+		}
+		else if (addr == 0x00271392)     // normal-boot 0x74 wait: feed event 0x74
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x74);
+		else if (addr == 0x002713a6)     // gate2: force 0x2b2f90 result to 0x80
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x80);
+		else if (addr == 0x002713aa)     // gate3: [0x11239d] = 1
+			debug_ram_byte_w(0x0011239d, 1);
+		else if (addr == 0x00271364 || addr == 0x0027136c || addr == 0x00271422 || addr == 0x0027138e ||
+				 addr == 0x00271392 || addr == 0x002713a2 || addr == 0x002713b2 || addr == 0x002714fe)
+		{
+			static unsigned bc = 0;
+			if (bc++ < 30)
+				logerror("bootpath: hit %06x mode=%04x r0=%02x t=%.4f\n", addr, debug_ram_word(FW_STARTUP_MODE),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff, machine().time().as_double());
 		}
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)

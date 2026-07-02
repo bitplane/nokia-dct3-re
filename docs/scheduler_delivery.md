@@ -269,6 +269,34 @@ so the *real* producers fire (side effects intact), phase by phase — confirmin
 per-phase state faking" assessment rather than bypassing it. `FORCE_OUTCOME` (commit override) and
 `TRACE_MODEWAIT` remain as opt-in diagnostics for that work.
 
+## Option C (hollow-idle bypass): mapped the normal-boot path to one blocking recv
+
+Rendering the captured frames was the unlock: `4235fa` is a **battery/charger indicator**, not idle —
+`94a2dc` blank, `4aab13` all-black (LCD init). The MMI main loop (`0x297fc4`) *runs* (recv's, dispatches,
+draws idle when `[0x11f81b]==1`) but sits in the charger/battery-display state, so forcing the idle flag
+(`FORCE_IDLE`) does nothing — it's not on the idle path.
+
+The Ghidra symbol names then cracked the mode chain: `0x2711f6`/`0x27124e`/`0x271266`/`0x2712cc` are all
+`startup_*charger*`, and **`startup_post74_boot_decision_271364`** forks the boot: `bl 0x2b084c`
+(`charger_present_check`, = ADC **channel 5** debounced `> 0x64`) → charger present → `0x271422`
+(battery-display); **absent → normal boot** → wait `0x74` → gate `0x2b2f90==0x80` + `[0x11239d]==1` →
+commit **outcome 3**. Our ADC model already returns channel 5 = 0 (`sane` profile), so the fork *takes the
+normal branch*.
+
+`EXPERIMENT_BOOTPATH` threads it PC-specifically (no side-effecting event injection): fill the `000c`
+accumulator flags in RAM + feed event `0xd` → flag-check → `0x271354` (`[0x112398]==0`) → **`0x271364`
+reached, charger-absent branch confirmed** (`0x271422` never hit) → `0x27138e` (the `0x74` wait). That's the
+deepest the boot has gone. **It stalls there on a *blocking* recv**: `0x26ff14 → bl 0x26a458` suspends the
+task on an empty ring, and event `0x74`'s only producers are the service-command handlers `0x213fcc`/
+`0x214836`, which don't run — so `0x74` is never posted, `0x26ff1a` is never reached, and MARCH-style feeding
+(which needs the recv to *return*) can't reach it. Feeding it needs a real post to the ring (a responder-style
+trampoline) or the real producer running.
+
+**Net:** option C mapped the entire normal-boot path down to a single missing event (`0x74`), the same
+subsystem-produced-readiness wall as everywhere else — and even past it, outcome 3 commits to the power
+supervisor, so idle isn't guaranteed without tracing the supervisor's proceed path. `EXPERIMENT_BOOTPATH`,
+`FORCE_OUTCOME`, `FORCE_IDLE`, `TRACE_MMI`, `TRACE_MODEWAIT` are the opt-in tools for this.
+
 ## Reusable disassembly
 
 `.venv/bin/python tools/disrom.py <addr>:<len>` (or `NOKI_BIN=roms/<img>_swap16.bin`). Key functions
