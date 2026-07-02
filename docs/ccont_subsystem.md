@@ -263,7 +263,12 @@ The `000d` advance is **blocked, but not by hardware**: it waits on a request/re
 the *same* subsystem CONTACT SERVICE needed. We scoped and **built** a `MODEL_SVC_RESPONDER`-class reply for
 it — but the build **did not land** (spec address never executes; six faithful levers all failed), so this
 is the **practical bottom for the corpus**: peer identified, mechanism unrecoverable here (full post-mortem at
-the end of this section). The confirmed ROM mechanism, settled several ways:
+the end of this section). **Update — clean disassembly reopened it (see `scheduler_delivery.md`):** the
+delivery mechanism is now nailed from ground truth, not inferred. The delayed channel *recodes* event `k` →
+surfaced code `0xc0+k` (table `0x2d71a8`), so a delayed `0x15` always arrives as `0xd5`, never raw `0x15` —
+the mechanical reason the delay-1 test failed, superseding the "delivery-context/subscription" framing
+below. The open lead is now the `0xd5` handler's `bl 0x2b08c6` (CCONT dispatch) as the real setter of flag
+bit `0x04`. The confirmed ROM mechanism, settled several ways:
 
 🟢 **The gate is a literal compare on the received code.** Mode-`000d` (`0x270e1c` loop → dispatch
 `0x270e22`) `cmp`s the code returned by the recv wrapper `0x26ff14` and ORs a bit into flag `[0x112399]`:
