@@ -67,28 +67,32 @@ the contact-service and leaves the CONTACT SERVICE screen; with them off, the de
 reproduces the regression oracle (`make verify` → frame `d8a9a7`). The full chain and every model
 are documented in `docs/service_bootstrap.md` (start at "Status & model stack").
 
-**Phase 2 — boot → idle — is mapped end-to-end, and the boundary is found.** Past CONTACT SERVICE the
-boot runs a chain of startup modes (`000d → 0004 → … → 0007 → readiness loop`) and holds at the
-**mode-`000d` limp**. That limp is now **fully reverse-engineered** (see `docs/service_bootstrap.md`
-"Beyond the gate"): it is the CCONT **power-on / charger measurement sweep** — mode `000d` advances only
-when four sub-events `0x14/0x15/0x16/0x17` are delivered to the startup task, and `0x15`/`0x16` never
-arrive because their producers post them on a **delayed scheduler channel** while `0x14`/`0x17` use a
-direct one (a structural firmware fact, not a missing model). Injecting the missing events advances
-`000d → 0004` and renders the first real **battery-present idle screen** (frame `4235fa`).
+**Phase 2 — boot → idle — is mapped end-to-end, and the `000d` boundary is diagnosed to the subsystem.**
+Past CONTACT SERVICE the boot runs a chain of startup modes (`000d → 0004 → … → 0007 → readiness loop`)
+and holds at the **mode-`000d` limp**. The gate advances only when the startup task *receives* four
+standalone events `0x14/0x15/0x16/0x17`; `0x15` never arrives as a raw code. Chasing that to the root
+(raw disassembly + a battery of emulator experiments) landed on a precise diagnosis: `000d` waits on a
+**service-transport peer reply** (`task_285` / remote node `0x18`) — the **same subsystem CONTACT SERVICE
+needed** — which never answers on our blank/peerless boot, so a timer keeps re-arming `0x15` long and it
+starves. Forcing the events (diagnostic, *not* faithful) advances `000d → 0004` and renders the first
+**battery-present idle screen** (frame `4235fa`).
 
-The **CCONT power-management subsystem is now faithfully modelled** (`docs/ccont_subsystem.md`): an
-explicit ADC-source model, the interrupt→event protocol decoded, the `0x77xx` PMM messages mapped, and
-its env-knob cluster retired into device state/constants. The measurement path was confirmed *already
-faithful* (synchronous ADC + the firmware's own timer-poll), so there is no measurement state machine to
-add for the boot.
+The **CCONT power-management subsystem is faithfully modelled** (`docs/ccont_subsystem.md`): an explicit
+ADC-source model, the interrupt→event protocol decoded, the `0x77xx` PMM messages mapped, its env-knob
+cluster retired into device state/constants. The measurement path was confirmed *already faithful*
+(synchronous ADC + the firmware's own timer-poll), and separately ruled **out** as the `000d` cause
+(the CCONT IRQ status settles cleanly).
 
-**The remaining boundary is data, not mechanism.** Reaching idle is blocked on **provisioned
-configuration** a real phone carries but the firmware dump does not — chiefly the service-response
-**channel-map** (command `0x70`) that enables the service channels. We currently clear CONTACT SERVICE by
-*faking* one node response (the responder trampoline), which leaves the post-CONTACT-SERVICE region in a
-state the real firmware never occupies; faithful progress past it needs the real provisioned data,
-realistically a **real-hardware service-bus capture** (the runtime analogue of "bring your own dump").
-This is documented with the dead-ends and disproofs in `docs/ccont_subsystem.md`.
+**We built the faithful fix and it didn't land — the practical bottom for this dump.** A
+`MODEL_SVC_RESPONDER`-class responder for `task_285` was built to the traced spec, but its trigger
+address is never executed: the scheduler bodies decompile to Thumb-garbage, so the exact code addresses
+don't survive even though the *subsystem* identification does. **Six faithful levers were tested; all six
+failed** — only the unfaithful event-forcing advances the boot (full scorecard + post-mortem in
+`docs/ccont_subsystem.md`). This is **not a hardware wall** (that framing was tested and retracted): the
+peer is software, but closing `000d` faithfully needs a **cleaner reference** — a working-phone boot/RAM
+trace to observe the real peer reply, or a better decompilation of the scheduler path — rather than
+another lever on this degraded corpus. (Reaching a fully live idle beyond `000d` additionally needs
+provisioned data the dump lacks, e.g. the service-channel map.)
 
 ## Reproducing
 
@@ -102,8 +106,18 @@ make verify     # boot to CONTACT SERVICE, check the LCD frame SHA == the oracle
 make swap16     # derive the halfword-swapped image the static tools/Ghidra use
 ```
 
-Every `NOKI3210_*` knob the driver reads is overridable on the command line
-(`make run NOKI3210_TRACE_PM=1`); the canonical oracle profile is baked into `make run`.
+Every `NOKI3210_*` knob the driver reads is overridable on the command line; the
+canonical oracle profile is baked into `make run`. Two useful profiles beyond the oracle:
+
+```
+# Clear CONTACT SERVICE and reach the mode-000d limp (Phase 1's five models):
+make run NOKI3210_MODEL_DSP_SERVICE=1 NOKI3210_MODEL_CCONT_PRESENT=1 NOKI3210_MODEL_SVC_RESPONDER=1
+
+# Diagnostic preview of the first battery-idle screen past the 000d gate (frame 4235fa;
+# forces events the firmware never emits on this path — NOT a faithful boot):
+make run NOKI3210_MODEL_DSP_SERVICE=1 NOKI3210_MODEL_CCONT_PRESENT=1 \
+         NOKI3210_MODEL_SVC_RESPONDER=1 NOKI3210_EXPERIMENT_FORCE_000D_EVENTS=1
+```
 
 ## License
 
