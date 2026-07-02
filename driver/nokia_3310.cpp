@@ -2371,6 +2371,47 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					machine().time().as_double());
 		}
 	}
+	// EXPERIMENT (opt-in, diagnostic): "march" the startup mode chain toward idle by injecting each
+	// mode's advance event at the startup recv (0x26ff1a, r0 = the code the mode handler will check).
+	// The real event-producers exist in-ROM but our stubbed subsystems (DSP/RF/battery-ready) don't
+	// fire them; this fakes the ready-signal per mode. 000d is left to FORCE_000D_EVENTS (multi-event
+	// flag). NOT faithful — a scaffold to see how far a "bullshit" boot reaches (a hollow idle).
+	// diagnostic (opt-in): map each startup mode to its recv wait-loop by logging the caller LR at
+	// the recv-wrapper entry 0x26ff14, once per (mode,lr). Reveals where each mode spins, so its exact
+	// wait event can be read from the disassembly.
+	if (nokia_env_u32("NOKI3210_TRACE_MODEWAIT", 0) != 0 && pc == addr && addr == 0x0026ff14)
+	{
+		const u16 mode = debug_ram_word(FW_STARTUP_MODE);
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		static uint32_t seen[64]; static unsigned n = 0;
+		const uint32_t key = (u32(mode) << 24) ^ lr;
+		bool f = false; for (unsigned i = 0; i < n; i++) if (seen[i] == key) { f = true; break; }
+		if (!f && n < 64) { seen[n++] = key;
+			logerror("modewait: mode=%04x recv-caller lr=%08x t=%.4f\n", mode, lr, machine().time().as_double()); }
+	}
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_MARCH", 0) != 0 && pc == addr && addr == 0x0026ff1a)
+	{
+		u16 ev = 0;
+		switch (debug_ram_word(FW_STARTUP_MODE))
+		{
+			case 0x0004: ev = 0x07; break;   // POST_SELFTEST      -> BATTERY_READY
+			case 0x000b: ev = 0x07; break;   // POST_CHARGER       -> BATTERY_READY
+			case 0x0005: ev = 0x06; break;   // READY_GATE
+			case 0x0006: ev = 0x03; break;   // SERVICE_QUIESCE
+			case 0x0007: ev = 0x74; break;   // BATTERY_READY_GATE -> subsystem-ready
+			case 0x0009: ev = 0x0e; break;   // BATTERY_WAIT
+			case 0x000c:                     // flag accumulator (0x2712c0): flags 0x112390-0x112395
+				if      (debug_ram_byte(0x00112390) == 0) ev = 0x09;
+				else if (debug_ram_byte(0x00112391) == 0) ev = 0x0d;
+				else if (debug_ram_byte(0x00112392) == 0) ev = 0x0c;
+				else if (debug_ram_byte(0x00112393) == 0) ev = 0x0b;
+				else if (debug_ram_byte(0x00112394) == 0) ev = 0x0a;
+				else if (debug_ram_byte(0x00112395) == 0) ev = 0x1c;
+				break;
+		}
+		if (ev != 0)
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, ev);
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
 	{
 		static unsigned dq = 0;

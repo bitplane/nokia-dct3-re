@@ -221,6 +221,29 @@ the calibration would only matter *after* the mode chain, which we never reach f
 earlier "reaching idle needs provisioned data" note: the operative missing piece is the **service session**,
 not the EEPROM.
 
+## "Bullshit the boot" — marching the startup mode chain (EXPERIMENT_MARCH)
+
+Tested how far a *hollow* boot can be driven by faking each mode's ready-signal (all the mode-advancing
+event producers are in-ROM; our stubbed subsystems just don't fire them). The startup is a **shared-code
+event-driven state machine**: a master dispatcher (`0x270c8e` recv → mode jump table `0x270ca8`, modes
+`0..0xd` → handlers) where each mode is a flag-accumulator or router. `TRACE_MODEWAIT` maps mode→wait-loop;
+the jump table gives every handler.
+
+`EXPERIMENT_MARCH` injects each mode's advance event at the recv (`0x26ff1a`). Result — **real forward
+motion**: `000d → 0004 → (event 7) → the flag-accumulator phase`, and it **renders the battery-idle frame
+`4235fa`**. But it dead-ends there, and the reason is structural: mode 4's event-7 handler runs a big
+**subsystem-init sequence** (`0x2af058`/`0x2a26d4`/`0x2794d2`/`0x29797c`/`0x29af90`/`0x2a102c`…) then waits
+in a flag-accumulator (`0x2712c0`, flags `0x112390-0x112395`) for events those subsystems are meant to
+produce. Faking the events partly fills the flags, but the machine has **consistency/terminal paths** —
+e.g. mode `000c`'s "exit" `0x2714fc` is `movs r0,#0xc; bl 0x2b4dda` (the **terminal commit**) + an infinite
+recv loop — that fire when the faked signals don't match a coherent subsystem state.
+
+**Takeaway:** boot-to-idle is *drivable* but not cheaply bullshittable — each phase kicks off real subsystem
+init (DSP/RF/battery) and then waits for those subsystems to report a *consistent* ready state. Reaching a
+clean idle means faking a coherent set of subsystem states + event sequences per phase — a real,
+phase-by-phase modelling grind (tractable, but with dead-end risk), not a single injection. The march
+(opt-in) is the tool for that grind, and it already advances further than any prior lever.
+
 ## Reusable disassembly
 
 `.venv/bin/python tools/disrom.py <addr>:<len>` (or `NOKI_BIN=roms/<img>_swap16.bin`). Key functions
