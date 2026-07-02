@@ -96,6 +96,22 @@ wheel service) — specifically how a matured node is routed into `fp+8` vs a ra
 would make a matured `0x15` land in a raw ring (→ raw `0x15` → `000d` clears). That is the remaining
 ground-truth thread; fully digital, no hardware required.
 
+## The `000d` gate strictly needs bit `0x04` (premise confirmed)
+
+Disassembled the full advance gate (`0x270ec6`): it loops until **both** `CCONT_STATE[0x11ff6c] & 0xf == 6`
+**and** `flag[0x112399] & 0xf == 0xf`, then `bl 0x2a6942` advances. No looser path — bit `0x04` (from a raw
+`0x15`) is genuinely required. The only writer of the flag's low nibble is the dispatcher itself, OR-ing a
+bit on receipt of a **raw** `0x14/0x16/0x15/0x17` (`0x270e3e`); `0x2b08c6` does not touch it. So `000d` can
+only clear if a raw `0x15` is delivered — yet `0x15` is delayed-only (→ recode → `0xd5`).
+
+**The reconciling fact: raw delivery is conditional, not impossible** — `limp2_deq` caught a raw `0x16`
+once, so `0x26a458` *does* emit these raw under some state. `0x269acc` matures a node and delegates the
+ring-enqueue to **`0x2aca40(wheelslot+8, node+8)`**; that routing (raw ring vs `fp+8` recode ring) is the
+last unknown. Whether it's timing (short-delay nodes caught before classification) or a node-field
+condition is next to pin — via `0x2aca40`, or faster, a **runtime probe at `0x26a458`'s three return paths**
+(`0x26a4ee`/`0x26a656`/`0x26a5ec`, all address-known) to catch the raw-`0x16` case live and read the node
+state that routed it raw.
+
 ## Reusable disassembly
 
 `.venv/bin/python tools/disrom.py <addr>:<len>` (or `NOKI_BIN=roms/<img>_swap16.bin`). Key functions
