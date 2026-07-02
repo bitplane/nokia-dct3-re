@@ -2412,6 +2412,20 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (ev != 0)
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, ev);
 	}
+	// EXPERIMENT (opt-in, diagnostic): override the startup *outcome* committed at 0x2b4dda. The whole
+	// power-on-reason arbiter (boot vs charge vs low-battery-off) funnels here: 0x2b4dda stores r4=outcome
+	// to [0x1150ff], and the supervisor 0x2a924c dispatches on it ({1,5,6}=retry). Sweeping the value lets
+	// us see empirically what each outcome renders, before RE-ing the gates that steer to a given outcome.
+	{
+		const u32 fo = nokia_env_u32("NOKI3210_FORCE_OUTCOME", 0xffffffff);
+		if (fo != 0xffffffff && pc == addr && addr == 0x002b4dda)
+		{
+			const u32 was = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, fo & 0xff);
+			logerror("force_outcome: commit outcome=%u (was %u) t=%.4f\n",
+					fo & 0xff, was, machine().time().as_double());
+		}
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
 	{
 		static unsigned dq = 0;

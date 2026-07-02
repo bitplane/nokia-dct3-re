@@ -244,6 +244,31 @@ clean idle means faking a coherent set of subsystem states + event sequences per
 phase-by-phase modelling grind (tractable, but with dead-end risk), not a single injection. The march
 (opt-in) is the tool for that grind, and it already advances further than any prior lever.
 
+## Tested: "backward-chain to the startup outcome" is NOT a shortcut
+
+The mode chain ends by committing a one-byte **outcome** to `[0x1150ff]` via `0x2b4dda` (which also parks the
+startup task in a `b self` loop — its natural retirement, not a crash). It looked like steering that outcome
+to a "success" value might shortcut the per-phase grind. Chased it end to end; it doesn't:
+
+- **The outcome is a power supervisor, not an idle selector.** `0x2a924c` reads `[0x1150ff]` and treats
+  `{1,5,6}` as **retry** (bumps `[0x1140ff]`, gives up via `0x2b4e16` after 6), else stores to `[0x1141ff]`.
+  Readers of `[0x1141ff]` (`0x29bc96`, `0x2a1140`, …) compare against `0xa`/`0xf`/`0x66` — CCONT/charger
+  reason codes. The sibling `0x2a92fc` "readiness loop" is a boolean **ready?** check (fail → re-loop;
+  success → returns 1), not a transition to idle UI. The whole cluster is the CCONT power-on/readiness
+  arbiter — reaching a given outcome doesn't render idle.
+- **Gate1 `0x2a6942`** just classifies charger state (`0x27d654` = `byte[0x113604]`); **the commit
+  re-validates** outcomes 2/3/4 via `0x2af9c6` (→ `0x2af858`) and downgrades to `1`/retry on failure. So
+  even a forced outcome stays entangled with coherent subsystem state.
+- **Event injection is too blunt.** `EXPERIMENT_MARCH` (inject each mode's advance event at recv) drives
+  `000d→0004→000c` but the injected events have side effects; adding the `000c` completion event *regressed*
+  the render (`4235fa` → limp). Faking events ≠ faking the conditions the real producers check.
+
+**Conclusion:** there is no clean shortcut around coherence. The events the mode chain waits on are produced
+by MCU/CCONT subsystem code gated on data conditions; a clean boot-to-idle needs those conditions made true
+so the *real* producers fire (side effects intact), phase by phase — confirming the earlier "coherent
+per-phase state faking" assessment rather than bypassing it. `FORCE_OUTCOME` (commit override) and
+`TRACE_MODEWAIT` remain as opt-in diagnostics for that work.
+
 ## Reusable disassembly
 
 `.venv/bin/python tools/disrom.py <addr>:<len>` (or `NOKI_BIN=roms/<img>_swap16.bin`). Key functions
