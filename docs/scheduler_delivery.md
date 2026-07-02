@@ -128,33 +128,33 @@ mid-straight-line instructions. So probe at a `bne`/`bl` target near the code of
 never at an arbitrary mid-function store. This is why the first `TRACE_DELIV` attempt (hooking the mid-line
 `str [sp,#4]` sites) saw nothing.
 
-## Resolution: `0x15` has no raw producer — bit `0x04` is unsettable
+## Resolution: the raw-`0x15` producer IS the contact-service command loop (`0x236bac`)
 
-The whole chain now closes. Mode-`000d` sets its flag bits only on receiving a **raw** sweep code, and the
-raw codes reach the startup task (**task 3**) as message-**codes** (`[msg+2]`) posted by service-layer code
-via `0x26a204`/`0x26a354` — the buffer/raw delivery paths, not the recode ring. Producers by event:
+The whole chain now closes — and my first pass ("`0x15` has no producer") was **wrong**: a `[+2]`-only scan
+missed it, because `0x15` is produced with the code at **`[msg+0]`**, by the contact-service command
+processor. The full trace:
 
-| event | raw message-code producers | delivered raw? |
-|---|---|---|
-| `0x14` | **8 sites** (`0x217108`, `0x21832e`, `0x218508`, `0x21885a`, `0x2191a4`, `0x2195fe`, `0x219af0`, `0x2a6a20`) | ✅ → bit `0x01` |
-| `0x16` | **1 site** (`0x264fc0`, a service record-builder) | ✅ once → bit `0x02` |
-| `0x17` | message-posted (`0x26a354`) | ✅ → bit `0x08` |
-| `0x15` | **none** — appears only as message *payload* (`[+4]`/`[+5]` in the `0x264fxx` records), never as a code | ❌ → bit `0x04` never |
+- **`0x236bac`** — a service **status-word → startup-event translator**. Arg `r0` = a status byte; it emits
+  code **`0x15` if bit 2** is set (`0x17` on bit 3, `0x19` on bit 5), gated by `0x2a674c()` and the slot
+  (`0x11d3fe`) being empty:
+  `0x236bd4 lsrs r0,r4,#2; blo … / 0x236bec movs r0,#0x15; strb r0,[r5]`.
+- **Caller `0x237844`**, inside the **contact-service command dispatch `0x237816`** (the same jump table
+  that reaches the channel-map handler `0x23670c`): `ldrb r0,[r5,#9]` → the status word is
+  **`message[+9]`** of a service command; `bl 0x236bac`.
 
-🟢 (runtime `TRACE_MSGSRC`: every message posted with a `0x15`/`0x16` byte was scanned; codes seen at
-`[+2]` were `0xe`/`0x16`/`0x1a`, never `0x15`. 🟡 static scan for `movs rX,#0x15 → strb rX,[rY,#2]` found 0
-sites, modulo register-move-chain blindness — it likewise misses `0x16`'s chained producer, so treat as
-corroborating, not sole, evidence.)
+So the mode-`000d` sweep events `0x15`/`0x17`/`0x19` are **produced by the contact-service command loop from
+real service messages** — specifically the status bits in `message[+9]`. (`0x14`/`0x16` have their own
+service producers — `0x14`: 8 event/message sites incl. immediate `0x2695f4`; `0x16`: `0x264fc0`. `0x15`'s
+*event-channel* posts, by contrast, are all delayed `0x2697aa` → recoded to `0xd5` — which is why the delayed
+path never helps; the **raw** `0x15` comes only from `0x236bac`.)
 
-So `0x15` is **only ever posted on the delayed CCONT event channel** (`0x2b0900`/`0x2b0a12`/the `0xd5`
-re-post), which the recv path **recodes to `0xd5`** (table `0x2d71a8`). There is no raw `0x15` producer, so
-the startup task never receives a raw `0x15`, bit `0x04` never sets, and the gate (`flag == 0xf`) never
-closes. This is the exact, ground-truth root cause of the `000d` limp — not "context", "subscription", a
-peer response, or a timer, all of which were tested and refuted. The open boundary is narrow and precise:
-**does a raw-`0x15` message-code producer exist in a service path our faked boot never runs** (e.g. gated
-behind real channel-map/provisioned processing — the `0x264fxx` producers are service record-builders, one
-of which carried a runtime `0x70` channel-map byte)? That is the same provisioned-data boundary the project
-already documented for reaching idle — now shown to gate `000d` too, via the missing raw-`0x15` producer.
+**Why our boot stalls, exactly:** we clear CONTACT SERVICE by *faking* one node-`0x18` response
+(`MODEL_SVC_RESPONDER`) instead of driving the real command loop. So `0x236bac` is never invoked with a
+`message[+9]` whose bit 2 is set → `0x15` is never emitted → bit `0x04` never sets → the gate (`flag==0xf`)
+never closes. This is the **same boundary as genuinely clearing CONTACT SERVICE** (processing real
+service-bus messages vs faking a reply) — now pinned, at the instruction level, as the gate on `000d` too.
+The narrow remaining question is what real service command/`message[+9]` a provisioned boot delivers to set
+bit 2 — a provisioned-data / real-service-bus question, not a modelling gap in the driver.
 
 ## Reusable disassembly
 
