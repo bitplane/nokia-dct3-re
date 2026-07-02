@@ -2309,6 +2309,31 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					debug_ram_byte(msg+6), m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					machine().time().as_double());
 	}
+	// raw-0x16 source probe (opt-in): at BOTH message-post primitives (0x26a204 / 0x26a354, r0=task,
+	// r1=msgptr — both branch targets, so the fetch hook fires), scan the message for a 0x15/0x16 byte
+	// in the first 12 bytes. Finds the producer of the raw sweep deliveries (the one-off raw 0x16),
+	// which is the template for what would deliver a raw 0x15 and clear 000d. Logs target task + LR.
+	if (nokia_env_u32("NOKI3210_TRACE_MSGSRC", 0) != 0 && pc == addr &&
+			(addr == 0x0026a204 || addr == 0x0026a354))
+	{
+		const u32 task = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		const u32 msg  = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+		{
+			bool hit = false;
+			for (int i = 0; i < 12; i++)
+			{ const uint8_t b = debug_ram_byte(msg + i); if (b == 0x15 || b == 0x16) hit = true; }
+			static unsigned mp = 0;
+			if (hit && mp++ < 60)
+				logerror("msgsrc: via=%s task=%02x hdr=%02x%02x %02x%02x %02x%02x %02x%02x %02x%02x lr=%08x mode=%04x t=%.5f\n",
+						addr == 0x0026a204 ? "a204" : "a354", task,
+						debug_ram_byte(msg+0), debug_ram_byte(msg+1), debug_ram_byte(msg+2), debug_ram_byte(msg+3),
+						debug_ram_byte(msg+4), debug_ram_byte(msg+5), debug_ram_byte(msg+6), debug_ram_byte(msg+7),
+						debug_ram_byte(msg+8), debug_ram_byte(msg+9),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+						debug_ram_word(FW_STARTUP_MODE), machine().time().as_double());
+		}
+	}
 	// startup-message dequeue probe: at 0x26ff1a (just after bl 0x26a458) log the raw message id
 	// r0 the translator received — the channel the 000d handler actually reads (vs 0x2697aa events).
 	// 0x70 channel-map response probes: does the 0x70/0x71 command handler (0x23670c) and/or the
