@@ -49,6 +49,11 @@ derived from the firmware (Ghidra decompiled listings) are git-ignored.
 - [`docs/ccont_subsystem.md`](docs/ccont_subsystem.md) — the CCONT power-management subsystem:
   confidence-tagged protocol map (serial regs, ADC, the interrupt→event/message fan-out) and
   the target `ccont_device` component. The first subsystem to model faithfully.
+- [`docs/scheduler_delivery.md`](docs/scheduler_delivery.md) — the RTOS event/message delivery path
+  from **ground-truth disassembly**: the immediate-vs-delayed post split, the `0x2d71a8` recode table,
+  the mode-`000d` gate, why the raw-`0x15` producer is dead-gated, and the **3310 cross-firmware**
+  confirmation that closes the `000d` limp (it's a faked-boot artifact). Includes the reusable
+  cross-firmware comparison method (byteswap + entry-signature search).
 - [`docs/battery_classifier_analysis.md`](docs/battery_classifier_analysis.md),
   [`docs/static_branch_map.md`](docs/static_branch_map.md),
   [`docs/firmware_code_maps.md`](docs/firmware_code_maps.md) — supporting analysis.
@@ -67,32 +72,33 @@ the contact-service and leaves the CONTACT SERVICE screen; with them off, the de
 reproduces the regression oracle (`make verify` → frame `d8a9a7`). The full chain and every model
 are documented in `docs/service_bootstrap.md` (start at "Status & model stack").
 
-**Phase 2 — boot → idle — is mapped end-to-end, and the `000d` boundary is diagnosed to the subsystem.**
+**Phase 2 — boot → idle — is mapped end-to-end, and the mode-`000d` limp is fully reverse-engineered.**
 Past CONTACT SERVICE the boot runs a chain of startup modes (`000d → 0004 → … → 0007 → readiness loop`)
-and holds at the **mode-`000d` limp**. The gate advances only when the startup task *receives* four
-standalone events `0x14/0x15/0x16/0x17`; `0x15` never arrives as a raw code. Chasing that to the root
-(raw disassembly + a battery of emulator experiments) landed on a precise diagnosis: `000d` waits on a
-**service-transport peer reply** (`task_285` / remote node `0x18`) — the **same subsystem CONTACT SERVICE
-needed** — which never answers on our blank/peerless boot, so a timer keeps re-arming `0x15` long and it
-starves. Forcing the events (diagnostic, *not* faithful) advances `000d → 0004` and renders the first
-**battery-present idle screen** (frame `4235fa`).
+and holds at the **mode-`000d` limp**, which advances only when the startup task *receives* the four raw
+startup events `0x14/0x15/0x16/0x17` (flag `[0x112399]` reaches `0x0f`); `0x15` never arrives. Ground-truth
+disassembly (`docs/scheduler_delivery.md`, via `tools/disrom.py` on the swap16 image — the Ghidra
+*decompiler* output is Thumb-garbage for this path, but the *disassembly* is clean) traced the exact
+delivery machinery: the scheduler has an **immediate** post path (raw code → the task's ring) and a
+**delayed** path that **recodes** every event `k` to `0xc0+k` via a table at `0x2d71a8` — so a
+delayed-posted `0x15` always surfaces as `0xd5`, never as raw `0x15`. `0x15` has **no** immediate producer;
+the one candidate — the contact-service command handler `0x236bac`, reached by command `0x65` — has its
+`0x15` emit **dead-gated** (`0x2a674c` returns 1 for its even argument, skipping the emit on every phone).
+
+**Cross-firmware confirmed — and it reframes the limp.** Diffing the sibling **Nokia 3310 (NHM-5 v06.39)**
+shows that dead-gate is **byte-identical** — shared DCT3 firmware design, not a 3210 bug. Since real 3310s
+boot to idle with the *same* dead `0x15`-emit, a normal DCT3 boot does **not** depend on this producer — so
+the mode-`000d` limp (waiting for a raw `0x15`) is an **artifact of the blank + faked boot**, not the path a
+real phone takes. The `000d` code is completely and correctly reverse-engineered; the *stall* is a property
+of how our unprovisioned/faked reconstruction reaches that state, not a missing model or a hardware gate.
+The diagnostic `EXPERIMENT_FORCE_000D_EVENTS` (not faithful) advances `000d → 0004` and renders the first
+**battery-present idle screen** (frame `4235fa`). The full mechanism, the refuted faithful levers, and the
+reusable cross-firmware method are in `docs/scheduler_delivery.md`.
 
 The **CCONT power-management subsystem is faithfully modelled** (`docs/ccont_subsystem.md`): an explicit
 ADC-source model, the interrupt→event protocol decoded, the `0x77xx` PMM messages mapped, its env-knob
 cluster retired into device state/constants. The measurement path was confirmed *already faithful*
 (synchronous ADC + the firmware's own timer-poll), and separately ruled **out** as the `000d` cause
 (the CCONT IRQ status settles cleanly).
-
-**We built the faithful fix and it didn't land — the practical bottom for this dump.** A
-`MODEL_SVC_RESPONDER`-class responder for `task_285` was built to the traced spec, but its trigger
-address is never executed: the scheduler bodies decompile to Thumb-garbage, so the exact code addresses
-don't survive even though the *subsystem* identification does. **Six faithful levers were tested; all six
-failed** — only the unfaithful event-forcing advances the boot (full scorecard + post-mortem in
-`docs/ccont_subsystem.md`). This is **not a hardware wall** (that framing was tested and retracted): the
-peer is software, but closing `000d` faithfully needs a **cleaner reference** — a working-phone boot/RAM
-trace to observe the real peer reply, or a better decompilation of the scheduler path — rather than
-another lever on this degraded corpus. (Reaching a fully live idle beyond `000d` additionally needs
-provisioned data the dump lacks, e.g. the service-channel map.)
 
 ## Reproducing
 
