@@ -71,12 +71,30 @@ Mode-`000d` advances only when flag `[0x112399]` reaches `0x0f` by *receiving* r
 - `0x15`/`0x16` have **no immediate producer**, and the delayed path recodes them to `0xd5`/`0xd6` →
   bits `0x04`/`0x02` are **never** set by event delivery, on **any** phone running this firmware.
 
-So the gate's bit-`0x04` cannot come from *receiving* event `0x15`. The remaining ground-truth lead is
-the `0xd5` handler's **`bl 0x2b08c6`** (the CCONT IRQ-status dispatch): 🟡 that is the plausible place a
-real, correctly-conditioned CCONT state would set the flag bit directly (or drive an immediate re-post),
-rather than the event ever arriving raw. That is the next function to disassemble and correlate with the
-CCONT registers — a concrete, digital next step (no hardware required), now that the delivery mechanism
-is nailed rather than inferred.
+So the gate's bit-`0x04` cannot come from *receiving* event `0x15`.
+
+**Lead checked and REFUTED (`0x2b08c6` disassembled):** the CCONT IRQ-status dispatch computes
+`r4 = (ccont_read(0x90ff) & ~ccont_read(0x11ff)) & 0xf8`, posts `0x15`/`0x16` **delayed**, sends `0x77xx`
+PMM messages, and writes battery/charger state (`1`/`2`/`4`) to **`0x1121d2`** — it does **not** write the
+`000d` flag `0x112399`. So the `0xd5` handler does not set the flag; that lead is dead.
+
+**The sharpened target — which of `0x26a458`'s three rings a node lands in.** `0x26a458` returns `[sp+4]`,
+set on one of three ring paths checked in priority order per task (`fp = 0x101484 + task*0x1c`):
+
+| path | source of return value | gate | raw or recoded? |
+|---|---|---|---|
+| **A** `0x26a4ee` | `*(fp[+0xc] + idx*4)` (indexed msg buffer) | wheel-slot `[+0xf]` bit0; `fp+0x10/+0x11` head/tail | **raw** |
+| **C** `0x26a656` | `recode_table[node[+9]]` (`0x2d71a8`) on the `fp+8` **linked list** | `fp+8 != ~0` (**priority**) | **recoded** `0xc0+class` |
+| **B** `0x26a5ec` | `*(fp[+0x14] + idx*4)` (indexed msg buffer) | `fp+8 == ~0`; `fp+0x18/+0x19` head/tail | **raw** |
+
+So **only the `fp+8` linked-list ring recodes**, and it has priority. The raw deliveries we observe
+(`0x14`/`0x17`, and the one-off raw `0x16`) come through the **indexed message rings** (A/B) — consistent
+with `0x17` being posted via `sched_context_post_message 0x26a354` (a *message* post) rather than an event.
+The delayed CCONT events (`0x15`/`0x16` via `0x2697aa` → timer wheel) are routed on maturity into the
+**`fp+8` recode ring**, so they come out as `0xd5`/`0xd6`. **Next function to trace: `0x269acc`** (the
+wheel service) — specifically how a matured node is routed into `fp+8` vs a raw message ring, i.e. what
+would make a matured `0x15` land in a raw ring (→ raw `0x15` → `000d` clears). That is the remaining
+ground-truth thread; fully digital, no hardware required.
 
 ## Reusable disassembly
 
