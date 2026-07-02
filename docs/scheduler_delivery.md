@@ -161,13 +161,25 @@ command family.
 delivered → `0x236bac` never emits `0x15` → bit `0x04` never sets → the gate never closes. Same boundary as
 genuinely clearing CONTACT SERVICE, now pinned at the instruction level as the `000d` gate too.
 
-**This reopens a BUILDABLE path.** Unlike the failed `task_285` responder (whose spec address never ran),
-this producer chain is fully verified and driven by a real command handler: a `MODEL_SVC_RESPONDER`-style
-injection of a **command-`0x65` message with `message[+9]` bit 2 set** to the contact-service task should
-make the firmware's *own* `0x236bac` emit a raw `0x15` (and `0x17` on bit 3, `0x19` on bit 5) → set bit
-`0x04` → advance `000d` — faithfully, via the real code path, no forced event injection. The open question
-(what a provisioned phone's command-`0x65` payload actually contains beyond bit 2) is a provisioned-data
-detail, but the trigger is now a concrete, testable model.
+**Build attempted (`MODEL_CMD65_RESPONDER`) — and it proved the producer is DEAD-GATED for `0x15`.** We
+built a `MODEL_SVC_RESPONDER`-style injection of a command-`0x65` message and verified the mechanism step by
+step: the service loop keeps polling for non-completion commands (unlike `0x64`, which stops it), `0x65`
+dispatches, and — once the service-ready gate `[0x11fed1]` bit 0 is set (skipped otherwise at `0x23742a`) —
+it reaches `0x236bac(status)`. **But the `0x15` emit never fires.** Inside `0x236bac`:
+- `0x15` is gated on **status bit 1** (`0x236bd4 lsrs r0,r4,#2` puts *bit 1* in carry, not bit 2), then on
+  **`0x2a674c(2) != 1`**. And `0x2a674c` returns `1` for **any even argument** (`0x2a6750 lsrs r0,#1; bhs`
+  → even → `r4=1`); the arg for `0x15` is `2` (even). So `0x2a674c(2)` is **always `1`**, and the `0x15`
+  emit at `0x236bec` is **skipped on every phone** — structurally dead code.
+- (`0x17` uses arg `1` (odd) → `0x2a674c` runs its real path → `0x17` *is* emitted. Consistent with runtime:
+  `0x17` delivers, `0x15` never.)
+
+Even overriding `0x2a674c(2)→0` (pure force, not a model), `000d` still did not advance — there is a
+further delivery step beyond the emit. **Conclusion:** `0x236bac` is a faithful producer for `0x17`/`0x19`
+but **not** for `0x15` — the `0x15` path is dead-gated. So there is **no reachable faithful producer of a raw
+`0x15`** in this firmware image: mode-`000d`'s bit `0x04` cannot be set by any real code path here. On a real
+phone the gate must be satisfied by state we don't reproduce (a seeded flag, a different provisioned/firmware
+configuration, or a mechanism still unidentified). The command-`0x65` responder + gate/`0x2a674c` forces were
+reverted (non-working forcing chain); the dispatch decode and the dead-gate finding stand.
 
 ## Reusable disassembly
 
