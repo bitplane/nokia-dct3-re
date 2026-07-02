@@ -112,6 +112,22 @@ condition is next to pin — via `0x2aca40`, or faster, a **runtime probe at `0x
 (`0x26a4ee`/`0x26a656`/`0x26a5ec`, all address-known) to catch the raw-`0x16` case live and read the node
 state that routed it raw.
 
+## Runtime confirmation (`TRACE_DELIV`) + a tooling caveat
+
+Probing the recode delivery live (branch target `0x26a640`, `r0` = the delivered node) confirms the
+mechanism: the delivered "node" is the **ECB entry itself** (`0x100140 + event*0xc`), and its class byte
+`[+9]` drives the recode. Observed at mode `000d`: `ecb=10023c class=15 → surfaced=d5` and
+`ecb=100248 class=16 → surfaced=d6` — i.e. the delayed `0x15`/`0x16` events **are** recoded to `0xd5`/`0xd6`,
+exactly as the static table predicts. The raw sweep deliveries (`0x14`/`0x17`, and the one-off `0x16`)
+arrive through the buffer paths, not here.
+
+**Tooling caveat (important for any runtime probe of these functions):** the driver's instruction-fetch
+hooks fire only when `m_maincpu->pc()` equals the fetched address, which — because the ARM7 pipeline runs
+the fetch ahead of the architectural PC — happens **only at branch/call targets and return addresses**, not
+mid-straight-line instructions. So probe at a `bne`/`bl` target near the code of interest (e.g. `0x26a640`),
+never at an arbitrary mid-function store. This is why the first `TRACE_DELIV` attempt (hooking the mid-line
+`str [sp,#4]` sites) saw nothing.
+
 ## Reusable disassembly
 
 `.venv/bin/python tools/disrom.py <addr>:<len>` (or `NOKI_BIN=roms/<img>_swap16.bin`). Key functions

@@ -2324,6 +2324,28 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xff,
 					debug_ram_byte(0x0011fee4), debug_ram_byte(0x0011fee5), machine().time().as_double());
 	}
+	// delivery-path probe (opt-in): catch which of 0x26a458's three return-value stores fires and
+	// with what code. pathA (raw, buffer @fp+0xc) = str r0 @0x26a4ee; pathC (RECODE table 0x2d71a8)
+	// = str r1 @0x26a658; pathB (raw, buffer @fp+0x14) = str r0 @0x26a5ec. Filtered to the sweep
+	// range (raw 0x14-0x17 / recoded 0xd4-0xd7). Shows whether 0x15 ever takes a raw path and what
+	// node state routed the one-off raw 0x16 — the 000d raw-vs-recode routing question.
+	// recode-path probe (opt-in): 0x26a640 is the bne target for the fp+8 linked-list delivery (a
+	// pipeline-resync point, so the instruction-fetch hook fires here — mid-line stores do NOT, as
+	// m_maincpu->pc() lags the fetch). r0 = the delivered node, which is the ECB entry itself
+	// (0x100140 + event*0xc); its class byte [+9] indexes the recode table 0x2d71a8 (small classes:
+	// surfaced = 0xc0 + class). Runtime-confirms class 0x15 -> 0xd5, class 0x16 -> 0xd6 at mode 000d.
+	if (nokia_env_u32("NOKI3210_TRACE_DELIV", 0) != 0 && pc == addr && addr == 0x0026a640)
+	{
+		const u32 node = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		static unsigned dv = 0;
+		if (dv++ < 50 && node >= 0x00100000 && node < 0x00180000)
+		{
+			const uint8_t cls = debug_ram_byte(node + 9);
+			logerror("recode: ecb=%06x class[+9]=%02x -> surfaced=%02x mode=%04x t=%.5f\n",
+					node, cls, (cls < 0x40) ? (0xc0 + cls) : 0, debug_ram_word(FW_STARTUP_MODE),
+					machine().time().as_double());
+		}
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
 	{
 		static unsigned dq = 0;
