@@ -181,6 +181,23 @@ phone the gate must be satisfied by state we don't reproduce (a seeded flag, a d
 configuration, or a mechanism still unidentified). The command-`0x65` responder + gate/`0x2a674c` forces were
 reverted (non-working forcing chain); the dispatch decode and the dead-gate finding stand.
 
+**Cross-firmware confirmation — the dead-gate is shared DCT3 design (Nokia 3310 NHM-5 v06.39).** To rule
+out a 3210-v06.00 quirk, disassembled the sibling 3310 firmware (BYO, analysed locally, never committed).
+The status→event translator is present **byte-for-byte identical in structure** (same `lsrs r0,r4,#2` bit
+test, same `movs r0,#2; bl <gate>`, same `movs r0,#0x15; strb r0,[r5]`, then `0x17`/`0x19`). Its gate
+function (found by exact entry-signature search) is byte-identical on the deciding path: `push {r4-r7,lr};
+adds r5,r0,#0; lsrs r0,r5,#1; bhs +2; movs r4,#1; b <ret>` — i.e. **even arg → return 1**, the same
+dead-gate. So on the 3310 too, the `0x15` emit (arg `2`, even) is dead code. This is **structural DCT3
+firmware design, not a 3210 bug**, confirmed against an independent image.
+
+**Implication (the real closure).** Real 3310s boot to idle, yet their `0x15` emit is *also* dead — so a
+normally-booting DCT3 phone does **not** depend on this translator emitting `0x15`. That strongly implies
+our mode-`000d` "limp" (waiting for a raw `0x15`) is an **artifact of the blank + faked boot**, not the path
+a real phone takes: the real boot satisfies the `000d` flag by a route our reconstructed/unprovisioned state
+never exercises (a seeded flag, a different state on entry to `000d`, or a producer outside the reachable
+set). The `000d` code is fully and correctly RE'd; the *stall* is a property of how we reach it, not a
+missing model. This is the honest end of the `000d` thread on the data we can obtain.
+
 ## Reusable disassembly
 
 `.venv/bin/python tools/disrom.py <addr>:<len>` (or `NOKI_BIN=roms/<img>_swap16.bin`). Key functions
