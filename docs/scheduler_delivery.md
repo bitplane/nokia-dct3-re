@@ -148,13 +148,26 @@ service producers — `0x14`: 8 event/message sites incl. immediate `0x2695f4`; 
 *event-channel* posts, by contrast, are all delayed `0x2697aa` → recoded to `0xd5` — which is why the delayed
 path never helps; the **raw** `0x15` comes only from `0x236bac`.)
 
-**Why our boot stalls, exactly:** we clear CONTACT SERVICE by *faking* one node-`0x18` response
-(`MODEL_SVC_RESPONDER`) instead of driving the real command loop. So `0x236bac` is never invoked with a
-`message[+9]` whose bit 2 is set → `0x15` is never emitted → bit `0x04` never sets → the gate (`flag==0xf`)
-never closes. This is the **same boundary as genuinely clearing CONTACT SERVICE** (processing real
-service-bus messages vs faking a reply) — now pinned, at the instruction level, as the gate on `000d` too.
-The narrow remaining question is what real service command/`message[+9]` a provisioned boot delivers to set
-bit 2 — a provisioned-data / real-service-bus question, not a modelling gap in the driver.
+**The command index (decoded):** the contact-service command loop dispatches on **`message[+8]`**
+(`0x23741a ldrb r4,[r5,#8]`, then a subtract-cascade). **Command `0x65`** routes (via `0x237492 b 0x237840`)
+to the case that calls `0x236bac` — so command `0x65`, with `message[+9]` bit 2 set, is what emits the raw
+`0x15`. Tell-tale: entry special-cases `cmp r4,#0x64` — and **`0x64` is exactly the command our
+`MODEL_SVC_RESPONDER` injects** (`SVC_RESPONDER_B8=0x64`, the completion that leaves CONTACT SERVICE). So we
+deliver command `0x64` (completion) but **not `0x65`** (the sweep-event trigger), a sibling in the same
+command family.
+
+**Why our boot stalls, exactly:** we clear CONTACT SERVICE by faking one node-`0x18` response (command
+`0x64`) instead of driving the real command loop, so command `0x65` (with `message[+9]` bit 2) is never
+delivered → `0x236bac` never emits `0x15` → bit `0x04` never sets → the gate never closes. Same boundary as
+genuinely clearing CONTACT SERVICE, now pinned at the instruction level as the `000d` gate too.
+
+**This reopens a BUILDABLE path.** Unlike the failed `task_285` responder (whose spec address never ran),
+this producer chain is fully verified and driven by a real command handler: a `MODEL_SVC_RESPONDER`-style
+injection of a **command-`0x65` message with `message[+9]` bit 2 set** to the contact-service task should
+make the firmware's *own* `0x236bac` emit a raw `0x15` (and `0x17` on bit 3, `0x19` on bit 5) → set bit
+`0x04` → advance `000d` — faithfully, via the real code path, no forced event injection. The open question
+(what a provisioned phone's command-`0x65` payload actually contains beyond bit 2) is a provisioned-data
+detail, but the trigger is now a concrete, testable model.
 
 ## Reusable disassembly
 
