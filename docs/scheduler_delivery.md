@@ -198,6 +198,29 @@ never exercises (a seeded flag, a different state on entry to `000d`, or a produ
 set). The `000d` code is fully and correctly RE'd; the *stall* is a property of how we reach it, not a
 missing model. This is the honest end of the `000d` thread on the data we can obtain.
 
+## The whole post-CONTACT-SERVICE mode chain is service-session-gated (not EEPROM-gated)
+
+Probed whether a synthesized provisioned **EEPROM** could carry the boot to idle. It cannot — the boundary is
+the service *session*, not calibration data:
+
+- **EEPROM read pattern:** the boot reads the 24C128 in one early bulk sweep (~t=0.008–0.35s; 637 distinct
+  addresses, 604 blank on a virgin unit — the RF/ADC calibration tables). These load into RAM once and are
+  **not re-read**; they do not gate the mode chain.
+- **Each mode waits on a service event, `000d`-style.** Mode `0007` (`0x271392`): `bl 0x26ff14; cmp r0,#0x74;
+  bne <recv>` — spins until it receives event `0x74`. Same recv-wrapper wait as `000d`/`0x15`. Event `0x74`
+  *does* have live producers (immediate `0x2695f4` posts at `0x213fcc`/`0x214836`), but they sit in the
+  **contact-service command handlers** (the `0x213–0x219` region that also produces `0x14`) — i.e. they fire
+  when the **real service-box session processes commands**, which our single faked completion (`0x64`) never
+  drives.
+
+**So reaching a genuine idle needs the whole service-box *session* modelled** (the command sequence that
+produces `0x14`/`0x74`/… and advances each mode), not a synthesized EEPROM. That is the same boundary as
+`000d` (a real service session vs a faked completion), and it needs the real service protocol + provisioned
+exchange we can't confidently synthesize. The EEPROM-synthesis avenue is therefore **closed for boot-to-idle**;
+the calibration would only matter *after* the mode chain, which we never reach faithfully. This refines the
+earlier "reaching idle needs provisioned data" note: the operative missing piece is the **service session**,
+not the EEPROM.
+
 ## Reusable disassembly
 
 `.venv/bin/python tools/disrom.py <addr>:<len>` (or `NOKI_BIN=roms/<img>_swap16.bin`). Key functions
