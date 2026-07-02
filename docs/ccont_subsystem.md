@@ -260,9 +260,10 @@ a different injection point and the provisioned map data; the simple responder-e
 
 The `000d` advance is **blocked, but not by hardware**: it waits on a request/response handshake
 (`task_285` = the service-transport / node-`0x18` layer) whose peer never answers on our blank+faked boot —
-the *same* subsystem CONTACT SERVICE needed, so modellable via a `MODEL_SVC_RESPONDER`-class reply (peer
-identified; fix scoped at the end of this section; one causal link still untested). The confirmed ROM
-mechanism, settled several ways:
+the *same* subsystem CONTACT SERVICE needed. We scoped and **built** a `MODEL_SVC_RESPONDER`-class reply for
+it — but the build **did not land** (spec address never executes; six faithful levers all failed), so this
+is the **practical bottom for the corpus**: peer identified, mechanism unrecoverable here (full post-mortem at
+the end of this section). The confirmed ROM mechanism, settled several ways:
 
 🟢 **The gate is a literal compare on the received code.** Mode-`000d` (`0x270e1c` loop → dispatch
 `0x270e22`) `cmp`s the code returned by the recv wrapper `0x26ff14` and ORs a bit into flag `[0x112399]`:
@@ -344,6 +345,23 @@ frame details. **"Needs live hardware" stays retracted** — this is a driver-mo
 remaining uncertainty is whether it chains, not whether we can build it. `EXPERIMENT_FORCE_000D_EVENTS`
 injects codes the firmware **never** injects on this path; it is a **diagnostic preview**, not faithful.
 Reproduce evidence with `TRACE_LIMP2=1` / `TRACE_CCONT_READ=1` (probes `limp2_ecb`/`limp2_deq`/`ccont_r`).
+
+**Build attempted, and it did NOT land (2026-07) — the practical bottom for this corpus.** We built the
+`MODEL_285_RESPONDER` trampoline to the spec above and it **never fired**: its trigger PC `0x285df8` (the
+claimed `task_285` recv site) is **executed 0 times** — the loop address was inference on garbage-decompiled
+bodies and does not match runtime. Working *backwards* from the runtime `limp2_evpost` caller-LRs, the real
+service-transport retry spins at **`lr=0x0021e00e`** (posting events `0xe2`/`0xe4`, delay ~642, ~360×/16s —
+the same site the older `SKIP_SERVICE_E2_REARM` shim already pokes for mode `0007`). So the *subsystem* id is
+right but the exact code addresses aren't recoverable from this corpus. And the causal chain is **also
+refuted**: suppressing the `0x21e00e` spin during `000d` (dropping its posts 184→2) left the `0xd5` count
+(8) and the `0x15` delivery (0) **unchanged** — so the transport spin is *not* the producer of the `0xd5`
+that starves `0x15`; that producer (not `0x2697aa`) remains unidentified. **Scorecard: six faithful levers,
+six failures** — suppress-`0xd5`-repost, force-all-`0x15`-delay-1, force-`task_285`-done-flag,
+`MODEL_285_RESPONDER`@`0x285df8`, suppress-`0x21e00e`-spin, and (earlier) provision-the-enable-flag; only the
+unfaithful `FORCE_000D_EVENTS` advances the boot. **Conclusion:** the peer subsystem is identified but the
+`0x15`-delivery / `0xd5`-producer mechanism is below what this dump + Thumb-garbage decompilation can resolve;
+closing `000d` faithfully needs a cleaner reference (better decompilation or a working-phone boot/RAM trace),
+not another lever on this corpus. Dead-end experiment code was reverted (driver kept to the working probes).
 
 ## Open questions (the mapping backlog)
 
