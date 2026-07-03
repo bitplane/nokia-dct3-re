@@ -2446,6 +2446,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// TRACE_SWEEP15 (opt-in, diagnostic): the raw-0x15 producer (0x2af208, called at 0x2521cc) fires only
 	// when the 11-byte battery-init checklist 0x112280[0..0xa] is ALL non-zero (loop at 0x2521b2). Log the
 	// checklist each time it is evaluated, and flag the post site -- shows which sub-steps our boot misses.
+	// TRACE_RESUME (opt-in, diagnostic): task make-ready primitive 0x269c6e (r0=task index; TCB at
+	// 0x1093bc+idx*0x10, state[+0xd] 5=dormant->2=ready). Shows which of the 23 registered tasks get
+	// resumed vs stay dormant (reporter tasks are indices 10..22), and from where (LR = the boot phase).
+	if (nokia_env_u32("NOKI3210_TRACE_RESUME", 0) != 0 && pc == addr && addr == 0x00269c6e)
+	{
+		static unsigned resc = 0;
+		if (resc++ < 80)
+			logerror("resume: task=%02u state[+d]=%u lr=%08x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+					debug_ram_byte(0x001093bc + (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) * 0x10 + 0xd),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_SWEEP15", 0) != 0 && pc == addr &&
 		(addr == 0x002520ec || addr == 0x002521cc))
 	{
