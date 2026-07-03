@@ -2433,6 +2433,35 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	}
 	if (nokia_env_u32("NOKI3210_FORCE_IDLE", 0) != 0 && pc == addr && addr == 0x00298008)
 		debug_ram_byte_w(0x0011f81b, 1);   // pin MMI idle-redraw flag so display_idle fires
+	// EXPERIMENT (opt-in, option C — hollow idle, done RIGHT): FORCE_IDLE alone fails because the MMI
+	// task is parked in the blocking recv at 0x298008 and never loops back to the flag-check at 0x297ffa.
+	// TRACE_MMI proved the MMI runs and reaches 0x298008 a few times (t<=0.84) then blocks forever. So we
+	// trampoline PAST the recv: on the Nth fetch of 0x298008 (after the initial display-init messages have
+	// been processed), set the idle flag and BX to 0x297ffa so display_idle (0x2a255c) actually renders.
+	// This drives the layer that draws screens (the MMI), not the startup machine (which never draws).
+	if (nokia_env_u32("NOKI3210_FORCE_IDLE_JUMP", 0) != 0 && pc == addr && addr == 0x00298008)
+	{
+		static bool ij_done = false;
+		static unsigned ij = 0;
+		ij++;
+		// Fire once. Two gating modes: FORCE_IDLE_JUMP_MS (fire on first recv at/after that sim-time —
+		// use when combined with a mode-advance knob so the display controller is initialised first) or,
+		// if unset, the Nth recv (bare limp, display never inits past t=0.84). Draw idle, then let later
+		// fetches recv normally so the framebuffer holds the idle image.
+		const u32 gate_ms = nokia_env_u32("NOKI3210_FORCE_IDLE_JUMP_MS", 0);
+		const bool fire = gate_ms ? (!ij_done && machine().time().as_double() * 1000.0 >= gate_ms)
+								  : (ij == nokia_env_u32("NOKI3210_FORCE_IDLE_JUMP_AFTER", 3));
+		if (fire)
+		{
+			ij_done = true;
+			debug_ram_byte_w(0x0011f81b, 1);                                        // idle-redraw flag
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R4, 0x0011f816);         // flag base (loaded at 0x297ff4, which we skip)
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x00297ffa | 1);    // -> flag-check
+			logerror("force_idle_jump: bypass recv #%u -> 0x297ffa t=%.4f\n",
+					ij, machine().time().as_double());
+			return uint16_t(0x4760);                                                // BX r12
+		}
+	}
 	// EXPERIMENT (opt-in, option C): thread the enumerated normal-boot path to outcome 3, PC-specific so
 	// side effects stay coherent (no blunt event injection). Requires MARCH (feeds mode 4 -> event 7, which
 	// lands in the 000c post-charger accumulator at 0x2712c0). Chain: fill accumulator flags in RAM + feed
