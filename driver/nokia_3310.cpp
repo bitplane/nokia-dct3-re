@@ -2431,6 +2431,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("mmi: %06x (#%u) idleflag[11f81b]=%u t=%.4f\n",
 					addr, mc[i], debug_ram_byte(0x0011f81b), machine().time().as_double());
 	}
+	// TRACE_RENDER (opt-in, diagnostic): instruments the display-render task (task 5). 0x2af638 = its loop
+	// top, 0x2af670 = display_state_main dispatch, 0x2af6ea = startup_status_message_post (idle posts here),
+	// 0x2b1c9a = lcd_write (GENSIO). Shows whether task 5 runs and renders in the plain limp.
+	if (nokia_env_u32("NOKI3210_TRACE_RENDER", 0) != 0 && pc == addr &&
+		(addr == 0x002af638 || addr == 0x002af670 || addr == 0x002af6ea || addr == 0x002b1c9a))
+	{
+		static unsigned rc[4] = { 0, 0, 0, 0 };
+		const int i = (addr == 0x002af638) ? 0 : (addr == 0x002af670) ? 1 : (addr == 0x002af6ea) ? 2 : 3;
+		if (rc[i]++ < 10)
+			logerror("render: %06x (#%u) r0=%04x t=%.4f\n", addr, rc[i],
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_FORCE_IDLE", 0) != 0 && pc == addr && addr == 0x00298008)
 		debug_ram_byte_w(0x0011f81b, 1);   // pin MMI idle-redraw flag so display_idle fires
 	// EXPERIMENT (opt-in, option C — hollow idle, done RIGHT): FORCE_IDLE alone fails because the MMI
