@@ -2446,19 +2446,26 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			debug_ram_byte_w(0x00112398, 0);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0d);
 		}
-		else if (addr == 0x00271392)     // normal-boot 0x74 wait: feed event 0x74
+		else if (addr == 0x0027138e)     // the 0x74 wait uses a BLOCKING recv (0x26ff14->0x26a458) on an
+		{                                // empty ring. Trampoline PAST it: land at 0x271392 with r0=0x74 so
+			debug_ram_byte_w(0x0011239d, 1);                       // gate3 ([0x11239d]==1) up front
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x74);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x00271392 | 1);
+			logerror("bootpath: trampoline 0x74 at 0x27138e t=%.4f\n", machine().time().as_double());
+			return uint16_t(0x4760);     // BX r12 -> 0x271392 (skips the blocking recv)
+		}
 		else if (addr == 0x002713a6)     // gate2: force 0x2b2f90 result to 0x80
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x80);
-		else if (addr == 0x002713aa)     // gate3: [0x11239d] = 1
-			debug_ram_byte_w(0x0011239d, 1);
-		else if (addr == 0x00271364 || addr == 0x0027136c || addr == 0x00271422 || addr == 0x0027138e ||
-				 addr == 0x00271392 || addr == 0x002713a2 || addr == 0x002713b2 || addr == 0x002714fe)
+		else if (addr == 0x00271364 || addr == 0x00271422 || addr == 0x00271392 ||
+				 addr == 0x002713b2 || addr == 0x002714fe || addr == 0x002b4dda ||
+				 addr == 0x002a924c || addr == 0x002a92fc || addr == 0x002a934c ||
+				 addr == 0x002a933a || addr == 0x00298000 || addr == 0x002a255c)
 		{
 			static unsigned bc = 0;
-			if (bc++ < 30)
-				logerror("bootpath: hit %06x mode=%04x r0=%02x t=%.4f\n", addr, debug_ram_word(FW_STARTUP_MODE),
-						m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff, machine().time().as_double());
+			if (bc++ < 40)
+				logerror("bootpath: hit %06x mode=%04x r0=%02x [1150ff]=%02x t=%.4f\n", addr,
+						debug_ram_word(FW_STARTUP_MODE), m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+						debug_ram_byte(0x001150ff), machine().time().as_double());
 		}
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)

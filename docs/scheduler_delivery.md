@@ -292,10 +292,23 @@ task on an empty ring, and event `0x74`'s only producers are the service-command
 (which needs the recv to *return*) can't reach it. Feeding it needs a real post to the ring (a responder-style
 trampoline) or the real producer running.
 
-**Net:** option C mapped the entire normal-boot path down to a single missing event (`0x74`), the same
-subsystem-produced-readiness wall as everywhere else — and even past it, outcome 3 commits to the power
-supervisor, so idle isn't guaranteed without tracing the supervisor's proceed path. `EXPERIMENT_BOOTPATH`,
-`FORCE_OUTCOME`, `FORCE_IDLE`, `TRACE_MMI`, `TRACE_MODEWAIT` are the opt-in tools for this.
+**Pushed through the `0x74` wall (trampoline) — and it settles the question.** `EXPERIMENT_BOOTPATH` now
+trampolines past the blocking recv (at `0x27138e`: set `r0=0x74`, `[0x11239d]=1`, `r12=0x271392`, return
+`BX r12`), forces gate2 (`0x2b2f90→0x80`), and **reaches the outcome-3 commit** (`0x2714fe`/`0x2b4dda`,
+`r0=3`) — the startup "success" outcome. Result: **it does NOT render idle.** The startup task validates
+(`0x2af9c6`, pure computation) and **parks** at `0x2b4e14` (its designed retirement), but the idle handoff
+never fires — the supervisor (`0x2a924c`), readiness loop (`0x2a92fc`), and MMI idle draw (`0x298000`/
+`0x2a255c`) are never reached; the screen stays limp for the rest of the run.
+
+**Decisive conclusion:** idle is not a state the startup state machine draws, and it is not gated by a single
+event or outcome. It is an **emergent downstream state** produced by real subsystem handoffs after boot, each
+of which independently blocks on signals our stubbed reconstruction never emits. Forcing the startup machine
+to "success" (option C) therefore cannot produce a hollow idle — completing/forcing the startup does not
+trigger the handoff, because the downstream consumers need coherent subsystem state, not just an outcome
+byte. The only path that yields a *real* idle is faithfully modelling those subsystems (option B), and it is
+a deep, multi-stage effort — the boot-to-idle chain is longer than "reach outcome 3." `EXPERIMENT_BOOTPATH`,
+`FORCE_OUTCOME`, `FORCE_IDLE`, `TRACE_MMI`, `TRACE_MODEWAIT` are the opt-in tools; the full normal-boot path
+(`000d → 000c → 0x271364 charger-fork → 0x74 → outcome 3 → park`) is now mapped and forceable end to end.
 
 ## Reusable disassembly
 
