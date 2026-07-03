@@ -2443,6 +2443,24 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("render: %06x (#%u) r0=%04x t=%.4f\n", addr, rc[i],
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
 	}
+	// TRACE_SWEEP15 (opt-in, diagnostic): the raw-0x15 producer (0x2af208, called at 0x2521cc) fires only
+	// when the 11-byte battery-init checklist 0x112280[0..0xa] is ALL non-zero (loop at 0x2521b2). Log the
+	// checklist each time it is evaluated, and flag the post site -- shows which sub-steps our boot misses.
+	if (nokia_env_u32("NOKI3210_TRACE_SWEEP15", 0) != 0 && pc == addr &&
+		(addr == 0x002520ec || addr == 0x002521cc))
+	{
+		static unsigned sc = 0;
+		if (sc++ < 60)
+		{
+			char b[64]; int n = 0;
+			for (offs_t k = 0; k < 0x0b; k++) n += std::snprintf(b + n, sizeof(b) - n, "%d", debug_ram_byte(0x00112280 + k) ? 1 : 0);
+			logerror("sweep15: %s code=%02x lr=%08x checklist[0..a]=%s t=%.4f\n",
+					addr == 0x002521cc ? "POST-0x15" : "mark",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), b,
+					machine().time().as_double());
+		}
+	}
 	if (nokia_env_u32("NOKI3210_FORCE_IDLE", 0) != 0 && pc == addr && addr == 0x00298008)
 		debug_ram_byte_w(0x0011f81b, 1);   // pin MMI idle-redraw flag so display_idle fires
 	// EXPERIMENT (opt-in, option C — hollow idle, done RIGHT): FORCE_IDLE alone fails because the MMI
