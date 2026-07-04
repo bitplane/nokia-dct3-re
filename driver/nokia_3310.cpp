@@ -2446,6 +2446,36 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// TRACE_SWEEP15 (opt-in, diagnostic): the raw-0x15 producer (0x2af208, called at 0x2521cc) fires only
 	// when the 11-byte battery-init checklist 0x112280[0..0xa] is ALL non-zero (loop at 0x2521b2). Log the
 	// checklist each time it is evaluated, and flag the post site -- shows which sub-steps our boot misses.
+	// TRACE_SVCREADY (opt-in, diagnostic): the block-2 (app-task) resume gate at 0x2a9182 needs
+	// 0x29bafc()==1 (reads service-ready [0x11fed1] bit7), phase [0x110c2c]==1, and [0x11239c]!=3.
+	// Hook the startup-service fn entries + the gate to see which run and what the gate variables hold.
+	if (nokia_env_u32("NOKI3210_TRACE_SVCREADY", 0) != 0 && pc == addr &&
+		(addr == 0x00290b54 || addr == 0x00290e42 || addr == 0x00291034 ||
+		 addr == 0x0029b700 || addr == 0x0029bafc || addr == 0x002a9182 ||
+		 addr == 0x002a91ac || addr == 0x002a91f0 || addr == 0x002a9216 ||
+		 addr == 0x0029bb06 || addr == 0x0029bb16 || addr == 0x0029bb1a || addr == 0x002a9186))
+	{
+		static unsigned svc = 0;
+		if (svc++ < 80)
+		{
+			const char *nm = addr == 0x00290b54 ? "svc_table_init" : addr == 0x00290e42 ? "svc_buf_update"
+						   : addr == 0x00291034 ? "svc_mode8_commit" : addr == 0x0029b700 ? "init_29b700"
+						   : addr == 0x0029bafc ? "GATE_29bafc" : addr == 0x002a9182 ? "block2_gate_2a9182"
+						   : addr == 0x002a91ac ? "BLOCK2_RESUMES!" : addr == 0x002a91f0 ? "gate_FAIL_2a91f0"
+						   : addr == 0x002a9216 ? "func_exit_2a9216" : addr == 0x0029bb06 ? "29bafc_waitloop"
+						   : addr == 0x0029bb16 ? "29bafc_ret1" : addr == 0x0029bb1a ? "29bafc_ret0_post19"
+						   : "ret_2a9186";
+			const u32 r7 = m_maincpu->state_int(arm7_cpu_device::ARM7_R7);
+			const u32 r6r = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
+			logerror("svcready: %-18s [11fed1]=%02x(b2=%u,b6=%u) phase[110c2c]=%02x [11239c]=%02x [11ff41]=%02x "
+					"r7=%08x [r7]=%02x [r7+1]=%02x r6=%08x t=%.4f\n",
+					nm, debug_ram_byte(0x0011fed1), (debug_ram_byte(0x0011fed1) >> 2) & 1, (debug_ram_byte(0x0011fed1) >> 6) & 1,
+					debug_ram_byte(0x00110c2c), debug_ram_byte(0x0011239c), debug_ram_byte(0x0011ff41),
+					r7, (r7 >= 0x00100000 && r7 < 0x00180000) ? debug_ram_byte(r7) : 0xff,
+					(r7 >= 0x00100000 && r7 < 0x00180000) ? debug_ram_byte(r7 + 1) : 0xff,
+					r6r, machine().time().as_double());
+		}
+	}
 	// TRACE_RESUME (opt-in, diagnostic): task make-ready primitive 0x269c6e (r0=task index; TCB at
 	// 0x1093bc+idx*0x10, state[+0xd] 5=dormant->2=ready). Shows which of the 23 registered tasks get
 	// resumed vs stay dormant (reporter tasks are indices 10..22), and from where (LR = the boot phase).
