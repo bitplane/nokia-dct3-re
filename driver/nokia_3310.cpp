@@ -2446,6 +2446,25 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// TRACE_SWEEP15 (opt-in, diagnostic): the raw-0x15 producer (0x2af208, called at 0x2521cc) fires only
 	// when the 11-byte battery-init checklist 0x112280[0..0xa] is ALL non-zero (loop at 0x2521b2). Log the
 	// checklist each time it is evaluated, and flag the post site -- shows which sub-steps our boot misses.
+	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate
+	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the
+	// service-channel-busy bit [0x11fed1] bit2 (0x04) to clear -- which a real service peer does by
+	// draining the channel. On our faked boot nothing drains it (bit2 stuck set), so the startup
+	// supervisor spins forever and never resumes the application tasks. Model the drain: when the gate
+	// is entered, clear bit2 (as the real transport would once the channel is empty). This is the
+	// analogue of MODEL_SVC_RESPONDER for the readiness handshake. If the causal chain is right this
+	// cascades: block2 resumes app tasks -> their init fills the 0x112280 checklist -> event 0x15 ->
+	// 000d advances.
+	if (nokia_env_u32("NOKI3210_MODEL_SVC_CHANNEL_DRAIN", 0) != 0 && pc == addr && addr == 0x0029bafc)
+	{
+		const uint8_t s = debug_ram_byte(0x0011fed1);
+		if (s & 0x04)
+		{
+			debug_ram_byte_w(0x0011fed1, s & ~0x04);
+			logerror("svc_drain: cleared [11fed1] bit2 (%02x->%02x) at gate t=%.4f\n",
+					s, s & ~0x04, machine().time().as_double());
+		}
+	}
 	// TRACE_SVCREADY (opt-in, diagnostic): the block-2 (app-task) resume gate at 0x2a9182 needs
 	// 0x29bafc()==1 (reads service-ready [0x11fed1] bit7), phase [0x110c2c]==1, and [0x11239c]!=3.
 	// Hook the startup-service fn entries + the gate to see which run and what the gate variables hold.
