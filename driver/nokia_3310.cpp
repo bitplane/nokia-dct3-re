@@ -2465,6 +2465,34 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					s, s & ~0x04, machine().time().as_double());
 		}
 	}
+	// TRACE_SIMSM (opt-in): map the SIM state machine 0x29ff2c (dispatch on state [r4+9]; data
+	// [r4+0xa]/[r4+0xb]) and the 0xaf service sends (0x234634 r1=code, r2=subcode) + the SIM reset
+	// entry 0x2a01b8. Shows the SIM protocol flow and where our boot is stuck.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMSM", 0) != 0 && pc == addr)
+	{
+		if (addr == 0x0029ff2c)
+		{
+			static unsigned e = 0;
+			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			if (e++ < 60 && r4 >= 0x00100000 && r4 < 0x00180000)
+				logerror("simsm: enter state[+9]=%02x d[+a]=%02x d[+b]=%02x r4=%08x lr=%08x t=%.4f\n",
+						debug_ram_byte(r4+9), debug_ram_byte(r4+0xa), debug_ram_byte(r4+0xb), r4,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+		else if (addr == 0x00234634)
+		{
+			static unsigned s = 0;
+			if ((m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff) == 0xaf && s++ < 60)
+				logerror("simsm: send 0xaf subcode=%02x lr=%08x t=%.4f\n",
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xff,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+		else if (addr == 0x002a01b8)
+		{
+			static unsigned r = 0;
+			if (r++ < 20) logerror("simsm: SIM-reset-entry 0x2a01b8 t=%.4f\n", machine().time().as_double());
+		}
+	}
 	// TRACE_SVCREADY (opt-in, diagnostic): the block-2 (app-task) resume gate at 0x2a9182 needs
 	// 0x29bafc()==1 (reads service-ready [0x11fed1] bit7), phase [0x110c2c]==1, and [0x11239c]!=3.
 	// Hook the startup-service fn entries + the gate to see which run and what the gate variables hold.
