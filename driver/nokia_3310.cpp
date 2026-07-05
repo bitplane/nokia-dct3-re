@@ -3045,6 +3045,15 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 {
 	uint8_t data = m_mad2_regs[offset];
 
+	// TRACE_SIM (opt-in): SIM UART/ISO-7816 traffic (regs 0x36-0x3f) to scope SIM emulation.
+	if (nokia_env_u32("NOKI3210_TRACE_SIM", 0) != 0 && offset >= 0x36 && offset <= 0x3f)
+	{
+		static unsigned sr = 0;
+		if (sr++ < 120)
+			logerror("sim R %02x=%02x (%s) pc=%08x t=%.4f\n", offset, data, nokia_mad2_reg_desc(offset),
+					m_maincpu->pc(), machine().time().as_double());
+	}
+
 	// Hardware-atlas breadth-first trace (opt-in): one line per distinct MAD2 I/O register
 	// the firmware reads, with its description + first PC. Builds docs/hardware_atlas.md.
 	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
@@ -3179,6 +3188,14 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 	uint8_t old_data = m_mad2_regs[offset];
 	const u32 pc = m_maincpu->pc();
 	m_mad2_regs[offset] = data;
+
+	if (nokia_env_u32("NOKI3210_TRACE_SIM", 0) != 0 && offset >= 0x36 && offset <= 0x3f)
+	{
+		static unsigned sw = 0;
+		if (sw++ < 120)
+			logerror("sim W %02x=%02x (%s) pc=%08x t=%.4f\n", offset, data, nokia_mad2_reg_desc(offset),
+					pc, machine().time().as_double());
+	}
 
 	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
 	{
