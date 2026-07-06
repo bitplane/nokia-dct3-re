@@ -2561,6 +2561,23 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (sa++ < 8)
 			logerror("sim_accept: forced [0x10dcb5]=1 (accept flag) at t=%.4f\n", machine().time().as_double());
 	}
+	// TRACE_SIMTX (opt-in, step 3): the SIM command sender 0x27e98c queues the outgoing SIM command
+	// (APDU: SELECT/READ with the file ID) via the TxD-queue fn 0x2a02e6 (r0 = buffer; buffer[0]=len,
+	// buffer[1..]=command bytes). Log the command to see which SIM files the phone requests.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMTX", 0) != 0 && pc == addr && addr == 0x002a02e6)
+	{
+		const u32 buf = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (buf >= 0x00100000 && buf < 0x00180000)
+		{
+			const uint8_t len = debug_ram_byte(buf);
+			char b[128]; int n = 0;
+			for (unsigned i = 1; i <= len && i <= 20; i++) n += std::snprintf(b + n, sizeof(b) - n, "%02x ", debug_ram_byte(buf + i));
+			static unsigned tx = 0;
+			if (tx++ < 40)
+				logerror("simtx: cmd len=%u bytes: %s lr=%08x t=%.4f\n", len, b,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+	}
 	// MODEL_SIM_ATR_MSG (opt-in, step 2): inject a valid ATR into the SIM-response buffer 0x10dddc that
 	// the ATR parser 0x27e046 reads (after it sends its 0x33 request, before the read at 0x27e070). The
 	// parser needs [0x10dddc](len halfword)>=2 and [0x10dddc+2]==0x3B/0x3F (TS). Default ATR 3B 00 (T=0,
