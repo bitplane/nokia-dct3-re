@@ -138,12 +138,34 @@ Overall: **L–XL**, dominated by the spike's outcome. The I/O plumbing, ATR
 trigger, and full protocol map are done; the remaining work is the card logic
 plus resolving risk (1).
 
+## Spike result (done): conditional GO
+
+The SELECT-phase spike ran. Key correction from it: the file-read block
+`0x27ee40` is reached when a recv **returns code 3** (`0x27ede0` dispatch,
+`r0==3`) — code 3 is the code-3 handler `0x27df9e`, which copies the message to
+buffer `0x10deec`. So the read is driven by **code-3 messages** (not code-`0xb`),
+and the file data lives in `0x10deec` (matching the c1 finding). Also `[sp+0x34]`
+is a *fixed* init pointer, not a SELECT-produced descriptor.
+
+Feeding code-3 messages (`SIM_LOOP_CODE=3`) **drives the read loop**: the phone
+goes from **1 APDU to 13** — it actively sends command after command. It still
+rejects (`0x15`) because the command it builds is garbage: the file-read APDU is
+assembled from the code-3 data at `0x10deec+5` (`[sp+0x10]`, length 5), so my
+placeholder bytes (`3b00`/zeros) produce `3b 00 00 00 00` and get rejected.
+
+**Verdict: the read phase is NOT an unbreakable wall — it drives via code-3
+injection.** So the emulator is viable. The remaining unknown drops from "can the
+phase run?" (answered: yes) to "what exact byte layout must each code-3 message
+carry so the built command is valid and the read advances to completion (code 1)
+→ accept → idle?" That is the file-descriptor/response format at `0x10deec+5`,
+resolvable by iterating `SIM_LOOP_HEX` against the command the phone emits.
+
 ## Recommendation
 
-**Do the SELECT-phase spike before committing to the full emulator.** If the
-SELECT phase can be driven to completion via injection, the rest is a bounded
-GSM-file-tree build. If it can't (the firmware needs internal state only the real
-DSP path produces), the honest call may be to treat **"Insert SIM card" / SIM-
-present** as the shipped milestone and document operator-idle as requiring a
-deeper DSP-layer model. Either way, the spike is the next concrete step, not more
-message-injection sweeps.
+**GO — build the emulator, but resolve the code-3 data format first.** The
+critical risk (phase drivability) is retired. Next concrete step: iterate the
+code-3 message payload (`SIM_LOOP_CODE=3` + `SIM_LOOP_HEX`) until the phone's
+built command (`sim_apdu` trace) is a valid GSM APDU and the read advances past
+reject — that pins the layout the file system component must emit. Then build the
+GSM file tree on top. Fallback unchanged: if a valid layout can't be found by
+injection (needs real DSP-path state), ship **SIM-present** as the milestone.
