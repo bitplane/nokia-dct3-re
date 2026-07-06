@@ -3289,10 +3289,15 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 					pc, machine().time().as_double());
 	}
 
-	// MODEL_SIM_ATR (opt-in, faithful SIM build): when the firmware activates the SIM UART
-	// (SIM_CONTROL 0x39 write with the activate bit 0x80 set — the reset sequence ends 0x32->0x33->0xb3),
-	// arm the ATR FIFO so subsequent RxD reads return a valid ATR. Default ATR is a minimal T=0 GSM
-	// convention (overridable via NOKI3210_SIM_ATR_HEX as space-free hex). Public ISO-7816 structure.
+	// MODEL_SIM_ATR (opt-in, register-level ATR probe — NOT the faithful reception path).
+	// CORRECTION: the MCU does NOT read the SIM RxD/RX_FILL/RX_FLAGS/IIR registers for reception — the
+	// only genuine SIM-UART (base 0x20000) access in the whole firmware is the reset config + the single
+	// flush at 0x2a01bc (earlier "register-based reception" scan hits were struct offsets that happen to
+	// match SIM reg numbers). SIM byte reception is DSP/hardware-assisted, surfaced to the MCU as 0xaf
+	// service messages into the data state machine 0x29ff2c. This model still arms an ATR on activate
+	// (SIM_CONTROL 0x39 bit 0x80; reset seq ends 0x32->0x33->0xb3) and serves it on the registers, but
+	// the firmware only ever reads the first byte via the flush — kept as a register probe, not a fix.
+	// Default ATR is a minimal T=0 GSM convention (overridable via NOKI3210_SIM_ATR_HEX, space-free hex).
 	if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && offset == 0x39 && (data & 0x80) && !(old_data & 0x80))
 	{
 		static const uint8_t default_atr[] = { 0x3b, 0x94, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00 };
