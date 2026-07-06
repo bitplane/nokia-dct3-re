@@ -2602,6 +2602,26 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
 		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
 	}
+	// TRACE_SIMPATH (opt-in): log which SIM state-machine decision points actually execute, to find the
+	// REAL reject path empirically (static reading of this machine has been error-prone). r4=0x10dca8.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMPATH", 0) != 0 && pc == addr)
+	{
+		const char *w =
+			addr == 0x0027e046 ? "parser_entry" : addr == 0x0027e556 ? "accept_decision" :
+			addr == 0x0027e560 ? "e=2_continue" : addr == 0x0027e570 ? "e=3_ACCEPT" :
+			addr == 0x0027ef9e ? "a=e" : addr == 0x0027efbc ? "reject_check_a==2" :
+			addr == 0x0027efde ? "post_0x15_setup" : addr == 0x0027ebb2 ? "a=sp28(2)" :
+			addr == 0x0027ec9c ? "process_resp" : addr == 0x0027f04c ? "proceed_a=sp28" :
+			addr == 0x0027efee ? "giveup_bump" : nullptr;
+		if (w)
+		{
+			static unsigned pt = 0;
+			if (pt++ < 60)
+				logerror("simpath: %-18s @%08x  [+9]=%02x [+a]=%02x [+e]=%02x [+10]=%02x t=%.4f\n", w, addr,
+						debug_ram_byte(0x0010dca8+9), debug_ram_byte(0x0010dca8+0xa),
+						debug_ram_byte(0x0010dca8+0xe), debug_ram_byte(0x0010dca8+0x10), machine().time().as_double());
+		}
+	}
 	// MODEL_SIM_FILE (opt-in, c2 probe): feed a file response into the code-3 buffer 0x10deec (the
 	// file-data channel from c1) at the code-5 handler entry 0x27ebbc, to see if a non-empty buffer
 	// changes the reject (status 0x15). First cut: a plausible GSM 11.11 MF 3F00 SELECT-response block
