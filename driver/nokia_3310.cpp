@@ -2507,6 +2507,20 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (rs++ < 20) logerror("simsm: RESET-START (0x27e024) t=%.4f\n", machine().time().as_double());
 		}
 	}
+	// EXPERIMENT (opt-in, Phase-1 SIM probe): force the SIM task dispatch (0x27df1c) to take the
+	// code-0xc "SIM present" path once, after the SIM has done its reset attempts. Code 0xc sets the
+	// SIM-ready flags ([0x10a8dd],[0x10a8e3],[0x113cff]) and signals startup-ready (0x279486). Tests
+	// whether "SIM present" alone breaks the Insert-SIM-card retry loop and advances the boot.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_PRESENT", 0) != 0 && pc == addr && addr == 0x0027df1c)
+	{
+		static unsigned n = 0;
+		n++;
+		if (n == nokia_env_u32("NOKI3210_SIM_PRESENT_AFTER", 6))
+		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R8, 0x0c);   // -> code-0xc handler 0x27df52
+			logerror("sim_present: forced dispatch #%u code=0xc at t=%.4f\n", n, machine().time().as_double());
+		}
+	}
 	// TRACE_SVCREADY (opt-in, diagnostic): the block-2 (app-task) resume gate at 0x2a9182 needs
 	// 0x29bafc()==1 (reads service-ready [0x11fed1] bit7), phase [0x110c2c]==1, and [0x11239c]!=3.
 	// Hook the startup-service fn entries + the gate to see which run and what the gate variables hold.
