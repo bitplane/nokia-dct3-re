@@ -6,12 +6,20 @@ driver with disassembly tools, headless Ghidra scripts, a symbol map, and detail
 analysis docs — enough to boot the firmware in emulation and reason about why it does
 what it does.
 
-The headline result: **CONTACT SERVICE is cleared.** A blank/un-provisioned 3210 halts at
-the CONTACT SERVICE screen because it is unprovisioned and the service bring-up correctly
-refuses to complete — and the whole chain, from the watchdog symptom down to the root, is now
-not only reverse-engineered end-to-end but **emulated by five faithful, opt-in models** that
-make the boot complete the service layer and leave the CONTACT SERVICE screen. See
-`docs/service_bootstrap.md`.
+The headline result: **a blank 3210 boots to "Insert SIM card"** — the correct home state
+for a DCT3 phone with no SIM inserted. A blank/un-provisioned phone first halts at the
+CONTACT SERVICE screen; that whole chain is reverse-engineered end-to-end and cleared by
+**faithful, opt-in models** (`docs/service_bootstrap.md`). From there the boot was carried
+the rest of the way: the `000d` startup wall, an 11-subsystem readiness barrier, and a
+startup-supervisor **busy-wait on a service-channel-busy bit** — the single root cause that
+gated everything — were traced and fixed with one more opt-in model, cascading all the way to
+a rendered **"Insert SIM card"** MMI screen. See `docs/boot_to_insert_sim.md`. The SIM
+subsystem is mapped and the Phase-1 "SIM present" injection validated
+(`docs/sim_subsystem.md`); reaching the operator-idle home screen is a SIM-emulation project
+on top.
+
+The default boot (no models) still reproduces the CONTACT SERVICE oracle frame byte-for-byte;
+every model is opt-in.
 
 ## ⚠️ No firmware here — bring your own
 
