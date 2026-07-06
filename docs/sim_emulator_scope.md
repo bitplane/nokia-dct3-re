@@ -181,9 +181,37 @@ Two blockers remain for *completion* (valid commands alone still reject):
    command 12× and gives up. Completion needs the payload to change per step
    (SELECT → GET RESPONSE → READ → next file).
 
+## Build attempt result: driver works, injection has a ceiling
+
+The conversation driver was built (`MODEL_SIM_LOOP`: caller-gated code override at
+`0x27ee56`, scripted commands into `0x10deec`, code-1 completion). It **drives the
+full SIM read to completion** — reject is gone (`0x15`→`0x0b`), the phone walks a
+varying command sequence and finishes. But it lands on "Insert SIM card" (`0x1f`),
+and building past that hit a wall:
+
+- The read-complete handler `0x27ea88` posts the no-SIM status `0x1f` iff flag
+  `[0x111c64]` != 0, else takes the success path (events `0xe8`/`0xea`).
+- `[0x111c64]` is a widely-referenced global; **forcing it to 0 crashes the boot**
+  (the success path needs coherent state the injection never built).
+- The accept-bit check `0x27e556` (bit 4 of `0x10dddc+0x10`) is **not on the
+  executed path** even with the read completing.
+
+So the "valid SIM" outcome depends on a *web* of interdependent conditions — file
+content in `0x10dddc`, global flags, struct fields — that must all be consistent.
+Piecemeal injection satisfies one and breaks another. **The conversation driver is
+the ceiling of the injection approach.**
+
 ## Recommendation
 
-**GO — the build is a stateful conversation, now fully specified.** The emulator
+**Injection reaches "read driven to completion"; operator-idle needs coherent SIM
+state that only a faithful emulator produces.** The realistic path is the fallback
+below, OR a from-scratch faithful build: model the SIM at the message layer as a
+real card that emits *consistent* file responses into `0x10dddc` (info blocks +
+data + SWs) driven by the phone's own commands, so the global flags/struct fields
+settle naturally — not by overriding codes. That is a substantial project; the
+mapping here (buffers, dispatch, decision points) is the foundation for it.
+
+Superseded plan (kept for reference): the emulator
 must, per SIM-message recv, choose the code by caller (`3` at trigger recvs,
 `0xb` in the file-read loop) and advance a code-3 command/response script through
 the GSM read to the code-`1` completion → accept → idle. The format mechanism is
