@@ -1445,6 +1445,22 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
 
+	// TRACE_SIMACCEPT (opt-in): trace writers of the SIM manager accept-state byte [0x10dcb2]
+	// (= struct 0x10dca8 + 0xa; big-endian -> high byte of the word at 0x10dcb2). The accept check
+	// 0x27f016 wants this ==3/1; our boot stalls at 2. Log every change with the writing PC to find
+	// what advances 1->2 and (on a real SIM) 2->3 -- the accept-critical transition.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMACCEPT", 0) != 0 && address == 0x0010dcb2)
+	{
+		const uint16_t oldw = m_ram[offset];
+		const uint16_t neww = (oldw & ~mem_mask) | (data & mem_mask);
+		const uint8_t oldb = oldw >> 8, newb = neww >> 8;   // even addr -> high byte
+		if (oldb != newb)
+		{
+			static unsigned sa = 0;
+			if (sa++ < 40)
+				logerror("simaccept: [10dcb2] %u->%u pc=%08x t=%.4f\n", oldb, newb, pc, machine().time().as_double());
+		}
+	}
 	// TRACE_SVCBIT2 (opt-in): faithfulness check for MODEL_SVC_CHANNEL_DRAIN. [0x11fed1] bit2 (the
 	// service-channel-busy bit the readiness gate 0x29bafc spins on) lives in the word at 0x11fed0.
 	// Log every write with the resulting byte + PC to see who sets bit2 (our faked responder path vs
@@ -2514,14 +2530,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			static unsigned r = 0;
 			if (r++ < 20) logerror("simsm: SIM-reset-entry 0x2a01b8 t=%.4f\n", machine().time().as_double());
 		}
-		else if (addr == 0x0027df1c)   // SIM task dispatch: r8=[msg+4] code, struct 0x10a8dc
+		else if (addr == 0x0027df1c)   // SIM task dispatch: r8=[msg+4] code. Struct base literal dca80010
 		{
+			// VERIFY the real struct address: dca80010 halfword-swaps to 0x0010dca8 (earlier 0x10a8dc was a
+			// byte-swap error). Log both so we can see which holds live SIM state.
 			static unsigned d = 0;
 			if (d++ < 60)
-				logerror("simsm: task msg[+4]=%02x  ctrl[10a8dc]: st[+9]=%02x flag[+7]=%02x [+0]=%02x [+1]=%02x t=%.4f\n",
+				logerror("simsm: msg[+4]=%02x  @dca8[+9,+7,+a]=%02x %02x %02x  @a8dc[+9,+7,+a]=%02x %02x %02x t=%.4f\n",
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R8) & 0xff,
-						debug_ram_byte(0x0010a8dc+9), debug_ram_byte(0x0010a8dc+7),
-						debug_ram_byte(0x0010a8dc+0), debug_ram_byte(0x0010a8dc+1), machine().time().as_double());
+						debug_ram_byte(0x0010dca8+9), debug_ram_byte(0x0010dca8+7), debug_ram_byte(0x0010dca8+0xa),
+						debug_ram_byte(0x0010a8dc+9), debug_ram_byte(0x0010a8dc+7), debug_ram_byte(0x0010a8dc+0xa),
+						machine().time().as_double());
 		}
 		else if (addr == 0x0027e024)   // reset-start
 		{
@@ -2529,16 +2548,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (rs++ < 20) logerror("simsm: RESET-START (0x27e024) t=%.4f\n", machine().time().as_double());
 		}
 	}
-	// EXPERIMENT (opt-in, pragmatic SIM route): make the SIM manager ACCEPT the SIM. At its state
-	// check 0x27f016 (ldrb [0x10a8dc+0xa]; ==3/1 -> proceed 0x27f03a, else retry/give-up), force the
-	// byte to 3 so the manager takes the proceed path instead of re-initing/giving up. Tests whether a
-	// "SIM responded" state advances the boot past re-init toward the file-read / idle flow.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_ACCEPT", 0) != 0 && pc == addr && addr == 0x0027f016)
+	// EXPERIMENT (opt-in, pragmatic SIM route — validates the accept-critical mechanism): the SIM
+	// manager struct is at 0x10dca8 (NOT 0x10a8dc — earlier byte-swap error). The accept-critical flag
+	// is [0x10dca8+0xd]: the code-5 (SIM-data) handler 0x27ebbc sets it to 1, which makes the retry
+	// handler (0x27eb98) NOT advance state [+0xa] past 1, so the accept check 0x27f016 ([+0xa]==1)
+	// passes. Our boot only gets code-6 (timeout) so [+0xd] stays 0. Force [+0xd]=1 at the retry check
+	// to confirm the SIM is accepted (leaves 'Insert SIM card') -- the effect a code-5 message would have.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_ACCEPT", 0) != 0 && pc == addr && addr == 0x0027eb98)
 	{
-		debug_ram_byte_w(0x0010a8dc + 0xa, 3);
+		debug_ram_byte_w(0x0010dca8 + 0xd, 1);   // BE: odd addr -> low byte, handled by fw_byte_w
 		static unsigned sa = 0;
 		if (sa++ < 8)
-			logerror("sim_accept: forced [0x10a8e6]=3 (proceed) at t=%.4f\n", machine().time().as_double());
+			logerror("sim_accept: forced [0x10dcb5]=1 (accept flag) at t=%.4f\n", machine().time().as_double());
 	}
 	// EXPERIMENT (opt-in, Phase-1 SIM probe): force the SIM task dispatch (0x27df1c) to take the
 	// code-0xc "SIM present" path once, after the SIM has done its reset attempts. Code 0xc sets the
