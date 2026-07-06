@@ -1441,6 +1441,24 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
 
+	// TRACE_SVCBIT2 (opt-in): faithfulness check for MODEL_SVC_CHANNEL_DRAIN. [0x11fed1] bit2 (the
+	// service-channel-busy bit the readiness gate 0x29bafc spins on) lives in the word at 0x11fed0.
+	// Log every write with the resulting byte + PC to see who sets bit2 (our faked responder path vs
+	// real boot code) and whether anything ever clears it.
+	if (nokia_env_u32("NOKI3210_TRACE_SVCBIT2", 0) != 0 && address == 0x0011fed0)
+	{
+		const uint16_t oldw = m_ram[offset];
+		const uint16_t neww = (oldw & ~mem_mask) | (data & mem_mask);
+		const uint8_t oldb = oldw & 0xff, newb = neww & 0xff;   // BE: odd addr 0x11fed1 = low byte
+		if (((oldb ^ newb) & 0x04) || nokia_env_u32("NOKI3210_TRACE_SVCBIT2", 0) == 2)
+		{
+			static unsigned b2 = 0;
+			if (b2++ < 50)
+				logerror("svcbit2: [11fed1] %02x->%02x (bit2 %u->%u) pc=%08x t=%.4f\n",
+						oldb, newb, (oldb>>2)&1, (newb>>2)&1, pc, machine().time().as_double());
+		}
+	}
+
 	// FW_STARTUP_SERVICE_BUFFER (0x110c2c) write lifecycle (opt-in): the gate that
 	// defers task 14's resume reads byte [0x110c2c]; log who writes it (or never).
 	if (nokia_env_u32("NOKI3210_TRACE_CONTACT_COMMIT", 0) != 0 &&
