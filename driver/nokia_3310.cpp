@@ -2492,6 +2492,20 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			static unsigned r = 0;
 			if (r++ < 20) logerror("simsm: SIM-reset-entry 0x2a01b8 t=%.4f\n", machine().time().as_double());
 		}
+		else if (addr == 0x0027df1c)   // SIM task dispatch: r8=[msg+4] code, struct 0x10a8dc
+		{
+			static unsigned d = 0;
+			if (d++ < 60)
+				logerror("simsm: task msg[+4]=%02x  ctrl[10a8dc]: st[+9]=%02x flag[+7]=%02x [+0]=%02x [+1]=%02x t=%.4f\n",
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R8) & 0xff,
+						debug_ram_byte(0x0010a8dc+9), debug_ram_byte(0x0010a8dc+7),
+						debug_ram_byte(0x0010a8dc+0), debug_ram_byte(0x0010a8dc+1), machine().time().as_double());
+		}
+		else if (addr == 0x0027e024)   // reset-start
+		{
+			static unsigned rs = 0;
+			if (rs++ < 20) logerror("simsm: RESET-START (0x27e024) t=%.4f\n", machine().time().as_double());
+		}
 	}
 	// TRACE_SVCREADY (opt-in, diagnostic): the block-2 (app-task) resume gate at 0x2a9182 needs
 	// 0x29bafc()==1 (reads service-ready [0x11fed1] bit7), phase [0x110c2c]==1, and [0x11239c]!=3.
