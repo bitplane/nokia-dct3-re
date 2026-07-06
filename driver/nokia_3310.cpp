@@ -2646,7 +2646,9 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			addr == 0x0027ef9e ? "a=e" : addr == 0x0027efbc ? "reject_check_a==2" :
 			addr == 0x0027efde ? "post_0x15_setup" : addr == 0x0027ebb2 ? "a=sp28(2)" :
 			addr == 0x0027ec9c ? "process_resp" : addr == 0x0027f04c ? "proceed_a=sp28" :
-			addr == 0x0027efee ? "giveup_bump" : nullptr;
+			addr == 0x0027efee ? "giveup_bump" :
+			addr == 0x0027ed3c ? "cxx=1_FILEREAD_LOOP" : addr == 0x0027ee72 ? "fileread_cmd_ready" :
+			addr == 0x0027eda8 ? "cxx=0_path" : addr == 0x0027ebee ? "cxx=2/3_reset" : nullptr;
 		if (w)
 		{
 			static unsigned pt = 0;
