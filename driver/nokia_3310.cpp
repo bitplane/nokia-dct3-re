@@ -2529,6 +2529,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (rs++ < 20) logerror("simsm: RESET-START (0x27e024) t=%.4f\n", machine().time().as_double());
 		}
 	}
+	// EXPERIMENT (opt-in, pragmatic SIM route): make the SIM manager ACCEPT the SIM. At its state
+	// check 0x27f016 (ldrb [0x10a8dc+0xa]; ==3/1 -> proceed 0x27f03a, else retry/give-up), force the
+	// byte to 3 so the manager takes the proceed path instead of re-initing/giving up. Tests whether a
+	// "SIM responded" state advances the boot past re-init toward the file-read / idle flow.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_ACCEPT", 0) != 0 && pc == addr && addr == 0x0027f016)
+	{
+		debug_ram_byte_w(0x0010a8dc + 0xa, 3);
+		static unsigned sa = 0;
+		if (sa++ < 8)
+			logerror("sim_accept: forced [0x10a8e6]=3 (proceed) at t=%.4f\n", machine().time().as_double());
+	}
 	// EXPERIMENT (opt-in, Phase-1 SIM probe): force the SIM task dispatch (0x27df1c) to take the
 	// code-0xc "SIM present" path once, after the SIM has done its reset attempts. Code 0xc sets the
 	// SIM-ready flags ([0x10a8dd],[0x10a8e3],[0x113cff]) and signals startup-ready (0x279486). Tests
