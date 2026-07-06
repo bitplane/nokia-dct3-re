@@ -2602,6 +2602,16 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
 		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
 	}
+	// TRACE_SIMSTATUS (opt-in, c0): the SIM manager posts a SIM status to the MMI via 0x27e240
+	// (r1 = status code: 0x15/0x16/...). Log each to find which code = "SIM card rejected" vs accept.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMSTATUS", 0) != 0 && pc == addr && addr == 0x0027e240)
+	{
+		static unsigned st = 0;
+		if (st++ < 40)
+			logerror("simstatus: post status=%02x lr=%08x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
 	// TRACE_SIMTX (opt-in, step 3): the SIM command sender 0x27e98c queues the outgoing SIM command
 	// (APDU: SELECT/READ with the file ID) via the TxD-queue fn 0x2a02e6 (r0 = buffer; buffer[0]=len,
 	// buffer[1..]=command bytes). Log the command to see which SIM files the phone requests.
