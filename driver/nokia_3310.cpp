@@ -392,6 +392,7 @@ private:
 	uint8_t       m_sim_atr_len = 0;
 	uint8_t       m_sim_atr_pos = 0;
 	bool          m_sim_loop = false;    // c2 feeder: set once the file-read loop (0x27ee40) is reached
+	uint8_t       m_sim_script_idx = 0;  // c2 feeder: scripted-command index
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -2615,7 +2616,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	{
 		constexpr u32 SCRATCH = 0x0017fd00;
 		uint8_t data[40]; unsigned n = 0;
-		if (const char *hex = getenv("NOKI3210_SIM_LOOP_HEX"))
+		// data = the current scripted command (SIM_LOOP_SCRIPT, comma-separated), advancing per feed;
+		// else SIM_LOOP_HEX; else SW=9000. The code-3 handler copies this to 0x10deec, the buffer the
+		// file-read block reads its 5-byte APDU from (0x10deec+5).
+		if (const char *scr = getenv("NOKI3210_SIM_LOOP_SCRIPT"))
+		{
+			unsigned ncmd = 1; for (const char *q = scr; *q; q++) if (*q == ',') ncmd++;
+			const char *p = scr; for (unsigned k = 0, idx = m_sim_script_idx % ncmd; k < idx; k++) { while (*p && *p != ',') p++; if (*p) p++; }
+			for (; p[0] && p[1] && p[0] != ',' && n < sizeof(data); p += 2)
+				data[n++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
+			m_sim_script_idx++;
+		}
+		else if (const char *hex = getenv("NOKI3210_SIM_LOOP_HEX"))
 			for (; hex[0] && hex[1] && n < sizeof(data); hex += 2)
 				data[n++] = uint8_t(std::strtoul(std::string(hex, 2).c_str(), nullptr, 16));
 		if (n == 0) { data[0] = 0x90; data[1] = 0x00; n = 2; }   // default: SW=9000
@@ -2635,6 +2647,21 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					nokia_env_u32("NOKI3210_SIM_LOOP_CODE", 0x0b) & 0xff, n, machine().time().as_double());
 			return uint16_t(0x4760);   // BX r12 -> return to 0x27df10 with r0=message
 		}
+	}
+	// MODEL_SIM_LOOP caller-gate: the code-3 message triggers the file-read at the trigger recvs, but the
+	// file-read LOOP recv 0x27ee52 (return 0x27ee56) then gets that same code 3 and rejects it. Override
+	// the returned code to 0xb at the loop return so the loop PROCESSES (0x27ee94 -> send next) instead of
+	// rejecting. 0x27ee56 is `strb r0,[r4,#5]` (stores the code); set r0=0xb before it runs.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_LOOP", 0) != 0 && m_sim_loop && pc == addr && addr == 0x0027ee56)
+	{
+		// 0xb = "process, keep reading"; once the script has been walked (idx >= SIM_LOOP_DONE) return
+		// code 1 = completion (-> 0x27ef34 -> read done -> accept), to try to end the read and reach idle.
+		const u32 done = nokia_env_u32("NOKI3210_SIM_LOOP_DONE", 0xffff);
+		const u32 code = (m_sim_script_idx >= done) ? 1 : 0x0b;
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, code);
+		static unsigned ov = 0;
+		if (ov++ < 40) logerror("sim_gate: loop recv 0x27ee56 -> code %u (script idx %u) t=%.4f\n",
+				code, m_sim_script_idx, machine().time().as_double());
 	}
 	// TRACE_SIMPATH (opt-in): log which SIM state-machine decision points actually execute, to find the
 	// REAL reject path empirically (static reading of this machine has been error-prone). r4=0x10dca8.
