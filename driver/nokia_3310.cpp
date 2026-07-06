@@ -387,6 +387,10 @@ private:
 	unsigned      m_svcresp_state;      // 0 idle, 1 await-alloc, 2 await-post, 3 done
 	uint32_t      m_svcresp_saved[16];  // R0..R14 + CPSR saved at the trigger point
 	uint32_t      m_svcresp_msg;        // allocated message pointer
+	// SIM ATR FIFO (NOKI3210_MODEL_SIM_ATR): register-level ATR delivery on SIM activation.
+	uint8_t       m_sim_atr[40];
+	uint8_t       m_sim_atr_len = 0;
+	uint8_t       m_sim_atr_pos = 0;
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -3211,19 +3215,33 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 				data &= 0xfe;
 			break;
 		case 0x37:  // SIM UART RxD
-			if (std::getenv("NOKI3210_SIM_PROFILE"))
+			// MODEL_SIM_ATR (opt-in, faithful SIM build): serve the ATR from a register-level FIFO.
+			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
+			{
+				data = m_sim_atr[m_sim_atr_pos++];
+				if (nokia_env_u32("NOKI3210_TRACE_SIM", 0) != 0)
+					logerror("sim_atr: RxD byte %u/%u = %02x pc=%08x t=%.4f\n",
+							m_sim_atr_pos, m_sim_atr_len, data, m_maincpu->pc(), machine().time().as_double());
+			}
+			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RXD", 0xff) & 0xff;
 			break;
 		case 0x38:  // SIM UART interrupt identification
-			if (std::getenv("NOKI3210_SIM_PROFILE"))
+			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
+				data = nokia_env_u32("NOKI3210_SIM_ATR_IIR", 0x0a) & 0xff;   // RxD-data cause (iterate)
+			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_IIR", 0x01) & 0xff;
 			break;
 		case 0x3c:  // SIM UART RxD queue fill
-			if (std::getenv("NOKI3210_SIM_PROFILE"))
+			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0)
+				data = uint8_t(m_sim_atr_len - m_sim_atr_pos);
+			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RX_FILL", 0x00) & 0xff;
 			break;
 		case 0x3d:  // SIM RxD flags
-			if (std::getenv("NOKI3210_SIM_PROFILE"))
+			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0)
+				data = (m_sim_atr_pos < m_sim_atr_len) ? (nokia_env_u32("NOKI3210_SIM_ATR_RXFLAGS", 0x80) & 0xff) : 0x00;
+			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RX_FLAGS", 0x00) & 0xff;
 			break;
 		case 0x3e:  // SIM TxD flags
@@ -3269,6 +3287,30 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		if (sw++ < 120)
 			logerror("sim W %02x=%02x (%s) pc=%08x t=%.4f\n", offset, data, nokia_mad2_reg_desc(offset),
 					pc, machine().time().as_double());
+	}
+
+	// MODEL_SIM_ATR (opt-in, faithful SIM build): when the firmware activates the SIM UART
+	// (SIM_CONTROL 0x39 write with the activate bit 0x80 set — the reset sequence ends 0x32->0x33->0xb3),
+	// arm the ATR FIFO so subsequent RxD reads return a valid ATR. Default ATR is a minimal T=0 GSM
+	// convention (overridable via NOKI3210_SIM_ATR_HEX as space-free hex). Public ISO-7816 structure.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && offset == 0x39 && (data & 0x80) && !(old_data & 0x80))
+	{
+		static const uint8_t default_atr[] = { 0x3b, 0x94, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00 };
+		m_sim_atr_len = 0;
+		if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
+			for (const char *p = hex; p[0] && p[1] && m_sim_atr_len < sizeof(m_sim_atr); p += 2)
+				m_sim_atr[m_sim_atr_len++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
+		if (m_sim_atr_len == 0)
+			for (uint8_t b : default_atr) m_sim_atr[m_sim_atr_len++] = b;
+		m_sim_atr_pos = 0;
+		if (nokia_env_u32("NOKI3210_TRACE_SIM", 0) != 0)
+			logerror("sim_atr: ARMED %u-byte ATR on activate (0x39=%02x) pc=%08x t=%.4f\n",
+					m_sim_atr_len, data, pc, machine().time().as_double());
+		// The SIM RxD reception is interrupt-driven; raise the SIM IRQ so the ISR drains the ATR.
+		// Line is configurable while we pin it down (DSP=4, CCONT=6 are taken); default 5.
+		const u32 line = nokia_env_u32("NOKI3210_SIM_IRQ_LINE", 5);
+		if (line < 8)
+			assert_irq(int(line));
 	}
 
 	if (nokia_env_u32("NOKI3210_TRACE_MMIO", 0) != 0)
