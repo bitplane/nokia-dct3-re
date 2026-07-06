@@ -1360,6 +1360,19 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
 
+	// TRACE_SIMBUF (opt-in): log reads of the code-3 SIM buffer 0x10deec (0x118 bytes) with PC + offset,
+	// to pin which bytes the phone reads as SIM file data (beyond the command at +5).
+	if (nokia_env_u32("NOKI3210_TRACE_SIMBUF", 0) != 0 &&
+			((address >= 0x0010deec && address < 0x0010df04) || (address >= 0x0010dddc && address < 0x0010ddf4)))
+	{
+		static unsigned sb_log = 0;
+		const char *buf = address >= 0x0010deec ? "deec" : "dddc";
+		const offs_t base = address >= 0x0010deec ? 0x0010deec : 0x0010dddc;
+		if (sb_log++ < 300)
+			logerror("simbuf: %s+%02x [%06x]=%04x pc=%08x t=%.4f\n",
+					buf, address - base, address, data, pc, machine().time().as_double());
+	}
+
 	// ccont_reg_read (0x2afb44) table probe (opt-in): log the RAM the idx6 availability
 	// check reads, to locate the "CCONT status" table it indexes (index 1 & 0x90) and what
 	// populates it — the firmware never serial-reads hardware reg 1, so the source is RAM.
