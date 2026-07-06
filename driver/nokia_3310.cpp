@@ -1476,6 +1476,23 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 				logerror("simaccept: [10dcb2] %u->%u pc=%08x t=%.4f\n", oldb, newb, pc, machine().time().as_double());
 		}
 	}
+	// TRACE_NOSIM (opt-in): trace writers of the "no SIM" flag [0x111c64] (BE even addr -> high byte of
+	// the word at 0x111c64). The read-complete handler 0x27ea88 posts status 0x1f (Insert SIM card) iff
+	// this is !=0. Log every change with the writing PC to find what SETS it during the failed read --
+	// its inverse is the success criterion (keep it 0 -> events 0xe8/0xea -> SIM ready).
+	if (nokia_env_u32("NOKI3210_TRACE_NOSIM", 0) != 0 && address == 0x00111c64)
+	{
+		const uint16_t oldw = m_ram[offset];
+		const uint16_t neww = (oldw & ~mem_mask) | (data & mem_mask);
+		const uint8_t oldb = oldw >> 8, newb = neww >> 8;   // even addr -> high byte
+		if (oldb != newb)
+		{
+			static unsigned ns = 0;
+			if (ns++ < 60)
+				logerror("nosim: [111c64] %02x->%02x pc=%08x lr=%08x t=%.4f\n", oldb, newb, pc,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+	}
 	// TRACE_SVCBIT2 (opt-in): faithfulness check for MODEL_SVC_CHANNEL_DRAIN. [0x11fed1] bit2 (the
 	// service-channel-busy bit the readiness gate 0x29bafc spins on) lives in the word at 0x11fed0.
 	// Log every write with the resulting byte + PC to see who sets bit2 (our faked responder path vs
@@ -2670,7 +2687,10 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		// 0xb = "process, keep reading"; once the script has been walked (idx >= SIM_LOOP_DONE) return
 		// code 1 = completion (-> 0x27ef34 -> read done -> accept), to try to end the read and reach idle.
 		const u32 done = nokia_env_u32("NOKI3210_SIM_LOOP_DONE", 0xffff);
-		const u32 code = (m_sim_script_idx >= done) ? 1 : 0x0b;
+		// completion code: 0xd routes to the SUCCESS path 0x27ee72 (events 0xe8/0xea, no no-SIM check);
+		// 1 routes to 0x27ef34 -> 0x27f06e -> no-SIM handler 0x27ea88. Default 0xd (the success route).
+		const u32 done_code = nokia_env_u32("NOKI3210_SIM_LOOP_DONE_CODE", 0x0d);
+		const u32 code = (m_sim_script_idx >= done) ? done_code : 0x0b;
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, code);
 		static unsigned ov = 0;
 		if (ov++ < 40) logerror("sim_gate: loop recv 0x27ee56 -> code %u (script idx %u) t=%.4f\n",
