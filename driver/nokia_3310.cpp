@@ -2602,6 +2602,23 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
 		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
 	}
+	// MODEL_SIM_FILE (opt-in, c2 probe): feed a file response into the code-3 buffer 0x10deec (the
+	// file-data channel from c1) at the code-5 handler entry 0x27ebbc, to see if a non-empty buffer
+	// changes the reject (status 0x15). First cut: a plausible GSM 11.11 MF 3F00 SELECT-response block
+	// at 0x10deec+5 (msg data ptr), header/[+4]=3 at 0x10deec. Empirical -- iterate format from result.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_FILE", 0) != 0 && pc == addr && addr == 0x0027ebbc)
+	{
+		// GSM MF (3F00) GET-RESPONSE data: RFU, mem, file ID 3F00, type 01(MF), RFU, len, chars, #DF, #EF...
+		static const uint8_t mf[] = { 0x00,0x00,0x00,0x00,0x3f,0x00,0x01,0x00,0x00,0x00,0x00,0x00,
+									  0x0a,0x00,0x05,0x0a,0x04,0x00,0x8a,0x8a,0x8a,0x8a,0x8a };
+		for (offs_t i = 0; i < 5; i++) debug_ram_byte_w(0x0010deec + i, 0);
+		debug_ram_byte_w(0x0010deec + 4, 3);                       // message code = 3 (code-3 data)
+		debug_ram_byte_w(0x0010deec + 2, uint8_t(sizeof(mf)));     // length guess
+		for (offs_t i = 0; i < sizeof(mf); i++) debug_ram_byte_w(0x0010deec + 5 + i, mf[i]);
+		static unsigned ff = 0;
+		if (ff++ < 8) logerror("sim_file: seeded 0x10deec with MF SELECT response (%u bytes) t=%.4f\n",
+				unsigned(sizeof(mf)), machine().time().as_double());
+	}
 	// TRACE_SIMSTATUS (opt-in, c0): the SIM manager posts a SIM status to the MMI via 0x27e240
 	// (r1 = status code: 0x15/0x16/...). Log each to find which code = "SIM card rejected" vs accept.
 	if (nokia_env_u32("NOKI3210_TRACE_SIMSTATUS", 0) != 0 && pc == addr && addr == 0x0027e240)
