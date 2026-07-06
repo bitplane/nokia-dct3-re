@@ -160,12 +160,35 @@ carry so the built command is valid and the read advances to completion (code 1)
 → accept → idle?" That is the file-descriptor/response format at `0x10deec+5`,
 resolvable by iterating `SIM_LOOP_HEX` against the command the phone emits.
 
+### Format pinned (mechanism): a command-script model
+
+Iterating the payload pinned the mechanism: the file-read block sends a **5-byte
+APDU copied verbatim from the code-3 payload at `0x10deec+5`** (msg+5). Verified —
+`SIM_LOOP_HEX=a0c0000016` → the phone emits `a0 c0 00 00 16` (GET RESPONSE),
+`a0a4000002` → SELECT, `a0b0000009` → READ BINARY. So the phone's SIM command
+*content* is supplied by the code-3 messages: **the emulator drives the command
+sequence, not merely the responses** (an unusual inversion — most likely a
+DSP-layer abstraction or T=0 continuation, worth noting in the design).
+
+Two blockers remain for *completion* (valid commands alone still reject):
+
+1. **Recv-site gating.** The file-read *loop* recv `0x27ee52` receives my code 3,
+   which it doesn't handle (`0x27ef02`→`0x27ef0a`→post `0x15`). It needs code
+   **`0xb`** (→`0x27ee94` process → `0x27eef6` send next). The *trigger* recvs
+   (`0x27ec10`/`0x27efb0`) want code **3**. The `0x27defc` caller is on the stack
+   at `[sp+0x18]` @`0x27df0c` — the feeder must choose the code by caller.
+2. **Advancing sequence.** The payload is fixed, so the phone re-sends the same
+   command 12× and gives up. Completion needs the payload to change per step
+   (SELECT → GET RESPONSE → READ → next file).
+
 ## Recommendation
 
-**GO — build the emulator, but resolve the code-3 data format first.** The
-critical risk (phase drivability) is retired. Next concrete step: iterate the
-code-3 message payload (`SIM_LOOP_CODE=3` + `SIM_LOOP_HEX`) until the phone's
-built command (`sim_apdu` trace) is a valid GSM APDU and the read advances past
-reject — that pins the layout the file system component must emit. Then build the
-GSM file tree on top. Fallback unchanged: if a valid layout can't be found by
+**GO — the build is a stateful conversation, now fully specified.** The emulator
+must, per SIM-message recv, choose the code by caller (`3` at trigger recvs,
+`0xb` in the file-read loop) and advance a code-3 command/response script through
+the GSM read to the code-`1` completion → accept → idle. The format mechanism is
+pinned; what remains is the state machine (the file system + sequencer) plus the
+caller-gated feeder. Next concrete step: implement the caller-gated feed
+(`[sp+0x18]`) with a short scripted sequence and watch for the reject clearing /
+frame change. Fallback unchanged: if the conversation can't be completed by
 injection (needs real DSP-path state), ship **SIM-present** as the milestone.
