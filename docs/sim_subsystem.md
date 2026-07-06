@@ -1,5 +1,15 @@
 # SIM subsystem — map and Phase-1
 
+> **Partly superseded — read `docs/sim_emulator_scope.md` first.** This doc is the
+> original Phase-1 map (SIM UART, the `0xc` present injection). The later c0–c2
+> investigation reverse-engineered the full SIM *read conversation* and corrected
+> some of the model here (e.g. the code-3 file buffer is `0x10deec`, not the
+> `0x10eede` written below; file responses land in `0x10dddc`, not via the `0xaf`
+> path). The command/response buffers, the read state machine, the dispatch, the
+> accept/no-SIM decision points, and the working conversation driver are all in
+> **`docs/sim_emulator_scope.md`** — the authoritative reference for the emulator
+> build. Keep this doc for the UART-level power-on sequence, which is still valid.
+
 Once the phone boots past the service wall (see `docs/boot_to_insert_sim.md`) it
 tries to bring up the SIM, fails (no card), and shows "Insert SIM card". This
 doc maps the SIM subsystem and records the validated Phase-1 injection point for

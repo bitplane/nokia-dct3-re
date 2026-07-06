@@ -220,3 +220,39 @@ caller-gated feeder. Next concrete step: implement the caller-gated feed
 (`[sp+0x18]`) with a short scripted sequence and watch for the reject clearing /
 frame change. Fallback unchanged: if the conversation can't be completed by
 injection (needs real DSP-path state), ship **SIM-present** as the milestone.
+
+## Quick reference (for the emulation research pass)
+
+Everything the emulator build needs, in one place. All addresses `3210f600a`, big-endian ARM7.
+
+### Buffers & struct
+
+| What | Address | Notes |
+|------|---------|-------|
+| SIM manager struct | `0x10dca8` | read-state `[+0xc]` (`3/2`=SELECT, `1`=file-read, `0`=other); accept-state `[+0xa]`; accept-flag `[+0xd]`; target `[+0xe]`; counter `[+0xb]` |
+| **Command buffer** | `0x10deec` | = the file descriptor (`[sp+0x34]`/`[sp+0x30]`). Phone reads `+2` (halfword len, cmp 5), `+6`/`+8` (cmd INS/param). 5-byte APDU at `+5`. Written by code-3 msgs (`0x27df9e`). |
+| **Response / file-content buffer** | `0x10dddc` | Parsed by `0x27e046` at `+06..+16`. Written by code-5/`8-b` msgs (`0x27df64` copies msg data → `+2`, len → `[+0]`). ATR injected here. |
+| No-SIM flag | `0x111c64` | `!=0` → status `0x1f` (Insert SIM card); `==0` → success path. Load-bearing global (~50 refs) — do NOT force. |
+| Idle flag | `0x11f81b` | gates `display_idle 0x2a255c` |
+
+### Message path (message-layer SIM)
+
+| Step | Address | Notes |
+|------|---------|-------|
+| APDU out | `0x2aec34` (r1=`0x2701`, r2=ptr, r0=len) → `0x2b13a2` | observe the command |
+| Command send+recv | `0x27e98c` | recv at `0x26a458` @`0x27e9ca` (ret `0x27e9ce`), must return **7** |
+| SIM-task recv | `0x27defc`: recv `0x26a458` @`0x27df0c` (ret `0x27df10`); `[msg+4]` → `3`→`0x27df9e`(→`0x10deec`), `5/8-b`→`0x27df64`(→`0x10dddc`), `0xc`→present, `0x11`→..; returns `[msg+4]` |
+| Read dispatch (post-response) | `0x27ede0`: `r0==3`→file-read `0x27ee40`, `1`→completion `0x27ef34`, `0x37`→`0x27ef40` | `r0` = returned msg code |
+| File-read loop | `0x27ee40` send (5-byte, `0x10deec+5`) → 7 → recv `0x27ee52` (ret `0x27ee56`) → dispatch `0xa/0xb/0xf/1` |
+| Status → MMI | `0x27e240` (r1=status: `0x15`=reject, `0x16`=detected, `0x1f`=no-SIM) |
+| No-SIM decision | `0x27ea88` (checks `[0x111c64]`) |
+
+### Driver knobs (research infrastructure, all opt-in)
+
+- Reach the read: 4 milestone models + `MODEL_SIM_ATR_MSG` + `SIM_ATR_HEX=3b1005` (TA1 non-special → `[+0xc]=1`) + `EXPERIMENT_SIM_CODE5`(`SIM_CODE5_AFTER=2`).
+- Conversation driver: `MODEL_SIM_RESPONDER`(`SIM_RESP_CODE=7`) + `MODEL_SIM_LOOP`(`SIM_LOOP_CODE=3`, `SIM_LOOP_SCRIPT=<cmds>`, `SIM_LOOP_DONE=<n>`). Caller-gate override lives at `0x27ee56`.
+- Traces: `TRACE_SIMBUF` (`0x10deec`+`0x10dddc` reads), `TRACE_SIMSTATUS` (`0x27e240` posts), `TRACE_SIMPATH` (state-machine branch targets, cxx markers), `TRACE_SIM`/`TRACE_SIMTX` (UART/APDU).
+
+### The open problem for the pass
+
+The conversation driver completes the read but lands on no-SIM because `0x10dddc` never gets coherent per-command file responses. A faithful emulator must, driven by the phone's own commands, emit **consistent** GSM 11.11 responses into `0x10dddc` (info blocks + data + SWs) so the read state, `[0x111c64]`, and the struct fields all settle to "valid SIM" together — not by overriding dispatch codes. Start by tracing, on a *real*-style boot path, what a valid response into `0x10dddc` must contain for the parser `0x27e046` to advance the state without the no-SIM flag being set.
