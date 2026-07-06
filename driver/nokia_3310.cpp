@@ -2561,6 +2561,28 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (sa++ < 8)
 			logerror("sim_accept: forced [0x10dcb5]=1 (accept flag) at t=%.4f\n", machine().time().as_double());
 	}
+	// MODEL_SIM_RESPONDER (opt-in, step 4 increment (a) — skeleton, log only): intercept the SIM APDU
+	// command the phone sends over the service-lower transport (0x2aec34 with msg code 0x2701 in r1;
+	// r0=len, r2=data ptr to the raw APDU). Log each APDU decoded (CLA INS P1 P2 P3 ...). This is the
+	// interception point where the T=0 response will be injected in later increments. For now it only
+	// observes -- with no response the phone stalls after the first APDU (that is expected here).
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_RESPONDER", 0) != 0 && pc == addr && addr == 0x002aec34 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x2701)
+	{
+		const u32 len = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		const u32 buf = m_maincpu->state_int(arm7_cpu_device::ARM7_R2);
+		if (buf >= 0x00100000 && buf < 0x00180000)
+		{
+			char hex[128]; int n = 0;
+			for (u32 i = 0; i < len && i < 32; i++) n += std::snprintf(hex + n, sizeof(hex) - n, "%02x ", debug_ram_byte(buf + i));
+			const uint8_t ins = len >= 2 ? debug_ram_byte(buf + 1) : 0;
+			const char *name = ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
+							 : ins == 0xb2 ? "READ_RECORD" : ins == 0x20 ? "VERIFY_CHV" : ins == 0xf2 ? "STATUS" : "?";
+			static unsigned ap = 0;
+			if (ap++ < 60)
+				logerror("sim_apdu: %-12s len=%u [ %s] t=%.4f\n", name, len, hex, machine().time().as_double());
+		}
+	}
 	// TRACE_SIMTX (opt-in, step 3): the SIM command sender 0x27e98c queues the outgoing SIM command
 	// (APDU: SELECT/READ with the file ID) via the TxD-queue fn 0x2a02e6 (r0 = buffer; buffer[0]=len,
 	// buffer[1..]=command bytes). Log the command to see which SIM files the phone requests.
