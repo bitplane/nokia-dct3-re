@@ -2583,6 +2583,25 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("sim_apdu: %-12s len=%u [ %s] t=%.4f\n", name, len, hex, machine().time().as_double());
 		}
 	}
+	// MODEL_SIM_RESPONDER increment (b): respond to the SIM command so the phone advances. The phone
+	// recv's the response inside the command sender 0x27e98c (bl 0x26a458 at 0x27e9ca, return 0x27e9ce).
+	// Trampoline that recv only (LR==0x27e9ce): return a synthetic response message (scratch RAM) with
+	// [msg+4]=the response code (default 0xa4 = the T=0 procedure byte ACK for INS a4), so the phone
+	// proceeds to send the SELECT data (the 2-byte file ID). Empirical: iterate SIM_RESP_CODE / fields.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_RESPONDER", 0) != 0 && pc == addr && addr == 0x0026a458 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027e9ce)
+	{
+		constexpr u32 SCRATCH = 0x0017fe00;   // high RAM, response message (not pool-freed by 0x27e98c)
+		for (offs_t i = 0; i < 0x20; i++) debug_ram_byte_w(SCRATCH + i, 0);
+		debug_ram_byte_w(SCRATCH + 4, nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff);
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027e9ce | 1);
+		static unsigned rp = 0;
+		if (rp++ < 40)
+			logerror("sim_resp: injected response [+4]=%02x -> 0x27e9ce t=%.4f\n",
+					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
+		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
+	}
 	// TRACE_SIMTX (opt-in, step 3): the SIM command sender 0x27e98c queues the outgoing SIM command
 	// (APDU: SELECT/READ with the file ID) via the TxD-queue fn 0x2a02e6 (r0 = buffer; buffer[0]=len,
 	// buffer[1..]=command bytes). Log the command to see which SIM files the phone requests.
@@ -2625,10 +2644,14 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	{
 		static unsigned c5 = 0;
 		c5++;
-		if (c5 == nokia_env_u32("NOKI3210_SIM_CODE5_AFTER", 4))
+		// Fire once at AFTER, or continuously from AFTER if SIM_CODE5_CONT=1 (to drive the file-read
+		// loop: each forced code-5 triggers the next APDU command).
+		const u32 after = nokia_env_u32("NOKI3210_SIM_CODE5_AFTER", 4);
+		if (c5 == after || (nokia_env_u32("NOKI3210_SIM_CODE5_CONT", 0) != 0 && c5 >= after))
 		{
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 5);
-			logerror("sim_code5: forced return code=5 (#%u) t=%.4f\n", c5, machine().time().as_double());
+			if (c5 < after + 30)
+				logerror("sim_code5: forced return code=5 (#%u) t=%.4f\n", c5, machine().time().as_double());
 		}
 	}
 	// EXPERIMENT (opt-in, Phase-1 SIM probe): force the SIM task dispatch (0x27df1c) to take the
