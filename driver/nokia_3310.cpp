@@ -391,6 +391,7 @@ private:
 	uint8_t       m_sim_atr[40];
 	uint8_t       m_sim_atr_len = 0;
 	uint8_t       m_sim_atr_pos = 0;
+	bool          m_sim_loop = false;    // c2 feeder: set once the file-read loop (0x27ee40) is reached
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -2596,11 +2597,44 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		debug_ram_byte_w(SCRATCH + 4, nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff);
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027e9ce | 1);
+		// c2 feeder: once we're answering SIM commands we're in the file-read phase -> arm the loop feed.
+		if (nokia_env_u32("NOKI3210_MODEL_SIM_LOOP", 0) != 0) m_sim_loop = true;
 		static unsigned rp = 0;
 		if (rp++ < 40)
 			logerror("sim_resp: injected response [+4]=%02x -> 0x27e9ce t=%.4f\n",
 					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
 		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
+	}
+	// MODEL_SIM_LOOP (opt-in, c2 feeder): drive the file-read loop. Armed by the command recv-trampoline
+	// above (file-read phase). At the SIM-task recv 0x27df0c (bl 0x26a458, return 0x27df10), once armed,
+	// inject a synthetic code-0xb SIM message carrying file data: 0x27df64 copies its data (msg+5, len
+	// [msg+2]) into the response buffer 0x10dddc, returns 0xb -> the continue path processes it and sends
+	// the next command. Data from NOKI3210_SIM_LOOP_HEX (default a bare SW=9000).
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_LOOP", 0) != 0 && m_sim_loop && pc == addr && addr == 0x0026a458 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027df10)
+	{
+		constexpr u32 SCRATCH = 0x0017fd00;
+		uint8_t data[40]; unsigned n = 0;
+		if (const char *hex = getenv("NOKI3210_SIM_LOOP_HEX"))
+			for (; hex[0] && hex[1] && n < sizeof(data); hex += 2)
+				data[n++] = uint8_t(std::strtoul(std::string(hex, 2).c_str(), nullptr, 16));
+		if (n == 0) { data[0] = 0x90; data[1] = 0x00; n = 2; }   // default: SW=9000
+		// Cap the number of feeds (SIM_LOOP_MAX, default 24) so a wrong code can't spin forever: once the
+		// cap is hit, fall through to the real (blocking) recv.
+		static unsigned lf = 0;
+		if (lf >= nokia_env_u32("NOKI3210_SIM_LOOP_MAX", 24)) { /* fall through to real recv */ }
+		else {
+			for (offs_t i = 0; i < 0x30; i++) debug_ram_byte_w(SCRATCH + i, 0);
+			debug_ram_byte_w(SCRATCH + 2, uint8_t(n >> 8));
+			debug_ram_byte_w(SCRATCH + 3, uint8_t(n));
+			debug_ram_byte_w(SCRATCH + 4, nokia_env_u32("NOKI3210_SIM_LOOP_CODE", 0x0b) & 0xff);
+			for (unsigned i = 0; i < n; i++) debug_ram_byte_w(SCRATCH + 5 + i, data[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
+			if (lf++ < 40) logerror("sim_loop: fed code-%02x msg (%u data bytes) -> 0x27df10 t=%.4f\n",
+					nokia_env_u32("NOKI3210_SIM_LOOP_CODE", 0x0b) & 0xff, n, machine().time().as_double());
+			return uint16_t(0x4760);   // BX r12 -> return to 0x27df10 with r0=message
+		}
 	}
 	// TRACE_SIMPATH (opt-in): log which SIM state-machine decision points actually execute, to find the
 	// REAL reject path empirically (static reading of this machine has been error-prone). r4=0x10dca8.
