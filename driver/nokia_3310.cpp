@@ -399,6 +399,7 @@ private:
 	uint8_t       m_sim_card_phase = 0;  // MODEL_SIM_CARD: 0=await ATR, 1=post-ATR (PPS/data)
 	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
+	bool          m_sim_card_ef_sent = false; // MODEL_SIM_CARD: the (test) code-3 EF-read request was injected
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -2715,6 +2716,27 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			else { data[0] = 0x90; data[1] = 0x00; n = 2; }
 			code = 9;
 			m_sim_card_pending = false;   // responded; wait for the next command
+		}
+		// Phase 2 (test, step 2b): after the PPS, model the dormant EF-read requester by posting a code-3
+		// file-read request. 0x27df9e copies the whole message (0x118 bytes) to the descriptor 0x10deec; the
+		// file-read then builds a SELECT from it. Layout: [+2]=len(5), [+4]=code(3), [+5..9]=5-byte SELECT
+		// APDU (a0 a4 00 00 02), [+0xa..b]=the 2-byte file id. Fires once (SIM_CARD_EF = file id, e.g. 6f07).
+		else if (m_sim_card_phase == 1 && !m_sim_card_pending && !m_sim_card_ef_sent
+				&& nokia_env_u32("NOKI3210_SIM_CARD_EF", 0) != 0)
+		{
+			const u32 fid = nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07);
+			for (offs_t i = 0; i < 0x118; i++) debug_ram_byte_w(SCRATCH + i, 0);
+			debug_ram_byte_w(SCRATCH + 2, 0); debug_ram_byte_w(SCRATCH + 3, 5);   // len = 5
+			debug_ram_byte_w(SCRATCH + 4, 3);                                     // code 3 = file-read request
+			debug_ram_byte_w(SCRATCH + 5, 0xa0); debug_ram_byte_w(SCRATCH + 6, 0xa4);
+			debug_ram_byte_w(SCRATCH + 7, 0x00); debug_ram_byte_w(SCRATCH + 8, 0x00);
+			debug_ram_byte_w(SCRATCH + 9, 0x02);                                  // SELECT a0 a4 00 00 02
+			debug_ram_byte_w(SCRATCH + 0xa, uint8_t(fid >> 8)); debug_ram_byte_w(SCRATCH + 0xb, uint8_t(fid));
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
+			m_sim_card_ef_sent = true;
+			logerror("sim_card: injected code-3 EF-read request for file %04x t=%.4f\n", fid, machine().time().as_double());
+			return uint16_t(0x4760);
 		}
 		if (code != 0)
 		{
