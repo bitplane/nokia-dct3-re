@@ -355,3 +355,20 @@ request, reports its status, and waits for the next request. Walking a full EF r
 the requester model posts a **code-3 per T=0 step** — `SELECT 6F07` → `GET RESPONSE a0 c0
 00 00 XX` (→ FCP block) → `READ BINARY a0 b0 …` (→ content) — each answered with the INS-echo
 procedure byte + payload + SW. That is the next increment (plus the GSM 11.11 FCP/EF layouts).
+
+## Step 2d/2e — the full EF-read conversation completes (2026-07-07)
+
+`MODEL_SIM_CARD` phase 2 scripts the EF-read T=0 sequence as one code-3 request per step
+(`m_sim_card_step`): SELECT → GET_RESPONSE → READ → code-1 completion. The pending-driven
+heuristic sequences them (post request when idle → manager issues APDU → phase-1 answers →
+next request). Responses carry real payloads: GET_RESPONSE → a GSM 11.11 EF **FCP block**
+(RFU/size/id/type/AC/status/structure), READ → synthetic content, both + `SW=9000`, led by the
+INS-echo procedure byte at `0x10dddc+2`. Verified: all three APDUs issue in order and the
+code-1 step drives the read-dispatch `0x27ede0` to the **completion handler `0x27ef34`**.
+
+So the entire T=0 EF-read mechanism works end-to-end. **But** completing after one incoherent
+EF regresses the screen `o016` (detected/blank) → `o074` ("Insert SIM card") — the phone judges
+the SIM invalid. The mechanism is done; the open layer is **data coherence**: read the right EFs
+(IMSI `6F07`, SST `6F38`, LOCI `6F7E`, AD `6FAD`, PHASE `6FAE`, …) with correct FCP/content in the
+right order, CHV1-disabled, so the completed read is *accepted* as a valid SIM instead of rejected.
+That likely also means finding where the phone decides valid-vs-invalid after the read completes.
