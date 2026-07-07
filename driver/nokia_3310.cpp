@@ -2752,8 +2752,14 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			&& machine().time().as_double() * 1000.0 >= nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_MS", 1000))
 	{
 		debug_ram_byte_w(0x001116fd, 1);
+		// EXPERIMENT_MMI_IDLE_DREADY: also force the display-ready flag [0x11fee4]=1 so the resource check
+		// 0x2b12b4 gets past its "display not ready" early-out -- test whether the idle draw then clears the
+		// resource-get 0x2b257e (render post 0x2af6ea would fire) or is gated further (the RAM bitmap).
+		if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_DREADY", 0) != 0)
+			debug_ram_byte_w(0x0011fee4, 1);
 		m_mmi_idle_forced = true;
-		logerror("mmi_idle: forced [1116fd]=1 at gate 0x297ffa t=%.4f\n", machine().time().as_double());
+		logerror("mmi_idle: forced [1116fd]=1 (dready=%u) at gate 0x297ffa t=%.4f\n",
+				nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_DREADY", 0), machine().time().as_double());
 	}
 	// EXPERIMENT_MMI_IDLE: trace display_idle (0x2a255c) entry, and 0x2b257e when called FROM display_idle
 	// (LR==0x2a2566, the resource get for 0x224c). If 0x2b257e is entered but the render post 0x2af6ea
