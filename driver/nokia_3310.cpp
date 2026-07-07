@@ -2597,6 +2597,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("sim_apdu: %-12s len=%u [ %s] t=%.4f\n", name, len, hex, machine().time().as_double());
 		}
 	}
+	// TRACE_SIMDATA (opt-in): does the SIM DATA state machine 0x29ff2c fire? It reads EFs and reports up
+	// via 0x234634 (service code 0xaf); entered from the contact-service dispatcher 0x2378e0. If it never
+	// fires after "SIM detected", the EF-read requester is dormant (the step-2 wall).
+	if (nokia_env_u32("NOKI3210_TRACE_SIMDATA", 0) != 0 && pc == addr &&
+			(addr == 0x0029ff2c || addr == 0x002378e0 || addr == 0x0027df9e))
+	{
+		static unsigned sd = 0;
+		if (sd++ < 30)
+			logerror("simdata: %s t=%.4f\n",
+					addr == 0x0029ff2c ? "SIM-data-SM 0x29ff2c" :
+					addr == 0x002378e0 ? "cs-dispatch 0x2378e0" : "code3-filereq 0x27df9e (EF-read request in)",
+					machine().time().as_double());
+	}
 	// TRACE_SIMRECV (opt-in): log every recv (0x26a458) whose return address is in the SIM code region
 	// (0x27de00..0x27f100), with the caller LR. Reveals which recv the phone blocks on after each command
 	// (e.g. after the SELECT) — i.e. where the genuine file-read response must be injected.
