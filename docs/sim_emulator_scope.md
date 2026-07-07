@@ -372,3 +372,22 @@ the SIM invalid. The mechanism is done; the open layer is **data coherence**: re
 (IMSI `6F07`, SST `6F38`, LOCI `6F7E`, AD `6FAD`, PHASE `6FAE`, …) with correct FCP/content in the
 right order, CHV1-disabled, so the completed read is *accepted* as a valid SIM instead of rejected.
 That likely also means finding where the phone decides valid-vs-invalid after the read completes.
+
+## Step 2f — the coherence layer: reject cracked, MMI idle transition is the next wall (2026-07-07)
+
+The completed read was being *rejected*. Found the read-complete valid/invalid decision
+`0x27ea88`: it reads the no-SIM flag `[0x111c64]` -- `==0` posts the SIM-OK events `0xe8`/`0xea`,
+`!=0` posts no-SIM `0x1f` ("Insert SIM card"). `TRACE_NOSIM`: the flag is set once at early init
+(t=0.0055, no card then) and never cleared, so every completed read is judged invalid.
+
+`MODEL_SIM_CARD` now clears `[0x111c64]` at read completion (`SIM_CARD_CLEAR_NOSIM`) -- the
+faithful analogue of "valid SIM detected". Result: the `0x1f` post is **gone** (status posts are
+`0x16` detected + read statuses only) and the boot survives (MMI alive at 20s) -- clearing it late
+(post-detected) is safe, unlike the early global force that crashed. **So the SIM is no longer
+rejected.**
+
+But not idle yet. `TRACE_IDLEFLAG`: the MMI idle-draw flag `[0x11f81b]` (gate for `display_idle`
+`0x2a255c` at `0x298000`) is **never written** across the whole boot. So the phone's top-level
+state machine never advances from "SIM detected/read" to "idle". That is the next coherence layer
+-- a new subsystem (MMI / phone-state, likely SIM-ready -> PIN-off -> idle), above the SIM read.
+Knobs: `SIM_CARD_CLEAR_NOSIM`, `TRACE_NOSIM`, `TRACE_IDLEFLAG`.
