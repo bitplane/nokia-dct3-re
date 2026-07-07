@@ -398,6 +398,7 @@ private:
 	uint8_t       m_sim_last_cmdlen = 0; // FS responder: length of m_sim_last_cmd
 	uint8_t       m_sim_card_phase = 0;  // MODEL_SIM_CARD: 0=await ATR, 1=post-ATR (PPS/data)
 	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
+	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -2574,7 +2575,8 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// r0=len, r2=data ptr to the raw APDU). Log each APDU decoded (CLA INS P1 P2 P3 ...). This is the
 	// interception point where the T=0 response will be injected in later increments. For now it only
 	// observes -- with no response the phone stalls after the first APDU (that is expected here).
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_RESPONDER", 0) != 0 && pc == addr && addr == 0x002aec34 &&
+	if ((nokia_env_u32("NOKI3210_MODEL_SIM_RESPONDER", 0) != 0 || nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0)
+			&& pc == addr && addr == 0x002aec34 &&
 			(m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x2701)
 	{
 		const u32 len = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
@@ -2587,6 +2589,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (len >= 2) m_sim_last_ins = ins;   // FS responder: remember for the T=0 procedure-byte echo
 			m_sim_last_cmdlen = uint8_t(std::min<u32>(len, sizeof(m_sim_last_cmd)));  // FS responder: full command
 			for (unsigned i = 0; i < m_sim_last_cmdlen; i++) m_sim_last_cmd[i] = debug_ram_byte(buf + i);
+			m_sim_card_pending = true;   // MODEL_SIM_CARD: this command now awaits exactly one response
 			const char *name = ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
 							 : ins == 0xb2 ? "READ_RECORD" : ins == 0x20 ? "VERIFY_CHV" : ins == 0xf2 ? "STATUS" : "?";
 			static unsigned ap = 0;
@@ -2678,27 +2681,54 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027df10)
 	{
 		m_sim_card_recv++;
+		constexpr u32 SCRATCH = 0x0017fc00;
+		uint8_t data[40]; unsigned n = 0; uint8_t code = 0;
 		if (m_sim_card_phase == 0 && m_sim_card_recv >= nokia_env_u32("NOKI3210_SIM_CARD_ATR_AFTER", 2))
 		{
-			uint8_t atr[40]; unsigned n = 0;
+			// Phase 0 -> ATR: a code-5 message carrying the ATR bytes (SIM_ATR_HEX).
 			if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
-				for (const char *p = hex; p[0] && p[1] && n < sizeof(atr); p += 2)
-					atr[n++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
-			if (n == 0) { atr[0] = 0x3b; atr[1] = 0x10; atr[2] = 0x05; n = 3; }
-			constexpr u32 SCRATCH = 0x0017fc00;
+				for (const char *p = hex; p[0] && p[1] && n < sizeof(data); p += 2)
+					data[n++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
+			if (n == 0) { data[0] = 0x3b; data[1] = 0x10; data[2] = 0x05; n = 3; }
+			code = 5;
+			m_sim_card_phase = 1;
+		}
+		else if (m_sim_card_phase == 1 && m_sim_card_pending)
+		{
+			// Phase 1 -> exactly one response per command (code 9): a PPS request (PPSS=0xFF) is echoed
+			// verbatim; otherwise a bare SW=9000. (EF file content comes in a later increment.)
+			if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)
+				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
+			else { data[0] = 0x90; data[1] = 0x00; n = 2; }
+			code = 9;
+			m_sim_card_pending = false;   // responded; wait for the next command
+		}
+		if (code != 0)
+		{
 			for (offs_t i = 0; i < 0x30; i++) debug_ram_byte_w(SCRATCH + i, 0);
 			debug_ram_byte_w(SCRATCH + 2, uint8_t(n >> 8));
 			debug_ram_byte_w(SCRATCH + 3, uint8_t(n));
-			debug_ram_byte_w(SCRATCH + 4, 5);                    // code 5 = response/data received (ATR)
-			for (unsigned i = 0; i < n; i++) debug_ram_byte_w(SCRATCH + 5 + i, atr[i]);
+			debug_ram_byte_w(SCRATCH + 4, code);
+			for (unsigned i = 0; i < n; i++) debug_ram_byte_w(SCRATCH + 5 + i, data[i]);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
-			m_sim_card_phase = 1;
-			m_sim_loop = true;   // hand off to the file-read feed for the PPS/EF conversation
-			logerror("sim_card: delivered ATR (%u bytes, TS=%02x) as code-5 msg (recv #%u) t=%.4f\n",
-					n, atr[0], m_sim_card_recv, machine().time().as_double());
+			static unsigned sc = 0;
+			if (sc++ < 40) logerror("sim_card: phase->%u fed code-%u (%u bytes, [0]=%02x) recv #%u t=%.4f\n",
+					m_sim_card_phase, code, n, data[0], m_sim_card_recv, machine().time().as_double());
 			return uint16_t(0x4760);   // BX r12 -> return to 0x27df10 with r0=message
 		}
+	}
+	// MODEL_SIM_CARD: the command ACK. The phone recv's the command result inside 0x27e98c (recv at
+	// 0x27e9ca, ret 0x27e9ce); return a message with [msg+4]=7 so the send is accepted (procedure ACK).
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && pc == addr && addr == 0x0026a458 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027e9ce)
+	{
+		constexpr u32 SCRATCH = 0x0017fb00;
+		for (offs_t i = 0; i < 0x20; i++) debug_ram_byte_w(SCRATCH + i, 0);
+		debug_ram_byte_w(SCRATCH + 4, 7);
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027e9ce | 1);
+		return uint16_t(0x4760);
 	}
 	// MODEL_SIM_LOOP (opt-in, c2 feeder): drive the file-read loop. Armed by the command recv-trampoline
 	// above (file-read phase). At the SIM-task recv 0x27df0c (bl 0x26a458, return 0x27df10), once armed,
