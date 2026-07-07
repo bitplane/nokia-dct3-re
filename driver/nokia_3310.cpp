@@ -396,6 +396,8 @@ private:
 	uint8_t       m_sim_last_ins = 0;    // FS responder: INS of the last APDU the phone sent (0x2aec34)
 	uint8_t       m_sim_last_cmd[16] = {0}; // FS responder: full bytes of the last command the phone sent
 	uint8_t       m_sim_last_cmdlen = 0; // FS responder: length of m_sim_last_cmd
+	uint8_t       m_sim_card_phase = 0;  // MODEL_SIM_CARD: 0=await ATR, 1=post-ATR (PPS/data)
+	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -2664,6 +2666,39 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("sim_resp: injected response [+4]=%02x -> 0x27e9ce t=%.4f\n",
 					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
 		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
+	}
+	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
+	// code 5 (EXPERIMENT_SIM_CODE5) and separately poking the ATR into 0x10dddc (MODEL_SIM_ATR_MSG), deliver
+	// a genuine code-5 "response received" SIM-task message CARRYING the ATR bytes -- exactly how a real
+	// SIM's ATR would arrive. The real dispatch 0x27df64 then copies the ATR (msg+5, len msg+2) into
+	// 0x10dddc ([+0]=len, [+2..]=bytes) and returns 5, which the manager dispatches (0x27eb7c) to the code-5
+	// handler 0x27ebbc -> parser 0x27e046. One message does the whole ATR handshake, no forcing.
+	// Delivered once, on the SIM_CARD_ATR_AFTER'th SIM-task recv (default 2, modelling "reset -> ATR ready").
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && pc == addr && addr == 0x0026a458 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027df10)
+	{
+		m_sim_card_recv++;
+		if (m_sim_card_phase == 0 && m_sim_card_recv >= nokia_env_u32("NOKI3210_SIM_CARD_ATR_AFTER", 2))
+		{
+			uint8_t atr[40]; unsigned n = 0;
+			if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
+				for (const char *p = hex; p[0] && p[1] && n < sizeof(atr); p += 2)
+					atr[n++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
+			if (n == 0) { atr[0] = 0x3b; atr[1] = 0x10; atr[2] = 0x05; n = 3; }
+			constexpr u32 SCRATCH = 0x0017fc00;
+			for (offs_t i = 0; i < 0x30; i++) debug_ram_byte_w(SCRATCH + i, 0);
+			debug_ram_byte_w(SCRATCH + 2, uint8_t(n >> 8));
+			debug_ram_byte_w(SCRATCH + 3, uint8_t(n));
+			debug_ram_byte_w(SCRATCH + 4, 5);                    // code 5 = response/data received (ATR)
+			for (unsigned i = 0; i < n; i++) debug_ram_byte_w(SCRATCH + 5 + i, atr[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
+			m_sim_card_phase = 1;
+			m_sim_loop = true;   // hand off to the file-read feed for the PPS/EF conversation
+			logerror("sim_card: delivered ATR (%u bytes, TS=%02x) as code-5 msg (recv #%u) t=%.4f\n",
+					n, atr[0], m_sim_card_recv, machine().time().as_double());
+			return uint16_t(0x4760);   // BX r12 -> return to 0x27df10 with r0=message
+		}
 	}
 	// MODEL_SIM_LOOP (opt-in, c2 feeder): drive the file-read loop. Armed by the command recv-trampoline
 	// above (file-read phase). At the SIM-task recv 0x27df0c (bl 0x26a458, return 0x27df10), once armed,
