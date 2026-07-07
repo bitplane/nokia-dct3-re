@@ -249,7 +249,7 @@ Everything the emulator build needs, in one place. All addresses `3210f600a`, bi
 
 ### Driver knobs (research infrastructure, all opt-in)
 
-- Reach the read: 4 milestone models + `MODEL_SIM_ATR_MSG` + `SIM_ATR_HEX=3b1005` (TA1 non-special → `[+0xc]=1`, which enters the file-read phase directly). (The old `EXPERIMENT_SIM_CODE5` forcing probe and the refuted `EXPERIMENT_SIM_ACCEPT` were pruned as dead ends.)
+- Reach the read (empirically confirmed): 4 milestone models + `MODEL_SIM_ATR_MSG` + `SIM_ATR_HEX=3b1005` + **`EXPERIMENT_SIM_CODE5` + `SIM_CODE5_AFTER=2` + `SIM_CODE5_CONT=1`** + `MODEL_SIM_RESPONDER`(`SIM_RESP_CODE=7`) + `MODEL_SIM_LOOP`. `EXPERIMENT_SIM_CODE5` is the **ATR-parse trigger** — the SIM-mgr recv only ever returns code 6 (timeout) on a peerless boot, so forcing code 5 (data-received) at `0x27f0a6` is what routes to the code-5 handler `0x27ebbc` → parser `0x27e046`, which injects the ATR (via `MODEL_SIM_ATR_MSG`) and sets read-state `[+0xc]=1`. With this the phone emits a real GSM `SELECT` (`a0 a4 00 00 02`). (`EXPERIMENT_SIM_ACCEPT`/`TRACE_SIMACCEPT` were correctly pruned; `EXPERIMENT_SIM_CODE5` was mistakenly pruned then restored — it's research scaffolding, not a dead end.)
 - Conversation driver: `MODEL_SIM_RESPONDER`(`SIM_RESP_CODE=7`) + `MODEL_SIM_LOOP`(`SIM_LOOP_CODE=3`, `SIM_LOOP_SCRIPT=<cmds>`, `SIM_LOOP_DONE=<n>`). Caller-gate override lives at `0x27ee56`.
 - Traces: `TRACE_SIMBUF` (`0x10deec`+`0x10dddc` reads), `TRACE_SIMSTATUS` (`0x27e240` posts), `TRACE_SIMPATH` (state-machine branch targets, cxx markers), `TRACE_SIM`/`TRACE_SIMTX` (UART/APDU).
 
