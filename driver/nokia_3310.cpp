@@ -2939,42 +2939,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
-	// MODEL_SIM_ATR_MSG (opt-in, step 2): inject a valid ATR into the SIM-response buffer 0x10dddc that
-	// the ATR parser 0x27e046 reads (after it sends its 0x33 request, before the read at 0x27e070). The
-	// parser needs [0x10dddc](len halfword)>=2 and [0x10dddc+2]==0x3B/0x3F (TS). Default ATR 3B 00 (T=0,
-	// no interface/historical); override via SIM_ATR_HEX. Hook at the return-from-send site 0x27e066.
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR_MSG", 0) != 0 && pc == addr && addr == 0x0027e066)
-	{
-		uint8_t atr[40]; unsigned n = 0;
-		if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
-			for (const char *p = hex; p[0] && p[1] && n < sizeof(atr); p += 2)
-				atr[n++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
-		if (n == 0) { atr[0] = 0x3b; atr[1] = 0x00; n = 2; }
-		debug_ram_word_w(0x0010dddc, n);                          // response length halfword
-		for (unsigned i = 0; i < n; i++) debug_ram_byte_w(0x0010dddc + 2 + i, atr[i]);  // ATR bytes at [+2..]
-		static unsigned am = 0;
-		if (am++ < 8)
-			logerror("sim_atr_msg: injected %u-byte ATR (TS=%02x) into 0x10dddc t=%.4f\n", n, atr[0], machine().time().as_double());
-	}
-	// RESEARCH PROBE (opt-in) — the ATR-parse trigger. On a peerless boot the SIM-manager recv only ever
-	// returns code 6 (timeout) → retries reset forever → the ATR parser 0x27e046 (called from the code-5
-	// handler 0x27ebbc) never runs. Force the manager to take the code-5 (data-received) dispatch: the
-	// manager recv's at 0x27defc, returns to 0x27f0a6 with the code in r0, dispatches at 0x27eb7c (5=data
-	// → 0x27ebbc → parser). Force r0=5 on the Nth return (SIM_CODE5_AFTER, default 4) to simulate "ATR
-	// received" and enter the read. Faithful version later delivers code-5 via a proper reset-response
-	// responder. SIM_CODE5_CONT=1 re-fires every return ≥AFTER (drives each successive file-read command).
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_CODE5", 0) != 0 && pc == addr && addr == 0x0027f0a6)
-	{
-		static unsigned c5 = 0;
-		c5++;
-		const u32 after = nokia_env_u32("NOKI3210_SIM_CODE5_AFTER", 4);
-		if (c5 == after || (nokia_env_u32("NOKI3210_SIM_CODE5_CONT", 0) != 0 && c5 >= after))
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 5);
-			if (c5 < after + 30)
-				logerror("sim_code5: forced return code=5 (#%u) t=%.4f\n", c5, machine().time().as_double());
-		}
-	}
 	// EXPERIMENT (opt-in, Phase-1 SIM probe): force the SIM task dispatch (0x27df1c) to take the
 	// code-0xc "SIM present" path once, after the SIM has done its reset attempts. Code 0xc sets the
 	// SIM-ready flags ([0x10a8dd],[0x10a8e3],[0x113cff]) and signals startup-ready (0x279486). Tests

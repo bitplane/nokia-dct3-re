@@ -665,6 +665,13 @@ public class ExportNokiaFunctions extends GhidraScript {
 		// File-read loop: sends 5-byte APDU from 0x10deec+5, needs response 7,
 		// recv at 0x27ee52 (ret/caller-gate 0x27ee56) dispatches 0xa/0xb/0xf/1.
 		new Target("sim_file_read_loop_27ee40", 0x0027ee40L),
+		// File-read T=0 data path: masks the response's first byte (0x10dddc+2) vs the INS (desc[+6]) as
+		// the procedure byte; PB==INS => "send all remaining". len-5 header -> status post 0x27ef0a.
+		new Target("sim_file_read_data_path_27ee94", 0x0027ee94L),
+		// SELECT-header-done: posts the command status via 0x27e240, then 0x27efb0 recv's + re-dispatches.
+		new Target("sim_file_read_header_status_27ef0a", 0x0027ef0aL),
+		// Post-command recv + re-dispatch loop: recv 0x27defc -> dispatch 0x27ede0 (3=file-read, 1=done).
+		new Target("sim_file_read_recv_redispatch_27efb0", 0x0027efb0L),
 		// Read completion handler (msg code 1 path).
 		new Target("sim_read_completion_handler_27ef34", 0x0027ef34L),
 		// APDU-out observation point: r1==0x2701, r2=APDU ptr, r0=len (the command the phone sends).
