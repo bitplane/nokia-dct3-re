@@ -399,6 +399,7 @@ private:
 	uint8_t       m_sim_card_phase = 0;  // MODEL_SIM_CARD: 0=await ATR, 1=post-ATR (PPS/data)
 	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
+	bool          m_mmi_idle_forced = false;  // EXPERIMENT_MMI_IDLE: idle flag forced once
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
@@ -2726,6 +2727,24 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("sim_resp: injected response [+4]=%02x -> 0x27e9ce t=%.4f\n",
 					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
 		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
+	}
+	// EXPERIMENT_MMI_IDLE (opt-in): at the MMI idle gate 0x297ffa (ldrb r0,[r4,#5]; cmp 1 -> display_idle
+	// 0x2a255c), force the idle flag [0x1116fd] = 1 once (after EXPERIMENT_MMI_IDLE_MS ms so the SIM read is
+	// done), to see whether display_idle draws a REAL idle screen now (SIM accepted, MMI alive) or black
+	// (content pipeline not up, as the old plain-limp FORCE_IDLE_JUMP did).
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x00297ffa
+			&& !m_mmi_idle_forced
+			&& machine().time().as_double() * 1000.0 >= nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_MS", 1000))
+	{
+		debug_ram_byte_w(0x001116fd, 1);
+		m_mmi_idle_forced = true;
+		logerror("mmi_idle: forced [1116fd]=1 at gate 0x297ffa t=%.4f\n", machine().time().as_double());
+	}
+	// EXPERIMENT_MMI_IDLE: log whenever display_idle (0x2a255c) actually executes.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x002a255c)
+	{
+		static unsigned di = 0;
+		if (di++ < 20) logerror("mmi_idle: display_idle 0x2a255c EXECUTED t=%.4f\n", machine().time().as_double());
 	}
 	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
 	// code 5 (EXPERIMENT_SIM_CODE5) and separately poking the ATR into 0x10dddc (MODEL_SIM_ATR_MSG), deliver
