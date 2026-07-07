@@ -394,6 +394,8 @@ private:
 	bool          m_sim_loop = false;    // c2 feeder: set once the file-read loop (0x27ee40) is reached
 	uint8_t       m_sim_script_idx = 0;  // c2 feeder: scripted-command index
 	uint8_t       m_sim_last_ins = 0;    // FS responder: INS of the last APDU the phone sent (0x2aec34)
+	uint8_t       m_sim_last_cmd[16] = {0}; // FS responder: full bytes of the last command the phone sent
+	uint8_t       m_sim_last_cmdlen = 0; // FS responder: length of m_sim_last_cmd
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -2581,6 +2583,8 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			for (u32 i = 0; i < len && i < 32; i++) n += std::snprintf(hex + n, sizeof(hex) - n, "%02x ", debug_ram_byte(buf + i));
 			const uint8_t ins = len >= 2 ? debug_ram_byte(buf + 1) : 0;
 			if (len >= 2) m_sim_last_ins = ins;   // FS responder: remember for the T=0 procedure-byte echo
+			m_sim_last_cmdlen = uint8_t(std::min<u32>(len, sizeof(m_sim_last_cmd)));  // FS responder: full command
+			for (unsigned i = 0; i < m_sim_last_cmdlen; i++) m_sim_last_cmd[i] = debug_ram_byte(buf + i);
 			const char *name = ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
 							 : ins == 0xb2 ? "READ_RECORD" : ins == 0x20 ? "VERIFY_CHV" : ins == 0xf2 ? "STATUS" : "?";
 			static unsigned ap = 0;
@@ -2645,6 +2649,14 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		else if (const char *hex = getenv("NOKI3210_SIM_LOOP_HEX"))
 			for (; hex[0] && hex[1] && n < sizeof(data); hex += 2)
 				data[n++] = uint8_t(std::strtoul(std::string(hex, 2).c_str(), nullptr, 16));
+		// SIM_LOOP_ECHO (FS responder, pass 2): a PPS exchange (command starts with PPSS=0xFF) requires the
+		// SIM to ECHO the request verbatim. When the last command the phone sent was a PPS, answer with its
+		// exact bytes so the protocol negotiation completes instead of failing to a giveup.
+		if (nokia_env_u32("NOKI3210_SIM_LOOP_ECHO", 0) != 0 && m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)
+		{
+			n = 0;
+			for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
+		}
 		if (n == 0) { data[0] = 0x90; data[1] = 0x00; n = 2; }   // default: SW=9000
 		// Cap the number of feeds (SIM_LOOP_MAX, default 24) so a wrong code can't spin forever: once the
 		// cap is hit, fall through to the real (blocking) recv.
