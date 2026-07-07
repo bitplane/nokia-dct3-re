@@ -82,7 +82,7 @@ IP-clean). The phone drives it; the emulator answers:
 5. **PIN state** — present the SIM as CHV1-disabled (no PIN prompt).
 6. **Completion** — when the phone's read state finishes, `[+0xc]→0`, the read
    completes, `[+0xa]` advances past the reject value, and `0x27e240` posts a
-   non-reject status → the idle flag `[0x11f81b]` can set → `display_idle`
+   non-reject status → the idle flag `[0x1116fd]` can set → `display_idle`
    (`0x2a255c`) fires → **operator-idle** (empty operator / no service, since RF
    registration is out of scope).
 
@@ -118,7 +118,7 @@ IP-clean). The phone drives it; the emulator answers:
 4. **[LOW] Faithfulness.** The emulator bypasses the DSP service layer that would
    really carry SIM traffic. It's a behavioural model (like `MODEL_SVC_RESPONDER`),
    opt-in, oracle-preserving — acceptable, but document it as such.
-5. **[LOW] Idle-flag gating.** `[0x11f81b]` (idle) may have gates beyond the SIM
+5. **[LOW] Idle-flag gating.** `[0x1116fd]` (idle) may have gates beyond the SIM
    (network/RF); confirm `display_idle` fires on SIM-complete alone (the
    Phase-2/`000d` work suggests the idle screen appears pre-registration).
 
@@ -233,7 +233,7 @@ Everything the emulator build needs, in one place. All addresses `3210f600a`, bi
 | **Command buffer** | `0x10deec` | = the file descriptor (`[sp+0x34]`/`[sp+0x30]`). Phone reads `+2` (halfword len, cmp 5), `+6`/`+8` (cmd INS/param). 5-byte APDU at `+5`. Written by code-3 msgs (`0x27df9e`). |
 | **Response / file-content buffer** | `0x10dddc` | Parsed by `0x27e046` at `+06..+16`. Written by code-5/`8-b` msgs (`0x27df64` copies msg data → `+2`, len → `[+0]`). ATR injected here. |
 | No-SIM flag | `0x111c64` | `!=0` → status `0x1f` (Insert SIM card); `==0` → success path. Load-bearing global (~50 refs) — do NOT force. |
-| Idle flag | `0x11f81b` | gates `display_idle 0x2a255c` |
+| Idle flag | `0x1116fd` | gates `display_idle 0x2a255c` |
 
 ### Message path (message-layer SIM)
 
@@ -386,7 +386,7 @@ faithful analogue of "valid SIM detected". Result: the `0x1f` post is **gone** (
 (post-detected) is safe, unlike the early global force that crashed. **So the SIM is no longer
 rejected.**
 
-But not idle yet. `TRACE_IDLEFLAG`: the MMI idle-draw flag `[0x11f81b]` (gate for `display_idle`
+But not idle yet. `TRACE_IDLEFLAG`: the MMI idle-draw flag `[0x1116fd]` (gate for `display_idle`
 `0x2a255c` at `0x298000`) is **never written** across the whole boot. So the phone's top-level
 state machine never advances from "SIM detected/read" to "idle". That is the next coherence layer
 -- a new subsystem (MMI / phone-state, likely SIM-ready -> PIN-off -> idle), above the SIM read.
