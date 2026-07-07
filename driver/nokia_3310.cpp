@@ -2805,7 +2805,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				// Step 3: post a code-1 completion so the read-dispatch 0x27ede0 reaches the completion
 				// handler 0x27ef34 (read done) instead of looping for more requests.
 				debug_ram_byte_w(SCRATCH + 4, 1);   // code 1 = read complete
-				logerror("sim_card: EF step 3 -> code-1 completion t=%.4f\n", machine().time().as_double());
+				// The read-complete decision 0x27ea88 posts no-SIM (0x1f) iff the no-SIM flag [0x111c64] is
+				// set. It is set once at early init (no card present then) and never cleared, so a completed
+				// read is always judged invalid. Model a validly-detected SIM by clearing it now (the
+				// faithful analogue of "valid SIM found") -- gated so we can confirm it survives (a global
+				// early force crashed the boot; clearing it late, post-detected, should be safe).
+				if (nokia_env_u32("NOKI3210_SIM_CARD_CLEAR_NOSIM", 0) != 0)
+					debug_ram_byte_w(0x00111c64, 0);
+				logerror("sim_card: EF step 3 -> code-1 completion (nosim-clear=%u) t=%.4f\n",
+						nokia_env_u32("NOKI3210_SIM_CARD_CLEAR_NOSIM", 0), machine().time().as_double());
 			}
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
