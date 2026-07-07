@@ -2615,12 +2615,16 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// stored), the data path 0x27ee94 (dumps sb + [sb..] + INS desc[+6]), the error 0x27ef02, the
 	// completion 0x27ef34 — to see how the EF SELECT response is (mis)handled.
 	if (nokia_env_u32("NOKI3210_TRACE_SIMSEL", 0) != 0 && pc == addr &&
-			(addr == 0x0027ee94 || addr == 0x0027ef02 || addr == 0x0027ef34))
+			(addr == 0x0027ee94 || addr == 0x0027ef02 || addr == 0x0027ef34 || addr == 0x0027ef0a))
 	{
 		static unsigned ss = 0;
 		if (ss++ < 30)
 		{
-			if (addr == 0x0027ee94)
+			if (addr == 0x0027ef0a)
+				logerror("simsel: HEADER-DONE 0x27ef0a INS=%02x r1=%02x t=%.4f\n",
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff, machine().time().as_double());
+			else if (addr == 0x0027ee94)
 			{
 				const u32 sb = m_maincpu->state_int(arm7_cpu_device::ARM7_R9);
 				char b[48]; int k = 0;
