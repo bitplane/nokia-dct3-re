@@ -243,6 +243,12 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Label("sim_command_buffer_10deec", 0x0010deecL),
 		// RAM: no-SIM flag consulted by the read-complete decision 0x27ea88.
 		new Label("sim_nosim_flag_111c64", 0x00111c64L),
+		// memcmp used by the PPS compare (called from 0x27ed6e): memcmp(0x10dddc+2, sent_PPS, len).
+		new Label("sim_memcmp_2b58e8", 0x002b58e8L),
+		// RAM: the sent PPS request buffer (PPSS/PPS0/PCK = ff 00 ff), compared vs the SIM's echo.
+		new Label("sim_pps_request_buf_10dcc4", 0x0010dcc4L),
+		// RAM: data-staging buffer the code-5/8-b handler 0x27df64 copies the response into (+ 0x10dddc+2).
+		new Label("sim_resp_stage_buf_10dcce", 0x0010dcceL),
 	};
 
 	private static final Target[] TARGETS = new Target[] {
@@ -653,6 +659,9 @@ public class ExportNokiaFunctions extends GhidraScript {
 		// Post-response read dispatch on returned msg code r0
 		// (3->file-read loop, 1->completion, 0x37->0x27ef40).
 		new Target("sim_read_dispatch_post_response_27ede0", 0x0027ede0L),
+		// File-read phase entry (read-state [+0xc]=1): sends the len-[+0x10] command (the PPS), recv's,
+		// then compares the SIM's PPS response (0x10dddc+2) vs the sent PPS (0x10dcc4) via memcmp 0x2b58e8.
+		new Target("sim_file_read_phase_entry_27ed3c", 0x0027ed3cL),
 		// File-read loop: sends 5-byte APDU from 0x10deec+5, needs response 7,
 		// recv at 0x27ee52 (ret/caller-gate 0x27ee56) dispatches 0xa/0xb/0xf/1.
 		new Target("sim_file_read_loop_27ee40", 0x0027ee40L),

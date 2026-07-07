@@ -2708,12 +2708,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			debug_ram_byte_w(SCRATCH + 3, uint8_t(n));
 			debug_ram_byte_w(SCRATCH + 4, nokia_env_u32("NOKI3210_SIM_LOOP_CODE", 0x0b) & 0xff);
 			for (unsigned i = 0; i < n; i++) debug_ram_byte_w(SCRATCH + 5 + i, data[i]);
-			// FS-responder probe: the 0xb data path (0x27ee94) reads [msg+0] as the T=0 procedure byte and
-			// masks it vs the INS (desc[+6]); PB==INS => "send all remaining" => the phone transmits the
-			// data phase (e.g. the 2-byte file ID after SELECT). Echo the last INS to advance past the
-			// header so we can capture which file is selected. Gated by SIM_LOOP_PROCBYTE.
-			if (nokia_env_u32("NOKI3210_SIM_LOOP_PROCBYTE", 0) != 0)
-				debug_ram_byte_w(SCRATCH + 0, m_sim_last_ins);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
 			if (lf++ < 40) logerror("sim_loop: fed code-%02x msg (%u data bytes) -> 0x27df10 t=%.4f\n",

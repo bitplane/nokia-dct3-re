@@ -2,6 +2,8 @@ address,kind,name
 0x0010dca8,label,sim_manager_struct_10dca8
 0x0010dcb2,label,sim_accept_state_10dcb2
 0x0010dcb4,label,sim_read_state_10dcb4
+0x0010dcc4,label,sim_pps_request_buf_10dcc4
+0x0010dcce,label,sim_resp_stage_buf_10dcce
 0x0010dddc,label,sim_response_buffer_10dddc
 0x0010deec,label,sim_command_buffer_10deec
 0x00111c64,label,sim_nosim_flag_111c64
@@ -238,6 +240,7 @@ address,kind,name
 0x0027e9ca,label,sim_command_recv_site_27e9ca
 0x0027e9ce,label,sim_command_recv_ret_must_be_7_27e9ce
 0x0027ea88,function,sim_read_complete_nosim_decision_27ea88
+0x0027ed3c,function,sim_file_read_phase_entry_27ed3c
 0x0027ede0,function,sim_read_dispatch_post_response_27ede0
 0x0027ee40,function,sim_file_read_loop_27ee40
 0x0027ee52,label,sim_file_read_recv_site_27ee52
@@ -556,6 +559,7 @@ address,kind,name
 0x002b5358,function,ccont_adc_read_msb_2b5358
 0x002b5388,function,divmod_2b5388
 0x002b56cc,function,mad2_mbus_irq_handler_2b56cc
+0x002b58e8,label,sim_memcmp_2b58e8
 0x002b5ae4,function,ccont_reg_write_2b5ae4
 0x002b5b24,function,ccont_reg_write_2b5b24
 0x002b5eaa,function,display_capability_record_sanitize_2b5eaa
