@@ -1484,6 +1484,22 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
+	// TRACE_IDLEFLAG (opt-in): trace writers of the MMI idle-draw flag [0x11f81b] (odd addr -> low byte of
+	// the word at 0x11f81a). The MMI loop 0x297fc4 draws display_idle (0x2a255c) at 0x298000 iff this is 1.
+	// It stays 0 on our boot; find who (if anyone) tries to set it after the SIM read completes.
+	if (nokia_env_u32("NOKI3210_TRACE_IDLEFLAG", 0) != 0 && address == 0x0011f81a)
+	{
+		const uint16_t oldw = m_ram[offset];
+		const uint16_t neww = (oldw & ~mem_mask) | (data & mem_mask);
+		const uint8_t oldb = oldw & 0xff, newb = neww & 0xff;   // odd addr -> low byte
+		if (oldb != newb)
+		{
+			static unsigned idf = 0;
+			if (idf++ < 60)
+				logerror("idleflag: [11f81b] %02x->%02x pc=%08x lr=%08x t=%.4f\n", oldb, newb, pc,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+	}
 	// TRACE_SVCBIT2 (opt-in): faithfulness check for MODEL_SVC_CHANNEL_DRAIN. [0x11fed1] bit2 (the
 	// service-channel-busy bit the readiness gate 0x29bafc spins on) lives in the word at 0x11fed0.
 	// Log every write with the resulting byte + PC to see who sets bit2 (our faked responder path vs
