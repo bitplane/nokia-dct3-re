@@ -13,10 +13,15 @@ CONTACT SERVICE screen; that whole chain is reverse-engineered end-to-end and cl
 the rest of the way: the `000d` startup wall, an 11-subsystem readiness barrier, and a
 startup-supervisor **busy-wait on a service-channel-busy bit** — the single root cause that
 gated everything — were traced and fixed with one more opt-in model, cascading all the way to
-a rendered **"Insert SIM card"** MMI screen. See `docs/boot_to_insert_sim.md`. The SIM
-subsystem is mapped and the Phase-1 "SIM present" injection validated
-(`docs/sim_subsystem.md`); reaching the operator-idle home screen is a SIM-emulation project
-on top.
+a rendered **"Insert SIM card"** MMI screen. See `docs/boot_to_insert_sim.md`. From there the
+SIM **read conversation** itself was reverse-engineered end-to-end — the SIM task and message
+dispatch, the two-buffer command/response model (`0x10deec`/`0x10dddc`), the stateful read
+machine, and the accept / no-SIM decision points — and driven to completion with an opt-in
+conversation model (`docs/sim_emulator_scope.md`). The finding: the read is a **self-referential
+retry state machine**, so message injection reliably reaches "SIM present / SIM accepted" but not
+operator-idle, which needs a **faithful message-layer virtual SIM** emitting consistent GSM 11.11
+responses (the scoped emulator build). "Insert SIM card / SIM-present" is the shipped milestone;
+`docs/sim_subsystem.md` keeps the original UART-level Phase-1 map.
 
 The default boot (no models) still reproduces the CONTACT SERVICE oracle frame byte-for-byte;
 every model is opt-in.

@@ -1460,22 +1460,6 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
 
-	// TRACE_SIMACCEPT (opt-in): trace writers of the SIM manager accept-state byte [0x10dcb2]
-	// (= struct 0x10dca8 + 0xa; big-endian -> high byte of the word at 0x10dcb2). The accept check
-	// 0x27f016 wants this ==3/1; our boot stalls at 2. Log every change with the writing PC to find
-	// what advances 1->2 and (on a real SIM) 2->3 -- the accept-critical transition.
-	if (nokia_env_u32("NOKI3210_TRACE_SIMACCEPT", 0) != 0 && address == 0x0010dcb2)
-	{
-		const uint16_t oldw = m_ram[offset];
-		const uint16_t neww = (oldw & ~mem_mask) | (data & mem_mask);
-		const uint8_t oldb = oldw >> 8, newb = neww >> 8;   // even addr -> high byte
-		if (oldb != newb)
-		{
-			static unsigned sa = 0;
-			if (sa++ < 40)
-				logerror("simaccept: [10dcb2] %u->%u pc=%08x t=%.4f\n", oldb, newb, pc, machine().time().as_double());
-		}
-	}
 	// TRACE_NOSIM (opt-in): trace writers of the "no SIM" flag [0x111c64] (BE even addr -> high byte of
 	// the word at 0x111c64). The read-complete handler 0x27ea88 posts status 0x1f (Insert SIM card) iff
 	// this is !=0. Log every change with the writing PC to find what SETS it during the failed read --
@@ -2580,19 +2564,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (rs++ < 20) logerror("simsm: RESET-START (0x27e024) t=%.4f\n", machine().time().as_double());
 		}
 	}
-	// EXPERIMENT (opt-in, pragmatic SIM route — validates the accept-critical mechanism): the SIM
-	// manager struct is at 0x10dca8 (NOT 0x10a8dc — earlier byte-swap error). The accept-critical flag
-	// is [0x10dca8+0xd]: the code-5 (SIM-data) handler 0x27ebbc sets it to 1, which makes the retry
-	// handler (0x27eb98) NOT advance state [+0xa] past 1, so the accept check 0x27f016 ([+0xa]==1)
-	// passes. Our boot only gets code-6 (timeout) so [+0xd] stays 0. Force [+0xd]=1 at the retry check
-	// to confirm the SIM is accepted (leaves 'Insert SIM card') -- the effect a code-5 message would have.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_ACCEPT", 0) != 0 && pc == addr && addr == 0x0027eb98)
-	{
-		debug_ram_byte_w(0x0010dca8 + 0xd, 1);   // BE: odd addr -> low byte, handled by fw_byte_w
-		static unsigned sa = 0;
-		if (sa++ < 8)
-			logerror("sim_accept: forced [0x10dcb5]=1 (accept flag) at t=%.4f\n", machine().time().as_double());
-	}
 	// MODEL_SIM_RESPONDER (opt-in, step 4 increment (a) — skeleton, log only): intercept the SIM APDU
 	// command the phone sends over the service-lower transport (0x2aec34 with msg code 0x2701 in r1;
 	// r0=len, r2=data ptr to the raw APDU). Log each APDU decoded (CLA INS P1 P2 P3 ...). This is the
@@ -2780,24 +2751,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		static unsigned am = 0;
 		if (am++ < 8)
 			logerror("sim_atr_msg: injected %u-byte ATR (TS=%02x) into 0x10dddc t=%.4f\n", n, atr[0], machine().time().as_double());
-	}
-	// EXPERIMENT (opt-in, step 2 probe): force the SIM manager to take the code-5 (data) dispatch. The
-	// manager calls SIM-task recv 0x27defc, returns to 0x27f0a6 with the code in r0, dispatches at
-	// 0x27eb7c (5=data). Force r0=5 on the Nth return (SIM_CODE5_AFTER, default 4) to run the code-5
-	// handler 0x27ebbc and see whether the code-5 PATH accepts the SIM (or what struct data it needs).
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_CODE5", 0) != 0 && pc == addr && addr == 0x0027f0a6)
-	{
-		static unsigned c5 = 0;
-		c5++;
-		// Fire once at AFTER, or continuously from AFTER if SIM_CODE5_CONT=1 (to drive the file-read
-		// loop: each forced code-5 triggers the next APDU command).
-		const u32 after = nokia_env_u32("NOKI3210_SIM_CODE5_AFTER", 4);
-		if (c5 == after || (nokia_env_u32("NOKI3210_SIM_CODE5_CONT", 0) != 0 && c5 >= after))
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 5);
-			if (c5 < after + 30)
-				logerror("sim_code5: forced return code=5 (#%u) t=%.4f\n", c5, machine().time().as_double());
-		}
 	}
 	// EXPERIMENT (opt-in, Phase-1 SIM probe): force the SIM task dispatch (0x27df1c) to take the
 	// code-0xc "SIM present" path once, after the SIM has done its reset attempts. Code 0xc sets the

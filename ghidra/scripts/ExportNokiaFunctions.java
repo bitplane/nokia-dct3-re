@@ -220,6 +220,29 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Label("eeprom_config_checksum_compare_234810", 0x00234810L),
 		// D9 watchdog: ack 0x11fedb resets counter 0x11fed6; 0x0f -> CONTACT SERVICE
 		new Label("contact_watchdog_poll_ack_counter_237b2e", 0x00237b2eL),
+		// --- SIM read conversation: internal sites, returns, and RAM (see docs/sim_emulator_scope.md) ---
+		// SIM-task recv site and its return (inject SIM-task responses here).
+		new Label("sim_task_recv_site_27df0c", 0x0027df0cL),
+		new Label("sim_task_recv_ret_27df10", 0x0027df10L),
+		// Accept-bit check (bit4 of 0x10dddc+0x10) -- verified NOT on the executed reject path.
+		new Label("sim_accept_bit_check_offpath_27e556", 0x0027e556L),
+		// Command recv site and its return; return value must be 7 to continue.
+		new Label("sim_command_recv_site_27e9ca", 0x0027e9caL),
+		new Label("sim_command_recv_ret_must_be_7_27e9ce", 0x0027e9ceL),
+		// File-read loop recv site and return; the return is the caller-gate (0xa/0xb/0xf/1).
+		new Label("sim_file_read_recv_site_27ee52", 0x0027ee52L),
+		new Label("sim_file_read_recv_ret_caller_gate_27ee56", 0x0027ee56L),
+		// RAM: SIM manager struct 0x10dca8 -- [+0xa]=accept-state, [+0xb]=retry counter,
+		// [+0xc]=read-state (3/2=SELECT, 1=file-read, 0=other), [+0xd]=accept-flag, [+0xe]=target.
+		new Label("sim_manager_struct_10dca8", 0x0010dca8L),
+		new Label("sim_accept_state_10dcb2", 0x0010dcb2L),
+		new Label("sim_read_state_10dcb4", 0x0010dcb4L),
+		// RAM: response/file-content buffer (code-5/8-b writes; parsed by 0x27e046).
+		new Label("sim_response_buffer_10dddc", 0x0010dddcL),
+		// RAM: command buffer / file descriptor (code-3 writes; 5-byte APDU at +5).
+		new Label("sim_command_buffer_10deec", 0x0010deecL),
+		// RAM: no-SIM flag consulted by the read-complete decision 0x27ea88.
+		new Label("sim_nosim_flag_111c64", 0x00111c64L),
 	};
 
 	private static final Target[] TARGETS = new Target[] {
@@ -610,6 +633,33 @@ public class ExportNokiaFunctions extends GhidraScript {
 		// on a received response message). r6 = response command; 0x05 => healthy
 		// completion (jump table at 0x236e34, cmd 0x05 -> result 5 -> substate 5).
 		new Target("contact_service_response_dispatch_236dc6", 0x00236dc6L),
+		// --- SIM read conversation (message-layer virtual SIM; see docs/sim_emulator_scope.md) ---
+		// SIM task main loop: recv at 0x27df0c, dispatch on [msg+4]
+		// (3->code3 cmd-buf, 5/8-b->code5 resp-buf, 0xc->present, 0x11->reset).
+		new Target("sim_task_recv_dispatch_loop_27defc", 0x0027defcL),
+		// Dispatch handlers: code 3 copies message -> command buffer 0x10deec;
+		// code 5/8-b copies message data -> response buffer 0x10dddc; code 0xc = SIM present.
+		new Target("sim_msg_present_handler_27df52", 0x0027df52L),
+		new Target("sim_msg_code5_to_respbuf_27df64", 0x0027df64L),
+		new Target("sim_msg_code3_to_cmdbuf_27df9e", 0x0027df9eL),
+		// Response/file-content parser: reads 0x10dddc at +06..+16 (accept bit at +0x10).
+		new Target("sim_response_buffer_parser_27e046", 0x0027e046L),
+		// Status -> MMI post (r1: 0x15=reject, 0x16=detected, 0x1f=no-SIM).
+		new Target("sim_status_post_mmi_27e240", 0x0027e240L),
+		// Command send+recv; the recv (ret 0x27e9ce) must return 7 to continue the read.
+		new Target("sim_command_send_recv_27e98c", 0x0027e98cL),
+		// Read-complete: posts no-SIM status 0x1f iff flag [0x111c64] is set.
+		new Target("sim_read_complete_nosim_decision_27ea88", 0x0027ea88L),
+		// Post-response read dispatch on returned msg code r0
+		// (3->file-read loop, 1->completion, 0x37->0x27ef40).
+		new Target("sim_read_dispatch_post_response_27ede0", 0x0027ede0L),
+		// File-read loop: sends 5-byte APDU from 0x10deec+5, needs response 7,
+		// recv at 0x27ee52 (ret/caller-gate 0x27ee56) dispatches 0xa/0xb/0xf/1.
+		new Target("sim_file_read_loop_27ee40", 0x0027ee40L),
+		// Read completion handler (msg code 1 path).
+		new Target("sim_read_completion_handler_27ef34", 0x0027ef34L),
+		// APDU-out observation point: r1==0x2701, r2=APDU ptr, r0=len (the command the phone sends).
+		new Target("sim_apdu_out_observe_2aec34", 0x002aec34L),
 	};
 
 	private Function prepareThumbFunction(Target target, Register tmode, RegisterValue thumbMode) throws Exception {
