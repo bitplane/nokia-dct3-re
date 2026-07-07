@@ -393,6 +393,7 @@ private:
 	uint8_t       m_sim_atr_pos = 0;
 	bool          m_sim_loop = false;    // c2 feeder: set once the file-read loop (0x27ee40) is reached
 	uint8_t       m_sim_script_idx = 0;  // c2 feeder: scripted-command index
+	uint8_t       m_sim_last_ins = 0;    // FS responder: INS of the last APDU the phone sent (0x2aec34)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	uint8_t       m_mode4_startup_completion_step;
@@ -2579,6 +2580,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			char hex[128]; int n = 0;
 			for (u32 i = 0; i < len && i < 32; i++) n += std::snprintf(hex + n, sizeof(hex) - n, "%02x ", debug_ram_byte(buf + i));
 			const uint8_t ins = len >= 2 ? debug_ram_byte(buf + 1) : 0;
+			if (len >= 2) m_sim_last_ins = ins;   // FS responder: remember for the T=0 procedure-byte echo
 			const char *name = ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
 							 : ins == 0xb2 ? "READ_RECORD" : ins == 0x20 ? "VERIFY_CHV" : ins == 0xf2 ? "STATUS" : "?";
 			static unsigned ap = 0;
@@ -2642,6 +2644,12 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			debug_ram_byte_w(SCRATCH + 3, uint8_t(n));
 			debug_ram_byte_w(SCRATCH + 4, nokia_env_u32("NOKI3210_SIM_LOOP_CODE", 0x0b) & 0xff);
 			for (unsigned i = 0; i < n; i++) debug_ram_byte_w(SCRATCH + 5 + i, data[i]);
+			// FS-responder probe: the 0xb data path (0x27ee94) reads [msg+0] as the T=0 procedure byte and
+			// masks it vs the INS (desc[+6]); PB==INS => "send all remaining" => the phone transmits the
+			// data phase (e.g. the 2-byte file ID after SELECT). Echo the last INS to advance past the
+			// header so we can capture which file is selected. Gated by SIM_LOOP_PROCBYTE.
+			if (nokia_env_u32("NOKI3210_SIM_LOOP_PROCBYTE", 0) != 0)
+				debug_ram_byte_w(SCRATCH + 0, m_sim_last_ins);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
 			if (lf++ < 40) logerror("sim_loop: fed code-%02x msg (%u data bytes) -> 0x27df10 t=%.4f\n",
