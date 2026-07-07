@@ -2517,7 +2517,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	{
 		static unsigned rc[4] = { 0, 0, 0, 0 };
 		const int i = (addr == 0x002af638) ? 0 : (addr == 0x002af670) ? 1 : (addr == 0x002af6ea) ? 2 : 3;
-		if (rc[i]++ < 10)
+		if (rc[i]++ < nokia_env_u32("NOKI3210_TRACE_RENDER_MAX", 10))
 			logerror("render: %06x (#%u) r0=%04x t=%.4f\n", addr, rc[i],
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
 	}
