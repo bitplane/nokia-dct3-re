@@ -2604,6 +2604,46 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (sr++ < 120) logerror("simrecv: 0x26a458 <- lr=%08x t=%.4f\n", lr, machine().time().as_double());
 		}
 	}
+	// TRACE_SIMPPS (opt-in): trace the file-read phase entry 0x27ed3c and the PPS-compare path, to see the
+	// ack code after the len-3 (PPS) send and whether the compare 0x27ed6a is reached / what it compares.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMPPS", 0) != 0 && pc == addr &&
+			(addr == 0x0027ed3c || addr == 0x0027ed4a || addr == 0x0027ed5c || addr == 0x0027ed6a || addr == 0x0027ed6e))
+	{
+		static unsigned pp = 0;
+		if (pp++ < 40)
+		{
+			const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			const uint8_t ack = (r4 >= 0x00100000 && r4 < 0x00180000) ? debug_ram_byte(r4 + 5) : 0xee;
+			if (addr == 0x0027ed3c)
+				logerror("simpps: ENTRY 0x27ed3c [+10]=%02x t=%.4f\n",
+						(r4 >= 0x00100000 && r4 < 0x00180000) ? debug_ram_byte(r4 + 0x10) : 0xee, machine().time().as_double());
+			else if (addr == 0x0027ed4a)
+				logerror("simpps: after len3 send, [+5]=%02x (need 7) t=%.4f\n", ack, machine().time().as_double());
+			else if (addr == 0x0027ed5c)
+				logerror("simpps: after recv, [+5]=%02x t=%.4f\n", ack, machine().time().as_double());
+			else if (addr == 0x0027ed6e)
+				logerror("simpps: cmp result r0=%d t=%.4f\n", int32_t(r0), machine().time().as_double());
+		}
+	}
+	// TRACE_SIMPPS: hook the memcmp 0x2b58e8 itself (a call target, so the fetch hook fires) when called
+	// from the PPS compare site (LR==0x27ed6e) — dumps the actual operands the firmware compares.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMPPS", 0) != 0 && pc == addr && addr == 0x002b58e8 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027ed6e)
+	{
+		const u32 c0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 c1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const u32 c2 = m_maincpu->state_int(arm7_cpu_device::ARM7_R2);
+		auto d = [&](u32 p)->std::string {
+			if (p < 0x00100000 || p >= 0x00180000) return std::string("<non-ram>");
+			char b[64]; int k = 0; for (u32 i = 0; i < c2 && i < 8; i++) k += std::snprintf(b+k, sizeof(b)-k, "%02x ", debug_ram_byte(p+i));
+			return std::string(b);
+		};
+		static unsigned mc = 0;
+		if (mc++ < 20)
+			logerror("simpps: CMP(sb=%08x [%s], sent=%08x [%s], len=%u) t=%.4f\n",
+					c0, d(c0).c_str(), c1, d(c1).c_str(), c2, machine().time().as_double());
+	}
 	// MODEL_SIM_RESPONDER increment (b): respond to the SIM command so the phone advances. The phone
 	// recv's the response inside the command sender 0x27e98c (bl 0x26a458 at 0x27e9ca, return 0x27e9ce).
 	// Trampoline that recv only (LR==0x27e9ce): return a synthetic response message (scratch RAM) with
