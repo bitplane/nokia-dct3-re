@@ -256,3 +256,36 @@ Everything the emulator build needs, in one place. All addresses `3210f600a`, bi
 ### The open problem for the pass
 
 The conversation driver completes the read but lands on no-SIM because `0x10dddc` never gets coherent per-command file responses. A faithful emulator must, driven by the phone's own commands, emit **consistent** GSM 11.11 responses into `0x10dddc` (info blocks + data + SWs) so the read state, `[0x111c64]`, and the struct fields all settle to "valid SIM" together — not by overriding dispatch codes. Start by tracing, on a *real*-style boot path, what a valid response into `0x10dddc` must contain for the parser `0x27e046` to advance the state without the no-SIM flag being set.
+
+## Build log — the T=0 responder (passes, 2026-07-07)
+
+Grinding the response-driven responder that walks the real GSM 11.11 T=0 conversation.
+Reference config (reaches the read): the 4 milestone models + `MODEL_SIM_ATR_MSG` +
+`SIM_ATR_HEX=3b1005` + `MODEL_SIM_RESPONDER`(`SIM_RESP_CODE=7`) + `MODEL_SIM_LOOP` +
+`EXPERIMENT_SIM_CODE5` (the ATR-parse trigger).
+
+- **Increment 1 (a877924).** Mapped the full T=0 file-read machine: send `0x27e98c`
+  → APDU out `0x2aec34` (msg `0x2701`); recv `0x27defc` (single recv site, ret `0x27df10`);
+  data path `0x27ee94`; **completion = recv code `1` → `0x27ef34`**. Confirmed a real
+  GSM `SELECT` (`a0 a4 00 00 02`). Forcing code-5 repeatedly is the wrong architecture —
+  the code-5 handler `0x27ebbc` re-enters the ATR parser every cycle, and `0x27defc`
+  clears `0x10dddc[+0]`/`sb` on every recv.
+- **Pass 1 (e5132cb).** One recv site in the SIM region — the phone SPINS, not blocks.
+  Decoded the `[ff 00 ff]` command: a valid ISO-7816 **PPS request** the firmware issues
+  after the ATR; the SIM must echo it.
+- **Pass 2 (22bcd14).** Response data path corrected: the code-5/8-b handler `0x27df64`
+  copies the injected data (msg+5) to `0x10dcce` **and to `0x10dddc+2`**, then re-forwards
+  via `0x2aec34` r1=`0x2700`.
+- **Pass 3 (eec2481).** Runtime trace (`TRACE_SIMPPS`) of the PPS memcmp `0x2b58e8`:
+  the check is `memcmp(0x10dddc+2, sent_PPS, 3)` — the PPS response must be the verbatim
+  echo `[ff 00 ff]` at `0x10dddc+2`. Firing code-5 **once** (so the ATR isn't re-injected
+  over those bytes) + `SIM_LOOP_ECHO` makes the PPS compare **pass** (result 0).
+- **Pass 4.** The PPS handler wants match **AND recv code `9`** (`0x27defc` returns
+  `[msg+4]`, so `SIM_LOOP_CODE=9`) → posts status `0x16` (SIM detected). Result: the
+  genuine ATR+PPS handshake **clears the "Insert SIM card" screen** (frame `o074`→`o016`,
+  blank text area = SIM present, awaiting data). Same end-state as the old forced
+  `EXPERIMENT_SIM_PRESENT`, but reached faithfully via a real ATR parse + PPS echo.
+
+**Where it stands:** the faithful ATR+PPS handshake is satisfied and "Insert SIM card"
+clears. Next: sustain the manager past PPS→detected so it issues the EF SELECT/READ
+sequence, and answer those with TS 51.011 file contents to reach operator-idle.
