@@ -2588,6 +2588,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("sim_apdu: %-12s len=%u [ %s] t=%.4f\n", name, len, hex, machine().time().as_double());
 		}
 	}
+	// TRACE_SIMRECV (opt-in): log every recv (0x26a458) whose return address is in the SIM code region
+	// (0x27de00..0x27f100), with the caller LR. Reveals which recv the phone blocks on after each command
+	// (e.g. after the SELECT) — i.e. where the genuine file-read response must be injected.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMRECV", 0) != 0 && pc == addr && addr == 0x0026a458)
+	{
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		if (lr >= 0x0027de00 && lr < 0x0027f100)
+		{
+			static unsigned sr = 0;
+			if (sr++ < 120) logerror("simrecv: 0x26a458 <- lr=%08x t=%.4f\n", lr, machine().time().as_double());
+		}
+	}
 	// MODEL_SIM_RESPONDER increment (b): respond to the SIM command so the phone advances. The phone
 	// recv's the response inside the command sender 0x27e98c (bl 0x26a458 at 0x27e9ca, return 0x27e9ce).
 	// Trampoline that recv only (LR==0x27e9ce): return a synthetic response message (scratch RAM) with
