@@ -2740,11 +2740,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		m_mmi_idle_forced = true;
 		logerror("mmi_idle: forced [1116fd]=1 at gate 0x297ffa t=%.4f\n", machine().time().as_double());
 	}
-	// EXPERIMENT_MMI_IDLE: log whenever display_idle (0x2a255c) actually executes.
+	// EXPERIMENT_MMI_IDLE: trace display_idle (0x2a255c) entry, and 0x2b257e when called FROM display_idle
+	// (LR==0x2a2566, the resource get for 0x224c). If 0x2b257e is entered but the render post 0x2af6ea
+	// (via TRACE_RENDER) never follows, the idle draw hangs acquiring resource 0x224c.
 	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x002a255c)
 	{
 		static unsigned di = 0;
 		if (di++ < 20) logerror("mmi_idle: display_idle 0x2a255c EXECUTED t=%.4f\n", machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x002b257e &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x002a2566)
+	{
+		static unsigned dg = 0;
+		if (dg++ < 20) logerror("mmi_idle: display_idle -> resource-get 0x2b257e(0x224c) entered t=%.4f\n", machine().time().as_double());
 	}
 	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
 	// code 5 (EXPERIMENT_SIM_CODE5) and separately poking the ATR into 0x10dddc (MODEL_SIM_ATR_MSG), deliver
