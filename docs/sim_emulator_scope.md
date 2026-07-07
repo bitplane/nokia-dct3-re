@@ -413,3 +413,19 @@ With the SIM accepted (reject cleared) the phone still doesn't show idle. Dug th
 path our boot doesn't reach). Reaching idle PIXELS needs that subsystem brought up -- a distinct wall
 above the (now solved) SIM read + accept. Knobs: `EXPERIMENT_MMI_IDLE[_MS]`, `TRACE_DREADY`,
 `TRACE_IDLEFLAG`, `TRACE_RENDER`(`_MAX`).
+
+## The go-idle MMI trigger (2026-07-08)
+
+Chased what sets the idle flag `[0x1116fd]` (=MMI base `0x1116f8` +5). Whole-image literal search
++ full MMI disassembly:
+- In the MMI, `[+5]` is only READ (gate `0x297ffa`) and SET to 2 (post-draw `0x298006`). Nothing
+  sets it to 1.
+- The adjacent byte `0x1116fc` (`+4`) has a get/set dispatch at `0x297bc0` -- not the idle flag.
+- `TRACE_IDLEFLAG` confirms `0x1116fd` is NEVER written at runtime by any path.
+- The MMI is a **window/screen state machine**: `0x297ed8` indexes an array at `0x111724` by the
+  active window `[0x1116f8+8]`, per-entry state `[+0x19] in {1,2,3}`. Screens are window states.
+
+So the go-idle "trigger" is not a single pokeable flag: the idle flag is set when the MMI enters
+the **idle window state**, which our boot never does. Same coherent-state wall -- the phone's UI
+state machine never transitions to idle (upstream of both the idle flag and the display bring-up).
+Reaching idle pixels needs that transition, not a poke.
