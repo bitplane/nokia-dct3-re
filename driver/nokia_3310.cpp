@@ -2515,6 +2515,28 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// EXPERIMENT (opt-in, option C — hollow idle): the MMI main loop (0x297fc4) recv's messages, dispatches,
 	// and when idle-flag [0x11f81b]==1 calls display_idle (0x2a255c). TRACE_MMI shows whether that task runs
 	// in our stuck boot; FORCE_IDLE pins the flag at the recv (0x298008) so the idle redraw fires each loop.
+	// TRACE_MMIWIN (opt-in): the MMI window state machine 0x297ed8 -- W = [0x1116f8+8] (window array cursor),
+	// count = [W+4], top entry = 0x111724 + count*0x1c, its window-id byte [top+0]->deref and state [+0x19].
+	// Shows the window stack over the boot: which screens are active and whether an idle window is ever pushed.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIWIN", 0) != 0 && pc == addr && addr == 0x00297ed8)
+	{
+		auto rw = [&](u32 a)->u32 { return (u32(debug_ram_byte(a))<<24)|(u32(debug_ram_byte(a+1))<<16)|
+				(u32(debug_ram_byte(a+2))<<8)|debug_ram_byte(a+3); };
+		const u32 W = rw(0x00111700);
+		const u8 count = (W >= 0x00100000 && W < 0x00180000) ? debug_ram_byte(W + 4) : 0xff;
+		const u32 top = 0x00111724 + u32(count) * 0x1c;
+		const u32 wdesc = rw(top);   // [top+0] = window descriptor ptr
+		const u8 wid = (wdesc >= 0x00100000 && wdesc < 0x00300000) ? debug_ram_byte(wdesc) : 0xff;
+		static u32 last = 0xffffffff;
+		const u32 key = (u32(count) << 16) | (wid << 8) | debug_ram_byte(top + 0x19);
+		if (key != last)
+		{
+			last = key;
+			static unsigned wc = 0;
+			if (wc++ < 40) logerror("mmiwin: count=%u topdesc=%08x wid=%02x state[+19]=%02x t=%.4f\n",
+					count, wdesc, wid, debug_ram_byte(top + 0x19), machine().time().as_double());
+		}
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_MMI", 0) != 0 && pc == addr &&
 		(addr == 0x00297fc4 || addr == 0x00298008 || addr == 0x002a255c))
 	{
