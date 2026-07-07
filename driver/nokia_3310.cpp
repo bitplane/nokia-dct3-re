@@ -1485,10 +1485,10 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
-	// TRACE_DREADY (opt-in): trace writers of the display-ready flag [0x11e4fe] (even addr -> high byte of
-	// word 0x11e4fe). 0x2b12b4 returns "resource unavailable" whenever this is 0, gating all display-resource
+	// TRACE_DREADY (opt-in): trace writers of the display-ready flag [0x11fee4] (even addr -> high byte of
+	// word 0x11fee4). 0x2b12b4 returns "resource unavailable" whenever this is 0, gating all display-resource
 	// acquisition (incl. the idle draw's 0x224c). Find if/when the display subsystem sets it.
-	if (nokia_env_u32("NOKI3210_TRACE_DREADY", 0) != 0 && address == 0x0011e4fe)
+	if (nokia_env_u32("NOKI3210_TRACE_DREADY", 0) != 0 && address == 0x0011fee4)
 	{
 		const uint16_t oldw = m_ram[offset];
 		const uint16_t neww = (oldw & ~mem_mask) | (data & mem_mask);
@@ -1497,7 +1497,7 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		{
 			static unsigned dr = 0;
 			if (dr++ < 40)
-				logerror("dready: [11e4fe] %02x->%02x pc=%08x t=%.4f\n", oldb, newb, pc, machine().time().as_double());
+				logerror("dready: [11fee4] %02x->%02x pc=%08x t=%.4f\n", oldb, newb, pc, machine().time().as_double());
 		}
 	}
 	// TRACE_IDLEFLAG (opt-in): trace writers of the MMI idle-draw flag [0x1116fd] = MMI-struct base
@@ -2761,10 +2761,10 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x002a255c)
 	{
 		static unsigned di = 0;
-		// [0x11e4fe] = display-ready flag gating resource availability (0x2b12b4 returns 0 if this is 0).
+		// [0x11fee4] = display-ready flag gating resource availability (0x2b12b4 returns 0 if this is 0).
 		// [0x2e5c2f + (0x224c&7)] and [0x1108ff + (0x224c>>3)] are the resource bitmaps for id 0x224c.
-		const uint8_t dready = debug_ram_byte(0x0011e4fe);
-		if (di++ < 20) logerror("mmi_idle: display_idle EXECUTED; display-ready[11e4fe]=%02x t=%.4f\n",
+		const uint8_t dready = debug_ram_byte(0x0011fee4);
+		if (di++ < 20) logerror("mmi_idle: display_idle EXECUTED; display-ready[11fee4]=%02x t=%.4f\n",
 				dready, machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x002b257e &&
