@@ -1484,10 +1484,10 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
-	// TRACE_IDLEFLAG (opt-in): trace writers of the MMI idle-draw flag [0x11f81b] (odd addr -> low byte of
-	// the word at 0x11f81a). The MMI loop 0x297fc4 draws display_idle (0x2a255c) at 0x298000 iff this is 1.
-	// It stays 0 on our boot; find who (if anyone) tries to set it after the SIM read completes.
-	if (nokia_env_u32("NOKI3210_TRACE_IDLEFLAG", 0) != 0 && address == 0x0011f81a)
+	// TRACE_IDLEFLAG (opt-in): trace writers of the MMI idle-draw flag [0x1116fd] = MMI-struct base
+	// 0x1116f8 (r4 in loop 0x297fc4, literal 16f80011 swap16) + 5; odd addr -> low byte of word 0x1116fc.
+	// The MMI draws display_idle (0x2a255c) at 0x298000 iff this is 1. (Prior 0x11f81b was a swap error.)
+	if (nokia_env_u32("NOKI3210_TRACE_IDLEFLAG", 0) != 0 && address == 0x001116fc)
 	{
 		const uint16_t oldw = m_ram[offset];
 		const uint16_t neww = (oldw & ~mem_mask) | (data & mem_mask);
@@ -1496,7 +1496,7 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		{
 			static unsigned idf = 0;
 			if (idf++ < 60)
-				logerror("idleflag: [11f81b] %02x->%02x pc=%08x lr=%08x t=%.4f\n", oldb, newb, pc,
+				logerror("idleflag: [1116fd] %02x->%02x pc=%08x lr=%08x t=%.4f\n", oldb, newb, pc,
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
