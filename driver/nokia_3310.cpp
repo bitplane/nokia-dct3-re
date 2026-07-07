@@ -2611,6 +2611,29 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					addr == 0x002378e0 ? "cs-dispatch 0x2378e0" : "code3-filereq 0x27df9e (EF-read request in)",
 					machine().time().as_double());
 	}
+	// TRACE_SIMSEL (opt-in): trace the file-read loop's response dispatch — the caller-gate 0x27ee56 (code
+	// stored), the data path 0x27ee94 (dumps sb + [sb..] + INS desc[+6]), the error 0x27ef02, the
+	// completion 0x27ef34 — to see how the EF SELECT response is (mis)handled.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMSEL", 0) != 0 && pc == addr &&
+			(addr == 0x0027ee94 || addr == 0x0027ef02 || addr == 0x0027ef34))
+	{
+		static unsigned ss = 0;
+		if (ss++ < 30)
+		{
+			if (addr == 0x0027ee94)
+			{
+				const u32 sb = m_maincpu->state_int(arm7_cpu_device::ARM7_R9);
+				char b[48]; int k = 0;
+				if (sb >= 0x00100000 && sb < 0x00180000)
+					for (unsigned i = 0; i < 6; i++) k += std::snprintf(b+k, sizeof(b)-k, "%02x ", debug_ram_byte(sb+i));
+				else std::snprintf(b, sizeof(b), "<non-ram>");
+				logerror("simsel: DATA-PATH 0x27ee94 sb=%08x [%s] t=%.4f\n", sb, b, machine().time().as_double());
+			}
+			else
+				logerror("simsel: %s t=%.4f\n", addr == 0x0027ef02 ? "ERROR 0x27ef02" : "COMPLETION 0x27ef34",
+						machine().time().as_double());
+		}
+	}
 	// TRACE_SIMRECV (opt-in): log every recv (0x26a458) whose return address is in the SIM code region
 	// (0x27de00..0x27f100), with the caller LR. Reveals which recv the phone blocks on after each command
 	// (e.g. after the SELECT) — i.e. where the genuine file-read response must be injected.
@@ -2712,8 +2735,13 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			// Phase 1 -> exactly one response per command (code 9): a PPS request (PPSS=0xFF) is echoed
 			// verbatim; otherwise a bare SW=9000. (EF file content comes in a later increment.)
 			if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)
+				// PPS request: echoed verbatim (compared by memcmp at 0x27ed66, not the data path).
 				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
-			else { data[0] = 0x90; data[1] = 0x00; n = 2; }
+			else
+				// File-read command: the data path 0x27ee94 reads the response's FIRST byte (0x10dddc+2) as
+				// the T=0 procedure byte and masks it vs the INS. Lead with the INS echo => "send all
+				// remaining" => the phone transmits the data phase (SELECT file id, GET RESPONSE fetch, ...).
+				{ data[0] = m_sim_last_ins; n = 1; }
 			code = 9;
 			m_sim_card_pending = false;   // responded; wait for the next command
 		}
@@ -2765,6 +2793,12 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027e9ce | 1);
 		return uint16_t(0x4760);
 	}
+	// MODEL_SIM_CARD: file-read-loop caller-gate. The loop recv 0x27ee52 (ret 0x27ee56 = strb r0,[r4,#5])
+	// gets our fed code (9); force it to 0xb so the loop takes the DATA path 0x27ee94 (procedure-byte /
+	// send-data / read) instead of the error branch. Only the file-read loop returns via 0x27ee56 -- the
+	// PPS phase (0x27ed3c) uses a different recv, so its code-9 handling is untouched.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && pc == addr && addr == 0x0027ee56)
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0b);
 	// MODEL_SIM_LOOP (opt-in, c2 feeder): drive the file-read loop. Armed by the command recv-trampoline
 	// above (file-read phase). At the SIM-task recv 0x27df0c (bl 0x26a458, return 0x27df10), once armed,
 	// inject a synthetic code-0xb SIM message carrying file data: 0x27df64 copies its data (msg+5, len
