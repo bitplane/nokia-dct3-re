@@ -289,3 +289,19 @@ Reference config (reaches the read): the 4 milestone models + `MODEL_SIM_ATR_MSG
 **Where it stands:** the faithful ATR+PPS handshake is satisfied and "Insert SIM card"
 clears. Next: sustain the manager past PPS→detected so it issues the EF SELECT/READ
 sequence, and answer those with TS 51.011 file contents to reach operator-idle.
+
+- **Pass 5.** Traced what happens after the faithful PPS→detected: the SIM manager
+  **freezes** — struct `@0x10dca8[+9,+7,+a]` stays `00 01 01`, it keeps receiving the
+  fed code-9 messages but issues **no further APDUs** (no EF SELECT/READ), status `0x16`
+  posted exactly once. So the manager does **not** proactively read EFs after "detected";
+  the EF-read phase is driven by a **higher-level SIM data service** (`0x29ff2c`, entered
+  from the contact-service dispatcher `0x2378e0`) that is dormant on our stubbed boot —
+  the same subsystem the earlier forced-`EXPERIMENT_SIM_PRESENT` probe found never fires.
+
+**Net of the 5-pass grind:** the T=0 ATR+PPS handshake is now **faithfully satisfied**
+(real ATR parse → real PPS echo at `0x10dddc+2` → status `0x16`), clearing "Insert SIM
+card" the genuine way. The next wall is **not** more of the T=0 responder — it's the
+higher-level SIM-read requester (`0x29ff2c` / the contact-service SIM path) that issues
+the EF SELECT/READ sequence. Reaching operator-idle now hinges on triggering *that*
+layer (analogous to how `MODEL_SVC_RESPONDER`/`MODEL_SVC_CHANNEL_DRAIN` drove the
+service session), then answering the EF reads with TS 51.011 content.
