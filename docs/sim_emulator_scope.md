@@ -326,3 +326,19 @@ faithful ATR+PPS handshake to "SIM detected" (frame `o016`), retiring `EXPERIMEN
 Minor remaining nit: the ATR timing is heuristic (Nth recv) rather than tied to the reset-start
 `0x27e024`; good enough as a model. **Next (step 2):** trigger the dormant EF-read requester
 (`0x29ff2c` / contact-service SIM path) and extend phase 1 to serve EF content (TS 51.011).
+
+## Step 2 — driving the EF reads (2026-07-07)
+
+Confirmed the EF-read requester is dormant: on the `MODEL_SIM_CARD` boot the code-3
+file-read-request handler `0x27df9e` never fires — nobody asks the manager to read EFs
+(`TRACE_SIMDATA`). Approach (b): **model the requester.** `MODEL_SIM_CARD` phase 2 posts a
+code-3 request (the message is copied verbatim into the descriptor `0x10deec`: `[+2]`=len 5,
+`[+4]`=code 3, `[+5..9]`=`a0 a4 00 00 02` SELECT, `[+0xa..b]`=file id; `SIM_CARD_EF`=file).
+**Result:** `0x27df9e` fires for the first time and the manager issues a real `SELECT` for
+the requested file — so the EF-read sequence is drivable by modelling the requester.
+
+**Remaining (Phase A/B):** answer the SELECT with the T=0 dance (file-id data phase → `9F XX`
+→ GET RESPONSE `a0 c0 …` → FCP block → READ BINARY/RECORD → content + `9000`), sequence the
+mandatory EFs (`2FE2 ICCID`, `6F07 IMSI`, `6F38 SST`, `6F7E LOCI`, `6FAD AD`, `6F46 SPN`, …)
+with synthetic TS 51.011 content, present CHV1-disabled — then see whether the completed read
+flips the status past reject and lets `display_idle` fire.
