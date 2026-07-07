@@ -342,3 +342,16 @@ the requested file — so the EF-read sequence is drivable by modelling the requ
 mandatory EFs (`2FE2 ICCID`, `6F07 IMSI`, `6F38 SST`, `6F7E LOCI`, `6FAD AD`, `6F46 SPN`, …)
 with synthetic TS 51.011 content, present CHV1-disabled — then see whether the completed read
 flips the status past reject and lets `display_idle` fire.
+
+## Step 2c — SELECT completion: the read is request-driven (2026-07-07)
+
+The EF SELECT header is accepted once its response leads with the T=0 procedure byte
+(INS echo) at `0x10dddc+2` (data path `0x27ee94`); a len-5 header then routes to `0x27ef0a`
+→ status dispatcher `0x27e240` (reports the SIM status upward), then **`0x27efb0` recv's
+again and re-dispatches at `0x27ede0`** (`3`→file-read, `1`→completion, `0xd`→keepalive).
+
+So the file read is **request-driven**: the manager issues exactly one command per code-3
+request, reports its status, and waits for the next request. Walking a full EF read means
+the requester model posts a **code-3 per T=0 step** — `SELECT 6F07` → `GET RESPONSE a0 c0
+00 00 XX` (→ FCP block) → `READ BINARY a0 b0 …` (→ content) — each answered with the INS-echo
+procedure byte + payload + SW. That is the next increment (plus the GSM 11.11 FCP/EF layouts).
