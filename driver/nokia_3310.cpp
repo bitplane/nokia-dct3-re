@@ -2739,13 +2739,40 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			// Phase 1 -> exactly one response per command (code 9): a PPS request (PPSS=0xFF) is echoed
 			// verbatim; otherwise a bare SW=9000. (EF file content comes in a later increment.)
 			if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)
+			{
 				// PPS request: echoed verbatim (compared by memcmp at 0x27ed66, not the data path).
 				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
+			}
 			else
+			{
 				// File-read command: the data path 0x27ee94 reads the response's FIRST byte (0x10dddc+2) as
-				// the T=0 procedure byte and masks it vs the INS. Lead with the INS echo => "send all
-				// remaining" => the phone transmits the data phase (SELECT file id, GET RESPONSE fetch, ...).
-				{ data[0] = m_sim_last_ins; n = 1; }
+				// the T=0 procedure byte (must equal the INS => "send all remaining"). After it comes the
+				// payload + SW=9000. GET RESPONSE -> a GSM 11.11 EF FCP block; READ -> synthetic EF content.
+				data[n++] = m_sim_last_ins;   // procedure byte = INS echo
+				if (m_sim_last_ins == 0xc0)   // GET RESPONSE -> EF file-control-parameters (TS 51.011 9.2.1)
+				{
+					const u32 fid = nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07);
+					const uint8_t fcp[15] = {
+						0x00, 0x00,               // RFU
+						0x00, 0x09,               // file size (9 bytes)
+						uint8_t(fid >> 8), uint8_t(fid), // file id
+						0x04,                     // type: EF
+						0x00,                     // RFU
+						0x00, 0x00, 0x00,         // access conditions: READ = ALWAYS (no PIN)
+						0x01,                     // file status: not invalidated
+						0x02,                     // length of following data
+						0x00,                     // structure: transparent
+						0x00 };                   // record length (n/a)
+					for (unsigned i = 0; i < 15; i++) data[n++] = fcp[i];
+					data[n++] = 0x90; data[n++] = 0x00;
+				}
+				else if (m_sim_last_ins == 0xb0 || m_sim_last_ins == 0xb2)  // READ -> synthetic EF content
+				{
+					const uint8_t body[8] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98 };
+					for (unsigned i = 0; i < 8; i++) data[n++] = body[i];
+					data[n++] = 0x90; data[n++] = 0x00;
+				}
+			}
 			code = 9;
 			m_sim_card_pending = false;   // responded; wait for the next command
 		}
@@ -2754,24 +2781,34 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		// 0x10deec ([+2]=len 5, [+4]=code 3, [+5..9]=5-byte APDU, [+0xa..b]=file id for SELECT); the manager
 		// issues the command and phase-1 answers it. Posted when no command is pending -- i.e. the manager is
 		// looping at 0x27efb0 waiting for the next request. SIM_CARD_EF = file id (e.g. 6f07).
-		else if (m_sim_card_phase == 1 && !m_sim_card_pending && m_sim_card_step < 3
+		else if (m_sim_card_phase == 1 && !m_sim_card_pending && m_sim_card_step < 4
 				&& nokia_env_u32("NOKI3210_SIM_CARD_EF", 0) != 0)
 		{
 			const u32 fid = nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07);
-			uint8_t apdu[5]; unsigned fidlen = 0;
-			static const char *sn[3] = { "SELECT", "GET_RESPONSE", "READ_BINARY" };
-			if (m_sim_card_step == 0)      { apdu[0]=0xa0; apdu[1]=0xa4; apdu[2]=0; apdu[3]=0; apdu[4]=0x02; fidlen=2; }
-			else if (m_sim_card_step == 1) { apdu[0]=0xa0; apdu[1]=0xc0; apdu[2]=0; apdu[3]=0; apdu[4]=0x0f; }
-			else                           { apdu[0]=0xa0; apdu[1]=0xb0; apdu[2]=0; apdu[3]=0; apdu[4]=0x08; }
 			for (offs_t i = 0; i < 0x118; i++) debug_ram_byte_w(SCRATCH + i, 0);
-			debug_ram_byte_w(SCRATCH + 2, 0); debug_ram_byte_w(SCRATCH + 3, 5);   // descriptor len = 5
-			debug_ram_byte_w(SCRATCH + 4, 3);                                     // code 3 = file-read request
-			for (unsigned i = 0; i < 5; i++) debug_ram_byte_w(SCRATCH + 5 + i, apdu[i]);
-			if (fidlen) { debug_ram_byte_w(SCRATCH + 0xa, uint8_t(fid >> 8)); debug_ram_byte_w(SCRATCH + 0xb, uint8_t(fid)); }
+			if (m_sim_card_step < 3)
+			{
+				uint8_t apdu[5]; unsigned fidlen = 0;
+				static const char *sn[3] = { "SELECT", "GET_RESPONSE", "READ_BINARY" };
+				if (m_sim_card_step == 0)      { apdu[0]=0xa0; apdu[1]=0xa4; apdu[2]=0; apdu[3]=0; apdu[4]=0x02; fidlen=2; }
+				else if (m_sim_card_step == 1) { apdu[0]=0xa0; apdu[1]=0xc0; apdu[2]=0; apdu[3]=0; apdu[4]=0x0f; }
+				else                           { apdu[0]=0xa0; apdu[1]=0xb0; apdu[2]=0; apdu[3]=0; apdu[4]=0x08; }
+				debug_ram_byte_w(SCRATCH + 2, 0); debug_ram_byte_w(SCRATCH + 3, 5);   // descriptor len = 5
+				debug_ram_byte_w(SCRATCH + 4, 3);                                     // code 3 = file-read request
+				for (unsigned i = 0; i < 5; i++) debug_ram_byte_w(SCRATCH + 5 + i, apdu[i]);
+				if (fidlen) { debug_ram_byte_w(SCRATCH + 0xa, uint8_t(fid >> 8)); debug_ram_byte_w(SCRATCH + 0xb, uint8_t(fid)); }
+				logerror("sim_card: EF step %u -> code-3 %s (file %04x) t=%.4f\n",
+						m_sim_card_step, sn[m_sim_card_step], fid, machine().time().as_double());
+			}
+			else
+			{
+				// Step 3: post a code-1 completion so the read-dispatch 0x27ede0 reaches the completion
+				// handler 0x27ef34 (read done) instead of looping for more requests.
+				debug_ram_byte_w(SCRATCH + 4, 1);   // code 1 = read complete
+				logerror("sim_card: EF step 3 -> code-1 completion t=%.4f\n", machine().time().as_double());
+			}
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
-			logerror("sim_card: EF step %u -> code-3 %s (file %04x) t=%.4f\n",
-					m_sim_card_step, sn[m_sim_card_step], fid, machine().time().as_double());
 			m_sim_card_step++;
 			return uint16_t(0x4760);
 		}
