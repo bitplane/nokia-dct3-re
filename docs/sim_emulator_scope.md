@@ -305,3 +305,24 @@ higher-level SIM-read requester (`0x29ff2c` / the contact-service SIM path) that
 the EF SELECT/READ sequence. Reaching operator-idle now hinges on triggering *that*
 layer (analogous to how `MODEL_SVC_RESPONDER`/`MODEL_SVC_CHANNEL_DRAIN` drove the
 service session), then answering the EF reads with TS 51.011 content.
+
+## Step 1 — the trigger gap closed: `MODEL_SIM_CARD` (2026-07-07)
+
+The 5-pass handshake was faithful in *content* but forced in *kickoff* (`EXPERIMENT_SIM_CODE5`
+faked `r0=5`, `MODEL_SIM_ATR_MSG` poked the ATR into `0x10dddc` separately). `MODEL_SIM_CARD`
+replaces both with a genuine message flow:
+
+- **ATR** (phase 0): on the `SIM_CARD_ATR_AFTER`'th SIM-task recv, deliver a real **code-5**
+  message carrying the ATR bytes. The firmware's own dispatch `0x27df64` copies them into
+  `0x10dddc` (`[+0]`=len, `[+2..]`=bytes) and returns 5 → manager `0x27eb7c` → code-5 handler
+  `0x27ebbc` → parser `0x27e046`. One real message, no forcing; delivered once (phase machine).
+- **Command ACK**: return a `[msg+4]=7` message at `0x27e9ce`.
+- **Per-command response** (phase 1, command-driven via a pending flag set at the APDU point
+  `0x2aec34`): PPS requests (`FF …`) echoed verbatim; else `SW=9000`. One response per command.
+
+**Result:** `MODEL_SIM_CARD + SIM_ATR_HEX=3b1005` alone (+ the 4 milestone models) drives the
+faithful ATR+PPS handshake to "SIM detected" (frame `o016`), retiring `EXPERIMENT_SIM_CODE5` /
+`MODEL_SIM_ATR_MSG` / `MODEL_SIM_RESPONDER` / `MODEL_SIM_LOOP` for the reach-detected path.
+Minor remaining nit: the ATR timing is heuristic (Nth recv) rather than tied to the reset-start
+`0x27e024`; good enough as a model. **Next (step 2):** trigger the dormant EF-read requester
+(`0x29ff2c` / contact-service SIM path) and extend phase 1 to serve EF content (TS 51.011).
