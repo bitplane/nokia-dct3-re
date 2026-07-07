@@ -2754,6 +2754,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		static unsigned dg = 0;
 		if (dg++ < 20) logerror("mmi_idle: display_idle -> resource-get 0x2b257e(0x224c) entered t=%.4f\n", machine().time().as_double());
 	}
+	// EXPERIMENT_MMI_IDLE: log the sub-calls of the resource-get 0x2b257e (called with LR in its range) to
+	// find where it hangs -- the last one logged before the run ends is the blocking sub-function.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && m_mmi_idle_forced &&
+			(addr == 0x002b12b4 || addr == 0x002b2560 || addr == 0x002b6680 || addr == 0x002b6638 || addr == 0x002b12dc))
+	{
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		if (lr >= 0x002b2580 && lr < 0x002b26a0)
+		{
+			static unsigned sg = 0;
+			if (sg++ < 30) logerror("mmi_idle: resget-subcall %06x (lr=%06x) t=%.4f\n", addr, lr, machine().time().as_double());
+		}
+	}
 	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
 	// code 5 (EXPERIMENT_SIM_CODE5) and separately poking the ATR into 0x10dddc (MODEL_SIM_ATR_MSG), deliver
 	// a genuine code-5 "response received" SIM-task message CARRYING the ATR bytes -- exactly how a real
