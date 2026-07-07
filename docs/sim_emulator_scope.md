@@ -391,3 +391,25 @@ But not idle yet. `TRACE_IDLEFLAG`: the MMI idle-draw flag `[0x1116fd]` (gate fo
 state machine never advances from "SIM detected/read" to "idle". That is the next coherence layer
 -- a new subsystem (MMI / phone-state, likely SIM-ready -> PIN-off -> idle), above the SIM read.
 Knobs: `SIM_CARD_CLEAR_NOSIM`, `TRACE_NOSIM`, `TRACE_IDLEFLAG`.
+
+## MMI idle-transition dig (passes 1-5, 2026-07-08)
+
+With the SIM accepted (reject cleared) the phone still doesn't show idle. Dug the MMI/render path:
+
+- **Idle flag corrected:** it is `[0x1116fd]` (MMI struct base `0x1116f8` +5, from literal `16f80011`),
+  not `0x11f81b` (an old swap error). Never written on our boot -> MMI never triggers idle.
+- **display_idle is reachable + executes.** `EXPERIMENT_MMI_IDLE` forces the flag at the gate `0x297ffa`;
+  `display_idle 0x2a255c` then runs. But no idle pixels appear.
+- **display_idle is tiny:** `push{lr}; r0=0x224c; bl 0x2b257e; r0=0x547; bl 0x2af6ea; pop{pc}` --
+  "acquire display resource `0x224c`, post render `0x547`". Its render post `0x2af6ea` never fires after
+  the forced draw, so it never gets past the resource-get.
+- **The resource-get 0x2b257e** calls the availability check `0x2b12b4`, which returns 0 (unavailable)
+  whenever the **display-ready flag `[0x11e4fe]` is 0** (else it bit-tests resource bitmaps `[0x2e5c2f]`/
+  `[0x1108ff]` for the id).
+- **`[0x11e4fe]` is NEVER written** the whole boot (`TRACE_DREADY`) -> stays 0 -> the idle draw's resource
+  `0x224c` can never be acquired. The text screens render via a different path that doesn't need it.
+
+**Root of the render wall:** the display subsystem never sets its ready flag `[0x11e4fe]` (a display-init
+path our boot doesn't reach). Reaching idle PIXELS needs that subsystem brought up -- a distinct wall
+above the (now solved) SIM read + accept. Knobs: `EXPERIMENT_MMI_IDLE[_MS]`, `TRACE_DREADY`,
+`TRACE_IDLEFLAG`, `TRACE_RENDER`(`_MAX`).
