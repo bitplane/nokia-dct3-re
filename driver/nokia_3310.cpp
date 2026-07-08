@@ -1512,6 +1512,17 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		if (neww != last) { last = neww; static unsigned us = 0;
 			if (us++ < 40) logerror("uistate: [11fcdc]=%04x pc=%08x t=%.4f\n", neww, pc, machine().time().as_double()); }
 	}
+		// TRACE_MMIVM (opt-in): writes into the MMI state vector 0x11fc80..0x11fcff -- the state array the
+		// task-5 bytecode VM applies (0x2aef7e: state[0x11fc80+slot]=val) and evaluates predicates against
+		// (0x2aeda0). UI-state 0x11fcdc is slot 0x5c of this vector. Reveals which slots the VM walks on our
+		// boot -- does the state vector progress toward a window-create state, or does the single VM run stall?
+		if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && address >= 0x0011fc80 && address <= 0x0011fcfe)
+		{
+			const uint16_t neww = (m_ram[offset] & ~mem_mask) | (data & mem_mask);
+			if (neww != m_ram[offset]) { static unsigned vm = 0;
+				if (vm++ < 400) logerror("mmivm: [%08x]=%04x slot=0x%02x pc=%08x t=%.4f\n", address, neww,
+						(address - 0x0011fc80), pc, machine().time().as_double()); }
+		}
 	// TRACE_DISPCB (opt-in): writes to the display-manager control block 0x10e2ec. Halfword 0x10e2ec holds
 	// +0,+1(=type gate byte, low byte); halfword 0x10e2ee holds +2(=state, high byte),+3. Reveals what sets
 	// the type to 0x80 (active window) -- the gate that unlocks the window-diff/code-2 path.
@@ -2711,6 +2722,16 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		static unsigned uc = 0;
 		if (uc++ < 60) logerror("uictl: handler event=%04x curtask=%u lr=%08x t=%.4f\n", ev,
 				debug_ram_byte(0x00100022), m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
+	// TRACE_MMIVM (opt-in, fetch side): at the rewrite mapper entry 0x2aefba (r0 = incoming 13-bit event
+	// key), log every event the task-5 VM rewrites. Pairs with the state-vector write trace: shows which
+	// keys drive the state array. Event 0x012e -> action base 0x80 (6-entry run); 0x05e8 is NOT a key.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002aefba)
+	{
+		const u32 ev = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff;
+		static unsigned mk = 0;
+		if (mk++ < 400) logerror("mmivm: MAP event=0x%04x lr=%08x t=%.4f\n", ev,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	}
 	// TRACE_DISPPROD (opt-in): find the display/window task's id and posters by matching message pointers.
 	// Log every send 0x26a204/0x26a354 (r0=target, r1=msg, [msg+0]hw = the display task's code) and every
