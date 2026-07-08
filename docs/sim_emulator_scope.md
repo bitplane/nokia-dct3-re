@@ -809,3 +809,38 @@ compose content). So idle pixels remain the full coherent display-subsystem brin
 now traced end-to-end: contact-service enable command → `0x2b140a` → bitmap +
 `[0x11fee4]` → resource availability `0x2b12b4` → idle draw's resource content.
 Knob: `TRACE_RESINIT`.
+
+## The resource-enable command byte, pinned: contact-service 0x70 (2026-07-08)
+
+Traced the contact-service command dispatcher `0x237400` to the exact command that
+drives the resource registrar.
+
+**Dispatcher.** `0x237400` reads the command byte `[msg+8]` into r4 (`0x23741a`) and
+runs a binary-search cascade to a per-command slot in the handler table at
+`0x2377f4+` (each slot: `adds r0,r5; bl handler; b`). The channel-map handler
+`0x23670c` — which holds the `0x2b140a` enable/disable calls — sits at slot
+`0x237814`, reached by `b 0x237814` at `0x2374be` for **command bytes 0x70/0x71**
+(arithmetic: `r0 = (cmd-0x6f)-1 = cmd-0x70; cmp #1; bhi` ⇒ `cmd ∈ {0x70,0x71}`).
+
+**Discrimination inside `0x23670c`** (same `[msg+8]` byte):
+- **`0x70` → ENABLE** — sends response subcmd 0x70, then `0x2366c8` (if `[msg+5]>0x42`)
+  → `0x2366d4` → `0x2b140a(enable=[msg+..dd], config_ptr = msg+9)`: registers the
+  bitmap `[0x11ff08]` and sets `[0x11fee4]`.
+- **`0x71` → DISABLE** — `0x2b140a(0,0,0,0)` clears `[0x11fee4]`.
+
+**Empirical confirmation (`TRACE_CSCMD` at `0x23741a`).** On our boot the
+contact-service processes **exactly one** command — `0x64`, the completion
+`MODEL_SVC_RESPONDER` injects — and **cmd `0x70` never arrives** (0 occurrences).
+So the resource-enable command is simply never sent on our minimal faked session:
+`MODEL_SVC_RESPONDER` supplies only the `0x64` completion, whereas a real service
+session would also carry the `0x70` channel-map / resource-enable command (with its
+0x40-byte config blob). 
+
+**This is the precise, final localization of the display-ready wall: contact-service
+command `0x70`.** Full traced chain: service session sends cmd `0x70` → dispatcher
+`0x237400` → channel-map `0x23670c` → `0x2366d4` → `0x2b140a` → bitmap `[0x11ff08]` +
+enable `[0x11fee4]` → availability `0x2b12b4` → idle-draw resource content. To reach
+idle pixels faithfully one would model delivery of cmd `0x70` with a valid config
+blob (the necessary step), though the resource *content* pipeline is a further
+coherent-bringup requirement (shown earlier: bitmap alone is insufficient). Knob:
+`TRACE_CSCMD`.
