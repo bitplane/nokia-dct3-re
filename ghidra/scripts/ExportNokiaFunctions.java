@@ -600,6 +600,8 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Target("display_state_source_28c940", 0x0028c940L),
 		new Target("display_state_emit_28c9c0", 0x0028c9c0L),
 		new Target("display_state_main_28bddc", 0x0028bddcL),
+		new Target("display_window_task_23e62c", 0x0023e62cL),  // live display/window task: recv 0x23e646 codes 0x0b04+, owns manager 0x10e2ec
+		new Label("display_state_dispatch_24047e", 0x0024047eL),  // state dispatch gated on manager type[+1]==0x80 (active window); idles at type 0
 		new Target("display_type2_post_2b1f24", 0x002b1f24L),  // = code-2 (window-mgmt) post to MMI task 6; wake producer
 		new Target("mmi_notify_code3_post_2b1f64", 0x002b1f64L),
 		// MMI (task 6) message-loop 0x298008 dispatch on primary code [msg+5]; code 2 (window mgmt) never arrives.

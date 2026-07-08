@@ -1502,6 +1502,16 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
+	// TRACE_DISPCB (opt-in): writes to the display-manager control block 0x10e2ec. Halfword 0x10e2ec holds
+	// +0,+1(=type gate byte, low byte); halfword 0x10e2ee holds +2(=state, high byte),+3. Reveals what sets
+	// the type to 0x80 (active window) -- the gate that unlocks the window-diff/code-2 path.
+	if (nokia_env_u32("NOKI3210_TRACE_DISPCB", 0) != 0 && (address == 0x0010e2ec || address == 0x0010e2ee))
+	{
+		const uint16_t neww = (m_ram[offset] & ~mem_mask) | (data & mem_mask);
+		static unsigned dc = 0;
+		if (dc++ < 40) logerror("dispcb: [%08x]=%04x (%s) pc=%08x t=%.4f\n", address, neww,
+				address == 0x0010e2ec ? "type=low byte" : "state=high byte", pc, machine().time().as_double());
+	}
 	// TRACE_DREADY (opt-in): trace writers of the display-ready flag [0x11fee4] (even addr -> high byte of
 	// word 0x11fee4). 0x2b12b4 returns "resource unavailable" whenever this is 0, gating all display-resource
 	// acquisition (incl. the idle draw's 0x224c). Find if/when the display subsystem sets it.
@@ -2657,6 +2667,40 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			static unsigned mp = 0;
 			if (mp++ < 400) logerror("mmiprod: POST fn=%s tgt=%u code=%02x msg=%08x lr=%08x t=%.4f\n",
 					addr == 0x0026a204 ? "204" : "354", tgt, debug_ram_byte(msg + 5), msg, lr, machine().time().as_double());
+		}
+	}
+	// TRACE_DISPSUB (opt-in): does the 0x240xxx-0x242xxx display/window-diff subsystem execute at all? Log
+	// the first fetch into the region and count distinct entry addresses -- if it never runs, the whole
+	// code-2-to-MMI producer layer is dead on our boot.
+	if (nokia_env_u32("NOKI3210_TRACE_DISPSUB", 0) != 0 && pc == addr && addr >= 0x00240000 && addr < 0x00243000)
+	{
+		static unsigned ds = 0; static u32 firstpc = 0;
+		if (firstpc == 0) { firstpc = addr; logerror("dispsub: FIRST entry pc=%08x t=%.4f\n", addr, machine().time().as_double()); }
+		if (ds++ < 4000 && (ds % 500) == 0) logerror("dispsub: %u fetches, latest pc=%08x t=%.4f\n", ds, addr, machine().time().as_double());
+		// At the state-dispatch entry 0x24047e dump the control block r4: +1=type, +2=state (the loop gate),
+		// +8=ptr; and [sp+0x10] pointer P whose [P] is compared to the state.
+		if (addr == 0x0024047e)
+		{
+			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			static unsigned de = 0;
+			if (de++ < 8 && r4 >= 0x00100000 && r4 < 0x00180000)
+				logerror("dispsub: @47e r4=%08x type[+1]=%02x state[+2]=%02x ptr[+8]=%08x t=%.4f\n",
+						r4, debug_ram_byte(r4 + 1), debug_ram_byte(r4 + 2),
+						(u32(debug_ram_byte(r4+8))<<24)|(u32(debug_ram_byte(r4+9))<<16)|(u32(debug_ram_byte(r4+10))<<8)|debug_ram_byte(r4+11),
+						machine().time().as_double());
+		}
+	}
+	// The display/window task 0x23e62c recv's at 0x23e646 (ret 0x23e64a, r0=msg, [msg]=code base 0x0b04).
+	// Log the codes it gets -- reveals whether a window-activate message (setting type 0x80) ever arrives.
+	if (nokia_env_u32("NOKI3210_TRACE_DISPSUB", 0) != 0 && pc == addr && addr == 0x0023e64a)
+	{
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+		{
+			static unsigned dm = 0;
+			if (dm++ < 40) logerror("dispsub: window-task recv code=%04x [+2]=%02x [+3]=%02x t=%.4f\n",
+					(u32(debug_ram_byte(msg)) << 8) | debug_ram_byte(msg + 1), debug_ram_byte(msg + 2), debug_ram_byte(msg + 3),
+					machine().time().as_double());
 		}
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_MMIPROD", 0) != 0 && pc == addr && addr == 0x0029800c)

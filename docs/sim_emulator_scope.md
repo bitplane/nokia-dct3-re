@@ -485,3 +485,29 @@ whole subsystem is DORMANT on our boot -- none of its code-2 posts fire.
 subsystem never runs, so it never posts the code-2 message that would drive the MMI window-SM to create
 the idle window.** Next step: characterize `0x240xxx` -- is it a task (is it scheduled/resumed at all?),
 and what message/state drives its screen-diff loop. That producer is the next node up the same chain.
+
+## Into the display/window subsystem (2026-07-08, 5-pass dig)
+
+Climbed one node further up the MMI wake-chain: characterized the 0x240xxx display subsystem that
+should post the code-2 (window-mgmt) message to MMI task 6.
+
+- **P1 (TRACE_DISPSUB):** the subsystem is ALIVE, not dark -- it enters at 0x24047e (t=0.84) and spins
+  a periodic idle-redraw loop 0x2404d8-0x240552 (~0.72s), but never reaches the code-2 post sites 0x2409xx.
+- **P2:** 0x24047e is a state dispatcher on a control block r4; every meaningful path gates on the type
+  byte [r4+1] == 0x80 (active window). With type != 0x80 it routes to the idle redraw.
+- **P3:** the control block is 0x0010e2ec, with type[+1]=0 and state[+2] cycling 0<->3.
+- **P4 (TRACE_DISPCB):** the type byte is ALWAYS written 0x00 (from 0x23e694) and never 0x80 -- the loop
+  keeps resetting it; the window-activate action that would write 0x80 never runs.
+- **P5:** the writer/owner is a live display/window TASK at 0x23e62c that recv's at 0x23e646 (message
+  codes based at 0x0b04) and, in its default handler 0x23e67e, sets manager state=[msg+2] and
+  type=[0x10e461] (the window entry's type). At runtime this task receives ONLY code 0x05df (a periodic
+  refresh tick, [+2]=00,[+3]=ff) -- NEVER the window-create codes 0x0b04+ that would populate an active
+  window. So it is message-starved exactly like the MMI above it.
+
+**Full chain (6 levels), all mapped:** top-level app state -> (missing) window-create message 0x0b04+ ->
+display/window task 0x23e62c -> manager 0x10e2ec type stays 0 (never 0x80) -> 0x240xxx dispatch idles ->
+code-2 poster display_type2_post_2b1f24 never called -> MMI task 6 never gets code 2 -> window-SM
+0x297ed8 never creates the idle window. Every layer is a live-but-starved task waiting on a message the
+layer above never sends, rooted in the top-level app state never issuing "show idle" -- the same
+coherent-boot wall, now traced end to end with precision. Next node up: who sends code 0x0b04+ (window
+create) to the display task, and what gates it.
