@@ -768,3 +768,44 @@ cannot compose content — identical in kind to every prior incoherent-force →
 result, now localized to the resource-registration layer. Idle pixels remain a
 faithful display/resource-subsystem bringup task, not an injectable flag. Knobs:
 `TRACE_RESREG`, `EXPERIMENT_MMI_IDLE_DREADY` (now also grants the bitmap).
+
+## The resource-provider registrar: a contact-service command (2026-07-08)
+
+Five passes to find what should set the resource bitmap `[0x11ff08]` + enable
+`[0x11fee4]`. Found it, and it closes the causal chain back to the known boundary.
+
+**Registrar = `resource_system_init 0x2b140a(r0, enable=r1, r2, config_ptr=r3)`.**
+Writers of the enable and bitmap live in the same resource cluster as the reader:
+- `0x2b140a`: if `r3==0` → disable (`[0x11fee4]=0`); else sets `[0x11fee4]=r1`,
+  `[0x11ff28]=r2`, `[0x11fee5]=r0`, and if `r1!=0` memcpy's a **0x40-byte config
+  blob** from `r3` into the two bitmaps `[0x11ff08]` (0x20 bytes) and `[0x11fee8]`
+  (0x20 bytes) via `0x2b5c7c`, then OR's bit `0x80` into `[0x11ff08]`. So *which*
+  resource classes are available is decided by a **caller-supplied config table**,
+  not hardcoded.
+
+**4 callers, all in the contact-service command layer `0x236xxx`:**
+- **ENABLE** — `0x2366d4 → 0x2366f6`: validates a 0x40-byte blob (`0x2a41d0`), then
+  calls `0x2b140a` with `enable=[0x11fedd]` and **`config_ptr = message_base+9`** —
+  the resource bitmap arrives as a **contact-service command payload**.
+- **DISABLE** — `0x23672c` inside the channel-map handler `0x23670c` (when command
+  byte `[+8] != 0x70`): `0x2b140a(0,0,0,0)` clears `[0x11fee4]`.
+- `0x236e6c` / `0x236f10` — two more command handlers.
+These are reached via the contact-service command cascade (`b`-branches on
+`message[+8]`), not a jump table, so they are invisible to pointer/`bl`-caller scans
+— consistent with the service dispatch.
+
+**Never runs on our boot.** `TRACE_RESINIT` (new hook at `0x2b140a`) logs **zero
+calls** the entire boot — the resource-enable command is never dispatched. So the
+resource registration is gated behind the full contact-service session, the **same
+boundary** as CONTACT SERVICE (cmd `0x64`/`0x65`), service-ready, and `000d`.
+
+**Verdict.** The display-ready wall is not a standalone hardware/injectable gate —
+it is another facet of the contact-service session. It is modellable in principle
+(deliver the enable command with a valid config blob, `MODEL_SVC_RESPONDER`-style),
+but two caveats stand: (a) the 0x40-byte config is provisioned/firmware data to
+source faithfully, and (b) the prior pass already proved the bitmap alone is
+necessary-but-insufficient (with resources granted, `display_idle` still cannot
+compose content). So idle pixels remain the full coherent display-subsystem bringup,
+now traced end-to-end: contact-service enable command → `0x2b140a` → bitmap +
+`[0x11fee4]` → resource availability `0x2b12b4` → idle draw's resource content.
+Knob: `TRACE_RESINIT`.
