@@ -2667,6 +2667,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			}
 		}
 	}
+	// TRACE_MMIMSG (opt-in): every message the MMI task receives, at 0x29800c (r0 = recv'd msg from
+	// 0x298008). Logs [msg+4] (code), [msg+5], [msg+6]. Shows what the MMI processes and what "create
+	// window / go idle" trigger it is missing.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIMSG", 0) != 0 && pc == addr && addr == 0x0029800c)
+	{
+		const u32 m = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (m >= 0x00100000 && m < 0x00180000)
+		{
+			static unsigned mm = 0;
+			if (mm++ < 40) logerror("mmimsg: [+4]=%02x [+5]=%02x [+6]=%02x t=%.4f\n",
+					debug_ram_byte(m + 4), debug_ram_byte(m + 5), debug_ram_byte(m + 6), machine().time().as_double());
+		}
+	}
 	// TRACE_MMIWIN (opt-in): the MMI window state machine 0x297ed8 -- W = [0x1116f8+8] (window array cursor),
 	// count = [W+4], top entry = 0x111724 + count*0x1c, its window-id byte [top+0]->deref and state [+0x19].
 	// Shows the window stack over the boot: which screens are active and whether an idle window is ever pushed.
