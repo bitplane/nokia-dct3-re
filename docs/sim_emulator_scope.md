@@ -885,3 +885,43 @@ the idle **content pipeline** (populating the layout's actual pixels — clock, 
 etc.) is the next layer, and it needs the coherent SIM/network bringup a no-SIM boot
 doesn't do. The boot correctly stays on "Insert SIM card". Knobs: `MODEL_RES_ENABLE`,
 `RES_ENABLE_MS`/`MSGSZ`/`FILL`/`VAL`.
+
+## The idle content pipeline: a ~18-class resource composition (2026-07-09)
+
+Dug into what actually fills the operator-idle pixels. `display_idle 0x2a255c` is
+minimal — `resource-get(0x4c22)` (acquire the idle window) + `render-post(0x547)`
+to task 5. The content is composed downstream from a large set of drawable
+resources.
+
+**Two swap16 corrections** (the recurring trap) surfaced here:
+- The idle window id is **`0x4c22` (class `0x4c`)**, not `0x224c`/class `0x22`
+  (literal `4c220000` unswaps to `0x4c22`; confirmed by `0x2b257e` doing
+  `(id>>8)-0x4c = 0`). Earlier notes had this backwards.
+- The availability bit-mask table `0x2e2f5c` is **permuted**
+  `{0x40,0x80,0x10,0x20,0x04,0x08,0x01,0x02}`, not `1<<i`; class `0x4c` needs bit
+  `0x04` of `[0x11ff11]` (not `0x10`).
+
+Fixed `MODEL_RES_ENABLE`'s sparse config to register the real display resource
+classes (`0x4c/0x4f/0x50/0x52/0x56` — the ROM-def-table `0x2e0a50` keys) with the
+correct permuted masks. `TRACE_RESAVAIL` (new, hooks `0x2b12b4`) then confirms the
+idle window `0x4c22` is **AVAILABLE** (`byte[11ff11]=06 & mask 04`).
+
+**But the idle draw still can't compose.** With the window acquired, the
+composition queries **~18 more resource classes** — `0x22 0x25 0x26 0x27 0x2a 0x2b
+0x30 0x31 0x3a 0x3c 0x3d 0x44 0x4a 0x5c 0x5d 0x5e 0x78` (fonts, icons, layout
+elements, sub-windows) — and **every one is unavailable** (bitmap byte 0).
+`display_idle` acquires the top-level window, but every drawable inside it is
+unregistered, so nothing composes → blank.
+
+**Conclusion.** The idle content pipeline needs:
+(a) the **full faithful resource registration** — the real cmd-`0x70` config blob a
+real phone sends, enabling exactly this ~18-class set *with their ROM/RAM backing
+providers*. This is provisioned data not obtainable here; all-`0xff` enables the
+classes but also unbacked ones, destabilizing/blanking the display.
+(b) the **runtime content values** — clock (RTC, available), operator/signal (SIM +
+network registration = RF hardware, out of scope).
+
+So operator-idle is fundamentally a SIM+network state; without them "Insert SIM
+card" is the correct and complete terminal screen. The whole boot→pixel path is now
+mapped end-to-end, down to the per-class resource composition. Boot-to-"Insert SIM
+card" stands as the clean milestone. Knob: `TRACE_RESAVAIL`.
