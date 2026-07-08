@@ -285,6 +285,13 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Target("startup_charger_present_event_wait_2711f6", 0x002711f6L),
 		new Target("startup_charger_event14_followup_wait_27120e", 0x0027120eL),
 		new Target("startup_charger_absent_event_wait_27124e", 0x0027124eL),
+		// Mode-4 dig (2026-07): mode-4 handler wants raw 3->0xe->7; ev7-init (=post_charger_sequence_271266)
+		// runs app-subsystem init then the readiness accumulator; terminal 000c is the accumulator else-path.
+		new Target("startup_mode4_handler_271254", 0x00271254L),
+		new Target("startup_readiness_accumulator_2712c0", 0x002712c0L),
+		new Target("startup_mode4_completion_advance_271354", 0x00271354L),
+		new Target("startup_mode_field_store_270184", 0x00270184L),
+		new Target("startup_set_mode_000c_terminal_270190", 0x00270190L),
 		new Target("startup_post_charger_sequence_continue_271266", 0x00271266L),
 		new Target("startup_post_charger_completion_accumulate_2712cc", 0x002712ccL),
 		new Target("startup_post_charger_completion_flags_check_271326", 0x00271326L),

@@ -2590,30 +2590,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("mode4: injected event 0x74 (mode-7 gate) t=%.4f\n", machine().time().as_double());
 		}
 	}
-	// TRACE_EV3 (opt-in): posts of startup event 3 -- immediate 0x2695f4 vs delayed 0x2697aa (recoded to
-	// 0xc3). Mode 4 needs RAW event 3 (its handler checks raw 3); it only ever gets 0xc3 (delayed). Log the
-	// caller so we can find event 3's producer and whether an immediate path exists.
-	if (nokia_env_u32("NOKI3210_TRACE_EV3", 0) != 0 && pc == addr &&
-			(addr == 0x002695f4 || addr == 0x002697aa) && (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) == 3)
-	{
-		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-		static unsigned e3 = 0;
-		if (e3++ < 30) logerror("ev3: %s event=3 lr=%08x t=%.4f\n",
-				addr == 0x002695f4 ? "IMMEDIATE 0x2695f4" : "delayed 0x2697aa", lr, machine().time().as_double());
-	}
-	// TRACE_STARTUP_EV (opt-in): every event the startup task receives, at the master dispatch recv-store
-	// 0x270c92 (strh r0,[r4+2]); r0 = event code, [r4+4] = current mode. Shows the full event stream and
-	// whether raw event 7 (which mode 4 needs) ever appears.
-	if (nokia_env_u32("NOKI3210_TRACE_STARTUP_EV", 0) != 0 && pc == addr && addr == 0x00270c92)
-	{
-		const u32 ev = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
-		const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
-		const u32 mode = (r4 >= 0x00100000 && r4 < 0x00180000) ?
-				((u16(debug_ram_byte(r4 + 4)) << 8) | debug_ram_byte(r4 + 5)) : 0xffff;
-		static unsigned se = 0;
-		if ((mode == 0x0004 || ev == 7) && se++ < 80)
-			logerror("startupev: event=%04x mode=%04x t=%.4f\n", ev, mode, machine().time().as_double());
-	}
 	// TRACE_STARTUP4 (opt-in): dump the startup-readiness flag accumulator 0x112390-0x112398 at the mode-4
 	// event loop 0x2712cc. Events 9/a/b/c/1c set flags [0x112390/92/93/94/95]; event 6 -> terminal 0x2714fc.
 	// Shows which subsystem-readiness flags are set vs missing with the SIM accepted.
@@ -2665,19 +2641,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					addr == 0x002712ba ? "post-init recv" : "?";
 				logerror("startup4: %s t=%.4f\n", w, machine().time().as_double());
 			}
-		}
-	}
-	// TRACE_MMIMSG (opt-in): every message the MMI task receives, at 0x29800c (r0 = recv'd msg from
-	// 0x298008). Logs [msg+4] (code), [msg+5], [msg+6]. Shows what the MMI processes and what "create
-	// window / go idle" trigger it is missing.
-	if (nokia_env_u32("NOKI3210_TRACE_MMIMSG", 0) != 0 && pc == addr && addr == 0x0029800c)
-	{
-		const u32 m = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
-		if (m >= 0x00100000 && m < 0x00180000)
-		{
-			static unsigned mm = 0;
-			if (mm++ < 40) logerror("mmimsg: [+4]=%02x [+5]=%02x [+6]=%02x t=%.4f\n",
-					debug_ram_byte(m + 4), debug_ram_byte(m + 5), debug_ram_byte(m + 6), machine().time().as_double());
 		}
 	}
 	// TRACE_MMIWIN (opt-in): the MMI window state machine 0x297ed8 -- W = [0x1116f8+8] (window array cursor),
@@ -2817,19 +2780,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("sim_apdu: %-12s len=%u [ %s] t=%.4f\n", name, len, hex, machine().time().as_double());
 		}
 	}
-	// TRACE_SIMDATA (opt-in): does the SIM DATA state machine 0x29ff2c fire? It reads EFs and reports up
-	// via 0x234634 (service code 0xaf); entered from the contact-service dispatcher 0x2378e0. If it never
-	// fires after "SIM detected", the EF-read requester is dormant (the step-2 wall).
-	if (nokia_env_u32("NOKI3210_TRACE_SIMDATA", 0) != 0 && pc == addr &&
-			(addr == 0x0029ff2c || addr == 0x002378e0 || addr == 0x0027df9e))
-	{
-		static unsigned sd = 0;
-		if (sd++ < 30)
-			logerror("simdata: %s t=%.4f\n",
-					addr == 0x0029ff2c ? "SIM-data-SM 0x29ff2c" :
-					addr == 0x002378e0 ? "cs-dispatch 0x2378e0" : "code3-filereq 0x27df9e (EF-read request in)",
-					machine().time().as_double());
-	}
 	// TRACE_SIMSEL (opt-in): trace the file-read loop's response dispatch — the caller-gate 0x27ee56 (code
 	// stored), the data path 0x27ee94 (dumps sb + [sb..] + INS desc[+6]), the error 0x27ef02, the
 	// completion 0x27ef34 — to see how the EF SELECT response is (mis)handled.
@@ -2855,18 +2805,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			else
 				logerror("simsel: %s t=%.4f\n", addr == 0x0027ef02 ? "ERROR 0x27ef02" : "COMPLETION 0x27ef34",
 						machine().time().as_double());
-		}
-	}
-	// TRACE_SIMRECV (opt-in): log every recv (0x26a458) whose return address is in the SIM code region
-	// (0x27de00..0x27f100), with the caller LR. Reveals which recv the phone blocks on after each command
-	// (e.g. after the SELECT) — i.e. where the genuine file-read response must be injected.
-	if (nokia_env_u32("NOKI3210_TRACE_SIMRECV", 0) != 0 && pc == addr && addr == 0x0026a458)
-	{
-		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-		if (lr >= 0x0027de00 && lr < 0x0027f100)
-		{
-			static unsigned sr = 0;
-			if (sr++ < 120) logerror("simrecv: 0x26a458 <- lr=%08x t=%.4f\n", lr, machine().time().as_double());
 		}
 	}
 	// TRACE_SIMPPS (opt-in): trace the file-read phase entry 0x27ed3c and the PPS-compare path, to see the
