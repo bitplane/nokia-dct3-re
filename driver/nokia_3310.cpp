@@ -2747,6 +2747,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R3),
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
+		// TRACE_CSCMD (opt-in, fetch side): the contact-service command dispatcher 0x237400 reads the
+		// command byte [msg+8] into r4 at 0x23741a and binary-searches to a handler. cmd 0x70/0x71 route to
+		// the channel-map handler 0x23670c: 0x70 = resource ENABLE (-> 0x2b140a, config blob = msg+9),
+		// 0x71 = resource DISABLE. Log every command byte the contact-service processes -- confirms whether
+		// the resource-enable command 0x70 is ever delivered on our boot, and inventories the command set.
+		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x0023741a)
+		{
+			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
+			static unsigned cc = 0;
+			if (cc++ < 80 && msg >= 0x00100000 && msg < 0x00180000)
+				logerror("cscmd: [msg+8]=%02x [msg+5]=%02x t=%.4f\n", debug_ram_byte(msg + 8),
+						debug_ram_byte(msg + 5), machine().time().as_double());
+		}
 	// TRACE_MMIVM (opt-in, fetch side): at the rewrite mapper entry 0x2aefba (r0 = incoming 13-bit event
 	// key), log every event the task-5 VM rewrites. Pairs with the state-vector write trace: shows which
 	// keys drive the state array. Event 0x012e -> action base 0x80 (6-entry run); 0x05e8 is NOT a key.
