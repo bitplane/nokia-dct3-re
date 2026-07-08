@@ -638,3 +638,32 @@ misdecodes (a tooling limit). The exact external message that maps to 0x05e8 rem
 a disrom fix for 0x2ac6xx or a Ghidra pass on that function. Forcing 0x05e8 gets one step (code-3) but not
 visible idle. Next: fix disrom's Thumb resync on 0x2ac6xx (or Ghidra-decompile it) to read the message->event
 table, OR follow the forced code-3 downstream to see what the next missing step is.
+
+## Decoded: task 5's message->event mapping (2026-07-08, 5-pass, with fixed disrom)
+
+With disrom's Thumb-1 resync fixed, the MMI UI engine (0x2ac6xx) is readable and the mapping is decoded.
+
+**Pipeline (task 5 top loop 0x2af630):** recv+decode 0x2af57c (msg -> 13-bit code, e.g. 0x012e) ->
+rewrite mapper 0x2aefba -> engine 0x2ac3f2 -> ... The engine passes its input event straight through to the
+state handler (0x2ac400 -> 0x2ac422 -> dispatch 0x2ac652, r6 unchanged), so handler input == engine input ==
+0x2aefba output.
+
+**The mapper 0x2aefba is an ITERATIVE REWRITE, not a flat map:** it stores the event at [0x112086], then
+binary-searches a sorted table via 0x2aed5c and applies an action (0x2aef44/0x2aef7e), looping until the
+event stabilizes.
+- Binary-search table at **0x002cb218** (swap16 of literal b218002c; the trap struck again -- NOT 0x2c18b2),
+  8-byte entries sorted by key: [+0]=event key, [+2]=action index, [+4]=count. Decoded entries:
+  key 0x012e -> index 0x80, count 6;  key 0x05e3 -> index 0x17d;  keys run 0x00c8..0x05e3+.
+- Action table at **0x002cc7f0** (= the state-init table): each action writes state bytes into the
+  0x11fc80+ array (this is what set UI state byte 0x0b earlier), i.e. it drives state transitions, not a
+  simple event substitution.
+
+**Why 0x05e8 has no producer:** the window-create event 0x05e8 is NOT a table key -- it is computed in the
+engine as 0xbd<<3 (0x2ac660) and used as a RETURN threshold. The return-chain never feeds 0x05e8 back as a
+handler INPUT, and no rewrite rule outputs it. So window creation is not reachable by any single message that
+"maps to 0x05e8"; it requires the state machine to arrive at the window-create state through the coherent
+transition sequence the rewrite table encodes -- consistent with every prior finding (forcing 0x05e8 got one
+step but not a coherent window). Net: the mapping is fully characterized as a table-driven state-transition
+rewrite (0x2cb218 keys + 0x2cc7f0 actions); the exact transition path to the window-create state is the
+remaining (large) decode. Next: walk the 0x2cc7f0 action entries for index 0x80 (the 0x012e transition) to
+see the state sequence it sets, and find which state's handler emits the window-create.

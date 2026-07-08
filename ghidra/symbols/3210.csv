@@ -474,6 +474,7 @@ address,kind,name
 0x002ac3e0,label,display_state_store_and_apply_2ac3e0
 0x002ac3f2,function,task5_status_handler_b_2ac3f2
 0x002ac3f2,label,task5_status_handler_b_2ac3f2
+0x002ac3f2,function,mmi_ui_engine_entry_2ac3f2
 0x002ac540,function,mmi_ui_state_machine_engine_2ac540
 0x002ac65a,label,mmi_ui_state_handler_call_2ac65a
 0x002aca44,function,sched_assert_unlinked_or_reset6_2aca44
@@ -487,6 +488,7 @@ address,kind,name
 0x002aec34,function,sim_apdu_out_observe_2aec34
 0x002aed5c,function,task5_status_descriptor_lookup_2aed5c
 0x002aed5c,label,task5_status_descriptor_lookup_2aed5c
+0x002aed5c,function,mmi_event_table_bsearch_2aed5c
 0x002aeda0,function,task5_status_descriptor_match_2aeda0
 0x002aeda0,label,task5_status_descriptor_match_2aeda0
 0x002aeec6,function,task5_status_descriptor_eval_2aeec6
@@ -498,6 +500,7 @@ address,kind,name
 0x002aef7e,function,ui_state_table_init_2aef7e
 0x002aefba,function,task5_status_handler_a_2aefba
 0x002aefba,label,task5_status_handler_a_2aefba
+0x002aefba,function,mmi_event_rewrite_mapper_2aefba
 0x002af058,function,ccont_startup_step_2af058
 0x002af066,function,ccont_startup_status_get_2af066
 0x002af086,function,ccont_init_post_startup_event17_2af086
@@ -508,6 +511,7 @@ address,kind,name
 0x002af416,label,mad2_irq_bit4_calls_service_ready_setter_2af416
 0x002af57c,function,task5_status_recv_message_2af57c
 0x002af57c,label,task5_status_recv_message_2af57c
+0x002af57c,function,task5_recv_decode_msg_2af57c
 0x002af5aa,function,ccont_irq_callback_2af5aa
 0x002af5d2,function,task5_generated_status_next_2af5d2
 0x002af5d2,label,task5_generated_status_next_2af5d2
@@ -515,6 +519,7 @@ address,kind,name
 0x002af5fc,label,task5_generated_payload_next_2af5fc
 0x002af630,function,task5_status_dispatch_loop_2af630
 0x002af630,label,task5_status_dispatch_loop_2af630
+0x002af630,function,task5_mmi_main_loop_2af630
 0x002af6ea,function,startup_status_message_post_2af6ea
 0x002af732,label,post_13xx_to_task5_2af732
 0x002af744,function,task5_sequence_append_payload_pair_2af744
