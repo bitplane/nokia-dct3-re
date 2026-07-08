@@ -2515,6 +2515,30 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// EXPERIMENT (opt-in, option C — hollow idle): the MMI main loop (0x297fc4) recv's messages, dispatches,
 	// and when idle-flag [0x11f81b]==1 calls display_idle (0x2a255c). TRACE_MMI shows whether that task runs
 	// in our stuck boot; FORCE_IDLE pins the flag at the recv (0x298008) so the idle redraw fires each loop.
+	// TRACE_EV3 (opt-in): posts of startup event 3 -- immediate 0x2695f4 vs delayed 0x2697aa (recoded to
+	// 0xc3). Mode 4 needs RAW event 3 (its handler checks raw 3); it only ever gets 0xc3 (delayed). Log the
+	// caller so we can find event 3's producer and whether an immediate path exists.
+	if (nokia_env_u32("NOKI3210_TRACE_EV3", 0) != 0 && pc == addr &&
+			(addr == 0x002695f4 || addr == 0x002697aa) && (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) == 3)
+	{
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		static unsigned e3 = 0;
+		if (e3++ < 30) logerror("ev3: %s event=3 lr=%08x t=%.4f\n",
+				addr == 0x002695f4 ? "IMMEDIATE 0x2695f4" : "delayed 0x2697aa", lr, machine().time().as_double());
+	}
+	// TRACE_STARTUP_EV (opt-in): every event the startup task receives, at the master dispatch recv-store
+	// 0x270c92 (strh r0,[r4+2]); r0 = event code, [r4+4] = current mode. Shows the full event stream and
+	// whether raw event 7 (which mode 4 needs) ever appears.
+	if (nokia_env_u32("NOKI3210_TRACE_STARTUP_EV", 0) != 0 && pc == addr && addr == 0x00270c92)
+	{
+		const u32 ev = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
+		const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		const u32 mode = (r4 >= 0x00100000 && r4 < 0x00180000) ?
+				((u16(debug_ram_byte(r4 + 4)) << 8) | debug_ram_byte(r4 + 5)) : 0xffff;
+		static unsigned se = 0;
+		if ((mode == 0x0004 || ev == 7) && se++ < 80)
+			logerror("startupev: event=%04x mode=%04x t=%.4f\n", ev, mode, machine().time().as_double());
+	}
 	// TRACE_STARTUP4 (opt-in): dump the startup-readiness flag accumulator 0x112390-0x112398 at the mode-4
 	// event loop 0x2712cc. Events 9/a/b/c/1c set flags [0x112390/92/93/94/95]; event 6 -> terminal 0x2714fc.
 	// Shows which subsystem-readiness flags are set vs missing with the SIM accepted.
