@@ -2118,7 +2118,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				if (fillenv <= 0xff)
 					for (u32 i = 0; i < 0x40; i++) debug_ram_byte_w(msg + 9 + i, uint8_t(fillenv));
 				else
-					debug_ram_byte_w(msg + 9 + 4, 0x04);   // class 0x22 -> bit2 of bitmap byte 4
+				{
+					// SPARSE: register only the display resource classes that have ROM resource
+					// definitions (table 0x2e0a50): 0x4c (idle window 0x4c22), 0x4f, 0x50, 0x52, 0x56.
+					// bit(class&7) of blob[class>>3]. (Earlier code registered class 0x22 -- a swap16
+					// misread of the idle resource id: 4c220000 unswaps to 0x4c22, class 0x4c, NOT 0x224c.)
+					// The availability bit for class C is the PERMUTED mask romtable[C&7], where
+					// romtable @0x2e2f5c = {0x40,0x80,0x10,0x20,0x04,0x08,0x01,0x02} (NOT 1<<i).
+					// 0x4c->rt[4]=0x04, 0x4f->rt[7]=0x02  => byte9 = 0x06
+					// 0x50->rt[0]=0x40, 0x52->rt[2]=0x10, 0x56->rt[6]=0x01 => byteA = 0x51
+					debug_ram_byte_w(msg + 9 + 9, 0x06);   // byte9: classes 0x4c (idle window) + 0x4f
+					debug_ram_byte_w(msg + 9 + 0xa, 0x51); // byteA: classes 0x50 + 0x52 + 0x56
+				}
 				// Seed the enable-param struct the handler reads (only-read, never-written on our
 				// boot): [0x11fedd]=enable value (any nonzero -> [0x11fee4]); [de]/[df] secondary.
 				debug_ram_byte_w(0x0011fedd, uint8_t(nokia_env_u32("NOKI3210_RES_ENABLE_VAL", 1)));
@@ -2849,6 +2860,20 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		// (r1=enable flag -> [0x11fee4], r3=config-blob ptr -> bitmap [0x11ff08]). Called by the
 		// contact-service command layer (0x2366f6 enable / 0x23672c disable / 0x236e6c / 0x236f10).
 		// Reveals whether resource registration is reached on our boot and with enable=0 or nonzero.
+		// TRACE_RESAVAIL (opt-in): the availability predicate 0x2b12b4 -- log the resource id (r0),
+		// enable [0x11fee4], the class, the bitmap byte it reads, the permuted mask, and the verdict.
+		// Pins exactly why acquisition of the idle window 0x4c22 (class 0x4c) fails.
+		if (nokia_env_u32("NOKI3210_TRACE_RESAVAIL", 0) != 0 && pc == addr && addr == 0x002b12b4)
+		{
+			const u32 id = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
+			const unsigned cls = (id >> 8) & 0xff;
+			const uint8_t byte = debug_ram_byte(0x0011ff08 + (cls >> 3));
+			static const uint8_t rt[8] = {0x40,0x80,0x10,0x20,0x04,0x08,0x01,0x02};
+			static unsigned ra = 0;
+			if (debug_ram_byte(0x0011fee4) != 0 && ra++ < 80) logerror("resavail: id=%04x cls=%02x en[11fee4]=%02x byte[11ff%02x]=%02x mask=%02x -> %s t=%.4f\n",
+					id, cls, debug_ram_byte(0x0011fee4), 0x08 + (cls>>3), byte, rt[cls&7],
+					(byte & rt[cls&7]) ? "AVAIL" : "UNAVAIL", machine().time().as_double());
+		}
 		if (nokia_env_u32("NOKI3210_TRACE_RESINIT", 0) != 0 && pc == addr && addr == 0x0023670c)
 		{
 			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
