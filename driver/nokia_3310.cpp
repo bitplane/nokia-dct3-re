@@ -1487,6 +1487,20 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
+	// TRACE_MODEWR (opt-in): writes to the startup mode field 0x1123f0 (struct 0x1123ec+4). Logs the new
+	// mode value + writing PC -- pins where mode 000c (terminal) is committed vs where mode 0007 (advance).
+	if (nokia_env_u32("NOKI3210_TRACE_MODEWR", 0) != 0 && address == 0x001123f0)
+	{
+		const uint16_t neww = (m_ram[offset] & ~mem_mask) | (data & mem_mask);
+		static uint16_t last = 0xffff;
+		if (neww != last)
+		{
+			last = neww;
+			static unsigned mw = 0;
+			if (mw++ < 40) logerror("modewr: [1123f0]=%04x pc=%08x lr=%08x t=%.4f\n", neww, pc,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+	}
 	// TRACE_DREADY (opt-in): trace writers of the display-ready flag [0x11fee4] (even addr -> high byte of
 	// word 0x11fee4). 0x2b12b4 returns "resource unavailable" whenever this is 0, gating all display-resource
 	// acquisition (incl. the idle draw's 0x224c). Find if/when the display subsystem sets it.
