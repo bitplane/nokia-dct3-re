@@ -2735,6 +2735,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (uc++ < 60) logerror("uictl: handler event=%04x curtask=%u lr=%08x t=%.4f\n", ev,
 				debug_ram_byte(0x00100022), m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	}
+		// TRACE_RESINIT (opt-in, fetch side): the resource-system init 0x2b140a
+		// (r1=enable flag -> [0x11fee4], r3=config-blob ptr -> bitmap [0x11ff08]). Called by the
+		// contact-service command layer (0x2366f6 enable / 0x23672c disable / 0x236e6c / 0x236f10).
+		// Reveals whether resource registration is reached on our boot and with enable=0 or nonzero.
+		if (nokia_env_u32("NOKI3210_TRACE_RESINIT", 0) != 0 && pc == addr && addr == 0x002b140a)
+		{
+			static unsigned ri = 0;
+			if (ri++ < 40) logerror("resinit: 0x2b140a enable(r1)=%02x cfg(r3)=%08x lr=%08x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R3),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
 	// TRACE_MMIVM (opt-in, fetch side): at the rewrite mapper entry 0x2aefba (r0 = incoming 13-bit event
 	// key), log every event the task-5 VM rewrites. Pairs with the state-vector write trace: shows which
 	// keys drive the state array. Event 0x012e -> action base 0x80 (6-entry run); 0x05e8 is NOT a key.
