@@ -614,3 +614,27 @@ Pinning the exact external message -> internal 0x05e8 mapping requires decoding 
 (message->event->state), which disrom partially misdecodes -- the honest limit this round. Next: decode task
 5's engine event mapping (what external message the engine turns into internal 0x05e8), or trace task 5's
 recv to see which 0x13xx messages it consumes and where the state machine parks.
+
+## Decoding task 5's message->event mapping (2026-07-08, 5-pass dig)
+
+- **P1 (TRACE_T5RECV):** task 5's main loop recv is at 0x2af57e (ret 0x2af582); it recv's rarely (3x in 10s,
+  mostly blocked doing render work between messages).
+- **P2:** the loop's 0x26a698 turned out to be a scheduler queue-count helper (walks the TCB ring at
+  0x00101484 stride 0x1c), NOT the message->event mapper. The mapping is done inside the engine.
+- **P3:** the window-create event 0x05e8 is never a pool literal -- it is a computed value in a contiguous
+  MMI event enum (~0x05dd-0x05ef), reached by the handler's subtract-cascade. So the message->event mapping
+  is computed in the engine (0x2ac6xx), which disrom partially misdecodes.
+- **P4 (empirical):** one concrete mapping captured -- task 5 recv'd message code 0x012e (t=0.46) and the UI
+  handler then ran with internal event 0x05e2 (t=0.76). So 0x012e -> 0x05e2 in the current state.
+- **P5 (EXPERIMENT_FORCE_UIEVENT, VALIDATION):** forcing the handler's one invocation event to 0x05e8 caused
+  a NEW code-3 (window op) post to MMI task 6 (t=0.777, poster 0x2b1fa0) that otherwise happens differently
+  -- confirming 0x05e8 IS the window-create advance event. But it did NOT complete to a code-2 (window-mgmt)
+  post nor change the frame: forcing one event advances one step; full window creation needs the coherent
+  follow-through (state + subsequent events), the incoherent-forcing wall.
+
+**Net.** Confirmed (by forcing) that internal event 0x05e8 is the MMI UI window-create advance; captured one
+real message->event mapping (0x012e -> 0x05e2); localized the full mapping to the engine 0x2ac6xx that disrom
+misdecodes (a tooling limit). The exact external message that maps to 0x05e8 remains open -- it needs either
+a disrom fix for 0x2ac6xx or a Ghidra pass on that function. Forcing 0x05e8 gets one step (code-3) but not
+visible idle. Next: fix disrom's Thumb resync on 0x2ac6xx (or Ghidra-decompile it) to read the message->event
+table, OR follow the forced code-3 downstream to see what the next missing step is.

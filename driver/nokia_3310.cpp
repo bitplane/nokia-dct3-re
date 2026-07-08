@@ -2679,6 +2679,29 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					addr == 0x0026a204 ? "204" : "354", tgt, debug_ram_byte(msg + 5), msg, lr, machine().time().as_double());
 		}
 	}
+	// TRACE_T5RECV (opt-in): at task 5's loop 0x2af582 (r0=recv'd msg), log the message code [msg+0] and
+	// payload [msg+4] -- the external messages the MMI UI task consumes, to correlate with the handler's
+	// internal event (which advances to window-create on 0x05e8).
+	if (nokia_env_u32("NOKI3210_TRACE_T5RECV", 0) != 0 && pc == addr && addr == 0x002af582)
+	{
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+		{
+			static unsigned t5 = 0;
+			if (t5++ < 40) logerror("t5recv: msg code=%04x [+4]=%02x%02x t=%.4f\n",
+					(u32(debug_ram_byte(msg)) << 8) | debug_ram_byte(msg + 1),
+					debug_ram_byte(msg + 4), debug_ram_byte(msg + 5), machine().time().as_double());
+		}
+	}
+	// EXPERIMENT_FORCE_UIEVENT (opt-in, NOT faithful): force the MMI UI handler's event to 0x05e8 (the
+	// window-create advance event) at its one invocation, to validate the downstream chain -- does it post
+	// MMI code-3/2 + activate the display + change the frame?
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_UIEVENT", 0) != 0 && pc == addr && addr == 0x002a0aec)
+	{
+		static unsigned fu = 0;
+		if (fu++ < 4) { m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x05e8);
+			logerror("force_uievent: forced handler event -> 0x05e8 t=%.4f\n", machine().time().as_double()); }
+	}
 	// TRACE_UICTL (opt-in): hook the MMI UI state-handler entry 0x2a0aec and log every EVENT it processes
 	// (r0). Event 0x05e8 is the one that reaches the window-create path (0x2a0c3a/0x2a0c40). Does it ever
 	// arrive at the handler, and if so does the UI advance?
