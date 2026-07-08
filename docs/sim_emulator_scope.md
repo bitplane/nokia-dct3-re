@@ -720,3 +720,51 @@ service registration / external state; note `0x11fee4` is also named
 and whether it is faithfully modellable (analogous to `MODEL_SVC_CHANNEL_DRAIN`),
 or whether the resource-acquisition gate `0x2b12b4` is the cleaner lever. Knob:
 `TRACE_MMIVM` (opt-in, cap 400).
+
+## The display-ready wall, mechanized: resource registration never runs (2026-07-08)
+
+Five passes on what sets display-ready `[0x11fee4]` and whether it is faithfully
+modellable. Result: the wall is the **resource-provider registration** layer, and
+both gates it depends on are downstream of a display-subsystem bringup our faked
+boot never performs.
+
+**`[0x11fee4]` = master resource-enable (one reader in the image).** A literal scan
+finds exactly one pool reference to `0x0011fee4`, in the resource-function cluster
+`0x2b12b4` (availability predicate) / `0x2b12dc` (acquire). `0x2b12b4` returns
+"unavailable" the instant `[0x11fee4]==0`. Firmware only ever *writes* it to 0
+(reset `0x2b13c0` clears `[11fee4]/[11ff28]/[11fee5]/[11f824]`); nothing on our boot
+sets it nonzero. (This reconciles `TRACE_DREADY`'s "0 writes" — a 0→0 store is
+filtered.) It is also `FW_SERVICE_CHANNEL_ENABLE_FLAGS` (driver line 228): the same
+flag gates the contact-service remote read, so it is a system-wide "resource/service
+channel enabled" bit, not display-specific.
+
+**`0x2b12b4` decoded.** `available = ([0x11fee4] != 0) AND bit(class&7) of
+[0x11ff08 + class>>3]`, where `class = id>>8`. The idle draw acquires resource
+`0x224c` → class `0x22` → bit 2 of `[0x11ff0c]`. So availability needs *both* the
+master enable and a per-class registration bit in the bitmap `[0x11ff08]`
+(`FW_SERVICE_CHANNEL_MASK_BASE`).
+
+**The bitmap is never registered.** `TRACE_RESREG` (new; writes to
+`0x11ff08..0x11ff10`) logs **zero writes the entire boot** — no resource class is
+ever registered. The "Insert SIM card" screen renders via a pre-resource path; the
+idle repaint is what needs a registered resource. The bitmap has a single literal
+reference in the image (the same `0x2b12b4` cluster), i.e. the registrar that should
+set it never executes on our boot.
+
+**Decisive test — grant the resource, does idle draw?** `EXPERIMENT_MMI_IDLE_DREADY`
+was extended to force all three gates at the idle gate `0x297ffa`: idle flag
+`[0x1116fd]=1`, enable `[0x11fee4]=1`, and the whole bitmap `[0x11ff08..0f]=0xff`.
+Result: `display_idle` runs and gets **past** the availability check, but still emits
+**no idle render post** (`0x2af6ea` — the render-task hand-off — stops after t≈0.88;
+only housekeeping recvs `0x2af638` fire after the t=14.9 force) and the frame never
+becomes an idle screen. So the flags+bitmap are **necessary but not sufficient**: the
+resource *content/memory* the idle layout needs is built by the display-subsystem
+bringup, which our boot never performs.
+
+**Conclusion.** The display-ready wall is fully mechanized. `[0x11fee4]` and the
+`[0x11ff08]` bitmap are products of a resource-provider registration that never runs;
+forcing them moves the wall one step (past availability) but the idle draw still
+cannot compose content — identical in kind to every prior incoherent-force → black
+result, now localized to the resource-registration layer. Idle pixels remain a
+faithful display/resource-subsystem bringup task, not an injectable flag. Knobs:
+`TRACE_RESREG`, `EXPERIMENT_MMI_IDLE_DREADY` (now also grants the bitmap).
