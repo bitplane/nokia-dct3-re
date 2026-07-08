@@ -2607,12 +2607,16 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// TRACE_STARTUP4 (opt-in): dump the startup-readiness flag accumulator 0x112390-0x112398 at the mode-4
 	// event loop 0x2712cc. Events 9/a/b/c/1c set flags [0x112390/92/93/94/95]; event 6 -> terminal 0x2714fc.
 	// Shows which subsystem-readiness flags are set vs missing with the SIM accepted.
-	if (nokia_env_u32("NOKI3210_TRACE_STARTUP4", 0) != 0 && pc == addr && (addr == 0x00271364 || addr == 0x00271396))
+	if (nokia_env_u32("NOKI3210_TRACE_STARTUP4", 0) != 0 && pc == addr &&
+			(addr == 0x00271364 || addr == 0x00271396 || addr == 0x00271422 || addr == 0x0027136c || addr == 0x0027138e))
 	{
 		static unsigned s7 = 0;
-		if (s7++ < 20) logerror("startup4: %s t=%.4f\n",
-				addr == 0x00271364 ? "ADVANCED past accumulator -> 0x271364 (charger/init)" : "reached mode-7 event-0x74 wait 0x271396",
-				machine().time().as_double());
+		if (s7++ < 25) logerror("startup4: %s t=%.4f\n",
+				addr == 0x00271364 ? "ADVANCED past accumulator -> 0x271364 (charger check)" :
+				addr == 0x00271422 ? "-> 0x271422 (charger PRESENT -> battery display)" :
+				addr == 0x0027136c ? "-> 0x27136c (charger absent -> subsystem inits)" :
+				addr == 0x0027138e ? "-> 0x27138e (post-init recv, before 0x74 wait)" :
+				"reached mode-7 event-0x74 wait 0x271396", machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_STARTUP4", 0) != 0 && pc == addr &&
 			(addr == 0x00271254 || addr == 0x00271266 || addr == 0x00271270 || addr == 0x00271292 ||
