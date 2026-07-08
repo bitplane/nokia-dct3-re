@@ -429,3 +429,32 @@ So the go-idle "trigger" is not a single pokeable flag: the idle flag is set whe
 the **idle window state**, which our boot never does. Same coherent-state wall -- the phone's UI
 state machine never transitions to idle (upstream of both the idle flag and the display bring-up).
 Reaching idle pixels needs that transition, not a poke.
+
+## Boot-to-idle: the complete dependency map (2026-07-08)
+
+After the SIM is faithfully accepted, reaching operator-idle needs TWO chains, both now mapped
+end to end. Neither is a single poke; both are message/state flows a fully-provisioned boot
+produces and a faked/unprovisioned boot does not.
+
+**Chain A — the startup state machine (now traversable):**
+`SIM accepted` → mode `000d` (service-ready, cleared by `MODEL_SVC_CHANNEL_DRAIN`) → **mode `0004`**:
+needs raw handshake `3→0xe→7` → **ev7-init** `0x271266` (runs app-subsystem init) → readiness
+accumulator `0x2712c0`: the self-tick `0xc3` hits the else branch → terminal `000c` UNLESS all
+flags `0x112390-95` are set and event `0xd` triggers the completion check `0x271326` → advance
+`0x271364` (charger absent) → **mode-7 event-`0x74` wait** → outcome 3. `EXPERIMENT_MODE4_EVENTS`
+drives all of this (inject `3/0xe/7`, pre-set flags, tick→`0xd`, inject `0x74`). Lands on outcome 3.
+
+**Chain B — the interactive MMI app layer (dormant):**
+MMI task `0x297fc4` is alive but STARVED — it receives 2 init messages (t<0.85) then nothing.
+The window manager `0x297ed8` (called from `0x2981be`, gated on MMI message subcodes `0x22/0x24/0xf0`)
+never runs → no windows created → idle flag `0x1116fd` never set → `display_idle 0x2a255c` never
+requested. Separately the display-resource layer is down: display-ready `0x11fee4` never set, so
+`0x2b257e(0x224c)` (the idle draw's resource-get) always fails. "Insert SIM card" on screen is a
+LEFTOVER from the status subsystem's early render (via the render task), NOT the MMI window manager.
+
+**The gap:** Chain A reaching outcome 3 does NOT emit the messages Chain B needs (window creation /
+"SIM ready → go idle"). On a real boot the completed startup drives the app controller to create the
+idle window and bring up the display; our faked boot produces neither. So idle PIXELS require the
+coherent app-layer message flow — the fundamental provisioned-boot wall, upstream of everything and
+not reachable by injection. The SIM-conversation problem (the emulator's purpose) is solved; idle is
+a coherent-boot problem on the MMI/display application layer.
