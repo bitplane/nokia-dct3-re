@@ -2669,6 +2669,30 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					addr == 0x0026a204 ? "204" : "354", tgt, debug_ram_byte(msg + 5), msg, lr, machine().time().as_double());
 		}
 	}
+	// TRACE_DISPPROD (opt-in): find the display/window task's id and posters by matching message pointers.
+	// Log every send 0x26a204/0x26a354 (r0=target, r1=msg, [msg+0]hw = the display task's code) and every
+	// display recv at 0x23e64a. The post whose msg ptr == a display-recv ptr is that message's producer;
+	// any post with code[+0] in 0x0b04+ (window-create) is the wake we're hunting.
+	if (nokia_env_u32("NOKI3210_TRACE_DISPPROD", 0) != 0 && pc == addr && (addr == 0x0026a204 || addr == 0x0026a354))
+	{
+		const u32 tgt = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+		{
+			const u32 code0 = (u32(debug_ram_byte(msg)) << 8) | debug_ram_byte(msg + 1);
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			static unsigned dp = 0;
+			if (dp++ < 400) logerror("dispprod: POST fn=%s tgt=%u code0=%04x msg=%08x lr=%08x t=%.4f\n",
+					addr == 0x0026a204 ? "204" : "354", tgt, code0, msg, lr, machine().time().as_double());
+		}
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_DISPPROD", 0) != 0 && pc == addr && addr == 0x0023e64a)
+	{
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+			logerror("dispprod: DISP-RECV msg=%08x code0=%04x t=%.4f\n", msg,
+					(u32(debug_ram_byte(msg)) << 8) | debug_ram_byte(msg + 1), machine().time().as_double());
+	}
 	// TRACE_DISPSUB (opt-in): does the 0x240xxx-0x242xxx display/window-diff subsystem execute at all? Log
 	// the first fetch into the region and count distinct entry addresses -- if it never runs, the whole
 	// code-2-to-MMI producer layer is dead on our boot.
@@ -2679,6 +2703,8 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (ds++ < 4000 && (ds % 500) == 0) logerror("dispsub: %u fetches, latest pc=%08x t=%.4f\n", ds, addr, machine().time().as_double());
 		// At the state-dispatch entry 0x24047e dump the control block r4: +1=type, +2=state (the loop gate),
 		// +8=ptr; and [sp+0x10] pointer P whose [P] is compared to the state.
+		if (addr == 0x0024092e || addr == 0x00240e5e || addr == 0x00241aac)
+			logerror("dispsub: REACHED code-2 post site %08x t=%.4f\n", addr, machine().time().as_double());
 		if (addr == 0x0024047e)
 		{
 			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
@@ -2689,6 +2715,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						(u32(debug_ram_byte(r4+8))<<24)|(u32(debug_ram_byte(r4+9))<<16)|(u32(debug_ram_byte(r4+10))<<8)|debug_ram_byte(r4+11),
 						machine().time().as_double());
 		}
+	}
+	// EXPERIMENT_FORCE_WINTYPE (opt-in, NOT faithful): the display manager's type stays 0 because the window
+	// entry [0x10e461] is 0. Poke it to 0x80 (active window) at the display recv, so the next manager update
+	// sees type 0x80 -- a cascade test: does the 0x240xxx dispatch then reach the code-2 post -> MMI window-SM?
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_WINTYPE", 0) != 0 && pc == addr && addr == 0x0023e64a)
+	{
+		debug_ram_byte_w(0x0010e461, 0x80);
+		static unsigned fw = 0;
+		if (fw++ < 4) logerror("force_wintype: poked [0x10e461]=0x80 t=%.4f\n", machine().time().as_double());
 	}
 	// The display/window task 0x23e62c recv's at 0x23e646 (ret 0x23e64a, r0=msg, [msg]=code base 0x0b04).
 	// Log the codes it gets -- reveals whether a window-activate message (setting type 0x80) ever arrives.

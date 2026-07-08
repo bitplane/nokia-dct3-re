@@ -511,3 +511,28 @@ code-2 poster display_type2_post_2b1f24 never called -> MMI task 6 never gets co
 layer above never sends, rooted in the top-level app state never issuing "show idle" -- the same
 coherent-boot wall, now traced end to end with precision. Next node up: who sends code 0x0b04+ (window
 create) to the display task, and what gates it.
+
+## Climbing to the window-create sender (2026-07-08, 5-pass dig)
+
+Pushed up from the display task toward whoever sends it window-create commands.
+
+- **P1 (TRACE_DISPPROD, pointer-match):** the display/window task is **task 13**. Its messages are matched
+  to posters by message pointer; the 0x05df refresh comes from lr=0x28d182 (movs r0,#0xd; bl 0x26a204).
+- **P2:** across the boot, task 13 receives ONLY code 0x05df (42x) -- a periodic refresh tick that is BELOW
+  the task's dispatch base 0x0b04, so it always hits the default handler (manager update). The real window
+  commands 0x0b04+ NEVER arrive.
+- **P3:** static scan for post-to-13 sites finds only 5 immediate `movs r0,#0xd` posts; most task-13 posts
+  load the target from a register, so an immediate-scan can't find the dormant window-create sender.
+- **P4 (EXPERIMENT_FORCE_WINTYPE, clean negative):** poking the window entry type [0x10e461]=0x80 does NOT
+  make the 0x240xxx dispatch reach the code-2 post sites (0x2409xx), and no code-2 reaches the MMI. So the
+  code-2 post is NOT gated on manager state -- it is driven by the window-command messages themselves.
+- **P5:** the display task's 0x0b04+ handlers are real window logic: 0x0b06 (0x23e702) links a window entry
+  into the manager and gates on window type [r4+1]==0x80; 0x0b04 (0x23e7ac) sets manager state via
+  0x23e324/0x23e378 against window-id constants 0x061a/0x061b. So the code-2-to-MMI post is genuinely
+  downstream of a real 0x0b04+ window command carrying window data.
+
+**Net:** the wall is now precise at this level -- task 13 (display) is a live task starved of the window-create
+commands (0x0b04+) that the app issues on "show a screen"; it only gets the 0x05df refresh tick. Forcing
+manager state does not substitute for the command. Same coherent-boot root (app-state never issues show-idle),
+one node higher. Next: find the register-target sender of a 0x0b04+ command to task 13 (needs register-aware
+static analysis, not an immediate-scan), or settle the provisioning question via 3310 cross-firmware.
