@@ -2561,16 +2561,23 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		// But ev7-init's own self-posted event 6 arrives first: event 6 -> 0x271316 -> [0x112398]=1 ->
 		// 0x2714fc UNCONDITIONAL terminal 000c. So suppress event 6 post-ev7-init (convert it to a harmless
 		// tick 0xc3 at the recv-stores) so event 4 wins the race and advances with [0x112398]==0.
-		// The accumulator's ELSE branch (0x2712f2) bl's 0x270190 = "set mode 0xc" (terminal 000c) on any
-		// unrecognized event. Pass 1 showed that's what kills it. During the experiment, override 0x270190's
-		// mode value from 0xc to 4 -- stay in mode 4 instead of terminaling -- so the accumulator survives
-		// and the real event-4 advance (0x271354 -> mode-7) can happen.
-		else if (addr == 0x00270184 && m_mode4_step == 3 &&
-				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0xc)
+		// The accumulator advances via the completion check 0x271326 (reached on event 0xd): if ALL readiness
+		// flags 0x112390-95 are set it falls through to the advance, else it loops. Combined lever: (a) at the
+		// post-init recv 0x2712ba pre-set all readiness flags 0x112390-95=1; (b) at the accumulator recv-stores
+		// convert the stray self-tick 0xc3 (which would hit the else->terminal) into event 0xd so the
+		// completion check runs and, with all flags set, advances instead of terminaling.
+		else if (addr == 0x002712ba && m_mode4_step == 3 && !m_mode4_bflag)
 		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 4);   // mode 0xc (terminal) -> stay in mode 4
+			for (offs_t a = 0x00112390; a <= 0x00112395; a++) debug_ram_byte_w(a, 1);
+			m_mode4_bflag = true;
+			logerror("mode4: pre-set all readiness flags 0x112390-95=1 t=%.4f\n", machine().time().as_double());
+		}
+		else if ((addr == 0x002712be || addr == 0x002712ca) && m_mode4_step == 3 &&
+				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0xc3)
+		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0d);   // tick -> completion-check trigger
 			static unsigned s6 = 0;
-			if (s6++ < 10) logerror("mode4: suppressed mode-set 0xc->4 at strh 0x270184 t=%.4f\n", machine().time().as_double());
+			if (s6++ < 12) logerror("mode4: tick 0xc3 -> event 0xd (completion check) at %06x t=%.4f\n", addr, machine().time().as_double());
 		}
 	}
 	// TRACE_EV3 (opt-in): posts of startup event 3 -- immediate 0x2695f4 vs delayed 0x2697aa (recoded to
@@ -2600,6 +2607,13 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// TRACE_STARTUP4 (opt-in): dump the startup-readiness flag accumulator 0x112390-0x112398 at the mode-4
 	// event loop 0x2712cc. Events 9/a/b/c/1c set flags [0x112390/92/93/94/95]; event 6 -> terminal 0x2714fc.
 	// Shows which subsystem-readiness flags are set vs missing with the SIM accepted.
+	if (nokia_env_u32("NOKI3210_TRACE_STARTUP4", 0) != 0 && pc == addr && (addr == 0x00271364 || addr == 0x00271396))
+	{
+		static unsigned s7 = 0;
+		if (s7++ < 20) logerror("startup4: %s t=%.4f\n",
+				addr == 0x00271364 ? "ADVANCED past accumulator -> 0x271364 (charger/init)" : "reached mode-7 event-0x74 wait 0x271396",
+				machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_STARTUP4", 0) != 0 && pc == addr &&
 			(addr == 0x00271254 || addr == 0x00271266 || addr == 0x00271270 || addr == 0x00271292 ||
 			 addr == 0x0027129a || addr == 0x002712aa || addr == 0x002712ba || addr == 0x002712cc))
