@@ -667,3 +667,56 @@ step but not a coherent window). Net: the mapping is fully characterized as a ta
 rewrite (0x2cb218 keys + 0x2cc7f0 actions); the exact transition path to the window-create state is the
 remaining (large) decode. Next: walk the 0x2cc7f0 action entries for index 0x80 (the 0x012e transition) to
 see the state sequence it sets, and find which state's handler emits the window-create.
+
+## The MMI VM is ALIVE, not dormant — the wall is display repaint (2026-07-08)
+
+Walked the `0x2cc7f0` action table and instrumented the task-5 MMI engine live
+(`TRACE_MMIVM`: hooks the rewrite mapper entry `0x2aefba` for the incoming event
+key, and every write into the state vector `0x11fc80..0x11fcff`). Two results,
+one of them a correction to the standing framing.
+
+**Engine structure (static).** The task-5 MMI state machine is a table-driven
+bytecode VM:
+- **Dispatch table `0x2cb218`** — 8-byte entries `{[+0]=key(hw), [+2]=action
+  base(hw), [+4]=count(b)}`, sorted by 13-bit event key, binary-searched by
+  `0x2aed5c`. `0x012e → base 0x80`; next key `0x012f → base 0x86`, so the run
+  length is the base-delta (6 entries).
+- **Action table `0x2cc7f0`** — 8-byte entries interpreted two ways: `0x2aeda0`
+  as a **predicate** (reads `state[0x11fc80 + op]`, compares to `[+1]`, bit7 =
+  negate; ops `0xb7..0xb9 → fn-ptr table 0x2cb160`, `≥0xba → table 0x111f0f`,
+  `<0xb7 → direct state slot`), and `0x2aef7e` as **apply** (writes
+  `state[0x11fc80 + slot] = [+2] & 0x3f`).
+- **State vector `0x11fc80`.** UI-state `0x11fcdc` is slot `0x5c` of it, so the
+  VM's writes and the UI-state dispatch are the same structure.
+
+**Live behaviour (the correction).** Under the full SIM config
+(`MODEL_DSP_SERVICE + MODEL_CCONT_PRESENT + MODEL_SVC_RESPONDER +
+MODEL_SVC_CHANNEL_DRAIN + MODEL_SIM_CARD + SIM_ATR_HEX=3b1005 +
+SIM_CARD_EF=0x6f07 + SIM_CARD_CLEAR_NOSIM=1`), the VM **runs continuously for the
+whole boot** — 2639 state ops, a rich event stream (`0x0aa4 0x0517 0x06ce 0x1b59
+0x09d1 0x138e/0x1390 0x13b5/6 0x1581 0x0596 0x05de/0x05e0/0x05f3 …`) through
+t=29.7. The earlier "MMI dormant / task starved (2 msgs then nothing)" was an
+artifact of a **less-complete boot config**; with the full SIM stack the MMI app
+layer is alive and ticking.
+- Dominant event **`0x05e2`** (1000× in 30s) is a **periodic timeout tick**:
+  handler `0x28c464` increments the slot-`0x4e` counter (`0x11fcce`) each tick
+  and, at count `0x7d` (125), fires event `0x12f` via `0x2ac3e0`. It is not even
+  a rewrite key (passes through the mapper unchanged).
+- **`0x05e8` (window-create) never fires** across the entire run — confirming the
+  static result that it is a computed `0xbd<<3` return threshold, not an emitted
+  event. Window creation is unreachable by any single message.
+
+**So the real wall is display REPAINT, not MMI logic.** The screen still OCRs
+"Insert SIM card" even though the SIM is accepted internally (`[0x111c64]`
+cleared) and the MMI VM is churning post-SIM events. The blocker: the
+display-ready flag **`[0x11fee4]` gets zero writes the entire boot** — the
+firmware only *reads* it (an externally-set "ready" flag; `TRACE_DREADY`), so
+resource acquisition `0x2b12b4` returns "unavailable" and the screen can't repaint
+to the post-SIM/idle window.
+
+**Next.** RE what sets `[0x11fee4]` on a real boot (fw never writes it — set by
+service registration / external state; note `0x11fee4` is also named
+`FW_SERVICE_CHANNEL_ENABLE_FLAGS` at driver line 228, a scope overlap to resolve),
+and whether it is faithfully modellable (analogous to `MODEL_SVC_CHANNEL_DRAIN`),
+or whether the resource-acquisition gate `0x2b12b4` is the cleaner lever. Knob:
+`TRACE_MMIVM` (opt-in, cap 400).
