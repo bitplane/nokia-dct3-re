@@ -402,6 +402,7 @@ private:
 	bool          m_mmi_idle_forced = false;  // EXPERIMENT_MMI_IDLE: idle flag forced once
 	uint8_t       m_mode4_step = 0;      // EXPERIMENT_MODE4_EVENTS: 0=idle,1=sent3,2=sent-e,3=done
 	bool          m_mode4_bflag = false; // EXPERIMENT_MODE4_EVENTS: the missing readiness flag pre-set once
+	bool          m_mode4_74 = false;    // EXPERIMENT_MODE4_EVENTS: event 0x74 injected once
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
@@ -2578,6 +2579,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0d);   // tick -> completion-check trigger
 			static unsigned s6 = 0;
 			if (s6++ < 12) logerror("mode4: tick 0xc3 -> event 0xd (completion check) at %06x t=%.4f\n", addr, machine().time().as_double());
+		}
+		// Past the accumulator the boot spins at 0x27138e waiting for event 0x74 (mode-7 gate 0x271396).
+		// Inject 0x74 once at the recv-store 0x271392 -- with the SIM accepted and mode 4 cracked, see how
+		// far the now-far-more-coherent boot proceeds (outcome 3? idle? terminal?).
+		else if (addr == 0x00271392 && m_mode4_step == 3 && !m_mode4_74)
+		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x74);
+			m_mode4_74 = true;
+			logerror("mode4: injected event 0x74 (mode-7 gate) t=%.4f\n", machine().time().as_double());
 		}
 	}
 	// TRACE_EV3 (opt-in): posts of startup event 3 -- immediate 0x2695f4 vs delayed 0x2697aa (recoded to
