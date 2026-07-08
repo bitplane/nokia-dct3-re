@@ -401,6 +401,7 @@ private:
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
 	bool          m_mmi_idle_forced = false;  // EXPERIMENT_MMI_IDLE: idle flag forced once
 	uint8_t       m_mode4_step = 0;      // EXPERIMENT_MODE4_EVENTS: 0=idle,1=sent3,2=sent-e,3=done
+	bool          m_mode4_bflag = false; // EXPERIMENT_MODE4_EVENTS: the missing readiness flag pre-set once
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
@@ -2542,6 +2543,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			m_mode4_step = 3;
 			logerror("mode4: injected event 7 (-> ev7-init 0x271266) t=%.4f\n", machine().time().as_double());
 		}
+		// The advance is event 4 -> 0x271354 -> (if [0x112398]!=1 and charger absent) -> mode-7 wait 0x271392.
+		// But ev7-init's own self-posted event 6 arrives first: event 6 -> 0x271316 -> [0x112398]=1 ->
+		// 0x2714fc UNCONDITIONAL terminal 000c. So suppress event 6 post-ev7-init (convert it to a harmless
+		// tick 0xc3 at the recv-stores) so event 4 wins the race and advances with [0x112398]==0.
+		else if ((addr == 0x00270c92 || addr == 0x002712be || addr == 0x002712ca) && m_mode4_step == 3 &&
+				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 6)
+		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0xc3);
+			static unsigned s6 = 0;
+			if (s6++ < 10) logerror("mode4: suppressed event 6 (terminal) -> tick at %06x t=%.4f\n", addr, machine().time().as_double());
+		}
 	}
 	// TRACE_EV3 (opt-in): posts of startup event 3 -- immediate 0x2695f4 vs delayed 0x2697aa (recoded to
 	// 0xc3). Mode 4 needs RAW event 3 (its handler checks raw 3); it only ever gets 0xc3 (delayed). Log the
@@ -2585,6 +2597,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("startup4: mode4 handler, event[r4+2]=%04x (needs 7 for ev7-init) t=%.4f\n",
 						ev, machine().time().as_double());
 			}
+			else if (addr == 0x002712cc)
+			{
+				const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+				const u16 ev = (r4 >= 0x00100000 && r4 < 0x00180000) ?
+						((u16(debug_ram_byte(r4 + 2)) << 8) | debug_ram_byte(r4 + 3)) : 0xffff;
+				char f[24]; for (int i = 0; i <= 8; i++) std::snprintf(f + i*2, 3, "%02x", debug_ram_byte(0x00112390 + i));
+				static std::string last;
+				std::string cur = std::to_string(ev) + f;
+				if (cur != last) { last = cur;
+					logerror("startup4: accum event=%04x flags[112390..98]=%s t=%.4f\n", ev, f, machine().time().as_double()); }
+			}
 			else
 			{
 				const char *w =
@@ -2593,7 +2616,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					addr == 0x00271292 ? "-> 0x2a26d4" :
 					addr == 0x0027129a ? "-> 0x2794d2" :
 					addr == 0x002712aa ? "-> 0x2a102c (last init)" :
-					addr == 0x002712ba ? "post-init recv" : "accumulator 0x2712cc";
+					addr == 0x002712ba ? "post-init recv" : "?";
 				logerror("startup4: %s t=%.4f\n", w, machine().time().as_double());
 			}
 		}
