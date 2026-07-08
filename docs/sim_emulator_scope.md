@@ -458,3 +458,30 @@ idle window and bring up the display; our faked boot produces neither. So idle P
 coherent app-layer message flow — the fundamental provisioned-boot wall, upstream of everything and
 not reachable by injection. The SIM-conversation problem (the emulator's purpose) is solved; idle is
 a coherent-boot problem on the MMI/display application layer.
+
+## The MMI-wake producer chain (2026-07-08)
+
+Traced the exact producer chain behind the starved MMI (Chain B), by matching MMI messages to
+their posters by message POINTER (`TRACE_MMIPROD`: logs every send via `sched_post_task_message_26a204`
+and `sched_context_post_message_26a354` plus every MMI recv at `0x29800c`).
+
+**The MMI is task 6.** Its message loop `0x298008` dispatches on primary code `[msg+5]`:
+- code 1 (`0x2982b4`) = app register/init  -- ARRIVES (t=0.57)
+- code 2 (`0x29817e`) = **window management** -> falls into the window-SM path `0x298190 -> 0x2981be ->
+  0x297ed8`. **NEVER ARRIVES.**
+- code 3 (`0x2980c4`) = a window/key op -- ARRIVES (t=0.84)
+
+So the single missing "wake" is a **code-2 message to task 6**. The posters are a sibling family:
+- code-1 poster `~0x2b1ee0` (called), code-3 poster `0x2b1f64` (called),
+- **code-2 poster `0x2b1f24`**: allocates a msg, sets `[msg+5]=2`, posts to task 6 via `0x26a354`.
+  **Never called** on our boot.
+
+`0x2b1f24` has MANY callers, ALL in the **unexplored `0x240xxx-0x242xxx` subsystem** -- a display/screen
+layer that compares bitmap regions (`ldrsb`/`muls` over pixel arrays) and, on a difference, posts code-2
+to the MMI (e.g. `0x24092e` with window params `r1=0xf1,r2=0x10`) and writes state `[0x11f802]`. That
+whole subsystem is DORMANT on our boot -- none of its code-2 posts fire.
+
+**So Chain B's wall is now precise and one level higher than "MMI dormant": the `0x240xxx` display/window
+subsystem never runs, so it never posts the code-2 message that would drive the MMI window-SM to create
+the idle window.** Next step: characterize `0x240xxx` -- is it a task (is it scheduled/resumed at all?),
+and what message/state drives its screen-diff loop. That producer is the next node up the same chain.

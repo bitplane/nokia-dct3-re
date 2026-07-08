@@ -2643,6 +2643,28 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			}
 		}
 	}
+	// TRACE_MMIPROD (opt-in): match MMI messages to their producer by message POINTER. Log every send via
+	// both 0x26a204 and 0x26a354 (r0=target, r1=msg ptr, [r1+5]=primary code) AND every MMI recv at 0x29800c
+	// (r0=recv'd msg). The post whose msg ptr == an MMI-recv msg ptr is that message's exact producer; and
+	// whether a code-2 (window-mgmt/wake) message is ever posted to the MMI reveals the missing producer.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIPROD", 0) != 0 && pc == addr && (addr == 0x0026a204 || addr == 0x0026a354))
+	{
+		const u32 tgt = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+		{
+			const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+			static unsigned mp = 0;
+			if (mp++ < 400) logerror("mmiprod: POST fn=%s tgt=%u code=%02x msg=%08x lr=%08x t=%.4f\n",
+					addr == 0x0026a204 ? "204" : "354", tgt, debug_ram_byte(msg + 5), msg, lr, machine().time().as_double());
+		}
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_MMIPROD", 0) != 0 && pc == addr && addr == 0x0029800c)
+	{
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (msg >= 0x00100000 && msg < 0x00180000)
+			logerror("mmiprod: MMI-RECV msg=%08x code=%02x t=%.4f\n", msg, debug_ram_byte(msg + 5), machine().time().as_double());
+	}
 	// TRACE_MMIWIN (opt-in): the MMI window state machine 0x297ed8 -- W = [0x1116f8+8] (window array cursor),
 	// count = [W+4], top entry = 0x111724 + count*0x1c, its window-id byte [top+0]->deref and state [+0x19].
 	// Shows the window stack over the boot: which screens are active and whether an idle window is ever pushed.

@@ -135,6 +135,7 @@ address,kind,name
 0x00237c70,label,contact_service_mode7_status40_dispatch_237c70
 0x00237c88,label,contact_service_mode7_unknown_response_drop_237c88
 0x00237c96,function,contact_service_event_237c96
+0x00240900,label,display_windowdiff_code2_post_site_240900
 0x0024bd30,function,task5_status_handler_d_24bd30
 0x0024bd30,label,task5_status_handler_d_24bd30
 0x0024cb0c,function,task5_status_handler_f_24cb0c
@@ -334,6 +335,9 @@ address,kind,name
 0x00297f60,function,display_apply_297f60
 0x00297fc4,function,display_manager_297fc4
 0x00298008,function,display_recv_298008
+0x002980c4,label,mmi_msg_code3_op_2980c4
+0x0029817e,label,mmi_msg_code2_window_mgmt_29817e
+0x002982b4,label,mmi_msg_code1_register_2982b4
 0x0029a72c,function,display_profile_mirror_apply_29a72c
 0x0029a72c,label,display_profile_mirror_apply_29a72c
 0x0029a768,function,display_capability_record_init_29a768
@@ -551,6 +555,7 @@ address,kind,name
 0x002b1e80,function,display_type2_state_seed_2b1e80
 0x002b1e80,label,display_type2_state_seed_2b1e80
 0x002b1f24,function,display_type2_post_2b1f24
+0x002b1f64,function,mmi_notify_code3_post_2b1f64
 0x002b21b6,function,contact_response65_store_status_detail_2b21b6
 0x002b2f90,function,keypad_matrix_scan_2b2f90
 0x002b3beb,function,ccont_adc_read_sequence_2b3beb

@@ -600,7 +600,13 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Target("display_state_source_28c940", 0x0028c940L),
 		new Target("display_state_emit_28c9c0", 0x0028c9c0L),
 		new Target("display_state_main_28bddc", 0x0028bddcL),
-		new Target("display_type2_post_2b1f24", 0x002b1f24L),
+		new Target("display_type2_post_2b1f24", 0x002b1f24L),  // = code-2 (window-mgmt) post to MMI task 6; wake producer
+		new Target("mmi_notify_code3_post_2b1f64", 0x002b1f64L),
+		// MMI (task 6) message-loop 0x298008 dispatch on primary code [msg+5]; code 2 (window mgmt) never arrives.
+		new Label("mmi_msg_code1_register_2982b4", 0x002982b4L),
+		new Label("mmi_msg_code2_window_mgmt_29817e", 0x0029817eL),
+		new Label("mmi_msg_code3_op_2980c4", 0x002980c4L),
+		new Label("display_windowdiff_code2_post_site_240900", 0x00240900L),
 		new Target("lcd_init_2b1d14", 0x002b1d14L),
 		new Target("lcd_write_2b1c96", 0x002b1c96L),
 		new Target("divmod_2b5388", 0x002b5388L),
