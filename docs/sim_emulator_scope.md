@@ -844,3 +844,44 @@ idle pixels faithfully one would model delivery of cmd `0x70` with a valid confi
 blob (the necessary step), though the resource *content* pipeline is a further
 coherent-bringup requirement (shown earlier: bitmap alone is insufficient). Knob:
 `TRACE_CSCMD`.
+
+## MODEL_RES_ENABLE: delivering contact-service cmd 0x70 (2026-07-08)
+
+Built a model that delivers the resource-enable command `0x70` the real service
+session would send (but our minimal faked session omits), driving the firmware's
+own registrar `0x2b140a` via the real command path — no forcing of the flag/bitmap.
+
+**Mechanism** (an `SVC_RESPONDER`-style trampoline at the contact-service loop top
+`0x237bc6`): alloc `0x26afe0`(0x50) → fill a cmd-`0x70` message (`[3]=0x40` dispatch
+route, `[5]=0x50 > 0x42` enable gate, `[8]=0x70`, config blob `[9..0x49]`) → post
+`0x26a204` to the contact-service task. The firmware then runs `0x237400` →
+channel-map `0x23670c` → `0x2366d4` → `0x2b140a`, which sets enable `[0x11fee4]=1`
+(verified: `dready [11fee4] 00->01 @0x2b141c`) and memcpy's the blob into the
+availability bitmap `[0x11ff08]` (verified: `resreg` writes @`0x2b5cd8`).
+
+**Three prerequisites** the faked session doesn't satisfy, each modelled:
+1. **Order** — deliver `0x70` *before* the `0x64` completion (which ends the command
+   loop). `SVC_RESPONDER` now waits for `RES_ENABLE` (`m_resen_state==3`) when both on.
+2. **Gate** — the dispatcher gates all non-`0x64` commands on service-ready
+   `[0x11fed1]` bit0 (`0x237426`, skips to `0x237894` if clear; `0xcc` on our boot).
+   Seed bit0 (analogous to `MODEL_SVC_CHANNEL_DRAIN` seeding bit2). `0x64` bypasses
+   this gate (checked first), which is why it worked while `0x70` was dropped.
+3. **Enable value** — the handler reads the enable arg from `[0x11fedd]` (only-read on
+   our boot; set by a prior channel-setup command on a real phone). Seed it at the
+   enable-handler entry `0x2366d4`.
+
+**Config blob.** Default is **sparse** — register only the idle-draw resource class
+`0x22` (bit2 of `[0x11ff0c]`). `RES_ENABLE_FILL=0xff` enables all 256 classes but
+**blanks the display** (the firmware acquires classes with no real provider); the
+faithful blob is the real 0x40 provisioned bytes, not obtainable here. The sparse
+default keeps the display alive ("Insert SIM card" still renders) while genuinely
+registering the resource.
+
+**Result.** With resources genuinely registered via the real path, the idle-draw
+availability wall is **removed** — `0x2b12b4` no longer spins (contrast the earlier
+forced-bitmap probe). But `display_idle` still composes **blank** content, confirming
+*through the faithful path* that resource registration is necessary-but-insufficient:
+the idle **content pipeline** (populating the layout's actual pixels — clock, operator,
+etc.) is the next layer, and it needs the coherent SIM/network bringup a no-SIM boot
+doesn't do. The boot correctly stays on "Insert SIM card". Knobs: `MODEL_RES_ENABLE`,
+`RES_ENABLE_MS`/`MSGSZ`/`FILL`/`VAL`.
