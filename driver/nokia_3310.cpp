@@ -1512,6 +1512,18 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		if (neww != last) { last = neww; static unsigned us = 0;
 			if (us++ < 40) logerror("uistate: [11fcdc]=%04x pc=%08x t=%.4f\n", neww, pc, machine().time().as_double()); }
 	}
+		// TRACE_RESREG (opt-in): writes into the resource-availability bitmap 0x11ff08..0x11ff10 (base
+		// FW_SERVICE_CHANNEL_MASK_BASE). The resource-availability predicate 0x2b12b4 returns "available"
+		// only if [0x11fee4]!=0 AND bit(class&7) of [0x11ff08 + class>>3] is set. The idle draw acquires
+		// resource 0x224c (class 0x22 -> bit2 of [0x11ff0c]); on our boot that bit is never set, so the
+		// idle draw's resource-get spins. Reveals which resource classes get registered and by whom.
+		if (nokia_env_u32("NOKI3210_TRACE_RESREG", 0) != 0 && address >= 0x0011ff08 && address <= 0x0011ff10)
+		{
+			const uint16_t neww = (m_ram[offset] & ~mem_mask) | (data & mem_mask);
+			if (neww != m_ram[offset]) { static unsigned rr = 0;
+				if (rr++ < 200) logerror("resreg: [%08x] %04x->%04x pc=%08x t=%.4f\n", address,
+						m_ram[offset], neww, pc, machine().time().as_double()); }
+		}
 		// TRACE_MMIVM (opt-in): writes into the MMI state vector 0x11fc80..0x11fcff -- the state array the
 		// task-5 bytecode VM applies (0x2aef7e: state[0x11fc80+slot]=val) and evaluates predicates against
 		// (0x2aeda0). UI-state 0x11fcdc is slot 0x5c of this vector. Reveals which slots the VM walks on our
@@ -3046,7 +3058,16 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		// 0x2b12b4 gets past its "display not ready" early-out -- test whether the idle draw then clears the
 		// resource-get 0x2b257e (render post 0x2af6ea would fire) or is gated further (the RAM bitmap).
 		if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_DREADY", 0) != 0)
+		{
 			debug_ram_byte_w(0x0011fee4, 1);
+			// Also register every resource class in the availability bitmap 0x11ff08..0x11ff0f so the
+			// availability predicate 0x2b12b4 passes its per-class bit test (idle draw's 0x224c = class
+			// 0x22 -> bit2 of [0x11ff0c]). Tests whether, with the resource GRANTED, display_idle renders
+			// a real idle screen or black (content pipeline down). The bitmap is never registered on our
+			// boot (TRACE_RESREG = 0 writes), so this is a pure "if resource available" probe.
+			for (offs_t a = 0x0011ff08; a <= 0x0011ff0f; a++)
+				debug_ram_byte_w(a, 0xff);
+		}
 		m_mmi_idle_forced = true;
 		logerror("mmi_idle: forced [1116fd]=1 (dready=%u) at gate 0x297ffa t=%.4f\n",
 				nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_DREADY", 0), machine().time().as_double());
