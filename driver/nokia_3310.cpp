@@ -1502,6 +1502,16 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
+	// TRACE_UISTATE (opt-in): writes to the UI-controller phone-state byte 0x11fcdc (high byte of hw 0x11fcdc)
+	// -- the state the 0x2a0xxx UI controller dispatches on to drive MMI/display window creation. Reveals its
+	// progression and writer PCs: does it advance through window-creation states, or stall (and on what)?
+	if (nokia_env_u32("NOKI3210_TRACE_UISTATE", 0) != 0 && address == 0x0011fcdc)
+	{
+		const uint16_t neww = (m_ram[offset] & ~mem_mask) | (data & mem_mask);
+		static uint16_t last = 0xffff;
+		if (neww != last) { last = neww; static unsigned us = 0;
+			if (us++ < 40) logerror("uistate: [11fcdc]=%04x pc=%08x t=%.4f\n", neww, pc, machine().time().as_double()); }
+	}
 	// TRACE_DISPCB (opt-in): writes to the display-manager control block 0x10e2ec. Halfword 0x10e2ec holds
 	// +0,+1(=type gate byte, low byte); halfword 0x10e2ee holds +2(=state, high byte),+3. Reveals what sets
 	// the type to 0x80 (active window) -- the gate that unlocks the window-diff/code-2 path.

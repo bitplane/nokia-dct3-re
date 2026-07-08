@@ -536,3 +536,30 @@ commands (0x0b04+) that the app issues on "show a screen"; it only gets the 0x05
 manager state does not substitute for the command. Same coherent-boot root (app-state never issues show-idle),
 one node higher. Next: find the register-target sender of a 0x0b04+ command to task 13 (needs register-aware
 static analysis, not an immediate-scan), or settle the provisioning question via 3310 cross-firmware.
+
+## Settling the provisioning question (2026-07-08, 5-pass dig)
+
+Question: is blank-boot-to-idle blocked by missing provisioning (NVRAM/network), or by the coherent-boot
+state handoff? (The 3310 cross-firmware image was BYO/local and is not present this session, so this is a
+3210-only structural analysis.)
+
+Findings:
+- The app layer is ALIVE, not hung: the UI controller / phone-state machine at 0x2a0xxx, MMI task 6,
+  display task 13, and the render task all run and loop. The phone is in a multi-task steady state.
+- The UI controller dispatches on a phone-state byte [0x11fcdc], using states 1/3/4/6 (posts MMI window
+  ops + calls the 0x240xxx display window fns 0x248ac2/0x24b6cc in the state-1 path).
+- TRACE_UISTATE: [0x11fcdc] progresses 0x00 -> 0x0b (t=0.53) and then STOPS at 0x0b for the whole boot.
+- 0x0b is written by a ROM-TABLE state initializer (0x2aef7e reads table 0x2cc7f0), NOT from EEPROM/NVRAM
+  and NOT from a network event -- it is the initialized default. The UI controller's own states are 1/3/4/6,
+  so it never drives [0x11fcdc] out of the initialized 0x0b toward the window-creation states.
+
+**Answer.** The current wall is NOT a provisioning-DATA problem: the stall state is a ROM-initialized
+default, gated by no NVRAM/EEPROM read, so modelling more provisioning data would not unblock it. It is NOT
+(yet) a network-registration wall either: the app layer is alive but stuck UPSTREAM of any network gate,
+before it ever attempts registration. The wall is the SAME coherent-boot state handoff as every prior one
+(CONTACT SERVICE, 000d, mode-4, MMI): the faked/incoherent reconstruction never generates the internal
+state-transition events that a real completed boot uses to drive the UI state machine from its initialized
+state through window creation to idle. Separately, true OPERATOR-idle (operator name) would additionally
+require live network registration -- a base station, i.e. hardware -- but that is a further wall we never
+reach. So: provisioning data is ruled OUT as the blocker; the blocker is coherent-boot state progression
+(digital but hard), with network=hardware as an additional requirement only for operator-idle proper.

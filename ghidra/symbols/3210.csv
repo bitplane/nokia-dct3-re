@@ -140,6 +140,8 @@ address,kind,name
 0x0023e7ac,label,display_task_cmd_0b04_window_state_23e7ac
 0x0024047e,label,display_state_dispatch_24047e
 0x00240900,label,display_windowdiff_code2_post_site_240900
+0x00248ac2,label,display_window_fn_a_248ac2
+0x0024b6cc,label,display_window_fn_b_24b6cc
 0x0024bd30,function,task5_status_handler_d_24bd30
 0x0024bd30,label,task5_status_handler_d_24bd30
 0x0024cb0c,function,task5_status_handler_f_24cb0c
@@ -356,6 +358,7 @@ address,kind,name
 0x0029f8c4,function,contact_response_code_ae_handler_29f8c4
 0x0029fcf4,function,contact_response_code_72_handler_29fcf4
 0x0029ff2c,function,contact_response_code_af_handler_29ff2c
+0x002a0c40,label,ui_controller_phonestate_dispatch_2a0c40
 0x002a0ec4,function,selftest_not_pending_2a0ec4
 0x002a0ee6,function,startup_branch_or_selftest_2a0ee6
 0x002a0fa4,function,startup_event14_cancel_2a0fa4
@@ -487,6 +490,7 @@ address,kind,name
 0x002aef44,label,task5_status_descriptor_children_2aef44
 0x002aef7e,function,task5_status_side_effect_commit_2aef7e
 0x002aef7e,label,task5_status_side_effect_commit_2aef7e
+0x002aef7e,function,ui_state_table_init_2aef7e
 0x002aefba,function,task5_status_handler_a_2aefba
 0x002aefba,label,task5_status_handler_a_2aefba
 0x002af058,function,ccont_startup_step_2af058
