@@ -2561,12 +2561,16 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		// But ev7-init's own self-posted event 6 arrives first: event 6 -> 0x271316 -> [0x112398]=1 ->
 		// 0x2714fc UNCONDITIONAL terminal 000c. So suppress event 6 post-ev7-init (convert it to a harmless
 		// tick 0xc3 at the recv-stores) so event 4 wins the race and advances with [0x112398]==0.
-		else if ((addr == 0x00270c92 || addr == 0x002712be || addr == 0x002712ca) && m_mode4_step == 3 &&
-				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 6)
+		// The accumulator's ELSE branch (0x2712f2) bl's 0x270190 = "set mode 0xc" (terminal 000c) on any
+		// unrecognized event. Pass 1 showed that's what kills it. During the experiment, override 0x270190's
+		// mode value from 0xc to 4 -- stay in mode 4 instead of terminaling -- so the accumulator survives
+		// and the real event-4 advance (0x271354 -> mode-7) can happen.
+		else if (addr == 0x00270184 && m_mode4_step == 3 &&
+				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0xc)
 		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0xc3);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 4);   // mode 0xc (terminal) -> stay in mode 4
 			static unsigned s6 = 0;
-			if (s6++ < 10) logerror("mode4: suppressed event 6 (terminal) -> tick at %06x t=%.4f\n", addr, machine().time().as_double());
+			if (s6++ < 10) logerror("mode4: suppressed mode-set 0xc->4 at strh 0x270184 t=%.4f\n", machine().time().as_double());
 		}
 	}
 	// TRACE_EV3 (opt-in): posts of startup event 3 -- immediate 0x2695f4 vs delayed 0x2697aa (recoded to
