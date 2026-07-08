@@ -588,3 +588,29 @@ window-creation states. This is the top-level form of the same coherent-boot wal
 initial MMI event(s) but not the ongoing 0x05xx event stream a real completed boot generates to walk the UI
 state machine through to idle. Open thread: identify the specific next 0x05xx event the engine expects after
 0x05ed, and its (dormant) producer.
+
+## Hunting the next UI event + producer (2026-07-08, 5-pass dig)
+
+Goal: find the specific event that would advance the MMI UI toward window creation, and its producer.
+
+- **P1-2:** the MMI UI engine (0x2ac6xx) is a large function whose entry/recv disrom can't cleanly locate
+  (it misdecodes parts of 0x2ac6xx). Pivoted to the state handler 0x2a0aec: a big event dispatcher that
+  branches on the event code (0x05de/0x05e1/0x05e8/0x09c6/0xca/...).
+- **P3:** decoded the handler's subtract-cascade: the window-create path (0x2a0c3a/0x2a0c40, which posts MMI
+  code-3 + calls display fns) is reached by internal event **0x05e8** (0x05e1 +2 +5 -> beq 0x2a0c38).
+- **P4 (TRACE_UICTL @0x2a0aec):** the handler runs EXACTLY ONCE, with internal event **0x05e2** (t=0.76),
+  never again. The window-create event 0x05e8 never reaches it. Separately (TRACE_DISPPROD) an external
+  message code 0x05e8 is posted 41x -- but to TASK 16, from the display task (0x23e306).
+- **P5:** the MMI UI engine runs in **TASK 5** (read via the current-task id at [0x00100022] -- note the
+  swap16 trap struck again: the recv's pointer literal 0x00200010 is really 0x00100020, so the task-id byte
+  is 0x00100022, not 0x00200012). Task 5 IS fed messages (0x13xx codes from 0x2af732) repeatedly, but the
+  window-create handler 0x2a0aec fires only once -- the state machine transitions to a state that does not
+  progress to idle.
+
+**Net.** Concrete gains: the MMI UI state machine lives in task 5; its window-create handler advances on
+internal event 0x05e8; on our boot that handler runs once (internal event 0x05e2) and the machine then sits
+in a non-progressing state. The external 0x05e8 messages go to task 16, decoupled from task 5's engine.
+Pinning the exact external message -> internal 0x05e8 mapping requires decoding task 5's large engine
+(message->event->state), which disrom partially misdecodes -- the honest limit this round. Next: decode task
+5's engine event mapping (what external message the engine turns into internal 0x05e8), or trace task 5's
+recv to see which 0x13xx messages it consumes and where the state machine parks.
