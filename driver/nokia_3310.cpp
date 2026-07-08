@@ -400,6 +400,7 @@ private:
 	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
 	bool          m_mmi_idle_forced = false;  // EXPERIMENT_MMI_IDLE: idle flag forced once
+	uint8_t       m_mode4_step = 0;      // EXPERIMENT_MODE4_EVENTS: 0=idle,1=sent3,2=sent-e,3=done
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
@@ -2515,6 +2516,33 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// EXPERIMENT (opt-in, option C — hollow idle): the MMI main loop (0x297fc4) recv's messages, dispatches,
 	// and when idle-flag [0x11f81b]==1 calls display_idle (0x2a255c). TRACE_MMI shows whether that task runs
 	// in our stuck boot; FORCE_IDLE pins the flag at the recv (0x298008) so the idle redraw fires each loop.
+	// EXPERIMENT_MODE4_EVENTS (opt-in): inject the raw handshake sequence 3 -> 0xe -> 7 that mode 4's
+	// nested recvs need (0x271254 wants raw 3 -> 0x2711f6 wants 0xe -> 0x27120e wants 7 -> ev7-init 0x271266),
+	// modelling the external producer our boot lacks. Started once after EXPERIMENT_MODE4_EVENTS_MS ms.
+	// Does ev7-init then run its subsystem-init and advance the boot toward the app/idle?
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_MODE4_EVENTS", 0) != 0 && pc == addr)
+	{
+		if (addr == 0x00271254 && m_mode4_step == 0 &&
+				machine().time().as_double() * 1000.0 >= nokia_env_u32("NOKI3210_EXPERIMENT_MODE4_EVENTS_MS", 1200))
+		{
+			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+			if (r4 >= 0x00100000 && r4 < 0x00180000) { debug_ram_byte_w(r4 + 2, 0); debug_ram_byte_w(r4 + 3, 3); }  // event 3
+			m_mode4_step = 1;
+			logerror("mode4: injected event 3 (-> 0x2711f6) t=%.4f\n", machine().time().as_double());
+		}
+		else if (addr == 0x002711fa && m_mode4_step == 1)   // nested recv return: force 0xe
+		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0e);
+			m_mode4_step = 2;
+			logerror("mode4: injected event 0xe (-> 0x27120e) t=%.4f\n", machine().time().as_double());
+		}
+		else if (addr == 0x00271212 && m_mode4_step == 2)   // nested recv return: force 7 -> ev7-init
+		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x07);
+			m_mode4_step = 3;
+			logerror("mode4: injected event 7 (-> ev7-init 0x271266) t=%.4f\n", machine().time().as_double());
+		}
+	}
 	// TRACE_EV3 (opt-in): posts of startup event 3 -- immediate 0x2695f4 vs delayed 0x2697aa (recoded to
 	// 0xc3). Mode 4 needs RAW event 3 (its handler checks raw 3); it only ever gets 0xc3 (delayed). Log the
 	// caller so we can find event 3's producer and whether an immediate path exists.
