@@ -2679,6 +2679,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					addr == 0x0026a204 ? "204" : "354", tgt, debug_ram_byte(msg + 5), msg, lr, machine().time().as_double());
 		}
 	}
+	// TRACE_UICTL (opt-in): does the UI controller (0x2a0a00-0x2a0d00, dispatch on [0x11fcdc] states 1/3/4/6)
+	// execute at all, and what state does it see? Log first entry + periodic, with the current [0x11fcdc].
+	if (nokia_env_u32("NOKI3210_TRACE_UICTL", 0) != 0 && pc == addr && addr >= 0x002a0a00 && addr < 0x002a0d00)
+	{
+		static unsigned uc = 0;
+		if (uc++ < 20) logerror("uictl: pc=%08x lr=%08x state=%02x/%02x t=%.4f\n", addr,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				debug_ram_byte(0x0011fcdc), debug_ram_byte(0x0011fcdd), machine().time().as_double());
+	}
 	// TRACE_DISPPROD (opt-in): find the display/window task's id and posters by matching message pointers.
 	// Log every send 0x26a204/0x26a354 (r0=target, r1=msg, [msg+0]hw = the display task's code) and every
 	// display recv at 0x23e64a. The post whose msg ptr == a display-recv ptr is that message's producer;

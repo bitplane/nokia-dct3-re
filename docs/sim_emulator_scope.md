@@ -563,3 +563,28 @@ state through window creation to idle. Separately, true OPERATOR-idle (operator 
 require live network registration -- a base station, i.e. hardware -- but that is a further wall we never
 reach. So: provisioning data is ruled OUT as the blocker; the blocker is coherent-boot state progression
 (digital but hard), with network=hardware as an additional requirement only for operator-idle proper.
+
+## Decoding the UI state machine (2026-07-08, 5-pass dig)
+
+Goal: decode "UI state 0x0b's handler." Result: the MMI UI is a table-driven, EVENT-DRIVEN state machine,
+and the stall is event-starvation, not a single waiting handler.
+
+- **P1 (TRACE_UICTL):** the UI controller region 0x2a0a00-0x2a0d00 executes EXACTLY ONCE (t=0.76), then
+  never again -- it is an event handler invoked once and then starved, not a spinning dispatcher.
+- **P2:** its caller LR is 0x2ac65e. Also corrected an earlier byte-offset slip: the dispatch state byte
+  [0x11fcdc] is 0x00 (the 0x0b my halfword trace showed sits in the adjacent byte 0x11fcdd).
+- **P3:** 0x2ac6xx is the MMI UI state-machine ENGINE: it indexes a per-state handler function-pointer
+  table by the current state [r5+3], loads the handler ([entry+4]), and `mov lr,pc; bx r1` calls it with an
+  event code in r0 (0x05ed at t=0.76). The handler returns the next state/event (r0 -> r6).
+- **P4:** the engine loop (0x2ac540+) walks the state table, and on transitions calls display fns
+  (0x24aedc/0x24af00/...) and posts event 0x30 (0x2695f4). State vars: [0x11cefc], [0x11c930].
+- **P5:** the engine has no recv of its own in-range; it is driven per-event (MMI signal codes in the 0x05xx
+  range: 0x05dd/0x05de/0x05ed). It processed the initial boot event (0x05ed) once and then stopped.
+
+**Decoded answer.** "State 0x0b" is not a lone handler blocked on one flag; the MMI UI is an event-driven
+state machine whose per-state handler (the 0x2a0aec UI controller) ran once on the initial boot event
+(0x05ed, t=0.76) and then received no further driving events, so the state never advances to the
+window-creation states. This is the top-level form of the same coherent-boot wall: the faked boot emits the
+initial MMI event(s) but not the ongoing 0x05xx event stream a real completed boot generates to walk the UI
+state machine through to idle. Open thread: identify the specific next 0x05xx event the engine expects after
+0x05ed, and its (dormant) producer.

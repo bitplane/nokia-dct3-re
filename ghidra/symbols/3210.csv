@@ -358,6 +358,7 @@ address,kind,name
 0x0029f8c4,function,contact_response_code_ae_handler_29f8c4
 0x0029fcf4,function,contact_response_code_72_handler_29fcf4
 0x0029ff2c,function,contact_response_code_af_handler_29ff2c
+0x002a0aec,label,ui_state_handler_entry_2a0aec
 0x002a0c40,label,ui_controller_phonestate_dispatch_2a0c40
 0x002a0ec4,function,selftest_not_pending_2a0ec4
 0x002a0ee6,function,startup_branch_or_selftest_2a0ee6
@@ -471,6 +472,8 @@ address,kind,name
 0x002ac3e0,label,display_state_store_and_apply_2ac3e0
 0x002ac3f2,function,task5_status_handler_b_2ac3f2
 0x002ac3f2,label,task5_status_handler_b_2ac3f2
+0x002ac540,function,mmi_ui_state_machine_engine_2ac540
+0x002ac65a,label,mmi_ui_state_handler_call_2ac65a
 0x002aca44,function,sched_assert_unlinked_or_reset6_2aca44
 0x002ad1c8,function,service_lower_idle_check_2ad1c8
 0x002ad254,function,service_lower_queue_drain_2ad254
