@@ -2515,6 +2515,37 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// EXPERIMENT (opt-in, option C — hollow idle): the MMI main loop (0x297fc4) recv's messages, dispatches,
 	// and when idle-flag [0x11f81b]==1 calls display_idle (0x2a255c). TRACE_MMI shows whether that task runs
 	// in our stuck boot; FORCE_IDLE pins the flag at the recv (0x298008) so the idle redraw fires each loop.
+	// TRACE_STARTUP4 (opt-in): dump the startup-readiness flag accumulator 0x112390-0x112398 at the mode-4
+	// event loop 0x2712cc. Events 9/a/b/c/1c set flags [0x112390/92/93/94/95]; event 6 -> terminal 0x2714fc.
+	// Shows which subsystem-readiness flags are set vs missing with the SIM accepted.
+	if (nokia_env_u32("NOKI3210_TRACE_STARTUP4", 0) != 0 && pc == addr &&
+			(addr == 0x00271254 || addr == 0x00271266 || addr == 0x00271270 || addr == 0x00271292 ||
+			 addr == 0x0027129a || addr == 0x002712aa || addr == 0x002712ba || addr == 0x002712cc))
+	{
+		static unsigned su = 0;
+		if (su++ < 60)
+		{
+			if (addr == 0x00271254)
+			{
+				const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+				const u16 ev = (r4 >= 0x00100000 && r4 < 0x00180000) ?
+						((u16(debug_ram_byte(r4 + 2)) << 8) | debug_ram_byte(r4 + 3)) : 0xffff;
+				logerror("startup4: mode4 handler, event[r4+2]=%04x (needs 7 for ev7-init) t=%.4f\n",
+						ev, machine().time().as_double());
+			}
+			else
+			{
+				const char *w =
+					addr == 0x00271266 ? "ev7-init START" :
+					addr == 0x00271270 ? "-> 0x2af058" :
+					addr == 0x00271292 ? "-> 0x2a26d4" :
+					addr == 0x0027129a ? "-> 0x2794d2" :
+					addr == 0x002712aa ? "-> 0x2a102c (last init)" :
+					addr == 0x002712ba ? "post-init recv" : "accumulator 0x2712cc";
+				logerror("startup4: %s t=%.4f\n", w, machine().time().as_double());
+			}
+		}
+	}
 	// TRACE_MMIWIN (opt-in): the MMI window state machine 0x297ed8 -- W = [0x1116f8+8] (window array cursor),
 	// count = [W+4], top entry = 0x111724 + count*0x1c, its window-id byte [top+0]->deref and state [+0x19].
 	// Shows the window stack over the boot: which screens are active and whether an idle window is ever pushed.
