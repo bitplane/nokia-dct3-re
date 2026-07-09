@@ -81,3 +81,39 @@ With forcing gone, the honest state is unobstructed: the boot reaches **CONTACT
 SERVICE** in ~8 emulated seconds because the EEPROM is blank/virgin (all 0xFF), so the
 firmware's power-on self-test / calibration check fails. That self-test path — not any
 force — is what stands between here and the idle screen.
+
+## 2026-07 tidy — RE scaffolding retired (the boot is now models + config + a few taps)
+
+Once the boot reached "Insert SIM card" and the operator-idle wall was mapped end
+to end, the research scaffolding was removed to make the driver read like a driver.
+All removals are opt-in (inert in every boot config) — the oracle stays `d8a9a7`
+and the full faithful boot still renders "Insert SIM card". Recoverable from git.
+
+**All 19 `EXPERIMENT_*` forcing shims + the dead `FORCE_*` shims** (−392 lines):
+`EXPERIMENT_{DSP_IRQ4,RESUME_TASK14,FORCE_ACK,PROV_READ,CLEAN_SVCCHAN,`
+`FORCE_000D_EVENTS,SCAFFOLD_MARCH,FORCE_TASK14_READY,MARCH,MODE4_EVENTS,`
+`FORCE_UIEVENT,FORCE_WINTYPE,MMI_IDLE(+_DREADY,_MS),SIM_PRESENT,BOOTPATH}`,
+`FORCE_IDLE`, `FORCE_IDLE_JUMP(+_MS,_AFTER)`, `FORCE_OUTCOME`. These were all
+dead-end levers from the 000d / startup-march / MMI-idle-force / bootpath digs —
+every one refuted or superseded by a faithful model. Orphaned member vars removed
+with them (`m_mode4_*`, `m_mmi_idle_forced`, dead startup-scaffold step counters).
+
+**Superseded SIM models** (replaced by `MODEL_SIM_CARD`): `MODEL_SIM_FILE`,
+`MODEL_SIM_LOOP` (+ its `SIM_LOOP_*` sub-knobs), `MODEL_SIM_RESPONDER`. The
+register-level `MODEL_SIM_ATR` + `SIM_PROFILE` stay (entangled with the SIM UART
+register model). `MODEL_SIM_CARD` — a genuine message-layer ATR→PPS→EF-read — is
+the one kept SIM model.
+
+**`TRACE_*` taps thinned 46 → 5.** Kept the ones that document the working boot
+across its layers: `TRACE_CCONT_READ` (power/ADC), `TRACE_LIMP`/`TRACE_LIMP2` (the
+startup limp), `TRACE_CSCMD` (contact-service command inventory), `TRACE_RESAVAIL`
+(display-resource availability). The ~40 one-off investigation taps
+(disp/mmi/render/sim-uart/scheduler/service traces) were removed — the findings
+they produced live in the docs.
+
+**Tools:** `tools/fwdis.py` (capstone-raw disassembler) removed; `tools/disrom.py`
+(Thumb-1-correct, resolves swap16 pool literals) is the replacement.
+
+Net: the surviving `NOKI3210_*` knobs are **hardware config** (display/ADC/battery/
+timers/EEPROM/power-IRQ/…), the **faithful opt-in `MODEL_*` stack** that reaches
+"Insert SIM card", and **five diagnostic taps**.
