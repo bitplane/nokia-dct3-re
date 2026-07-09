@@ -1001,3 +1001,38 @@ MMI never transitions. Next: find what advances `[0x10a8e2]` past `1` (which SIM
 code/message marks the SIM fully ready) and whether `MODEL_SIM_CARD` can deliver it —
 the analogue, one layer up, of the ATR/PPS/EF steps it already models. Knob (reverted):
 `TRACE_SIMDEC`.
+
+## Correction + refinement: the SIM is present AND stable; the wall is the post-SIM render (2026-07)
+
+The prior section guessed the SIM state machine "loops in retry" — that was wrong.
+Tracing the SIM control struct directly (`TRACE_SIMST` on `0x10a8dc`): the state byte
+`[0x10a8e2]` (+6) is **0** and `[+9]` is **0** the whole run (RESET-START `0x27e024`
+runs once early, ~t=0.86). So the SIM is **recognised present and stable** — the
+`0x27ea88` poll (~every 34 ms) simply re-confirms SIM-present against an unchanging
+state; it is not thrashing.
+
+And the SIM **does report its progress upward**. The status reporter `0x27e240` is
+called with `0x1f` (no SIM), `0x15` (ATR), `0x16` (detected/PPS). It dispatches per
+status to handlers (`0x16 → 0x27e394`) that build and **post messages onward** — e.g.
+the `0x16` handler allocates a `0x120c` message and posts it to task 20 via `0x26a354`
+(gated on the SIM response buffer `[0x10dddc]` leading byte `== 0x91`). So "SIM
+detected" genuinely propagates into the message system.
+
+**So the SIM fake is, at the message layer, essentially complete:** the firmware
+recognises the card as present, holds a stable SIM state, and reports/propagates the
+detection status. The reason the screen doesn't visibly advance past "Insert SIM card"
+is **not** the SIM — it is **downstream, in the post-SIM UI render**: composing the
+next screen (idle / PIN / menu chrome) needs the display **resource-content pipeline**
+(the ~18 resource-provider classes), which we proved earlier requires the full coherent
+display-subsystem bring-up and cannot be faked by flipping availability bits (that
+blanks/crashes the display).
+
+**Net:** every thread — SIM acceptance, the MMI state, the input path — now terminates
+at the same wall: the **display resource-provider graph** that a real boot constructs
+and our reconstructed boot does not. That is the one genuine remaining blocker to a
+visibly-interactive screen, and it is a large, coherent-bring-up problem (or a source of
+the real provisioned resource config), not a message injection. Possible actionable
+thread if pursued: the `0x16` handler's gate on `[0x10dddc]==0x91` — check whether
+`MODEL_SIM_CARD`'s response words match what the status-propagation path expects (it may
+return `SW=9000` where the path wants a `0x91xx` proactive/status byte). Knob (reverted):
+`TRACE_SIMST`/`TRACE_SIMDEC`.
