@@ -604,3 +604,11 @@
 0x002e1ff4,label,battery_classifier_high_threshold_defaults_2e1ff4
 0x002e2d74,label,battery_source_channel_map_2e2d74
 address,kind,name
+0x002b257e,function,resource_get_2b257e
+0x002b12dc,function,resource_acquire_descriptor_2b12dc
+0x002b12b4,function,resource_available_2b12b4
+0x002b140a,function,resource_registrar_2b140a
+0x002b2560,function,resource_deftable_lookup_2b2560
+0x002a255c,function,display_idle_2a255c
+0x002e0a50,label,resource_deftable_2e0a50
+0x002e2f5c,label,resource_availbit_masktable_2e2f5c
