@@ -2077,19 +2077,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// so the sequencer takes the confirmed path 0x2713b6 instead of draining at 0x2714a4.
 	if (nokia_env_u32("NOKI3210_MODEL_STARTUP_REPORTS", 0) != 0 && pc == addr && addr == 0x0027139e)
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 3);
-	// task-3 (display/resource server) liveness trace: does it reach init (0x2b18d2) and its recv (0x2b18e8),
-	// and what codes does it process? If it never runs, the mode-0xc display init that waits on it hangs.
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr && addr == 0x002b18d2)
-	{
-		static unsigned e = 0; if (e++ < 3) logerror("task3: init reached (0x2b18d2) t=%.4f\n", machine().time().as_double());
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr && addr == 0x002b18e8)
-	{
-		static u32 seen[32]; static unsigned n = 0;
-		const u32 code = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
-		bool dup = false; for (unsigned i = 0; i < n; i++) if (seen[i] == code) { dup = true; break; }
-		if (!dup && n < 32) { seen[n++] = code; logerror("task3: recv code=%04x t=%.4f\n", code, machine().time().as_double()); }
-	}
 	// EXPERIMENT_FORCE_CODE7 (opt-in, diagnostic): the mode-0d advance's getmsg at 0x270f46 (bl 0x26ff14)
 	// expects message code 7 to run the init burst; it never arrives. Force the getmsg return r0:=7 at the
 	// post-bl point 0x270f4a (a reliably-hooked address, unlike mid-linear code MAME prefetches) so the

@@ -338,11 +338,23 @@ display init. So the terminus is *not* a dead subsystem. `0x2355b6(2)` cooperati
 the RTOS scheduler `0x269d00`** (the context-switch/dispatch, not an event-wait) and task 1
 progresses only slowly through the display init (a ~5 s gap between successive checkpoints),
 threading many scheduler yields and subsystem calls (`0x2795e6`, `0x2b28e0`, `0x2904c0`, the
-task-3 posts, resource acquisition). Over 60 s it still does not return to `0x2a130c` and mode-0
-interactive-init (`0x270d1c`) never runs. So the ceiling is the **display-subsystem init being a
-deeply interconnected multi-step process that does not converge** on our reconstructed boot — the
-coherent-boot wall, reached *from above*. (Skipping the yield is not an option: `0x269d00` is core
-scheduler used across the whole system; forcing it past breaks the boot at mode-0d.)
+task-3 posts, resource acquisition). Over **60 s and 200 s** runs it still does not return to `0x2a130c`, mode-0 interactive-init
+(`0x270d1c`) never runs, and the frame never changes. So the ceiling is the **display-subsystem
+init being a deeply interconnected multi-step process that does not converge** on our reconstructed
+boot — the coherent-boot wall, reached *from above*. (Skipping the yield is not an option:
+`0x269d00` is core scheduler used across the whole system; forcing it past breaks the boot at
+mode-0d.)
+
+**What the init actually does (the root of the non-convergence).** `0x2355b6`, after the yield,
+calls `0x2795e6`, which **resumes/starts the application-task layer** — tasks **0xa..0x11 (10–17)**
+via `0x269bf4` (each `0x1093bc + id*0x10` TCB). So the mode-`0xc` display init is the "bring up the
+application/UI tasks" step. Those tasks then run their own inits (needing resources, the display
+render path, DSP/RF state). On our reconstructed boot that app-layer bring-up **does not converge**
+— which is exactly the resource-provider / coherent-boot wall, now seen to be *the app-task layer
+init*, not a single missing message. Emulating mode-0 interactive-init therefore requires driving
+~8 more application tasks to convergence (each with its own report/resource dependencies, and
+behind them the resource-content pipeline that blanks/crashes when forced) — an open-ended
+subsystem bring-up, the documented digital ceiling.
 
 **Status vs the goal.** VBAT confirmation — mapped + emulated at its gate (`0x2a6942()==3`);
 code-7 trigger — **emulated** (fed via `0x26ff14`); mode-4 6-message checklist — **emulated**

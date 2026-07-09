@@ -653,3 +653,5 @@ address,kind,name
 0x002355b6,function,display_ui_init_wait_task3_2355b6
 0x002a1300,function,display_ui_init_r0eq1_2a1300
 0x002b18a0,task,task3_display_resource_server_2b18a0
+0x002795e6,function,resume_app_tasks_10_17_2795e6
+0x00269bf4,function,rtos_task_resume_269bf4
