@@ -327,15 +327,22 @@ mode 4  (Insert-SIM park)
 
 **The definitive terminus.** Past the VBAT-confirm gate, mode `0xc` calls the **display/UI
 subsystem init `0x2a12a0`** (r0=1 → `0x2a1300`), which reports a resource (`0x2b13d4`), posts
-three messages to **task 3**, and calls **`0x2355b6`** — and does not return. Drilled to the
-root: `0x2355b6(2)` **yields via the RTOS scheduler `0x269d00`** (reads the scheduler flag
-`[0x100020]`; task-switch on the miss path) — i.e. it **blocks waiting for task 3** (the
-display/UI server it posts to) to run and service the request. Task 3 is not functional on our
-reconstructed boot, so the display init never completes (traced: reaches `0x2713b6`/`0x2713bc`,
-never `0x2713c2`; inside, reaches `0x2a1306`, never `0x2a130c`). So report injection drives the
-boot through *every message-gated gate*, and then hits a subsystem call that **blocks on the
-non-functional display/UI server task 3** — the resource-provider / coherent-boot wall the whole
-project has converged on, now reached *from above* and confirmed as the ceiling.
+three messages to **task 3**, and calls **`0x2355b6`** — and this long multi-step init **does not
+complete** (traced: reaches `0x2713b6`/`0x2713bc`, never `0x2713c2`; inside `0x2a1300`, reaches
+`0x2a1306`, never `0x2a130c`, even over a 60 s run).
+
+**Correction (task 3 IS alive).** An earlier note here said task 3 (the display/UI server) is
+"not functional". That is wrong — a liveness trace shows **task 3 runs and recv-loops throughout
+the boot**, processing many codes (`0x1740, 0x2b14, 0x2c48, …`), including during the mode-`0xc`
+display init. So the terminus is *not* a dead subsystem. `0x2355b6(2)` cooperatively **yields via
+the RTOS scheduler `0x269d00`** (the context-switch/dispatch, not an event-wait) and task 1
+progresses only slowly through the display init (a ~5 s gap between successive checkpoints),
+threading many scheduler yields and subsystem calls (`0x2795e6`, `0x2b28e0`, `0x2904c0`, the
+task-3 posts, resource acquisition). Over 60 s it still does not return to `0x2a130c` and mode-0
+interactive-init (`0x270d1c`) never runs. So the ceiling is the **display-subsystem init being a
+deeply interconnected multi-step process that does not converge** on our reconstructed boot — the
+coherent-boot wall, reached *from above*. (Skipping the yield is not an option: `0x269d00` is core
+scheduler used across the whole system; forcing it past breaks the boot at mode-0d.)
 
 **Status vs the goal.** VBAT confirmation — mapped + emulated at its gate (`0x2a6942()==3`);
 code-7 trigger — **emulated** (fed via `0x26ff14`); mode-4 6-message checklist — **emulated**
