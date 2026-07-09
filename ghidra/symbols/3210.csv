@@ -646,3 +646,6 @@ address,kind,name
 0x002af190,function,code7_reporter_post_2af190
 0x0027cd82,function,vbat_code7_voltage_gate_27cd82
 0x0021e3f8,function,battery_shutdown_check_code7_21e3f8
+0x0026ff14,function,task1_msg_getter_26ff14
+0x002a12a0,function,display_ui_subsystem_init_2a12a0
+0x00271254,function,task1_mode0xc_startup_phase3_271254

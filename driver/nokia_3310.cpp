@@ -1765,54 +1765,26 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	}
 
 	// MODEL_STARTUP_REPORTS (opt-in): emulate the subsystem-ready reports that drive the interactive
-	// handoff past the mode-0d limp -- code 7 (the mode-4/7 init-burst trigger) and the mode-4 6-message
-	// ready checklist codes 9/a/b/c/d/1c. On a real boot these are posted to task-1's mailbox by the
-	// 0x2af0xx reporter stubs when the battery/MMI/display subsystems reach their ready states; our
-	// reconstructed boot never reaches those states (docs/interactive_handoff.md #33). This model injects
-	// them faithfully via the firmware's own post 0x26a354(mailbox=1, code) -- one call per report code,
-	// chained through a sentinel trampoline (same pattern as MODEL_SVC_RESPONDER / MODEL_RES_ENABLE).
-	// Triggered once at task-1's message getter 0x26ff14, after mode-0d completes.
-	if (nokia_env_u32("NOKI3210_MODEL_STARTUP_REPORTS", 0) != 0 && pc == addr)
+	// handoff past the mode-0d limp. On a real boot the battery/MMI/display subsystems post these codes to
+	// task-1 (via the 0x2af0xx reporter stubs) as they reach ready; our reconstructed boot never reaches
+	// those states (docs/interactive_handoff.md #33). This model feeds them REACTIVELY: at task-1's getter
+	// 0x26ff14 (after mode-0d), it returns the next report code directly to the caller (bx lr), one per
+	// getmsg call, in the order the successive startup sub-phases wait for them -- so each wait loop gets
+	// exactly its code (avoids the FIFO discard-loops that eat an all-at-once injection out of order).
+	if (nokia_env_u32("NOKI3210_MODEL_STARTUP_REPORTS", 0) != 0 && pc == addr && addr == 0x0026ff14 &&
+			machine().time().as_double() >= nokia_env_u32("NOKI3210_STARTUP_REPORTS_MS", 950) / 1000.0 &&
+			debug_ram_byte(0x00100022) == 1)
 	{
-		constexpr u32 SENT = 0x003ff200;     // distinct flash return sentinel
-		constexpr uint16_t BX_R12 = 0x4760;
-		static const uint8_t CODES[] = { 7, 9, 0xa, 0xb, 0xc, 0xd, 0x1c, 0x74 };
-		constexpr unsigned NC = sizeof(CODES);
-		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
-		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
-		const double trig = nokia_env_u32("NOKI3210_STARTUP_REPORTS_MS", 950) / 1000.0;
-
-		if (m_reports_state == 0 && addr == 0x0026ff14 &&
-				machine().time().as_double() >= trig && debug_ram_byte(0x00100022) == 1)
+		// The sequence of codes the mode-4/0xc startup sub-phases consume, in order.
+		static const uint8_t FEED[] = { 7, 9, 0xa, 0xb, 0xc, 0xd, 0x1c, 0x74, 3, 0x11 };
+		if (m_reports_idx < sizeof(FEED))
 		{
-			for (int i = 0; i < 15; i++) m_reports_saved[i] = getr(i);
-			m_reports_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			setr(0, 1);                         // r0 = mailbox (task 1)
-			setr(1, CODES[0]);                  // r1 = first report code
-			setr(14, SENT | 1);                 // LR -> sentinel
-			setr(12, 0x0026a354 | 1);           // r12 -> post-to-mailbox
-			m_reports_idx = 0;
-			m_reports_state = 2;
-			logerror("reports: inject start t=%.4f (7,9,a,b,c,d,1c -> task1 mailbox)\n", machine().time().as_double());
-			return BX_R12;
-		}
-		if (m_reports_state == 2 && addr == SENT)
-		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, FEED[m_reports_idx]);
+			static unsigned logn = 0;
+			if (logn++ < 20) logerror("reports: feed code=%02x (#%u) t=%.4f\n",
+					FEED[m_reports_idx], m_reports_idx, machine().time().as_double());
 			m_reports_idx++;
-			if (m_reports_idx < NC)
-			{
-				setr(0, 1);
-				setr(1, CODES[m_reports_idx]);
-				setr(14, SENT | 1);
-				setr(12, 0x0026a354 | 1);
-				return BX_R12;
-			}
-			for (int i = 0; i < 15; i++) setr(i, m_reports_saved[i]);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_reports_saved[15]);
-			setr(12, 0x0026ff14 | 1);           // resume: re-run task-1 getmsg (now finds the posted codes)
-			m_reports_state = 3;
-			logerror("reports: injected %u codes; resuming getmsg t=%.4f\n", NC, machine().time().as_double());
-			return BX_R12;
+			return 0x4770;   // bx lr -> getmsg returns this code to its caller
 		}
 	}
 
@@ -2100,6 +2072,11 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	{
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, nokia_env_u32("NOKI3210_VBAT_RAW", 0x200) & 0xffff);
 	}
+	// MODEL_STARTUP_REPORTS VBAT-confirm at the mode-0xc exit gate: emulate the VBAT voltage-confirmation
+	// reaching its confirmed value (0x2a6942()==3) at 0x27139e (post bl 0x2a6942 in the mode-0xc handler),
+	// so the sequencer takes the confirmed path 0x2713b6 instead of draining at 0x2714a4.
+	if (nokia_env_u32("NOKI3210_MODEL_STARTUP_REPORTS", 0) != 0 && pc == addr && addr == 0x0027139e)
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 3);
 	// EXPERIMENT_FORCE_CODE7 (opt-in, diagnostic): the mode-0d advance's getmsg at 0x270f46 (bl 0x26ff14)
 	// expects message code 7 to run the init burst; it never arrives. Force the getmsg return r0:=7 at the
 	// post-bl point 0x270f4a (a reliably-hooked address, unlike mid-linear code MAME prefetches) so the

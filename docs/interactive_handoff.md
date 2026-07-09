@@ -310,12 +310,36 @@ multi-comparison over the moving-average vs ROM thresholds; a faithful state-3 n
 to converge into a specific band, still open). Knobs: `MODEL_STARTUP_REPORTS`,
 `STARTUP_REPORTS_MS`, `VBAT_RAW`.
 
-**Status vs the goal:** VBAT confirmation — mapped, and shown to be the remaining gate (not yet
-driven to state 3 faithfully); code-7 trigger — **emulated** (injected via the firmware's post);
-mode-4 6-message checklist — **emulated** (injected, checklist passes, mode advances 4→0xc);
-mode-0 interactive-init — reachable once the VBAT state-3 confirmation is modelled (the only gate
-between mode 0xc and it). The emulation mechanism is proven; the last blocker is the VBAT
-classifier reaching its confirming state.
+**Reactive feed (final form).** The one-shot mailbox injection hit an ordering problem (the
+`0x74`-wait and later discard-loops eat an all-at-once injection). The model was reworked to feed
+**reactively**: at task-1's getter `0x26ff14` (after mode-0d), it returns the next report code
+directly (`bx lr`), one per getmsg call, in the order the successive sub-phases wait for them.
+This carries the boot cleanly through the full message-gated startup handoff:
+
+```
+mode 4  (Insert-SIM park)
+ feed 7          → code-7 trigger → init burst → mode 0xc
+ feed 9,a,b,c,d,1c → 6-message ready checklist passes
+ feed 0x74       → post-checklist report consumed
+ [VBAT-confirm gate 0x27139a: model emulates 0x2a6942()==3, the confirmed value]
+ → 0x2713b6 sub-phase → bl 0x2a12a0  ← HANGS
+```
+
+**The definitive terminus.** Past the VBAT-confirm gate, mode `0xc` calls the **display/UI
+subsystem init `0x2a12a0`** (r0=1 → `0x2a1300`), which reports a resource (`0x2b13d4`), posts
+three messages to **task 3**, and drives timer/`0x290cf4` calls — and **does not return** on our
+boot (traced: reaches `0x2713b6`/`0x2713bc`, never `0x2713c2`). So report injection drives the
+boot through *every message-gated gate* of the handoff, and then hits a **subsystem-init call
+that hangs because the display/UI subsystem (and task 3) are not functional** — the
+resource-provider / coherent-boot wall the whole project has converged on.
+
+**Status vs the goal.** VBAT confirmation — mapped + emulated at its gate (`0x2a6942()==3`);
+code-7 trigger — **emulated** (fed via `0x26ff14`); mode-4 6-message checklist — **emulated**
+(fed, checklist passes); mode-0 interactive-init — **not reached**: it is behind the display/UI
+subsystem init `0x2a12a0` that hangs (needs the display/resource subsystem + task 3 functional,
+i.e. the coherent-boot wall). Three of the four gates are driven; the fourth (mode-0) is blocked
+not by another message but by a non-functional subsystem — the genuine, long-documented ceiling.
+Knob: `MODEL_STARTUP_REPORTS` (`STARTUP_REPORTS_MS`).
 
 ## Next
 
