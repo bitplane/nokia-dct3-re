@@ -317,6 +317,7 @@
 0x0028e0aa,label,startup_service_table_copy_loop_28e0aa
 0x0028ff14,function,task14_startup_ready_28ff14
 0x002909e4,function,startup_service_buffer_seed_2909e4
+0x00290a94,function,dsp_coeff_table_download_290a94
 0x00290b54,function,startup_service_table_init_290b54
 0x00290cf4,function,startup_service_buffer_update_290cf4
 0x00290cf8,function,service_startup_dispatch_290cf8
@@ -332,6 +333,7 @@
 0x00291096,label,startup_service_ready_gate_dsp_counter_291096
 0x0029109e,label,startup_service_ready_store_1_29109e
 0x00295ea2,function,contact_service_optional_flag_295ea2
+0x00295f40,function,dsp_shram_selftest_295f40
 0x002961ac,function,startup_resource_table_check_2961ac
 0x002961ec,function,startup_flash_table_check_2961ec
 0x0029697e,function,event_source_29697e
@@ -593,6 +595,7 @@
 0x002b58e8,label,sim_memcmp_2b58e8
 0x002b5ae4,function,ccont_reg_write_2b5ae4
 0x002b5b24,function,ccont_reg_write_2b5b24
+0x002b5bd0,function,dsp_shram_arm_blockcopy_2b5bd0
 0x002b5eaa,function,display_capability_record_sanitize_2b5eaa
 0x002b5eaa,label,display_capability_record_sanitize_2b5eaa
 0x002b6524,function,dsp_ram_addr_encode_2b6524

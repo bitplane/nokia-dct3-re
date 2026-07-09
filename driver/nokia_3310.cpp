@@ -624,8 +624,9 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
 //      TRACE_CCONT_READ (power/ADC), TRACE_LIMP/TRACE_LIMP2 (the startup limp),
 //      TRACE_CSCMD (contact-service command stream), TRACE_RESAVAIL (display-resource
-//      availability), TRACE_DSPDRV (entries into the GSM-L1/audio DSP driver layer —
-//      the network frontier; see docs/network_scouting.md). The RE forcing shims and
+//      availability), TRACE_DSPDRV (entries into the GSM-L1/audio DSP driver layer),
+//      TRACE_DSPIO (MCU<->DSP shared-RAM + DSPIF access map; docs/dsp_interface.md) --
+//      the network/DSP frontier (docs/network_scouting.md). The RE forcing shims and
 //      one-off traces have been retired (docs/removed_forcing_knobs.md).
 //
 // The forcing/model logic is quarantined in flash_firmware_hooks / ram_*_firmware_*
@@ -1497,8 +1498,24 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
 	m_timer_dsp_service->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", 5)));
 }
 
+// TRACE_DSPIO (opt-in): map the MCU<->DSP interface. Logs first-touch of each distinct
+// DSP shared-RAM (0x10000) offset and DSPIF (0x30000) register the firmware accesses, with
+// direction, value, and the accessing PC. Byte offsets are shown (halfword*2). See docs/dsp_interface.md.
+static bool dsp_io_first_touch(char kindc, unsigned byte_off, char dir)
+{
+	static std::unordered_map<unsigned, bool> seen;   // key = kind<<24 | dir<<16 | off
+	const unsigned key = (unsigned(kindc) << 24) | (unsigned(dir) << 16) | (byte_off & 0xffff);
+	static unsigned n = 0;
+	if (seen[key] || n >= 400) return false;
+	seen[key] = true; n++;
+	return true;
+}
+
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'R'))
+		logerror("dspio: shram R [%03x] = %04x  pc=%08x\n", offset << 1, m_dsp_ram[offset & 0x7ff],
+				m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 
 	// HACK: avoid hangs when ARM try to communicate with the DSP
 	if (offset <= 0x004 >> 1)   return 0x01;
@@ -1512,6 +1529,10 @@ uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	COMBINE_DATA(&m_dsp_ram[offset & 0x7ff]);
+
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'W'))
+		logerror("dspio: shram W [%03x] = %04x  pc=%08x\n", offset << 1, m_dsp_ram[offset & 0x7ff],
+				m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 
 	// DSP service-completion model (opt-in): when the MCU queues lower-service work by
 	// writing a non-zero count to the pending counter (byte 0xe4, pc 0x290c98), the real
@@ -2722,12 +2743,16 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'R'))
+		logerror("dspio: dspif R [%03x]        pc=%08x\n", offset, m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 	return 0;
 }
 
 void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'W'))
+		logerror("dspio: dspif W [%03x] = %02x   pc=%08x\n", offset, data, m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 }
 
 uint8_t noki3310_state::mad2_mcuif_r(offs_t offset)
