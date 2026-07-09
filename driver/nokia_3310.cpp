@@ -1983,8 +1983,10 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				static unsigned hga = 0;
 				if (hga++ < 4) logerror("gate0d: *** ADVANCE TAKEN 0x270ee6 t=%.4f\n", machine().time().as_double());
 			}
-			// SIM-struct gate byte [0x110436] (= [0x110434+2]) trajectory: the advance is blocked while it
-			// is 1 or 2 (0x2a6942 returns 0). Log on change, plus neighbour [0x110434+9].
+			// VBAT voltage-confirmation gate byte [0x110436] (= battery struct [0x110434+2]) trajectory:
+			// the interactive advance is blocked while it is 1 or 2 (0x2a6942 returns 0). NOTE this is the
+			// battery/VBAT subsystem (0x21exxx, struct 0x110434), NOT the SIM -- confirmed via debug strings
+			// ("BATTERY VOLTAGE CHECK", "Initialise VBAT filter"). Log on change.
 			else if (addr == 0x0027d654)
 			{
 				static u32 last = 0xffffffff;
@@ -1992,8 +1994,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				if (v != last)
 				{
 					last = v;
-					logerror("simgate: [0x110436]=%02x [0x11043d]=%02x t=%.4f\n", v,
-							debug_ram_byte(0x0011043d), machine().time().as_double());
+					logerror("vbatgate: [0x110436]=%02x t=%.4f\n", v, machine().time().as_double());
 				}
 			}
 			// mode-write epilogue 0x270184 (strh r0,[r4,#4]): every task-1 mode transition + its caller lr.
@@ -2012,19 +2013,22 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				}
 			}
 		}
-	// EXPERIMENT_SIMGATE_PASS (opt-in, diagnostic): the mode-0d proper advance (0x270eee, which arms the
-	// mode-0x04 init-burst trigger 'code 7') is blocked because SIM-struct byte [0x110436] == 1, making the
-	// gate helper 0x2a6942 return 0. Force it to pass by overriding 0x2a6942's read of [0x110436] (at
-	// 0x2a6948, just after bl 0x27d654) to 0 -> 0x2a6942 returns 2 (nonzero). Tests whether the advance then
-	// fires and cascades (arm code 7 -> burst -> interactive). Diagnostic only; reverted after use.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIMGATE_PASS", 0) != 0 && pc == addr && addr == 0x002a6948)
+	// EXPERIMENT_VBAT_GATE_PASS (opt-in, diagnostic): the mode-0d proper advance (0x270eee, which arms the
+	// mode-0x04 init-burst trigger 'code 7') is blocked because the VBAT voltage-confirmation byte [0x110436]
+	// (battery struct 0x110434 field +2) == 1, making gate helper 0x2a6942 return 0. It is NOT a SIM state --
+	// 0x21exxx/0x27dxxx here is the battery/VBAT voltage monitor (strings "BATTERY VOLTAGE CHECK",
+	// "Initialise VBAT filter"); [0x110436] is a 15-tap moving-average classification that structurally
+	// stays 1 on our boot and is independent of the battery ADC value. Force the gate to pass by overriding
+	// 0x2a6942's read (at 0x2a6948, after bl 0x27d654) 1->0 -> 0x2a6942 returns 2 (nonzero). Tests whether
+	// the advance then fires and cascades (arm code 7 -> burst -> interactive). Diagnostic only.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_VBAT_GATE_PASS", 0) != 0 && pc == addr && addr == 0x002a6948)
 	{
 		const u32 v = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
 		if (v == 1 || v == 2)
 		{
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0);
 			static unsigned e = 0;
-			if (e++ < 4) logerror("simgate_pass: forced 0x2a6942 read %u -> 0 t=%.4f\n", v, machine().time().as_double());
+			if (e++ < 4) logerror("vbat_gate_pass: forced 0x2a6942 read %u -> 0 t=%.4f\n", v, machine().time().as_double());
 		}
 	}
 	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate

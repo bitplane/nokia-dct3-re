@@ -151,6 +151,37 @@ ready) so `[0x110436]` reaches its ready value naturally — the same shape as e
 Knobs: `EXPERIMENT_SIMGATE_PASS` (diagnostic force), `TRACE_HANDOFF` (`simgate` tap on
 `0x27d654`).
 
+## Follow-up (#30): CORRECTION — the gate is a BATTERY/VBAT byte, not SIM
+
+Investigating how to make `[0x110436]` reach "ready" overturned its labelling. **It is not a
+SIM state.** The subsystem that owns struct `0x110434` and drives `[0x110436]` is the
+**battery / VBAT voltage monitor** at `0x21exxx` — its debug strings are "BATTERY VOLTAGE
+CHECK", "REGULAR COLD CHARGE CHECKS", "Initialise VBAT filter", "Start limited fast VBAT
+reads", "Check voltage level for shutdown". So the mode-0d→interactive advance is gated on a
+**battery-voltage confirmation**: the firmware won't proceed to full operational/interactive
+mode until the VBAT classification is out of the "checking/marginal" band {1,2}. (This
+corrects the `#28` section above and the earlier `EXPERIMENT_SIMGATE_PASS` name — both said
+"SIM"; it is VBAT. The knob is now `EXPERIMENT_VBAT_GATE_PASS`.)
+
+**How `[0x110436]` is computed.** Writer `0x27dcfa` stores `[0x110436] = 0x27cbec()`. The
+classifier `0x27cbec` compares a filtered voltage (`r1 = [0x110486] = 0x0995`) and a filter
+output `ip` (from `0x27d500`, a **15-tap moving-average**: ring index `[0x110434+0xb] mod 15`,
+accumulator `[+0x44]`, sample buffer `0x1104b4`) against **fixed thresholds**
+`[0x110494]=0x076c`, `[0x110496]=0x0910`, `[0x110498]=0x08b6`. On our boot `ip ≈ 0x09ac ≥
+0x0910`, so it structurally returns **1** and never changes over 20 s. Values 1/2 block the
+gate; 0 and 3 pass.
+
+**Not the battery ADC.** Sweeping the battery-voltage ADC (`NOKI3210_ADC2`) across its full
+range `0x120…0x3ff` leaves `[0x110436]=1` and `r1=0x0995` unchanged — the classifier's inputs
+are internal/calibration values, not the live ADC channel-2 reading. So **extending the SIM
+init (the original #30 framing) cannot affect it, and neither can a battery-voltage tweak.**
+
+**Verdict.** The faithful unblock of `[0x110436]` is a **battery/VBAT-subsystem** matter (the
+filter/classification reaching "confirmed"), not a SIM-model extension. It was partially
+explored before (`SKIP_SERVICE_E2_REARM`, the VBAT-pipeline probe) and is not resolved by any
+single value. The digital lever to explore *past* this gate remains the forced pass
+(`EXPERIMENT_VBAT_GATE_PASS`), which advances mode `0d→7` (confirmed) for use by `#31`.
+
 ## Next
 
 Two open threads for the code-`7` trigger:
