@@ -182,6 +182,37 @@ explored before (`SKIP_SERVICE_E2_REARM`, the VBAT-pipeline probe) and is not re
 single value. The digital lever to explore *past* this gate remains the forced pass
 (`EXPERIMENT_VBAT_GATE_PASS`), which advances mode `0d→7` (confirmed) for use by `#31`.
 
+## Follow-up (#31): the mode-7+ chain — enumerated, and it does not reach pixels
+
+Used the two diagnostic force levers (`EXPERIMENT_VBAT_GATE_PASS` + `EXPERIMENT_FORCE_CODE7`,
+the latter forcing the advance's getmsg return `r0:=7` at the reliably-hooked post-`bl`
+point `0x270f4a`) to push the sequencer as far as it will go and map the gate chain:
+
+| # | gate | our boot | lever |
+|---|---|---|---|
+| 1 | mode-0d startup checklist (`[0x112399]` ← events `0x14/15/16/17`) | **satisfied** (limp clears) | — |
+| 2 | **VBAT voltage-confirmation** `[0x110436]` (via `0x2a6942`) | blocks (structurally 1) | `VBAT_GATE_PASS` |
+| 3 | **code-7 trigger** (msg code 7 to task 1 at the advance getmsg) | never posted (unrun subsystem) | `FORCE_CODE7` |
+| 4 | **mode-4 6-message ready checklist** `[0x112390..95]` (codes `9/a/b/c/d/1c`) | never all posted | — |
+| 5+ | mode-0 interactive-init `0x270d1c`, idle repaint `[0x1116fd]`, resource-provider graph | never reached | — |
+
+**Result of forcing gates 2 + 3:** the mode-0d advance and its init burst run, and the
+sequencer reaches **mode 4** (confirmed: the VBAT gate is consulted a second time from the
+mode-4 caller `0x27139a` at t=0.88). But it then parks on gate 4 (the 6-message checklist),
+and — decisively — **the display never changes: the frame stays `d8a9a7` ("Insert SIM
+card")**, with no interactive-init and no idle repaint.
+
+**Take-stock conclusion.** The visibly-interactive screen is not one or two gates away — it
+sits behind a **chain of subsystem-readiness gates**, each a signal our reconstructed boot
+does not produce (battery-voltage confirmation; the code-7 trigger from an unrun subsystem;
+six more subsystem-ready posts; then the resource-provider graph). Forcing the leading gates
+does **not** cascade to pixels, because each unblocked gate merely exposes the next, and the
+downstream subsystems (the ready-message posters, the resource providers) still are not
+running. This is the coherent-boot wall, now *enumerated* as a concrete gate sequence rather
+than a vague region: reaching the interactive screen requires coherent bring-up of that whole
+graph, not a bounded set of pokes. Levers (opt-in, diagnostic): `EXPERIMENT_VBAT_GATE_PASS`,
+`EXPERIMENT_FORCE_CODE7`.
+
 ## Next
 
 Two open threads for the code-`7` trigger:

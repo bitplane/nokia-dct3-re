@@ -2031,6 +2031,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (e++ < 4) logerror("vbat_gate_pass: forced 0x2a6942 read %u -> 0 t=%.4f\n", v, machine().time().as_double());
 		}
 	}
+	// EXPERIMENT_FORCE_CODE7 (opt-in, diagnostic): the mode-0d advance's getmsg at 0x270f46 (bl 0x26ff14)
+	// expects message code 7 to run the init burst; it never arrives. Force the getmsg return r0:=7 at the
+	// post-bl point 0x270f4a (a reliably-hooked address, unlike mid-linear code MAME prefetches) so the
+	// burst runs -- to MAP what gate comes next in the interactive chain (-> mode 0 interactive-init
+	// 0x270d1c -> idle). Diagnostic chain-mapping lever, used with EXPERIMENT_VBAT_GATE_PASS.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_CODE7", 0) != 0 && pc == addr && addr == 0x00270f4a)
+	{
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 7);
+		static unsigned e = 0;
+		if (e++ < 8) logerror("force_code7: getmsg r0:=7 at 0x270f4a t=%.4f\n", machine().time().as_double());
+	}
 	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate
 	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the
 	// service-channel-busy bit [0x11fed1] bit2 (0x04) to clear -- which a real service peer does by
