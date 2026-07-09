@@ -21,10 +21,14 @@ current stall; it sits behind it.
 | `0x30000–0x30003` | **DSPIF** control register | `mad2_dspif_r/w` (stub: reads 0, writes no-op) | **almost none** — one early `0`-init at pc `0x2001a4`; its ~287 references are all in the L1 code that never runs |
 | `0x40000` | MCUIF (memory-range config) | `mad2_mcuif_r/w` (stub) | early config |
 
-The atlas counted ~444 references to the shared-RAM base and ~287 to DSPIF across the
-image, but **`TRACE_DSPIO` shows the *reachable boot* touches DSPIF exactly twice** (the
-early zero-init). Everything else DSPIF is in the `0x2b7xxx–0x2c9xxx` GSM-L1 driver that
-never runs (see `network_scouting.md`).
+The atlas counted ~444 references to the shared-RAM base and 42 pool-literal references
+to DSPIF across the image, but **`TRACE_DSPIO` (deduped per distinct offset+dir+PC) shows
+the *reachable boot* touches DSPIF exactly twice** — `W[0]=0` and `W[1]=0` at `0x2001a4`.
+The one *other* boot-region DSPIF write — `strh #4 → 0x30000` ("command 4") at `0x29103c`
+in the DSP-service handshake — is **gated by the branch at `0x291030` and skipped**,
+because `MODEL_DSP_SERVICE` fakes the service completion so that path isn't taken. All
+remaining DSPIF use is in the `0x2b7xxx–0x2c9xxx` GSM-L1 driver that never runs (see
+`network_scouting.md`). So DSPIF's command/status protocol is **static-only** for us.
 
 ## Shared-RAM layout at boot (`0x10000` base; offsets are byte offsets)
 

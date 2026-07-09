@@ -1501,19 +1501,21 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
 // TRACE_DSPIO (opt-in): map the MCU<->DSP interface. Logs first-touch of each distinct
 // DSP shared-RAM (0x10000) offset and DSPIF (0x30000) register the firmware accesses, with
 // direction, value, and the accessing PC. Byte offsets are shown (halfword*2). See docs/dsp_interface.md.
-static bool dsp_io_first_touch(char kindc, unsigned byte_off, char dir)
+static bool dsp_io_first_touch(char kindc, unsigned byte_off, char dir, u32 pc)
 {
-	static std::unordered_map<unsigned, bool> seen;   // key = kind<<24 | dir<<16 | off
-	const unsigned key = (unsigned(kindc) << 24) | (unsigned(dir) << 16) | (byte_off & 0xffff);
+	// Dedup per distinct (kind, dir, offset, PC) so every call site is shown once.
+	static std::unordered_map<uint64_t, bool> seen;
+	const uint64_t key = (uint64_t(unsigned(kindc)) << 56) | (uint64_t(unsigned(dir)) << 48)
+			| (uint64_t(byte_off & 0xffff) << 32) | pc;
 	static unsigned n = 0;
-	if (seen[key] || n >= 400) return false;
+	if (seen[key] || n >= 600) return false;
 	seen[key] = true; n++;
 	return true;
 }
 
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'R'))
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'R', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
 		logerror("dspio: shram R [%03x] = %04x  pc=%08x\n", offset << 1, m_dsp_ram[offset & 0x7ff],
 				m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 
@@ -1530,7 +1532,7 @@ void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	COMBINE_DATA(&m_dsp_ram[offset & 0x7ff]);
 
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'W'))
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'W', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
 		logerror("dspio: shram W [%03x] = %04x  pc=%08x\n", offset << 1, m_dsp_ram[offset & 0x7ff],
 				m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 
@@ -2743,7 +2745,7 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'R'))
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'R', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
 		logerror("dspio: dspif R [%03x]        pc=%08x\n", offset, m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 	return 0;
 }
@@ -2751,7 +2753,7 @@ uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'W'))
+	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'W', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
 		logerror("dspio: dspif W [%03x] = %02x   pc=%08x\n", offset, data, m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 }
 
