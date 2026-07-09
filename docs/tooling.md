@@ -6,7 +6,9 @@
   [capstone](https://www.capstone-engine.org/). They operate on the **swap16**
   firmware image (see `roms/README.md`). Set the image path via the `NOKI_BIN`
   environment variable (default points at `roms/3210f600a_swap16.bin`).
-  - `fwdis.py ADDR [LEN]` — disassemble
+  - `disrom.py ADDR:LEN ...` — **the** disassembler. Thumb-1 (ARMv4T) correct:
+    it rejects capstone's Thumb-2 mis-decodes and resolves pc-relative pool
+    literals (halfword-swapped). Prefer this over anything capstone-raw.
   - `findcalls.py ADDR...` — find `bl`/branch callers of an address
   - `findptr.py VALUE...` — find pointer literals (raw LE and halfword-swapped)
   - `dump.py ADDR [LEN]` — dump words / halfword-swapped pointers

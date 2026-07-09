@@ -31,11 +31,15 @@ The real device models — `nokia_ccont_*`, `mad2_io_*`, `eeprom_*`,
   helpers now hold only non-force research shims (NV/display-source stubs, trace
   taps). Do **not** re-introduce result forcing; model the missing hardware/NV state
   instead.
-- **Update:** the "model the missing state" work is now underway — opt-in faithful
-  models `NOKI3210_MODEL_DSP_SERVICE` (DSP lower-service handshake), `NOKI3210_MODEL_CCONT_PRESENT`
-  (CCONT present-status bit), and the `EEPROM_PROFILE=selftest` checksums. Each preserves the
-  oracle and replaces an `EXPERIMENT_*` force. The remaining `EXPERIMENT_*` knobs are diagnostic
-  only. See `service_bootstrap.md` (Status & model stack) for the full stack and the one open gate.
+- **Update (2026-07): the model work is complete and the scaffolding is retired.** The faithful
+  opt-in models now carry the boot all the way to "Insert SIM card":
+  `MODEL_DSP_SERVICE`, `MODEL_CCONT_PRESENT`, `EEPROM_PROFILE=selftest`, `MODEL_SVC_RESPONDER`,
+  `MODEL_SVC_CHANNEL_DRAIN`, `MODEL_SIM_CARD`, and `MODEL_RES_ENABLE` (the display-resource
+  registration groundwork). **All 19 `EXPERIMENT_*` forcing shims and the `FORCE_IDLE/OUTCOME`
+  shims were removed** (they were dead-end diagnostics; recoverable from git). The `TRACE_*` taps
+  were thinned to a curated few that document the working boot (`CCONT_READ`, `LIMP`, `LIMP2`,
+  `CSCMD`, `RESAVAIL`). See `sim_emulator_scope.md` for the SIM + resource layers and
+  `boot_to_insert_sim.md` for the service-channel-busy root cause.
 
 ## Regression oracle
 

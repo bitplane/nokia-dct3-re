@@ -21,14 +21,19 @@ the ISO-7816 PPS, and answers the phone's own GSM 11.11 T=0 command stream
 so the firmware **accepts the SIM** (the no-SIM reject decision at `0x27ea88`/`[0x111c64]` is cleared
 through the read, not forced). That is the whole SIM-conversation problem, solved.
 
-Reaching the classic **operator-idle** home screen is a *separate* wall, now mapped in detail but
-not broken: the interactive **MMI application layer is dormant** on the reconstructed boot — the idle
-"dirty" flag (`0x1116fd`), the display-ready flag (`0x11fee4`), the window-state machine (`0x297ed8`),
-and the display-resource path (`0x2b257e`/`0x224c`) are never activated because the phone's top-level
-state never declares "ready for interactive UI" and never emits the MMI window-creation messages.
-That is a coherent top-level-state problem (like CONTACT SERVICE and `000d` were), upstream of the
-SIM. `docs/sim_subsystem.md` keeps the original UART-level Phase-1 map; the SIM build log and the
-MMI/idle dig are in `docs/sim_emulator_scope.md`.
+Reaching the classic **operator-idle** home screen is a *separate* wall, now mapped end-to-end down
+to the pixel. Under the full SIM boot the interactive **MMI layer is alive** — the task-5 state-machine
+VM runs continuously — but the screen can't repaint to idle because the whole **display-resource
+subsystem is never registered**. Registration is a contact-service command (`0x70`) carrying a config
+blob that a real service session sends but our minimal faked session omits; `MODEL_RES_ENABLE` now
+delivers it faithfully (the firmware's own `0x2b140a` sets the enable flag `[0x11fee4]` and the
+availability bitmap). Even then the idle *content* stays blank: composing it acquires the idle window
+(`0x4c22`) plus **~18 more resource classes** (fonts, icons, layout, sub-windows) whose backing
+providers only come up with the full provisioned config, and its content values (clock, operator,
+signal) need a SIM + network registration — RF hardware, out of scope. So without a SIM+network,
+**"Insert SIM card" is the correct and complete terminal screen**; operator-idle is fundamentally a
+provisioned/SIM/network state. `docs/sim_subsystem.md` keeps the original UART-level Phase-1 map;
+the full SIM build log and the resource/content-pipeline dig are in `docs/sim_emulator_scope.md`.
 
 The default boot (no models) still reproduces the CONTACT SERVICE oracle frame byte-for-byte;
 every model is opt-in.
@@ -110,9 +115,10 @@ boot to idle with the *same* dead `0x15`-emit, a normal DCT3 boot does **not** d
 the mode-`000d` limp (waiting for a raw `0x15`) is an **artifact of the blank + faked boot**, not the path a
 real phone takes. The `000d` code is completely and correctly reverse-engineered; the *stall* is a property
 of how our unprovisioned/faked reconstruction reaches that state, not a missing model or a hardware gate.
-The diagnostic `EXPERIMENT_FORCE_000D_EVENTS` (not faithful) advances `000d → 0004` and renders the first
-**battery-present idle screen** (frame `4235fa`). The full mechanism, the refuted faithful levers, and the
-reusable cross-firmware method are in `docs/scheduler_delivery.md`.
+(A since-retired diagnostic that force-injected the `000d` events advanced `000d → 0004` and rendered the
+first **battery-present idle screen**, frame `4235fa`, confirming the mechanism.) The full mechanism, the
+refuted faithful levers, and the reusable cross-firmware method are in `docs/scheduler_delivery.md`. The
+real fix came later — the service-channel-busy busy-wait — see `docs/boot_to_insert_sim.md`.
 
 The **CCONT power-management subsystem is faithfully modelled** (`docs/ccont_subsystem.md`): an explicit
 ADC-source model, the interrupt→event protocol decoded, the `0x77xx` PMM messages mapped, its env-knob
@@ -136,14 +142,19 @@ Every `NOKI3210_*` knob the driver reads is overridable on the command line; the
 canonical oracle profile is baked into `make run`. Two useful profiles beyond the oracle:
 
 ```
-# Clear CONTACT SERVICE and reach the mode-000d limp (Phase 1's five models):
+# Clear CONTACT SERVICE and reach the mode-000d limp (the three service models):
 make run NOKI3210_MODEL_DSP_SERVICE=1 NOKI3210_MODEL_CCONT_PRESENT=1 NOKI3210_MODEL_SVC_RESPONDER=1
 
-# Diagnostic preview of the first battery-idle screen past the 000d gate (frame 4235fa;
-# forces events the firmware never emits on this path — NOT a faithful boot):
-make run NOKI3210_MODEL_DSP_SERVICE=1 NOKI3210_MODEL_CCONT_PRESENT=1 \
-         NOKI3210_MODEL_SVC_RESPONDER=1 NOKI3210_EXPERIMENT_FORCE_000D_EVENTS=1
+# The headline result: the full faithful boot all the way to "Insert SIM card"
+# (service models + the service-channel drain + the message-layer virtual SIM):
+make run NOKI3210_MODEL_DSP_SERVICE=1 NOKI3210_MODEL_CCONT_PRESENT=1 NOKI3210_MODEL_SVC_RESPONDER=1 \
+         NOKI3210_MODEL_SVC_CHANNEL_DRAIN=1 NOKI3210_MODEL_SIM_CARD=1 NOKI3210_SIM_ATR_HEX=3b1005 \
+         NOKI3210_SIM_CARD_EF=0x6f07 NOKI3210_SIM_CARD_CLEAR_NOSIM=1
 ```
+
+`MODEL_RES_ENABLE` (optional, on top of the above) delivers the resource-registration
+command `0x70` — the display-resource groundwork for operator-idle; see
+`docs/sim_emulator_scope.md`.
 
 ## License
 
