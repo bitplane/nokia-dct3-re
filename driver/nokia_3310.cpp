@@ -405,20 +405,10 @@ private:
 	uint8_t       m_sim_card_phase = 0;  // MODEL_SIM_CARD: 0=await ATR, 1=post-ATR (PPS/data)
 	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
-	bool          m_mmi_idle_forced = false;  // EXPERIMENT_MMI_IDLE: idle flag forced once
-	uint8_t       m_mode4_step = 0;      // EXPERIMENT_MODE4_EVENTS: 0=idle,1=sent3,2=sent-e,3=done
-	bool          m_mode4_bflag = false; // EXPERIMENT_MODE4_EVENTS: the missing readiness flag pre-set once
-	bool          m_mode4_74 = false;    // EXPERIMENT_MODE4_EVENTS: event 0x74 injected once
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
-	uint8_t       m_mode4_startup_completion_step;
-	uint8_t       m_post_charger_completion_step;
 	bool          m_post_charger_sequence_entered;
-	uint8_t       m_mode5_startup_event_step;
-	bool          m_mode5_ccont_event_sent;
-	bool          m_mode_d_startup_complete_forced;
-	bool          m_mode_d_late_startup_complete_forced;
 	uint32_t      m_power_irq_count;
 	attotime      m_startup_latch_complete_time;
 
@@ -757,13 +747,7 @@ void noki3310_state::machine_reset()
 	m_resen_msg = 0;
 	m_battery_startup_event_step = 0;
 	m_battery_startup_event_step_mode9 = 0;
-	m_mode4_startup_completion_step = 0;
-	m_post_charger_completion_step = 0;
 	m_post_charger_sequence_entered = false;
-	m_mode5_startup_event_step = 0;
-	m_mode5_ccont_event_sent = false;
-	m_mode_d_startup_complete_forced = false;
-	m_mode_d_late_startup_complete_forced = false;
 	m_power_irq_count = 0;
 	m_startup_latch_complete_time = attotime::never;
 
@@ -1280,16 +1264,6 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_keypad)
 	}
 
 	m_keypad_irq_state = state;
-
-	// EXPERIMENT (opt-in): the lower-service / service_ready poll is driven by MAD2
-	// IRQ line 4, which in real hardware is raised by the (un-emulated) MAD2 DSP on
-	// work completion. Nothing in the driver ever asserts it, so the service_ready
-	// setter 0x291068 never runs. Simulate the DSP completion interrupt by pulsing
-	// IRQ 4 periodically (200 Hz here) once past early init, to test whether it lets
-	// the service come up and clear CONTACT SERVICE. See docs/service_bootstrap.md.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_DSP_IRQ4", 0) != 0 &&
-			machine().time().as_double() >= nokia_env_u32("NOKI3210_EXPERIMENT_DSP_IRQ4_AFTER_MS", 250) / 1000.0)
-		assert_irq(MAD2_IRQ_LINE_DSP_SERVICE);  // DSP service-completion interrupt (experiment)
 }
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_mad2_soft_reset)
@@ -1411,47 +1385,6 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 	if (display_type != 0xff && address == 0x11fc86 && mem_mask == 0x00ff)
 		data = (data & 0xff00) | display_type;
 	}
-
-	// EXPERIMENT (opt-in, diagnostic only): force the FW_STARTUP_SERVICE_BUFFER gate
-	// byte non-zero at the resume-sequence gate read (pc 0x2a9132) so the extended
-	// task batch — including task 14 — gets resumed. Used to map what lies behind
-	// task14_ready; NOT a real model. Mirrors the removed FORCE_STARTUP_SERVICE_READY.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_RESUME_TASK14", 0) != 0 &&
-			pc == 0x002a9132 && address == 0x00110c2c)
-		data |= 0x0101;
-
-	// EXPERIMENT (opt-in): force the D9 watchdog ack/heartbeat byte non-zero. The
-	// watchdog (0x237b2e) resets its counter whenever ack [0x11fedb] != 0, so forcing
-	// it keeps the counter from reaching the CONTACT SERVICE timeout. ack is the low
-	// byte of the word at 0x11feda. Tests whether the ack heartbeat is the last gate
-	// once the DSP/IRQ-4 model has set service_ready + bit 6.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_ACK", 0) != 0 && address == 0x0011feda &&
-			pc == 0x00237b42)
-		data |= 0x0001;
-
-	// EXPERIMENT (opt-in): provision the service-channel enable flag at READ time. The firmware
-	// only READS 0x11fee4 (never writes it), so a write-side force can't set it — force the read.
-	// Used to test whether provisioning the enable flag (vs the responder trampoline) clears
-	// CONTACT SERVICE / changes the post-CS 000d state. Result: it does NOT (see ccont_subsystem.md).
-	{
-		const unsigned prov_enable = nokia_env_u32("NOKI3210_EXPERIMENT_PROV_READ", 0);
-		if (prov_enable != 0 && address == 0x0011fee4)
-			data |= (prov_enable & mem_mask);
-	}
-
-
-	// EXPERIMENT (opt-in, diagnostic — like FORCE_ACK, not a model): the contact-service
-	// bit-6 loop (0x23487e) clears service-present bit 6 unless every service-channel status
-	// byte [0x11fc60+i] (i != 11) reads 0x00/0xfe/0xff. Two are dirty on a blank phone
-	// ([0x11fc66]=0xfd idx6, [0x11fc72]=0x12 idx18 — service modules reporting "not OK").
-	// Force them to read 0xff ("absent") to test whether a clean service-channel array is
-	// the real gate that keeps bit 6 set and clears CONTACT SERVICE (the ack 0x11fedb is a
-	// red herring — never written non-zero anywhere reachable).
-	// idx6=0x11fc66, idx18=0x11fc72 are even addresses = the HIGH byte of their 16-bit word
-	// (big-endian: ROM_REGION16_BE), so force bits 15..8, not 7..0.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_CLEAN_SVCCHAN", 0) != 0 &&
-			(address == 0x0011fc66 || address == 0x0011fc72))
-		data |= 0xff00;
 
 	// Boot-research shim: startup check 5 currently expects this event-14
 	// latch byte to be clear. Replace with the real producer.
@@ -1776,64 +1709,6 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 				m_battery_startup_event_step++;
 			}
 		}
-	// EXPERIMENT (opt-in, diagnostic): mode-000d advance-gate preview. The handler (0x270e22)
-	// completes flag [0x112399] only when it RECEIVES standalone codes 0x14/0x16/0x15/0x17
-	// (bits 0x01/0x02/0x04/0x08). Confirmed (ROM disasm + limp2_ecb trace): 0x15 is posted ONLY
-	// via the delayed primitive 0x2697aa, whose waiter-delivery branch (0x2697f2) needs
-	// (TCB.mask 0x100024 & ECB.flags 0x10023c+7) != 0 — but it is 0x100 & 0x01 = 0 here, and the
-	// ECB waiter list is empty (waithead=ffffffff), so the post is wheel-only and only ever
-	// reflects as the 0xd5 poll (never a raw 0x15). That waiter/subscription state is runtime
-	// state a genuinely-provisioned boot establishes and our blank+faked boot does not — a WALL,
-	// not a missing hardware model. This knob injects the codes the firmware never injects on
-	// this path, purely to preview post-gate boot (renders 4235fa). NOT faithful; see
-	// docs/ccont_subsystem.md ("the 000d wall").
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_000D_EVENTS", 0) != 0 &&
-			pc == 0x00270e20 &&
-			address == FW_STARTUP_EVENT &&
-			mem_mask == 0xffff &&
-			ram_word(FW_STARTUP_MODE) == FW_STARTUP_MODE_CHARGER_WAIT)
-	{
-		const uint8_t flag = debug_ram_byte(0x00112399);
-		if ((flag & 0x02) == 0)        data = 0x16;   // bit 1
-		else if ((flag & 0x04) == 0)   data = 0x15;   // bit 2
-	}
-	// EXPERIMENT (opt-in, diagnostic): scaffold-march. Generalises FORCE_000D_EVENTS to the whole
-	// startup mode chain — at any dispatch write of FW_STARTUP_EVENT, inject the advancing event
-	// for the current mode (table from the per-mode dispatch disasm). Marches the boot through the
-	// charger/battery startup states to see how close idle is. NOT faithful — the real fix is a
-	// CCONT measurement-event model that produces this stream. See docs/service_bootstrap.md.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_SCAFFOLD_MARCH", 0) != 0 &&
-			address == FW_STARTUP_EVENT &&
-			mem_mask == 0xffff &&
-			pc >= 0x00270000 && pc <= 0x00271600)
-	{
-		// PC-specific nested sub-loop waits (take priority over the mode-level event)
-		if (pc == 0x00271392)   // mode-0007 tail spins until event 0x74
-		{
-			data = 0x74;
-		}
-		else
-		switch (ram_word(FW_STARTUP_MODE))
-		{
-		case 0x000d:   // flag accumulator: feed whichever of 0x14/0x16/0x15/0x17 is still missing
-		{
-			const uint8_t f = debug_ram_byte(0x00112399);
-			if      ((f & 0x01) == 0) data = 0x14;
-			else if ((f & 0x02) == 0) data = 0x16;
-			else if ((f & 0x04) == 0) data = 0x15;
-			else if ((f & 0x08) == 0) data = 0x17;
-			break;
-		}
-		case 0x0004:   data = 0x07;  break;   // POST_SELFTEST       -> BATTERY_READY
-		case 0x000b:   data = 0x07;  break;   // POST_CHARGER        -> BATTERY_READY
-		case 0x0007:   data = 0x07;  break;   // BATTERY_READY_GATE  -> BATTERY_READY
-		case 0x0005:   data = 0x06;  break;   // READY_GATE          -> event 6
-		case 0x0006:   data = 0x03;  break;   // SERVICE_QUIESCE_GATE-> event 3
-		case 0x0009:   data = 0x0e;  break;   // BATTERY_WAIT        -> CHARGER_PRESENT (try)
-		case 0x000c:   data = 0x04;  break;   // (sub-states)        -> try 0x04
-		default: break;
-		}
-	}
 	if (nokia_env_u32("NOKI3210_CONTACT_DA_PRESERVE_READY_BIT", 0) != 0 &&
 			address == FW_CONTACT_SERVICE_STATUS &&
 			mem_mask == 0x00ff &&
@@ -1915,14 +1790,6 @@ uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 	if (offset == 0x0e0 >> 1)   return 0x00;
 	if (offset == 0x0fe >> 1)   return 0x01;
 	if (offset == 0x100 >> 1)   return 0x01;
-
-	// EXPERIMENT (opt-in): the lower-service "pending work" counter at DSP-shared
-	// RAM byte 0xe4 (word offset 0x72) is read by the service_ready setter 0x291068;
-	// ready is set only when it is 0. In real hardware the DSP drains it on
-	// completion. Simulate that drain so the setter (driven by the IRQ-4 pulse, see
-	// timer_keypad) can set service_ready. See docs/service_bootstrap.md.
-	if (offset == (DSP_SVC_PENDING_COUNTER_OFF >> 1) && nokia_env_u32("NOKI3210_EXPERIMENT_DSP_IRQ4", 0) != 0)
-		return 0x00;
 
 	return m_dsp_ram[offset & 0x7ff];
 }
@@ -2206,14 +2073,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						machine().time().as_double(), mode, cur, lr);
 		}
 	}
-
-	// EXPERIMENT (opt-in, diagnostic only): force task14_ready_28ff14 to "pass" by
-	// setting R0=1 at the readiness-loop check (0x2a931e), to map what blocks the
-	// boot once task 14 is treated as ready. NOT a real model.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_TASK14_READY", 0) != 0 &&
-			pc == addr && addr == 0x002a931e)
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 1);
-
 
 	// Task-resume batch-2 gate probe (opt-in): task 14's resume is in the second,
 	// conditionally-skipped batch of the startup resume sequence. Log the gate
@@ -2645,11 +2504,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					machine().time().as_double());
 		}
 	}
-	// EXPERIMENT (opt-in, diagnostic): "march" the startup mode chain toward idle by injecting each
-	// mode's advance event at the startup recv (0x26ff1a, r0 = the code the mode handler will check).
-	// The real event-producers exist in-ROM but our stubbed subsystems (DSP/RF/battery-ready) don't
-	// fire them; this fakes the ready-signal per mode. 000d is left to FORCE_000D_EVENTS (multi-event
-	// flag). NOT faithful — a scaffold to see how far a "bullshit" boot reaches (a hollow idle).
 	// diagnostic (opt-in): map each startup mode to its recv wait-loop by logging the caller LR at
 	// the recv-wrapper entry 0x26ff14, once per (mode,lr). Reveals where each mode spins, so its exact
 	// wait event can be read from the disassembly.
@@ -2662,97 +2516,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		bool f = false; for (unsigned i = 0; i < n; i++) if (seen[i] == key) { f = true; break; }
 		if (!f && n < 64) { seen[n++] = key;
 			logerror("modewait: mode=%04x recv-caller lr=%08x t=%.4f\n", mode, lr, machine().time().as_double()); }
-	}
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_MARCH", 0) != 0 && pc == addr && addr == 0x0026ff1a)
-	{
-		u16 ev = 0;
-		switch (debug_ram_word(FW_STARTUP_MODE))
-		{
-			case 0x0004: ev = 0x07; break;   // POST_SELFTEST      -> BATTERY_READY
-			case 0x000b: ev = 0x07; break;   // POST_CHARGER       -> BATTERY_READY
-			case 0x0005: ev = 0x06; break;   // READY_GATE
-			case 0x0006: ev = 0x03; break;   // SERVICE_QUIESCE
-			case 0x0007: ev = 0x74; break;   // BATTERY_READY_GATE -> subsystem-ready
-			case 0x0009: ev = 0x0e; break;   // BATTERY_WAIT
-			case 0x000c: break;              // 000c handled by EXPERIMENT_BOOTPATH (PC-specific, no derail)
-		}
-		if (ev != 0)
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, ev);
-	}
-	// EXPERIMENT (opt-in, diagnostic): override the startup *outcome* committed at 0x2b4dda. The whole
-	// power-on-reason arbiter (boot vs charge vs low-battery-off) funnels here: 0x2b4dda stores r4=outcome
-	// to [0x1150ff], and the supervisor 0x2a924c dispatches on it ({1,5,6}=retry). Sweeping the value lets
-	// us see empirically what each outcome renders, before RE-ing the gates that steer to a given outcome.
-	{
-		const u32 fo = nokia_env_u32("NOKI3210_FORCE_OUTCOME", 0xffffffff);
-		if (fo != 0xffffffff && pc == addr && addr == 0x002b4dda)
-		{
-			const u32 was = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, fo & 0xff);
-			logerror("force_outcome: commit outcome=%u (was %u) t=%.4f\n",
-					fo & 0xff, was, machine().time().as_double());
-		}
-	}
-	// EXPERIMENT (opt-in, option C — hollow idle): the MMI main loop (0x297fc4) recv's messages, dispatches,
-	// and when idle-flag [0x11f81b]==1 calls display_idle (0x2a255c). TRACE_MMI shows whether that task runs
-	// in our stuck boot; FORCE_IDLE pins the flag at the recv (0x298008) so the idle redraw fires each loop.
-	// EXPERIMENT_MODE4_EVENTS (opt-in): inject the raw handshake sequence 3 -> 0xe -> 7 that mode 4's
-	// nested recvs need (0x271254 wants raw 3 -> 0x2711f6 wants 0xe -> 0x27120e wants 7 -> ev7-init 0x271266),
-	// modelling the external producer our boot lacks. Started once after EXPERIMENT_MODE4_EVENTS_MS ms.
-	// Does ev7-init then run its subsystem-init and advance the boot toward the app/idle?
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_MODE4_EVENTS", 0) != 0 && pc == addr)
-	{
-		if (addr == 0x00271254 && m_mode4_step == 0 &&
-				machine().time().as_double() * 1000.0 >= nokia_env_u32("NOKI3210_EXPERIMENT_MODE4_EVENTS_MS", 1200))
-		{
-			const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
-			if (r4 >= 0x00100000 && r4 < 0x00180000) { debug_ram_byte_w(r4 + 2, 0); debug_ram_byte_w(r4 + 3, 3); }  // event 3
-			m_mode4_step = 1;
-			logerror("mode4: injected event 3 (-> 0x2711f6) t=%.4f\n", machine().time().as_double());
-		}
-		else if (addr == 0x002711fa && m_mode4_step == 1)   // nested recv return: force 0xe
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0e);
-			m_mode4_step = 2;
-			logerror("mode4: injected event 0xe (-> 0x27120e) t=%.4f\n", machine().time().as_double());
-		}
-		else if (addr == 0x00271212 && m_mode4_step == 2)   // nested recv return: force 7 -> ev7-init
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x07);
-			m_mode4_step = 3;
-			logerror("mode4: injected event 7 (-> ev7-init 0x271266) t=%.4f\n", machine().time().as_double());
-		}
-		// The advance is event 4 -> 0x271354 -> (if [0x112398]!=1 and charger absent) -> mode-7 wait 0x271392.
-		// But ev7-init's own self-posted event 6 arrives first: event 6 -> 0x271316 -> [0x112398]=1 ->
-		// 0x2714fc UNCONDITIONAL terminal 000c. So suppress event 6 post-ev7-init (convert it to a harmless
-		// tick 0xc3 at the recv-stores) so event 4 wins the race and advances with [0x112398]==0.
-		// The accumulator advances via the completion check 0x271326 (reached on event 0xd): if ALL readiness
-		// flags 0x112390-95 are set it falls through to the advance, else it loops. Combined lever: (a) at the
-		// post-init recv 0x2712ba pre-set all readiness flags 0x112390-95=1; (b) at the accumulator recv-stores
-		// convert the stray self-tick 0xc3 (which would hit the else->terminal) into event 0xd so the
-		// completion check runs and, with all flags set, advances instead of terminaling.
-		else if (addr == 0x002712ba && m_mode4_step == 3 && !m_mode4_bflag)
-		{
-			for (offs_t a = 0x00112390; a <= 0x00112395; a++) debug_ram_byte_w(a, 1);
-			m_mode4_bflag = true;
-			logerror("mode4: pre-set all readiness flags 0x112390-95=1 t=%.4f\n", machine().time().as_double());
-		}
-		else if ((addr == 0x002712be || addr == 0x002712ca) && m_mode4_step == 3 &&
-				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0xc3)
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0d);   // tick -> completion-check trigger
-			static unsigned s6 = 0;
-			if (s6++ < 12) logerror("mode4: tick 0xc3 -> event 0xd (completion check) at %06x t=%.4f\n", addr, machine().time().as_double());
-		}
-		// Past the accumulator the boot spins at 0x27138e waiting for event 0x74 (mode-7 gate 0x271396).
-		// Inject 0x74 once at the recv-store 0x271392 -- with the SIM accepted and mode 4 cracked, see how
-		// far the now-far-more-coherent boot proceeds (outcome 3? idle? terminal?).
-		else if (addr == 0x00271392 && m_mode4_step == 3 && !m_mode4_74)
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x74);
-			m_mode4_74 = true;
-			logerror("mode4: injected event 0x74 (mode-7 gate) t=%.4f\n", machine().time().as_double());
-		}
 	}
 	// TRACE_STARTUP4 (opt-in): dump the startup-readiness flag accumulator 0x112390-0x112398 at the mode-4
 	// event loop 0x2712cc. Events 9/a/b/c/1c set flags [0x112390/92/93/94/95]; event 6 -> terminal 0x2714fc.
@@ -2836,15 +2599,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					(u32(debug_ram_byte(msg)) << 8) | debug_ram_byte(msg + 1),
 					debug_ram_byte(msg + 4), debug_ram_byte(msg + 5), machine().time().as_double());
 		}
-	}
-	// EXPERIMENT_FORCE_UIEVENT (opt-in, NOT faithful): force the MMI UI handler's event to 0x05e8 (the
-	// window-create advance event) at its one invocation, to validate the downstream chain -- does it post
-	// MMI code-3/2 + activate the display + change the frame?
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_UIEVENT", 0) != 0 && pc == addr && addr == 0x002a0aec)
-	{
-		static unsigned fu = 0;
-		if (fu++ < 4) { m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x05e8);
-			logerror("force_uievent: forced handler event -> 0x05e8 t=%.4f\n", machine().time().as_double()); }
 	}
 	// TRACE_UICTL (opt-in): hook the MMI UI state-handler entry 0x2a0aec and log every EVENT it processes
 	// (r0). Event 0x05e8 is the one that reaches the window-create path (0x2a0c3a/0x2a0c40). Does it ever
@@ -2957,15 +2711,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						(u32(debug_ram_byte(r4+8))<<24)|(u32(debug_ram_byte(r4+9))<<16)|(u32(debug_ram_byte(r4+10))<<8)|debug_ram_byte(r4+11),
 						machine().time().as_double());
 		}
-	}
-	// EXPERIMENT_FORCE_WINTYPE (opt-in, NOT faithful): the display manager's type stays 0 because the window
-	// entry [0x10e461] is 0. Poke it to 0x80 (active window) at the display recv, so the next manager update
-	// sees type 0x80 -- a cascade test: does the 0x240xxx dispatch then reach the code-2 post -> MMI window-SM?
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_WINTYPE", 0) != 0 && pc == addr && addr == 0x0023e64a)
-	{
-		debug_ram_byte_w(0x0010e461, 0x80);
-		static unsigned fw = 0;
-		if (fw++ < 4) logerror("force_wintype: poked [0x10e461]=0x80 t=%.4f\n", machine().time().as_double());
 	}
 	// The display/window task 0x23e62c recv's at 0x23e646 (ret 0x23e64a, r0=msg, [msg]=code base 0x0b04).
 	// Log the codes it gets -- reveals whether a window-activate message (setting type 0x80) ever arrives.
@@ -3210,63 +2955,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("sim_resp: injected response [+4]=%02x -> 0x27e9ce t=%.4f\n",
 					nokia_env_u32("NOKI3210_SIM_RESP_CODE", 0xa4) & 0xff, machine().time().as_double());
 		return uint16_t(0x4760);   // BX r12 -> return to 0x27e9ce with r0=response
-	}
-	// EXPERIMENT_MMI_IDLE (opt-in): at the MMI idle gate 0x297ffa (ldrb r0,[r4,#5]; cmp 1 -> display_idle
-	// 0x2a255c), force the idle flag [0x1116fd] = 1 once (after EXPERIMENT_MMI_IDLE_MS ms so the SIM read is
-	// done), to see whether display_idle draws a REAL idle screen now (SIM accepted, MMI alive) or black
-	// (content pipeline not up, as the old plain-limp FORCE_IDLE_JUMP did).
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x00297ffa
-			&& !m_mmi_idle_forced
-			&& machine().time().as_double() * 1000.0 >= nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_MS", 1000))
-	{
-		debug_ram_byte_w(0x001116fd, 1);
-		// EXPERIMENT_MMI_IDLE_DREADY: also force the display-ready flag [0x11fee4]=1 so the resource check
-		// 0x2b12b4 gets past its "display not ready" early-out -- test whether the idle draw then clears the
-		// resource-get 0x2b257e (render post 0x2af6ea would fire) or is gated further (the RAM bitmap).
-		if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_DREADY", 0) != 0)
-		{
-			debug_ram_byte_w(0x0011fee4, 1);
-			// Also register every resource class in the availability bitmap 0x11ff08..0x11ff0f so the
-			// availability predicate 0x2b12b4 passes its per-class bit test (idle draw's 0x224c = class
-			// 0x22 -> bit2 of [0x11ff0c]). Tests whether, with the resource GRANTED, display_idle renders
-			// a real idle screen or black (content pipeline down). The bitmap is never registered on our
-			// boot (TRACE_RESREG = 0 writes), so this is a pure "if resource available" probe.
-			for (offs_t a = 0x0011ff08; a <= 0x0011ff0f; a++)
-				debug_ram_byte_w(a, 0xff);
-		}
-		m_mmi_idle_forced = true;
-		logerror("mmi_idle: forced [1116fd]=1 (dready=%u) at gate 0x297ffa t=%.4f\n",
-				nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE_DREADY", 0), machine().time().as_double());
-	}
-	// EXPERIMENT_MMI_IDLE: trace display_idle (0x2a255c) entry, and 0x2b257e when called FROM display_idle
-	// (LR==0x2a2566, the resource get for 0x224c). If 0x2b257e is entered but the render post 0x2af6ea
-	// (via TRACE_RENDER) never follows, the idle draw hangs acquiring resource 0x224c.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x002a255c)
-	{
-		static unsigned di = 0;
-		// [0x11fee4] = display-ready flag gating resource availability (0x2b12b4 returns 0 if this is 0).
-		// [0x2e5c2f + (0x224c&7)] and [0x1108ff + (0x224c>>3)] are the resource bitmaps for id 0x224c.
-		const uint8_t dready = debug_ram_byte(0x0011fee4);
-		if (di++ < 20) logerror("mmi_idle: display_idle EXECUTED; display-ready[11fee4]=%02x t=%.4f\n",
-				dready, machine().time().as_double());
-	}
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && addr == 0x002b257e &&
-			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x002a2566)
-	{
-		static unsigned dg = 0;
-		if (dg++ < 20) logerror("mmi_idle: display_idle -> resource-get 0x2b257e(0x224c) entered t=%.4f\n", machine().time().as_double());
-	}
-	// EXPERIMENT_MMI_IDLE: log the sub-calls of the resource-get 0x2b257e (called with LR in its range) to
-	// find where it hangs -- the last one logged before the run ends is the blocking sub-function.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_MMI_IDLE", 0) != 0 && pc == addr && m_mmi_idle_forced &&
-			(addr == 0x002b12b4 || addr == 0x002b2560 || addr == 0x002b6680 || addr == 0x002b6638 || addr == 0x002b12dc))
-	{
-		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-		if (lr >= 0x002b2580 && lr < 0x002b26a0)
-		{
-			static unsigned sg = 0;
-			if (sg++ < 30) logerror("mmi_idle: resget-subcall %06x (lr=%06x) t=%.4f\n", addr, lr, machine().time().as_double());
-		}
 	}
 	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
 	// code 5 (EXPERIMENT_SIM_CODE5) and separately poking the ATR into 0x10dddc (MODEL_SIM_ATR_MSG), deliver
@@ -3546,20 +3234,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 		}
 	}
-	// EXPERIMENT (opt-in, Phase-1 SIM probe): force the SIM task dispatch (0x27df1c) to take the
-	// code-0xc "SIM present" path once, after the SIM has done its reset attempts. Code 0xc sets the
-	// SIM-ready flags ([0x10a8dd],[0x10a8e3],[0x113cff]) and signals startup-ready (0x279486). Tests
-	// whether "SIM present" alone breaks the Insert-SIM-card retry loop and advances the boot.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIM_PRESENT", 0) != 0 && pc == addr && addr == 0x0027df1c)
-	{
-		static unsigned n = 0;
-		n++;
-		if (n == nokia_env_u32("NOKI3210_SIM_PRESENT_AFTER", 6))
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R8, 0x0c);   // -> code-0xc handler 0x27df52
-			logerror("sim_present: forced dispatch #%u code=0xc at t=%.4f\n", n, machine().time().as_double());
-		}
-	}
 	// TRACE_SVCREADY (opt-in, diagnostic): the block-2 (app-task) resume gate at 0x2a9182 needs
 	// 0x29bafc()==1 (reads service-ready [0x11fed1] bit7), phase [0x110c2c]==1, and [0x11239c]!=3.
 	// Hook the startup-service fn entries + the gate to see which run and what the gate variables hold.
@@ -3615,72 +3289,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), b,
 					machine().time().as_double());
-		}
-	}
-	if (nokia_env_u32("NOKI3210_FORCE_IDLE", 0) != 0 && pc == addr && addr == 0x00298008)
-		debug_ram_byte_w(0x0011f81b, 1);   // pin MMI idle-redraw flag so display_idle fires
-	// EXPERIMENT (opt-in, option C — hollow idle, done RIGHT): FORCE_IDLE alone fails because the MMI
-	// task is parked in the blocking recv at 0x298008 and never loops back to the flag-check at 0x297ffa.
-	// TRACE_MMI proved the MMI runs and reaches 0x298008 a few times (t<=0.84) then blocks forever. So we
-	// trampoline PAST the recv: on the Nth fetch of 0x298008 (after the initial display-init messages have
-	// been processed), set the idle flag and BX to 0x297ffa so display_idle (0x2a255c) actually renders.
-	// This drives the layer that draws screens (the MMI), not the startup machine (which never draws).
-	if (nokia_env_u32("NOKI3210_FORCE_IDLE_JUMP", 0) != 0 && pc == addr && addr == 0x00298008)
-	{
-		static bool ij_done = false;
-		static unsigned ij = 0;
-		ij++;
-		// Fire once. Two gating modes: FORCE_IDLE_JUMP_MS (fire on first recv at/after that sim-time —
-		// use when combined with a mode-advance knob so the display controller is initialised first) or,
-		// if unset, the Nth recv (bare limp, display never inits past t=0.84). Draw idle, then let later
-		// fetches recv normally so the framebuffer holds the idle image.
-		const u32 gate_ms = nokia_env_u32("NOKI3210_FORCE_IDLE_JUMP_MS", 0);
-		const bool fire = gate_ms ? (!ij_done && machine().time().as_double() * 1000.0 >= gate_ms)
-								  : (ij == nokia_env_u32("NOKI3210_FORCE_IDLE_JUMP_AFTER", 3));
-		if (fire)
-		{
-			ij_done = true;
-			debug_ram_byte_w(0x0011f81b, 1);                                        // idle-redraw flag
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R4, 0x0011f816);         // flag base (loaded at 0x297ff4, which we skip)
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x00297ffa | 1);    // -> flag-check
-			logerror("force_idle_jump: bypass recv #%u -> 0x297ffa t=%.4f\n",
-					ij, machine().time().as_double());
-			return uint16_t(0x4760);                                                // BX r12
-		}
-	}
-	// EXPERIMENT (opt-in, option C): thread the enumerated normal-boot path to outcome 3, PC-specific so
-	// side effects stay coherent (no blunt event injection). Requires MARCH (feeds mode 4 -> event 7, which
-	// lands in the 000c post-charger accumulator at 0x2712c0). Chain: fill accumulator flags in RAM + feed
-	// event 0xd -> flag-check -> 0x271354([0x112398]==0) -> 0x271364 boot decision; charger_present_check
-	// (ADC ch5=0) -> normal boot -> wait 0x74 -> gate2 (0x2b2f90==0x80) + [0x11239d]==1 -> commit outcome 3.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_BOOTPATH", 0) != 0 && pc == addr)
-	{
-		if (addr == 0x002712ca)          // 000c recv return: pre-fill flags, feed event 0xd
-		{
-			for (offs_t f = 0x00112390; f <= 0x00112395; f++) debug_ram_byte_w(f, 1);
-			debug_ram_byte_w(0x00112398, 0);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0d);
-		}
-		else if (addr == 0x0027138e)     // the 0x74 wait uses a BLOCKING recv (0x26ff14->0x26a458) on an
-		{                                // empty ring. Trampoline PAST it: land at 0x271392 with r0=0x74 so
-			debug_ram_byte_w(0x0011239d, 1);                       // gate3 ([0x11239d]==1) up front
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x74);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x00271392 | 1);
-			logerror("bootpath: trampoline 0x74 at 0x27138e t=%.4f\n", machine().time().as_double());
-			return uint16_t(0x4760);     // BX r12 -> 0x271392 (skips the blocking recv)
-		}
-		else if (addr == 0x002713a6)     // gate2: force 0x2b2f90 result to 0x80
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x80);
-		else if (addr == 0x00271364 || addr == 0x00271422 || addr == 0x00271392 ||
-				 addr == 0x002713b2 || addr == 0x002714fe || addr == 0x002b4dda ||
-				 addr == 0x002a924c || addr == 0x002a92fc || addr == 0x002a934c ||
-				 addr == 0x002a933a || addr == 0x00298000 || addr == 0x002a255c)
-		{
-			static unsigned bc = 0;
-			if (bc++ < 40)
-				logerror("bootpath: hit %06x mode=%04x r0=%02x [1150ff]=%02x t=%.4f\n", addr,
-						debug_ram_word(FW_STARTUP_MODE), m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
-						debug_ram_byte(0x001150ff), machine().time().as_double());
 		}
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
