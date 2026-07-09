@@ -639,3 +639,7 @@ address,kind,name
 0x0027cbec,function,vbat_voltage_classify_27cbec
 0x0027d500,function,vbat_moving_avg_filter_27d500
 0x0027dc54,function,vbat_sample_pipeline_27dc54
+0x0027cc74,function,vbat_sample_generator_27cc74
+0x002b1bb2,function,vbat_raw_reader_ch_2b1bb2
+0x0027cd4c,function,vbat_sample_accumulate_27cd4c
+0x002982e8,label,display_idle_flag_clear_2982e8

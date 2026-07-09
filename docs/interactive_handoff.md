@@ -213,6 +213,40 @@ than a vague region: reaching the interactive screen requires coherent bring-up 
 graph, not a bounded set of pokes. Levers (opt-in, diagnostic): `EXPERIMENT_VBAT_GATE_PASS`,
 `EXPERIMENT_FORCE_CODE7`.
 
+## Follow-up (#29, #32): the idle flag is downstream, and the VBAT gate is a fork not a wall
+
+**#29 — idle-repaint flag `[0x1116fd]`.** A ram-write watch shows it is written **only to 0**
+(pc `0x2982e8`, the display manager's "clear idle request") and to 2 (after a paint); **never
+to 1**. The display-manager loop's own idle-request accumulator (`[sp+4]`) stays 0, and no
+reachable code writes `[0x1116f8+5]=1`. So the idle repaint is never *requested*. That request
+is issued when the phone transitions into the idle state — which is behind the whole gate chain
+above. **#29 is the display-side manifestation of the same coherent-boot wall, not an
+independent seam** (confirmed: the forced #31 run, which reaches mode 4, still leaves the flag
+0 and the frame unchanged).
+
+**#32 — can the VBAT gate be unblocked faithfully?** Traced the classifier end-to-end:
+sample generator `0x27cc74` → raw reader **`0x2b1bb2(7)`** (a *different* source than CCONT ADC
+ch2 — which is why sweeping `NOKI3210_ADC2` did nothing; it returns a **ROM default** via
+`[0x2e742d+7]` when calibration flag `[0x1124d0]==0`, scaled `×1500/313` with cal words from
+`[0x11fde0]`) → accumulated into `[0x110454]`/`[0x11045c]` → ÷10 moving-average filter
+(`0x27d500`) → classified (`0x27cbec`) against **ROM-constant thresholds** (memcpy'd from ROM
+`0x2e1ff4`, *not* EEPROM) → **state 1**.
+
+Two conclusions:
+1. **It's not calibration/EEPROM data we can supply** — thresholds are ROM constants and the
+   reading is a ROM default; the classifier structurally returns 1.
+2. **More importantly, the VBAT gate is a *fork*, not the interactive blocker.** state 1/2 →
+   fallback → **mode 4**; state 0/3 → advance → **mode 7**. And *both* mode 4 and mode 7 then
+   wait on **message code 7** (mode-4 entry `0x27125e`, mode-7 handler `0x270f4c`). So our
+   unforced boot already takes a valid branch (mode 4); making VBAT "pass" only switches the
+   branch to mode 7, which hits the *same* code-7 wall. **`EXPERIMENT_VBAT_GATE_PASS` was
+   therefore a detour** — the real shared blocker on both branches is the code-7 trigger.
+
+**Verdict:** don't model VBAT (it is a fork, and mode 4 — our current unforced path — is a
+faithful branch); the single remaining shared blocker to advance the sequencer is **message
+code 7 arriving at task 1**, whose source is an unrun subsystem (per #27/#28). That is the
+correct next target, on the *unforced* boot.
+
 ## Next
 
 Two open threads for the code-`7` trigger:
