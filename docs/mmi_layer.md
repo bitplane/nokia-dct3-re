@@ -120,3 +120,40 @@ Final hop (next): identify the event-`0x72` consumer task (the mailbox `0x26aac0
 targets) and confirm it is unscheduled / blocked elsewhere — then find what should
 have activated it (the post-startup → interactive-app handoff). Knobs (reverted,
 git-recoverable): `TRACE_IRQ`, `TRACE_UIMODE`, `POST_READY_KEY`.
+
+## The `0x72` consumer, pinned — and a correction: the input path is NOT dormant
+
+Pinned the consumer and it overturns the "dormant" reading above.
+
+- **Mailbox = task id.** recv `0x26a458` reads the current task id `[0x100022]` and
+  indexes `0x108414 + id*0x1c`. The keypad ISR posts to mailbox **1**, so the consumer
+  is **task 1** (`0x270170`) — the startup state machine (dispatcher `0x270c8e` → mode
+  jump table `0x270ca8`).
+- **Task 1 is alive** (`TRACE_RECV`: it recv's every ~1 s in the settled state) and it
+  **does receive the keypad event**: `TRACE_T1` shows task 1 recv `code=0x72` at exactly
+  the injected keypress time, while `mode=0x00`.
+- **And it has a real handler for it.** Task 1's mode-0 path dispatches on the *message
+  code* (`0x2701cc` cascade): `cmp r1,#0x72 → bl 0x270a8c`. The handler `0x270a8c →
+  0x270742` runs IRQ-mask management (it **re-enables** the keypad IRQ so the next press
+  is delivered — confirmed: the dispatcher sees `reg0x09=0x40` on *every* press) plus
+  hardware checks and trace sends (`0x2b5b24`→`0x2b13a2`, code `0x1773`, payloads
+  `0x50/0x51/…`).
+
+**So the earlier "input consumer is dormant" conclusion is wrong.** The full path —
+IRQ6 → ISR `0x2b5da0` → event `0x72` → task 1 mailbox → recv → dispatch `0x72` →
+handler `0x270a8c/0x270742` → re-enable — is **functional and runs on every keypress.**
+Keys are delivered and handled by task 1.
+
+**The real conclusion is subtler:** the keypress is consumed by task 1's *startup-machine
+mode-0* handler, which handles it as a low-level wake/IRQ event and does **not** translate
+it into an MMI menu-navigation action. Whether that is a *bug* or *correct behaviour* is
+now the open question: on a DCT3 with **no SIM**, the "Insert SIM card" state may
+legitimately block menu access, in which case the phone is behaving faithfully and there
+is nothing to "fix" — full keypad-driven navigation would only come with an accepted SIM
+moving the MMI into an interactive state. So the input plumbing is proven correct; the
+remaining question folds back into the SIM/MMI-state question (does "Insert SIM card"
+grant menu access on real hardware?), not a broken input path.
+
+This retires the "input is dormant / up-but-not-alive on the input side" framing: the
+input side *is* alive. The display-content pipeline (unbacked resource providers) remains
+the genuine wall for *rendering* a richer screen; the input wall was a misread.
