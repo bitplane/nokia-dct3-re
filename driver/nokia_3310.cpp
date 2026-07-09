@@ -2031,6 +2031,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (e++ < 4) logerror("vbat_gate_pass: forced 0x2a6942 read %u -> 0 t=%.4f\n", v, machine().time().as_double());
 		}
 	}
+	// code-7 emitter watch (opt-in): the single code-7 reporter 0x2af19e (post code 7 to task 1). If this
+	// never fires, code 7 is never posted -- confirmed on our boot (all 4 callers sit behind subsystem
+	// state machines that never reach the posting state; docs/interactive_handoff.md #33).
+	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr && addr == 0x002af19e)
+	{
+		static unsigned e = 0;
+		if (e++ < 6) logerror("code7_post: code 7 -> task 1 lr=%08x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
 	// EXPERIMENT_FORCE_CODE7 (opt-in, diagnostic): the mode-0d advance's getmsg at 0x270f46 (bl 0x26ff14)
 	// expects message code 7 to run the init burst; it never arrives. Force the getmsg return r0:=7 at the
 	// post-bl point 0x270f4a (a reliably-hooked address, unlike mid-linear code MAME prefetches) so the

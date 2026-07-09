@@ -247,6 +247,37 @@ faithful branch); the single remaining shared blocker to advance the sequencer i
 code 7 arriving at task 1**, whose source is an unrun subsystem (per #27/#28). That is the
 correct next target, on the *unforced* boot.
 
+## Follow-up (#33): code 7 (and the 6-message checklist) are subsystem-ready reports — none fire
+
+Found the emitter of code 7: **`0x2af190`** (`post code 7 to task-1 mailbox`), one of a cluster
+of tiny **subsystem-ready reporter stubs at `0x2af01c…0x2af27a`**, each `report-state (0x2b5ae4)`
++ `post <code> to task 1`. Crucially this one cluster emits **every** code in the chain:
+- the mode-0d startup events `0x14/15/16/17` (reporters `0x2af1da/216/03e/094`) — which **do**
+  fire (that's why the limp clears),
+- **code 7** (`0x2af190`),
+- and the **mode-4 6-message checklist** codes `9/0xa/0xb/0xc/0xd/0x1c` (reporters
+  `0x2af052/202/02a/1c6/1b2/1ee`),
+- plus 3 (`0x2af252`) and 0xe (`0x2af27a`).
+
+So the code-7 trigger and the 6-message checklist are the **same mechanism**: a subsystem calls
+its reporter stub when it reaches a state. Code 7's reporter `0x2af190` has **4 callers** —
+`0x21e40c` (the battery/charger state machine's "Check voltage level for shutdown" branch,
+gated on `0x27cd82()` seeing VBAT sample ≤ `[0x110494]+0xe9` = 2133), `0x21f8de`, `0x255c3c`,
+and `0x27b3b6` (a SIM-region code dispatcher). **Trace `code7path`: none of these is reached on
+our boot — code 7 is never posted by any emitter.** Each sits behind a subsystem state machine
+(battery/charger, SIM-region, …) that never reaches the posting state; the battery one is a
+deep charger state machine gated on charger/voltage events, and the VBAT reading (raw `0x200` →
+sample ~2453) is above its threshold anyway.
+
+**Assessment for faithful emulation.** The mode-0d events fire because CCONT/startup complete;
+code 7 and the six checklist messages do **not**, because their subsystems never reach the
+reporting state. Emulating them faithfully is therefore **coherent bring-up of those subsystem
+state machines** (battery/charger, display, SIM-region dispatchers) — each a deep RE + model
+effort gated on hardware/charger state, not a bounded injection. This is the coherent-boot wall,
+now mapped to its finest grain: the `0x2af0xx` reporter cluster and the specific subsystem state
+machines that drive it. The mechanism is fully understood; the remaining work is per-subsystem
+bring-up, which is open-ended.
+
 ## Next
 
 Two open threads for the code-`7` trigger:

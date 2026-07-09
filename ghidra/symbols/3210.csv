@@ -643,3 +643,6 @@ address,kind,name
 0x002b1bb2,function,vbat_raw_reader_ch_2b1bb2
 0x0027cd4c,function,vbat_sample_accumulate_27cd4c
 0x002982e8,label,display_idle_flag_clear_2982e8
+0x002af190,function,code7_reporter_post_2af190
+0x0027cd82,function,vbat_code7_voltage_gate_27cd82
+0x0021e3f8,function,battery_shutdown_check_code7_21e3f8
