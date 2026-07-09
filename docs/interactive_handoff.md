@@ -278,6 +278,45 @@ now mapped to its finest grain: the `0x2af0xx` reporter cluster and the specific
 machines that drive it. The mechanism is fully understood; the remaining work is per-subsystem
 bring-up, which is open-ended.
 
+## EMULATION (MODEL_STARTUP_REPORTS): the chain advances mode 4 → mode 0xc, faithfully
+
+Built a faithful emulation of the subsystem-ready reports (not a gate-force): **`MODEL_STARTUP_REPORTS`**
+injects code 7 + the six checklist codes `9/a/b/c/d/1c` + the post-checklist `0x74` into task-1's
+mailbox via the firmware's **own** post `0x26a354(mailbox=1, code)`, chained through a sentinel
+trampoline (the `MODEL_SVC_RESPONDER` / `MODEL_RES_ENABLE` pattern), triggered once at task-1's
+getter `0x26ff14` after mode-0d completes.
+
+**Result (traced):** the sequencer advances
+
+```
+mode 000d → 0004 (mode-0d limp cleared)   [pre-existing]
+reports injected (t≈0.95)
+mode 0004 → 000c (t≈1.06)   ← code 7 consumed, init burst ran, entered the checklist mode
+6-message checklist [0x112390..95] all set   (chk_w trace)
+mode-0xc completion reached, waited for + consumed 0x74   (mode0c_wait74 trace)
+```
+
+So three of the four gates are now **emulated faithfully** (driven through the firmware's own
+mechanisms, not forced): the **code-7 trigger** and the **mode-4 6-message ready checklist** carry
+the boot from the "Insert SIM card" park (mode 4) into mode `0xc` and through its `0x74` report.
+
+**Where it now stops — the VBAT confirmation gate, again.** Mode `0xc`'s exit (`0x27139a`) needs
+either `0x2a6942()==3` (VBAT classification **state 3**) or a keypad condition
+(`0x2b2f90()==0x80 && [0x11239d]==1`); otherwise it falls to `0x2714a4` → an idle getmsg drain.
+So the **VBAT voltage-confirmation** gate (goal item 1) is genuinely required *here* to reach
+mode 3 → mode-0 interactive-init. The classifier `0x27cbec` writes `[0x110436]`, and it does not
+reach state 3 from a simple `NOKI3210_VBAT_RAW` reading override (the classification is a
+multi-comparison over the moving-average vs ROM thresholds; a faithful state-3 needs the reading
+to converge into a specific band, still open). Knobs: `MODEL_STARTUP_REPORTS`,
+`STARTUP_REPORTS_MS`, `VBAT_RAW`.
+
+**Status vs the goal:** VBAT confirmation — mapped, and shown to be the remaining gate (not yet
+driven to state 3 faithfully); code-7 trigger — **emulated** (injected via the firmware's post);
+mode-4 6-message checklist — **emulated** (injected, checklist passes, mode advances 4→0xc);
+mode-0 interactive-init — reachable once the VBAT state-3 confirmation is modelled (the only gate
+between mode 0xc and it). The emulation mechanism is proven; the last blocker is the VBAT
+classifier reaching its confirming state.
+
 ## Next
 
 Two open threads for the code-`7` trigger:
