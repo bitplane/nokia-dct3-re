@@ -616,3 +616,12 @@ address,kind,name
 0x0023670c,function,cs_channel_map_handler_23670c
 0x002a41d0,function,resource_blob_bytesum_2a41d0
 0x002b13d4,function,resource_report_if_available_2b13d4
+0x00270170,function,task1_sequencer_270170
+0x00270c8e,function,task1_dispatch_270c8e
+0x00270ca8,label,task1_mode_table_270ca8
+0x00270cfe,function,task1_mode0_handler_270cfe
+0x00270d1c,function,task1_mode0_interactive_init_270d1c
+0x00270e22,function,task1_mode0d_limp_270e22
+0x00270ec6,function,task1_mode0d_exit_gate_270ec6
+0x00271254,function,task1_mode04_handler_271254
+0x00298000,label,display_mgr_idle_call_298000

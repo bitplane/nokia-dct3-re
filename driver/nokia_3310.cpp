@@ -626,7 +626,9 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      TRACE_CSCMD (contact-service command stream), TRACE_RESAVAIL (display-resource
 //      availability), TRACE_DSPDRV (entries into the GSM-L1/audio DSP driver layer),
 //      TRACE_DSPIO (MCU<->DSP shared-RAM + DSPIF access map; docs/dsp_interface.md) --
-//      the network/DSP frontier (docs/network_scouting.md). The RE forcing shims and
+//      the network/DSP frontier (docs/network_scouting.md), TRACE_HANDOFF (task-1 master
+//      sequencer mode + startup checklist; the post-SIM interactive handoff,
+//      docs/interactive_handoff.md). The RE forcing shims and
 //      one-off traces have been retired (docs/removed_forcing_knobs.md).
 //
 // The forcing/model logic is quarantined in flash_firmware_hooks / ram_*_firmware_*
@@ -1900,6 +1902,42 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (cc++ < 80 && msg >= 0x00100000 && msg < 0x00180000)
 				logerror("cscmd: [msg+8]=%02x [msg+5]=%02x svcready[11fed1]=%02x t=%.4f\n", debug_ram_byte(msg + 8),
 						debug_ram_byte(msg + 5), debug_ram_byte(0x0011fed1), machine().time().as_double());
+		}
+		// TRACE_HANDOFF (opt-in): the post-SIM interactive/idle handoff, probed at three seams:
+		//  (a) task-1 master-sequencer dispatcher 0x270c8e -- log mode [0x1123f0], mode-0 sub-state
+		//      [0x11239c] (the arbiter-set power-on-reason fork), and UI-mode [0x11ff41];
+		//  (b) mode-0 interactive-subsystem-init burst 0x270d1c -- did it run at all?
+		//  (c) display-manager idle-repaint call site 0x298000 (calls display_idle) -- did idle fire,
+		//      i.e. did anything ever set the idle flag [0x1116fd]==1?
+		if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr)
+		{
+			if (addr == 0x00270c8e)
+			{
+				static unsigned h1 = 0; static u32 h1_last = 0xffffffff;
+				const u32 key = (u32(debug_ram_word(0x001123f0)) << 16) | (u32(debug_ram_byte(0x00112399)) << 8)
+						| debug_ram_byte(0x0011ff6c);
+				if (key != h1_last && h1++ < 60)
+				{
+					h1_last = key;
+					logerror("handoff: t1_dispatch mode=%04x chk[112399]=%02x ccont[11ff6c]=%02x sub[11239c]=%02x t=%.4f\n",
+							debug_ram_word(0x001123f0), debug_ram_byte(0x00112399), debug_ram_byte(0x0011ff6c),
+							debug_ram_byte(0x0011239c), machine().time().as_double());
+				}
+			}
+			else if (addr == 0x00270d1c)
+			{
+				static unsigned h2 = 0;
+				if (h2++ < 8)
+					logerror("handoff: mode0 INTERACTIVE-INIT burst 0x270d1c ENTERED t=%.4f\n",
+							machine().time().as_double());
+			}
+			else if (addr == 0x00298000)
+			{
+				static unsigned h3 = 0;
+				if (h3++ < 8)
+					logerror("handoff: display_idle FIRED (idle repaint) [1116fd]=%02x t=%.4f\n",
+							debug_ram_byte(0x001116fd), machine().time().as_double());
+			}
 		}
 	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate
 	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the
