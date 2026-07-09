@@ -327,11 +327,15 @@ mode 4  (Insert-SIM park)
 
 **The definitive terminus.** Past the VBAT-confirm gate, mode `0xc` calls the **display/UI
 subsystem init `0x2a12a0`** (r0=1 → `0x2a1300`), which reports a resource (`0x2b13d4`), posts
-three messages to **task 3**, and drives timer/`0x290cf4` calls — and **does not return** on our
-boot (traced: reaches `0x2713b6`/`0x2713bc`, never `0x2713c2`). So report injection drives the
-boot through *every message-gated gate* of the handoff, and then hits a **subsystem-init call
-that hangs because the display/UI subsystem (and task 3) are not functional** — the
-resource-provider / coherent-boot wall the whole project has converged on.
+three messages to **task 3**, and calls **`0x2355b6`** — and does not return. Drilled to the
+root: `0x2355b6(2)` **yields via the RTOS scheduler `0x269d00`** (reads the scheduler flag
+`[0x100020]`; task-switch on the miss path) — i.e. it **blocks waiting for task 3** (the
+display/UI server it posts to) to run and service the request. Task 3 is not functional on our
+reconstructed boot, so the display init never completes (traced: reaches `0x2713b6`/`0x2713bc`,
+never `0x2713c2`; inside, reaches `0x2a1306`, never `0x2a130c`). So report injection drives the
+boot through *every message-gated gate*, and then hits a subsystem call that **blocks on the
+non-functional display/UI server task 3** — the resource-provider / coherent-boot wall the whole
+project has converged on, now reached *from above* and confirmed as the ceiling.
 
 **Status vs the goal.** VBAT confirmation — mapped + emulated at its gate (`0x2a6942()==3`);
 code-7 trigger — **emulated** (fed via `0x26ff14`); mode-4 6-message checklist — **emulated**

@@ -649,3 +649,6 @@ address,kind,name
 0x0026ff14,function,task1_msg_getter_26ff14
 0x002a12a0,function,display_ui_subsystem_init_2a12a0
 0x00271254,function,task1_mode0xc_startup_phase3_271254
+0x00269d00,function,rtos_scheduler_taskswitch_269d00
+0x002355b6,function,display_ui_init_wait_task3_2355b6
+0x002a1300,function,display_ui_init_r0eq1_2a1300
