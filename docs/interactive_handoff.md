@@ -116,6 +116,41 @@ init-burst trigger — is never delivered to task 1.** Everything downstream (th
 subsystem-ready checklist, the mode-0 interactive-init burst `0x270d1c`, the idle repaint)
 waits behind it.
 
+## Follow-up (#28): the code-`7` trigger is armed by an advance gated on a SIM byte
+
+Traced *why* code 7 is never delivered. It is **not** an external subsystem post — it is
+**self-armed** by the mode-`0x0d` *proper* advance path, which our boot never takes.
+
+**The two mode-0d exits.** When the mode-0d checklist completes (`chk[112399]&f==f` and
+`ccont[11ff6c]&f==6`, both true at t=0.85), the handler reaches the gate `0x270ec6`, which
+then calls **`0x2a6942`**:
+- `0x2a6942 != 0` → **proper advance `0x270eee`** → runs the burst inline and, at `0x270f56`,
+  sets mode to **7** with code 7 armed;
+- `0x2a6942 == 0` → **fallback `0x270fa4`** → sets `ccont` state to 3 (`0x2af058(3)`, explains
+  the 6→3 move) and lands in the **dead-park mode 4** that waits forever for a code 7 nobody
+  sends.
+
+**The gate is a single SIM byte.** `0x2a6942` reads `0x27d654`, which returns byte
+**`[0x110436]`** (= field `+2` of the SIM struct at `0x110434`). It returns 0 (block) while
+`[0x110436] ∈ {1,2}`. Trace `simgate`: `[0x110436] == 1` for the entire boot, never changes.
+So the proper advance is blocked, mode falls to the dead park, and code 7 is never armed.
+This gate is checked at *two* task-1 transitions (`0x270edc` in mode-0d, `0x27139a` in
+mode-04) — it is the general "interactive-ready" predicate.
+
+**Confirmed by experiment.** `EXPERIMENT_SIMGATE_PASS` overrides `0x2a6942`'s read of
+`[0x110436]` from 1→0 at `0x2a6948`. Result: the advance fires and **mode goes `000d → 0007`
+via `lr=0x270f56`** (the code-7-armed path) instead of `→ 0004`. So `[0x110436]` is decisively
+*the* first blocker of the interactive handoff. (Mode 7 then parks — a further gate — so the
+chain is 0d→7→…, but the first, causal gate is this SIM byte.)
+
+**What `[0x110436]` is / the faithful fix.** It is a SIM/interactive-readiness enum (1 = "not
+ready"); the gate wants 0 or ≥3. Our synthetic SIM does ATR + a couple of EF reads only, so
+the firmware's SIM-init never advances this byte past 1. The faithful path is to complete more
+of the SIM initialisation conversation (the files/status the firmware reads to declare the SIM
+ready) so `[0x110436]` reaches its ready value naturally — the same shape as every prior gate.
+Knobs: `EXPERIMENT_SIMGATE_PASS` (diagnostic force), `TRACE_HANDOFF` (`simgate` tap on
+`0x27d654`).
+
 ## Next
 
 Two open threads for the code-`7` trigger:

@@ -1964,6 +1964,38 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					}
 				}
 			}
+			// mode-0d exit gate 0x270ec6 (log the two gate operands) + advance-taken 0x270ee6.
+			else if (addr == 0x00270ec6)
+			{
+				static unsigned hgk = 0; static u32 hgk_last = 0xffffffff;
+				const u32 chk = debug_ram_byte(0x00112399) & 0xf;
+				const u32 cc = debug_ram_byte(0x0011ff6c) & 0xf;
+				const u32 kv = (chk << 4) | cc;
+				if (kv != hgk_last && hgk++ < 24)
+				{
+					hgk_last = kv;
+					logerror("gate0d: 0x270ec6 chk&f=%x ccont&f=%x (need chk=f && cc=6) t=%.4f\n",
+							chk, cc, machine().time().as_double());
+				}
+			}
+			else if (addr == 0x00270ee6)
+			{
+				static unsigned hga = 0;
+				if (hga++ < 4) logerror("gate0d: *** ADVANCE TAKEN 0x270ee6 t=%.4f\n", machine().time().as_double());
+			}
+			// SIM-struct gate byte [0x110436] (= [0x110434+2]) trajectory: the advance is blocked while it
+			// is 1 or 2 (0x2a6942 returns 0). Log on change, plus neighbour [0x110434+9].
+			else if (addr == 0x0027d654)
+			{
+				static u32 last = 0xffffffff;
+				const u32 v = debug_ram_byte(0x00110436);
+				if (v != last)
+				{
+					last = v;
+					logerror("simgate: [0x110436]=%02x [0x11043d]=%02x t=%.4f\n", v,
+							debug_ram_byte(0x0011043d), machine().time().as_double());
+				}
+			}
 			// mode-write epilogue 0x270184 (strh r0,[r4,#4]): every task-1 mode transition + its caller lr.
 			else if (addr == 0x00270184)
 			{
@@ -1980,6 +2012,21 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				}
 			}
 		}
+	// EXPERIMENT_SIMGATE_PASS (opt-in, diagnostic): the mode-0d proper advance (0x270eee, which arms the
+	// mode-0x04 init-burst trigger 'code 7') is blocked because SIM-struct byte [0x110436] == 1, making the
+	// gate helper 0x2a6942 return 0. Force it to pass by overriding 0x2a6942's read of [0x110436] (at
+	// 0x2a6948, just after bl 0x27d654) to 0 -> 0x2a6942 returns 2 (nonzero). Tests whether the advance then
+	// fires and cascades (arm code 7 -> burst -> interactive). Diagnostic only; reverted after use.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_SIMGATE_PASS", 0) != 0 && pc == addr && addr == 0x002a6948)
+	{
+		const u32 v = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		if (v == 1 || v == 2)
+		{
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0);
+			static unsigned e = 0;
+			if (e++ < 4) logerror("simgate_pass: forced 0x2a6942 read %u -> 0 t=%.4f\n", v, machine().time().as_double());
+		}
+	}
 	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate
 	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the
 	// service-channel-busy bit [0x11fed1] bit2 (0x04) to clear -- which a real service peer does by
