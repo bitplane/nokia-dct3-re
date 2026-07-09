@@ -624,8 +624,9 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
 //      TRACE_CCONT_READ (power/ADC), TRACE_LIMP/TRACE_LIMP2 (the startup limp),
 //      TRACE_CSCMD (contact-service command stream), TRACE_RESAVAIL (display-resource
-//      availability). The RE forcing shims and one-off traces have been retired
-//      (docs/removed_forcing_knobs.md).
+//      availability), TRACE_DSPDRV (entries into the GSM-L1/audio DSP driver layer —
+//      the network frontier; see docs/network_scouting.md). The RE forcing shims and
+//      one-off traces have been retired (docs/removed_forcing_knobs.md).
 //
 // The forcing/model logic is quarantined in flash_firmware_hooks / ram_*_firmware_*
 // (banner'd "NOT hardware behaviour"); see docs/driver_structure.md.
@@ -1852,6 +1853,16 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (debug_ram_byte(0x0011fee4) != 0 && ra++ < 80) logerror("resavail: id=%04x cls=%02x en[11fee4]=%02x byte[11ff%02x]=%02x mask=%02x -> %s t=%.4f\n",
 					id, cls, debug_ram_byte(0x0011fee4), 0x08 + (cls>>3), byte, rt[cls&7],
 					(byte & rt[cls&7]) ? "AVAIL" : "UNAVAIL", machine().time().as_double());
+		}
+		// TRACE_DSPDRV (opt-in, scouting): log distinct branch/call targets entering the GSM-L1 / audio
+		// DSP driver layer 0x2b6000-0x2c8000 -- does the post-SIM boot reach the RF/network driver at all?
+		if (nokia_env_u32("NOKI3210_TRACE_DSPDRV", 0) != 0 && pc == addr && addr >= 0x002b6000 && addr < 0x002c8000)
+		{
+			static std::unordered_map<u32, bool> seen;
+			static unsigned dd = 0;
+			if (!seen[addr] && dd++ < 120) { seen[addr] = true;
+				logerror("dspdrv: enter %08x lr=%08x t=%.4f\n", addr,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double()); }
 		}
 		// TRACE_CSCMD (opt-in, fetch side): the contact-service command dispatcher 0x237400 reads the
 		// command byte [msg+8] into r4 at 0x23741a and binary-searches to a handler. cmd 0x70/0x71 route to

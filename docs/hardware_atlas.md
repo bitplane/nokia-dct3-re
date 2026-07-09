@@ -128,6 +128,15 @@ Either way, the practical next move is to **get the boot past the limp first** (
 actually runs and can be traced), *then* deep-dive the DSP dynamically. The shared-RAM mailbox layout
 and the service-handshake subset are already mapped (above + `service_bootstrap.md`).
 
+**Update (2026-07-09): we are now well past the limp (boot reaches "Insert SIM card", SIM accepted),
+and the GSM-L1 *protocol* layer still does not run.** `TRACE_DSPDRV` shows the full-SIM boot enters
+only `0x2b60xx–0x2b66xx` (the DSP-IF *plumbing* — task 22 `dsp_if_task_2b6548` + the mailbox
+primitives, driven by the SIM/CCONT/scheduler for their own needs); **nothing above `0x2b6fff`
+(`0x2b7xxx–0x2c9xxx` = the L1 stack) is ever reached.** So the network layer is self-contained behind
+the DSP-IF task and is not attempted before the upstream MMI/resource wall. Full analysis and the
+"can operator-idle be faked" verdict (DSP-bound; not message-injectable like the SIM) are in
+`docs/network_scouting.md`.
+
 ## What the boot touches — and doesn't (the frontier)
 
 To the **mode-`000d` limp** (past CONTACT SERVICE) the firmware exercises: CTSI (clock/timer/IRQ),
