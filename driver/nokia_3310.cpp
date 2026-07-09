@@ -1903,12 +1903,13 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("cscmd: [msg+8]=%02x [msg+5]=%02x svcready[11fed1]=%02x t=%.4f\n", debug_ram_byte(msg + 8),
 						debug_ram_byte(msg + 5), debug_ram_byte(0x0011fed1), machine().time().as_double());
 		}
-		// TRACE_HANDOFF (opt-in): the post-SIM interactive/idle handoff, probed at three seams:
-		//  (a) task-1 master-sequencer dispatcher 0x270c8e -- log mode [0x1123f0], mode-0 sub-state
-		//      [0x11239c] (the arbiter-set power-on-reason fork), and UI-mode [0x11ff41];
-		//  (b) mode-0 interactive-subsystem-init burst 0x270d1c -- did it run at all?
-		//  (c) display-manager idle-repaint call site 0x298000 (calls display_idle) -- did idle fire,
-		//      i.e. did anything ever set the idle flag [0x1116fd]==1?
+		// TRACE_HANDOFF (opt-in): the post-SIM interactive/idle handoff. Seams (docs/interactive_handoff.md):
+		//  (a) task-1 dispatcher 0x270c8e -- mode [0x1123f0], mode-0d checklist [0x112399], CCONT [0x11ff6c];
+		//  (b) mode-0 interactive-init burst 0x270d1c -- did it run? (no: task 1 never enters mode 0);
+		//  (c) display-manager idle-repaint call 0x298000 -- did display_idle fire? (no);
+		//  (d) mode-0x04 handler entry 0x271254 -- the msgcodes task 1 gets in mode 4 (d5/75/33/c3, never
+		//      the 7 that would trigger the init burst); 0x270184 -- every mode transition + caller lr;
+		//      0x26a204/0x26a354 -- inventory of codes posted to task-1 mailbox (code 7 never appears).
 		if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr)
 		{
 			if (addr == 0x00270c8e)
@@ -1937,6 +1938,46 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				if (h3++ < 8)
 					logerror("handoff: display_idle FIRED (idle repaint) [1116fd]=%02x t=%.4f\n",
 							debug_ram_byte(0x001116fd), machine().time().as_double());
+			}
+			else if (addr == 0x00271254)
+			{
+				static unsigned he = 0;
+				if (he++ < 8) logerror("handoff4: mode-0x04 handler ENTERED (0x271254) msgcode=%04x t=%.4f\n",
+						debug_ram_word(0x001123ee), machine().time().as_double());
+			}
+			// Inventory: every RTOS post to task 1 (0x26a204/0x26a354, r0=taskid, r1=msgptr; code=[msg+0]),
+			// deduped by (code, caller). Does anything ever post code 7 (the mode-0x04 burst trigger)?
+			else if (addr == 0x0026a204 || addr == 0x0026a354)
+			{
+				const u32 task = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+				if (task == 1)
+				{
+					const u32 code = m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff;
+					const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+					static u32 seen[96]; static unsigned nseen = 0;
+					const u32 kv = (code << 12) ^ lr;
+					bool dup = false; for (unsigned i = 0; i < nseen; i++) if (seen[i] == kv) { dup = true; break; }
+					if (!dup && nseen < 96)
+					{
+						seen[nseen++] = kv;
+						logerror("t1post: code=%04x via=%08x lr=%08x t=%.4f\n", code, addr, lr, machine().time().as_double());
+					}
+				}
+			}
+			// mode-write epilogue 0x270184 (strh r0,[r4,#4]): every task-1 mode transition + its caller lr.
+			else if (addr == 0x00270184)
+			{
+				static u32 seen[48]; static unsigned nseen = 0;
+				const u32 nm = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
+				const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+				const u32 cur = debug_ram_word(0x001123f0) & 0xffff;
+				const u32 kv = (cur << 20) ^ (nm << 12) ^ (lr & 0xfff);
+				bool dup = false; for (unsigned i = 0; i < nseen; i++) if (seen[i] == kv) { dup = true; break; }
+				if (!dup && nseen < 48)
+				{
+					seen[nseen++] = kv;
+					logerror("t1mode: %04x -> %04x via lr=%08x t=%.4f\n", cur, nm, lr, machine().time().as_double());
+				}
 			}
 		}
 	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate

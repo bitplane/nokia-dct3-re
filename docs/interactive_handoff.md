@@ -75,12 +75,59 @@ gate. This is the same *shape* as CONTACT SERVICE / `000d` / service-ready — a
 boot-state handoff waiting on a message our reconstructed boot doesn't deliver — now
 localised one mode further along than before.
 
+## Follow-up: the mode-`0x4` gate is a single trigger — message code `7`, never delivered
+
+Traced mode `0x4` in detail (extended `TRACE_HANDOFF`: hooks at handler entry `0x271254`,
+mode-write `0x270184`, and the task-1 mailbox posts `0x26a204`/`0x26a354`). The result
+**re-frames the "6-message checklist" target**: that inner checklist (`0x112390..0x112395`,
+loop `0x2712cc`) is *downstream and never reached*. The actual gate is one step earlier.
+
+**Mode-`0x4` handler `0x271254` dispatches on the entry message code:**
+`3 → 0x2711f6`, `0xe → 0x271230`, `7 → the init burst 0x271266`, **else → `0x2701b0`**,
+which is a mode-set stub (`movs r0,#4; b 0x270184` = "stay in mode 4, yield"). So the init
+burst (and thus the inner 6-message checklist behind it) runs **only on entry message code
+`7`** (or 3/0xe).
+
+**What task 1 actually receives in mode 4:** codes `d5, 75, 33, c3` (c3 = the periodic
+tick) — **never `7`/`3`/`0xe`**. Every message hits the else-path → `0x2701b0` → re-arms
+mode 4. Confirmed by the mode-transition trace:
+
+```
+0001 -> 000d  via lr=0x270e3c   (mode-0d handler)
+000d -> 0004  via lr=0x271266   t=0.9127   (= return from bl 0x2701b0 at 0x271264)
+0004 -> 0004  via lr=0x271266             (stable park; re-armed every message)
+```
+
+**Why code 7 never comes:** inventory of every post to task 1's mailbox
+(`0x26a204`/`0x26a354`, `r0`=task, `r1`=code) over the whole boot yields exactly:
+`0x14 0x15 0x16 0x17` (the mode-0d checklist events — all arrive, which is why the limp
+clears) plus `0x32 0x33 0x37 0x75`. **Code `7` is never posted.** The event posters are
+small stubs at `0x2af074+` (`movs r0,#1; movs r1,#<code>; bl 0x26a354`; e.g. `0x2af086`→
+`0x17`, `0x2af09a`→`0x11`); no reachable stub posts `7` on our boot.
+
+Correction to the section above: the mode-`0x0d` exit gate `0x270ec6`→advance `0x270ee6`
+(and its *inline* copy of the burst) is **not** the path our boot takes — those hooks never
+fire; the `0x0d→0x4` transition happens via `lr=0x271266` (the mode-4 handler's own
+else-path), and `ccont[11ff6c]` moves 6→3 across it. So the gate documented earlier is one
+of several mode-0d branches, not the one exercised.
+
+**Net gate:** the interactive handoff is blocked because **message code `7` — the mode-`0x4`
+init-burst trigger — is never delivered to task 1.** Everything downstream (the 6-message
+subsystem-ready checklist, the mode-0 interactive-init burst `0x270d1c`, the idle repaint)
+waits behind it.
+
 ## Next
 
-Identify the message/event mode `0x4`'s inner loop (`0x2712cc`) is waiting for to advance
-task 1 to the next mode (toward mode 0 / interactive), and what subsystem should emit it.
-That is the immediate, well-scoped next gate. Knob: `NOKI3210_TRACE_HANDOFF` (opt-in;
-hooks `0x270c8e` / `0x270d1c` / `0x298000`).
+Two open threads for the code-`7` trigger:
+1. **Not yet traced:** the other post paths — delayed `0x2697aa`, immediate `0x2695f4`, ring
+   `0x26aac0` — and the getter `0x26ff14`'s *translation* (raw `0xc0/0xc1/0xc4/0xc6` return
+   RAM cells `[0x1123a0]/[0x112408]/[0x11245e]/[0x11239a]`, which could evaluate to 7).
+   Confirm code 7 is absent by *every* delivery mechanism, or find the one that carries it.
+2. **Who should emit it:** identify the subsystem whose "ready" report is code 7 (by analogy
+   with the `0x2af074+` posters for `0x14–0x17`) and why its path isn't taken on our boot.
+
+Knob: `NOKI3210_TRACE_HANDOFF` (opt-in; hooks `0x270c8e`, `0x270d1c`, `0x298000`,
+`0x271254`, `0x270184`, `0x26a204`/`0x26a354`).
 
 Symbols: `task1_sequencer 0x270170`, `task1_dispatch 0x270c8e`, `task1_mode_table 0x270ca8`,
 `task1_mode0d_limp 0x270e22`, `task1_mode0d_exit_gate 0x270ec6`, `task1_mode04 0x271254`,

@@ -625,3 +625,8 @@ address,kind,name
 0x00270ec6,function,task1_mode0d_exit_gate_270ec6
 0x00271254,function,task1_mode04_handler_271254
 0x00298000,label,display_mgr_idle_call_298000
+0x0026ff14,function,task1_msg_get_translate_26ff14
+0x002701b0,function,task1_modeset_stub_2701b0
+0x0026a354,function,rtos_mailbox_post_26a354
+0x002af058,function,fw_ccont_state_setter_2af058
+0x002af074,function,task1_event_post_stubs_2af074
