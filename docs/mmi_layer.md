@@ -85,9 +85,38 @@ but the IRQ6 handler / input task that should read the latched key and post a ke
 *finer* than the outcome/mode: it is the **runtime input ISR / input task**, not the
 top-level state.
 
-Next: find the IRQ6 keypad ISR (via the MAD2 IRQ dispatcher that reads status reg
-`0x09`) and the input task it should feed — determine why it doesn't read/post the key
-(handler unregistered? input task dormant? deferred to a task that isn't scheduled?).
-That task's activation is the true root — and, by the "up but not alive" symmetry,
-likely the same activation that would build the display resource providers. Knob
-(reverted, git-recoverable): `TRACE_UIMODE`.
+## The IRQ6 keypad ISR chain — the ISR works, the consumer is dormant
+
+Traced the whole keypad interrupt path (empirically via `TRACE_IRQ` on MAD2 status
+reg `0x09`, then statically):
+
+1. **IRQ dispatcher `0x2af430`** (runs in the DSP-service IRQ context, ~200 Hz):
+   reads active IRQs `= status[0x09] & ~mask[0x0b]`; dispatches by line at `0x2af3d6`
+   (a shift/`bhs` cascade). Line 6 (bit6 = keypad) → `0x2af40a` → **`bl 0x2b5da0`**.
+   Confirmed live: when a key is injected, the dispatcher reads `reg0x09 = 0x40`
+   (keypad bit) at exactly the keypress times.
+2. **Keypad ISR `0x2b5da0`** does *not* scan the matrix. It:
+   - **masks** further keypad IRQs — sets bit6 in IRQ mask `[0x2000b]`;
+   - **enqueues event `0x72`** (from ROM `[0x2e2230]`) into a task mailbox via the
+     scheduler post `0x26aac0` (TCB-indexed; `str r4,[r1,r0]`) — i.e. it *delegates*
+     the scan/decode to a consumer task;
+   - **acks** the IRQ (writes `0x40` to `[0x20009]`).
+
+So the runtime design is: keypad IRQ → ISR masks + posts event `0x72` to the input
+consumer → the consumer recvs `0x72`, scans/decodes the key, posts a key message to
+the MMI, and **re-enables** the keypad IRQ. On our boot that consumer never completes
+the cycle: keys are never decoded, the MMI never gets a key message, and — because the
+ISR masked the keypad IRQ pending the consumer — **the input path self-locks after the
+first press** (the mask is never cleared).
+
+**So the true root is the event-`0x72` consumer task being dormant/stuck.** This is
+the same shape as the display side (a screen painted, but the runtime consumer/provider
+graph not running) and fits the coherent-boot-handoff theme: a task that should have
+transitioned into interactive-app mode after startup never does, so the events it
+should consume (keypad `0x72`, and by symmetry the display resource-provider setup)
+pile up unhandled.
+
+Final hop (next): identify the event-`0x72` consumer task (the mailbox `0x26aac0`
+targets) and confirm it is unscheduled / blocked elsewhere — then find what should
+have activated it (the post-startup → interactive-app handoff). Knobs (reverted,
+git-recoverable): `TRACE_IRQ`, `TRACE_UIMODE`, `POST_READY_KEY`.
