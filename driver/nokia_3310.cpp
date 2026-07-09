@@ -2077,6 +2077,24 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// so the sequencer takes the confirmed path 0x2713b6 instead of draining at 0x2714a4.
 	if (nokia_env_u32("NOKI3210_MODEL_STARTUP_REPORTS", 0) != 0 && pc == addr && addr == 0x0027139e)
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 3);
+	// EXPERIMENT_UIINIT_SKIP (diagnostic): the mode-0xc handler's display-init call 0x2a1300->0x2355b6 does
+	// not return on our boot (it resumes app tasks 10-17 + threads scheduler yields that never settle). Skip
+	// that specific call (return from 0x2355b6 when invoked from the display init at lr=0x2a130c) so the
+	// mode-0xc handler can continue -- to see whether the sequencer then reaches mode-0 and runs the
+	// interactive-init 0x270d1c.
+	if (nokia_env_u32("NOKI3210_EXPERIMENT_UIINIT_SKIP", 0) != 0 && pc == addr && addr == 0x002355b6 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x002a130c)
+	{
+		static unsigned e = 0; if (e++ < 3) logerror("uiskip: skipping 0x2355b6 (display init) t=%.4f\n", machine().time().as_double());
+		return 0x4770;   // bx lr -> return immediately
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
+			(addr == 0x002a130c || addr == 0x00270d1c || addr == 0x00298000))
+	{
+		static u32 seen[4]; static unsigned n = 0; bool dup = false;
+		for (unsigned i = 0; i < n; i++) if (seen[i] == addr) { dup = true; break; }
+		if (!dup && n < 4) { seen[n++] = addr; logerror("deep: reached %08x t=%.4f\n", addr, machine().time().as_double()); }
+	}
 	// EXPERIMENT_FORCE_CODE7 (opt-in, diagnostic): the mode-0d advance's getmsg at 0x270f46 (bl 0x26ff14)
 	// expects message code 7 to run the init burst; it never arrives. Force the getmsg return r0:=7 at the
 	// post-bl point 0x270f4a (a reliably-hooked address, unlike mid-linear code MAME prefetches) so the
