@@ -73,3 +73,16 @@ protocol (the MM/RR commands down *and* the DSP L1 measurement/sync reports up).
 So boot-to-"Insert SIM card" remains the clean, complete milestone. The next
 digital frontier, if pursued, is the **MMI resource-content pipeline** (data), not
 the network (hardware). Scouting knob: `NOKI3210_TRACE_DSPDRV`.
+
+## Observed end-state (clarification)
+
+Both the no-SIM boot and the full faithful-SIM boot **display "Insert SIM card"**.
+The difference is internal: with the SIM models the read conversation completes and
+the no-SIM reject clears *internally* (the SIM RE, `sim_emulator_scope.md`), and the
+MMI renders a *complete* screen — frames evolve `blank → o058 → o074`, the o074 form
+adding the scrollbar + status-icon chrome, i.e. a fully-up MMI. But the **displayed
+text screen never advances past "Insert SIM card"**: the state→display handoff that
+would repaint to the next screen doesn't fire (the same MMI resource-content wall).
+So "Insert SIM card" is both the correct no-SIM home screen *and* the visible
+ceiling of the faithful-SIM boot — the phone is further along internally than the
+pixels show, but the pixels are gated on the resource-content pipeline, not the SIM.
