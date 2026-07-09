@@ -612,3 +612,7 @@ address,kind,name
 0x002a255c,function,display_idle_2a255c
 0x002e0a50,label,resource_deftable_2e0a50
 0x002e2f5c,label,resource_availbit_masktable_2e2f5c
+0x002366d4,function,cs_resource_enable_cmd70_2366d4
+0x0023670c,function,cs_channel_map_handler_2366d4
+0x002a41d0,function,resource_blob_bytesum_2a41d0
+0x002b13d4,function,resource_report_if_available_2b13d4
