@@ -967,3 +967,37 @@ no cheap digital shortcut — for a different reason (needs real subsystem-creat
 providers, vs the network's RF/DSP hardware). **Boot-to-"Insert SIM card" stands as
 the honest, complete digital milestone.** (Probe harness `EXPERIMENT_IDLE_DRAW` +
 the 18-class blob were used to establish this and then retired; recoverable from git.)
+
+## SIM-present transition: recognized present, but the SIM state machine never settles (2026-07)
+
+Goal: get past "Insert SIM card" into the interactive MMI state. `MODEL_SIM_CARD`
+clears the no-SIM reject, so the question was whether the SIM is *accepted into the
+interactive state* or just has the reject flag cleared. Traced the decision chain
+(`TRACE_SIMDEC`, reverted/git-recoverable).
+
+**The SIM IS recognized present.** The read-complete decision `0x27ea88` reads the
+no-SIM flag `[0x111c64]`: `!=0` → posts status `0x1f` ("Insert SIM card") via
+`0x27e240`; `==0` → calls the **SIM-present handler `0x27dfc4`** and posts events
+`0xe8` (immediate) + `0xea` (delayed). On our boot `[0x111c64]==0` **every time**, so
+`0x27ea88` always takes the **SIM-present** path — the no-SIM branch never fires. And
+`0x27dfc4` proceeds (its gates `[0x111c9d]==0` and `[0x10a8e3]==1` are met after
+t≈0.9), setting the SIM-present flags. So the firmware does recognise the SIM.
+
+**But the SIM state machine never settles.** `0x27ea88` is called only from
+`0x27f06e` (the SIM main loop), and the surrounding logic (`0x27ea20`) reads a state
+byte `[0x10a8e2]`; while it is `1` it **re-arms a retry timer (event `0xe9`, ~34 ms)
+and blocks on recv**. On our boot `[0x10a8e2]` stays `1` — the SIM subsystem cycles
+this "establishing/retry" poll **continuously** (0x27ea88 fires ~every 34 ms, 300+×
+over the run) instead of reaching a stable "ready/done" state. So the SIM is *present*
+but never *finished*: the state machine loops in ATR/reset-retry rather than settling,
+so the clean "SIM ready → MMI interactive" handoff that would clear the "Insert SIM
+card" screen never completes.
+
+**The gap, precisely:** `MODEL_SIM_CARD` drives the read conversation (ATR→PPS→EF) and
+gets the SIM recognised as present, but it does not drive the SIM control state
+`[0x10a8e2]` (SIM struct `0x10a8dc+6`) out of the retry/establishing state (`1`) into
+its settled/ready value. Until that settles, the SIM subsystem keeps polling and the
+MMI never transitions. Next: find what advances `[0x10a8e2]` past `1` (which SIM-task
+code/message marks the SIM fully ready) and whether `MODEL_SIM_CARD` can deliver it —
+the analogue, one layer up, of the ATR/PPS/EF steps it already models. Knob (reverted):
+`TRACE_SIMDEC`.
