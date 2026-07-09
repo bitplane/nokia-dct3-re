@@ -1680,14 +1680,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					for (u32 i = 0; i < 0x40; i++) debug_ram_byte_w(msg + 9 + i, uint8_t(fillenv));
 				else
 				{
-					// SPARSE: register only the display resource classes that have ROM resource
-					// definitions (table 0x2e0a50): 0x4c (idle window 0x4c22), 0x4f, 0x50, 0x52, 0x56.
-					// bit(class&7) of blob[class>>3]. (Earlier code registered class 0x22 -- a swap16
-					// misread of the idle resource id: 4c220000 unswaps to 0x4c22, class 0x4c, NOT 0x224c.)
-					// The availability bit for class C is the PERMUTED mask romtable[C&7], where
-					// romtable @0x2e2f5c = {0x40,0x80,0x10,0x20,0x04,0x08,0x01,0x02} (NOT 1<<i).
-					// 0x4c->rt[4]=0x04, 0x4f->rt[7]=0x02  => byte9 = 0x06
-					// 0x50->rt[0]=0x40, 0x52->rt[2]=0x10, 0x56->rt[6]=0x01 => byteA = 0x51
+					// SPARSE (safe default): register only the display resource classes that have ROM
+					// resource definitions in table 0x2e0a50 -- 0x4c (idle window 0x4c22), 0x4f, 0x50,
+					// 0x52, 0x56. These are ROM-backed, so marking them available is safe (display stays
+					// alive). The availability bit for class C is the PERMUTED mask romtable[C&7] @0x2e2f5c
+					// = {0x40,0x80,0x10,0x20,0x04,0x08,0x01,0x02}; blob[C>>3] |= romtable[C&7].
+					// 0x4c->rt[4]=0x04, 0x4f->rt[7]=0x02 => byte9=0x06; 0x50->0x40,0x52->0x10,0x56->0x01
+					// => byteA=0x51. NB: registering the OTHER ~13 idle-content classes the draw queries
+					// (0x22/0x25/0x26/0x27/0x2a/0x2b/0x30/0x31/0x3a/0x3c/0x3d/0x44/0x4a/0x5c/0x5d/0x5e/0x78)
+					// has NO ROM backing -> the render then fails (blank); see docs/sim_emulator_scope.md.
 					debug_ram_byte_w(msg + 9 + 9, 0x06);   // byte9: classes 0x4c (idle window) + 0x4f
 					debug_ram_byte_w(msg + 9 + 0xa, 0x51); // byteA: classes 0x50 + 0x52 + 0x56
 				}

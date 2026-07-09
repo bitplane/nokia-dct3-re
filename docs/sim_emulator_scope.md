@@ -925,3 +925,45 @@ So operator-idle is fundamentally a SIM+network state; without them "Insert SIM
 card" is the correct and complete terminal screen. The whole boot→pixel path is now
 mapped end-to-end, down to the per-class resource composition. Boot-to-"Insert SIM
 card" stands as the clean milestone. Knob: `TRACE_RESAVAIL`.
+
+## Digging the resource-content pipeline — verdict: unbacked, not bit-flippable (2026-07-09)
+
+Followed the last digital frontier: can the idle screen's *content* be rendered by
+registering the resource classes it needs?
+
+**Resource model.** `display_idle 0x2a255c` = `resource-get(0x4c22)` + `render-post
+(0x547 → task 5)`. Resource-get `0x2b257e` for the idle window (class `0x4c`, no
+caller data) routes through the acquire `0x2b12dc`, which builds a **management
+descriptor (a handle)** — it allocates + fills metadata, it does **not** hold pixels.
+The actual content (fonts / icons / layout) is ROM data fetched *by id at draw time*.
+So in principle the data is present (it must be — "Insert SIM card" renders text),
+and the question is whether registering availability lets the draw path reach it.
+
+**Decisive experiment.** Registered *exactly* the ~18 resource classes the idle draw
+queries (`TRACE_RESAVAIL`: `0x22 0x25 0x26 0x27 0x2a 0x2b 0x30 0x31 0x3a 0x3c 0x3d
+0x44 0x4a 0x4c 0x5c 0x5d 0x5e 0x78`) via the `MODEL_RES_ENABLE` config blob (not
+all-`0xff`), and forced `display_idle`. **Result: the display goes blank — even
+"Insert SIM card" stops rendering** (`run_content`: all `o000`; `resavail` confirms
+`0x5c/0x5d/0x5e` became AVAIL; the early "Soft reset" is the normal boot reset, not
+a crash from this).
+
+**Why: the content classes are unbacked.** The split is clean:
+- The **ROM-def-table (`0x2e0a50`) classes** — `0x4c/0x4f/0x50/0x52/0x56` — are
+  ROM-backed; registering just these (the sparse-5 default) keeps the display alive
+  (renders "Insert SIM card").
+- The **other ~13 idle-content classes** have **no ROM resource definition and no
+  runtime provider** on our boot. Marking them *available* makes the render path try
+  to acquire their (nonexistent) provider objects, and the render can't complete →
+  blank. (Same failure mode as all-`0xff`, now localised to the non-def classes.)
+
+**Verdict.** The idle content pipeline is **not digitally fakeable by flipping
+availability bits.** Availability is a *promise* that a provider object exists; the
+provider objects (the fonts/icons/window widgets the idle layout draws) are created
+by the display / font / window subsystems during a full coherent bring-up — the same
+coherent-boot state wall as everything above the SIM. Providing them would mean
+faithfully running those subsystems (or hand-constructing every resource object),
+not a bitmap poke. So the resource-content pipeline joins the network as a wall with
+no cheap digital shortcut — for a different reason (needs real subsystem-created
+providers, vs the network's RF/DSP hardware). **Boot-to-"Insert SIM card" stands as
+the honest, complete digital milestone.** (Probe harness `EXPERIMENT_IDLE_DRAW` +
+the 18-class blob were used to establish this and then retired; recoverable from git.)
