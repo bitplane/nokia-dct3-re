@@ -1765,6 +1765,39 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 	}
 
+	// TRACE_TASKS (opt-in): app-task-layer forcing-sweep tap. Log the first time each RTOS task reaches
+	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). With MODEL_STARTUP_REPORTS
+	// + EXPERIMENT_UIINIT_SKIP this shows which of the app tasks 10-17 (resumed by mode-0xc's 0x2795e6)
+	// actually come alive. Task id = [0x100022]. docs/interactive_handoff.md app-task sweep.
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x0026a458)
+	{
+		static u32 seen = 0;
+		const u32 tid = debug_ram_byte(0x00100022);
+		if (tid < 31 && !(seen & (1u << tid)))
+		{
+			seen |= (1u << tid);
+			logerror("task_alive: task %2u first recv t=%.4f\n", tid, machine().time().as_double());
+		}
+	}
+	// TRACE_TASKS post-flow: inter-task messages during the handoff/stall (from=[0x100022] -> mailbox r0,
+	// code r1), deduped by (from,to,code). Maps the message protocol so the missing handshake stands out.
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && (addr == 0x0026a354 || addr == 0x0026a204))
+	{
+		const u32 from = debug_ram_byte(0x00100022);
+		const u32 to = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		const u32 code = m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff;
+		static u32 seen[64]; static unsigned n = 0; static u32 total = 0;
+		total++;
+		const u32 kv = (from << 8) | to;   // dedup by communication EDGE (codes are per-message seq ids)
+		bool dup = false; for (unsigned i = 0; i < n; i++) if (seen[i] == kv) { dup = true; break; }
+		if (!dup && n < 64)
+		{
+			seen[n++] = kv;
+			logerror("msgedge: t%u -> t%u (first code=%04x) t=%.4f\n", from, to, code, machine().time().as_double());
+		}
+		if ((total % 2000) == 0)
+			logerror("msgrate: %u posts by t=%.4f (protocol still active)\n", total, machine().time().as_double());
+	}
 	// MODEL_STARTUP_REPORTS (opt-in): emulate the subsystem-ready reports that drive the interactive
 	// handoff past the mode-0d limp. On a real boot the battery/MMI/display subsystems post these codes to
 	// task-1 (via the 0x2af0xx reporter stubs) as they reach ready; our reconstructed boot never reaches

@@ -381,3 +381,38 @@ Symbols: `task1_sequencer 0x270170`, `task1_dispatch 0x270c8e`, `task1_mode_tabl
 `task1_mode0d_limp 0x270e22`, `task1_mode0d_exit_gate 0x270ec6`, `task1_mode04 0x271254`,
 `task1_mode0_interactive_init 0x270d1c`, `display_mgr_idle_call 0x298000`. State:
 mode `0x1123f0`, checklist `0x112399`, CCONT-state `0x11ff6c`.
+
+## App-task forcing sweep (2026-07): the layer is ALIVE, not hung
+
+Ran a task-liveness + message-flow sweep (`NOKI3210_TRACE_TASKS`) with
+`MODEL_STARTUP_REPORTS` driving the boot. This overturns the "non-converging /
+hung" framing:
+
+- **All 22 RTOS tasks reach their recv loop.** The application tasks **10–17**
+  (resumed on the mode-0xc path) come alive at t≈0.84; every task 1–22 is scheduled
+  and running its message loop. Entry points (task-table `0x2d7090`, stride 0xc):
+  t10 `0x21bf60`, t11 `0x2159c4`, t12 `0x273ea0`, t13 `0x23ebd0`, t14 `0x248318`,
+  t15 `0x20a8a8`, t16 `0x24f5a0`, t17 `0x22391c`. Known hubs: t5 `0x2af630` (MMI VM),
+  t6 `0x297fc4` (display manager), t3 `0x2b18a0` (display/resource server),
+  t21 `0x27eae0` (SIM).
+- **They run a busy, continuous inter-task protocol.** Communication graph (edges,
+  deduped): `t5` is the central hub (receives from t0/t1/t17/t20/t21/t2/t6); `t13↔t16`
+  exchange bidirectionally; `t15→t16/t17`, `t16→t10/t11/t13`, `t17→t5/t15/t20/t3`,
+  `t20→t21/t5/t17`, `t21→t17/t5`, `t5→t6` (MMI→display). Message codes are per-message
+  **sequence ids** (`0x17xx→0x1axx`, monotonically increasing), i.e. genuine traffic.
+- **It reaches a STEADY STATE, it does not stall.** Post rate holds ~2000/s out to
+  t=16s+ (still active), but **no new communication edges appear after t≈6.4** — the
+  same task-pairs loop. A new phase engages at t≈6.38 (t6 display-manager → t5, t2→t5),
+  then it settles.
+
+**Reframe.** The interactive handoff is **not** blocked by a dead subsystem or a
+non-converging init. The whole task graph is alive and continuously messaging; it
+settles into an **intermediate steady state that still shows "Insert SIM card."**
+Reaching the interactive/idle screen therefore needs a **trigger that advances the MMI
+(t5) out of this steady state** — the same *kind* of missing-signal problem the reports
+solved for the earlier gates, not a hardware/convergence wall.
+
+**Next dig.** The MMI VM (t5) state machine: what state is it parked in, and what
+message/event moves it from "Insert SIM card" to the idle/menu screen. Likely a
+SIM-ready → MMI-idle transition (ties back to the SIM thread). Sweep knob:
+`NOKI3210_TRACE_TASKS` (task liveness + `msgedge`/`msgrate`).
