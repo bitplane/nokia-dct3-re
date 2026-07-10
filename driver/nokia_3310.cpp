@@ -2719,6 +2719,28 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				addr == 0x0026a204 ? "26a204" : "26a354", body,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	}
+	// REGCHAIN keystones (under TRACE_SIMKICK). Gate 0x208218 opens only when ENABLE [0x111c79]==1, set solely
+	// by task-20 reply handler 0x20733c on messages 0x1196/0x1199 -- emitted ONLY by SIM-server commit 0x254b40.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00254b40)
+	{
+		static unsigned c = 0;
+		if (c++ < 8) logerror("simkick: SIM-server COMMIT 0x254b40 RUNS (emits 0x1196/0x1199) session=%08x t=%.4f\n",
+				debug_ram_word(0x00110f1c), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0020733c)
+	{
+		static unsigned c = 0;
+		if (c++ < 8) logerror("simkick: ENABLE-setter 0x20733c reached ([111c79]<-1) t=%.4f\n", machine().time().as_double());
+	}
+	// Task-21 SIM main-loop counter check 0x27eff8 (ldr r0,[sp]; cmp #4; bge completion). Does the reset/ATR
+	// retry counter ever ADVANCE toward 4 (=> completion 0x27f064 -> 0x27ea88), or is it pinned below 4 forever?
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027eff8)
+	{
+		const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
+		const u32 ctr = (sp >= 0x00100000 && sp < 0x00180000) ? debug_ram_word(sp) : 0xffffffff;
+		static unsigned c = 0;
+		if (c++ < 20) logerror("simkick: task21 loop counter=[sp]=%u (need>=4 to complete) t=%.4f\n", ctr, machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
 	{
 		static unsigned dq = 0;
