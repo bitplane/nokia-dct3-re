@@ -1765,20 +1765,21 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			m_simreg_state = 2;
 			return BX_LR;   // return from 0x2904d4 to caller, skipping its 0x119a post to task 20
 		}
-		// Step B: at detect, mark SIM present + re-post 0x119a to task 20 (now it won't divert).
+		// Step B (drive test): at detect, mark SIM present, then post a REAL 0x1199 read-enable message to
+		// task 20 by calling its producer 0x28fea6 (the one the SIM-server commit 0x254b40 uses) with
+		// zeroed session data -- enough to WAKE task 20 and make it loop to its read-enable gate 0x208218.
 		if (m_simreg_state == 2 && pc == addr && addr == 0x0027e394)
 		{
-			debug_ram_byte_w(0x00111c69, 1);   // SIM selected (0x119a handler gate 1 @0x208816)
-			debug_ram_byte_w(0x00111c7a, 0);   // 0x119a sub-guard (gate 2 @0x20881e) -> take proper handler 0x20797c
-			debug_ram_byte_w(0x00111c65, 1);   // task-21-wake guard: task 21 already activated (step A) -> 0x207704
-			                                   // skips the blocking 0x293a6a wake (@0x2077b8) and SELECTs directly
+			debug_ram_byte_w(0x00111c69, 1);   // SIM selected
 			debug_ram_byte_w(0x00111c64, 0);   // no-SIM cleared (valid SIM detected)
+			constexpr u32 SC1 = 0x0017fa00, SC2 = 0x0017fa40;
+			for (offs_t i = 0; i < 0x20; i++) { debug_ram_byte_w(SC1 + i, 0); debug_ram_byte_w(SC2 + i, 0); }
 			for (int i = 0; i < 15; i++) m_simreg_saved[i] = getr(i);
 			m_simreg_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			setr(0, 0x14); setr(1, 0x002e2cd8);   // task 20, 0x119a template
-			setr(12, 0x0026a204 | 1); setr(14, SENT | 1);
+			setr(0, SC1); setr(1, SC2);           // 0x28fea6(word0, word1) -> posts 0x1199 to task 20
+			setr(12, 0x0028fea6 | 1); setr(14, SENT | 1);
 			m_simreg_state = 3;
-			logerror("simreg: B detect -> [111c69]=1, re-post 0x119a to task 20 t=%.4f\n", machine().time().as_double());
+			logerror("simreg: B detect -> [111c69]=1, post 0x1199 to task 20 t=%.4f\n", machine().time().as_double());
 			return BX_R12;
 		}
 		if (m_simreg_state == 3 && pc == addr && addr == SENT)
@@ -1788,6 +1789,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			m_simreg_state = 4;
 			setr(12, 0x0027e394 | 1);
 			return BX_R12;   // resume the detect handler 0x27e394 normally
+		}
+		// Step C (drive test): once SIM is selected, force task 20's read-enable gate OPEN at its gate-top
+		// 0x208218 (5 conds: [0x111c76]==0, [0x111c79]==1, [0x111c96]==0, [0x111c97]==0) so it enters its
+		// read phases 0x201a3a and issues its OWN SELECT/READ sequence into the file-driven responder.
+		// This bypasses the SIM-server commit for the test; if reads flow, read engine + responder are proven.
+		if (m_simreg_state >= 3 && pc == addr && addr == 0x00208218 && debug_ram_byte(0x00111c69) == 1)
+		{
+			debug_ram_byte_w(0x00111c76, 0);
+			debug_ram_byte_w(0x00111c79, 1);
+			debug_ram_byte_w(0x00111c96, 0);
+			debug_ram_byte_w(0x00111c97, 0);
+			static unsigned g = 0;
+			if (g++ < 4) logerror("simreg: C force read-gate OPEN @0x208218 t=%.4f\n", machine().time().as_double());
 		}
 	}
 	// SIM_REG_DEFER119A (opt-in, forcing probe): the SIM-registration ordering fix, step 1 (see
