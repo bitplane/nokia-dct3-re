@@ -1770,6 +1770,8 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		{
 			debug_ram_byte_w(0x00111c69, 1);   // SIM selected (0x119a handler gate 1 @0x208816)
 			debug_ram_byte_w(0x00111c7a, 0);   // 0x119a sub-guard (gate 2 @0x20881e) -> take proper handler 0x20797c
+			debug_ram_byte_w(0x00111c65, 1);   // task-21-wake guard: task 21 already activated (step A) -> 0x207704
+			                                   // skips the blocking 0x293a6a wake (@0x2077b8) and SELECTs directly
 			debug_ram_byte_w(0x00111c64, 0);   // no-SIM cleared (valid SIM detected)
 			for (int i = 0; i < 15; i++) m_simreg_saved[i] = getr(i);
 			m_simreg_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
@@ -2468,6 +2470,24 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (d++ < 20) logerror("simkick: APDU-send 0x27e98c hdr=%02x %02x %02x %02x %02x t=%.4f\n",
 				debug_ram_byte(buf), debug_ram_byte(buf+1), debug_ram_byte(buf+2),
 				debug_ram_byte(buf+3), debug_ram_byte(buf+4), machine().time().as_double());
+	}
+	// SIM_REG_BOOTSTRAP debugging: the code-2 reply to task 20. Detect handler 0x27e394 posts code-2 to
+	// task 20 via 0x26a95c (@0x27e96a). 0x293a6a (task-20 re-select wake) blocks on this reply; it must
+	// return 2 for 0x207704 to proceed to the SELECT. Trace the post + the reply 0x293a6a receives.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0026a95c
+			&& (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) == 0x14)
+	{
+		const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const u32 code = (r1 >= 0x00100000 && r1 < 0x00180000) ? (((debug_ram_byte(r1) << 8) | debug_ram_byte(r1 + 1)) & 0xffff) : 0xffff;
+		static unsigned d = 0;
+		if (d++ < 16) logerror("simkick: POST->task20 via 26a95c code=%04x caller=%08x t=%.4f\n",
+				code, m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00293a8e)
+	{
+		static unsigned d = 0;
+		if (d++ < 12) logerror("simkick: 0x293a6a reply code=%d t=%.4f\n",
+				int16_t(m_maincpu->state_int(arm7_cpu_device::ARM7_R4) & 0xffff), machine().time().as_double());
 	}
 	// SIM_REG_BOOTSTRAP debugging: task-20 read-continuation path after the re-posted 0x119a. 0x20797c =
 	// proper 0x119a handler; 0x207704 = re-init that issues the MF/DF SELECT; 0x2078f0 = the SELECT gate

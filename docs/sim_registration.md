@@ -224,3 +224,56 @@ past "Insert SIM card". Against this: GPT's milestone-2 argument (offline idle+m
 display-content-gated the same way) and the observation that the MMI VM is alive. **Whether a real
 firmware-driven registration reaches an interactive menu, or stalls at the same display wall, is the
 key open question** — best answered empirically once step 3 above produces real task-20 reads.
+
+## Scheduling deep-dive (5-pass) — the drive path corrected
+
+A second 5-pass sweep (2026-07-10) traced why the `SIM_REG_BOOTSTRAP` attempt (drive task 20
+via `0x207704`) stalls, and **redirected the whole approach**:
+
+- **The `0x293a6a`/code-2/`0x207704` path is a re-init detect-confirm, NOT the read driver.**
+  `0x293a6a` is one of a 25-caller task-20→task-21 **RPC family** (`0x293946/0x293a96/0x293fa0/…`):
+  post a SIM primitive to task 21, block on `0x26a458` for the paired reply. `0x207704` needs
+  reply `2`/`0x67`, then does only config reads (`0x20764c`→`0x200282`) and returns — it emits **no
+  `0x119x`**. So even a correct reply leaves task 20 with an empty read queue and gate `0x208218`
+  shut. (Confirmed.)
+- **The code-2 I saw from `0x27e394` is a red herring** — the SIM-present *status enum* (async
+  detect broadcast to task 20 via `0x26a95c`), numerically colliding with the reply value 2, not
+  task 21's paired RPC response. recv `0x26a458` is **unfiltered** (3-source priority scan: TCB+8
+  linked-list → ring#2 → ring#1), so routing isn't the issue; the non-wake was a timing/state
+  artifact — but moot, since this path doesn't drive reads.
+- **RTOS mechanics mapped:** recv `0x26a458` on current task `[0x100022]`; TCB `0x101484+task*0x1c`
+  (ring#1 `+0xc/+0x10/+0x11`, ring#2 `+0x14/+0x18/+0x19`, reply-list `+8`); MB `0x1093bc+task*0x10`
+  (`+0xd` state: 1=run/2=ready/4=blocked/5=ready; `+0xf` recv-arm). Posters wake **inline**
+  (`state←2` + `0x2699be` into ready-list `0x10004c` + reschedule `0x269acc`) iff target is state 4
+  at post time — **never** via `0x269bf4` (so a `0x269bf4` probe can't observe the wake). `0x26a204`
+  posts ring#1, `0x26a95c` posts ring#2.
+- **The real read engine (theory b, CONFIRMED):** task-20 codes `0x1195..0x11b4` (jump table
+  `0x2084dc`) write per-EF read descriptors (`[ctrl+0x34..0x3c]`) that gate `0x208218` services;
+  those codes are emitted **only** by the SIM-server commit `0x254b40` (`0x1199` producer `0x28fea6`
+  single-caller `0x254c1c`; siblings `0x11a7`=`0x290348`, `0x11a8`=`0x290314`).
+- **The missing trigger:** SIM-ready must propagate from task 21's detect **up** to the service
+  layer `0x245a84` (62 callers) → router `0x253d30` (populates session `0x110f1c` / table
+  `0x110413` / mask `0x1112f4`) → SIM-server task `0x2af630`/dispatcher `0x253e20` → commit
+  `0x254b40` (code `0x177b`, L). Our faked boot only did the low-level task-21↔task-20 code-2
+  handshake; it never broadcast SIM-ready to the app/SIM-server layer, so `0x253d30` never populates
+  the session and the commit never runs.
+
+### Corrected build direction
+Abandon driving task 20 through `0x207704`. **Keep** `SIM_REG_BOOTSTRAP` step A (independent
+task-21 activation — still valid, decouples the reset). Retarget the driver at the **SIM-server
+commit chain**:
+1. Propagate task 21's detect (status 0x16) as a SIM-ready event into the service layer `0x245a84`
+   / router `0x253d30` so it populates session `0x110f1c`.
+2. Trigger the SIM-server commit `0x254b40` (dispatcher `0x253e20`, code `0x177b`) so it emits the
+   `0x1199`/`0x11a7`/`0x11a8` read-enable family to task 20.
+3. Task-20 `0x2084dc` handlers write read descriptors → gate `0x208218` opens → task 20 issues
+   SELECT/READ → **the file-driven responder answers them.**
+
+Cheap decisive test before modelling the full chain: post `0x1199` (+`0x11a7`/`0x11a8`) to task 20
+directly and confirm the gate opens and reads flow into the responder. If yes, the task-20 read
+engine + responder are proven, and only the SIM-server-commit trigger (+`0x110f1c` populate)
+remains to model faithfully.
+
+New symbols: service dispatcher `0x245a84`, SIM-server task `0x2af630`, SIM-server dispatcher
+`0x253e20`, task-20 family jump table `0x2084dc`, read-descriptor gate `0x208218`, RPC family head
+`0x293a6a` (+ `0x293946/0x293a96/0x293fa0`), reply status enum path `0x27e394→0x27e960→0x26a95c`.
