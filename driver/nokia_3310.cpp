@@ -443,6 +443,8 @@ private:
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
 	uint16_t      m_sim_sel_file = 0;    // responder: file id last SELECTed (parsed from a0 a4 command)
+	unsigned      m_simreg_state = 0;    // SIM_REG_BOOTSTRAP ordering state machine
+	uint32_t      m_simreg_saved[16];    // R0..R14 + CPSR saved at a trampoline redirect
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	bool          m_post_charger_sequence_entered;
@@ -1732,6 +1734,60 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			return BX_R12;
 		}
 	}
+	// SIM_REG_BOOTSTRAP (opt-in): the ordering fix (docs/sim_registration.md). The premature 0x119a
+	// (producer 0x2904d4, task 17) reaches task 20 BEFORE task 21 has detected the SIM -> task 20's
+	// read-continuation diverts to the deadlock re-init 0x207704 (SIM-selected [0x111c69] still 0), and a
+	// late [0x111c69]=1 can't wake it (it's blocked mid-function). Fix: (A) redirect the premature 0x119a to
+	// SCHEDULE task 21 instead (post it the same wake template 0x293a6a uses), so it activates/detects
+	// independently; (B) at detect (0x27e394) set the SIM-present state and re-post 0x119a to task 20 -- now
+	// [0x111c69]==1, so task 20 proceeds and drives its OWN reads (answered by the file-driven responder).
+	if (nokia_env_u32("NOKI3210_SIM_REG_BOOTSTRAP", 0) != 0)
+	{
+		constexpr u32 SENT = 0x003ff100;
+		constexpr uint16_t BX_R12 = 0x4760, BX_LR = 0x4770;
+		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
+		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
+		// Step A: at the premature-0x119a producer, redirect -> post wake template 0x2e29f8 to task 21.
+		if (m_simreg_state == 0 && pc == addr && addr == 0x002904d4 && debug_ram_byte(0x00111c69) == 0)
+		{
+			for (int i = 0; i < 15; i++) m_simreg_saved[i] = getr(i);
+			m_simreg_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			setr(0, 0x15); setr(1, 0x002e29f8);   // task 21, wake template
+			setr(12, 0x0026a204 | 1); setr(14, SENT | 1);
+			m_simreg_state = 1;
+			logerror("simreg: A redirect premature 0x119a -> schedule task 21 t=%.4f\n", machine().time().as_double());
+			return BX_R12;
+		}
+		if (m_simreg_state == 1 && pc == addr && addr == SENT)
+		{
+			for (int i = 0; i < 15; i++) setr(i, m_simreg_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_simreg_saved[15]);
+			m_simreg_state = 2;
+			return BX_LR;   // return from 0x2904d4 to caller, skipping its 0x119a post to task 20
+		}
+		// Step B: at detect, mark SIM present + re-post 0x119a to task 20 (now it won't divert).
+		if (m_simreg_state == 2 && pc == addr && addr == 0x0027e394)
+		{
+			debug_ram_byte_w(0x00111c69, 1);   // SIM selected (0x119a handler gate 1 @0x208816)
+			debug_ram_byte_w(0x00111c7a, 0);   // 0x119a sub-guard (gate 2 @0x20881e) -> take proper handler 0x20797c
+			debug_ram_byte_w(0x00111c64, 0);   // no-SIM cleared (valid SIM detected)
+			for (int i = 0; i < 15; i++) m_simreg_saved[i] = getr(i);
+			m_simreg_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			setr(0, 0x14); setr(1, 0x002e2cd8);   // task 20, 0x119a template
+			setr(12, 0x0026a204 | 1); setr(14, SENT | 1);
+			m_simreg_state = 3;
+			logerror("simreg: B detect -> [111c69]=1, re-post 0x119a to task 20 t=%.4f\n", machine().time().as_double());
+			return BX_R12;
+		}
+		if (m_simreg_state == 3 && pc == addr && addr == SENT)
+		{
+			for (int i = 0; i < 15; i++) setr(i, m_simreg_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_simreg_saved[15]);
+			m_simreg_state = 4;
+			setr(12, 0x0027e394 | 1);
+			return BX_R12;   // resume the detect handler 0x27e394 normally
+		}
+	}
 	// SIM_REG_DEFER119A (opt-in, forcing probe): the SIM-registration ordering fix, step 1 (see
 	// docs/sim_registration.md). The premature message 0x119a (producer 0x2904d4, task 17) reaches task 20
 	// BEFORE the SIM is selected ([0x111c69]==1, set by 0x27dfc4 at read-complete) -> task 20's 0x119a
@@ -2412,6 +2468,23 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (d++ < 20) logerror("simkick: APDU-send 0x27e98c hdr=%02x %02x %02x %02x %02x t=%.4f\n",
 				debug_ram_byte(buf), debug_ram_byte(buf+1), debug_ram_byte(buf+2),
 				debug_ram_byte(buf+3), debug_ram_byte(buf+4), machine().time().as_double());
+	}
+	// SIM_REG_BOOTSTRAP debugging: task-20 read-continuation path after the re-posted 0x119a. 0x20797c =
+	// proper 0x119a handler; 0x207704 = re-init that issues the MF/DF SELECT; 0x2078f0 = the SELECT gate
+	// (needs [0x111c69]==1 AND 0x2038ec()!=1). Shows where task 20 stops before relaying a SELECT to task 21.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr &&
+			(addr == 0x0020797c || addr == 0x00207704))
+	{
+		static unsigned d = 0;
+		if (d++ < 12) logerror("simkick: task20 %s [111c69]=%02x [111c7a]=%02x t=%.4f\n",
+				addr == 0x0020797c ? "0x20797c(proper)" : "0x207704(reinit/SELECT)",
+				debug_ram_byte(0x00111c69), debug_ram_byte(0x00111c7a), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x002078f0)
+	{
+		static unsigned d = 0;
+		if (d++ < 12) logerror("simkick: SELECT-gate 0x2078f0 [111c69]=%02x t=%.4f\n",
+				debug_ram_byte(0x00111c69), machine().time().as_double());
 	}
 	// SIM read-complete decision 0x27ea88: reads no-SIM flag [0x111c64]; !=0 -> status 0x1f "Insert SIM";
 	// ==0 -> SIM-present handler 0x27dfc4 (which sets SIM-selected [0x111c69]=1). Logs the flag + branch so
