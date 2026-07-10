@@ -441,6 +441,7 @@ private:
 	uint8_t       m_sim_card_phase = 0;  // MODEL_SIM_CARD: 0=await ATR, 1=post-ATR (PPS/data)
 	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
+	bool          m_sim_t0_write_data = false; // T=0 outgoing-data phase: procedure ACK sent, awaiting body
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
 	uint16_t      m_sim_sel_file = 0;    // responder: file id last SELECTed (parsed from a0 a4 command)
 	unsigned      m_simreg_state = 0;    // SIM_REG_BOOTSTRAP ordering state machine
@@ -451,6 +452,19 @@ private:
 	uint32_t      m_ring2_msg[4] = {0};  // scratch ptrs of the messages queued to post to ring#2
 	unsigned      m_ring2_nmsg = 0;      // number of messages queued
 	bool          m_ring2_atr_resuming = false;  // per-reset re-entry guard for the ATR trampoline
+	bool          m_regcommit_done = false;      // MODEL_SIM_REG_COMMIT one-shot guard
+	unsigned      m_regcommit_state = 0;         // 0 idle, 1 await alloc, 2 in dispatcher, 3 await task-20 handling
+	uint32_t      m_regcommit_saved[16] = {0};   // R0..R14 + CPSR saved across trampoline hops
+	uint32_t      m_regcommit_session = 0;       // allocator-owned registration session probe
+	uint32_t      m_regcommit_resume = 0;        // interrupted firmware address restored after a probe pass
+	unsigned      m_regcommit_pass = 0;          // bounded commit-key dispatcher pass count
+	bool          m_regcommit_seen_1196 = false;
+	bool          m_regcommit_seen_1199 = false;
+	bool          m_regroute_done = false;       // MODEL_SIM_REG_ROUTE one-shot guard
+	unsigned      m_regroute_active = 0;         // 0 idle, 1 await allocator, 2 routing commit keys
+	uint32_t      m_regroute_saved[16] = {0};    // R0..R14 + CPSR across the route trampoline
+	uint32_t      m_regroute_session = 0;
+	unsigned      m_regroute_pass = 0;
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	bool          m_post_charger_sequence_entered;
@@ -810,6 +824,18 @@ void noki3310_state::machine_reset()
 	m_after_mad2_soft_reset = false;
 	m_svcresp_state = 0;
 	m_svcresp_msg = 0;
+	m_sim_t0_write_data = false;
+	m_regcommit_done = false;
+	m_regcommit_state = 0;
+	m_regcommit_session = 0;
+	m_regcommit_resume = 0;
+	m_regcommit_pass = 0;
+	m_regcommit_seen_1196 = false;
+	m_regcommit_seen_1199 = false;
+	m_regroute_done = false;
+	m_regroute_active = false;
+	m_regroute_session = 0;
+	m_regroute_pass = 0;
 	m_reports_idx = 0;
 	m_battery_startup_event_step = 0;
 	m_battery_startup_event_step_mode9 = 0;
@@ -1726,7 +1752,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			}
 			for (int i = 0; i < 15; i++) setr(i, m_simkick_saved[i]);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_simkick_saved[15]);
-			setr(12, 0x0027e394 | 1);
+			setr(12, 0x00270c8e | 1);
 			m_simkick_state = 3;
 			return BX_R12;
 		}
@@ -1778,15 +1804,29 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		{
 			debug_ram_byte_w(0x00111c69, 1);   // SIM selected
 			debug_ram_byte_w(0x00111c64, 0);   // no-SIM cleared (valid SIM detected)
+			const bool handshake1196 = nokia_env_u32("NOKI3210_MODEL_SIM_1196_HANDSHAKE", 0) != 0;
+			if (handshake1196)
+			{
+				// Let the detect handler post its asynchronous status before starting the
+				// nested 0x1196 RPC. Otherwise that unfiltered status can satisfy the RPC wait.
+				m_simreg_state = 5;
+				logerror("simreg: B detect -> [111c69]=1, defer isolated 0x1196 until status post t=%.4f\n",
+						machine().time().as_double());
+			}
+			else
+			{
 			constexpr u32 SC1 = 0x0017fa00, SC2 = 0x0017fa40;
 			for (offs_t i = 0; i < 0x20; i++) { debug_ram_byte_w(SC1 + i, 0); debug_ram_byte_w(SC2 + i, 0); }
 			for (int i = 0; i < 15; i++) m_simreg_saved[i] = getr(i);
 			m_simreg_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			setr(0, SC1); setr(1, SC2);           // 0x28fea6(word0, word1) -> posts 0x1199 to task 20
-			setr(12, 0x0028fea6 | 1); setr(14, SENT | 1);
+			setr(0, SC1); setr(1, SC2);
+			setr(12, 0x0028fea6 | 1);
+			setr(14, SENT | 1);
 			m_simreg_state = 3;
-			logerror("simreg: B detect -> [111c69]=1, post 0x1199 to task 20 t=%.4f\n", machine().time().as_double());
+			logerror("simreg: B detect -> [111c69]=1, post 0x1199 to task 20 t=%.4f\n",
+					machine().time().as_double());
 			return BX_R12;
+			}
 		}
 		if (m_simreg_state == 3 && pc == addr && addr == SENT)
 		{
@@ -1796,11 +1836,38 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			setr(12, 0x0027e394 | 1);
 			return BX_R12;   // resume the detect handler 0x27e394 normally
 		}
+		// Isolated contract probe: task 20 reaches 0x208868 after consuming the detect
+		// status posted at 0x27e96a. Starting here both removes that code 2 from its
+		// unfiltered receive queues and precedes unrelated queued task-20 work.
+		if (m_simreg_state == 5 && pc == addr && addr == 0x00208868)
+		{
+			constexpr u32 SC1 = 0x0017fa00, SC2 = 0x0017fa40;
+			for (offs_t i = 0; i < 0x20; i++) { debug_ram_byte_w(SC1 + i, 0); debug_ram_byte_w(SC2 + i, 0); }
+			for (int i = 0; i < 15; i++) m_simreg_saved[i] = getr(i);
+			m_simreg_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			setr(0, SC1); setr(1, SC2);
+			setr(12, 0x002902ac | 1); setr(14, SENT | 1);
+			m_simreg_state = 6;
+			logerror("simreg: B status posted -> isolated 0x1196 to task 20 t=%.4f\n",
+					machine().time().as_double());
+			return BX_R12;
+		}
+		if (m_simreg_state == 6 && pc == addr && addr == SENT)
+		{
+			for (int i = 0; i < 15; i++) setr(i, m_simreg_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_simreg_saved[15]);
+			m_simreg_state = 7;
+			setr(12, 0x00208868 | 1);
+			return BX_R12;
+		}
 		// Step C (drive test): once SIM is selected, force task 20's read-enable gate OPEN at its gate-top
 		// 0x208218 (5 conds: [0x111c76]==0, [0x111c79]==1, [0x111c96]==0, [0x111c97]==0) so it enters its
 		// read phases 0x201a3a and issues its OWN SELECT/READ sequence into the file-driven responder.
 		// This bypasses the SIM-server commit for the test; if reads flow, read engine + responder are proven.
-		if (m_simreg_state >= 3 && pc == addr && addr == 0x00208218 && debug_ram_byte(0x00111c69) == 1)
+		if (m_simreg_state >= 3 && pc == addr && addr == 0x00208218 && debug_ram_byte(0x00111c69) == 1 &&
+				nokia_env_u32("NOKI3210_MODEL_SIM_REG_COMMIT", 0) == 0 &&
+				nokia_env_u32("NOKI3210_MODEL_SIM_REG_ROUTE", 0) == 0 &&
+				nokia_env_u32("NOKI3210_MODEL_SIM_1196_HANDSHAKE", 0) == 0)
 		{
 			debug_ram_byte_w(0x00111c76, 0);
 			debug_ram_byte_w(0x00111c79, 1);
@@ -2167,15 +2234,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			char hex[128]; int n = 0;
 			for (u32 i = 0; i < len && i < 32; i++) n += std::snprintf(hex + n, sizeof(hex) - n, "%02x ", debug_ram_byte(buf + i));
 			const uint8_t ins = len >= 2 ? debug_ram_byte(buf + 1) : 0;
-			if (len >= 2) m_sim_last_ins = ins;   // FS responder: remember for the T=0 procedure-byte echo
-			m_sim_last_cmdlen = uint8_t(std::min<u32>(len, sizeof(m_sim_last_cmd)));  // FS responder: full command
-			for (unsigned i = 0; i < m_sim_last_cmdlen; i++) m_sim_last_cmd[i] = debug_ram_byte(buf + i);
+			if (!m_sim_t0_write_data)
+			{
+				if (len >= 2) m_sim_last_ins = ins;   // FS responder: remember for the T=0 procedure-byte echo
+				m_sim_last_cmdlen = uint8_t(std::min<u32>(len, sizeof(m_sim_last_cmd)));  // full command header
+				for (unsigned i = 0; i < m_sim_last_cmdlen; i++) m_sim_last_cmd[i] = debug_ram_byte(buf + i);
+			}
 			// responder: track the SELECTed file id (a0 a4 00 00 02 <hi> <lo>) so GET_RESPONSE/READ answer
 			// the RIGHT file. This is what makes the responder file-driven rather than single-EF.
 			if (ins == 0xa4 && len >= 7)
 				m_sim_sel_file = uint16_t((debug_ram_byte(buf + 5) << 8) | debug_ram_byte(buf + 6));
 			m_sim_card_pending = true;   // MODEL_SIM_CARD: this command now awaits exactly one response
-			const char *name = ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
+			const char *name = m_sim_t0_write_data ? "T0_WRITE_DATA" : ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
 							 : ins == 0xb2 ? "READ_RECORD" : ins == 0x20 ? "VERIFY_CHV" : ins == 0xf2 ? "STATUS" : "?";
 			static unsigned ap = 0;
 			if (ap++ < 60)
@@ -2257,13 +2327,30 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				&& (m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x2701)
 		{
 			uint8_t data[48]; unsigned n = 0;
+			uint8_t response_code = 9;
 			// Firmware-driven SELECT is a 5-byte header (a0 a4 00 00 02) with the file id in the T=0 descriptor
 			// 0x10deec (+0xa..0xb), NOT inline in the command -- track it from there so the responder answers
 			// the RIGHT file. (The injection put the id inline; the firmware puts it in the descriptor.)
 			if (m_sim_last_ins == 0xa4)
 				m_sim_sel_file = uint16_t((debug_ram_byte(0x0010deec + 0xa) << 8) | debug_ram_byte(0x0010deec + 0xb));
-			if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)          // PPS request: echo verbatim
+			if (m_sim_t0_write_data)
+			{
+				// The procedure byte caused the terminal to transmit the command body.
+				// Complete that same command with SW1/SW2; do not interpret body bytes as a new APDU.
+				data[n++] = 0x90; data[n++] = 0x00;
+				response_code = 0x0a; // RX handler classification for SW1=0x90
+				m_sim_t0_write_data = false;
+			}
+			else if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)     // PPS request: echo verbatim
 				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
+			else if (m_sim_last_ins == 0x24)
+			{
+				// CHANGE CHV carries Lc bytes from terminal to card. T=0 requires a
+				// procedure-byte exchange before that data, with status returned afterward.
+				data[n++] = m_sim_last_ins;
+				response_code = 0x0b; // RX handler classification for a procedure byte
+				m_sim_t0_write_data = true;
+			}
 			else
 			{
 				const u16 fid = m_sim_sel_file ? m_sim_sel_file : uint16_t(nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07));
@@ -2301,18 +2388,187 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			}
 			m_ring2_nmsg = 0;
 			const uint8_t ack = 7; queue(7, &ack, 0);   // send-accepted ACK for 0x27e98c's recv
-			queue(9, data, n);                          // data response for the pump
+			queue(response_code, data, n);              // RX-handler-classified response for the pump
 			m_sim_card_pending = false;
 			for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
 			m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			m_ring2_resume = 0;   // resume by returning to 0x27e98c's caller (BX lr)
+			m_ring2_resume = 0;
 			setr(0, 0x15); setr(1, m_ring2_msg[0]);
 			setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
 			m_ring2_state = 1;
 			static unsigned rc = 0;
-			if (rc++ < 40) logerror("sim_card: RING2 reply ins=%02x -> ACK+%u-byte code9 t=%.4f\n",
-					m_sim_last_ins, n, machine().time().as_double());
+			if (rc++ < 80) logerror("sim_card: RING2 reply ins=%02x fid=%04x -> ACK+%u-byte code%u t=%.4f\n",
+					m_sim_last_ins, m_sim_sel_file, n, response_code, machine().time().as_double());
 			return BX_R12;
+		}
+	}
+	// MODEL_SIM_REG_COMMIT (opt-in isolation probe): populate the registration-session globals and
+	// invoke the normal task-5 dispatcher for the commit key family. These cases reach SIM-server
+	// commit 0x254bb4 and emit the genuine 0x1196/0x1199 pair to task 20. This bypasses
+	// task-5 mailbox delivery only, separating commit/session validity from the blocked MMI handoff.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 &&
+			nokia_env_u32("NOKI3210_MODEL_SIM_REG_COMMIT", 0) != 0)
+	{
+		constexpr u32 SENT_ALLOC = 0x003ff400;
+		constexpr u32 SENT_DISPATCH = 0x003ff410;
+		constexpr uint16_t BX_R12 = 0x4760;
+		constexpr u32 COMMIT_KEYS[] = { 0x1770, 0x1584, 0x1583, 0x1582, 0x1581, 0x1580, 0x157f, 0x157e, 0x157d };
+		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
+		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
+
+		if (m_regcommit_state == 1 && pc == addr && addr == SENT_ALLOC)
+		{
+			m_regcommit_session = getr(0);
+			if (m_regcommit_session < 0x00100000 || m_regcommit_session >= 0x00180000)
+			{
+				m_regcommit_state = 0;
+				logerror("simreg_commit: session allocation failed (%08x)\n", m_regcommit_session);
+				return std::nullopt;
+			}
+			for (offs_t i = 0; i < 0x14; i++)
+				debug_ram_byte_w(m_regcommit_session + i, 0);
+			// Registration commit reads its two session words from these globals.
+			fw_word_w(0x00110f1c, uint16_t(m_regcommit_session >> 16));
+			fw_word_w(0x00110f1e, uint16_t(m_regcommit_session));
+			fw_word_w(0x00110f20, uint16_t(m_regcommit_session >> 16));
+			fw_word_w(0x00110f22, uint16_t(m_regcommit_session));
+			m_regcommit_pass = 0;
+			m_regcommit_seen_1196 = false;
+			m_regcommit_seen_1199 = false;
+			setr(0, COMMIT_KEYS[m_regcommit_pass]);
+			setr(12, 0x00253e20 | 1);          // task5_status_handler_g(state_key)
+			setr(14, SENT_DISPATCH | 1);
+			m_regcommit_state = 2;
+			return BX_R12;
+		}
+
+		if (m_regcommit_state == 2 && pc == addr && addr == SENT_DISPATCH)
+		{
+			m_regcommit_pass++;
+			for (int i = 0; i < 15; i++)
+				setr(i, m_regcommit_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_regcommit_saved[15]);
+			const bool finished = (m_regcommit_seen_1196 && m_regcommit_seen_1199) ||
+					m_regcommit_pass >= std::size(COMMIT_KEYS);
+			m_regcommit_state = finished ? 0 : 3;
+			setr(12, m_regcommit_resume | 1);
+			logerror("simreg_commit: dispatcher pass=%u session=%08x seen1196=%u seen1199=%u%s t=%.4f\n",
+					m_regcommit_pass, m_regcommit_session, m_regcommit_seen_1196,
+					m_regcommit_seen_1199, finished ? " finished" : " awaiting task20",
+					machine().time().as_double());
+			return BX_R12;
+		}
+
+		// Let task 20 consume the previous stage's message before advancing the commit state machine.
+		if (m_regcommit_state == 3 && pc == addr && addr == 0x00208868)
+		{
+			for (int i = 0; i < 15; i++)
+				m_regcommit_saved[i] = getr(i);
+			m_regcommit_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			m_regcommit_resume = addr;
+			setr(0, COMMIT_KEYS[m_regcommit_pass]);
+			setr(12, 0x00253e20 | 1);
+			setr(14, SENT_DISPATCH | 1);
+			m_regcommit_state = 2;
+			logerror("simreg_commit: task20 completed stage; dispatching key=%04x pass=%u t=%.4f\n",
+					COMMIT_KEYS[m_regcommit_pass], m_regcommit_pass + 1, machine().time().as_double());
+			return BX_R12;
+		}
+
+		// Trigger on the re-entered SIM-detected handler. SIM_REG_BOOTSTRAP uses the first entry and
+		// trampolines back here; on re-entry its state is already advanced, so this block can queue the
+		// registration event while task 5 is blocked in recv. A time-gated task-5 fetch is unreliable
+		// because the function body may already be in the CPU's fetch cache.
+		if (!m_regcommit_done && m_regcommit_state == 0 && pc == addr && addr == 0x0027e394)
+		{
+			m_regcommit_done = true;
+			for (int i = 0; i < 15; i++)
+				m_regcommit_saved[i] = getr(i);
+			m_regcommit_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			m_regcommit_resume = addr;
+			setr(0, 0x14);
+			setr(12, 0x0026afe0 | 1);
+			setr(14, SENT_ALLOC | 1);
+			m_regcommit_state = 1;
+			return BX_R12;
+		}
+	}
+	// MODEL_SIM_REG_ROUTE: retag one redundant task-5 render status as registration-start while task 5
+	// is active. Its firmware helper, queue, descriptor expansion, session allocation and dispatch run.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 &&
+			nokia_env_u32("NOKI3210_MODEL_SIM_REG_ROUTE", 0) != 0)
+	{
+		constexpr u32 SENT_ALLOC = 0x003ff420;
+		constexpr uint16_t BX_R12 = 0x4760;
+		constexpr u32 COMMIT_KEYS[] = { 0x1770, 0x1584, 0x1583, 0x1582, 0x1581, 0x1580, 0x157f, 0x157e, 0x157d };
+		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
+		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
+
+		if (m_regroute_active == 1 && pc == addr && addr == SENT_ALLOC)
+		{
+			m_regroute_session = getr(0);
+			if (m_regroute_session < 0x00100000 || m_regroute_session >= 0x00180000)
+			{
+				m_regroute_active = 0;
+				logerror("simreg_route: firmware session allocation failed (%08x)\n", m_regroute_session);
+				return std::nullopt;
+			}
+			for (offs_t i = 0; i < 0x14; i++)
+				debug_ram_byte_w(m_regroute_session + i, 0);
+			fw_word_w(0x00110f1c, uint16_t(m_regroute_session >> 16));
+			fw_word_w(0x00110f1e, uint16_t(m_regroute_session));
+			fw_word_w(0x00110f20, uint16_t(m_regroute_session >> 16));
+			fw_word_w(0x00110f22, uint16_t(m_regroute_session));
+			for (int i = 0; i < 15; i++)
+				setr(i, m_regroute_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_regroute_saved[15]);
+			setr(0, COMMIT_KEYS[0]);
+			setr(12, 0x00253e20 | 1);
+			m_regroute_pass = 1;
+			m_regroute_active = 3;
+			logerror("simreg_route: firmware session=%08x; dispatching key=1770 t=%.4f\n",
+					m_regroute_session, machine().time().as_double());
+			return BX_R12;
+		}
+
+		if (m_regroute_active == 3 && pc == addr && addr == 0x00253e20)
+		{
+			m_regroute_active = 2;
+		}
+		else if (m_regroute_active == 2 && pc == addr && addr == 0x00253e20 &&
+				m_regroute_pass < std::size(COMMIT_KEYS))
+		{
+			setr(0, COMMIT_KEYS[m_regroute_pass]);
+			logerror("simreg_route: task5 routed commit key=%04x pass=%u t=%.4f\n",
+					COMMIT_KEYS[m_regroute_pass], m_regroute_pass + 1, machine().time().as_double());
+			m_regroute_pass++;
+			if (m_regroute_pass == std::size(COMMIT_KEYS))
+				m_regroute_active = 0;
+		}
+
+		if (m_regroute_done && m_regroute_active == 0 && m_regroute_pass == 0 &&
+				pc == addr && addr == 0x00253e20 &&
+				((m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff) == 0x1770 ||
+				 (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff) == 0x1774))
+		{
+			for (int i = 0; i < 15; i++)
+				m_regroute_saved[i] = getr(i);
+			m_regroute_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			setr(0, 0x14);
+			setr(12, 0x0026afe0 | 1);
+			setr(14, SENT_ALLOC | 1);
+			m_regroute_active = 1;
+			return BX_R12;
+		}
+
+		if (!m_regroute_done && pc == addr && addr == 0x002af798 &&
+				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff) == 0x05e2 &&
+				machine().time().as_double() >= 0.78)
+		{
+			m_regroute_done = true;
+			setr(0, 0x1770);
+			logerror("simreg_route: retagged task-5 generated status 0x05e2 -> 0x1770 t=%.4f\n",
+					machine().time().as_double());
 		}
 	}
 	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
@@ -2720,17 +2976,103 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	}
 	// REGCHAIN keystones (under TRACE_SIMKICK). Gate 0x208218 opens only when ENABLE [0x111c79]==1, set solely
-	// by task-20 reply handler 0x20733c on messages 0x1196/0x1199 -- emitted ONLY by SIM-server commit 0x254b40.
-	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00254b40)
+	// by task-20 reply handler 0x20733c on messages 0x1196/0x1199 -- emitted by SIM-server commit 0x254bb4.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00254bb4)
 	{
 		static unsigned c = 0;
-		if (c++ < 8) logerror("simkick: SIM-server COMMIT 0x254b40 RUNS (emits 0x1196/0x1199) session=%08x t=%.4f\n",
+		if (c++ < 8) logerror("simkick: SIM-server COMMIT 0x254bb4 RUNS (emits 0x1196/0x1199) session=%08x t=%.4f\n",
 				debug_ram_word(0x00110f1c), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr &&
+			(addr == 0x00290314 || addr == 0x00290348 || addr == 0x002902e4 ||
+			 addr == 0x002900a0 || addr == 0x0028fea6 || addr == 0x00290250 ||
+			 addr == 0x00290280 || addr == 0x002902ac))
+	{
+		if (m_regcommit_state == 2)
+		{
+			m_regcommit_seen_1199 |= addr == 0x0028fea6;
+			m_regcommit_seen_1196 |= addr == 0x002902ac;
+		}
+		static unsigned c = 0;
+		if (c++ < 40)
+			logerror("simkick: commit producer %08x%s t=%.4f\n", addr,
+					addr == 0x0028fea6 ? " (0x1199)" : addr == 0x002902ac ? " (0x1196)" : "",
+					machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0020733c)
 	{
 		static unsigned c = 0;
 		if (c++ < 8) logerror("simkick: ENABLE-setter 0x20733c reached ([111c79]<-1) t=%.4f\n", machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr &&
+			(addr == 0x002af6ea || addr == 0x002af798 || addr == 0x002aee84))
+	{
+		static unsigned c = 0;
+		if (c++ < 200)
+		{
+			if (addr == 0x002aee84)
+				logerror("simkick: task5 session-populate [110f1c+%u] <- %08x caller=%08x t=%.4f\n",
+						unsigned(m_maincpu->state_int(arm7_cpu_device::ARM7_R1) - 0x00110f1c),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+			else
+				logerror("simkick: task5 %s status=%04x argc=%u caller=%08x t=%.4f\n",
+						addr == 0x002af6ea ? "post" : "generate",
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff,
+						(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) >> 14) & 3,
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00253e20)
+	{
+		static unsigned c = 0;
+		if (c++ < 200)
+			logerror("simkick: task5 dispatcher-g status=%04x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff, machine().time().as_double());
+	}
+	// 0x1196 handshake contract: producer inputs -> task-20 handler -> A0 24 RPC reply -> ENABLE.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr &&
+			(addr == 0x002902ac || addr == 0x00207234 || addr == 0x00293f30 ||
+			 addr == 0x00293fae || addr == 0x0020723e))
+	{
+		auto dump = [&](u32 p, unsigned n, char *out, size_t cap) {
+			size_t used = 0;
+			if (p < 0x00100000 || p + n > 0x00180000)
+			{
+				std::snprintf(out, cap, "<%08x>", p);
+				return;
+			}
+			for (unsigned i = 0; i < n && used + 4 < cap; i++)
+				used += std::snprintf(out + used, cap - used, "%02x%s", debug_ram_byte(p + i), i + 1 == n ? "" : " ");
+		};
+		char a[160] = {}, b[160] = {};
+		const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		if (addr == 0x002902ac)
+		{
+			dump(r0, 16, a, sizeof(a)); dump(r1, 16, b, sizeof(b));
+			logerror("sim1196: producer inputs p0=%08x [%s] p1=%08x [%s] t=%.4f\n",
+					r0, a, r1, b, machine().time().as_double());
+		}
+		else if (addr == 0x00207234)
+		{
+			dump(r0, 24, a, sizeof(a)); dump(r1, 24, b, sizeof(b));
+			logerror("sim1196: handler enter r0=%08x [%s] r1=%08x [%s] t=%.4f\n",
+					r0, a, r1, b, machine().time().as_double());
+		}
+		else if (addr == 0x00293f30)
+		{
+			dump(r0, 24, a, sizeof(a)); dump(r1, 24, b, sizeof(b));
+			logerror("sim1196: rpc A024 enter p0=%08x [%s] p1=%08x [%s] mode=%u t=%.4f\n",
+					r0, a, r1, b, m_maincpu->state_int(arm7_cpu_device::ARM7_R2), machine().time().as_double());
+		}
+		else if (addr == 0x00293fae)
+		{
+			dump(r0, 16, a, sizeof(a));
+			logerror("sim1196: rpc recv msg=%08x [%s] t=%.4f\n", r0, a, machine().time().as_double());
+		}
+		else
+			logerror("sim1196: handler rpc returned %d t=%.4f\n", int16_t(r0), machine().time().as_double());
 	}
 	// Task-21 SIM main-loop counter check 0x27eff8 (ldr r0,[sp]; cmp #4; bge completion). Does the reset/ATR
 	// retry counter ever ADVANCE toward 4 (=> completion 0x27f064 -> 0x27ea88), or is it pinned below 4 forever?

@@ -278,6 +278,32 @@ New symbols: service dispatcher `0x245a84`, SIM-server task `0x2af630`, SIM-serv
 `0x253e20`, task-20 family jump table `0x2084dc`, read-descriptor gate `0x208218`, RPC family head
 `0x293a6a` (+ `0x293946/0x293a96/0x293fa0`), reply status enum path `0x27e394→0x27e960→0x26a95c`.
 
+### Commit dispatcher key map (runtime-confirmed)
+
+The commit is a family of separate `0x253e20` cases, not one straight-line handler. Each case
+returns through the shared epilogue `0x255fc2`. The ordered keys are `0x1770` (setup), then
+`0x1584..0x157d` descending. The latter map to producers `0x290314`, `0x290348`, `0x2902e4`,
+`0x2900a0`, `0x28fea6` (**0x1199**), `0x290250`, `0x290280`, and `0x2902ac`
+(**0x1196**). An opt-in dispatcher probe ran all nine cases while yielding to task 20 between
+them; both genuine producer entries and both task-20 receives were observed.
+
+### Task-5 routed commit and EF-list rerun (forced probes only)
+
+`MODEL_SIM_REG_ROUTE` replaces one redundant in-flight task-5 `0x05e2` generated status with the
+registration start, then keeps execution in task 5. The normal rewrite changes it to `0x1774`, so
+the route shim allocates the 0x14-byte session through firmware allocator `0x26afe0`, populates the
+mapped session globals `0x110f1c/0x110f20`, and substitutes the confirmed commit keys at successive
+real `0x253e20` invocations. This force-calls the real `0x28fea6`/`0x2902ac` producer functions,
+but it does not demonstrate a natural registration session reaching them. Both this route shim and
+`MODEL_SIM_REG_COMMIT` replay the hard-coded key family. They are isolation probes, not registration
+models, and neither settles the boot loop or composes with the EF-read run below.
+
+The downstream EF profile was rerun separately with the normal SIM bootstrap and ring-2 responder.
+Task 20 issued firmware SELECT and READ_BINARY commands; the multi-file responder tracked selected
+file `EA00` and returned its configured 18-byte body plus `9000`. The two runs are separate because
+executing the commit family before SIM reset changes task scheduling; integrating their ordering is
+the next cleanup target, not part of the responder/EF-list proof.
+
 ## BREAKTHROUGH — firmware-driven APDUs, and the ring#2-delivery fix (2nd 5-pass)
 
 A third 5-pass sweep cracked the "task 21 doesn't serve task-20 commands" wall and produced the
@@ -310,11 +336,12 @@ emits **uninjected firmware-driven APDUs**: `a0 2c`, `a0 f2` STATUS, `a0 a4 00 0
 never drained and the wake/arm state (`MB[+0xd]` wait, `MB[+0xf]` arm) desyncs — task-20 ring#1
 commands strand. Also **`0x2aec34` is only a trace trampoline** (to `0x2b13a2`); the real APDU-out
 is `0x2a02e6`/byte-engine `0x2a0268` on SIM-UART MMIO **`0x020000`**, and genuine card responses
-arrive via RX-complete handler **`0x2a0454` → `0x26aac0(0x15) → RING#2`** as code **5** (ATR) /
-code **9** (data).
+arrive via RX-complete handler **`0x2a0454` → `0x26aac0(0x15) → RING#2`**. The handler classifies
+ATR as code **5**, an ordinary buffered receive as **9**, a T=0 procedure byte as **0x0b**, and a
+terminal status beginning `6x`/`9x` as **0x0a**.
 
 **THE FIX:** deliver ATR/responses by **posting the response message to task 21's ring#2 via the
-real poster `0x26aac0(0x15, msg)`** (`{[+2]=len, [+4]=5|9, [+5..]=card bytes}`) and let the
+real poster `0x26aac0(0x15, msg)`** (`{[+2]=len, [+4]=rx classification, [+5..]=card bytes}`) and let the
 firmware's own recv run **unmodified**. Then ring#2 (responses) and ring#1 (task-20 commands) drain
 in priority order coherently, the arm-bit is maintained by the real recv, and no re-arm hack is
 needed. The most faithful variant drives the `0x020000` SIM-UART MMIO so `0x2a0454` emits the
@@ -330,3 +357,35 @@ needed. The most faithful variant drives the `0x020000` SIM-UART MMIO so `0x2a04
 
 Reply target = task 20 via `0x26a95c` (ring#2); transport id `0x127`; SW at `rx[len]/rx[len+1]`.
 Async statuses (0x15 ATR / 0x16 detect / 0x1e err / 0x1f no-SIM) use the same path with no payload.
+
+## Step 7 complete — coherent 0x1196 / CHANGE CHV handshake
+
+The isolated `NOKI3210_MODEL_SIM_1196_HANDSHAKE` probe starts only after task 20 has consumed task
+21's asynchronous SIM-present code `2`. This ordering matters because `0x26a458` is unfiltered:
+starting at detect-handler entry allowed that unrelated status to steal `0x293522`'s nested RPC wait
+and produced a false-positive ENABLE write.
+
+With the stale status removed first, the responder exposed the real failure: it returned procedure
+byte and status together (`24 90 00`) as code 9. `A0 24` is an outgoing-data T=0 command and requires
+three phases:
+
+1. Terminal sends `A0 24 00 01 10`.
+2. Card returns procedure byte `24`, classified by the real RX handler as mailbox code `0x0b`.
+3. Terminal sends the 16-byte body; card returns `90 00`, classified as code `0x0a`.
+
+The ring-2 responder now models those phases. Two repeat runs produced the same causal trace:
+
+```text
+task20 recv 1196 -> 0x207234 -> 0x293f30
+sim_apdu: [ a0 24 00 01 10 ]
+task21 recv code=0b
+sim_apdu: T0_WRITE_DATA len=16
+task21 recv code=0a; SW1=90
+0x27e96a posts code=2 -> 0x2935c8 reposts the paired reply
+0x293f30 returns 2
+pc=0x20733c writes [0x111c79] = 1
+```
+
+This completes the step-7 transport/handler contract. It does **not** prove the upstream SIM-server
+registration route: the probe still invokes the genuine `0x2902ac` producer with isolated scratch
+inputs. Organic session population and producer scheduling remain the next layer.
