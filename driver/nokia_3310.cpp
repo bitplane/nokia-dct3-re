@@ -450,7 +450,7 @@ private:
 	uint32_t      m_ring2_resume = 0;    // address to resume after the ring#2 posts complete
 	uint32_t      m_ring2_msg[4] = {0};  // scratch ptrs of the messages queued to post to ring#2
 	unsigned      m_ring2_nmsg = 0;      // number of messages queued
-	bool          m_ring2_atr_done = false;
+	bool          m_ring2_atr_resuming = false;  // per-reset re-entry guard for the ATR trampoline
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	bool          m_post_charger_sequence_entered;
@@ -2223,24 +2223,32 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (resume) { setr(12, resume | 1); return BX_R12; }
 			return BX_LR;   // resume by returning to the trigger's caller (restored LR)
 		}
-		// ATR trigger: at the SIM reset 0x27e024, queue a code-5 ATR message to ring#2, then resume the reset.
-		if (m_ring2_state == 0 && !m_ring2_atr_done && pc == addr && addr == 0x0027e024)
+		// ATR trigger: on EVERY SIM reset 0x27e024, queue a code-5 ATR message to ring#2, then resume the
+		// reset. The firmware may reset/retry; each reset must get a fresh ATR. m_ring2_atr_resuming is the
+		// per-reset re-entry guard: when we BX back to 0x27e024 after the post, fall through (real reset runs).
+		if (pc == addr && addr == 0x0027e024)
 		{
-			uint8_t atr[16]; unsigned an = 0;
-			if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
-				for (const char *q = hex; q[0] && q[1] && an < sizeof(atr); q += 2)
-					atr[an++] = uint8_t(std::strtoul(std::string(q, 2).c_str(), nullptr, 16));
-			if (an == 0) { atr[0] = 0x3b; atr[1] = 0x10; atr[2] = 0x05; an = 3; }
-			m_ring2_nmsg = 0; queue(5, atr, an);
-			m_ring2_atr_done = true;
-			for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
-			m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			m_ring2_resume = 0x0027e024;   // resume the reset (atr_done guards re-fire)
-			setr(0, 0x15); setr(1, m_ring2_msg[0]);
-			setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
-			m_ring2_state = 1;
-			logerror("sim_card: RING2 queued ATR (%u bytes) -> task21 ring#2 t=%.4f\n", an, machine().time().as_double());
-			return BX_R12;
+			if (m_ring2_atr_resuming)
+				m_ring2_atr_resuming = false;   // resume re-entry: let the real reset instruction run
+			else if (m_ring2_state == 0)
+			{
+				uint8_t atr[16]; unsigned an = 0;
+				if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
+					for (const char *q = hex; q[0] && q[1] && an < sizeof(atr); q += 2)
+						atr[an++] = uint8_t(std::strtoul(std::string(q, 2).c_str(), nullptr, 16));
+				if (an == 0) { atr[0] = 0x3b; atr[1] = 0x10; atr[2] = 0x05; an = 3; }
+				m_ring2_nmsg = 0; queue(5, atr, an);
+				for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
+				m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+				m_ring2_resume = 0x0027e024;   // resume the reset (m_ring2_atr_resuming guards re-fire)
+				m_ring2_atr_resuming = true;
+				setr(0, 0x15); setr(1, m_ring2_msg[0]);
+				setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
+				m_ring2_state = 1;
+				static unsigned ac = 0;
+				if (ac++ < 8) logerror("sim_card: RING2 queued ATR (%u bytes) -> task21 ring#2 t=%.4f\n", an, machine().time().as_double());
+				return BX_R12;
+			}
 		}
 		// Response trigger: at the command capture 0x2aec34 (already recorded above), queue the paired reply
 		// to ring#2 -- an ACK (code 7, read by 0x27e98c's own recv 0x27e9ce) then the data response (code 9,
@@ -2249,6 +2257,11 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				&& (m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x2701)
 		{
 			uint8_t data[48]; unsigned n = 0;
+			// Firmware-driven SELECT is a 5-byte header (a0 a4 00 00 02) with the file id in the T=0 descriptor
+			// 0x10deec (+0xa..0xb), NOT inline in the command -- track it from there so the responder answers
+			// the RIGHT file. (The injection put the id inline; the firmware puts it in the descriptor.)
+			if (m_sim_last_ins == 0xa4)
+				m_sim_sel_file = uint16_t((debug_ram_byte(0x0010deec + 0xa) << 8) | debug_ram_byte(0x0010deec + 0xb));
 			if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)          // PPS request: echo verbatim
 				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
 			else
