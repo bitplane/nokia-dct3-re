@@ -66,8 +66,20 @@ then draw-time content.
 ```
 available(id) = [0x11fee4] != 0
               AND  ( masktable[class & 7] )  bit-set-in  [0x11ff08 + (class>>3)]
-  where class = id>>8, masktable @ 0x2e2f5c = {40,80,10,20,04,08,01,02} (permuted)
+  where class = id>>8, masktable @ 0x2e2f5c
 ```
+
+**Correction (2026-07): the mask table is a swap16 trap.** The swap16-image bytes at
+`0x2e2f5c` read `{40,80,10,20,04,08,01,02}` and earlier notes recorded that as a
+"permuted" table. But the firmware indexes it with `ldrb`, which reads the *real* rom
+byte `image[addr ^ 1]`, so the table the firmware actually sees is a clean descending
+`masktable = {0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01} = 0x80 >> (class & 7)`. This was
+confirmed at runtime: with `[0x11fee4]=1` and the class-`0x4c` bitmap byte `[0x11ff11]`
+holding bit `0x04`, `available(0x4c22)` returned **0** — because the real mask for class
+`0x4c` (`class&7=4`) is `0x08`, not `0x04`. Correcting the bit to `0x08` makes
+`available(0x4c22)=1` and the idle window acquires. Any blob built from the permuted
+table enables the *wrong* classes (e.g. the old sparse blob byte9=`0x06`/byteA=`0x51`
+enabled `{0x4d,0x4e,0x51,0x53,0x57}`, never the intended `{0x4c,0x4f,0x50,0x52,0x56}`).
 
 The bitmap `[0x11ff08..0x11ff10]` + `[0x11fee8..]` is written **only** by the registrar:
 

@@ -471,3 +471,46 @@ richer screen is the idle-window/content **resource acquisition** — the known
 than a forced experiment. Diagnostic knob (curated, opt-in, log-only): `NOKI3210_TRACE_MMIVM`
 (`display_idle` entry, `resource-get(0x4c22)` result, event dequeue histogram / late-event
 cadence).
+
+## Resource-enable dig (2026-07): a swap16 mask-table bug — and the natural idle draw now proven to blank on content
+
+Followed the `resource-get(0x4c22)` failure into the resource-enable machinery. Findings,
+in order:
+
+- **The cmd-`0x70` enable is the *only* way to set the availability bitmap; there is no
+  self-issue init path.** The registrar `0x2b140a` has 4 callers; the two outside the
+  channel-map handler (`0x236e6c`, `0x236f10`) are both *disable* calls (all-zero args →
+  `config_ptr=0`). Enable comes only from a received `0x70` message dispatched through the
+  contact-service loop (`0x237bc6` recv → `0x237400` → `0x23670c`). On our boot only cmd
+  `0x64` is injected (`MODEL_SVC_RESPONDER`); a real session also carries `0x70` + its
+  0x40-byte blob. `MODEL_RES_ENABLE` synthesises the `0x70` the same faithful way.
+- **With `MODEL_RES_ENABLE`, `[0x11fee4]=1` and the class bitmap is written — yet
+  `resource-get(0x4c22)` still returned null.** Instrumenting inside `resource-get 0x2b257e`
+  showed `available(0x4c22)=0` even though enable and the bitmap byte `[0x11ff11]` were both
+  set. The formula is `enable!=0 AND (masktable[class&7] & bitmap[0x11ff08 + class>>3])`.
+- **Root cause: the mask table `0x2e2f5c` is a swap16 trap.** The swap16-image bytes read
+  `{40,80,10,20,04,08,01,02}` (recorded as "permuted" in older notes), but `ldrb` reads the
+  *real* rom byte `image[addr^1]`, so the firmware sees `{0x80,0x40,0x20,0x10,0x08,0x04,
+  0x02,0x01} = 0x80>>(class&7)`. Class `0x4c` (`class&7=4`) → real mask `0x08`, but the old
+  `MODEL_RES_ENABLE` sparse blob (built from the permuted table) set bit `0x04` → the
+  availability test `0x08 & 0x06 = 0` failed. The old blob had actually been enabling the
+  *wrong* classes `{0x4d,0x4e,0x51,0x53,0x57}`, so **`0x4c22` was never available in any
+  prior "sparse-5" run** — the display stayed on "Insert SIM card" precisely because the
+  idle draw failed at *window acquire* and never reached content.
+- **Fixed the blob to the real masks (byte9=`0x09`, byteA=`0xa2`, enabling
+  `{0x4c,0x4f,0x50,0x52,0x56}`).** Now — for the first time — the *natural* t≈6.43
+  `display_idle` acquires the idle window: `available(0x4c22)=1`, `resource-get(0x4c22)→5`
+  (non-null). The idle draw then proceeds into content composition and the **display blanks**
+  (uniform frame `94a2dc…`, all `o000`), because the ~13 idle-content classes
+  (fonts/icons/layout sub-windows) have no ROM backing.
+
+**Net.** This corrects a real bug (the swap16 mask-table trap, which had silently
+invalidated both the documented mask table *and* the sparse blob) and, more importantly,
+proves the content-backing wall **from the natural idle path** rather than a forced draw:
+with the idle window genuinely available, the real `display_idle → 0x0547` render advances
+one layer further and dies on the unbacked content classes. The two boot outcomes are now
+cleanly separated: **`0x4c22` unavailable → "Insert SIM card" persists (pre-idle screen);
+`0x4c22` available → idle draw proceeds → blank (content wall).** Neither reaches a real
+idle screen; the terminal blocker remains the unbacked ~13 content resource classes
+(`docs/resource_providers.md`), needing the display/font/window subsystems' coherent
+bring-up (no bitmap shortcut). `MODEL_RES_ENABLE`'s default blob is now the corrected one.

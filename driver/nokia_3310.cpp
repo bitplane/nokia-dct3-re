@@ -1720,14 +1720,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					// SPARSE (safe default): register only the display resource classes that have ROM
 					// resource definitions in table 0x2e0a50 -- 0x4c (idle window 0x4c22), 0x4f, 0x50,
 					// 0x52, 0x56. These are ROM-backed, so marking them available is safe (display stays
-					// alive). The availability bit for class C is the PERMUTED mask romtable[C&7] @0x2e2f5c
-					// = {0x40,0x80,0x10,0x20,0x04,0x08,0x01,0x02}; blob[C>>3] |= romtable[C&7].
-					// 0x4c->rt[4]=0x04, 0x4f->rt[7]=0x02 => byte9=0x06; 0x50->0x40,0x52->0x10,0x56->0x01
-					// => byteA=0x51. NB: registering the OTHER ~13 idle-content classes the draw queries
-					// (0x22/0x25/0x26/0x27/0x2a/0x2b/0x30/0x31/0x3a/0x3c/0x3d/0x44/0x4a/0x5c/0x5d/0x5e/0x78)
-					// has NO ROM backing -> the render then fails (blank); see docs/sim_emulator_scope.md.
-					debug_ram_byte_w(msg + 9 + 9, 0x06);   // byte9: classes 0x4c (idle window) + 0x4f
-					debug_ram_byte_w(msg + 9 + 0xa, 0x51); // byteA: classes 0x50 + 0x52 + 0x56
+					// alive). The availability bit for class C is masktable[C&7] @0x2e2f5c; blob[C>>3] |=
+					// masktable[C&7]. NB: the mask table is a swap16 TRAP -- the swap16-image bytes read
+					// {40,80,10,20,04,08,01,02}, but ldrb reads the REAL rom byte image[addr^1], so the
+					// firmware sees masktable = {0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01} = 0x80>>(C&7).
+					// (An earlier version used the permuted bytes and silently enabled the WRONG classes
+					// {0x4d,0x4e,0x51,0x53,0x57}, so 0x4c22 was never actually available.) Correct masks:
+					//   0x4c: C>>3=9, mask 0x80>>4=0x08 ; 0x4f: C>>3=9, mask 0x80>>7=0x01  => byte9=0x09
+					//   0x50: C>>3=a, mask 0x80>>0=0x80 ; 0x52: 0x80>>2=0x20 ; 0x56: 0x80>>6=0x02 => byteA=0xa2
+					// Registering the OTHER ~13 idle-content classes the draw queries has NO ROM backing
+					// -> the render then fails (blank); see docs/sim_emulator_scope.md.
+					debug_ram_byte_w(msg + 9 + 9, 0x09);   // byte9: classes 0x4c (idle window) + 0x4f
+					debug_ram_byte_w(msg + 9 + 0xa, 0xa2); // byteA: classes 0x50 + 0x52 + 0x56
 				}
 				// Seed the enable-param struct the handler reads (only-read, never-written on our
 				// boot): [0x11fedd]=enable value (any nonzero -> [0x11fee4]); [de]/[df] secondary.
@@ -1812,13 +1816,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a255c)
 		logerror("mmivm: >>> display_idle 0x2a255c entry t=%.4f\n", machine().time().as_double());
 	// post-bl point after resource-get(0x4c22): r0 = idle-window handle (nonzero) or fail (0).
+	// Also snapshot the availability inputs: master-enable [0x11fee4] and the class-0x4c bitmap byte
+	// [0x11ff11] (class 0x4c: byte 0x11ff08+(0x4c>>3)=+9, permuted mask rt[4]=0x04).
 	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a2566)
-		logerror("mmivm: resource-get(0x4c22) -> r0=%08x t=%.4f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), machine().time().as_double());
-	// availability predicate one instr in (dodges bl-target prefetch): r0 = queried id.
-	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002b12b6)
-		logerror("mmivm: avail? id=%04x t=%.4f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
+		logerror("mmivm: resource-get(0x4c22) -> r0=%08x  enable[11fee4]=%02x  bitmap[11ff11]=%02x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), debug_ram_byte(0x0011fee4),
+				debug_ram_byte(0x0011ff11), machine().time().as_double());
+	// resource-get 0x2b257e availability result (post-bl 0x2b2588, id in r6): 0 = unavailable.
+	// Pins the idle-window acquisition: with MODEL_RES_ENABLE this is where the mask-table swap16
+	// trap showed up (avail=0 despite enable+bitmap set) -- see docs/interactive_handoff.md.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002b2588)
+		logerror("mmivm:   resget id=%04x avail=%u t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xffff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) != 0, machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002af582)
 	{
 		const u32 msgp = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
