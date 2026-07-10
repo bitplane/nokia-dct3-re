@@ -2182,6 +2182,27 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// because its read-phase gate needs read-enable [0x111c79]==1 (never set on our boot) and [0x111c76]==0.
 	// Force both at task 20's recv (0x26a458, lr=0x20837a) so it re-checks the gate OPEN after dispatch and,
 	// if the gate is the only blocker, starts issuing its own SELECT/READ sequence (uninjected a0 a4/b0).
+	// SIM-init ordering timeline: SIM reset-start 0x27e024, and the readiness barrier [0x112399] reaching
+	// 0xf (via task-1 dispatcher 0x270c8e). Compare against the ATR delivery (~0.862) to see the race.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027e024)
+	{
+		static unsigned r = 0;
+		if (r++ < 4) logerror("simkick: SIM reset-start 0x27e024 t=%.4f  [110436]=%02x\n",
+				machine().time().as_double(), debug_ram_byte(0x00110436));
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00270c8e)
+	{
+		static uint8_t last = 0xff; const uint8_t b = debug_ram_byte(0x00112399);
+		if (b != last) { last = b; logerror("simkick: barrier [112399]=%02x t=%.4f\n", b, machine().time().as_double()); }
+	}
+	// 0x2794c0 (emits service event 0x1587 -> task 17 -> premature 0x119a). Log the caller (LR): 0x270fae =
+	// task-1 startup path (barrier-gated), 0x2ab6aa = the 0x2ab6xx service-channel sequencer.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x002794c0)
+	{
+		static unsigned e = 0;
+		if (e++ < 6) logerror("simkick: emit 0x1587 (0x2794c0) from LR=%08x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
 	// the 0x119a poster 0x2904d4 (posts the premature read-trigger to task 20): log its caller (LR) + time,
 	// to find which upstream site (0x224e42/0x225198/0x2251aa/0x2253ec/0x225fce) fires it before SIM-ready.
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x002904d4)
