@@ -2182,6 +2182,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// because its read-phase gate needs read-enable [0x111c79]==1 (never set on our boot) and [0x111c76]==0.
 	// Force both at task 20's recv (0x26a458, lr=0x20837a) so it re-checks the gate OPEN after dispatch and,
 	// if the gate is the only blocker, starts issuing its own SELECT/READ sequence (uninjected a0 a4/b0).
+	// posts to task 20 (mailbox id 0x14): who posts what code, and via which poster (the working wake path).
+	// r0=target task, r1=message; [msg+0] = code. Shows the 0x119a producer + confirms the wake mechanism.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && (addr == 0x0026a204 || addr == 0x0026a354)
+			&& (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) == 0x14)
+	{
+		const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const u32 body = (r1 >= 0x00100000 && r1 < 0x00180000) ? (((debug_ram_byte(r1) << 8) | debug_ram_byte(r1 + 1)) & 0xffff) : 0;
+		static unsigned p = 0;
+		if (p++ < 20) logerror("simkick: POST->task20 via %s r1=%08x ([r1+0]=%04x) caller=%08x t=%.4f\n",
+				addr == 0x0026a204 ? "26a204" : "26a354", r1, body,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
 	// gate-top trace (0x208218, loop top before the read-phase gate): log the gate fields each time task 20
 	// re-evaluates, so we see whether it reaches the gate and which condition blocks the read phases.
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00208218)
@@ -2190,6 +2202,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (g++ < 12) logerror("simkick: task20 gate-top [1c76]=%02x [1c79]=%02x [1c96]=%02x [1c97]=%02x t=%.4f\n",
 				debug_ram_byte(0x00111c76), debug_ram_byte(0x00111c79),
 				debug_ram_byte(0x00111c96), debug_ram_byte(0x00111c97), machine().time().as_double());
+	}
+	// loop-back tracepoints: 0x208868 (post-free, before epilogue), 0x208874 (b 0x208218 back to gate),
+	// 0x208376 (recv call). Determines whether task 20 reaches the gate + parks at recv, or stalls earlier.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && (addr == 0x00208868 || addr == 0x00208874 || addr == 0x00208372))
+	{
+		static unsigned q = 0;
+		if (q++ < 16) logerror("simkick: task20 @%06x (%s) t=%.4f\n", addr,
+				addr == 0x00208868 ? "post-free/epilogue" : addr == 0x00208874 ? "loop->gate" : "recv-path",
+				machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00208254)
 	{
