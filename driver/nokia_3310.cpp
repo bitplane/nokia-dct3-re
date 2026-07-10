@@ -2475,6 +2475,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (r++ < 50) logerror("simkick: task21 recv code=%02x  state[10bcdc]=%04x t=%.4f\n",
 				code, debug_ram_word(0x0010bcdc) & 0xffff, machine().time().as_double());
 	}
+	// SIM_REG_BOOTSTRAP debugging: transport poster 0x293522 (task 20 -> task 21 RPC). It relays the
+	// command to task 21 only if SIM struct [0x10dcaf](+7)==1 OR [0x10dca9](+1)==1; else it errors code
+	// 0x1e straight back to task 20 (0x29353a). Log which path -> is the relay gate the block?
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr &&
+			(addr == 0x00293522 || addr == 0x0029355a || addr == 0x0029353a))
+	{
+		static unsigned d = 0;
+		if (d++ < 16) logerror("simkick: xport 0x293522 %s [10dcaf]=%02x [10dca9]=%02x t=%.4f\n",
+				addr == 0x00293522 ? "ENTER" : addr == 0x0029355a ? "RELAY->task21" : "ERROR-0x1e->task20",
+				debug_ram_byte(0x0010dcaf), debug_ram_byte(0x0010dca9), machine().time().as_double());
+	}
 	// SIM APDU-send 0x27e98c (task 21 relays a command to the card): logs the command header so we see
 	// whether task 21 issues its own SELECT/READ after detect (responder-missing) or sits idle (driver-gated).
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027e98c)
