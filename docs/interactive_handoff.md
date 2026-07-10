@@ -595,3 +595,36 @@ container has exactly one layer because only the idle-entry pushes a window and 
 content-producer does. The clock is the only non-RF producer, but its display is gated on the
 camped state too (a real 3210 shows no clock without a SIM/network — the "Insert SIM card"
 modal). New diagnostic (opt-in, log-only): `TRACE_MMIVM` t6cmd tap (task-6 display commands).
+
+## Camped-state flag dig (2026-07): it is a *derived view*, not a flippable flag — forcing it does nothing
+
+Located the network service/camped state the content producers gate on, and tested forcing
+it. The state and the negative result:
+
+- **The camped state is `[0x11fce1]`** (a byte in the MMI state struct at `0x11fcce`). The
+  status-icon classifier `0x28f0f2` reads it: value `1` = no service (our boot), `4/5/6` =
+  registered service classes (→ different signal/service icon glyphs via `0x28fa4c`, called
+  from 15 sites in the idle-element render library `0x2a2xxx`).
+- **Its *source* is network-registration data in DSP shared RAM.** The classifier's
+  sub-reader `0x26f952` reads `[0x1028d1]` / `[0x107ed3]` (the `0x10xxxx` DSP-shared-RAM
+  region) — the actual registration status the GSM-L1/DSP layer writes. On our boot these
+  are **0** (L1/DSP network never runs), so `[0x11fce1]` is a *derived* "no service".
+  `TRACE_MMIVM` service snapshot at the idle moment: `[11fce1]=01 [1119fd]=00 [11fcce]=2f
+  netdsp[1028d1]=00000000 [107ed3]=00`.
+- **Forcing `[0x11fce1]=4` (registered) does nothing.** With the byte forced continuously
+  (and corrected `MODEL_RES_ENABLE` so the idle window opens): it **sticks** at 4 — *no
+  network handler overwrites it*, confirming the handler that would maintain it never runs —
+  but **task 6 receives the same 5 display commands, no content-window pushes appear, and the
+  screen stays blank**. The content producers don't gate on the derived byte; they read the
+  underlying network data (operator string, signal level, registration) from the DSP-shared
+  RAM, which is still empty.
+
+**Verdict.** The camped-state is **not a single flippable flag**. `[0x11fce1]` is a derived
+view of the network-registration data structure that the L1/DSP stack populates in shared
+RAM; forcing the view while its source stays empty produces nothing. So the "camped" gate is
+the same **GSM-L1/DSP/RF wall** (`docs/network_scouting.md`) — now located at the specific
+variables (`[0x11fce1]` derived from DSP-RAM `[0x1028d1]`/`[0x107ed3]`). To fake "camped"
+would mean populating the whole DSP-shared-RAM registration structure the way a real L1
+attach does — i.e. reimplementing the network state, not flipping a bit. `EXPERIMENT_CAMPED`
+(the force that produced this negative result) is retired; the `TRACE_MMIVM` service snapshot
+is kept as a diagnostic.

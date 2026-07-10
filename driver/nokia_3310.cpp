@@ -1837,6 +1837,14 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		logerror("mmivm: resource-get(0x4c22) -> r0=%08x  enable[11fee4]=%02x  bitmap[11ff11]=%02x t=%.4f\n",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), debug_ram_byte(0x0011fee4),
 				debug_ram_byte(0x0011ff11), machine().time().as_double());
+	// camped/service state snapshot at the idle moment: [0x11fce1] MMI service byte (classifier 0x28f0f2:
+	// 4/5/6 = service classes), [0x1119fd] status-icon gate, and the DSP-shared-RAM network-registration
+	// words [0x1028d1]/[0x107ed3] (read via 0x26f952; 0 when L1/DSP network never runs).
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a2566)
+		logerror("mmivm: service: [11fce1]=%02x [1119fd]=%02x [11fcce]=%02x  netdsp[1028d1]=%08x [107ed3]=%02x t=%.4f\n",
+				debug_ram_byte(0x0011fce1), debug_ram_byte(0x001119fd), debug_ram_byte(0x0011fcce),
+				(debug_ram_byte(0x001028d1)<<24)|(debug_ram_byte(0x001028d2)<<16)|(debug_ram_byte(0x001028d3)<<8)|debug_ram_byte(0x001028d4),
+				debug_ram_byte(0x00107ed3), machine().time().as_double());
 	// resource-get 0x2b257e availability result (post-bl 0x2b2588, id in r6): 0 = unavailable.
 	// Pins the idle-window acquisition: with MODEL_RES_ENABLE this is where the mask-table swap16
 	// trap showed up (avail=0 despite enable+bitmap set) -- see docs/interactive_handoff.md.
