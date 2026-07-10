@@ -416,3 +416,58 @@ solved for the earlier gates, not a hardware/convergence wall.
 message/event moves it from "Insert SIM card" to the idle/menu screen. Likely a
 SIM-ready → MMI-idle transition (ties back to the SIM thread). Sweep knob:
 `NOKI3210_TRACE_TASKS` (task liveness + `msgedge`/`msgrate`).
+
+## MMI-VM (task 5) dig (2026-07): the idle transition IS reached — the wall is the idle render
+
+Traced the MMI VM's own event stream with `TRACE_MMIVM` (hook `0x2af582`, the post-recv
+point in the event fetch `0x2af57c`: `r0`=msg ptr, `[r0]`=raw 16-bit code → event =
+`code & 0x1fff`, params = `code>>14`). This resolves the "steady-state trigger" reframe
+above into a precise, and much more encouraging, statement.
+
+- **Task 5 is a low-rate event processor, not a busy loop.** It dequeues **< 200 events
+  in 25 s** (the ~2000 posts/s "steady state" is the *other* tasks; t5 sees only a
+  fraction). From t≈3.5 it runs a periodic UI cycle — events `138e / 1390 / 13b6 / 13b5`
+  every ~0.6 s (a refresh/poll animation while it waits).
+- **The boot REACHES the idle transition.** At **t≈6.38** `display_idle 0x2a255c` fires
+  **exactly once**, and task 5 dequeues render event **`0x0547`** exactly once (the
+  message `display_idle` render-posts via `0x2af6ea`). Immediately after, the periodic
+  `138e/1390/13b6/13b5` cycle **stops** — task 5 quiesces into "idle painted, waiting."
+  So the phone is further along than "up but not alive": it actively runs its idle-screen
+  *entry*. **This overturns the older claim that `display_idle` never fires / the idle flag
+  is never set** — that was a less-complete-config artifact; under the full SIM stack the
+  idle entry runs.
+- **The render fails at one gate: the idle window can't be acquired.** Hooking the
+  post-`bl` point `0x2a2566` shows **`resource-get(0x4c22) → r0 = 0`** (null handle).
+  `resource-get 0x2b257e` bails at its very first instruction: `bl 0x2b12b4` (availability)
+  returns 0 → `b 0x2b2690` (fail). Availability = `[0x11fee4]!=0 AND bitmap-bit(class)`;
+  on our boot `[0x11fee4]` (master resource-enable) is **0** because the faithful
+  contact-service cmd-`0x70` was never issued. `display_idle` **does not check the return**
+  — it render-posts `0x0547` regardless — so task 5 processes the render with a null idle
+  window and composes nothing → the frame stays "Insert SIM card."
+- **`MODEL_RES_ENABLE` doesn't rescue the *natural* idle draw.** Re-run with the faithful
+  cmd-`0x70` model: `resource-get(0x4c22)` **still returns null** because the default blob
+  enables class `0x22`, not class **`0x4c`** (the idle window). Enabling the 5 ROM-backed
+  classes (`0x4c/0x4f/0x50/0x52/0x56`) renders the "Insert SIM card" chrome; enabling all
+  ~18 idle-content classes blanks/crashes (the unbacked-provider dead-end already proven in
+  `docs/resource_providers.md`).
+
+**Convergence.** The "interactive handoff" thread and the "resource-provider" thread are
+now proven to be the **same wall**, meeting at one runtime instant:
+
+```
+t≈6.38  idle transition reached
+     → display_idle 0x2a255c
+       → resource-get(0x4c22)  [0x2b257e]
+         → availability 0x2b12b4  →  0   (because [0x11fee4]==0, cmd 0x70 never issued)
+       → null idle window
+     → render-post 0x0547 → task 5 composes nothing
+   ⇒ "Insert SIM card" persists
+```
+
+The last sweep's "missing trigger to advance the MMI" is resolved: the trigger
+(`display_idle → 0x0547`) **is** emitted and consumed. The single remaining blocker to a
+richer screen is the idle-window/content **resource acquisition** — the known
+`[0x11fee4]` / cmd-`0x70` + class-backing wall — now pinned to the real idle moment rather
+than a forced experiment. Diagnostic knob (curated, opt-in, log-only): `NOKI3210_TRACE_MMIVM`
+(`display_idle` entry, `resource-get(0x4c22)` result, event dequeue histogram / late-event
+cadence).

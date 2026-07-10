@@ -633,8 +633,11 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      availability), TRACE_DSPDRV (entries into the GSM-L1/audio DSP driver layer),
 //      TRACE_DSPIO (MCU<->DSP shared-RAM + DSPIF access map; docs/dsp_interface.md) --
 //      the network/DSP frontier (docs/network_scouting.md), TRACE_HANDOFF (task-1 master
-//      sequencer mode + startup checklist; the post-SIM interactive handoff,
-//      docs/interactive_handoff.md). Most RE forcing shims and one-off traces have
+//      sequencer mode + startup checklist; the post-SIM interactive handoff),
+//      TRACE_TASKS (app-task liveness + inter-task message edges), TRACE_MMIVM (the MMI VM
+//      / task-5 event stream: proves the idle transition IS reached at t~6.38 --
+//      display_idle -> resource-get(0x4c22) fails on [0x11fee4]==0; docs/interactive_handoff.md).
+//      Most RE forcing shims and one-off traces have
 //      been retired (docs/removed_forcing_knobs.md); the one live research force is
 //      EXPERIMENT_UIINIT_SKIP -- no-ops the mode-0xc display-init call so the app-task
 //      layer past it can be probed (the current "force to explore" frontier).
@@ -1797,6 +1800,46 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 		if ((total % 2000) == 0)
 			logerror("msgrate: %u posts by t=%.4f (protocol still active)\n", total, machine().time().as_double());
+	}
+	// TRACE_MMIVM (opt-in): the MMI-VM (task 5) event loop, hooked at the post-recv point 0x2af582 in the
+	// event fetch 0x2af57c. r0 = message ptr; [r0] = raw 16-bit code -> event = code & 0x1fff, params = code>>14.
+	// Logs each distinct event code once (first-seen time + running count), so the steady-state event mix task 5
+	// actually processes on the "Insert SIM card" screen is visible -- what it dequeues and what it never gets.
+	// docs/interactive_handoff.md MMI-VM dig.
+	// TRACE_MMIVM: also mark display_idle 0x2a255c entry (the fn that acquires idle window 0x4c22 and
+	// render-posts 0x0547 to task 5) so its firing time lines up with the 0x0547 dequeue and the
+	// resource-availability queries (TRACE_RESAVAIL) inside the 0x0547 handler.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a255c)
+		logerror("mmivm: >>> display_idle 0x2a255c entry t=%.4f\n", machine().time().as_double());
+	// post-bl point after resource-get(0x4c22): r0 = idle-window handle (nonzero) or fail (0).
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a2566)
+		logerror("mmivm: resource-get(0x4c22) -> r0=%08x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), machine().time().as_double());
+	// availability predicate one instr in (dodges bl-target prefetch): r0 = queried id.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002b12b6)
+		logerror("mmivm: avail? id=%04x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002af582)
+	{
+		const u32 msgp = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 raw = debug_ram_word(msgp);
+		const u32 ev = raw & 0x1fff;
+		const u32 np = raw >> 14;
+		static u32 codes[96]; static u32 cnt[96]; static double first[96]; static unsigned n = 0; static u32 total = 0;
+		total++;
+		unsigned i = 0; for (; i < n; i++) if (codes[i] == raw) break;
+		if (i == n && n < 96) { codes[n] = raw; cnt[n] = 0; first[n] = machine().time().as_double(); n++; }
+		if (i < 96) cnt[i]++;
+		if (i == n - 1)   // newly seen this call
+			logerror("mmivm: NEW event=%04x (raw=%04x np=%u) t=%.4f\n", ev, raw, np, machine().time().as_double());
+		if (ev >= 0x0500 && ev != 0x05e2)   // watch the late/render/window events (skip the timeout tick)
+			logerror("mmivm: deq event=%04x t=%.4f\n", ev, machine().time().as_double());
+		if ((total % 200) == 0)
+		{
+			logerror("mmivm: --- event histogram at t=%.4f (%u dequeued) ---\n", machine().time().as_double(), total);
+			for (unsigned j = 0; j < n; j++)
+				logerror("mmivm:   event=%04x  x%-6u first=%.4f\n", codes[j] & 0x1fff, cnt[j], first[j]);
+		}
 	}
 	// MODEL_STARTUP_REPORTS (opt-in): emulate the subsystem-ready reports that drive the interactive
 	// handoff past the mode-0d limp. On a real boot the battery/MMI/display subsystems post these codes to
