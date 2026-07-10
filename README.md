@@ -14,12 +14,17 @@ the rest of the way: the `000d` startup wall, an 11-subsystem readiness barrier,
 startup-supervisor **busy-wait on a service-channel-busy bit** — the single root cause that
 gated everything — were traced and fixed with one more opt-in model, cascading all the way to
 a rendered **"Insert SIM card"** MMI screen. See `docs/boot_to_insert_sim.md`. From there the SIM
-**read conversation** was reverse-engineered end-to-end *and modelled faithfully*: `MODEL_SIM_CARD`
-(`docs/sim_emulator_scope.md`) is a message-layer virtual SIM that delivers a genuine ATR, echoes
-the ISO-7816 PPS, and answers the phone's own GSM 11.11 T=0 command stream
-(`SELECT → GET_RESPONSE → READ`, with a synthetic EF file-control block + content) to completion —
-so the firmware **accepts the SIM** (the no-SIM reject decision at `0x27ea88`/`[0x111c64]` is cleared
-through the read, not forced). That is the whole SIM-conversation problem, solved.
+**conversation** was reverse-engineered: `MODEL_SIM_CARD` (`docs/sim_emulator_scope.md`) is a
+message-layer virtual SIM that delivers a genuine ATR and echoes the ISO-7816 PPS, and the
+GSM 11.11 T=0 command framing (`SELECT → GET_RESPONSE → READ`) is understood end-to-end.
+**However** — a 2026-07 review (`docs/sim_emulator_scope.md` "Moves 1+2") found the current
+model still short-cuts SIM init: it *injects* a single-EF read and pokes the no-SIM flag
+(`SIM_CARD_CLEAR_NOSIM`) rather than the firmware driving its own reads. The firmware's SIM-init
+read sequencer (RTOS task 20) does not run on the reconstructed boot: its read-trigger message
+`0x119a` arrives *before* the SIM ATR, deadlocking it in a premature SELECT. Reaching a real,
+firmware-driven SIM init (the true milestone: a firmware-originated SELECT with `SIM_CARD_EF`
+unset) is an open, in-progress problem — the coherent SIM-registration ordering. The clean,
+reproducible milestone remains **boot-to-"Insert SIM card"**.
 
 Reaching the classic **operator-idle** home screen is a *separate* wall, now mapped end-to-end down
 to the pixel. Under the full SIM boot the interactive **MMI layer is alive** — the task-5 state-machine

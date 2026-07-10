@@ -2182,6 +2182,14 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// because its read-phase gate needs read-enable [0x111c79]==1 (never set on our boot) and [0x111c76]==0.
 	// Force both at task 20's recv (0x26a458, lr=0x20837a) so it re-checks the gate OPEN after dispatch and,
 	// if the gate is the only blocker, starts issuing its own SELECT/READ sequence (uninjected a0 a4/b0).
+	// the 0x119a poster 0x2904d4 (posts the premature read-trigger to task 20): log its caller (LR) + time,
+	// to find which upstream site (0x224e42/0x225198/0x2251aa/0x2253ec/0x225fce) fires it before SIM-ready.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x002904d4)
+	{
+		static unsigned p = 0;
+		if (p++ < 12) logerror("simkick: 0x119a-poster 0x2904d4 called from LR=%08x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
 	// posts to task 20 (mailbox id 0x14): who posts what code, and via which poster (the working wake path).
 	// r0=target task, r1=message; [msg+0] = code. Shows the 0x119a producer + confirms the wake mechanism.
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && (addr == 0x0026a204 || addr == 0x0026a354)
