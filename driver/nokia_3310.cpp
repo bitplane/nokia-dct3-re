@@ -1414,6 +1414,11 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && (address == 0x00111c76 || address == 0x00111c78))
 		logerror("simkick: WRITE [%06x] <- %04x mask=%04x pc=%08x t=%.4f\n",
 				address, data, mem_mask, pc & ~u32(1), machine().time().as_double());
+	// watch [0x111c69] (SIM-SELECTED flag, high byte of word 0x111c68): the linchpin the 0x119a handler
+	// tests at 0x2078f0. Its only setter is 0x27dfc4 (at SIM read-complete). Logs when/if it reaches 1.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && address == 0x00111c68 && (mem_mask & 0xff00))
+		logerror("simkick: WRITE [111c69] <- %02x pc=%08x t=%.4f\n",
+				(data >> 8) & 0xff, pc & ~u32(1), machine().time().as_double());
 
 	auto ram_word = [this](offs_t addr) -> uint16_t
 	{
@@ -1688,6 +1693,27 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("simkick: wake posted; resuming 0x16 handler t=%.4f\n", machine().time().as_double());
 			return BX_R12;
 		}
+	}
+	// SIM_REG_DEFER119A (opt-in, forcing probe): the SIM-registration ordering fix, step 1 (see
+	// docs/sim_registration.md). The premature message 0x119a (producer 0x2904d4, task 17) reaches task 20
+	// BEFORE the SIM is selected ([0x111c69]==1, set by 0x27dfc4 at read-complete) -> task 20's 0x119a
+	// handler diverts to the re-init SELECT 0x207704 that deadlocks on the mid-reset SIM manager. This probe
+	// intercepts the producer 0x2904d4 at entry: while SIM-selected [0x111c69]==0 it SWALLOWS the post
+	// (returns BX lr, no 0x119a delivered); once [0x111c69]==1 it lets it through. Observe: (a) does task 21
+	// still activate (reset/ATR/status 0x16) without the 0x119a -> tells us if 0x119a is load-bearing for
+	// activation (Pass 1 predicts YES); (b) does [0x111c69] ever reach 1; (c) where task 20 stalls instead.
+	if (nokia_env_u32("NOKI3210_SIM_REG_DEFER119A", 0) != 0 && pc == addr && addr == 0x002904d4)
+	{
+		const u32 selected = debug_ram_byte(0x00111c69);
+		static unsigned swallowed = 0, passed = 0;
+		if (selected == 0)
+		{
+			if (swallowed++ < 12) logerror("simreg: SWALLOW premature 0x119a ([111c69]=0) #%u t=%.4f\n",
+					swallowed, machine().time().as_double());
+			return uint16_t(0x4770);   // BX lr -> skip the post
+		}
+		if (passed++ < 6) logerror("simreg: PASS 0x119a ([111c69]=1 now) #%u t=%.4f\n",
+				passed, machine().time().as_double());
 	}
 	// TRACE_TASKS (opt-in): app-task-layer forcing-sweep tap. Log the first time each RTOS task reaches
 	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the faithful boot
@@ -2314,6 +2340,34 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		static unsigned r = 0;
 		if (r++ < 50) logerror("simkick: task21 recv code=%02x  state[10bcdc]=%04x t=%.4f\n",
 				code, debug_ram_word(0x0010bcdc) & 0xffff, machine().time().as_double());
+	}
+	// SIM APDU-send 0x27e98c (task 21 relays a command to the card): logs the command header so we see
+	// whether task 21 issues its own SELECT/READ after detect (responder-missing) or sits idle (driver-gated).
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027e98c)
+	{
+		const u32 buf = 0x0010dca8 + 0x1c;   // APDU command-header buffer (struct +0x1c)
+		static unsigned d = 0;
+		if (d++ < 20) logerror("simkick: APDU-send 0x27e98c hdr=%02x %02x %02x %02x %02x t=%.4f\n",
+				debug_ram_byte(buf), debug_ram_byte(buf+1), debug_ram_byte(buf+2),
+				debug_ram_byte(buf+3), debug_ram_byte(buf+4), machine().time().as_double());
+	}
+	// SIM read-complete decision 0x27ea88: reads no-SIM flag [0x111c64]; !=0 -> status 0x1f "Insert SIM";
+	// ==0 -> SIM-present handler 0x27dfc4 (which sets SIM-selected [0x111c69]=1). Logs the flag + branch so
+	// we see whether task 21 ever takes the SIM-present path on its own (no injection). docs/sim_registration.md.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027ea88)
+	{
+		const u32 nosim = debug_ram_byte(0x00111c64);
+		static unsigned d = 0;
+		if (d++ < 20) logerror("simkick: read-complete 0x27ea88 [111c64]=%02x -> %s t=%.4f\n",
+				nosim, nosim ? "no-SIM(0x1f)" : "PRESENT(0x27dfc4)", machine().time().as_double());
+	}
+	// SIM-present handler 0x27dfc4 entry: gated on [0x111c9d]==0 and struct [0x10dcaf](=+7)==1; on success
+	// sets [0x111c69]=1. Logs the two gate inputs so we see why it does/doesn't set SIM-selected.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027dfc4)
+	{
+		static unsigned d = 0;
+		if (d++ < 12) logerror("simkick: SIM-present 0x27dfc4 [111c9d]=%02x [10dcaf]=%02x t=%.4f\n",
+				debug_ram_byte(0x00111c9d), debug_ram_byte(0x0010dcaf), machine().time().as_double());
 	}
 	// posts to task 21 (mailbox id 0x15, the SIM manager): who wakes it and with what code. Same shape as
 	// the task-20 post hook; identifies the poster of the message that releases task 21 toward the reset.
