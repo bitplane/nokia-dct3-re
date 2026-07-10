@@ -168,9 +168,41 @@ message chunks memcpy'd to `+0x34`), accessed from `0x26f1b8`/`0x208110`/`0x26f6
 camped-dig *conclusion* (forcing `[0x11fce1]` changes nothing) stands; only the auxiliary
 net-data address was mis-swapped.
 
+### The `0x2b2exx` "data-block processors" are thin routers (2026-07)
+
+Followed the data-block primitives (`0x30/0x33/0x36`) into their `0x2b2exx` targets. They do
+**no processing** — each is a 3-instruction thunk that render-posts the parsed descriptor to
+**task 5 (the MMI VM)** with a unique type id:
+
+| target | render id | from primitive |
+|--------|-----------|----------------|
+| `0x2b2ebc` | `0x7a59` | `0x36` (list/blob ≤300B) |
+| `0x2b2ec8` | `0x7859` | `0x30` (blob ≤170B) |
+| `0x2b2ed4` | `0x7959` | `0x33` (short) |
+| `0x2b2ee0` | `0x8c99` | — |
+| `0x2b2eee` | `0x8e19` | — |
+| `0x2b2ef8` | `0x8d59` | — |
+
+`render-post 0x2af6ea(id, descriptor)` (big-endian: `msg[0]=id`, params follow) allocates a
+0x10-byte message and posts it to **mailbox 5 = task 5** via `0x26a354`. So the descriptor
+becomes task-5 event `id & 0x1fff` (`0x1859/0x1959/0x1a59/…`) with the descriptor pointer as
+param 0.
+
+Two consequences: (1) combined with the display-update primitives (which also render-post to
+task 5, via the `0x2a2xxx` functions), the **entire** class-5/7/0xa handler `0x23cde0` is a
+uniform *parse-and-forward-to-MMI* layer — there is no separate "L1 data processing", the MMI
+VM (task 5) is the universal consumer. (2) These data-block events are **not** in the MMI-VM
+rewrite table (`0x2cb218`, max key `0x1b5d`) and have **no other producers** in the image, so
+they fall through to the VM's general action pipeline. Their blobs' exact semantics (what the
+≤300-byte payloads *are* — cell-broadcast text? measurement lists?) cannot be pinned
+statically without a spec or a live trace; the code never runs on our boot.
+
+**This thread bottoms out here:** the data path is thin routing into a dormant MMI-VM event,
+not a decodable processor. Further decode would be guessing at never-executed code.
+
 ## Open items (future deep-dives)
 - Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the
-  `0x2b2exx` L1 data-block processors; the full `0x2b66b0` routing table.
+  full `0x2b66b0` routing table (same caveat: dormant, no runtime to validate).
 - Static RE of the `0x2b7xxx–0x2c9xxx` L1 driver *send* side: enumerate the 287 DSPIF
   command stubs and their command encodings (large, code never runs on our boot).
 - Identify the two downloaded blobs (`[0x200+]` from flash `0x200040`; `[0xe00+]`): DSP
