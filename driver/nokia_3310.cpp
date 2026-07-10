@@ -1820,6 +1820,21 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("t6cmd: NEW display cmd=%02x sub=%02x t=%.4f\n", cmd, sub, machine().time().as_double()); }
 		if (i < 64) cnt[i]++;
 	}
+	// TRACE_DSPMSG (opt-in): the L1<->DSP mailbox recv side. Hook post-bl 0x23d638 in the DSP-IF message
+	// dispatch 0x23d62c (r4 = message): [r4+3] = message class (dispatch key: 2/3/5/6/7/8/a/11/13/14/47/64/d5),
+	// [r4+9] = primitive sub-type. Shows which DSP->MCU L1 messages actually arrive on our boot (vs the
+	// dormant network protocol). docs/dsp_interface.md.
+	if (nokia_env_u32("NOKI3210_TRACE_DSPMSG", 0) != 0 && pc == addr && addr == 0x0023d638)
+	{
+		const u32 m = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		const u32 cls = debug_ram_byte(m + 3), prim = debug_ram_byte(m + 9);
+		static u32 seen[64]; static unsigned n = 0; static u32 tot = 0; tot++;
+		const u32 kv = (cls << 8) | prim;
+		unsigned i = 0; for (; i < n; i++) if (seen[i] == kv) break;
+		if (i == n && n < 64) { seen[n++] = kv;
+			logerror("dspmsg: NEW class=%02x prim=%02x t=%.4f\n", cls, prim, machine().time().as_double()); }
+		if ((tot % 500) == 0) logerror("dspmsg: %u messages by t=%.4f\n", tot, machine().time().as_double());
+	}
 	// TRACE_MMIVM (opt-in): the MMI-VM (task 5) event loop, hooked at the post-recv point 0x2af582 in the
 	// event fetch 0x2af57c. r0 = message ptr; [r0] = raw 16-bit code -> event = code & 0x1fff, params = code>>14.
 	// Logs each distinct event code once (first-seen time + running count), so the steady-state event mix task 5

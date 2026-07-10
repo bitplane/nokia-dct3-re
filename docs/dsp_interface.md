@@ -45,18 +45,47 @@ So the MCU **stages DSP tables/program from flash into shared RAM** at boot — 
 data *is* in the image. On a real phone the DSP would then execute/consume it; with the
 DSP stubbed the blobs just sit in `m_dsp_ram`, harmless.
 
-## The runtime message protocol (recv side — task 22)
+## The L1↔DSP mailbox protocol (2026-07 dig — both directions mapped)
 
-Task **22** (`dsp_if_task_2b6548`) is the DSP-interface RTOS task: it `recv`-loops and
-dispatches via `dsp_if_message_dispatch_23d62c`. That dispatcher:
-- copies message fields into a state struct at `[0x11251c]` (`[msg+2]→+0`, `[msg+7]→+1`,
-  `[msg+0]→+3`),
-- forwards to `0x2b5f88` with a code `0x8257`,
-- **dispatches on `[msg+3]`** (a subtract-cascade on values `2,3,5,6,0xa,…`), like the
-  contact-service command dispatcher.
+Task **22** (`dsp_if_task_2b6548`) is the DSP-interface RTOS task. Its loop: `recv`
+(`0x26a458`) → if the code < `0xc0` call the dispatch `0x23d62c` (`0x2b6564`); codes
+`0xc0–0x1bf` are delayed-message markers, freed and ignored.
 
-This task *runs* (it services the SIM/CCONT/scheduler's use of the DSP mailbox), but on
-our boot it only ever handles those housekeeping messages — never the L1/network traffic.
+**Recv side (DSP→MCU downlink) — dispatch `0x23d62c`:**
+- copies message header fields into a state struct at `[0x11251c]` (`[msg+2]→+0`,
+  `[msg+7]→+1`, `[msg+0]→+3`),
+- **dispatches on `[msg+3]` = message class**, a subtract-cascade over
+  `{2, 3, 5, 6, 7, 8, 0xa, 0x11, 0x13, 0x14, 0x47, 0x64, 0xd5}` → handlers
+  `0x23c4fc / 0x23c55c / 0x23c9e8 / 0x23cbe8 / 0x23cde0 / 0x23d158 / 0x23d2fe / 0x23d430`
+  (payload pointer = `msg+9`). Class `0xd5` is a special inline (wheel-only: sets state
+  `{0xc,1,0}`, forwards id `0x3957`).
+- **Two-level protocol**: each handler sub-dispatches on `[msg+9]` = primitive (e.g.
+  `0x23cde0` branches on `0x10/0x13/0x16/0x18/0x1a/0x25/…`). So a message is
+  `{class:[+3], primitive:[+9], payload:[+10…]}`.
+- **Routing to the upper L1 layers uses the resource-message bus**: the "forward" helper
+  `0x2b5f88(id, msg)` is actually `resource_available(id)` + `resource_acquire(id, msg)`
+  (the same `0x2b12b4`/`0x2b12dc` pair as the display) — i.e. L1 messages are delivered to
+  whichever task registered for message-id `id` (`0x82xx`/`0x03xx`). A routing table at
+  `0x2b66b0` (0xc-byte records) maps DSP primitives `0x10–0x29` ↔ upper-layer message ids
+  `0x035c–0x037b`.
+
+**Send side (MCU→DSP uplink):** write a command halfword to the **DSPIF register
+`0x30000`**, then poke the doorbell interrupt at `0x20008` (pattern seen at `0x291038`:
+`strh #4→[0x30000]; strb #2→[0x20008]`). The DSPIF has **287 write sites, almost all in the
+L1 driver `0x2b7xxx–0x2c9xxx`** — the per-command send stubs.
+
+**Runtime status — the whole protocol is DORMANT (`TRACE_DSPMSG`).** On our boot the
+dispatch `0x23d62c` is reached **0 times**: task 22's handler is entered only ~twice
+(t≈0.37, 3.76) for the low-level echo/handshake and stays `recv`-blocked — no DSP→MCU L1
+message ever arrives, and the 287 DSPIF send stubs never run. The mailbox plumbing (task 22,
+IRQ4 lower-service, dispatch, routing table) is fully present and now mapped, but **no
+GSM-L1 traffic flows** because nothing runs the L1 stack: there is no DSP executing the air
+interface to emit measurement/sync/registration primitives, and the MCU-side L1 senders sit
+behind the same coherent-boot/network-attach phase we never reach.
+
+This task's *housekeeping* use (SIM/CCONT/scheduler mailbox) is what keeps it alive; the
+L1/network traffic is the dormant half. Diagnostic: `NOKI3210_TRACE_DSPMSG` (recv classes/
+primitives at `0x23d638`).
 
 ## What the boot waits on from the DSP: nothing (the key finding)
 
@@ -94,8 +123,11 @@ statically until that wall falls. The practical unlock order is **coherent boot 
 L1 second** — the reverse of the intuition. Trace knob: `NOKI3210_TRACE_DSPIO`.
 
 ## Open items (future deep-dives)
-- Static RE of the `0x2b7xxx–0x2c9xxx` L1 driver: enumerate the DSPIF command/status
-  protocol and the L1 message primitives (large, code never runs on our boot).
+- Decode each recv handler's primitive set (`0x23cde0` etc.) and the full `0x2b66b0`
+  routing table — the DSP→MCU message *content* (the class/primitive skeleton is mapped
+  above; the per-primitive payload semantics are not).
+- Static RE of the `0x2b7xxx–0x2c9xxx` L1 driver *send* side: enumerate the 287 DSPIF
+  command stubs and their command encodings (large, code never runs on our boot).
 - Identify the two downloaded blobs (`[0x200+]` from flash `0x200040`; `[0xe00+]`): DSP
   program vs coefficient tables vs audio codec params.
 - The MCUIF (`0x40000`) memory-range configuration.
