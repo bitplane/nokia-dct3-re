@@ -1805,6 +1805,21 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if ((total % 2000) == 0)
 			logerror("msgrate: %u posts by t=%.4f (protocol still active)\n", total, machine().time().as_double());
 	}
+	// TRACE_MMIVM: task 6 (display manager 0x297fc4) post-recv 0x29800c. r0 = message; [r0+5] = display
+	// command byte (dispatched by the subtract-cascade at 0x298026). Shows which display/content-draw
+	// commands the content producers post to the display manager -- on our boot, whether the idle content
+	// (clock/operator/signal) is ever requested. docs/interactive_handoff.md content-producers dig.
+	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x0029800c)
+	{
+		const u32 msgp = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 cmd = debug_ram_byte(msgp + 5);
+		const u32 sub = debug_ram_byte(msgp + 6);
+		static u32 seen[64]; static u32 cnt[64]; static unsigned n = 0;
+		unsigned i = 0; for (; i < n; i++) if (seen[i] == ((cmd<<8)|sub)) break;
+		if (i == n && n < 64) { seen[n]=((cmd<<8)|sub); cnt[n]=0; n++;
+			logerror("t6cmd: NEW display cmd=%02x sub=%02x t=%.4f\n", cmd, sub, machine().time().as_double()); }
+		if (i < 64) cnt[i]++;
+	}
 	// TRACE_MMIVM (opt-in): the MMI-VM (task 5) event loop, hooked at the post-recv point 0x2af582 in the
 	// event fetch 0x2af57c. r0 = message ptr; [r0] = raw 16-bit code -> event = code & 0x1fff, params = code>>14.
 	// Logs each distinct event code once (first-seen time + running count), so the steady-state event mix task 5

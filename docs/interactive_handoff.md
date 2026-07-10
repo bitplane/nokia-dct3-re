@@ -557,3 +557,41 @@ have a deliberate ordering interlock: SVC_RESPONDER's cmd-`0x64` completion wait
 SVC_RESPONDER stalls → the boot never reaches the idle transition at all (≤5 MMI events),
 while still showing "Insert SIM card" from the early render. The MS=440 run used for the
 findings above is clean (resen delivers → 0x64 fires → boot proceeds normally).
+
+## Content-producers dig (2026-07): the idle screen is a window *stack*; only the base is pushed
+
+Went after the content producers themselves — the subsystems that would fill the empty idle
+container. The display architecture and each producer's state:
+
+- **The display is a window STACK managed by task 6** (display manager `0x297fc4`). Two
+  structures: display state `0x1116f8` (idle-redraw flag at `+5` = `0x1116fd`) and the
+  window stack `0x111724` (0x1c-byte entries; active index at `[0x1116f9]`). Task 6's loop
+  recvs a display command (`[msg+5]`) and dispatches via a subtract-cascade; when the idle
+  flag `[0x1116fd]==1` it calls `display_idle`, then clears it to 2. Command `01` pushes /
+  activates a window and (sub `01`) sets the idle flag → redraw.
+- **On our boot task 6 receives only 5 display commands** (`TRACE_MMIVM` t6cmd tap at
+  `0x29800c`): `01/00`@0.57, `03/00`@0.84, `02/00`@4.45, `ff/ff`@4.45, and `01/01`@6.377 —
+  the last one pushes the **base idle window** and triggers the `t≈6.38` `display_idle`.
+  **No further `01` (window-push) commands ever arrive**, so no content windows
+  (clock/operator/signal/indicators) are stacked. The idle screen is a stack with only its
+  base layer → empty.
+- **Producer status, one by one:**
+  - **Clock** — reads the CCONT RTC (reg 8 min / reg 9 hour, via `ccont_reg_read 0x2afb44`
+    reg-indices 0x0a/0x0b; map table `0x2e2da8`, phys = reg<<3). `TRACE_CCONT_READ`: reg 7
+    (sec) is read **once** at t=0.23 (CCONT init); **regs 8/9 are never read** the whole
+    boot. The clock producer is dormant — it never even samples the time.
+  - **Operator name** — from network registration (GSM-L1/MM in `0x2b7xxx`, which never runs
+    — `docs/network_scouting.md`). Dormant.
+  - **Signal / battery** — CCONT ADC (regs 2/3, reg-indices 0x02/0x03). These **are** polled
+    constantly (~1358×/10 s), so the ADC producer *runs* — but signal bars are only rendered
+    into idle once camped. Producer alive, output not idle-rendered.
+
+**Verdict.** The content producers are all downstream of the **network-camped MMI state**.
+Without network registration (no L1/RF) the phone stays in "Insert SIM card", so nothing
+pushes content windows onto the display stack — even the RTC clock is never sampled, and the
+live ADC isn't rendered as bars. This is the same network/RF terminal as every other thread
+(`docs/network_scouting.md`), now mechanized down to the display-window-stack level: the idle
+container has exactly one layer because only the idle-entry pushes a window and no
+content-producer does. The clock is the only non-RF producer, but its display is gated on the
+camped state too (a real 3210 shows no clock without a SIM/network — the "Insert SIM card"
+modal). New diagnostic (opt-in, log-only): `TRACE_MMIVM` t6cmd tap (task-6 display commands).
