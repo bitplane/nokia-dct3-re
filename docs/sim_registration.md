@@ -277,3 +277,56 @@ remains to model faithfully.
 New symbols: service dispatcher `0x245a84`, SIM-server task `0x2af630`, SIM-server dispatcher
 `0x253e20`, task-20 family jump table `0x2084dc`, read-descriptor gate `0x208218`, RPC family head
 `0x293a6a` (+ `0x293946/0x293a96/0x293fa0`), reply status enum path `0x27e394→0x27e960→0x26a95c`.
+
+## BREAKTHROUGH — firmware-driven APDUs, and the ring#2-delivery fix (2nd 5-pass)
+
+A third 5-pass sweep cracked the "task 21 doesn't serve task-20 commands" wall and produced the
+**first firmware-driven SIM APDUs**.
+
+### The wall: ring#1 mask (CONFIRMED, proven at runtime)
+- recv `0x26a458` (current task `[0x100022]`) scans, by priority: **reply-list `TCB[+8]` → ring#2
+  `TCB[+0x14/0x18/0x19]` → ring#1 `TCB[+0xc/0x10/0x11]`** (TCB=`0x101484+task*0x1c`, also aliased
+  `0x108414` in some literals). Ring#1 is **gated by `MB[+0xf]` bit0** (MB=`0x1093bc+task*0x10`;
+  for task 21 the byte is **`0x10951b`**): **bit0 SET ⇒ ring#1 MASKED** (recv skips it, blocks);
+  CLEAR ⇒ served. Polarity CONFIRMED (`0x26a496`: `lsrs #1; bhs block`).
+- Only setter: **`0x26abba`** (mask, part of the "reply-wait" idiom `0x26abba`→recv→`0x26abf8`).
+  Only clearer: the **real recv auto-clears bit0** when it delivers a reply-list/ring#2 message
+  (`0x26a674`/`0x26a620`). No standalone re-arm.
+- Task 21's post-detect command loop is `0x27efb0 → 0x27defc (recv) → 0x27ede0 (dispatch)` — coded
+  correctly (Pass 1). But it blocks in the recv **because bit0 is left SET** after a masked
+  reply-wait recv, so ring#1 (where task 20's relayed commands land) is skipped forever.
+- Task-20 commands are posted to task 21's **ring#1** via `0x26a204(0x15)` (`0x293522` relay);
+  they are code **3** (read requests). Code-3 only *stashes* the request into `0x10deec`; the APDU
+  is emitted only when the pumped 3 is consumed at the `0x27efb0` site → `0x27ede0` → `0x27e98c`.
+
+### Proof (SIM_REG_REARM): first firmware-driven APDUs
+Clearing bit0 at each task-21 recv unblocks ring#1 → task 21 receives code-3, runs `0x27ede0`, and
+emits **uninjected firmware-driven APDUs**: `a0 2c`, `a0 f2` STATUS, `a0 a4 00 00 02` SELECT.
+(Band-aid on the wrong layer: it got one SELECT then desynced — the real fix is below.)
+
+### The root cause + production fix (Pass 4, CONFIRMED)
+`MODEL_SIM_CARD`'s recv-intercept is **architecturally wrong**: it hooks recv `0x26a458`
+(LR=`0x27df10`) and returns a synthetic message **without running the real recv**, so the rings are
+never drained and the wake/arm state (`MB[+0xd]` wait, `MB[+0xf]` arm) desyncs — task-20 ring#1
+commands strand. Also **`0x2aec34` is only a trace trampoline** (to `0x2b13a2`); the real APDU-out
+is `0x2a02e6`/byte-engine `0x2a0268` on SIM-UART MMIO **`0x020000`**, and genuine card responses
+arrive via RX-complete handler **`0x2a0454` → `0x26aac0(0x15) → RING#2`** as code **5** (ATR) /
+code **9** (data).
+
+**THE FIX:** deliver ATR/responses by **posting the response message to task 21's ring#2 via the
+real poster `0x26aac0(0x15, msg)`** (`{[+2]=len, [+4]=5|9, [+5..]=card bytes}`) and let the
+firmware's own recv run **unmodified**. Then ring#2 (responses) and ring#1 (task-20 commands) drain
+in priority order coherently, the arm-bit is maintained by the real recv, and no re-arm hack is
+needed. The most faithful variant drives the `0x020000` SIM-UART MMIO so `0x2a0454` emits the
+`0x26aac0` post itself; the minimal correct substitution is to post at `0x26aac0` directly.
+
+### Acceptance spec (Pass 5) — task 21 serving one task-20 read
+| recv code (via `0x27defc`) | task-21 action | APDU (`0x27e98c`) | response (rx `0x10dddc`) | reply to task 20 |
+|---|---|---|---|---|
+| **3** (payload→`0x10deec`) | `0x27edfc`: parse `[+6]`=INS `[+9]`=len | 5-byte hdr from `0x10deec+5` | ack code 7 | — |
+| **0xb** | `0x27ee94`: procedure byte, remaining len | GET_RESPONSE/continuation | data+SW1SW2 at `rx[len]` | — (loops) |
+| **0xa/0xf/0x11** | `0x27ef0a`: terminal report | — | final SW → `S[2]/S[3]` | `0x27e240`→`0x26a95c(0x14)` code **0x64/0x65/0x67/0x6a** (INS-keyed) + data+SW |
+| **0xd** (from task 20) | `0x27ee72`: `0x27dfc4`+`0x290208` | — | — | SIM-ready (`0x2ed42c`); clears no-SIM `[0x111c64]` |
+
+Reply target = task 20 via `0x26a95c` (ring#2); transport id `0x127`; SW at `rx[len]/rx[len+1]`.
+Async statuses (0x15 ATR / 0x16 detect / 0x1e err / 0x1f no-SIM) use the same path with no payload.
