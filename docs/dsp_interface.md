@@ -122,10 +122,55 @@ the interesting L1 half is gated behind the coherent-boot wall and can only be R
 statically until that wall falls. The practical unlock order is **coherent boot first, DSP
 L1 second** — the reverse of the intuition. Trace knob: `NOKI3210_TRACE_DSPIO`.
 
+## Per-primitive payload semantics (2026-07 — handler `0x23cde0`, classes 5/7/0xa)
+
+Decoded the primitive dispatch of `0x23cde0` (`[msg+9]` = primitive; `r5` = `msg+9`). **The
+key finding: most primitives forward straight into the `0x2a2xxx` idle-element render
+library — the DSP L1 layer *is* the idle content producer.** Each `0x2a2xxx` target opens
+with a call to the status classifier `0x28fa4c` (the same one that reads the camped/service
+state `[0x11fce1]`, from the camped-state dig) and then render-posts to task 5. So the full
+producer chain is:
+
+```
+DSP L1 status primitive → 0x23cde0 → 0x2a2xxx render fn → 0x28fa4c (camped-state gate)
+    → render-post 0x2af6ea → task 5 → idle content (signal bars / indicators / operator)
+```
+
+Primitive table (payload = byte fields at fixed offsets, big-endian 16-bit lengths, blobs):
+
+| prim | payload | target | role (inferred) |
+|------|---------|--------|-----------------|
+| `0x10` | `{b[2],b[3],b[4]}` | `0x2a23f2` | 3-field display indicator update |
+| `0x13` | `{b[2],b[3]}` | `0x2a24ae` (posts render id `0xd394`) | 2-field indicator update |
+| `0x16` | — | `0x2a237a` | indicator refresh/trigger |
+| `0x18` | `{b[1],…}` → 0x18-byte struct | (0x23ad40 err if b[1]==0) | structured element |
+| `0x1a` | `{b[1]}` | `0x2a2518` | 1-field element |
+| `0x1c` | `{b[1]!=0, b[2]==3, …}` parsed | `0x2a24f2` | structured element |
+| `0x22` | `{b[1]}` validate 1..3 | err `0x23cd96` | validation |
+| `0x25` | **null-terminated string** at `msg+5` (`strlen 0x2b6680`) | `0x23c664` parse | **text element (operator name?)** |
+| `0x30` | `{4 bytes, BE16 len, blob ≤0xaa}` | `0x2b2ec8` | data block |
+| `0x33` | `{b[1]}` | `0x2b2ed4` | short command |
+| `0x36` | `{type, count≤0xc, items, BE16 len, blob ≤0x12c}` | `0x2b2ebc` | list/data block |
+| `0x70` | — | `0x2b3ea2` | notification |
+
+So the primitives split into **display-update** (`0x10–0x1c`, `0x25` → `0x2a2xxx` render) and
+**L1 data-block** (`0x30/0x33/0x36` → `0x2b2exx`, carrying big-endian length-prefixed blobs
+up to 300 bytes — measurement/frame data). Big-endian multi-byte fields (`b[n]<<8|b[n+1]`)
+confirm GSM network-byte-order framing. This mechanizes *why* forcing the camped-state byte
+did nothing (previous dig): the content is produced by these DSP primitives arriving and
+being rendered — not by the state byte — and **no primitive ever arrives** (`TRACE_DSPMSG`:
+`0x23d62c` runs 0 times).
+
+⚠️ **swap16 correction to the camped-state dig:** the network-registration data it read as
+`[0x1028d1]`/`[0x107ed3]` is really the struct at **`0x10d124`** (literal `d1280010` →
+`0x0010d128`) / **`0x10d37e`** — a network/registration struct (field `+2` a status halfword,
+message chunks memcpy'd to `+0x34`), accessed from `0x26f1b8`/`0x208110`/`0x26f608`. The
+camped-dig *conclusion* (forcing `[0x11fce1]` changes nothing) stands; only the auxiliary
+net-data address was mis-swapped.
+
 ## Open items (future deep-dives)
-- Decode each recv handler's primitive set (`0x23cde0` etc.) and the full `0x2b66b0`
-  routing table — the DSP→MCU message *content* (the class/primitive skeleton is mapped
-  above; the per-primitive payload semantics are not).
+- Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the
+  `0x2b2exx` L1 data-block processors; the full `0x2b66b0` routing table.
 - Static RE of the `0x2b7xxx–0x2c9xxx` L1 driver *send* side: enumerate the 287 DSPIF
   command stubs and their command encodings (large, code never runs on our boot).
 - Identify the two downloaded blobs (`[0x200+]` from flash `0x200040`; `[0xe00+]`): DSP
