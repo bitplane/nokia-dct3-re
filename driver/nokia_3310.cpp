@@ -386,12 +386,6 @@ private:
 	unsigned      m_svcresp_state;      // 0 idle, 1 await-alloc, 2 await-post, 3 done
 	uint32_t      m_svcresp_saved[16];  // R0..R14 + CPSR saved at the trigger point
 	uint32_t      m_svcresp_msg;        // allocated message pointer
-	// Resource-enable trampoline state (NOKI3210_MODEL_RES_ENABLE): delivers contact-service
-	// command 0x70 (channel-map / resource enable) with a config blob so the firmware's own
-	// 0x2b140a registers the resource-availability bitmap [0x11ff08] + enable [0x11fee4].
-	unsigned      m_resen_state = 0;    // 0 idle, 1 await-alloc, 2 await-post, 3 done
-	uint32_t      m_resen_saved[16];    // R0..R14 + CPSR saved at the trigger point
-	uint32_t      m_resen_msg = 0;      // allocated message pointer
 	// MODEL_STARTUP_REPORTS: feed the subsystem-ready reports (code 7 + the mode-4 6-message checklist
 	// codes + 0x74 + 3/0x11) to task-1's getter reactively, as the real subsystems would post them.
 	unsigned      m_reports_idx = 0;    // index into the report-code FEED list
@@ -620,27 +614,25 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      code (no result-forcing); all oracle-preserving. The stack that reaches the
 //      "Insert SIM card" home screen: MODEL_DSP_SERVICE, MODEL_CCONT_PRESENT,
 //      MODEL_SVC_RESPONDER, MODEL_SVC_CHANNEL_DRAIN, MODEL_SIM_CARD (+ MODEL_SIM_ATR,
-//      the register-level ATR variant), and MODEL_RES_ENABLE (display-resource
-//      registration groundwork for operator-idle). MODEL_STARTUP_REPORTS feeds the
+//      the register-level ATR variant). MODEL_STARTUP_REPORTS feeds the
 //      subsystem-ready reports that drive the post-SIM interactive handoff (code-7
 //      trigger + mode-4 checklist + VBAT-confirm), advancing task 1 mode 4 -> 0xc;
 //      docs/interactive_handoff.md. See docs/service_bootstrap.md,
 //      docs/boot_to_insert_sim.md, docs/sim_emulator_scope.md.
+//      NOTE: MODEL_SIM_CARD's single-EF read + SIM_CARD_CLEAR_NOSIM poke is a KNOWN
+//      SHORT-CUT (not faithful): it stands in for the real SIM-init read sequencer, which
+//      the firmware does not drive on its own (docs/sim_emulator_scope.md, moves 1+2). The
+//      current SIM-lifecycle work replaces it with a faithful multi-file responder.
 //
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
-//      TRACE_CCONT_READ (power/ADC), TRACE_LIMP/TRACE_LIMP2 (the startup limp),
-//      TRACE_CSCMD (contact-service command stream), TRACE_RESAVAIL (display-resource
-//      availability), TRACE_DSPDRV (entries into the GSM-L1/audio DSP driver layer),
-//      TRACE_DSPIO (MCU<->DSP shared-RAM + DSPIF access map; docs/dsp_interface.md) --
-//      the network/DSP frontier (docs/network_scouting.md), TRACE_HANDOFF (task-1 master
+//      TRACE_CCONT_READ (power/ADC/RTC), TRACE_LIMP/TRACE_LIMP2 (the startup limp),
+//      TRACE_CSCMD (contact-service command stream), TRACE_HANDOFF (task-1 master
 //      sequencer mode + startup checklist; the post-SIM interactive handoff),
 //      TRACE_TASKS (app-task liveness + inter-task message edges), TRACE_MMIVM (the MMI VM
-//      / task-5 event stream: proves the idle transition IS reached at t~6.38 --
-//      display_idle -> resource-get(0x4c22) fails on [0x11fee4]==0; docs/interactive_handoff.md).
-//      Most RE forcing shims and one-off traces have
-//      been retired (docs/removed_forcing_knobs.md); the one live research force is
-//      EXPERIMENT_UIINIT_SKIP -- no-ops the mode-0xc display-init call so the app-task
-//      layer past it can be probed (the current "force to explore" frontier).
+//      / task-5 event stream + display_idle entry + t6cmd = the task-6 display-command
+//      stream; the "first content-window push" oracle for the SIM-lifecycle work).
+//      The SIM APDU stream the phone sends is logged by MODEL_SIM_CARD (sim_apdu). Retired
+//      forcing shims and one-off traces: docs/removed_forcing_knobs.md.
 //
 // The forcing/model logic is quarantined in flash_firmware_hooks / ram_*_firmware_*
 // (banner'd "NOT hardware behaviour"); see docs/driver_structure.md.
@@ -767,8 +759,6 @@ void noki3310_state::machine_reset()
 	m_after_mad2_soft_reset = false;
 	m_svcresp_state = 0;
 	m_svcresp_msg = 0;
-	m_resen_state = 0;
-	m_resen_msg = 0;
 	m_reports_idx = 0;
 	m_battery_startup_event_step = 0;
 	m_battery_startup_event_step_mode9 = 0;
@@ -1512,27 +1502,8 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
 	m_timer_dsp_service->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", 5)));
 }
 
-// TRACE_DSPIO (opt-in): map the MCU<->DSP interface. Logs first-touch of each distinct
-// DSP shared-RAM (0x10000) offset and DSPIF (0x30000) register the firmware accesses, with
-// direction, value, and the accessing PC. Byte offsets are shown (halfword*2). See docs/dsp_interface.md.
-static bool dsp_io_first_touch(char kindc, unsigned byte_off, char dir, u32 pc)
-{
-	// Dedup per distinct (kind, dir, offset, PC) so every call site is shown once.
-	static std::unordered_map<uint64_t, bool> seen;
-	const uint64_t key = (uint64_t(unsigned(kindc)) << 56) | (uint64_t(unsigned(dir)) << 48)
-			| (uint64_t(byte_off & 0xffff) << 32) | pc;
-	static unsigned n = 0;
-	if (seen[key] || n >= 600) return false;
-	seen[key] = true; n++;
-	return true;
-}
-
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'R', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
-		logerror("dspio: shram R [%03x] = %04x  pc=%08x\n", offset << 1, m_dsp_ram[offset & 0x7ff],
-				m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
-
 	// HACK: avoid hangs when ARM try to communicate with the DSP
 	if (offset <= 0x004 >> 1)   return 0x01;
 	if (offset == 0x0e0 >> 1)   return 0x00;
@@ -1545,10 +1516,6 @@ uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	COMBINE_DATA(&m_dsp_ram[offset & 0x7ff]);
-
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('s', offset << 1, 'W', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
-		logerror("dspio: shram W [%03x] = %04x  pc=%08x\n", offset << 1, m_dsp_ram[offset & 0x7ff],
-				m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 
 	// DSP service-completion model (opt-in): when the MCU queues lower-service work by
 	// writing a non-zero count to the pending counter (byte 0xe4, pc 0x290c98), the real
@@ -1592,10 +1559,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
 
 		if (m_svcresp_state == 0 && addr == 0x00237bc6 &&
-				machine().time().as_double() >= nokia_env_u32("NOKI3210_SVC_RESPONDER_DELAY_MS", 450) / 1000.0 &&
-				// When RES_ENABLE is on, let it deliver cmd 0x70 FIRST (the enable command must be
-				// processed before the 0x64 completion, which ends the contact-service command loop).
-				(nokia_env_u32("NOKI3210_MODEL_RES_ENABLE", 0) == 0 || m_resen_state == 3))
+				machine().time().as_double() >= nokia_env_u32("NOKI3210_SVC_RESPONDER_DELAY_MS", 450) / 1000.0)
 		{
 			for (int i = 0; i < 15; i++) m_svcresp_saved[i] = getr(i);
 			m_svcresp_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
@@ -1657,125 +1621,10 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 	}
 
-	// MODEL: resource-enable / channel-map command 0x70 (opt-in, NOKI3210_MODEL_RES_ENABLE).
-	// The display/idle draw acquires resources through 0x2b12b4, which needs the enable flag
-	// [0x11fee4] set AND the per-class bit in the availability bitmap [0x11ff08]. Both are
-	// registered only by resource_system_init 0x2b140a, which fires from the contact-service
-	// command handler 0x23670c on command byte [msg+8]==0x70 (config blob = msg+9, 0x40 bytes;
-	// enable value read from [0x11fedd]). On our faked session only cmd 0x64 is delivered, so
-	// 0x70 never arrives (TRACE_CSCMD). This model synthesises it the same faithful way as
-	// MODEL_SVC_RESPONDER: drive the firmware's own alloc 0x26afe0 -> fill -> post 0x26a204,
-	// seeding the enable-param struct [0x11fedd/de/df] the handler reads (never written on our
-	// boot; on a real phone a prior channel-setup command sets it). Delivered once, after the
-	// 0x64 completion. The config blob defaults to all-0xff = "all resource classes available".
-	if (nokia_env_u32("NOKI3210_MODEL_RES_ENABLE", 0) != 0 && pc == addr)
-	{
-		constexpr u32 SENT2 = 0x003ff100;    // distinct flash return sentinel (SVC_RESPONDER uses 0x3ff000)
-		constexpr uint16_t BX_R12 = 0x4760;
-		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
-		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
-		const u32 msgsz = nokia_env_u32("NOKI3210_RES_ENABLE_MSGSZ", 0x50);   // >= 9 + 0x40 config blob
-
-		// Seed the enable value [0x11fedd] right at the enable-handler entry 0x2366d4, immediately
-		// before it reads it (0x2366ec) and passes it as the enable arg to 0x2b140a. A post-time seed
-		// does not survive to here (the enable-param struct is only-read on our boot; on a real phone
-		// a prior channel-setup command sets it). Any nonzero value -> [0x11fee4] enable set.
-		if (addr == 0x002366d4)
-			debug_ram_byte_w(0x0011fedd, uint8_t(nokia_env_u32("NOKI3210_RES_ENABLE_VAL", 1)));
-
-		if (m_resen_state == 0 && addr == 0x00237bc6 &&
-				machine().time().as_double() >= nokia_env_u32("NOKI3210_RES_ENABLE_MS", 440) / 1000.0)
-		{
-			for (int i = 0; i < 15; i++) m_resen_saved[i] = getr(i);
-			m_resen_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			setr(0, msgsz);                    // alloc size
-			setr(14, SENT2 | 1);               // LR -> sentinel
-			setr(12, 0x0026afe0 | 1);          // r12 -> alloc
-			m_resen_state = 1;
-			logerror("resen: trigger task=%02x t=%.4f -> alloc(%#x)\n",
-					debug_ram_byte(0x00100022), machine().time().as_double(), msgsz);
-			return BX_R12;
-		}
-		if (m_resen_state == 1 && addr == SENT2)
-		{
-			const u32 msg = getr(0);
-			if (msg >= 0x00100000 && msg < 0x00180000)
-			{
-				for (u32 i = 0; i < msgsz; i++) debug_ram_byte_w(msg + i, 0);
-				debug_ram_byte_w(msg + 3, 0x40);   // -> 0x237400 dispatch route
-				debug_ram_byte_w(msg + 5, 0x50);   // [msg+5] must be > 0x42 (enable gate at 0x2366cc)
-				debug_ram_byte_w(msg + 8, 0x70);   // -> channel-map handler 0x23670c, ENABLE branch
-				// config blob msg+9 .. msg+0x49 (0x40 bytes): first 0x20 -> bitmap [0x11ff08],
-				// second 0x20 -> [0x11fee8]. bit(class&7) of blob[class>>3] marks class available.
-				// DEFAULT is SPARSE: register only the idle-draw resource class 0x22 (bit2 of byte4).
-				// Enabling ALL classes (RES_ENABLE_FILL=0xff) is unfaithful and blanks the display --
-				// the firmware acquires resource-classes with no real provider. A faithful blob is the
-				// real 0x40 provisioned bytes (not obtainable here); this sparse default is the minimal
-				// stab that keeps the display alive while satisfying the idle-draw availability check.
-				const unsigned fillenv = nokia_env_u32("NOKI3210_RES_ENABLE_FILL", 0x100);   // 0x100 = sparse
-				if (fillenv <= 0xff)
-					for (u32 i = 0; i < 0x40; i++) debug_ram_byte_w(msg + 9 + i, uint8_t(fillenv));
-				else
-				{
-					// SPARSE (safe default): register only the display resource classes that have ROM
-					// resource definitions in table 0x2e0a50 -- 0x4c (idle window 0x4c22), 0x4f, 0x50,
-					// 0x52, 0x56. These are ROM-backed, so marking them available is safe (display stays
-					// alive). The availability bit for class C is masktable[C&7] @0x2e2f5c; blob[C>>3] |=
-					// masktable[C&7]. NB: the mask table is a swap16 TRAP -- the swap16-image bytes read
-					// {40,80,10,20,04,08,01,02}, but ldrb reads the REAL rom byte image[addr^1], so the
-					// firmware sees masktable = {0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01} = 0x80>>(C&7).
-					// (An earlier version used the permuted bytes and silently enabled the WRONG classes
-					// {0x4d,0x4e,0x51,0x53,0x57}, so 0x4c22 was never actually available.) Correct masks:
-					//   0x4c: C>>3=9, mask 0x80>>4=0x08 ; 0x4f: C>>3=9, mask 0x80>>7=0x01  => byte9=0x09
-					//   0x50: C>>3=a, mask 0x80>>0=0x80 ; 0x52: 0x80>>2=0x20 ; 0x56: 0x80>>6=0x02 => byteA=0xa2
-					// Registering the OTHER ~13 idle-content classes the draw queries has NO ROM backing
-					// -> the render then fails (blank); see docs/sim_emulator_scope.md.
-					debug_ram_byte_w(msg + 9 + 9, 0x09);   // byte9: classes 0x4c (idle window) + 0x4f
-					debug_ram_byte_w(msg + 9 + 0xa, 0xa2); // byteA: classes 0x50 + 0x52 + 0x56
-				}
-				// Seed the enable-param struct the handler reads (only-read, never-written on our
-				// boot): [0x11fedd]=enable value (any nonzero -> [0x11fee4]); [de]/[df] secondary.
-				debug_ram_byte_w(0x0011fedd, uint8_t(nokia_env_u32("NOKI3210_RES_ENABLE_VAL", 1)));
-				debug_ram_byte_w(0x0011fede, 0);
-				debug_ram_byte_w(0x0011fedf, 0);
-				// The command dispatcher 0x237400 gates all non-0x64 commands on service-ready
-				// [0x11fed1] bit0 (0x237426: skips to 0x237894 if clear). On our boot it is 0 (0xcc),
-				// so cmd 0x70 would be dropped. Seed bit0 (models the service session reaching ready,
-				// analogous to MODEL_SVC_CHANNEL_DRAIN seeding bit2).
-				debug_ram_byte_w(0x0011fed1, debug_ram_byte(0x0011fed1) | 0x01);
-				const uint8_t task = debug_ram_byte(0x00100022);
-				setr(0, task);
-				setr(1, msg);
-				setr(14, SENT2 | 1);
-				setr(12, 0x0026a204 | 1);          // r12 -> post_task_message
-				m_resen_msg = msg;
-				m_resen_state = 2;
-				logerror("resen: alloc=%08x -> post(task=%02x cmd=70 blob=%s)\n", msg, task,
-					fillenv <= 0xff ? "fill" : "sparse-class0x22");
-				return BX_R12;
-			}
-			for (int i = 0; i < 15; i++) setr(i, m_resen_saved[i]);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_resen_saved[15]);
-			setr(12, 0x00237bc6 | 1);
-			m_resen_state = 3;
-			logerror("resen: alloc returned %08x (not RAM) — aborted\n", msg);
-			return BX_R12;
-		}
-		if (m_resen_state == 2 && addr == SENT2)
-		{
-			for (int i = 0; i < 15; i++) setr(i, m_resen_saved[i]);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_resen_saved[15]);
-			setr(12, 0x00237bc6 | 1);
-			m_resen_state = 3;
-			logerror("resen: posted cmd 0x70; resuming contact-service loop t=%.4f\n", machine().time().as_double());
-			return BX_R12;
-		}
-	}
-
 	// TRACE_TASKS (opt-in): app-task-layer forcing-sweep tap. Log the first time each RTOS task reaches
-	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). With MODEL_STARTUP_REPORTS
-	// + EXPERIMENT_UIINIT_SKIP this shows which of the app tasks 10-17 (resumed by mode-0xc's 0x2795e6)
-	// actually come alive. Task id = [0x100022]. docs/interactive_handoff.md app-task sweep.
+	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the faithful boot
+	// stack this shows which of the app tasks 10-17 (resumed by mode-0xc's 0x2795e6) actually come
+	// alive. Task id = [0x100022]. docs/interactive_handoff.md app-task sweep.
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x0026a458)
 	{
 		static u32 seen = 0;
@@ -1820,53 +1669,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("t6cmd: NEW display cmd=%02x sub=%02x t=%.4f\n", cmd, sub, machine().time().as_double()); }
 		if (i < 64) cnt[i]++;
 	}
-	// TRACE_DSPMSG (opt-in): the L1<->DSP mailbox recv side. Hook post-bl 0x23d638 in the DSP-IF message
-	// dispatch 0x23d62c (r4 = message): [r4+3] = message class (dispatch key: 2/3/5/6/7/8/a/11/13/14/47/64/d5),
-	// [r4+9] = primitive sub-type. Shows which DSP->MCU L1 messages actually arrive on our boot (vs the
-	// dormant network protocol). docs/dsp_interface.md.
-	if (nokia_env_u32("NOKI3210_TRACE_DSPMSG", 0) != 0 && pc == addr && addr == 0x0023d638)
-	{
-		const u32 m = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
-		const u32 cls = debug_ram_byte(m + 3), prim = debug_ram_byte(m + 9);
-		static u32 seen[64]; static unsigned n = 0; static u32 tot = 0; tot++;
-		const u32 kv = (cls << 8) | prim;
-		unsigned i = 0; for (; i < n; i++) if (seen[i] == kv) break;
-		if (i == n && n < 64) { seen[n++] = kv;
-			logerror("dspmsg: NEW class=%02x prim=%02x t=%.4f\n", cls, prim, machine().time().as_double()); }
-		if ((tot % 500) == 0) logerror("dspmsg: %u messages by t=%.4f\n", tot, machine().time().as_double());
-	}
 	// TRACE_MMIVM (opt-in): the MMI-VM (task 5) event loop, hooked at the post-recv point 0x2af582 in the
 	// event fetch 0x2af57c. r0 = message ptr; [r0] = raw 16-bit code -> event = code & 0x1fff, params = code>>14.
 	// Logs each distinct event code once (first-seen time + running count), so the steady-state event mix task 5
 	// actually processes on the "Insert SIM card" screen is visible -- what it dequeues and what it never gets.
 	// docs/interactive_handoff.md MMI-VM dig.
 	// TRACE_MMIVM: also mark display_idle 0x2a255c entry (the fn that acquires idle window 0x4c22 and
-	// render-posts 0x0547 to task 5) so its firing time lines up with the 0x0547 dequeue and the
-	// resource-availability queries (TRACE_RESAVAIL) inside the 0x0547 handler.
+	// render-posts 0x0547 to task 5) so its firing time lines up with the 0x0547 dequeue.
 	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a255c)
 		logerror("mmivm: >>> display_idle 0x2a255c entry t=%.4f\n", machine().time().as_double());
-	// post-bl point after resource-get(0x4c22): r0 = idle-window handle (nonzero) or fail (0).
-	// Also snapshot the availability inputs: master-enable [0x11fee4] and the class-0x4c bitmap byte
-	// [0x11ff11] (class 0x4c: byte 0x11ff08+(0x4c>>3)=+9, permuted mask rt[4]=0x04).
-	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a2566)
-		logerror("mmivm: resource-get(0x4c22) -> r0=%08x  enable[11fee4]=%02x  bitmap[11ff11]=%02x t=%.4f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), debug_ram_byte(0x0011fee4),
-				debug_ram_byte(0x0011ff11), machine().time().as_double());
-	// camped/service state snapshot at the idle moment: [0x11fce1] MMI service byte (classifier 0x28f0f2:
-	// 4/5/6 = service classes), [0x1119fd] status-icon gate, and the DSP-shared-RAM network-registration
-	// words [0x1028d1]/[0x107ed3] (read via 0x26f952; 0 when L1/DSP network never runs).
-	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002a2566)
-		logerror("mmivm: service: [11fce1]=%02x [1119fd]=%02x [11fcce]=%02x  netdsp[1028d1]=%08x [107ed3]=%02x t=%.4f\n",
-				debug_ram_byte(0x0011fce1), debug_ram_byte(0x001119fd), debug_ram_byte(0x0011fcce),
-				(debug_ram_byte(0x001028d1)<<24)|(debug_ram_byte(0x001028d2)<<16)|(debug_ram_byte(0x001028d3)<<8)|debug_ram_byte(0x001028d4),
-				debug_ram_byte(0x00107ed3), machine().time().as_double());
-	// resource-get 0x2b257e availability result (post-bl 0x2b2588, id in r6): 0 = unavailable.
-	// Pins the idle-window acquisition: with MODEL_RES_ENABLE this is where the mask-table swap16
-	// trap showed up (avail=0 despite enable+bitmap set) -- see docs/interactive_handoff.md.
-	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002b2588)
-		logerror("mmivm:   resget id=%04x avail=%u t=%.4f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xffff,
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) != 0, machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MMIVM", 0) != 0 && pc == addr && addr == 0x002af582)
 	{
 		const u32 msgp = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
@@ -2008,45 +1819,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					debug_ram_byte(msg+6), m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					machine().time().as_double());
 	}
-	// startup-message dequeue probe: at 0x26ff1a (just after bl 0x26a458) log the raw message id
-	// r0 the translator received — the channel the 000d handler actually reads (vs 0x2697aa events).
-	// 0x70 channel-map response probes: does the 0x70/0x71 command handler (0x23670c) and/or the
-	// channel-map-apply (0x2366c8) run, with what enable flags? Tests delivering a 0x70 response via
-	// the responder (SVC_RESPONDER_B9=0x70) so the firmware sets 0x11fee4 itself.
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr &&
-			(addr == 0x00236dc4 || addr == 0x00236e60 || addr == 0x002b140a))
-	{
-		static unsigned ch70 = 0;
-		if (ch70++ < 24)
-			logerror("svc70: pc=%08x (236dc4=resp,236e60=high-cmd,2b140a=config-writer) r0=%02x r6=%02x enable[11fee4]=%02x%02x t=%.5f\n",
-					pc, m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xff,
-					debug_ram_byte(0x0011fee4), debug_ram_byte(0x0011fee5), machine().time().as_double());
-	}
-		// TRACE_RESAVAIL (opt-in): the availability predicate 0x2b12b4 -- log the resource id (r0),
-		// enable [0x11fee4], the class, the bitmap byte it reads, the permuted mask, and the verdict.
-		// Pins exactly why acquisition of the idle window 0x4c22 (class 0x4c) fails.
-		if (nokia_env_u32("NOKI3210_TRACE_RESAVAIL", 0) != 0 && pc == addr && addr == 0x002b12b4)
-		{
-			const u32 id = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
-			const unsigned cls = (id >> 8) & 0xff;
-			const uint8_t byte = debug_ram_byte(0x0011ff08 + (cls >> 3));
-			static const uint8_t rt[8] = {0x40,0x80,0x10,0x20,0x04,0x08,0x01,0x02};
-			static unsigned ra = 0;
-			if (debug_ram_byte(0x0011fee4) != 0 && ra++ < 80) logerror("resavail: id=%04x cls=%02x en[11fee4]=%02x byte[11ff%02x]=%02x mask=%02x -> %s t=%.4f\n",
-					id, cls, debug_ram_byte(0x0011fee4), 0x08 + (cls>>3), byte, rt[cls&7],
-					(byte & rt[cls&7]) ? "AVAIL" : "UNAVAIL", machine().time().as_double());
-		}
-		// TRACE_DSPDRV (opt-in, scouting): log distinct branch/call targets entering the GSM-L1 / audio
-		// DSP driver layer 0x2b6000-0x2c8000 -- does the post-SIM boot reach the RF/network driver at all?
-		if (nokia_env_u32("NOKI3210_TRACE_DSPDRV", 0) != 0 && pc == addr && addr >= 0x002b6000 && addr < 0x002c8000)
-		{
-			static std::unordered_map<u32, bool> seen;
-			static unsigned dd = 0;
-			if (!seen[addr] && dd++ < 120) { seen[addr] = true;
-				logerror("dspdrv: enter %08x lr=%08x t=%.4f\n", addr,
-						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double()); }
-		}
 		// TRACE_CSCMD (opt-in, fetch side): the contact-service command dispatcher 0x237400 reads the
 		// command byte [msg+8] into r4 at 0x23741a and binary-searches to a handler. cmd 0x70/0x71 route to
 		// the channel-map handler 0x23670c: 0x70 = resource ENABLE (-> 0x2b140a, config blob = msg+9),
@@ -2151,24 +1923,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// so the sequencer takes the confirmed path 0x2713b6 instead of draining at 0x2714a4.
 	if (nokia_env_u32("NOKI3210_MODEL_STARTUP_REPORTS", 0) != 0 && pc == addr && addr == 0x0027139e)
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 3);
-	// EXPERIMENT_UIINIT_SKIP (diagnostic): the mode-0xc handler's display-init call 0x2a1300->0x2355b6 does
-	// not return on our boot (it resumes app tasks 10-17 + threads scheduler yields that never settle). Skip
-	// that specific call (return from 0x2355b6 when invoked from the display init at lr=0x2a130c) so the
-	// mode-0xc handler can continue -- to see whether the sequencer then reaches mode-0 and runs the
-	// interactive-init 0x270d1c.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_UIINIT_SKIP", 0) != 0 && pc == addr && addr == 0x002355b6 &&
-			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x002a130c)
-	{
-		static unsigned e = 0; if (e++ < 3) logerror("uiskip: skipping 0x2355b6 (display init) t=%.4f\n", machine().time().as_double());
-		return 0x4770;   // bx lr -> return immediately
-	}
-	// With EXPERIMENT_UIINIT_SKIP, mark when the mode-0xc display init returns (0x2a130c) so the app-task
-	// forcing sweep can see how far past the display-init wall the sequencer then gets.
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr && addr == 0x002a130c)
-	{
-		static unsigned n = 0;
-		if (n++ < 3) logerror("uiskip: display init returned (0x2a130c) t=%.4f\n", machine().time().as_double());
-	}
 	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate
 	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the
 	// service-channel-busy bit [0x11fed1] bit2 (0x04) to clear -- which a real service peer does by
@@ -3013,16 +2767,12 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'R', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
-		logerror("dspio: dspif R [%03x]        pc=%08x\n", offset, m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 	return 0;
 }
 
 void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 {
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
-	if (nokia_env_u32("NOKI3210_TRACE_DSPIO", 0) && dsp_io_first_touch('d', offset, 'W', m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1)))
-		logerror("dspio: dspif W [%03x] = %02x   pc=%08x\n", offset, data, m_maincpu->state_int(arm7_cpu_device::ARM7_PC) & ~u32(1));
 }
 
 uint8_t noki3310_state::mad2_mcuif_r(offs_t offset)

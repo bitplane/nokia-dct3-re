@@ -11,6 +11,49 @@ ATR, **accepts the SIM** and enters the read flow. The read flow is fully mapped
 but **dormant** — reaching idle needs the SIM *conversation* to complete, not a
 poke. This doc scopes that build.
 
+## ★ Moves 1+2 (2026-07): the SIM-init READ SEQUENCER is the real blocker
+
+A cross-model review (GPT-5.6) pushed back on the earlier "everything terminates at the
+RF/DSP wall" conclusion, arguing it was **confounded by the model's own SIM scaffolds**. Two
+read-only probes settled it — and the pushback was right.
+
+**The firmware's SIM manager (task 21) is a passive request-server.** It issues an APDU only
+when a code-3 `{len, code, APDU, fileid}` read-request message is queued to it (dispatch
+`0x27df64` → APDU-send `0x2aec34`). It does **not** walk a file list on its own.
+
+**Probe (move 2):** ran `MODEL_SIM_CARD` with the injection step-machine **off**
+(`SIM_CARD_EF` unset) and **no `SIM_CARD_CLEAR_NOSIM`**. Over 20 s the firmware's entire SIM
+activity is: ATR (recv #2) → PPS `ff 00 ff` (recv #3) → **silence. Zero file reads, no
+retries.** In the full profile, by contrast, *every* SELECT/GET_RESPONSE/READ is
+**model-injected** (each `sim_apdu` line is preceded by a `sim_card: EF step N` inject).
+
+**So the model's single-EF injection + `CLEAR_NOSIM` poke (`[0x111c64]=0`) was a crude
+stand-in for the real SIM-init read sequencer** — the higher-level code that walks
+ICCID/IMSI/SST/LOCI/… and posts read requests. That sequencer is not running/triggered on
+our boot; the manager negotiates ATR/PPS and then parks.
+
+**Reframe of the whole project (milestones):**
+- **Milestone 1 — no-SIM "Insert SIM card":** done (the no-model oracle).
+- **Milestone 2 — offline no-service idle + menu/Snake (valid SIM, no coverage):** *not
+  network-gated.* Real hardware: a 3210 with a SIM but no coverage still gives Menu/Snake.
+  So the blocker is the SIM-init lifecycle, **not** L1/RF. This is the near-term target.
+- **Milestone 3 — operator name / signal bars / registered service:** genuinely needs
+  GSM-L1/DSP/RF (docs/network_scouting.md, dsp_interface.md). Deferred.
+
+All prior "idle content needs network registration" conclusions were observed **under the
+full profile**, where the injection + `CLEAR_NOSIM` short-circuit the SIM lifecycle — a
+confound. Correcting it re-opens milestone 2.
+
+**Critical path (the sequencer hunt):** find what triggers/gates the SIM-init read sequencer
+after ATR/PPS. Candidates: (a) the ATR `3b1005` is too minimal for the parser `0x27e046` to
+advance to init; (b) a "SIM detected/ready" message that should kick off init isn't produced;
+(c) the sequencer is a higher task gated on state the scaffolds bypass. Then replace the
+`CLEAR_NOSIM` short-cut with a faithful multi-file GSM 11.11 responder. **New success oracles
+(better than pixels): first content-window push beyond the base idle (task-6 `cmd 01/*`,
+`TRACE_MMIVM` t6cmd), and first MMI key-navigation event (task 5, `POST_READY_KEY`).**
+Key symbols: SIM read-dispatch `0x27df64`, manager recv `0x27df10`, ATR parser `0x27e046`,
+descriptors `0x10dcc8`/`0x10deec`.
+
 ## Why an emulator, not injection
 
 The c0–c2 experiments ruled out every shortcut, and that negative result is the

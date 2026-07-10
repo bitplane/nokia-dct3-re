@@ -137,6 +137,35 @@ retired (git-recoverable):
 
 **Kept:** `MODEL_STARTUP_REPORTS` (+ `STARTUP_REPORTS_MS`) — faithful; the curated
 `TRACE_HANDOFF` seam set (dispatcher/mode/checklist, mode transitions, mailbox-post
-inventory, VBAT-gate byte, interactive-init/idle markers); and **one live research
-force, `EXPERIMENT_UIINIT_SKIP`** — no-ops the mode-0xc display-init call so the
-app-task layer past it can be probed (the current "force to explore" frontier).
+inventory, VBAT-gate byte, interactive-init/idle markers).
+
+## 2026-07 SIM-lifecycle-pivot cleanup
+
+After moves 1+2 (docs/sim_emulator_scope.md "SIM-init sequencer" section) reframed the
+target from "operator-idle / RF" to **milestone 2 (offline no-service menu)**, the
+DSP/network and resource-content threads were deprioritised and their forcing shims +
+one-off diagnostic taps retired (all git-recoverable):
+
+- **`MODEL_RES_ENABLE`** (+ `RES_ENABLE_VAL/MS/MSGSZ/FILL`) — the cmd-0x70 resource-enable
+  trampoline. Proven necessary-but-insufficient for the operator-idle window (milestone 3):
+  registering the idle window `0x4c22` lets `display_idle` acquire it but the render then
+  blanks on unbacked content classes (docs/resource_providers.md). Not needed for milestone 2.
+- **`EXPERIMENT_UIINIT_SKIP`** — no-op'd the mode-0xc display-init call. The mode-0xc /
+  coherent-boot thread it probed is understood; superseded.
+- **`TRACE_DSPMSG` / `TRACE_DSPDRV` / `TRACE_DSPIO`** — the L1↔DSP mailbox / DSP-interface
+  taps. The DSP protocol is mapped and dormant (docs/dsp_interface.md); the thread is
+  deprioritised until (if ever) a DSP-L1 model exists to exercise it.
+- **`TRACE_RESAVAIL`** and the `TRACE_MMIVM` sub-hooks for the closed digs (resource-get
+  `0x4c22` result, `resget` availability `0x2b2588`, the camped-state service snapshot) —
+  the resource-content and camped-state threads are bottomed out (docs/interactive_handoff.md).
+
+**Kept for the new approach:** `MODEL_SIM_CARD`'s `sim_apdu` trace (the SIM APDU stream — the
+move-2 tool), the `TRACE_MMIVM` **t6cmd** tap (task-6 display-command stream = the
+"first content-window push" oracle) + the event-stream / `display_idle`-entry taps,
+`TRACE_HANDOFF` (task-1 mode / checklist), `TRACE_TASKS`, `TRACE_CCONT_READ` (incl. RTC),
+`TRACE_CSCMD`, `TRACE_LIMP/LIMP2`, and `POST_READY_KEY` (the key-nav oracle).
+
+⚠️ **`SIM_CARD_CLEAR_NOSIM` + the single-EF injection are a known short-cut, not faithful**
+(moves 1+2): they stand in for the SIM-init read sequencer the firmware doesn't self-drive.
+Slated for replacement by a faithful multi-file GSM 11.11 responder — kept meanwhile as the
+current best boot reference.

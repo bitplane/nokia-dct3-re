@@ -1,5 +1,15 @@
 # The interactive-boot handoff — task-1 master sequencer, traced
 
+> ⚠️ **2026-07 caveat — read `docs/sim_emulator_scope.md` "Moves 1+2" first.** Many
+> conclusions below (idle content / camped state / DSP primitives "terminate at the RF/DSP
+> wall") were observed under the *full model profile*, where `MODEL_SIM_CARD`'s single-EF
+> injection + `SIM_CARD_CLEAR_NOSIM` poke short-circuit the SIM-init lifecycle — a confound.
+> The firmware's SIM manager is a passive request-server that reads **zero** files on its
+> own after ATR/PPS; the real blocker is the un-triggered **SIM-init read sequencer**, and
+> **milestone 2 (offline no-service menu) is not network-gated**. The RF-wall findings hold
+> only for milestone 3 (operator/signal). Treat the DSP/content/camped sections below as
+> milestone-3 background, not the near-term path.
+
 Every thread of this project (SIM acceptance, MMI state, keypad input, the display
 resource-enable, the idle repaint) ends at the same place: some post-startup transition
 into the interactive/idle UI never fires, so the screen holds at "Insert SIM card". This
