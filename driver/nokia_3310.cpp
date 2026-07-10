@@ -392,12 +392,9 @@ private:
 	unsigned      m_resen_state = 0;    // 0 idle, 1 await-alloc, 2 await-post, 3 done
 	uint32_t      m_resen_saved[16];    // R0..R14 + CPSR saved at the trigger point
 	uint32_t      m_resen_msg = 0;      // allocated message pointer
-	// MODEL_STARTUP_REPORTS: inject the subsystem-ready reports (code 7 + the mode-4 6-message
-	// checklist codes) into task-1's mailbox via the firmware's own post 0x26a354, as the real
-	// subsystems would. State machine driving one 0x26a354(1,code) call per report code.
-	unsigned      m_reports_state = 0;  // 0 idle, 1 armed, 2 posting, 3 done
-	unsigned      m_reports_idx = 0;    // index into the report-code list
-	uint32_t      m_reports_saved[16];  // R0..R14 + CPSR saved at the trigger point
+	// MODEL_STARTUP_REPORTS: feed the subsystem-ready reports (code 7 + the mode-4 6-message checklist
+	// codes + 0x74 + 3/0x11) to task-1's getter reactively, as the real subsystems would post them.
+	unsigned      m_reports_idx = 0;    // index into the report-code FEED list
 	// SIM ATR FIFO (NOKI3210_MODEL_SIM_ATR): register-level ATR delivery on SIM activation.
 	uint8_t       m_sim_atr[40];
 	uint8_t       m_sim_atr_len = 0;
@@ -624,7 +621,10 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      "Insert SIM card" home screen: MODEL_DSP_SERVICE, MODEL_CCONT_PRESENT,
 //      MODEL_SVC_RESPONDER, MODEL_SVC_CHANNEL_DRAIN, MODEL_SIM_CARD (+ MODEL_SIM_ATR,
 //      the register-level ATR variant), and MODEL_RES_ENABLE (display-resource
-//      registration groundwork for operator-idle). See docs/service_bootstrap.md,
+//      registration groundwork for operator-idle). MODEL_STARTUP_REPORTS feeds the
+//      subsystem-ready reports that drive the post-SIM interactive handoff (code-7
+//      trigger + mode-4 checklist + VBAT-confirm), advancing task 1 mode 4 -> 0xc;
+//      docs/interactive_handoff.md. See docs/service_bootstrap.md,
 //      docs/boot_to_insert_sim.md, docs/sim_emulator_scope.md.
 //
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
@@ -634,8 +634,10 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      TRACE_DSPIO (MCU<->DSP shared-RAM + DSPIF access map; docs/dsp_interface.md) --
 //      the network/DSP frontier (docs/network_scouting.md), TRACE_HANDOFF (task-1 master
 //      sequencer mode + startup checklist; the post-SIM interactive handoff,
-//      docs/interactive_handoff.md). The RE forcing shims and
-//      one-off traces have been retired (docs/removed_forcing_knobs.md).
+//      docs/interactive_handoff.md). Most RE forcing shims and one-off traces have
+//      been retired (docs/removed_forcing_knobs.md); the one live research force is
+//      EXPERIMENT_UIINIT_SKIP -- no-ops the mode-0xc display-init call so the app-task
+//      layer past it can be probed (the current "force to explore" frontier).
 //
 // The forcing/model logic is quarantined in flash_firmware_hooks / ram_*_firmware_*
 // (banner'd "NOT hardware behaviour"); see docs/driver_structure.md.
@@ -764,7 +766,6 @@ void noki3310_state::machine_reset()
 	m_svcresp_msg = 0;
 	m_resen_state = 0;
 	m_resen_msg = 0;
-	m_reports_state = 0;
 	m_reports_idx = 0;
 	m_battery_startup_event_step = 0;
 	m_battery_startup_event_step_mode9 = 0;
@@ -1935,13 +1936,14 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("cscmd: [msg+8]=%02x [msg+5]=%02x svcready[11fed1]=%02x t=%.4f\n", debug_ram_byte(msg + 8),
 						debug_ram_byte(msg + 5), debug_ram_byte(0x0011fed1), machine().time().as_double());
 		}
-		// TRACE_HANDOFF (opt-in): the post-SIM interactive/idle handoff. Seams (docs/interactive_handoff.md):
+		// TRACE_HANDOFF (opt-in): the post-SIM interactive/idle handoff (docs/interactive_handoff.md).
+		// The message-gated portion is EMULATED by MODEL_STARTUP_REPORTS; mode-0 sits behind the app-task
+		// layer that mode-0xc's display init resumes. Curated seams:
 		//  (a) task-1 dispatcher 0x270c8e -- mode [0x1123f0], mode-0d checklist [0x112399], CCONT [0x11ff6c];
-		//  (b) mode-0 interactive-init burst 0x270d1c -- did it run? (no: task 1 never enters mode 0);
-		//  (c) display-manager idle-repaint call 0x298000 -- did display_idle fire? (no);
-		//  (d) mode-0x04 handler entry 0x271254 -- the msgcodes task 1 gets in mode 4 (d5/75/33/c3, never
-		//      the 7 that would trigger the init burst); 0x270184 -- every mode transition + caller lr;
-		//      0x26a204/0x26a354 -- inventory of codes posted to task-1 mailbox (code 7 never appears).
+		//  (b) mode-0 interactive-init burst 0x270d1c / display_idle 0x298000 -- did they run? (not yet);
+		//  (c) 0x270184 -- every task-1 mode transition + caller lr;
+		//  (d) 0x26a204/0x26a354 -- inventory of codes posted to task-1's mailbox;
+		//  (e) 0x27d654 -- VBAT voltage-confirmation gate byte [0x110436] trajectory.
 		if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr)
 		{
 			if (addr == 0x00270c8e)
@@ -1971,12 +1973,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					logerror("handoff: display_idle FIRED (idle repaint) [1116fd]=%02x t=%.4f\n",
 							debug_ram_byte(0x001116fd), machine().time().as_double());
 			}
-			else if (addr == 0x00271254)
-			{
-				static unsigned he = 0;
-				if (he++ < 8) logerror("handoff4: mode-0x04 handler ENTERED (0x271254) msgcode=%04x t=%.4f\n",
-						debug_ram_word(0x001123ee), machine().time().as_double());
-			}
 			// Inventory: every RTOS post to task 1 (0x26a204/0x26a354, r0=taskid, r1=msgptr; code=[msg+0]),
 			// deduped by (code, caller). Does anything ever post code 7 (the mode-0x04 burst trigger)?
 			else if (addr == 0x0026a204 || addr == 0x0026a354)
@@ -1995,25 +1991,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						logerror("t1post: code=%04x via=%08x lr=%08x t=%.4f\n", code, addr, lr, machine().time().as_double());
 					}
 				}
-			}
-			// mode-0d exit gate 0x270ec6 (log the two gate operands) + advance-taken 0x270ee6.
-			else if (addr == 0x00270ec6)
-			{
-				static unsigned hgk = 0; static u32 hgk_last = 0xffffffff;
-				const u32 chk = debug_ram_byte(0x00112399) & 0xf;
-				const u32 cc = debug_ram_byte(0x0011ff6c) & 0xf;
-				const u32 kv = (chk << 4) | cc;
-				if (kv != hgk_last && hgk++ < 24)
-				{
-					hgk_last = kv;
-					logerror("gate0d: 0x270ec6 chk&f=%x ccont&f=%x (need chk=f && cc=6) t=%.4f\n",
-							chk, cc, machine().time().as_double());
-				}
-			}
-			else if (addr == 0x00270ee6)
-			{
-				static unsigned hga = 0;
-				if (hga++ < 4) logerror("gate0d: *** ADVANCE TAKEN 0x270ee6 t=%.4f\n", machine().time().as_double());
 			}
 			// VBAT voltage-confirmation gate byte [0x110436] (= battery struct [0x110434+2]) trajectory:
 			// the interactive advance is blocked while it is 1 or 2 (0x2a6942 returns 0). NOTE this is the
@@ -2045,33 +2022,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				}
 			}
 		}
-	// EXPERIMENT_VBAT_GATE_PASS (opt-in, diagnostic): the mode-0d proper advance (0x270eee, which arms the
-	// mode-0x04 init-burst trigger 'code 7') is blocked because the VBAT voltage-confirmation byte [0x110436]
-	// (battery struct 0x110434 field +2) == 1, making gate helper 0x2a6942 return 0. It is NOT a SIM state --
-	// 0x21exxx/0x27dxxx here is the battery/VBAT voltage monitor (strings "BATTERY VOLTAGE CHECK",
-	// "Initialise VBAT filter"); [0x110436] is a 15-tap moving-average classification that structurally
-	// stays 1 on our boot and is independent of the battery ADC value. Force the gate to pass by overriding
-	// 0x2a6942's read (at 0x2a6948, after bl 0x27d654) 1->0 -> 0x2a6942 returns 2 (nonzero). Tests whether
-	// the advance then fires and cascades (arm code 7 -> burst -> interactive). Diagnostic only.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_VBAT_GATE_PASS", 0) != 0 && pc == addr && addr == 0x002a6948)
-	{
-		const u32 v = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
-		if (v == 1 || v == 2)
-		{
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0);
-			static unsigned e = 0;
-			if (e++ < 4) logerror("vbat_gate_pass: forced 0x2a6942 read %u -> 0 t=%.4f\n", v, machine().time().as_double());
-		}
-	}
-	// MODEL_VBAT_CONFIRM (opt-in): the VBAT voltage-confirmation gate. The classifier 0x27cbec writes a
-	// state to [0x110436] used by 0x2a6942 (mode-0d fork AND mode-0xc exit, which needs state 3). Our
-	// ROM-default reading (raw 0x200 -> sample ~2453) keeps it at 1. NOKI3210_VBAT_RAW overrides the raw
-	// read at the sample generator (0x27cc80, post-bl 0x2b1bb2) so the classifier converges to a confirming
-	// value -- faithful in that it drives the firmware's own classifier via the reading, not the gate.
-	if (nokia_env_u32("NOKI3210_VBAT_RAW", 0xffffffff) != 0xffffffff && pc == addr && addr == 0x0027cc80)
-	{
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, nokia_env_u32("NOKI3210_VBAT_RAW", 0x200) & 0xffff);
-	}
 	// MODEL_STARTUP_REPORTS VBAT-confirm at the mode-0xc exit gate: emulate the VBAT voltage-confirmation
 	// reaching its confirmed value (0x2a6942()==3) at 0x27139e (post bl 0x2a6942 in the mode-0xc handler),
 	// so the sequencer takes the confirmed path 0x2713b6 instead of draining at 0x2714a4.
@@ -2088,23 +2038,12 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		static unsigned e = 0; if (e++ < 3) logerror("uiskip: skipping 0x2355b6 (display init) t=%.4f\n", machine().time().as_double());
 		return 0x4770;   // bx lr -> return immediately
 	}
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
-			(addr == 0x002a130c || addr == 0x00270d1c || addr == 0x00298000))
+	// With EXPERIMENT_UIINIT_SKIP, mark when the mode-0xc display init returns (0x2a130c) so the app-task
+	// forcing sweep can see how far past the display-init wall the sequencer then gets.
+	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr && addr == 0x002a130c)
 	{
-		static u32 seen[4]; static unsigned n = 0; bool dup = false;
-		for (unsigned i = 0; i < n; i++) if (seen[i] == addr) { dup = true; break; }
-		if (!dup && n < 4) { seen[n++] = addr; logerror("deep: reached %08x t=%.4f\n", addr, machine().time().as_double()); }
-	}
-	// EXPERIMENT_FORCE_CODE7 (opt-in, diagnostic): the mode-0d advance's getmsg at 0x270f46 (bl 0x26ff14)
-	// expects message code 7 to run the init burst; it never arrives. Force the getmsg return r0:=7 at the
-	// post-bl point 0x270f4a (a reliably-hooked address, unlike mid-linear code MAME prefetches) so the
-	// burst runs -- to MAP what gate comes next in the interactive chain (-> mode 0 interactive-init
-	// 0x270d1c -> idle). Diagnostic chain-mapping lever, used with EXPERIMENT_VBAT_GATE_PASS.
-	if (nokia_env_u32("NOKI3210_EXPERIMENT_FORCE_CODE7", 0) != 0 && pc == addr && addr == 0x00270f4a)
-	{
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 7);
-		static unsigned e = 0;
-		if (e++ < 8) logerror("force_code7: getmsg r0:=7 at 0x270f4a t=%.4f\n", machine().time().as_double());
+		static unsigned n = 0;
+		if (n++ < 3) logerror("uiskip: display init returned (0x2a130c) t=%.4f\n", machine().time().as_double());
 	}
 	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate
 	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the

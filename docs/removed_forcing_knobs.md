@@ -117,3 +117,26 @@ they produced live in the docs.
 Net: the surviving `NOKI3210_*` knobs are **hardware config** (display/ADC/battery/
 timers/EEPROM/power-IRQ/…), the **faithful opt-in `MODEL_*` stack** that reaches
 "Insert SIM card", and **five diagnostic taps**.
+
+## 2026-07 tidy (post interactive-handoff arc)
+
+The interactive-handoff investigation added a batch of forcing shims + one-off taps;
+after the message-gated handoff became a faithful model, the throwaway forces were
+retired (git-recoverable):
+
+- **`EXPERIMENT_VBAT_GATE_PASS`** — forced the VBAT gate `0x2a6942` read 1→0. Superseded
+  by `MODEL_STARTUP_REPORTS`, which emulates the VBAT voltage-confirmation at its gate
+  (`0x27139e`, the confirmed value the classifier would produce).
+- **`EXPERIMENT_FORCE_CODE7`** — forced the code-7 getmsg return. Superseded by
+  `MODEL_STARTUP_REPORTS` feeding code 7 (and the whole report sequence) faithfully.
+- **`VBAT_RAW`** — overrode the raw VBAT reading at `0x27cc80`; never reached the
+  confirming classification (the classifier is a multi-comparison, not linear in the
+  reading), and is moot now the gate is modelled directly.
+- One-off TRACE_HANDOFF sub-taps (`handoff4:` mode-0x04 entry, `gate0d:` mode-0d gate)
+  removed — their findings are in `docs/interactive_handoff.md`.
+
+**Kept:** `MODEL_STARTUP_REPORTS` (+ `STARTUP_REPORTS_MS`) — faithful; the curated
+`TRACE_HANDOFF` seam set (dispatcher/mode/checklist, mode transitions, mailbox-post
+inventory, VBAT-gate byte, interactive-init/idle markers); and **one live research
+force, `EXPERIMENT_UIINIT_SKIP`** — no-ops the mode-0xc display-init call so the
+app-task layer past it can be probed (the current "force to explore" frontier).
