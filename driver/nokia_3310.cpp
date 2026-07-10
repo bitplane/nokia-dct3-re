@@ -1403,6 +1403,13 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
 
+	// TRACE_SIMKICK: watch writes to task-20's read-enable gate fields -- word 0x111c76 (low byte = gate
+	// [0x111c76], init 1, must reach 0) and word 0x111c78 (high byte = [0x111c79], init 0, must reach 1).
+	// Logs value + PC so the gate-flipper (or its absence) is visible. docs/sim_emulator_scope.md Phase A.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && (address == 0x00111c76 || address == 0x00111c78))
+		logerror("simkick: WRITE [%06x] <- %04x mask=%04x pc=%08x t=%.4f\n",
+				address, data, mem_mask, pc & ~u32(1), machine().time().as_double());
+
 	auto ram_word = [this](offs_t addr) -> uint16_t
 	{
 		if (addr < 0x100000 || addr >= 0x180000)
@@ -2110,6 +2117,57 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// PPS phase (0x27ed3c) uses a different recv, so its code-9 handling is untouched.
 	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && pc == addr && addr == 0x0027ee56)
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0b);
+	// EXPERIMENT_SIM_INIT_GATE (opt-in, Phase A force): task 20 (SIM-init read sequencer, 0x208134) parks
+	// because its read-phase gate needs read-enable [0x111c79]==1 (never set on our boot) and [0x111c76]==0.
+	// Force both at task 20's recv (0x26a458, lr=0x20837a) so it re-checks the gate OPEN after dispatch and,
+	// if the gate is the only blocker, starts issuing its own SELECT/READ sequence (uninjected a0 a4/b0).
+	// gate-top trace (0x208218, loop top before the read-phase gate): log the gate fields each time task 20
+	// re-evaluates, so we see whether it reaches the gate and which condition blocks the read phases.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00208218)
+	{
+		static unsigned g = 0;
+		if (g++ < 12) logerror("simkick: task20 gate-top [1c76]=%02x [1c79]=%02x [1c96]=%02x [1c97]=%02x t=%.4f\n",
+				debug_ram_byte(0x00111c76), debug_ram_byte(0x00111c79),
+				debug_ram_byte(0x00111c96), debug_ram_byte(0x00111c97), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00208254)
+	{
+		static unsigned p = 0;
+		if (p++ < 4) logerror("simkick: task20 GATE PASSED -> read phases t=%.4f\n", machine().time().as_double());
+	}
+	// TRACE_SIMKICK (opt-in, Phase A): the SIM-detected 0x16 handler's 0x120c kickoff gate to task 20 (the
+	// SIM-init read sequencer). At handler entry 0x27e3a2: len = BE halfword [0x10dddc]; SW1 = [0x10dddc+len];
+	// gate2 = [0x10dca8+0xf]. The manager posts 0x120c to task 20 iff SW1==0x91 AND gate2!=0 (verified
+	// disasm 0x27e3b8/0x27e3c2). Also logs task-20 body entry (0x208134). docs/sim_emulator_scope.md.
+	// Dispatcher entry 0x27e240(r0=detail, r1=status): log every SIM status the manager reports. Statuses:
+	// 0x15=reject, 0x16=SIM-detected(->0x27e394), 0x1e=malformed, 0x1f=no-SIM, 0x0b=normal-response+SW
+	// (->0x27e3a2, the SW1==0x91 toolkit branch), 0x06/0x08/0x0a. Also snapshots the response SW at 0x10dddc.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027e240)
+	{
+		const u32 st = m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff;
+		const u32 det = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		const u32 len = ((debug_ram_byte(0x0010dddc) << 8) | debug_ram_byte(0x0010dddd)) & 0xffff;
+		const u32 sw1 = debug_ram_byte(0x0010dddc + len);
+		static unsigned k = 0;
+		if (k++ < 60) logerror("simkick: status=%02x detail=%02x  buf_len=%u SW1=%02x t=%.4f\n",
+				st, det, len, sw1, machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00208134)
+	{
+		static unsigned t20 = 0;
+		if (t20++ < 8) logerror("simkick: task20 body (0x208134) ENTER #%u t=%.4f\n", t20, machine().time().as_double());
+	}
+	// task 20 recv return (post-bl 0x20837a, r0/r4 = message): log the received message code [msg+0] and the
+	// read-phase gate fields [0x111c76] (init=1, must be 0) and [0x111c79] (init=0, must be 1). Shows which
+	// messages task 20 gets and whether the gate ever unlocks so it starts issuing SELECTs.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0020837a)
+	{
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 code = ((debug_ram_byte(msg) << 8) | debug_ram_byte(msg + 1)) & 0xffff;
+		static unsigned r = 0;
+		if (r++ < 40) logerror("simkick: task20 recv code=%04x  gate[1c76]=%02x [1c79]=%02x t=%.4f\n",
+				code, debug_ram_byte(0x00111c76), debug_ram_byte(0x00111c79), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
 	{
 		static unsigned dq = 0;
