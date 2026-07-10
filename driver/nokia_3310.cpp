@@ -38,6 +38,43 @@ namespace {
 
 static unsigned nokia_env_u32(const char *name, unsigned fallback);
 
+// TS 51.011 GSM EF body sizes, taken verbatim from the firmware's own read-list table 0x2e0c04 (26 entries),
+// so the file-driven SIM responder answers each SELECTed file with exactly the size the firmware expects.
+// Returns 0 for unknown ids (a DF/MF or an EF outside the mandatory set). Content is synthetic (public
+// TS 51.011 structure only -- no real SIM data; see sim_ef_byte).
+static unsigned sim_ef_size(uint16_t fid)
+{
+	static const struct { uint16_t id; uint8_t len; } tbl[] = {
+		{0x2fe2,0x0a},{0x6fad,0x03},{0x6f07,0x09},{0x6f74,0x10},{0x6f78,0x02},
+		{0x6f7e,0x0b},{0x6f20,0x09},{0x6f7b,0x0c},{0x6fae,0x01},{0x6f31,0x01},
+		{0x6f37,0x03},{0x6f41,0x05},{0x6f43,0x02},{0x6f46,0x11},{0x6f13,0x01},
+		{0x6f98,0x16},{0x6f9b,0x25},{0x6f91,0x01},{0x6f93,0x01},{0x6f95,0x1d},
+		{0x6f96,0x1d},{0x6f9f,0x01},{0x6f92,0x01},{0xea00,0x12},{0xea03,0x0b},
+		{0x2fe6,0x04},
+	};
+	for (const auto &e : tbl) if (e.id == fid) return e.len;
+	return 0;
+}
+
+// Synthetic EF content byte i for file fid (public-spec structure only). A blank/un-provisioned but
+// internally-consistent test SIM: IMSI test id (MCC 001), LOCI "not updated" (forces normal registration),
+// Phase 2; everything else an unset EF (0xff). No real subscriber data.
+static uint8_t sim_ef_byte(uint16_t fid, unsigned i)
+{
+	switch (fid)
+	{
+	case 0x6f07: { // IMSI: [len=8][BCD parity+digits], test IMSI 001-01 ...
+		static const uint8_t imsi[9] = {0x08,0x09,0x10,0x10,0x32,0x54,0x76,0x98,0x10};
+		return i < 9 ? imsi[i] : 0xff; }
+	case 0x6f7e: // LOCI: byte 10 = location-update status 1 = "not updated"
+		return (i == 10) ? 0x01 : (i < 4 ? 0xff : 0x00);
+	case 0x6fae: // Phase: GSM phase 2
+		return 0x02;
+	default:
+		return 0xff;   // unset EF
+	}
+}
+
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
 constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
@@ -405,6 +442,7 @@ private:
 	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
 	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
 	uint8_t       m_sim_card_step = 0;   // MODEL_SIM_CARD: EF-read T=0 step (0=SELECT,1=GET_RESPONSE,2=READ,3=done)
+	uint16_t      m_sim_sel_file = 0;    // responder: file id last SELECTed (parsed from a0 a4 command)
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	bool          m_post_charger_sequence_entered;
@@ -2054,6 +2092,10 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			if (len >= 2) m_sim_last_ins = ins;   // FS responder: remember for the T=0 procedure-byte echo
 			m_sim_last_cmdlen = uint8_t(std::min<u32>(len, sizeof(m_sim_last_cmd)));  // FS responder: full command
 			for (unsigned i = 0; i < m_sim_last_cmdlen; i++) m_sim_last_cmd[i] = debug_ram_byte(buf + i);
+			// responder: track the SELECTed file id (a0 a4 00 00 02 <hi> <lo>) so GET_RESPONSE/READ answer
+			// the RIGHT file. This is what makes the responder file-driven rather than single-EF.
+			if (ins == 0xa4 && len >= 7)
+				m_sim_sel_file = uint16_t((debug_ram_byte(buf + 5) << 8) | debug_ram_byte(buf + 6));
 			m_sim_card_pending = true;   // MODEL_SIM_CARD: this command now awaits exactly one response
 			const char *name = ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
 							 : ins == 0xb2 ? "READ_RECORD" : ins == 0x20 ? "VERIFY_CHV" : ins == 0xf2 ? "STATUS" : "?";
@@ -2074,7 +2116,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	{
 		m_sim_card_recv++;
 		constexpr u32 SCRATCH = 0x0017fc00;
-		uint8_t data[40]; unsigned n = 0; uint8_t code = 0;
+		uint8_t data[48]; unsigned n = 0; uint8_t code = 0;
 		if (m_sim_card_phase == 0 && m_sim_card_recv >= nokia_env_u32("NOKI3210_SIM_CARD_ATR_AFTER", 2))
 		{
 			// Phase 0 -> ATR: a code-5 message carrying the ATR bytes (SIM_ATR_HEX).
@@ -2098,29 +2140,49 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			{
 				// File-read command: the data path 0x27ee94 reads the response's FIRST byte (0x10dddc+2) as
 				// the T=0 procedure byte (must equal the INS => "send all remaining"). After it comes the
-				// payload + SW=9000. GET RESPONSE -> a GSM 11.11 EF FCP block; READ -> synthetic EF content.
+				// payload + SW=9000. GET RESPONSE -> the SELECTed file's FCP; READ -> its synthetic content.
+				// FILE-DRIVEN: sizes come from the firmware's own EF read-list 0x2e0c04, keyed on the file id
+				// tracked at SELECT (m_sim_sel_file), so the responder answers the RIGHT file, not a fixed EF.
+				const u16 fid = m_sim_sel_file ? m_sim_sel_file : uint16_t(nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07));
+				const bool is_df = (fid == 0x3f00 || fid == 0x7f20 || (fid & 0xf000) == 0x7000);
+				const unsigned efsize = sim_ef_size(fid);   // TS 51.011 EF body length (0 if unknown -> DF or fallback)
 				data[n++] = m_sim_last_ins;   // procedure byte = INS echo
-				if (m_sim_last_ins == 0xc0)   // GET RESPONSE -> EF file-control-parameters (TS 51.011 9.2.1)
+				if (m_sim_last_ins == 0xc0)   // GET RESPONSE -> FCP (TS 51.011 9.2.1 / 9.3)
 				{
-					const u32 fid = nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07);
-					const uint8_t fcp[15] = {
-						0x00, 0x00,               // RFU
-						0x00, 0x09,               // file size (9 bytes)
-						uint8_t(fid >> 8), uint8_t(fid), // file id
-						0x04,                     // type: EF
-						0x00,                     // RFU
-						0x00, 0x00, 0x00,         // access conditions: READ = ALWAYS (no PIN)
-						0x01,                     // file status: not invalidated
-						0x02,                     // length of following data
-						0x00,                     // structure: transparent
-						0x00 };                   // record length (n/a)
-					for (unsigned i = 0; i < 15; i++) data[n++] = fcp[i];
+					if (is_df)
+					{
+						// DF/MF FCP: 22-byte block; characteristics byte 13 = 0x80 (CHV1 disabled -> no PIN prompt).
+						uint8_t fcp[22] = {0};
+						fcp[2] = 0x00; fcp[3] = 0x00;               // total memory (n/a here)
+						fcp[4] = uint8_t(fid >> 8); fcp[5] = uint8_t(fid);
+						fcp[6] = (fid == 0x3f00) ? 0x01 : 0x02;     // type: MF / DF
+						fcp[13] = 0x80;                             // characteristics: CHV1 disabled
+						fcp[12] = 0x0a;                             // length of following (GSM-specific data)
+						for (unsigned i = 0; i < 22; i++) data[n++] = fcp[i];
+					}
+					else
+					{
+						uint8_t fcp[15] = {
+							0x00, 0x00,                              // RFU
+							uint8_t(efsize >> 8), uint8_t(efsize),   // file size (from 0x2e0c04)
+							uint8_t(fid >> 8), uint8_t(fid),         // file id
+							0x04,                                    // type: EF
+							0x00,                                    // RFU
+							0x00, 0x00, 0x00,                        // access conditions: READ = ALWAYS (no PIN)
+							0x01,                                    // file status: not invalidated
+							0x02,                                    // length of following data
+							0x00,                                    // structure: transparent
+							0x00 };                                  // record length (n/a for transparent)
+						for (unsigned i = 0; i < 15; i++) data[n++] = fcp[i];
+					}
 					data[n++] = 0x90; data[n++] = 0x00;
 				}
 				else if (m_sim_last_ins == 0xb0 || m_sim_last_ins == 0xb2)  // READ -> synthetic EF content
 				{
-					const uint8_t body[8] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98 };
-					for (unsigned i = 0; i < 8; i++) data[n++] = body[i];
+					// T=0 READ returns exactly P3 (cmd[4]) bytes of the file's content.
+					unsigned p3 = m_sim_last_cmdlen >= 5 ? m_sim_last_cmd[4] : (efsize ? efsize : 8);
+					if (p3 == 0) p3 = efsize ? efsize : 8;
+					for (unsigned i = 0; i < p3 && n < sizeof(data) - 2; i++) data[n++] = sim_ef_byte(fid, i);
 					data[n++] = 0x90; data[n++] = 0x00;
 				}
 			}
