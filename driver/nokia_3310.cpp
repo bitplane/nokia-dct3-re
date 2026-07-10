@@ -386,6 +386,11 @@ private:
 	unsigned      m_svcresp_state;      // 0 idle, 1 await-alloc, 2 await-post, 3 done
 	uint32_t      m_svcresp_saved[16];  // R0..R14 + CPSR saved at the trigger point
 	uint32_t      m_svcresp_msg;        // allocated message pointer
+	// SIM-init kick trampoline (NOKI3210_MODEL_SIM_INIT_KICK): at SIM-detected status 0x16, set task-20's
+	// read-enable ([0x111c79]=1, paired [0x111c6f]=1) and post a wake message so the SIM-init read
+	// sequencer (task 20) enters its read phases -- the faithful analogue of the dormant 0x254b40 producer.
+	unsigned      m_simkick_state = 0;  // 0 idle, 1 await-alloc, 2 await-post, 3 done
+	uint32_t      m_simkick_saved[16];  // R0..R14 + CPSR saved at the trigger point
 	// MODEL_STARTUP_REPORTS: feed the subsystem-ready reports (code 7 + the mode-4 6-message checklist
 	// codes + 0x74 + 3/0x11) to task-1's getter reactively, as the real subsystems would post them.
 	unsigned      m_reports_idx = 0;    // index into the report-code FEED list
@@ -1628,6 +1633,62 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 	}
 
+	// MODEL_SIM_INIT_KICK (opt-in): wake the SIM-init read sequencer (task 20). On a real boot, after
+	// ATR/PPS the SIM file-access sequencer (0x254b40, dormant here) posts msg 0x1199/0x1196 to task 20,
+	// whose handler sets read-enable [0x111c79]=1 (paired [0x111c6f]=1) and starts the file reads. This
+	// shim replicates that at SIM-detected status 0x16 (handler 0x27e394): set the two enable bytes, then
+	// trampoline alloc->post a benign wake msg to task 20 (id 0x14) so its blocked recv wakes and re-enters
+	// the read-phase gate 0x20821c (now passing) -> read phases 0x201a3a. docs/sim_emulator_scope.md.
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_INIT_KICK", 0) != 0)
+	{
+		constexpr u32 SENT4 = 0x003ff100;   // flash return sentinel (proven; SVC_RESPONDER uses 0x3ff000)
+		constexpr uint16_t BX_R12 = 0x4760;
+		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
+		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
+		if (m_simkick_state == 0 && addr == 0x0027e394)
+		{
+			debug_ram_byte_w(0x00111c79, 1);   // read-enable  [0x111c64+0x15]
+			debug_ram_byte_w(0x00111c6f, 1);   // paired flag  [0x111c64+0xb]
+			for (int i = 0; i < 15; i++) m_simkick_saved[i] = getr(i);
+			m_simkick_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			setr(0, 0x10);                     // alloc size
+			setr(14, SENT4 | 1);               // LR -> sentinel
+			setr(12, 0x0026afe0 | 1);          // r12 -> alloc
+			m_simkick_state = 1;
+			logerror("simkick: status 0x16 -> set [1c79]/[1c6f]=1, alloc wake for task20 t=%.4f\n", machine().time().as_double());
+			return BX_R12;
+		}
+		if (m_simkick_state == 1 && addr == SENT4)
+		{
+			const u32 msg = getr(0);
+			if (msg >= 0x00100000 && msg < 0x00180000)
+			{
+				for (offs_t i = 0; i < 0x10; i++) debug_ram_byte_w(msg + i, 0);
+				debug_ram_byte_w(msg + 1, 0x02);   // [msg+0] = 0x0002 benign wake code (BE halfword)
+				setr(0, 0x14);                      // task 20
+				setr(1, msg);
+				setr(14, SENT4 | 1);
+				setr(12, 0x0026a204 | 1);           // r12 -> post_task_message
+				m_simkick_state = 2;
+				logerror("simkick: posting wake msg=%08x -> task20 t=%.4f\n", msg, machine().time().as_double());
+				return BX_R12;
+			}
+			for (int i = 0; i < 15; i++) setr(i, m_simkick_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_simkick_saved[15]);
+			setr(12, 0x0027e394 | 1);
+			m_simkick_state = 3;
+			return BX_R12;
+		}
+		if (m_simkick_state == 2 && addr == SENT4)
+		{
+			for (int i = 0; i < 15; i++) setr(i, m_simkick_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_simkick_saved[15]);
+			setr(12, 0x0027e394 | 1);           // re-run the 0x16 handler naturally (state 3 -> no re-trigger)
+			m_simkick_state = 3;
+			logerror("simkick: wake posted; resuming 0x16 handler t=%.4f\n", machine().time().as_double());
+			return BX_R12;
+		}
+	}
 	// TRACE_TASKS (opt-in): app-task-layer forcing-sweep tap. Log the first time each RTOS task reaches
 	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the faithful boot
 	// stack this shows which of the app tasks 10-17 (resumed by mode-0xc's 0x2795e6) actually come
