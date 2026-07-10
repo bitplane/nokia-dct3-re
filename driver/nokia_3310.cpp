@@ -2475,6 +2475,25 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (r++ < 50) logerror("simkick: task21 recv code=%02x  state[10bcdc]=%04x t=%.4f\n",
 				code, debug_ram_word(0x0010bcdc) & 0xffff, machine().time().as_double());
 	}
+	// SIM_REG_BOOTSTRAP debugging: EVERY task-21 recv call site. Hook the universal recv 0x26a458 when the
+	// current task [0x100022]==0x15 and log the caller LR -> shows where task 21 parks after detect (which
+	// recv it blocks in) and whether it ever returns to the main command loop 0x27df10 to service relays.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0026a458
+			&& debug_ram_byte(0x00100022) == 0x15)
+	{
+		static unsigned d = 0;
+		if (d++ < 30) logerror("simkick: task21 recv-call LR=%08x [10951b]=%02x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				debug_ram_byte(0x0010951b), machine().time().as_double());
+	}
+	// SIM_REG_REARM (opt-in test): the recv-intercept feeds task 21's messages by returning to 0x27df10
+	// WITHOUT running the real recv 0x26a458, so it bypasses the ring#1 auto-clear (0x26a674/0x26a620) and
+	// leaves the ring#1 mask bit0 of MB[0x15][+0xf]=[0x10951b] SET after a masked sub-recv -> task 21's recv
+	// skips ring#1 and never sees task 20's relayed commands. Mimic the real recv's re-arm: clear bit0 at
+	// every task-21 recv so ring#1 is served. If task 21 then dispatches the relayed command -> confirmed fix.
+	if (nokia_env_u32("NOKI3210_SIM_REG_REARM", 0) != 0 && pc == addr && addr == 0x0026a458
+			&& debug_ram_byte(0x00100022) == 0x15)
+		debug_ram_byte_w(0x0010951b, debug_ram_byte(0x0010951b) & 0xfe);
 	// SIM_REG_BOOTSTRAP debugging: transport poster 0x293522 (task 20 -> task 21 RPC). It relays the
 	// command to task 21 only if SIM struct [0x10dcaf](+7)==1 OR [0x10dca9](+1)==1; else it errors code
 	// 0x1e straight back to task 20 (0x29353a). Log which path -> is the relay gate the block?
