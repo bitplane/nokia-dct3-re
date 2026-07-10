@@ -2303,6 +2303,30 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (r++ < 40) logerror("simkick: task20 recv code=%04x  gate[1c76]=%02x [1c79]=%02x t=%.4f\n",
 				code, debug_ram_byte(0x00111c76), debug_ram_byte(0x00111c79), machine().time().as_double());
 	}
+	// task 21 (SIM manager) recv return: 0x27defc calls recv 0x26a458 @0x27df0c; at 0x27df10 r0 = message
+	// ptr, code byte at [msg+4]. This is the message task 21 BLOCKS on after power-on init (state 1) before
+	// it can advance to the reset 0x27e024. The 9ms gap = time parked here. Logs code + t = which message
+	// wakes it and exactly when (GPT ordering audit step 2: why the reset happens at 0.861, not before).
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027df10)
+	{
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 code = (msg >= 0x00100000 && msg < 0x00180000) ? debug_ram_byte(msg + 4) : 0xffff;
+		static unsigned r = 0;
+		if (r++ < 50) logerror("simkick: task21 recv code=%02x  state[10bcdc]=%04x t=%.4f\n",
+				code, debug_ram_word(0x0010bcdc) & 0xffff, machine().time().as_double());
+	}
+	// posts to task 21 (mailbox id 0x15, the SIM manager): who wakes it and with what code. Same shape as
+	// the task-20 post hook; identifies the poster of the message that releases task 21 toward the reset.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && (addr == 0x0026a204 || addr == 0x0026a354)
+			&& (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) == 0x15)
+	{
+		const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const u32 body = (r1 >= 0x00100000 && r1 < 0x00180000) ? debug_ram_byte(r1 + 4) : 0xff;
+		static unsigned p = 0;
+		if (p++ < 30) logerror("simkick: POST->task21 via %s code=%02x caller=%08x t=%.4f\n",
+				addr == 0x0026a204 ? "26a204" : "26a354", body,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
 	{
 		static unsigned dq = 0;
