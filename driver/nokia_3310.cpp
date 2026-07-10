@@ -2182,6 +2182,30 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// because its read-phase gate needs read-enable [0x111c79]==1 (never set on our boot) and [0x111c76]==0.
 	// Force both at task 20's recv (0x26a458, lr=0x20837a) so it re-checks the gate OPEN after dispatch and,
 	// if the gate is the only blocker, starts issuing its own SELECT/READ sequence (uninjected a0 a4/b0).
+	// SIM manager (task 21) body entry 0x27eae0 + task 21 recv 0x27df10-caller: when does the SIM manager
+	// first RUN? If ~0.86 it is started late (after task 1's substate-6 SIM check @0.8545) -> the inversion.
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027eae0)
+	{
+		static unsigned t = 0;
+		if (t++ < 3) logerror("simkick: SIM-manager (task21) body ENTER t=%.4f\n", machine().time().as_double());
+	}
+	// task resume 0x269bf4(r0=task id): log when tasks 0x14/0x15 (SIM sequencer/manager) are made ready,
+	// and by whom (caller LR). Answers "who resumes the SIM subsystem, and is it later than the MMI startup?"
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x00269bf4)
+	{
+		const u32 id = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+		if (id == 0x14 || id == 0x15)
+			logerror("simkick: RESUME task 0x%02x from LR=%08x t=%.4f\n", id,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
+	// SIM manager dispatch (0x27ede0): log the recv'd code r0 + time, to see what the manager processes
+	// before it resets the SIM at 0x27e024 (~0.861) -- the reset trigger causality (GPT ordering audit).
+	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027ede0)
+	{
+		static unsigned m = 0;
+		if (m++ < 20) logerror("simkick: SIM-mgr dispatch code=%u t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff, machine().time().as_double());
+	}
 	// SIM-init ordering timeline: SIM reset-start 0x27e024, and the readiness barrier [0x112399] reaching
 	// 0xf (via task-1 dispatcher 0x270c8e). Compare against the ATR delivery (~0.862) to see the race.
 	if (nokia_env_u32("NOKI3210_TRACE_SIMKICK", 0) != 0 && pc == addr && addr == 0x0027e024)
