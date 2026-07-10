@@ -445,6 +445,12 @@ private:
 	uint16_t      m_sim_sel_file = 0;    // responder: file id last SELECTed (parsed from a0 a4 command)
 	unsigned      m_simreg_state = 0;    // SIM_REG_BOOTSTRAP ordering state machine
 	uint32_t      m_simreg_saved[16];    // R0..R14 + CPSR saved at a trampoline redirect
+	unsigned      m_ring2_state = 0;     // SIM_CARD_RING2 delivery trampoline state (0 idle, N posting msg N)
+	uint32_t      m_ring2_saved[16];     // regs saved at a ring#2-post trampoline
+	uint32_t      m_ring2_resume = 0;    // address to resume after the ring#2 posts complete
+	uint32_t      m_ring2_msg[4] = {0};  // scratch ptrs of the messages queued to post to ring#2
+	unsigned      m_ring2_nmsg = 0;      // number of messages queued
+	bool          m_ring2_atr_done = false;
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	bool          m_post_charger_sequence_entered;
@@ -2176,6 +2182,126 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("sim_apdu: %-12s len=%u [ %s] t=%.4f\n", name, len, hex, machine().time().as_double());
 		}
 	}
+	// SIM_CARD_RING2 (opt-in): FAITHFUL ring#2 delivery (docs/sim_registration.md "BREAKTHROUGH"). The old
+	// recv-intercept (below) returns synthetic messages from inside recv 0x26a458 WITHOUT running the real
+	// recv -> it never drains the rings and desyncs the ring#1 arm-bit MB[0x15][+0xf], so task-20 commands
+	// posted to task 21's ring#1 strand and task 21 never serves firmware-driven reads. Instead, POST the
+	// ATR/responses to task 21's ring#2 via the real poster 0x26aac0(0x15, msg) and let the firmware's own
+	// recv run unmodified -> ring#2 (responses) and ring#1 (task-20 commands) drain coherently. Card
+	// responses on real HW arrive exactly this way (RX handler 0x2a0454 -> 0x26aac0(0x15) -> ring#2).
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) != 0)
+	{
+		constexpr u32 SENT_R2 = 0x003ff300;   // ring#2-post trampoline sentinel
+		constexpr u32 SC_BASE = 0x0017f800;   // scratch message ring (4 slots x 0x40)
+		constexpr uint16_t BX_R12 = 0x4760, BX_LR = 0x4770;
+		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
+		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
+		// build a message {[+2..3]=len, [+4]=code, [+5..]=data} in the next scratch slot; queue its ptr.
+		auto queue = [&](uint8_t code, const uint8_t *d, unsigned nn) {
+			if (m_ring2_nmsg >= 4) return;
+			const u32 p = SC_BASE + m_ring2_nmsg * 0x40;
+			for (offs_t i = 0; i < 0x40; i++) debug_ram_byte_w(p + i, 0);
+			debug_ram_byte_w(p + 2, uint8_t(nn >> 8)); debug_ram_byte_w(p + 3, uint8_t(nn));
+			debug_ram_byte_w(p + 4, code);
+			for (unsigned i = 0; i < nn && i < 0x38; i++) debug_ram_byte_w(p + 5 + i, d[i]);
+			m_ring2_msg[m_ring2_nmsg++] = p;
+		};
+		// SENT_R2 sentinel: post the next queued message, or (all posted) restore + resume.
+		if (m_ring2_state > 0 && pc == addr && addr == SENT_R2)
+		{
+			if (m_ring2_state < m_ring2_nmsg)   // msg[0] already posted at the trigger; state = # posted
+			{
+				setr(0, 0x15); setr(1, m_ring2_msg[m_ring2_state]);
+				setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
+				m_ring2_state++;
+				return BX_R12;
+			}
+			for (int i = 0; i < 15; i++) setr(i, m_ring2_saved[i]);
+			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_ring2_saved[15]);
+			const u32 resume = m_ring2_resume;
+			m_ring2_state = 0; m_ring2_nmsg = 0; m_ring2_resume = 0;
+			if (resume) { setr(12, resume | 1); return BX_R12; }
+			return BX_LR;   // resume by returning to the trigger's caller (restored LR)
+		}
+		// ATR trigger: at the SIM reset 0x27e024, queue a code-5 ATR message to ring#2, then resume the reset.
+		if (m_ring2_state == 0 && !m_ring2_atr_done && pc == addr && addr == 0x0027e024)
+		{
+			uint8_t atr[16]; unsigned an = 0;
+			if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
+				for (const char *q = hex; q[0] && q[1] && an < sizeof(atr); q += 2)
+					atr[an++] = uint8_t(std::strtoul(std::string(q, 2).c_str(), nullptr, 16));
+			if (an == 0) { atr[0] = 0x3b; atr[1] = 0x10; atr[2] = 0x05; an = 3; }
+			m_ring2_nmsg = 0; queue(5, atr, an);
+			m_ring2_atr_done = true;
+			for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
+			m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			m_ring2_resume = 0x0027e024;   // resume the reset (atr_done guards re-fire)
+			setr(0, 0x15); setr(1, m_ring2_msg[0]);
+			setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
+			m_ring2_state = 1;
+			logerror("sim_card: RING2 queued ATR (%u bytes) -> task21 ring#2 t=%.4f\n", an, machine().time().as_double());
+			return BX_R12;
+		}
+		// Response trigger: at the command capture 0x2aec34 (already recorded above), queue the paired reply
+		// to ring#2 -- an ACK (code 7, read by 0x27e98c's own recv 0x27e9ce) then the data response (code 9,
+		// read by the pump 0x27defc). Then resume by returning to 0x27e98c (skip the 0x2aec34 trace).
+		if (m_ring2_state == 0 && pc == addr && addr == 0x002aec34
+				&& (m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x2701)
+		{
+			uint8_t data[48]; unsigned n = 0;
+			if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)          // PPS request: echo verbatim
+				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
+			else
+			{
+				const u16 fid = m_sim_sel_file ? m_sim_sel_file : uint16_t(nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07));
+				const bool is_df = (fid == 0x3f00 || fid == 0x7f20 || (fid & 0xf000) == 0x7000);
+				const unsigned efsize = sim_ef_size(fid);
+				data[n++] = m_sim_last_ins;   // T=0 procedure byte = INS echo
+				// STATUS (0xf2) returns the current directory's FCP, like a DF GET_RESPONSE.
+				if (m_sim_last_ins == 0xc0 || (m_sim_last_ins == 0xf2 && is_df) || m_sim_last_ins == 0xf2)
+				{
+					if (is_df || m_sim_last_ins == 0xf2)
+					{
+						uint8_t fcp[22] = {0};
+						fcp[4] = uint8_t(fid >> 8); fcp[5] = uint8_t(fid);
+						fcp[6] = (fid == 0x3f00) ? 0x01 : 0x02; fcp[12] = 0x0a; fcp[13] = 0x80;
+						for (unsigned i = 0; i < 22; i++) data[n++] = fcp[i];
+					}
+					else
+					{
+						uint8_t fcp[15] = { 0,0, uint8_t(efsize>>8),uint8_t(efsize),
+							uint8_t(fid>>8),uint8_t(fid), 0x04,0, 0,0,0, 0x01, 0x02, 0x00, 0x00 };
+						for (unsigned i = 0; i < 15; i++) data[n++] = fcp[i];
+					}
+					data[n++] = 0x90; data[n++] = 0x00;
+				}
+				else if (m_sim_last_ins == 0xb0 || m_sim_last_ins == 0xb2)
+				{
+					unsigned p3 = m_sim_last_cmdlen >= 5 && m_sim_last_cmd[4] ? m_sim_last_cmd[4] : (efsize ? efsize : 8);
+					for (unsigned i = 0; i < p3 && n < sizeof(data) - 2; i++) data[n++] = sim_ef_byte(fid, i);
+					data[n++] = 0x90; data[n++] = 0x00;
+				}
+				else   // any other INS (a4 SELECT, 2c, ...): procedure byte + SW 9000
+				{
+					data[n++] = 0x90; data[n++] = 0x00;
+				}
+			}
+			m_ring2_nmsg = 0;
+			const uint8_t ack = 7; queue(7, &ack, 0);   // send-accepted ACK for 0x27e98c's recv
+			queue(9, data, n);                          // data response for the pump
+			m_sim_card_pending = false;
+			for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
+			m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
+			m_ring2_resume = 0;   // resume by returning to 0x27e98c's caller (BX lr)
+			setr(0, 0x15); setr(1, m_ring2_msg[0]);
+			setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
+			m_ring2_state = 1;
+			static unsigned rc = 0;
+			if (rc++ < 40) logerror("sim_card: RING2 reply ins=%02x -> ACK+%u-byte code9 t=%.4f\n",
+					m_sim_last_ins, n, machine().time().as_double());
+			return BX_R12;
+		}
+	}
 	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
 	// code 5 (EXPERIMENT_SIM_CODE5) and separately poking the ATR into 0x10dddc (MODEL_SIM_ATR_MSG), deliver
 	// a genuine code-5 "response received" SIM-task message CARRYING the ATR bytes -- exactly how a real
@@ -2183,7 +2309,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// 0x10dddc ([+0]=len, [+2..]=bytes) and returns 5, which the manager dispatches (0x27eb7c) to the code-5
 	// handler 0x27ebbc -> parser 0x27e046. One message does the whole ATR handshake, no forcing.
 	// Delivered once, on the SIM_CARD_ATR_AFTER'th SIM-task recv (default 2, modelling "reset -> ATR ready").
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && pc == addr && addr == 0x0026a458 &&
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) == 0 && pc == addr && addr == 0x0026a458 &&
 			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027df10)
 	{
 		m_sim_card_recv++;
@@ -2322,7 +2448,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	}
 	// MODEL_SIM_CARD: the command ACK. The phone recv's the command result inside 0x27e98c (recv at
 	// 0x27e9ca, ret 0x27e9ce); return a message with [msg+4]=7 so the send is accepted (procedure ACK).
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && pc == addr && addr == 0x0026a458 &&
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) == 0 && pc == addr && addr == 0x0026a458 &&
 			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027e9ce)
 	{
 		constexpr u32 SCRATCH = 0x0017fb00;
@@ -2336,7 +2462,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// gets our fed code (9); force it to 0xb so the loop takes the DATA path 0x27ee94 (procedure-byte /
 	// send-data / read) instead of the error branch. Only the file-read loop returns via 0x27ee56 -- the
 	// PPS phase (0x27ed3c) uses a different recv, so its code-9 handling is untouched.
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && pc == addr && addr == 0x0027ee56)
+	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) == 0 && pc == addr && addr == 0x0027ee56)
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0b);
 	// EXPERIMENT_SIM_INIT_GATE (opt-in, Phase A force): task 20 (SIM-init read sequencer, 0x208134) parks
 	// because its read-phase gate needs read-enable [0x111c79]==1 (never set on our boot) and [0x111c76]==0.
