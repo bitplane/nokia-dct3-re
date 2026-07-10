@@ -514,3 +514,46 @@ cleanly separated: **`0x4c22` unavailable → "Insert SIM card" persists (pre-id
 idle screen; the terminal blocker remains the unbacked ~13 content resource classes
 (`docs/resource_providers.md`), needing the display/font/window subsystems' coherent
 bring-up (no bitmap shortcut). `MODEL_RES_ENABLE`'s default blob is now the corrected one.
+
+## Content-backing wall dig (2026-07): the idle window is an empty *container*, not a failed content fetch
+
+Went at the content wall empirically (skeptical after the mask-table swap trap that the
+"~13 unbacked content classes queried by the render" framing might also be imprecise). It
+is imprecise. Findings:
+
+- **The idle render issues NO content resource-gets.** With the corrected blob so `0x4c22`
+  actually acquires, `TRACE_MMIVM` shows the *only* resource-get in the whole idle sequence
+  is `0x4c22` itself (the window). After task 5 dequeues the render event `0x0547`, it does
+  **no** `resource-get`/availability calls for fonts/icons/layout and then goes quiet. So
+  the earlier "the `0x0547` handler composes ~18 content classes via resource-get" model is
+  **wrong** — content is *not* resource-acquired inside the render.
+- **The idle window is a container that opens empty.** Over a 30 s run with `0x4c22`
+  available, the LCD does ~9 full refreshes and **every frame is blank** (`o000`; content
+  byte count 0) — the firmware composes an empty framebuffer and blits it, forever. No
+  content ever appears. The window's child content (clock / operator name / signal bars /
+  indicators) is drawn by **separate child render events that subsystems post** to task 5
+  after the window opens; on our boot none arrive (task 5 quiesces after `0x0547`), because
+  those producers are gated on live subsystem state (network/operator = RF; clock = RTC).
+- **"Insert SIM card" is the no-idle-window fallback.** Baseline (no `RES_ENABLE`) is
+  deterministic (45 MMI events/boot) and *does* reach the idle transition at t≈6.38, but
+  `resource-get(0x4c22)` fails (`[0x11fee4]==0`) → the pre-resource "Insert SIM card" screen
+  (which uses no resources) persists. Making `0x4c22` available flips the boot to draw the
+  empty idle container **instead of** "Insert SIM card". So "Insert SIM card" is precisely
+  what shows when the idle window can't open — the correct terminal for a no-network phone.
+
+**Refined verdict.** The content-backing wall is *not* "~13 resource classes with no ROM
+backing that the render tries to acquire" — the render acquires none of them. It is: **the
+idle window opens as an empty container, and its content is populated by child render
+events that live subsystems (network/operator/clock) post — which never fire without the
+SIM/network/RF bring-up.** Same terminal wall, more precisely mechanized: forcing the
+window open just yields an empty frame; the missing piece is the *content producers*, not a
+resource bitmap.
+
+*Harness note (important for reproducing).* `MODEL_RES_ENABLE` and `MODEL_SVC_RESPONDER`
+have a deliberate ordering interlock: SVC_RESPONDER's cmd-`0x64` completion waits for
+`m_resen_state==3` (so `0x70` lands before `0x64`). resen can only be injected in the early
+~0.45 s contact-service window (the trigger point `0x237bc6` is not re-entered later), so
+`RES_ENABLE_MS` must stay ≈440. A wrong (late) `RES_ENABLE_MS` → resen never delivers →
+SVC_RESPONDER stalls → the boot never reaches the idle transition at all (≤5 MMI events),
+while still showing "Insert SIM card" from the early render. The MS=440 run used for the
+findings above is clean (resen delivers → 0x64 fires → boot proceeds normally).

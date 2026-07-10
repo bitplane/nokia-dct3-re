@@ -24,10 +24,18 @@ return
 ```
 
 So `display_idle` itself only acquires the **idle window** resource `0x4c22` and posts a
-render message. The ~18-class content composition (fonts, icons, layout sub-windows,
-clock, operator/signal) happens **inside task 5's handler for message `0x0547`**, where
-each child element issues its *own* `resource-get`. `display_idle` is not where content
-lives; it is the trigger.
+render message.
+
+**Correction (2026-07): the `0x0547` handler issues NO content resource-gets.** With the
+mask-table fix so `0x4c22` actually acquires, a runtime trace (`TRACE_MMIVM`) shows the
+*only* resource-get in the entire idle sequence is `0x4c22`; after task 5 dequeues `0x0547`
+it does no further `resource-get`/availability calls and goes quiet. So the ~18-class
+"content composition inside the `0x0547` handler, each child issuing its own resource-get"
+model above is wrong. The idle window is a **container** that opens empty; its content
+(fonts/icons/clock/operator/signal) is drawn by **separate child render events that live
+subsystems post** after the window opens — not by resource-gets in the render. On our boot
+none arrive (no network/operator producers), so the window renders blank forever. See
+`docs/interactive_handoff.md` "Content-backing wall dig".
 
 ## What `resource-get` / acquire actually build (a descriptor, not pixels)
 
