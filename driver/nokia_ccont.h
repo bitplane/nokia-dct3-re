@@ -10,6 +10,7 @@ public:
 	nokia_ccont_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
 
 	auto irq_cb() { return m_irq_cb.bind(); }
+	auto power_cb() { return m_power_cb.bind(); }
 	void serial_w(uint8_t data);
 	uint8_t serial_r();
 	void set_adc_source(unsigned channel, uint16_t value);
@@ -26,6 +27,7 @@ private:
 	void update_irq();
 
 	devcb_write_line m_irq_cb;
+	devcb_write_line m_power_cb;
 	uint8_t m_cmd = 0;
 	uint8_t m_watchdog = 0;
 	uint8_t m_regs[0x10] = {0};

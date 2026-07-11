@@ -40,7 +40,7 @@ trajectory to every subsystem.
 
 ## Target shape, per peripheral
 
-### CCONT — power / ADC / RTC / charger (`nokia_ccont_r/w`)
+### CCONT — power / ADC / RTC / charger (`nokia_ccont_device`)
 **Today:** a real serial-protocol device with a register file — *plus* a scatter of
 external shims: `BATTERY_PROFILE`, `CCONT_EVENT15_DELAY`, `ADC_PROFILE`,
 `ADC5_AFTER_READY*`, `CCONT_BOOT_STATUS`, `MODEL_CCONT_PRESENT`.

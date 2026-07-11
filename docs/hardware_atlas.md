@@ -6,8 +6,9 @@ charger ADC reading zero). This atlas maps that boundary — what MMIO the firmw
 **emulated / partial / stubbed**, and where in the boot it's reached — so the *next* mystery hang
 becomes "look up which stub the firmware is poking" instead of a fresh labyrinth.
 
-Built breadth-first with `NOKI3210_TRACE_MMIO=1` (one line per distinct register, with its
-description + first PC), cross-referenced with the driver's address map and `nokia_mad2_reg_desc`.
+Originally built breadth-first with the now-removed `NOKI3210_TRACE_MMIO` probe,
+then cross-referenced with the driver's address map and `nokia_mad2_reg_desc`.
+Current fidelity claims are maintained in `mad2_fidelity.md`.
 
 ## The chip
 
@@ -29,7 +30,7 @@ the **SIM** and the RF/synth path.
 | `0x100000–0x17ffff` | main RAM | `ram_r/w` | emulated |
 | `0x200000–0x5fffff` | flash (the firmware) | `flash_r/w` | emulated (BYO dump) |
 | `0x600000–0x9fffff` | ROM2 window/mirror | `rom2_mirror_r/w` | emulated |
-| `0xa00000–0xa03fff` | EEPROM (24C128) | `eeprom_r/w` | emulated (blank; `selftest` overlay) |
+| `0xa00000–0xa03fff` | EEPROM parallel alias | `eeprom_r/w` | **unproven** read-only view of the input region; normal access uses serial I2C |
 | `0xa04000–0xffffff` | unmapped / reserved | — | — |
 
 ## MAD2 I/O peripheral registers (`0x20000`, byte offsets)
@@ -68,7 +69,7 @@ ROW `0x28/0x29/0x68/0x69/0xa8/0xa9`, COL `0x2a/0x2b/0x6a/0x6b/0xaa/0xab` (signal
 | off | reg | status |
 |---|---|---|
 | `0x2c` / `0x6c` | **CCONT write / read** | emulated (serial protocol; see CCONT below) |
-| `0x2d` / `0x6d` | GENSIO start-transaction / status | emulated ✓ |
+| `0x2d` / `0x6d` | GENSIO start-transaction / status | **placeholder**: write stored, status always `0x07` |
 | `0x2e` / `0x6e` | **LCD data / command write** (PCD8544) | emulated ✓ |
 | `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** lines | partial — GENSIO multiplexes other devices on the SELECT lines; **SELECT1/2 are touched at boot** (`0x6f`, `0xad/0xae`) but what sits on them past CCONT is unmapped. A deep-dive target (RF synth? audio codec control?). |
 
@@ -84,7 +85,7 @@ undocumented — `<Unknown>` in the desc table.)
 
 ## CCONT — power / ADC / RTC / charger ASIC (serial, via GENSIO `0x2c`/`0x6c`)
 
-Register file (`nokia_ccont_r/w`), addressed inside the serial command (`addr = (cmd>>3)&0xf`):
+Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial command (`addr = (cmd>>3)&0xf`):
 
 | reg | role | notes |
 |---|---|---|
@@ -167,6 +168,6 @@ dequeued to the `000d` handler** — an unmodelled CCONT measurement-complete si
 
 ## Knob
 
-`NOKI3210_TRACE_MMIO=1` — one deduped line per distinct MMIO register the firmware touches (MAD2 I/O,
-DSPIF, MCUIF), with its description + first PC + time. Combine with `TRACE_DSP` (DSP shared RAM),
-`TRACE_CCONT_READ` (CCONT), `TRACE_BUS` (scheduler) for the full boundary.
+The former `NOKI3210_TRACE_MMIO` probe was removed during instrumentation cleanup; older notes that
+describe it are historical. Use `NOKI3210_TRACE_MAD2_LEDGER=1` for a bounded first-read/first-write
+trace of MAD2 I/O. See `mad2_fidelity.md` for the authoritative implementation ledger.

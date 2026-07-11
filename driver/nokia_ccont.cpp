@@ -17,7 +17,8 @@ constexpr uint8_t IRQ_MASK = 0x0f;
 
 nokia_ccont_device::nokia_ccont_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, NOKIA_CCONT, tag, owner, clock),
-	m_irq_cb(*this)
+	m_irq_cb(*this),
+	m_power_cb(*this)
 {
 }
 
@@ -39,6 +40,7 @@ void nokia_ccont_device::device_reset()
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
 	m_data_cycle = false;
 	m_irq_cb(0);
+	m_power_cb(1);
 }
 
 void nokia_ccont_device::set_adc_source(unsigned channel, uint16_t value)
@@ -81,7 +83,9 @@ void nokia_ccont_device::serial_w(uint8_t data)
 			break;
 		}
 		case WATCHDOG:
-			if (data == 0x20)
+			if (data == 0x00)
+				m_power_cb(0);
+			else if (data == 0x20)
 				m_regs[address] = data;
 			else if (data == 0x31)
 				m_watchdog = m_regs[address];

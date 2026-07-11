@@ -37,13 +37,15 @@ DISABLE_CCONT_WATCHDOG suppresses lives in CCONT. So "battery/charger/RTC/power-
 ## Transport — serial register access (GENSIO)
 
 🟢 CCONT is a serial peripheral on the MAD2 **GENSIO** block: write at MMIO `0x2c`, read at `0x6c`,
-transaction start/status at `0x2d`/`0x6d` (see `hardware_atlas.md`). The driver already models this
-(`nokia_ccont_w` / `nokia_ccont_r`). 🟡 A command word selects a register `addr = (cmd>>3)&0xf` and
-read/write direction; the firmware's `ccont_reg_read` helper is `0x2afb44`, write setup `0x2b5ae4`.
+transaction start/status at `0x2d`/`0x6d` (see `hardware_atlas.md`). The extracted device models the
+alternating command/data transfers at `0x2c`/`0x6c`. The surrounding GENSIO transaction controller
+does **not** yet model start/busy/complete: `0x6d` always returns `0x07`. 🟡 A command word selects a
+register `addr = (cmd>>3)&0xf` and read/write direction; the firmware's `ccont_reg_read` helper is
+`0x2afb44`, write setup `0x2b5ae4`.
 
 ## Register file (reg 0x0–0xf)
 
-From `nokia_ccont_r/w` + access sites. 🟡 unless tagged.
+From `nokia_ccont_device::serial_r/w` + access sites. 🟡 unless tagged.
 
 | reg | role | notes |
 |---|---|---|
@@ -381,10 +383,10 @@ not another lever on this corpus. Dead-end experiment code was reverted (driver 
 - 🟡 ADC conversion timing — how long after a request the completion interrupt should fire.
 - 🟢→ confirm reg `0xf` is the mask (vs another role) by a runtime read at the ISR.
 
-## Target C++ component
+## Current component and target behavior
 
-A MAME `ccont_device` (the PCD8544 LCD is already a real device, so this fits the grain). Staged:
-a cohesive driver-internal `ccont` class first, promoted to a `device_t` once stable.
+`nokia_ccont_device` is now a MAME `device_t`. The sketch below is the remaining
+target, not a description of code already implemented:
 
 ```cpp
 class ccont_device : public device_t {
@@ -410,7 +412,7 @@ private:
 };
 ```
 
-**It retires** the whole CCONT knob cluster — `ADC_PROFILE`, `ADC0/5*`, `BATTERY_PROFILE`,
+**The completed model should retire** the whole CCONT knob cluster — `ADC_PROFILE`, `ADC0/5*`, `BATTERY_PROFILE`,
 `CCONT_EVENT15_DELAY`, `STARTUP_EVENT15_DELAY_CLAMP`, `CCONT_BOOT_STATUS`, `MODEL_CCONT_PRESENT`,
 `CCONT_IRQ_*` — collapsing them into modelled state + the measurement timer. **Boundary:** the device
 owns power/ADC/RTC/charger-monitor/watchdog and the interrupt it raises; it does **not** own the
@@ -426,6 +428,10 @@ RTC interrupt. Getting the component's boundaries and signal names right now mea
 # Device boundary
 
 CCONT is now a separate MAME device in `driver/nokia_ccont.{h,cpp}`. It owns
-serial command/data framing, registers, ADC conversion values, RTC reads,
-interrupt status/masking, and watchdog countdown. The phone driver owns the
-power scenario that supplies ADC inputs and routes the device IRQ into MAD2.
+serial command/data framing, registers, immediate ADC result sampling, RTC
+reads, interrupt status/masking, and watchdog countdown. The phone driver owns
+the environment-driven power scenario that supplies ADC inputs and routes the
+device IRQ into MAD2. A watchdog-register power-off request is exposed through
+a device callback and asserts the phone CPU reset line. It does **not** yet implement conversion latency or a
+conversion-complete interrupt because neither the interrupt-bit mapping nor
+latency has been established. Adding arbitrary values here would be a new shim.

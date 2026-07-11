@@ -359,6 +359,7 @@ private:
 	void update_fiq_line();
 	void update_irq_line();
 	void ccont_irq_w(int state);
+	void ccont_power_w(int state);
 	bool timer0_compare_due() const;
 	void update_timer0_compare();
 	void schedule_mbus_fiq(int num);
@@ -454,6 +455,8 @@ private:
 	emu_timer * m_timer_dsp_service;
 
 	uint8_t       m_mad2_regs[0x100];
+	bool          m_mad2_trace_read[0x100] = {false};
+	bool          m_mad2_trace_write[0x100] = {false};
 };
 
 static const char * nokia_mad2_reg_desc(uint8_t offset)
@@ -706,6 +709,8 @@ void noki3310_state::machine_reset()
 	m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, NOKIA_FLASH_ENTRY);
 
 	memset(m_mad2_regs, 0, 0x100);
+	std::fill(std::begin(m_mad2_trace_read), std::end(m_mad2_trace_read), false);
+	std::fill(std::begin(m_mad2_trace_write), std::end(m_mad2_trace_write), false);
 	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
 	m_mad2_regs[MAD2_IRQ_CTRL] = 0x0a;         // disable FIQ and IRQ
 	m_mad2_regs[MAD2_WATCHDOG] = 0xff;         // disable MAD2 watchdog
@@ -835,6 +840,12 @@ void noki3310_state::ccont_irq_w(int state)
 	else
 		m_irq_status &= ~irq_mask;
 	update_irq_line();
+}
+
+void noki3310_state::ccont_power_w(int state)
+{
+	if (!state)
+		m_maincpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
 }
 
 uint8_t noki3310_state::keypad_irq_state() const
@@ -3014,6 +3025,12 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 	if (offset == 0x20)
 		data = (data & 0xfe) | (BIT(data, 0) & m_eeprom->read_sda());
 
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mad2_trace_read[offset])
+	{
+		m_mad2_trace_read[offset] = true;
+		logerror("mad2_ledger: R off=%02x data=%02x pc=%08x t=%.6f %s\n", offset, data,
+				m_maincpu->pc(), machine().time().as_double(), nokia_mad2_reg_desc(offset));
+	}
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
 	return data;
 }
@@ -3022,6 +3039,12 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	uint8_t old_data = m_mad2_regs[offset];
 	m_mad2_regs[offset] = data;
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mad2_trace_write[offset])
+	{
+		m_mad2_trace_write[offset] = true;
+		logerror("mad2_ledger: W off=%02x data=%02x old=%02x pc=%08x t=%.6f %s\n", offset,
+				data, old_data, m_maincpu->pc(), machine().time().as_double(), nokia_mad2_reg_desc(offset));
+	}
 
 	// MODEL_SIM_ATR (opt-in, register-level ATR probe — NOT the faithful reception path).
 	// CORRECTION: the MCU does NOT read the SIM RxD/RX_FILL/RX_FLAGS/IIR registers for reception — the
@@ -3353,6 +3376,7 @@ void noki3310_state::noki3310(machine_config &config)
 	I2C_24C128(config, m_eeprom);
 	NOKIA_CCONT(config, m_ccont);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
+	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
 }
 
 void noki3310_state::noki3330(machine_config &config)
