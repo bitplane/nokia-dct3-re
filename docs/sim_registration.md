@@ -522,3 +522,407 @@ boot. The registration diagnostic had created the service callback without the e
 task/application state needed to consume it. Therefore callback emission is the Phase 4 peer
 milestone, while reaching `0x289e7c -> 0x27953e` remains downstream of organic SIM/session
 initialization and must not be forced by the peer.
+
+### Organic service-0x0a and post-class89 correction
+
+Firmware naturally declares service `0x0a` and installs callback record `0x00dc` at boot. A
+registered-mode peer transaction completed through `0x263154 -> 0x2635ac` and produced task-5
+status `0x00dc`; it did **not** produce `0x1580` or advance the SIM commit family. The temporary
+service-`0x0a` responder was removed after this falsification. Service `0x0a` is therefore not the
+missing `0x1581 -> 0x1580` scheduler.
+
+The display peer's class-`0x89` path is also a separate boundary. With the capability isolation
+seed, firmware accepts the class, constructs class `0x1a`, and consumes twelve successful
+class-`0x80`/subtype-`0x60` indications while its progress counter descends `0x2d` to terminal.
+Firmware then enters its normal class-`0x11` polling state. Supplying an additional class-`0x11`
+notification was accepted but inert and was removed. Completing class `0x89` does not itself
+schedule `0x1580`.
+
+The SIM responder also corrected two concrete GSM filesystem contradictions found during this
+audit: `EF_ECC (6FB7)` now has the advertised 15-byte body size, and DF STATUS/GET RESPONSE data
+advertises child-file and CHV counts rather than an impossible empty `DF_GSM`. Neither correction
+changes the missing task-5 transition, but both are required for a coherent integrated peer.
+
+### Task-5 rule-table correction
+
+The task-5 rewrite VM does not contain a `0x1581 -> 0x1580` rule. Decoding the
+eight-byte action records at `0x2cc7f0` found exactly three records in this part
+of the registration family:
+
+```text
+action 0x0594 @ 0x2cf490: predicate 61/06/82 -> packed 0x5581
+action 0x059b @ 0x2cf4c8: predicate 61/3f/42 -> packed 0x5581
+action 0x05a9 @ 0x2cf538: predicate 61/3f/43 -> packed 0x5581
+```
+
+No action record emits packed status `0x1580` or `0x5580`. The sorted status
+table entry at `0x2cb908` only describes how an already-produced `0x1580`
+message expands (descriptor offset `0x0398`, five arguments); it is not a
+producer. The next stage is therefore asynchronous firmware state ownership,
+not another task-5 rule predicate.
+
+The relevant ownership contract is narrower as a result. `0x2900a0`, the
+natural `0x1581` handler, calls `0x2793b6` only when `[0x111c86] == 1`. Reset
+completion `0x27dfc4` also calls `0x2793b6`, but first clears `[0x10dcaf]` and
+`[0x111c86]`. Static references to `0x111c86` are limited to the reset/lifecycle
+cluster (`0x27e224`, `0x27e6fc`) and task-5/SIM code (`0x290484`, `0x2939c0`).
+The immediate target is the successful lifecycle path that re-arms this byte.
+
+A current-tree replay exposed a baseline regression that must be resolved
+before interpreting that later predicate. After organic reads through
+`EF_PHASE (6FAE)`, task 20 receives a non-RAM/invalid message while the
+display-peer and SIM paths overlap, and execution stops advancing at about
+1.24 seconds instead of reproducing the previously observed natural `0x1581`
+at about 6.76 seconds. Suppressing receive-side T=0 procedure indications was
+tested and falsified: it caused immediate STATUS retries and repeated reset
+completion, so the experiment was reverted. Restore the natural `0x1581`
+baseline before changing the `0x111c86` lifecycle contract.
+
+### Organic `0x1580` predecessor decoded
+
+The absence of a literal `0x1580` action output does not mean that the task-5
+VM cannot produce it. Descriptor expansion is recursive. Incoming event
+`0x157d` selects dispatch-table entry `0x2cb8f0`, whose six-action range is
+`0x0390..0x0395`. Action `0x0394` is:
+
+```text
+action 0x0394 @ 0x2ce490: state slot 0x61 == 5 -> packed descriptor 0x21f8
+```
+
+Descriptor `0x01f8` starts at `0x2cc148` and expands the following sequence:
+
+```text
+0x157d, 0x057a, 0x00dc, 0x1580, 0x057a, 0x00dc, ...
+```
+
+This supplies the missing causal link. The organic incoming `0x157d` is the
+message allocated by `0x27953e`, whose sole relevant caller is
+`0x289e7c -> 0x28a03a -> 0x28a050` after service callback `0x0fa4`. Thus the
+actual predecessor graph is:
+
+```text
+registered service-0x0b callback 0x0fa4
+  -> task-5 handler 0x289e7c
+  -> 0x27953e posts incoming 0x157d
+  -> dispatch entry 0x2cb8f0
+  -> action 0x0394, provided state[0x61] == 5
+  -> descriptor 0x01f8
+  -> queued 0x1580
+  -> 0x28fea6 produces task-20 message 0x1199
+```
+
+Consequently `[0x111c86]` is not the `0x1580` producer. It gates an optional
+side effect in the preceding `0x1581` handler and may still matter to coherent
+SIM lifecycle state, but it is not the next transition to implement. The
+implementation target returns to organic service-`0x0b` registration and
+callback consumption, plus proving the final VM predicate `state[0x61] == 5`.
+
+### Organic service-0x0b configuration source
+
+The bit required by `0x26f278` has a genuine SIM-filesystem writer. The generic
+EF parser `0x200364(fid)` dispatches `EF_IMSI (6F07)` to `0x20194c`. That parser
+copies the IMSI body to the configuration block beginning at `0x10d148 + 0x24`
+and, at `0x201962`, executes the equivalent of:
+
+```text
+byte[0x10d126] |= 0x02
+```
+
+This is exactly the service-availability bit tested by `0x26f278`. The same
+parser supplies the bytes at `0x10d149..0x10d14b` from which that consumer
+derives its three-byte callback payload. Therefore the capability and payload
+isolation seed stands in for one missing organic `EF_IMSI` parse, not for a
+display-peer property.
+
+`EF 6F98` is a separate capability source. Its decoder at `0x200a10` ends at
+`0x200d08` by ORing `0x10` into `[0x10d126]`; that is not the bit tested by
+service `0x0b`.
+
+The natural preliminary read pass currently selects ICCID, ECC, and PHASE and
+then stops after `EF_PHASE (6FAE)`. It never requests `EF_IMSI`; the extended
+firmware EF parser is already present and does not require a synthetic config
+write. The next implementation target is the organic lifecycle transition that
+starts the extended EF-read pass at `0x2038ec`. Its acceptance chain is:
+
+```text
+firmware requests and reads EF_IMSI 6F07
+  -> 0x200364 / 0x20194c parse the returned file
+  -> 0x201956 copies the IMSI body to 0x10d148 + 0x24
+  -> 0x201962 sets 0x10d126 bit 0x02
+  -> 0x26f278 succeeds
+  -> firmware registers/enables service 0x0b callback 0x0fa4
+  -> registered peer completion delivers 0x0fa4
+  -> incoming 0x157d, action 0x0394, descriptor 0x01f8
+  -> organic 0x1580 and task-20 0x1199
+```
+
+The natural-`0x1581` baseline itself is still intact with the SIM peer alone
+(observed at 1.3096 s and 1.6687 s). The earlier apparent baseline regression
+is specifically a non-composition failure when the display peer runs
+concurrently, and should be handled during integrated-peer validation rather
+than used to reinterpret the SIM-only predecessor graph.
+
+### Pre-IMSI registration owner
+
+Runtime ordering shows that the IMSI/service-`0x0b` path is downstream of the
+initial SIM-server commit. Deferring the first pre-detect `0x119a` prevents read
+state `6`, but the later `0x119a` still finishes the preliminary ICCID/ECC/PHASE
+pass with result zero and moves read state to `7`. The full `EF_IMSI` pass still
+requires the earlier `0x1196` commit result. Class `0x89` cannot bootstrap it:
+task 15 calls `0x26f278` at `0x20e942` while building that transaction, so its
+session is intentionally empty until IMSI configuration already exists.
+
+The pre-IMSI registration state machine is owned by task 14. Its receive loop
+at `0x247c0c` passes the `0x09df..0x09eb` and `0x1771..0x177e` families to
+`0x2a2e44`. The state machine owns its request objects at `0x11233c`, builds
+service `0x2a` / resource `0x08` / subtype `0x02` / operation `0xe0` requests,
+and organically emits the descending `0x177x` sequence. In coherent SIM-only,
+class-`0x87`, and class-`0x89` runs task 14 is scheduled and blocked in recv,
+but receives none of these messages. Multiple natural `0x1581` events likewise
+do not wake it.
+
+This locates the remaining external model boundary below task 14: the lower GSM
+service peer must cause task 15 to deliver the initial `0x09e5`-family result.
+Once that first result is delivered through the normal task-15 parser/poster,
+task 14, task 5, and the SIM-server dispatcher must own session allocation and
+the `0x1770..0x177b` progression. Posting `0x1770`, replaying commit keys, or
+calling `0x2902ac` remains an invalid shortcut.
+
+An early DSP transmit packet is visible at about 0.253 s as
+`05 1e ff 00 d0 00 03 01 01 e0`. DSP framing includes its first logical byte
+in the length/class word; it is not a class-`0x70` packet. Delayed test replies
+do traverse DSP RX and the generic router, but the apparent `0x0a35`
+correlation was falsified: initialization routine `0x223418` unconditionally
+calls cleanup `0x221d52` at `0x223462`, which clears the pending list through
+`0x221d3c` and posts `0x0a35`. The same event exists independently of the
+injected packet. Therefore the 0.253 s transmit packet is not established as
+the missing registration request, and no responder should key from it. The
+remaining search starts after channel-manager initialization and must locate
+the real producer of task-15 `0x07dd`/parser `0x209978`.
+
+That producer chain is now mapped one layer further. Handler `0x28d29c`
+receives generic event `0x05ea`; at `0x28d364`, a non-class-6 attached object
+is forwarded by `0x28d194` as task-15 event `0x07dd`. No `0x05ea` post or
+consumer entry occurs in an eight-second organic run. Service-5 callback
+`0x2618e8` is responsible for returning `0x05ea` for ordinary inbound objects
+(`0x261b9e`) after its `0x05dc` branch declares, registers, and enables generic
+service `0x05` (`0x261ba8` through `0x261bc0`). In the current boot the callback
+is invoked from framework `0x2ac65e` with `0x05f3` and then `0x05e2` at about
+0.7995 s while its state byte `[0x11fcc3]` is still zero. It never receives the
+required cold-start `0x05dc`, and no service-5 registration reaches `0x2632fc`.
+Thus the remaining predecessor is the framework callback sweep/order that
+skips `0x05dc`, not a guessed DSP response packet.
+
+### Task-15 completion correction
+
+The service-5 cold-start observation above is real, but it is not yet evidence
+that service 5 is the immediate predecessor of task 14. A complete task-5
+engine trace shows that callback index `0x2f` is the active application
+callback: it receives `0x05dc` and remains selected for the subsequent status
+stream. Index `0x28` (`0x2618e8`) is visited transiently for `0x05f3` and
+`0x05e2`; there is no global constructor sweep advancing through it.
+
+More importantly, task 15 already invokes its ordinary result formatter with
+`0x09fe` organically at about 0.866 and 0.902 seconds. In `0x208ee0`, the
+`0x09fe` case reads the lower-result discriminator at `[0x10fe73]`:
+
+```text
+0x1f -> 0x09d8
+0x20 -> 0x09e5
+0x21 -> 0x09c5
+```
+
+The current run leaves that byte zero, so the organic completion produces no
+task-14 result. `0x209978`, entered from task-15 event `0x07dd`, is the parser
+that consumes the missing lower object. Its minimum object contract is a
+signed length of at least two, class nibble 5 at `object+4`, and a primitive at
+`object+5`; primitive `0x20` is the required registration result family.
+
+An isolation frame `{DSP class 5, primitive 0x20}` was tested through the real
+DSP RX ring both before and after the display/resource handshake. Firmware
+accepted the physical ring frame but task 4 discarded it as the wrong lower
+protocol; it never reached `0x05ea`, `0x07dd`, or `0x209978`. The probe was
+removed. This confirms that the display DSP ring is not a substitute for the
+generic service-owned lower object. The next boundary remains the organic
+service transaction that creates that object; direct writes to `0x10fe73` or
+posting `0x09e5` would bypass the parser contract.
+
+### Service-30 readiness predecessor
+
+The common handler `0x28d29c` is a mailbox drain, not a provider-result
+callback. It calls receive primitive `0x26a458` at `0x28d4d2` and dispatches
+the returned message by its status word. In the canonical boot its live stream
+contains `0x083b`, `0x07d6`, `0x07d5`, `0x0835`, and repeated `0x05e8`
+messages. None owns an object, and no `0x05ea` is received.
+
+The object path belongs to two static service-30 callbacks. Client handler
+`0x26e4d4` and completion handler `0x26e764` both receive framework startup
+`0x05e2` organically at about 0.833 s. Their descriptor and session globals
+remain zero. Both return `0x05e2`; neither becomes the selected callback and
+the client does not register the five service-30 records at startup. That
+registration occurs only when the client later receives readiness status
+`0x0578`: branch
+`0x26e65c` calls `0x26e466`, which installs the five records through
+`0x2632fc`. A related status `0x057c` is generated by `0x29ea68` earlier in
+boot, but `0x0578` is never generated or delivered.
+
+Once active, the client handles an object-bearing request at its `0x05dc`
+branch (`0x26e620`): it copies the request descriptor from the framework
+argument slot, calls allocator `0x26e400`, and populates the session under
+`0x1113a4`. Completion handler `0x26e764` converts lower completions `0x0578`
+or `0x0580` to `0x05ea` and releases the outstanding object at `0x1113b0`.
+This is the organic predecessor chain to investigate. The immediate missing
+event is service-30 readiness `0x0578`, before session population or an
+object-bearing `0x05ea` can occur.
+
+An earlier interpretation of `0x26b58c` as a subscription call was rejected
+after full disassembly. For startup input `0x05e2`, it falls through its
+generic status mapper, returns `3`, and does not initiate a lower transaction.
+
+Resource decoding sharpens this further: `0x0578` is resource event
+`0xaf << 3`, `0x0580` is `0xb0 << 3`, and observed `0x057c` is resource-AF
+subtype `+4`. The only live `0x057c` producer is the normal cold-start reset
+at `0x29ec60`, reached when network callback `0x29ea80` receives `0x05e2`.
+It closes resources `0x5e/0x5d`, posts AF-unavailable, clears state, and does
+not by itself prove a failed hardware condition.
+
+The resource-AF handlers are callback indices `0x36` (`0x2689d8`) and `0x3a`
+(`0x2680f8`). The service-30 client/completion pair are indices `0x7a` and
+`0x7b`. All four receive only `0x05e2` in canonical and 20-second runs and
+return it unchanged. The task-5 engine routes the later event batch to index
+`0x2f` (`0x27cb28`); this is an RF/measurement application callback, not a
+phone-profile selector. Repeated framework rescans select the same index, and
+no AF base event appears.
+
+Four firmware sites can organically post AF base: `0x268240`, `0x268284`,
+`0x268a58`, and `0x268aec`. Each is inside the two AF handlers and is gated by
+an already-populated descriptor/state transition. None executes in the current
+boot. Consequently, directly posting `0x0578` would still bypass the unknown
+resource-provider contract and is not an acceptable implementation. The next
+static/runtime boundary is the input event or provider operation that populates
+those AF handler descriptors.
+
+A removed isolation probe additionally proved that an unscoped `0x0578` post
+after bootstrap does not select service 30: it was delivered to the currently
+selected callback, index `0x2f`, while index `0x7a` saw nothing. A callback-tail
+trace over indices `0x70..0x7b` shows that the entire group receives and returns
+`0x05e2` during the startup scan with an empty task-5 queue. Status `0x012f`
+then selects index `0x2f`; the ROM contains a structured `0x017a` entry in the
+same selector family, but no live producer has yet been observed. This narrows
+the missing contract to the provider-owned selection/readiness sequence that
+makes index `0x7a` current before delivering `0x0578`, rather than the AF base
+event alone.
+
+Further callback-boundary isolation separated readiness from requests. Giving
+`0x0578` to index `0x7a` during its startup visit executes `0x26e466`, installs
+the five service-30 records, and returns `0x00dc`; it does not create an object
+request or a class-5 completion. The request input is instead `0x05dc` at
+`0x26e620`, where the callback consumes the framework descriptor and calls
+`0x26e400`. Thus service-30 needs two distinct organic inputs: readiness first,
+then a descriptor-bearing request.
+
+The immediately preceding callback, index `0x79` (`0x26dc1c`), is an NV-backed
+request owner. Its own `0x0578` branch calls `0x26dbd6`, which allocates a
+0x190-byte record buffer and reads one of four variants through `0x2abbae`.
+That helper resolves the NV descriptor and calls the already-modelled serial
+EEPROM path `0x2af8e2`; the latter bit-bangs address and payload bytes through
+MAD2 PUP McuGenIO register `0x020020`. Delivering
+readiness only to index `0x79` submits this request and returns `0x05e6`, but
+does not deliver readiness or `0x05dc` to index `0x7a`; the framework revisits
+`0x79`. Both isolation probes were removed.
+
+Runtime resolution pins NV descriptor `0x0757`, variant 0 to EEPROM offset
+`0x0db0`, length `0x190`. The erased EEPROM returned all `0xff`; firmware's own
+fallback constructor `0x26db44` defines a canonical variant-0 record as the
+9-byte header at `0x2d7fdc` plus the 0x187-byte body at `0x2d7c08`. The
+`selftest` EEPROM profile now exposes that ROM-version-specific default through
+the existing I2C model. A clean boot still does not request the record or emit
+`0x0578`, proving that record is downstream data rather than the readiness
+trigger. The remaining predecessor is the framework request that selects and
+constructs provider callback `0x36` or `0x3a`; adding another EEPROM peer or
+injecting a dispatcher status would target the wrong layer.
+
+### Research checkpoint before cleanup (2026-07-11)
+
+The final selector hypothesis above needs one correction. The records around
+`0x2db660` containing `0x0136`, `0x0139`, and related values are not generic
+service-registration descriptors. They are part of a display/MMI descriptor
+chain rooted at `0x2db6f0`; `0x28bd4c` passes that root to `0x24b174`. The
+nearby callback-function table begins separately at `0x2db720`. Although task
+5 does use the low byte of a queued status to select a callback, the static
+MMI records are not evidence that the service framework will organically
+select provider callback `0x36` or `0x3a`.
+
+A canonical four-second trace confirms the distinction. The startup scan
+visits callbacks `0x36`, `0x3a`, `0x7a`, and `0x7b` with input `0x05e2`; each
+returns without constructing a provider transaction. After the scan,
+`0x012f` selects callback `0x2f`, which receives the later `0x05dc` and status
+stream. No organic `0x0136`, `0x013a`, provider descriptor, service-30
+readiness `0x0578`, or lower object `0x05ea` appears. The missing predecessor
+therefore remains an external resource/service transaction, but its exact
+transport boundary is not yet identified.
+
+The two commit-forcing experiments remain negative controls, not candidate
+models:
+
+- `MODEL_SIM_REG_ROUTE` force-selects/replays the commit family, emits both
+  producers, then creates a scheduler resume storm. It never reaches the
+  ENABLE setter `0x20733c`.
+- `MODEL_SIM_REG_COMMIT` also force-calls the producer family. It emits
+  `0x1196` and `0x1199` but leaves the registration loop cycling and likewise
+  never reaches `0x20733c`.
+
+These results prove that delivery of `0x1196` is necessary but insufficient.
+Handler `0x207234` sets `[0x111c79]` only on its reply-code-2 branch, which
+requires the real card exchange and parser state. Replaying the producer,
+posting a commit key, or setting the enable byte cannot substitute for the
+coherent request/reply transaction.
+
+#### State of the four organic-peer milestones
+
+At this checkpoint none of the following should be reported as complete:
+
+1. A lower service transaction has not organically created the required
+   class-5, primitive-`0x20` object.
+2. The full `0x05ea -> 0x07dd -> 0x209978 -> 0x09e5` chain is statically
+   mapped, but has not executed end to end in one organic run.
+3. Task 14 has not reached `0x2902ac` from that result, and task 20 has not
+   established IMSI/ENABLE state through the real `0x1196` reply path.
+4. The SIM, GSM/resource, and display peers have not composed into one stable
+   boot satisfying all preceding milestones.
+
+What is worth banking is the boundary map: ring-2 SIM delivery, the multi-file
+APDU responder, corrected GSM FCP/STATUS data, the service-30 callback and
+session contract, the task-15 parser contract, the commit producer family,
+the reply-code-2 requirement, corrected commit tap `0x254bb4`, and the
+ROM-derived EEPROM default for NV record `0x0757`.
+
+#### Cleanup classification
+
+The driver at this checkpoint is a research harness. The following families
+are isolation/forcing probes and should be removed in the cleanup pass rather
+than promoted to hardware models:
+
+```text
+MODEL_SIM_INIT_KICK
+SIM_REG_BOOTSTRAP
+SIM_REG_DEFER119A
+SIM_REG_REARM
+MODEL_SIM_1196_HANDSHAKE
+MODEL_SIM_REG_COMMIT
+MODEL_SIM_REG_ROUTE
+SIM_CARD_CLEAR_NOSIM
+MODEL_DISPLAY_PEER_PROBE / PROBE_SIM_CONFIG_READY
+```
+
+In particular, direct writes to the registration/configuration state at
+`0x111c64`, `0x111c69`, `0x111c6f`, `0x111c76`, `0x111c79`,
+`0x111c96`, `0x111c97`, or `0x10d126` are assertions about firmware state,
+not emulated hardware behavior.
+
+The SIM UART/ATR path, ring-2 message delivery, APDU filesystem responder,
+EEPROM I2C behavior, DSP service, and CCONT behavior are the useful model
+substrate. Service, startup, GSM, and display peer responders may encode valid
+external protocol behavior, but their current PC-hook/message-mutation
+mechanisms still need replacement by explicit device or transport boundaries
+before an upstream-oriented driver is cut.
