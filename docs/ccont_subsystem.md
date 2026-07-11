@@ -423,3 +423,9 @@ The same interrupt model serves normal operation: plug a charger → CCONT charg
 (bit 3) → event `0x16` + `0x7706`; periodic battery poll → ADC completion interrupts; RTC alarm →
 RTC interrupt. Getting the component's boundaries and signal names right now means post-boot features
 (charging UI, battery meter, clock/alarm) plug into a real model instead of more forcing.
+# Device boundary
+
+CCONT is now a separate MAME device in `driver/nokia_ccont.{h,cpp}`. It owns
+serial command/data framing, registers, ADC conversion values, RTC reads,
+interrupt status/masking, and watchdog countdown. The phone driver owns the
+power scenario that supplies ADC inputs and routes the device IRQ into MAD2.

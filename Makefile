@@ -8,6 +8,7 @@ MAME_DIR    ?= mame
 PYTHON ?= python3
 VENV   := .venv
 DRIVER := driver/nokia_3310.cpp
+DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h
 PHONE ?= noki3210
 
 # Bring-your-own firmware (see roms/README.md). Git-ignored.
@@ -79,6 +80,7 @@ download-mame:
 # Overlay our single driver onto the upstream tree (MAME is not vendored).
 overlay: download-mame
 	install -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_3310.cpp
+	@for src in $(DRIVER_COMPONENTS); do install -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
 
 eeprom-profile:
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
@@ -94,7 +96,7 @@ roms: eeprom-profile
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

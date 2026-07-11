@@ -16,8 +16,12 @@ the forcing shims + traces:
 | `ram_w`   (≈10 lines) | `ram_w_firmware_overrides` (forcing can rewrite the stored value) |
 | `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (forcing can rewrite the returned value) |
 
-The PCD8544 LCD is already a MAME device. EEPROM and CCONT are the first local implementations to
-extract; SIM and the MAD2/DSP mailbox follow after their boundaries stabilize.
+The PCD8544 LCD and MAME `I2C_24C128` now model the display and external
+EEPROM. CCONT is an explicit local `nokia_ccont_device` owning its serial
+registers, ADC results, RTC, interrupt state and watchdog. The phone state owns
+MAD2 interrupt routing and supplies power-scenario ADC inputs. SIM and the
+MAD2/DSP mailbox follow after their boundaries stabilize; MAD2 extraction
+should wait for the cross-ROM pass to identify the genuinely shared contract.
 
 ## Rules
 

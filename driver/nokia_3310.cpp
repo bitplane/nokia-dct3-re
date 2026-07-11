@@ -21,6 +21,8 @@
 #include "machine/intelfsh.h"
 #include "video/pcd8544.h"
 
+#include "nokia_ccont.h"
+
 #include "debugger.h"
 #include "emupal.h"
 #include "screen.h"
@@ -30,7 +32,6 @@
 #include <cstdio>
 
 #define LOG_MAD2_REGISTER_ACCESS    (1U << 1)
-#define LOG_CCONT_REGISTER_ACCESS   (1U << 2)
 
 #define VERBOSE (0)
 #include "logmacro.h"
@@ -128,28 +129,6 @@ enum mad2_reg : uint8_t
 	MAD2_SIM_TX_FILL = 0x3f
 };
 
-enum ccont_reg : uint8_t
-{
-	CCONT_ADC_CTRL = 0x0,
-	CCONT_ADC_LSB = 0x2,
-	CCONT_ADC_MSB = 0x3,
-	CCONT_WATCHDOG = 0x5,
-	CCONT_IRQ_STATUS = 0x0e,
-	CCONT_IRQ_MASK = 0x0f
-};
-
-enum ccont_adc_channel : uint8_t
-{
-	CCONT_ADC_ACCESSORY = 0,
-	CCONT_ADC_RSSI = 1,
-	CCONT_ADC_BATTERY_VOLTAGE = 2,
-	CCONT_ADC_BATTERY_TYPE = 3,
-	CCONT_ADC_BATTERY_TEMP = 4,
-	CCONT_ADC_CHARGER_VOLTAGE = 5,
-	CCONT_ADC_VCXO_TEMP = 6,
-	CCONT_ADC_CHARGING_CURRENT = 7
-};
-
 // MAD2 interrupt and MBUS control bits observed during the 3210 boot path.
 constexpr uint16_t MAD2_LINE_EXTENDED = 0x100;
 constexpr uint8_t MAD2_IRQ_CTRL_FIQ_ENABLE = 0x01;
@@ -168,8 +147,6 @@ constexpr uint16_t MAD2_FIQ_MBUS_MASK = 0x0c;
 // CCONT serial command/status bits + fixed wiring (hardware constants, not configurable).
 constexpr uint8_t CCONT_BOOT_IRQ_DEFAULT = 0x08;  // IRQ status the CCONT raises at boot (pulse 0)
 constexpr uint8_t CCONT_IRQ_LINE_NUM = 6;         // MAD2 IRQ line the CCONT asserts
-constexpr uint8_t CCONT_CMD_READ = 0x04;
-constexpr uint8_t CCONT_CMD_ADDR_SHIFT = 3;
 
 // Firmware RAM locations used only by focused diagnostics and scoped boot shims.
 constexpr offs_t FW_CURRENT_TASK_ID = 0x100002;
@@ -322,6 +299,7 @@ public:
 		m_maincpu(*this, "maincpu"),
 		m_flash(*this, "flash"),
 		m_eeprom(*this, "eeprom"),
+		m_ccont(*this, "ccont"),
 		m_pcd8544(*this, "pcd8544"),
 		m_keypad(*this, "COL.%u", 0),
 		m_pwr(*this, "PWR")
@@ -380,9 +358,7 @@ private:
 	void ack_irq(uint16_t mask);
 	void update_fiq_line();
 	void update_irq_line();
-	void ccont_update_irq_line();
-	void ccont_set_irq_status(uint8_t status, const char *reason);
-	uint8_t ccont_boot_status(unsigned pulse) const;
+	void ccont_irq_w(int state);
 	bool timer0_compare_due() const;
 	void update_timer0_compare();
 	void schedule_mbus_fiq(int num);
@@ -400,11 +376,10 @@ private:
 	uint8_t debug_ram_byte(offs_t address) const { return fw_byte(address); }
 	void debug_ram_word_w(offs_t address, uint16_t data) { fw_word_w(address, data); }
 	void debug_ram_byte_w(offs_t address, uint8_t data) { fw_byte_w(address, data); }
-	void nokia_ccont_w(uint8_t data);
-	uint8_t nokia_ccont_r();
 	required_device<cpu_device> m_maincpu;
 	required_device<intelfsh16_device> m_flash;
 	required_device<i2c_24c128_device> m_eeprom;
+	required_device<nokia_ccont_device> m_ccont;
 	required_device<pcd8544_device> m_pcd8544;
 	required_ioport_array<5> m_keypad;
 	required_ioport m_pwr;
@@ -477,26 +452,6 @@ private:
 	emu_timer * m_timer_keypad;
 	emu_timer * m_timer_mad2_soft_reset;
 	emu_timer * m_timer_dsp_service;
-
-	// CCONT
-	struct nokia_ccont
-	{
-		bool    dc;
-		uint8_t   cmd;
-		uint8_t   watchdog;
-		uint8_t   regs[0x10];
-		uint8_t   adc_request;
-		uint8_t   adc_channel;
-		uint16_t  adc_value;
-		uint32_t  adc_log_count;
-		// ADC source values (10-bit) the chip "measures", indexed by ccont_adc_channel.
-		// Populated from the power scenario at reset; the measurement path samples these.
-		// This is the ccont_device's "what the chip senses" model (replacing per-read knobs).
-		uint16_t  adc_src[8];
-		uint8_t   irq_line;
-		uint8_t   boot_status;
-		bool      irq_asserted;
-	} m_ccont;
 
 	uint8_t       m_mad2_regs[0x100];
 };
@@ -585,30 +540,6 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0xF1:  return "[UIF] CTRL I/O 1 input (r)";
 	case 0xF2:  return "[UIF] CTRL I/O 2 input (r)";
 	case 0xF3:  return "[UIF] CTRL I/O 3 input (r)";
-	default:    return "<Unknown>";
-	}
-}
-
-static const char * nokia_ccont_reg_desc(uint8_t offset)
-{
-	switch(offset)
-	{
-	case 0x0:   return "Control register (w)";
-	case 0x1:   return "PWM (charger) (w)";
-	case 0x2:   return "A/D read (LSB) (r)";
-	case 0x3:   return "A/D read (MSB) (rw)";
-	case 0x4:   return "?";
-	case 0x5:   return "Watchdog (WDReg) (w)";
-	case 0x6:   return "RTC enabled (w)";
-	case 0x7:   return "RTC second (rw)";
-	case 0x8:   return "RTC minute (r)";
-	case 0x9:   return "RTC hour (r)";
-	case 0xA:   return "RTC day (rw)";
-	case 0xB:   return "RTC alarm minute (rw)";
-	case 0xC:   return "RTC alarm hour (rw)";
-	case 0xD:   return "RTC calibration value (rw)";
-	case 0xE:   return "Interrupt lines (rw)";
-	case 0xF:   return "Interrupt mask (rw)";
 	default:    return "<Unknown>";
 	}
 }
@@ -778,14 +709,6 @@ void noki3310_state::machine_reset()
 	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
 	m_mad2_regs[MAD2_IRQ_CTRL] = 0x0a;         // disable FIQ and IRQ
 	m_mad2_regs[MAD2_WATCHDOG] = 0xff;         // disable MAD2 watchdog
-	for (uint8_t &reg : m_ccont.regs)
-		reg = 0;
-	m_ccont.watchdog  = 0;      // disable CCONT watchdog
-	m_ccont.dc  = false;
-	m_ccont.adc_request = 0;
-	m_ccont.adc_channel = 0;
-	m_ccont.adc_value = 0;
-	m_ccont.adc_log_count = 0;
 	// Load the ADC source model from the power scenario. Per-channel defaults are the
 	// chip's "battery present, no charger" rest state; nokia_adc_override applies the
 	// NOKI3210_ADC_PROFILE / ADCn knobs on top, so values are identical to before (the
@@ -794,11 +717,10 @@ void noki3310_state::machine_reset()
 		static const uint16_t adc_default[8] =
 				{ 0x000, 0x3ff, 0x3ff, 0x280, 0x200, 0x000, 0x200, 0x000 };
 		for (unsigned id = 0; id < 8; id++)
-			m_ccont.adc_src[id] = nokia_adc_override(id, adc_default[id]);
+			m_ccont->set_adc_source(id, nokia_adc_override(id, adc_default[id]));
 	}
-	m_ccont.irq_line = CCONT_IRQ_LINE_NUM;            // fixed hardware wiring (was CCONT_IRQ_LINE knob)
-	m_ccont.boot_status = CCONT_BOOT_IRQ_DEFAULT;     // fixed boot IRQ status (was CCONT_BOOT_STATUS knob)
-	m_ccont.irq_asserted = false;
+	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
+	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0);
 	m_eeprom->write_scl(1);
 	m_eeprom->write_sda(1);
 
@@ -905,41 +827,14 @@ void noki3310_state::update_irq_line()
 	m_maincpu->set_input_line(0, active ? ASSERT_LINE : CLEAR_LINE);
 }
 
-void noki3310_state::ccont_update_irq_line()
+void noki3310_state::ccont_irq_w(int state)
 {
-	const uint16_t irq_mask = (m_ccont.irq_line < 8) ? (uint16_t(1) << m_ccont.irq_line) : MAD2_LINE_EXTENDED;
-	const bool active = (m_ccont.regs[CCONT_IRQ_STATUS] & ~m_ccont.regs[CCONT_IRQ_MASK]) != 0;
-
-	if (active)
-	{
-		if (!m_ccont.irq_asserted)
-		{
-			m_irq_status |= irq_mask;
-			m_ccont.irq_asserted = true;
-		}
-	}
-	else if (m_ccont.irq_asserted)
-	{
+	const uint16_t irq_mask = uint16_t(1) << CCONT_IRQ_LINE_NUM;
+	if (state)
+		m_irq_status |= irq_mask;
+	else
 		m_irq_status &= ~irq_mask;
-		m_ccont.irq_asserted = false;
-	}
-
 	update_irq_line();
-}
-
-void noki3310_state::ccont_set_irq_status(uint8_t status, const char *reason)
-{
-	if (status == 0)
-		return;
-
-	m_ccont.regs[CCONT_IRQ_STATUS] |= status;
-	ccont_update_irq_line();
-}
-
-uint8_t noki3310_state::ccont_boot_status(unsigned pulse) const
-{
-	// The CCONT raises its boot IRQ (status 0x08) once, on the first pulse.
-	return (pulse == 0) ? m_ccont.boot_status : 0;
 }
 
 uint8_t noki3310_state::keypad_irq_state() const
@@ -1139,111 +1034,6 @@ void noki3310_state::ack_irq(uint16_t mask)
 	update_irq_line();
 }
 
-void noki3310_state::nokia_ccont_w(uint8_t data)
-{
-	if (m_ccont.dc == false)
-	{
-		LOGMASKED(LOG_CCONT_REGISTER_ACCESS, "CCONT command %s %x\n", data & CCONT_CMD_READ ? "R" : "W", data >> CCONT_CMD_ADDR_SHIFT);
-		m_ccont.cmd  = data;
-	}
-	else
-	{
-		uint8_t addr = (m_ccont.cmd >> CCONT_CMD_ADDR_SHIFT) & 0x0f;
-
-		switch(addr)
-		{
-			case CCONT_ADC_CTRL:
-			{
-					uint16_t ad_id = (data >> 4) & 0x07;
-				// Sample the ADC source model (the conversion result). Today this is
-				// instantaneous; the measurement state machine (next increment) will move
-				// the result + completion IRQ onto a timer.
-				uint16_t ad_value = m_ccont.adc_src[ad_id & 0x07];
-
-				m_ccont.regs[addr] = data;
-				m_ccont.regs[CCONT_ADC_LSB] = ad_value & 0xff;
-				m_ccont.regs[CCONT_ADC_MSB] = ((ad_value >> 8) & 0x03);
-				m_ccont.adc_request = data;
-				m_ccont.adc_channel = ad_id;
-				m_ccont.adc_value = ad_value;
-				m_ccont.adc_log_count++;
-				break;
-			}
-			case CCONT_WATCHDOG:
-				if (data == 0x20)
-					m_ccont.regs[addr] = data;
-				else if (data == 0x31)
-					m_ccont.watchdog = m_ccont.regs[addr];
-				else if (data == 0x3f)
-					m_ccont.watchdog = 0;
-				else if (data == 0)
-					printf("CCONT power-off\n");
-				break;
-
-			case CCONT_IRQ_STATUS:
-			{
-				m_ccont.regs[addr] &= ~data;
-				ccont_update_irq_line();
-				break;
-			}
-
-			default:
-				m_ccont.regs[addr] = data;
-				if (addr == CCONT_IRQ_MASK)
-					ccont_update_irq_line();
-				break;
-		}
-
-		LOGMASKED(LOG_CCONT_REGISTER_ACCESS, "CCONT W %02x = %02x %s\n", addr, data, nokia_ccont_reg_desc(addr));
-	}
-
-	m_ccont.dc = !m_ccont.dc;
-}
-
-uint8_t noki3310_state::nokia_ccont_r()
-{
-	uint8_t addr = (m_ccont.cmd >> CCONT_CMD_ADDR_SHIFT) & 0x0f;
-	uint8_t data = m_ccont.regs[addr];
-
-	// CCONT register-1 read probe (opt-in): the idx6 service-channel check tests a cached
-	// CCONT value at index 1 & 0x90. Confirm whether the firmware actually serial-reads
-	// hardware register 1, and what the emulation returns (0 currently — write-only PWM reg).
-	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0)
-	{
-		static unsigned cr_log = 0;
-		if (cr_log++ < 4000)
-			logerror("ccont_r reg=%x returns=%02x t=%.4f\n", addr, data, machine().time().as_double());
-	}
-
-	// MODEL (opt-in): CCONT register 0xe (the interrupt register) bit 0 is a persistent
-	// present/status bit, NOT a serviced interrupt — the firmware's own CCONT IRQ dispatcher
-	// (0x2b08c6) masks bits 0..2 off (`and #0xf8`) before handling. The service-channel scan
-	// reads it *live* as "is the CCONT service present?" (idx6, via ccont_reg_read(0x9001) =>
-	// CCONT cmd 0x74 => reg 0xe & 0x01). A functional CCONT reports it set on any phone (blank
-	// or provisioned); the emulation otherwise never sets it, so idx6 wrongly reads the CCONT
-	// as absent. Report it set (read-time only, so it does not perturb the IRQ-line latch).
-	// See docs/service_bootstrap.md. (Open: confirm bit-0 semantics vs a CCONT register map.)
-	if (addr == CCONT_IRQ_STATUS && nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0)
-		data |= 0x01;
-
-	system_time systime;
-	machine().current_datetime(systime);
-
-	switch(addr)
-	{
-		case CCONT_ADC_MSB: data = 0xb0 | (m_ccont.regs[addr] & 0x03);  break;
-		case 0x7:       data = systime.local_time.second;           break;
-		case 0x8:       data = systime.local_time.minute;           break;
-		case 0x9:       data = systime.local_time.hour;             break;
-		case 0xa:       data = systime.local_time.mday;             break;
-	}
-
-	m_ccont.dc = !m_ccont.dc;
-
-	LOGMASKED(LOG_CCONT_REGISTER_ACCESS, "CCONT R %02x = %02x %s\n", addr, data, nokia_ccont_reg_desc(addr));
-	return data;
-}
-
 PCD8544_SCREEN_UPDATE(noki3310_state::pcd8544_screen_update)
 {
 	for (int r = 0; r < 6; r++)
@@ -1325,14 +1115,7 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_power_irq)
 	if (assert_power_irq)
 		assert_irq(0);
 
-	const uint8_t ccont_status = ccont_boot_status(pulse);
-	if (m_ccont.irq_line < 9 && ccont_status != 0)
-	{
-		ccont_set_irq_status(ccont_status, "boot");
-	}
-	else
-	{
-	}
+	m_ccont->raise_boot_irq(pulse);
 }
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_keypad)
@@ -1392,15 +1175,10 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_mad2_soft_reset)
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 {
 	// CCONT watchdog
-	if (m_ccont.watchdog != 0 && nokia_env_u32("NOKI3210_DISABLE_CCONT_WATCHDOG", 0) == 0)
+	if (nokia_env_u32("NOKI3210_DISABLE_CCONT_WATCHDOG", 0) == 0 && m_ccont->watchdog_tick())
 	{
-		m_ccont.watchdog--;
-
-		if (m_ccont.watchdog == 0)
-		{
-			m_maincpu->reset();
-			machine_reset();
-		}
+		m_maincpu->reset();
+		machine_reset();
 	}
 
 	// MAD2 watchdog
@@ -3226,7 +3004,7 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 				data = nokia_env_u32("NOKI3210_SIM_TX_FILL", 0x00) & 0xff;
 			break;
 		case 0x6c:
-			data = nokia_ccont_r();
+			data = m_ccont->serial_r();
 			break;
 		case 0x6d:
 			data = 0x07;    // GENSIO ready
@@ -3342,7 +3120,7 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 			schedule_mbus_fiq(2);
 			break;
 		case 0x2c:
-			nokia_ccont_w(data);
+			m_ccont->serial_w(data);
 			break;
 		case 0x2e:
 		case 0x6e:
@@ -3573,6 +3351,8 @@ void noki3310_state::noki3310(machine_config &config)
 
 	INTEL_TE28F160(config, "flash");
 	I2C_24C128(config, m_eeprom);
+	NOKIA_CCONT(config, m_ccont);
+	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 }
 
 void noki3310_state::noki3330(machine_config &config)
