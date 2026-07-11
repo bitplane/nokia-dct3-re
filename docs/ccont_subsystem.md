@@ -40,15 +40,22 @@ CCONT is selected through MAD2 GENSIO:
 | --- | --- | --- |
 | `0x2c` | write | alternating CCONT command and data bytes |
 | `0x6c` | read | CCONT register data |
-| `0x2d` | write | GENSIO transaction control, currently only stored by MAD2 |
-| `0x6d` | read | GENSIO status, currently the placeholder constant `0x07` |
+| `0x2d` | write | endpoint/mode selection; `0x21` is used for LCD and `0x25` for CCONT |
+| `0x6d` | read | status: idle/TX-ready `0x03`, CCONT receive-ready `0x07` |
 
 The command selects `address = (command >> 3) & 0x0f`; bit `0x04` selects a
 read. Firmware helpers include `ccont_reg_read` at `0x2afb44` and the write path
-around `0x2b5ae4`.
+at `0x2afa74`. The older `0x2b5ae4` label was incorrect; that address is an IPC
+message-send wrapper, not CCONT transport.
 
-The device currently assumes command/data alternation. Faithful GENSIO
-start/busy/complete behavior must eventually delimit transactions explicitly.
+Firmware establishes three status predicates: bit 0 is polled before endpoint
+writes, bit 1 by controller-availability helper `0x2b642a`, and bit 2 after a
+CCONT read command. MAD2 starts at `0x03`, resets to `0x03` on endpoint
+selection, sets bit 2 after a CCONT transfer byte, and clears it when `0x6c` is
+consumed. Transfers remain synchronous, so no busy interval is represented.
+
+The CCONT device still assumes command/data alternation internally. GENSIO mode
+selection does not yet reset or validate that device phase.
 
 ## Register map
 
@@ -135,13 +142,14 @@ evidence, not another firmware event injection.
 
 ## Fidelity backlog
 
-1. Trace the complete GENSIO `0x2d/0x6d` transaction sequence and model
-   start/busy/complete rather than permanent-ready status.
-2. Establish ADC request-to-result latency and which interrupt bit denotes
+1. Establish whether real GENSIO exposes a measurable busy interval and map
+   the remaining endpoint-control bits.
+2. Reset or validate CCONT command/data phase at an evidenced boundary.
+3. Establish ADC request-to-result latency and which interrupt bit denotes
    conversion completion. Do not add an arbitrary timer before both are known.
-3. Confirm reset values, RTC encoding, alarm behavior and watchdog tick source.
-4. Replace raw environment ADC overrides with typed battery, charger and RF
+4. Confirm reset values, RTC encoding, alarm behavior and watchdog tick source.
+5. Replace raw environment ADC overrides with typed battery, charger and RF
    scenario inputs while retaining deterministic tests.
-5. Validate register semantics against a second ROM or working-phone trace.
+6. Validate register semantics against a second ROM or working-phone trace.
 
 The 3210 oracle remains the regression gate for every behavior change.

@@ -1,5 +1,12 @@
 # Boot to "Insert SIM card"
 
+> **Current status (2026-07-11): event `0x15` path restored.** The cleaned
+> driver initially remained in startup mode `0x000d` because its service peer
+> completed the channel-empty request too late for the firmware's bounded poll.
+> A one-microsecond asynchronous response restores the organic extended-task
+> resume and checklist path. See `structural_regression.md` for acceptance
+> status.
+
 The headline result beyond CONTACT SERVICE: a blank, un-provisioned Nokia 3210
 **boots all the way to the "Insert SIM card" screen** — the correct home state
 for a DCT3 phone with no SIM inserted. This doc traces the whole chain from the
@@ -119,7 +126,11 @@ with the responder approach — not an override of real hardware behaviour.
 
 ### 5. The fix cascades to a rendered screen
 
-`MODEL_SVC_CHANNEL_DRAIN` clears `[0x11fed1]` bit2 at the gate. The whole chain
+`MODEL_SVC_CHANNEL_DRAIN` schedules an asynchronous peer completion when
+`0x29bafc` begins. Firmware then calls `0x2b13d4`, sets the busy bit and polls at
+`0x29bb06`; the peer timer completes after one microsecond. Clearing it
+synchronously at `0x29bafc` entry is too early because the request sets it
+again. The whole chain
 then fires end to end (each link verified in traces): block 2 resumes the app
 tasks → their init fills the checklist → event `0x15` posts (first time ever) →
 `000d` advances → the MMI comes alive and renders glyph content. The LCD shows

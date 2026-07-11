@@ -535,7 +535,7 @@
 0x002af946,function,eeprom_write_profile_byte_loop_2af946
 0x002af946,label,eeprom_write_profile_byte_loop_2af946
 0x002af97a,function,eeprom_nv_read_bytes_2af97a
-0x002afa74,function,ccont_reg_or_2afa74
+0x002afa74,function,ccont_reg_masked_write_2afa74
 0x002afb44,function,ccont_reg_read_2afb44
 0x002b0188,function,eeprom_i2c_write_byte_2b0188
 0x002b024a,function,eeprom_i2c_read_byte_2b024a
@@ -593,7 +593,7 @@
 0x002b5388,function,divmod_2b5388
 0x002b56cc,function,mad2_mbus_irq_handler_2b56cc
 0x002b58e8,label,sim_memcmp_2b58e8
-0x002b5ae4,function,ccont_reg_write_2b5ae4
+0x002b5ae4,function,ipc_send_u16_if_enabled_2b5ae4
 0x002b5b24,function,ccont_reg_write_2b5b24
 0x002b5bd0,function,dsp_shram_arm_blockcopy_2b5bd0
 0x002b5eaa,function,display_capability_record_sanitize_2b5eaa

@@ -25,6 +25,15 @@ FRAME_PNG ?= progress_latest_frame.png
 # Regression oracle: sha256 prefix of the promoted LCD frame from `make run`.
 # A blank/un-provisioned 3210 deterministically reaches CONTACT SERVICE here.
 ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
+ORACLE_STRUCT ?= oracles/noki3210-default.struct
+ORACLE_DEEP_FRAME_SHA ?= 90eb19a5478483ca
+ORACLE_DEEP_STRUCT ?= oracles/noki3210-deep.struct
+
+DEEP_ENV := \
+	NOKI3210_MODEL_DSP_SERVICE=1 \
+	NOKI3210_MODEL_CCONT_PRESENT=1 \
+	NOKI3210_MODEL_SVC_RESPONDER=1 \
+	NOKI3210_MODEL_SVC_CHANNEL_DRAIN=1
 
 # Canonical "boot-progress" run profile — the minimal knob set that reproduces the
 # CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/adc/
@@ -53,7 +62,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua
 
-.PHONY: help venv download-mame overlay eeprom-profile roms build swap16 run smoke audit-roms frame watch verify clean
+.PHONY: help venv download-mame overlay eeprom-profile roms build swap16 run run-deep smoke audit-roms frame watch verify verify-deep verify-structure clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -62,6 +71,8 @@ help:
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
+	@echo "make verify-deep    reproduce the Insert SIM frame and deep structural oracle"
+	@echo "make verify-structure  compare deterministic boot milestones with $(ORACLE_STRUCT)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
@@ -104,8 +115,12 @@ swap16:
 run: build
 	@mkdir -p $(RUN_DIR)
 	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKI3210_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
+
+run-deep:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) $(DEEP_ENV)
 
 smoke: build
 	@mkdir -p $(RUN_DIR)
@@ -136,6 +151,23 @@ verify: run
 	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_FRAME_SHA)"; \
 	if [ "$$got" = "$(ORACLE_FRAME_SHA)" ]; then echo "OK — oracle reproduced"; \
 	else echo "MISMATCH — boot diverged from the recorded CONTACT SERVICE state"; exit 1; fi
+	@$(MAKE) --no-print-directory verify-structure RUN_DIR=$(RUN_DIR)
+
+verify-deep: PHONE=noki3210
+verify-deep: run-deep
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no LCD frame produced in $(RUN_DIR)"; exit 1; }; \
+	got=$$(sha256sum "$$frame" | cut -c1-16); \
+	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_DEEP_FRAME_SHA)"; \
+	if [ "$$got" = "$(ORACLE_DEEP_FRAME_SHA)" ]; then echo "OK — Insert SIM oracle reproduced"; \
+	else echo "MISMATCH — boot diverged from the recorded Insert SIM state"; exit 1; fi
+	@$(MAKE) --no-print-directory verify-structure RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_DEEP_STRUCT)
+
+verify-structure:
+	@test -f $(RUN_DIR)/boot_summary.txt || { echo "missing $(RUN_DIR)/boot_summary.txt; run make run first"; exit 1; }
+	@test -f $(ORACLE_STRUCT) || { echo "missing structural oracle $(ORACLE_STRUCT)"; exit 1; }
+	@diff -u $(ORACLE_STRUCT) $(RUN_DIR)/boot_summary.txt
+	@echo "OK — structural boot oracle reproduced"
 
 clean:
 	rm -rf $(RUN_DIR) run run_* $(MAME_DIR)/obj progress_latest_frame.*

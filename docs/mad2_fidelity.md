@@ -51,7 +51,7 @@ Confidence labels:
 | Vibrator/buzzer `1b/1c/1e` | register storage only | Placeholder | Connect outputs and derive divider/volume mapping. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
 | Key GPIO `28..2b` | matrix scan and IRQ approximation | Partial | Implement row/column direction and interrupt masks instead of unconditional key IRQ. |
-| GENSIO `2c..2e`, `6c..6f` | CCONT and LCD endpoints; ready=`0x07` | Partial | Model transaction state/status and SELECT routing rather than a permanent-ready value. |
+| GENSIO `2c..2e`, `6c..6f` | CCONT and LCD endpoints; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready | Partial | Confirm busy timing, remaining control bits and SELECT routing. |
 | SELECT2/3 aliases `ad..af`, `ed..ef` | backing registers | Placeholder | Identify attached companion devices and alias/decode behavior. |
 | SIMI `36..3f` | configuration registers plus diagnostic ATR FIFO | Placeholder | Normal reception is DSP/service-message mediated; register FIFO model is not the organic path. |
 | UIF control pins `31..33`, `70..f3` | mostly backing registers | Placeholder | Map pin functions from service schematics and live access sequences. |
@@ -88,3 +88,21 @@ Validation run (3210 v6.00, three emulated seconds, 2026-07-11): 86 bounded
 records were emitted, comprising 34 first reads and 52 first writes. The trace
 captured reset/UIF setup from `0x200068`, GENSIO/LCD initialization, CCONT
 selection, MBUS status, interrupt activity, watchdog service and SIMI setup.
+
+## GENSIO focused trace
+
+`NOKI3210_TRACE_GENSIO=1` logs value-level accesses to `0x2c/0x2d/0x6c/0x6d`
+and is capped at 20,000 records per reset. Firmware disassembly and runtime
+tracing establish:
+
+- control `0x21` selects the LCD path;
+- control `0x25` selects the CCONT path;
+- status bit 0 is endpoint-write ready;
+- status bit 1 is controller idle/available; and
+- status bit 2 indicates CCONT read data available.
+
+The causal status model returns `0x03` after selection, `0x07` after a CCONT
+command byte and `0x03` after consuming `0x6c`. A one-second trace produced
+1,978 records and exercised both values; the byte-exact 20-second oracle was
+unchanged. An earlier interpretation that firmware polled status bit 3 was
+incorrect: Thumb `LSRS #3` exposes original bit 2 through carry.

@@ -335,6 +335,7 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_keypad);
 	TIMER_CALLBACK_MEMBER(timer_mad2_soft_reset);
 	TIMER_CALLBACK_MEMBER(timer_dsp_service);
+	TIMER_CALLBACK_MEMBER(timer_svc_channel_drain);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	uint16_t ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask);
@@ -453,10 +454,13 @@ private:
 	emu_timer * m_timer_keypad;
 	emu_timer * m_timer_mad2_soft_reset;
 	emu_timer * m_timer_dsp_service;
+	emu_timer * m_timer_svc_channel_drain;
 
 	uint8_t       m_mad2_regs[0x100];
 	bool          m_mad2_trace_read[0x100] = {false};
 	bool          m_mad2_trace_write[0x100] = {false};
+	unsigned      m_gensio_trace_count = 0;
+	uint8_t       m_gensio_status = 0x03;
 };
 
 static const char * nokia_mad2_reg_desc(uint8_t offset)
@@ -654,6 +658,7 @@ void noki3310_state::machine_start()
 	m_timer_keypad = timer_alloc(FUNC(noki3310_state::timer_keypad), this);
 	m_timer_mad2_soft_reset = timer_alloc(FUNC(noki3310_state::timer_mad2_soft_reset), this);
 	m_timer_dsp_service = timer_alloc(FUNC(noki3310_state::timer_dsp_service), this);
+	m_timer_svc_channel_drain = timer_alloc(FUNC(noki3310_state::timer_svc_channel_drain), this);
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -711,6 +716,8 @@ void noki3310_state::machine_reset()
 	memset(m_mad2_regs, 0, 0x100);
 	std::fill(std::begin(m_mad2_trace_read), std::end(m_mad2_trace_read), false);
 	std::fill(std::begin(m_mad2_trace_write), std::end(m_mad2_trace_write), false);
+	m_gensio_trace_count = 0;
+	m_gensio_status = 0x03;
 	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
 	m_mad2_regs[MAD2_IRQ_CTRL] = 0x0a;         // disable FIQ and IRQ
 	m_mad2_regs[MAD2_WATCHDOG] = 0xff;         // disable MAD2 watchdog
@@ -1380,6 +1387,16 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
 	m_timer_dsp_service->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", 5)));
 }
 
+TIMER_CALLBACK_MEMBER(noki3310_state::timer_svc_channel_drain)
+{
+	const uint8_t status = debug_ram_byte(0x0011fed1);
+	const uint8_t completed = (status & ~0x04) | 0x40;
+	debug_ram_byte_w(0x0011fed1, completed);
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0)
+		logerror("svc_drain: peer completion busy-clear+present (%02x->%02x) t=%.8f\n",
+					status, completed, machine().time().as_double());
+}
+
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
 	// HACK: avoid hangs when ARM try to communicate with the DSP
@@ -1687,6 +1704,18 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			}
 		}
 	}
+	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr &&
+			(addr == 0x002a912a || addr == 0x002a9132 || addr == 0x002a9182 ||
+			 addr == 0x002a9186 || addr == 0x002a91f0))
+	{
+		const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 r7 = m_maincpu->state_int(arm7_cpu_device::ARM7_R7);
+		const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		logerror("resume_gate: pc=%08x r0=%08x r7=%08x r7[0]=%02x r7[1]=%02x r4=%08x r4[0]=%02x "
+				"svc_ready=%02x phase=%02x t=%.8f\n", addr, r0, r7, debug_ram_byte(r7),
+				debug_ram_byte(r7 + 1), r4, debug_ram_byte(r4), debug_ram_byte(0x00110c2c),
+				debug_ram_byte(0x0011239c), machine().time().as_double());
+	}
 	// task-message POST probe: at 0x26a204(r0=task, r1=msgptr) scan the message buffer for a
 	// sweep-event id (0x14/0x16/0x17); log offset, value, target task, and caller lr — finds the
 	// producers of the mailbox messages the 000d handler consumes.
@@ -1810,21 +1839,15 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the
 	// service-channel-busy bit [0x11fed1] bit2 (0x04) to clear -- which a real service peer does by
 	// draining the channel. On our faked boot nothing drains it (bit2 stuck set), so the startup
-	// supervisor spins forever and never resumes the application tasks. Model the drain: when the gate
-	// is entered, clear bit2 (as the real transport would once the channel is empty). This is the
+	// supervisor spins forever and never resumes the application tasks. Model the drain after the
+	// request has been posted. Entering the request function schedules an asynchronous peer completion;
+	// the firmware then sets the busy bit and polls until the timer clears it. This is the
 	// analogue of MODEL_SVC_RESPONDER for the readiness handshake. If the causal chain is right this
 	// cascades: block2 resumes app tasks -> their init fills the 0x112280 checklist -> event 0x15 ->
 	// 000d advances.
 	if (nokia_env_u32("NOKI3210_MODEL_SVC_CHANNEL_DRAIN", 0) != 0 && pc == addr && addr == 0x0029bafc)
-	{
-		const uint8_t s = debug_ram_byte(0x0011fed1);
-		if (s & 0x04)
-		{
-			debug_ram_byte_w(0x0011fed1, s & ~0x04);
-			logerror("svc_drain: cleared [11fed1] bit2 (%02x->%02x) at gate t=%.4f\n",
-					s, s & ~0x04, machine().time().as_double());
-		}
-	}
+		m_timer_svc_channel_drain->adjust(attotime::from_usec(
+				nokia_env_u32("NOKI3210_SVC_CHANNEL_DRAIN_US", 1)));
 	// MODEL_SIM_CARD command capture: intercept the SIM APDU command the phone sends over the
 	// service-lower transport (0x2aec34 with msg code 0x2701 in r1; r0=len, r2=data ptr to the raw
 	// APDU). Remember the command (INS + full bytes) so the SIM_CARD responder can echo the T=0
@@ -3016,14 +3039,20 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			break;
 		case 0x6c:
 			data = m_ccont->serial_r();
+			m_gensio_status &= ~0x04;
 			break;
 		case 0x6d:
-			data = 0x07;    // GENSIO ready
+			data = m_gensio_status;
 			break;
 	}
 
 	if (offset == 0x20)
 		data = (data & 0xfe) | (BIT(data, 0) & m_eeprom->read_sda());
+	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
+			(offset == 0x2c || offset == 0x2d || offset == 0x6c || offset == 0x6d) &&
+			m_gensio_trace_count++ < 20000)
+		logerror("gensio: R off=%02x data=%02x pc=%08x t=%.9f\n", offset, data,
+				m_maincpu->pc(), machine().time().as_double());
 
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mad2_trace_read[offset])
 	{
@@ -3039,6 +3068,23 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	uint8_t old_data = m_mad2_regs[offset];
 	m_mad2_regs[offset] = data;
+	if (offset == 0x2d)
+	{
+		// Selecting a GENSIO endpoint leaves the controller idle and its
+		// transmit path available. Read-data-ready is transaction-local.
+		m_gensio_status = 0x03;
+	}
+	else if (offset == 0x2c && (m_mad2_regs[0x2d] & 0x04))
+	{
+		// CCONT transfers complete synchronously for now; the firmware polls
+		// status bit 2 before consuming a register byte from 0x6c.
+		m_gensio_status |= 0x04;
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
+			(offset == 0x2c || offset == 0x2d || offset == 0x6c || offset == 0x6d) &&
+			m_gensio_trace_count++ < 20000)
+		logerror("gensio: W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset, data,
+				old_data, m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mad2_trace_write[offset])
 	{
 		m_mad2_trace_write[offset] = true;

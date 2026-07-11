@@ -12,6 +12,7 @@ Documentation is organized by authority rather than investigation date.
 | `driver_vision.md` | Current modularization path and configuration taxonomy. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
 | `cross_rom_confidence.md` | 3210/3330 portability evidence and ROM-input status. |
+| `structural_regression.md` | Default mid-boot oracle and current deep-profile result. |
 
 ## Current boot frontier
 
