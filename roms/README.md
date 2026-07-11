@@ -6,7 +6,7 @@ supplied by you. Everything in this repo is original tooling, analysis, and
 annotations that operate *on* such an image — it is useless to anyone who does not
 already have a legitimately-obtained dump.
 
-## What you need
+## Reference 3210 image
 
 The **NSE-8/9 v06.00 3210** flash file. It is distributed (by third parties) inside
 a `.rar` of flash files, e.g.:
@@ -40,3 +40,34 @@ roms/
 
 The EEPROM is a separate blank 24C128 (the 3210 keeps NV there); a blank/erased
 image (all `0xFF`) is what a fresh unit has — see `docs/eeprom_analysis.md`.
+
+## Portability ROMs
+
+Additional firmware is used only as local validation material. Put each complete MAME set in its
+own ignored directory (`roms/noki3330/`, and so on), run `make audit-roms PHONE=<set>`, and never
+commit an image or extracted archive.
+
+### Nokia 3330 NHM-6 v4.50
+
+The first portability target is the 3330. Firmware.center provides service-format archive
+`NHM-6 v.04.50 3330.rar` containing:
+
+| archive member | size | sha256 |
+|---|---:|---|
+| `NHM6NX04.500` | 2,689,928 | `fac546ceaf7f56e536383730ec6cadc6519f9a11a08a3a9688f2439e77f3eca8` |
+| `NHM6NX04.50E` | 787,296 | `318fcc3fa9d2a926e574fea89af9d8cda81796acb904f196636b886ef4e6ce9e` |
+| `3330 virgin eeprom.pmm` | 65,608 | `83e58fe48153a7c1d60247ba7b80b72e05ddb8fd5443aa0d9ed976ec3ad88808` |
+
+These are Nokia flashing-container pieces, not the normalized raw images named by MAME. Do not
+blindly concatenate or rename them: their record headers and placement metadata must be decoded or
+a verified raw dump must be supplied.
+
+The existing MAME declaration expects:
+
+| file | size | CRC32 | SHA-1 |
+|---|---:|---|---|
+| `3330f450c.fls` | `0x350000` | `259313e7` | `88bcc39d9358fd8a8562fe3a0280f0ce82f5897f` |
+| `3330 virgin eeprom 005f0000.fls` | `0x10000` | `23459c10` | `68481effb39d90a1639e8f261009c66e97d3e668` |
+
+Only an exact MAME audit match establishes the canonical 3330 baseline. Differently sourced
+service images remain useful RE inputs, but their results must be labelled with their own hashes.

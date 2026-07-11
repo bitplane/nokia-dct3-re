@@ -8,6 +8,7 @@ MAME_DIR    ?= mame
 PYTHON ?= python3
 VENV   := .venv
 DRIVER := driver/nokia_3310.cpp
+PHONE ?= noki3210
 
 # Bring-your-own firmware (see roms/README.md). Git-ignored.
 ROM  ?= roms/3210f600a.fls
@@ -47,12 +48,12 @@ BOOT_ENV := \
 	NOKI3210_LUA_QUIET=1 \
 	NOKI3210_INPUT_EXERCISER_PRESS=0
 
-MAME_ARGS := noki3210 -rompath roms -log -video none -sound none \
+MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-keyboardprovider none -mouseprovider none -lightgunprovider none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua
 
-.PHONY: help venv download-mame overlay roms build swap16 run frame watch verify clean
+.PHONY: help venv download-mame overlay roms build swap16 run smoke audit-roms frame watch verify clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -60,6 +61,8 @@ help:
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
+	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
+	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
 	@echo "make clean          remove build/run state (keeps the MAME clone)"
 	@echo "Override any knob on the command line, e.g.  make run NOKI3210_TRACE_PM=1"
@@ -79,8 +82,12 @@ overlay: download-mame
 
 roms:
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
-	mkdir -p $(MAME_DIR)/roms/noki3210
-	cp -a roms/noki3210/. $(MAME_DIR)/roms/noki3210/
+	@for src in roms/noki*/; do \
+		[ -d "$$src" ] || continue; \
+		dst="$(MAME_DIR)/roms/$$(basename "$$src")"; \
+		mkdir -p "$$dst"; \
+		cp -a "$$src". "$$dst"/; \
+	done
 
 build: overlay roms
 	$(MAKE) -C $(MAME_DIR) SOURCES=src/mame/nokia/nokia_3310.cpp USE_QTDEBUG=0 -j$$(nproc)
@@ -95,6 +102,14 @@ run: build
 		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
+smoke: build
+	@mkdir -p $(RUN_DIR)
+	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
+
+audit-roms: build
+	cd $(MAME_DIR) && ./mame -rompath roms -verifyroms $(PHONE)
+
 # Promote the latest non-blank LCD frame in RUN_DIR to FRAME_PNG (for chafa/preview).
 frame:
 	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
@@ -108,6 +123,7 @@ watch:
 	@command -v chafa >/dev/null || { echo "chafa not installed"; exit 1; }
 	@while :; do clear; chafa --size=84x48 $(FRAME_PNG) 2>/dev/null || echo "no $(FRAME_PNG) yet"; sleep 0.5; done
 
+verify: PHONE=noki3210
 verify: run
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no LCD frame produced in $(RUN_DIR)"; exit 1; }; \
