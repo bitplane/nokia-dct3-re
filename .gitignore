@@ -28,6 +28,10 @@ mame/
 .venv/
 venv/
 run_*/
+run/
+cfg/
+nvram/
+snap/
 progress_latest_frame.*
 *.pgm
 scratchpad/

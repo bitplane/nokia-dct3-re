@@ -165,7 +165,32 @@ move-2 tool), the `TRACE_MMIVM` **t6cmd** tap (task-6 display-command stream = t
 `TRACE_HANDOFF` (task-1 mode / checklist), `TRACE_TASKS`, `TRACE_CCONT_READ` (incl. RTC),
 `TRACE_CSCMD`, `TRACE_LIMP/LIMP2`, and `POST_READY_KEY` (the key-nav oracle).
 
-⚠️ **`SIM_CARD_CLEAR_NOSIM` + the single-EF injection are a known short-cut, not faithful**
-(moves 1+2): they stand in for the SIM-init read sequencer the firmware doesn't self-drive.
-Slated for replacement by a faithful multi-file GSM 11.11 responder — kept meanwhile as the
-current best boot reference.
+`SIM_CARD_CLEAR_NOSIM` and the single-EF injection were retained temporarily at this point as a
+known non-faithful boot reference. They were removed in the later cleanup below after the ring-2
+multi-file responder had preserved the useful transport behavior.
+
+## 2026-07-11 GSM/SIM research-checkpoint cleanup
+
+The organic registration investigation was banked at commit `9ab5ef2`, including its negative
+results and exact firmware boundary map. The following isolation probes were then deleted rather
+than allowed to become implied hardware behavior:
+
+- `MODEL_SIM_INIT_KICK`, `SIM_REG_BOOTSTRAP`, `SIM_REG_DEFER119A`, and `SIM_REG_REARM`;
+- `MODEL_SIM_1196_HANDSHAKE`, `MODEL_SIM_REG_COMMIT`, and `MODEL_SIM_REG_ROUTE`;
+- `SIM_CARD_CLEAR_NOSIM` and its direct write to the firmware no-SIM flag;
+- `MODEL_DISPLAY_PEER_PROBE`, `PROBE_SIM_CONFIG_READY`, and
+  `PROBE_SIM_CAPABILITY_MASK`, including their synthetic DSP frames and SIM/config RAM writes.
+
+All private trampoline, scratch-session, route, and display-probe state was removed with those
+knobs. No direct writes remain to the registration/configuration targets `0x111c64`, `0x111c69`,
+`0x111c6f`, `0x111c76`, `0x111c79`, `0x111c96`, `0x111c97`, or `0x10d126`.
+
+The dense `TRACE_SIMKICK`, `TRACE_SIM_SERVER`, and `TRACE_SIM_CONFIG` investigations were also
+removed. Their conclusions are recorded in `sim_registration.md`. The retained
+`TRACE_GSM_LOWER`/`TRACE_GSM_SERVICE` taps observe the current external service boundary, while
+the compact startup/MMI traces continue to serve established boot milestones.
+
+The useful substrate remains: register/ring-2 SIM delivery, the multi-file APDU responder,
+EEPROM I2C behavior, DSP service, CCONT behavior, and request-driven peer prototypes. The default
+oracle remains `d8a9a7a58e587be8`; an integrated-model smoke run still reaches the natural
+ICCID/ECC/PHASE transaction sequence without any deleted probe.
