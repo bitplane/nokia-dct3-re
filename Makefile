@@ -86,8 +86,7 @@ eeprom-profile:
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
 	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/3210 selftest eeprom.bin"
 
-roms: eeprom-profile
-	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
+roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	@for src in roms/noki*/; do \
 		[ -d "$$src" ] || continue; \
 		dst="$(MAME_DIR)/roms/$$(basename "$$src")"; \
