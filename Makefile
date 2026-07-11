@@ -43,7 +43,6 @@ BOOT_ENV := \
 	NOKI3210_TIMER1_HZ=1057 \
 	NOKI3210_TIMER0_CATCHUP=1 \
 	NOKI3210_CCONT_EVENT15_DELAY=1 \
-	NOKI3210_EEPROM_PROFILE=selftest \
 	NOKI3210_DISABLE_CCONT_WATCHDOG=1 \
 	NOKI3210_LUA_QUIET=1 \
 	NOKI3210_INPUT_EXERCISER_PRESS=0
@@ -53,12 +52,13 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua
 
-.PHONY: help venv download-mame overlay roms build swap16 run smoke audit-roms frame watch verify clean
+.PHONY: help venv download-mame overlay eeprom-profile roms build swap16 run smoke audit-roms frame watch verify clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
+	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
@@ -80,7 +80,11 @@ download-mame:
 overlay: download-mame
 	install -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_3310.cpp
 
-roms:
+eeprom-profile:
+	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
+	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/3210 selftest eeprom.bin"
+
+roms: eeprom-profile
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
 	@for src in roms/noki*/; do \
 		[ -d "$$src" ] || continue; \
@@ -90,7 +94,7 @@ roms:
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) SOURCES=src/mame/nokia/nokia_3310.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

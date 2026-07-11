@@ -17,6 +17,7 @@
 #include <unordered_map>
 
 #include "cpu/arm7/arm7.h"
+#include "machine/i2cmem.h"
 #include "machine/intelfsh.h"
 #include "video/pcd8544.h"
 
@@ -320,6 +321,7 @@ public:
 		driver_device(mconfig, type, tag),
 		m_maincpu(*this, "maincpu"),
 		m_flash(*this, "flash"),
+		m_eeprom(*this, "eeprom"),
 		m_pcd8544(*this, "pcd8544"),
 		m_keypad(*this, "COL.%u", 0),
 		m_pwr(*this, "PWR")
@@ -400,14 +402,9 @@ private:
 	void debug_ram_byte_w(offs_t address, uint8_t data) { fw_byte_w(address, data); }
 	void nokia_ccont_w(uint8_t data);
 	uint8_t nokia_ccont_r();
-	void serial_eeprom_start();
-	void serial_eeprom_write_bit(uint8_t bit);
-	void serial_eeprom_accept_byte(uint8_t data);
-	void serial_eeprom_clock_read_bit();
-	uint8_t serial_eeprom_byte(uint16_t address) const;
-
 	required_device<cpu_device> m_maincpu;
 	required_device<intelfsh16_device> m_flash;
+	required_device<i2c_24c128_device> m_eeprom;
 	required_device<pcd8544_device> m_pcd8544;
 	required_ioport_array<5> m_keypad;
 	required_ioport m_pwr;
@@ -500,19 +497,6 @@ private:
 		uint8_t   boot_status;
 		bool      irq_asserted;
 	} m_ccont;
-
-	struct nokia_serial_eeprom
-	{
-		uint8_t write_shift;
-		uint8_t write_bits;
-		uint16_t address;
-		uint16_t address_temp;
-		uint8_t address_stage;
-		uint8_t read_byte;
-		uint8_t read_bits;
-		uint8_t read_latched_bit;
-		bool read_mode;
-	} m_serial_eeprom;
 
 	uint8_t       m_mad2_regs[0x100];
 };
@@ -815,7 +799,8 @@ void noki3310_state::machine_reset()
 	m_ccont.irq_line = CCONT_IRQ_LINE_NUM;            // fixed hardware wiring (was CCONT_IRQ_LINE knob)
 	m_ccont.boot_status = CCONT_BOOT_IRQ_DEFAULT;     // fixed boot IRQ status (was CCONT_BOOT_STATUS knob)
 	m_ccont.irq_asserted = false;
-	m_serial_eeprom = {};
+	m_eeprom->write_scl(1);
+	m_eeprom->write_sda(1);
 
 	m_fiq_status = 0;
 	m_irq_status = 0;
@@ -3131,158 +3116,6 @@ void noki3310_state::rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_ma
 	// The ROM mirrors are also used by the firmware as a one-byte trace/status port.
 }
 
-void noki3310_state::serial_eeprom_start()
-{
-	m_serial_eeprom.write_shift = 0;
-	m_serial_eeprom.write_bits = 0;
-}
-
-void noki3310_state::serial_eeprom_write_bit(uint8_t bit)
-{
-	m_serial_eeprom.write_shift = (m_serial_eeprom.write_shift << 1) | (bit & 1);
-	m_serial_eeprom.write_bits++;
-	if (m_serial_eeprom.write_bits == 8)
-	{
-		serial_eeprom_accept_byte(m_serial_eeprom.write_shift);
-		m_serial_eeprom.write_shift = 0;
-		m_serial_eeprom.write_bits = 0;
-	}
-}
-
-void noki3310_state::serial_eeprom_accept_byte(uint8_t data)
-{
-	if (m_serial_eeprom.address_stage == 0 && (data & 0xf0) == 0xa0)
-	{
-		m_serial_eeprom.read_mode = BIT(data, 0);
-		m_serial_eeprom.read_bits = 0;
-		if (!m_serial_eeprom.read_mode)
-		{
-			m_serial_eeprom.address_temp = 0;
-			m_serial_eeprom.address_stage = 1;
-		}
-		return;
-	}
-
-	if (!m_serial_eeprom.read_mode)
-	{
-		if (m_serial_eeprom.address_stage == 1)
-		{
-			m_serial_eeprom.address_temp = uint16_t(data) << 8;
-			m_serial_eeprom.address_stage = 2;
-		}
-		else
-		{
-			m_serial_eeprom.address = uint16_t(m_serial_eeprom.address_temp | data);
-			m_serial_eeprom.address_stage = 0;
-			m_serial_eeprom.read_bits = 0;
-		}
-	}
-}
-
-void noki3310_state::serial_eeprom_clock_read_bit()
-{
-	if (!m_serial_eeprom.read_mode)
-		return;
-
-	if (m_serial_eeprom.read_bits == 0)
-	{
-		m_serial_eeprom.read_byte = serial_eeprom_byte(m_serial_eeprom.address);
-	}
-
-	m_serial_eeprom.read_latched_bit = BIT(m_serial_eeprom.read_byte, 7 - m_serial_eeprom.read_bits);
-	if (m_serial_eeprom.read_latched_bit)
-		m_mad2_regs[0x20] |= 0x01;
-	else
-		m_mad2_regs[0x20] &= ~0x01;
-	m_serial_eeprom.read_bits++;
-	if (m_serial_eeprom.read_bits == 8)
-	{
-		m_serial_eeprom.read_bits = 0;
-		m_serial_eeprom.address++;
-	}
-}
-
-uint8_t noki3310_state::serial_eeprom_byte(uint16_t address) const
-{
-	if (const char *profile = std::getenv("NOKI3210_EEPROM_PROFILE"))
-	{
-		if (!std::strcmp(profile, "selftest"))
-		{
-			// NV descriptor 0x0757, variant 0. Firmware's own fallback builder
-			// (0x26db44) constructs this 0x190-byte record from a 9-byte header
-			// followed by the variant-0 body. Mirror that provisioned default in
-			// the synthetic EEPROM profile rather than returning erased 0xff.
-			if (address >= 0x0db0 && address < 0x0f40)
-			{
-				const u32 index = address - 0x0db0;
-				const u32 source = index < 9 ? 0x002d7fdc + index : 0x002d7c08 + index - 9;
-				if (memory_region *flash = memregion("flash"))
-				{
-					const u32 raw = (source - NOKIA_FLASH1_BASE) ^ 1;
-					if (raw < flash->bytes())
-						return flash->base()[raw];
-				}
-			}
-			// The bundled EEPROM file is erased. This overlay supplies the
-			// small set of NV defaults needed to expose later boot gates.
-			// Offsets are annotated with their checksummed block (see the
-			// FW_EEPROM_*_BLOCK_* map above and docs/eeprom_analysis.md).
-			switch (address)
-			{
-				// --- config block [0x0120..0x0243], checksum at FW_EEPROM_CONFIG_BLOCK_CKSUM ---
-				case 0x0170: return 0x01;
-				case 0x0171: return 0x00;
-				// Stored checksum (big-endian) for the config block, read at 0x234810.
-				// Firmware computes sum16(EEPROM[0x120..0x243]) minus a correction
-				// (EEPROM[0x154]+[0x155]) = 0x1ee1 for this overlay; high byte = 0x1e,
-				// low = 0xe1. (NokTool's tune/security blocks use a plain sum16; this
-				// firmware block additionally subtracts the [0x154] word.)
-				case FW_EEPROM_CONFIG_BLOCK_CKSUM:     return 0x1e;
-				case FW_EEPROM_CONFIG_BLOCK_CKSUM + 1: return 0xe1;
-				// --- tune+security region [0x00..0x11b] checksum, verified by idx18's
-				// service-channel availability check (0x264c56: sum16(EEPROM[0..0x11b]) ==
-				// 32-bit word[0x11c], big-endian). The erased region (all 0xff over 0x11c
-				// bytes) sums to 0x1ae4; store that big-endian at 0x11c..0x11f (these four
-				// bytes are outside the summed range, so they don't change the sum). A
-				// real provisioned phone has a matching checksum here; a virgin EEPROM
-				// leaves 0xffff (mismatch) — which is why idx18 reads the service absent.
-				case 0x011c: return 0x00;
-				case 0x011d: return 0x00;
-				case 0x011e: return 0x1a;
-				case 0x011f: return 0xe4;
-				// --- blocks beyond config (RF/ADC profile records, [0x0394+], [0x048c+]) ---
-				case 0x048c: return 0x0a;
-				case 0x048d: return 0x00;
-				case 0x048e: return 0x0a;
-				case 0x048f: return 0x80;
-				case 0x0394: return 0x0a;
-				case 0x0395: return 0x00;
-				case 0x0396: return 0x0a;
-				case 0x0397: return 0x80;
-				case 0x0398: return 0x09;
-				case 0x0399: return 0x00;
-				case 0x039a: return 0x00;
-				case 0x039b: return 0x00;
-			}
-
-			// ADC monitor calibration/config records read by 0x2a7230. Erased
-			// 0xff bytes turn into invalid selector and weight tables at
-			// 0x11145a/0x111d3c/0x111d5c, causing the live source walker to
-			// accumulate implausible scores during startup mode 7.
-			if ((address >= 0x02e0 && address <= 0x02eb) ||
-					(address >= 0x0310 && address <= 0x0313) ||
-					(address >= 0x0330 && address <= 0x0337))
-				return 0x00;
-		}
-	}
-
-	memory_region *eeprom = memregion("eeprom");
-	if (!eeprom || eeprom->bytes() == 0)
-		return 0xff;
-
-	return eeprom->base()[address % eeprom->bytes()];
-}
-
 uint8_t noki3310_state::mad2_io_r(offs_t offset)
 {
 	uint8_t data = m_mad2_regs[offset];
@@ -3400,16 +3233,8 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			break;
 	}
 
-	const u32 pc = m_maincpu->pc();
-	if (offset == 0x20 && pc >= 0x002b0188 && pc <= 0x002b0238)
-	{
-		// The EEPROM acknowledges by pulling SDA low after a byte write.
-		data &= 0xfe;
-	}
-	else if (offset == 0x20 && pc >= 0x002b024a && pc <= 0x002b0288)
-	{
-		data = (data & 0xfe) | (m_serial_eeprom.read_latched_bit & 1);
-	}
+	if (offset == 0x20)
+		data = (data & 0xfe) | (BIT(data, 0) & m_eeprom->read_sda());
 
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
 	return data;
@@ -3418,7 +3243,6 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	uint8_t old_data = m_mad2_regs[offset];
-	const u32 pc = m_maincpu->pc();
 	m_mad2_regs[offset] = data;
 
 	// MODEL_SIM_ATR (opt-in, register-level ATR probe — NOT the faithful reception path).
@@ -3447,12 +3271,13 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 			assert_irq(int(line));
 	}
 
-	if (offset == 0x20 && pc >= 0x002b0318 && pc <= 0x002b0340)
-		serial_eeprom_start();
-	else if (offset == 0x20 && pc >= 0x002b01ac && pc <= 0x002b01c8)
-		serial_eeprom_write_bit(data & 1);
-	else if (offset == 0x20 && pc == 0x002b028e)
-		serial_eeprom_clock_read_bit();
+	if (offset == 0x20 || offset == 0x24)
+	{
+		const uint8_t signal = m_mad2_regs[0x20];
+		const uint8_t direction = m_mad2_regs[0x24];
+		m_eeprom->write_sda(BIT(direction, 0) ? BIT(signal, 0) : 1);
+		m_eeprom->write_scl(BIT(signal, 3));
+	}
 
 	if (offset == 0x01 && (data & 0x04) != 0 && (old_data & 0x04) == 0 &&
 			nokia_env_u32("NOKI3210_MAD2_SOFT_RESET", 0) != 0)
@@ -3747,6 +3572,7 @@ void noki3310_state::noki3310(machine_config &config)
 	m_pcd8544->set_screen_update_cb(FUNC(noki3310_state::pcd8544_screen_update));
 
 	INTEL_TE28F160(config, "flash");
+	I2C_24C128(config, m_eeprom);
 }
 
 void noki3310_state::noki3330(machine_config &config)
@@ -3794,8 +3620,8 @@ ROM_START( noki3210 )
 	ROM_SYSTEM_BIOS(0, "600", "v6.00")  // A 03-10-2000
 	ROMX_LOAD("3210f600a.fls", 0x000000, 0x200000, CRC(6a978478) SHA1(6bdec2ec76aca15bc12b621be4402e455562454b), ROM_BIOS(0))
 
-	ROM_REGION16_BE(0x04000, "eeprom", 0 )
-	ROM_LOAD("3210 virgin eeprom,24c128.bin", 0x00000, 0x04000, CRC(690b37d3) SHA1(547372f1044a3442aa52fcd2b3546540aba59344))
+	ROM_REGION(0x04000, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("3210 selftest eeprom.bin", 0x00000, 0x04000, CRC(4d7bbbf5) SHA1(a60510d9d4e84dc0d522f1f3dea69a96c39fb494))
 ROM_END
 
 ROM_START( noki3310 )

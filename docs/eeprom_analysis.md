@@ -180,3 +180,11 @@ MBUS ack (`0x11fedb`) are solved. The checksum algorithm is now known (byte-sum)
 the kind of recalculation NokiaTool performs. The rest of a full image remains a later
 concern (RF/ADC/config consume EEPROM throughout t=0.006–0.40; phases past `94a2dc` may gate
 on it).
+# Emulation status
+
+The driver now presents the external 24C128 through MAME's `I2C_24C128`
+device, connected to MAD2 GenIO SDA (bit 0) and SCL (bit 3). The former
+firmware-PC-gated byte sequencer has been removed. `tools/make_eeprom_profile.py`
+materializes the current synthetic self-test provisioning as a local, ignored
+16 KiB input image; it is test data, not a hardware model or a redistributable
+phone dump.
