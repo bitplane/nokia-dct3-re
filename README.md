@@ -1,168 +1,149 @@
-# nokia-dct3-re
+# Nokia DCT Platform Emulation
 
-Reverse-engineering toolkit for **Nokia DCT3-era phones** (TI MAD2-based), starting
-with the **Nokia 3210 (NSE-8/9)**. It pairs a [MAME](https://github.com/mamedev/mame)
-driver with disassembly tools, headless Ghidra scripts, a symbol map, and detailed
-analysis docs — enough to boot the firmware in emulation and reason about why it does
-what it does.
+This project reverse-engineers and emulates Nokia's early digital cellular phone platforms in
+[MAME](https://github.com/mamedev/mame). The reference machine is the Nokia 3210 (NSE-8/9), a
+DCT3 phone built around the MAD2 baseband ASIC. The long-term aspiration is a reusable,
+maintainable DCT-family architecture capable of running unmodified firmware from DCT1, DCT2,
+DCT3, DCTL, and eventually DCT4 phones where the hardware is understood.
 
-The headline result: **a blank 3210 boots to "Insert SIM card"** — the correct home state
-for a DCT3 phone with no SIM inserted. A blank/un-provisioned phone first halts at the
-CONTACT SERVICE screen; that whole chain is reverse-engineered end-to-end and cleared by
-**faithful, opt-in models** (`docs/service_bootstrap.md`). From there the boot was carried
-the rest of the way: the `000d` startup wall, an 11-subsystem readiness barrier, and a
-startup-supervisor **busy-wait on a service-channel-busy bit** — the single root cause that
-gated everything — were traced and fixed with one more opt-in model, cascading all the way to
-a rendered **"Insert SIM card"** MMI screen. See `docs/boot_to_insert_sim.md`. From there the SIM
-**conversation** was reverse-engineered: `MODEL_SIM_CARD` (`docs/sim_emulator_scope.md`) is a
-message-layer virtual SIM that delivers a genuine ATR and echoes the ISO-7816 PPS, and the
-GSM 11.11 T=0 command framing (`SELECT → GET_RESPONSE → READ`) is understood end-to-end.
-**However** — a 2026-07 review (`docs/sim_emulator_scope.md` "Moves 1+2") found the current
-model still short-cuts SIM init: it *injects* a single-EF read and pokes the no-SIM flag
-(`SIM_CARD_CLEAR_NOSIM`) rather than the firmware driving its own reads. The firmware's SIM-init
-read sequencer (RTOS task 20) does not run on the reconstructed boot: its read-trigger message
-`0x119a` arrives *before* the SIM ATR, deadlocking it in a premature SELECT. Reaching a real,
-firmware-driven SIM init (the true milestone: a firmware-originated SELECT with `SIM_CARD_EF`
-unset) is an open, in-progress problem — the coherent SIM-registration ordering. The clean,
-reproducible milestone remains **boot-to-"Insert SIM card"**.
+That is a research direction, not a compatibility promise. Nokia product generations differ in
+ASICs, flash layout, displays, companion chips, RF, DSP firmware, product data, and application
+software. The practical method is incremental:
 
-Reaching the classic **operator-idle** home screen is a *separate* wall, now mapped end-to-end down
-to the pixel. Under the full SIM boot the interactive **MMI layer is alive** — the task-5 state-machine
-VM runs continuously — but the screen can't repaint to idle because the whole **display-resource
-subsystem is never registered**. Registration is a contact-service command (`0x70`) carrying a config
-blob that a real service session sends but our minimal faked session omits; `MODEL_RES_ENABLE` now
-delivers it faithfully (the firmware's own `0x2b140a` sets the enable flag `[0x11fee4]` and the
-availability bitmap). Even then the idle *content* stays blank: composing it acquires the idle window
-(`0x4c22`) plus **~18 more resource classes** (fonts, icons, layout, sub-windows) whose backing
-providers only come up with the full provisioned config, and its content values (clock, operator,
-signal) need a SIM + network registration — RF hardware, out of scope. So without a SIM+network,
-**"Insert SIM card" is the correct and complete terminal screen**; operator-idle is fundamentally a
-provisioned/SIM/network state. `docs/sim_subsystem.md` keeps the original UART-level Phase-1 map;
-the full SIM build log and the resource/content-pipeline dig are in `docs/sim_emulator_scope.md`.
+1. Observe a real firmware/hardware boundary.
+2. Map it statically and at runtime.
+3. Prototype the absent peer without claiming the prototype is hardware.
+4. Replace the prototype with a register, bus, mailbox, or device model.
+5. Validate the component against another ROM before treating it as shared platform behavior.
 
-The default boot (no models) still reproduces the CONTACT SERVICE oracle frame byte-for-byte;
-every model is opt-in.
+The original milestone was to run Snake on a Nokia 3210. That remains a useful vertical test, but
+the intended result is the platform implementation that makes Snake, T9, ringtones, the address
+book, operator logos, settings, and the rest of the phone ordinary firmware behavior rather than
+special cases.
 
-## ⚠️ No firmware here — bring your own
+## Current State
 
-This repo contains **no copyrighted firmware, dumps, or proprietary tools** — only
-original tooling, annotations, and analysis. You supply your own legitimately-obtained
-3210 flash image; see [`roms/README.md`](roms/README.md) for the source and the
-SHA-256 to verify against. Without a matching dump, the absolute addresses in the docs
-and symbol map won't line up.
+The 3210 firmware executes deeply enough to initialize the CPU, MAD2 peripherals, CCONT, display,
+EEPROM paths, RTOS tasks, contact-service machinery, and a substantial SIM conversation. The
+default profile deterministically reaches the authentic **CONTACT SERVICE** frame and is protected
+by a byte-exact LCD oracle. Opt-in peer prototypes can carry the firmware further and the ring-2
+SIM responder completes natural ATR and ICCID/ECC/PHASE APDU traffic.
 
-## Layout
+The phone does **not** yet complete organic SIM registration or reach the offline application
+desktop. The missing lower service transaction is mapped through
+`0x05ea -> 0x07dd -> 0x209978 -> 0x09e5`, but it has not executed end to end in one coherent boot.
+The research checkpoint and negative results are in
+[`docs/sim_registration.md`](docs/sim_registration.md).
 
-```
-driver/nokia_3310.cpp     the MAME driver (BSD-3-Clause; overlaid onto a fresh MAME clone at build)
-tools/                  Thumb-disasm / xref helpers (capstone); the MAME input-exerciser Lua
-ghidra/scripts/         headless Ghidra naming/export scripts
-ghidra/symbols/3210.csv address -> name -> kind, exported from the naming script (use without Ghidra)
-docs/                   the reverse-engineering write-ups (see below)
-roms/                   bring-your-own firmware (git-ignored) + how-to + verification SHAs
-```
+Several surviving `MODEL_*` paths describe plausible absent peers but still operate at known
+firmware PCs. They are executable protocol hypotheses, not finished hardware emulation. No direct
+SIM-registration state forcing remains in the cleaned driver.
 
-Build state (the MAME checkout, `.venv`, run outputs, frames) and anything
-derived from the firmware (Ghidra decompiled listings) are git-ignored.
+## Maturity
 
-## Key docs
+The labels below have precise meanings:
 
-- [`docs/service_bootstrap.md`](docs/service_bootstrap.md) — the main result: the full
-  CONTACT SERVICE chain, the validated experiments, the **DSP/PM/MBUS service layer**,
-  and the **forward "provisioning model" plan**. Start with its executive summary.
-- [`docs/eeprom_analysis.md`](docs/eeprom_analysis.md) — EEPROM block layout + the
-  additive-checksum algorithm (cross-validated with NokTool).
-- [`docs/driver_structure.md`](docs/driver_structure.md) — how the driver is organised
-  (thin hardware handlers + quarantined research hooks/traces).
-- [`docs/driver_vision.md`](docs/driver_vision.md) — the per-peripheral target shape and
-  the knob→model retirement map (turning the bring-up scaffolding into a clean driver).
-- [`docs/ccont_subsystem.md`](docs/ccont_subsystem.md) — the CCONT power-management subsystem:
-  confidence-tagged protocol map (serial regs, ADC, the interrupt→event/message fan-out) and
-  the target `ccont_device` component. The first subsystem to model faithfully.
-- [`docs/scheduler_delivery.md`](docs/scheduler_delivery.md) — the RTOS event/message delivery path
-  from **ground-truth disassembly**: the immediate-vs-delayed post split, the `0x2d71a8` recode table,
-  the mode-`000d` gate, why the raw-`0x15` producer is dead-gated, and the **3310 cross-firmware**
-  confirmation that closes the `000d` limp (it's a faked-boot artifact). Includes the reusable
-  cross-firmware comparison method (byteswap + entry-signature search).
-- [`docs/battery_classifier_analysis.md`](docs/battery_classifier_analysis.md),
-  [`docs/static_branch_map.md`](docs/static_branch_map.md),
-  [`docs/firmware_code_maps.md`](docs/firmware_code_maps.md) — supporting analysis.
-- [`docs/hardware_atlas.md`](docs/hardware_atlas.md) — the firmware↔hardware boundary:
-  every MMIO region the firmware touches, tagged emulated/partial/**stub**, and what the
-  boot reaches vs not (the phase-2 map; the DSP interface is the next deep-dive).
-- [`docs/tooling.md`](docs/tooling.md) — the in-repo tools and external references
-  (NokTool, IDR).
+- **Mapped**: firmware ownership and boundary are documented.
+- **Prototype**: enough peer behavior exists to test the contract, usually through research hooks.
+- **Partial hardware**: firmware uses ordinary registers or buses, but behavior is incomplete.
+- **Component-ready**: the contract is stable enough to extract into a MAME device.
+- **Validated**: the component passes the 3210 regression and a second-ROM confidence check.
 
-## Status
+| Subsystem | State | Evidence / next step |
+|---|---|---|
+| ARM7, flash, RAM mapping | Partial hardware | 3210 executes reliably; product layouts need cross-ROM validation. |
+| MAD2 timers and IRQ/FIQ | Partial hardware | Boot-critical paths work; several timings remain calibrated assumptions. |
+| PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames and input is scriptable. |
+| 24C128 EEPROM | Component-ready | I2C and profile contents are understood; migrate to MAME's native device. |
+| CCONT power/ADC/RTC | Component-ready | Serial register protocol and IRQ behavior are mapped; extract a device. |
+| SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
+| DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
+| Startup/contact peers | Prototype | Useful protocol behavior, still implemented through firmware hooks. |
+| GSM/resource registration | Mapped | Organic provider transaction remains the active RE frontier. |
+| MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
+| Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |
 
-**Phase 1 — CONTACT SERVICE — is complete.** The boot stall is fully understood *and* cleared
-by five faithful, opt-in models (DSP service handshake, CCONT present-bit, EEPROM config +
-tune/security checksums, and the node-`0x18` service responder). With them on, the boot completes
-the contact-service and leaves the CONTACT SERVICE screen; with them off, the default boot still
-reproduces the regression oracle (`make verify` → frame `d8a9a7`). The full chain and every model
-are documented in `docs/service_bootstrap.md` (start at "Status & model stack").
+A component is considered boxed off only when firmware reaches it through its ordinary interface,
+it performs no firmware-state writes, timing is expressed as device behavior, save state is
+supported, and it passes the reference and portability checks.
 
-**Phase 2 — boot → idle — is mapped end-to-end, and the mode-`000d` limp is fully reverse-engineered.**
-Past CONTACT SERVICE the boot runs a chain of startup modes (`000d → 0004 → … → 0007 → readiness loop`)
-and holds at the **mode-`000d` limp**, which advances only when the startup task *receives* the four raw
-startup events `0x14/0x15/0x16/0x17` (flag `[0x112399]` reaches `0x0f`); `0x15` never arrives. Ground-truth
-disassembly (`docs/scheduler_delivery.md`, via `tools/disrom.py` on the swap16 image — the Ghidra
-*decompiler* output is Thumb-garbage for this path, but the *disassembly* is clean) traced the exact
-delivery machinery: the scheduler has an **immediate** post path (raw code → the task's ring) and a
-**delayed** path that **recodes** every event `k` to `0xc0+k` via a table at `0x2d71a8` — so a
-delayed-posted `0x15` always surfaces as `0xd5`, never as raw `0x15`. `0x15` has **no** immediate producer;
-the one candidate — the contact-service command handler `0x236bac`, reached by command `0x65` — has its
-`0x15` emit **dead-gated** (`0x2a674c` returns 1 for its even argument, skipping the emit on every phone).
+## Roadmap
 
-**Cross-firmware confirmed — and it reframes the limp.** Diffing the sibling **Nokia 3310 (NHM-5 v06.39)**
-shows that dead-gate is **byte-identical** — shared DCT3 firmware design, not a 3210 bug. Since real 3310s
-boot to idle with the *same* dead `0x15`-emit, a normal DCT3 boot does **not** depend on this producer — so
-the mode-`000d` limp (waiting for a raw `0x15`) is an **artifact of the blank + faked boot**, not the path a
-real phone takes. The `000d` code is completely and correctly reverse-engineered; the *stall* is a property
-of how our unprovisioned/faked reconstruction reaches that state, not a missing model or a hardware gate.
-(A since-retired diagnostic that force-injected the `000d` events advanced `000d → 0004` and rendered the
-first **battery-present idle screen**, frame `4235fa`, confirming the mechanism.) The full mechanism, the
-refuted faithful levers, and the reusable cross-firmware method are in `docs/scheduler_delivery.md`. The
-real fix came later — the service-channel-busy busy-wait — see `docs/boot_to_insert_sim.md`.
+### Reference 3210 milestones
 
-The **CCONT power-management subsystem is faithfully modelled** (`docs/ccont_subsystem.md`): an explicit
-ADC-source model, the interrupt→event protocol decoded, the `0x77xx` PMM messages mapped, its env-knob
-cluster retired into device state/constants. The measurement path was confirmed *already faithful*
-(synchronous ADC + the firmware's own timer-poll), and separately ruled **out** as the `000d` cause
-(the CCONT IRQ status settles cleanly).
+1. Stable default and modeled boot regressions.
+2. Organic SIM initialization and offline desktop.
+3. Reliable keypad navigation and persistent settings.
+4. Address book editing and text/T9 entry.
+5. Ringtone playback and audio output.
+6. Operator logos and other period content workflows.
+7. Snake and the other built-in games.
 
-## Reproducing
+### Platform work
 
-Three things pin reproducibility anywhere: the **MAME commit** (`MAME_COMMIT` in the
-Makefile), the **firmware SHA-256** (`roms/README.md`), and the **oracle frame hash**
-(`d8a9a7…`) the boot must reach. Once your dump is in `roms/` (see `roms/README.md`):
+1. Extract EEPROM and CCONT from the monolithic driver.
+2. Use the Nokia 3330 (NHM-6) as the first cross-ROM confidence target.
+3. Consolidate SIM transport and card behavior behind one device boundary.
+4. Separate MAD2 peripheral blocks and the DSP mailbox from phone configuration.
+5. Add further DCT3 products as diagnostic evidence, then evaluate earlier/later DCT generations.
 
-```
-make build      # clone MAME at the pin, overlay driver/nokia_3310.cpp, build
-make verify     # boot to CONTACT SERVICE, check the LCD frame SHA == the oracle
-make swap16     # derive the halfword-swapped image the static tools/Ghidra use
+New phone support is initially a portability probe. A ROM that fails early is still valuable when
+it identifies a 3210-specific assumption.
+
+## Repository Layout
+
+```text
+driver/                 MAME driver and extracted Nokia devices
+tools/                  Thumb-1 disassembly and cross-ROM helpers
+ghidra/scripts/         headless analysis and symbol-export scripts
+ghidra/symbols/         firmware-specific symbol maps
+docs/                   hardware atlas and RE reports
+roms/                   ignored, user-supplied firmware plus verification instructions
 ```
 
-Every `NOKI3210_*` knob the driver reads is overridable on the command line; the
-canonical oracle profile is baked into `make run`. Two useful profiles beyond the oracle:
+Start with:
 
+- [`docs/hardware_atlas.md`](docs/hardware_atlas.md) for the firmware/hardware boundary.
+- [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
+- [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
+- [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for CONTACT SERVICE.
+- [`docs/sim_registration.md`](docs/sim_registration.md) for the current boot frontier.
+- [`docs/tooling.md`](docs/tooling.md) for the analysis tools.
+
+## Firmware Policy
+
+No Nokia firmware, EEPROM image, proprietary tool, or derived decompilation is distributed here.
+Bring legally obtained images and place them under the ignored `roms/` directory. The repository
+records filenames and hashes solely for reproducibility; see [`roms/README.md`](roms/README.md).
+
+Absolute addresses and the exported 3210 symbol map are specific to NSE-8/9 v6.00. Other ROMs are
+expected to move functions and data even when they implement the same hardware contract.
+
+## Build and Reproduce
+
+The Makefile pins the upstream MAME revision and overlays the Nokia sources into a local checkout.
+With the required 3210 files installed:
+
+```sh
+make build
+make verify
+make swap16
 ```
-# Clear CONTACT SERVICE and reach the mode-000d limp (the three service models):
-make run NOKI3210_MODEL_DSP_SERVICE=1 NOKI3210_MODEL_CCONT_PRESENT=1 NOKI3210_MODEL_SVC_RESPONDER=1
 
-# The headline result: the full faithful boot all the way to "Insert SIM card"
-# (service models + the service-channel drain + the message-layer virtual SIM):
-make run NOKI3210_MODEL_DSP_SERVICE=1 NOKI3210_MODEL_CCONT_PRESENT=1 NOKI3210_MODEL_SVC_RESPONDER=1 \
-         NOKI3210_MODEL_SVC_CHANNEL_DRAIN=1 NOKI3210_MODEL_SIM_CARD=1 NOKI3210_SIM_ATR_HEX=3b1005 \
-         NOKI3210_SIM_CARD_EF=0x6f07 NOKI3210_SIM_CARD_CLEAR_NOSIM=1
-```
+`make verify` boots the default 3210 profile and checks the promoted LCD frame against oracle
+`d8a9a7a58e587be8`. Peer models and diagnostic traces are opt-in through `NOKI3210_*` environment
+variables. They must not be enabled when establishing a new ROM's hardware baseline.
 
-`MODEL_RES_ENABLE` (optional, on top of the above) delivers the resource-registration
-command `0x70` — the display-resource groundwork for operator-idle; see
-`docs/sim_emulator_scope.md`.
+## Engineering Rules
+
+- Hardware behavior belongs in a device or ordinary memory-map handler.
+- Product differences are machine configuration or data, not firmware-PC conditions.
+- Research hooks are opt-in, explicitly labelled, and must shrink as contracts become devices.
+- Failed probes are documented and removed rather than retained as compatibility paths.
+- The 3210 oracle runs after every behavior change.
+- A second ROM is used before declaring behavior shared across DCT3.
 
 ## License
 
-BSD-3-Clause (see [`LICENSE`](LICENSE)). The MAME driver keeps its upstream BSD-3-Clause
-header; MAME-as-a-whole is GPL-2.0-or-later but is not redistributed here (fetched from
-upstream and overlaid at build time).
+Original project code is BSD-3-Clause; see [`LICENSE`](LICENSE). MAME is fetched separately and is
+GPL-2.0-or-later as a whole. Copyrighted phone firmware is not part of this project.

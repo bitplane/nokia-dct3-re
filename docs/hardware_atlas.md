@@ -72,9 +72,11 @@ ROW `0x28/0x29/0x68/0x69/0xa8/0xa9`, COL `0x2a/0x2b/0x6a/0x6b/0xaa/0xab` (signal
 | `0x2e` / `0x6e` | **LCD data / command write** (PCD8544) | emulated ✓ |
 | `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** lines | partial — GENSIO multiplexes other devices on the SELECT lines; **SELECT1/2 are touched at boot** (`0x6f`, `0xad/0xae`) but what sits on them past CCONT is unmapped. A deep-dive target (RF synth? audio codec control?). |
 
-### SIMI — SIM UART (`0x36–0x3f`) — **not touched at boot-to-limp**
-TxD/RxD/IIR/control/clock/flags/fill. Emulation status unverified; the SIM card path is a future
-frontier (GSM needs the SIM). Not reached before the limp.
+### SIMI — SIM UART (`0x36–0x3f`) — **mapped, reception is not MCU-UART driven**
+The firmware configures and flushes these registers, but normal SIM reception is surfaced through
+the lower service/ring message path. The retained ring-2 card model completes ATR and T=0 APDU
+traffic. Register-level ATR injection is a diagnostic probe, not the faithful receive path; see
+`sim_emulator_scope.md` and `sim_registration.md`.
 
 ### UIF — CTRL I/O pins (`0x32/0x33`, `0x70–0x73`, `0xb0–0xb3`, `0xf0–0xf3`)
 General control I/O + directions; partly emulated, touched ✓. (Register `0x31` is read/written but
@@ -137,7 +139,17 @@ the DSP-IF task and is not attempted before the upstream MMI/resource wall. Full
 "can operator-idle be faked" verdict (DSP-bound; not message-injectable like the SIM) are in
 `docs/network_scouting.md`.
 
-## What the boot touches — and doesn't (the frontier)
+## Current frontier
+
+The project now reaches substantially beyond the historical mode-`000d` observations below. The
+default oracle remains CONTACT SERVICE, while opt-in peer prototypes exercise display, startup,
+SIM reset, ATR, and preliminary ICCID/ECC/PHASE reads. Organic GSM/resource registration remains
+missing; the lower-object contract is mapped but not produced in a coherent boot.
+
+The component order is EEPROM, CCONT, then SIM. The Nokia 3330 is the first portability probe used
+to distinguish shared MAD2 behavior from 3210 firmware assumptions.
+
+## Historical boot boundary
 
 To the **mode-`000d` limp** (past CONTACT SERVICE) the firmware exercises: CTSI (clock/timer/IRQ),
 MBUS, CCONT (power/ADC/RTC), LCD, keypad, CTRL-I/O, and the DSP interface (stubbed). It does **not**

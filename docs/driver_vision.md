@@ -1,5 +1,10 @@
 # Driver vision — what each peripheral should look like, and how we get there
 
+> Current execution order (2026-07-11): adopt MAME's native 24C128 device, extract CCONT into a
+> standalone Nokia device, validate both against the 3210 and 3330, then consolidate SIM. Historical
+> tables below document how the present understanding was reached; stale `MODEL_*` entries are not
+> claims that those paths are hardware-faithful.
+
 This is the north star for `driver/nokia_3310.cpp`: the *target shape* of each
 peripheral model, an honest assessment of where the code is today, and the
 **knob → model retirement map** that turns the current firmware-bring-up

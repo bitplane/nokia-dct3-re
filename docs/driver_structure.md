@@ -1,8 +1,8 @@
 # Driver structure convention
 
-Goal: `nokia_3310.cpp` should read like a hardware-emulation driver, with all
-firmware-research forcing and execution tracing quarantined away from the real
-hardware models so it can be deleted incrementally as the emulation matures.
+Goal: the Nokia driver should describe machine composition while reusable hardware behavior lives
+in explicit MAME devices. Firmware-research execution tracing remains quarantined so it can be
+deleted incrementally as observed contracts become components.
 
 ## Entry points vs. quarantine
 
@@ -16,12 +16,12 @@ the forcing shims + traces:
 | `ram_w`   (≈10 lines) | `ram_w_firmware_overrides` (forcing can rewrite the stored value) |
 | `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (forcing can rewrite the returned value) |
 
-The real device models — `nokia_ccont_*`, `mad2_io_*`, `eeprom_*`,
-`serial_eeprom_*`, the `pcd8544` LCD — are already clean and stay as-is.
+The PCD8544 LCD is already a MAME device. EEPROM and CCONT are the first local implementations to
+extract; SIM and the MAD2/DSP mailbox follow after their boundaries stabilize.
 
 ## Rules
 
-- New *hardware* behaviour goes in the thin entry points or a device model.
+- New *hardware* behaviour goes in a device model or the owning MAD2 register block.
 - New *forcing/diagnostic* shims go in the `*_firmware_*` helpers, gated by their
   `NOKI3210_*` knob, with a comment naming the gate they stand in for.
 - The `*_firmware_*` helpers should **shrink over time**: when a shim's gate is
@@ -31,15 +31,16 @@ The real device models — `nokia_ccont_*`, `mad2_io_*`, `eeprom_*`,
   helpers now hold only non-force research shims (NV/display-source stubs, trace
   taps). Do **not** re-introduce result forcing; model the missing hardware/NV state
   instead.
-- **Update (2026-07): the model work is complete and the scaffolding is retired.** The faithful
-  opt-in models now carry the boot all the way to "Insert SIM card":
-  `MODEL_DSP_SERVICE`, `MODEL_CCONT_PRESENT`, `EEPROM_PROFILE=selftest`, `MODEL_SVC_RESPONDER`,
-  `MODEL_SVC_CHANNEL_DRAIN`, `MODEL_SIM_CARD`, and `MODEL_RES_ENABLE` (the display-resource
-  registration groundwork). **All 19 `EXPERIMENT_*` forcing shims and the `FORCE_IDLE/OUTCOME`
-  shims were removed** (they were dead-end diagnostics; recoverable from git). The `TRACE_*` taps
-  were thinned to a curated few that document the working boot (`CCONT_READ`, `LIMP`, `LIMP2`,
-  `CSCMD`, `RESAVAIL`). See `sim_emulator_scope.md` for the SIM + resource layers and
-  `boot_to_insert_sim.md` for the service-channel-busy root cause.
+- **Update (2026-07-11):** the organic registration investigation is banked and its forcing lineage
+  has been removed. Surviving `MODEL_*` firmware hooks are peer prototypes until their behavior is
+  expressed at a real transport boundary. See `sim_registration.md` and
+  `removed_forcing_knobs.md`.
+
+## Component completion gate
+
+A subsystem leaves this driver only when its external interface is explicit, save-state fields are
+registered, configuration contains no firmware addresses, and both the 3210 oracle and the current
+cross-ROM smoke pass. Phone-specific constants remain in machine configuration.
 
 ## Regression oracle
 
