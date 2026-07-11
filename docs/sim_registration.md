@@ -389,3 +389,136 @@ pc=0x20733c writes [0x111c79] = 1
 This completes the step-7 transport/handler contract. It does **not** prove the upstream SIM-server
 registration route: the probe still invokes the genuine `0x2902ac` producer with isolated scratch
 inputs. Organic session population and producer scheduling remain the next layer.
+
+## Organic task-5 route audit (2026-07-10)
+
+The forced commit-key probes are not evidence of an organic registration session. A correlated
+`NOKI3210_TRACE_TASK5_REG` run now records task-5 mailbox input, descriptor expansion, argument
+copies, dispatcher cases, and producer milestones in one timeline.
+
+With native task-21 activation (`NOKI3210_SIM_CARD_AUTOSTART=1`) and ring-2 T=0 delivery, firmware
+naturally reaches repeated dispatcher case `0x1581`. It does not reach `0x1580..0x157d` or
+`0x2902ac`. The route below the missing transition is now exact:
+
+```text
+task-5 state handler 0x289e7c receives event 0x0fa4
+  -> 0x28a03a copies three bytes from the current argument pointer
+  -> sole call at 0x28a050 to 0x27953e
+  -> allocate/post message 0x157d to task 17
+  -> task-5 commit case 0x157d
+  -> 0x254c42 -> 0x2902ac -> task-20 message 0x1196
+```
+
+`0x0fa4` is a registered service callback, not a SIM-UART status. Initialization code at
+`0x289db4` constructs callback descriptors containing `0x0fa4` and registers them through service
+`0x0b` (`0x2632fc`). In the current run this handler receives only timeout `0x05e2`; the service
+callback is never delivered. A trial interpretation of ROM-table pair `0x1395/0x1f05` was
+falsified: raw `0x1f05` reached the dispatcher unchanged and did not initialize this state. The
+speculative responder was removed.
+
+Two corrections follow from this audit:
+
+- `0x110f1c` is the transient task-5 argument vector populated by descriptor expansion at
+  `0x2aee84`; treating it unconditionally as a persistent allocated SIM session was incorrect.
+- `0x119a` always runs reinitialization call `0x207704`, even when SIM-selected is set. Deferring
+  only the premature pre-detect instance avoids the initial inversion, but later `0x119a` messages
+  remain part of the retry/polling behavior and reset the selected flag.
+
+Next implementation boundary: trace the real service-`0x0b` request/response transport around
+`0x2632fc` and reproduce that peer response, including its three-byte callback payload. Do not
+post `0x157d`, invoke `0x27953e`, or replay commit keys; those bypass the state being tested.
+
+### Service-0x0b prerequisite correction
+
+A follow-up allocator-backed diagnostic reached handler event `0x1395` with a valid linked-list
+argument. The handler still correctly declined service-`0x0b` initialization: helper `0x26f278`
+first tests the SIM configuration word at `0x10d126` (bit selected by `lsrs #10`). Only when that
+service bit is present does it derive the three-byte value from `0x10d149` and allow `0x289c5c ->
+0x289db4` to register callback `0x0fa4`.
+
+Therefore `0x0fa4` is not the immediate missing peer response after natural `0x1581`. It is
+downstream of earlier SIM EF/config population. The next organic transition to solve is
+`0x1581 -> 0x1580`; then continue descending through the commit cases until the SIM configuration
+needed by `0x26f278` exists. The direct-handler/list diagnostic was removed after establishing
+this dependency.
+
+### First missing transition before 0x1580
+
+Natural dispatcher case `0x1581` enters `0x2900a0`, but its gate `[0x111c86]` is zero, so the
+conditional call to `0x2793b6` is skipped. A RAM-boundary write watch found no setter during the
+run. Instead, task-21 completion `0x27dfc4` writes zero to the gate and calls `0x2793b6` itself.
+That completion repeats approximately every 75 ms in the current boot, matching the outstanding
+SIM reset/reinitialization cycle. At the first natural `0x1581` (about 6.76 s), `[0x111c86]=0`
+while SIM-manager flags `[0x10dcaf]` and `[0x10dca9]` are both 1.
+
+This moves the immediate implementation target upstream again: make the post-detect SIM lifecycle
+settle so `0x27dfc4` is not repeatedly re-entered, then observe the legitimate indirect setter of
+`0x111c86`. Do not force this byte; doing so would bypass the task-17/task-21 completion contract
+that is supposed to schedule `0x1580`.
+
+## Phase 4 scaffold: GSM service peer boundary
+
+The generic service framework around `0x262xxx` is now sufficiently mapped to attach a peer
+without invoking an application callback directly:
+
+- `0x10b2fc`: six-entry service registry (8-byte entries).
+- `0x10b32c`: callback-record pool (up to 80 records, stride `0x1c`).
+- `0x2632fc(service, ordinal, descriptor)`: installs a callback record.
+- `0x263154(service, enabled)`: enables or disables the service.
+- `0x2629d0(token, mode)`: triggers/rescans framework-owned resident data; its second argument is
+  not a frame pointer.
+- `0x2624b8(service)`: resolves resident data against callback records and dispatches it through
+  the normal task/MMI path.
+
+`NOKI3210_MODEL_GSM_SERVICE` now owns explicit dormant/registered/enabled peer state and arms only
+from firmware-originated service-`0x0b` registration. `NOKI3210_TRACE_GSM_SERVICE` reports service
+declaration, callback descriptors, enablement, trigger calls, and callback dispatch. In the current
+boot the model remains dormant, as required: the unsettled SIM lifecycle never reaches service
+`0x0b` registration.
+
+### Phase 4 dispatch-mode correction
+
+An opt-in registration diagnostic established the complete callback record created by
+`0x289c5c -> 0x289db4`: parsed display data at `+0x00`, the originating PLMN/list node at `+0x0c`,
+event `0x0114` at `+0x10`, callback `0x0fa4` at `+0x12`, flags `0x00000049` at `+0x14`, and byte
+`0x10` at `+0x18`. The installed pool record was index 15 with framework ordinal zero.
+
+The ROM object at `0x2cfae0` is not the GSM response for this record. It is a built-in resident
+descriptor containing callbacks `0x00dc`, `0x0fa3`, and `0x0fa2`. Passing it to `0x263d30`
+correctly matches resident ordinal one, but cannot select `0x0fa4`.
+
+More importantly, `0x263d30` explicitly marks the active framework slot as resident-table mode
+(`slot + 9 = 0`). `0x26309c` then extracts callback metadata from the ROM resident table; trace at
+`0x262dfe` showed callback/resource value `0x001a`, not `0x0fa4`. Direct-ordinal RAM objects and
+standalone calls to `0x263154` or `0x2629d0` do not change that ownership contract. Registered
+callback extraction is the separate branch at `0x262bc6`, taken only while a lower service-channel
+transaction owns a slot with `slot + 9 = 1`.
+
+`0x2638e4` is the task-5 control/status handler for those transactions, not a raw inbound frame
+boundary. The next peer implementation step is therefore to map the lower receive path that
+creates the registered-mode transaction and feed it a service-`0x0b` response. The peer must still
+not call `0x289e7c`, inject `0x0fa4`, call `0x27953e`, or force the framework mode byte.
+
+### Phase 4 registered transaction implemented
+
+The registered-mode completion helper is `0x2635ac(result)`. It reads the selected callback-pool
+record while the service transaction still owns the active slot, then asks the normal task-5
+sequencer to post `0x4000 | callback` with the record's `+0x0c` source pointer. The peer now:
+
+1. Arms only after firmware registers callback `0x0fa4` for service `0x0b` and enables that service.
+2. Re-enters the firmware service transaction with `0x263154(0x0b, 1)`.
+3. Before restoring the interrupted task context, completes that same registered transaction with
+   `0x2635ac(0)`.
+4. Lets firmware derive both callback `0x0fa4` and source pointer `0x101c28` from callback-pool
+   record 15 and enqueue the resulting task-5 message.
+
+The validation run produced `status=0x0fa4` at the natural task-5 dispatcher with argument zero
+equal to `0x101c28`. No callback value, task status, application handler, or framework mode byte is
+written by the model.
+
+That run also corrected the claimed downstream chain. Task 5's static 233-entry descriptor lookup
+at `0x2aed5c` returns `0xffff` for `0x0fa4`; the status does not enter `0x289e7c` in this diagnostic
+boot. The registration diagnostic had created the service callback without the earlier organic
+task/application state needed to consume it. Therefore callback emission is the Phase 4 peer
+milestone, while reaching `0x289e7c -> 0x27953e` remains downstream of organic SIM/session
+initialization and must not be forced by the peer.

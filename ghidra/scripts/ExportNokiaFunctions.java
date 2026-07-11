@@ -252,6 +252,13 @@ public class ExportNokiaFunctions extends GhidraScript {
 	};
 
 	private static final Target[] TARGETS = new Target[] {
+		new Target("service_resident_match_262544", 0x00262544L),
+		new Target("service_resident_inbound_263d30", 0x00263d30L),
+		new Target("gsm_resident_parser_28993c", 0x0028993cL),
+		new Target("gsm_registration_handler_289e7c", 0x00289e7cL),
+		new Target("gsm_registration_data_build_289c5c", 0x00289c5cL),
+		new Target("gsm_registration_callback_build_289db4", 0x00289db4L),
+		new Target("service_dynamic_message_handler_2638e4", 0x002638e4L),
 		new Target("sched_post_event_delay_2697aa", 0x002697aaL),
 		new Target("sched_post_event2_2698e4", 0x002698e4L),
 		new Target("sched_delay_queue_insert_2699be", 0x002699beL),
@@ -601,14 +608,14 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Target("display_state_emit_28c9c0", 0x0028c9c0L),
 		new Target("display_state_main_28bddc", 0x0028bddcL),
 		new Target("display_window_task_23e62c", 0x0023e62cL),  // live display/window task: recv 0x23e646 codes 0x0b04+, owns manager 0x10e2ec
-		new Label("display_state_dispatch_24047e", 0x0024047eL),  // state dispatch gated on manager type[+1]==0x80 (active window); idles at type 0
+		new Target("display_state_dispatch_24047e", 0x0024047eL),  // state dispatch gated on manager type[+1]==0x80 (active window); idles at type 0
 		new Target("display_type2_post_2b1f24", 0x002b1f24L),  // = code-2 (window-mgmt) post to MMI task 6; wake producer
 		new Target("mmi_notify_code3_post_2b1f64", 0x002b1f64L),
 		// MMI (task 6) message-loop 0x298008 dispatch on primary code [msg+5]; code 2 (window mgmt) never arrives.
-		new Label("mmi_msg_code1_register_2982b4", 0x002982b4L),
-		new Label("mmi_msg_code2_window_mgmt_29817e", 0x0029817eL),
-		new Label("mmi_msg_code3_op_2980c4", 0x002980c4L),
-		new Label("display_windowdiff_code2_post_site_240900", 0x00240900L),
+		new Target("mmi_msg_code1_register_2982b4", 0x002982b4L),
+		new Target("mmi_msg_code2_window_mgmt_29817e", 0x0029817eL),
+		new Target("mmi_msg_code3_op_2980c4", 0x002980c4L),
+		new Target("display_windowdiff_code2_post_site_240900", 0x00240900L),
 		new Target("lcd_init_2b1d14", 0x002b1d14L),
 		new Target("lcd_write_2b1c96", 0x002b1c96L),
 		new Target("divmod_2b5388", 0x002b5388L),
