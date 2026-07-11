@@ -336,27 +336,5 @@ loop stalls → task 2's D9 watchdog free-runs to timeout → CONTACT SERVICE. A
 `0001` resumes 00/07/01, sends the D0 frame (t≈0.251); mode flips to `000d` (t≈0.332); task 02's D9
 watchdog ticks every ~9 ms from t≈0.405 and fires ~t≈0.54.
 
-## Appendix: investigation timeline (terse)
-
-The chain was found by chasing the symptom inward, with several mid-course corrections (full detail
-in git history):
-
-1. **Symptom → watchdog.** CONTACT SERVICE = D9 watchdog timeout. Initially read as "ack `0x11fedb`
-   never set" — **later corrected**: the ack is a red herring (no writer); the real gate is bit 6.
-2. **bit 6 linchpin.** The watchdog only arms when service-present bit 6 is clear; the contact-service
-   init clears it on three checks (service_ready, EEPROM config checksum, service-channel array).
-3. **service_ready → DSP.** Traced to MAD2 IRQ line 4 / DSP-shared RAM; the unemulated DSP never
-   raises it. Modelled (`MODEL_DSP_SERVICE`), replacing the `EXPERIMENT_DSP_IRQ4` force. Found it must
-   *recur* (the ready byte is reset each phase).
-4. **EEPROM is a real gate** (correcting an earlier "NOT the EEPROM"): the config checksum (`0x244`)
-   and the tune/security checksum (`0x11c`, idx18) both clear bit 6. Modelled in the `selftest` overlay.
-5. **Service-channel fan-out = 2.** The 24-entry array's two dirty entries resolved to known
-   subsystems — CCONT reg `0xe` bit 0 (idx6, `MODEL_CCONT_PRESENT`) and the idx18 EEPROM checksum —
-   not an open-ended explosion.
-6. **Remaining gate = the responder.** With the array clean, bit 6 survives the init; enabling the
-   channel removes the watchdog halt; but completion needs an async cmd-`0x05` response. Channel-open
-   turned out to be response-driven too, so both collapse into one build: model node `0x18`'s service
-   messages.
-
 See also `eeprom_analysis.md` (block/checksum layout), `static_branch_map.md` (the resume-gate
 branches), `driver_structure.md` (how the models/probes live in the driver).

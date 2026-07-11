@@ -54,8 +54,8 @@ The labels below have precise meanings:
 | ARM7, flash, RAM mapping | Partial hardware | 3210 executes reliably; product layouts need cross-ROM validation. |
 | MAD2 timers and IRQ/FIQ | Partial hardware | Boot-critical paths work; several timings remain calibrated assumptions. |
 | PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames and input is scriptable. |
-| 24C128 EEPROM | Component-ready | I2C and profile contents are understood; migrate to MAME's native device. |
-| CCONT power/ADC/RTC | Component-ready | Serial register protocol and IRQ behavior are mapped; extract a device. |
+| 24C128 EEPROM | Partial hardware | MAME's native I2C device is wired through GenIO and passes the oracle; provisioning and the parallel alias need validation. |
+| CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; GENSIO transaction state and ADC completion IRQ behavior remain open. |
 | SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
 | Startup/contact peers | Prototype | Useful protocol behavior, still implemented through firmware hooks. |
@@ -81,11 +81,11 @@ supported, and it passes the reference and portability checks.
 
 ### Platform work
 
-1. Extract EEPROM and CCONT from the monolithic driver.
-2. Use the Nokia 3330 (NHM-6) as the first cross-ROM confidence target.
-3. Consolidate SIM transport and card behavior behind one device boundary.
-4. Separate MAD2 peripheral blocks and the DSP mailbox from phone configuration.
-5. Add further DCT3 products as diagnostic evidence, then evaluate earlier/later DCT generations.
+1. Improve the extracted EEPROM and CCONT devices from observed transactions.
+2. Use the Nokia 3330 (NHM-6) as the first cross-ROM confidence target once its service files are normalized reproducibly.
+3. Stabilize MAD2 timer, interrupt and GENSIO contracts before extracting blocks.
+4. Consolidate SIM transport and card behavior behind one device boundary.
+5. Separate the DSP mailbox from phone configuration, then add further DCT3 products as evidence.
 
 New phone support is initially a portability probe. A ROM that fails early is still valuable when
 it identifies a 3210-specific assumption.
@@ -103,6 +103,7 @@ roms/                   ignored, user-supplied firmware plus verification instru
 
 Start with:
 
+- [`docs/README.md`](docs/README.md) for the documentation map and authority rules.
 - [`docs/hardware_atlas.md`](docs/hardware_atlas.md) for the firmware/hardware boundary.
 - [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
