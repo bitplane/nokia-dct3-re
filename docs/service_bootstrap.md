@@ -21,7 +21,8 @@ see "Beyond the gate"). All models are opt-in, preserve the regression oracle (`
 | `NOKI3210_MODEL_DSP_SERVICE` | DSP lower-service handshake: drains pending counter `[0x100e4]`, raises IRQ 4 | `service_ready` |
 | `NOKI3210_MODEL_CCONT_PRESENT` | CCONT reg `0xe` bit 0 = present/status | service-channel idx6 |
 | `EEPROM_PROFILE=selftest` (overlay) | EEPROM config checksum (`0x244`) + tune/security checksum (`0x11c`) | EEPROM config gate + service-channel idx18 |
-| `NOKI3210_MODEL_SVC_RESPONDER` | node-`0x18` service responder — injects the healthy `0x5f00`→cmd-`0x05` reply | contact-service **completion** |
+| `NOKI3210_MODEL_SVC_RESPONDER` | node-`0x18` service device — supplies the healthy `0x5f00`→cmd-`0x05` reply | contact-service **completion** |
+| `NOKI3210_MODEL_SVC_CHANNEL_DRAIN` | async completion of service report `0x622a` | extended-task resume gate |
 
 The first three clear the **bit-6 / service-channel** gate (the array is clean and bit 6 survives the
 init). `MODEL_SVC_RESPONDER` then makes the contact-service genuinely **complete** by delivering the
@@ -97,14 +98,24 @@ the remaining gate, below.
 
 > **DONE.** The responder injects the healthy reply node `0x18` would send, and the contact-service
 > completes — the boot leaves CONTACT SERVICE (reaches `94a2dc`/`4aab13`, the display-init limp).
-> **How it's built (trampoline):** at the contact-service loop top (`0x237bc6`, a safe point) the
-> driver's flash-fetch hook overrides the fetched opcode with `BX r12` to drive the firmware's *own*
-> primitives in sequence — `alloc 0x26afe0(0x14)` → fill `{[3]=0x40,[8]=0x64,[9]=0x05}` → `post
-> 0x26a204(contact-service task, msg)` — each call returning to a flash sentinel (`0x3ff000`) where
-> the hook fires again; finally the saved CPU state is restored and the loop resumes. The loop then
+> **How it's built:** `nokia_service_transport_device` owns the response bytes,
+> readiness and peer state. At the contact-service loop top (`0x237bc6`, a safe
+> point), a narrow flash trampoline drives the firmware's *own* primitives in
+> sequence — `alloc 0x26afe0(0x14)` → device writes its response into the
+> firmware-owned allocation → `post 0x26a204(contact-service task, msg)` — each
+> call returning to a flash sentinel (`0x3ff000`) where the bridge advances;
+> finally the saved CPU state is restored and the loop resumes. The hook no
+> longer owns protocol bytes or writes service status. The loop then
 > `recv`s the posted message and dispatches it (`[3]=0x40`→`0x237400`, `[8]=0x64`→`0x236dc4([9]=0x05)`
 > → substate 5, HEALTHY), which drives the lower-service completion (`0x2af3ca`→`0x291068`). Validated
 > end to end; default boot (responder off) unchanged. The analysis below is the pre-build map.
+
+The extended-task gate makes service report `0x622a` through the shared report
+entry `0x2b13d4` (`lr=0x29bb05`). The transport recognizes that specific code,
+waits one microsecond, and signals channel-empty/service-present through its
+callback. Tracing all calls to `0x2b13d4` was essential: it carries many report
+families, so treating every call or every earlier busy-bit edge as this request
+is incorrect.
 
 The contact-service reads logical address **`0x5f00`** (count 2) from destination **node `0x18`**
 (`[0x11fee5]`) every ~9 ms (the D9 watchdog tick). Two things are missing, and **both reduce to

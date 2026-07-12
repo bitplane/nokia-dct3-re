@@ -18,7 +18,9 @@ the forcing shims + traces:
 
 The PCD8544 LCD and MAME `I2C_24C128` now model the display and external
 EEPROM. CCONT is an explicit local `nokia_ccont_device` owning its serial
-registers, ADC results, RTC, interrupt state and watchdog. The phone state owns
+registers, ADC results, RTC, interrupt state and watchdog. The
+`nokia_service_transport_device` owns the modeled node-`0x18` response payload,
+response readiness and channel-empty completion timing. The phone state owns
 MAD2 interrupt routing and supplies power-scenario ADC inputs. SIM and the
 MAD2/DSP mailbox follow after their boundaries stabilize; MAD2 extraction
 should wait for the cross-ROM pass to identify the genuinely shared contract.
@@ -39,12 +41,24 @@ should wait for the cross-ROM pass to identify the genuinely shared contract.
   has been removed. Surviving `MODEL_*` firmware hooks are peer prototypes until their behavior is
   expressed at a real transport boundary. See `sim_registration.md` and
   `removed_forcing_knobs.md`.
+- **Service boundary (2026-07-11):** service payload construction and
+  service-status completion writes no longer live in `flash_firmware_hooks`.
+  The remaining flash trampoline is a narrow firmware-call bridge: it asks the
+  firmware to allocate and post a device-owned inbound message. The observed
+  channel-empty request is report code `0x622a` at `0x2b13d4`; the device
+  completes it asynchronously through a callback.
 
 ## Component completion gate
 
 A subsystem leaves this driver only when its external interface is explicit, save-state fields are
 registered, configuration contains no firmware addresses, and both the 3210 oracle and the current
 cross-ROM smoke pass. Phone-specific constants remain in machine configuration.
+
+The local 3330 PPM E Wintesla records are normalized reproducibly by
+`make normalize-3330` and exercised by `make smoke-3330e`. This is a labelled
+cross-ROM execution baseline, not the canonical PPM C audit declared by
+upstream MAME. Component changes must preserve both 3210 oracles and avoid
+regressing this smoke run.
 
 ## Regression oracle
 

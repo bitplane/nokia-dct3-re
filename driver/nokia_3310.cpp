@@ -22,6 +22,7 @@
 #include "video/pcd8544.h"
 
 #include "nokia_ccont.h"
+#include "nokia_service_transport.h"
 
 #include "debugger.h"
 #include "emupal.h"
@@ -300,6 +301,7 @@ public:
 		m_flash(*this, "flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
+		m_service_transport(*this, "service_transport"),
 		m_pcd8544(*this, "pcd8544"),
 		m_keypad(*this, "COL.%u", 0),
 		m_pwr(*this, "PWR")
@@ -335,7 +337,6 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_keypad);
 	TIMER_CALLBACK_MEMBER(timer_mad2_soft_reset);
 	TIMER_CALLBACK_MEMBER(timer_dsp_service);
-	TIMER_CALLBACK_MEMBER(timer_svc_channel_drain);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	uint16_t ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask);
@@ -361,6 +362,7 @@ private:
 	void update_irq_line();
 	void ccont_irq_w(int state);
 	void ccont_power_w(int state);
+	void service_channel_empty_w(int state);
 	bool timer0_compare_due() const;
 	void update_timer0_compare();
 	void schedule_mbus_fiq(int num);
@@ -382,6 +384,7 @@ private:
 	required_device<intelfsh16_device> m_flash;
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
+	required_device<nokia_service_transport_device> m_service_transport;
 	required_device<pcd8544_device> m_pcd8544;
 	required_ioport_array<5> m_keypad;
 	required_ioport m_pwr;
@@ -454,7 +457,6 @@ private:
 	emu_timer * m_timer_keypad;
 	emu_timer * m_timer_mad2_soft_reset;
 	emu_timer * m_timer_dsp_service;
-	emu_timer * m_timer_svc_channel_drain;
 
 	uint8_t       m_mad2_regs[0x100];
 	bool          m_mad2_trace_read[0x100] = {false};
@@ -658,7 +660,6 @@ void noki3310_state::machine_start()
 	m_timer_keypad = timer_alloc(FUNC(noki3310_state::timer_keypad), this);
 	m_timer_mad2_soft_reset = timer_alloc(FUNC(noki3310_state::timer_mad2_soft_reset), this);
 	m_timer_dsp_service = timer_alloc(FUNC(noki3310_state::timer_dsp_service), this);
-	m_timer_svc_channel_drain = timer_alloc(FUNC(noki3310_state::timer_svc_channel_drain), this);
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -733,6 +734,11 @@ void noki3310_state::machine_reset()
 	}
 	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
 	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0);
+	m_service_transport->configure(
+			nokia_env_u32("NOKI3210_MODEL_SVC_RESPONDER", 0) != 0,
+			nokia_env_u32("NOKI3210_MODEL_SVC_CHANNEL_DRAIN", 0) != 0,
+			nokia_env_u32("NOKI3210_SVC_RESPONDER_DELAY_MS", 450),
+			nokia_env_u32("NOKI3210_SVC_CHANNEL_DRAIN_US", 1));
 	m_eeprom->write_scl(1);
 	m_eeprom->write_sda(1);
 
@@ -1387,8 +1393,10 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
 	m_timer_dsp_service->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", 5)));
 }
 
-TIMER_CALLBACK_MEMBER(noki3310_state::timer_svc_channel_drain)
+void noki3310_state::service_channel_empty_w(int state)
 {
+	if (!state)
+		return;
 	const uint8_t status = debug_ram_byte(0x0011fed1);
 	const uint8_t completed = (status & ~0x04) | 0x40;
 	debug_ram_byte_w(0x0011fed1, completed);
@@ -1458,8 +1466,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
 		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
 
-		if (m_svcresp_state == 0 && addr == 0x00237bc6 &&
-				machine().time().as_double() >= nokia_env_u32("NOKI3210_SVC_RESPONDER_DELAY_MS", 450) / 1000.0)
+		if (m_svcresp_state == 0 && addr == 0x00237bc6 && m_service_transport->response_ready())
 		{
 			for (int i = 0; i < 15; i++) m_svcresp_saved[i] = getr(i);
 			m_svcresp_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
@@ -1474,13 +1481,13 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				logerror("svcresp: DRY-RUN save+restore at trigger t=%.4f\n", machine().time().as_double());
 				return BX_R12;
 			}
-			setr(0, nokia_env_u32("NOKI3210_SVC_RESPONDER_MSGSZ", 0x14));   // alloc size
+			setr(0, 0x14);                                                    // alloc size
 			setr(14, SENT | 1);                                            // LR -> sentinel
 			setr(12, 0x0026afe0 | 1);                                      // r12 -> alloc
 			m_svcresp_state = 1;
 			logerror("svcresp: trigger task=%02x t=%.4f -> alloc(%#x)\n",
 					debug_ram_byte(0x00100022), machine().time().as_double(),
-					nokia_env_u32("NOKI3210_SVC_RESPONDER_MSGSZ", 0x14));
+					0x14);
 			return BX_R12;
 		}
 		if (m_svcresp_state == 1 && addr == SENT)
@@ -1488,10 +1495,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			const u32 msg = getr(0);
 			if (msg >= 0x00100000 && msg < 0x00180000)
 			{
-				for (int i = 0; i < 0x14; i++) debug_ram_byte_w(msg + i, 0);
-				debug_ram_byte_w(msg + 3, nokia_env_u32("NOKI3210_SVC_RESPONDER_B3", 0x40));   // -> 0x237400 dispatch
-				debug_ram_byte_w(msg + 8, nokia_env_u32("NOKI3210_SVC_RESPONDER_B8", 0x64));   // -> response handler 0x236dc4
-				debug_ram_byte_w(msg + 9, nokia_env_u32("NOKI3210_SVC_RESPONDER_B9", 0x05));   // -> HEALTHY substate 5
+				m_service_transport->write_response(msg);
 				const uint8_t task = debug_ram_byte(0x00100022);
 				setr(0, task);
 				setr(1, msg);
@@ -1512,6 +1516,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 		if (m_svcresp_state == 2 && addr == SENT)
 		{
+			m_service_transport->response_posted();
 			for (int i = 0; i < 15; i++) setr(i, m_svcresp_saved[i]);
 			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_svcresp_saved[15]);
 			setr(12, 0x00237bc6 | 1);              // resume the contact-service loop
@@ -1835,19 +1840,19 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// so the sequencer takes the confirmed path 0x2713b6 instead of draining at 0x2714a4.
 	if (nokia_env_u32("NOKI3210_MODEL_STARTUP_REPORTS", 0) != 0 && pc == addr && addr == 0x0027139e)
 		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 3);
-	// MODEL: service-channel drain (opt-in, NOKI3210_MODEL_SVC_CHANNEL_DRAIN). The service-ready gate
-	// 0x29bafc requests channel-empty (0x2b13d4 -> msg 0x2a62) then busy-waits at 0x29bb06 for the
-	// service-channel-busy bit [0x11fed1] bit2 (0x04) to clear -- which a real service peer does by
-	// draining the channel. On our faked boot nothing drains it (bit2 stuck set), so the startup
-	// supervisor spins forever and never resumes the application tasks. Model the drain after the
-	// request has been posted. Entering the request function schedules an asynchronous peer completion;
-	// the firmware then sets the busy bit and polls until the timer clears it. This is the
-	// analogue of MODEL_SVC_RESPONDER for the readiness handshake. If the causal chain is right this
-	// cascades: block2 resumes app tasks -> their init fills the 0x112280 checklist -> event 0x15 ->
-	// 000d advances.
-	if (nokia_env_u32("NOKI3210_MODEL_SVC_CHANNEL_DRAIN", 0) != 0 && pc == addr && addr == 0x0029bafc)
-		m_timer_svc_channel_drain->adjust(attotime::from_usec(
-				nokia_env_u32("NOKI3210_SVC_CHANNEL_DRAIN_US", 1)));
+	// Service transport request boundary. The firmware calls 0x2b13d4 to report
+	// the channel-empty/resource state; the peer completes it asynchronously and
+	// exposes service-present through its callback. No firmware state is changed
+	// from this execution hook.
+	if (pc == addr && addr == 0x002b13d4 &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0x622a)
+	{
+		if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0)
+			logerror("svc_request: channel-empty 622a lr=%08x task=%02x t=%.8f\n",
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)),
+					debug_ram_byte(0x00100022), machine().time().as_double());
+		m_service_transport->channel_busy();
+	}
 	// MODEL_SIM_CARD command capture: intercept the SIM APDU command the phone sends over the
 	// service-lower transport (0x2aec34 with msg code 0x2701 in r1; r0=len, r2=data ptr to the raw
 	// APDU). Remember the command (INS + full bytes) so the SIM_CARD responder can echo the T=0
@@ -3423,6 +3428,8 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_CCONT(config, m_ccont);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
+	NOKIA_SERVICE_TRANSPORT(config, m_service_transport);
+	m_service_transport->channel_empty_cb().set(FUNC(noki3310_state::service_channel_empty_w));
 }
 
 void noki3310_state::noki3330(machine_config &config)
@@ -3497,7 +3504,9 @@ ROM_START( noki3330 )
 
 	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF )
 	ROM_SYSTEM_BIOS(0, "450", "v4.50")  // C 12-10-2001
+	ROM_SYSTEM_BIOS(1, "450e", "v4.50 PPM E")
 	ROMX_LOAD("3330f450c.fls", 0x000000, 0x350000, CRC(259313e7) SHA1(88bcc39d9358fd8a8562fe3a0280f0ce82f5897f), ROM_BIOS(0))
+	ROMX_LOAD("3330f450e.fls", 0x000000, 0x350000, CRC(9710f695) SHA1(7e88caa4963c57ebbd4d919023e38103ff8b528a), ROM_BIOS(1))
 	ROM_LOAD("3330 virgin eeprom 005f0000.fls", 0x3f0000, 0x010000, CRC(23459c10) SHA1(68481effb39d90a1639e8f261009c66e97d3e668))
 ROM_END
 

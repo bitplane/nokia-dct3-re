@@ -8,8 +8,10 @@ MAME_DIR    ?= mame
 PYTHON ?= python3
 VENV   := .venv
 DRIVER := driver/nokia_3310.cpp
-DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h
+DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
+	driver/nokia_service_transport.cpp driver/nokia_service_transport.h
 PHONE ?= noki3210
+BIOS ?=
 
 # Bring-your-own firmware (see roms/README.md). Git-ignored.
 ROM  ?= roms/3210f600a.fls
@@ -60,20 +62,22 @@ BOOT_ENV := \
 MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-keyboardprovider none -mouseprovider none -lightgunprovider none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
-	-autoboot_script ../mame_noki3210_input_exerciser.lua
+	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile roms build swap16 run run-deep smoke audit-roms frame watch verify verify-deep verify-structure clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
+	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make verify-deep    reproduce the Insert SIM frame and deep structural oracle"
 	@echo "make verify-structure  compare deterministic boot milestones with $(ORACLE_STRUCT)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
+	@echo "make smoke-3330e     normalize and boot the local v4.50 PPM E service files"
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
 	@echo "make clean          remove build/run state (keeps the MAME clone)"
@@ -97,6 +101,17 @@ eeprom-profile:
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
 	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/3210 selftest eeprom.bin"
 
+normalize-3330:
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--mcu roms/3330-nhm6-v450/NHM6NX04.500 \
+		--ppm roms/3330-nhm6-v450/NHM6NX04.50E \
+		--pmm "roms/3330-nhm6-v450/3330 virgin eeprom.pmm" \
+		--flash-output roms/noki3330/3330f450e.fls \
+		--eeprom-output "roms/noki3330/3330 virgin eeprom 005f0000.fls" \
+		--expect-flash-sha1 7e88caa4963c57ebbd4d919023e38103ff8b528a \
+		--expect-eeprom-sha1 68481effb39d90a1639e8f261009c66e97d3e668
+	cp roms/noki3210/boot_rom roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3330/
+
 roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	@for src in roms/noki*/; do \
 		[ -d "$$src" ] || continue; \
@@ -106,7 +121,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_service_transport.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
@@ -126,6 +141,9 @@ smoke: build
 	@mkdir -p $(RUN_DIR)
 	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
+
+smoke-3330e: normalize-3330
+	@$(MAKE) --no-print-directory smoke PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
 
 audit-roms: build
 	cd $(MAME_DIR) && ./mame -rompath roms -verifyroms $(PHONE)

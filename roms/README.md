@@ -58,9 +58,9 @@ The first portability target is the 3330. Firmware.center provides service-forma
 | `NHM6NX04.50E` | 787,296 | `318fcc3fa9d2a926e574fea89af9d8cda81796acb904f196636b886ef4e6ce9e` |
 | `3330 virgin eeprom.pmm` | 65,608 | `83e58fe48153a7c1d60247ba7b80b72e05ddb8fd5443aa0d9ed976ec3ad88808` |
 
-These are Nokia flashing-container pieces, not the normalized raw images named by MAME. Do not
-blindly concatenate or rename them: their record headers and placement metadata must be decoded or
-a verified raw dump must be supplied.
+These are Wintesla record streams. `make normalize-3330` validates and removes
+their nine-byte per-`0x2000` record headers, then combines the contiguous MCU
+and PPM E regions. The generated files remain git-ignored.
 
 The existing MAME declaration expects:
 
@@ -71,3 +71,5 @@ The existing MAME declaration expects:
 
 Only an exact MAME audit match establishes the canonical 3330 baseline. Differently sourced
 service images remain useful RE inputs, but their results must be labelled with their own hashes.
+The local PPM E result is declared separately as BIOS `450e` with SHA-1
+`7e88caa4963c57ebbd4d919023e38103ff8b528a`; run it with `make smoke-3330e`.

@@ -126,11 +126,11 @@ with the responder approach — not an override of real hardware behaviour.
 
 ### 5. The fix cascades to a rendered screen
 
-`MODEL_SVC_CHANNEL_DRAIN` schedules an asynchronous peer completion when
-`0x29bafc` begins. Firmware then calls `0x2b13d4`, sets the busy bit and polls at
-`0x29bb06`; the peer timer completes after one microsecond. Clearing it
-synchronously at `0x29bafc` entry is too early because the request sets it
-again. The whole chain
+`MODEL_SVC_CHANNEL_DRAIN` recognizes report code `0x622a` when firmware sends it
+through `0x2b13d4`. The service transport schedules an asynchronous peer
+completion after one microsecond and exposes service-present before the bounded
+check in `0x29bafc` returns. Earlier busy-bit activity belongs to other service
+transactions and is not a reliable trigger. The whole chain
 then fires end to end (each link verified in traces): block 2 resumes the app
 tasks → their init fills the checklist → event `0x15` posts (first time ever) →
 `000d` advances → the MMI comes alive and renders glyph content. The LCD shows
@@ -148,7 +148,7 @@ fires. Reaching operator-idle is a separate **SIM-emulation** project — see
 
 | Knob | What it shows |
 |------|---------------|
-| `MODEL_SVC_CHANNEL_DRAIN` | the fix: clear `[0x11fed1]` bit2 at the readiness gate |
+| `MODEL_SVC_CHANNEL_DRAIN` | device completion for service report `0x622a` |
 | `TRACE_SVCREADY` | the block-2 gate conditions at `0x2a9182` |
 | `TRACE_RESUME` | which of the 23 tasks get resumed (`0x269c6e`) |
 | `TRACE_SWEEP15` | the `0x112280` checklist filling + `0x15` post |
