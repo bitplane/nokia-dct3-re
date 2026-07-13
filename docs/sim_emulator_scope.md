@@ -51,7 +51,13 @@ ATR -> PPS
   -> SELECT MF -> SELECT/READ ICCID
   -> SELECT DF_GSM -> SELECT/GET RESPONSE/READ ECC
   -> SELECT/READ PHASE
-  -> periodic DF_GSM STATUS
+  -> SELECT/READ LP, AD and SST
+  -> SELECT/READ LOCI, IMSI and ACC
+  -> SELECT MF -> SELECT/READ 2FE6
+  -> SELECT DF_GSM -> optional CPHS ONS 6F14 absent (94 04)
+  -> remaining GSM/vendor EFs
+  -> optional 6F99 absent (94 04)
+  -> timed directory STATUS presence monitor
 ```
 
 All of this travels through device registers, FIQ6, task 21, and the firmware's
@@ -59,13 +65,16 @@ normal T=0 implementation. No message responder or SIM-state write is needed.
 
 ## STATUS polling conclusion
 
-The repeated `A0 F2 00 00 16` after `EF_PHASE (6FAE)` is not evidence of a bad
-FCP. Each command is scheduled by firmware. The response follows the normal
+The repeated `A0 F2 00 00 16` after `EF_PHASE (6FAE)` was a real
+firmware-scheduled presence poll. The response follows the normal
 code-`0x0b` data path at `0x27ee94`; the epilogue at `0x27ef0a` explicitly
 handles INS `0xf2`, runs `0x27ea20`, and waits for the next message at
 `0x27efb0`. The run does not reset the card or report no-SIM.
 
-Do not change card data merely to suppress this stable presence poll.
+However, it was not a terminal steady state: correcting the surrounding
+MF/DF GSM-specific response layout let firmware leave that preliminary cycle.
+Do not suppress a STATUS command ad hoc; model its response and the directory
+metadata correctly.
 
 ## Remaining card work
 
@@ -80,8 +89,16 @@ firmware request establishes a concrete requirement. Likely later work includes:
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 
-These are not the present boot blocker. Firmware stops before requesting the
-extended IMSI pass.
+The organically requested initialization pass is complete for a non-CPHS
+synthetic card. Unsupported optional files return `94 04` and leave the current
+selection unchanged. `6F14` is CPHS Operator Name String and is intentionally
+absent; it should only gain content in a card profile that advertises CPHS.
+
+After initialization, task 20 deliberately polls the selected directory with
+STATUS. Function `0x2028a4` rearms timer `0xea` with delay `0x181`; this is the
+card-presence monitor, not a remaining filesystem blocker. The device tracks
+current DF independently of the selected EF; observed `7F40` polls take the
+firmware's steady path rather than falsely reporting a directory change.
 
 ## Current boundary outside the SIM
 

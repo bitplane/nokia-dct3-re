@@ -143,7 +143,9 @@ contact completion, and the external task-7 service session in one boot. The gen
 The project now reaches substantially beyond the historical mode-`000d` observations below. The
 default oracle remains CONTACT SERVICE, while the coherent opt-in peer profile reaches mode
 `0x0004`, starts SIM control, and performs ordinary SELECT/STATUS/GET RESPONSE/READ traffic through
-`EF_PHASE`. SIM acceptance and the later idle/resource transition remain incomplete.
+the extended initialization pass. SIM enable rises organically, unsupported optional files are
+handled with `94 04`, and task 20 enters its normal timed presence monitor. The later
+idle/resource transition remains incomplete.
 
 The component order is EEPROM, CCONT, then SIM. The Nokia 3330 is the first portability probe used
 to distinguish shared MAD2 behavior from 3210 firmware assumptions.
@@ -158,8 +160,10 @@ yet touch: the **SIM** (`SIMI`), and — necessarily, since they come after the 
 the firmware *insists* on before idle vs *degrades* past.
 
 The mode-`000d` gate and its CCONT/startup events are retained below as historical mapping. They are
-satisfied in the coherent profile; they are not the immediate blocker. The current frontier is the
-firmware-owned SIM acceptance transition after `EF_PHASE` and periodic DF_GSM STATUS polling.
+satisfied in the coherent profile; they are not the immediate blocker. The current observed
+frontier is now the organic owner of task-1 startup report code `0x07`. Task-13 status `0x05eb` can reach the
+code-7 reporter, but the task-13 segmented protocol has not been identified as the UI display
+window stack and must not yet be treated as the missing owner.
 
 ## Knob
 

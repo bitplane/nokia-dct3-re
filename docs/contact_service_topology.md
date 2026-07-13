@@ -72,8 +72,9 @@ The forcing-free contact path now composes in one boot:
 In the five-second acceptance run this leaves contact status `0x49`, advances
 startup `0x000d -> 0x0004`, activates SIM control
 `0x32 -> 0x33 -> 0xb3 -> 0xe3`, and begins the normal SIM SELECT/READ/STATUS
-conversation. The current downstream fault is a repeated `A0 F2` SIM STATUS
-exchange with SIM enable still zero; it is no longer a contact-service blocker.
+conversation. Later SIM-card corrections now raise SIM enable organically and
+complete the non-CPHS SIM initialization pass before entering the timed
+card-presence monitor; it is no longer a contact-service blocker.
 
 ## Command inventory
 

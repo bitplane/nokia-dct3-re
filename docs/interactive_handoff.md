@@ -9,9 +9,13 @@
 > They describe successive historical profiles that used responder, drain, and
 > startup-report bridges. The coherent contact profile now reaches mode `0x0004`,
 > starts SIM control (`0x32 -> 0x33 -> 0xb3 -> 0xe3`), and exchanges SELECT,
-> READ, GET RESPONSE, and STATUS APDUs. The live frontier is ordinary SIM
-> initialization after `EF_PHASE`, not delivery of forced code 7, a synthetic
-> startup checklist, task-14 startup, or contact-service completion.
+> READ, GET RESPONSE, and STATUS APDUs. Two live predicates are now separated:
+> ordinary non-CPHS SIM initialization now completes organically. Task 1 enters
+> mode `0x0004`; the live predicate is the unidentified organic producer of
+> report code 7. Task-13 status
+> `0x05eb` can reach that reporter, but task 13 is not established as the UI
+> display-window owner. The fixed
+> startup-report bridge below satisfies neither predicate organically.
 
 > ⚠️ **2026-07 caveat — read `docs/sim_emulator_scope.md` "Moves 1+2" first.** Many
 > conclusions below (idle content / camped state / DSP primitives "terminate at the RF/DSP
@@ -301,10 +305,10 @@ now mapped to its finest grain: the `0x2af0xx` reporter cluster and the specific
 machines that drive it. The mechanism is fully understood; the remaining work is per-subsystem
 bring-up, which is open-ended.
 
-## EMULATION (MODEL_STARTUP_REPORTS): the chain advances mode 4 → mode 0xc, faithfully
+## HISTORICAL BRIDGE (MODEL_STARTUP_REPORTS): synthetic mode 4 → mode 0xc advance
 
-Built a faithful emulation of the subsystem-ready reports (not a gate-force): **`MODEL_STARTUP_REPORTS`**
-injects code 7 + the six checklist codes `9/a/b/c/d/1c` + the post-checklist `0x74` into task-1's
+`MODEL_STARTUP_REPORTS` injects code 7 + the six checklist codes
+`9/a/b/c/d/1c` + the post-checklist `0x74` into task-1's
 mailbox via the firmware's **own** post `0x26a354(mailbox=1, code)`, chained through a sentinel
 trampoline (the `MODEL_SVC_RESPONDER` / `MODEL_RES_ENABLE` pattern), triggered once at task-1's
 getter `0x26ff14` after mode-0d completes.
@@ -319,9 +323,10 @@ mode 0004 → 000c (t≈1.06)   ← code 7 consumed, init burst ran, entered the
 mode-0xc completion reached, waited for + consumed 0x74   (mode0c_wait74 trace)
 ```
 
-So three of the four gates are now **emulated faithfully** (driven through the firmware's own
-mechanisms, not forced): the **code-7 trigger** and the **mode-4 6-message ready checklist** carry
-the boot from the "Insert SIM card" park (mode 4) into mode `0xc` and through its `0x74` report.
+This demonstrated what the reports unlock, but not who owns or times them. A
+later coherent-contact run showed the fixed 950 ms bridge firing while task 1
+was still in mode `0x000d`, where the reports were consumed before mode 4. It
+is therefore a diagnostic firmware bridge, not faithful subsystem emulation.
 
 **Where it now stops — the VBAT confirmation gate, again.** Mode `0xc`'s exit (`0x27139a`) needs
 either `0x2a6942()==3` (VBAT classification **state 3**) or a keypad condition
@@ -379,13 +384,13 @@ init*, not a single missing message. Emulating mode-0 interactive-init therefore
 behind them the resource-content pipeline that blanks/crashes when forced) — an open-ended
 subsystem bring-up, the documented digital ceiling.
 
-**Status vs the goal.** VBAT confirmation — mapped + emulated at its gate (`0x2a6942()==3`);
-code-7 trigger — **emulated** (fed via `0x26ff14`); mode-4 6-message checklist — **emulated**
-(fed, checklist passes); mode-0 interactive-init — **not reached**: it is behind the display/UI
+**Historical status.** VBAT confirmation was bridged at its gate (`0x2a6942()==3`);
+code 7 and the mode-4 checklist were fed via `0x26ff14`; mode-0 interactive-init was
+**not reached** because it is behind the display/UI
 subsystem init `0x2a12a0` that hangs (needs the display/resource subsystem + task 3 functional,
 i.e. the coherent-boot wall). Three of the four gates are driven; the fourth (mode-0) is blocked
 not by another message but by a non-functional subsystem — the genuine, long-documented ceiling.
-Knob: `MODEL_STARTUP_REPORTS` (`STARTUP_REPORTS_MS`).
+These observations describe the historical bridge profile, not current modeled completeness.
 
 ## Next
 

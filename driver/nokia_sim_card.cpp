@@ -31,6 +31,7 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_tx_expected));
 	save_item(NAME(m_ins));
 	save_item(NAME(m_selected_file));
+	save_item(NAME(m_selected_df));
 	save_item(NAME(m_receiving_body));
 }
 
@@ -45,6 +46,7 @@ void nokia_sim_card_device::device_reset()
 	m_tx_len = m_tx_expected = 0;
 	m_ins = 0;
 	m_selected_file = 0x3f00;
+	m_selected_df = 0x3f00;
 	m_receiving_body = false;
 }
 
@@ -70,6 +72,8 @@ void nokia_sim_card_device::control_w(u8 data)
 		m_iir = 0;
 		m_tx_ready_pending = false;
 		m_tx_len = m_tx_expected = 0;
+		m_selected_file = 0x3f00;
+		m_selected_df = 0x3f00;
 		m_receiving_body = false;
 		// Deliver ATR outside the control-register write so its FIQ cannot
 		// re-enter the firmware's activation routine.
@@ -213,18 +217,29 @@ void nokia_sim_card_device::finish_header()
 
 void nokia_sim_card_device::finish_body()
 {
-	if (m_ins == 0xa4 && m_tx_len >= 2)
-		m_selected_file = u16(m_tx[0] << 8) | m_tx[1];
+	const u16 requested_file = m_tx_len >= 2 ? u16(m_tx[0] << 8) | m_tx[1] : 0;
+	const bool select_ok = m_ins != 0xa4 || is_known_file(requested_file);
+	if (m_ins == 0xa4 && select_ok)
+	{
+		m_selected_file = requested_file;
+		if (is_directory(requested_file))
+			m_selected_df = requested_file;
+	}
 	if (std::getenv("NOKI3210_TRACE_SIM_RX") != nullptr)
-		logerror("sim_device: body ins=%02x length=%u selected=%04x t=%.8f\n",
-				m_ins, m_tx_len, m_selected_file, machine().time().as_double());
+		logerror("sim_device: body ins=%02x length=%u requested=%04x selected=%04x result=%s t=%.8f\n",
+				m_ins, m_tx_len, requested_file, m_selected_file, select_ok ? "ok" : "not-found",
+				machine().time().as_double());
 	m_tx_len = m_tx_expected = 0;
 	m_receiving_body = false;
 	if (m_ins == 0xa4)
 	{
-		const bool df = m_selected_file == 0x3f00 || m_selected_file == 0x7f20 ||
-				(m_selected_file & 0xf000) == 0x7000;
-		queue_status(0x9f, df ? 22 : 15);
+		if (!select_ok)
+			queue_status(0x94, 0x04); // GSM 11.11: file ID not found
+		else
+		{
+			const bool df = is_directory(m_selected_file);
+			queue_status(0x9f, df ? 22 : 15);
+		}
 	}
 	else
 		queue_status(0x90, 0x00);
@@ -241,19 +256,26 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 	u8 response[26] = { 0 };
 	unsigned n = 0;
 	response[n++] = m_ins;
-	const bool df = fid == 0x3f00 || fid == 0x7f20 || (fid & 0xf000) == 0x7000;
+	const bool df = is_directory(fid);
 	if (requested != 0)
 	{
 		if (df || m_ins == 0xf2)
 		{
-			const u16 response_fid = m_ins == 0xf2 ? (fid == 0x3f00 ? 0x3f00 : 0x7f20) : fid;
+			const u16 response_fid = m_ins == 0xf2 ? m_selected_df : fid;
 			u8 fcp[22] = { 0 };
 			fcp[4] = response_fid >> 8; fcp[5] = response_fid;
 			fcp[6] = response_fid == 0x3f00 ? 0x01 : 0x02;
-			fcp[12] = 0x0a; fcp[13] = 0x92;
+			// GSM 11.11 directory status, bytes 13 onward: length of the
+			// GSM-specific data, file characteristics, child counts, code
+			// count, RFU, then CHV1/PUK1/CHV2/PUK2 status. The firmware
+			// requests the 22-byte prefix and parses these positions directly.
+			fcp[12] = 0x15;
+			fcp[13] = 0x81; // clock stop allowed; CHV1 disabled
 			fcp[14] = response_fid == 0x3f00 ? 0x02 : 0x00;
-			fcp[15] = response_fid == 0x3f00 ? 0x01 : 0x20;
-			fcp[16] = 0x02; fcp[18] = fcp[19] = fcp[20] = fcp[21] = 0x03;
+			fcp[15] = response_fid == 0x3f00 ? 0x02 : 0x16;
+			fcp[16] = 0x03;
+			fcp[18] = 0x83; fcp[19] = 0x8a;
+			fcp[20] = 0x83; fcp[21] = 0x8a;
 			const unsigned count = std::min<unsigned>(requested, std::size(fcp));
 			std::copy_n(fcp, count, response + n); n += count;
 		}
@@ -282,11 +304,23 @@ void nokia_sim_card_device::queue_read(u16 fid, unsigned requested)
 	queue_rx(response, n);
 }
 
+bool nokia_sim_card_device::is_directory(u16 fid)
+{
+	return fid == 0x3f00 || fid == 0x7f10 || fid == 0x7f20 || fid == 0x7f21 || fid == 0x7f40;
+}
+
+bool nokia_sim_card_device::is_known_file(u16 fid)
+{
+	if (is_directory(fid))
+		return true;
+	return ef_size(fid) != 0;
+}
+
 unsigned nokia_sim_card_device::ef_size(u16 fid)
 {
 	static constexpr struct { u16 fid; u8 size; } files[] = {
-		{ 0x2fe2, 0x0a }, { 0x6fb7, 0x0f }, { 0x6fad, 0x03 }, { 0x6f07, 0x09 },
-		{ 0x6f74, 0x10 }, { 0x6f78, 0x02 }, { 0x6f7e, 0x0b }, { 0x6f20, 0x09 },
+		{ 0x2fe2, 0x0a }, { 0x6f05, 0x04 }, { 0x6fb7, 0x0f }, { 0x6fad, 0x03 }, { 0x6f07, 0x09 },
+		{ 0x6f38, 0x0f }, { 0x6f74, 0x10 }, { 0x6f78, 0x02 }, { 0x6f7e, 0x0b }, { 0x6f20, 0x09 },
 		{ 0x6f7b, 0x0c }, { 0x6fae, 0x01 }, { 0x6f31, 0x01 }, { 0x6f37, 0x03 },
 		{ 0x6f41, 0x05 }, { 0x6f43, 0x02 }, { 0x6f46, 0x11 }, { 0x6f13, 0x01 },
 		{ 0x6f98, 0x16 }, { 0x6f9b, 0x25 }, { 0x6f91, 0x01 }, { 0x6f93, 0x01 },
@@ -304,8 +338,14 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset)
 	static constexpr u8 iccid[] = { 0x98, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0 };
 	static constexpr u8 ecc[] = { 0x11, 0xf2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	static constexpr u8 language_preference[] = { 0x01, 0xff, 0xff, 0xff };
+	// A standards-valid minimal service table: no optional SIM services are
+	// allocated or activated. Mandatory card identification remains available.
+	static constexpr u8 service_table[15] = { 0 };
 	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98, 0x10 };
 	if (fid == 0x2fe2 && offset < std::size(iccid)) return iccid[offset];
+	if (fid == 0x6f05 && offset < std::size(language_preference)) return language_preference[offset];
+	if (fid == 0x6f38 && offset < std::size(service_table)) return service_table[offset];
 	if (fid == 0x6fb7 && offset < std::size(ecc)) return ecc[offset];
 	if (fid == 0x6f07 && offset < std::size(imsi)) return imsi[offset];
 	if (fid == 0x6f7e) return offset == 10 ? 0x01 : (offset < 4 ? 0xff : 0x00);

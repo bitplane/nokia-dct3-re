@@ -88,17 +88,54 @@ ATR -> PPS
   -> SELECT 7F20
   -> SELECT/GET RESPONSE/READ 6FB7 (ECC)
   -> SELECT/READ 6FAE (PHASE)
-  -> periodic STATUS A0 F2 00 00 16
+  -> SELECT/GET RESPONSE/READ 6F05 (LP)
+  -> SELECT/READ 6FAD (AD)
+  -> SELECT/GET RESPONSE/READ 6F38 (SST)
+  -> SELECT/GET RESPONSE 6F7E (LOCI)
+  -> SELECT/READ 6F07 (IMSI)
+  -> SELECT/READ 6F78 (ACC)
+  -> SELECT/READ 2FE6
+  -> SELECT 6F14 -> 94 04 (optional CPHS Operator Name String absent)
+  -> remaining GSM/vendor file pass
+  -> SELECT 6F99 -> 94 04 (optional file absent)
+  -> timed directory STATUS presence monitor
 ```
 
-The periodic STATUS is stable firmware-owned presence polling. Its 22-byte
-DF_GSM data follows the normal code-`0x0b` path at `0x27ee94`; `0x27ef0a`
-special-cases INS `0xf2`, calls `0x27ea20`, and returns to the receive loop at
-`0x27efb0`. It does not imply a malformed FCP or card-reset loop (**S/R**).
+Correcting the GSM 11.11 MF/DF response layout and supplying requested LP and
+SST files lets `[0x111c79]` become 1 organically at about 1.309 s and reaches
+the extended file sequence above. `6F14` is optional CPHS Operator Name String;
+parser `0x201876` accepts at most 24 transparent bytes. The faithful synthetic
+card profile omits CPHS, so unsupported SELECT now returns `94 04` and preserves
+the previous selection. Firmware accepts that result and completes the remaining
+file pass (**S/R**).
 
-The preliminary pass never requests `EF_IMSI (6F07)`. Consequently the generic
-EF parser `0x200364` never dispatches IMSI to `0x20194c`, which would copy it to
-the configuration block and set bit `0x02` in `0x10d126` (**S/R**).
+The later repeated `A0 F2` commands come from presence-monitor function
+`0x2028a4`, not the initialization sequencer. At its first entry the coherent
+run has SIM enable 1, no-SIM 0, ready 1, and selected directory `7F40`.
+Separately tracking current DF makes STATUS report `7F40`; four observed polls
+take steady exit `0x20290a` and none takes changed-directory exit `0x2028f4`.
+`0x2028fc` rearms timer `0xea` with delay `0x181`, explaining the observed
+roughly 42 ms cadence. The repeated APDU remains because real firmware polls
+the card; the initialization loop and false directory-change handling are gone (**R**).
+
+In the coherent contact profile task 1 enters mode `0x0004` at about 1.435 s. Its next
+firmware predicate is report code `0x07`, posted by `0x2af190`. Runtime reaches
+the reporter's status-dispatch caller `0x27b370` with the normal global status
+`0x05e2`; that dispatch does not report ready. The same dispatcher calls
+`0x2af190` for `0x05eb` (and `0x06c5`). The mapped task-13 segmented transaction
+is an organic producer of `0x05eb`, so it is a candidate predecessor even
+though its task-16 callback branch does not construct the later registration
+object (**S/R**). Its subsystem ownership is unresolved; it is not established
+as display readiness. Code 7 and SIM initialization remain parallel predicates.
+
+The historical `MODEL_STARTUP_REPORTS` run does not contradict this ownership.
+Under the coherent contact ordering its fixed 950 ms hook returns code 7 and all
+later reports while task 1 is still in mode `0x000d`; the wrong phase consumes
+them before mode 4 begins. It is a superseded timing bridge, not evidence that
+the mode-4 predicate has been satisfied.
+
+The corrected card now requests and reads `EF_IMSI (6F07)`. The older absence
+claim described the malformed-directory run and is superseded (**R**).
 
 ## Task-20 reply contract
 
@@ -423,14 +460,15 @@ primitive-`0x70` candidate traverses the real RX ring and task-4 dispatcher, but
 task 13 rejects it for this registration context even when delayed by up to
 306 ms. That response hypothesis is falsified and its probe was removed.
 
-The broader task-13 route does not recover the missing registration lifecycle.
+The broader DSP-to-task-13 route does not recover the missing registration lifecycle.
 Type-`0x80` and type-`0x83` packets can normalize into `0x040b`; accepted
-segmented transfers are parsed at `0x23e324`/`0x23e378` and produce task-16
-status `0x05eb`. Callback `0x3c` handles `0x05eb` at `0x25df18`, publishes
+segmented transactions are parsed at `0x23e324`/`0x23e378` by
+the task at `0x23e62c` and produce task-16 status `0x05eb`. Callback `0x3c`
+handles `0x05eb` at `0x25df18`, publishes
 `0x057a`, and returns `0x05e6`. It does not reach that callback's `0x05e8`
 publisher at `0x25df08`, nor construct an object-bearing `0x05dc`. This closes
-the apparent numerical connection between the DSP transfer service and the
-registration frontier.
+the apparent numerical connection between this transaction and the
+registration frontier. The task-13 subsystem owner remains unresolved.
 
 The `0x2697aa(0x23, 0x0a0a)` call made after constructing type `0x1a` is not a
 task-10 timeout message. `0x2697aa` indexes a global 12-byte timer control block;

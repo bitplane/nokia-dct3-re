@@ -309,13 +309,16 @@ periodic liveness traffic is real DSP behavior, but it is not the missing
 registration-semantic response.
 
 The wider type-`0x80`/type-`0x83` `0x040b` route is now classified separately.
-Task 13 parses a segmented lower-layer transfer at `0x23e324`/`0x23e378`; a
-valid completed transfer emits `0x05eb` to task 16 through `0x23e1a4`. Task-16
+Task 13's receive loop at `0x23e62c` and command handler `0x23e7ac` parse a
+segmented transfer at `0x23e324`/`0x23e378`. A valid completed transfer emits
+`0x05eb` to task 16 through `0x23e1a4`. Task-16
 callback `0x3c` takes a dedicated `0x05eb` branch at `0x25df18`, publishes
 `0x057a`, and returns `0x05e6`. That branch bypasses the callback's argumentless
 `0x05e8` fallback at `0x25df08`. Therefore a legitimate `0x040b` transfer is not
-the missing ordinary-registration `0x05dc` predecessor, even though it shares a
-nearby service-status namespace.
+the missing ordinary-registration `0x05dc` predecessor. The transfer's owning
+subsystem is not yet established. In particular, the UI window stack is task 6
+around `0x297fc4` and RAM `0x1116f8`/`0x111724`; a Ghidra function name is not
+evidence that task 13 is the display-window subsystem.
 
 The task-10 completion route is now pinned more tightly, and corrects an earlier
 false lead. Task 17's initializer enters its long-lived event loop at

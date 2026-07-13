@@ -28,7 +28,19 @@
     {
       "id": "sim_preliminary_lifecycle", "owner": "sim_task", "status": "satisfied",
       "predicate": "ATR, PPS and mandatory EF reads complete through SIMI/FIQ transport",
-      "current": "Satisfied organically by nokia_sim_card_device", "evidence": ["docs/sim_subsystem.md"]
+      "current": "Correct GSM 11.11 directory metadata plus LP and SST content let SIM enable rise organically and advance through IMSI and ACC reads", "evidence": ["docs/sim_subsystem.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "sim_ef_6f14_completion", "owner": "sim_card", "status": "satisfied",
+      "predicate": "An unsupported optional EF does not create a zero-length phantom file or restart SIM initialization",
+      "current": "6F14 is optional CPHS Operator Name String. The non-CPHS synthetic card returns GSM 11.11 file-not-found 94 04 while preserving the prior selection; firmware continues through the remaining file pass and reaches its timed presence monitor. Current DF is tracked separately, and four observed 7F40 STATUS polls take steady exit 0x20290a rather than the changed-directory path.",
+      "evidence": ["docs/sim_subsystem.md", "docs/sim_registration.md", "docs/sim_emulator_scope.md"]
+    },
+    {
+      "id": "task1_mode4_code7", "owner": "startup", "status": "unresolved",
+      "predicate": "Task 1 receives organic report code 0x07 after entering startup mode 0x0004",
+      "current": "After the non-CPHS SIM initialization pass, the coherent profile enters mode 0x0004 at about 1.435 s but receives no later code 7. Reporter 0x2af190 has four firmware callers; the currently exercised status dispatcher 0x27b370 sees global status 0x05e2, while an accepted task-13 segmented transaction would produce 0x05eb and call the reporter. The task-13 subsystem owner is unresolved and is not established as the task-6 UI window stack. The historical startup-report bridge emits too early in mode 0x000d and is not evidence for this predicate.",
+      "evidence": ["docs/dsp_interface.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
     },
     {
       "id": "generic_service_05e8_activation", "owner": "generic_service", "status": "unresolved",

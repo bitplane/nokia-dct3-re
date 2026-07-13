@@ -122,21 +122,23 @@ timers/EEPROM/power-IRQ/…), the **faithful opt-in `MODEL_*` stack** that reach
 ## 2026-07 tidy (post interactive-handoff arc)
 
 The interactive-handoff investigation added a batch of forcing shims + one-off taps;
-after the message-gated handoff became a faithful model, the throwaway forces were
+after the message-gated handoff was isolated behind a firmware bridge, the throwaway forces were
 retired (git-recoverable):
 
-- **`EXPERIMENT_VBAT_GATE_PASS`** — forced the VBAT gate `0x2a6942` read 1→0. Superseded
-  by `MODEL_STARTUP_REPORTS`, which emulates the VBAT voltage-confirmation at its gate
-  (`0x27139e`, the confirmed value the classifier would produce).
+- **`EXPERIMENT_VBAT_GATE_PASS`** — forced the VBAT gate `0x2a6942` read 1→0. Its
+  diagnostic role was absorbed by `MODEL_STARTUP_REPORTS`, which bridges the
+  voltage-confirmation result at `0x27139e`.
 - **`EXPERIMENT_FORCE_CODE7`** — forced the code-7 getmsg return. Superseded by
-  `MODEL_STARTUP_REPORTS` feeding code 7 (and the whole report sequence) faithfully.
+  `MODEL_STARTUP_REPORTS` feeding code 7 and the whole report sequence through
+  the firmware mailbox path. This remains a bridge, not an organic producer.
 - **`VBAT_RAW`** — overrode the raw VBAT reading at `0x27cc80`; never reached the
   confirming classification (the classifier is a multi-comparison, not linear in the
   reading), and is moot now the gate is modelled directly.
 - One-off TRACE_HANDOFF sub-taps (`handoff4:` mode-0x04 entry, `gate0d:` mode-0d gate)
   removed — their findings are in `docs/interactive_handoff.md`.
 
-**Kept:** `MODEL_STARTUP_REPORTS` (+ `STARTUP_REPORTS_MS`) — faithful; the curated
+**Kept at that checkpoint:** `MODEL_STARTUP_REPORTS` (+ `STARTUP_REPORTS_MS`) as
+a quarantined diagnostic bridge; the curated
 `TRACE_HANDOFF` seam set (dispatcher/mode/checklist, mode transitions, mailbox-post
 inventory, VBAT-gate byte, interactive-init/idle markers).
 

@@ -29,7 +29,7 @@
     {
       "id": "dsp_040b_service5_predecessor", "status": "disproven",
       "hypothesis": "A valid type-0x80/type-0x83 0x040b transfer supplies the missing ordinary-registration 0x05dc/0x05e8 predecessor",
-      "conclusion": "Successful task-13 reassembly emits task-16 status 0x05eb; callback 0x3c handles it on a dedicated branch that publishes 0x057a and returns 0x05e6, bypassing its 0x05e8 fallback and constructing no object-bearing 0x05dc lifecycle",
+      "conclusion": "Successful task-13 segmented-transfer reassembly at 0x23e62c emits task-16 status 0x05eb; callback 0x3c handles it on a dedicated branch that publishes 0x057a and returns 0x05e6, bypassing its 0x05e8 fallback and constructing no object-bearing 0x05dc lifecycle. The task-13 subsystem is not yet identified; it must not be conflated with the task-6 UI window stack",
       "evidence": ["docs/sim_registration.md", "docs/dsp_interface.md"]
     },
     {

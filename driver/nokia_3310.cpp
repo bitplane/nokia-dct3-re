@@ -1854,6 +1854,60 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					machine().time().as_double());
 		}
 	}
+	// Task 1 advances from both startup modes 4 and 7 on report code 7. Trace
+	// branch targets around every organic reporter caller and the real getter
+	// entry; hooks at the former mid-function 0x26ff14 seam are not reliable.
+	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
+			(addr == 0x0021e3f8 || addr == 0x0021f830 || addr == 0x00255c2e ||
+			 addr == 0x0027b370 || addr == 0x0026ff14 || addr == 0x0026ff1a))
+	{
+		static unsigned code7_owner_count = 0;
+		static unsigned task1_getter_count = 0;
+		const bool task1_getter = addr == 0x0026ff14 || addr == 0x0026ff1a;
+		unsigned &count = task1_getter ? task1_getter_count : code7_owner_count;
+		if (count++ < (task1_getter ? 32U : 128U))
+			logerror("code7_owner: pc=%08x r0=%08x r1=%08x mode=%04x task=%02x "
+					"sim-enable=%02x no-sim=%02x caller=%08x t=%.6f\n",
+					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					debug_ram_word(FW_STARTUP_MODE), debug_ram_byte(0x00100022),
+					debug_ram_byte(0x00111c79), debug_ram_byte(0x00111c64),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
+	}
+	// Follow the organic code-7 candidate at its transport and consumer seams.
+	// The DSP decoder normalizes accepted packets to 0x040b; task 13 must then
+	// complete its firmware-owned segment state before publishing
+	// 0x05eb. This trace is read-only and bounded because segments can be noisy.
+	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
+			(addr == 0x00284b7c || addr == 0x00284cce || addr == 0x0023e64a ||
+			 addr == 0x0023e7ac || addr == 0x0023e7ea))
+	{
+		static unsigned task13_segment_count = 0;
+		if (task13_segment_count++ < 128)
+		{
+			const u32 r0 = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0));
+			const u32 r4 = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R4));
+			const u32 r6 = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R6));
+			const u32 r7 = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R7));
+			const u32 msg = addr == 0x0023e64a ? r0 :
+				((addr == 0x0023e7ac || addr == 0x0023e7ea) ? r7 : r0);
+			logerror("task13_segment: pc=%08x task=%02x msg=%08x id=%04x "
+					"b2=%02x family=%02x sub=%02x flags=%02x state=%08x "
+					"s=%02x/%02x/%04x result=%04x t=%.6f\n",
+					addr, debug_ram_byte(0x00100022), msg,
+					(msg >= 0x00100000 && msg < 0x00180000) ? debug_ram_word(msg) : 0xffff,
+					(msg >= 0x00100000 && msg + 0x0e < 0x00180000) ? debug_ram_byte(msg + 2) : 0xff,
+					(msg >= 0x00100000 && msg + 0x0e < 0x00180000) ? debug_ram_byte(msg + 0x0b) : 0xff,
+					(msg >= 0x00100000 && msg + 0x0e < 0x00180000) ? debug_ram_byte(msg + 0x0c) : 0xff,
+					(msg >= 0x00100000 && msg + 0x0e < 0x00180000) ? debug_ram_byte(msg + 0x0e) : 0xff,
+					r4,
+					(r4 >= 0x00100000 && r4 + 4 < 0x00180000) ? debug_ram_byte(r4 + 1) : 0xff,
+					(r4 >= 0x00100000 && r4 + 4 < 0x00180000) ? debug_ram_byte(r4 + 2) : 0xff,
+					(r4 >= 0x00100000 && r4 + 4 < 0x00180000) ? debug_ram_word(r4 + 4) : 0xffff,
+					r6 & 0xffff, machine().time().as_double());
+		}
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a03b4)
 	{
 		static unsigned sim_rx_count = 0;
@@ -1862,6 +1916,30 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					m_irq_status, m_fiq_status, debug_ram_byte(0x001106c4),
 					debug_ram_byte(0x001106d4), debug_ram_word(0x001106d6),
 					debug_ram_word(0x001106d8), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002028a4)
+	{
+		static bool sim_presence_seen = false;
+		if (!sim_presence_seen)
+		{
+			sim_presence_seen = true;
+			logerror("sim_presence_monitor: mode=%04x enable=%02x no-sim=%02x selected-df=%04x "
+					"ready=%02x task=%02x caller=%08x t=%.8f\n",
+					debug_ram_word(FW_STARTUP_MODE), debug_ram_byte(0x00111c79),
+					debug_ram_byte(0x00111c64), debug_ram_word(0x00111ca4),
+					debug_ram_byte(0x0010dcaf), debug_ram_byte(0x00100022),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
+		}
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr &&
+			(addr == 0x002028f4 || addr == 0x0020290a))
+	{
+		static unsigned sim_presence_result_count = 0;
+		if (sim_presence_result_count++ < 4)
+			logerror("sim_presence_result: %s current-df=%04x t=%.8f\n",
+					addr == 0x0020290a ? "steady" : "changed",
+					debug_ram_word(0x00111ca4), machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a04c8)
 	{

@@ -74,24 +74,44 @@ is owned by this device. Their scratch-message injection, firmware trampolines a
 receive-result rewriting are not part of the supported SIM boundary.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
-includes ICCID `2FE2`, ECC `6FB7`, IMSI `6F07`, LOCI `6F7E`, and Phase `6FAE`; other known files are
-erased (`0xff`). `EF_PHASE` must report Phase 2 (`0x02`). Returning `0x00` prevents the validated
-preliminary lifecycle from composing.
+includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`, LOCI `6F7E`, and Phase
+`6FAE`; other known files are erased (`0xff`). `EF_PHASE` reports Phase 2 (`0x02`). Returning `0x00`
+prevents the validated preliminary lifecycle from composing. MF/DF STATUS data uses the GSM 11.11
+directory layout, including a `0x15` GSM-specific-data length and CHV status fields; the earlier
+shifted layout caused the firmware to repeat the preliminary pass.
 
 ## Current organic result
 
-In one unforced run the device now completes:
+In an unforced coherent run the device now completes:
 
 ```text
-ATR -> PPS -> SELECT 7F20 -> STATUS -> SELECT/READ mandatory EFs
+ATR -> PPS -> preliminary SELECT/STATUS/READ pass
+  -> LP -> AD -> SST -> LOCI -> IMSI -> ACC -> 2FE6
+  -> optional CPHS ONS 6F14 absent -> remaining GSM/vendor EFs
+  -> optional 6F99 absent -> timed directory-presence monitor
 ```
 
-Observed reads include ICCID, ECC and Phase, and the task-5 run reaches natural status `0x1581`
-with `[0x10dcaf]=1` and `[0x10dca9]=1`. This restores the established preliminary-SIM baseline.
+Observed reads include ICCID, ECC, Phase, LP, SST, IMSI and ACC. SIM-enable byte `[0x111c79]`
+changes to 1 organically at about 1.309 s. This is the first coherent run to pass the preliminary
+card-acceptance transition without firmware-state forcing.
 
-After PHASE, firmware deliberately polls DF_GSM with `A0 F2 00 00 16`; this is stable presence
-polling, not a rejected STATUS response. The next wall is outside the card transport. The extended
-IMSI pass requires a GSM/radio session which constructs callback 7 and drives:
+`6F14` is the optional CPHS Operator Name String, a transparent default-alphabet field of up to
+the 24 bytes accepted by parser `0x201876`. The card does not advertise CPHS and need not provide
+it. The previous device nevertheless accepted every unknown SELECT, advertised a zero-byte EF,
+and caused initialization to restart. SELECT now returns GSM 11.11 `94 04` (file ID not found)
+without changing the current selection for unsupported files. Firmware handles that organic
+optional-file result and continues through the rest of its initialization sequence.
+
+At about 1.427 s task 20 reaches its card-presence monitor at `0x2028a4` with SIM enable 1,
+no-SIM 0, and ready byte `0x10dcaf` equal to 1. The card tracks current DF separately from the
+selected EF, so STATUS reports `7F40`; four consecutive checks take the monitor's steady exit at
+`0x20290a`, not its changed-directory path at `0x2028f4`. The monitor issues `A0 F2` and explicitly
+rearms timer `0xea` with delay `0x181`, producing a roughly 42 ms cadence. This perpetual traffic
+is a normal firmware-owned presence check, not a repeated initialization pass. Task 1 subsequently
+enters mode `0x0004` at about 1.435 s.
+
+The later extended registration pass still requires a GSM/radio session which constructs callback
+7 and drives:
 
 ```text
 callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
@@ -109,6 +129,17 @@ Validated DSP RX families do not feed this SAT path. Service-5's callback is alr
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract
 by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
+
+The coherent contact profile also fixes the next task-1 predicate. Task 1 enters
+mode `0x0004` at about 1.436 s and waits for report code `0x07`. Its organic
+reporter is `0x2af190`. Of the reporter's four callers, the only route exercised
+by the current runtime is the status dispatcher `0x27b370`: the
+global callback sweep reaches it with `0x05e2`, while status `0x05eb` would call
+the reporter and release task 1. A valid segmented transaction in task 13 at
+`0x23e62c` produces `0x05eb`; no such transaction is currently accepted. The
+owning subsystem is unresolved and is not established as the task-6 UI window
+stack. Code 7 is therefore a parallel startup predicate, not yet a proven
+display-readiness predicate or part of the SIM lifecycle.
 
 The descriptor factory is now identified as `0x24f120`. Its four known callers
 (`0x2996aa`, `0x2997dc`, `0x299860`, `0x2998a0`) sit immediately before the callback-7 handler and

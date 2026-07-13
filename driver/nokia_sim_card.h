@@ -35,6 +35,8 @@ private:
 	void queue_status(u8 sw1, u8 sw2);
 	void queue_fcp(u16 fid, unsigned requested);
 	void queue_read(u16 fid, unsigned requested);
+	static bool is_directory(u16 fid);
+	static bool is_known_file(u16 fid);
 	static unsigned ef_size(u16 fid);
 	static u8 ef_byte(u16 fid, unsigned offset);
 
@@ -56,6 +58,7 @@ private:
 	u16 m_tx_expected = 0;
 	u8 m_ins = 0;
 	u16 m_selected_file = 0x3f00;
+	u16 m_selected_df = 0x3f00;
 	bool m_receiving_body = false;
 };
 

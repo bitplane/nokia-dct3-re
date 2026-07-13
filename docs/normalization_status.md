@@ -9,10 +9,11 @@ to end.
 
 - Four named runtime manifests define the default, deep-GSM, contact-service and
   3330 smoke profiles.
-- The 3210 v6.00 topology profile has stable symbolic identities for 13 nodes
-  and nine reviewed semantic edges across the active boot frontier.
+- The 3210 v6.00 topology profile has stable symbolic identities for the
+  reviewed nodes and semantic edges across the active boot frontier.
 - Hardware contracts, state predicates and falsifications have machine-checked
-  ledgers. The current ledgers contain 18 entries in total.
+  ledgers. `tools/validate_evidence.py` reports the authoritative current counts
+  rather than this document duplicating values that drift as findings land.
 - Runtime observations are subsystem-scoped. A trace collected for contact
   service can no longer silently establish absence in generic service or GSM.
 - Current network and resource-provider conclusions are separated from the
@@ -80,8 +81,9 @@ A subsystem is boxed off only when it has:
 5. stale probes and contradictory historical claims removed or clearly marked.
 
 The immediate research frontier is the ordinary GSM 11.11 SIM initialization
-sequence after `EF_PHASE`: SIM control reaches `0xe3`, APDUs are exchanged, and
-the firmware remains in its periodic DF_GSM `A0 F2` presence cycle with SIM
-enable clear. Normalization should make that work cheaper and harder to
+sequence. Correct directory metadata and the requested `EF_LP`/`EF_SST` files
+let SIM enable rise organically and advance the firmware through the complete
+non-CPHS initialization pass. Unsupported optional SELECTs now return `94 04`;
+task 20 then enters its timed card-presence monitor. Normalization should make that work cheaper and harder to
 misinterpret; it must not turn the historical service-5/SAT chain into a claimed
 ordinary-registration dependency.
