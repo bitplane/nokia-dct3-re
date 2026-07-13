@@ -85,8 +85,8 @@ extended IMSI pass.
 
 ## Current boundary outside the SIM
 
-The next registration transaction depends on an object-bearing GSM/radio
-session. Firmware must construct callback 7 with lifecycle `0x05dc`; its own
+The next registration transaction depends on a GSM/radio session. Firmware must
+construct callback 7 with lifecycle `0x05dc`; its own
 code then attaches a radio context and emits:
 
 ```text

@@ -54,15 +54,15 @@ packet.
 The downstream chain is mapped independently of its missing ingress:
 
 ```text
-object-bearing service-5 0x05e8 -> 0x05ea -> task-15 0x07dd
+service-5 status 0x05e8 -> 0x05ea -> task-15 0x07dd
   -> parser success -> task-14 0x09d8
   -> opcode 0x2a -> lower event 0x102f -> result 0x0fbf
   -> task-10 0x1392 -> task-17 0x0434
 ```
 
-This does not prove that type `0x1a` directly produces the object-bearing
-`0x05e8`. The transport relationship between the organic request and the queued
-generic-service object remains unresolved. A valid peer model must establish
+This does not prove that type `0x1a` directly produces `0x05e8`. The relationship
+between the organic request and the firmware state which activates a recovered
+argumentless publisher remains unresolved. A valid peer model must establish
 that relationship from request/response evidence rather than inject any member
 of the downstream chain.
 
@@ -79,7 +79,7 @@ In the named eight-second deep-GSM run, transient-registration tracing observes
 only service `0x0a`: callers `0x26341e`, `0x296ec8`, and `0x296f16`, all with
 event `0x0114`. No transient service-5 registration executes, and no resident
 registration through `0x263d30` executes. Therefore the unresolved descriptors
-do not populate the organic `0x05e8` session in the current boot. The indirect
+do not explain organic `0x05e8` publication in the current boot. The indirect
 resident site may execute in another firmware state, so this is not a global
 absence proof.
 
@@ -100,5 +100,5 @@ absence proof.
 A transport investigation succeeds when an organically emitted MCU request is
 correlated with a peer-owned state change or inbound packet which the existing
 firmware consumes through its real boundary, eventually causing the first
-object-bearing service-5 `0x05e8`. Until that correlation exists, a peer may
-model queue ownership and acknowledgements but not the missing semantic result.
+service-5 `0x05e8`. Until that correlation exists, a peer may model transport
+ownership and acknowledgements but not the missing semantic result.

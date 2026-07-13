@@ -20,7 +20,11 @@
     {"id": "task17_radio_init", "kind": "rtos_consumer", "task": 17, "rom_addresses": {"noki3210_v600": "0x223964"}},
     {"id": "task5_session_dispatch", "kind": "rtos_consumer", "task": 5, "rom_addresses": {"noki3210_v600": "0x255124"}},
     {"id": "task14_session_request", "kind": "rtos_consumer", "task": 14, "rom_addresses": {"noki3210_v600": "0x238a24"}},
-    {"id": "sim_task", "kind": "rtos_task", "task": 21, "rom_addresses": {"noki3210_v600": "0x27defc"}}
+    {"id": "sim_task", "kind": "rtos_task", "task": 21, "rom_addresses": {"noki3210_v600": "0x27defc"}},
+    {"id": "task20_sim_router", "kind": "rtos_consumer", "task": 20, "rom_addresses": {"noki3210_v600": "0x2085ce"}},
+    {"id": "sim_registration_request", "kind": "firmware_dispatch", "task": 20, "rom_addresses": {"noki3210_v600": "0x2938b0"}},
+    {"id": "sim_d0_object_parser", "kind": "firmware_dispatch", "task": 20, "rom_addresses": {"noki3210_v600": "0x2726e0"}},
+    {"id": "lower_object_classifier", "kind": "firmware_dispatch", "task": 5, "rom_addresses": {"noki3210_v600": "0x267e68"}}
   ],
   "apis": [
     {"address": "0x26a204", "name": "task_post", "kind": "message_send", "arguments": {"destination_task": "r0", "message": "r1"}},
@@ -92,7 +96,7 @@
   },
   "semantic_edges": [
     {
-      "id": "service5_object_completion",
+      "id": "service5_status_completion",
       "from": "service5_callback",
       "to": "generic_service_provider_dispatch",
       "input_status": "0x05e8",
@@ -212,8 +216,72 @@
         {"type": "decoded_address", "address": "0x238a24"},
         {"type": "call", "address": "0x2389fe", "target": "0x26a354"}
       ]
+    },
+    {
+      "id": "sim_task_notification_120c",
+      "from": "sim_task",
+      "to": "task20_sim_router",
+      "input_status": "notification_byte_0x10dcb7",
+      "output_status": "0x120c",
+      "classification": "dormant",
+      "provenance": "reviewed_static_and_runtime",
+      "anchors": [
+        {"type": "effective_literal_load", "address": "0x27e3cc", "value": "0x120c"},
+        {"type": "call", "address": "0x27e3e6", "target": "0x26a354"},
+        {"type": "effective_literal_load", "address": "0x27e8fe", "value": "0x120c"},
+        {"type": "call", "address": "0x27e912", "target": "0x26a354"}
+      ]
+    },
+    {
+      "id": "task20_120c_to_sim_a012",
+      "from": "task20_sim_router",
+      "to": "sim_registration_request",
+      "input_status": "0x120c",
+      "output_status": "A0/12",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x2085ce"},
+        {"type": "decoded_address", "address": "0x203d2c"},
+        {"type": "decoded_address", "address": "0x2938b0"},
+        {"type": "decoded_address", "address": "0x293522"}
+      ]
+    },
+    {
+      "id": "sim_a012_response_to_d0_object",
+      "from": "sim_registration_request",
+      "to": "sim_d0_object_parser",
+      "input_status": "0x006a",
+      "output_status": "D0_object",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "call", "address": "0x203d5c", "target": "0x2726e0"},
+        {"type": "decoded_address", "address": "0x2726e0"}
+      ]
+    },
+    {
+      "id": "sim_d0_object_to_lower_classifier",
+      "from": "sim_d0_object_parser",
+      "to": "lower_object_classifier",
+      "input_status": "0x1770..0x1788",
+      "output_status": "0x85e0",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "call", "address": "0x254aac", "target": "0x267e68"},
+        {"type": "decoded_address", "address": "0x269524"},
+        {"type": "decoded_address", "address": "0x267e68"}
+      ]
     }
   ],
+  "dispatcher_scratch_contract": {
+    "address_range": "0x110f1c..0x110f2b",
+    "classification": "transient_callback_abi",
+    "runtime_writer_pcs": ["0x200168", "0x20016a", "0x2af594", "0x2af696", "0x2af75e", "0x2af770", "0x2af78e"],
+    "argument_1": "0x110f20",
+    "coverage": "Coherent RAM write watch; startup clearing, task-5 receive copies, and internal queue bookkeeping. No DSP/device writer observed."
+  },
   "dynamic_descriptor_assessments": [
     {"callsite": "0x26341a", "storage": "stack", "event": "0x0114", "callback": "0x00dc", "service5_population": "excluded_by_fields"},
     {"callsite": "0x2684dc", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x1776", "service5_population": "excluded_by_fields"},
@@ -222,6 +290,21 @@
     {"callsite": "0x26b53e", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x06ff", "service5_population": "excluded_by_fields"},
     {"callsite": "0x2a6c0e", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x0e14_or_0x0e15", "service5_population": "excluded_by_fields"},
     {"callsite": "0x28c672", "storage": "runtime_indirect_resident", "descriptor_source": "[0x110f1c]", "service5_population": "dormant_in_deep_runtime"}
+  ],
+  "status_05e8_publishers": [
+    {"callback_index": "0x22", "entry": "0x227bc0", "callsites": ["0x227c70"], "trigger_statuses": ["0x0c2c"], "role": "status-specific fallback"},
+    {"callback_index": "0x21", "entry": "0x228210", "callsites": ["0x228a88"], "trigger_statuses": ["0x0580"], "role": "status-specific fallback"},
+    {"callback_index": "0x26", "entry": "0x22b6d4", "callsites": ["0x22b87e"], "trigger_statuses": ["0x0388"], "role": "status-specific fallback"},
+    {"callback_index": "0x54", "entry": "0x249aa4", "callsites": ["0x249be4"], "trigger_statuses": ["0x05e7"], "role": "state-gated helper failure"},
+    {"callback_index": "0x55", "entry": "0x24a84c", "callsites": ["0x24a99e"], "trigger_statuses": ["0x0578"], "role": "state-gated completion"},
+    {"callback_index": "0x3c", "entry": "0x25db88", "callsites": ["0x25df08"], "trigger_statuses": ["multiple"], "role": "multi-status cleanup/error convergence"},
+    {"callback_index": "0x37", "entry": "0x2679da", "callsites": ["0x267a52", "0x267a7e", "0x267b96"], "trigger_statuses": ["0x1778", "0x0598", "0x0599", "0x05dc"], "role": "lower-radio object/control classifier"},
+    {"callback_index": "0x34", "entry": "0x268534", "callsites": ["0x2686a2"], "trigger_statuses": ["0x05a5"], "role": "object/state-gated failure"},
+    {"callback_index": "0x39", "entry": "0x26870c", "callsites": ["0x2687d0"], "trigger_statuses": ["0x0578"], "role": "lower-radio completion fallback"},
+    {"callback_index": "0x38", "entry": "0x26903c", "callsites": ["0x26910e", "0x2694f6"], "trigger_statuses": ["0x0578", "0x05dc"], "role": "lower-radio completion/object rejection"},
+    {"callback_index": "0x57", "entry": "0x2882dc", "callsites": ["0x2883c8"], "trigger_statuses": ["0x05e1"], "role": "state-gated lifecycle fallback"},
+    {"callback_index": "0x52", "entry": "0x28882c", "callsites": ["0x2888d2"], "trigger_statuses": ["0x035c"], "role": "status-specific fallback"},
+    {"callback_index": "0x65", "entry": "0x29a3a4", "callsites": ["0x29a4dc"], "trigger_statuses": ["multiple"], "role": "multi-status state-machine fallback"}
   ],
   "runtime_claims": [
     {
@@ -243,7 +326,7 @@
     {
       "id": "deep_gsm_service5_inputs", "manifest": "deep-gsm", "subsystem": "generic_service",
       "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
-      "statement": "An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no object-bearing 0x05e8."
+      "statement": "An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no 0x05e8."
     },
     {
       "id": "deep_gsm_target_chain_absent", "manifest": "deep-gsm", "subsystem": "generic_service",
@@ -254,6 +337,16 @@
       "id": "deep_gsm_task14_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",
       "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
       "statement": "Task 14 initialized its controller slots but received no subsequent message; decoder 0x267258 did not execute."
+    },
+    {
+      "id": "deep_gsm_05e8_publishers_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",
+      "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
+      "statement": "All 13 callback owners containing the 16 direct 0x05e8 publishers received the global 0x05e2 sweep once; none generated 0x05e8."
+    },
+    {
+      "id": "deep_gsm_sim_registration_notification_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",
+      "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
+      "statement": "Ordinary task-21 SIM traffic executes, but task-21 status 0x120c and its downstream A0/12/D0/0x177x classifier chain do not occur; no setting write to notification byte 0x10dcb7 was observed."
     }
   ],
   "runtime_patterns": [

@@ -153,8 +153,11 @@ be assumed to produce service-5 `0x05ea` or task-15 `0x07dd`.
 Service 5 itself is not missing: callback `0x2618e8` is selected organically by
 the generic callback dispatcher and receives the normal `0x05f3`/`0x05e2` sweep.
 The framework is downstream of task 5 (`0x2af652 -> 0x2638e4`), so it is not the
-hardware ingress. The open DSP/peer question is which lower transport populates
-the queued object that changes the callback input to object-bearing `0x05e8`.
+	hardware ingress. The object-ingress question is now closed against the DSP
+	interface: task-21 status `0x120c` crosses task 20 into a synchronous task-21
+	`A0/12` request, whose D0 response reaches the `0x177x` router and classifier
+	`0x267e68`. None of the validated DSP RX families enters that chain. DSP work
+	remains necessary for radio/L1 behavior, but is not the source of this object.
 
 For type `0x70`, `0x29bc00` preserves the type as the firmware message class
 and posts the message to task 2. Task 2 has no direct class-`0x70` case: its

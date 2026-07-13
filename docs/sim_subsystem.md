@@ -91,21 +91,22 @@ with `[0x10dcaf]=1` and `[0x10dca9]=1`. This restores the established preliminar
 
 After PHASE, firmware deliberately polls DF_GSM with `A0 F2 00 00 16`; this is stable presence
 polling, not a rejected STATUS response. The next wall is outside the card transport. The extended
-IMSI pass requires an object-bearing GSM/radio session which constructs callback 7 and drives:
+IMSI pass requires a GSM/radio session which constructs callback 7 and drives:
 
 ```text
 callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
   -> task-17 0x1583 -> registration/session commit -> 0x1196/0x1199
 ```
 
-Callback 7 currently receives only the global `0x05e2` sweep, not constructor `0x05dc`. The
-missing predecessor is now narrowed to the lower-radio result path: task 15 must produce `0x09ee`,
-which task 17 converts to `0x0a2e`; the task-15 router then reaches the session-object factory.
-The related object route (`0x05ea -> 0x07dd -> 0x209978 -> 0x09f3 -> 0x0a08`) populates the lower
-state consumed by that result path, but no such object arrives in the coherent run. Service-5's
-callback is already registered and organically receives the framework sweep (`0x05f3`, `0x05e2`);
-the missing input is the queued object state which selects object-bearing `0x05e8`. Do not replace
-this peer contract
+Callback 7 currently receives only the global `0x05e2` sweep, not constructor
+`0x05dc`. Its strongest organic ingress is now mapped as task 21 status `0x120c`
+to task 20, followed by a synchronous task-21 `A0/12` request, a `0x006a`/D0
+response, the D0 parser's `0x177x` event, and classifier `0x267e68`. The
+coherent run never produces `0x120c`; both producer sites are gated by SIM-state
+notification byte `0x10dcb7`, for which no setting write was observed.
+Validated DSP RX families do not feed this path. Service-5's callback is already
+registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
+branch remains dormant downstream. Do not replace this firmware contract
 by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
 
 The descriptor factory is now identified as `0x24f120`. Its four known callers

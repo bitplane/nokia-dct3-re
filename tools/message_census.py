@@ -454,18 +454,37 @@ def render_report(result):
 		lines.append(f"- `{item['callsite']}` ({item['storage']}): {', '.join(fields)}; **{item['service5_population']}**.")
 	lines.append("")
 	absence = result["status_inventory_05e8"]
+	publisher_callsites = ", ".join(
+		f"`{hexadecimal(item['callsite'])}`" for item in absence["call_arguments"])
 	lines += ["## 0x05e8 inventory", "",
 		f"- Effective literal loads: {len(absence['literal_loads'])}",
 		f"- Recovered argumentless global-event generators: {len(absence['call_arguments'])}",
+		f"- Generator callsites: {publisher_callsites or 'none'}",
 		f"- Decoded registration fields: {len(absence['descriptor_fields'])}", ""]
+	publishers = result.get("status_05e8_publishers", [])
+	if publishers:
+		lines += ["### Publisher owners", ""]
+		for item in publishers:
+			triggers = ", ".join(f"`{value}`" for value in item["trigger_statuses"])
+			callsites = ", ".join(f"`{value}`" for value in item["callsites"])
+			lines.append(f"- callback `{item['callback_index']}` / `{item['entry']}`: {callsites}; triggers {triggers}; {item['role']}.")
+		lines.append("")
+	scratch = result.get("dispatcher_scratch_contract")
+	if scratch:
+		writers = ", ".join(f"`{pc}`" for pc in scratch["runtime_writer_pcs"])
+		lines += ["## Dispatcher scratch contract", "",
+			f"- Range: `{scratch['address_range']}` ({scratch['classification']})",
+			f"- Argument 1 / object slot when supplied by the callback ABI: `{scratch['argument_1']}`",
+			f"- Coherent runtime writer PCs: {writers}",
+			f"- Coverage: {scratch['coverage']}", ""]
 	lines += ["## Acceptance chains", ""]
 	for edge in result["semantic_edges"]:
 		mark = "PASS" if edge["anchors_valid"] else "FAIL"
 		lines.append(f"- **{mark}** `{edge['id']}`: `{edge['input_status']}` -> `{edge['output_status']}` ({edge['classification']}, {edge['provenance']})")
 	lines += ["", "## 0x05e8 boundary", "",
-		"The census finds `0x05e8` as the registered input of callback-table entry `0x28` (`0x2618e9`), not as a direct immediate producer callsite. The callback's object-bearing completion would return `0x05ea`, and the provider then constructs task-15 `0x07dd`.", "",
-		"The strongest evidenced missing predecessor is therefore **generic-service session/queue population before callback dispatch**: firmware must register or populate an object-bearing transaction that selects callback `0x28` and supplies `0x05e8`. Directly posting `0x05e8`, `0x05ea`, `0x07dd`, or `0x09d8` would skip this ownership boundary.", "",
-		"The census does find argumentless in-ROM generators of the global `0x05e8` event (`0xbd << 3`). They are triggers, not object producers: the packed-event ABI encodes zero argument words, so none supplies the object the callback path later expects. The quantified absence is narrower and stronger: no literal load and no recovered `0x05e8` generator carries an argument word, while unresolved RAM-built descriptors remain outside static coverage.", ""]
+		"Callback-table entry `0x28` (`0x2618e9`) accepts numeric status `0x05e8` and returns `0x05ea`. Reviewed control flow shows that branch does not consume an object argument from dispatcher scratch `0x110f1c`; the earlier object-bearing interpretation was incorrect.", "",
+		"The census recovers argumentless in-ROM generators of global event `0x05e8` (`0xbd << 3`). That is the expected ABI: the packed event becomes the callback input even with zero argument words. These are genuine candidate publishers, not incomplete object constructors.", "",
+		"The strongest object-bearing predecessor is now mapped through task-21 `0x120c`, synchronous `A0/12`, a `0x006a`/D0 response, the `0x177x` router, and classifier `0x267e68`. That chain remains dormant before `0x120c`; posting downstream events remains an invalid substitute.", ""]
 	observed = [item for item in result["runtime"] if item["subsystem"] == "generic_service" and item["kind"] == "callback"]
 	if observed:
 		statuses = sorted({item["fields"]["status"] for item in observed})
@@ -594,8 +613,10 @@ def main():
 		"calls": calls, "callbacks": callbacks, "descriptor_registrations": descriptors,
 		"consumers": consumers, "semantic_edges": edges,
 		"status_inventory_05e8": inventory_05e8,
+		"status_05e8_publishers": profile.get("status_05e8_publishers", []),
+		"dispatcher_scratch_contract": profile.get("dispatcher_scratch_contract"),
 		"unresolved_contract": {"status": 0x05e8, "classification": "unresolved",
-			"boundary": "generic-service session/queue population before callback-table index 0x28 dispatch",
+			"boundary": "organic 0x05e8 publisher activation and downstream readiness before callback-table index 0x28 dispatch",
 			"external": "not_proven"},
 		"runtime_status_inventory": runtime_status_inventory, "runtime": runtime,
 		"runtime_manifests": runtime_manifests,

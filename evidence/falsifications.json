@@ -10,8 +10,8 @@
     },
     {
       "id": "direct_05e8_completion", "status": "disproven",
-      "hypothesis": "Posting numeric event 0x05e8 is sufficient to create the registration object",
-      "conclusion": "The global event has zero argument words; session/queue population must precede callback dispatch",
+      "hypothesis": "Forcing numeric event 0x05e8 proves the organic registration predecessor",
+      "conclusion": "The event is a valid argumentless callback input, but forcing it bypasses the unresolved publisher activation and downstream readiness path",
       "evidence": ["docs/message_topology_census.md"]
     },
     {
@@ -19,6 +19,12 @@
       "hypothesis": "A DSP type-0x80 primitive-0x70 response completes the current registration context",
       "conclusion": "The real RX path delivers it, but task 13 rejects it across tested delays",
       "evidence": ["docs/sim_registration.md"]
+    },
+    {
+      "id": "dsp_rx_populates_service5_object", "status": "disproven",
+      "hypothesis": "A validated DSP RX packet family populates the object path leading to service-5 activation",
+      "conclusion": "The complete organic ingress is task-21 0x120c -> task-20 A0/12 request -> 0x006a/D0 parser -> 0x177x -> 0x267e68; validated DSP RX families have no edge into that chain",
+      "evidence": ["docs/sim_registration.md", "docs/dsp_interface.md"]
     },
     {
       "id": "forced_registration_messages", "status": "disproven",
@@ -29,7 +35,7 @@
     {
       "id": "task8_8d_8e_peer", "status": "unsupported",
       "hypothesis": "Task-8 0x8d/0x8e traffic is the missing generic-service peer response",
-      "conclusion": "No evidenced edge links this traffic to the object-bearing 0x05e8 path",
+      "conclusion": "No evidenced edge links this traffic to an organic 0x05e8 publisher path",
       "evidence": ["docs/sim_registration.md"]
     },
     {

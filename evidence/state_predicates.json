@@ -25,10 +25,16 @@
       "current": "Satisfied organically by nokia_sim_card_device", "evidence": ["docs/sim_subsystem.md"]
     },
     {
-      "id": "generic_service_object_population", "owner": "generic_service", "status": "unresolved",
-      "predicate": "A firmware-owned object selects callback-table entry 0x28 and delivers object-bearing 0x05e8",
-      "current": "No object-bearing completion observed; no transient service-5 registration executes in the named deep run and numeric global 0x05e8 triggers are insufficient",
+      "id": "generic_service_05e8_activation", "owner": "generic_service", "status": "unresolved",
+      "predicate": "An organic firmware path publishes 0x05e8 while callback-table entry 0x28 and its downstream readiness state are active",
+      "current": "Entry 0x28 accepts argumentless numeric 0x05e8 and returns 0x05ea; its strongest object-bearing predecessor is mapped through task-21 0x120c, synchronous A0/12, D0 parsing, the 0x177x router and classifier 0x267e68, but that chain is dormant in the named deep run",
       "evidence": ["docs/message_topology_census.md", "docs/dsp_service_transport_contract.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "sim_registration_object_notification", "owner": "sim_task", "status": "unresolved",
+      "predicate": "Task 21 organically posts status 0x120c and completes its internal A0/12 request with a 0x006a/D0 registration object",
+      "current": "Both 0x120c producers require notification byte 0x10dcb7; no setting write or 0x120c message occurs in the coherent deep run, although ordinary task-21 APDU traffic works",
+      "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
       "id": "task17_radio_completion", "owner": "task17_radio_init", "status": "unresolved",

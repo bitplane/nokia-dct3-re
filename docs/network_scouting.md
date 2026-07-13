@@ -27,7 +27,7 @@ generic-service/lower-radio boundary, but never receives the owned object which
 would complete this chain:
 
 ```text
-service-5 object-bearing 0x05e8
+service-5 status 0x05e8
   -> 0x05ea -> task-15 0x07dd
   -> successful parse -> task-14 0x09d8
   -> opcode 0x2a / lower result 0x0fbf
@@ -36,9 +36,9 @@ service-5 object-bearing 0x05e8
 ```
 
 The static portions are normalized in `tools/profiles/noki3210_v600.json` and
-checked by `message_census.py`. The missing predecessor remains generic-service
-session/queue population before callback-table entry `0x28`; reviewed runtime
-shows the numeric sweep callbacks but no object-bearing completion.
+checked by `message_census.py`. The missing predecessor is now the organic path
+to one of the recovered `0x05e8` publishers plus entry `0x28`'s downstream
+readiness state; reviewed runtime does not execute that transition.
 
 ## Emulation direction
 
