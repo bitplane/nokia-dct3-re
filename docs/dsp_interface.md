@@ -36,7 +36,7 @@ still need to be mapped before implementing a reply model.
 |---|---|---|
 | `[0x00–0x24]` | **self-test / RAM echo region** | written with a walking pattern at `0x295f48`, read back + compared at `0x295fc0`/`0x295fd6`. A RAM test of the shared window; passes trivially against a real backing store. |
 | `[0x00–0x04]` | **DSP status fakes** → `0x01` | `dsp_ram_r` HACK; the firmware reads these as "DSP alive". |
-| `[0xe0]` → `0x00`, `[0xfe]`/`[0x100]` → `0x01` | **DSP ready/busy flags** | HACK fakes; `0xe4` = lower-service pending counter (MCU writes `0x0002` at `0x290c98`; `MODEL_DSP_SERVICE` drains it + raises IRQ 4). |
+| `[0xe0]` → `0x00`, `[0xfe]`/`[0x100]` → `0x01` | **DSP ready/busy flags** | `[0xe0]` is still a read override: firmware sets the backing word before DSPIF command 4, but the peer-clear timing is unresolved. `0xe4` is the lower-service pending counter. |
 | `[0xf6–0x102]` | **config words** (`0x0100 0x0300 0x0001 0x0000 0x0001 0x0001 0x0200`) | 7 individual writes at `0x290a44–0x290a64`. |
 | `[0x200–0x600]` | **coefficient/parameter table** (512 halfwords) | strided copy at `0x290a94`: reads one halfword per 0x20-byte record from flash `0x200040`, packs into `[0x200+]`. |
 | `[0xe00+]` | **second blob** (~240+ halfwords) | ARM block-copy (`stmia`) at `0x2b5bd0` (reached via `bx pc` ARM-mode switch). |
@@ -105,6 +105,21 @@ IRQ 4. It is enough to reach "Insert SIM card", but it is not a complete DSP pee
 No derived response format or receive-ring transition has yet connected this traffic
 to `0x05ea`, task-15 `0x07dd`, or the SIM registration result, so treating the D0 packet
 as that request would be speculation.
+
+### Reachable shared-control commands
+
+The stateful-SIM path calls `0x290cf4` with command `0x30`, then command `0x32`.
+These are bitfield setters, not opaque DSP primitive IDs: their jump-table cases update
+the MCU shadow halfword at `0x110c3a`, and the common tail copies the result to DSP shared
+offset `0xa8`. The observed `0xfff5` argument produces the successive values `0x700c` and
+`0x7004`. Only the second call has payload flag 1; it sets DSP-owned busy word `[0xe0]=1`,
+writes command 4 to DSPIF, and rings doorbell byte 2 at `0x20008`.
+
+IRQ 4 enters `0x291068`. That routine handles the shared service counts at `[0xda]`,
+`[0xe2]`, and `[0xe4]`; it does not parse a command-`0x30`/`0x32` reply payload. A trial which
+exposed `[0xe0]=1` until the existing 5 ms service tick regressed the deep boot, so that delay
+is disproved. The historical idle read override remains until the actual doorbell-completion
+timing is recovered; do not tune a delay merely to reproduce the oracle.
 
 ### Shared packet rings
 

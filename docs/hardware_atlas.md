@@ -110,8 +110,9 @@ and the DSP itself is unemulated. This is where GSM L1 and audio will land. What
 (from the CONTACT-SERVICE work, `service_bootstrap.md` "DSP service-area map"):
 
 - **DSP shared RAM `0x10000–0x10fff`** (`dsp_ram_r` HACK): `0x00..0x24` self-test echo; `0xa4/a6`
-  service status/version; `0xda/e2` lower-service channel counts; `0xe0` busy flag; **`0xe4`
-  lower-service pending counter** (MCU writes `0x0002` at pc `0x290c98`; `MODEL_DSP_SERVICE` drains it
+  service status/version; `0xda/e2` lower-service channel counts; `0xe0` command-busy word
+  (MCU sets; driver currently masks idle, peer timing unresolved); **`0xe4` lower-service
+  pending counter** (MCU writes `0x0002` at pc `0x290c98`; `MODEL_DSP_SERVICE` drains it
   + raises IRQ 4); `0xfe/0x100` ready flags.
 - **DSPIF `0x30000`** (stub → 0): written at boot (`pc 0x2001a4`) and by the reachable service
   command path (`0x290cf4`; command 4 at `0x29103c`, followed by doorbell byte 2). Stateful-SIM
