@@ -98,11 +98,12 @@ dead-end levers from the 000d / startup-march / MMI-idle-force / bootpath digs �
 every one refuted or superseded by a faithful model. Orphaned member vars removed
 with them (`m_mode4_*`, `m_mmi_idle_forced`, dead startup-scaffold step counters).
 
-**Superseded SIM models** (replaced by `MODEL_SIM_CARD`): `MODEL_SIM_FILE`,
+**Superseded SIM models** (historically replaced by `MODEL_SIM_CARD`): `MODEL_SIM_FILE`,
 `MODEL_SIM_LOOP` (+ its `SIM_LOOP_*` sub-knobs), `MODEL_SIM_RESPONDER`. The
 register-level `MODEL_SIM_ATR` + `SIM_PROFILE` stay (entangled with the SIM UART
-register model). `MODEL_SIM_CARD` — a genuine message-layer ATR→PPS→EF-read — is
-the one kept SIM model.
+register model). `MODEL_SIM_CARD` was the retained message-layer research responder at
+this checkpoint. It is now a legacy comparison harness; `nokia_sim_card_device` and
+`NOKI3210_MODEL_SIM_DEVICE` are the intended register/FIQ architecture.
 
 **`TRACE_*` taps thinned 46 → 5.** Kept the ones that document the working boot
 across its layers: `TRACE_CCONT_READ` (power/ADC), `TRACE_LIMP`/`TRACE_LIMP2` (the
@@ -159,8 +160,9 @@ one-off diagnostic taps retired (all git-recoverable):
   `0x4c22` result, `resget` availability `0x2b2588`, the camped-state service snapshot) —
   the resource-content and camped-state threads are bottomed out (docs/interactive_handoff.md).
 
-**Kept for the new approach:** `MODEL_SIM_CARD`'s `sim_apdu` trace (the SIM APDU stream — the
-move-2 tool), the `TRACE_MMIVM` **t6cmd** tap (task-6 display-command stream = the
+**Kept at that checkpoint:** `MODEL_SIM_CARD`'s `sim_apdu` trace (the SIM APDU stream — the
+move-2 tool; now superseded by `TRACE_SIM_RX` on the stateful device), the `TRACE_MMIVM`
+**t6cmd** tap (task-6 display-command stream = the
 "first content-window push" oracle) + the event-stream / `display_idle`-entry taps,
 `TRACE_HANDOFF` (task-1 mode / checklist), `TRACE_TASKS`, `TRACE_CCONT_READ` (incl. RTC),
 `TRACE_CSCMD`, `TRACE_LIMP/LIMP2`, and `POST_READY_KEY` (the key-nav oracle).

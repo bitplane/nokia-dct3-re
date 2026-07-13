@@ -22,6 +22,7 @@
 #include "video/pcd8544.h"
 
 #include "nokia_ccont.h"
+#include "nokia_sim_card.h"
 #include "nokia_service_transport.h"
 
 #include "debugger.h"
@@ -181,6 +182,8 @@ constexpr offs_t FW_STARTUP_SERVICE_READY = FW_STARTUP_SERVICE_BUFFER;  // ready
 constexpr offs_t FW_STARTUP_SERVICE_STATUS = 0x110c2e;                  // service-startup status word (-> 0x8002)
 constexpr offs_t FW_STARTUP_PHASE = 0x112449;                          // startup phase byte (batch-2/task14 gate)
 constexpr unsigned DSP_SVC_PENDING_COUNTER_OFF = 0x0e4;                // DSP-shared RAM byte: lower-service pending count
+constexpr unsigned DSP_MCU_TX_PRODUCER_OFF = 0x0a4;
+constexpr unsigned DSP_MCU_TX_CONSUMER_OFF = 0x0a6;
 constexpr int MAD2_IRQ_LINE_DSP_SERVICE = 4;                          // IRQ line 4 = DSP service-completion interrupt
 constexpr offs_t FW_POWER_STATE = 0x1100d0;
 constexpr offs_t FW_BATTERY_RECORD = 0x110434;
@@ -301,6 +304,7 @@ public:
 		m_flash(*this, "flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
+		m_sim_card(*this, "sim_card"),
 		m_service_transport(*this, "service_transport"),
 		m_pcd8544(*this, "pcd8544"),
 		m_keypad(*this, "COL.%u", 0),
@@ -362,6 +366,7 @@ private:
 	void update_irq_line();
 	void ccont_irq_w(int state);
 	void ccont_power_w(int state);
+	void sim_irq_w(int state);
 	void service_channel_empty_w(int state);
 	bool timer0_compare_due() const;
 	void update_timer0_compare();
@@ -384,6 +389,7 @@ private:
 	required_device<intelfsh16_device> m_flash;
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
+	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<nokia_service_transport_device> m_service_transport;
 	required_device<pcd8544_device> m_pcd8544;
 	required_ioport_array<5> m_keypad;
@@ -414,21 +420,23 @@ private:
 	uint8_t       m_sim_atr[40];
 	uint8_t       m_sim_atr_len = 0;
 	uint8_t       m_sim_atr_pos = 0;
-	uint8_t       m_sim_last_ins = 0;    // FS responder: INS of the last APDU the phone sent (0x2aec34)
-	uint8_t       m_sim_last_cmd[16] = {0}; // FS responder: full bytes of the last command the phone sent
-	uint8_t       m_sim_last_cmdlen = 0; // FS responder: length of m_sim_last_cmd
-	uint8_t       m_sim_card_phase = 0;  // MODEL_SIM_CARD: 0=await ATR, 1=post-ATR (PPS/data)
-	uint32_t      m_sim_card_recv = 0;   // MODEL_SIM_CARD: SIM-task recv count (for ATR delivery timing)
-	bool          m_sim_card_pending = false; // MODEL_SIM_CARD: a command awaits a response (set at 0x2aec34)
-	bool          m_sim_t0_write_data = false; // T=0 outgoing-data phase: procedure ACK sent, awaiting body
-	uint16_t      m_sim_sel_file = 0;    // responder: file id last SELECTed (parsed from a0 a4 command)
-	unsigned      m_ring2_state = 0;     // SIM_CARD_RING2 delivery trampoline state (0 idle, N posting msg N)
-	uint32_t      m_ring2_saved[16];     // regs saved at a ring#2-post trampoline
-	uint32_t      m_ring2_resume = 0;    // address to resume after the ring#2 posts complete
-	uint32_t      m_ring2_msg[4] = {0};  // scratch ptrs of the messages queued to post to ring#2
-	unsigned      m_ring2_nmsg = 0;      // number of messages queued
-	bool          m_ring2_atr_resuming = false;  // per-reset re-entry guard for the ATR trampoline
-	bool          m_ring2_activation_posted = false; // external card-present event posted through real ring#2
+	// Legacy message-layer SIM responder state. Kept temporarily as a comparison
+	// harness while the register/FIQ device becomes the sole supported path.
+	uint8_t       m_sim_last_ins = 0;
+	uint8_t       m_sim_last_cmd[16] = {0};
+	uint8_t       m_sim_last_cmdlen = 0;
+	uint8_t       m_sim_card_phase = 0;
+	uint32_t      m_sim_card_recv = 0;
+	bool          m_sim_card_pending = false;
+	bool          m_sim_t0_write_data = false;
+	uint16_t      m_sim_sel_file = 0;
+	unsigned      m_ring2_state = 0;
+	uint32_t      m_ring2_saved[16];
+	uint32_t      m_ring2_resume = 0;
+	uint32_t      m_ring2_msg[4] = {0};
+	unsigned      m_ring2_nmsg = 0;
+	bool          m_ring2_atr_resuming = false;
+	bool          m_ring2_activation_posted = false;
 	// Request-driven GSM service peer. It remains dormant until firmware registers service 0x0b.
 	bool          m_gsm_service_registered = false;
 	bool          m_gsm_service_enabled = false;
@@ -602,8 +610,9 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      handshake that a blank/peerless boot can't perform, driving the firmware's OWN
 //      code (no result-forcing); all oracle-preserving. The stack that reaches the
 //      "Insert SIM card" home screen: MODEL_DSP_SERVICE, MODEL_CCONT_PRESENT,
-//      MODEL_SVC_RESPONDER, MODEL_SVC_CHANNEL_DRAIN, MODEL_SIM_CARD (+ MODEL_SIM_ATR,
-//      the register-level ATR variant). MODEL_STARTUP_REPORTS feeds the
+//      MODEL_SVC_RESPONDER and MODEL_SVC_CHANNEL_DRAIN. The stateful register/FIQ
+//      SIM is selected separately with MODEL_SIM_DEVICE; MODEL_SIM_CARD is a
+//      legacy message-layer comparison harness. MODEL_STARTUP_REPORTS feeds the
 //      subsystem-ready reports that drive the post-SIM interactive handoff (code-7
 //      trigger + mode-4 checklist + VBAT-confirm), advancing task 1 mode 4 -> 0xc;
 //      docs/interactive_handoff.md. See docs/service_bootstrap.md,
@@ -615,8 +624,9 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      TRACE_TASKS (app-task liveness + inter-task message edges), TRACE_MMIVM (the MMI VM
 //      / task-5 event stream + display_idle entry + t6cmd = the task-6 display-command
 //      stream; the "first content-window push" oracle for the SIM-lifecycle work).
-//      The SIM APDU stream the phone sends is logged by MODEL_SIM_CARD (sim_apdu). Retired
-//      forcing shims and one-off traces: docs/removed_forcing_knobs.md.
+//      TRACE_SIM_RX covers the register/FIQ/APDU path and SIM reply milestones;
+//      TRACE_DSP_BOUNDARY and TRACE_GSM_LOWER cover the current peer boundary.
+//      Retired forcing shims and one-off traces: docs/removed_forcing_knobs.md.
 //
 // The forcing/model logic is quarantined in flash_firmware_hooks / ram_*_firmware_*
 // (banner'd "NOT hardware behaviour"); see docs/driver_structure.md.
@@ -734,6 +744,18 @@ void noki3310_state::machine_reset()
 	}
 	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
 	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0);
+	m_sim_card->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", 0) != 0);
+	{
+		u8 atr[40] = { 0x3b, 0x10, 0x05 };
+		unsigned length = 3;
+		if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
+		{
+			length = 0;
+			for (const char *p = hex; p[0] && p[1] && length < std::size(atr); p += 2)
+				atr[length++] = u8(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
+		}
+		m_sim_card->set_atr(atr, length);
+	}
 	m_service_transport->configure(
 			nokia_env_u32("NOKI3210_MODEL_SVC_RESPONDER", 0) != 0,
 			nokia_env_u32("NOKI3210_MODEL_SVC_CHANNEL_DRAIN", 0) != 0,
@@ -859,6 +881,12 @@ void noki3310_state::ccont_power_w(int state)
 {
 	if (!state)
 		m_maincpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
+}
+
+void noki3310_state::sim_irq_w(int state)
+{
+	if (state)
+		assert_fiq(6);
 }
 
 uint8_t noki3310_state::keypad_irq_state() const
@@ -1271,25 +1299,12 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 {
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
-	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && address == 0x0011fcc2)
-		logerror("gsm_lower: service5-state write pc=%08x data=%04x mask=%04x old=%04x t=%.4f\n",
-				pc & ~u32(1), data, mem_mask, m_ram[offset], machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && address == 0x0011fcce)
-		logerror("gsm_lower: callback-index write pc=%08x data=%04x mask=%04x old=%04x event=%04x ctl=%02x/%02x/%02x t=%.4f\n",
-				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_word(0x00110f14),
-				fw_byte(0x00111930), fw_byte(0x00111931), fw_byte(0x00111932), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && address == 0x0011ff40)
 		logerror("gsm_lower: startup-mode write pc=%08x data=%04x mask=%04x old=%04x t=%.4f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && address == 0x0010fe72)
 		logerror("gsm_lower: task15-proto write pc=%08x data=%04x mask=%04x old=%04x t=%.4f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 &&
-			((address >= 0x00110a18 && address < 0x00110a60) ||
-			 (address >= 0x00110f1c && address < 0x00110f30)))
-		logerror("gsm_lower: provider-state write pc=%08x addr=%08x data=%04x mask=%04x old=%04x task=%02x t=%.4f\n",
-				pc & ~u32(1), u32(address), data, mem_mask, m_ram[offset], fw_byte(0x00100022),
-				machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_TASK5_REG", 0) != 0 && address == 0x00111c86)
 		logerror("task5reg: WRITE [111c86/87] <- %04x mask=%04x pc=%08x t=%.4f\n",
 				data, mem_mask, pc & ~u32(1), machine().time().as_double());
@@ -1389,6 +1404,35 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
 	// wall-clock-gated EXPERIMENT_DSP_IRQ4 pulse, now causally anchored to the DSP being
 	// given work and draining real DSP RAM. See docs/service_bootstrap.md.
 	m_dsp_ram[DSP_SVC_PENDING_COUNTER_OFF >> 1] = 0;
+	// The MCU owns the producer index for the 0x000..0x0a2 transmit ring;
+	// the DSP owns the consumer index. Processing queued work releases every
+	// complete packet currently visible to the peer, without manufacturing an
+	// inbound payload.
+	if (nokia_env_u32("NOKI3210_MODEL_DSP_RING_DRAIN", 0) != 0)
+	{
+		unsigned cursor = m_dsp_ram[DSP_MCU_TX_CONSUMER_OFF >> 1] % 0x52;
+		const unsigned producer = m_dsp_ram[DSP_MCU_TX_PRODUCER_OFF >> 1] % 0x52;
+		while (cursor != producer)
+		{
+			const uint16_t header = m_dsp_ram[cursor];
+			const unsigned payload_bytes = header >> 8;
+			const unsigned words = (payload_bytes + 3) / 2;
+			const unsigned available = producer >= cursor ? producer - cursor : 0x52 - cursor + producer;
+			if (words == 0 || words > available)
+				break;
+
+			if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+			{
+				logerror("dsp_boundary: TX packet type=%02x payload=%u words=%u ring=%02x data=",
+						header & 0xff, payload_bytes, words, cursor);
+				for (unsigned i = 0; i < std::min(words, 12U); i++)
+					logerror("%s%04x", i ? " " : "", m_dsp_ram[(cursor + i) % 0x52]);
+				logerror("%s t=%.6f\n", words > 12 ? " ..." : "", machine().time().as_double());
+			}
+			cursor = (cursor + words) % 0x52;
+		}
+		m_dsp_ram[DSP_MCU_TX_CONSUMER_OFF >> 1] = cursor;
+	}
 	assert_irq(MAD2_IRQ_LINE_DSP_SERVICE);
 	m_timer_dsp_service->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", 5)));
 }
@@ -1418,12 +1462,34 @@ uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 			(m_dsp_ram[0x01c8 >> 1] < 0x0080 || m_dsp_ram[0x01ca >> 1] < 0x0080))
 		return 0x01;
 
-	return m_dsp_ram[offset & 0x7ff];
+	const u16 value = m_dsp_ram[offset & 0x7ff];
+	const u32 byte_offset = (offset & 0x7ff) << 1;
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
+			(byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
+			 byte_offset == 0x1c8 || byte_offset == 0x1ca))
+	{
+		static unsigned count = 0;
+		if (count++ < 1024)
+			logerror("dsp_boundary: RAM R off=%03x data=%04x pc=%08x task=%02x t=%.6f\n",
+					byte_offset, value, m_maincpu->pc() & ~u32(1),
+					fw_byte(0x00100022), machine().time().as_double());
+	}
+	return value;
 }
 
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	COMBINE_DATA(&m_dsp_ram[offset & 0x7ff]);
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+	{
+		static unsigned count = 0;
+		// Skip the power-on DSP program upload; this probe is for live mailbox traffic.
+		const u32 writer = m_maincpu->pc() & ~u32(1);
+		if (writer != 0x00290a96 && writer != 0x00290ab6 && writer != 0x00290ba6 && count++ < 2048)
+			logerror("dsp_boundary: RAM W off=%03x data=%04x mask=%04x pc=%08x task=%02x t=%.6f\n",
+					u32((offset & 0x7ff) << 1), data, mem_mask, writer,
+					fw_byte(0x00100022), machine().time().as_double());
+	}
 
 	// DSP service-completion model (opt-in): when the MCU queues lower-service work by
 	// writing a non-zero count to the pending counter (byte 0xe4, pc 0x290c98), the real
@@ -1444,6 +1510,36 @@ void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 // ============================================================================
 std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 pc, u32 addr, uint16_t mem_mask)
 {
+	if (pc == addr && addr == 0x00290cf4 && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("dsp_boundary: service-command command=%08x arg=%08x payload=%08x caller=%08x "
+				"task=%02x t=%.6f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				fw_byte(0x00100022), machine().time().as_double());
+	if (pc == addr && addr == 0x0028d710 && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("dsp_boundary: gsm-l1-update caller=%08x task=%02x t=%.6f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				fw_byte(0x00100022), machine().time().as_double());
+	if (pc == addr && (addr == 0x002a1c88 || addr == 0x002a1ea6) &&
+			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("dsp_boundary: l1-state-input pc=%08x r0=%08x r1=%08x caller=%08x task=%02x t=%.6f\n",
+				addr, m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				fw_byte(0x00100022), machine().time().as_double());
+	if (pc == addr && addr == 0x00291028 && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("dsp_boundary: service-update r0=%08x r1=%08x r2=%08x r3=%08x caller=%08x "
+				"a8=%04x ac=%04x ae=%04x b6=%04x bc=%04x task=%02x t=%.6f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R3),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				m_dsp_ram[0x0a8 >> 1], m_dsp_ram[0x0ac >> 1], m_dsp_ram[0x0ae >> 1],
+				m_dsp_ram[0x0b6 >> 1], m_dsp_ram[0x0bc >> 1], fw_byte(0x00100022),
+				machine().time().as_double());
 	// ========================================================================
 	// MODEL: node-0x18 service responder (opt-in, NOKI3210_MODEL_SVC_RESPONDER).
 	// The contact-service completes when it receives a message {[3]=0x40,[8]=0x64,
@@ -1537,16 +1633,120 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (tid < 31 && !(seen & (1u << tid)))
 		{
 			seen |= (1u << tid);
-			logerror("task_alive: task %2u first recv t=%.4f\n", tid, machine().time().as_double());
+			logerror("task_alive: task %2u first recv caller=%08x t=%.4f\n", tid,
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
 		}
 	}
-	// TRACE_TASKS post-flow: inter-task messages during the handoff/stall (from=[0x100022] -> mailbox r0,
-	// code r1), deduped by (from,to,code). Maps the message protocol so the missing handshake stands out.
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a03b4)
+	{
+		static unsigned sim_rx_count = 0;
+		if (sim_rx_count++ < 64)
+			logerror("sim_rx_isr: irq=%04x fiq=%04x byte=%02x state=%02x remaining=%04x received=%04x t=%.8f\n",
+					m_irq_status, m_fiq_status, debug_ram_byte(0x001106c4),
+					debug_ram_byte(0x001106d4), debug_ram_word(0x001106d6),
+					debug_ram_word(0x001106d8), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a04c8)
+	{
+		static unsigned sim_irq_count = 0;
+		if (sim_irq_count++ < 32)
+			logerror("sim_irq_dispatch: irq=%04x fiq=%04x fifo=%02x control=%02x t=%.8f\n",
+					m_irq_status, m_fiq_status, m_sim_card->rx_count_r(),
+					debug_ram_byte(0x001106c3), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr &&
+			(addr == 0x0027e240 || addr == 0x002902ac || addr == 0x00293f30 ||
+			 addr == 0x00207234 || addr == 0x0020733c || addr == 0x0027e046 ||
+			 addr == 0x0027e98c || addr == 0x002a0218 || addr == 0x002a0060 ||
+			 addr == 0x002a02e6 || addr == 0x002a0268 || addr == 0x002a0336))
+	{
+		static unsigned sim_contract_count = 0;
+		if (sim_contract_count++ < 256)
+			logerror("sim_contract: pc=%08x r0=%08x r1=%08x r2=%08x task=%02x enable=%02x t=%.8f\n",
+					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)),
+					debug_ram_byte(0x00100022), debug_ram_byte(0x00111c79),
+					machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x0027ee94)
+	{
+		static unsigned sim_procedure_count = 0;
+		const u32 r9 = m_maincpu->state_int(arm7_cpu_device::ARM7_R9);
+		const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
+		const u32 command = fw_dword(sp + 0x30);
+		const u32 reply = fw_dword(sp + 0x34);
+		if (sim_procedure_count++ < 128)
+			logerror("sim_procedure: r9=%08x proc=%02x command=%08x ins=%02x command_len=%04x reply=%08x reply_len=%04x t=%.8f\n",
+					r9, debug_ram_byte(r9), command, debug_ram_byte(command + 6),
+					debug_ram_word(command + 2), reply, debug_ram_word(reply + 2),
+					machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x0027df10)
+	{
+		static unsigned sim_recv_count = 0;
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (sim_recv_count++ < 256 && msg >= NOKIA_RAM_BASE && msg + 8 < NOKIA_RAM_END)
+			logerror("sim_recv: msg=%08x code=%02x len=%04x bytes=%02x %02x %02x task=%02x lr=%08x sp=%08x t=%.8f\n",
+					msg, debug_ram_byte(msg + 4), debug_ram_word(msg + 2),
+					debug_ram_byte(msg + 5), debug_ram_byte(msg + 6), debug_ram_byte(msg + 7),
+					debug_ram_byte(0x00100022),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R13)), machine().time().as_double());
+		else if (sim_recv_count <= 256)
+			logerror("sim_recv_static: msg=%08x task=%02x t=%.8f\n", msg,
+					debug_ram_byte(0x00100022), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x0027defc)
+	{
+		static unsigned sim_recv_entry_count = 0;
+		if (sim_recv_entry_count++ < 256)
+			logerror("sim_recv_entry: lr=%08x r0=%08x r1=%08x sp=%08x task=%02x t=%.8f\n",
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R13)),
+					debug_ram_byte(0x00100022), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x0027ebc0)
+	{
+		const u32 manager = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		logerror("sim_atr_result: result=%02x atr_len=%04x state=%02x manager=%08x fields=%02x/%02x/%02x/%02x/%02x t=%.8f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xff,
+				debug_ram_word(0x0010dddc), debug_ram_byte(0x001106c0), manager,
+				debug_ram_byte(manager + 0xa), debug_ram_byte(manager + 0xb),
+				debug_ram_byte(manager + 0xc), debug_ram_byte(manager + 0xd),
+				debug_ram_byte(manager + 0x10), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a04b6)
+	{
+		const u32 msg = (u32(debug_ram_word(0x001106cc)) << 16) |
+				debug_ram_word(0x001106ce);
+		logerror("sim_rx_complete: msg=%08x code=%02x len=%04x mode=%02x remaining=%04x received=%04x t=%.8f\n",
+				msg, debug_ram_byte(msg + 4), debug_ram_word(msg + 2),
+				debug_ram_byte(0x001106d4), debug_ram_word(0x001106d6),
+				debug_ram_word(0x001106d8), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a04be)
+		logerror("sim_rx_post_result: r0=%08x task=%02x t=%.8f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+				debug_ram_byte(0x00100022), machine().time().as_double());
+	// TRACE_TASKS post-flow: inter-task messages during the handoff/stall. r1 is a message pointer;
+	// decode its status instead of treating the allocation address as a protocol code.
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && (addr == 0x0026a354 || addr == 0x0026a204))
 	{
 		const u32 from = debug_ram_byte(0x00100022);
 		const u32 to = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
-		const u32 code = m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff;
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const bool ram_msg = msg >= NOKIA_RAM_BASE && msg + 32 <= NOKIA_RAM_END;
+		const bool flash_msg = msg >= 0x00200000 && msg + 32 <= 0x00400000;
+		const bool readable_msg = ram_msg || flash_msg;
+		auto message_byte = [&](u32 address) {
+			return ram_msg ? fw_byte(address) : m_maincpu->space(AS_PROGRAM).read_byte(address);
+		};
+		const u16 status = ram_msg ? fw_word(msg) :
+				(flash_msg ? m_maincpu->space(AS_PROGRAM).read_word(msg) : 0xffff);
 		static u32 seen[64]; static unsigned n = 0; static u32 total = 0;
 		total++;
 		const u32 kv = (from << 8) | to;   // dedup by communication EDGE (codes are per-message seq ids)
@@ -1554,10 +1754,53 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (!dup && n < 64)
 		{
 			seen[n++] = kv;
-			logerror("msgedge: t%u -> t%u (first code=%04x) t=%.4f\n", from, to, code, machine().time().as_double());
+			logerror("msgedge: t%u -> t%u (first status=%04x msg=%08x) t=%.4f\n",
+					from, to, status, msg, machine().time().as_double());
+		}
+		if ((from == 5 || from == 15 || from == 16 || from == 17 || from == 20 || from == 21 ||
+				to == 5 || to == 15 || to == 16 || to == 17 || to == 20 || to == 21) && readable_msg)
+		{
+			static unsigned provider_posts = 0;
+			static unsigned task17_posts = 0;
+			static unsigned task5_posts = 0;
+			const bool task17_edge = from == 17 || to == 17;
+			const bool task5_edge = from == 5 || to == 5;
+			const bool log_post = task17_edge ? task17_posts++ < 256 :
+				(task5_edge ? task5_posts++ < 256 : provider_posts++ < 128);
+			if (log_post)
+				logerror("sim_owner_post: t%u -> t%u status=%04x msg=%08x caller=%08x bytes="
+						"%02x %02x %02x %02x %02x %02x %02x %02x "
+						"%02x %02x %02x %02x %02x %02x %02x %02x t=%.4f\n",
+						from, to, status, msg,
+						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+						message_byte(msg + 0), message_byte(msg + 1), message_byte(msg + 2), message_byte(msg + 3),
+						message_byte(msg + 4), message_byte(msg + 5), message_byte(msg + 6), message_byte(msg + 7),
+						message_byte(msg + 8), message_byte(msg + 9), message_byte(msg + 10), message_byte(msg + 11),
+						message_byte(msg + 12), message_byte(msg + 13), message_byte(msg + 14), message_byte(msg + 15),
+						machine().time().as_double());
 		}
 		if ((total % 2000) == 0)
 			logerror("msgrate: %u posts by t=%.4f (protocol still active)\n", total, machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00221d74)
+		logerror("sim_owner_event: task17 build status=%04x caller=%08x state=%02x/%02x/%02x/%02x t=%.4f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+				fw_byte(0x0010fca8), fw_byte(0x0010fca9), fw_byte(0x0010fcaa), fw_byte(0x0010fcba),
+				machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00225c9c)
+		logerror("sim_owner_phase_rx: status=%04x latch=%02x phase=%02x/%02x t=%.4f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
+				fw_byte(0x0010fcb4), fw_byte(0x0010fca9), fw_byte(0x0010fcba),
+				machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00251c2a)
+	{
+		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		logerror("sim_owner_043c: caller=%08x msg=%08x bytes=%02x %02x %02x %02x %02x %02x %02x %02x t=%.4f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1), msg,
+				fw_byte(msg), fw_byte(msg + 1), fw_byte(msg + 2), fw_byte(msg + 3),
+				fw_byte(msg + 4), fw_byte(msg + 5), fw_byte(msg + 6), fw_byte(msg + 7),
+				machine().time().as_double());
 	}
 	// TRACE_MMIVM: task 6 (display manager 0x297fc4) post-recv 0x29800c. r0 = message; [r0+5] = display
 	// command byte (dispatched by the subtract-cascade at 0x298026). Shows which display/content-draw
@@ -2030,7 +2273,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					// here makes the firmware terminate on code 0x0b and leaves SW1/SW2 stale.
 					// At this ring#2 boundary the UART RX engine has already consumed any
 					// card-to-terminal procedure byte and accumulated data through SW1/SW2.
-					queue_procedure = p3 != 0;
 					if (m_sim_last_ins == 0xf2 && p3 == 0)
 					{
 						data[n++] = 0x90; data[n++] = 0x00;
@@ -2064,7 +2306,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				}
 				else if (m_sim_last_ins == 0xb0 || m_sim_last_ins == 0xb2)
 				{
-					queue_procedure = true;
 					unsigned p3 = m_sim_last_cmdlen >= 5 && m_sim_last_cmd[4] ? m_sim_last_cmd[4] : (efsize ? efsize : 8);
 					for (unsigned i = 0; i < p3 && n < sizeof(data) - 2; i++) data[n++] = sim_ef_byte(fid, i);
 					data[n++] = 0x90; data[n++] = 0x00;
@@ -2310,6 +2551,26 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		logerror("gsm_lower: channel-manager pc=%08x status=%04x caller=%08x state=%02x/%02x pending=%08x t=%.4f\n",
 				addr, status, caller, fw_byte(0x0010fca8), fw_byte(0x0010fca9),
 				fw_dword(0x0010fce4), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x002860f6 || addr == 0x002862f0))
+	{
+		const u32 request = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 descriptor = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		char bytes[160] = {};
+		unsigned used = 0;
+		if (descriptor >= NOKIA_RAM_BASE && descriptor + 32 <= NOKIA_RAM_END)
+			for (unsigned i = 0; i < 32 && used + 4 < sizeof(bytes); i++)
+				used += std::snprintf(bytes + used, sizeof(bytes) - used, "%02x%s",
+						fw_byte(descriptor + i), i == 31 ? "" : " ");
+		else
+			std::snprintf(bytes, sizeof(bytes), "<%08x>", descriptor);
+		logerror("gsm_lower: resource-send pc=%08x request=%08x descriptor=%08x completion=%04x "
+				"caller=%08x task=%02x bytes=[%s] t=%.4f\n",
+				addr, request, descriptor,
+				addr == 0x002860f6 ? m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xffff : 0x0578,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
+				bytes, machine().time().as_double());
+	}
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
 			(addr == 0x0026e764 || addr == 0x0026e7ae))
@@ -2361,19 +2622,156 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x002af798)
 	{
 		const u16 status = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff;
-		if ((status >= 0x0100 && status <= 0x017f) || (status >= 0x0570 && status <= 0x05a0))
-			logerror("gsm_lower: lower-status status=%04x argc=%u r1=%08x r2=%08x r3=%08x caller=%08x task=%02x t=%.4f\n",
-					status, (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) >> 14) & 3,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R1), m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R3),
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
+		const u32 caller = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		const u32 argument = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		static unsigned object_count = 0;
+		const bool relevant_object = status == 0x05dc || status == 0x05e8 || status == 0x05ea ||
+				status == 0x0aa0 || status == 0x1518;
+		if (relevant_object && object_count < 80 &&
+				argument >= NOKIA_RAM_BASE && argument + 16 <= NOKIA_RAM_END)
+		{
+			object_count++;
+			logerror("gsm_lower: status-object status=%04x argc=%u argument=%08x "
+					"words=%08x/%08x/%08x/%08x caller=%08x task=%02x t=%.4f\n",
+					status, (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) >> 14) & 3, argument,
+					fw_dword(argument), fw_dword(argument + 4), fw_dword(argument + 8),
+					fw_dword(argument + 12), caller, fw_byte(0x00100022),
 					machine().time().as_double());
+		}
+		if (status == 0x05e0)
+			logerror("gsm_lower: selector-append selector=%08x r2=%08x r3=%08x caller=%08x task=%02x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R3), caller,
+					fw_byte(0x00100022), machine().time().as_double());
 	}
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x0024df28)
+	{
+		char slots[320] = {};
+		unsigned used = 0;
+		for (unsigned slot = 0; slot < 4; slot++)
+		{
+			const u32 base = 0x0010ea20 + slot * 0x20;
+			used += std::snprintf(slots + used, sizeof(slots) - used, "%s%u:", slot ? " " : "", slot);
+			for (unsigned byte = 0; byte < 8 && used + 4 < sizeof(slots); byte++)
+				used += std::snprintf(slots + used, sizeof(slots) - used, "%02x", fw_byte(base + byte));
+		}
+		logerror("gsm_lower: active-slot-scan slots=[%s] caller=%08x t=%.4f\n", slots,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x0024d588 || addr == 0x0024d6ee))
+	{
+		static unsigned context_arbiter_count = 0;
+		if (context_arbiter_count++ < 80)
+		{
+			char slots[384] = {};
+			unsigned used = 0;
+			for (unsigned slot = 0; slot < 4; slot++)
+			{
+				const u32 base = 0x0010ea20 + slot * 0x20;
+				used += std::snprintf(slots + used, sizeof(slots) - used,
+						"%s%u:%02x/%02x/%02x/%02x/%02x/%02x/%02x/%02x",
+						slot ? " " : "", slot + 1, fw_byte(base), fw_byte(base + 2),
+						fw_byte(base + 3), fw_byte(base + 5), fw_byte(base + 6),
+						fw_byte(base + 8), fw_byte(base + 0x1c), fw_byte(base + 0x1f));
+			}
+			logerror("gsm_lower: context-arbiter pc=%08x globals=%02x/%02x/%02x state=%02x/%02x/%02x slots=[%s] caller=%08x t=%.4f\n",
+					addr, fw_byte(0x0010e898), fw_byte(0x0010e899), fw_byte(0x0010e89a),
+					fw_byte(0x0011fcc4), fw_byte(0x0011fcc5), fw_byte(0x0011fcc6), slots,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+		}
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x0029992c)
+		logerror("gsm_lower: callback-07 status=%04x selected=%02x caller=%08x t=%.4f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, fw_byte(0x0011fcce),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x00299bda)
+		logerror("gsm_lower: callback-07 constructor-object object=%08x slot=%08x current=%02x caller=%08x t=%.4f\n",
+				fw_dword(0x00110f20), fw_dword(0x001120e4), fw_byte(0x0011fcce),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x0026e620 || addr == 0x0026e6aa || addr == 0x0026e466 || addr == 0x002862f0))
+		logerror("gsm_lower: service30 pc=%08x status=%04x selector=%08x descriptor=%08x type=%02x "
+				"session=%08x request=%08x caller=%08x t=%.4f\n",
+				addr, m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+				fw_dword(0x00110f1c), fw_dword(0x00110f20), fw_byte(0x00110f27),
+				fw_dword(0x001113c0), fw_dword(0x001113c4),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x0026dd38 || addr == 0x0026dbd6 || addr == 0x0026dcfc))
+		logerror("gsm_lower: nv-provider79 pc=%08x status=%04x selector=%08x descriptor=%08x type=%02x "
+				"variant=%02x session=%08x caller=%08x t=%.4f\n",
+				addr, m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+				fw_dword(0x00110f1c), fw_dword(0x00110f20), fw_byte(0x00110f27),
+				fw_byte(0x001113d0), fw_dword(0x001113a4),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x0029ea48)
 		logerror("gsm_lower: af-unavailable caller=%08x task=%02x mode=%02x flags=%02x/%02x/%02x state=%02x/%02x t=%.4f\n",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
 				fw_byte(0x00110f1f), fw_byte(0x0011fd20), fw_byte(0x00111aa8), fw_byte(0x00111aaa),
 				fw_byte(0x00111aa9), fw_byte(0x00111adc), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x00253f2c || addr == 0x00255df0))
+	{
+		static unsigned count = 0;
+		if (count++ < 180)
+			logerror("gsm_lower: callback-walk pc=%08x status=%04x selector=%08x object=%08x current=%02x "
+					"ctl=%02x/%02x/%02x caller=%08x task=%02x t=%.4f\n",
+					addr, m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+					fw_dword(0x00110f1c), fw_dword(0x00110f20), fw_byte(0x0011fcce), fw_byte(0x00111930),
+					fw_byte(0x00111931), fw_byte(0x00111932),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
+					machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x00258570 || addr == 0x0028d310 || addr == 0x0028cfec || addr == 0x00283db6))
+	{
+		static unsigned count = 0;
+		if (count++ < 180)
+		{
+			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			logerror("gsm_lower: resource-b1 pc=%08x r0=%08x r1=%08x r2=%08x r3=%08x "
+					"category=%02x state=%02x/%02x caller=%08x task=%02x "
+					"msg=%04x/%02x/%02x/%02x/%02x/%02x/%02x t=%.4f\n",
+					addr, m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R3), fw_byte(0x00110f1f),
+					fw_byte(0x00110fb8), fw_byte(0x00110fbf),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
+					msg >= NOKIA_RAM_BASE && msg + 8 <= NOKIA_RAM_END ? fw_word(msg) : 0xffff,
+					msg >= NOKIA_RAM_BASE && msg + 8 <= NOKIA_RAM_END ? fw_byte(msg + 2) : 0xff,
+					msg >= NOKIA_RAM_BASE && msg + 8 <= NOKIA_RAM_END ? fw_byte(msg + 3) : 0xff,
+					msg >= NOKIA_RAM_BASE && msg + 8 <= NOKIA_RAM_END ? fw_byte(msg + 4) : 0xff,
+					msg >= NOKIA_RAM_BASE && msg + 8 <= NOKIA_RAM_END ? fw_byte(msg + 5) : 0xff,
+					msg >= NOKIA_RAM_BASE && msg + 8 <= NOKIA_RAM_END ? fw_byte(msg + 6) : 0xff,
+					msg >= NOKIA_RAM_BASE && msg + 8 <= NOKIA_RAM_END ? fw_byte(msg + 7) : 0xff,
+					machine().time().as_double());
+		}
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x002a9ea6)
+	{
+		static unsigned count = 0;
+		if (count++ < 120)
+		{
+			const u32 frame = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+			const u32 length = m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xffff;
+			char bytes[256] = {};
+			unsigned used = 0;
+			if (frame >= NOKIA_RAM_BASE && frame + std::min<u32>(length, 64) <= NOKIA_RAM_END)
+				for (unsigned i = 0; i < std::min<u32>(length, 64) && used + 4 < sizeof(bytes); i++)
+					used += std::snprintf(bytes + used, sizeof(bytes) - used, "%02x%s", fw_byte(frame + i),
+							i + 1 == std::min<u32>(length, 64) ? "" : " ");
+			else
+				std::snprintf(bytes, sizeof(bytes), "<%08x/%u>", frame, length);
+			logerror("gsm_lower: service-frame-send queue=%08x frame=%08x length=%u bytes=[%s] "
+					"caller=%08x task=%02x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0), frame, length, bytes,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
+					machine().time().as_double());
+		}
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
 			(addr == 0x0029ea80 || addr == 0x0029ec52 || addr == 0x002a0e04))
 		logerror("gsm_lower: network-dispatch pc=%08x input=%04x r1=%08x state=%02x/%02x/%02x flags=%02x/%02x caller=%08x t=%.4f\n",
@@ -2393,8 +2791,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			(addr == 0x0026a204 || addr == 0x0026a354 || addr == 0x0026a95c))
 	{
 		const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		if (msg >= NOKIA_RAM_BASE && msg + 16 <= NOKIA_RAM_END &&
+				(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff) == 5 &&
+				fw_word(msg) >= 0x0100 && fw_word(msg) <= 0x013f)
+			logerror("gsm_lower: selector-post status=%04x from=%02x via=%08x msg=%08x "
+					"args=%08x/%08x/%08x caller=%08x t=%.4f\n",
+					fw_word(msg), fw_byte(0x00100022), addr, msg,
+					fw_dword(msg + 4), fw_dword(msg + 8), fw_dword(msg + 12),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+					machine().time().as_double());
 		if (msg >= NOKIA_RAM_BASE && msg + 12 <= NOKIA_RAM_END &&
-				(fw_word(msg) == 0x05dc || fw_word(msg) == 0x05ea))
+				(fw_word(msg) == 0x05dc || fw_word(msg) == 0x05e8 || fw_word(msg) == 0x05ea))
 			logerror("gsm_lower: post status=%04x to=%02x via=%08x msg=%08x object=%08x class=%02x caller=%08x t=%.4f\n",
 					fw_word(msg),
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff, addr, msg,
@@ -2472,20 +2879,35 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		logerror("gsm_lower: task15-result pc=%08x status=%04x proto=%02x object=%08x t=%.4f\n",
 				addr, m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
 				fw_byte(0x0010fe73), m_maincpu->state_int(arm7_cpu_device::ARM7_R4), machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x002ac3f2)
-	{
-		static unsigned n = 0;
-		if (n++ < 120) logerror("gsm_lower: callback-engine enter status=%04x index=%02x ctl=%02x/%02x/%02x queue=%02x/%02x t=%.4f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
-				fw_byte(0x0011fcce), fw_byte(0x00111930), fw_byte(0x00111931), fw_byte(0x00111932),
-				fw_byte(0x00111938), fw_byte(0x00111939), machine().time().as_double());
-	}
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x002ac5cc)
-		logerror("gsm_lower: constructor-select index=%02x state=%02x callback=%08x flags=%08x t=%.4f\n",
+	{
+		const u32 descriptor = fw_dword(0x00111f20);
+		logerror("gsm_lower: constructor-select index=%02x state=%02x callback=%08x flags=%08x "
+				"descriptor=%08x type=%02x words=%04x/%04x/%04x/%04x t=%.4f\n",
 				fw_byte(0x0011fcce), fw_byte(0x0011fcc3),
 				m_maincpu->space(AS_PROGRAM).read_dword(0x002db720 + fw_byte(0x0011fcce) * 8),
 				m_maincpu->space(AS_PROGRAM).read_dword(0x002db724 + fw_byte(0x0011fcce) * 8),
+				descriptor, fw_byte(0x00111f27),
+				descriptor >= NOKIA_RAM_BASE && descriptor + 8 <= NOKIA_RAM_END ? fw_word(descriptor) : 0xffff,
+				descriptor >= NOKIA_RAM_BASE && descriptor + 8 <= NOKIA_RAM_END ? fw_word(descriptor + 2) : 0xffff,
+				descriptor >= NOKIA_RAM_BASE && descriptor + 8 <= NOKIA_RAM_END ? fw_word(descriptor + 4) : 0xffff,
+				descriptor >= NOKIA_RAM_BASE && descriptor + 8 <= NOKIA_RAM_END ? fw_word(descriptor + 6) : 0xffff,
 				machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x002ac4ca || addr == 0x002ac4ce || addr == 0x002ac6b0))
+	{
+		const u32 selector = m_maincpu->state_int(arm7_cpu_device::ARM7_R11);
+		logerror("gsm_lower: callback-switch pc=%08x input=%04x current=%02x selector=%08x "
+				"selector-words=%08x/%08x r0=%08x r1=%08x r7=%08x t=%.4f\n",
+				addr, m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xffff,
+				fw_byte(0x0011fcce), selector,
+				selector >= NOKIA_RAM_BASE && selector + 8 <= NOKIA_RAM_END ? fw_dword(selector) : 0xffffffff,
+				selector >= NOKIA_RAM_BASE && selector + 8 <= NOKIA_RAM_END ? fw_dword(selector + 4) : 0xffffffff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R7), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x002ac65e)
 	{
 		const u8 index = fw_byte(0x0011fcce);
@@ -2510,18 +2932,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
 	}
-	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == 0x002ac65a &&
-			addr >= 0x002ac658 && addr <= 0x002ac65c)
-	{
-		static unsigned n = 0;
-		const u32 state = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
-		const u8 index = (state >= NOKIA_RAM_BASE && state + 4 <= NOKIA_RAM_END) ? fw_byte(state + 3) : 0xff;
-		if (n++ < 240) logerror("gsm_lower: framework callback status=%04x index=%02x callback=%08x flags=%08x queue=%02x stateptr=%08x t=%.4f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xffff,
-				index, index < 0x50 ? fw_dword(0x002db720 + index * 8) : 0,
-				index < 0x50 ? fw_dword(0x002db724 + index * 8) : 0, fw_byte(0x00111931), state,
-				machine().time().as_double());
-	}
 	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x002af798 &&
 			((m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff) == 0x05dc ||
 			 (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff) == 0x05f3))
@@ -2529,6 +2939,17 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
 				machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr && addr == 0x002af798 &&
+			((m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff) == 0x0aa0 ||
+			 (m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff) == 0x1518))
+	{
+		logerror("gsm_lower: registration-chain packed=%04x status=%04x source=%08x caller=%08x task=%02x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0x1fff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_byte(0x00100022),
+					machine().time().as_double());
+	}
 	// Generic service framework boundary used by the GSM peer. 0x2632fc installs a 0x1c-byte
 	// callback record, 0x263154 establishes its registered transaction, and 0x2635ac completes it.
 	// The model only arms from firmware-originated service-0x0b registration; it never creates that
@@ -2556,7 +2977,7 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 				const u16 event = fw_word(descriptor + 0x10);
 				const u16 callback = fw_word(descriptor + 0x12);
 				if ((event >= 0x197f && event <= 0x198b) || (callback >= 0x197f && callback <= 0x198b) ||
-						callback == 0x0136 || callback == 0x0139 || callback == 0x013a)
+						callback == 0x0136 || callback == 0x0139 || callback == 0x013a || callback == 0x1518)
 					logerror("gsm_lower: nv-family register service=%02x ordinal=%02x descriptor=%08x event=%04x callback=%04x flags=%04x/%04x caller=%08x t=%.4f\n",
 							reg(0) & 0xff, reg(1) & 0xff, descriptor, event, callback,
 							fw_word(descriptor + 0x14), fw_word(descriptor + 0x16),
@@ -2680,6 +3101,26 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					addr, reg(0), reg(1), reg(2), reg(3), machine().time().as_double());
 		}
 	}
+	// Observe organic resource-manager requests independently of the provisional GSM-service
+	// responder.  Callback 0x2f uses this API after its natural constructor, before any service-5
+	// or service-30 transaction exists, so gating it on m_gsm_service_registered hid the producer
+	// traffic that can identify the missing lower peer.
+	if (nokia_env_u32("NOKI3210_TRACE_GSM_LOWER", 0) != 0 && pc == addr &&
+			(addr == 0x002430de || addr == 0x00243550 || addr == 0x00243646 || addr == 0x0024383c ||
+			 addr == 0x0024387a || addr == 0x002438e8 || addr == 0x00243180))
+	{
+		static unsigned resource_api_count = 0;
+		const u32 resource = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0));
+		if ((addr != 0x002430de || resource == 0x67) && resource_api_count++ < 256)
+			logerror("gsm_lower: resource-api pc=%08x r0=%08x r1=%08x r2=%08x r3=%08x caller=%08x task=%02x t=%.4f\n",
+					addr,
+					resource,
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R3)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					fw_byte(0x00100022), machine().time().as_double());
+	}
 	// Correlated task-5 registration trace. 0x110f1c is the transient argument vector populated from
 	// the sequence descriptor at 0x2cb968 + status*4, not intrinsically a persistent SIM session.
 	// Keep this opt-in observer separate from the lower-service boundary trace.
@@ -2700,9 +3141,22 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		if (addr == 0x002af582) // task-5 mailbox receive returned; r0 is the allocated message
 		{
 			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
-			const u16 packed = (msg >= 0x00100000 && msg + 0x10 <= 0x00180000) ? debug_ram_word(msg) : 0xffff;
+			const bool ram_msg = msg >= NOKIA_RAM_BASE && msg + 0x10 <= NOKIA_RAM_END;
+			const bool flash_msg = msg >= 0x00200000 && msg + 0x10 <= 0x00400000;
+			const u16 packed = ram_msg ? fw_word(msg) :
+				(flash_msg ? m_maincpu->space(AS_PROGRAM).read_word(msg) : 0xffff);
 			char bytes[96] = {};
-			dump(msg, 16, bytes, sizeof(bytes));
+			if (ram_msg)
+				dump(msg, 16, bytes, sizeof(bytes));
+			else if (flash_msg)
+			{
+				size_t used = 0;
+				for (unsigned i = 0; i < 16 && used + 4 < sizeof(bytes); i++)
+					used += std::snprintf(bytes + used, sizeof(bytes) - used, "%02x%s",
+							m_maincpu->space(AS_PROGRAM).read_byte(msg + i), i == 15 ? "" : " ");
+			}
+			else
+				std::snprintf(bytes, sizeof(bytes), "<%08x>", msg);
 			active_seq = ++seq;
 			logerror("task5reg: seq=%u recv msg=%08x packed=%04x status=%04x argc=%u bytes=[%s] t=%.4f\n",
 					active_seq, msg, packed, packed & 0x1fff, packed >> 14, bytes, machine().time().as_double());
@@ -3008,22 +3462,29 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 				data &= 0xfe;
 			break;
 		case 0x37:  // SIM UART RxD
-			// MODEL_SIM_ATR (opt-in, faithful SIM build): serve the ATR from a register-level FIFO.
-			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
-			{
+			if (m_sim_card->enabled())
+				data = m_sim_card->rxd_r();
+			else if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
 				data = m_sim_atr[m_sim_atr_pos++];
-			}
 			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RXD", 0xff) & 0xff;
 			break;
 		case 0x38:  // SIM UART interrupt identification
-			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
-				data = nokia_env_u32("NOKI3210_SIM_ATR_IIR", 0x0a) & 0xff;   // RxD-data cause (iterate)
+			if (m_sim_card->enabled())
+				data = m_sim_card->iir_r();
+			else if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
+				data = nokia_env_u32("NOKI3210_SIM_ATR_IIR", 0x0a) & 0xff;
 			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_IIR", 0x01) & 0xff;
 			break;
+		case 0x39:  // SIM control and live-interface status
+			if (m_sim_card->enabled())
+				data = m_sim_card->control_r();
+			break;
 		case 0x3c:  // SIM UART RxD queue fill
-			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0)
+			if (m_sim_card->enabled())
+				data = m_sim_card->rx_count_r();
+			else if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0)
 				data = uint8_t(m_sim_atr_len - m_sim_atr_pos);
 			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RX_FILL", 0x00) & 0xff;
@@ -3053,6 +3514,15 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 
 	if (offset == 0x20)
 		data = (data & 0xfe) | (BIT(data, 0) & m_eeprom->read_sda());
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 &&
+			nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", 0) != 0 &&
+			(offset == 0x37 || offset == 0x38 || offset == 0x3c))
+	{
+		static unsigned sim_fifo_read_count = 0;
+		if (sim_fifo_read_count++ < 64)
+			logerror("sim_fifo_read: off=%02x data=%02x remaining=%u pc=%08x t=%.8f\n",
+					offset, data, m_sim_card->rx_count_r(), m_maincpu->pc(), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
 			(offset == 0x2c || offset == 0x2d || offset == 0x6c || offset == 0x6d) &&
 			m_gensio_trace_count++ < 20000)
@@ -3073,6 +3543,28 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	uint8_t old_data = m_mad2_regs[offset];
 	m_mad2_regs[offset] = data;
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && offset == 0x36)
+	{
+		static unsigned sim_txd_count = 0;
+		if (sim_txd_count++ < 128)
+			logerror("sim_txd: data=%02x pc=%08x t=%.8f\n", data, m_maincpu->pc(),
+					machine().time().as_double());
+	}
+	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && offset == 0x39)
+	{
+		static unsigned sim_control_count = 0;
+		if (sim_control_count++ < 128)
+			logerror("sim_control_w: data=%02x old=%02x live=%02x pc=%08x t=%.8f\n", data,
+					old_data, m_sim_card->control_r(), m_maincpu->pc(), machine().time().as_double());
+	}
+	if (offset == 0x36 && m_sim_card->enabled())
+		m_sim_card->txd_w(data);
+	else if (offset == 0x38 && m_sim_card->enabled())
+		m_sim_card->iir_w(data);
+	else if (offset == 0x39 && m_sim_card->enabled())
+		m_sim_card->control_w(data);
+	else if (offset == 0x3d && m_sim_card->enabled())
+		m_sim_card->rx_ack_w(data);
 	if (offset == 0x2d)
 	{
 		// Selecting a GENSIO endpoint leaves the controller idle and its
@@ -3098,31 +3590,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 	}
 
 	// MODEL_SIM_ATR (opt-in, register-level ATR probe — NOT the faithful reception path).
-	// CORRECTION: the MCU does NOT read the SIM RxD/RX_FILL/RX_FLAGS/IIR registers for reception — the
-	// only genuine SIM-UART (base 0x20000) access in the whole firmware is the reset config + the single
-	// flush at 0x2a01bc (earlier "register-based reception" scan hits were struct offsets that happen to
-	// match SIM reg numbers). SIM byte reception is DSP/hardware-assisted, surfaced to the MCU as 0xaf
-	// service messages into the data state machine 0x29ff2c. This model still arms an ATR on activate
-	// (SIM_CONTROL 0x39 bit 0x80; reset seq ends 0x32->0x33->0xb3) and serves it on the registers, but
-	// the firmware only ever reads the first byte via the flush — kept as a register probe, not a fix.
-	// Default ATR is a minimal T=0 GSM convention (overridable via NOKI3210_SIM_ATR_HEX, space-free hex).
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && offset == 0x39 && (data & 0x80) && !(old_data & 0x80))
-	{
-		static const uint8_t default_atr[] = { 0x3b, 0x94, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00 };
-		m_sim_atr_len = 0;
-		if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
-			for (const char *p = hex; p[0] && p[1] && m_sim_atr_len < sizeof(m_sim_atr); p += 2)
-				m_sim_atr[m_sim_atr_len++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
-		if (m_sim_atr_len == 0)
-			for (uint8_t b : default_atr) m_sim_atr[m_sim_atr_len++] = b;
-		m_sim_atr_pos = 0;
-		// The SIM RxD reception is interrupt-driven; raise the SIM IRQ so the ISR drains the ATR.
-		// Line is configurable while we pin it down (DSP=4, CCONT=6 are taken); default 5.
-		const u32 line = nokia_env_u32("NOKI3210_SIM_IRQ_LINE", 5);
-		if (line < 8)
-			assert_irq(int(line));
-	}
-
 	if (offset == 0x20 || offset == 0x24)
 	{
 		const uint8_t signal = m_mad2_regs[0x20];
@@ -3189,8 +3656,7 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 			break;
 		case 0x1a:
 			// Byte written to the MBUS TX register; the controller raises the
-			// TX-byte-sent FIQ. (No bus peer answers: the D0 lower-service reply
-			// is superseded by MODEL_DSP_SERVICE and task 08 is never resumed.)
+			// TX-byte-sent FIQ. No bus peer is currently attached.
 			schedule_mbus_fiq(2);
 			break;
 		case 0x2c:
@@ -3326,6 +3792,10 @@ uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 
 void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 {
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("dsp_boundary: DSPIF W off=%x data=%02x pc=%08x task=%02x t=%.6f\n",
+				u32(offset), data, m_maincpu->pc() & ~u32(1), fw_byte(0x00100022),
+				machine().time().as_double());
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
 }
 
@@ -3428,6 +3898,8 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_CCONT(config, m_ccont);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
+	NOKIA_SIM_CARD(config, m_sim_card);
+	m_sim_card->irq_cb().set(FUNC(noki3310_state::sim_irq_w));
 	NOKIA_SERVICE_TRANSPORT(config, m_service_transport);
 	m_service_transport->channel_empty_cb().set(FUNC(noki3310_state::service_channel_empty_w));
 }

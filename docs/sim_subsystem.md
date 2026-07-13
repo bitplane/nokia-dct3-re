@@ -1,114 +1,115 @@
-# SIM subsystem — map and Phase-1
+# SIM subsystem
 
-> **Partly superseded — read `docs/sim_emulator_scope.md` first.** This doc is the
-> original Phase-1 map (SIM UART, the `0xc` present injection). The later c0–c2
-> investigation reverse-engineered the full SIM *read conversation* and corrected
-> some of the model here (e.g. the code-3 file buffer is `0x10deec`, not the
-> `0x10eede` written below; file responses land in `0x10dddc`, not via the `0xaf`
-> path). The command/response buffers, the read state machine, the dispatch, the
-> accept/no-SIM decision points, and the working conversation driver are all in
-> **`docs/sim_emulator_scope.md`** — the authoritative reference for the emulator
-> build. Keep this doc for the UART-level power-on sequence, which is still valid.
+This is the concise hardware and firmware contract for the Nokia 3210 v6.00 SIM path. The
+address-heavy registration investigation remains in `sim_registration.md`; this document records
+only conclusions that are implemented or directly observed.
 
-Once the phone boots past the service wall (see `docs/boot_to_insert_sim.md`) it
-tries to bring up the SIM, fails (no card), and shows "Insert SIM card". This
-doc maps the SIM subsystem and records the validated Phase-1 injection point for
-getting past that screen. Reaching the operator-idle home screen is a larger
-faithful build sketched at the end.
+## Hardware boundary
 
-## Hardware
+SIMI is the MAD2 SIM UART at `0x020036..0x02003f`:
 
-The SIM UART (SIMI) is MMIO at base `0x20000`, offsets `0x36–0x3f`:
-TXD `0x36`, RXD `0x37`, IIR `0x38`, CONTROL `0x39`, CLOCK `0x3a`, TxD-low-water
-`0x3b`, RX_FILL `0x3c`, RX_FLAGS `0x3d`, TX_FLAGS `0x3e`, TX_FILL `0x3f`. Already
-mapped in `mad2_io_r/w`. `TRACE_SIM` logs traffic on these registers.
+| Offset | Register | Verified behavior |
+| --- | --- | --- |
+| `0x36` | TXD | Firmware writes PPS, T=0 headers and command bodies here. |
+| `0x37` | RXD | Firmware drains ATR, procedure, data and status bytes here. |
+| `0x38` | IIR | `0x10` advances/completes TX; `0x40` reports received bytes. Writing the observed bits acknowledges them. |
+| `0x39` | control/status | Firmware activation writes `0x32 -> 0x33 -> 0xb3`; live readback must include ready bit `0x40` while enabled. |
+| `0x3b` | TX low-water | Firmware programs `0x60` during activation. |
+| `0x3c` | RX fill | Number of readable bytes consumed by the receive FIQ loop. |
+| `0x3d..0x3f` | FIFO flags/fill | Not yet needed by the stateful model; retain as open SIMI detail. |
 
-## The power-on sequence (observed)
+FIQ line 6 is the SIMI interrupt. The firmware route is:
 
-On boot the SIM driver configures the UART (clock `0x3a=03`, FIFO flags
-`0x3d`/`0x3e`), asserts reset via `SIM_CONTROL 0x39` (`0x32 → 0x33 → 0xb3`),
-writes TxD-low-water `0x3b=0x60`, then waits for the **ATR** (Answer To Reset)
-in RxD. Our SIM answers nothing, so RxD stays `0x00`; the driver retries the
-whole reset loop and, after N failures, declares no SIM → "Insert SIM card".
+```text
+FIQ dispatcher 0x2af49c
+  -> line-6 handler 0x2a054a
+     -> IIR bit 0x10: TX progression 0x2a033e
+     -> IIR bit 0x40: RX dispatcher 0x2a04c8
+        -> byte classifier 0x2a03b4
+        -> allocate/post task-21 response through 0x26aac0
+```
 
-**Key asymmetry:** the MCU *writes* command bytes to `SIM_TxD 0x36`
-(`0x2a0268`, from a RAM ring at `0x1106c0`) but **never reads `SIM_RxD 0x37`**
-except the reset flush (whole-firmware scan confirms). SIM *responses* (ATR,
-APDU results) come back through the DSP/service layer as service messages
-(code `0xaf`), not the UART registers. Modelling SIM input therefore means
-injecting service messages, not feeding the RxD register.
+The former conclusion that RXD is only a reset flush and SIM replies arrive through an unrelated
+DSP/service message was false. It came from confusing SIM structure offsets with MMIO references.
+The register/FIQ path above has now executed end to end.
 
-## The layers
+## Firmware transaction contract
 
-| Layer | Address | Role |
-|-------|---------|------|
-| SIM task main loop | `0x27defc` | recv → dispatch on `[msg+4]`; ctrl struct RAM `0x10a8dc` |
-| Reset-start | `0x27e024` | set state, call reset driver, schedule timeout event `0xe9` |
-| Reset driver | `0x2a01b8` | SIM UART reset/activate; reset-state struct `0x1106d4` |
-| TxD transmit | `0x2a0268` | write command bytes from ring `0x1106c0` to `SIM_TxD` |
-| Data state machine | `0x29ff2c` | paged 250-byte transfer; results up via `0x234634` code `0xaf`; entered from contact-service dispatcher `0x2378e0` |
+Task 21 owns card activation and T=0 transport. The receive classifier produces these messages:
 
-## SIM task dispatch (`[msg+4]`)
+| Code | Meaning |
+| --- | --- |
+| `0x05` | ATR buffer complete. |
+| `0x07` | TX descriptor accepted/completed, posted by the `0x10` IIR path. |
+| `0x09` | Unclassified receive, including the PPS echo. |
+| `0x0a` | Terminal SW1/SW2 result. |
+| `0x0b` | T=0 procedure/data response. |
 
-Confirmed by careful re-read (an earlier fast read mis-attributed several
-branches; `0x2695f4` is event-post-to-self via ECB table `0x100140`, so the
-else-branch just re-arms the `0xe9` retry tick):
+The ordering is part of the contract. `0x27e98c` sends through `0x2a02e6`, waits for code `0x07`,
+and only then does its caller consume the card response. Raising RX alone leaves a valid reply
+stranded behind the missing TX event. IIR `0x20` is not TX completion: it posts static code `0x06`.
 
-| code | handler | meaning |
-|------|---------|---------|
-| `3` | `0x27df9e` | copy message into a 0x118-byte buffer at `0x10eede` |
-| `5`, `8`–`b` | `0x27df64` | copy `[msg+2]` data into struct `0x10c8dc` |
-| `0xc` | `0x27df52` | **SIM present**: set `[0x10a8dd]=1`, `[0x10a8e3]=1`, `[0x113cff]=1`, call startup-ready `0x279486` |
-| `0x11` | `0x27df44` | reset-state sub-handler |
-| else | `0x27df3c` | re-arm `0xe9` retry tick |
+Card responses must also be asynchronous. Raising FIQ from inside the final TXD write lets the
+handler observe the previous firmware descriptor. The device schedules TX-ready and RX-ready on a
+timer, exposes RX bytes only when ready, and cancels the trailing event when the FIFO empties.
 
-Our boot only ever sees the retry cycle (`01 → 11 → 06 → repeat`); the response
-codes `3` / `5` / `0xc` are never delivered.
+## Stateful card device
 
-## Phase-1 result (validated)
+`nokia_sim_card_device` is enabled by `NOKI3210_MODEL_SIM_DEVICE=1`. It owns:
 
-`EXPERIMENT_SIM_PRESENT` forces the dispatch to take the code-`0xc` path once
-during the retry window (`SIM_PRESENT_AFTER`, default the 6th dispatch). The
-handler ignores the message payload, so this is functionally equivalent to
-delivering a code-`0xc` "SIM present" message.
+- activation, ready-status and ATR state;
+- SIMI IIR, RX FIFO and timed FIQ delivery;
+- PPS echo;
+- T=0 SELECT, STATUS, GET RESPONSE, READ BINARY/RECORD and CHANGE CHV sequencing;
+- selected-file state; and
+- synthetic GSM 11.11 file metadata and content.
 
-Result: the SIM retry loop **stops** (no more reset-starts), the "Insert SIM
-card" screen is **removed**, and the phone advances to a blank MMI screen
-(scrollbar + status icons, empty text area) — SIM present, no data. No crash,
-stable. `display_idle` still doesn't fire. **The injection point and mechanism
-are validated.**
+It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
+device is disabled, SIMI reads and writes retain the legacy/default behavior so the ordinary boot
+profiles remain unaffected.
 
-## Why Phase 1 alone doesn't reach idle
+The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
+includes ICCID `2FE2`, ECC `6FB7`, IMSI `6F07`, LOCI `6F7E`, and Phase `6FAE`; other known files are
+erased (`0xff`). `EF_PHASE` must report Phase 2 (`0x02`). Returning `0x00` prevents the validated
+preliminary lifecycle from composing.
 
-The forced `0xc` clears the *screen* but not the *data*: traced afterwards, the
-data state machine `0x29ff2c` and the `0xaf` sends never fire, there are zero
-`SIM_TxD` writes, and at t≈3.5 the phone merely re-inits the SIM UART. So it
-never requests SIM files. The blank text area is a phone that thinks a SIM is
-present but has nothing to read from it.
+## Current organic result
 
-## Toward operator-idle (future work)
+In one unforced run the device now completes:
 
-Reaching the operator-idle home screen is a faithful SIM-protocol build:
+```text
+ATR -> PPS -> SELECT 7F20 -> STATUS -> SELECT/READ mandatory EFs
+```
 
-1. **Faithful Phase 1** — deliver a real code-`0xc` "SIM present" message
-   (responder-style) rather than forcing `r8`, so the SIM comes up through the
-   genuine init path and drives the file-read flow.
-2. **Phase 2** — provide SIM file contents (IMSI `6F07`, operator, service
-   table, PIN-disabled) delivered as `0xaf` service messages into the data
-   state machine `0x29ff2c`. Once the real init runs, `TRACE_SIM`/`TRACE_SIMSM`
-   will show the exact file/APDU sequence to answer.
-3. **Phase 3** — with a valid SIM and PIN off, the phone leaves "Insert SIM
-   card" for idle. Network registration (RF, `RUN GSM ALGORITHM`) is out of
-   scope; the idle screen appears before registration (empty operator / no
-   service).
+Observed reads include ICCID, ECC and Phase, and the task-5 run reaches natural status `0x1581`
+with `[0x10dcaf]=1` and `[0x10dca9]=1`. This restores the established preliminary-SIM baseline.
 
-IP-clean: synthetic test IMSI/files; ATR and file structures are public
-(ISO-7816, GSM 11.11 / TS 51.011). No real SIM dump needed.
+After PHASE, firmware deliberately polls DF_GSM with `A0 F2 00 00 16`; this is stable presence
+polling, not a rejected STATUS response. The next wall is outside the card transport. The extended
+IMSI pass requires an object-bearing GSM/radio session which constructs callback 7 and drives:
 
-## Diagnostics (opt-in knobs)
+```text
+callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
+  -> task-17 0x1583 -> registration/session commit -> 0x1196/0x1199
+```
 
-| Knob | What it shows |
-|------|---------------|
-| `TRACE_SIM` | SIM UART register traffic (`0x36–0x3f`) |
-| `TRACE_SIMSM` | SIM task dispatch codes, reset-start, data SM, `0xaf` sends |
-| `EXPERIMENT_SIM_PRESENT` / `SIM_PRESENT_AFTER` | Phase-1 SIM-present injection |
+Callback 7 currently receives only the global `0x05e2` sweep, not constructor `0x05dc`. A related
+generic-service route (`0x05ea -> 0x07dd -> 0x209978`) is statically mapped but also dormant; its
+relationship to callback-7 construction is not proved. Do not replace either provider contract by
+selecting callbacks, posting task results, replaying commit keys, or setting registration state.
+
+## Reply-code 2
+
+The downstream card contract is already mapped. Organic `0x1196` enters `0x207234`, which calls
+`0x293f30`. That function constructs `A0 24` CHANGE CHV with a 16-byte body, posts it to task 21 and
+waits for the result. Success is return code `2`; only that branch reaches the ENABLE setter at
+`0x20733c`. The stateful card implements the required header -> TX-ready -> procedure -> body ->
+TX-ready -> `9000` sequence. It still needs an organic `0x1196` run to prove the full path.
+
+## Acceptance gates
+
+- `make verify`: exact 3210 frame and structural oracle.
+- `make verify-deep`: exact deep frame and structural oracle.
+- `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
+- Stateful-model trace: natural ATR/PPS/APDUs, then organic `0x1196`, reply code `2`, and
+  `0x20733c`, with no injected messages or SIM-state RAM writes.

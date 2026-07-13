@@ -8,7 +8,9 @@
 # garbage (vqrshrun/ldc2l/...) for the rest of the region. We step manually and
 # reject any 4-byte decode that isn't bl/blx, keeping 16-bit alignment.
 import sys, re, capstone
-data = open('/data/gaz/src/nokia3210/ghidra_out/3210f600a_swap16.bin','rb').read()
+from pathlib import Path
+
+data = (Path(__file__).resolve().parent.parent / 'roms/3210f600a_swap16.bin').read_bytes()
 FLASH=0x200000
 
 def resolve_lit(ins):

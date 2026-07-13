@@ -9,6 +9,7 @@ PYTHON ?= python3
 VENV   := .venv
 DRIVER := driver/nokia_3310.cpp
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
+	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
 	driver/nokia_service_transport.cpp driver/nokia_service_transport.h
 PHONE ?= noki3210
 BIOS ?=
@@ -121,7 +122,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_service_transport.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_service_transport.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

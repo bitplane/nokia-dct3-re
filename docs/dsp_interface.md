@@ -6,12 +6,12 @@ baseband + audio codec) in the Nokia 3210 firmware. Built from static disassembl
 every DSP shared-RAM offset and DSPIF register with direction/value/PC over the boot).
 
 **TL;DR for emulation:** at boot the MCU treats the DSP interface as (a) a RAM
-self-test it passes by echo, (b) a handful of "DSP ready" status flags, and (c) a
-**one-way download** of coefficient/program blobs from flash into shared RAM. It does
-**not** wait on any DSP-*computed* result during the reachable boot. The bidirectional
-L1 message protocol — where real DSP emulation would matter — is **downstream of the
-MMI/coherent-boot wall and never executes**. So the DSP is **not** the keystone for the
-current stall; it sits behind it.
+self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
+download target for coefficient/program blobs, and (d) a lower-service transmit
+queue. The current model drains that queue and raises IRQ 4 but does not construct
+reply payloads. A live D0-bearing packet proves MCU-to-DSP traffic is reachable;
+it does not yet prove that a DSP reply is the missing SIM-registration predecessor.
+The larger bidirectional L1 protocol remains downstream of the coherent-boot wall.
 
 ## The two hardware windows
 
@@ -87,12 +87,79 @@ This task's *housekeeping* use (SIM/CCONT/scheduler mailbox) is what keeps it al
 L1/network traffic is the dormant half. Diagnostic: `NOKI3210_TRACE_DSPMSG` (recv classes/
 primitives at `0x23d638`).
 
-## What the boot waits on from the DSP: nothing (the key finding)
+## What the reachable boot currently proves
 
-`TRACE_DSPIO` shows **no MCU reads of DSP-computed results** beyond the self-test region
-and the hardcoded ready-flags. The MCU inits the interface (self-test → config → blob
-download → "DSP ready" flags) and proceeds. It does not block on the DSP. This is why the
-existing 4-line stub is enough to reach "Insert SIM card".
+`TRACE_DSPIO` shows **no MCU reads of DSP-computed result words** beyond the self-test
+region and hardcoded ready flags. The MCU nevertheless queues lower-service packets in
+the shared transmit ring. The first captured pair is:
+
+```text
+00 02 0a 05 1e ff 00 d0 00 03 01 01 e0 00
+08 05 1e 14 00 f4 00 01 03 00
+```
+
+The model currently acknowledges these only by zeroing the pending count and raising
+IRQ 4. It is enough to reach "Insert SIM card", but it is not a complete DSP peer.
+No derived response format or receive-ring transition has yet connected this traffic
+to `0x05ea`, task-15 `0x07dd`, or the SIM registration result, so treating the D0 packet
+as that request would be speculation.
+
+### Shared packet rings
+
+The lower-service packet queue is independent of the startup/table-transfer words at
+`0xda..0xe4`. Static recovery plus ownership tracing gives its exact layout:
+
+| DSP RAM offsets | owner | role |
+|---|---|---|
+| `0x000..0x0a2` | MCU writes, DSP reads | MCU-to-DSP circular packet ring |
+| `0x0a4` | MCU | TX producer index, in halfwords (`0..0x51`) |
+| `0x0a6` | DSP | TX consumer index, in halfwords |
+| `0x100..0x1c6` | DSP writes, MCU reads | DSP-to-MCU circular packet ring |
+| `0x1c8` | DSP | RX producer index, in halfwords (`0x80..0xe3`) |
+| `0x1ca` | MCU | RX consumer index, in halfwords |
+
+`0x29099a` computes TX free space from `0x0a4`/`0x0a6` with one slot reserved.
+`0x2907c4` appends a header plus packed big-endian bytes and commits the producer.
+For a header halfword `LLTT`, `LL` is the payload byte count, `TT` is packet type,
+and total ring occupancy is `(LL + 3) / 2` halfwords. On the inbound side,
+`0x290904` copies from the RX consumer, wraps at `0x1c8` to `0x100`, and commits
+the new consumer at `0x1ca`.
+
+Inbound header parsing at `0x29088e` allocates a firmware message of `LL + 5`
+bytes and constructs `{0x18, 0x02, LL, TT, payload...}`. The surrounding receive
+task dispatches `TT` only through the `0x70`, `0x80`, and selected `0x83..0x99`
+families (`0x29bc00`, `0x284ac4`, `0x28464c`, and `0x283fe6`). Other types take
+the invalid-message/free path. Consequently a symmetrical type-`0x05` reply to
+the outbound D0 packet is not a valid inbound generic-service object and cannot
+be assumed to produce service-5 `0x05ea` or task-15 `0x07dd`.
+
+For type `0x70`, `0x29bc00` preserves the type as the firmware message class
+and posts the message to task 2. Task 2 has no direct class-`0x70` case: its
+fallback passes the first payload byte to `0x237960`, which records an
+unknown-response notification. It does not unwrap a nested generic-service
+object. The direct DSP translator `0x282d64` handles classes 3/5/17/47, but its
+class-5 primitive set starts at `0x11` and does not include the task-15
+registration primitive `0x0b`. These are distinct protocols despite sharing a
+numeric class value.
+
+The old DSP model leaves TX consumer `0x0a6` at zero. The producer reaches `0x34`,
+free space collapses, and later firmware packets cannot be queued. The opt-in
+`MODEL_DSP_RING_DRAIN` candidate advances the DSP-owned consumer across complete
+packets on each service tick. It models consumption only: it writes no inbound packet
+or firmware state. The newly visible coherent stream is:
+
+```text
+type 05: 0a05 1eff 00d0 0003 0101 e000
+type 05: 0805 1e14 00f4 0001 0300
+type 51: seven configuration/coefficient packets (six 80-byte, one 28-byte)
+type 70: three control packets (6, 14, and 22 payload bytes)
+```
+
+No later type-`0x05` transaction appears, and consumption alone produces none of
+`0x0588`, `0x05ea`, or `0x07dd`. This makes the ring drain a fidelity correction,
+not evidence for a D0 response or a SIM-registration fix. It remains separate from
+the established deep profile because enabling it preserves the final LCD hash but
+changes the structural oracle's repeated-work counters.
 
 The **bidirectional L1 protocol** — MCU sends "search/sync/measure/attach", DSP returns
 cell/RSSI/registration — lives in the `0x2b7xxx–0x2c9xxx` driver and **never executes on
@@ -102,12 +169,11 @@ the network-attach phase.
 
 ## Emulation feasibility & the dependency re-ordering
 
-- **To reach where we are:** the DSP needs *nothing more* than the current echo + fake-ready
-  stub. Done.
-- **The DSP is downstream of the current wall, not the keystone.** Earlier framing (get the
-  DSP right → coherent boot → UI) had the order backwards. The immediate stall is the **MMI
-  resource-content / coherent-boot** layer, which passes the DSP self-test and does **not**
-  wait on the DSP. Emulating the DSP further would not move it.
+- **To reach where we are:** the current echo, ready flags, queue drain, and IRQ model are
+  sufficient, but they are not a completed DSP contract.
+- **The DSP is not yet established as the keystone.** The immediate stall remains in the
+  MMI/resource/coherent-boot layer. DSP reply modelling becomes a justified frontier only
+  when a real response contract or a causal edge to that layer is recovered.
 - **For the network (operator name + signal):** a message-boundary DSP stub (answer the L1
   commands with "camped on a fake cell, operator X, RSSI y") is feasible *in principle* and
   is the right MAME approach — but it is **doubly blocked**: (1) the L1 protocol is
@@ -117,10 +183,10 @@ the network-attach phase.
 - **Full DSP-core emulation** (a TI Lead core running the downloaded blobs) is a much larger
   project and would still need a faked air interface; not warranted given the above ordering.
 
-**Net:** the reachable MCU↔DSP interface is now mapped and is satisfied by a trivial stub;
-the interesting L1 half is gated behind the coherent-boot wall and can only be RE'd
-statically until that wall falls. The practical unlock order is **coherent boot first, DSP
-L1 second** — the reverse of the intuition. Trace knob: `NOKI3210_TRACE_DSPIO`.
+**Net:** the reachable MCU↔DSP interface is mapped far enough to expose an incomplete
+queue-acknowledgement model, but not far enough to claim its missing replies block SIM
+registration. The interesting L1 half remains gated behind coherent boot and can only be
+RE'd statically until that wall falls. Trace knob: `NOKI3210_TRACE_DSPIO`.
 
 ## Per-primitive payload semantics (2026-07 — handler `0x23cde0`, classes 5/7/0xa)
 

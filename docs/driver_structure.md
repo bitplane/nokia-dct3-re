@@ -20,10 +20,11 @@ The PCD8544 LCD and MAME `I2C_24C128` now model the display and external
 EEPROM. CCONT is an explicit local `nokia_ccont_device` owning its serial
 registers, ADC results, RTC, interrupt state and watchdog. The
 `nokia_service_transport_device` owns the modeled node-`0x18` response payload,
-response readiness and channel-empty completion timing. The phone state owns
-MAD2 interrupt routing and supplies power-scenario ADC inputs. SIM and the
-MAD2/DSP mailbox follow after their boundaries stabilize; MAD2 extraction
-should wait for the cross-ROM pass to identify the genuinely shared contract.
+response readiness and channel-empty completion timing. The provisional
+`nokia_sim_card_device` owns the verified SIMI register/FIQ transport and a synthetic GSM 11.11
+card. The phone state owns MAD2 interrupt routing and supplies power-scenario ADC inputs. The
+MAD2/DSP mailbox follows after its boundary stabilizes; MAD2 extraction should wait for the
+cross-ROM pass to identify the genuinely shared contract.
 
 ## Rules
 
