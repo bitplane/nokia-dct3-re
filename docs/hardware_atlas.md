@@ -113,8 +113,9 @@ and the DSP itself is unemulated. This is where GSM L1 and audio will land. What
   service status/version; `0xda/e2` lower-service channel counts; `0xe0` busy flag; **`0xe4`
   lower-service pending counter** (MCU writes `0x0002` at pc `0x290c98`; `MODEL_DSP_SERVICE` drains it
   + raises IRQ 4); `0xfe/0x100` ready flags.
-- **DSPIF `0x30000`** (stub → 0): written at boot (`pc 0x2001a4`) and during the service handshake
-  (`pc 0x29103c`, `DSPIF[1]=0x04`). Likely the command/status side of the DSP protocol.
+- **DSPIF `0x30000`** (stub → 0): written at boot (`pc 0x2001a4`) and by the reachable service
+  command path (`0x290cf4`; command 4 at `0x29103c`, followed by doorbell byte 2). Stateful-SIM
+  runs reach this path with service commands `0x30` and `0x32`; completion semantics are open.
 
 **Structural scope (deep-dive scout).** The DSP interface is **heavily referenced** in the firmware:
 **~287 references to DSPIF `0x30000`** and **~444 to the shared-RAM base `0x10000`**, clustered in a

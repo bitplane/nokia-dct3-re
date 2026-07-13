@@ -11,24 +11,24 @@ download target for coefficient/program blobs, and (d) a lower-service transmit
 queue. The current model drains that queue and raises IRQ 4 but does not construct
 reply payloads. A live D0-bearing packet proves MCU-to-DSP traffic is reachable;
 it does not yet prove that a DSP reply is the missing SIM-registration predecessor.
-The larger bidirectional L1 protocol remains downstream of the coherent-boot wall.
+With stateful SIM initialization, radio control reaches service commands `0x30` and
+`0x32`; the reply contract for those commands is the current frontier.
 
 ## The two hardware windows
 
 | MMIO | region | driver | boot usage |
 |---|---|---|---|
 | `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `dsp_ram_r/w` (stub, real backing store `m_dsp_ram`) | heavy — self-test, config, blob download |
-| `0x30000–0x30003` | **DSPIF** control register | `mad2_dspif_r/w` (stub: reads 0, writes no-op) | **almost none** — one early `0`-init at pc `0x2001a4`; its ~287 references are all in the L1 code that never runs |
+| `0x30000–0x30003` | **DSPIF** control register | `mad2_dspif_r/w` (stub: reads 0, writes no-op) | early initialization plus reachable command-4 doorbells from `0x290cf4`; wider L1 use remains unmapped at runtime |
 | `0x40000` | MCUIF (memory-range config) | `mad2_mcuif_r/w` (stub) | early config |
 
 The atlas counted ~444 references to the shared-RAM base and 42 pool-literal references
-to DSPIF across the image, but **`TRACE_DSPIO` (deduped per distinct offset+dir+PC) shows
-the *reachable boot* touches DSPIF exactly twice** — `W[0]=0` and `W[1]=0` at `0x2001a4`.
-The one *other* boot-region DSPIF write — `strh #4 → 0x30000` ("command 4") at `0x29103c`
-in the DSP-service handshake — is **gated by the branch at `0x291030` and skipped**,
-because `MODEL_DSP_SERVICE` fakes the service completion so that path isn't taken. All
-remaining DSPIF use is in the `0x2b7xxx–0x2c9xxx` GSM-L1 driver that never runs (see
-`network_scouting.md`). So DSPIF's command/status protocol is **static-only** for us.
+to DSPIF across the image. Earlier boot-only traces saw just the initialization writes,
+but a coherent stateful-SIM run reaches `0x290cf4` with service commands `0x30` and
+`0x32`. That function updates DSP shared control words, writes command 4 to DSPIF at
+`0x29103c`, and rings doorbell byte 2 at `0x20008`. DSPIF is therefore a live boundary,
+not a static-only future path. The DSP-owned completion data and firmware IRQ-4 parser
+still need to be mapped before implementing a reply model.
 
 ## Shared-RAM layout at boot (`0x10000` base; offsets are byte offsets)
 
@@ -74,18 +74,20 @@ Task **22** (`dsp_if_task_2b6548`) is the DSP-interface RTOS task. Its loop: `re
 `strh #4→[0x30000]; strb #2→[0x20008]`). The DSPIF has **287 write sites, almost all in the
 L1 driver `0x2b7xxx–0x2c9xxx`** — the per-command send stubs.
 
-**Runtime status — the whole protocol is DORMANT (`TRACE_DSPMSG`).** On our boot the
+**Runtime status.** The task-22 downlink protocol remains dormant: on the measured boot the
 dispatch `0x23d62c` is reached **0 times**: task 22's handler is entered only ~twice
 (t≈0.37, 3.76) for the low-level echo/handshake and stays `recv`-blocked — no DSP→MCU L1
-message ever arrives, and the 287 DSPIF send stubs never run. The mailbox plumbing (task 22,
+message ever arrives. However, the separate `0x290cf4` shared-control service path now runs
+and issues command-4 doorbells. The mailbox plumbing (task 22,
 IRQ4 lower-service, dispatch, routing table) is fully present and now mapped, but **no
 GSM-L1 traffic flows** because nothing runs the L1 stack: there is no DSP executing the air
 interface to emit measurement/sync/registration primitives, and the MCU-side L1 senders sit
 behind the same coherent-boot/network-attach phase we never reach.
 
 This task's *housekeeping* use (SIM/CCONT/scheduler mailbox) is what keeps it alive; the
-L1/network traffic is the dormant half. Diagnostic: `NOKI3210_TRACE_DSPMSG` (recv classes/
-primitives at `0x23d638`).
+Whether the `0x30`/`0x32` completion returns through task 22 or only through shared control
+state is unresolved. Use `NOKI3210_TRACE_DSP_BOUNDARY` for this boundary; the retired broad
+`TRACE_DSPMSG` history should not be restored without a specific mailbox hypothesis.
 
 ## What the reachable boot currently proves
 
@@ -161,19 +163,19 @@ not evidence for a D0 response or a SIM-registration fix. It remains separate fr
 the established deep profile because enabling it preserves the final LCD hash but
 changes the structural oracle's repeated-work counters.
 
-The **bidirectional L1 protocol** — MCU sends "search/sync/measure/attach", DSP returns
-cell/RSSI/registration — lives in the `0x2b7xxx–0x2c9xxx` driver and **never executes on
-our boot** (it's entered only after the MMI/coherent-boot phase we can't reach). So it is
-**static-analysis-only** today: we cannot trace it live until the boot coherently reaches
-the network-attach phase.
+The wider **bidirectional L1 protocol** — MCU sends "search/sync/measure/attach", DSP returns
+cell/RSSI/registration — lives largely in the `0x2b7xxx–0x2c9xxx` driver and is not yet
+observed carrying task-22 messages. The narrower shared-control path at `0x290cf4` is live,
+however, so DSP work is no longer wholly static: its `0x30`/`0x32` request and IRQ-4 completion
+contract can be traced at the current boot frontier.
 
 ## Emulation feasibility & the dependency re-ordering
 
 - **To reach where we are:** the current echo, ready flags, queue drain, and IRQ model are
   sufficient, but they are not a completed DSP contract.
-- **The DSP is not yet established as the keystone.** The immediate stall remains in the
-  MMI/resource/coherent-boot layer. DSP reply modelling becomes a justified frontier only
-  when a real response contract or a causal edge to that layer is recovered.
+- **The DSP is now the leading bounded frontier, not yet a proven keystone.** Organic radio
+  initialization issues DSP service requests immediately before the absent lower-radio result.
+  Mapping their completion contract is justified; fabricating an L1 reply before that mapping is not.
 - **For the network (operator name + signal):** a message-boundary DSP stub (answer the L1
   commands with "camped on a fake cell, operator X, RSSI y") is feasible *in principle* and
   is the right MAME approach — but it is **doubly blocked**: (1) the L1 protocol is
@@ -183,10 +185,10 @@ the network-attach phase.
 - **Full DSP-core emulation** (a TI Lead core running the downloaded blobs) is a much larger
   project and would still need a faked air interface; not warranted given the above ordering.
 
-**Net:** the reachable MCU↔DSP interface is mapped far enough to expose an incomplete
-queue-acknowledgement model, but not far enough to claim its missing replies block SIM
-registration. The interesting L1 half remains gated behind coherent boot and can only be
-RE'd statically until that wall falls. Trace knob: `NOKI3210_TRACE_DSPIO`.
+**Net:** the reachable MCU↔DSP interface exposes both an incomplete queue-acknowledgement model
+and live shared-control commands. Neither has yet proved the exact reply that blocks SIM
+registration. The next pass should map command `0x30`/`0x32` completion through IRQ 4 using
+`NOKI3210_TRACE_DSP_BOUNDARY`, then decide whether a DSP peer device is warranted.
 
 ## Per-primitive payload semantics (2026-07 — handler `0x23cde0`, classes 5/7/0xa)
 

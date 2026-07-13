@@ -181,12 +181,17 @@ allocates an `0x18`-byte descriptor and initializes the fields later read by
 - context selector at `+0x13` (initially zero);
 - request parameters at `+0x14`, `+0x15`, and `+0x16`.
 
-The four known factory call sites are `0x2996aa`, `0x2997dc`, `0x299860`, and
-`0x2998a0`, in the handler family immediately before callback 7. They are the
-next ownership boundary to map: determine which incoming request reaches each
-call site, how the returned descriptor is published, and why none executes in
-the coherent boot. This does not yet prove which external peer owns the
-trigger.
+The four factory call sites (`0x2996aa`, `0x2997dc`, `0x299860`, and
+`0x2998a0`) are branches of one function, `0x299610`. Every successful branch
+publishes its descriptor through `0x2af798(0xca8a, 0x1e, object)`. The function
+is reached from the task-15 router at `0x255a34` when it receives status
+`0x0a2e`.
+
+The organic predecessor is now statically closed back to the lower-radio
+result. Task 15 handles `0x09ee` at `0x209274` and forwards it through
+`0x251cc8`; task 17 maps that status at `0x22270c` to a newly constructed
+`0x0a2e`, which returns to task 15 and selects the router branch above. None of
+`0x09ee`, `0x0a2e`, or the factory calls occurs in the coherent run.
 
 ## Adjacent paths and exclusions
 
@@ -223,7 +228,7 @@ These results constrain the missing boundary:
 
 ## Generic lower-object path
 
-A related but currently dormant result route is statically established:
+A related result route is statically established:
 
 ```text
 generic service callback receives object-bearing 0x05e8
@@ -234,9 +239,20 @@ generic service callback receives object-bearing 0x05e8
 ```
 
 No object-bearing `0x05e8`, `0x05ea`, or `0x07dd` occurs in the coherent run
-(**S/R**). The known DSP display ring is not this transport. This path may be
-part of the missing radio-session activation, but that relationship is not yet
-proved.
+(**S/R**). Parser `0x209978` populates the task-15 lower state later consumed
+while producing `0x09ee`, so this path is part of the missing radio-session
+activation. Delivering its object remains an external-peer responsibility; its
+exact hardware transport is not yet proved.
+
+The coherent runtime instead completes a separate acknowledgement side path:
+
+```text
+task 17 0x09ec -> task 15 -> task 16 0x07d6
+  -> task 10 0x03e9 -> task 17 0x043c
+```
+
+Task 17 consumes `0x043c` as bookkeeping. It does not construct the session
+object and is not a substitute for the absent `0x09ee` result.
 
 ## Current boundary and next acceptance point
 
@@ -247,14 +263,14 @@ request that a peer can honestly complete.
 
 The next investigation must therefore:
 
-1. map the four `0x24f120` callers and the request which supplies their inputs;
-2. trace the executed radio/task-17 path preceding the absent factory call;
-3. find an actual firmware-originated request or hardware-visible condition at
-   a GSM/resource/DSP boundary;
-4. model only the external side of that proven contract;
-5. let firmware generate `0x05dc -> 0x5518 -> 0x1583 -> 0x1196` itself;
-6. observe `0x293f30` return 2 from the coherent reply data;
-7. extend the SIM filesystem only when the resulting organic APDUs demand it.
+1. decode the reachable DSP service commands `0x30` and `0x32` issued through
+   `0x290cf4`, including their DSP-owned completion words and IRQ-4 consumer;
+2. determine whether the absent lower-radio result returns through DSP shared
+   control words, the task-22 L1 mailbox, or another DSP-owned callback route;
+3. model only the external side of that proven DSP/L1 contract;
+4. let firmware generate `0x05dc -> 0x5518 -> 0x1583 -> 0x1196` itself;
+5. observe `0x293f30` return 2 from the coherent reply data;
+6. extend the SIM filesystem only when the resulting organic APDUs demand it.
 
 Completion requires one coherent boot with no injected task messages, forced
 callback events, forced return values, or writes to SIM/registration RAM.

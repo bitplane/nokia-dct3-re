@@ -93,16 +93,19 @@ callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
   -> task-17 0x1583 -> registration/session commit -> 0x1196/0x1199
 ```
 
-Callback 7 currently receives only the global `0x05e2` sweep, not constructor `0x05dc`. A related
-generic-service route (`0x05ea -> 0x07dd -> 0x209978`) is statically mapped but also dormant; its
-relationship to callback-7 construction is not proved. Do not replace either provider contract by
-selecting callbacks, posting task results, replaying commit keys, or setting registration state.
+Callback 7 currently receives only the global `0x05e2` sweep, not constructor `0x05dc`. The
+missing predecessor is now narrowed to the lower-radio result path: task 15 must produce `0x09ee`,
+which task 17 converts to `0x0a2e`; the task-15 router then reaches the session-object factory.
+The related object route (`0x05ea -> 0x07dd -> 0x209978`) populates the lower state consumed by
+that result path, but no such object arrives in the coherent run. Do not replace this peer contract
+by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
 
 The descriptor factory is now identified as `0x24f120`. Its four known callers
 (`0x2996aa`, `0x2997dc`, `0x299860`, `0x2998a0`) sit immediately before the callback-7 handler and
-construct the same `0x18`-byte radio-session object later attached by `0x24f25c`. None has yet been
-shown to execute organically. The next RE pass should map their incoming request and publication
-path rather than infer a trigger from the SIM completion sequence.
+construct the same `0x18`-byte radio-session object later attached by `0x24f25c`. All four are
+branches of `0x299610`; every successful result is published through
+`0x2af798(0xca8a, 0x1e, object)`. The factory remains unexecuted because the lower peer has not
+delivered the state which makes task 15 emit `0x09ee`.
 
 ## Reply-code 2
 
