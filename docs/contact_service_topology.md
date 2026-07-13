@@ -34,6 +34,47 @@ source `0x00` (the phone), which is phone-to-service-peer traffic. The inverse
 interpretation in the first trace pass came from labelling the two address bytes
 backwards.
 
+The current DSP-ring model sharpens the ordering.  The startup D0 exchange is
+serialized by task 8/task 3 as DSP packet type `0x05`; a type-`0x8e` reply reaches
+task 8 through FIQ0 and task 7 accepts the state-`4` D0 data frame organically.
+That exchange is finite when the model answers only the state-`1` discovery
+request.  It does **not** populate the contact-service header globals: task-2
+initialization clears `0x11fedd..0x11fedf` about 130 ms after the D0 exchange and
+they remain zero through the first `0x64` construction.
+
+The firmware-owned learning point is the class-`0x40` receive path at
+`0x237c70`: it copies received frame byte `[2]` to `0x11fedd`, byte `[0]` to
+`0x11fede`, and byte `[7]` to `0x11fedf` before dispatching the command.  Thus the
+peer must initiate a correctly framed class-`0x40` session message through the
+lower transport. The current model does so; delaying D0 or supplying an address
+through a firmware write is neither necessary nor correct.
+
+## Recovered coherent startup session
+
+The forcing-free contact path now composes in one boot:
+
+1. Task 8 emits the state-1 D0 discovery frame as DSP TX type `0x05`. The peer
+   returns its compact acknowledgement and state-4 data frame as RX type `0x8e`.
+2. Contact initialization sets status `0xc8 -> 0xcc` and posts static task-3
+   object `0x2db250`. Task 3 serializes it as DSP TX type `0x70`, payload
+   `0d 00`.
+3. The DSP returns RX type `0x74`, payload `0d 00`. Decoder `0x29bc00` builds a
+   class-`0x74` task-2 object; command `0x0d` reaches `0x2349c8`. Firmware clears
+   busy bit 2 at `0x2349dc` and leaves service-present bit 6 set. The two payload
+   bits are failure indicators, so zero is the healthy result.
+4. Only after that DSP completion does the external peer send class-`0x40`
+   command `0x64` result 1, command `0x70` with the `0x5f`/`0x62` channel map,
+   and command `0x64` result 5. Firmware replies through task 7; the peer returns
+   compact class-`0x7f` acknowledgements derived from each outgoing transaction.
+5. The final `0x622a` report is likewise acknowledged at the transport boundary.
+   No semantic echo is needed and no firmware state is written by the model.
+
+In the five-second acceptance run this leaves contact status `0x49`, advances
+startup `0x000d -> 0x0004`, activates SIM control
+`0x32 -> 0x33 -> 0xb3 -> 0xe3`, and begins the normal SIM SELECT/READ/STATUS
+conversation. The current downstream fault is a repeated `A0 F2` SIM STATUS
+exchange with SIM enable still zero; it is no longer a contact-service blocker.
+
 ## Command inventory
 
 | Command | Incoming consumer | Sole MCU constructor | Constructor role | Initiating producer |
@@ -67,6 +108,11 @@ Neither profile constructs, sends, or receives `0x65`, `0x70`, `0x71`, or
 command `0x74`. Absence from these two profiles proves dormancy in those boots,
 not absence from the ROM. The static constructor census supplies the latter
 coverage.
+
+A later request-derived DSP-ring run established the missing incoming
+class-`0x40` session and compact acknowledgement grammar. The earlier zero-header
+self-route is retained only as the falsification which identified the learning
+point; it is not present in the recovered session.
 
 The formerly reported 31,068-entry `0x64` loop is therefore model-induced. It
 occurs with or without `MODEL_SVC_CHANNEL_DRAIN`; the drain changes its start

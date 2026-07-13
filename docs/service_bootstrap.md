@@ -338,6 +338,27 @@ Delivery path (now superseded by `MODEL_DSP_SERVICE`, kept for reference): the R
 `0x283d6e`, which advances the lower-service state. That thread fed `service_ready`; the model
 now supplies `service_ready` directly, so the D0 reply itself is no longer on the critical path.
 
+**Transport correction (current 3210 v6.00 trace):** the live task-8 path does
+not reach the MAD2 serial register for this D0 exchange.  Task 8 wraps the frame,
+task 3 writes DSP shared TX-ring packet type `0x05`, and the inverse path is DSP
+RX-ring packet type `0x8e` followed by FIQ0 -> task 4 -> task 8.  A
+request-derived state-`1` D0 response now completes that path and reaches task 7
+without an RTOS post or firmware-state write.  It establishes lower-transport
+discovery only; the later contact-service header/session is learned separately
+from an incoming class-`0x40` frame at `0x237c70`.  The serial-register account
+below is retained as historical evidence from the earlier hook/model and must
+not be used as the current transport specification.
+
+The contact busy flag has a separate, now-recovered DSP transaction. After
+contact initialization posts static task-3 object `0x2db250`, the MCU TX ring
+contains type `0x70`, payload `0d 00`. The healthy peer response is RX type
+`0x74`, payload `0d 00`; `0x29bc00` translates it into the class-`0x74` task-2
+message consumed at `0x234954`. Its command-`0x0d` path clears
+`[0x11fed1]` bit 2 at `0x2349dc` while retaining bit 6. This supersedes
+`MODEL_SVC_CHANNEL_DRAIN` for the coherent contact-peer profile: the firmware
+performs the flag transition itself, and the later `0x622a` transaction needs
+only its correlated transport acknowledgement.
+
 **`0x5f00` service request** (internal message bus, captured at `0x2b0482`):
 ```
 00 [node] 00 00 00 0a 00 01 5f 00 [seq][seq] [ctr] 02 00 [d9/da] ...

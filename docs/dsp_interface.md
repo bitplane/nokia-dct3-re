@@ -201,13 +201,13 @@ The framework is downstream of task 5 (`0x2af652 -> 0x2638e4`), so it is not the
 	ordinary-registration path.
 
 For types `0x70..0x7f`, `0x29bc00` preserves the type as the firmware message class
-and posts the message to task 2. Task 2 has no direct class-`0x70` or class-`0x74`
-case: its
-fallback passes the first payload byte to `0x237960`, which records an
-unknown-response notification. It does not unwrap a nested generic-service
-object or provide a simple DSP self-test-result route. Numeric group labels from
-another DCT3 firmware must therefore be reconciled with this two-layer decoder
-before being used as 3210 RX packet types. The direct DSP translator `0x282d64`
+and posts the message to task 2. Class `0x70` takes task 2's unknown-response
+fallback, but class `0x74` is explicitly dispatched to `0x234954`. This is the
+contact/self-test result route: the organic outbound type-`0x70` request
+`0d 00` is completed by inbound type `0x74` payload `0d 00`, which clears the
+contact busy flag through firmware at `0x2349dc`. Numeric group labels from
+another DCT3 firmware still need reconciliation at both decoder layers before
+being generalized. The direct DSP translator `0x282d64`
 handles classes 3/5/17/47, but its
 class-5 primitive set starts at `0x11` and does not include the task-15
 registration primitive `0x0b`. These are distinct protocols despite sharing a

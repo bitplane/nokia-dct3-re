@@ -10,14 +10,20 @@
     {
       "id": "contact_healthy_completion", "owner": "contact_task", "status": "modeled",
       "predicate": "class-0x40 command 0x64 with payload result 0x05 reaches 0x236dc4",
-      "current": "MODEL_SVC_RESPONDER reaches the result-5 branch with a header-incomplete task message; it does not prove a coherent peer transaction",
+      "current": "MODEL_DSP_CONTACT_PEER learns the session header through a peer-originated class-0x40 result-1 command, installs the channel map, then delivers result 5 through task 7; firmware replies receive request-correlated class-0x7f transport acknowledgements",
       "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
     },
     {
-      "id": "contact_064_response_stability", "owner": "contact_task", "status": "drift",
+      "id": "contact_064_response_stability", "owner": "contact_task", "status": "modeled",
       "predicate": "After a peer-originated contact result, the firmware status report terminates at the peer instead of routing back to task 2",
-      "current": "The provisional responder's zeroed transport header causes task 7 to assign route 1 and self-deliver fresh result-5 frames to task 2; the former 31,068-report anomaly is model-induced",
+      "current": "The learned address header sends firmware reports outward through task 7; compact class-0x7f acknowledgements complete those transactions without semantic echo or the former 0x64 self-delivery loop",
       "evidence": ["docs/contact_service_topology.md"]
+    },
+    {
+      "id": "contact_dsp_busy_completion", "owner": "dsp_peer", "status": "modeled",
+      "predicate": "Organic DSP TX type-0x70 payload 0d00 receives RX type-0x74 payload 0d00 and firmware clears contact busy bit 2 while retaining present bit 6",
+      "current": "Observed in one coherent boot at 0x2349dc; final contact status 0x49 and startup advances from mode 0x000d to 0x0004 before normal SIM APDUs begin",
+      "evidence": ["docs/contact_service_topology.md", "docs/dsp_interface.md"]
     },
     {
       "id": "sim_preliminary_lifecycle", "owner": "sim_task", "status": "satisfied",
