@@ -170,6 +170,24 @@ object is a GSM/radio-session object, not SIM-card state. The SIM device must
 not select callback 7, publish `0x05dc`, populate `0x110f20/0x1120e4`, allocate
 contexts, or emit any downstream event.
 
+### Session-object factory
+
+Helper `0x24f120` constructs the object consumed by callback 7 (**S**). It
+allocates an `0x18`-byte descriptor and initializes the fields later read by
+`0x24f25c`:
+
+- owned payload pointers at `+0x00` and `+0x04`;
+- status fields at `+0x10` and `+0x12`;
+- context selector at `+0x13` (initially zero);
+- request parameters at `+0x14`, `+0x15`, and `+0x16`.
+
+The four known factory call sites are `0x2996aa`, `0x2997dc`, `0x299860`, and
+`0x2998a0`, in the handler family immediately before callback 7. They are the
+next ownership boundary to map: determine which incoming request reaches each
+call site, how the returned descriptor is published, and why none executes in
+the coherent boot. This does not yet prove which external peer owns the
+trigger.
+
 ## Adjacent paths and exclusions
 
 These results constrain the missing boundary:
@@ -177,6 +195,10 @@ These results constrain the missing boundary:
 - The global callback sweep deliberately supplies `0x05e2`; it is not a
   constructor sweep. Terminal status `0x012f` selects the normal application
   callback `0x2f`, which then receives `0x05dc` (**S/R**).
+- After preliminary SIM status `0x13b5`, the callback engine intentionally
+  reconstructs callback `0x2f` with argument `0x0787`, then delivers `0x05e0`,
+  `0x05e1`, `0x0b5b`, and `0x1581` to that callback (**R**). This is not a
+  failed attempt to select callback 7 and is not the missing session trigger.
 - Status `0x0518` with argument 7 is input to the already-current callback; it
   does not select callback 7 (**S/R**).
 - Resource `0x67`, installed by callback `0x2f`, is local resource-manager
@@ -225,8 +247,8 @@ request that a peer can honestly complete.
 
 The next investigation must therefore:
 
-1. identify the semantic layout and owner of the callback-7 object;
-2. trace the executed radio/task-17 path preceding its absent construction;
+1. map the four `0x24f120` callers and the request which supplies their inputs;
+2. trace the executed radio/task-17 path preceding the absent factory call;
 3. find an actual firmware-originated request or hardware-visible condition at
    a GSM/resource/DSP boundary;
 4. model only the external side of that proven contract;

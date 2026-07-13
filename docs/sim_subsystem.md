@@ -98,6 +98,12 @@ generic-service route (`0x05ea -> 0x07dd -> 0x209978`) is statically mapped but 
 relationship to callback-7 construction is not proved. Do not replace either provider contract by
 selecting callbacks, posting task results, replaying commit keys, or setting registration state.
 
+The descriptor factory is now identified as `0x24f120`. Its four known callers
+(`0x2996aa`, `0x2997dc`, `0x299860`, `0x2998a0`) sit immediately before the callback-7 handler and
+construct the same `0x18`-byte radio-session object later attached by `0x24f25c`. None has yet been
+shown to execute organically. The next RE pass should map their incoming request and publication
+path rather than infer a trigger from the SIM completion sequence.
+
 ## Reply-code 2
 
 The downstream card contract is already mapped. Organic `0x1196` enters `0x207234`, which calls
