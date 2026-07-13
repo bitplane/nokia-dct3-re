@@ -270,6 +270,15 @@ coherent boot and is downstream, not the missing producer. Future census tooling
 must therefore recover descriptor fields and indirect event generation in addition
 to direct `0x2af798` call sites.
 
+The message-topology census refines that statement without contradicting the
+literal result. It recovers 16 in-ROM calls which construct global `0x05e8` as
+`0xbd << 3` and pass it to `0x2af798`. In that ABI the high bits encode the
+argument count; plain `0x05e8` carries **zero argument words**. These sites can
+trigger the global callback sweep, but none supplies the queued object required
+for service-5 callback `0x2618e8` to take its object-bearing completion path.
+The unresolved predecessor remains session/queue population before the trigger,
+not production of the numeric event itself.
+
 The coherent runtime instead completes a separate acknowledgement side path:
 
 ```text

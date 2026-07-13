@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "name": "Nokia 3210 MCU v6.00",
+  "runtime_profile": "coherent deep boot with NOKI3210_TRACE_TASKS=1 and NOKI3210_TRACE_GSM_LOWER=1",
+  "flash_base": "0x200000",
+  "callback_table": {
+    "address": "0x2db720",
+    "entries": 126,
+    "entry_size": 8
+  },
+  "apis": [
+    {"address": "0x26a204", "name": "task_post", "kind": "message_send", "arguments": {"destination_task": "r0", "message": "r1"}},
+    {"address": "0x26a354", "name": "task_post_alt", "kind": "message_send", "arguments": {"destination_task": "r0", "message": "r1"}},
+    {"address": "0x26a95c", "name": "task_post_owned", "kind": "message_send", "arguments": {"destination_task": "r0", "message": "r1"}},
+    {"address": "0x2695f4", "name": "event_post_immediate", "kind": "event_transport", "arguments": {"event": "r0"}},
+    {"address": "0x2697aa", "name": "event_post_delayed", "kind": "event_transport", "arguments": {"task": "r0", "event": "r1"}},
+    {"address": "0x2698e4", "name": "event_table_service", "kind": "event_transport", "arguments": {"task": "r0"}},
+    {"address": "0x2af6ea", "name": "task5_render_post", "kind": "packed_event", "arguments": {"event": "r0", "descriptor": "r1"}},
+    {"address": "0x2af798", "name": "generic_event_generate", "kind": "packed_event", "arguments": {"packed_event": "r0"}},
+    {"address": "0x2632fc", "name": "service_register_transient", "kind": "descriptor_registration", "arguments": {"service": "r0", "callback": "r1", "descriptor": "r2"}, "descriptor_argument": "descriptor"},
+    {"address": "0x263d30", "name": "service_register_resident", "kind": "descriptor_registration", "arguments": {"descriptor": "r0", "enable": "r1", "mask": "r2"}, "descriptor_argument": "descriptor"},
+    {"address": "0x2b13d4", "name": "service_channel_report", "kind": "service_transport", "arguments": {"report": "r0"}}
+  ],
+  "consumers": [
+    {"address": "0x2618e8", "name": "service5_callback", "task": 5, "statuses": ["0x05e2", "0x05e8"], "provenance": "reviewed_static"},
+    {"address": "0x28d29c", "name": "generic_service_provider_dispatch", "task": 5, "statuses": ["0x05ea"], "provenance": "reviewed_static"},
+    {"address": "0x209978", "name": "task15_object_parser", "task": 15, "statuses": ["0x07dd"], "provenance": "reviewed_static"},
+    {"address": "0x267258", "name": "task14_object_decoder", "task": 14, "statuses": ["0x09d8", "0x09de"], "provenance": "reviewed_static"},
+    {"address": "0x21b198", "name": "task10_completion_dispatch", "task": 10, "statuses": ["0x1392"], "provenance": "reviewed_static"}
+  ],
+  "semantic_edges": [
+    {
+      "id": "service5_object_completion",
+      "from": "service5_callback",
+      "to": "generic_service_provider_dispatch",
+      "input_status": "0x05e8",
+      "output_status": "0x05ea",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "callback_entry", "index": 40, "pointer": "0x2618e9", "flags": "0x3ac00000"},
+        {"type": "effective_literal_load", "address": "0x28d374", "value": "0x05ea"}
+      ]
+    },
+    {
+      "id": "provider_05ea_to_task15_07dd",
+      "from": "generic_service_provider_dispatch",
+      "to": "task15_object_parser",
+      "input_status": "0x05ea",
+      "output_status": "0x07dd",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "effective_literal_load", "address": "0x28d374", "value": "0x05ea"},
+        {"type": "effective_literal_load", "address": "0x28d38a", "value": "0x07dd"},
+        {"type": "call", "address": "0x28d390", "target": "0x28d194"}
+      ]
+    },
+    {
+      "id": "task15_generated_09d8",
+      "from": "task15_object_parser",
+      "to": "task14_object_decoder",
+      "input_status": "0x07dd",
+      "output_status": "0x09d8",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "effective_literal_load", "address": "0x2091c6", "value": "0x09d8"},
+        {"type": "call", "address": "0x209228", "target": "0x26a204"}
+      ]
+    },
+    {
+      "id": "task10_completion_0434",
+      "from": "task10_completion_dispatch",
+      "to": "task17_radio_init",
+      "input_status": "0x1392",
+      "output_status": "0x0434",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "effective_literal_load", "address": "0x219e72", "value": "0x0434"},
+        {"type": "call", "address": "0x219e94", "target": "0x251c3e"}
+      ]
+    },
+    {
+      "id": "corrected_lower_result_0fbf",
+      "from": "task14_object_decoder",
+      "to": "lower_radio_result_dispatch",
+      "input_status": "0x102f",
+      "output_status": "0x0fbf",
+      "classification": "disproven_alternative",
+      "disproven": "0x0fc3",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "effective_literal_load", "address": "0x24788e", "value": "0x0fbf"},
+        {"type": "call", "address": "0x247890", "target": "0x246ad6"}
+      ]
+    }
+  ],
+  "runtime_patterns": [
+    {"kind": "message", "regex": "msgedge: t(?P<source>\\d+) -> t(?P<destination>\\d+) \\(first status=(?P<status>[0-9a-fA-F]{4})"},
+    {"kind": "message", "regex": "sim_owner_post: t(?P<source>\\d+) -> t(?P<destination>\\d+) status=(?P<status>[0-9a-fA-F]{4})"},
+    {"kind": "callback", "regex": "gsm_lower: service5 callback status=(?P<status>[0-9a-fA-F]{4}).*caller=(?P<caller>[0-9a-fA-F]{8})"}
+  ]
+}

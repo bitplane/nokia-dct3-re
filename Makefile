@@ -20,6 +20,7 @@ SWAP ?= roms/3210f600a_swap16.bin
 
 RUN_DIR ?= run
 SECONDS ?= 20
+CENSUS_LOG ?=
 
 # Stable, git-ignored PNG of the latest LCD frame — promoted after every run so an
 # external `watch chafa progress_latest_frame.png` updates live.
@@ -65,12 +66,13 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
+	@echo "make census         build the 3210 v6.00 message-topology JSON/report"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
@@ -127,6 +129,14 @@ build: overlay roms
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
 	@$(PYTHON) -c "d=open('$(ROM)','rb').read(); b=bytearray(d); b[0::2],b[1::2]=d[1::2],d[0::2]; open('$(SWAP)','wb').write(bytes(b)); print('wrote $(SWAP) (%d bytes)'%len(b))"
+
+census:
+	@mkdir -p run_census
+	$(VENV)/bin/python tools/message_census.py --check \
+		$(if $(CENSUS_LOG),--runtime-log $(CENSUS_LOG)) \
+		--json run_census/noki3210_v600.json \
+		--report run_census/noki3210_v600.md
+	@echo "census: run_census/noki3210_v600.json and run_census/noki3210_v600.md"
 
 run: build
 	@mkdir -p $(RUN_DIR)
