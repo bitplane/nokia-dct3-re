@@ -32,13 +32,13 @@ cross-ROM pass to identify the genuinely shared contract.
 - New *hardware* behaviour goes in a device model or the owning MAD2 register block.
 - New diagnostic traces may go in the `*_firmware_*` helpers when no component
   boundary exists yet. Do not add result forcing or task-message injection.
-- The `*_firmware_*` helpers should **shrink over time**: when a shim's gate is
-  understood and modeled as real hardware/scheduler state, delete the shim.
+- The `*_firmware_*` helpers should **shrink over time**: when a bridge's gate is
+  understood and modeled at a real device or transport boundary, delete the bridge.
 - **Status (2026-06-26):** all `NOKI3210_FORCE_*` firmware-result forcing has been
   removed (audited inert against the oracle — see `removed_forcing_knobs.md`). The
-  helpers now hold only non-force research shims (NV/display-source stubs, trace
-  taps). Do **not** re-introduce result forcing; model the missing hardware/NV state
-  instead.
+  helpers still contain two explicit RAM-read shortcuts (display-type sourcing and
+  the startup event-14 latch), provisional firmware bridges, and trace taps. Do
+  **not** add result forcing; model the missing hardware/NV state instead.
 - **Update (2026-07-11):** the organic registration investigation is banked and its forcing lineage
   has been removed. Surviving `MODEL_*` firmware hooks are peer prototypes until their behavior is
   expressed at a real transport boundary. See `sim_registration.md` and

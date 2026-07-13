@@ -14,6 +14,12 @@
       "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
     },
     {
+      "id": "contact_064_response_stability", "owner": "contact_task", "status": "drift",
+      "predicate": "After healthy contact completion, class-0x40 command 0x64 status reporting converges instead of re-reporting indefinitely",
+      "current": "The deep trace observed 31,068 firmware construct/send attempts; the responder supplies only the first healthy completion and the missing convergence condition is unresolved",
+      "evidence": ["docs/contact_service_topology.md"]
+    },
+    {
       "id": "sim_preliminary_lifecycle", "owner": "sim_task", "status": "satisfied",
       "predicate": "ATR, PPS and mandatory EF reads complete through SIMI/FIQ transport",
       "current": "Satisfied organically by nokia_sim_card_device", "evidence": ["docs/sim_subsystem.md"]

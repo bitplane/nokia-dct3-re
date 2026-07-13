@@ -519,7 +519,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 
 // ============================================================================
 // NOKI3210_* environment knobs — the driver reads every runtime option from the
-// environment (overridable on the `make run` command line). Three kinds:
+// environment (overridable on the `make run` command line). Four kinds:
 //
 //   1. HARDWARE CONFIG — selects a hardware *scenario*, not firmware behaviour:
 //      display variant (DISPLAY_TYPE), power/ADC/battery (ADC_PROFILE,
@@ -528,17 +528,16 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      SIM UART (SIM_PROFILE), reset (MAD2_SOFT_RESET*). The default boot (none set)
 //      reproduces the CONTACT SERVICE oracle frame byte-for-byte.
 //
-//   2. FAITHFUL BOOT MODELS (MODEL_*) — opt-in, each reproduces one real subsystem's
-//      handshake that a blank/peerless boot can't perform, driving the firmware's OWN
-//      code (no result-forcing); all oracle-preserving. The stack that reaches the
-//      "Insert SIM card" home screen: MODEL_DSP_SERVICE, MODEL_CCONT_PRESENT,
-//      MODEL_SVC_RESPONDER and MODEL_SVC_CHANNEL_DRAIN. The stateful register/FIQ
-//      SIM is selected separately with MODEL_SIM_DEVICE. MODEL_STARTUP_REPORTS feeds the
-//      subsystem-ready reports that drive the post-SIM interactive handoff (code-7
-//      trigger + mode-4 checklist + VBAT-confirm), advancing task 1 mode 4 -> 0xc;
-//      docs/interactive_handoff.md. See docs/service_bootstrap.md,
-//      docs/boot_to_insert_sim.md, docs/sim_emulator_scope.md.
-//   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
+//   2. DEVICE-BOUNDARY MODELS — opt-in behavior behind an ordinary hardware
+//      interface. MODEL_SIM_DEVICE owns SIMI/FIQ6. MODEL_CCONT_PRESENT selects
+//      the extracted CCONT device scenario. MODEL_DSP_SERVICE and
+//      MODEL_DSP_RING_DRAIN currently model DSP-owned counters/ring consumption;
+//      their semantic reply contract remains incomplete.
+//   3. PROVISIONAL FIRMWARE BRIDGES — MODEL_SVC_RESPONDER,
+//      MODEL_SVC_CHANNEL_DRAIN and MODEL_STARTUP_REPORTS reproduce observed peer
+//      effects through firmware-call boundaries. They are not final hardware
+//      models and must move behind a proved transport/device contract.
+//   4. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
 //      TRACE_CCONT_READ (power/ADC/RTC), TRACE_LIMP/TRACE_LIMP2 (the startup limp),
 //      TRACE_CSCMD (contact-service command stream), TRACE_HANDOFF (task-1 master
 //      sequencer mode + startup checklist; the post-SIM interactive handoff),
@@ -549,8 +548,10 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      TRACE_DSP_BOUNDARY and TRACE_GSM_LOWER cover the current peer boundary.
 //      Retired forcing shims and one-off traces: docs/removed_forcing_knobs.md.
 //
-// The forcing/model logic is quarantined in flash_firmware_hooks / ram_*_firmware_*
-// (banner'd "NOT hardware behaviour"); see docs/driver_structure.md.
+// Firmware bridges, traces and the two remaining RAM-read shortcuts are
+// quarantined in flash_firmware_hooks / ram_*_firmware_* (banner'd "NOT hardware
+// behaviour"). Add no new forced firmware results/messages; the two named
+// RAM-read shortcuts remain quarantined debt. See docs/driver_structure.md.
 // ============================================================================
 static unsigned nokia_env_u32(const char *name, unsigned fallback)
 {
@@ -1155,7 +1156,7 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 }
 
 // Hardware RAM read entry point (registered in the address map). The real
-// backing read plus all firmware-research forcing/traces live in the
+// backing read plus firmware-research shortcuts/traces live in the
 // quarantined ram_r_firmware_overrides below.
 uint16_t noki3310_state::ram_r(offs_t offset, uint16_t mem_mask)
 {
@@ -1163,9 +1164,9 @@ uint16_t noki3310_state::ram_r(offs_t offset, uint16_t mem_mask)
 }
 
 // ============================================================================
-// Firmware-research RAM-read path: backing read + forcing shims (which can
-// rewrite the returned value) + execution traces. NOT clean hardware
-// behaviour; should shrink as shims become real models.
+// Firmware-research RAM-read path: backing read + two explicit shortcuts which
+// can rewrite the returned value + execution traces. NOT clean hardware
+// behaviour; should shrink as their real hardware/NV owners are established.
 // ============================================================================
 uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask)
 {
@@ -1191,7 +1192,7 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 }
 
 // Hardware RAM write entry point (registered in the address map). The backing
-// store plus all firmware-research forcing/traces live in the quarantined
+// store plus firmware-research traces live in the quarantined
 // ram_w_firmware_overrides below.
 void noki3310_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
@@ -1199,9 +1200,9 @@ void noki3310_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 }
 
 // ============================================================================
-// Firmware-research RAM-write path: forcing shims (which can rewrite the stored
-// value) + execution traces, wrapping the real backing store (COMBINE_DATA).
-// NOT clean hardware behaviour; should shrink as shims become real models.
+// Firmware-research RAM-write path: execution traces around the real backing
+// store (COMBINE_DATA). NOT hardware behaviour; should shrink as investigations
+// close.
 // ============================================================================
 void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
@@ -1418,10 +1419,10 @@ void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 }
 
 // ============================================================================
-// Firmware-research hooks for flash fetches: forcing shims + execution traces.
-// This is NOT hardware behaviour. It returns an override fetch value, or
-// nullopt to let the real flash read proceed. It should shrink toward empty as
-// each shim is replaced by a real hardware/scheduler model.
+// Firmware-research hooks for flash fetches: provisional firmware bridges and
+// execution traces. This is NOT hardware behaviour. It returns an override
+// fetch value, or nullopt to let the real flash read proceed. It should shrink
+// toward empty as each bridge moves behind a proved hardware/transport model.
 // ============================================================================
 std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 pc, u32 addr, uint16_t mem_mask)
 {
@@ -1537,8 +1538,8 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 	}
 
-	// TRACE_TASKS (opt-in): app-task-layer forcing-sweep tap. Log the first time each RTOS task reaches
-	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the faithful boot
+	// TRACE_TASKS (opt-in): app-task liveness tap. Log the first time each RTOS task reaches
+	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the deep profile
 	// stack this shows which of the app tasks 10-17 (resumed by mode-0xc's 0x2795e6) actually come
 	// alive. Task id = [0x100022]. docs/interactive_handoff.md app-task sweep.
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x0026a458)
