@@ -42,50 +42,6 @@ namespace {
 
 static unsigned nokia_env_u32(const char *name, unsigned fallback);
 
-// TS 51.011 GSM EF body sizes, taken verbatim from the firmware's own read-list table 0x2e0c04 (26 entries),
-// so the file-driven SIM responder answers each SELECTed file with exactly the size the firmware expects.
-// Returns 0 for unknown ids (a DF/MF or an EF outside the mandatory set). Content is synthetic (public
-// TS 51.011 structure only -- no real SIM data; see sim_ef_byte).
-static unsigned sim_ef_size(uint16_t fid)
-{
-	static const struct { uint16_t id; uint8_t len; } tbl[] = {
-		{0x2fe2,0x0a},{0x6fb7,0x0f},{0x6fad,0x03},{0x6f07,0x09},{0x6f74,0x10},{0x6f78,0x02},
-		{0x6f7e,0x0b},{0x6f20,0x09},{0x6f7b,0x0c},{0x6fae,0x01},{0x6f31,0x01},
-		{0x6f37,0x03},{0x6f41,0x05},{0x6f43,0x02},{0x6f46,0x11},{0x6f13,0x01},
-		{0x6f98,0x16},{0x6f9b,0x25},{0x6f91,0x01},{0x6f93,0x01},{0x6f95,0x1d},
-		{0x6f96,0x1d},{0x6f9f,0x01},{0x6f92,0x01},{0xea00,0x12},{0xea03,0x0b},
-		{0x2fe6,0x04},
-	};
-	for (const auto &e : tbl) if (e.id == fid) return e.len;
-	return 0;
-}
-
-// Synthetic EF content byte i for file fid (public-spec structure only). A blank/un-provisioned but
-// internally-consistent test SIM: IMSI test id (MCC 001), LOCI "not updated" (forces normal registration),
-// Phase 2; everything else an unset EF (0xff). No real subscriber data.
-static uint8_t sim_ef_byte(uint16_t fid, unsigned i)
-{
-	switch (fid)
-	{
-	case 0x2fe2: { // ICCID: BCD test identifier, padded to the mandatory 10-byte EF
-		static const uint8_t iccid[10] = {0x98,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf0};
-		return i < sizeof(iccid) ? iccid[i] : 0xff; }
-	case 0x6fb7: { // ECC: one provisioned 112 record followed by empty records
-		static const uint8_t ecc[15] = {0x11,0xf2,0xff, 0xff,0xff,0xff, 0xff,0xff,0xff,
-			0xff,0xff,0xff, 0xff,0xff,0xff};
-		return i < sizeof(ecc) ? ecc[i] : 0xff; }
-	case 0x6f07: { // IMSI: [len=8][BCD parity+digits], test IMSI 001-01 ...
-		static const uint8_t imsi[9] = {0x08,0x09,0x10,0x10,0x32,0x54,0x76,0x98,0x10};
-		return i < 9 ? imsi[i] : 0xff; }
-	case 0x6f7e: // LOCI: byte 10 = location-update status 1 = "not updated"
-		return (i == 10) ? 0x01 : (i < 4 ? 0xff : 0x00);
-	case 0x6fae: // Phase: GSM phase 2
-		return 0x02;
-	default:
-		return 0xff;   // unset EF
-	}
-}
-
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
 constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
@@ -416,27 +372,6 @@ private:
 	// MODEL_STARTUP_REPORTS: feed the subsystem-ready reports (code 7 + the mode-4 6-message checklist
 	// codes + 0x74 + 3/0x11) to task-1's getter reactively, as the real subsystems would post them.
 	unsigned      m_reports_idx = 0;    // index into the report-code FEED list
-	// SIM ATR FIFO (NOKI3210_MODEL_SIM_ATR): register-level ATR delivery on SIM activation.
-	uint8_t       m_sim_atr[40];
-	uint8_t       m_sim_atr_len = 0;
-	uint8_t       m_sim_atr_pos = 0;
-	// Legacy message-layer SIM responder state. Kept temporarily as a comparison
-	// harness while the register/FIQ device becomes the sole supported path.
-	uint8_t       m_sim_last_ins = 0;
-	uint8_t       m_sim_last_cmd[16] = {0};
-	uint8_t       m_sim_last_cmdlen = 0;
-	uint8_t       m_sim_card_phase = 0;
-	uint32_t      m_sim_card_recv = 0;
-	bool          m_sim_card_pending = false;
-	bool          m_sim_t0_write_data = false;
-	uint16_t      m_sim_sel_file = 0;
-	unsigned      m_ring2_state = 0;
-	uint32_t      m_ring2_saved[16];
-	uint32_t      m_ring2_resume = 0;
-	uint32_t      m_ring2_msg[4] = {0};
-	unsigned      m_ring2_nmsg = 0;
-	bool          m_ring2_atr_resuming = false;
-	bool          m_ring2_activation_posted = false;
 	uint8_t       m_battery_startup_event_step;
 	uint8_t       m_battery_startup_event_step_mode9;
 	bool          m_post_charger_sequence_entered;
@@ -598,8 +533,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      code (no result-forcing); all oracle-preserving. The stack that reaches the
 //      "Insert SIM card" home screen: MODEL_DSP_SERVICE, MODEL_CCONT_PRESENT,
 //      MODEL_SVC_RESPONDER and MODEL_SVC_CHANNEL_DRAIN. The stateful register/FIQ
-//      SIM is selected separately with MODEL_SIM_DEVICE; MODEL_SIM_CARD is a
-//      legacy message-layer comparison harness. MODEL_STARTUP_REPORTS feeds the
+//      SIM is selected separately with MODEL_SIM_DEVICE. MODEL_STARTUP_REPORTS feeds the
 //      subsystem-ready reports that drive the post-SIM interactive handoff (code-7
 //      trigger + mode-4 checklist + VBAT-confirm), advancing task 1 mode 4 -> 0xc;
 //      docs/interactive_handoff.md. See docs/service_bootstrap.md,
@@ -762,8 +696,6 @@ void noki3310_state::machine_reset()
 	m_after_mad2_soft_reset = false;
 	m_svcresp_state = 0;
 	m_svcresp_msg = 0;
-	m_sim_t0_write_data = false;
-	m_ring2_activation_posted = false;
 	m_reports_idx = 0;
 	m_battery_startup_event_step = 0;
 	m_battery_startup_event_step_mode9 = 0;
@@ -2245,369 +2177,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					debug_ram_byte(0x00100022), machine().time().as_double());
 		m_service_transport->channel_busy();
 	}
-	// MODEL_SIM_CARD command capture: intercept the SIM APDU command the phone sends over the
-	// service-lower transport (0x2aec34 with msg code 0x2701 in r1; r0=len, r2=data ptr to the raw
-	// APDU). Remember the command (INS + full bytes) so the SIM_CARD responder can echo the T=0
-	// procedure byte and mark that exactly one response is now pending.
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0
-			&& pc == addr && addr == 0x002aec34 &&
-			(m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x2701)
-	{
-		const u32 len = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
-		const u32 buf = m_maincpu->state_int(arm7_cpu_device::ARM7_R2);
-		if (buf >= 0x00100000 && buf < 0x00180000)
-		{
-			char hex[128]; int n = 0;
-			for (u32 i = 0; i < len && i < 32; i++) n += std::snprintf(hex + n, sizeof(hex) - n, "%02x ", debug_ram_byte(buf + i));
-			const uint8_t ins = len >= 2 ? debug_ram_byte(buf + 1) : 0;
-			if (!m_sim_t0_write_data)
-			{
-				if (len >= 2) m_sim_last_ins = ins;   // FS responder: remember for the T=0 procedure-byte echo
-				m_sim_last_cmdlen = uint8_t(std::min<u32>(len, sizeof(m_sim_last_cmd)));  // full command header
-				for (unsigned i = 0; i < m_sim_last_cmdlen; i++) m_sim_last_cmd[i] = debug_ram_byte(buf + i);
-			}
-			// responder: track the SELECTed file id (a0 a4 00 00 02 <hi> <lo>) so GET_RESPONSE/READ answer
-			// the RIGHT file. This is what makes the responder file-driven rather than single-EF.
-			if (ins == 0xa4 && len >= 7)
-				m_sim_sel_file = uint16_t((debug_ram_byte(buf + 5) << 8) | debug_ram_byte(buf + 6));
-			m_sim_card_pending = true;   // MODEL_SIM_CARD: this command now awaits exactly one response
-			const char *name = m_sim_t0_write_data ? "T0_WRITE_DATA" : ins == 0xa4 ? "SELECT" : ins == 0xc0 ? "GET_RESPONSE" : ins == 0xb0 ? "READ_BINARY"
-							 : ins == 0xb2 ? "READ_RECORD" : ins == 0x20 ? "VERIFY_CHV" : ins == 0xf2 ? "STATUS" : "?";
-			static unsigned ap = 0;
-			if (ap++ < 60)
-				logerror("sim_apdu: %-12s len=%u [ %s] t=%.4f\n", name, len, hex, machine().time().as_double());
-		}
-	}
-	// SIM_CARD_RING2 (opt-in): FAITHFUL ring#2 delivery (docs/sim_registration.md "BREAKTHROUGH"). The old
-	// recv-intercept (below) returns synthetic messages from inside recv 0x26a458 WITHOUT running the real
-	// recv -> it never drains the rings and desyncs the ring#1 arm-bit MB[0x15][+0xf], so task-20 commands
-	// posted to task 21's ring#1 strand and task 21 never serves firmware-driven reads. Instead, POST the
-	// ATR/responses to task 21's ring#2 via the real poster 0x26aac0(0x15, msg) and let the firmware's own
-	// recv run unmodified -> ring#2 (responses) and ring#1 (task-20 commands) drain coherently. Card
-	// responses on real HW arrive exactly this way (RX handler 0x2a0454 -> 0x26aac0(0x15) -> ring#2).
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) != 0)
-	{
-		constexpr u32 SENT_R2 = 0x003ff300;   // ring#2-post trampoline sentinel
-		constexpr u32 SC_BASE = 0x0017f800;   // scratch message ring (4 slots x 0x40)
-		constexpr uint16_t BX_R12 = 0x4760, BX_LR = 0x4770;
-		auto setr = [&](int r, u32 v){ m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0 + r, v); };
-		auto getr = [&](int r){ return u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0 + r)); };
-		// build a message {[+2..3]=len, [+4]=code, [+5..]=data} in the next scratch slot; queue its ptr.
-		auto queue = [&](uint8_t code, const uint8_t *d, unsigned nn) {
-			if (m_ring2_nmsg >= 4) return;
-			const u32 p = SC_BASE + m_ring2_nmsg * 0x40;
-			for (offs_t i = 0; i < 0x40; i++) debug_ram_byte_w(p + i, 0);
-			debug_ram_byte_w(p + 2, uint8_t(nn >> 8)); debug_ram_byte_w(p + 3, uint8_t(nn));
-			debug_ram_byte_w(p + 4, code);
-			for (unsigned i = 0; i < nn && i < 0x38; i++) debug_ram_byte_w(p + 5 + i, d[i]);
-			m_ring2_msg[m_ring2_nmsg++] = p;
-		};
-		// SENT_R2 sentinel: post the next queued message, or (all posted) restore + resume.
-		if (m_ring2_state > 0 && pc == addr && addr == SENT_R2)
-		{
-			if (m_ring2_state < m_ring2_nmsg)   // msg[0] already posted at the trigger; state = # posted
-			{
-				setr(0, 0x15); setr(1, m_ring2_msg[m_ring2_state]);
-				setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
-				m_ring2_state++;
-				return BX_R12;
-			}
-			for (int i = 0; i < 15; i++) setr(i, m_ring2_saved[i]);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_CPSR, m_ring2_saved[15]);
-			const u32 resume = m_ring2_resume;
-			m_ring2_state = 0; m_ring2_nmsg = 0; m_ring2_resume = 0;
-			if (resume) { setr(12, resume | 1); return BX_R12; }
-			return BX_LR;   // resume by returning to the trigger's caller (restored LR)
-		}
-		// ATR trigger: on EVERY SIM reset 0x27e024, queue a code-5 ATR message to ring#2, then resume the
-		// reset. The firmware may reset/retry; each reset must get a fresh ATR. m_ring2_atr_resuming is the
-		// per-reset re-entry guard: when we BX back to 0x27e024 after the post, fall through (real reset runs).
-		if (pc == addr && addr == 0x0027e024)
-		{
-			if (m_ring2_atr_resuming)
-				m_ring2_atr_resuming = false;   // resume re-entry: let the real reset instruction run
-			else if (m_ring2_state == 0)
-			{
-				uint8_t atr[16]; unsigned an = 0;
-				if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
-					for (const char *q = hex; q[0] && q[1] && an < sizeof(atr); q += 2)
-						atr[an++] = uint8_t(std::strtoul(std::string(q, 2).c_str(), nullptr, 16));
-				if (an == 0) { atr[0] = 0x3b; atr[1] = 0x10; atr[2] = 0x05; an = 3; }
-				m_ring2_nmsg = 0; queue(5, atr, an);
-				for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
-				m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-				m_ring2_resume = 0x0027e024;   // resume the reset (m_ring2_atr_resuming guards re-fire)
-				m_ring2_atr_resuming = true;
-				setr(0, 0x15); setr(1, m_ring2_msg[0]);
-				setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
-				m_ring2_state = 1;
-				static unsigned ac = 0;
-				if (ac++ < 8) logerror("sim_card: RING2 queued ATR (%u bytes) -> task21 ring#2 t=%.4f\n", an, machine().time().as_double());
-				return BX_R12;
-			}
-		}
-		// External card-presence model: once task 21 is initialized and about to enter its receive loop,
-		// deliver its native activation code through the real ring#2 poster. This models the missing
-		// SIM-UART/CCONT peer event without calling a firmware handler or rewriting a received status.
-		if (!m_ring2_activation_posted && m_ring2_state == 0 && pc == addr && addr == 0x0027eae0 &&
-				nokia_env_u32("NOKI3210_SIM_CARD_AUTOSTART", 0) != 0)
-		{
-			m_ring2_nmsg = 0;
-			queue(1, nullptr, 0);
-			for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
-			m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			m_ring2_resume = 0x0027eae0;
-			m_ring2_activation_posted = true;
-			setr(0, 0x15); setr(1, m_ring2_msg[0]);
-			setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
-			m_ring2_state = 1;
-			logerror("sim_card: posted native activation code1 -> task21 ring#2 t=%.4f\n",
-					machine().time().as_double());
-			return BX_R12;
-		}
-		// Response trigger: queue the send ACK, then RX-handler-classified T=0 events. Procedure bytes are
-		// code 0x0b and terminal 6x/9x responses are code 0x0a; code 9 is only an unclassified buffered RX.
-		if (m_ring2_state == 0 && pc == addr && addr == 0x002aec34
-				&& (m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff) == 0x2701)
-		{
-			uint8_t data[48]; unsigned n = 0;
-			uint8_t response_code = 9;
-			bool queue_procedure = false;
-			bool queue_terminal = false;
-			// Firmware-driven SELECT is a 5-byte header (a0 a4 00 00 02) with the file id in the T=0 descriptor
-			// 0x10deec (+0xa..0xb), NOT inline in the command -- track it from there so the responder answers
-			// the RIGHT file. (The injection put the id inline; the firmware puts it in the descriptor.)
-			if (m_sim_last_ins == 0xa4)
-				m_sim_sel_file = uint16_t((debug_ram_byte(0x0010deec + 0xa) << 8) | debug_ram_byte(0x0010deec + 0xb));
-			if (m_sim_t0_write_data)
-			{
-				// The procedure byte caused the terminal to transmit the command body.
-				// Complete that same command with SW1/SW2; do not interpret body bytes as a new APDU.
-				// GSM 11.11 SELECT reports response data availability as 9Fxx, where xx is the
-				// exact GET RESPONSE length. Returning 9000 makes the firmware request length zero.
-				if (m_sim_last_ins == 0xa4)
-				{
-					const u16 fid = m_sim_sel_file;
-					const bool is_df = fid == 0x3f00 || fid == 0x7f20 || (fid & 0xf000) == 0x7000;
-					data[n++] = 0x9f;
-					data[n++] = is_df ? 22 : 15;
-				}
-				else
-				{
-					data[n++] = 0x90; data[n++] = 0x00;
-				}
-				response_code = 0x0a; // RX handler classification for SW1=0x90
-				queue_terminal = true;
-				m_sim_t0_write_data = false;
-			}
-			else if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)     // PPS request: echo verbatim
-				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
-			else if (m_sim_last_ins == 0x24 || m_sim_last_ins == 0xa4)
-			{
-				// CHANGE CHV and SELECT carry Lc bytes from terminal to card. A procedure
-				// byte authorizes the body; SW1/SW2 are returned only after that body arrives.
-				queue_procedure = true;
-				m_sim_t0_write_data = true;
-			}
-			else
-			{
-				const u16 fid = m_sim_sel_file ? m_sim_sel_file : uint16_t(nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07));
-				const bool is_df = (fid == 0x3f00 || fid == 0x7f20 || (fid & 0xf000) == 0x7000);
-				const unsigned efsize = sim_ef_size(fid);
-				const unsigned p3 = m_sim_last_cmdlen >= 5 ? m_sim_last_cmd[4] : 0;
-				// STATUS (0xf2) returns the current directory's FCP, like a DF GET_RESPONSE.
-				if (m_sim_last_ins == 0xc0 || (m_sim_last_ins == 0xf2 && is_df) || m_sim_last_ins == 0xf2)
-				{
-					// A zero-length STATUS has no T=0 data phase. Supplying a procedure byte
-					// here makes the firmware terminate on code 0x0b and leaves SW1/SW2 stale.
-					// At this ring#2 boundary the UART RX engine has already consumed any
-					// card-to-terminal procedure byte and accumulated data through SW1/SW2.
-					if (m_sim_last_ins == 0xf2 && p3 == 0)
-					{
-						data[n++] = 0x90; data[n++] = 0x00;
-					}
-					else if (is_df || m_sim_last_ins == 0xf2)
-					{
-						// STATUS describes the current directory, not the last selected EF.
-						// This bootstrap remains in DF_GSM after selecting a 6Fxx EF.
-						const u16 response_fid = m_sim_last_ins == 0xf2 ?
-							(fid == 0x3f00 || fid == 0 ? 0x3f00 : 0x7f20) : fid;
-						uint8_t fcp[22] = {0};
-						fcp[4] = uint8_t(response_fid >> 8); fcp[5] = uint8_t(response_fid);
-						fcp[6] = (response_fid == 0x3f00) ? 0x01 : 0x02;
-						fcp[12] = 0x0a;       // bytes following the mandatory DF header
-						fcp[13] = 0x92;       // 3 V operation, clock-stop allowed, CHV1 disabled
-						fcp[14] = response_fid == 0x3f00 ? 0x02 : 0x00; // child DFs
-						fcp[15] = response_fid == 0x3f00 ? 0x01 : 0x20; // child EFs
-						fcp[16] = 0x02;       // CHV1 and CHV2 are present
-						fcp[18] = 0x03; fcp[19] = 0x03; // CHV1 / unblock attempts remaining
-						fcp[20] = 0x03; fcp[21] = 0x03; // CHV2 / unblock attempts remaining
-						for (unsigned i = 0; i < 22; i++) data[n++] = fcp[i];
-					}
-					else
-					{
-						uint8_t fcp[15] = { 0,0, uint8_t(efsize>>8),uint8_t(efsize),
-							uint8_t(fid>>8),uint8_t(fid), 0x04,0, 0,0,0, 0x01, 0x02, 0x00, 0x00 };
-						for (unsigned i = 0; i < 15; i++) data[n++] = fcp[i];
-					}
-					data[n++] = 0x90; data[n++] = 0x00;
-					queue_terminal = true;
-				}
-				else if (m_sim_last_ins == 0xb0 || m_sim_last_ins == 0xb2)
-				{
-					unsigned p3 = m_sim_last_cmdlen >= 5 && m_sim_last_cmd[4] ? m_sim_last_cmd[4] : (efsize ? efsize : 8);
-					for (unsigned i = 0; i < p3 && n < sizeof(data) - 2; i++) data[n++] = sim_ef_byte(fid, i);
-					data[n++] = 0x90; data[n++] = 0x00;
-					queue_terminal = true;
-				}
-				else   // no modelled data phase: terminal status only
-				{
-					data[n++] = 0x90; data[n++] = 0x00;
-					queue_terminal = true;
-				}
-				response_code = 0x0a;
-			}
-			m_ring2_nmsg = 0;
-			const uint8_t ack = 7; queue(7, &ack, 0);   // send-accepted ACK for 0x27e98c's recv
-			if (queue_procedure)
-			{
-				const uint8_t procedure = m_sim_last_ins;
-				queue(0x0b, &procedure, 1);
-			}
-			if (queue_terminal || (!queue_procedure && n != 0))
-				queue(response_code, data, n);
-			m_sim_card_pending = false;
-			for (int i = 0; i < 15; i++) m_ring2_saved[i] = getr(i);
-			m_ring2_saved[15] = m_maincpu->state_int(arm7_cpu_device::ARM7_CPSR);
-			m_ring2_resume = 0;
-			setr(0, 0x15); setr(1, m_ring2_msg[0]);
-			setr(12, 0x0026aac0 | 1); setr(14, SENT_R2 | 1);
-			m_ring2_state = 1;
-			static unsigned rc = 0;
-			if (rc++ < 80) logerror("sim_card: RING2 reply ins=%02x fid=%04x -> proc=%u terminal=%u bytes=%u code=%u t=%.4f\n",
-					m_sim_last_ins, m_sim_sel_file, queue_procedure, queue_terminal, n, response_code,
-					machine().time().as_double());
-			return BX_R12;
-		}
-	}
-	// MODEL_SIM_CARD (opt-in): the FAITHFUL ATR delivery. Instead of forcing the manager's recv return to
-	// code 5 (EXPERIMENT_SIM_CODE5) and separately poking the ATR into 0x10dddc (MODEL_SIM_ATR_MSG), deliver
-	// a genuine code-5 "response received" SIM-task message CARRYING the ATR bytes -- exactly how a real
-	// SIM's ATR would arrive. The real dispatch 0x27df64 then copies the ATR (msg+5, len msg+2) into
-	// 0x10dddc ([+0]=len, [+2..]=bytes) and returns 5, which the manager dispatches (0x27eb7c) to the code-5
-	// handler 0x27ebbc -> parser 0x27e046. One message does the whole ATR handshake, no forcing.
-	// Delivered once, on the SIM_CARD_ATR_AFTER'th SIM-task recv (default 2, modelling "reset -> ATR ready").
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) == 0 && pc == addr && addr == 0x0026a458 &&
-			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027df10)
-	{
-		m_sim_card_recv++;
-		constexpr u32 SCRATCH = 0x0017fc00;
-		uint8_t data[48]; unsigned n = 0; uint8_t code = 0;
-		if (m_sim_card_phase == 0 && m_sim_card_recv >= nokia_env_u32("NOKI3210_SIM_CARD_ATR_AFTER", 2))
-		{
-			// Phase 0 -> ATR: a code-5 message carrying the ATR bytes (SIM_ATR_HEX).
-			if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
-				for (const char *p = hex; p[0] && p[1] && n < sizeof(data); p += 2)
-					data[n++] = uint8_t(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
-			if (n == 0) { data[0] = 0x3b; data[1] = 0x10; data[2] = 0x05; n = 3; }
-			code = 5;
-			m_sim_card_phase = 1;
-		}
-		else if (m_sim_card_phase == 1 && m_sim_card_pending)
-		{
-			// Phase 1 -> exactly one response per command (code 9): a PPS request (PPSS=0xFF) is echoed
-			// verbatim; otherwise a bare SW=9000. (EF file content comes in a later increment.)
-			if (m_sim_last_cmdlen > 0 && m_sim_last_cmd[0] == 0xff)
-			{
-				// PPS request: echoed verbatim (compared by memcmp at 0x27ed66, not the data path).
-				for (unsigned i = 0; i < m_sim_last_cmdlen && n < sizeof(data); i++) data[n++] = m_sim_last_cmd[i];
-			}
-			else
-			{
-				// File-read command: the data path 0x27ee94 reads the response's FIRST byte (0x10dddc+2) as
-				// the T=0 procedure byte (must equal the INS => "send all remaining"). After it comes the
-				// payload + SW=9000. GET RESPONSE -> the SELECTed file's FCP; READ -> its synthetic content.
-				// FILE-DRIVEN: sizes come from the firmware's own EF read-list 0x2e0c04, keyed on the file id
-				// tracked at SELECT (m_sim_sel_file), so the responder answers the RIGHT file, not a fixed EF.
-				const u16 fid = m_sim_sel_file ? m_sim_sel_file : uint16_t(nokia_env_u32("NOKI3210_SIM_CARD_EF", 0x6f07));
-				const bool is_df = (fid == 0x3f00 || fid == 0x7f20 || (fid & 0xf000) == 0x7000);
-				const unsigned efsize = sim_ef_size(fid);   // TS 51.011 EF body length (0 if unknown -> DF or fallback)
-				data[n++] = m_sim_last_ins;   // procedure byte = INS echo
-				if (m_sim_last_ins == 0xc0)   // GET RESPONSE -> FCP (TS 51.011 9.2.1 / 9.3)
-				{
-					if (is_df)
-					{
-						// DF/MF FCP: 22-byte block; characteristics byte 13 = 0x80 (CHV1 disabled -> no PIN prompt).
-						uint8_t fcp[22] = {0};
-						fcp[2] = 0x00; fcp[3] = 0x00;               // total memory (n/a here)
-						fcp[4] = uint8_t(fid >> 8); fcp[5] = uint8_t(fid);
-						fcp[6] = (fid == 0x3f00) ? 0x01 : 0x02;     // type: MF / DF
-						fcp[13] = 0x80;                             // characteristics: CHV1 disabled
-						fcp[12] = 0x0a;                             // length of following (GSM-specific data)
-						for (unsigned i = 0; i < 22; i++) data[n++] = fcp[i];
-					}
-					else
-					{
-						uint8_t fcp[15] = {
-							0x00, 0x00,                              // RFU
-							uint8_t(efsize >> 8), uint8_t(efsize),   // file size (from 0x2e0c04)
-							uint8_t(fid >> 8), uint8_t(fid),         // file id
-							0x04,                                    // type: EF
-							0x00,                                    // RFU
-							0x00, 0x00, 0x00,                        // access conditions: READ = ALWAYS (no PIN)
-							0x01,                                    // file status: not invalidated
-							0x02,                                    // length of following data
-							0x00,                                    // structure: transparent
-							0x00 };                                  // record length (n/a for transparent)
-						for (unsigned i = 0; i < 15; i++) data[n++] = fcp[i];
-					}
-					data[n++] = 0x90; data[n++] = 0x00;
-				}
-				else if (m_sim_last_ins == 0xb0 || m_sim_last_ins == 0xb2)  // READ -> synthetic EF content
-				{
-					// T=0 READ returns exactly P3 (cmd[4]) bytes of the file's content.
-					unsigned p3 = m_sim_last_cmdlen >= 5 ? m_sim_last_cmd[4] : (efsize ? efsize : 8);
-					if (p3 == 0) p3 = efsize ? efsize : 8;
-					for (unsigned i = 0; i < p3 && n < sizeof(data) - 2; i++) data[n++] = sim_ef_byte(fid, i);
-					data[n++] = 0x90; data[n++] = 0x00;
-				}
-			}
-			code = 9;
-			m_sim_card_pending = false;   // responded; wait for the next command
-		}
-		if (code != 0)
-		{
-			for (offs_t i = 0; i < 0x30; i++) debug_ram_byte_w(SCRATCH + i, 0);
-			debug_ram_byte_w(SCRATCH + 2, uint8_t(n >> 8));
-			debug_ram_byte_w(SCRATCH + 3, uint8_t(n));
-			debug_ram_byte_w(SCRATCH + 4, code);
-			for (unsigned i = 0; i < n; i++) debug_ram_byte_w(SCRATCH + 5 + i, data[i]);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
-			m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027df10 | 1);
-			static unsigned sc = 0;
-			if (sc++ < 40) logerror("sim_card: phase->%u fed code-%u (%u bytes, [0]=%02x) recv #%u t=%.4f\n",
-					m_sim_card_phase, code, n, data[0], m_sim_card_recv, machine().time().as_double());
-			return uint16_t(0x4760);   // BX r12 -> return to 0x27df10 with r0=message
-		}
-	}
-	// MODEL_SIM_CARD: the command ACK. The phone recv's the command result inside 0x27e98c (recv at
-	// 0x27e9ca, ret 0x27e9ce); return a message with [msg+4]=7 so the send is accepted (procedure ACK).
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) == 0 && pc == addr && addr == 0x0026a458 &&
-			(m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1)) == 0x0027e9ce)
-	{
-		constexpr u32 SCRATCH = 0x0017fb00;
-		for (offs_t i = 0; i < 0x20; i++) debug_ram_byte_w(SCRATCH + i, 0);
-		debug_ram_byte_w(SCRATCH + 4, 7);
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, SCRATCH);
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R12, 0x0027e9ce | 1);
-		return uint16_t(0x4760);
-	}
-	// MODEL_SIM_CARD: file-read-loop caller-gate. The loop recv 0x27ee52 (ret 0x27ee56 = strb r0,[r4,#5])
-	// gets our fed code (9); force it to 0xb so the loop takes the DATA path 0x27ee94 (procedure-byte /
-	// send-data / read) instead of the error branch. Only the file-read loop returns via 0x27ee56 -- the
-	// PPS phase (0x27ed3c) uses a different recv, so its code-9 handling is untouched.
-	if (nokia_env_u32("NOKI3210_MODEL_SIM_CARD", 0) != 0 && nokia_env_u32("NOKI3210_SIM_CARD_RING2", 0) == 0 && pc == addr && addr == 0x0027ee56)
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R0, 0x0b);
 	// Diagnostic model of the MAD2 display-transfer completion. The firmware has
 	// committed a complete frame to the display ring when 0x290840 returns; real
 	// hardware reports that completion on FIQ0, whose firmware handler posts wake
@@ -3108,8 +2677,8 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			logerror("gsm_service: task5-lookup pc=%08x current=%04x packed=%04x result=%08x t=%.4f\n",
 					addr, fw_word(0x00112086), fw_word(0x00112088), reg(0),
 					machine().time().as_double());
-		if (addr == 0x002632fc && ((reg(0) & 0xff) == 0x05 || (reg(0) & 0xff) == 0x0a ||
-				(reg(0) & 0xff) == 0x0b || (reg(0) & 0xff) == 0x1e))
+		if (addr == 0x002632fc && trace_count++ < 512 &&
+				reg(2) >= NOKIA_RAM_BASE && reg(2) + 0x1c <= NOKIA_RAM_END)
 		{
 			const u8 service = reg(0) & 0xff;
 			const u32 descriptor = reg(2);
@@ -3122,11 +2691,14 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			dump(descriptor, 0x1c, bytes, sizeof(bytes));
 			dump(data, 32, data_bytes, sizeof(data_bytes));
 			dump(source, 16, source_bytes, sizeof(source_bytes));
-			logerror("gsm_service: register service=%02x ordinal=%u descriptor=%08x data=%08x raw=%08x source=%08x event=%04x callback=%04x bytes=[%s] data_bytes=[%s] source_bytes=[%s] t=%.4f\n",
+			logerror("gsm_service: register service=%02x ordinal=%u descriptor=%08x data=%08x raw=%08x source=%08x event=%04x callback=%04x caller=%08x bytes=[%s] data_bytes=[%s] source_bytes=[%s] t=%.4f\n",
 					service, reg(1) & 0xff, descriptor, data, fw_dword(descriptor),
-					source, fw_word(descriptor + 0x10), callback,
+					source, fw_word(descriptor + 0x10), callback, reg(14) & ~u32(1),
 					bytes, data_bytes, source_bytes, machine().time().as_double());
 		}
+		if (addr == 0x00263d30 && trace_count++ < 512)
+			logerror("gsm_service: resident descriptor=%08x enable=%08x mask=%08x caller=%08x t=%.4f\n",
+					reg(0), reg(1), reg(2), reg(14) & ~u32(1), machine().time().as_double());
 		else if (addr == 0x00263154 && ((reg(0) & 0xff) == 0x0a || (reg(0) & 0xff) == 0x0b ||
 				(reg(0) & 0xff) == 0x1e))
 		{
@@ -3574,16 +3146,12 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		case 0x37:  // SIM UART RxD
 			if (m_sim_card->enabled())
 				data = m_sim_card->rxd_r();
-			else if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
-				data = m_sim_atr[m_sim_atr_pos++];
 			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RXD", 0xff) & 0xff;
 			break;
 		case 0x38:  // SIM UART interrupt identification
 			if (m_sim_card->enabled())
 				data = m_sim_card->iir_r();
-			else if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0 && m_sim_atr_pos < m_sim_atr_len)
-				data = nokia_env_u32("NOKI3210_SIM_ATR_IIR", 0x0a) & 0xff;
 			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_IIR", 0x01) & 0xff;
 			break;
@@ -3594,15 +3162,11 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		case 0x3c:  // SIM UART RxD queue fill
 			if (m_sim_card->enabled())
 				data = m_sim_card->rx_count_r();
-			else if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0)
-				data = uint8_t(m_sim_atr_len - m_sim_atr_pos);
 			else if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RX_FILL", 0x00) & 0xff;
 			break;
 		case 0x3d:  // SIM RxD flags
-			if (nokia_env_u32("NOKI3210_MODEL_SIM_ATR", 0) != 0)
-				data = (m_sim_atr_pos < m_sim_atr_len) ? (nokia_env_u32("NOKI3210_SIM_ATR_RXFLAGS", 0x80) & 0xff) : 0x00;
-			else if (std::getenv("NOKI3210_SIM_PROFILE"))
+			if (std::getenv("NOKI3210_SIM_PROFILE"))
 				data = nokia_env_u32("NOKI3210_SIM_RX_FLAGS", 0x00) & 0xff;
 			break;
 		case 0x3e:  // SIM TxD flags
@@ -3699,7 +3263,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 				data, old_data, m_maincpu->pc(), machine().time().as_double(), nokia_mad2_reg_desc(offset));
 	}
 
-	// MODEL_SIM_ATR (opt-in, register-level ATR probe — NOT the faithful reception path).
 	if (offset == 0x20 || offset == 0x24)
 	{
 		const uint8_t signal = m_mad2_regs[0x20];

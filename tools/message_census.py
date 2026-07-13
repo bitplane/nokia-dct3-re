@@ -247,7 +247,31 @@ def decode_resident_descriptor(data, base, address):
 	return result
 
 
-def extract_descriptors(profile, calls, data, base):
+def descriptor_storage(call, instruction_by_address, data, base):
+	address = call["arguments"].get("descriptor")
+	if address is not None:
+		if base <= address < base + len(data):
+			return "rom"
+		if 0x00100000 <= address < 0x00180000:
+			return "fixed_ram"
+		return "address_outside_image"
+	insn = instruction_by_address.get(call["callsite"] - 2)
+	if insn and len(insn.operands) >= 2 and insn.operands[0].type == capstone.arm.ARM_OP_REG:
+		if insn.reg_name(insn.operands[0].reg) == "r2" and insn.mnemonic in ("mov", "adds", "add"):
+			source = insn.operands[1]
+			if source.type == capstone.arm.ARM_OP_REG:
+				return "stack" if insn.reg_name(source.reg) == "sp" else "dynamic_ram"
+	return "unresolved_pointer"
+
+
+def service5_candidacy(call):
+	service = call["arguments"].get("service")
+	if service is None:
+		return "dynamic_service_unresolved"
+	return "candidate" if service == 5 else "excluded_other_service"
+
+
+def extract_descriptors(profile, calls, instruction_by_address, data, base):
 	by_name = {api["name"]: api for api in profile["apis"]}
 	result = []
 	for call in calls:
@@ -260,6 +284,9 @@ def extract_descriptors(profile, calls, data, base):
 		decoded = decoder(data, base, address)
 		record = {"callsite": call["callsite"], "api": call["api"], "address": address,
 			"resolution": "rom" if decoded else "unresolved_or_runtime",
+			"storage": descriptor_storage(call, instruction_by_address, data, base),
+			"service": call["arguments"].get("service"),
+			"service5_candidacy": service5_candidacy(call),
 			"classification": "descriptor_generated", "provenance": "extracted_static"}
 		if decoded:
 			record["fields"] = decoded
@@ -297,7 +324,8 @@ def load_runtime_records(profile, manifest_id, subsystems, paths):
 				for key in ("source", "destination"):
 					if key in fields:
 						fields[key] = int(fields[key])
-				for key in ("status", "caller", "command", "payload", "task", "class", "source_node", "destination_node"):
+				for key in ("status", "caller", "command", "payload", "task", "class", "source_node", "destination_node",
+						"service", "ordinal", "descriptor", "event", "callback", "enable", "mask"):
 					if key in fields:
 						fields[key] = int(fields[key], 16)
 				key = (manifest_id, str(path), item["kind"], tuple(sorted(fields.items())))
@@ -409,6 +437,9 @@ def render_report(result):
 		f"- Known consumer entries: {summary['consumers']} ({summary['consumer_entries_decoded']} entry addresses decode)",
 		f"- Descriptor registrations: {summary['descriptor_registrations']} ({summary['rom_descriptors']} ROM descriptors decoded, {summary['unresolved_descriptors']} RAM-built or unresolved)",
 		f"- Runtime observations: {summary['runtime_observations']}", ""]
+	lines += [
+		"Descriptor storage: " + ", ".join(f"`{key}`={value}" for key, value in sorted(summary["descriptor_storage"].items())) + ".",
+		"Service-5 candidacy among unresolved descriptors: " + ", ".join(f"`{key}`={value}" for key, value in sorted(summary["unresolved_descriptor_service5_candidacy"].items())) + ".", ""]
 	lines += ["## Runtime manifests", ""]
 	if result["runtime_manifests"]:
 		for manifest in result["runtime_manifests"]:
@@ -416,6 +447,11 @@ def render_report(result):
 			lines.append(f"- `{manifest['id']}` ({state}): {manifest['description']} [subsystems: {', '.join(manifest['subsystems']) or 'none'}]")
 	else:
 		lines.append("- No runtime manifest supplied; static extraction and reviewed runtime claims remain available.")
+	lines.append("")
+	lines += ["## Dynamic descriptor assessment", ""]
+	for item in result.get("dynamic_descriptor_assessments", []):
+		fields = [f"{key} `{item[key]}`" for key in ("event", "callback", "descriptor_source") if key in item]
+		lines.append(f"- `{item['callsite']}` ({item['storage']}): {', '.join(fields)}; **{item['service5_population']}**.")
 	lines.append("")
 	absence = result["status_inventory_05e8"]
 	lines += ["## 0x05e8 inventory", "",
@@ -501,7 +537,7 @@ def main():
 		(base <= item["pointer"] < base + len(data) and item["pointer"] & 1) for item in callbacks) and not (
 		base <= next_callback_pointer < base + len(data) and next_callback_pointer & 1)
 	consumers = extract_consumers(profile, by_address, instructions, data, base)
-	descriptors = extract_descriptors(profile, calls, data, base)
+	descriptors = extract_descriptors(profile, calls, by_address, data, base)
 	runtime, runtime_manifests = load_runtime(profile, args.runtime_manifest, args.runtime_log)
 	missing_runtime = [subsystem for subsystem in args.require_runtime_subsystem
 		if not subsystem_runtime_available(runtime_manifests, subsystem)]
@@ -548,6 +584,12 @@ def main():
 			"descriptor_registrations": len(descriptors),
 			"rom_descriptors": sum(item["resolution"] == "rom" for item in descriptors),
 			"unresolved_descriptors": sum(item["resolution"] != "rom" for item in descriptors),
+			"descriptor_storage": {kind: sum(item["storage"] == kind for item in descriptors)
+				for kind in sorted({item["storage"] for item in descriptors})},
+			"descriptor_service5_candidacy": {kind: sum(item["service5_candidacy"] == kind for item in descriptors)
+				for kind in sorted({item["service5_candidacy"] for item in descriptors})},
+			"unresolved_descriptor_service5_candidacy": {kind: sum(item["resolution"] != "rom" and item["service5_candidacy"] == kind for item in descriptors)
+				for kind in sorted({item["service5_candidacy"] for item in descriptors if item["resolution"] != "rom"})},
 			"runtime_observations": len(runtime)},
 		"calls": calls, "callbacks": callbacks, "descriptor_registrations": descriptors,
 		"consumers": consumers, "semantic_edges": edges,
@@ -558,6 +600,7 @@ def main():
 		"runtime_status_inventory": runtime_status_inventory, "runtime": runtime,
 		"runtime_manifests": runtime_manifests,
 		"runtime_claims": profile.get("runtime_claims", []),
+		"dynamic_descriptor_assessments": profile.get("dynamic_descriptor_assessments", []),
 		"nodes": profile.get("nodes", [])
 	}
 	result["contact_service"] = contact_service

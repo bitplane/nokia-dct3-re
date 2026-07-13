@@ -8,12 +8,25 @@ This report separates extracted ROM facts, reviewed static semantics, and cohere
 - Callback-table entries: 126 (`0x2db720` through `0x2dbb0f`; index `0x28` is `0x2db860`)
 - Known consumer entries: 5 (5 entry addresses decode)
 - Descriptor registrations: 149 (112 ROM descriptors decoded, 37 RAM-built or unresolved)
-- Runtime observations: 46
+- Runtime observations: 49
+
+Descriptor storage: `dynamic_ram`=12, `fixed_ram`=6, `rom`=112, `stack`=18, `unresolved_pointer`=1.
+Service-5 candidacy among unresolved descriptors: `dynamic_service_unresolved`=7, `excluded_other_service`=30.
 
 ## Runtime manifests
 
 - `contact-service` (available): Default and bounded deep contact-service command-direction traces [subsystems: contact_service]
 - `deep-gsm` (available): Coherent deep 3210 GSM/service trace with task and lower-boundary taps [subsystems: generic_service]
+
+## Dynamic descriptor assessment
+
+- `0x26341a` (stack): event `0x0114`, callback `0x00dc`; **excluded_by_fields**.
+- `0x2684dc` (dynamic_ram): event `0x0114`, callback `0x1776`; **excluded_by_fields**.
+- `0x26b49e` (dynamic_ram): event `0x0114`, callback `0x06f5`; **excluded_by_fields**.
+- `0x26b4d8` (dynamic_ram): event `0x0114`, callback `0x06f5`; **excluded_by_fields**.
+- `0x26b53e` (dynamic_ram): event `0x0114`, callback `0x06ff`; **excluded_by_fields**.
+- `0x2a6c0e` (dynamic_ram): event `0x0114`, callback `0x0e14_or_0x0e15`; **excluded_by_fields**.
+- `0x28c672` (runtime_indirect_resident): descriptor_source `[0x110f1c]`; **dormant_in_deep_runtime**.
 
 ## 0x05e8 inventory
 
@@ -44,6 +57,8 @@ The census does find argumentless in-ROM generators of the global `0x05e8` event
 Observed service-5 callback inputs in supplied coherent logs: `0x05e2`, `0x05f3`.
 
 Reviewed runtime claims:
+- `deep_gsm_transient_registration_scope` (deep-gsm, reviewed_runtime): The eight-second coherent run executes transient registrations only for service 0x0a at callers 0x26341e, 0x296ec8 and 0x296f16; no transient service-5 registration executes.
+- `deep_gsm_resident_registration_scope` (deep-gsm, reviewed_runtime): No resident registration through 0x263d30 executes in the eight-second coherent run, including the indirect callsite at 0x28c672.
 - `deep_gsm_service5_inputs` (deep-gsm, reviewed_runtime): An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no object-bearing 0x05e8.
 - `deep_gsm_target_chain_absent` (deep-gsm, reviewed_runtime): No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained coherent-run analysis.
 - `deep_gsm_task14_dormant` (deep-gsm, reviewed_runtime): Task 14 initialized its controller slots but received no subsequent message; decoder 0x267258 did not execute.

@@ -100,10 +100,10 @@ with them (`m_mode4_*`, `m_mmi_idle_forced`, dead startup-scaffold step counters
 
 **Superseded SIM models** (historically replaced by `MODEL_SIM_CARD`): `MODEL_SIM_FILE`,
 `MODEL_SIM_LOOP` (+ its `SIM_LOOP_*` sub-knobs), `MODEL_SIM_RESPONDER`. The
-register-level `MODEL_SIM_ATR` + `SIM_PROFILE` stay (entangled with the SIM UART
-register model). `MODEL_SIM_CARD` was the retained message-layer research responder at
-this checkpoint. It is now a legacy comparison harness; `nokia_sim_card_device` and
-`NOKI3210_MODEL_SIM_DEVICE` are the intended register/FIQ architecture.
+register-level `MODEL_SIM_ATR` and `MODEL_SIM_CARD` were retained at this checkpoint.
+Both were removed after `nokia_sim_card_device` reproduced their useful ATR, T=0,
+selected-file, FCP and EF behavior through the register/FIQ boundary. `SIM_PROFILE`
+remains hardware-scenario configuration for the disabled-device path.
 
 **`TRACE_*` taps thinned 46 → 5.** Kept the ones that document the working boot
 across its layers: `TRACE_CCONT_READ` (power/ADC), `TRACE_LIMP`/`TRACE_LIMP2` (the

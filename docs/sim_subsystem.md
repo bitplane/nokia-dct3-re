@@ -68,6 +68,11 @@ It does not inject task messages, call firmware handlers, or write SIM/registrat
 device is disabled, SIMI reads and writes retain the legacy/default behavior so the ordinary boot
 profiles remain unaffected.
 
+The former `MODEL_SIM_CARD` message responder and `MODEL_SIM_ATR` FIFO probe have
+been removed. Their useful ATR, T=0, selected-file, FCP and synthetic-EF behavior
+is owned by this device. Their scratch-message injection, firmware trampolines and
+receive-result rewriting are not part of the supported SIM boundary.
+
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
 includes ICCID `2FE2`, ECC `6FB7`, IMSI `6F07`, LOCI `6F7E`, and Phase `6FAE`; other known files are
 erased (`0xff`). `EF_PHASE` must report Phase 2 (`0x02`). Returning `0x00` prevents the validated

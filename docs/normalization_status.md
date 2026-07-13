@@ -25,8 +25,12 @@ current frontier and the contracts already strong enough to state precisely.
 
 ## Topology gaps
 
-- The census still leaves 37 runtime-built descriptor registrations unresolved.
-  These are explicit unknowns, not evidence of an external producer.
+- The census contains 37 RAM-built or unresolved descriptor registrations. Of
+  these, 30 statically target services other than service 5 and seven select the
+  service dynamically. Six dynamic sites are excluded by their event/callback
+  fields; the remaining indirect resident site is dormant. The named deep run
+  observes only service-`0x0a` transient registrations and no resident
+  registrations, so none populates service 5 in the current boot.
 - Only the active 3210 frontier has semantic node and edge annotations. Most of
   the mechanically recovered call sites and consumers are not yet promoted to
   reviewed topology.
@@ -42,7 +46,7 @@ The following opt-in paths remain useful, but are not final hardware models:
 
 | Area | Current role | Remaining normalization work |
 | --- | --- | --- |
-| SIM | `MODEL_SIM_DEVICE` is the stateful register/FIQ path; `MODEL_SIM_CARD` remains as a legacy message-layer comparison harness and `MODEL_SIM_ATR` as a register probe. | Retire the overlapping legacy paths once the stateful device covers their remaining observations. |
+| SIM | `MODEL_SIM_DEVICE` is the sole card model and owns the stateful register/FIQ path. | Validate additional SIMI FIFO flags and card commands as firmware reaches them. |
 | Contact service | `MODEL_SVC_RESPONDER` supplies a known healthy completion through a firmware message bridge. | Move the behavior behind an explicit peer/transport contract and remove the firmware trampoline. |
 | Service channel | `MODEL_SVC_CHANNEL_DRAIN` models provisional progress at the channel boundary. | Establish the real producer/consumer contract before treating this as device behavior. |
 | DSP | `MODEL_DSP_SERVICE` and `MODEL_DSP_RING_DRAIN` model parts of the missing DSP-side peer. | Consolidate them at a transport boundary backed by request/response evidence. |

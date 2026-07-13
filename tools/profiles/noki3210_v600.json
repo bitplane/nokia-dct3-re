@@ -214,7 +214,32 @@
       ]
     }
   ],
+  "dynamic_descriptor_assessments": [
+    {"callsite": "0x26341a", "storage": "stack", "event": "0x0114", "callback": "0x00dc", "service5_population": "excluded_by_fields"},
+    {"callsite": "0x2684dc", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x1776", "service5_population": "excluded_by_fields"},
+    {"callsite": "0x26b49e", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x06f5", "service5_population": "excluded_by_fields"},
+    {"callsite": "0x26b4d8", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x06f5", "service5_population": "excluded_by_fields"},
+    {"callsite": "0x26b53e", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x06ff", "service5_population": "excluded_by_fields"},
+    {"callsite": "0x2a6c0e", "storage": "dynamic_ram", "event": "0x0114", "callback": "0x0e14_or_0x0e15", "service5_population": "excluded_by_fields"},
+    {"callsite": "0x28c672", "storage": "runtime_indirect_resident", "descriptor_source": "[0x110f1c]", "service5_population": "dormant_in_deep_runtime"}
+  ],
   "runtime_claims": [
+    {
+      "id": "deep_gsm_transient_registration_scope",
+      "manifest": "deep-gsm",
+      "subsystem": "generic_service",
+      "classification": "reviewed_runtime",
+      "statement": "The eight-second coherent run executes transient registrations only for service 0x0a at callers 0x26341e, 0x296ec8 and 0x296f16; no transient service-5 registration executes.",
+      "evidence": "docs/dsp_service_transport_contract.md"
+    },
+    {
+      "id": "deep_gsm_resident_registration_scope",
+      "manifest": "deep-gsm",
+      "subsystem": "generic_service",
+      "classification": "reviewed_runtime",
+      "statement": "No resident registration through 0x263d30 executes in the eight-second coherent run, including the indirect callsite at 0x28c672.",
+      "evidence": "docs/dsp_service_transport_contract.md"
+    },
     {
       "id": "deep_gsm_service5_inputs", "manifest": "deep-gsm", "subsystem": "generic_service",
       "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
@@ -232,6 +257,16 @@
     }
   ],
   "runtime_patterns": [
+    {
+      "kind": "resident_registration",
+      "subsystem": "generic_service",
+      "regex": "gsm_service: resident descriptor=(?P<descriptor>[0-9a-f]+) enable=(?P<enable>[0-9a-f]+) mask=(?P<mask>[0-9a-f]+) caller=(?P<caller>[0-9a-f]+)"
+    },
+    {
+      "kind": "service_registration",
+      "subsystem": "generic_service",
+      "regex": "gsm_service: register service=(?P<service>[0-9a-f]+) ordinal=(?P<ordinal>[0-9]+) descriptor=(?P<descriptor>[0-9a-f]+).* event=(?P<event>[0-9a-f]+) callback=(?P<callback>[0-9a-f]+).* caller=(?P<caller>[0-9a-f]+)"
+    },
     {"kind": "message", "subsystem": "generic_service", "regex": "msgedge: t(?P<source>\\d+) -> t(?P<destination>\\d+) \\(first status=(?P<status>[0-9a-fA-F]{4})"},
     {"kind": "message", "subsystem": "generic_service", "regex": "sim_owner_post: t(?P<source>\\d+) -> t(?P<destination>\\d+) status=(?P<status>[0-9a-fA-F]{4})"},
     {"kind": "callback", "subsystem": "generic_service", "regex": "gsm_lower: service5 callback status=(?P<status>[0-9a-fA-F]{4}).*caller=(?P<caller>[0-9a-fA-F]{8})"},

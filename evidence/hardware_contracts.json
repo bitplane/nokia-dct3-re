@@ -20,7 +20,7 @@
     {
       "id": "dsp_shared_ring", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
       "boundary": "MCU task 3 serializes outbound work to the DSP shared ring; FIQ 0 owns inbound delivery",
-      "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md"]
+      "evidence": ["docs/dsp_service_transport_contract.md", "docs/dsp_interface.md", "docs/sim_registration.md"]
     },
     {
       "id": "external_eeprom_i2c", "subsystem": "eeprom", "status": "validated", "confidence": "strong",

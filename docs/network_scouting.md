@@ -1,7 +1,7 @@
 # Network and registration boundary
 
 This document records the current conclusion for reaching the classic operator
-idle screen. Earlier scouting based on the legacy `MODEL_SIM_CARD` comparison
+idle screen. Earlier scouting based on the former `MODEL_SIM_CARD` comparison
 harness and the removed `MODEL_RES_ENABLE` and `TRACE_DSPDRV` probes is
 superseded by the organic SIM and lower-radio work in `sim_subsystem.md`,
 `sim_registration.md`, and `dsp_interface.md`.

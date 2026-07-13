@@ -165,7 +165,8 @@ run-manifest-default:
 run-manifest-deep-gsm: build
 	@mkdir -p run_manifest_deep_gsm
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(DEEP_ENV) NOKI3210_MODEL_SIM_DEVICE=1 \
-		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_GSM_LOWER=1 NOKI3210_TRACE_DSP_BOUNDARY=1 \
+		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 NOKI3210_TRACE_GSM_LOWER=1 \
+		NOKI3210_TRACE_DSP_BOUNDARY=1 \
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_deep_gsm) \
 		NOKI3210_BOOT_SUMMARY=$(abspath run_manifest_deep_gsm)/boot_summary.txt \
 		./mame $(MAME_ARGS) -seconds_to_run 8

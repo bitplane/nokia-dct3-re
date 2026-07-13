@@ -56,5 +56,21 @@ class RuntimeManifestTests(unittest.TestCase):
 		self.assertFalse(message_census.subsystem_runtime_available(manifests, "generic_service"))
 
 
+class DescriptorClassificationTests(unittest.TestCase):
+	def test_fixed_ram_descriptor_is_not_a_service5_candidate(self):
+		call = {"callsite": 0x2002, "arguments": {"descriptor": 0x110000, "service": 0x0a}}
+		self.assertEqual(message_census.descriptor_storage(call, {}, b"", 0x200000), "fixed_ram")
+		self.assertEqual(message_census.service5_candidacy(call), "excluded_other_service")
+
+	def test_stack_descriptor_with_dynamic_service_remains_explicit(self):
+		md = message_census.capstone.Cs(message_census.capstone.CS_ARCH_ARM,
+				message_census.capstone.CS_MODE_THUMB)
+		md.detail = True
+		insn = next(md.disasm(bytes((0x6a, 0x46)), 0x2000))
+		call = {"callsite": 0x2002, "arguments": {"descriptor": None, "service": None}}
+		self.assertEqual(message_census.descriptor_storage(call, {0x2000: insn}, b"", 0x200000), "stack")
+		self.assertEqual(message_census.service5_candidacy(call), "dynamic_service_unresolved")
+
+
 if __name__ == "__main__":
 	unittest.main()

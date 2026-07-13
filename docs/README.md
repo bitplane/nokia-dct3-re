@@ -24,6 +24,7 @@ Documentation is organized by authority rather than investigation date.
 | `sim_subsystem.md` | Concise SIM ownership and interface summary. |
 | `resource_providers.md` | Current organic GSM/resource-provider dependency chain. |
 | `network_scouting.md` | Boundary between pre-idle startup and GSM/DSP work. |
+| `dsp_service_transport_contract.md` | Ownership and acceptance contract for the active DSP/generic-service frontier. |
 | `contact_service_topology.md` | Contact command producers, acknowledgements, and lower-service boundary. |
 
 ## Deep reverse-engineering references

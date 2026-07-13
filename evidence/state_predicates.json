@@ -21,8 +21,8 @@
     {
       "id": "generic_service_object_population", "owner": "generic_service", "status": "unresolved",
       "predicate": "A firmware-owned object selects callback-table entry 0x28 and delivers object-bearing 0x05e8",
-      "current": "No object-bearing completion observed; numeric global 0x05e8 triggers are insufficient",
-      "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
+      "current": "No object-bearing completion observed; no transient service-5 registration executes in the named deep run and numeric global 0x05e8 triggers are insufficient",
+      "evidence": ["docs/message_topology_census.md", "docs/dsp_service_transport_contract.md", "docs/sim_registration.md"]
     },
     {
       "id": "task17_radio_completion", "owner": "task17_radio_init", "status": "unresolved",
