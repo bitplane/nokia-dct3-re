@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "3330-smoke",
+  "description": "Bounded Nokia 3330 NHM-6 v4.50E portability smoke run",
+  "phone": "noki3330",
+  "firmware": "noki3330_v450e",
+  "subsystems": [],
+  "logs": ["run_manifest_3330/error.log"],
+  "artifacts": [],
+  "oracle": null
+}

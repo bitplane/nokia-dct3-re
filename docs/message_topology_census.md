@@ -8,10 +8,12 @@ This report separates extracted ROM facts, reviewed static semantics, and cohere
 - Callback-table entries: 126 (`0x2db720` through `0x2dbb0f`; index `0x28` is `0x2db860`)
 - Known consumer entries: 5 (5 entry addresses decode)
 - Descriptor registrations: 149 (112 ROM descriptors decoded, 37 RAM-built or unresolved)
-- Runtime observations: 7
+- Runtime observations: 46
 
-Runtime profile: coherent deep boot with NOKI3210_TRACE_TASKS=1 and NOKI3210_TRACE_GSM_LOWER=1.
-Runtime source(s): `run_contact_default/error.log`, `run_contact_trace_bounded/error.log`.
+## Runtime manifests
+
+- `contact-service` (available): Default and bounded deep contact-service command-direction traces [subsystems: contact_service]
+- `deep-gsm` (available): Coherent deep 3210 GSM/service trace with task and lower-boundary taps [subsystems: generic_service]
 
 ## 0x05e8 inventory
 
@@ -26,6 +28,10 @@ Runtime source(s): `run_contact_default/error.log`, `run_contact_trace_bounded/e
 - **PASS** `task15_generated_09d8`: `0x07dd` -> `0x09d8` (dormant, reviewed_static)
 - **PASS** `task10_completion_0434`: `0x1392` -> `0x0434` (dormant, reviewed_static)
 - **PASS** `corrected_lower_result_0fbf`: `0x102f` -> `0x0fbf` (disproven_alternative, reviewed_static)
+- **PASS** `task14_opcode_2a_to_lower_result_0fbf`: `0x09d8` -> `0x0fbf` (dormant, reviewed_static)
+- **PASS** `lower_result_0fbf_to_task10_1392`: `0x0fbf` -> `0x1392` (dormant, reviewed_static)
+- **PASS** `task17_completion_to_task5_13e2`: `0x0434` -> `0x13e2` (dormant, reviewed_static)
+- **PASS** `task5_13e2_to_task14_1776`: `0x13e2` -> `0x1776` (dormant, reviewed_static)
 
 ## 0x05e8 boundary
 
@@ -35,7 +41,12 @@ The strongest evidenced missing predecessor is therefore **generic-service sessi
 
 The census does find argumentless in-ROM generators of the global `0x05e8` event (`0xbd << 3`). They are triggers, not object producers: the packed-event ABI encodes zero argument words, so none supplies the object the callback path later expects. The quantified absence is narrower and stronger: no literal load and no recovered `0x05e8` generator carries an argument word, while unresolved RAM-built descriptors remain outside static coverage.
 
-No runtime log was supplied; the boundary statement is static-only until a coherent trace is correlated.
+Observed service-5 callback inputs in supplied coherent logs: `0x05e2`, `0x05f3`.
+
+Reviewed runtime claims:
+- `deep_gsm_service5_inputs` (deep-gsm, reviewed_runtime): An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no object-bearing 0x05e8.
+- `deep_gsm_target_chain_absent` (deep-gsm, reviewed_runtime): No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained coherent-run analysis.
+- `deep_gsm_task14_dormant` (deep-gsm, reviewed_runtime): Task 14 initialized its controller slots but received no subsequent message; decoder 0x267258 did not execute.
 
 Target-chain statuses observed as task messages: `0x05e8`=0, `0x05ea`=0, `0x07dd`=0, `0x09d8`=0, `0x0434`=0.
 

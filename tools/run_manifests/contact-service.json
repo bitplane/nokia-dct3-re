@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "contact-service",
+  "description": "Default and bounded deep contact-service command-direction traces",
+  "phone": "noki3210",
+  "firmware": "noki3210_v600",
+  "subsystems": ["contact_service"],
+  "logs": ["run_manifest_contact_default/error.log", "run_manifest_contact_deep/error.log"],
+  "artifacts": [],
+  "oracle": null
+}

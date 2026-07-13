@@ -15,12 +15,15 @@
   - `message_census.py` — profile-driven 3210 v6.00 producer, callback-table,
     generic-service descriptor, and runtime-edge census. `make census` writes
     machine-readable JSON and a concise report under `run_census/`; set
-    `CENSUS_LOG=mame/error.log` to correlate a coherent traced boot. Records
+    Named inputs under `tools/run_manifests/` scope runtime evidence by
+    subsystem; use `CENSUS_LOG=mame/error.log` only for ad-hoc unscoped work. Records
     retain `extracted_static`, `reviewed_static`, or `observed_runtime`
     provenance rather than presenting reviewed control-flow semantics as
     mechanically recovered facts.
   - `test_message_census.py` — byte-lane tests for MCU byte reads and rotated
-    32-bit literal-pool values in the swap16 image.
+    32-bit literal-pool values in the swap16 image, plus runtime-manifest isolation.
+  - `validate_evidence.py` — validates `evidence/*.json` and runtime-manifest
+    structure. `make evidence-check` runs it directly.
 - `ghidra/scripts/*.java` — headless Ghidra scripts (run via `analyzeHeadless`)
 
 The 3210 flash is stored in 16-bit bus order. Import

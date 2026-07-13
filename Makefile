@@ -21,6 +21,7 @@ SWAP ?= roms/3210f600a_swap16.bin
 RUN_DIR ?= run
 SECONDS ?= 20
 CENSUS_LOG ?=
+CENSUS_MANIFESTS ?= tools/run_manifests/contact-service.json tools/run_manifests/deep-gsm.json
 
 # Stable, git-ignored PNG of the latest LCD frame — promoted after every run so an
 # external `watch chafa progress_latest_frame.png` updates live.
@@ -66,13 +67,16 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census census-docs evidence-check run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
 	@echo "make census         build the 3210 v6.00 message-topology JSON/report"
+	@echo "make census-docs    refresh the committed report; refuses missing scoped runtime"
+	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
+	@echo "make run-manifest-* reproduce named default/deep-gsm/contact/3330 evidence runs"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
@@ -132,11 +136,55 @@ swap16:
 
 census:
 	@mkdir -p run_census
+	$(PYTHON) tools/validate_evidence.py
 	$(VENV)/bin/python tools/message_census.py --check \
+		$(foreach manifest,$(CENSUS_MANIFESTS),--runtime-manifest $(manifest)) \
 		$(if $(CENSUS_LOG),--runtime-log $(CENSUS_LOG)) \
 		--json run_census/noki3210_v600.json \
 		--report run_census/noki3210_v600.md
 	@echo "census: run_census/noki3210_v600.json and run_census/noki3210_v600.md"
+
+census-docs:
+	@mkdir -p run_census
+	$(PYTHON) tools/validate_evidence.py
+	$(VENV)/bin/python tools/message_census.py --check \
+		$(foreach manifest,$(CENSUS_MANIFESTS),--runtime-manifest $(manifest)) \
+		--require-runtime-subsystem contact_service \
+		--require-runtime-subsystem generic_service \
+		--json run_census/noki3210_v600.json \
+		--report docs/message_topology_census.md
+	@echo "census-docs: docs/message_topology_census.md"
+
+evidence-check:
+	$(PYTHON) tools/validate_evidence.py
+
+run-manifest-default:
+	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
+	cp $(MAME_DIR)/error.log run_manifest_default/error.log
+
+run-manifest-deep-gsm: build
+	@mkdir -p run_manifest_deep_gsm
+	cd $(MAME_DIR) && env $(BOOT_ENV) $(DEEP_ENV) NOKI3210_MODEL_SIM_DEVICE=1 \
+		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_GSM_LOWER=1 NOKI3210_TRACE_DSP_BOUNDARY=1 \
+		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_deep_gsm) \
+		NOKI3210_BOOT_SUMMARY=$(abspath run_manifest_deep_gsm)/boot_summary.txt \
+		./mame $(MAME_ARGS) -seconds_to_run 8
+	cp $(MAME_DIR)/error.log run_manifest_deep_gsm/error.log
+
+run-manifest-contact: build
+	@mkdir -p run_manifest_contact_default run_manifest_contact_deep
+	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_TRACE_CSCMD=1 \
+		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_default) \
+		./mame $(MAME_ARGS) -seconds_to_run 1
+	cp $(MAME_DIR)/error.log run_manifest_contact_default/error.log
+	cd $(MAME_DIR) && env $(BOOT_ENV) $(DEEP_ENV) NOKI3210_TRACE_CSCMD=1 \
+		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_deep) \
+		./mame $(MAME_ARGS) -seconds_to_run 6
+	cp $(MAME_DIR)/error.log run_manifest_contact_deep/error.log
+
+run-manifest-3330:
+	@$(MAKE) --no-print-directory smoke-3330e RUN_DIR=run_manifest_3330 SECONDS=3
+	cp $(MAME_DIR)/error.log run_manifest_3330/error.log
 
 run: build
 	@mkdir -p $(RUN_DIR)

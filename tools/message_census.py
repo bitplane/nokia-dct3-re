@@ -277,13 +277,16 @@ def verify_anchor(anchor, instruction_by_address, callbacks, data, base):
 		return insn is not None and insn.mnemonic in ("bl", "blx") and immediate_target(insn) == number(anchor["target"])
 	if kind == "effective_literal_load":
 		return literal_value(insn, data, base) == number(anchor["value"])
+	if kind == "decoded_address":
+		return insn is not None
 	return False
 
 
-def load_runtime(profile, paths):
+def load_runtime_records(profile, manifest_id, subsystems, paths):
 	records = []
 	seen = {}
-	patterns = [(item, re.compile(item["regex"])) for item in profile.get("runtime_patterns", [])]
+	patterns = [(item, re.compile(item["regex"])) for item in profile.get("runtime_patterns", [])
+		if item.get("subsystem", "unscoped") in subsystems]
 	for path in paths:
 		for line_number, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
 			for item, pattern in patterns:
@@ -297,16 +300,46 @@ def load_runtime(profile, paths):
 				for key in ("status", "caller", "command", "payload", "task", "class", "source_node", "destination_node"):
 					if key in fields:
 						fields[key] = int(fields[key], 16)
-				key = (str(path), item["kind"], tuple(sorted(fields.items())))
+				key = (manifest_id, str(path), item["kind"], tuple(sorted(fields.items())))
 				if key in seen:
 					seen[key]["count"] += 1
 				else:
-					record = {"kind": item["kind"], "fields": fields, "file": str(path),
+					record = {"kind": item["kind"], "subsystem": item.get("subsystem", "unscoped"),
+						"manifest": manifest_id, "fields": fields, "file": str(path),
 						"line": line_number, "count": 1, "classification": "observed",
 						"provenance": "observed_runtime"}
 					seen[key] = record
 					records.append(record)
 	return records
+
+
+def load_runtime(profile, manifest_paths, legacy_paths):
+	records = []
+	manifests = []
+	for manifest_path in manifest_paths:
+		manifest = json.loads(manifest_path.read_text())
+		paths = [(ROOT / item).resolve() if not Path(item).is_absolute() else Path(item)
+			for item in manifest.get("logs", [])]
+		missing = [str(path) for path in paths if not path.is_file()]
+		available = [path for path in paths if path.is_file()]
+		records.extend(load_runtime_records(profile, manifest["id"], set(manifest.get("subsystems", [])), available))
+		manifests.append({
+			"id": manifest["id"], "description": manifest["description"],
+			"subsystems": manifest.get("subsystems", []), "path": str(manifest_path),
+			"logs": [str(path) for path in paths], "missing_logs": missing,
+			"available": bool(paths) and not missing
+		})
+	if legacy_paths:
+		subsystems = {item.get("subsystem", "unscoped") for item in profile.get("runtime_patterns", [])}
+		records.extend(load_runtime_records(profile, "ad_hoc", subsystems, legacy_paths))
+		manifests.append({"id": "ad_hoc", "description": "Unscoped command-line runtime logs",
+			"subsystems": sorted(subsystems), "path": None, "logs": [str(path) for path in legacy_paths],
+			"missing_logs": [], "available": True})
+	return records, manifests
+
+
+def subsystem_runtime_available(manifests, subsystem):
+	return any(item["available"] and subsystem in item["subsystems"] for item in manifests)
 
 
 def contact_service_inventory(profile, calls, runtime):
@@ -376,9 +409,14 @@ def render_report(result):
 		f"- Known consumer entries: {summary['consumers']} ({summary['consumer_entries_decoded']} entry addresses decode)",
 		f"- Descriptor registrations: {summary['descriptor_registrations']} ({summary['rom_descriptors']} ROM descriptors decoded, {summary['unresolved_descriptors']} RAM-built or unresolved)",
 		f"- Runtime observations: {summary['runtime_observations']}", ""]
-	if result["runtime"]:
-		lines += [f"Runtime profile: {result['profile']['runtime_profile']}.",
-			"Runtime source(s): " + ", ".join(f"`{path}`" for path in sorted({item["file"] for item in result["runtime"]})) + ".", ""]
+	lines += ["## Runtime manifests", ""]
+	if result["runtime_manifests"]:
+		for manifest in result["runtime_manifests"]:
+			state = "available" if manifest["available"] else "missing"
+			lines.append(f"- `{manifest['id']}` ({state}): {manifest['description']} [subsystems: {', '.join(manifest['subsystems']) or 'none'}]")
+	else:
+		lines.append("- No runtime manifest supplied; static extraction and reviewed runtime claims remain available.")
+	lines.append("")
 	absence = result["status_inventory_05e8"]
 	lines += ["## 0x05e8 inventory", "",
 		f"- Effective literal loads: {len(absence['literal_loads'])}",
@@ -392,12 +430,19 @@ def render_report(result):
 		"The census finds `0x05e8` as the registered input of callback-table entry `0x28` (`0x2618e9`), not as a direct immediate producer callsite. The callback's object-bearing completion would return `0x05ea`, and the provider then constructs task-15 `0x07dd`.", "",
 		"The strongest evidenced missing predecessor is therefore **generic-service session/queue population before callback dispatch**: firmware must register or populate an object-bearing transaction that selects callback `0x28` and supplies `0x05e8`. Directly posting `0x05e8`, `0x05ea`, `0x07dd`, or `0x09d8` would skip this ownership boundary.", "",
 		"The census does find argumentless in-ROM generators of the global `0x05e8` event (`0xbd << 3`). They are triggers, not object producers: the packed-event ABI encodes zero argument words, so none supplies the object the callback path later expects. The quantified absence is narrower and stronger: no literal load and no recovered `0x05e8` generator carries an argument word, while unresolved RAM-built descriptors remain outside static coverage.", ""]
-	observed = [item for item in result["runtime"] if item["kind"] == "callback"]
+	observed = [item for item in result["runtime"] if item["subsystem"] == "generic_service" and item["kind"] == "callback"]
 	if observed:
 		statuses = sorted({item["fields"]["status"] for item in observed})
 		lines.append("Observed service-5 callback inputs in supplied coherent logs: " + ", ".join(f"`{hexadecimal(x)}`" for x in statuses) + ".")
+	elif subsystem_runtime_available(result["runtime_manifests"], "generic_service"):
+		lines.append("The supplied generic-service manifest contained no service-5 callback observations.")
 	else:
-		lines.append("No runtime log was supplied; the boundary statement is static-only until a coherent trace is correlated.")
+		lines.append("No generic-service runtime manifest was supplied; reviewed runtime claims below are retained and are not replaced by contact-only evidence.")
+	claims = [item for item in result["runtime_claims"] if item["subsystem"] == "generic_service"]
+	if claims:
+		lines += ["", "Reviewed runtime claims:"]
+		for claim in claims:
+			lines.append(f"- `{claim['id']}` ({claim['manifest']}, {claim['classification']}): {claim['statement']}")
 	if result["runtime_status_inventory"]:
 		lines += ["", "Target-chain statuses observed as task messages: " + ", ".join(
 			f"`{int(status):#06x}`={count}" for status, count in result["runtime_status_inventory"].items()) + "."]
@@ -434,6 +479,9 @@ def main():
 	parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
 	parser.add_argument("--rom", type=Path, default=DEFAULT_ROM)
 	parser.add_argument("--runtime-log", type=Path, action="append", default=[])
+	parser.add_argument("--runtime-manifest", type=Path, action="append", default=[])
+	parser.add_argument("--require-runtime-subsystem", action="append", default=[],
+		help="fail before writing outputs unless an available manifest covers this subsystem")
 	parser.add_argument("--json", type=Path)
 	parser.add_argument("--report", type=Path)
 	parser.add_argument("--check", action="store_true", help="fail if a reviewed acceptance anchor is not present")
@@ -454,12 +502,21 @@ def main():
 		base <= next_callback_pointer < base + len(data) and next_callback_pointer & 1)
 	consumers = extract_consumers(profile, by_address, instructions, data, base)
 	descriptors = extract_descriptors(profile, calls, data, base)
-	runtime = load_runtime(profile, args.runtime_log)
+	runtime, runtime_manifests = load_runtime(profile, args.runtime_manifest, args.runtime_log)
+	missing_runtime = [subsystem for subsystem in args.require_runtime_subsystem
+		if not subsystem_runtime_available(runtime_manifests, subsystem)]
+	if missing_runtime:
+		print("message_census: required runtime subsystem(s) unavailable: " + ", ".join(missing_runtime),
+			file=sys.stderr)
+		return 2
 	contact_service = contact_service_inventory(profile, calls, runtime)
 	inventory_05e8 = status_inventory(instructions, calls, descriptors, data, base, 0x05e8)
 	target_statuses = (0x05e8, 0x05ea, 0x07dd, 0x09d8, 0x0434)
-	runtime_status_inventory = {str(status): sum(item["kind"] == "message" and item["fields"].get("status") == status for item in runtime)
-		for status in target_statuses}
+	runtime_status_inventory = {}
+	if subsystem_runtime_available(runtime_manifests, "generic_service"):
+		runtime_status_inventory = {str(status): sum(item["count"] for item in runtime
+			if item["subsystem"] == "generic_service" and item["kind"] == "message" and item["fields"].get("status") == status)
+			for status in target_statuses}
 	edges = []
 	for definition in profile["semantic_edges"]:
 		edge = dict(definition)
@@ -479,8 +536,7 @@ def main():
 			"disproven_alternative": "previous edge interpretation contradicted by current evidence",
 			"unresolved": "boundary is known but its producer or population mechanism is not"
 		},
-		"profile": {"name": profile["name"], "path": str(args.profile), "rom": str(args.rom),
-			"runtime_profile": profile["runtime_profile"]},
+		"profile": {"name": profile["name"], "path": str(args.profile), "rom": str(args.rom)},
 		"summary": {"calls": len(calls), "call_arguments": total, "resolved_call_arguments": resolved,
 			"unresolved_call_arguments": total - resolved,
 			"argument_coverage_percent": 100.0 * resolved / total if total else 100.0,
@@ -499,7 +555,10 @@ def main():
 		"unresolved_contract": {"status": 0x05e8, "classification": "unresolved",
 			"boundary": "generic-service session/queue population before callback-table index 0x28 dispatch",
 			"external": "not_proven"},
-		"runtime_status_inventory": runtime_status_inventory, "runtime": runtime
+		"runtime_status_inventory": runtime_status_inventory, "runtime": runtime,
+		"runtime_manifests": runtime_manifests,
+		"runtime_claims": profile.get("runtime_claims", []),
+		"nodes": profile.get("nodes", [])
 	}
 	result["contact_service"] = contact_service
 	result["contact_service_boundary"] = profile["contact_service_boundary"]

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "kind": "state_predicates",
+  "entries": [
+    {
+      "id": "lower_service_idle", "owner": "startup", "status": "modeled",
+      "predicate": "service_context_ready_2b03d8 returns nonzero after the lower transmit queue drains",
+      "current": "Satisfied by the deep service model", "evidence": ["docs/service_bootstrap.md"]
+    },
+    {
+      "id": "contact_healthy_completion", "owner": "contact_task", "status": "modeled",
+      "predicate": "class-0x40 command 0x64 with payload result 0x05 reaches 0x236dc4",
+      "current": "Supplied by MODEL_SVC_RESPONDER at a provisional firmware-message boundary",
+      "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
+    },
+    {
+      "id": "sim_preliminary_lifecycle", "owner": "sim_task", "status": "satisfied",
+      "predicate": "ATR, PPS and mandatory EF reads complete through SIMI/FIQ transport",
+      "current": "Satisfied organically by nokia_sim_card_device", "evidence": ["docs/sim_subsystem.md"]
+    },
+    {
+      "id": "generic_service_object_population", "owner": "generic_service", "status": "unresolved",
+      "predicate": "A firmware-owned object selects callback-table entry 0x28 and delivers object-bearing 0x05e8",
+      "current": "No object-bearing completion observed; numeric global 0x05e8 triggers are insufficient",
+      "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "task17_radio_completion", "owner": "task17_radio_init", "status": "unresolved",
+      "predicate": "Task 17 receives organic 0x0434 after lower result 0x0fbf and task-10 status 0x1392",
+      "current": "Static chain mapped; dormant in reviewed coherent runtime",
+      "evidence": ["docs/sim_registration.md"]
+    },
+    {
+      "id": "deep_ccont_counter_stability", "owner": "regression", "status": "drift",
+      "predicate": "Deep boot reproduces recorded CCONT byte/read counts 5143/4289",
+      "current": "Frame and all other fields match; current counts are 5153/4299 and remain under review",
+      "evidence": ["docs/structural_regression.md"]
+    }
+  ]
+}

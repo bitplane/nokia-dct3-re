@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "kind": "falsifications",
+  "entries": [
+    {
+      "id": "lower_result_0fc3", "status": "disproven",
+      "hypothesis": "The lower-radio result selected by event 0x102f is 0x0fc3",
+      "conclusion": "Swap16-aware jump-table decoding proves 0x0fbf at literal load 0x24788e",
+      "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "direct_05e8_completion", "status": "disproven",
+      "hypothesis": "Posting numeric event 0x05e8 is sufficient to create the registration object",
+      "conclusion": "The global event has zero argument words; session/queue population must precede callback dispatch",
+      "evidence": ["docs/message_topology_census.md"]
+    },
+    {
+      "id": "dsp_type80_primitive70_reply", "status": "disproven",
+      "hypothesis": "A DSP type-0x80 primitive-0x70 response completes the current registration context",
+      "conclusion": "The real RX path delivers it, but task 13 rejects it across tested delays",
+      "evidence": ["docs/sim_registration.md"]
+    },
+    {
+      "id": "forced_registration_messages", "status": "disproven",
+      "hypothesis": "Injected 0x1196 or replayed commit keys can establish coherent SIM registration",
+      "conclusion": "They reach downstream handlers without the owned reply object and never set ENABLE organically",
+      "evidence": ["docs/removed_forcing_knobs.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "task8_8d_8e_peer", "status": "unsupported",
+      "hypothesis": "Task-8 0x8d/0x8e traffic is the missing generic-service peer response",
+      "conclusion": "No evidenced edge links this traffic to the object-bearing 0x05e8 path",
+      "evidence": ["docs/sim_registration.md"]
+    },
+    {
+      "id": "contact_command_74_is_event74", "status": "disproven",
+      "hypothesis": "Scheduler event 0x74 producers also produce contact-service command 0x74",
+      "conclusion": "They are separate namespaces and transports; the command is an external request with an MCU acknowledgement",
+      "evidence": ["docs/contact_service_topology.md"]
+    }
+  ]
+}

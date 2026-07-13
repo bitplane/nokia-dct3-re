@@ -1,5 +1,9 @@
 # Scheduler event delivery — the `0x15`/`000d` mechanism, from clean disassembly
 
+> **Historical research reference.** Current topology edges are normalized in
+> the firmware profile and generated census; retained material here provides
+> address-level scheduler context and falsification provenance.
+
 Ground-truth Thumb disassembly of the RTOS event/message delivery path, cutting through the
 Thumb-**mis**decoded C bodies that misled the earlier `000d` investigation. Method: `tools/disrom.py`
 on the swap16 image (`roms/*_swap16.bin`), `offset = addr − 0x200000`. **Instruction bytes decode

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "deep-gsm",
+  "description": "Coherent deep 3210 GSM/service trace with task and lower-boundary taps",
+  "phone": "noki3210",
+  "firmware": "noki3210_v600",
+  "subsystems": ["generic_service"],
+  "logs": ["run_manifest_deep_gsm/error.log"],
+  "artifacts": ["run_manifest_deep_gsm/boot_summary.txt"],
+  "oracle": "oracles/noki3210-deep.struct"
+}

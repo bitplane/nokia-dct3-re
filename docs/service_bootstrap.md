@@ -1,5 +1,9 @@
 # Service-startup bootstrap — why a blank 3210 shows CONTACT SERVICE
 
+> **Address-heavy research reference.** Use `contact_service_topology.md` for
+> current contact-command direction and `evidence/state_predicates.json` for
+> current readiness gates. This file retains the underlying boot-chain detail.
+
 CONTACT SERVICE is the firmware's **correct** response to a blank/un-provisioned 3210: the
 service layer can't bring up, so the contact-service watchdog halts. This doc is the current
 map of that chain and the models that emulate a provisioned service environment.

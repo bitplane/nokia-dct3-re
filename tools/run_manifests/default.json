@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "default",
+  "description": "Canonical 3210 CONTACT SERVICE boot and structural oracle",
+  "phone": "noki3210",
+  "firmware": "noki3210_v600",
+  "subsystems": [],
+  "logs": ["run_manifest_default/error.log"],
+  "artifacts": ["run_manifest_default/boot_summary.txt"],
+  "oracle": "oracles/noki3210-default.struct"
+}

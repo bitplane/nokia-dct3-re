@@ -1,13 +1,27 @@
 {
   "schema_version": 1,
   "name": "Nokia 3210 MCU v6.00",
-  "runtime_profile": "coherent deep boot with NOKI3210_TRACE_TASKS=1 and NOKI3210_TRACE_GSM_LOWER=1",
   "flash_base": "0x200000",
   "callback_table": {
     "address": "0x2db720",
     "entries": 126,
     "entry_size": 8
   },
+  "nodes": [
+    {"id": "contact_task", "kind": "rtos_task", "task": 2, "rom_addresses": {"noki3210_v600": "0x237bb4"}},
+    {"id": "service_transport_task", "kind": "rtos_task", "task": 7, "rom_addresses": {"noki3210_v600": "0x2ad254"}},
+    {"id": "external_service_peer", "kind": "external_peer", "rom_addresses": {}},
+    {"id": "service5_callback", "kind": "firmware_callback", "task": 5, "rom_addresses": {"noki3210_v600": "0x2618e8"}},
+    {"id": "generic_service_provider_dispatch", "kind": "firmware_dispatch", "task": 5, "rom_addresses": {"noki3210_v600": "0x28d29c"}},
+    {"id": "task15_object_parser", "kind": "rtos_consumer", "task": 15, "rom_addresses": {"noki3210_v600": "0x209978"}},
+    {"id": "task14_object_decoder", "kind": "rtos_consumer", "task": 14, "rom_addresses": {"noki3210_v600": "0x267258"}},
+    {"id": "lower_radio_result_dispatch", "kind": "firmware_dispatch", "rom_addresses": {"noki3210_v600": "0x245a84"}},
+    {"id": "task10_completion_dispatch", "kind": "rtos_consumer", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b198"}},
+    {"id": "task17_radio_init", "kind": "rtos_consumer", "task": 17, "rom_addresses": {"noki3210_v600": "0x223964"}},
+    {"id": "task5_session_dispatch", "kind": "rtos_consumer", "task": 5, "rom_addresses": {"noki3210_v600": "0x255124"}},
+    {"id": "task14_session_request", "kind": "rtos_consumer", "task": 14, "rom_addresses": {"noki3210_v600": "0x238a24"}},
+    {"id": "sim_task", "kind": "rtos_task", "task": 21, "rom_addresses": {"noki3210_v600": "0x27defc"}}
+  ],
   "apis": [
     {"address": "0x26a204", "name": "task_post", "kind": "message_send", "arguments": {"destination_task": "r0", "message": "r1"}},
     {"address": "0x26a354", "name": "task_post_alt", "kind": "message_send", "arguments": {"destination_task": "r0", "message": "r1"}},
@@ -143,14 +157,86 @@
         {"type": "effective_literal_load", "address": "0x24788e", "value": "0x0fbf"},
         {"type": "call", "address": "0x247890", "target": "0x246ad6"}
       ]
+    },
+    {
+      "id": "task14_opcode_2a_to_lower_result_0fbf",
+      "from": "task14_object_decoder",
+      "to": "lower_radio_result_dispatch",
+      "input_status": "0x09d8",
+      "output_status": "0x0fbf",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x267258"},
+        {"type": "effective_literal_load", "address": "0x24788e", "value": "0x0fbf"}
+      ]
+    },
+    {
+      "id": "lower_result_0fbf_to_task10_1392",
+      "from": "lower_radio_result_dispatch",
+      "to": "task10_completion_dispatch",
+      "input_status": "0x0fbf",
+      "output_status": "0x1392",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x245c76"},
+        {"type": "decoded_address", "address": "0x2525a8"},
+        {"type": "decoded_address", "address": "0x2b60f6"}
+      ]
+    },
+    {
+      "id": "task17_completion_to_task5_13e2",
+      "from": "task17_radio_init",
+      "to": "task5_session_dispatch",
+      "input_status": "0x0434",
+      "output_status": "0x13e2",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "call", "address": "0x225b8c", "target": "0x2b3f60"},
+        {"type": "effective_literal_load", "address": "0x2b3f64", "value": "0x53e2"}
+      ]
+    },
+    {
+      "id": "task5_13e2_to_task14_1776",
+      "from": "task5_session_dispatch",
+      "to": "task14_session_request",
+      "input_status": "0x13e2",
+      "output_status": "0x1776",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x255124"},
+        {"type": "decoded_address", "address": "0x28a4a8"},
+        {"type": "decoded_address", "address": "0x238a24"},
+        {"type": "call", "address": "0x2389fe", "target": "0x26a354"}
+      ]
+    }
+  ],
+  "runtime_claims": [
+    {
+      "id": "deep_gsm_service5_inputs", "manifest": "deep-gsm", "subsystem": "generic_service",
+      "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
+      "statement": "An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no object-bearing 0x05e8."
+    },
+    {
+      "id": "deep_gsm_target_chain_absent", "manifest": "deep-gsm", "subsystem": "generic_service",
+      "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
+      "statement": "No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained coherent-run analysis."
+    },
+    {
+      "id": "deep_gsm_task14_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",
+      "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
+      "statement": "Task 14 initialized its controller slots but received no subsequent message; decoder 0x267258 did not execute."
     }
   ],
   "runtime_patterns": [
-    {"kind": "message", "regex": "msgedge: t(?P<source>\\d+) -> t(?P<destination>\\d+) \\(first status=(?P<status>[0-9a-fA-F]{4})"},
-    {"kind": "message", "regex": "sim_owner_post: t(?P<source>\\d+) -> t(?P<destination>\\d+) status=(?P<status>[0-9a-fA-F]{4})"},
-    {"kind": "callback", "regex": "gsm_lower: service5 callback status=(?P<status>[0-9a-fA-F]{4}).*caller=(?P<caller>[0-9a-fA-F]{8})"},
-    {"kind": "contact_construct", "regex": "csconstruct: command=(?P<command>[0-9a-fA-F]{2}) payload=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
-    {"kind": "contact_send", "regex": "cssend: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
-    {"kind": "contact_receive", "regex": "cscmd: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*payload0=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"}
+    {"kind": "message", "subsystem": "generic_service", "regex": "msgedge: t(?P<source>\\d+) -> t(?P<destination>\\d+) \\(first status=(?P<status>[0-9a-fA-F]{4})"},
+    {"kind": "message", "subsystem": "generic_service", "regex": "sim_owner_post: t(?P<source>\\d+) -> t(?P<destination>\\d+) status=(?P<status>[0-9a-fA-F]{4})"},
+    {"kind": "callback", "subsystem": "generic_service", "regex": "gsm_lower: service5 callback status=(?P<status>[0-9a-fA-F]{4}).*caller=(?P<caller>[0-9a-fA-F]{8})"},
+    {"kind": "contact_construct", "subsystem": "contact_service", "regex": "csconstruct: command=(?P<command>[0-9a-fA-F]{2}) payload=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
+    {"kind": "contact_send", "subsystem": "contact_service", "regex": "cssend: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
+    {"kind": "contact_receive", "subsystem": "contact_service", "regex": "cscmd: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*payload0=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"}
   ]
 }

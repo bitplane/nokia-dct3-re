@@ -1,5 +1,10 @@
 # Static Branch Map: Boot Service Gates
 
+> **Historical research reference.** This file preserves address-level branch
+> work and superseded experiments. Current service direction and producer
+> conclusions live in `contact_service_topology.md`; normalized state and
+> falsification conclusions live in `evidence/*.json`.
+
 Generated from Thumb disassembly of the swap16 firmware image. The purpose is to keep the next two boot branches explicit so runtime experiments can target known pass/fail conditions instead of rediscovering the same path.
 
 > **⚠️ Read `docs/service_bootstrap.md` first (its Status & model stack).** This file frames the D9

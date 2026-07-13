@@ -8,19 +8,20 @@ deleted incrementally as observed contracts become components.
 
 The memory-map-registered handlers are thin and contain only real hardware
 behaviour. Each forwards to a clearly-banner'd `*_firmware_*` helper that holds
-the forcing shims + traces:
+bounded traces and provisional firmware-call bridges:
 
 | hardware entry point | quarantined research helper |
 |---|---|
-| `flash_r` (≈9 lines)  | `flash_firmware_hooks` (returns an override fetch, or `nullopt`) |
-| `ram_w`   (≈10 lines) | `ram_w_firmware_overrides` (forcing can rewrite the stored value) |
-| `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (forcing can rewrite the returned value) |
+| `flash_r` (≈9 lines)  | `flash_firmware_hooks` (observes fetches; legacy optional return remains) |
+| `ram_w`   (≈10 lines) | `ram_w_firmware_overrides` (write-side research observations) |
+| `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (read-side research observations) |
 
 The PCD8544 LCD and MAME `I2C_24C128` now model the display and external
 EEPROM. CCONT is an explicit local `nokia_ccont_device` owning its serial
 registers, ADC results, RTC, interrupt state and watchdog. The
-`nokia_service_transport_device` owns the modeled node-`0x18` response payload,
-response readiness and channel-empty completion timing. The provisional
+`nokia_service_transport_device` owns the modeled healthy contact completion,
+response readiness and channel-empty completion timing. Task 7 remains the
+firmware adapter to the external service/test peer. The provisional
 `nokia_sim_card_device` owns the verified SIMI register/FIQ transport and a synthetic GSM 11.11
 card. The phone state owns MAD2 interrupt routing and supplies power-scenario ADC inputs. The
 MAD2/DSP mailbox follows after its boundary stabilizes; MAD2 extraction should wait for the
@@ -29,8 +30,8 @@ cross-ROM pass to identify the genuinely shared contract.
 ## Rules
 
 - New *hardware* behaviour goes in a device model or the owning MAD2 register block.
-- New *forcing/diagnostic* shims go in the `*_firmware_*` helpers, gated by their
-  `NOKI3210_*` knob, with a comment naming the gate they stand in for.
+- New diagnostic traces may go in the `*_firmware_*` helpers when no component
+  boundary exists yet. Do not add result forcing or task-message injection.
 - The `*_firmware_*` helpers should **shrink over time**: when a shim's gate is
   understood and modeled as real hardware/scheduler state, delete the shim.
 - **Status (2026-06-26):** all `NOKI3210_FORCE_*` firmware-result forcing has been

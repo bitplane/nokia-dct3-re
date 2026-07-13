@@ -1,5 +1,10 @@
 # The interactive-boot handoff — task-1 master sequencer, traced
 
+> **Historical research reference.** This chronological investigation retains
+> useful addresses and negative results. Current subsystem conclusions and
+> normalized predicates/falsifications take precedence; see `README.md` and
+> `evidence_regime.md`.
+
 > ⚠️ **2026-07 caveat — read `docs/sim_emulator_scope.md` "Moves 1+2" first.** Many
 > conclusions below (idle content / camped state / DSP primitives "terminate at the RF/DSP
 > wall") were observed under the *full model profile*, where `MODEL_SIM_CARD`'s single-EF

@@ -119,7 +119,7 @@ block-2 resumes.
 `TRACE_SVCBIT2` confirmed `[0x11fed1]` bit2 is set `0→1` exactly once, by real
 firmware at `0x2347d0` inside `contact_startup_fault_seed_bits_234750` — it OR's
 in `0x04` and posts a service message. It is **never cleared** in our boot
-because `MODEL_SVC_RESPONDER` injects the node-`0x18` reply instead of running
+because `MODEL_SVC_RESPONDER` supplies the healthy contact completion instead of running
 the full service startup that would complete the operation and clear the seed
 bit. So clearing the bit is a faithful model of that completion, consistent
 with the responder approach — not an override of real hardware behaviour.

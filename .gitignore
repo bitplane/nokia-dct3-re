@@ -28,6 +28,8 @@ mame/
 .venv/
 venv/
 run_*/
+!tools/run_manifests/
+!tools/run_manifests/*.json
 run/
 cfg/
 nvram/

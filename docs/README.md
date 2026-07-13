@@ -13,6 +13,8 @@ Documentation is organized by authority rather than investigation date.
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
 | `cross_rom_confidence.md` | 3210/3330 portability evidence and ROM-input status. |
 | `structural_regression.md` | Default mid-boot oracle and current deep-profile result. |
+| `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
+| `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
 
 ## Current boot frontier
 
@@ -40,6 +42,10 @@ remain useful when working in the corresponding firmware subsystem:
 Treat concise subsystem documents and current source code as authoritative
 when a deep reference conflicts with them. Absolute addresses apply to the
 3210 v6.00 firmware unless explicitly stated otherwise.
+
+Normalized reviewed evidence lives in `evidence/*.json`; named runtime inputs
+live in `tools/run_manifests/*.json`. Run `make evidence-check` before banking a
+new conclusion.
 
 ## Evidence policy
 
