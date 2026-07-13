@@ -96,8 +96,11 @@ callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
 Callback 7 currently receives only the global `0x05e2` sweep, not constructor `0x05dc`. The
 missing predecessor is now narrowed to the lower-radio result path: task 15 must produce `0x09ee`,
 which task 17 converts to `0x0a2e`; the task-15 router then reaches the session-object factory.
-The related object route (`0x05ea -> 0x07dd -> 0x209978`) populates the lower state consumed by
-that result path, but no such object arrives in the coherent run. Do not replace this peer contract
+The related object route (`0x05ea -> 0x07dd -> 0x209978 -> 0x09f3 -> 0x0a08`) populates the lower
+state consumed by that result path, but no such object arrives in the coherent run. Service-5's
+callback is already registered and organically receives the framework sweep (`0x05f3`, `0x05e2`);
+the missing input is the queued object state which selects object-bearing `0x05e8`. Do not replace
+this peer contract
 by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
 
 The descriptor factory is now identified as `0x24f120`. Its four known callers

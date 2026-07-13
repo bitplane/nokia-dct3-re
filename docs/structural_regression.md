@@ -61,6 +61,19 @@ mode `0x0004` with flags `0x0f`, contact status `0x0049`, no-SIM asserted and
 SIM-enable clear. That result is now recorded as a separate deep oracle; it
 does not replace or weaken the default CONTACT SERVICE acceptance test.
 
+As of 2026-07-13, repeated 20-second deep runs still reproduce the Insert SIM
+frame hash `90eb19a5478483ca` and every non-CCONT structural field, but report
+`ccont_bytes=5153` and `ccont_reads=4299`, ten above the recorded `5143`/`4289`.
+Restoring the old 5 ms DSP service cadence produces the same counts, while the
+default-profile structural oracle remains byte-identical. The drift therefore
+predates and is independent of the ring-drain cadence used by the current radio
+investigation. Do not update the deep oracle until the extra CCONT transaction
+has been identified or accepted as a deliberate model change.
+
 The service responder remains a firmware-boundary model: it expresses a real
 request/completion contract but currently completes it through the shared
 status byte rather than a separately emulated transport device.
+
+`tools/find_literal_loads.py` scans Thumb-1 PC-relative literal loads while
+normalizing the swapped image's 32-bit halfword order. It is intended for static
+producer censuses; use `--raw` only when searching for the on-disk literal value.

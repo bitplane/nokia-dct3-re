@@ -236,23 +236,94 @@ generic service callback receives object-bearing 0x05e8
   -> 0x28d29c / 0x28d194 transfers ownership as task-15 0x07dd
   -> parser 0x209978 validates class 5, primitive 0x0b
   -> maps primitive to registration discriminator 0x20
+  -> successful task-15 parse result 0x09f3
+  -> state-machine branches 0x20be0c or 0x20f324 publish internal result 0x0a08
+  -> task-15 translator 0x208ee0 constructs object-bearing task-14 0x09d8
+  -> task-14 decoder 0x267258
 ```
 
 No object-bearing `0x05e8`, `0x05ea`, or `0x07dd` occurs in the coherent run
-(**S/R**). Parser `0x209978` populates the task-15 lower state later consumed
-while producing `0x09ee`, so this path is part of the missing radio-session
-activation. Delivering its object remains an external-peer responsibility; its
-exact hardware transport is not yet proved.
+(**S/R**). The two `0x0a08` producer sites are also absent while task 15's receive
+loop runs three times. Both are selected only when the handler returns `0x09f3`,
+which ties the missing task-14 `0x09d8` directly to successful parsing of the
+`0x07dd` object rather than to an independent unsolicited task-14 message.
+Delivering the original object remains an external-peer responsibility; its exact
+hardware transport is not yet proved.
+
+The generic framework boundary is now separated from that external transport.
+`0x2638e4` is called only by the task-5 dispatcher at `0x2af652`, and callback
+`0x2618e8` is the organic **service-5** callback selected by the callback table
+(`0x002db860`). In an unforced deep run it already receives `0x05f3` and `0x05e2`
+through the normal dispatcher. The absent condition is therefore the queued
+object/completion state that makes the framework deliver object-bearing `0x05e8`,
+not service registration itself. The former `MODEL_GSM_SERVICE` prototype tracked
+service `0x0b` and force-called `0x263154`/`0x2635ac`; it targeted a neighboring
+transaction and was deleted.
+
+An exhaustive Thumb literal-load scan adds an important qualification: executable
+ROM contains loads of `0x05e2`, `0x05e7`, and `0x05ea`, but no instruction loads
+`0x05e8` as an immediate literal. `0x05e8` instead appears in firmware registration
+descriptors as a callback/event field. For example callback-table index `0x24`
+(`0x28b844`) handles the global `0x05e8` transition and only then registers a
+resident descriptor through `0x28ba9a -> 0x263d30`; that call is absent from the
+coherent boot and is downstream, not the missing producer. Future census tooling
+must therefore recover descriptor fields and indirect event generation in addition
+to direct `0x2af798` call sites.
 
 The coherent runtime instead completes a separate acknowledgement side path:
 
 ```text
-task 17 0x09ec -> task 15 -> task 16 0x07d6
-  -> task 10 0x03e9 -> task 17 0x043c
+task 17 0x09ec -> task 15 internal case 6 -> task 16 0x07d6
+  -> task 10 0x03e9 -> task 17 0x043c (immediate acknowledgement)
+  -> task 10 builds 72-byte work object -> task 3 -> MCU-to-DSP TX ring
 ```
 
-Task 17 consumes `0x043c` as bookkeeping. It does not construct the session
-object and is not a substitute for the absent `0x09ee` result.
+Task 17 consumes `0x043c` as bookkeeping and remains in its phase loop. The
+completion it accepts is `0x0434` or `0x0a22` (with later `0x1583`/`0x1584`
+phase events); it does not construct the session object and is not a substitute
+for the absent `0x09ee` result. Task 10 produces the real `0x0434` asynchronously
+from `0x219e30`, after its task-3/DSP work completes.
+
+The coherent run pins the missing predecessor at the DSP boundary. Task 10 creates
+`{00 02 44 1a 00 81 98 ...}` and posts it to task 3. Task 3 serializes queued
+work through `0x290840` into the MCU-owned DSP TX ring. With the DSP peer cadence
+decoupled from the old 5 ms phase-lock (the opt-in model now defaults to 4 ms),
+the earlier type-`0x51`/`0x70` backlog drains and this object appears organically
+as `type 0x1a, payload 68`, beginning `441a 0081 9800`.
+
+DSP-to-MCU RX delivery is also pinned to FIQ 0. A correlated type-`0x80`,
+primitive-`0x70` candidate traverses the real RX ring and task-4 dispatcher, but
+task 13 rejects it for this registration context even when delayed by up to
+306 ms. That response hypothesis is falsified and its probe was removed.
+
+The relevant task-10 transition is status `0x1392`, not `0x138f`. Task 17 enters
+its long-lived event loop through `0x223964 -> 0x2271c6`; `0x2222fc` and the
+`0x138f` callback family occur only after that loop returns, so they cannot
+produce the `0x0434` the loop is awaiting. The similarly numbered DSP packet
+type `0x89` is also an initialization-only route (`[0x112501] == 0`); a real
+FIQ-0 probe at the current frontier was rejected and removed.
+
+Status `0x1392` dispatches through `0x21b9b4 -> 0x21b198` and can reach the
+`0x0434` producer at `0x219e30`. Callback `0x2b60f6` publishes it after
+unregistering lower-radio key `0x4c00`. The organic callback path is:
+
+```text
+lower-radio result dispatcher 0x245a84, case 0x0fbf (0x245c76)
+  -> callback-object wrapper 0x2525a8
+  -> callback 0x2b60f6
+  -> task-10 status 0x1392
+  -> 0x21b198 -> 0x219e30 -> task-17 0x0434
+```
+
+The dispatcher input is encoded as `0x0fbf0000` and is loaded from a ROM literal
+at `0x24788e` on the lower-radio controller's event-`0x102f` branch. The earlier
+`0x0fc3` value was a jump-table arithmetic error. Decoder `0x267258` returns
+event `0x102f` for an incoming object whose opcode byte is `0x2a`; task 14 calls
+that decoder for statuses `0x09d8`/`0x09de`. Status `0x09d8` is constructed by
+task 15 itself after its `0x07dd` object parser succeeds and returns internal result
+`0x09f3`; it is not a raw peer status. The exact transport which supplies the
+earlier generic-service object remains unresolved. The prior task-8 `0x8d`/`0x8e`
+hypothesis is not linked to this path and is not a valid peer model yet.
 
 ## Current boundary and next acceptance point
 
@@ -261,16 +332,47 @@ the firmware or external-peer transition that constructs callback 7 with a
 real, firmware-owned object. Known resource APIs currently expose no pending
 request that a peer can honestly complete.
 
+This is now runtime-confirmed rather than inferred: in an eight-second coherent deep
+boot, task 14 initializes its eight lower-radio controller slots, but receives no
+message afterward. Neither the resource-`0x35` transmitter `0x282238` nor object decoder
+`0x267258` executes. The simultaneous DSP ring type-`0x1a` packet is a fixed 68-byte
+state/control block (`00 81 98 00` then zeroes), not the missing resource request.
+
+The post-completion session transition is now mapped. Task 17 owns the natural producer
+of `0x13e2`; it is not an absent transport message. Once task 17 accepts `0x0434` (or the
+parallel `0x0a22` completion), its phase handler can call `0x2b3f60` from `0x225b8c`.
+The same publisher is called at `0x223a28` after the long-lived phase loop returns.
+`0x2b3f60` publishes packed status `0x53e2`, carrying one firmware-owned pointer, and the
+normal task-5 path continues as follows:
+
+```text
+task-17 completion branch -> 0x2b3f60(packed 0x53e2, firmware pointer)
+  -> task-5 status 0x13e2 -> handler 0x255124
+  -> transient descriptor bytes at 0x110f1f / object pointer at 0x110f20
+  -> 0x28a4a8 -> request builder 0x238a24
+  -> status 0x1776 object -> serializer 0x23879e
+  -> post to decimal task 14 (ID 0x0e) at 0x2389fe
+```
+
+`0x13e2` is a real three-byte entry in the ROM message catalogue at `0x2cb810`, and its
+packed one-argument producer literal `0x53e2` is at `0x2b3f64`. It remains absent in the
+current runtime because task 17 never receives the preceding `0x0434`; the task-5
+dispatcher and the `0x28aXXX` consumer are not the broken boundary. A scheduler-only trace
+briefly misattributed live `0x13b5` to task 20 because `0x2af6ea` allocates and can reschedule
+before posting. Tracing publisher entry preserves the caller and confirms why task identity
+must be sampled before allocation.
+
 The next investigation must therefore:
 
-1. decode the reachable DSP service commands `0x30` and `0x32` issued through
-   `0x290cf4`, including their DSP-owned completion words and IRQ-4 consumer;
-2. determine whether the absent lower-radio result returns through DSP shared
-   control words, the task-22 L1 mailbox, or another DSP-owned callback route;
-3. model only the external side of that proven DSP/L1 contract;
-4. let firmware generate `0x05dc -> 0x5518 -> 0x1583 -> 0x1196` itself;
-5. observe `0x293f30` return 2 from the coherent reply data;
-6. extend the SIM filesystem only when the resulting organic APDUs demand it.
+1. identify and model only the lower-radio transport response carrying opcode `0x2a`,
+   then verify the organic precondition chain
+   `0x245c76 -> 0x2525a8 -> 0x2b60f6 -> 0x1392 -> 0x0434` and task 17's
+   natural call to `0x2b3f60`;
+2. verify the resulting firmware-owned pointer drives
+   `0x13e2 -> 0x255124 -> 0x28a4a8 -> 0x238a24 -> 0x1776` without intervention;
+3. follow the organic session through `0x05dc -> 0x5518 -> 0x1583 -> 0x1196`;
+4. observe `0x293f30` return 2 from coherent reply data;
+5. extend the SIM filesystem only when the resulting organic APDUs demand it.
 
 Completion requires one coherent boot with no injected task messages, forced
 callback events, forced return values, or writes to SIM/registration RAM.

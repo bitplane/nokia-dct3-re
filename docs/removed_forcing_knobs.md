@@ -192,6 +192,12 @@ removed. Their conclusions are recorded in `sim_registration.md`. The retained
 `TRACE_GSM_LOWER`/`TRACE_GSM_SERVICE` taps observe the current external service boundary, while
 the compact startup/MMI traces continue to serve established boot milestones.
 
+`MODEL_GSM_SERVICE` was subsequently removed as another disproven execution shim. It watched
+service `0x0b`, saved the CPU context, and force-called generic-framework helpers `0x263154` and
+`0x2635ac`. Static and runtime evidence instead places the required object-bearing completion on
+the already-organic service-5 callback `0x2618e8`; the missing condition is its queued object, not
+an unregistered service-`0x0b` transaction. The observational framework traces remain.
+
 The useful substrate remains: register/ring-2 SIM delivery, the multi-file APDU responder,
 EEPROM I2C behavior, DSP service, CCONT behavior, and request-driven peer prototypes. The default
 oracle remains `d8a9a7a58e587be8`; an integrated-model smoke run still reaches the natural

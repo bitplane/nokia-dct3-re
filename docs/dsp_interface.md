@@ -150,6 +150,12 @@ the invalid-message/free path. Consequently a symmetrical type-`0x05` reply to
 the outbound D0 packet is not a valid inbound generic-service object and cannot
 be assumed to produce service-5 `0x05ea` or task-15 `0x07dd`.
 
+Service 5 itself is not missing: callback `0x2618e8` is selected organically by
+the generic callback dispatcher and receives the normal `0x05f3`/`0x05e2` sweep.
+The framework is downstream of task 5 (`0x2af652 -> 0x2638e4`), so it is not the
+hardware ingress. The open DSP/peer question is which lower transport populates
+the queued object that changes the callback input to object-bearing `0x05e8`.
+
 For type `0x70`, `0x29bc00` preserves the type as the firmware message class
 and posts the message to task 2. Task 2 has no direct class-`0x70` case: its
 fallback passes the first payload byte to `0x237960`, which records an
@@ -178,6 +184,70 @@ not evidence for a D0 response or a SIM-registration fix. It remains separate fr
 the established deep profile because enabling it preserves the final LCD hash but
 changes the structural oracle's repeated-work counters.
 
+### Organic radio-init queue frontier
+
+The registration chain now reaches this ring without an isolated producer probe.
+Task 17 sends `0x09ec`; task 15 case 6 sends `0x07d6`; task 16 sends `0x03e9` to
+task 10. Task 10 immediately acknowledges task 17 with `0x043c`, then constructs
+a 72-byte task-3 object headed `{00 02 44 1a 00 81 98 ...}`. Its later completion
+routine at `0x219e30` is the organic producer of `0x0434`.
+
+Task 3 does not immediately serialize that object. Its FIFO first releases the
+type-`0x51` coefficient/configuration stream and five type-`0x70` control packets.
+The old 5 ms peer cadence can phase-lock against task 3's immediate free-space
+recheck and strand the FIFO after sequence `0x22a2`. A 4 ms cadence avoids that
+model artifact: all earlier packets drain and the organic request reaches the
+DSP boundary as a 35-word packet:
+
+```text
+type 0x1a, payload 68: 441a 0081 9800 0000 ...
+```
+
+No firmware message, callback, or RAM state is injected to produce it. The
+driver's opt-in DSP service defaults now use the empirically stable 4 ms cadence;
+the eventual DSP peer should own TX consumption independently of the service-IRQ
+timer so correctness does not depend on this scheduling phase.
+
+An RX-ring transport probe also pins the return notification: advancing RX
+producer `0x1c8` and asserting **FIQ 0** wakes task 4 with receive sentinel `4`,
+which calls `0x290904` and dispatches the packet naturally. IRQ lines and the
+other FIQ lines do not. A candidate type-`0x80`, primitive-`0x70` response was
+decoded and forwarded to task 13 as `0x040b`, but its subscriber/parser rejected
+it; delaying it by 3-306 ms did not change that result. It is therefore not the
+proven completion for this type-`0x1a` request, and the probe was removed.
+
+The task-10 completion route is now pinned more tightly, and corrects an earlier
+false lead. Task 17's initializer enters its long-lived event loop at
+`0x223964 -> 0x2271c6`; code at `0x2222fc` and its `0x138f` callbacks is reached
+only after that loop returns. It is therefore downstream of the awaited
+`0x0434`, not its missing predecessor. DSP packet type `0x89` can also produce
+`0x138f`, but only while task 4's initialization flag `[0x112501]` is zero. A
+real FIQ-0 type-`0x89` probe at the current frontier was rejected after that flag
+became one, so the probe was removed.
+
+The relevant task-10 completion is status `0x1392`. Task 10 dispatches it through
+`0x21b9b4 -> 0x21b198`; when the firmware-owned work state is ready this reaches
+`0x219e30`, the producer of `0x0434`. Its organic publisher is callback
+`0x2b60f6`, which unregisters lower-radio key `0x4c00` with `0x2b257e` and posts
+`0x1392` through `0x2af6ea`.
+
+The callback wrapper `0x2525a8` is selected by the `0x0fbf` case of the large
+lower-radio result dispatcher `0x245a84`. That case (`0x245c76`) copies the
+firmware-owned result fields into a callback object before invoking the wrapper;
+it is not a bare status notification. The encoded dispatcher value is
+`0x0fbf0000`, loaded as a literal at `0x24788e` on the controller's event-`0x102f`
+branch. The earlier `0x0fc3` value was a jump-table arithmetic error. Event
+`0x102f` is returned by object decoder `0x267258` for opcode byte `0x2a`; that
+decoder is reached from task 14 for statuses `0x09d8`/`0x09de`. The remaining
+boundary question is how a peer response is transported into that decoder.
+
+The producer side is pinned one layer further back. Task 15 constructs `0x09d8`
+through translator `0x208ee0` after an object-bearing `0x07dd` has passed parser
+`0x209978`, returned internal success `0x09f3`, and selected one of the two `0x0a08`
+state-machine branches (`0x20be0c`/`0x20f324`). Neither branch executes in the
+coherent run. Consequently a DSP peer must not inject task-14 `0x09d8`; the open
+hardware boundary precedes the generic-service object delivered to task 15.
+
 The wider **bidirectional L1 protocol** — MCU sends "search/sync/measure/attach", DSP returns
 cell/RSSI/registration — lives largely in the `0x2b7xxx–0x2c9xxx` driver and is not yet
 observed carrying task-22 messages. The narrower shared-control path at `0x290cf4` is live,
@@ -188,9 +258,10 @@ contract can be traced at the current boot frontier.
 
 - **To reach where we are:** the current echo, ready flags, queue drain, and IRQ model are
   sufficient, but they are not a completed DSP contract.
-- **The DSP is now the leading bounded frontier, not yet a proven keystone.** Organic radio
-  initialization issues DSP service requests immediately before the absent lower-radio result.
-  Mapping their completion contract is justified; fabricating an L1 reply before that mapping is not.
+- **The lower-radio session start is the proven bounded frontier.** Organic initialization
+  creates task 14 and its eight controller slots, but no task-14 input starts a resource-`0x35`
+  operation. The concurrent type-`0x1a` DSP state block is not evidence of such an operation;
+  the falsified type-`0x80`/`0x70` reply must not be restored.
 - **For the network (operator name + signal):** a message-boundary DSP stub (answer the L1
   commands with "camped on a fake cell, operator X, RSSI y") is feasible *in principle* and
   is the right MAME approach — but it is **doubly blocked**: (1) the L1 protocol is
@@ -200,10 +271,22 @@ contract can be traced at the current boot frontier.
 - **Full DSP-core emulation** (a TI Lead core running the downloaded blobs) is a much larger
   project and would still need a faked air interface; not warranted given the above ordering.
 
-**Net:** the reachable MCU↔DSP interface exposes both an incomplete queue-acknowledgement model
-and live shared-control commands. Neither has yet proved the exact reply that blocks SIM
-registration. The next pass should map command `0x30`/`0x32` completion through IRQ 4 using
-`NOKI3210_TRACE_DSP_BOUNDARY`, then decide whether a DSP peer device is warranted.
+An eight-second coherent deep run with DSP-ring draining established that the organic
+type-`0x1a` packet is **not** the resource-`0x35` transaction. Its complete contents are
+`44 1a 00 81 98 00` followed by zeroes (35 ring words total), consistent with a fixed-size
+DSP state/control block. The lower-radio controller initializes at about 0.814 s, but task
+14 receives no message and neither `0x282238` (resource-`0x35` transmit) nor `0x267258`
+(object receive) runs.
+
+**Net:** task-5 status `0x13e2` is downstream, not the missing radio transition. Its natural
+producer is `0x2b3f60`, called by task 17 at `0x225b8c` after the phase handler accepts
+`0x0434`/`0x0a22` (and at `0x223a28` after the phase loop returns). It publishes packed
+`0x53e2` with one firmware-owned pointer; the consumer path
+`0x255124 -> 0x28a4a8 -> 0x238a24` then constructs `0x1776` for decimal task 14
+(ID `0x0e`). The runtime never reaches it because `0x0434` is still absent. The leading
+frontier therefore remains the unforced lower-radio result chain
+`0x245c76 -> 0x2525a8 -> 0x2b60f6 -> 0x1392 -> 0x0434`; only then should the proven
+bidirectional contract move into a DSP peer device.
 
 ## Per-primitive payload semantics (2026-07 — handler `0x23cde0`, classes 5/7/0xa)
 
