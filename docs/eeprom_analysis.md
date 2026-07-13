@@ -18,6 +18,17 @@ This replaced the former firmware-PC-gated byte sequencer. Firmware now drives
 ordinary SDA/SCL transitions and receives acknowledgement/data from the MAME
 device.
 
+The GenIO input path must distinguish the output latch from the physical SDA
+level. When direction bit 0 is clear, the MCU has released SDA and reads the
+EEPROM's line directly; combining that level with the stale signal-register bit
+can hold SDA low after the MCU last transmitted a zero. That integration error
+previously made the firmware calculate `0x00ff` and read stored checksum/guard
+words as zero at `0x234810`, despite a correct backing image. With the released
+line read directly, the failure branch at `0x234826` is absent and contact status
+keeps bit 6 through EEPROM validation (`0xc8` -> `0xcc`). The later clear at
+`0x237b04` is the independent disabled service-channel/PM-read predicate described
+in `service_bootstrap.md`.
+
 The memory map also exposes a read-only region at `0xa00000..0xa03fff`. Its
 relationship to the physical serial EEPROM is not established; the current
 handler reads the input region directly and is classified as an unproven
@@ -68,7 +79,9 @@ organized as additive-checksummed blocks with big-endian stored sums:
 
 The contact-service check uses checksum routine `0x234588` and comparison site
 `0x234810`. A mismatch clears the service-present bit used by startup. EEPROM
-validity is one real CONTACT SERVICE prerequisite, but not the only one.
+validity is one real CONTACT SERVICE prerequisite, but not the only one. The
+native serial path now demonstrates this check organically; it is not satisfied
+by a firmware hook or RAM override.
 
 ## Synthetic self-test profile
 

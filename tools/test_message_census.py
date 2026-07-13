@@ -72,5 +72,68 @@ class DescriptorClassificationTests(unittest.TestCase):
 		self.assertEqual(message_census.service5_candidacy(call), "dynamic_service_unresolved")
 
 
+class ObjectLifecycleTests(unittest.TestCase):
+	def test_only_object_bearing_05e0_constructors_are_inventoried(self):
+		calls = [
+			{"callsite": 0x2000, "api": "generic_event_generate", "arguments": {
+				"packed_event": 0x45e0, "event": 0x05e0, "argument_count": 1, "argument_words": [7]}},
+			{"callsite": 0x2002, "api": "generic_event_generate", "arguments": {
+				"packed_event": 0x85e0, "event": 0x05e0, "argument_count": 2, "argument_words": [7, 0x110000]}},
+			{"callsite": 0x2004, "api": "generic_event_generate", "arguments": {
+				"packed_event": 0xc5e0, "event": 0x05e0, "argument_count": 3, "argument_words": [8, 0x110100, 3]}}
+		]
+		assessments = [
+			{"callsite": "0x2002", "classification": "dormant", "role": "fixture"},
+			{"callsite": "0x2004", "classification": "unresolved", "role": "fixture"}
+		]
+		result = message_census.object_lifecycle_inventory(calls, assessments)
+		self.assertEqual([item["callsite"] for item in result["constructors"]], [0x2002, 0x2004])
+		self.assertEqual(result["constructors"][1]["extra_arguments"], [3])
+		self.assertTrue(result["coverage_complete"])
+
+	def test_assessment_coverage_reports_missing_and_stale_callsites(self):
+		calls = [{"callsite": 0x2002, "api": "generic_event_generate", "arguments": {
+			"packed_event": 0x85e0, "event": 0x05e0, "argument_count": 2, "argument_words": [7, 1]}}]
+		result = message_census.object_lifecycle_inventory(calls,
+			[{"callsite": "0x2004", "classification": "stale", "role": "fixture"}])
+		self.assertEqual(result["missing_assessments"], [0x2002])
+		self.assertEqual(result["stale_assessments"], [0x2004])
+		self.assertFalse(result["coverage_complete"])
+
+	def test_dynamic_inventory_bounds_object_bearing_candidates(self):
+		calls = [
+			{"callsite": 0x3000, "api": "generic_event_generate", "arguments": {"packed_event": None}},
+			{"callsite": 0x3002, "api": "generic_event_generate", "arguments": {"packed_event": None}},
+			{"callsite": 0x3004, "api": "task_post", "arguments": {"packed_event": None}}
+		]
+		assessments = [
+			{"callsite": "0x3000", "argument_count": 1, "classification": "scalar", "role": "fixture"},
+			{"callsite": "0x3002", "argument_count": 2, "possible_events": ["0x0594", "0x0c2d"],
+				"classification": "bounded", "role": "fixture"}
+		]
+		result = message_census.dynamic_packed_event_inventory(calls, assessments)
+		self.assertEqual(result["unresolved_calls"], 2)
+		self.assertEqual(result["assessed_calls"], 2)
+		self.assertEqual([item["callsite"] for item in result["object_bearing_candidates"]], ["0x3002"])
+		self.assertTrue(result["coverage_complete"])
+		self.assertFalse(result["can_publish_05e0"])
+
+	def test_dynamic_inventory_rejects_unreviewed_or_05e0_candidate(self):
+		calls = [
+			{"callsite": 0x3000, "api": "generic_event_generate", "arguments": {"packed_event": None}},
+			{"callsite": 0x3002, "api": "generic_event_generate", "arguments": {"packed_event": None}}
+		]
+		assessments = [
+			{"callsite": "0x3000", "argument_count": 2, "possible_events": ["0x05e0"],
+				"classification": "candidate", "role": "fixture"},
+			{"callsite": "0x3004", "argument_count": 0, "classification": "stale", "role": "fixture"}
+		]
+		result = message_census.dynamic_packed_event_inventory(calls, assessments)
+		self.assertEqual(result["missing_assessments"], [0x3002])
+		self.assertEqual(result["stale_assessments"], [0x3004])
+		self.assertFalse(result["coverage_complete"])
+		self.assertTrue(result["can_publish_05e0"])
+
+
 if __name__ == "__main__":
 	unittest.main()

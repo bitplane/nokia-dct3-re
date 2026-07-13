@@ -423,6 +423,59 @@ def status_inventory(instructions, calls, descriptors, data, base, status):
 		"descriptor_fields": descriptor_fields}
 
 
+def object_lifecycle_inventory(calls, assessments):
+	"""Inventory direct 0x05e0 lifecycle constructors that carry an object word."""
+	reviewed = {number(item["callsite"]): item for item in assessments}
+	result = []
+	for call in calls:
+		arguments = call["arguments"]
+		if call["api"] != "generic_event_generate" or arguments.get("event") != 0x05e0:
+			continue
+		if (arguments.get("argument_count") or 0) < 2:
+			continue
+		words = arguments.get("argument_words", [])
+		record = {
+			"callsite": call["callsite"],
+			"packed_event": arguments["packed_event"],
+			"argument_count": arguments["argument_count"],
+			"selector": words[0] if words else None,
+			"object": words[1] if len(words) > 1 else None,
+			"extra_arguments": words[2:],
+			"provenance": "extracted_static"
+		}
+		assessment = reviewed.get(call["callsite"])
+		if assessment:
+			record["assessment"] = {key: value for key, value in assessment.items() if key != "callsite"}
+		result.append(record)
+	extracted = {item["callsite"] for item in result}
+	return {
+		"constructors": result,
+		"reviewed_callsites": sorted(reviewed),
+		"missing_assessments": sorted(extracted - set(reviewed)),
+		"stale_assessments": sorted(set(reviewed) - extracted),
+		"coverage_complete": extracted == set(reviewed)
+	}
+
+
+def dynamic_packed_event_inventory(calls, assessments):
+	"""Require reviewed bounds for packed-event calls whose r0 is runtime-built."""
+	unresolved = [call for call in calls if call["api"] == "generic_event_generate" and
+		call["arguments"].get("packed_event") is None]
+	reviewed = {number(item["callsite"]): item for item in assessments}
+	extracted = {call["callsite"] for call in unresolved}
+	return {
+		"calls": [{**call, "assessment": reviewed.get(call["callsite"])} for call in unresolved],
+		"unresolved_calls": len(unresolved),
+		"assessed_calls": sum(call["callsite"] in reviewed for call in unresolved),
+		"missing_assessments": sorted(extracted - set(reviewed)),
+		"stale_assessments": sorted(set(reviewed) - extracted),
+		"coverage_complete": extracted == set(reviewed),
+		"object_bearing_candidates": [item for item in assessments if item.get("argument_count", 0) >= 2],
+		"can_publish_05e0": any(number(event) == 0x05e0 for item in assessments
+			for event in item.get("possible_events", []))
+	}
+
+
 def hexadecimal(value):
 	return f"0x{value:04x}" if isinstance(value, int) else "?"
 
@@ -469,6 +522,30 @@ def render_report(result):
 			callsites = ", ".join(f"`{value}`" for value in item["callsites"])
 			lines.append(f"- callback `{item['callback_index']}` / `{item['entry']}`: {callsites}; triggers {triggers}; {item['role']}.")
 		lines.append("")
+	lifecycle = result["object_lifecycle_05e0"]
+	lines += ["## Object-bearing 0x05dc lifecycle constructors", "",
+		f"The ROM scan recovered {len(lifecycle['constructors'])} direct packed `0x05e0` constructors with at least two argument words. "
+		"Argumentless and selector-only lifecycle events are excluded.", ""]
+	for item in lifecycle["constructors"]:
+		assessment = item.get("assessment", {})
+		lines.append(f"- `{item['callsite']:#08x}`: selector `{hexadecimal(item['selector'])}`, "
+			f"object `{hexadecimal(item['object'])}`, argc `{item['argument_count']}`; "
+			f"**{assessment.get('classification', 'unreviewed')}** - {assessment.get('role', 'no reviewed role')}.")
+	lines += ["", f"Assessment coverage: **{'complete' if lifecycle['coverage_complete'] else 'incomplete'}**; "
+		f"missing {len(lifecycle['missing_assessments'])}, stale {len(lifecycle['stale_assessments'])}.", ""]
+	dynamic = result["dynamic_packed_events"]
+	lines += ["### Runtime-built packed events", "",
+		f"The extractor leaves {dynamic['unresolved_calls']} packed-event values runtime-built; "
+		f"{dynamic['assessed_calls']} have reviewed bounds. Assessment coverage is "
+		f"**{'complete' if dynamic['coverage_complete'] else 'incomplete'}**.",
+		f"Reviewed two-word candidates: {len(dynamic['object_bearing_candidates'])}; "
+		f"can publish lifecycle event `0x05e0`: **{'yes' if dynamic['can_publish_05e0'] else 'no'}**.", ""]
+	for item in dynamic["object_bearing_candidates"]:
+		events = ", ".join(f"`{event}`" for event in item.get("possible_events", [])) or "unbounded"
+		lines.append(f"- `{item['callsite']}`: events {events}; **{item['classification']}** - {item['role']}.")
+	lines.append("")
+	lines += ["### Registration-relevant intersection", "",
+		"Intersecting these constructors with callbacks that contain direct `0x05e8` publishers leaves owners `0x21`, `0x22`, `0x26`, `0x3c`, and `0x54`, plus the dynamic `0x35..0x3a` classifier. Exhaustive concrete dispatch maps every classifier mode exclusively from proactive-SIM events `0x1777..0x1782`, excluding the whole classifier from ordinary registration. Backward tracing excludes every other member from the coherent bootstrap: callback `0x24` builds `0x21` only in framework mode 9 and emits the `0x0388` consumed by `0x26` only in mode 11, while the coherent run remains in mode 0; `0x22` is constructed by `0x21`, `0x3c` by `0x51`/`0x25`, and `0x54` by `0x55`/`0x42`. These are later fallback/cleanup convergence paths, not demonstrated ordinary-registration predecessors.", ""]
 	scratch = result.get("dispatcher_scratch_contract")
 	if scratch:
 		writers = ", ".join(f"`{pc}`" for pc in scratch["runtime_writer_pcs"])
@@ -484,7 +561,7 @@ def render_report(result):
 	lines += ["", "## 0x05e8 boundary", "",
 		"Callback-table entry `0x28` (`0x2618e9`) accepts numeric status `0x05e8` and returns `0x05ea`. Reviewed control flow shows that branch does not consume an object argument from dispatcher scratch `0x110f1c`; the earlier object-bearing interpretation was incorrect.", "",
 		"The census recovers argumentless in-ROM generators of global event `0x05e8` (`0xbd << 3`). That is the expected ABI: the packed event becomes the callback input even with zero argument words. These are genuine candidate publishers, not incomplete object constructors.", "",
-		"The strongest object-bearing predecessor is now mapped through task-21 `0x120c`, synchronous `A0/12`, a `0x006a`/D0 response, the `0x177x` router, and classifier `0x267e68`. That chain remains dormant before `0x120c`; posting downstream events remains an invalid substitute.", ""]
+		"The mapped task-21 `0x120c` -> `A0/12` -> D0 -> `0x177x` path is GSM 11.14 SIM Toolkit, not the ordinary registration predecessor. The current EF_PHASE=2 card correctly leaves it dormant; posting downstream events remains an invalid substitute.", ""]
 	observed = [item for item in result["runtime"] if item["subsystem"] == "generic_service" and item["kind"] == "callback"]
 	if observed:
 		statuses = sorted({item["fields"]["status"] for item in observed})
@@ -566,6 +643,9 @@ def main():
 		return 2
 	contact_service = contact_service_inventory(profile, calls, runtime)
 	inventory_05e8 = status_inventory(instructions, calls, descriptors, data, base, 0x05e8)
+	lifecycle_05e0 = object_lifecycle_inventory(calls, profile.get("object_lifecycle_assessments", []))
+	dynamic_packed_events = dynamic_packed_event_inventory(calls,
+		profile.get("dynamic_packed_event_assessments", []))
 	target_statuses = (0x05e8, 0x05ea, 0x07dd, 0x09d8, 0x0434)
 	runtime_status_inventory = {}
 	if subsystem_runtime_available(runtime_manifests, "generic_service"):
@@ -613,6 +693,8 @@ def main():
 		"calls": calls, "callbacks": callbacks, "descriptor_registrations": descriptors,
 		"consumers": consumers, "semantic_edges": edges,
 		"status_inventory_05e8": inventory_05e8,
+		"object_lifecycle_05e0": lifecycle_05e0,
+		"dynamic_packed_events": dynamic_packed_events,
 		"status_05e8_publishers": profile.get("status_05e8_publishers", []),
 		"dispatcher_scratch_contract": profile.get("dispatcher_scratch_contract"),
 		"unresolved_contract": {"status": 0x05e8, "classification": "unresolved",
@@ -636,12 +718,19 @@ def main():
 	if not args.json and not args.report:
 		print(report)
 	if args.check and (not all(edge["anchors_valid"] for edge in edges) or not callback_extent_valid or
-			not contact_service["all_constructor_anchors_valid"]):
+			not contact_service["all_constructor_anchors_valid"] or not lifecycle_05e0["coverage_complete"] or
+			not dynamic_packed_events["coverage_complete"] or dynamic_packed_events["can_publish_05e0"]):
 		failed = [edge["id"] for edge in edges if not edge["anchors_valid"]]
 		if not callback_extent_valid:
 			failed.append("callback_table_extent")
 		if not contact_service["all_constructor_anchors_valid"]:
 			failed.append("contact_service_constructor_anchors")
+		if not lifecycle_05e0["coverage_complete"]:
+			failed.append("object_lifecycle_assessment_coverage")
+		if not dynamic_packed_events["coverage_complete"]:
+			failed.append("dynamic_packed_event_assessment_coverage")
+		if dynamic_packed_events["can_publish_05e0"]:
+			failed.append("dynamic_packed_event_05e0_candidate")
 		print(f"message_census: failed checks: {', '.join(failed)}", file=sys.stderr)
 		return 1
 	return 0

@@ -56,18 +56,27 @@ contracts.
 Two coherent profiles were traced without adding an emulation shim:
 
 - default four-second boot: one firmware `0x64` construct/send and no receive;
-- deep twenty-second boot: the model supplies the first healthy `0x64`; later
-  firmware-generated `0x64` responses repeatedly follow the lower transport path.
+- deep boot: the provisional model posts one header-incomplete healthy `0x64`
+  directly to task 2. The firmware consumes and frees that allocation once. Its
+  resulting status report is then routed through task 7, assigned route selector
+  `1`, and delivered back to task 2 as a fresh allocation. That self-delivery
+  repeats result `5`; it is not a watchdog result-`2` loop or repeated delivery
+  of the original allocation.
 
 Neither profile constructs, sends, or receives `0x65`, `0x70`, `0x71`, or
 command `0x74`. Absence from these two profiles proves dormancy in those boots,
 not absence from the ROM. The static constructor census supplies the latter
 coverage.
 
-The deep trace exposed a pre-existing `0x64` loop with 31,068 construct/send
-occurrences. `TRACE_CSCMD` is observational only and is now capped at 256
-constructs, 256 sends, and 80 receives so later runs retain the evidence without
-large logs.
+The formerly reported 31,068-entry `0x64` loop is therefore model-induced. It
+occurs with or without `MODEL_SVC_CHANNEL_DRAIN`; the drain changes its start
+time but is not its cause. The responder fires before observing a request and
+writes only `{[3]=0x40,[8]=0x64,[9]=0x05}`, leaving address, route, sequence, and
+length fields zero. It proves the result-5 firmware branch in isolation, but not
+a coherent node-0x18 transaction or stable contact-service completion.
+
+`TRACE_CSCMD` is observational only and is capped so later runs retain this
+ownership and routing evidence without large logs.
 
 ## Separate `0x74` namespaces
 

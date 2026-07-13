@@ -147,7 +147,7 @@ inside `0x253d30`, consumes a populated session, emits the `0x1199/0x1196`
 family, and frees the session (**S**). Replaying commit keys or calling its
 producers directly is a forcing probe, not organic registration.
 
-## Callback 7: the immediate missing session
+## Callback 7: a later-session lifecycle
 
 Callback-table entry 7 is handler `0x29992c` (**S**). During a coherent boot it
 is visited once by the global `0x05e2` callback sweep, but it never receives
@@ -188,11 +188,16 @@ publishes its descriptor through `0x2af798(0xca8a, 0x1e, object)`. The function
 is reached from the task-15 router at `0x255a34` when it receives status
 `0x0a2e`.
 
-The organic predecessor is now statically closed back to the lower-radio
-result. Task 15 handles `0x09ee` at `0x209274` and forwards it through
-`0x251cc8`; task 17 maps that status at `0x22270c` to a newly constructed
-`0x0a2e`, which returns to task 15 and selects the router branch above. None of
-`0x09ee`, `0x0a2e`, or the factory calls occurs in the coherent run.
+The post-operation loop is statically closed, but it is not a peer boundary.
+Seven branches in task 15 load `0x09ee` and call its internal message builder
+`0x208ee0(0x09ee, 0)` (`0x20cbbe`, `0x20ce70`, `0x20cfa8`, `0x20cffa`,
+`0x20d956`, `0x20f262`, and `0x20f432`). The task-15 receive branch at
+`0x209274` forwards that firmware-constructed message through `0x251cc8` to
+task 17. Task 17 maps it at `0x22270c` to a newly constructed `0x0a2e`, which
+returns to task 15 and selects the router branch above. None of those seven
+completion sites, `0x09ee`, `0x0a2e`, or the factory calls occurs in the
+coherent run. The missing predecessor is therefore the object-bearing input to
+the task-15 operation, not either status in this local completion loop.
 
 ## Adjacent paths and exclusions
 
@@ -304,28 +309,34 @@ multi-status cleanup/error callbacks. Registration is therefore not the missing
 step; an organic input and its associated state/object must reach one of these
 owners.
 
-The strongest mapped predecessor is the firmware-owned object classifier at
-`0x267e68`. It reads the current lower-radio object from controller state, selects
-callbacks `0x36`, `0x37`, `0x38`, `0x39`, or `0x3a`, and publishes packed event
-`0x85e0` with selector and object arguments. Normal dispatcher expansion then
-places the selector at `0x110f1c`, the object at `0x110f20`, and supplies lifecycle
-input `0x05dc`. Callers at `0x254aac` and `0x26955c` belong to the same controller
-dispatch region; `0x26955c` is reached through the sole call to helper `0x269524`
-at `0x254b6a`. This route is dormant in the coherent run.
+The firmware-owned object classifier at `0x267e68` reads the current lower-radio
+object from controller state, selects callbacks `0x35..0x3a`, and publishes packed
+event `0x85e0` with selector and object arguments. Normal dispatcher expansion
+then places the selector at `0x110f1c`, the object at `0x110f20`, and supplies
+lifecycle input `0x05dc`. It is not, however, an independent non-SAT predecessor.
+The task-5 event table maps `0x177f`, `0x1782`, and `0x1783` to controller modes
+`0x21`, `0x22`, and `0x23`; those modes select callback `0x37`, `0x38`, and `0x38`
+respectively. All three inputs belong to the proactive-SIM `0x1770..0x1788`
+family described below. The direct call at `0x254aac` handles status `0x1978` and
+only re-runs the classifier against controller mode and object state populated by
+an earlier event. It does not construct an object. Both classifier call paths are
+dormant in the coherent run, and callbacks `0x37`/`0x38` are excluded from the
+ordinary-registration frontier until a non-SAT writer of those controller modes
+or their object slot is demonstrated.
 
-### Organic SIM-task ingress to the classifier
+### SIM Toolkit path (excluded as the registration predecessor)
 
-The classifier's upstream contract is now closed. It is not populated by a DSP
-RX packet. Task 21 constructs task-20 status `0x120c` at `0x27e3cc` or
+Task 21 constructs task-20 status `0x120c` at `0x27e3cc` or
 `0x27e8fe` and includes a selector byte. Task 20 handles it at `0x2085ce` and
 calls `0x203d2c`, which reaches `0x2938b0`. That routine builds an internal
-SIM-server request beginning `03 a0 12 00 00 <selector>` and uses synchronous
-task-21 helper `0x293522`. A successful response begins with halfword `0x006a`;
-its D0 object at reply+4 is parsed by `0x2726e0`.
+SIM-server request beginning `03 a0 12 00 00 <selector>`. `A0 12` is the GSM
+11.14 FETCH instruction. A successful response begins with halfword `0x006a`;
+its proactive-command BER-TLV (tag D0) at reply+4 is parsed by `0x2726e0`.
 
 The D0 parser publishes one of the `0x1770..0x1788` task-5 events. Router
 `0x253e20` then reaches `0x269524`/`0x267e68`, which publishes packed `0x85e0`
-with a callback selector and firmware-owned object:
+with a callback selector and firmware-owned object for applicable proactive
+command types:
 
 ```text
 task 21 status 0x120c -> task 20 / 0x203d2c
@@ -334,18 +345,30 @@ task 21 status 0x120c -> task 20 / 0x203d2c
   -> packed 0x85e0(selector, object) -> callback lifecycle 0x05dc
 ```
 
+The latch contract is fully mapped. Dedicated function `0x27def4` sets
+`0x10dcb7`; callers `0x2037e6` and `0x29383c` invoke it immediately before
+TERMINAL PROFILE (`A0 10`) and TERMINAL RESPONSE (`A0 14`). A returned `91xx`
+status denotes a pending proactive command; while the latch is set, firmware
+posts `0x120c`, issues FETCH, and clears the latch. The FETCH itself travels
+through the ordinary task-21/SIMI transport.
+
+The emulated card reports EF_PHASE `0x02`, correctly declaring a Phase-2 card
+without profile download. Firmware gate `0x203906` calls TERMINAL PROFILE only
+for parsed phase >= 3. An isolation run made EF_PHASE return 3, but the current
+boot never reached function `0x2038ec`: profile download is downstream of the
+registration wall. Therefore no hardware or scheduling correction is missing
+at this latch, and manufacturing `91xx`, `0x120c`, or a D0 object would bypass
+the firmware lifecycle rather than repair it.
+
 Validated DSP RX families (type `0x70`, type `0x80`, types `0x83..0x99`, and
 translator classes 3/5/17/47) have no edge into status `0x120c`, `0x2938b0`,
 or this task-21 request. The DSP-ingress hypothesis is therefore disproven for
-this object path, rather than merely unobserved.
+this SAT object path, rather than for registration generally.
 
 In the retained coherent deep run, normal SIM APDU requests prove task 21 works,
 but no task message `0x120c` occurs and none of `0x203d2c`, `0x2938b0`,
-`0x2726e0`, `0x267e68`, or `0x05e8` is reached. The strongest organic
-predecessor is the dormant task-21 `0x120c` notification. Both producer sites
-require SIM-state notification byte `0x10dcb7` to be nonzero and clear it after
-use; the coherent run records no write which sets that byte. Its
-initialization/subscription contract remains unresolved.
+`0x2726e0`, `0x267e68`, or `0x05e8` is reached. This absence is expected for
+the advertised Phase-2 card and no longer identifies the registration frontier.
 
 The dispatcher scratch region `0x110f1c..0x110f2b` is transient callback ABI,
 not persistent session storage. Runtime write watching identifies startup
@@ -362,48 +385,96 @@ task 17 0x09ec -> task 15 internal case 6 -> task 16 0x07d6
   -> task 10 builds 72-byte work object -> task 3 -> MCU-to-DSP TX ring
 ```
 
+This is the normal route for the observed message, not a failed attempt to take
+an adjacent `0x09ee` branch. Task 17 constructs `09 ec 00 ...`. Task 15's receive
+dispatcher copies byte `+2` into protocol-mode byte `0x10fe49` at `0x209efe`.
+The handler at `0x20e74a` takes its direct `0x09ec` fast path only for mode
+`0x10`; mode zero deliberately publishes `0x07d6`. A bounded write-watch proved
+the organic zero comes from the message and is not stale initialization state.
+
 Task 17 consumes `0x043c` as bookkeeping and remains in its phase loop. The
 completion it accepts is `0x0434` or `0x0a22` (with later `0x1583`/`0x1584`
 phase events); it does not construct the session object and is not a substitute
-for the absent `0x09ee` result. Task 10 produces the real `0x0434` asynchronously
-from `0x219e30`, after its task-3/DSP work completes.
+for the later `0x09ee` result. Task 10 can produce `0x0434` from finalizer
+`0x219e30`, but no direct task-3 completion edge into that finalizer is proved.
 
-The coherent run also pins a separate radio-completion path at the DSP boundary. Task 10 creates
+The coherent run also pins a separate radio state-publication path at the DSP boundary. Task 10 creates
 `{00 02 44 1a 00 81 98 ...}` and posts it to task 3. Task 3 serializes queued
 work through `0x290840` into the MCU-owned DSP TX ring. With the DSP peer cadence
 decoupled from the old 5 ms phase-lock (the opt-in model now defaults to 4 ms),
 the earlier type-`0x51`/`0x70` backlog drains and this object appears organically
 as `type 0x1a, payload 68`, beginning `441a 0081 9800`.
 
+This packet is not a proved request for the missing completion. Builder
+`0x219f0c` is called only by the task-10 state dispatcher at `0x21ba54`. It
+retains no transaction token, reply object, or task-3 completion callback after
+posting the packet; it arms the global DSP cadence timer, clears the activity
+counter, and returns. Task 17 has already received `0x043c`. Type `0x1a` is thus
+classified as a fire-and-forget DSP state/control publication unless a future
+consumer correlation proves otherwise.
+
+The apparent type-`0x80` correlation at `0x284c74` is numeric coincidence. It
+tests radio-controller state byte `0x10dbd2`, which is `0x00` at this organic
+send, against later state `0x1a`. Its inner-command-`0x60` handler can publish
+task-10 status `0x1395`, not completion status `0x1391`.
+
 DSP-to-MCU RX delivery is also pinned to FIQ 0. A correlated type-`0x80`,
 primitive-`0x70` candidate traverses the real RX ring and task-4 dispatcher, but
 task 13 rejects it for this registration context even when delayed by up to
 306 ms. That response hypothesis is falsified and its probe was removed.
 
-The relevant task-10 transition is status `0x1392`, not `0x138f`. Task 17 enters
+The broader task-13 route does not recover the missing registration lifecycle.
+Type-`0x80` and type-`0x83` packets can normalize into `0x040b`; accepted
+segmented transfers are parsed at `0x23e324`/`0x23e378` and produce task-16
+status `0x05eb`. Callback `0x3c` handles `0x05eb` at `0x25df18`, publishes
+`0x057a`, and returns `0x05e6`. It does not reach that callback's `0x05e8`
+publisher at `0x25df08`, nor construct an object-bearing `0x05dc`. This closes
+the apparent numerical connection between the DSP transfer service and the
+registration frontier.
+
+The `0x2697aa(0x23, 0x0a0a)` call made after constructing type `0x1a` is not a
+task-10 timeout message. `0x2697aa` indexes a global 12-byte timer control block;
+runtime tracing shows timer `0x23` expiring roughly every 34 ms, waking task 4,
+and being rearmed immediately. Task 10 receives no timer-derived status and
+`0x219e30` remains dormant. The timer wheel and DSP service cadence are therefore
+working; timer expiry is not the missing semantic completion.
+
+The relevant task-10 completion transition is status `0x1391`, not `0x1392` or
+`0x138f`. Task 17 enters
 its long-lived event loop through `0x223964 -> 0x2271c6`; `0x2222fc` and the
 `0x138f` callback family occur only after that loop returns, so they cannot
 produce the `0x0434` the loop is awaiting. The similarly numbered DSP packet
 type `0x89` is also an initialization-only route (`[0x112501] == 0`); a real
 FIQ-0 probe at the current frontier was rejected and removed.
 
-Status `0x1392` dispatches through `0x21b9b4 -> 0x21b198` and can reach the
-`0x0434` producer at `0x219e30`. Callback `0x2b60f6` publishes it after
-unregistering lower-radio key `0x4c00`. The organic callback path is:
+The task-10 jump table at `0x21b4a0` maps `0x1391` to `0x21b9b4`, which can
+reach `0x21b198` and the `0x0434` producer at `0x219e30`. Its adjacent entry
+`0x1392` maps to `0x21b790`, a radio-state/configuration update path. The large
+lower-radio result table distinguishes their producers:
 
 ```text
-lower-radio result dispatcher 0x245a84, case 0x0fbf (0x245c76)
-  -> callback-object wrapper 0x2525a8
-  -> callback 0x2b60f6
-  -> task-10 status 0x1392
-  -> 0x21b198 -> 0x219e30 -> task-17 0x0434
+result 0x0fc1 -> 0x245c8c -> wrapper 0x2525be -> 0x2b610a
+  -> task-10 0x1391 -> completion path -> task-17 0x0434
+
+result 0x0fc2 -> 0x245c76 -> wrapper 0x2525a8 -> 0x2b60f6
+  -> task-10 0x1392 -> radio-state update 0x21b790
 ```
 
-The dispatcher input is encoded as `0x0fbf0000` and is loaded from a ROM literal
-at `0x24788e` on the lower-radio controller's event-`0x102f` branch. The earlier
-`0x0fc3` value was a jump-table arithmetic error. Decoder `0x267258` returns
-event `0x102f` for an incoming object whose opcode byte is `0x2a`; task 14 calls
-that decoder for statuses `0x09d8`/`0x09de`. Status `0x09d8` is constructed by
+Task-14 object decoder branch `0x2674da` handles opcode byte `0x36`, parses its
+payload through `0x266ffc`, and emits controller event `0x1033`. The controller
+branch at `0x2476fa` maps that event to normalized result `0x0fc1`. Adjacent
+opcode `0x37` instead emits event `0x1034` and result `0x0fc2`. The completion
+object itself is constructed by task 15 after the still-absent service-5 object
+chain; it is not a raw DSP ingress and must not be injected at task 14.
+
+The dispatcher input `0x0fbf` is loaded from a ROM literal at `0x24788e` on the
+lower-radio controller's event-`0x102f` branch. The branch enters `0x246ad6`
+after the neighboring `0x0fca` literal load, preserving `r0 = 0x0fbf`; its table
+case is `0x245cb2 -> 0x253610`, not either task-10 publisher. The earlier
+`0x0fc3` value and the later `0x245c76` association were separate jump-table
+indexing errors. Decoder `0x267258` returns event `0x102f` for an incoming object
+whose opcode byte is `0x2a`; task 14 calls that decoder for statuses
+`0x09d8`/`0x09de`. Status `0x09d8` is constructed by
 task 15 itself after its `0x07dd` object parser succeeds and returns internal result
 `0x09f3`; it is not a raw peer status. The exact transport which supplies the
 earlier generic-service object remains unresolved. The prior task-8 `0x8d`/`0x8e`
@@ -411,16 +482,17 @@ hypothesis is not linked to this path and is not a valid peer model yet.
 
 ## Current boundary and next acceptance point
 
-The card-side preliminary transaction is functional. The newly closed ingress
-chain moves the immediate boundary to the SIM manager's dormant task-20
-notification: establish why task 21 does not set its notification latch and
-post `0x120c`. The physical SIM device must continue to answer only register/FIQ
-and APDU traffic; it must not post `0x120c` or construct the internal D0 object.
+The card-side preliminary transaction is functional. The `0x120c` latch is not
+the immediate boundary: it belongs to downstream SIM Toolkit operation and is
+correctly dormant for the current Phase-2 card. The ordinary-registration
+frontier therefore returns to the mapped lower-radio/session paths which can
+construct callback lifecycle `0x05dc` without SAT.
 
-An eight-second coherent deep boot proves ordinary task-21 requests work, but
-records neither a setting write to `0x10dcb7` nor `0x120c`. This is the next
-bounded acceptance point. The previously mapped task-14/DSP radio-completion
-path remains valid adjacent work, but is not ingress to this SIM-server object.
+An eight-second coherent deep boot proves ordinary task-21 requests work. Its
+lack of `0x10dcb7`/`0x120c` activity is expected and must not be treated as a
+failed hardware model. The previously mapped task-14/DSP radio-completion path
+remains valid adjacent evidence and is again a candidate for ordinary
+registration, subject to an evidenced producer/consumer edge.
 
 The post-completion session transition is now mapped. Task 17 owns the natural producer
 of `0x13e2`; it is not an absent transport message. Once task 17 accepts `0x0434` (or the
@@ -446,12 +518,110 @@ briefly misattributed live `0x13b5` to task 20 because `0x2af6ea` allocates and 
 before posting. Tracing publisher entry preserves the caller and confirms why task identity
 must be sampled before allocation.
 
-The next investigation must therefore trace every initialization, subscription,
-and write path for `0x10dcb7` and its containing task-21 state, compare the two
-`0x120c` producer preconditions with the working APDU path, and make only the
-smallest faithful hardware/boot-order correction needed to let firmware post
-`0x120c` itself. It must then verify the mapped
-`A0/12 -> 0x006a/D0 -> 0x177x -> 0x267e68 -> 0x05dc` chain in one coherent run.
+One non-SAT object-bearing later-cycle predecessor is identified. The catalogue entries for
+statuses `0x06cd` and `0x09cd` both dispatch to the large context handler at `0x24df74`.
+Its branch at `0x24e74e` publishes packed event `0x85e0` with selector 7 and the real object
+pointer from `[r4+4]`; the callback engine subsequently supplies lifecycle input `0x05dc`.
+This is distinct from the SAT-owned callback family selected by the D0 classifier.
+
+The only direct `0x09cd` producer is the context routine at `0x24d8e8`. When its input slot
+matches active slot byte `0x10e89a` and callback-registration state byte `0x11fcdd` is 1 or 2, it emits the
+ordered sequence `0x09c9`, `0x09cd`, `0x151c`. In an eight-second coherent deep run,
+`0x11fcdd` was observed as zero after task-5 registration processing and never changed; none of
+`0x24d8e8`, `0x24df74`, or `0x24e754` executed. This confirms that the context
+route is dormant; it does not make that route the current bootstrap boundary.
+
+`0x11fcdd` is not a pending selector. It is callback-state array slot `0x5d` at
+`0x11fc80 + 0x5d`. Catalogue registration at `0x2aefba` selects descriptors from
+`0x2cc7f0`; eligibility helper `0x2aeda0` checks the old state, and `0x2aefa2`
+commits the descriptor's six-bit new state. The descriptors recovered for callback
+`0x5d` contain transitions from states `1`, `2`, `3`, `4`, or `0x0b`, but none
+establishes state 1 from the coherent cleared state 0. Callback 7 is therefore a
+configuration or later-session cycle, not the ordinary-registration bootstrap
+frontier.
+
+The external callers are now connected to one concrete context-initialization cycle. A task-14
+`0x09d8` object with opcode byte `0x3a` selects decoder branch `0x267414`, which parses field
+type `0x1c` and emits lower result `0x0fc8` at `0x26746e`. The lower-result dispatcher reaches
+`0x252aac`; parser `0x2528cc` classifies its type-2 object and `0x2b5cf8` publishes task-5
+event `0x0ac8` command `0x16`. Task 5 populates the context slots and enters the task-5/task-20
+handshake which can ultimately call `0x24d8e8`, emit `0x09cd`, and construct callback 7.
+
+This route is **not** the first bootstrap producer. The only proved `0x09d8` constructor is
+task-15 translator `0x208ee0`, reached after the absent `0x05e8 -> 0x05ea -> 0x07dd` service
+object has already parsed successfully. The opcode-`0x3a` route is therefore a valid later
+session cycle but circular as a correction for the initial `0x05e8` wall. Status `0x09de`
+is another output of the same task-15 translator: input `0x0a0c` reaches `0x209116`, where
+task-15 mode `0x1f` selects `0x09de` (modes `0x20` and `0x21` select `0x09eb` and `0x09ca`).
+No immediate, PC-relative ROM literal, or statically recovered call argument supplies
+`0x0a0c` to `0x208ee0`. A dynamic caller remains possible, but `0x09de` therefore does not
+establish an independent peer ingress or an ordinary-bootstrap producer.
+
+The generated census now inventories every direct packed `0x05e0` constructor with
+at least two argument words and requires a reviewed assessment for each callsite.
+Intersecting that closed set with callbacks containing direct `0x05e8` publishers
+leaves owners `0x21`, `0x22`, `0x26`, `0x3c`, and `0x54`, plus the mixed dynamic
+`0x35..0x3a` classifier. The recovered constructors for `0x22`, `0x3c`, and `0x54`
+carry constant or null object words, while the proved `0x37`/`0x38` dynamic modes
+are SAT-derived.
+
+Backward tracing excludes `0x21` and `0x26` from the coherent bootstrap as well.
+Callback `0x24` at `0x28b844` builds a callback-`0x21` object through `0x228aa0`
+only in generic-framework mode 9 after input `0x013d`. It is also the only recovered
+direct producer of global `0x0388`, at `0x28b926`, `0x28b960`, and `0x28b9aa`,
+and those branches require framework mode 11 and inputs `0x013c`, `0x013a`, or
+`0x0136`. Active callback `0x26` maps `0x0388` to `0x05e8`. The other `0x21`
+constructor is callback-`0x54` input `0x1a34`; the five pointer-bearing `0x26`
+constructors belong to callbacks `0x1f`, `0x1e`, `0x51`, `0x29`, and `0x79`.
+
+In the coherent eight-second run callback `0x24` receives only global sweep
+`0x05e2`, with framework mode 0; none of the constructors or `0x0388` sites runs.
+Callbacks `0x21` and `0x26` then receive the same sweep but no lifecycle object.
+Their direct `0x05e8` publishers are status-specific fallback/cleanup branches
+(`0x0580` and `0x0388`), not a demonstrated registration-success path. This
+removes the last non-scalar intersection candidates rather than identifying a
+missing peer response.
+
+The scalar intersection is downstream too. Callback `0x21` constructs callback
+`0x22` at `0x228a66`; callbacks `0x51` and `0x25` construct callback `0x3c` at
+`0x25d25c` and `0x25d6d0`; callbacks `0x55` and `0x42` construct callback `0x54`
+at `0x24a8f4` and `0x2a8868`. Their direct `0x05e8` sites converge later
+failure/cleanup lifecycles. Consequently every direct object-bearing constructor
+whose selected callback can itself publish `0x05e8` is now SAT-derived,
+mode-gated later-cycle, or downstream failure convergence. The direct-constructor
+census does **not** identify a missing ordinary-registration peer response.
+
+The former runtime-built-event caveat is closed as well. The census requires a
+reviewed bound for all 22 calls to `0x2af798` whose packed event is not recovered
+as a static value. Only the five calls in parameterized helper `0x26b58c` carry
+two argument words. Its only ROM callers bound their completion events to
+`0x0594` or `0x0c2d`; the other dynamic calls are argumentless or one-word
+events. None can construct object-bearing lifecycle event `0x05e0`. Together,
+the direct and runtime-built inventories are a quantified absence proof: this
+ROM contains no unclassified MCU-side packed-event constructor that can create
+the missing non-SAT `0x05dc` session lifecycle.
+
+The mixed-looking controller classifier is SAT-owned in this boot vocabulary.
+Its mode byte is `0x110a64`; helper `0x269524` stores the mode and object before
+calling `0x267e68`. Concrete execution of the unmodified dispatcher
+`0x253e20` over every 16-bit input recovers the complete selector map:
+
+| input event | controller mode | lifecycle callback |
+| --- | --- | --- |
+| `0x177c` | `0x10` | `0x39` |
+| `0x1782` | `0x11` | `0x3a` |
+| `0x1779` | `0x13` | `0x36` |
+| `0x177a` | `0x20` | conditional control path / `0x37` |
+| `0x177d` | `0x21` | `0x37` |
+| `0x1780` | `0x22` | `0x38` |
+| `0x1781` | `0x23` | `0x38` |
+| `0x1777` | `0x24` | `0x35` |
+
+All eight inputs are members of the proactive-SIM `0x1770..0x1788` family.
+Callbacks `0x3a` and `0x36` do contain organic `0x0578` publishers, but their
+only dispatcher predecessors are SAT events `0x1782` and `0x1779`. They are not
+ordinary-registration activation candidates. This closes the final dynamic
+classifier exception in the non-SAT constructor proof.
 
 Completion requires one coherent boot with no injected task messages, forced
 callback events, forced return values, or writes to SIM/registration RAM.

@@ -10,9 +10,13 @@ Generated from Thumb disassembly of the swap16 firmware image. The purpose is to
 > **⚠️ Read `docs/service_bootstrap.md` first (its Status & model stack).** This file frames the D9
 > watchdog around the **ack `0x11fedb`**. The ack is real *mechanism* (the watchdog counts up while
 > `ack==0`) but a **red herring as a fix target** — the firmware never writes the ack, and the
-> watchdog is gated **earlier by service-present bit 6** of `0x11fed0`. Keeping bit 6 set (via
-> `MODEL_DSP_SERVICE` + `MODEL_CCONT_PRESENT` + the EEPROM `selftest` checksums) stops the watchdog
-> arming at all, so the ack never matters. Trust the bit-6 chain over any "ack is the gate" wording here.
+> watchdog is gated **earlier by service-present bit 6** of `0x11fed0`. A current six-second
+> comparison with `MODEL_DSP_SERVICE` + `MODEL_CCONT_PRESENT` + the EEPROM `selftest` profile,
+> but no responder, still reached watchdog result `2` at `0.556 s` with contact flags `0x88`.
+> Corrected native I2C reads now keep bit 6 through initialization (`0xc8` -> `0xcc`);
+> it is subsequently cleared at `0x237b04` because the PM/service-channel read is disabled.
+> This is a separate lower-service predicate, not evidence for an unidentified EEPROM
+> failure or a DSP FIQ0 registration reply.
 
 ---
 

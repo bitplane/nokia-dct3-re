@@ -31,7 +31,10 @@ service-5 status 0x05e8
   -> 0x05ea -> task-15 0x07dd
   -> successful parse -> task-14 0x09d8
   -> opcode 0x2a / lower result 0x0fbf
-  -> task-10 0x1392 -> task-17 0x0434
+  -> lower context handler 0x253610
+
+separate unresolved completion:
+  lower result 0x0fc1 -> task-10 0x1391 -> task-17 0x0434
   -> task-5 0x13e2 -> task-14 0x1776 session request
 ```
 
@@ -56,7 +59,8 @@ that response and must not be restored.
 Network work becomes composable when one coherent run:
 
 1. supplies the missing owned object through an evidenced peer transport;
-2. reaches organic `0x0fbf -> 0x1392 -> 0x0434`;
+2. reaches organic lower result `0x0fc1 -> 0x1391 -> 0x0434` without conflating
+   the separate `0x0fbf` context and `0x0fc2 -> 0x1392` radio-state paths;
 3. publishes `0x13e2` and constructs task-14 `0x1776` without intervention;
 4. continues through SIM registration and emits operator/signal child content;
 5. preserves both 3210 oracles and the 3330 smoke baseline.

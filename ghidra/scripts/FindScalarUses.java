@@ -4,6 +4,7 @@
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.scalar.Scalar;
 import ghidra.program.model.symbol.Reference;
 
@@ -11,6 +12,22 @@ public class FindScalarUses extends GhidraScript {
 	@Override
 	protected void run() throws Exception {
 		long wanted = Long.decode(getScriptArgs().length > 0 ? getScriptArgs()[0] : "0x0578");
+		if (wanted > 0xffff) {
+			for (MemoryBlock block : currentProgram.getMemory().getBlocks()) {
+				if (!block.isInitialized())
+					continue;
+				long start = block.getStart().getOffset();
+				long end = block.getEnd().getOffset();
+				for (long raw = (start + 1) & ~1L; raw + 3 <= end; raw += 2) {
+					Address address = toAddr(raw);
+					long word = getInt(address) & 0xffffffffL;
+					long swapped = ((word & 0xffffL) << 16) | ((word >>> 16) & 0xffffL);
+					if (word == wanted || swapped == wanted)
+						println(String.format("pointer value=%08x at %s encoding=%s", wanted,
+								address, word == wanted ? "native" : "swap16"));
+				}
+			}
+		}
 		for (Instruction instruction : currentProgram.getListing().getInstructions(true)) {
 			boolean match = false;
 			for (int operand = 0; operand < instruction.getNumOperands(); operand++) {

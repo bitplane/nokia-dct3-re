@@ -15,22 +15,26 @@ map of that chain and the models that emulate a provisioned service environment.
 
 ## Status & model stack
 
-**CONTACT SERVICE is cleared.** Five faithful models clear the whole chain — the boot completes the
-contact-service and **leaves the CONTACT SERVICE screen** (advancing to the display-init "limp",
-see "Beyond the gate"). All models are opt-in, preserve the regression oracle (`make verify` → frame
-`d8a9a7`), and leave the default boot byte-identical.
+**CONTACT SERVICE can be crossed by the research profile, but not yet through one
+coherent faithful peer.** The hardware models establish the readiness predicates;
+the provisional service responder then isolates the downstream branch and leaves
+the CONTACT SERVICE screen. All are opt-in and leave the default oracle unchanged,
+but the responder is a firmware bridge and must not be treated as completed device
+emulation.
 
 | model (env) | what it emulates | gate it clears |
 |---|---|---|
 | `NOKI3210_MODEL_DSP_SERVICE` | DSP lower-service handshake: drains pending counter `[0x100e4]`, raises IRQ 4 | `service_ready` |
 | `NOKI3210_MODEL_CCONT_PRESENT` | CCONT reg `0xe` bit 0 = present/status | service-channel idx6 |
 | `EEPROM_PROFILE=selftest` (overlay) | EEPROM config checksum (`0x244`) + tune/security checksum (`0x11c`) | EEPROM config gate + service-channel idx18 |
-| `NOKI3210_MODEL_SVC_RESPONDER` | node-`0x18` service device — supplies the healthy `0x5f00`→cmd-`0x05` reply | contact-service **completion** |
+| `NOKI3210_MODEL_SVC_RESPONDER` | provisional node-`0x18` branch-isolation bridge | contact-service result-5 branch |
 | `NOKI3210_MODEL_SVC_CHANNEL_DRAIN` | async completion of service report `0x622a` | extended-task resume gate |
 
-The first three clear the **bit-6 / service-channel** gate (the array is clean and bit 6 survives the
-init). `MODEL_SVC_RESPONDER` then makes the contact-service genuinely **complete** by delivering the
-async response message the absent node `0x18` would send — so the phone leaves CONTACT SERVICE.
+The first three keep bit 6 through the initialization checks. The later disabled
+PM/service-channel read clears it again at `0x237b04`. `MODEL_SVC_RESPONDER`
+delivers a result-5 message and crosses the branch, but its incomplete header causes
+route recursion; it proves downstream reachability, not a coherent node-`0x18`
+transaction.
 
 ## How CONTACT SERVICE works (the bit-6 gate)
 
@@ -66,11 +70,24 @@ i.e. the DSP must signal continuously, not once.
 `0x290c98` writes `0x0002`), after a short delay drain it to 0 and `assert_irq(4)`, then re-arm at
 a service-tick rate (a running DSP raises a periodic per-frame interrupt).
 
+A crossed isolation run proves both operations are necessary. With CCONT present and
+the same EEPROM, draining `[0x100e4]` without IRQ 4 is identical to a silent DSP
+(`service_ready=0`, soft reset, final event `0x32`); recurring IRQ 4 while leaving
+the counter at 2 is also identical. Only drain plus IRQ produces
+`service_ready=1`, avoids the reset, and advances the one-second boot to event
+`0xc3`. This is the minimum firmware-observable shared-service completion
+contract, not a semantic registration reply.
+
 **(b) EEPROM config checksum** — `0x234810` compares `sum16(EEPROM[0x120..0x243])` against the
 stored halfword at `EEPROM[0x244..0x245]`; mismatch clears bit 6 at `0x234832`. The firmware
 computes `0x1ee1` = `sum16 (0x20df)` minus a correction `EEPROM[0x154]+[0x155]` (`0x2978c0`), and
 reads `0x244/0x245` **big-endian-in-word**.
 → **`EEPROM_PROFILE=selftest`** overlay returns `0x244=0x1e`, `0x245=0xe1` → `ldrh=0x1ee1`, match.
+The native I2C path now reaches that match organically. A former GenIO integration
+bug ANDed released SDA with the stale output latch and yielded
+`computed=0x00ff, stored=0x0000, guard=0x0000`; after correcting input/release
+semantics, `0x234826` is not taken and bit 6 survives as status `0xcc` until the
+separate PM-read clear below.
 
 **(c) service-channel status array** — a loop `0x23487e..0x2348a2` walks 24 bytes at `0x11fc60`;
 bit 6 is cleared (`0x234896`) if any entry `[0x11fc60+i]` (i≠11) is not `0x00/0xfe/0xff`. Two are
@@ -98,21 +115,29 @@ return) when the `0x5f00` read is **dropped** (channel disabled). Enabling the s
 removes this clear (and the watchdog timeout) — but completion still needs the response. This is
 the remaining gate, below.
 
-## Healthy contact completion — MODELLED (`NOKI3210_MODEL_SVC_RESPONDER`)
+## Healthy contact branch — PROVISIONAL (`NOKI3210_MODEL_SVC_RESPONDER`)
 
-> **DONE.** The responder injects the healthy reply expected by the contact task, and the contact-service
-> completes — the boot leaves CONTACT SERVICE (reaches `94a2dc`/`4aab13`, the display-init limp).
+> **Correction:** the responder reaches the firmware's result-5 branch and lets the boot leave the
+> initial CONTACT SERVICE frame, but it does not complete a coherent service transaction.
 > **How it's built:** `nokia_service_transport_device` owns the response bytes,
 > readiness and peer state. At the contact-service loop top (`0x237bc6`, a safe
 > point), a narrow flash trampoline drives the firmware's *own* primitives in
 > sequence — `alloc 0x26afe0(0x14)` → device writes its response into the
 > firmware-owned allocation → `post 0x26a204(contact-service task, msg)` — each
 > call returning to a flash sentinel (`0x3ff000`) where the bridge advances;
-> finally the saved CPU state is restored and the loop resumes. The hook no
-> longer owns protocol bytes or writes service status. The loop then
+> finally the saved CPU state is restored and the loop resumes. The loop then
 > `recv`s the posted message and dispatches it (`[3]=0x40`→`0x237400`, `[8]=0x64`→`0x236dc4([9]=0x05)`
-> → substate 5, HEALTHY), which drives the lower-service completion (`0x2af3ca`→`0x291068`). Validated
-> end to end; default boot (responder off) unchanged. The analysis below is the pre-build map.
+> → substate 5, HEALTHY), which drives the downstream startup branch. Default boot
+> (responder off) remains unchanged, but the model is an isolation bridge rather
+> than a validated peer implementation.
+
+The missing header fields are behaviorally significant. In a six-second trace the
+injected allocation `0x101b60` was consumed once and freed. The firmware-generated
+status frame then acquired route selector `1` through task 7 and returned to task 2,
+where fresh allocations alternated between `0x101b60` and `0x101b88` while result
+`5` re-entered `0x236dc4`. Disabling `MODEL_SVC_CHANNEL_DRAIN` merely moved the loop
+earlier. The responder must not be treated as proof that an ordinary standalone
+boot receives this command from a service box.
 
 The extended-task gate makes service report `0x622a` through the shared report
 entry `0x2b13d4` (`lr=0x29bb05`). The transport recognizes that specific code,
@@ -154,9 +179,9 @@ gone) — but the frame stays `d8a9a7`: watchdog-satisfied ≠ completed. No loc
 (`svc_response` count 0 in those configurations); the required lower-service behavior is absent
 from the driver.
 
-**Current model:** `MODEL_SVC_RESPONDER` supplies this one healthy completion at the task-message
-boundary. It does not model the complete lower-service session or prove node `0x18` is the physical
-producer of every sibling command.
+**Current model:** `MODEL_SVC_RESPONDER` supplies one header-incomplete result-5 message at the
+task-message boundary. It neither models the lower-service session nor converges after the
+firmware's status response. It is retained only as a provisional branch-isolation model.
 
 **Response message spec (fully traced).** The contact-service task loop `0x237bb4` calls
 `recv 0x26a458` → `r4` = message, then dispatches on **`[msg+3]`**; `[msg+3]==0x40` →
@@ -172,11 +197,10 @@ message **pointers** at `[TCB+0xc]` indexed by tail `[TCB+0x10]`. `alloc = 0x26a
 0x26a458`. **Crucially, the contact-service frees the message after dispatch** (`0x26abf8(msg)` at
 `0x237c8e`), so an injected message must be a *real pool buffer*, not scratch RAM.
 
-**Therefore the faithful injection** is to drive the firmware's own machinery: allocate a real
-message (`0x26afe0`), fill `{[3]=0x40,[8]=0x64,[9]=0x05}`, and post it to the contact-service task
-(`0x26a204`) — e.g. by trampolining those calls from a driver hook at a safe scheduler point. That is
-the remaining build step; `EXPERIMENT_FORCE_SVC_CHANNEL` remains a diagnostic stand-in for the
-*enable* only.
+Using a real pool allocation fixes buffer ownership but is not sufficient for faithful delivery.
+A real model must observe the initiating boundary, preserve address/route/sequence metadata, and
+let firmware-generated reports terminate at the peer rather than route back to task 2. Directly
+posting the three discriminating bytes is an isolation probe, not the remaining faithful build step.
 
 ## Beyond the gate (the "limp" frontier — what comes after)
 

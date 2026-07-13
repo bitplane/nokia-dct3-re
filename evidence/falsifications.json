@@ -5,8 +5,14 @@
     {
       "id": "lower_result_0fc3", "status": "disproven",
       "hypothesis": "The lower-radio result selected by event 0x102f is 0x0fc3",
-      "conclusion": "Swap16-aware jump-table decoding proves 0x0fbf at literal load 0x24788e",
+      "conclusion": "The event branch loads 0x0fbf at 0x24788e and enters the dispatcher call at 0x246ad6 with that value intact; swap16-aware table decoding maps it to 0x245cb2 -> 0x253610",
       "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "lower_result_0fbf_completes_task17", "status": "disproven",
+      "hypothesis": "Lower result 0x0fbf selects 0x245c76 -> 0x2525a8 -> task-10 0x1392 and completes task 17",
+      "conclusion": "The result table maps 0x0fbf to context handler 0x253610, 0x0fc1 to completion status 0x1391, and 0x0fc2 to radio-state status 0x1392; only the 0x1391 task-10 route can reach 0x0434",
+      "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md", "docs/dsp_interface.md"]
     },
     {
       "id": "direct_05e8_completion", "status": "disproven",
@@ -17,14 +23,50 @@
     {
       "id": "dsp_type80_primitive70_reply", "status": "disproven",
       "hypothesis": "A DSP type-0x80 primitive-0x70 response completes the current registration context",
-      "conclusion": "The real RX path delivers it, but task 13 rejects it across tested delays",
+      "conclusion": "The real RX path delivers the fabricated primitive-0x70 payload, but task 13 rejects it across tested delays; this disproves that payload only, not the broader type-0x80 family decoded at 0x284ac4",
       "evidence": ["docs/sim_registration.md"]
     },
     {
-      "id": "dsp_rx_populates_service5_object", "status": "disproven",
-      "hypothesis": "A validated DSP RX packet family populates the object path leading to service-5 activation",
-      "conclusion": "The complete organic ingress is task-21 0x120c -> task-20 A0/12 request -> 0x006a/D0 parser -> 0x177x -> 0x267e68; validated DSP RX families have no edge into that chain",
+      "id": "dsp_040b_service5_predecessor", "status": "disproven",
+      "hypothesis": "A valid type-0x80/type-0x83 0x040b transfer supplies the missing ordinary-registration 0x05dc/0x05e8 predecessor",
+      "conclusion": "Successful task-13 reassembly emits task-16 status 0x05eb; callback 0x3c handles it on a dedicated branch that publishes 0x057a and returns 0x05e6, bypassing its 0x05e8 fallback and constructing no object-bearing 0x05dc lifecycle",
       "evidence": ["docs/sim_registration.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "dsp_rx_populates_service5_object", "status": "disproven",
+      "hypothesis": "A validated DSP RX packet family populates the task-21 0x120c/D0 object path",
+      "conclusion": "That path is GSM 11.14 SIM Toolkit: TERMINAL PROFILE/91xx -> 0x120c -> FETCH A0/12 -> proactive D0 command. Validated DSP RX families have no edge into this SAT chain; this does not exclude a different DSP-owned registration path",
+      "evidence": ["docs/sim_registration.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "dsp_type03_heartbeat_registration_predecessor", "status": "disproven",
+      "hypothesis": "Periodic header-only DSP RX type-0x03 liveness traffic activates the missing ordinary-registration publisher",
+      "conclusion": "Empty-ring-gated DSP RAM delivery through producer 0x1c8 and FIQ0 was consumed by task 4 and incremented firmware activity counter 0x112502, but emitted none of 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 and reduced coherent boot work counts; liveness traffic alone is not the semantic registration reply",
+      "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "dsp_type1a_direct_registration_request", "status": "disproven",
+      "hypothesis": "The organic outbound DSP type-0x1a packet is a request whose direct inbound reply supplies task-17 registration completion",
+      "conclusion": "The sole caller of builder 0x219f0c is task-10 state dispatcher 0x21ba54; after posting the packet the builder retains no transaction token, reply object, or task-3 callback, arms only the global DSP cadence timer, clears the activity counter, and returns after task 17 has already received 0x043c. The apparent type-0x80 correlation at 0x284c74 instead tests radio-controller state 0x10dbd2, observed as 0x00 at the send, against later state 0x1a and can publish 0x1395 rather than 0x1391. Type 0x1a is a fire-and-forget state/control publication, not the missing direct registration request",
+      "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "sat_fetch_is_registration_predecessor", "status": "disproven",
+      "hypothesis": "The task-21 0x120c -> A0/12 -> D0 path is the missing ordinary SIM-registration predecessor",
+      "conclusion": "A0/12 and D0 are the GSM 11.14 FETCH/proactive-command protocol. Firmware arms it only after TERMINAL PROFILE for phase >=3, and the profile-download function is itself downstream of the current registration wall",
+      "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
+    },
+    {
+      "id": "controller_modes_11_13_are_non_sat", "status": "disproven",
+      "hypothesis": "Controller modes 0x11 and 0x13 select non-SAT callbacks 0x3a and 0x36 that can activate ordinary registration through 0x0578",
+      "conclusion": "Exhaustive concrete execution of dispatcher 0x253e20 maps mode 0x11 only from event 0x1782 and mode 0x13 only from event 0x1779; the complete mode map is sourced exclusively by the proactive-SIM 0x1770..0x1788 family",
+      "evidence": ["docs/sim_registration.md", "docs/message_topology_census.md"]
+    },
+    {
+      "id": "task15_09ee_is_peer_ingress", "status": "disproven",
+      "hypothesis": "Task-15 status 0x09ee is an independent lower-peer result which starts the callback-7 session factory",
+      "conclusion": "Seven branches inside task 15 construct 0x09ee through 0x208ee0; task 15 forwards its local result to task 17, which constructs 0x0a2e and returns it before the factory runs. The absent predecessor is the earlier object-bearing task-15 operation, not 0x09ee or 0x0a2e",
+      "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
       "id": "forced_registration_messages", "status": "disproven",
@@ -43,6 +85,12 @@
       "hypothesis": "Scheduler event 0x74 producers also produce contact-service command 0x74",
       "conclusion": "They are separate namespaces and transports; the command is an external request with an MCU acknowledgement",
       "evidence": ["docs/contact_service_topology.md"]
+    },
+    {
+      "id": "contact_064_storm_is_watchdog", "status": "disproven",
+      "hypothesis": "The deep-profile command-0x64 storm is repeated watchdog result 2 or repeated consumption of the injected response allocation",
+      "conclusion": "The injected result-5 allocation is consumed and freed once. Firmware-generated status frames then pass through task 7 with route selector 1 and return as fresh task-2 allocations, repeatedly re-entering 0x236dc4 with result 5. The anomaly is caused by the provisional responder's incomplete transport session, not the watchdog",
+      "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
     }
   ]
 }

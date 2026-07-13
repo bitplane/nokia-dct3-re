@@ -33,7 +33,7 @@ Packet header halfword `LLTT` contains payload length `LL` and packet type `TT`.
 The occupied size is `(LL + 3) / 2` halfwords. The peer must never advance a
 consumer over a partial packet or overwrite a producer owned by the other side.
 
-## Current organic request
+## Current organic state publication
 
 The deep profile reaches the peer without an isolated producer probe:
 
@@ -44,10 +44,33 @@ task 17 0x09ec -> task 15 case 6 -> task 16 0x07d6
   -> type 0x1a, payload 68, prefix 44 1a 00 81 98 00
 ```
 
+The task-15 leg is firmware-selected, not an emulation divergence: the organic
+message is `09 ec 00 ...`, and task 15 copies byte `+2` into its protocol mode.
+Mode zero selects `0x07d6`; the nearby fast path requires mode `0x10`.
+
 The DSP-owned consumer must drain earlier type-`0x51` and type-`0x70` traffic for
-this request to become visible. Consumption is not completion: advancing `0x0a6`
+this packet to become visible. Consumption is not completion: advancing `0x0a6`
 must not synthesize a firmware result, queued generic-service object, or inbound
 packet.
+
+No response contract is established for type `0x1a`. Builder `0x219f0c` is
+called only from task-10 state dispatcher `0x21ba54`; after posting the packet it
+retains no transaction identifier, reply object, or task-3 completion callback.
+It arms the global DSP-service timer, clears the activity counter, and returns.
+Task 17 has already received the immediate `0x043c` acknowledgement. The packet
+is therefore a fire-and-forget state/control publication unless later evidence
+identifies a correlated inbound transition.
+
+The type-`0x80` inner-command-`0x60` decoder does test a byte against `0x1a`,
+but the byte is radio-controller state at `0x10dbd2`. It is `0x00` when the
+organic type-`0x1a` packet is emitted. That dormant later-state path updates a
+counter and can post `0x1395`, not the required `0x1391`; it is not a reply
+correlation for the outbound packet.
+
+Timer `0x23`, armed with delay `0x0a0a` beside this publication, belongs to the
+global DSP-service cadence. It expires and rearms through task 4 at roughly
+34 ms intervals without delivering a task-10 status. It is not the missing
+semantic acknowledgement.
 
 ## Expected firmware-side completion
 
@@ -56,11 +79,15 @@ The downstream chain is mapped independently of its missing ingress:
 ```text
 service-5 status 0x05e8 -> 0x05ea -> task-15 0x07dd
   -> parser success -> task-14 0x09d8
-  -> opcode 0x2a -> lower event 0x102f -> result 0x0fbf
-  -> task-10 0x1392 -> task-17 0x0434
+  -> opcode 0x36 -> lower event 0x1033 -> result 0x0fc1
+  -> task-10 0x1391 -> task-17 0x0434
 ```
 
-This does not prove that type `0x1a` directly produces `0x05e8`. The relationship
+Opcode `0x2a` is an adjacent context path which produces event `0x102f`, result
+`0x0fbf`, and context-handler dispatch `0x253610`; it is not the completion.
+The opcode-`0x36` object is a firmware translator product, not a raw peer packet,
+so this corrected chain still does not prove that type `0x1a` directly produces
+`0x05e8`. The relationship
 between the organic request and the firmware state which activates a recovered
 argumentless publisher remains unresolved. A valid peer model must establish
 that relationship from request/response evidence rather than inject any member
@@ -85,7 +112,8 @@ absence proof.
 
 ## Prohibited shortcuts
 
-- Do not post `0x05e8`, `0x05ea`, `0x07dd`, `0x09d8`, `0x0fbf`, `0x1392`, or
+- Do not post `0x05e8`, `0x05ea`, `0x07dd`, `0x09d8`, `0x0fbf`, `0x0fc1`,
+  `0x0fc2`, `0x1391`, `0x1392`, or
   `0x0434` directly.
 - Do not treat an outbound packet type as an inbound type without decoder
   evidence.
@@ -97,8 +125,9 @@ absence proof.
 
 ## Next acceptance point
 
-A transport investigation succeeds when an organically emitted MCU request is
-correlated with a peer-owned state change or inbound packet which the existing
-firmware consumes through its real boundary, eventually causing the first
-service-5 `0x05e8`. Until that correlation exists, a peer may model transport
-ownership and acknowledgements but not the missing semantic result.
+A transport investigation succeeds when a peer-owned state change or inbound
+packet is correlated with a firmware consumer through the real hardware
+boundary and advances the ordinary task-17 registration lifecycle. Type `0x1a`
+and service-5 `0x05e8` must not be assumed to be the two ends of that contract:
+the former has no proved reply dependency, while the exhaustive non-SAT census
+does not establish the latter as an ordinary-registration requirement.

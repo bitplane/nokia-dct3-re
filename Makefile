@@ -67,13 +67,14 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census census-docs evidence-check run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
 	@echo "make census         build the 3210 v6.00 message-topology JSON/report"
+	@echo "make controller-census exhaustively verify the 3210 controller dispatcher"
 	@echo "make census-docs    refresh the committed report; refuses missing scoped runtime"
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
 	@echo "make run-manifest-* reproduce named default/deep-gsm/contact/3330 evidence runs"
@@ -144,9 +145,13 @@ census:
 		--report run_census/noki3210_v600.md
 	@echo "census: run_census/noki3210_v600.json and run_census/noki3210_v600.md"
 
+controller-census:
+	$(VENV)/bin/python tools/controller_dispatch_census.py --check
+
 census-docs:
 	@mkdir -p run_census
 	$(PYTHON) tools/validate_evidence.py
+	$(VENV)/bin/python tools/controller_dispatch_census.py --check
 	$(VENV)/bin/python tools/message_census.py --check \
 		$(foreach manifest,$(CENSUS_MANIFESTS),--runtime-manifest $(manifest)) \
 		--require-runtime-subsystem contact_service \

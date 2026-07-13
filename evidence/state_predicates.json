@@ -10,13 +10,13 @@
     {
       "id": "contact_healthy_completion", "owner": "contact_task", "status": "modeled",
       "predicate": "class-0x40 command 0x64 with payload result 0x05 reaches 0x236dc4",
-      "current": "Supplied by MODEL_SVC_RESPONDER at a provisional firmware-message boundary",
+      "current": "MODEL_SVC_RESPONDER reaches the result-5 branch with a header-incomplete task message; it does not prove a coherent peer transaction",
       "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
     },
     {
       "id": "contact_064_response_stability", "owner": "contact_task", "status": "drift",
-      "predicate": "After healthy contact completion, class-0x40 command 0x64 status reporting converges instead of re-reporting indefinitely",
-      "current": "The deep trace observed 31,068 firmware construct/send attempts; the responder supplies only the first healthy completion and the missing convergence condition is unresolved",
+      "predicate": "After a peer-originated contact result, the firmware status report terminates at the peer instead of routing back to task 2",
+      "current": "The provisional responder's zeroed transport header causes task 7 to assign route 1 and self-deliver fresh result-5 frames to task 2; the former 31,068-report anomaly is model-induced",
       "evidence": ["docs/contact_service_topology.md"]
     },
     {
@@ -27,19 +27,25 @@
     {
       "id": "generic_service_05e8_activation", "owner": "generic_service", "status": "unresolved",
       "predicate": "An organic firmware path publishes 0x05e8 while callback-table entry 0x28 and its downstream readiness state are active",
-      "current": "Entry 0x28 accepts argumentless numeric 0x05e8 and returns 0x05ea; its strongest object-bearing predecessor is mapped through task-21 0x120c, synchronous A0/12, D0 parsing, the 0x177x router and classifier 0x267e68, but that chain is dormant in the named deep run",
+      "current": "Entry 0x28 accepts argumentless numeric 0x05e8 and returns 0x05ea. Exhaustive concrete dispatch proves every mode selecting callbacks 0x35..0x3a comes exclusively from proactive-SIM events 0x1777..0x1782; this includes the 0x0578-producing callbacks 0x3a and 0x36. Callback 0x07 is a dormant later-session cycle and callbacks 0x21/0x26 are mode-gated fallback/cleanup paths. All 22 runtime-built packed-event callsites are bounded: only five carry two words, and their ROM callers restrict them to events 0x0594 or 0x0c2d. No unclassified MCU-side constructor can create a non-SAT object-bearing 0x05dc lifecycle. The later 0x09ee -> 0x0a2e session-factory loop is also firmware-local: seven task-15 completion branches construct 0x09ee internally. This chain therefore does not identify an independent peer ingress or prove that 0x05e8 is required by ordinary registration.",
       "evidence": ["docs/message_topology_census.md", "docs/dsp_service_transport_contract.md", "docs/sim_registration.md"]
     },
     {
-      "id": "sim_registration_object_notification", "owner": "sim_task", "status": "unresolved",
-      "predicate": "Task 21 organically posts status 0x120c and completes its internal A0/12 request with a 0x006a/D0 registration object",
-      "current": "Both 0x120c producers require notification byte 0x10dcb7; no setting write or 0x120c message occurs in the coherent deep run, although ordinary task-21 APDU traffic works",
+      "id": "context_09cd_activation", "owner": "generic_service", "status": "unresolved",
+      "predicate": "A firmware-owned context invokes 0x24d8e8 with the active slot selected and callback-state slot 0x5d at 0x11fcdd equal to 1 or 2, producing organic status 0x09cd",
+      "current": "0x11fcdd is populated by the generic catalogue descriptor transition mechanism, not a standalone pending selector. No recovered callback-0x5d descriptor transitions coherent state 0 to required state 1; 0x24d8e8, 0x24df74 and callback-7 publication 0x24e754 remain dormant. A task-14 0x09d8 opcode-0x3a object can initialize the surrounding context, but its proved producer is downstream of the absent 0x05e8 chain, confirming this as a later cycle rather than a bootstrap correction",
+      "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "sim_toolkit_proactive_notification", "owner": "sim_task", "status": "satisfied",
+      "predicate": "A Phase-2+ SAT card completes TERMINAL PROFILE, advertises a proactive command with 91xx, and task 21 organically posts 0x120c before FETCH A0/12",
+      "current": "The current card advertises EF_PHASE=2, so firmware correctly performs no TERMINAL PROFILE and no 0x120c; a phase-3 isolation profile still cannot reach the downstream profile-download function before the registration wall",
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
       "id": "task17_radio_completion", "owner": "task17_radio_init", "status": "unresolved",
-      "predicate": "Task 17 receives organic 0x0434 after lower result 0x0fbf and task-10 status 0x1392",
-      "current": "Static chain mapped; dormant in reviewed coherent runtime",
+      "predicate": "Task 17 receives organic 0x0434 through task-10 completion status 0x1391",
+      "current": "The task-10 jump table maps 0x1391 to 0x21b9b4, which can reach the 0x0434 producer. Task-14 object opcode 0x36 produces controller event 0x1033; the controller maps that event to lower-radio result 0x0fc1, which selects wrapper 0x2525be and organically publishes 0x1391. The object is a task-15 translator product downstream of the still-absent service-5 0x05e8 -> 0x05ea -> 0x07dd chain, not a raw DSP packet. Result 0x0fc2 instead publishes adjacent status 0x1392 and dispatches to the separate radio-state update path at 0x21b790. The previously linked 0x0fbf result selects context handler 0x253610 and reaches neither publisher. The organic task-17 0x09ec carries mode byte 0 and task 15 deliberately routes it through 0x07d6, task 16, and task 10. The resulting type-0x1a DSP packet is fire-and-forget state/control publication: its builder retains no reply correlation and task 17 has already received immediate status 0x043c. It is not a proved direct predecessor of 0x1391 or 0x0434.",
       "evidence": ["docs/sim_registration.md"]
     },
     {

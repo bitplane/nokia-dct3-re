@@ -7,6 +7,21 @@
     "entries": 126,
     "entry_size": 8
   },
+  "controller_dispatch_contract": {
+    "entry": "0x253e20",
+    "code_end": "0x254fa0",
+    "mode_store": "0x269524",
+    "expected": [
+      {"status": "0x177c", "mode": "0x10"},
+      {"status": "0x1782", "mode": "0x11"},
+      {"status": "0x1779", "mode": "0x13"},
+      {"status": "0x177a", "mode": "0x20"},
+      {"status": "0x177d", "mode": "0x21"},
+      {"status": "0x1780", "mode": "0x22"},
+      {"status": "0x1781", "mode": "0x23"},
+      {"status": "0x1777", "mode": "0x24"}
+    ]
+  },
   "nodes": [
     {"id": "contact_task", "kind": "rtos_task", "task": 2, "rom_addresses": {"noki3210_v600": "0x237bb4"}},
     {"id": "service_transport_task", "kind": "rtos_task", "task": 7, "rom_addresses": {"noki3210_v600": "0x2ad254"}},
@@ -16,7 +31,10 @@
     {"id": "task15_object_parser", "kind": "rtos_consumer", "task": 15, "rom_addresses": {"noki3210_v600": "0x209978"}},
     {"id": "task14_object_decoder", "kind": "rtos_consumer", "task": 14, "rom_addresses": {"noki3210_v600": "0x267258"}},
     {"id": "lower_radio_result_dispatch", "kind": "firmware_dispatch", "rom_addresses": {"noki3210_v600": "0x245a84"}},
-    {"id": "task10_completion_dispatch", "kind": "rtos_consumer", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b198"}},
+    {"id": "lower_radio_context_handler", "kind": "firmware_dispatch", "rom_addresses": {"noki3210_v600": "0x253610"}},
+    {"id": "task10_status_dispatch", "kind": "firmware_dispatch", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b468"}},
+    {"id": "task10_radio_update_dispatch", "kind": "rtos_consumer", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b790"}},
+    {"id": "task10_completion_dispatch", "kind": "rtos_consumer", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b9b4"}},
     {"id": "task17_radio_init", "kind": "rtos_consumer", "task": 17, "rom_addresses": {"noki3210_v600": "0x223964"}},
     {"id": "task5_session_dispatch", "kind": "rtos_consumer", "task": 5, "rom_addresses": {"noki3210_v600": "0x255124"}},
     {"id": "task14_session_request", "kind": "rtos_consumer", "task": 14, "rom_addresses": {"noki3210_v600": "0x238a24"}},
@@ -24,7 +42,11 @@
     {"id": "task20_sim_router", "kind": "rtos_consumer", "task": 20, "rom_addresses": {"noki3210_v600": "0x2085ce"}},
     {"id": "sim_registration_request", "kind": "firmware_dispatch", "task": 20, "rom_addresses": {"noki3210_v600": "0x2938b0"}},
     {"id": "sim_d0_object_parser", "kind": "firmware_dispatch", "task": 20, "rom_addresses": {"noki3210_v600": "0x2726e0"}},
-    {"id": "lower_object_classifier", "kind": "firmware_dispatch", "task": 5, "rom_addresses": {"noki3210_v600": "0x267e68"}}
+    {"id": "lower_object_classifier", "kind": "firmware_dispatch", "task": 5, "rom_addresses": {"noki3210_v600": "0x267e68"}},
+    {"id": "lower_context_result_dispatch", "kind": "firmware_dispatch", "rom_addresses": {"noki3210_v600": "0x245a84"}},
+    {"id": "task5_context_initializer", "kind": "firmware_dispatch", "task": 5, "rom_addresses": {"noki3210_v600": "0x2528cc"}},
+    {"id": "context_status09cd_producer", "kind": "firmware_dispatch", "task": 5, "rom_addresses": {"noki3210_v600": "0x24d8e8"}},
+    {"id": "callback7_object_handler", "kind": "firmware_dispatch", "task": 5, "rom_addresses": {"noki3210_v600": "0x24df74"}}
   ],
   "apis": [
     {"address": "0x26a204", "name": "task_post", "kind": "message_send", "arguments": {"destination_task": "r0", "message": "r1"}},
@@ -47,7 +69,8 @@
     {"address": "0x28d29c", "name": "generic_service_provider_dispatch", "task": 5, "statuses": ["0x05ea"], "provenance": "reviewed_static"},
     {"address": "0x209978", "name": "task15_object_parser", "task": 15, "statuses": ["0x07dd"], "provenance": "reviewed_static"},
     {"address": "0x267258", "name": "task14_object_decoder", "task": 14, "statuses": ["0x09d8", "0x09de"], "provenance": "reviewed_static"},
-    {"address": "0x21b198", "name": "task10_completion_dispatch", "task": 10, "statuses": ["0x1392"], "provenance": "reviewed_static"}
+    {"address": "0x21b790", "name": "task10_radio_update_dispatch", "task": 10, "statuses": ["0x1392", "0x1396"], "provenance": "reviewed_static"},
+    {"address": "0x21b9b4", "name": "task10_completion_dispatch", "task": 10, "statuses": ["0x1391"], "provenance": "reviewed_static"}
   ],
   "contact_service_commands": [
     {
@@ -136,14 +159,15 @@
       ]
     },
     {
-      "id": "task10_completion_0434",
+      "id": "task10_1391_completion_0434",
       "from": "task10_completion_dispatch",
       "to": "task17_radio_init",
-      "input_status": "0x1392",
+      "input_status": "0x1391",
       "output_status": "0x0434",
       "classification": "dormant",
       "provenance": "reviewed_static",
       "anchors": [
+        {"type": "decoded_address", "address": "0x21b9b4"},
         {"type": "effective_literal_load", "address": "0x219e72", "value": "0x0434"},
         {"type": "call", "address": "0x219e94", "target": "0x251c3e"}
       ]
@@ -176,17 +200,77 @@
       ]
     },
     {
-      "id": "lower_result_0fbf_to_task10_1392",
+      "id": "lower_result_0fbf_to_context_handler",
+      "from": "lower_radio_result_dispatch",
+      "to": "lower_radio_context_handler",
+      "input_status": "0x0fbf",
+      "output_status": "dispatch 0x253610",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x245cb2"},
+        {"type": "call", "address": "0x245cc6", "target": "0x253610"}
+      ]
+    },
+    {
+      "id": "lower_result_0fc1_to_task10_1391_completion",
       "from": "lower_radio_result_dispatch",
       "to": "task10_completion_dispatch",
-      "input_status": "0x0fbf",
+      "input_status": "0x0fc1",
+      "output_status": "0x1391",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x245c8c"},
+        {"type": "call", "address": "0x245c92", "target": "0x2525be"},
+        {"type": "call", "address": "0x2525c2", "target": "0x2b610a"},
+        {"type": "effective_literal_load", "address": "0x2b610c", "value": "0x1391"}
+      ]
+    },
+    {
+      "id": "task14_opcode_36_to_lower_result_0fc1",
+      "from": "task14_object_decoder",
+      "to": "lower_radio_result_dispatch",
+      "input_status": "0x09d8 object opcode 0x36",
+      "output_status": "0x1033 -> 0x0fc1",
+      "classification": "dormant",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x2674da", "object_opcode": "0x36"},
+        {"type": "effective_literal_load", "address": "0x2674e6", "value": "0x1033"},
+        {"type": "call", "address": "0x2674f4", "target": "0x266ffc"},
+        {"type": "decoded_address", "address": "0x2476fa", "input_status": "0x1033"},
+        {"type": "effective_literal_load", "address": "0x247700", "value": "0x0fc1"},
+        {"type": "call", "address": "0x247702", "target": "0x245a84"}
+      ]
+    },
+    {
+      "id": "lower_result_0fc2_to_task10_1392_update",
+      "from": "lower_radio_result_dispatch",
+      "to": "task10_radio_update_dispatch",
+      "input_status": "0x0fc2",
       "output_status": "0x1392",
       "classification": "dormant",
       "provenance": "reviewed_static",
       "anchors": [
         {"type": "decoded_address", "address": "0x245c76"},
-        {"type": "decoded_address", "address": "0x2525a8"},
-        {"type": "decoded_address", "address": "0x2b60f6"}
+        {"type": "call", "address": "0x245c86", "target": "0x2525a8"},
+        {"type": "call", "address": "0x2525ac", "target": "0x2b60f6"}
+      ]
+    },
+    {
+      "id": "corrected_task10_1392_dispatch",
+      "from": "task10_status_dispatch",
+      "to": "task10_radio_update_dispatch",
+      "input_status": "0x1392",
+      "output_status": "dispatch 0x21b790",
+      "classification": "disproven_alternative",
+      "disproven": "0x1392 -> 0x21b9b4",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x21b790"},
+        {"type": "decoded_address", "address": "0x21b9b4"},
+        {"type": "effective_literal_load", "address": "0x2b610c", "value": "0x1391"}
       ]
     },
     {
@@ -218,12 +302,46 @@
       ]
     },
     {
+      "id": "task14_opcode_3a_to_context_initialization",
+      "from": "task14_object_decoder",
+      "to": "task5_context_initializer",
+      "input_status": "0x09d8 object opcode 0x3a",
+      "output_status": "0x0fc8 -> type-2 object -> 0x0ac8 command 0x16",
+      "classification": "dormant_downstream_cycle",
+      "provenance": "reviewed_static",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x267414", "object_opcode": "0x3a"},
+        {"type": "effective_literal_load", "address": "0x26746c", "value": "0x0fc8"},
+        {"type": "call", "address": "0x26746e", "target": "0x245a84"},
+        {"type": "decoded_address", "address": "0x245c38", "input_status": "0x0fc8"},
+        {"type": "call", "address": "0x245c4e", "target": "0x252aac"},
+        {"type": "call", "address": "0x252aca", "target": "0x2528cc"},
+        {"type": "call", "address": "0x252a4e", "target": "0x2b5cf8", "packed_event": "0x0ac8", "command": "0x16"}
+      ]
+    },
+    {
+      "id": "context_09cd_to_callback7_object",
+      "from": "context_status09cd_producer",
+      "to": "callback7_object_handler",
+      "input_status": "context slot matches 0x10e89a and callback-state slot 0x5d at 0x11fcdd is 1 or 2",
+      "output_status": "0x09cd -> 0x85e0(selector 7, object)",
+      "classification": "dormant",
+      "provenance": "reviewed_static_and_runtime",
+      "anchors": [
+        {"type": "decoded_address", "address": "0x24d8e8"},
+        {"type": "effective_literal_load", "address": "0x24d92e", "value": "0x09cd"},
+        {"type": "call", "address": "0x24d930", "target": "0x2af798"},
+        {"type": "decoded_address", "address": "0x24df74", "catalogue_statuses": ["0x06cd", "0x09cd"]},
+        {"type": "call", "address": "0x24e754", "target": "0x2af798", "packed_event": "0x85e0", "selector": 7}
+      ]
+    },
+    {
       "id": "sim_task_notification_120c",
       "from": "sim_task",
       "to": "task20_sim_router",
       "input_status": "notification_byte_0x10dcb7",
       "output_status": "0x120c",
-      "classification": "dormant",
+      "classification": "dormant_sat",
       "provenance": "reviewed_static_and_runtime",
       "anchors": [
         {"type": "effective_literal_load", "address": "0x27e3cc", "value": "0x120c"},
@@ -238,7 +356,7 @@
       "to": "sim_registration_request",
       "input_status": "0x120c",
       "output_status": "A0/12",
-      "classification": "dormant",
+      "classification": "dormant_sat",
       "provenance": "reviewed_static",
       "anchors": [
         {"type": "decoded_address", "address": "0x2085ce"},
@@ -253,7 +371,7 @@
       "to": "sim_d0_object_parser",
       "input_status": "0x006a",
       "output_status": "D0_object",
-      "classification": "dormant",
+      "classification": "dormant_sat",
       "provenance": "reviewed_static",
       "anchors": [
         {"type": "call", "address": "0x203d5c", "target": "0x2726e0"},
@@ -266,7 +384,7 @@
       "to": "lower_object_classifier",
       "input_status": "0x1770..0x1788",
       "output_status": "0x85e0",
-      "classification": "dormant",
+      "classification": "conditional_sat",
       "provenance": "reviewed_static",
       "anchors": [
         {"type": "call", "address": "0x254aac", "target": "0x267e68"},
@@ -274,6 +392,70 @@
         {"type": "decoded_address", "address": "0x267e68"}
       ]
     }
+  ],
+  "object_lifecycle_assessments": [
+    {"callsite": "0x227c22", "classification": "candidate_owner_0x23", "role": "callback 0x23 lifecycle object; object register unresolved"},
+    {"callsite": "0x228a66", "classification": "downstream_failure_lifecycle", "role": "callback 0x22 scalar lifecycle constructed inside callback 0x21"},
+    {"callsite": "0x228aea", "classification": "later_service_lifecycle", "role": "callback 0x21 allocated object built from callback 0x24 in framework mode 9 after status 0x013d"},
+    {"callsite": "0x228b98", "classification": "later_service_lifecycle", "role": "callback 0x21 allocated object built from callback 0x54 after status 0x1a34"},
+    {"callsite": "0x229b36", "classification": "later_service_lifecycle", "role": "callback 0x26 normalized object built by callback 0x1f"},
+    {"callsite": "0x229b4e", "classification": "scalar_control", "role": "callback 0x26 null-object lifecycle control"},
+    {"callsite": "0x22aa6a", "classification": "scalar_control", "role": "callback 0x1f lifecycle with constant object word 2"},
+    {"callsite": "0x22baa4", "classification": "later_service_lifecycle", "role": "callback 0x26 normalized object built by callback 0x1e"},
+    {"callsite": "0x248f7a", "classification": "scalar_control", "role": "callback 0x20 null-object lifecycle control"},
+    {"callsite": "0x24a8f4", "classification": "downstream_failure_lifecycle", "role": "callback 0x54 null-object lifecycle constructed inside callback 0x55"},
+    {"callsite": "0x24aa2a", "classification": "scalar_control", "role": "callback 0x06 lifecycle with constant object word 1"},
+    {"callsite": "0x24d712", "classification": "candidate_owner_0x40", "role": "callback 0x40 firmware-context object"},
+    {"callsite": "0x24e754", "classification": "dormant_configuration_cycle", "role": "callback 0x07 context object; requires callback-state 0x5d activation and is not a bootstrap predecessor"},
+    {"callsite": "0x255424", "classification": "scalar_or_state", "role": "callback 0x2c lifecycle object sourced from byte state"},
+    {"callsite": "0x25c4aa", "classification": "candidate_owner_0x51", "role": "callback 0x51 lifecycle object"},
+    {"callsite": "0x25ca50", "classification": "later_service_lifecycle", "role": "callback 0x26 normalized object built by callback 0x51"},
+    {"callsite": "0x25d25c", "classification": "downstream_failure_lifecycle", "role": "callback 0x3c scalar lifecycle constructed inside callback 0x51"},
+    {"callsite": "0x25d6d0", "classification": "downstream_failure_lifecycle", "role": "callback 0x3c scalar lifecycle constructed inside callback 0x25"},
+    {"callsite": "0x25d8d0", "classification": "scalar_control", "role": "callback 0x3d null-object lifecycle control"},
+    {"callsite": "0x2613d4", "classification": "later_service_lifecycle", "role": "callback 0x26 normalized object built by callback 0x29"},
+    {"callsite": "0x261f26", "classification": "candidate_owner_0x29", "role": "callback 0x29 three-word lifecycle object"},
+    {"callsite": "0x26800c", "classification": "sat_controller_classifier", "role": "dynamic callbacks 0x35..0x3a; exhaustive concrete dispatch maps modes 0x10/0x11/0x13/0x20/0x21/0x22/0x23/0x24 exclusively from proactive-SIM events 0x177c/0x1782/0x1779/0x177a/0x177d/0x1780/0x1781/0x1777; status 0x1978 only reuses existing state"},
+    {"callsite": "0x26d39c", "classification": "candidate_owner_0x72", "role": "callback 0x72 lifecycle object"},
+    {"callsite": "0x26d3fc", "classification": "candidate_owner_0x73", "role": "callback 0x73 lifecycle object"},
+    {"callsite": "0x26d49a", "classification": "candidate_owner_0x73", "role": "callback 0x73 lifecycle object"},
+    {"callsite": "0x26dcc4", "classification": "later_service_lifecycle", "role": "callback 0x26 normalized object built by callback 0x79"},
+    {"callsite": "0x26de7c", "classification": "candidate_owner_0x79", "role": "callback 0x79 three-word lifecycle object"},
+    {"callsite": "0x26e386", "classification": "candidate_owner_0x73", "role": "callback 0x73 lifecycle object"},
+    {"callsite": "0x26e398", "classification": "scalar_control", "role": "callback 0x77 null-object lifecycle control"},
+    {"callsite": "0x26e578", "classification": "candidate_owner_0x76", "role": "callback 0x76 lifecycle object"},
+    {"callsite": "0x28886e", "classification": "scalar_control", "role": "callback 0x06 three-word lifecycle control with constant object word 3"},
+    {"callsite": "0x2888c6", "classification": "scalar_control", "role": "callback 0x06 three-word lifecycle control with constant object word 3"},
+    {"callsite": "0x28ee92", "classification": "candidate_owner_0x61", "role": "callback 0x61 lifecycle object"},
+    {"callsite": "0x299064", "classification": "candidate_owner_0x6d", "role": "callback 0x6d lifecycle object"},
+    {"callsite": "0x2991ca", "classification": "candidate_owner_0x6e", "role": "callback 0x6e lifecycle object"},
+    {"callsite": "0x299470", "classification": "candidate_owner_0x6c", "role": "callback 0x6c lifecycle object"},
+    {"callsite": "0x2a8868", "classification": "downstream_failure_lifecycle", "role": "callback 0x54 scalar lifecycle constructed inside callback 0x42"},
+    {"callsite": "0x2ade5c", "classification": "scalar_or_state", "role": "callback 0x2c lifecycle object sourced from byte state"}
+  ],
+  "dynamic_packed_event_assessments": [
+    {"callsite": "0x24bdec", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x24befa", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x24c06c", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x24c3b0", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x24cfcc", "argument_count": 0, "possible_events": ["0x012d", "0x0268"], "classification": "stored_argumentless_event", "role": "event saved at 0x1105a8 by 0x24b11a; its wrapper and two direct callers supply only 0x0268 or 0x012d"},
+    {"callsite": "0x26312c", "argument_count": 1, "possible_events": ["0x038c", "0x038e"], "classification": "one_argument_finite", "role": "one-word branch result"},
+    {"callsite": "0x263638", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x26b5ea", "argument_count": 0, "possible_events": ["0x0c2e", "0x1989"], "classification": "subscription_companion", "role": "0x26b58c caller-supplied companion event; both ROM callers reviewed"},
+    {"callsite": "0x26b5fa", "argument_count": 2, "possible_events": ["0x0594", "0x0c2d"], "classification": "subscription_completion", "role": "0x26b58c caller-supplied completion with selector and object; both ROM callers reviewed"},
+    {"callsite": "0x26b632", "argument_count": 0, "possible_events": ["0x0c2e", "0x1989"], "classification": "subscription_companion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x26b642", "argument_count": 2, "possible_events": ["0x0594", "0x0c2d"], "classification": "subscription_completion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x26b64c", "argument_count": 0, "possible_events": ["0x0c2e", "0x1989"], "classification": "subscription_companion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x26b65c", "argument_count": 2, "possible_events": ["0x0594", "0x0c2d"], "classification": "subscription_completion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x26b668", "argument_count": 0, "possible_events": ["0x0c2e", "0x1989"], "classification": "subscription_companion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x26b678", "argument_count": 2, "possible_events": ["0x0594", "0x0c2d"], "classification": "subscription_completion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x26b6b0", "argument_count": 0, "possible_events": ["0x0c2e", "0x1989"], "classification": "subscription_companion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x26b6c0", "argument_count": 2, "possible_events": ["0x0594", "0x0c2d"], "classification": "subscription_completion", "role": "same parameterized subscription callback"},
+    {"callsite": "0x2868c0", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x286968", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x286cf8", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"},
+    {"callsite": "0x29ab24", "argument_count": 0, "possible_events": ["0x01b1"], "classification": "branch_predecessor_constant", "role": "immediate predecessor block constructs 0x01b1 before branching to the shared call"},
+    {"callsite": "0x2b4fb6", "argument_count": 1, "classification": "one_argument_dynamic", "role": "0x4000 OR dynamic status; cannot construct a two-word lifecycle object"}
   ],
   "dispatcher_scratch_contract": {
     "address_range": "0x110f1c..0x110f2b",
@@ -344,9 +526,14 @@
       "statement": "All 13 callback owners containing the 16 direct 0x05e8 publishers received the global 0x05e2 sweep once; none generated 0x05e8."
     },
     {
+      "id": "deep_gsm_callback24_lifecycle_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",
+      "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
+      "statement": "Callback 0x24 receives only the global 0x05e2 sweep with framework mode 0. Its mode-9 callback-0x21 constructor and mode-11 0x0388 publishers do not execute; callback 0x21 and 0x26 therefore cannot reach their 0x05e8 fallback branches in the coherent boot."
+    },
+    {
       "id": "deep_gsm_sim_registration_notification_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",
       "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
-      "statement": "Ordinary task-21 SIM traffic executes, but task-21 status 0x120c and its downstream A0/12/D0/0x177x classifier chain do not occur; no setting write to notification byte 0x10dcb7 was observed."
+      "statement": "Ordinary task-21 SIM traffic executes, while the EF_PHASE=2 card correctly produces no TERMINAL PROFILE, 0x120c, FETCH A0/12, or proactive D0 command. A phase-3 isolation card cannot reach the downstream profile-download function before the registration wall."
     }
   ],
   "runtime_patterns": [

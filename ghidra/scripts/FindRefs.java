@@ -8,6 +8,12 @@ import ghidra.program.model.symbol.Reference;
 
 public class FindRefs extends GhidraScript {
 	private static final long[] ADDRS = new long[] {
+		0x002093f4L, // task-15 protocol state base (runtime 0x0010fe48)
+		0x0021a1c2L,
+		0x0021ba36L,
+		0x0021ba8cL,
+		0x0021b198L,
+		0x0021b9b4L,
 		0x0028fe7aL,
 		0x0028ff0eL,
 		0x0028ff14L,

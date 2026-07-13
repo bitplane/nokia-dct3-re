@@ -99,12 +99,13 @@ callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
 ```
 
 Callback 7 currently receives only the global `0x05e2` sweep, not constructor
-`0x05dc`. Its strongest organic ingress is now mapped as task 21 status `0x120c`
-to task 20, followed by a synchronous task-21 `A0/12` request, a `0x006a`/D0
-response, the D0 parser's `0x177x` event, and classifier `0x267e68`. The
-coherent run never produces `0x120c`; both producer sites are gated by SIM-state
-notification byte `0x10dcb7`, for which no setting write was observed.
-Validated DSP RX families do not feed this path. Service-5's callback is already
+`0x05dc`. The mapped task-21 `0x120c -> A0/12 -> D0 -> 0x177x` route is GSM
+11.14 SIM Toolkit: TERMINAL PROFILE arms latch `0x10dcb7`, `91xx` advertises a
+proactive command, and `A0/12` FETCH retrieves it. The current EF_PHASE=2 card
+correctly leaves this path dormant, and firmware's profile-download function is
+downstream of the current registration wall even with a phase-3 isolation card.
+This route is therefore excluded as the ordinary registration predecessor.
+Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract
 by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
@@ -114,7 +115,10 @@ The descriptor factory is now identified as `0x24f120`. Its four known callers
 construct the same `0x18`-byte radio-session object later attached by `0x24f25c`. All four are
 branches of `0x299610`; every successful result is published through
 `0x2af798(0xca8a, 0x1e, object)`. The factory remains unexecuted because the lower peer has not
-delivered the state which makes task 15 emit `0x09ee`.
+delivered the object-bearing input which lets task 15 complete its local operation. Status
+`0x09ee` is not that peer input: seven branches inside the task-15 state machine call
+`0x208ee0(0x09ee, 0)`. Task 15 then forwards its own result to task 17, which constructs
+`0x0a2e` and returns it to task 15 before `0x299610` runs.
 
 ## Reply-code 2
 
