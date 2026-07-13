@@ -1,9 +1,17 @@
-# The interactive-boot handoff — task-1 master sequencer, traced
+# Historical interactive-boot handoff investigation
 
 > **Historical research reference.** This chronological investigation retains
 > useful addresses and negative results. Current subsystem conclusions and
-> normalized predicates/falsifications take precedence; see `README.md` and
-> `evidence_regime.md`.
+> normalized predicates/falsifications take precedence; see `README.md`,
+> `contact_service_topology.md`, `sim_subsystem.md`, and `evidence_regime.md`.
+>
+> **Do not use the “current wall” headings below as current project status.**
+> They describe successive historical profiles that used responder, drain, and
+> startup-report bridges. The coherent contact profile now reaches mode `0x0004`,
+> starts SIM control (`0x32 -> 0x33 -> 0xb3 -> 0xe3`), and exchanges SELECT,
+> READ, GET RESPONSE, and STATUS APDUs. The live frontier is ordinary SIM
+> initialization after `EF_PHASE`, not delivery of forced code 7, a synthetic
+> startup checklist, task-14 startup, or contact-service completion.
 
 > ⚠️ **2026-07 caveat — read `docs/sim_emulator_scope.md` "Moves 1+2" first.** Many
 > conclusions below (idle content / camped state / DSP primitives "terminate at the RF/DSP

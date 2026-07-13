@@ -133,18 +133,17 @@ Either way, the practical next move is to **get the boot past the limp first** (
 actually runs and can be traced), *then* deep-dive the DSP dynamically. The shared-RAM mailbox layout
 and the service-handshake subset are already mapped (above + `service_bootstrap.md`).
 
-**Current update:** the organic run now reaches the DSP/lower-radio control boundary. Task 3
-serializes work into the DSP TX ring and FIQ 0 owns inbound delivery, but the generic-service object
-needed to start the lower-radio result chain is absent. The active path and its acceptance sequence
-are normalized in `message_topology_census.md` and summarized in `network_scouting.md`; the old
-`TRACE_DSPDRV` “protocol layer never runs” conclusion is superseded.
+**Current update:** task 3 serializes DSP work into the TX ring and FIQ 0 owns inbound delivery.
+The request-driven peer now completes the startup D0 exchange, the organic type-`0x70/0x74`
+contact completion, and the external task-7 service session in one boot. The generic-service
+`0x05e8` chain remains a mapped later radio/SAT path, not the current ordinary-SIM prerequisite.
 
 ## Current frontier
 
 The project now reaches substantially beyond the historical mode-`000d` observations below. The
-default oracle remains CONTACT SERVICE, while opt-in peer prototypes exercise display, startup,
-SIM reset, ATR, and preliminary ICCID/ECC/PHASE reads. Organic GSM/resource registration remains
-missing; the lower-object contract is mapped but not produced in a coherent boot.
+default oracle remains CONTACT SERVICE, while the coherent opt-in peer profile reaches mode
+`0x0004`, starts SIM control, and performs ordinary SELECT/STATUS/GET RESPONSE/READ traffic through
+`EF_PHASE`. SIM acceptance and the later idle/resource transition remain incomplete.
 
 The component order is EEPROM, CCONT, then SIM. The Nokia 3330 is the first portability probe used
 to distinguish shared MAD2 behavior from 3210 firmware assumptions.
@@ -158,12 +157,9 @@ yet touch: the **SIM** (`SIMI`), and — necessarily, since they come after the 
 **"boots to idle, no SIM / no network"**; the open strategic question is how much of the DSP/RF/SIM
 the firmware *insists* on before idle vs *degrades* past.
 
-**The limp gate is now diagnosed to a single CCONT signal** (see `service_bootstrap.md` "Beyond the
-gate"). Mode `000d` advances only when the flag byte `[0x112399]` reaches `0xf` (all four startup
-sub-events `0x14/0x15/0x16/0x17` delivered) **and** `FW_CCONT_STATE [0x11ff6c]` low nibble `== 6`
-(already met). It stalls because **CCONT battery-measurement events `0x15`/`0x16` are queued but never
-dequeued to the `000d` handler** — an unmodelled CCONT measurement-complete signal. That makes CCONT
-(not the DSP) the **immediate next blocker**; the DSP deep-dive still waits behind the limp.
+The mode-`000d` gate and its CCONT/startup events are retained below as historical mapping. They are
+satisfied in the coherent profile; they are not the immediate blocker. The current frontier is the
+firmware-owned SIM acceptance transition after `EF_PHASE` and periodic DF_GSM STATUS polling.
 
 ## Knob
 

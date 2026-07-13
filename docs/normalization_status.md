@@ -37,8 +37,9 @@ current frontier and the contracts already strong enough to state precisely.
 - The 3330 is a smoke-test and comparative input. Its equivalent node addresses
   and semantic edges have not been mapped, so it is not yet a second supported
   topology profile.
-- The deep-GSM trace establishes the current object-population absence but does
-  not identify the missing producer or prove that it is external to the ROM.
+- The contact-service producer boundary is now resolved: the DSP-facing D0 and
+  type-`0x70` transactions and the task-7 external service session compose in a
+  single boot. The remaining topology gap starts after ordinary SIM traffic.
 
 ## Model-boundary debt
 
@@ -47,9 +48,9 @@ The following opt-in paths remain useful, but are not final hardware models:
 | Area | Current role | Remaining normalization work |
 | --- | --- | --- |
 | SIM | `MODEL_SIM_DEVICE` is the sole card model and owns the stateful register/FIQ path. | Validate additional SIMI FIFO flags and card commands as firmware reaches them. |
-| Contact service | `MODEL_SVC_RESPONDER` supplies a known healthy completion through a firmware message bridge. | Move the behavior behind an explicit peer/transport contract and remove the firmware trampoline. |
-| Service channel | `MODEL_SVC_CHANNEL_DRAIN` models provisional progress at the channel boundary. | Establish the real producer/consumer contract before treating this as device behavior. |
-| DSP | `MODEL_DSP_SERVICE` and `MODEL_DSP_RING_DRAIN` model parts of the missing DSP-side peer. | Consolidate them at a transport boundary backed by request/response evidence. |
+| Contact service | `MODEL_DSP_CONTACT_PEER` answers observed DSP requests and runs the external class-`0x40` session through task 7. | Extract the peer from the driver once the surrounding DSP mailbox ownership is stable. |
+| Service channel | Compact class-`0x7f` acknowledgements complete firmware-originated transactions, including `0x622a`, at the transport boundary. | Expand only when a new organic request demonstrates additional framing or status semantics. |
+| DSP | `MODEL_DSP_SERVICE`, `MODEL_DSP_RING_DRAIN`, and `MODEL_DSP_CONTACT_PEER` cover distinct observed portions of the missing DSP-side machine. | Consolidate them into one request-driven peer without losing the verified ordering between D0, type `0x70/0x74`, and contact startup. |
 | Startup | `MODEL_STARTUP_REPORTS` supplies firmware-visible subsystem reports. | Replace the firmware-call bridge with the devices or transport peers that own each report. |
 | Display | `MODEL_LCD_TRANSFER_FIQ` supplies a provisional transfer interrupt. | Validate the precise controller interrupt contract and move it into the display device. |
 
@@ -78,7 +79,9 @@ A subsystem is boxed off only when it has:
 4. no direct firmware-state forcing in its supported path; and
 5. stale probes and contradictory historical claims removed or clearly marked.
 
-The immediate research frontier remains organic generic-service object
-population and the lower-radio/DSP response path. Normalization should make that
-work cheaper and harder to misinterpret; it should not substitute documentation
-for resolving the missing machine behavior.
+The immediate research frontier is the ordinary GSM 11.11 SIM initialization
+sequence after `EF_PHASE`: SIM control reaches `0xe3`, APDUs are exchanged, and
+the firmware remains in its periodic DF_GSM `A0 F2` presence cycle with SIM
+enable clear. Normalization should make that work cheaper and harder to
+misinterpret; it must not turn the historical service-5/SAT chain into a claimed
+ordinary-registration dependency.

@@ -5,7 +5,7 @@
     {
       "id": "lower_service_idle", "owner": "startup", "status": "modeled",
       "predicate": "service_context_ready_2b03d8 returns nonzero after the lower transmit queue drains",
-      "current": "Satisfied by the deep service model", "evidence": ["docs/service_bootstrap.md"]
+      "current": "Satisfied in the coherent contact profile; the DSP service model drains the observed pending counter and supplies recurring IRQ-4 completion while the request-driven contact peer handles the distinct ring and external-session transactions", "evidence": ["docs/service_bootstrap.md", "docs/contact_service_topology.md"]
     },
     {
       "id": "contact_healthy_completion", "owner": "contact_task", "status": "modeled",

@@ -1,4 +1,13 @@
-# Boot to "Insert SIM card"
+# Historical boot to "Insert SIM card" milestone
+
+> **Superseded profile.** This document preserves the first successful route to
+> the Insert SIM screen and the branch evidence it produced. Its
+> `MODEL_SVC_RESPONDER`/`MODEL_SVC_CHANNEL_DRAIN` configuration is not the
+> current contact-service implementation. The request-driven
+> `MODEL_DSP_CONTACT_PEER` now completes D0, DSP type `0x70/0x74`, class-`0x40`,
+> and `0x622a` transactions in one coherent boot through the transport
+> boundaries. See `contact_service_topology.md` for the supported path and
+> `sim_subsystem.md` for the live frontier.
 
 > **Current status (2026-07-11): event `0x15` path restored.** The cleaned
 > driver initially remained in startup mode `0x000d` because its service peer
@@ -19,10 +28,9 @@ reading byte offsets out of 16-bit RAM words. Disassembly is via
 `tools/disrom.py` on the swap16 image; instruction-fetch hooks fire only at
 branch/call targets.
 
-## Boot config
+## Historical boot config
 
-Reaching "Insert SIM card" needs the three CONTACT-SERVICE models plus the
-service-channel drain:
+The original milestone used the following branch-isolation profile:
 
 ```
 NOKI3210_MODEL_DSP_SERVICE=1
@@ -31,10 +39,11 @@ NOKI3210_MODEL_SVC_RESPONDER=1
 NOKI3210_MODEL_SVC_CHANNEL_DRAIN=1     # the one new model documented here
 ```
 
-The default (no models) still reproduces the CONTACT SERVICE oracle frame
-`d8a9a7a58e587be8` byte-for-byte; every model is opt-in.
+Do not use this profile as evidence of a coherent service session. The default
+oracle remains useful, but current contact acceptance uses
+`MODEL_DSP_CONTACT_PEER` and does not enable either legacy model above.
 
-## The chain, end to end
+## The historical chain, end to end
 
 ```
 CONTACT SERVICE cleared (DSP + CCONT + responder models)

@@ -7,12 +7,12 @@ every DSP shared-RAM offset and DSPIF register with direction/value/PC over the 
 
 **TL;DR for emulation:** at boot the MCU treats the DSP interface as (a) a RAM
 self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
-download target for coefficient/program blobs, and (d) a lower-service transmit
-queue. The current model drains that queue and raises IRQ 4 but does not construct
-reply payloads. A live D0-bearing packet proves MCU-to-DSP traffic is reachable;
-it does not yet prove that a DSP reply is the missing SIM-registration predecessor.
-With stateful SIM initialization, radio control reaches service commands `0x30` and
-`0x32`; the reply contract for those commands is the current frontier.
+download target for coefficient/program blobs, and (d) bidirectional lower-service
+message rings. The request-driven contact peer now answers the organic D0 discovery
+and type-`0x70` contact request through FIQ 0, proving that MCU-to-DSP requests and
+DSP-to-MCU replies compose in the normal scheduler. The later lower-radio
+command/reply vocabulary remains incomplete, but it is no longer the immediate
+boot frontier: ordinary SIM initialization now runs after contact startup.
 
 ## The two hardware windows
 
@@ -27,8 +27,9 @@ to DSPIF across the image. Earlier boot-only traces saw just the initialization 
 but a coherent stateful-SIM run reaches `0x290cf4` with service commands `0x30` and
 `0x32`. That function updates DSP shared control words, writes command 4 to DSPIF at
 `0x29103c`, and rings doorbell byte 2 at `0x20008`. DSPIF is therefore a live boundary,
-not a static-only future path. The DSP-owned completion data and firmware IRQ-4 parser
-still need to be mapped before implementing a reply model.
+not a static-only future path. Those service commands remain useful lower-radio
+evidence; the distinct boot-critical contact completion is now mapped as type
+`0x70` TX / type `0x74` RX.
 
 ## Shared-RAM layout at boot (`0x10000` base; offsets are byte offsets)
 

@@ -8,8 +8,10 @@ same frame.
 `NOKI3210_BOOT_SUMMARY`. `make run` places it at
 `RUN_DIR/boot_summary.txt`; `make verify` compares it with
 `oracles/noki3210-default.struct` after checking the frame hash.
-`make verify-deep` performs the corresponding check for the four-model Insert
-SIM profile against `oracles/noki3210-deep.struct`.
+`make verify-deep` performs the corresponding check for the historical
+four-model Insert SIM profile against `oracles/noki3210-deep.struct`. That
+profile remains a regression artifact; it is not the current coherent
+contact-service acceptance profile.
 
 ## Summary fields
 
@@ -38,7 +40,7 @@ Two independent 20-second default-profile runs produced byte-identical schema-1
 summaries. The corresponding latest nonblank LCD frame retained SHA-256 prefix
 `d8a9a7a58e587be8`.
 
-## Deep-profile reference
+## Legacy deep-profile reference
 
 The historical four-model profile enables:
 
@@ -70,9 +72,13 @@ predates and is independent of the ring-drain cadence used by the current radio
 investigation. Do not update the deep oracle until the extra CCONT transaction
 has been identified or accepted as a deliberate model change.
 
-The service responder remains a firmware-boundary model: it expresses a real
-request/completion contract but currently completes it through the shared
-status byte rather than a separately emulated transport device.
+The responder and drain are superseded research bridges. Current acceptance
+uses `MODEL_DSP_CONTACT_PEER`, which answers observed DSP requests, delivers the
+external class-`0x40` session through task 7, and acknowledges `0x622a` without
+writing firmware state. Its last clean five-second run ended with startup mode
+`0x0004`, flags `0x0f`, contact status `0x0049`, and normal SIM APDUs in progress.
+The default frame/structural oracle remains the release regression until a
+separate coherent-peer manifest and oracle are deliberately banked.
 
 `tools/find_literal_loads.py` scans Thumb-1 PC-relative literal loads while
 normalizing the swapped image's 32-bit halfword order. It is intended for static

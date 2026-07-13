@@ -1,40 +1,43 @@
-# Service-startup bootstrap — why a blank 3210 shows CONTACT SERVICE
+# Service-startup bootstrap
 
 > **Address-heavy research reference.** Use `contact_service_topology.md` for
 > current contact-command direction and `evidence/state_predicates.json` for
 > current readiness gates. This file retains the underlying boot-chain detail.
 
-CONTACT SERVICE is the firmware's **correct** response to a blank/un-provisioned 3210: the
-service layer can't bring up, so the contact-service watchdog halts. This doc is the current
-map of that chain and the models that emulate a provisioned service environment.
+CONTACT SERVICE is the firmware's response when the service layer cannot complete
+startup and its watchdog expires. This document retains the branch-level map of
+that failure and the experiments used to isolate it.
 
 > This is a **current-knowledge** reference, not a journal. The full investigation history
 > (including conclusions later corrected — the `ack` red herring, "NOT the EEPROM", etc.) lives
 > in git history; a terse summary is in the Appendix. Where older commits/wording conflict with
 > this file, this file wins.
 
-## Status & model stack
+## Current status
 
-**CONTACT SERVICE can be crossed by the research profile, but not yet through one
-coherent faithful peer.** The hardware models establish the readiness predicates;
-the provisional service responder then isolates the downstream branch and leaves
-the CONTACT SERVICE screen. All are opt-in and leave the default oracle unchanged,
-but the responder is a firmware bridge and must not be treated as completed device
-emulation.
+**The contact-service path now completes coherently without a firmware-message
+bridge or firmware-state write.** The authoritative transaction and ordering map
+is `contact_service_topology.md`. In one boot, the request-driven peer answers the
+DSP D0 discovery, returns the type-`0x74` completion for the organic type-`0x70`
+request, initiates the external class-`0x40` session through task 7, and
+acknowledges the final `0x622a` transaction. Firmware retains service-present bit
+6, clears busy bit 2 itself, resumes the extended tasks, and starts normal SIM
+traffic.
+
+The old `MODEL_SVC_RESPONDER` and `MODEL_SVC_CHANNEL_DRAIN` discussion below is
+**historical branch-isolation evidence**, not the supported path. Its incomplete
+header, self-route loop, direct task-2 delivery, and shared-status completion were
+useful falsifications but are superseded by `MODEL_DSP_CONTACT_PEER`.
 
 | model (env) | what it emulates | gate it clears |
 |---|---|---|
 | `NOKI3210_MODEL_DSP_SERVICE` | DSP lower-service handshake: drains pending counter `[0x100e4]`, raises IRQ 4 | `service_ready` |
 | `NOKI3210_MODEL_CCONT_PRESENT` | CCONT reg `0xe` bit 0 = present/status | service-channel idx6 |
 | `EEPROM_PROFILE=selftest` (overlay) | EEPROM config checksum (`0x244`) + tune/security checksum (`0x11c`) | EEPROM config gate + service-channel idx18 |
-| `NOKI3210_MODEL_SVC_RESPONDER` | provisional node-`0x18` branch-isolation bridge | contact-service result-5 branch |
-| `NOKI3210_MODEL_SVC_CHANNEL_DRAIN` | async completion of service report `0x622a` | extended-task resume gate |
+| `NOKI3210_MODEL_DSP_CONTACT_PEER` | request-driven DSP and external service counterparty | contact result, busy-bit completion, extended-task resume |
 
-The first three keep bit 6 through the initialization checks. The later disabled
-PM/service-channel read clears it again at `0x237b04`. `MODEL_SVC_RESPONDER`
-delivers a result-5 message and crosses the branch, but its incomplete header causes
-route recursion; it proves downstream reachability, not a coherent node-`0x18`
-transaction.
+The first three establish the hardware prerequisites. The contact peer supplies
+the missing counterpart transactions; firmware then owns all state transitions.
 
 ## How CONTACT SERVICE works (the bit-6 gate)
 
@@ -115,7 +118,7 @@ return) when the `0x5f00` read is **dropped** (channel disabled). Enabling the s
 removes this clear (and the watchdog timeout) — but completion still needs the response. This is
 the remaining gate, below.
 
-## Healthy contact branch — PROVISIONAL (`NOKI3210_MODEL_SVC_RESPONDER`)
+## Historical branch-isolation responder (`MODEL_SVC_RESPONDER`)
 
 > **Correction:** the responder reaches the firmware's result-5 branch and lets the boot leave the
 > initial CONTACT SERVICE frame, but it does not complete a coherent service transaction.
@@ -168,9 +171,11 @@ service transport.
 **2. The contact-service never *completes*.** The healthy completion is the async response
 dispatcher **`0x236dc6`** with command **`0x05`** (`0x236efe` maps result `5` → substate 5,
 HEALTHY). `0x236dc6` has **no static references** (computed dispatch only) — it runs solely when a
-correctly-formatted **response message** is received and routed. The request is on the **internal
-message bus** (frame starts `0x00`, not the MBUS-serial `0x1f`), so the response must be an injected
-internal scheduler message. The *synchronous* `0x5f00` read (D9 watchdog dispatch `0x237994`,
+correctly-formatted **response message** is received and routed. The request is represented on the
+firmware's **internal message bus** (frame starts `0x00`, not the MBUS-serial `0x1f`). The old
+investigation incorrectly inferred that the response therefore had to be injected there; the
+coherent model shows task 7's lower transport produces that internal representation. The
+*synchronous* `0x5f00` read (D9 watchdog dispatch `0x237994`,
 `value-0xd9` jump table) only steers watchdog sub-handlers, never completion.
 
 **Proven (with the models on):** forcing the channel enable (`EXPERIMENT_FORCE_SVC_CHANNEL`) makes
@@ -179,7 +184,7 @@ gone) — but the frame stays `d8a9a7`: watchdog-satisfied ≠ completed. No loc
 (`svc_response` count 0 in those configurations); the required lower-service behavior is absent
 from the driver.
 
-**Current model:** `MODEL_SVC_RESPONDER` supplies one header-incomplete result-5 message at the
+**Historical model:** `MODEL_SVC_RESPONDER` supplies one header-incomplete result-5 message at the
 task-message boundary. It neither models the lower-service session nor converges after the
 firmware's status response. It is retained only as a provisional branch-isolation model.
 
@@ -202,7 +207,7 @@ A real model must observe the initiating boundary, preserve address/route/sequen
 let firmware-generated reports terminate at the peer rather than route back to task 2. Directly
 posting the three discriminating bytes is an isolation probe, not the remaining faithful build step.
 
-## Beyond the gate (the "limp" frontier — what comes after)
+## Historical post-responder frontier
 
 With the responder (and the model stack), the boot **leaves CONTACT SERVICE** and advances the mode
 `0001 → 000d`, where it currently **holds**: the LCD cycles a white fill (`94a2dc`) / black fill

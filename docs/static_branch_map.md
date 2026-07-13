@@ -4,6 +4,12 @@
 > work and superseded experiments. Current service direction and producer
 > conclusions live in `contact_service_topology.md`; normalized state and
 > falsification conclusions live in `evidence/*.json`.
+>
+> **All “current blocker” labels below are chronological artifacts.** The
+> request-driven contact peer now completes the DSP type-`0x70/0x74` exchange,
+> external class-`0x40` session, and `0x622a` acknowledgement in one boot.
+> Firmware reaches mode `0x0004` and starts the SIM conversation without the
+> forcing experiments catalogued here.
 
 Generated from Thumb disassembly of the swap16 firmware image. The purpose is to keep the next two boot branches explicit so runtime experiments can target known pass/fail conditions instead of rediscovering the same path.
 

@@ -19,12 +19,12 @@ superseded by the organic SIM and lower-radio work in `sim_subsystem.md`,
 - **Idle presentation:** task-5/MMI child events render operator, signal and
   status content after the corresponding live subsystems publish it.
 
-## Active bounded frontier
+## Mapped later radio frontier
 
-The current blocker is not “the GSM stack never starts” and is not a missing
-display-resource registration. The organic preliminary startup reaches the
-generic-service/lower-radio boundary, but never receives the owned object which
-would complete this chain:
+This is not the immediate SIM-init blocker. It is the strongest mapped later
+generic-service/lower-radio lifecycle, retained for the point where ordinary SIM
+acceptance completes. The current firmware does not receive the owned object
+which would complete this chain:
 
 ```text
 service-5 status 0x05e8
