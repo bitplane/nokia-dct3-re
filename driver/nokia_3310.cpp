@@ -2099,7 +2099,32 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					debug_ram_byte(msg+6), m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					machine().time().as_double());
 	}
-		// TRACE_CSCMD (opt-in, fetch side): the contact-service command dispatcher 0x237400 reads the
+		// TRACE_CSCMD (opt-in, fetch side): log both sides of the contact-service transport.
+		// 0x234634 constructs an MCU-to-peer frame and 0x234684 queues it; the dispatcher below
+		// consumes peer-to-MCU frames. Keeping direction explicit prevents acknowledgements from
+		// being mistaken for organic producers of inbound commands with the same numeric id.
+		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00234634)
+		{
+			static unsigned csconstruct_count = 0;
+			if (csconstruct_count++ < 256)
+				logerror("csconstruct: command=%02x payload=%02x output=%08x caller=%08x task=%02x t=%.4f\n",
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xff,
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+					debug_ram_byte(0x00100022), machine().time().as_double());
+		}
+		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00234684)
+		{
+			static unsigned cssend_count = 0;
+			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+			if (cssend_count++ < 256 && msg >= NOKIA_RAM_BASE && msg + 9 < NOKIA_RAM_END)
+				logerror("cssend: command=%02x class=%02x destination=%02x source=%02x length=%04x caller=%08x task=%02x t=%.4f\n",
+						fw_byte(msg + 8), fw_byte(msg + 3), fw_byte(msg), fw_byte(msg + 1),
+						fw_word(msg + 4), m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+						debug_ram_byte(0x00100022), machine().time().as_double());
+		}
+		// The contact-service command dispatcher 0x237400 reads the
 		// command byte [msg+8] into r4 at 0x23741a and binary-searches to a handler. cmd 0x70/0x71 route to
 		// the channel-map handler 0x23670c: 0x70 = resource ENABLE (-> 0x2b140a, config blob = msg+9),
 		// 0x71 = resource DISABLE. Log every command byte the contact-service processes -- confirms whether
@@ -2109,8 +2134,12 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
 			static unsigned cc = 0;
 			if (cc++ < 80 && msg >= 0x00100000 && msg < 0x00180000)
-				logerror("cscmd: [msg+8]=%02x [msg+5]=%02x svcready[11fed1]=%02x t=%.4f\n", debug_ram_byte(msg + 8),
-						debug_ram_byte(msg + 5), debug_ram_byte(0x0011fed1), machine().time().as_double());
+				logerror("cscmd: command=%02x class=%02x destination=%02x source=%02x length=%04x payload0=%02x "
+						"svcready=%02x caller=%08x task=%02x t=%.4f\n",
+						debug_ram_byte(msg + 8), debug_ram_byte(msg + 3), debug_ram_byte(msg), debug_ram_byte(msg + 1),
+						debug_ram_word(msg + 4), debug_ram_byte(msg + 9), debug_ram_byte(0x0011fed1),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+						debug_ram_byte(0x00100022), machine().time().as_double());
 		}
 		// TRACE_HANDOFF (opt-in): the post-SIM interactive/idle handoff (docs/interactive_handoff.md).
 		// The message-gated portion is EMULATED by MODEL_STARTUP_REPORTS; mode-0 sits behind the app-task

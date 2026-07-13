@@ -492,8 +492,9 @@ in order:
   channel-map handler (`0x236e6c`, `0x236f10`) are both *disable* calls (all-zero args →
   `config_ptr=0`). Enable comes only from a received `0x70` message dispatched through the
   contact-service loop (`0x237bc6` recv → `0x237400` → `0x23670c`). On our boot only cmd
-  `0x64` is injected (`MODEL_SVC_RESPONDER`); a real session also carries `0x70` + its
-  0x40-byte blob. `MODEL_RES_ENABLE` synthesises the `0x70` the same faithful way.
+  `0x64` is injected (`MODEL_SVC_RESPONDER`); current profiles never receive `0x70` + its
+  0x40-byte blob. The initiating producer is the external service/test peer behind task 7
+  (`contact_service_topology.md`). `MODEL_RES_ENABLE` synthesises the receive side.
 - **With `MODEL_RES_ENABLE`, `[0x11fee4]=1` and the class bitmap is written — yet
   `resource-get(0x4c22)` still returned null.** Instrumenting inside `resource-get 0x2b257e`
   showed `available(0x4c22)=0` even though enable and the bitmap byte `[0x11ff11]` were both

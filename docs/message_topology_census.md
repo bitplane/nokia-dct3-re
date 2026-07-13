@@ -4,14 +4,14 @@ This report separates extracted ROM facts, reviewed static semantics, and cohere
 
 ## Coverage
 
-- Known API callsites: 2494 (3114 / 3776 arguments resolved, 82.5%)
+- Known API callsites: 2739 (3296 / 4217 arguments resolved, 78.2%)
 - Callback-table entries: 126 (`0x2db720` through `0x2dbb0f`; index `0x28` is `0x2db860`)
 - Known consumer entries: 5 (5 entry addresses decode)
 - Descriptor registrations: 149 (112 ROM descriptors decoded, 37 RAM-built or unresolved)
-- Runtime observations: 32
+- Runtime observations: 7
 
 Runtime profile: coherent deep boot with NOKI3210_TRACE_TASKS=1 and NOKI3210_TRACE_GSM_LOWER=1.
-Runtime source(s): `mame/error.log`.
+Runtime source(s): `run_contact_default/error.log`, `run_contact_trace_bounded/error.log`.
 
 ## 0x05e8 inventory
 
@@ -35,10 +35,61 @@ The strongest evidenced missing predecessor is therefore **generic-service sessi
 
 The census does find argumentless in-ROM generators of the global `0x05e8` event (`0xbd << 3`). They are triggers, not object producers: the packed-event ABI encodes zero argument words, so none supplies the object the callback path later expects. The quantified absence is narrower and stronger: no literal load and no recovered `0x05e8` generator carries an argument word, while unresolved RAM-built descriptors remain outside static coverage.
 
-Observed service-5 callback inputs in supplied coherent logs: `0x05e2`, `0x05f3`.
+No runtime log was supplied; the boundary statement is static-only until a coherent trace is correlated.
 
 Target-chain statuses observed as task messages: `0x05e8`=0, `0x05ea`=0, `0x07dd`=0, `0x09d8`=0, `0x0434`=0.
 
+## Contact-service command family
+
+The ROM scan recovered 98 calls to `contact_message_alloc_234634`. The five target commands each have exactly one constructor; constructor existence is not treated as proof of an initiating producer.
+
+### Command `0x64`: completion_or_timeout_status
+
+- Incoming consumer: `0x236dc4`
+- MCU constructor(s): `0x236dd8`/len `9` (status/timeout frame built by the same routine that consumes the incoming completion code)
+- Initiating-producer classification: **organic MCU outbound status; external service peer is the counterparty** (high)
+- Runtime construct/send/receive occurrences: 257 / 257 / 80
+- Evidence: The constructor is reachable from the D9 watchdog timeout and from received-command dispatch. With the service address learned, its frame is destination 0x02/source 0x00 (phone), matching an outbound service response; the model supplies the healthy inbound completion.
+
+### Command `0x65`: startup_status_bits
+
+- Incoming consumer: `0x236bac`
+- MCU constructor(s): `0x29bd4a`/len `1` (MCU status notification containing the byte at 0x11fed3)
+- Initiating-producer classification: **organic MCU outbound notification to the external service peer** (high static, dormant runtime)
+- Runtime construct/send/receive occurrences: 0 / 0 / 0
+- Evidence: The constructor has callers at 0x236c52, 0x2379f4, and 0x292462; the last is outside the contact response dispatcher. Neither supplied runtime profile reaches it.
+
+### Command `0x70`: channel_map_enable
+
+- Incoming consumer: `0x23670c`
+- MCU constructor(s): `0x236742`/len `1` (acknowledgement built only after an incoming 0x70 applies its 0x40-byte channel map)
+- Initiating-producer classification: **external service/test peer request; MCU acknowledgement** (high)
+- Runtime construct/send/receive occurrences: 0 / 0 / 0
+- Evidence: The sole constructor is dominated by the incoming 0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. No natural transaction occurs in the supplied profiles.
+
+### Command `0x71`: channel_map_disable
+
+- Incoming consumer: `0x23670c`
+- MCU constructor(s): `0x236736`/len `0` (acknowledgement built only after an incoming 0x71 disables the channel map)
+- Initiating-producer classification: **external service/test peer request; MCU acknowledgement** (high)
+- Runtime construct/send/receive occurrences: 0 / 0 / 0
+- Evidence: The sole constructor is dominated by the incoming non-0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. No natural transaction occurs in the supplied profiles.
+
+### Command `0x74`: indexed_nv_event_write
+
+- Incoming consumer: `0x236560`
+- MCU constructor(s): `0x23662c`/len `0` (completion acknowledgement after processing an incoming indexed NV operation)
+- Initiating-producer classification: **external service/test peer request; MCU acknowledgement** (high)
+- Runtime construct/send/receive occurrences: 0 / 0 / 0
+- Evidence: The sole command constructor is inside the incoming indexed-operation handler. Contact frames pass through task 7's external service transport. It is unrelated to the direct scheduler-event 0x74 producers at 0x213fcc and 0x214836.
+
+## Contact-service transport boundary
+
+The strongest evidenced boundary is the external service/test peer behind task 7's lower service transport. Task 2 builds class-0x40 frames at 0x234634; 0x234684 offers them to channel 0x6400 via 0x2b203e and queues them through 0x2b0482; 0x2b0482 routes ordinary frames to task 7. The frame header is [0]=destination, [1]=source: after service discovery, MCU output is destination 0x02/source 0x00 (phone). The ROM census finds organic MCU output for 0x64 and 0x65, while 0x70, 0x71, and command 0x74 are external requests whose sole MCU constructors are acknowledgements. Task 7 is the on-device transport adapter, not the semantic producer of those requests.
+
+The numeric command and scheduler event `0x74` are separate namespaces. The ROM contains direct MCU producers of scheduler event `0x74` at `0x213fcc` and `0x214836`; they do not construct contact-service command `0x74`.
+
+
 ## Phase-two decision
 
-A broader census is justified, but should be a separate phase. Its acceptance question should be: **does any in-ROM path self-issue contact-service commands `0x64`, `0x65`, `0x70`, `0x71`, or the `0x74` producer family, or are those contracts external?** That phase needs consumer-cascade recovery and RAM-built descriptor data-flow; merely adding more direct callsites would not answer it.
+This bounded contact-service phase classifies the available MCU constructors and the observed transport behavior. A future full-ROM contract census can reuse the same distinction between an initiating request, a response/acknowledgement with the same id, and a scheduler event in another namespace.

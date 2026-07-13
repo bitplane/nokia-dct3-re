@@ -139,7 +139,7 @@ data/state, not a runtime object graph a subsystem forgot to build**:
      content is *computed* from subsystems that must be coherently up.
 
 So the earlier framing — "a provider-object graph a real boot constructs and ours
-doesn't" — resolves to: **(a) an availability bitmap set by a self-issued enable command
+doesn't" — resolves to: **(a) an availability bitmap set by a received enable command
 + (b) live subsystem content**, both already known walls. There is **no
 provider-registration function that runs on a real boot and not on ours** that we could
 call to populate a registry — the acquire/get path has no such registry, only a bitmap
@@ -147,11 +147,10 @@ call to populate a registry — the acquire/get path has no such registry, only 
 it is proven, in code, to have no seam. Consistent with the empirical result that forcing
 availability blanks the screen.
 
-## Follow-up pass: the enable is an *un-reached trigger*, not missing external data
+## Follow-up pass: the enable is an unobserved lower-service transaction
 
-A second pass corrected one thing above — the claim that the availability blob is
-"provisioned data **we lack**." It is on-device; the wall is that its trigger is never
-reached. Evidence:
+A second pass established that the blob is message-supplied, but not where its initiating
+producer resides. Evidence:
 
 - **The whole availability state has exactly one writer.** `findptr` on the enable flag
   `0x11fee4` and both bitmaps `0x11ff08` / `0x11fee8` returns a **single reference each**,
@@ -165,26 +164,23 @@ reached. Evidence:
   message (`config_ptr = msg+9`), checksums it (`0x2a41d0`, a plain 0x40-byte byte-sum),
   and calls the registrar — **no ROM default blob is referenced**, so the 0x40 bytes are
   the sender's.
-- **Therefore the sender is on-device.** A real phone with no service PC attached still
-  brings up its resource-backed UI, and the *only* way its availability bitmap can be set
-  is through this enable command. So the firmware must **issue the enable to itself**
-  during a normal boot, and the blob it carries is generated on the phone (from ROM /
-  computed), not shipped from an external tool.
+- **The sender is the external service/test peer.** The constructor census
+  (`contact_service_topology.md`) finds only the MCU acknowledgement at `0x236742`, not an
+  MCU-side initiating `0x70`; outgoing contact frames address the learned external service
+  node through task 7. A standalone normal boot need not enable this service channel, so
+  cmd-`0x70` availability cannot be assumed to be a prerequisite for the ordinary idle UI.
 - **The base "Insert SIM card" screen doesn't need it.** That screen renders through a
   pre-resource path (no bitmap), which is why our boot shows it despite the enable never
-  firing. The self-issued enable belongs to a **later, interactive/idle** boot phase —
-  the one gated behind the SIM/network coherent-boot walls we never clear. On our boot the
+  firing. The enable is needed by a **later, interactive/idle** boot phase — the one gated
+  behind the SIM/network coherent-boot walls we never clear. On our boot the
   contact-service processes exactly one command (`0x64`, injected by `MODEL_SVC_RESPONDER`);
-  cmd `0x70` never arrives because we never reach the phase that emits it.
+  cmd `0x70` never arrives in the current profiles.
 
-**Refined verdict:** the display-resource wall is **not** a data gap ("we don't have the
-blob") and **not** a dormant registry we could populate — it is an **un-reached trigger**:
-the interactive-boot phase in which the firmware self-issues its resource-enable (with an
-on-device blob) never runs, because it sits behind the same SIM/network coherent-bringup
-walls every other thread ends at. This is a strictly better characterisation than
-"provisioned data we lack," and it re-localises the single remaining blocker precisely: it
-is the **post-SIM interactive-boot handoff**, upstream of which the resource-enable (and
-everything else) simply isn't emitted.
+**Refined verdict:** the display-resource wall is not a dormant registry we could populate.
+It is an unobserved external-service transaction: no current coherent profile receives `0x70`,
+and the MCU ROM contains no independent initiating constructor for it. The 0x40-byte blob is
+peer-supplied service configuration; forcing the registrar would skip that contract. It should
+not be treated as the ordinary boot-to-idle critical path without new runtime evidence.
 
 Additional structure mapped this pass (for future work): the low icon/indicator classes
 (`0x22–0x4a`) are **optional** — availability `0x2b12b4` is consulted from ~74 sites

@@ -94,9 +94,9 @@ return) when the `0x5f00` read is **dropped** (channel disabled). Enabling the s
 removes this clear (and the watchdog timeout) — but completion still needs the response. This is
 the remaining gate, below.
 
-## The node-`0x18` service responder — MODELLED (`NOKI3210_MODEL_SVC_RESPONDER`)
+## Healthy contact completion — MODELLED (`NOKI3210_MODEL_SVC_RESPONDER`)
 
-> **DONE.** The responder injects the healthy reply node `0x18` would send, and the contact-service
+> **DONE.** The responder injects the healthy reply expected by the contact task, and the contact-service
 > completes — the boot leaves CONTACT SERVICE (reaches `94a2dc`/`4aab13`, the display-init limp).
 > **How it's built:** `nokia_service_transport_device` owns the response bytes,
 > readiness and peer state. At the contact-service loop top (`0x237bc6`, a safe
@@ -118,8 +118,11 @@ families, so treating every call or every earlier busy-bit edge as this request
 is incorrect.
 
 The contact-service reads logical address **`0x5f00`** (count 2) from destination **node `0x18`**
-(`[0x11fee5]`) every ~9 ms (the D9 watchdog tick). Two things are missing, and **both reduce to
-one problem — modelling node `0x18`'s responses**:
+(`[0x11fee5]`) every ~9 ms (the D9 watchdog tick). Two things are missing, and both reduce to
+the lower service transport returning a coherent response. The command census in
+`contact_service_topology.md` shows that task 7 is the immediate MCU boundary and that contact
+responses address the learned external service node. Node `0x18` is the PM-read destination;
+it should not be conflated with every class-`0x40` command id or address.
 
 **1. The channel is never opened.** The validity check `service_channel_lookup_2b12b4` requires the
 master enable `0x11fee4 != 0` **and** the address registered (ROM bit-table `0x2e2f5c` gated by RAM
@@ -130,7 +133,8 @@ Its four callers (`0x2366f6`, `0x23672c`, `0x236e6c`, `0x236f10`) are **all cont
 message-command handlers** — cases in the dispatch switch at `0x2377fc` and inside the response
 dispatcher `0x236dc6`. They process a *received message struct* (`0x2366c8` checksums its payload
 `[r0+9..+0x40]`). So **channel-open is response-driven, not a local write**: a real phone opens the
-channel by receiving a registration message from node `0x18`.
+channel after receiving a registration message from the external service peer through the lower
+service transport.
 
 **2. The contact-service never *completes*.** The healthy completion is the async response
 dispatcher **`0x236dc6`** with command **`0x05`** (`0x236efe` maps result `5` → substate 5,
@@ -143,10 +147,12 @@ internal scheduler message. The *synchronous* `0x5f00` read (D9 watchdog dispatc
 **Proven (with the models on):** forcing the channel enable (`EXPERIMENT_FORCE_SVC_CHANNEL`) makes
 the reads transmit and **stops the D9 watchdog timing out** (`D9TIMEOUT` 1→0, the `0x237b04` clear
 gone) — but the frame stays `d8a9a7`: watchdog-satisfied ≠ completed. No local provider answers
-(`svc_response` count 0 in every configuration); node `0x18` is genuinely absent.
+(`svc_response` count 0 in those configurations); the required lower-service behavior is absent
+from the driver.
 
-**The build:** a **node-`0x18` service-message responder** — post the response message(s) the node
-would send. The RE is now complete; what remains is the injection engineering.
+**Current model:** `MODEL_SVC_RESPONDER` supplies this one healthy completion at the task-message
+boundary. It does not model the complete lower-service session or prove node `0x18` is the physical
+producer of every sibling command.
 
 **Response message spec (fully traced).** The contact-service task loop `0x237bb4` calls
 `recv 0x26a458` → `r4` = message, then dispatches on **`[msg+3]`**; `[msg+3]==0x40` →

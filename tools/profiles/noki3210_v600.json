@@ -19,7 +19,10 @@
     {"address": "0x2af798", "name": "generic_event_generate", "kind": "packed_event", "arguments": {"packed_event": "r0"}},
     {"address": "0x2632fc", "name": "service_register_transient", "kind": "descriptor_registration", "arguments": {"service": "r0", "callback": "r1", "descriptor": "r2"}, "descriptor_argument": "descriptor"},
     {"address": "0x263d30", "name": "service_register_resident", "kind": "descriptor_registration", "arguments": {"descriptor": "r0", "enable": "r1", "mask": "r2"}, "descriptor_argument": "descriptor"},
-    {"address": "0x2b13d4", "name": "service_channel_report", "kind": "service_transport", "arguments": {"report": "r0"}}
+    {"address": "0x2b13d4", "name": "service_channel_report", "kind": "service_transport", "arguments": {"report": "r0"}},
+    {"address": "0x234634", "name": "contact_message_alloc", "kind": "contact_service_construct", "arguments": {"output": "r0", "command": "r1", "payload_length": "r2"}},
+    {"address": "0x234684", "name": "contact_message_send", "kind": "contact_service_transport", "arguments": {"message": "r0"}},
+    {"address": "0x2b0482", "name": "service_transport_queue", "kind": "contact_service_transport", "arguments": {"message": "r0"}}
   ],
   "consumers": [
     {"address": "0x2618e8", "name": "service5_callback", "task": 5, "statuses": ["0x05e2", "0x05e8"], "provenance": "reviewed_static"},
@@ -28,6 +31,51 @@
     {"address": "0x267258", "name": "task14_object_decoder", "task": 14, "statuses": ["0x09d8", "0x09de"], "provenance": "reviewed_static"},
     {"address": "0x21b198", "name": "task10_completion_dispatch", "task": 10, "statuses": ["0x1392"], "provenance": "reviewed_static"}
   ],
+  "contact_service_commands": [
+    {
+      "command": "0x64", "name": "completion_or_timeout_status", "consumer": "0x236dc4",
+      "expected_constructor": {"callsite": "0x236dd8", "payload_length": 9},
+      "constructor_role": "status/timeout frame built by the same routine that consumes the incoming completion code",
+      "producer_class": "organic MCU outbound status; external service peer is the counterparty",
+      "confidence": "high",
+      "evidence": "The constructor is reachable from the D9 watchdog timeout and from received-command dispatch. With the service address learned, its frame is destination 0x02/source 0x00 (phone), matching an outbound service response; the model supplies the healthy inbound completion."
+    },
+    {
+      "command": "0x65", "name": "startup_status_bits", "consumer": "0x236bac",
+      "expected_constructor": {"callsite": "0x29bd4a", "payload_length": 1},
+      "constructor_role": "MCU status notification containing the byte at 0x11fed3",
+      "producer_class": "organic MCU outbound notification to the external service peer",
+      "confidence": "high static, dormant runtime",
+      "evidence": "The constructor has callers at 0x236c52, 0x2379f4, and 0x292462; the last is outside the contact response dispatcher. Neither supplied runtime profile reaches it."
+    },
+    {
+      "command": "0x70", "name": "channel_map_enable", "consumer": "0x23670c",
+      "expected_constructor": {"callsite": "0x236742", "payload_length": 1},
+      "constructor_role": "acknowledgement built only after an incoming 0x70 applies its 0x40-byte channel map",
+      "producer_class": "external service/test peer request; MCU acknowledgement",
+	  "confidence": "high",
+	  "evidence": "The sole constructor is dominated by the incoming 0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. No natural transaction occurs in the supplied profiles."
+    },
+    {
+      "command": "0x71", "name": "channel_map_disable", "consumer": "0x23670c",
+      "expected_constructor": {"callsite": "0x236736", "payload_length": 0},
+      "constructor_role": "acknowledgement built only after an incoming 0x71 disables the channel map",
+      "producer_class": "external service/test peer request; MCU acknowledgement",
+	  "confidence": "high",
+	  "evidence": "The sole constructor is dominated by the incoming non-0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. No natural transaction occurs in the supplied profiles."
+    },
+    {
+      "command": "0x74", "name": "indexed_nv_event_write", "consumer": "0x236560",
+      "expected_constructor": {"callsite": "0x23662c", "payload_length": 0},
+      "constructor_role": "completion acknowledgement after processing an incoming indexed NV operation",
+	  "producer_class": "external service/test peer request; MCU acknowledgement",
+	  "confidence": "high",
+	  "evidence": "The sole command constructor is inside the incoming indexed-operation handler. Contact frames pass through task 7's external service transport. It is unrelated to the direct scheduler-event 0x74 producers at 0x213fcc and 0x214836."
+    }
+  ],
+  "contact_service_boundary": {
+    "statement": "The strongest evidenced boundary is the external service/test peer behind task 7's lower service transport. Task 2 builds class-0x40 frames at 0x234634; 0x234684 offers them to channel 0x6400 via 0x2b203e and queues them through 0x2b0482; 0x2b0482 routes ordinary frames to task 7. The frame header is [0]=destination, [1]=source: after service discovery, MCU output is destination 0x02/source 0x00 (phone). The ROM census finds organic MCU output for 0x64 and 0x65, while 0x70, 0x71, and command 0x74 are external requests whose sole MCU constructors are acknowledgements. Task 7 is the on-device transport adapter, not the semantic producer of those requests."
+  },
   "semantic_edges": [
     {
       "id": "service5_object_completion",
@@ -100,6 +148,9 @@
   "runtime_patterns": [
     {"kind": "message", "regex": "msgedge: t(?P<source>\\d+) -> t(?P<destination>\\d+) \\(first status=(?P<status>[0-9a-fA-F]{4})"},
     {"kind": "message", "regex": "sim_owner_post: t(?P<source>\\d+) -> t(?P<destination>\\d+) status=(?P<status>[0-9a-fA-F]{4})"},
-    {"kind": "callback", "regex": "gsm_lower: service5 callback status=(?P<status>[0-9a-fA-F]{4}).*caller=(?P<caller>[0-9a-fA-F]{8})"}
+    {"kind": "callback", "regex": "gsm_lower: service5 callback status=(?P<status>[0-9a-fA-F]{4}).*caller=(?P<caller>[0-9a-fA-F]{8})"},
+    {"kind": "contact_construct", "regex": "csconstruct: command=(?P<command>[0-9a-fA-F]{2}) payload=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
+    {"kind": "contact_send", "regex": "cssend: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
+    {"kind": "contact_receive", "regex": "cscmd: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*payload0=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"}
   ]
 }

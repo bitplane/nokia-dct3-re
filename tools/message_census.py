@@ -282,7 +282,7 @@ def verify_anchor(anchor, instruction_by_address, callbacks, data, base):
 
 def load_runtime(profile, paths):
 	records = []
-	seen = set()
+	seen = {}
 	patterns = [(item, re.compile(item["regex"])) for item in profile.get("runtime_patterns", [])]
 	for path in paths:
 		for line_number, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
@@ -294,15 +294,51 @@ def load_runtime(profile, paths):
 				for key in ("source", "destination"):
 					if key in fields:
 						fields[key] = int(fields[key])
-				for key in ("status", "caller"):
+				for key in ("status", "caller", "command", "payload", "task", "class", "source_node", "destination_node"):
 					if key in fields:
 						fields[key] = int(fields[key], 16)
-				key = (item["kind"], tuple(sorted(fields.items())))
-				if key not in seen:
-					seen.add(key)
-					records.append({"kind": item["kind"], "fields": fields, "file": str(path),
-						"line": line_number, "classification": "observed", "provenance": "observed_runtime"})
+				key = (str(path), item["kind"], tuple(sorted(fields.items())))
+				if key in seen:
+					seen[key]["count"] += 1
+				else:
+					record = {"kind": item["kind"], "fields": fields, "file": str(path),
+						"line": line_number, "count": 1, "classification": "observed",
+						"provenance": "observed_runtime"}
+					seen[key] = record
+					records.append(record)
 	return records
+
+
+def contact_service_inventory(profile, calls, runtime):
+	constructors = [call for call in calls if call["api"] == "contact_message_alloc"]
+	commands = []
+	for definition in profile.get("contact_service_commands", []):
+		record = dict(definition)
+		command = number(record["command"])
+		record["command"] = command
+		record["consumer"] = number(record["consumer"])
+		record["constructors"] = [call for call in constructors if call["arguments"].get("command") == command]
+		expected = record.pop("expected_constructor", None)
+		if expected:
+			expected_callsite = number(expected["callsite"])
+			expected_length = number(expected["payload_length"])
+			record["constructor_anchor_valid"] = any(call["callsite"] == expected_callsite and
+				call["arguments"].get("payload_length") == expected_length for call in record["constructors"])
+		else:
+			record["constructor_anchor_valid"] = not record["constructors"]
+		record["runtime"] = {}
+		for kind in ("contact_construct", "contact_send", "contact_receive"):
+			matches = [item for item in runtime if item["kind"] == kind and item["fields"].get("command") == command]
+			record["runtime"][kind] = {
+				"occurrences": sum(item["count"] for item in matches),
+				"profiles": sorted({item["file"] for item in matches})
+			}
+		commands.append(record)
+	return {
+		"constructor_callsites_scanned": len(constructors),
+		"commands": commands,
+		"all_constructor_anchors_valid": all(item["constructor_anchor_valid"] for item in commands)
+	}
 
 
 def status_inventory(instructions, calls, descriptors, data, base, status):
@@ -365,8 +401,24 @@ def render_report(result):
 	if result["runtime_status_inventory"]:
 		lines += ["", "Target-chain statuses observed as task messages: " + ", ".join(
 			f"`{int(status):#06x}`={count}" for status, count in result["runtime_status_inventory"].items()) + "."]
+	contact = result["contact_service"]
+	lines += ["", "## Contact-service command family", "",
+		f"The ROM scan recovered {contact['constructor_callsites_scanned']} calls to `contact_message_alloc_234634`. "
+		"The five target commands each have exactly one constructor; constructor existence is not treated as proof of an initiating producer.", ""]
+	for command in contact["commands"]:
+		constructors = ", ".join(f"`{item['callsite']:#08x}`/len `{item['arguments'].get('payload_length')}`" for item in command["constructors"]) or "none"
+		runtime = command["runtime"]
+		lines += [f"### Command `{command['command']:#04x}`: {command['name']}", "",
+			f"- Incoming consumer: `{command['consumer']:#08x}`",
+			f"- MCU constructor(s): {constructors} ({command['constructor_role']})",
+			f"- Initiating-producer classification: **{command['producer_class']}** ({command['confidence']})",
+			f"- Runtime construct/send/receive occurrences: {runtime['contact_construct']['occurrences']} / {runtime['contact_send']['occurrences']} / {runtime['contact_receive']['occurrences']}",
+			f"- Evidence: {command['evidence']}", ""]
+	lines += ["## Contact-service transport boundary", "",
+		result["contact_service_boundary"]["statement"], "",
+		"The numeric command and scheduler event `0x74` are separate namespaces. The ROM contains direct MCU producers of scheduler event `0x74` at `0x213fcc` and `0x214836`; they do not construct contact-service command `0x74`.", ""]
 	lines += ["", "## Phase-two decision", "",
-		"A broader census is justified, but should be a separate phase. Its acceptance question should be: **does any in-ROM path self-issue contact-service commands `0x64`, `0x65`, `0x70`, `0x71`, or the `0x74` producer family, or are those contracts external?** That phase needs consumer-cascade recovery and RAM-built descriptor data-flow; merely adding more direct callsites would not answer it.", ""]
+		"This bounded contact-service phase classifies the available MCU constructors and the observed transport behavior. A future full-ROM contract census can reuse the same distinction between an initiating request, a response/acknowledgement with the same id, and a scheduler event in another namespace.", ""]
 	return "\n".join(lines)
 
 
@@ -403,6 +455,7 @@ def main():
 	consumers = extract_consumers(profile, by_address, instructions, data, base)
 	descriptors = extract_descriptors(profile, calls, data, base)
 	runtime = load_runtime(profile, args.runtime_log)
+	contact_service = contact_service_inventory(profile, calls, runtime)
 	inventory_05e8 = status_inventory(instructions, calls, descriptors, data, base, 0x05e8)
 	target_statuses = (0x05e8, 0x05ea, 0x07dd, 0x09d8, 0x0434)
 	runtime_status_inventory = {str(status): sum(item["kind"] == "message" and item["fields"].get("status") == status for item in runtime)
@@ -448,6 +501,8 @@ def main():
 			"external": "not_proven"},
 		"runtime_status_inventory": runtime_status_inventory, "runtime": runtime
 	}
+	result["contact_service"] = contact_service
+	result["contact_service_boundary"] = profile["contact_service_boundary"]
 	report = render_report(result)
 	if args.json:
 		args.json.parent.mkdir(parents=True, exist_ok=True)
@@ -457,10 +512,13 @@ def main():
 		args.report.write_text(report)
 	if not args.json and not args.report:
 		print(report)
-	if args.check and (not all(edge["anchors_valid"] for edge in edges) or not callback_extent_valid):
+	if args.check and (not all(edge["anchors_valid"] for edge in edges) or not callback_extent_valid or
+			not contact_service["all_constructor_anchors_valid"]):
 		failed = [edge["id"] for edge in edges if not edge["anchors_valid"]]
 		if not callback_extent_valid:
 			failed.append("callback_table_extent")
+		if not contact_service["all_constructor_anchors_valid"]:
+			failed.append("contact_service_constructor_anchors")
 		print(f"message_census: failed checks: {', '.join(failed)}", file=sys.stderr)
 		return 1
 	return 0

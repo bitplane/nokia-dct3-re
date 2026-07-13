@@ -156,8 +156,8 @@ to the case that calls `0x236bac` — so command `0x65`, with `message[+9]` bit 
 deliver command `0x64` (completion) but **not `0x65`** (the sweep-event trigger), a sibling in the same
 command family.
 
-**Why our boot stalls, exactly:** we clear CONTACT SERVICE by faking one node-`0x18` response (command
-`0x64`) instead of driving the real command loop, so command `0x65` (with `message[+9]` bit 2) is never
+**Why our boot stalls at this branch:** we clear CONTACT SERVICE with one modelled lower-service response (command
+`0x64`) instead of driving the full lower-service exchange, so command `0x65` (with `message[+9]` bit 2) is never
 delivered → `0x236bac` never emits `0x15` → bit `0x04` never sets → the gate never closes. Same boundary as
 genuinely clearing CONTACT SERVICE, now pinned at the instruction level as the `000d` gate too.
 
@@ -209,13 +209,12 @@ the service *session*, not calibration data:
 - **Each mode waits on a service event, `000d`-style.** Mode `0007` (`0x271392`): `bl 0x26ff14; cmp r0,#0x74;
   bne <recv>` — spins until it receives event `0x74`. Same recv-wrapper wait as `000d`/`0x15`. Event `0x74`
   *does* have live producers (immediate `0x2695f4` posts at `0x213fcc`/`0x214836`), but they sit in the
-  **contact-service command handlers** (the `0x213–0x219` region that also produces `0x14`) — i.e. they fire
-  when the **real service-box session processes commands**, which our single faked completion (`0x64`) never
-  drives.
+  subsystem handlers in the `0x213–0x219` region (which also produces `0x14`). These are scheduler-event
+  producers, not constructors of contact-service command `0x74`; see `contact_service_topology.md`.
 
-**So reaching a genuine idle needs the whole service-box *session* modelled** (the command sequence that
+**So reaching a genuine idle needs the whole lower-service *session* modelled** (the command sequence that
 produces `0x14`/`0x74`/… and advances each mode), not a synthesized EEPROM. That is the same boundary as
-`000d` (a real service session vs a faked completion), and it needs the real service protocol + provisioned
+`000d` (a coherent lower-service session vs a modelled completion), and it needs the real service protocol + provisioned
 exchange we can't confidently synthesize. The EEPROM-synthesis avenue is therefore **closed for boot-to-idle**;
 the calibration would only matter *after* the mode chain, which we never reach faithfully. This refines the
 earlier "reaching idle needs provisioned data" note: the operative missing piece is the **service session**,
