@@ -140,13 +140,15 @@ with `0x05e2`, and callback state slot `0x5d` is already `0x0b`. Inputs
 instead of an automatic `0x05dc` start. A valid task-13 segmented transaction
 publishes `0x05eb` directly to task 16 and does not enter this callback path.
 The separately
-mapped callback-`0x1a` chain (`0x1400 -> 0x08ac -> 0x0795`) is dormant:
+mapped callback-`0x1a` chain (`0x1400 -> 0x08ac`) is dormant:
 `0x1400` is task-5 mailbox ingress, and exhaustive recovery of all 188 direct
 task-5 event-helper calls found no in-ROM producer. It is therefore not the
-current ordinary-boot hypothesis. A display lifecycle (`0x0280/81/82 -> 0x05e7
+owner of the current ordinary-boot path. A separate telephony/controller path
+now produces `0x08ac` organically, but aborts when `0x287250` rejects selector
+`0`; it never reaches `0x0795`. A display lifecycle (`0x0280/81/82 -> 0x05e7
 -> 0x0389 -> 0x157e -> 0x0396 -> 0x05eb`) is a valid service/test route, not
-the ordinary predecessor. Callback `0x5d` is not yet proven to be the exclusive
-ordinary owner; the independent controller-status callers remain candidates.
+the ordinary predecessor. Callback `0x5d` is not the exclusive ordinary owner;
+the organically reached controller availability check is the active candidate.
 The unresolved code-7 predicate remains parallel to,
 and is not part of, the SIM lifecycle.
 

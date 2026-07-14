@@ -40,6 +40,9 @@
 > advance callback-state slot `0x45`, and its previously registered
 > DSP-downstream ownership prediction is falsified. The code-7 search must
 > return to the remaining unconditional ordinary-boot completion families.
+> That census is now complete: the current profile organically reaches the
+> controller family through `0x08ac`, then fails `0x287250(0)` and exits at
+> `0x27f16e` before `0x0795`. See “Current ordinary `0x08ac` route” below.
 > The fixed
 > startup-report bridge below satisfies neither predicate organically.
 
@@ -345,9 +348,23 @@ its initial DSP configuration stream (**R**).
 A targeted type-`0x03` DSP liveness retest delivered 182 header-only entries through the real
 empty-ring-gated RX/FIQ0 path during a coherent 12-second SIM run. Callback `0x1a` ran once only
 for the pre-existing `0x05e2` / message-type `0xfe` event; it never received `0x1400`, and neither
-`0x08ac`, `0x0795`, nor code 7 appeared. Task 1 remained in mode `0x0004`. This independently
+`0x08ac`, `0x0795`, nor code 7 appeared in that heartbeat experiment. Task 1 remained in mode `0x0004`. This independently
 confirms that the periodic heartbeat may be necessary DSP behavior but is not the semantic
 telephony-control completion, so the temporary heartbeat model was removed again (**R**).
+
+## Current ordinary `0x08ac` route
+
+The later coherent SIM profile changes the runtime conclusion without reviving
+the disproven callback-`0x1a` premise. It organically publishes `0x08ac` twice
+at about 5.65 s. Controller dispatcher `0x255b5e` calls `0x27f150`, which reads
+selector byte `[0x11fcfa] == 0` through `0x287216` and calls availability helper
+`0x287250(0)`. The helper returns zero twice and the handler exits through
+`0x27f16e`, before its activity-slot construction and any `0x0795` publication.
+
+This is the first executed surviving code-7 route with a bounded missing
+predicate. The accompanying raw network/config word `[0x10d128]` is
+`0x28207c06`; that observation is not yet a decode of the helper contract and
+must not be reduced to a guessed single-bit requirement (**R**).
 
 Callback-table index `0x5d` at `0x27b370` is not itself the missing activation.
 The initialization sequence reaches it with state byte `[0x11fcdd] == 0x0b`

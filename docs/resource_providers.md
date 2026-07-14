@@ -95,17 +95,32 @@ boot source. A coherent trace of controller transform `0x253e20` also produces
 none of `0x0280`-`0x0282`. This route is therefore mapped but excluded as the
 ordinary code-7 owner.
 
-The active frontier is the ordinary transaction that supplies any valid
-callback-`0x5d` completion. The
-transient and resident service-registration completion paths at `0x2632be` and
-`0x263e64` are the strongest candidates: both publish readiness after
+The static producer inventory is now closed at the reporter boundary. Reporter
+`0x2af190` has four of four callers classified. The two power callers are
+excluded from ordinary boot; `0x27b3b6` is the callback-`0x5d` route; and
+`0x255c3c` is the independent controller route. Five of five direct global
+`0x05eb` publishers are classified. The registration family owns three of
+them (`0x2632be`, `0x263bd4`, and `0x263e64`); `0x2298d2` is service/session
+owned and `0x263ba0` handles display-owned `0x0396`. The sole effective
+`0x0395` literal is the intermediate output at `0x263b8e`; its predecessor
+`0x0397` has no recovered direct publisher. Four of four effective `0x0795`
+literal sites are classified as one comparator and three producer paths.
+
+The transient and resident service-registration completion paths at `0x2632be` and
+`0x263e64` both publish readiness after
 `0x26265c` reports no registrations remain. The reviewed deep run executes
 transient registration only for service `0x0a`, never service `0x05`, and
 executes no resident registration through `0x263d30`. The callback-`0x21` path
 at `0x2298d2` consumes event
 `0x0c20`, but its only recovered direct producer (`0x27616e`) sits in a
 service-command/session block and is not presently an ordinary-hardware
-candidate. Status `0x0395` reaches the sibling handler at `0x263bd4`, but its
-producer is still unresolved. The independent controller-status `0x0795`
-route remains a separate candidate; no current evidence proves callback
-`0x5d` is the exclusive ordinary owner.
+candidate.
+
+The controller route is now the active frontier. The canonical eight-second
+profile produces `0x08ac` twice and enters `0x27f150` twice. Selector getter
+`0x287216` returns `0`; availability helper `0x287250(0)` returns zero; and the
+handler aborts at `0x27f16e` before building the activity slots that can
+publish `0x0795`. No registration completion tail, global `0x0395`, `0x05eb`,
+`0x06c5`, `0x0795`, or report code 7 is observed. The next investigation is
+therefore the bounded contract behind `0x287250` selector 0, not another
+search for an unexecuted reporter.

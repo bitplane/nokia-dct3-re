@@ -140,9 +140,16 @@ selects `0x255c30`. Further backchaining corrected the route's priority:
 `0x2af57c`, not a callback return. All 188 direct calls to task-5's event helper
 `0x2af6ea` have recoverable constants and none emits `0x1400`; the remaining
 unresolved-destination send is a service router whose table does not target
-task 5. Neither `0x1400`, `0x08ac`, nor the `0x0795` producer runs in the
-coherent profile. This makes callback `0x1a` a mapped dormant/service-specific
-contract, not the strongest ordinary-startup hypothesis (**R**).
+task 5. This makes callback `0x1a` a mapped dormant/service-specific contract,
+not the owner of the current ordinary-startup path (**R**).
+
+The current coherent profile does produce `0x08ac` twice, but through a later
+telephony/controller owner rather than through `0x1400`. Dispatcher `0x255b5e`
+calls `0x27f150`; selector getter `0x287216` returns `0`, and availability
+helper `0x287250(0)` returns zero. The handler takes its abort at `0x27f16e`
+before constructing the activity slots that can lead to `0x0795`. Thus the
+old `0x1400` premise remains disproven while `0x08ac` is now the first organic
+code-7 route with a concrete unsatisfied predicate (**R**).
 
 Callback-table index `0x5d` at `0x27b370` is a mapped completion branch, not an
 established ordinary-boot owner. Initialization invokes it with `0x05e2`, and

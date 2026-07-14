@@ -41,7 +41,7 @@
     {
       "id": "dsp_type03_heartbeat_registration_predecessor", "status": "disproven",
       "hypothesis": "Periodic header-only DSP RX type-0x03 liveness traffic activates the missing ordinary-registration publisher",
-      "conclusion": "Two independent empty-ring-gated DSP RAM/FIQ0 runs were consumed by task 4. The first incremented firmware activity counter 0x112502 but emitted none of 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434. A later 182-heartbeat coherent SIM run also emitted none of callback-0x1a status 0x1400, initializer status 0x08ac, controller status 0x0795, or report code 7; task 1 remained in mode 0x0004. Liveness traffic alone is not the missing semantic peer response",
+      "conclusion": "Two independent empty-ring-gated DSP RAM/FIQ0 runs were consumed by task 4. The first incremented firmware activity counter 0x112502 but emitted none of 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434. The later 182-heartbeat experiment also emitted none of callback-0x1a status 0x1400, initializer status 0x08ac, controller status 0x0795, or report code 7. A newer coherent profile reaches 0x08ac through a different controller owner; this does not change the finding that liveness traffic alone supplies no semantic completion",
       "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
     },
     {

@@ -39,7 +39,7 @@
     {
       "id": "task1_mode4_code7", "owner": "startup", "status": "unresolved",
       "predicate": "Task 1 receives organic report code 0x07 after entering startup mode 0x0004",
-      "current": "The coherent profile completes non-CPHS SIM initialization and enters mode 0x0004 with SIM ENABLE set, but receives no later code 7. Power, service/test, task-13, callback-0x1a and display-state-7 routes are excluded. The 0x24d716 context chooser maps a possible route through 0x09d0 and callback 0x5d, but a quantified writer census rejects slot 0x45 as the active blocker: 46 catalogue rows preserve state, none of 46 generic initialization records targets selector 0x45, broad indexed stores clear it, and the sole exact direct store is the global-0x05e2 reset at 0x299ba0. Code 7 remains unresolved, but the search must return to the remaining unconditional ordinary-boot completion families rather than assume a missing slot-45 transition.",
+      "current": "The coherent profile completes non-CPHS SIM initialization and enters mode 0x0004 with SIM ENABLE set. All four reporter callers are classified. The ordinary profile publishes 0x08ac twice through the controller path and enters 0x27f150; selector getter 0x287216 returns 0, availability helper 0x287250(0) returns zero, and the handler aborts at 0x27f16e before activity-slot construction, 0x0795, or report code 7. The raw network/config word 0x10d128 is 0x28207c06, but its helper contract is not yet decoded. This is the first organically executed surviving path with an unsatisfied prerequisite.",
       "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
     },
     {

@@ -1906,6 +1906,67 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						machine().time().as_double());
 		}
 	}
+	// Bound the remaining ordinary code-7 candidates at their real firmware
+	// seams. These taps observe control flow and state only; they do not alter
+	// registration, controller, callback, or task state.
+	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr)
+	{
+		static unsigned registration_count = 0;
+		static unsigned controller_count = 0;
+		static unsigned publication_count = 0;
+		const u16 registration_status = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff;
+		const bool relevant_handler_status = addr == 0x002638e4 &&
+				(registration_status == 0x0395 || registration_status == 0x0396 ||
+				 registration_status == 0x05dc || registration_status == 0x05eb ||
+				 registration_status == 0x06c5 || registration_status == 0x0795 ||
+				 registration_status == 0x08ac);
+		if ((addr == 0x00263154 || addr == 0x002632ae || addr == 0x002632b2 ||
+				addr == 0x002632be || addr == 0x002638e4 || addr == 0x00263b8e ||
+				addr == 0x00263bd4 || addr == 0x00263d30 || addr == 0x00263e54 ||
+				addr == 0x00263e58 || addr == 0x00263e64) &&
+				(addr != 0x002638e4 || relevant_handler_status) && registration_count++ < 256)
+			logerror("code7_registration: pc=%08x status=%04x service=%02x arg1=%08x arg2=%08x "
+					"active=%02x transient=%02x/%02x resident=%02x/%02x caller=%08x task=%02x t=%.6f\n",
+					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xff,
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)),
+					fw_byte(0x00111931), fw_byte(0x0010b2b4), fw_byte(0x0010b2b5),
+					fw_byte(0x0010b2dc), fw_byte(0x0010b2dd),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					fw_byte(0x00100022), machine().time().as_double());
+		if ((addr == 0x00255d26 || addr == 0x0027f150 ||
+				addr == 0x0027f15e || addr == 0x0027f162 || addr == 0x0027f16e || addr == 0x0027f1c0 ||
+				addr == 0x0027f1c4 || addr == 0x0027f1e8 || addr == 0x0027f1f0 ||
+				addr == 0x0027f23e || addr == 0x002878e4 || addr == 0x00287950 ||
+				addr == 0x00287958 || addr == 0x00287962 || addr == 0x0028796a ||
+				addr == 0x0028c2be) && controller_count++ < 256)
+			logerror("code7_controller: pc=%08x r0=%08x r1=%08x r2=%08x state=%02x/%02x/%02x "
+					"init=%02x/%02x work=%02x selector=%02x netcfg=%08x mode=%04x "
+					"caller=%08x task=%02x t=%.6f\n",
+					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)),
+					fw_byte(0x0010fcd5), fw_byte(0x0010fcba), fw_byte(0x0010fd14),
+					fw_byte(0x0011fd03), fw_byte(0x0011fd04), fw_byte(0x00110e2d),
+					fw_byte(0x0011fcfa), fw_dword(0x0010d128),
+					fw_word(FW_STARTUP_MODE),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					fw_byte(0x00100022), machine().time().as_double());
+		if (addr == 0x002af798)
+		{
+			const u16 status = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0x1fff;
+			if ((status == 0x0395 || status == 0x05e1 || status == 0x05e7 ||
+					status == 0x05dc || status == 0x05eb || status == 0x06c5 ||
+					status == 0x0795) && publication_count++ < 256)
+				logerror("code7_publication: status=%04x packed=%04x source=%08x caller=%08x "
+						"task=%02x mode=%04x t=%.6f\n",
+						status, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
+						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+						fw_byte(0x00100022), fw_word(FW_STARTUP_MODE), machine().time().as_double());
+		}
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a03b4)
 	{
 		static unsigned sim_rx_count = 0;

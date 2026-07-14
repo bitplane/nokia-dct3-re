@@ -34,8 +34,11 @@ the ordinary non-CPHS initialization pass, after which task 1 waits in mode `0x0
 report code `0x07`. Callback `0x5d` is organically activated and can report code `0x07` either
 from direct completion `0x05eb` or from a task-local timeout started by `0x05e1`, `0x05e7`, or
 `0x05dc`. A mapped display lifecycle reaches the same callback but is service/test-owned. The
-active RE frontier is the ordinary transaction that completes callback `0x5d`, or evidence that
-one of the independent controller-status callers owns the ordinary boot path. See [`docs/resource_providers.md`](docs/resource_providers.md) and
+active RE frontier is now the controller path reached by organic status `0x08ac`.
+It calls availability helper `0x287250` with selector `0`, receives zero, and
+aborts before publishing controller status `0x0795` and report code `0x07`.
+The next investigation is the firmware or hardware-owned predicate behind that
+failed availability check. See [`docs/resource_providers.md`](docs/resource_providers.md) and
 [`docs/sim_registration.md`](docs/sim_registration.md).
 
 `make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
