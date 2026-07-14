@@ -88,14 +88,24 @@ below `0x076c`, faithfully sourced — NOT to raise the thresholds.
 
 ## Full VBAT pipeline (CLOSED — capstone disasm + runtime trace)
 
+`CLOSED` here applies to the later ADC-monitor/classifier path only. A separate
+boot battery reader at `0x2a84b0` calls `ccont_adc_read_2b52cc(0)` five times and
+is classified by task-18 code at `0x270848`. `0x2b52cc` shifts its argument
+directly into the CCONT ADC control byte, so this really selects hardware channel
+0; it does not pass through the source map below. Replacing the current generic
+channel-0 value with a battery-like value changes coherent boot from mode 4 to
+an early mode-1 stall, so the 3210 channel routing cannot yet be adopted from
+static evidence alone. The next validation must compare both paths and their
+early consumers.
+
 The classifier's VBAT sample is sourced from the CCONT ADC, not the D5/MBUS path
 (that was a wrong guess; `0x2a594c` references ROM tables `0x2e14xx`, never the
 battery record). End-to-end:
 
 ```
 CCONT ADC channel 2 (battery voltage)
-  -> adc_monitor_source_read_2b1bb2(source=7): maps source 7 -> CCONT channel via
-     ROM byte-map 0x2e2d74 ([0x2e2d74+7] == 2 == BATTERY_VOLTAGE), calls
+  -> adc_monitor_source_read_2b1bb2(source=7): maps source 7 -> CCONT selector via
+     ROM byte-map 0x2e2d74 ([0x2e2d74+7] == 1 with MCU byte lanes), calls
      ccont_adc_read_2b52cc
   -> battery_classifier_input_update_27cc74: float-calibrate the raw ADC:
        v = adc * gain_f[0x11fe14] + offset_f[0x11fe18]   (soft-float 2b59e0/2b5446)
@@ -107,136 +117,38 @@ CCONT ADC channel 2 (battery voltage)
      076c/0910/08b6 -> band (1/2/3) -> 0x110436 -> downstream gates
 ```
 
-ROM source->channel map @ `0x2e2d74` (sources 0..7): `4 0 6 5 3 7 1 2`.
+ROM source->selector map @ `0x2e2d74` (sources 0..7, MCU byte order):
+`0 4 5 6 7 3 2 1`. The earlier `4 0 6 5 3 7 1 2` transcription read the
+swap16 analysis image linearly and was wrong. Runtime pairs source 7 with
+selector 1 and source 6 with selector 2.
 Calibration constants live in RAM floats `0x11fe14` (gain) / `0x11fe18` (offset),
 seeded during startup (likely from EEPROM/NV — the selftest profile is suspect).
 
-## Modeling target (the faithful fix)
+## Calibration and current interpretation
 
-The VBAT the classifier judges is fully determined by:
-  (a) the CCONT channel-2 battery-voltage ADC value (driver currently feeds 0x2d0
-      in the "sane"/"charged" profile), and
-  (b) the float calibration gain/offset at `0x11fe14`/`0x11fe18` (from NV).
+The current synthetic EEPROM leaves the live calibration at gain `1.0f` and
+offset `0.0f`, so selector-1 ADC `0x200` produces sample `0x995` and battery band
+1. The reference at `0x112306` is EEPROM-fed, with firmware default `0x233` when
+the record is invalid. A real PMM capture is still required before assigning
+physical voltage units or declaring which band represents a charged pack.
 
-To make band 3 emerge naturally, model a real charged-pack channel-2 value plus
-correct calibration so `(int)(adc*gain+offset)*1500/313` lands in the intended
-band, then delete the `FORCE_BATTERY_*` shims. OPEN PHYSICAL QUESTION: band 3 is
-the *below-076c* band; confirm whether a real charged 3210 reads into band 3 here
-(i.e. 076c/0910/08b6 are correct and our ADC/calibration is too high) before
-choosing the value — otherwise we just build a prettier force. Capture the live
-`0x11fe14`/`0x11fe18` calibration floats (via the `NOKI3210_TRACE_VBAT_PIPELINE`
-probe, extended) as the next concrete step.
+The shutdown boundary is independently measured. Selector 1=`0x1b0` powers the
+handset off before task 1 starts. Selector 1=`0x1c0` remains valid, reaches mode
+`0x0004`, and produces band 2 without code 7. Reporter caller `0x21e40c` is the
+battery event-`0x25` branch under the literal firmware string "Check voltage
+level for shutdown" and reports only below its voltage gate. The adjacent
+caller `0x21f8de` belongs to the same low-voltage/charger lifecycle.
 
-## CALIBRATION SOURCE + BAND REFRAME (measured)
+## Modeling status
 
-The VBAT gain is data-driven, not hardcoded:
-`gain = 563.0f / float(ref[0x112306])` (the 563.0 literal lives at the writer
-`0x21c4be`). The reference `0x112306` (with `0x112304`/`0x112308`) IS EEPROM-fed:
-`eeprom_i2c read 0x2af9a4` loads it, gets `0xFF` (blank image), then `0x2a66ac`
-writes the firmware **default `0x233` = 563** because the record is invalid. So
-`gain = 563/563 = exactly 1.0`.
+- The source-to-selector map and classifier arithmetic are validated.
+- The 3210 PCB signal names and real factory calibration values are not.
+- The generic driver channel labels must not be promoted to a 3210 wiring claim.
+- A real EEPROM/PMM capture remains useful for physical fidelity.
+- Battery calibration is not the active code-7 hypothesis. Tuning ADC or NV
+  values until report 7 appears would model a shutdown condition, not ordinary
+  boot.
 
-Key implication: a real tuned EEPROM's reference would still be ~563 (factory ADC
-calibration is a small +/-% correction, gain ~1.0 -- a 2x correction to reach the
-~0.5 gain that band 3 needs is not physically plausible). So **even a faithful
-tuned EEPROM gives gain ~1.0, and a charged pack still reads band 1** (measured
-`0x995` -> band 1). The firmware's own uncalibrated default (gain 1.0) yields band
-1 for the live battery -- i.e. **band 1 is the normal operating state**.
-
-Therefore the earlier "band 3 = charged" reading is WRONG. Band 3 is the
-low/critical band, and the boot's apparent "needs band 3" requirement (met today
-via `FORCE_POST74_BATTERY_READY` -> `0x2a6942` returns 3) is most likely an
-ARTIFACT: a real phone boots in band 1, and that gate is either off the real path
-or the force is masking an unrelated blocker. The decisive test: run with a
-natural band-1 battery and `FORCE_POST74_BATTERY_READY` removed, and see whether
-the boot still advances via a different branch.
-
-Consequence for the "synthesize a tuned EEPROM" plan: it will NOT change the band
-(tuned ~= default here), so it is not the boot fix. Re-evaluate before building it.
-
-### CONFIRMED by experiment
-
-Removed `FORCE_POST74_BATTERY_READY` (boot-progress now defaults it OFF) and ran:
-the boot reaches the **identical** end state -- same `ccont=0x0600`, `mode=0x000d`,
-80 task5 dispatch hits, and a **byte-identical LCD frame** (`94a2dc...`) -- with
-the live battery in band 1. So the post74 battery gate was a no-op in this profile
-and is retired. The battery measurement subsystem is fully understood AND proven
-to be a red herring for the boot. The real blocker is unchanged: the task5
-display-capability gate `0x0199` (needs `[0x11fc80+2]==4`, `[+5]==0`).
-
-## BOX-OFF SUMMARY (battery VBAT measurement subsystem)
-
-Status: fully mapped and root-caused. The band-3 "paradox" is resolved by the
-calibration. Remaining work is one concrete model: load real VBAT calibration
-from NV instead of leaving it identity.
-
-- **Pipeline** (capstone + runtime trace, Ghidra decompile is corrupt here):
-  CCONT ADC -> `adc_monitor_source_read_2b1bb2(src 7)` -> float calibrate in
-  `battery_classifier_input_update_27cc74`:
-  `sample = (int)(adc*gain[0x11fe14] + offset[0x11fe18]) * 1500/313` ->
-  10-sample average `battery_vbat_moving_average_27d500` ->
-  `battery_classifier_27cbec` vs ROM thresholds `076c/0910/08b6` -> band.
-- **Measured calibration:** gain = `1.0f` (identity), offset = `0.0f`. So
-  `sample = adc * 4.79`. Observed `sample = 0x995` from `adc = 0x200`.
-- **Band logic:** band3 = `sample < 0x076c (1900)`; band1 = `sample >= 0x910 (2320)`.
-- **Band-3 resolution (arithmetic):** a charged pack on CCONT ch2 (`0x2d0`=720)
-  gives `720*4.79 = 3450` -> band1 with the identity gain. With the *real* NV gain
-  (~<0.55) it gives `720*0.5*4.79 ~= 1725 < 1900` -> **band3**. So band3 IS the
-  charged/normal state; the identity gain makes every reading ~2x too high and
-  pins band1 (the "stuck VBAT loop"). The boot's band-3 requirement is correct;
-  our uninitialized calibration is the bug.
-- **Validation attempt:** overriding the gain float at `0x11fe14` via a RAM-read
-  shim destabilises battery init (ch2 is never read, the classifier never runs).
-  So `0x11fe14` is read *early* in battery init for more than the gain, and the
-  calibration cannot be fixed with a RAM poke -- it must be fixed at the NV/EEPROM
-  load that populates it (consistent with "model real hardware, not force RAM").
-
-### Faithful fix to delete the FORCE_BATTERY_* shims (one model)
-
-Make the startup NV/PMM calibration read populate `0x11fe14`/`0x11fe18` (and the
-ADC-monitor battery source) with real values from a correct EEPROM image, so a
-charged pack flows `ADC -> real gain -> band3` naturally. The exact gain/offset
-come from a real handset EEPROM (the selftest profile leaves them identity).
-Diagnostics retained: `NOKI3210_TRACE_VBAT_PIPELINE` (`probe:vbat_calib`,
-`probe:vbat_rec_write`).
-
-Functions newly identified: `adc_monitor_source_read_2b1bb2`,
-`battery_vbat_float_calibrate` path in `battery_classifier_input_update_27cc74`,
-ROM data `battery_source_channel_map_2e2d74`.
-
-## ROOT CAUSE (measured live, gain/offset + sample)
-
-The battery-voltage measurement path is **uninitialized**, not mis-tuned:
-
-- Calibration floats are identity: `gain[0x11fe14] = 1.0f` (0x3f800000),
-  `offset[0x11fe18] = 0.0f`. No PMM/EEPROM calibration is applied. (The NV reader
-  `startup_nv_calibration_read_29bbd0` is the suspected loader — verify it runs and
-  what it reads.)
-- So `sample = (int)(adc*1.0 + 0.0) * 1500/313 = adc * 4.79`.
-- Measured `sample = 0x995 = 2453`, which back-solves to `adc = 0x200` (512) — the
-  **mid-scale ADC default**, NOT the battery-voltage channel's `0x2d0`. The
-  source-7 read returns a 0x200 channel (RSSI/temp-like, ch1/ch4), so the ADC
-  monitor ring's battery source is delivering a default, not real VBAT.
-
-Net: VBAT = (mid-scale-default) x (identity-calibration) x 4.79 = a meaningless
-`0x995` that lands in band 1. The `FORCE_BATTERY_*` shims were masking an
-uninitialized measurement subsystem.
-
-### Faithful fix (revised)
-
-Not "pick a channel-2 value". Initialize the measurement subsystem:
-1. Make `startup_nv_calibration_read_29bbd0` load real VBAT gain/offset into
-   `0x11fe14`/`0x11fe18` (from a correct EEPROM/PMM image, or sane defaults).
-2. Ensure the ADC-monitor battery source actually samples CCONT channel 2 (real
-   VBAT), not the mid-scale default.
-Then a real pack reading flows through real calibration to a real band, and the
-`FORCE_BATTERY_*` shims can be deleted. Charger latch `FW_CCONT_CHARGER_EVENT`
-reads `0x0001` during boot — consistent with the firmware not establishing a clean
-battery start (the charging/limited path the LCD may be stuck on).
-
-Note: `0x2a41d0` is `contact_service_checksum` (a checksum over the threshold table
-in `0x27d56c`), NOT an NV reader — earlier guess corrected.
-
-Note: the existing Target `battery_adc_sample_counter_update_27d51c` sits at an
-instruction *inside* `battery_vbat_moving_average_27d500` (the `strb [r4,#0xb]`
-ring-index update), not at a separate function entry.
+`0x2a41d0` is a checksum over the threshold table, not an NV reader. Symbol
+`battery_adc_sample_counter_update_27d51c` is an instruction inside
+`battery_vbat_moving_average_27d500`, not a separate function entry.

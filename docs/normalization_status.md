@@ -38,9 +38,20 @@ current frontier and the contracts already strong enough to state precisely.
 - The 3330 is a smoke-test and comparative input. Its equivalent node addresses
   and semantic edges have not been mapped, so it is not yet a second supported
   topology profile.
-- The contact-service producer boundary is now resolved: the DSP-facing D0 and
+- The contact-service producer boundary is resolved: the DSP-facing D0 and
   type-`0x70` transactions and the task-7 external service session compose in a
-  single boot. The remaining topology gap starts after ordinary SIM traffic.
+  single boot. Ordinary non-CPHS SIM initialization also completes. The active
+  topology gap is now the ordinary owner of global status `0x05eb`. The mapped
+  display-status route beginning with `0x0280`-`0x0282` is service/test-owned
+  and is no longer the active ordinary-boot hypothesis. Callback `0x28`'s
+  service-5 `0x05dc` initializer is also excluded: the apparently comparable
+  callback-`0x2f` initialization is deliberately selected by terminal status
+  `0x012f`, and no ordinary selector for callback `0x28` is mapped. The
+  transient service framework is also excluded as the immediate owner.
+  Ordinary boot populates service `0x0a`, but the exhaustive literal/callsite
+  census finds `0x0394` constructors only for services `0x08`, `0x19`, and
+  `0x1a`; the mapped dynamic activation branch therefore does not activate
+  service `0x0a` in ordinary boot.
 
 ## Model-boundary debt
 
@@ -80,10 +91,23 @@ A subsystem is boxed off only when it has:
 4. no direct firmware-state forcing in its supported path; and
 5. stale probes and contradictory historical claims removed or clearly marked.
 
-The immediate research frontier is the ordinary GSM 11.11 SIM initialization
-sequence. Correct directory metadata and the requested `EF_LP`/`EF_SST` files
-let SIM enable rise organically and advance the firmware through the complete
-non-CPHS initialization pass. Unsupported optional SELECTs now return `94 04`;
-task 20 then enters its timed card-presence monitor. Normalization should make that work cheaper and harder to
-misinterpret; it must not turn the historical service-5/SAT chain into a claimed
-ordinary-registration dependency.
+The ordinary GSM 11.11 SIM initialization sequence is now a validated supporting
+contract rather than the immediate frontier. Correct directory metadata and the
+requested `EF_LP`/`EF_SST` files let SIM enable rise organically and complete the
+non-CPHS initialization pass; task 20 then enters its timed card-presence monitor.
+
+The task-1 report-code-`0x07` frontier remains an ordinary-boot contract, but
+the power/analog candidate is excluded. Task 1 explicitly waits for the same
+report in both branches out of mode `0x000d`: SIM-ready/no-charger selects mode
+`0x0007`, while the fallback selects mode `0x0004`; both run the shared init
+burst only after receiving code `0x07`. Exhaustive caller review leaves four
+reporter sites. Runtime state tracing places the power task in its normal
+no-charger state `0x04`; `0x21e40c` is a shutdown path and `0x21f8de` is reached
+only through firmware blocks labelled maintenance and cold charging. Modeling
+an analog-ready event solely to reach either site would select the wrong
+lifecycle. The remaining ordinary owner must therefore be recovered through
+the status routes at `0x255c3c` or `0x27b3b6`, without assuming one already
+mapped service/test predecessor is the only ingress.
+
+Status `0x0394` remains excluded from activating ordinary service `0x0a`: its
+three recovered constructors are tied to services `0x08`, `0x19`, and `0x1a`.

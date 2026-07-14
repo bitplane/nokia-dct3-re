@@ -99,9 +99,12 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0xe` | **interrupt lines (status)** | bit 0 = present-status (`MODEL_CCONT_PRESENT`, idx6); bits 0–2 ignored by the IRQ dispatcher |
 | `0xf` | interrupt mask | |
 
-**ADC channels** (read via reg `0x0`/`0x2`/`0x3`): `0`=accessory, `1`=RSSI, `2`=battery V, `3`=battery
-type, `4`=battery temp, **`5`=charger V** (= 0 → "no charger"; the mode-`000d` limp), `6`=VCXO temp,
-`7`=charging current. Values come from `nokia_adc_override` (env `NOKI3210_ADC0..7`, profiles).
+**ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver currently uses the generic profile
+`0`=accessory, `1`=RSSI, `2`=battery V, `3`=battery type, `4`=battery temp, `5`=charger V,
+`6`=VCXO temp, `7`=charging current. This is not yet a validated 3210 board mapping. Firmware boot
+reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7 maps through
+ROM table `0x2e2d74` to selector 1. Values come from `nokia_adc_override` (env
+`NOKI3210_ADC0..7`, profiles); electrical scaling and the 3210-specific routing remain open.
 
 ## The DSP interface (the big stub — deep-dive target)
 
@@ -162,8 +165,13 @@ the firmware *insists* on before idle vs *degrades* past.
 The mode-`000d` gate and its CCONT/startup events are retained below as historical mapping. They are
 satisfied in the coherent profile; they are not the immediate blocker. The current observed
 frontier is now the organic owner of task-1 startup report code `0x07`. Task-13 status `0x05eb` can reach the
-code-7 reporter, but the task-13 segmented protocol has not been identified as the UI display
-window stack and must not yet be treated as the missing owner.
+task-16 path, but does not enter callback `0x5d` or reach the code-7 reporter. Callback `0x5d`
+accepts direct `0x05eb`/`0x06c5` or starts a task-local completion timer on
+`0x05e1`/`0x05e7`/`0x05dc`; none is observed. A mapped
+display lifecycle beginning with status `0x0280`, `0x0281`, or `0x0282` is service/test-owned,
+not ordinary boot. The ordinary transaction owner, and whether callback `0x5d` or the independent
+controller-status route owns normal startup, remains unresolved;
+see `resource_providers.md`.
 
 ## Knob
 

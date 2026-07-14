@@ -150,8 +150,21 @@ The mapped task-21 `0x120c` -> `A0/12` -> D0 -> `0x177x` path is GSM 11.14 SIM T
 
 Observed service-5 callback inputs in supplied coherent logs: `0x05e2`, `0x05f3`.
 
+Callback `0x28`'s service-5 descriptor initializer is `0x2616bc`. It performs
+four statically decoded transient registrations at `0x2616e2`, `0x2616f4`,
+`0x261706`, and `0x261710`, then the callback's `0x05dc` branch starts the
+session through `0x263154(5, 1)`. No coherent run reaches that branch. Dispatcher
+status `0x05dc` is callback-selective: callback `0x2f` receives it through
+`0x2ac5cc`, while callback `0x28` receives `0x05f3` and `0x05e2`. The difference
+is intentional: terminal status `0x012f` selects normal application callback
+`0x2f` through a catalogue-generated `0x05e0` switch, after which the switch
+walker supplies `0x05dc`. No ordinary selector for callback `0x28` is mapped.
+Its service-5 initializer must not be treated as the code-7 frontier without such
+evidence.
+
 Reviewed runtime claims:
-- `deep_gsm_transient_registration_scope` (deep-gsm, reviewed_runtime): The eight-second coherent run executes transient registrations only for service 0x0a at callers 0x26341e, 0x296ec8 and 0x296f16; no transient service-5 registration executes.
+- `deep_gsm_transient_registration_scope` (deep-gsm, reviewed_runtime): The eight-second coherent run executes transient registrations only for service 0x0a at callers 0x26341e, 0x296ec8 and 0x296f16; callback 0x28 never receives the `0x05dc` lifecycle input required to run its four mapped service-5 registrations.
+- `service_0394_not_service0a_activation` (static exhaustive): The only recovered packed-`0x0394` constructors select services 0x08, 0x19 and 0x1a; none selects the organically registered service 0x0a. The dynamic activation branch is not the ordinary code-7 predecessor.
 - `deep_gsm_resident_registration_scope` (deep-gsm, reviewed_runtime): No resident registration through 0x263d30 executes in the eight-second coherent run, including the indirect callsite at 0x28c672.
 - `deep_gsm_service5_inputs` (deep-gsm, reviewed_runtime): An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no 0x05e8.
 - `deep_gsm_target_chain_absent` (deep-gsm, reviewed_runtime): No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained coherent-run analysis.

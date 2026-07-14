@@ -11,10 +11,29 @@
 > starts SIM control (`0x32 -> 0x33 -> 0xb3 -> 0xe3`), and exchanges SELECT,
 > READ, GET RESPONSE, and STATUS APDUs. Two live predicates are now separated:
 > ordinary non-CPHS SIM initialization now completes organically. Task 1 enters
-> mode `0x0004`; the live predicate is the unidentified organic producer of
-> report code 7. Task-13 status
-> `0x05eb` can reach that reporter, but task 13 is not established as the UI
-> display-window owner. The fixed
+> mode `0x0004`; both this fallback and the SIM-ready/no-charger mode-`0x0007`
+> branch explicitly wait for report code 7 before the shared init burst.
+> Callback-table index `0x5d` is already exercised with state `0x0b`, but the
+> coherent run supplies only initialization status `0x05e2`. The strongest
+> ordinary predecessor is now the context-completion chooser at `0x24d716`.
+> Callback-state slot `0x45` at `0x11fcc5` remains zero, so the chooser emits
+> sibling status `0x09d1`; state `0x0b` makes that descriptor ineligible while
+> accepting `0x09d0`. The accepted descriptor invokes callback `0x5d` with
+> action `0x00dc`, closing the mapped path to report code 7.
+> A coherent write-watch sees only array initialization and two later zero
+> writes to slot `0x45` (`0x2aefa2`, `0x299ba0`), with no nonzero write.
+> Task 13's separate direct-to-task-16 `0x05eb` route does not enter this chain.
+> Later producer analysis classifies the `0x0280`-`0x0282` path as a
+> service/test lifecycle, not the ordinary owner.
+> The power-owned callers are non-ordinary: `0x21e40c` and `0x21f8de` belong to
+> shutdown/charger state machines. The power task reaches and remains in its
+> normal no-charger state `0x04`; the `0x21f8de` route is explicitly labelled
+> maintenance/cold charging in the ROM. The display-owned
+> `0x06ca -> 0x0795` alternative is excluded from the current mode-4 lifecycle:
+> it requires display startup state 7, while the ordinary fallback enters mode
+> 4 with state 3. The next bounded question is who legitimately owns and
+> advances callback-state slot `0x45`.
+> The fixed
 > startup-report bridge below satisfies neither predicate organically.
 
 > ⚠️ **2026-07 caveat — read `docs/sim_emulator_scope.md` "Moves 1+2" first.** Many
@@ -290,11 +309,89 @@ So the code-7 trigger and the 6-message checklist are the **same mechanism**: a 
 its reporter stub when it reaches a state. Code 7's reporter `0x2af190` has **4 callers** —
 `0x21e40c` (the battery/charger state machine's "Check voltage level for shutdown" branch,
 gated on `0x27cd82()` seeing VBAT sample ≤ `[0x110494]+0xe9` = 2133), `0x21f8de`, `0x255c3c`,
-and `0x27b3b6` (a SIM-region code dispatcher). **Trace `code7path`: none of these is reached on
-our boot — code 7 is never posted by any emitter.** Each sits behind a subsystem state machine
-(battery/charger, SIM-region, …) that never reaches the posting state; the battery one is a
-deep charger state machine gated on charger/voltage events, and the VBAT reading (raw `0x200` →
-sample ~2453) is above its threshold anyway.
+and `0x27b3b6` (a status dispatcher). The original hook for the third caller was incorrectly
+placed at `0x255c2e`; the dispatcher branches to `0x255c30`. Concrete execution maps that case
+to status `0x0795`, whose firmware producer sits downstream of callback-table index `0x1a`
+receiving status `0x1400` and emitting initializer status `0x08ac`. None of that chain is reached
+on our boot. Subsequent exhaustive backchaining showed that `0x1400` is task-5 mailbox ingress,
+not a callback return, and is absent from all 188 direct task-5 event-helper call sites; the only
+unresolved-destination sender does not route to task 5. This is a mapped dormant/service-specific
+contract, not evidence for ordinary boot. Code 7 is therefore never posted by any emitter. Each
+sits behind a subsystem state machine. The two power-owned callers are now
+excluded from ordinary boot: `0x21e40c` is the literal "Check voltage level for
+shutdown" event-`0x25` branch, and `0x21f8de` belongs to the low-voltage/charger
+lifecycle. Runtime ADC mapping proves logical source 7 uses CCONT selector 1;
+selector `0x1b0` powers off before task 1, while `0x1c0` reaches mode 4 with no
+code 7. Tuning battery inputs cannot faithfully satisfy the ordinary predicate.
+
+The adjacent L1 configuration machinery is not dormant. A coherent six-second
+`TRACE_DSP_BOUNDARY` run enters initializer `0x2a2074`, then engine `0x28d710`
+from tasks 0, 1, 9, 6, and 13. Task 9's first update builds six `0x54`-byte,
+class-`0x51` messages for task 3 between about 0.366 and 0.370 s; task 3's normal
+serializer drains them into the MCU-to-DSP TX ring. The task-13 update at about
+1.422 s, immediately before mode 4, also reaches the engine but emits no new
+batch. This rules out a missing L1 initializer as the direct code-7 cause. The
+remaining question is which real completion path independently arms callback
+`0x5d`, not whether the MCU constructs
+its initial DSP configuration stream (**R**).
+
+A targeted type-`0x03` DSP liveness retest delivered 182 header-only entries through the real
+empty-ring-gated RX/FIQ0 path during a coherent 12-second SIM run. Callback `0x1a` ran once only
+for the pre-existing `0x05e2` / message-type `0xfe` event; it never received `0x1400`, and neither
+`0x08ac`, `0x0795`, nor code 7 appeared. Task 1 remained in mode `0x0004`. This independently
+confirms that the periodic heartbeat may be necessary DSP behavior but is not the semantic
+telephony-control completion, so the temporary heartbeat model was removed again (**R**).
+
+Callback-table index `0x5d` at `0x27b370` is not itself the missing activation.
+The initialization sequence reaches it with state byte `[0x11fcdd] == 0x0b`
+and input `0x05e2`. Inputs `0x05eb` and `0x06c5` call the reporter directly;
+inputs `0x05e1`, `0x05e7`, and `0x05dc` arm task-local class `0x52`, whose
+task-5 recode is `0x06c5`. None of those completion inputs reaches the callback.
+Flags `0x01a00000` intentionally select `0x032d`, not automatic `0x05dc`, at
+framework initialization. A valid type-`0x80`
+task-13 transfer correlated with the organic DSP type-`0x70` payload `{0x0a,
+0x09}` traversed FIQ0, normalized to `0x040b`, returned parser result `0x061a`,
+and published `0x05eb` directly to task 16 through `0x23e1a4`. It did not enter
+the global callback sweep, produce code 7, or advance mode 4. The diagnostic
+reply was removed; this excludes task 13 as the ordinary code-7 owner (**R**).
+
+One predecessor is mapped backward through task 5. Display
+dispatcher `0x28bddc` handles statuses `0x0280`-`0x0282` by calling `0x256f68`,
+which publishes `0x05e7`. Callback `0x57` can then publish `0x0389`; callback
+`0x31` converts that lifecycle to event `0x157e`; the catalogue maps `0x157e`
+to internal status `0x0396`; handler `0x2638e4` publishes `0x05eb`; and callback
+`0x5d` reports code 7. None of `0x0280`-`0x0282`, `0x0389`, `0x157e`, or
+`0x05eb` appears in the coherent run. Static ownership and a coherent runtime
+trace subsequently exclude this as the ordinary path: `0x0280`-`0x0282` are
+transaction-engine states reached by local/test command handlers, and
+`0x253e20` never produces them during ordinary boot (**R**). The remaining
+question is which other global `0x05eb` producer represents ordinary readiness.
+
+### Current frontier: `0x09d0` versus `0x09d1`
+
+The context manager at `0x24d588` scans four activity slots and reaches its
+completion tail at `0x24d716`. It reads callback-state slot `0x45` from
+`0x11fcc5`: values other than 0/5 (with one state-6 exception) select global
+status `0x09d0` at `0x24d762`; reset state 0 selects sibling `0x09d1` at
+`0x24d76c`. The coherent boot executes this chooser once at about 1.145 s,
+while task 5 is still in startup mode `0x000d`, with slot `0x45 == 0`, and
+therefore publishes `0x09d1`.
+
+Catalogue decoding makes the distinction causal rather than numerical. With
+callback `0x5d` already in state `0x0b`, the `0x09d0` descriptor is eligible
+and carries action `0x00dc`; the `0x09d1` descriptor uses the inverted state
+predicate and is ineligible. The display alternative does not rescue this
+boot: its `0x06ca` case requires startup/display state 7, but task 1 sets state
+3 on the ordinary fallback into mode 4.
+
+A bounded write-watch over the callback-state array records slot `0x45` being
+zeroed during initialization, then written as zero by catalogue commit
+`0x2aefa2` and callback path `0x299ba0`. No nonzero write occurs through the
+coherent three-second boot. All decoded catalogue descriptors for selector
+`0x45` carry new-state value `0x3f` (no state transition), so the missing owner
+must be a direct/indexed firmware writer or another framework operation. DSP
+ownership remains a hypothesis until that writer census reaches a transport
+boundary.
 
 **Assessment for faithful emulation.** The mode-0d events fire because CCONT/startup complete;
 code 7 and the six checklist messages do **not**, because their subsystems never reach the
@@ -392,7 +489,10 @@ i.e. the coherent-boot wall). Three of the four gates are driven; the fourth (mo
 not by another message but by a non-functional subsystem — the genuine, long-documented ceiling.
 These observations describe the historical bridge profile, not current modeled completeness.
 
-## Next
+## Superseded next questions
+
+The questions below are retained as investigation history. The delivery census
+and backward chain in `resource_providers.md` supersede them.
 
 Two open threads for the code-`7` trigger:
 1. **Not yet traced:** the other post paths — delayed `0x2697aa`, immediate `0x2695f4`, ring

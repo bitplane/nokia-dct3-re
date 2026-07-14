@@ -29,10 +29,13 @@ default profile deterministically reaches the authentic **CONTACT SERVICE** fram
 by a byte-exact LCD oracle. Opt-in peer prototypes can carry the firmware further and the ring-2
 SIM responder completes natural ATR and ICCID/ECC/PHASE APDU traffic.
 
-The phone does **not** yet complete organic SIM registration or reach the offline application
-desktop. The missing lower service transaction is mapped through
-`0x05ea -> 0x07dd -> 0x209978 -> 0x09e5`, but it has not executed end to end in one coherent boot.
-The research checkpoint and negative results are in
+The phone does **not** yet reach the offline application desktop. The modeled SIM now completes
+the ordinary non-CPHS initialization pass, after which task 1 waits in mode `0x0004` for startup
+report code `0x07`. Callback `0x5d` is organically activated and can report code `0x07` either
+from direct completion `0x05eb` or from a task-local timeout started by `0x05e1`, `0x05e7`, or
+`0x05dc`. A mapped display lifecycle reaches the same callback but is service/test-owned. The
+active RE frontier is the ordinary transaction that completes callback `0x5d`, or evidence that
+one of the independent controller-status callers owns the ordinary boot path. See [`docs/resource_providers.md`](docs/resource_providers.md) and
 [`docs/sim_registration.md`](docs/sim_registration.md).
 
 Several surviving `MODEL_*` paths describe plausible absent peers but still operate at known
@@ -59,7 +62,7 @@ The labels below have precise meanings:
 | SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
 | Startup/contact peers | Prototype | Useful protocol behavior, still implemented through firmware hooks. |
-| GSM/resource registration | Mapped | Organic provider transaction remains the active RE frontier. |
+| Display/resource lifecycle | Mapped | Service/test `0x0280`-`0x0282` route excluded; identify the ordinary global `0x05eb` producer. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |
 
@@ -108,7 +111,8 @@ Start with:
 - [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
 - [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for CONTACT SERVICE.
-- [`docs/sim_registration.md`](docs/sim_registration.md) for the current boot frontier.
+- [`docs/resource_providers.md`](docs/resource_providers.md) for the current boot frontier.
+- [`docs/sim_registration.md`](docs/sim_registration.md) for the SIM and generic-service findings.
 - [`docs/tooling.md`](docs/tooling.md) for the analysis tools.
 
 ## Firmware Policy

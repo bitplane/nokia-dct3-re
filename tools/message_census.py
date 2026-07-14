@@ -612,6 +612,8 @@ def main():
 	parser.add_argument("--rom", type=Path, default=DEFAULT_ROM)
 	parser.add_argument("--runtime-log", type=Path, action="append", default=[])
 	parser.add_argument("--runtime-manifest", type=Path, action="append", default=[])
+	parser.add_argument("--inventory-status", type=number, action="append", default=[],
+		help="add a status to the machine-readable static producer inventory")
 	parser.add_argument("--require-runtime-subsystem", action="append", default=[],
 		help="fail before writing outputs unless an available manifest covers this subsystem")
 	parser.add_argument("--json", type=Path)
@@ -643,6 +645,10 @@ def main():
 		return 2
 	contact_service = contact_service_inventory(profile, calls, runtime)
 	inventory_05e8 = status_inventory(instructions, calls, descriptors, data, base, 0x05e8)
+	requested_status_inventories = {
+		hexadecimal(status): status_inventory(instructions, calls, descriptors, data, base, status)
+		for status in dict.fromkeys(args.inventory_status)
+	}
 	lifecycle_05e0 = object_lifecycle_inventory(calls, profile.get("object_lifecycle_assessments", []))
 	dynamic_packed_events = dynamic_packed_event_inventory(calls,
 		profile.get("dynamic_packed_event_assessments", []))
@@ -693,6 +699,7 @@ def main():
 		"calls": calls, "callbacks": callbacks, "descriptor_registrations": descriptors,
 		"consumers": consumers, "semantic_edges": edges,
 		"status_inventory_05e8": inventory_05e8,
+		"requested_status_inventories": requested_status_inventories,
 		"object_lifecycle_05e0": lifecycle_05e0,
 		"dynamic_packed_events": dynamic_packed_events,
 		"status_05e8_publishers": profile.get("status_05e8_publishers", []),

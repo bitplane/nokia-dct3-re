@@ -121,12 +121,54 @@ the card; the initialization loop and false directory-change handling are gone (
 In the coherent contact profile task 1 enters mode `0x0004` at about 1.435 s. Its next
 firmware predicate is report code `0x07`, posted by `0x2af190`. Runtime reaches
 the reporter's status-dispatch caller `0x27b370` with the normal global status
-`0x05e2`; that dispatch does not report ready. The same dispatcher calls
-`0x2af190` for `0x05eb` (and `0x06c5`). The mapped task-13 segmented transaction
-is an organic producer of `0x05eb`, so it is a candidate predecessor even
-though its task-16 callback branch does not construct the later registration
-object (**S/R**). Its subsystem ownership is unresolved; it is not established
-as display readiness. Code 7 and SIM initialization remain parallel predicates.
+`0x05e2`; that dispatch does not report ready. Backward mapping of all four
+callers identified this additional dormant route (**S/R**):
+
+```text
+callback-table index 0x1a receives status 0x1400
+  + message type 0x85 + state [0x11fced] == 2
+  -> controller status 0x08ac
+  -> telephony-control initialization drains its four activity slots
+  -> controller status 0x0795
+  -> handler 0x255c30 -> reporter 0x2af190
+```
+
+The old trace hook at `0x255c2e` was two bytes before the branch target and
+therefore could not fire; the concrete dispatcher census proves `0x0795`
+selects `0x255c30`. Further backchaining corrected the route's priority:
+`0x1400` is the event decoded from an argumentless task-5 mailbox message at
+`0x2af57c`, not a callback return. All 188 direct calls to task-5's event helper
+`0x2af6ea` have recoverable constants and none emits `0x1400`; the remaining
+unresolved-destination send is a service router whose table does not target
+task 5. Neither `0x1400`, `0x08ac`, nor the `0x0795` producer runs in the
+coherent profile. This makes callback `0x1a` a mapped dormant/service-specific
+contract, not the strongest ordinary-startup hypothesis (**R**).
+
+Callback-table index `0x5d` at `0x27b370` is a mapped completion branch, not an
+established ordinary-boot owner. Initialization invokes it with `0x05e2`, and
+its state slot is already selected organically as `0x0b`. Direct inputs
+`0x05eb` and `0x06c5` call the code-7 reporter. Inputs `0x05e1`, `0x05e7`, and
+`0x05dc` instead schedule task-local class `0x52`; the task-5 recode table
+returns that timeout as `0x06c5`, completing the same route. The earlier
+`0x06dc` interpretation was a subtract-cascade arithmetic error. Callback-table
+flags `0x01a00000` select initialization status `0x032d`, rather than automatic
+`0x05dc`, so organic activation does not itself start the completion timer.
+The later context-completion census narrows that owner further. Manager
+`0x24d588` reaches chooser `0x24d716` with callback-state slot `0x45`
+(`[0x11fcc5]`) still zero and emits `0x09d1`. For callback `0x5d` state `0x0b`,
+that sibling descriptor is ineligible; `0x09d0` is eligible and carries action
+`0x00dc` into the mapped completion. A coherent write-watch records no nonzero
+slot-`0x45` write, and selector-`0x45` catalogue descriptors all specify
+no-transition state `0x3f`. The missing fact is now the direct/indexed writer
+or framework owner that establishes slot `0x45` during ordinary boot.
+A valid task-13 segmented transfer produces `0x05eb` directly for task 16 via
+`0x23e1a4`; it does not feed the global callback sweep or callback `0x5d`.
+Correlating such a transfer with the organic DSP `{0x0a, 0x09}` transaction
+completed the parser without code 7 or a mode advance. Code 7 and SIM
+initialization remain parallel predicates. The display lifecycle documented in
+`resource_providers.md` is a valid service/test route to code 7, but is excluded
+as the ordinary predecessor. Its separate `0x06ca -> 0x0795` path requires
+startup/display state 7; the ordinary mode-4 fallback establishes state 3.
 
 The historical `MODEL_STARTUP_REPORTS` run does not contradict this ownership.
 Under the coherent contact ordering its fixed 950 ms hook returns code 7 and all
@@ -304,6 +346,50 @@ condition is therefore an organic `0x05e8` publisher path with the required
 readiness state, not queued-object population. The former `MODEL_GSM_SERVICE` prototype tracked
 service `0x0b` and force-called `0x263154`/`0x2635ac`; it targeted a neighboring
 transaction and was deleted.
+
+The callback's missing initialization lifecycle is now pinned more precisely.
+Status `0x05dc` selects the branch at `0x261ba8`, which calls `0x2633d0`, installs
+four transient service-5 descriptors through initializer `0x2616bc`, and calls
+`0x263154(5, 1)` to start the transient session. The four static registrations
+are:
+
+| callsite | descriptor |
+| --- | --- |
+| `0x2616e2` | `0x2dfb1c` |
+| `0x2616f4` | `0x2dfb38` |
+| `0x261706` | `0x2dfb54` |
+| `0x261710` | `0x2dfb70` |
+
+Here `0x2632fc` is the transient-registration API, while `0x263154` is the
+transient handler/completion routine. Its tail at `0x2632be` publishes global
+`0x05eb` once `0x26265c` reports that no registrations remain. The resident
+registration API `0x263d30` has a parallel completion tail at `0x263e64`.
+This explains how the later service-5 chain is initialized, but it does not make
+that initialization an ordinary-boot prerequisite.
+
+This lifecycle is selected per callback; it is not a global `0x05dc` broadcast.
+In a coherent trace callback `0x28` receives `0x05f3` followed by `0x05e2`, both
+with state zero and descriptor flags `0x3ac00000`. Callback `0x2f`, by contrast,
+reaches the dispatcher path at `0x2ac5cc` that synthesizes `0x05dc`. The observed
+`0x05f3` is emitted by the registry-change tail `0x2ae47e` after ordinary
+initializer `0x26084e` calls `0x2ae3e4(0x10, 4)`; it is not an external peer
+message and does not directly reconfigure callback `0x28`. A callback input/
+return trace resolves the apparent discrepancy: terminal status `0x012f`
+deliberately selects normal application callback `0x2f` through a catalogue-
+generated `0x05e0` switch; the switch walker then supplies that selected callback
+with `0x05dc`, and callback `0x2f` returns `0x05dd`. There is no equivalent
+ordinary selector for callback `0x28`, nor evidence that one is required.
+Service-5 initialization is therefore excluded from the immediate code-7
+frontier unless a separate ordinary selector is demonstrated.
+
+The later service-`0x0a` activation hypothesis is also disproven. Although an
+ordinary coherent boot installs service-`0x0a` registrations and performs its
+configuration reads, it never calls registry predicate `0x26265c` or starts a
+draining transient transaction. More decisively, exhaustive recovery of packed
+`0x0394` constructors finds only services `0x08`, `0x19`, and `0x1a` at
+`0x27703a`, `0x2774c0`, and `0x277c4e`. The dynamic
+`0x0394 -> 0x28c64c -> 0x263154(service, 1)` branch therefore cannot be used as
+evidence that ordinary service `0x0a` is missing an activation event (**S/R**).
 
 An exhaustive Thumb literal-load scan adds an important qualification: executable
 ROM contains loads of `0x05e2`, `0x05e7`, and `0x05ea`, but no instruction loads
@@ -564,17 +650,20 @@ This is distinct from the SAT-owned callback family selected by the D0 classifie
 
 The only direct `0x09cd` producer is the context routine at `0x24d8e8`. When its input slot
 matches active slot byte `0x10e89a` and callback-registration state byte `0x11fcdd` is 1 or 2, it emits the
-ordered sequence `0x09c9`, `0x09cd`, `0x151c`. In an eight-second coherent deep run,
+ordered sequence `0x09c9`, `0x09cd`, `0x151c`. In an earlier eight-second registration run,
 `0x11fcdd` was observed as zero after task-5 registration processing and never changed; none of
 `0x24d8e8`, `0x24df74`, or `0x24e754` executed. This confirms that the context
-route is dormant; it does not make that route the current bootstrap boundary.
+route was dormant in that profile; it does not make that route the current
+bootstrap boundary. The later code-7 sweep observes slot `0x5d == 0x0b`, which
+still does not satisfy this context routine's required state 1 or 2.
 
 `0x11fcdd` is not a pending selector. It is callback-state array slot `0x5d` at
 `0x11fc80 + 0x5d`. Catalogue registration at `0x2aefba` selects descriptors from
 `0x2cc7f0`; eligibility helper `0x2aeda0` checks the old state, and `0x2aefa2`
 commits the descriptor's six-bit new state. The descriptors recovered for callback
-`0x5d` contain transitions from states `1`, `2`, `3`, `4`, or `0x0b`, but none
-establishes state 1 from the coherent cleared state 0. Callback 7 is therefore a
+`0x5d` contain transitions from states `1`, `2`, `3`, `4`, or `0x0b`. The
+current code-7 run reaches state `0x0b`, while the later context producer still
+requires state 1 or 2. Callback 7 is therefore a
 configuration or later-session cycle, not the ordinary-registration bootstrap
 frontier.
 

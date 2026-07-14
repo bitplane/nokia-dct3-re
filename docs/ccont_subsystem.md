@@ -76,7 +76,13 @@ selection does not yet reset or validate that device phase.
 Writing interrupt-status bits clears them. The IRQ output is active whenever
 `status & ~mask` is nonzero. MAD2 owns the resulting CPU interrupt assertion.
 
-## ADC channels
+## ADC selectors
+
+The table below is the current generic driver profile, not a validated 3210
+board netlist. The 3210 v6.00 firmware directly calls `0x2b52cc` with selector
+`0` in boot battery reader `0x2a84b0`, while the later ADC monitor maps logical
+source 7 through ROM table `0x2e2d74` to selector 1. Those are distinct paths;
+the electrical signal attached to each selector remains under validation.
 
 | Channel | Signal |
 | ---: | --- |
@@ -89,10 +95,10 @@ Writing interrupt-status bits clears them. The IRQ output is active whenever
 | 6 | VCXO temperature |
 | 7 | charging current |
 
-The channel mapping is consistent with firmware use and DCT3 service
-documentation. Exact electrical scaling is not established. Environment
-profiles currently populate raw ten-bit values; this is scenario input, not a
-finished physical battery model.
+This generic mapping is consistent with some DCT3 service documentation, but it
+is not yet established for the 3210 PCB. Exact electrical scaling is likewise
+open. Environment profiles populate raw ten-bit values; this is scenario input,
+not a finished physical battery model.
 
 ## Interrupt-to-firmware behavior
 

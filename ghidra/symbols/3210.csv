@@ -655,3 +655,7 @@ address,kind,name
 0x002b18a0,task,task3_display_resource_server_2b18a0
 0x002795e6,function,resume_app_tasks_10_17_2795e6
 0x00269bf4,function,rtos_task_resume_269bf4
+0x0027f34c,function,telephony_callback1a_status_dispatch_27f34c
+0x0027f3bc,label,telephony_status08ac_publish_27f3bc
+0x0028796a,label,telephony_status0795_publish_28796a
+0x00255c30,label,controller_status0795_code7_handler_255c30

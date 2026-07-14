@@ -39,8 +39,14 @@
     {
       "id": "task1_mode4_code7", "owner": "startup", "status": "unresolved",
       "predicate": "Task 1 receives organic report code 0x07 after entering startup mode 0x0004",
-      "current": "After the non-CPHS SIM initialization pass, the coherent profile enters mode 0x0004 at about 1.435 s but receives no later code 7. Reporter 0x2af190 has four firmware callers; the currently exercised status dispatcher 0x27b370 sees global status 0x05e2, while an accepted task-13 segmented transaction would produce 0x05eb and call the reporter. The task-13 subsystem owner is unresolved and is not established as the task-6 UI window stack. The historical startup-report bridge emits too early in mode 0x000d and is not evidence for this predicate.",
-      "evidence": ["docs/dsp_interface.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
+      "current": "The coherent profile completes non-CPHS SIM initialization and enters mode 0x0004 with SIM ENABLE set, but receives no later code 7. Power, service/test, task-13, callback-0x1a and display-state-7 routes are excluded. Callback 0x5d is organically in state 0x0b. The context-completion chooser at 0x24d716 runs once with callback-state slot 0x45 at 0x11fcc5 equal to zero and emits ineligible sibling status 0x09d1. A nonzero ordinary state would select 0x09d0; its state-0x0b descriptor is eligible and carries action 0x00dc into callback 0x5d's mapped code-7 completion. A coherent array write-watch records initialization plus zero writes at 0x2aefa2 and 0x299ba0, but no nonzero slot-0x45 write. Selector-0x45 catalogue descriptors all specify new state 0x3f (no transition). The unresolved predicate is the legitimate direct/indexed writer or framework owner of slot 0x45 and its external prerequisite.",
+      "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "callback45_ordinary_state", "owner": "unresolved", "status": "unresolved",
+      "predicate": "The ordinary context lifecycle advances callback-state slot 0x45 at 0x11fcc5 from reset state before the 0x24d716 completion chooser runs",
+      "current": "Runtime observes only zero writes and static catalogue descriptors for selector 0x45 all carry no-transition state 0x3f. A DSP-downstream completion is the registered working hypothesis because the MCU has transmitted its L1 configuration while the emulated DSP remains semantically incomplete, but no writer or transport edge yet proves DSP ownership. The next pass must enumerate direct and indexed writers with quantified coverage and treat absence as a valid result.",
+      "evidence": ["docs/interactive_handoff.md", "docs/dsp_interface.md"]
     },
     {
       "id": "generic_service_05e8_activation", "owner": "generic_service", "status": "unresolved",
@@ -51,7 +57,7 @@
     {
       "id": "context_09cd_activation", "owner": "generic_service", "status": "unresolved",
       "predicate": "A firmware-owned context invokes 0x24d8e8 with the active slot selected and callback-state slot 0x5d at 0x11fcdd equal to 1 or 2, producing organic status 0x09cd",
-      "current": "0x11fcdd is populated by the generic catalogue descriptor transition mechanism, not a standalone pending selector. No recovered callback-0x5d descriptor transitions coherent state 0 to required state 1; 0x24d8e8, 0x24df74 and callback-7 publication 0x24e754 remain dormant. A task-14 0x09d8 opcode-0x3a object can initialize the surrounding context, but its proved producer is downstream of the absent 0x05e8 chain, confirming this as a later cycle rather than a bootstrap correction",
+      "current": "0x11fcdd is populated by the generic catalogue descriptor transition mechanism, not a standalone pending selector. A current code-7 sweep observes state 0x0b, which still does not satisfy 0x24d8e8's required state 1 or 2; 0x24d8e8, 0x24df74 and callback-7 publication 0x24e754 remain dormant. A task-14 0x09d8 opcode-0x3a object can initialize the surrounding context, but its proved producer is downstream of the absent 0x05e8 chain, confirming this as a later cycle rather than a bootstrap correction",
       "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
     },
     {

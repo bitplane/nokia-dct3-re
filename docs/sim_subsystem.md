@@ -130,16 +130,25 @@ registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract
 by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
 
-The coherent contact profile also fixes the next task-1 predicate. Task 1 enters
-mode `0x0004` at about 1.436 s and waits for report code `0x07`. Its organic
-reporter is `0x2af190`. Of the reporter's four callers, the only route exercised
-by the current runtime is the status dispatcher `0x27b370`: the
-global callback sweep reaches it with `0x05e2`, while status `0x05eb` would call
-the reporter and release task 1. A valid segmented transaction in task 13 at
-`0x23e62c` produces `0x05eb`; no such transaction is currently accepted. The
-owning subsystem is unresolved and is not established as the task-6 UI window
-stack. Code 7 is therefore a parallel startup predicate, not yet a proven
-display-readiness predicate or part of the SIM lifecycle.
+The coherent contact profile also exposes the next task-1 predicate. Task 1 enters
+mode `0x0004` at about 1.436 s and waits for report code `0x07`; the reporter is
+`0x2af190`. Status dispatcher `0x27b370` is exercised during initialization
+with `0x05e2`, and callback state slot `0x5d` is already `0x0b`. Inputs
+`0x05eb` and `0x06c5` report ready directly. Inputs `0x05e1`, `0x05e7`, and
+`0x05dc` arm task-local timer class `0x52`, which returns to task 5 as
+`0x06c5`; none is observed. Flags `0x01a00000` intentionally select `0x032d`
+instead of an automatic `0x05dc` start. A valid task-13 segmented transaction
+publishes `0x05eb` directly to task 16 and does not enter this callback path.
+The separately
+mapped callback-`0x1a` chain (`0x1400 -> 0x08ac -> 0x0795`) is dormant:
+`0x1400` is task-5 mailbox ingress, and exhaustive recovery of all 188 direct
+task-5 event-helper calls found no in-ROM producer. It is therefore not the
+current ordinary-boot hypothesis. A display lifecycle (`0x0280/81/82 -> 0x05e7
+-> 0x0389 -> 0x157e -> 0x0396 -> 0x05eb`) is a valid service/test route, not
+the ordinary predecessor. Callback `0x5d` is not yet proven to be the exclusive
+ordinary owner; the independent controller-status callers remain candidates.
+The unresolved code-7 predicate remains parallel to,
+and is not part of, the SIM lifecycle.
 
 The descriptor factory is now identified as `0x24f120`. Its four known callers
 (`0x2996aa`, `0x2997dc`, `0x299860`, `0x2998a0`) sit immediately before the callback-7 handler and

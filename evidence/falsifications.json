@@ -41,8 +41,38 @@
     {
       "id": "dsp_type03_heartbeat_registration_predecessor", "status": "disproven",
       "hypothesis": "Periodic header-only DSP RX type-0x03 liveness traffic activates the missing ordinary-registration publisher",
-      "conclusion": "Empty-ring-gated DSP RAM delivery through producer 0x1c8 and FIQ0 was consumed by task 4 and incremented firmware activity counter 0x112502, but emitted none of 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 and reduced coherent boot work counts; liveness traffic alone is not the semantic registration reply",
-      "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md"]
+      "conclusion": "Two independent empty-ring-gated DSP RAM/FIQ0 runs were consumed by task 4. The first incremented firmware activity counter 0x112502 but emitted none of 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434. A later 182-heartbeat coherent SIM run also emitted none of callback-0x1a status 0x1400, initializer status 0x08ac, controller status 0x0795, or report code 7; task 1 remained in mode 0x0004. Liveness traffic alone is not the missing semantic peer response",
+      "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "dsp_type70_0a09_task13_reply", "status": "disproven",
+      "hypothesis": "The organic outbound DSP type-0x70 payload 0a 09 expects a type-0x74 echo which completes task 13 and reports startup code 7",
+      "conclusion": "An empty-ring-gated type-0x74 payload 0a 09 was delivered through the real DSP RX/FIQ0 path immediately after the organic request. It produced no task-13 message, 0x05eb, code 7, or mode advance; task 1 remained in mode 0x0004. This disproves that response shape, not the broader type-0x70 request family",
+      "evidence": ["docs/interactive_handoff.md"]
+    },
+    {
+      "id": "battery_callers_are_ordinary_code7_owner", "status": "disproven",
+      "hypothesis": "A normal 3210 ADC value or calibration activates one of the two power-owned report-code-7 callers during ordinary boot",
+      "conclusion": "The 0x21e40c caller is battery event 0x25 under the firmware string 'Check voltage level for shutdown'; selector 1 value 0x1b0 powers off before task 1, while 0x1c0 reaches mode 0x0004 with battery band 2 and no code 7. The 0x21f8de caller is also confined to the low-voltage/charger lifecycle. These are shutdown/power-event reporters, not the missing ordinary-ready producer",
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "task5_1400_ordinary_code7_route", "status": "disproven",
+      "hypothesis": "Callback-table index 0x1a receives an ordinary-boot callback return 0x1400 and initiates the 0x08ac to 0x0795 code-7 chain",
+      "conclusion": "0x1400 is decoded from an argumentless task-5 mailbox message at 0x2af57c, not returned by a callback. All 188 direct task-5 event-helper calls have recovered constant events and none emits 0x1400; the remaining unresolved-destination sender routes through a service table that does not target task 5. The chain is a mapped dormant or service-specific contract, not the strongest ordinary-boot route",
+      "evidence": ["docs/sim_registration.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "display_028x_ordinary_code7_route", "status": "disproven",
+      "hypothesis": "Display statuses 0x0280, 0x0281, or 0x0282 head the ordinary-boot lifecycle that supplies global 0x05eb and report code 7",
+      "conclusion": "The 0x028x states are owned by the transaction engine around 0x264504/0x264c98 and reached from contact-service commands 0x81/0x82 and local/test ASCII command frontends. No catalogue or literal producer establishes an ordinary source, and coherent controller-transform tracing produces none of them. The route is valid but service/test-specific.",
+      "evidence": ["docs/resource_providers.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "display_06ca_0795_mode4_route", "status": "disproven",
+      "hypothesis": "Display status 0x06ca supplies ordinary report code 7 through 0x0795 while task 1 is parked in mode 0x0004",
+      "conclusion": "The 0x06ca case at 0x28c268 reaches the 0x0795 generator only when getter 0x2af066 returns startup/display state 7. The ordinary fallback enters mode 0x0004 after setter 0x2af058 establishes state 3; state 7 belongs a separate mode-2 branch after input code 0x10. Coherent runtime observes state 3 and no 0x06ca/0x0795 publication.",
+      "evidence": ["docs/interactive_handoff.md"]
     },
     {
       "id": "dsp_type1a_direct_registration_request", "status": "disproven",
@@ -67,6 +97,12 @@
       "hypothesis": "Task-15 status 0x09ee is an independent lower-peer result which starts the callback-7 session factory",
       "conclusion": "Seven branches inside task 15 construct 0x09ee through 0x208ee0; task 15 forwards its local result to task 17, which constructs 0x0a2e and returns it before the factory runs. The absent predecessor is the earlier object-bearing task-15 operation, not 0x09ee or 0x0a2e",
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
+    },
+    {
+      "id": "task13_05eb_is_code7_owner", "status": "disproven",
+      "hypothesis": "A valid DSP type-0x80 segmented completion correlated with the organic type-0x70 0a09 transaction supplies callback 0x5d status 0x05eb and report code 7",
+      "conclusion": "The packet traverses FIQ0, normalizes to 0x040b, returns parser result 0x061a, and publishes 0x05eb directly to task 16 through 0x23e1a4. It does not enter the global callback sweep, call the code-7 reporter, or advance task 1 beyond mode 0x0004",
+      "evidence": ["docs/dsp_interface.md", "docs/interactive_handoff.md", "docs/sim_registration.md"]
     },
     {
       "id": "forced_registration_messages", "status": "disproven",
