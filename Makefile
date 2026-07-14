@@ -72,7 +72,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check prepare-run-nvram run run-frontier smoke smoke-3330e audit-roms frame watch verify verify-frontier verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check prepare-run-nvram run run-frontier smoke smoke-3330e audit-roms frame watch verify verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -89,6 +89,7 @@ help:
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make run-frontier   run the current coherent contact/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier oracles"
+	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
 	@echo "make verify-structure  compare semantic boot predicates with $(ORACLE_STRUCT)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
@@ -265,6 +266,24 @@ verify-frontier: run-frontier
 	if [ "$$got" = "$(ORACLE_FRONTIER_FRAME_SHA)" ]; then echo "OK — coherent frontier oracle reproduced"; \
 	else echo "MISMATCH — boot diverged from the coherent frontier state"; exit 1; fi
 	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_FRONTIER_STRUCT)
+
+FRONTIER_STABILITY_RUNS ?= 3
+FRONTIER_STABILITY_STRICT ?= 0
+verify-frontier-stability:
+	@set -e; reference=""; \
+	for iteration in $$(seq 1 $(FRONTIER_STABILITY_RUNS)); do \
+		dir="$(RUN_DIR)_$$iteration"; \
+		rm -rf "$$dir"; \
+		$(MAKE) --no-print-directory verify-frontier RUN_DIR="$$dir" SECONDS=$(SECONDS); \
+		summary=$$(sha256sum "$$dir/boot_summary.txt" | cut -d' ' -f1); \
+		echo "frontier stability $$iteration/$(FRONTIER_STABILITY_RUNS): $$summary"; \
+		if [ -z "$$reference" ]; then reference="$$summary"; \
+		elif [ "$$summary" != "$$reference" ]; then \
+			echo "frontier diagnostic-counter drift: $$summary != $$reference"; \
+			if [ "$(FRONTIER_STABILITY_STRICT)" = "1" ]; then exit 1; fi; \
+		fi; \
+	done; \
+	echo "OK — $(FRONTIER_STABILITY_RUNS) frontier runs reproduced the frame and semantic predicates"
 
 verify-structure-subset:
 	@test -f $(RUN_DIR)/boot_summary.txt || { echo "missing $(RUN_DIR)/boot_summary.txt; run make run first"; exit 1; }

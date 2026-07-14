@@ -494,7 +494,8 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      sequencer mode + startup checklist; the post-SIM interactive handoff),
 //      TRACE_TASKS (app-task liveness + inter-task message edges).
 //      TRACE_SIM_RX covers the register/FIQ/APDU path and SIM reply milestones;
-//      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary.
+//      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary;
+//      TRACE_BATTERY_CAL observes the live ADC calibration contract.
 //      Research-force policy: docs/evidence_regime.md.
 //
 // Traces are quarantined in flash_firmware_traces /
@@ -992,6 +993,21 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)) & 0xff,
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xff,
 				fw_byte(0x00100022), fw_word(FW_STARTUP_MODE), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_BATTERY_CAL", 0) != 0 &&
+			(address == 0x0011fe14 || address == 0x0011fe18 || address == 0x001124d0 ||
+			 address == 0x0011ff40 ||
+			 (address >= 0x00110422 && address <= 0x0011042a) ||
+			 (address >= 0x00110600 && address <= 0x00110630) ||
+			 (address >= 0x001121d0 && address <= 0x001121f0)))
+		logerror("battery_cal_write: pc=%08x address=%08x data=%04x mask=%04x old=%04x "
+				"task=%02x t=%.6f\n",
+				pc & ~u32(1), u32(address), data, mem_mask, m_ram[offset],
+				fw_byte(0x00100022), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_BATTERY_CAL", 0) != 0 && pc == 0x002204a2)
+		logerror("battery_cal_task13: source=%08x destination=%08x coefficient=%08x t=%.6f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R8)),
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R11)),
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)), machine().time().as_double());
 	COMBINE_DATA(&m_ram[offset]);
 
 	}
@@ -1026,6 +1042,51 @@ void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 // ============================================================================
 void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_BATTERY_CAL", 0) != 0)
+	{
+		static bool calibration_pm_read = false;
+		const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const u32 r2 = m_maincpu->state_int(arm7_cpu_device::ARM7_R2);
+		const u32 r3 = m_maincpu->state_int(arm7_cpu_device::ARM7_R3);
+		if (addr == 0x002abbf4 && r1 == 0x074c)
+		{
+			calibration_pm_read = true;
+			logerror("battery_cal_pm: logical=074c variant=%u destination=%08x limit=%04x "
+					"task=%02x t=%.6f\n", r3, r0, r2 & 0xffff,
+					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+		}
+		else if (addr == 0x002abc24 && calibration_pm_read)
+		{
+			logerror("battery_cal_pm: physical=%04x destination=%08x length=%u t=%.6f\n",
+					r0 & 0xffff, r1, r2 & 0xffff, machine().time().as_double());
+			calibration_pm_read = false;
+		}
+		if ((addr == 0x002af8e2 || addr == 0x002af97a) &&
+				r0 >= 0x0d80 && r0 < 0x0dd0)
+			logerror("battery_cal_eeprom: pc=%08x physical=%04x destination=%08x length=%u "
+					"caller=%08x t=%.6f\n", addr, r0 & 0xffff, r1, r2 & 0xffff,
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
+		if (addr == 0x0021c4be || addr == 0x0021c4d2 || addr == 0x002203dc ||
+				addr == 0x00220492 || addr == 0x002204a2)
+			logerror("battery_cal_convert: pc=%08x r0=%08x r8=%08x fp=%08x "
+					"source_110622=%04x source_110422=%04x source_110424=%04x t=%.6f\n",
+					addr, r0, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R8)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R11)), fw_word(0x00110622),
+					fw_word(0x00110422), fw_word(0x00110424), machine().time().as_double());
+		if (addr == 0x0029b2f6)
+			logerror("battery_power_record: bytes=%02x/%02x/%02x/%02x/%02x/%02x "
+					"reason=%02x task=%02x t=%.6f\n",
+					fw_byte(0x001121d0), fw_byte(0x001121d1), fw_byte(0x001121d2),
+					fw_byte(0x001121d3), fw_byte(0x001121d4), fw_byte(0x001121d5),
+					fw_byte(0x0011ff41), fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+		if (addr == 0x00270cf0 || addr == 0x00271004)
+			logerror("battery_power_reason: pc=%08x ui_mode=%02x stored_reason=%02x "
+					"record_status=%02x task=%02x t=%.6f\n",
+					addr, fw_byte(0x0011ff41), fw_byte(0x0011239c), fw_byte(0x001121d3),
+					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
 	if (pc == addr && addr == 0x00290cf4 && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
 		logerror("dsp_boundary: service-command command=%08x arg=%08x payload=%08x caller=%08x "
 				"task=%02x t=%.6f\n",

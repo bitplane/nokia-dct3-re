@@ -17,6 +17,15 @@ The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.
 
+`make verify-frontier` checks the current request-driven contact/SIM profile's
+exact frame and stable semantic predicates. `make verify-frontier-stability`
+repeats that complete check with freshly seeded NVRAM. It reports full-summary
+hash drift without failing because LCD-command, CCONT-byte/read, and similar
+raw counters vary with harmless scheduling. Set `FRONTIER_STABILITY_STRICT=1`
+when investigating those counters specifically. Use the repeatability target
+before banking a new frontier; ordinary RE iterations should use the faster
+single-run target.
+
 The default runner reseeds an isolated per-run NVRAM directory from the
 generated EEPROM profile. This prevents an old shared `mame/nvram` file from
 silently changing product data. Introducing that deterministic fixture added
