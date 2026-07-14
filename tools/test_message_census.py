@@ -17,6 +17,40 @@ class ByteLaneTests(unittest.TestCase):
 	def test_effective_pool_literal_rotates_halfwords(self):
 		self.assertEqual(message_census.effective_u32(bytes((0x11, 0x22, 0x33, 0x44)), 0), 0x22114433)
 
+	def test_computed_r0_construction_tracks_straight_line_shift(self):
+		# movs r0,#0xef; lsls r0,r0,#3 -> 0x0778
+		data = bytes((0xef, 0x20, 0xc0, 0x00))
+		instructions = message_census.decode_image(data, 0x2000)
+		result = message_census.computed_r0_constructions(instructions, data, 0x2000, 0x0778)
+		self.assertEqual([item["address"] for item in result], [0x2002])
+
+	def test_computed_r0_construction_does_not_cross_branch(self):
+		# movs r0,#0xef; b +0; lsls r0,r0,#3
+		data = bytes((0xef, 0x20, 0x00, 0xe0, 0xc0, 0x00))
+		instructions = message_census.decode_image(data, 0x2000)
+		self.assertEqual(message_census.computed_r0_constructions(
+			instructions, data, 0x2000, 0x0778), [])
+
+	def test_catalogue_predecessor_uses_effective_word_layout(self):
+		# Effective entries 0x089a and 0x08b0 in swap16 storage.
+		data = bytes((0x00, 0x00, 0x9a, 0x08, 0x00, 0x00, 0xb0, 0x08))
+		contract = {"address": 0x2000, "entries": 2, "entry_size": 4}
+		result = message_census.catalogue_predecessors(contract, data, 0x2000, 0x08b0)
+		self.assertEqual(result[-1], {
+			"status_index": 1, "packed_inputs": [0x2001, 0x6001], "entry": 0x2004,
+			"sequence_offset": 0,
+			"producer_evidence": {"literal_loads": [],
+				"computed_r0_constructions": [], "direct_calls": []}})
+
+	def test_catalogue_predecessor_decodes_sequence_and_skips_arguments(self):
+		# Entry 0: packed argc-1 event 0x0123, argument 0x08b0, then event 0x08b0.
+		words = (0x4123, 0x08b0, 0x08b0, 0x00dc)
+		data = b"".join(((word >> 16).to_bytes(2, "little") +
+			(word & 0xffff).to_bytes(2, "little")) for word in words)
+		contract = {"address": 0x2000, "entries": 1, "entry_size": 4}
+		result = message_census.catalogue_predecessors(contract, data, 0x2000, 0x08b0)
+		self.assertEqual(result[0]["sequence_offset"], 1)
+
 
 class ContactServiceTests(unittest.TestCase):
 	def test_constructor_role_is_separate_from_numeric_command(self):

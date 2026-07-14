@@ -7,10 +7,11 @@
 # prefix (0xE800-0xFFFF), capstone greedily eats 4 bytes, misaligns, and emits
 # garbage (vqrshrun/ldc2l/...) for the rest of the region. We step manually and
 # reject any 4-byte decode that isn't bl/blx, keeping 16-bit alignment.
-import sys, re, capstone
+import os, sys, re, capstone
 from pathlib import Path
 
-data = (Path(__file__).resolve().parent.parent / 'roms/3210f600a_swap16.bin').read_bytes()
+default_image = Path(__file__).resolve().parent.parent / 'roms/3210f600a_swap16.bin'
+data = Path(os.environ.get('NOKI_BIN', default_image)).read_bytes()
 FLASH=0x200000
 
 def resolve_lit(ins):

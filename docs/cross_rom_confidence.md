@@ -47,6 +47,21 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
   multi-source/multi-ROM capable; the first two extracted hardware components
   contain no 3210 firmware addresses.
 
+### Static code-7 topology
+
+A signature search independent of absolute addresses finds the task-1 report
+code-7 stub at `0x386a94` in 3330 v4.50. Like the 3210 stub at `0x2af190`, it
+has exactly four callers. The 3330 callback caller at `0x25fc86` sits in a
+dispatcher structurally identical to 3210 callback `0x5d`: the same
+`0x05e1`/`0x05e7` timer-start branches and direct `0x05eb`/`0x06c5` completion
+branches are present. Two other callers remain power/charger owned and the
+fourth remains controller owned, matching the 3210 ownership split.
+
+This is static portability evidence, not a successful-boot oracle. It proves
+that the four-owner code-7 topology is shared across the DCT3 firmware family;
+it does not identify which owner completes during an ordinary healthy boot.
+No 3330 firmware-PC hook was added.
+
 ## Acceptance criteria
 
 The next confidence increment is a 3330-specific structural summary: first

@@ -128,9 +128,7 @@ callers identified this additional dormant route (**S/R**):
 callback-table index 0x1a receives status 0x1400
   + message type 0x85 + state [0x11fced] == 2
   -> controller status 0x08ac
-  -> telephony-control initialization drains its four activity slots
-  -> controller status 0x0795
-  -> handler 0x255c30 -> reporter 0x2af190
+  -> conditional Advice-of-Charge controller 0x27f150
 ```
 
 The old trace hook at `0x255c2e` was two bytes before the branch target and
@@ -145,11 +143,22 @@ not the owner of the current ordinary-startup path (**R**).
 
 The current coherent profile does produce `0x08ac` twice, but through a later
 telephony/controller owner rather than through `0x1400`. Dispatcher `0x255b5e`
-calls `0x27f150`; selector getter `0x287216` returns `0`, and availability
-helper `0x287250(0)` returns zero. The handler takes its abort at `0x27f16e`
-before constructing the activity slots that can lead to `0x0795`. Thus the
-old `0x1400` premise remains disproven while `0x08ac` is now the first organic
-code-7 route with a concrete unsatisfied predicate (**R**).
+calls `0x27f150`. Selector `0` is backed by the EEPROM product gate plus CPHS
+CSP, or by SIM service-table provisioning. Coherent service-5 initialization
+reads ACM, ACMmax, and PUCT and proves `0x27f150` is an Advice-of-Charge limit
+controller. An exhausted-account fixture reaches its completion organically;
+the function publishes `0x019a`, not `0x0795` (**R correction**).
+
+The non-display `0x0795` producer at `0x28796a` belongs to another controller
+lifecycle. Catalogue-mode packed input `0x213a`/`0x613a` (status index
+`0x013a`) expands to `0x089a, 0x08b0`; adjacent `0x213b`/`0x613b` expands
+directly to `0x08b0`. Both are later framework-mode-11 paths: `0x013a` is an
+input to callback `0x24` in that mode, while callback `0x013b` is registered
+only after input `0x03ab` establishes the same mode. The coherent boot remains
+in mode 0.
+This exhausts the two literal `0x0795` producers and excludes the status as
+ordinary mode-4 ownership. See `interactive_handoff.md` for the selector,
+catalogue, and runtime evidence.
 
 Callback-table index `0x5d` at `0x27b370` is a mapped completion branch, not an
 established ordinary-boot owner. Initialization invokes it with `0x05e2`, and

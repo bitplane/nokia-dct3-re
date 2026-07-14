@@ -81,6 +81,12 @@
       "evidence": ["docs/interactive_handoff.md"]
     },
     {
+      "id": "controller_08ac_ordinary_code7_route", "status": "disproven",
+      "hypothesis": "The organically reached 0x08ac -> 0x27f150 controller route is the unconditional ordinary-boot owner of 0x0795 and task-1 report code 7",
+      "conclusion": "The corrected guard is 0x11fd04, but coherent service-5 initialization proves initializer 0x27f9e8 owns it from EF_ACMmax. A standards-valid exhausted account reaches 0x27f23e organically and the function publishes 0x019a, not 0x0795. The true non-display 0x0795 producer at 0x28796a is reached after 0x08b0. The variable-length catalogue proves two inputs: packed 0x213a/0x613a expands to 0x089a,0x08b0 and packed 0x213b/0x613b emits 0x08b0 directly. Status 0x013a is consumed by callback 0x24 in framework mode 11; callback 0x013b is registered only after input 0x03ab establishes the same later mode, while coherent startup remains in mode 0. The other literal producer requires display state 7. Thus 0x08ac -> 0x27f150 is not the ordinary code-7 route.",
+      "evidence": ["docs/resource_providers.md", "docs/interactive_handoff.md", "docs/sim_registration.md"]
+    },
+    {
       "id": "dsp_type1a_direct_registration_request", "status": "disproven",
       "hypothesis": "The organic outbound DSP type-0x1a packet is a request whose direct inbound reply supplies task-17 registration completion",
       "conclusion": "The sole caller of builder 0x219f0c is task-10 state dispatcher 0x21ba54; after posting the packet the builder retains no transaction token, reply object, or task-3 callback, arms only the global DSP cadence timer, clears the activity counter, and returns after task 17 has already received 0x043c. The apparent type-0x80 correlation at 0x284c74 instead tests radio-controller state 0x10dbd2, observed as 0x00 at the send, against later state 0x1a and can publish 0x1395 rather than 0x1391. Type 0x1a is a fire-and-forget state/control publication, not the missing direct registration request",
@@ -109,6 +115,12 @@
       "hypothesis": "A valid DSP type-0x80 segmented completion correlated with the organic type-0x70 0a09 transaction supplies callback 0x5d status 0x05eb and report code 7",
       "conclusion": "The packet traverses FIQ0, normalizes to 0x040b, returns parser result 0x061a, and publishes 0x05eb directly to task 16 through 0x23e1a4. It does not enter the global callback sweep, call the code-7 reporter, or advance task 1 beyond mode 0x0004",
       "evidence": ["docs/dsp_interface.md", "docs/interactive_handoff.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "callback47_0778_1441_completion_inputs", "status": "disproven",
+      "hypothesis": "Callback 0x47's shared 0x05e1 branch is selected by absent dynamic statuses 0x0778 and 0x1441",
+      "conclusion": "Correct subtract-cascade execution yields 0x0578 and 0x1440. The observed 0x05dc branch starts the generic text/UI manager through 0x24b174 -> 0x24af70, stores 0x0578 as its completion, and publishes 0x057c when presented. The coherent run reaches 0x05dc/0x057c but no interactive completion. This is not an absent DSP/network reply or the unconditional code-7 owner.",
+      "evidence": ["docs/resource_providers.md", "docs/interactive_handoff.md"]
     },
     {
       "id": "forced_registration_messages", "status": "disproven",

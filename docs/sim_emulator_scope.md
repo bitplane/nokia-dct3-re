@@ -94,6 +94,14 @@ synthetic card. Unsupported optional files return `94 04` and leave the current
 selection unchanged. `6F14` is CPHS Operator Name String and is intentionally
 absent; it should only gain content in a card profile that advertises CPHS.
 
+`NOKI3210_SIM_CPHS_AOC=1` is a card-provisioning scenario, not a boot bypass.
+It advertises CPHS phase 2 through `EF_INFO (6F16)`, allocates and activates
+the Customer Service Profile, and serves a minimum valid 18-byte `EF_CSP
+(6F15)` with only group-03 mask `0x20` enabled. Firmware requests both files
+through the ordinary SIMI/FIQ6 path. This profile validates the decoded
+selector-0 contract at `0x287250`; it does not populate firmware task state or
+manufacture an active call.
+
 After initialization, task 20 deliberately polls the selected directory with
 STATUS. Function `0x2028a4` rearms timer `0xea` with delay `0x181`; this is the
 card-presence monitor, not a remaining filesystem blocker. The device tracks

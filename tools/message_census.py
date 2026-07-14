@@ -402,8 +402,86 @@ def contact_service_inventory(profile, calls, runtime):
 	}
 
 
-def status_inventory(instructions, calls, descriptors, data, base, status):
+def computed_r0_constructions(instructions, data, base, status):
+	"""Find conservative straight-line constructions of a requested value in r0.
+
+	This is supporting evidence, not a producer claim. State is discarded across
+	calls, branches, returns, and function-entry pushes so values are never
+	propagated through an unresolved control-flow join.
+	"""
+	registers = {f"r{i}": None for i in range(8)}
+	result = []
+	for insn in instructions:
+		if not insn:
+			registers = {f"r{i}": None for i in range(8)}
+			continue
+		if insn.mnemonic == "push" and "lr" in insn.op_str:
+			registers = {f"r{i}": None for i in range(8)}
+		apply_constant(insn, registers, data, base)
+		if written_register(insn) == "r0" and registers.get("r0") == status:
+			result.append({"address": insn.address, "instruction": f"{insn.mnemonic} {insn.op_str}"})
+		if insn.mnemonic in ("bl", "blx"):
+			for reg in ("r0", "r1", "r2", "r3"):
+				registers[reg] = None
+		elif insn.mnemonic.startswith("b") or insn.mnemonic == "pop":
+			registers = {f"r{i}": None for i in range(8)}
+	return result
+
+
+def catalogue_predecessors(contract, data, base, status, instructions=None, calls=None):
+	"""Return catalogue-mode packed inputs whose decoded sequence emits status."""
+	if not contract:
+		return []
+	address = number(contract["address"])
+	entries = number(contract["entries"])
+	entry_size = number(contract.get("entry_size", 4))
+	result = []
+	for input_status in range(entries):
+		offset = address + input_status * entry_size - base
+		sequence_offset = None
+		for ordinal in range(number(contract.get("max_sequence_events", 64))):
+			if offset < 0 or offset + 4 > len(data):
+				break
+			packed = effective_u32(data, offset)
+			offset += 4
+			if packed == 0x00dc:
+				break
+			if (packed & 0x1fff) == status:
+				sequence_offset = ordinal
+				break
+			argument_count = (packed >> 14) & 3
+			offset += argument_count * 4
+		if sequence_offset is not None:
+			# 0x2aee20 enters this table only when (packed & 0xa000) == 0x2000.
+			# Bit 14 is the argument-count bit and is outside that mode mask, so
+			# both packed forms select the same catalogue sequence.
+			packed_inputs = [0x2000 | input_status, 0x6000 | input_status]
+			literal_loads = []
+			computed_r0 = []
+			direct_calls = []
+			for packed in packed_inputs:
+				if instructions is not None:
+					literal_loads.extend(insn.address for insn in instructions
+						if literal_value(insn, data, base) == packed)
+					computed_r0.extend(item["address"] for item in
+						computed_r0_constructions(instructions, data, base, packed))
+				if calls is not None:
+					direct_calls.extend(call["callsite"] for call in calls
+						if call["arguments"].get("packed_event") == packed)
+			result.append({"status_index": input_status,
+				"packed_inputs": packed_inputs,
+				"entry": address + input_status * entry_size,
+				"sequence_offset": sequence_offset,
+				"producer_evidence": {"literal_loads": sorted(set(literal_loads)),
+					"computed_r0_constructions": sorted(set(computed_r0)),
+					"direct_calls": sorted(set(direct_calls))}})
+	return result
+
+
+def status_inventory(instructions, calls, descriptors, data, base, status,
+		catalogue_contract=None):
 	literal_loads = [insn.address for insn in instructions if literal_value(insn, data, base) == status]
+	computed_r0 = computed_r0_constructions(instructions, data, base, status)
 	call_arguments = []
 	for call in calls:
 		for name, value in call["arguments"].items():
@@ -419,8 +497,11 @@ def status_inventory(instructions, calls, descriptors, data, base, status):
 					descriptor_fields.append({"registration_callsite": descriptor["callsite"],
 						"descriptor": descriptor["address"], "entry": entry.get("address", descriptor["address"]),
 						"field": name})
-	return {"status": status, "literal_loads": literal_loads, "call_arguments": call_arguments,
-		"descriptor_fields": descriptor_fields}
+	return {"status": status, "literal_loads": literal_loads,
+		"computed_r0_constructions": computed_r0, "call_arguments": call_arguments,
+		"descriptor_fields": descriptor_fields,
+		"catalogue_predecessors": catalogue_predecessors(
+			catalogue_contract, data, base, status, instructions, calls)}
 
 
 def object_lifecycle_inventory(calls, assessments):
@@ -644,9 +725,12 @@ def main():
 			file=sys.stderr)
 		return 2
 	contact_service = contact_service_inventory(profile, calls, runtime)
-	inventory_05e8 = status_inventory(instructions, calls, descriptors, data, base, 0x05e8)
+	catalogue_contract = profile.get("status_translation_table")
+	inventory_05e8 = status_inventory(instructions, calls, descriptors, data, base, 0x05e8,
+		catalogue_contract)
 	requested_status_inventories = {
-		hexadecimal(status): status_inventory(instructions, calls, descriptors, data, base, status)
+		hexadecimal(status): status_inventory(instructions, calls, descriptors, data, base, status,
+			catalogue_contract)
 		for status in dict.fromkeys(args.inventory_status)
 	}
 	lifecycle_05e0 = object_lifecycle_inventory(calls, profile.get("object_lifecycle_assessments", []))

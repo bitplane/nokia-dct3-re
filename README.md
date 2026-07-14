@@ -33,16 +33,27 @@ The phone does **not** yet reach the offline application desktop. The modeled SI
 the ordinary non-CPHS initialization pass, after which task 1 waits in mode `0x0004` for startup
 report code `0x07`. Callback `0x5d` is organically activated and can report code `0x07` either
 from direct completion `0x05eb` or from a task-local timeout started by `0x05e1`, `0x05e7`, or
-`0x05dc`. A mapped display lifecycle reaches the same callback but is service/test-owned. The
-active RE frontier is now the controller path reached by organic status `0x08ac`.
-It calls availability helper `0x287250` with selector `0`, receives zero, and
-aborts before publishing controller status `0x0795` and report code `0x07`.
-The next investigation is the firmware or hardware-owned predicate behind that
-failed availability check. See [`docs/resource_providers.md`](docs/resource_providers.md) and
+`0x05dc`. A mapped display lifecycle reaches the same callback but is service/test-owned.
+The selector-`0` contract at `0x287250` is now recovered. Its primary CPHS
+path combines EEPROM product-feature record `0x150`, parsed `EF_CSP` validity,
+and group-`03` mask `0x20`; its fallback uses the parsed `EF_SST` service-5
+pair. A coherent CPHS/AoC card drives both alternatives and the associated
+`EF_ACM`, `EF_ACMmax`, and `EF_PUCT` reads through the real SIM transport.
+That work also disproved the former frontier: `0x27f150` is an Advice-of-Charge
+limit controller. Its completion publishes `0x019a`, not `0x0795`.
+
+The only non-display route to `0x0795` is a later framework cycle. Catalogue
+status index `0x013a` expands to `0x089a, 0x08b0`, while index `0x013b`
+expands directly to `0x08b0`; both belong to framework-mode-11 paths, including
+the resident callback registered after input `0x03ab`. Controller reconciliation may then publish
+`0x0795`. The coherent boot remains in framework mode `0`, so this is not
+ordinary startup ownership. The active RE frontier returns to the genuine
+callback-`0x5d` completion inputs that can report code `0x07`.
+See [`docs/resource_providers.md`](docs/resource_providers.md) and
 [`docs/sim_registration.md`](docs/sim_registration.md).
 
 `make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
-research baseline for that boundary. It uses the request-driven contact peer
+research baseline for this boundary. It uses the request-driven contact peer
 and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with contact status
 `0x49`, no-SIM clear, and SIM enable set. `make verify-deep` is retained only
 for its historical bridge-profile oracle.

@@ -681,6 +681,7 @@ void noki3310_state::machine_reset()
 	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
 	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0);
 	m_sim_card->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", 0) != 0);
+	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKI3210_SIM_CPHS_AOC", 0) != 0);
 	{
 		u8 atr[40] = { 0x3b, 0x10, 0x05 };
 		unsigned length = 3;
@@ -1291,7 +1292,12 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 	if (nokia_env_u32("NOKI3210_TRACE_TASK5_REG", 0) != 0 && address == 0x00111c86)
 		logerror("task5reg: WRITE [111c86/87] <- %04x mask=%04x pc=%08x t=%.4f\n",
 				data, mem_mask, pc & ~u32(1), machine().time().as_double());
-
+	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 &&
+			(address == 0x00110e2e || address == 0x0011fd04))
+		logerror("code7_activity_write: pc=%08x address=%08x data=%04x mask=%04x old=%04x "
+				"task=%02x mode=%04x t=%.6f\n",
+				pc & ~u32(1), u32(address), data, mem_mask, m_ram[offset],
+				fw_byte(0x00100022), fw_word(FW_STARTUP_MODE), machine().time().as_double());
 	auto ram_word = [this](offs_t addr) -> uint16_t
 	{
 		if (addr < 0x100000 || addr >= 0x180000)
@@ -1912,8 +1918,24 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr)
 	{
 		static unsigned registration_count = 0;
+		static unsigned callback47_count = 0;
 		static unsigned controller_count = 0;
+		static unsigned controller_activity_count = 0;
+		static unsigned controller_selector_count = 0;
 		static unsigned publication_count = 0;
+		static unsigned init_family_count = 0;
+		const u16 task5_status = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff;
+		if ((addr == 0x00253e20 || addr == 0x00254590 || addr == 0x00255030) &&
+				(task5_status == 0x13fd || task5_status == 0x13fe) && init_family_count++ < 32)
+			logerror("code7_init_family: pc=%08x status=%04x source=%08x activity=%02x/%02x/%02x/%02x "
+					"guard=%02x task=%02x mode=%04x caller=%08x t=%.6f\n",
+					addr, task5_status,
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					fw_byte(0x00110e2c), fw_byte(0x00110e2d),
+					fw_byte(0x00110e2e), fw_byte(0x00110e2f), fw_byte(0x0011fd04),
+					fw_byte(0x00100022), fw_word(FW_STARTUP_MODE),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
 		const u16 registration_status = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff;
 		const bool relevant_handler_status = addr == 0x002638e4 &&
 				(registration_status == 0x0395 || registration_status == 0x0396 ||
@@ -1935,24 +1957,86 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					fw_byte(0x0010b2dc), fw_byte(0x0010b2dd),
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 					fw_byte(0x00100022), machine().time().as_double());
+		const u16 callback47_input = u32(m_maincpu->state_int(addr == 0x0028f484 ?
+				arm7_cpu_device::ARM7_R0 : arm7_cpu_device::ARM7_R4)) & 0xffff;
+		const bool relevant_callback47_entry = addr == 0x0028f484 &&
+				(callback47_input == 0x05dc || callback47_input == 0x0578 ||
+				 callback47_input == 0x1440);
+		if ((relevant_callback47_entry || addr == 0x0028f4e4 || addr == 0x0028f4ea) &&
+				callback47_count++ < 64)
+			logerror("code7_callback47: pc=%08x input=%04x query=%08x query_result=%04x "
+					"task=%02x caller=%08x t=%.6f\n",
+					addr, callback47_input,
+					fw_dword(0x00111988),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
+					debug_ram_byte(0x00100022),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
 		if ((addr == 0x00255d26 || addr == 0x0027f150 ||
 				addr == 0x0027f15e || addr == 0x0027f162 || addr == 0x0027f16e || addr == 0x0027f1c0 ||
-				addr == 0x0027f1c4 || addr == 0x0027f1e8 || addr == 0x0027f1f0 ||
-				addr == 0x0027f23e || addr == 0x002878e4 || addr == 0x00287950 ||
+				addr == 0x0027f1c4 || addr == 0x0027f1dc || addr == 0x0027f1e8 || addr == 0x0027f1f4 ||
+				addr == 0x0027f220 || addr == 0x0027f22e || addr == 0x0027f236 ||
+				addr == 0x0027f23e || addr == 0x0027f242 || addr == 0x002878e4 || addr == 0x00287950 ||
 				addr == 0x00287958 || addr == 0x00287962 || addr == 0x0028796a ||
 				addr == 0x0028c2be) && controller_count++ < 256)
-			logerror("code7_controller: pc=%08x r0=%08x r1=%08x r2=%08x state=%02x/%02x/%02x "
+			logerror("code7_controller: pc=%08x r0=%08x r1=%08x r2=%08x r4=%08x r5=%08x "
+					"state=%02x/%02x/%02x "
 					"init=%02x/%02x work=%02x selector=%02x netcfg=%08x mode=%04x "
-					"caller=%08x task=%02x t=%.6f\n",
+					"slot=%02x/%02x/%02x/%02x/%08x caller=%08x task=%02x t=%.6f\n",
 					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R4)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R5)),
 					fw_byte(0x0010fcd5), fw_byte(0x0010fcba), fw_byte(0x0010fd14),
 					fw_byte(0x0011fd03), fw_byte(0x0011fd04), fw_byte(0x00110e2d),
 					fw_byte(0x0011fcfa), fw_dword(0x0010d128),
 					fw_word(FW_STARTUP_MODE),
+					fw_byte(0x00110e4c), fw_byte(0x00110e4d), fw_byte(0x00110e4e),
+					fw_byte(0x00110e4f), fw_dword(0x00110e54),
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 					fw_byte(0x00100022), machine().time().as_double());
+		if ((addr == 0x0027f698 || addr == 0x0027f6d6 || addr == 0x0027f712 ||
+				addr == 0x0027f718 || addr == 0x0027f76c || addr == 0x0027f7ec ||
+				addr == 0x0027f7f6) && controller_activity_count++ < 128)
+			logerror("code7_controller_activity: pc=%08x input=%04x source=%02x guard=%02x "
+					"activity=%02x/%02x/%02x/%02x selector=%02x task=%02x caller=%08x t=%.6f\n",
+					addr, u32(m_maincpu->state_int(addr == 0x0027f698 ?
+						arm7_cpu_device::ARM7_R0 : arm7_cpu_device::ARM7_R4)) & 0xffff,
+					fw_byte(0x00110e2f), fw_byte(0x0011fd04),
+					fw_byte(0x00110e2c), fw_byte(0x00110e2d),
+					fw_byte(0x00110e2e), fw_byte(0x00110e2f),
+					fw_byte(0x0011fd03), fw_byte(0x00100022),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
+		if ((addr == 0x0020157e || addr == 0x00201870 || addr == 0x0026f5a4 ||
+				addr == 0x0026f5d8 || addr == 0x0026f5e0 || addr == 0x0026f5fa ||
+				addr == 0x00287250 || addr == 0x0028725a || addr == 0x00287266 ||
+				addr == 0x00287284 || addr == 0x0028728e || addr == 0x0029bb98 ||
+				addr == 0x0029bbb4 || addr == 0x0029bbc2 || addr == 0x002b4764) &&
+				controller_selector_count++ < 128)
+		{
+			const u32 selector_record = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R4));
+			const bool selector_record_valid = selector_record >= NOKIA_RAM_BASE &&
+				selector_record + 3 < NOKIA_RAM_END;
+			logerror("code7_selector0: pc=%08x r0=%08x r4=%08x cphs_flags=%08x "
+					"cphs_data=%02x/%02x/%02x/%02x feature=%02x/%02x/%02x/%02x "
+					"record=%02x/%02x/%02x/%02x sst_flags=%04x task=%02x caller=%08x t=%.6f\n",
+					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R4)),
+					fw_dword(0x0010d128), fw_byte(0x0010d24c), fw_byte(0x0010d24d),
+					fw_byte(0x0010d24e), fw_byte(0x0010d24f),
+					fw_byte(0x001124e8), fw_byte(0x001124e9),
+					fw_byte(0x001124ea), fw_byte(0x001124eb),
+					selector_record_valid ? fw_byte(selector_record + 0) : 0xff,
+					selector_record_valid ? fw_byte(selector_record + 1) : 0xff,
+					selector_record_valid ? fw_byte(selector_record + 2) : 0xff,
+					selector_record_valid ? fw_byte(selector_record + 3) : 0xff,
+					fw_word(0x0010d126),
+					fw_byte(0x00100022),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					machine().time().as_double());
+		}
 		if (addr == 0x002af798)
 		{
 			const u16 status = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0x1fff;
@@ -4173,7 +4257,7 @@ ROM_START( noki3210 )
 	ROMX_LOAD("3210f600a.fls", 0x000000, 0x200000, CRC(6a978478) SHA1(6bdec2ec76aca15bc12b621be4402e455562454b), ROM_BIOS(0))
 
 	ROM_REGION(0x04000, "eeprom", ROMREGION_ERASEFF)
-	ROM_LOAD("3210 selftest eeprom.bin", 0x00000, 0x04000, CRC(4d7bbbf5) SHA1(a60510d9d4e84dc0d522f1f3dea69a96c39fb494))
+	ROM_LOAD("3210 selftest eeprom.bin", 0x00000, 0x04000, CRC(7f7fd703) SHA1(3402e47e133dc74c7fa03863fee44a171f15100e))
 ROM_END
 
 ROM_START( noki3310 )

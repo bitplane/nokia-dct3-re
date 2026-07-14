@@ -139,18 +139,20 @@ with `0x05e2`, and callback state slot `0x5d` is already `0x0b`. Inputs
 `0x06c5`; none is observed. Flags `0x01a00000` intentionally select `0x032d`
 instead of an automatic `0x05dc` start. A valid task-13 segmented transaction
 publishes `0x05eb` directly to task 16 and does not enter this callback path.
-The separately
-mapped callback-`0x1a` chain (`0x1400 -> 0x08ac`) is dormant:
+The separately mapped callback-`0x1a` chain (`0x1400 -> 0x08ac`) is dormant:
 `0x1400` is task-5 mailbox ingress, and exhaustive recovery of all 188 direct
 task-5 event-helper calls found no in-ROM producer. It is therefore not the
 owner of the current ordinary-boot path. A separate telephony/controller path
-now produces `0x08ac` organically, but aborts when `0x287250` rejects selector
-`0`; it never reaches `0x0795`. A display lifecycle (`0x0280/81/82 -> 0x05e7
+produces `0x08ac` organically. Selector `0` accepts either an EEPROM-enabled
+CPHS CSP group-03 mask `0x20` or a parsed EF_SST service-5 pair; a valid
+CPHS/AoC profile passes it and causes the normal ACM/ACMmax/PUCT reads. The
+following `0x27f150` path is an Advice-of-Charge limit controller and publishes
+`0x019a` when an active limit is exhausted. It does not produce `0x0795`; the
+earlier connection was disproven by instruction and runtime tracing. A display
+lifecycle (`0x0280/81/82 -> 0x05e7
 -> 0x0389 -> 0x157e -> 0x0396 -> 0x05eb`) is a valid service/test route, not
-the ordinary predecessor. Callback `0x5d` is not the exclusive ordinary owner;
-the organically reached controller availability check is the active candidate.
-The unresolved code-7 predicate remains parallel to,
-and is not part of, the SIM lifecycle.
+the ordinary predecessor. The completed SIM file conversation is no longer
+the current code-7 frontier.
 
 The descriptor factory is now identified as `0x24f120`. Its four known callers
 (`0x2996aa`, `0x2997dc`, `0x299860`, `0x2998a0`) sit immediately before the callback-7 handler and

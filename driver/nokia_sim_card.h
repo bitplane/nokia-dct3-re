@@ -10,6 +10,7 @@ public:
 	auto irq_cb() { return m_irq_cb.bind(); }
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
+	void set_cphs_aoc(bool enabled) { m_cphs_aoc = enabled; }
 	bool enabled() const { return m_enabled; }
 	void set_atr(const u8 *data, unsigned length);
 
@@ -36,13 +37,14 @@ private:
 	void queue_fcp(u16 fid, unsigned requested);
 	void queue_read(u16 fid, unsigned requested);
 	static bool is_directory(u16 fid);
-	static bool is_known_file(u16 fid);
-	static unsigned ef_size(u16 fid);
-	static u8 ef_byte(u16 fid, unsigned offset);
+	bool is_known_file(u16 fid) const;
+	unsigned ef_size(u16 fid) const;
+	u8 ef_byte(u16 fid, unsigned offset) const;
 
 	devcb_write_line m_irq_cb;
 	emu_timer *m_rx_timer = nullptr;
 	bool m_enabled = false;
+	bool m_cphs_aoc = false;
 	u8 m_control = 0;
 	u8 m_atr[40] = { 0x3b, 0x10, 0x05 };
 	u8 m_atr_len = 3;

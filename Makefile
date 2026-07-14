@@ -21,6 +21,8 @@ SWAP ?= roms/3210f600a_swap16.bin
 RUN_DIR ?= run
 SECONDS ?= 20
 RUN_ENV ?=
+RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
+PRESERVE_NVRAM ?= 0
 CENSUS_LOG ?=
 CENSUS_MANIFESTS ?= tools/run_manifests/contact-service.json tools/run_manifests/deep-gsm.json
 
@@ -80,7 +82,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check run run-deep run-frontier smoke smoke-3330e audit-roms frame watch verify verify-deep verify-frontier verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check prepare-run-nvram run run-deep run-frontier smoke smoke-3330e audit-roms frame watch verify verify-deep verify-frontier verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -98,6 +100,7 @@ help:
 	@echo "make verify-deep    reproduce the Insert SIM frame and deep structural oracle"
 	@echo "make run-frontier   run the current coherent contact/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier oracles"
+	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
 	@echo "make verify-structure  compare deterministic boot milestones with $(ORACLE_STRUCT)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
 	@echo "make smoke-3330e     normalize and boot the local v4.50 PPM E service files"
@@ -184,34 +187,46 @@ run-manifest-default:
 
 run-manifest-deep-gsm: build
 	@mkdir -p run_manifest_deep_gsm
+	@$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 RUN_DIR=run_manifest_deep_gsm
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) \
 		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 NOKI3210_TRACE_GSM_LOWER=1 \
 		NOKI3210_TRACE_DSP_BOUNDARY=1 \
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_deep_gsm) \
 		NOKI3210_BOOT_SUMMARY=$(abspath run_manifest_deep_gsm)/boot_summary.txt \
-		./mame $(MAME_ARGS) -seconds_to_run 8
+		./mame $(MAME_ARGS) -nvram_directory $(abspath run_manifest_deep_gsm)/nvram -seconds_to_run 8
 	cp $(MAME_DIR)/error.log run_manifest_deep_gsm/error.log
 
 run-manifest-contact: build
 	@mkdir -p run_manifest_contact_default run_manifest_contact_deep
+	@$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 RUN_DIR=run_manifest_contact_default
 	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_TRACE_CSCMD=1 \
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_default) \
-		./mame $(MAME_ARGS) -seconds_to_run 1
+		./mame $(MAME_ARGS) -nvram_directory $(abspath run_manifest_contact_default)/nvram -seconds_to_run 1
 	cp $(MAME_DIR)/error.log run_manifest_contact_default/error.log
+	@$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 RUN_DIR=run_manifest_contact_deep
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) NOKI3210_TRACE_CSCMD=1 \
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_deep) \
-		./mame $(MAME_ARGS) -seconds_to_run 6
+		./mame $(MAME_ARGS) -nvram_directory $(abspath run_manifest_contact_deep)/nvram -seconds_to_run 6
 	cp $(MAME_DIR)/error.log run_manifest_contact_deep/error.log
 
 run-manifest-3330:
 	@$(MAKE) --no-print-directory smoke-3330e RUN_DIR=run_manifest_3330 SECONDS=3
 	cp $(MAME_DIR)/error.log run_manifest_3330/error.log
 
-run: build
+prepare-run-nvram:
+	@if [ "$(PHONE)" = "noki3210" ]; then \
+		mkdir -p "$(RUN_NVRAM_DIR)/$(PHONE)"; \
+		if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
+			cp "$(MAME_DIR)/roms/noki3210/3210 selftest eeprom.bin" \
+				"$(RUN_NVRAM_DIR)/$(PHONE)/eeprom"; \
+		fi; \
+	fi
+
+run: build prepare-run-nvram
 	@mkdir -p $(RUN_DIR)
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKI3210_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
-		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
+		./mame $(MAME_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
 run-deep:

@@ -119,9 +119,18 @@ reporter sites. Runtime state tracing places the power task in its normal
 no-charger state `0x04`; `0x21e40c` is a shutdown path and `0x21f8de` is reached
 only through firmware blocks labelled maintenance and cold charging. Modeling
 an analog-ready event solely to reach either site would select the wrong
-lifecycle. The remaining ordinary owner must therefore be recovered through
-the status routes at `0x255c3c` or `0x27b3b6`, without assuming one already
-mapped service/test predecessor is the only ingress.
+lifecycle. Selector `0` is a CPHS/SST provisioning check whose complete
+contract includes the EEPROM product-feature gate. Its following `0x27f150`
+path is a conditional Advice-of-Charge limit controller. Coherent
+exhausted-account evidence reaches its completion and proves it publishes
+`0x019a`, not `0x0795`. The actual non-display `0x0795` producer is downstream
+of catalogue sequences for packed `0x213a`/`0x613a` and
+`0x213b`/`0x613b` (status indexes `0x013a`/`0x013b`), both of which emit
+`0x08b0`; their callback paths are established only in later framework mode
+11. Mapped service/test, SAT, power,
+and this later controller lifecycle remain excluded from ordinary mode-4
+startup; the frontier is again unresolved callback-`0x5d` completion
+ownership.
 
 Status `0x0394` remains excluded from activating ordinary service `0x0a`: its
 three recovered constructors are tied to services `0x08`, `0x19`, and `0x1a`.

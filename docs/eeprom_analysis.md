@@ -91,6 +91,8 @@ by a firmware hook or RAM override.
 - starts with an erased 16 KiB image;
 - copies the firmware's fallback NV descriptor `0x0757` into
   `0x0db0..0x0f3f`;
+- supplies the firmware-defined default four-byte availability record
+  `{30 00 80 90}` at `0x0150..0x0153`;
 - supplies the known checksum/config bytes; and
 - initializes the ADC-monitor selector/weight records that cannot sensibly be
   all `0xff`.
@@ -98,9 +100,9 @@ by a firmware hook or RAM override.
 This profile is explicit test provisioning. It is not a factory EEPROM dump and
 does not belong in the hardware device. The generated image currently has:
 
-- CRC32 `4d7bbbf5`;
-- SHA-1 `a60510d9d4e84dc0d522f1f3dea69a96c39fb494`; and
-- SHA-256 `2df63a1d2413f0f4818b48d2dd0af986f407fe1192282597afe9215df8341572`.
+- CRC32 `7f7fd703`;
+- SHA-1 `3402e47e133dc74c7fa03863fee44a171f15100e`; and
+- SHA-256 `d7561ddd13d5c1c584bc785514102e68de5a39c3f1078467f769ef47e4850d67`.
 
 ## Remaining work
 

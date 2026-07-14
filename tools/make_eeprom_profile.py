@@ -21,6 +21,13 @@ def build_profile(flash: bytes) -> bytearray:
         image[0x0DB0 + index] = flash[raw]
 
     patches = {
+        # Firmware default written by the contact-service provisioning path at
+        # 0x236a78. Startup reloads this four-byte availability record from
+        # EEPROM offset 0x0150 through 0x29bb98.
+        0x0150: 0x30,
+        0x0151: 0x00,
+        0x0152: 0x80,
+        0x0153: 0x90,
         0x0170: 0x01,
         0x0171: 0x00,
         0x0244: 0x1E,
@@ -44,6 +51,12 @@ def build_profile(flash: bytes) -> bytearray:
     }
     for address, value in patches.items():
         image[address] = value
+
+    # The contact/config block checksum excludes the two correction bytes at
+    # 0x0154..0x0155 even though they reside inside the summed range.
+    contact_sum = (sum(image[0x0120:0x0244]) - image[0x0154] - image[0x0155]) & 0xFFFF
+    image[0x0244] = contact_sum >> 8
+    image[0x0245] = contact_sum & 0xFF
 
     for start, end in ((0x02E0, 0x02EC), (0x0310, 0x0314), (0x0330, 0x0338)):
         image[start:end] = bytes(end - start)

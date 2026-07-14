@@ -7,6 +7,11 @@
     "entries": 126,
     "entry_size": 8
   },
+  "status_translation_table": {
+    "address": "0x2cb968",
+    "entries": "0x2000",
+    "entry_size": 4
+  },
   "controller_dispatch_contract": {
     "entry": "0x253e20",
     "code_end": "0x254fa0",

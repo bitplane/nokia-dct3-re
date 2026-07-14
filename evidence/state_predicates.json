@@ -39,8 +39,14 @@
     {
       "id": "task1_mode4_code7", "owner": "startup", "status": "unresolved",
       "predicate": "Task 1 receives organic report code 0x07 after entering startup mode 0x0004",
-      "current": "The coherent profile completes non-CPHS SIM initialization and enters mode 0x0004 with SIM ENABLE set. All four reporter callers are classified. The ordinary profile publishes 0x08ac twice through the controller path and enters 0x27f150; selector getter 0x287216 returns 0, availability helper 0x287250(0) returns zero, and the handler aborts at 0x27f16e before activity-slot construction, 0x0795, or report code 7. The raw network/config word 0x10d128 is 0x28207c06, but its helper contract is not yet decoded. This is the first organically executed surviving path with an unsatisfied prerequisite.",
+      "current": "The coherent profile completes non-CPHS SIM initialization and enters mode 0x0004 with SIM ENABLE set. All four reporter callers are classified. Selector-0 and coherent AoC initialization prove 0x27f150 is a conditional call-charge-limit controller whose completion publishes 0x019a, not 0x0795. The only non-display 0x0795 route follows 0x08b0. Variable-length catalogue decoding finds both packed 0x213a/0x613a (sequence 0x089a,0x08b0) and packed 0x213b/0x613b (direct 0x08b0); both status indexes belong to later framework-mode-11 callback paths, while coherent startup remains in mode 0. Callback-0x5d completion inputs are finite: the ten direct 0x05e1 publishers are transaction tails, and the additional catalogue sequence headed by 0x05e1 requires packed 0x212b/0x612b, for which automated static coverage recovers no producer. Power, display/service, and later controller routes remain excluded; ordinary code-7 ownership is unresolved.",
       "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "controller_selector0_availability", "owner": "sim_provisioning", "status": "satisfied",
+      "predicate": "0x287250 selector 0 returns true only for its decoded CPHS CSP or EF_SST provisioning alternatives",
+      "current": "Primary helper 0x26f5a4 requires EEPROM product-feature query 0x1a to return zero (record 0x150, mirrored 0x1124e9.bit0 clear), the EF_CSP parsed-valid flag, and group-03 mask 0x20. Fallback 0x26eef4 requires the EF_SST parsed-valid flag and both mapped bits sourced from EF_SST byte 2 bits 1 and 2. An opt-in standards-valid CPHS phase-2/AoC card is read through the ordinary SIM device path and makes the selector return one without firmware state changes. The separate post-selector guard is 0x11fd04 and belongs to the conditional AoC limit lifecycle; it is not part of selector availability itself.",
+      "evidence": ["docs/resource_providers.md", "docs/interactive_handoff.md", "docs/sim_registration.md"]
     },
     {
       "id": "generic_service_05e8_activation", "owner": "generic_service", "status": "unresolved",

@@ -16,6 +16,7 @@ void nokia_sim_card_device::device_start()
 {
 	m_rx_timer = timer_alloc(FUNC(nokia_sim_card_device::rx_ready), this);
 	save_item(NAME(m_enabled));
+	save_item(NAME(m_cphs_aoc));
 	save_item(NAME(m_control));
 	save_item(NAME(m_atr));
 	save_item(NAME(m_atr_len));
@@ -309,19 +310,26 @@ bool nokia_sim_card_device::is_directory(u16 fid)
 	return fid == 0x3f00 || fid == 0x7f10 || fid == 0x7f20 || fid == 0x7f21 || fid == 0x7f40;
 }
 
-bool nokia_sim_card_device::is_known_file(u16 fid)
+bool nokia_sim_card_device::is_known_file(u16 fid) const
 {
 	if (is_directory(fid))
 		return true;
 	return ef_size(fid) != 0;
 }
 
-unsigned nokia_sim_card_device::ef_size(u16 fid)
+unsigned nokia_sim_card_device::ef_size(u16 fid) const
 {
+	if (m_cphs_aoc)
+	{
+		if (fid == 0x6f16)
+			return 3;
+		if (fid == 0x6f15)
+			return 18;
+	}
 	static constexpr struct { u16 fid; u8 size; } files[] = {
 		{ 0x2fe2, 0x0a }, { 0x6f05, 0x04 }, { 0x6fb7, 0x0f }, { 0x6fad, 0x03 }, { 0x6f07, 0x09 },
 		{ 0x6f38, 0x0f }, { 0x6f74, 0x10 }, { 0x6f78, 0x02 }, { 0x6f7e, 0x0b }, { 0x6f20, 0x09 },
-		{ 0x6f7b, 0x0c }, { 0x6fae, 0x01 }, { 0x6f31, 0x01 }, { 0x6f37, 0x03 },
+		{ 0x6f7b, 0x0c }, { 0x6fae, 0x01 }, { 0x6f31, 0x01 }, { 0x6f37, 0x03 }, { 0x6f39, 0x03 },
 		{ 0x6f41, 0x05 }, { 0x6f43, 0x02 }, { 0x6f46, 0x11 }, { 0x6f13, 0x01 },
 		{ 0x6f98, 0x16 }, { 0x6f9b, 0x25 }, { 0x6f91, 0x01 }, { 0x6f93, 0x01 },
 		{ 0x6f95, 0x1d }, { 0x6f96, 0x1d }, { 0x6f9f, 0x01 }, { 0x6f92, 0x01 },
@@ -333,21 +341,42 @@ unsigned nokia_sim_card_device::ef_size(u16 fid)
 	return 0;
 }
 
-u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset)
+u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 {
 	static constexpr u8 iccid[] = { 0x98, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0 };
 	static constexpr u8 ecc[] = { 0x11, 0xf2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	static constexpr u8 language_preference[] = { 0x01, 0xff, 0xff, 0xff };
-	// A standards-valid minimal service table: no optional SIM services are
-	// allocated or activated. Mandatory card identification remains available.
+	// The base card advertises no optional SIM services.  The opt-in CPHS AoC
+	// profile also advertises GSM 11.11 service 5, keeping EF_CSP and EF_SST
+	// consistent and causing the ME to read ACM, ACMmax and PUCT normally.
 	static constexpr u8 service_table[15] = { 0 };
+	// GSM 11.11 defines zero as "ACMmax not valid": this profile enables AoC
+	// without imposing a subscriber call-charge limit.
+	static constexpr u8 acm_max[] = { 0x00, 0x00, 0x00 };
+	static constexpr u8 acm[] = { 0x00, 0x00, 0x00 };
+	static constexpr u8 puct[] = { 'G', 'B', 'P', 0x00, 0x00 };
 	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98, 0x10 };
+	// CPHS phase 2 with only the Customer Service Profile allocated and
+	// activated.  The CSP contains its mandatory nine group entries and makes
+	// only Advice of Charge (group 03, bit 6) customer-accessible.
+	static constexpr u8 cphs_info[] = { 0x02, 0x03, 0x00 };
+	static constexpr u8 cphs_aoc[] = {
+		0x01, 0x00, 0x02, 0x00, 0x03, 0x20,
+		0x04, 0x00, 0x05, 0x00, 0x06, 0x00,
+		0x07, 0x00, 0x08, 0x00, 0x09, 0x00
+	};
 	if (fid == 0x2fe2 && offset < std::size(iccid)) return iccid[offset];
 	if (fid == 0x6f05 && offset < std::size(language_preference)) return language_preference[offset];
-	if (fid == 0x6f38 && offset < std::size(service_table)) return service_table[offset];
+	if (fid == 0x6f38 && offset < std::size(service_table))
+		return m_cphs_aoc && offset == 1 ? 0x03 : service_table[offset];
 	if (fid == 0x6fb7 && offset < std::size(ecc)) return ecc[offset];
 	if (fid == 0x6f07 && offset < std::size(imsi)) return imsi[offset];
+	if (m_cphs_aoc && fid == 0x6f16 && offset < std::size(cphs_info)) return cphs_info[offset];
+	if (m_cphs_aoc && fid == 0x6f15 && offset < std::size(cphs_aoc)) return cphs_aoc[offset];
+	if (m_cphs_aoc && fid == 0x6f37 && offset < std::size(acm_max)) return acm_max[offset];
+	if (m_cphs_aoc && fid == 0x6f39 && offset < std::size(acm)) return acm[offset];
+	if (m_cphs_aoc && fid == 0x6f41 && offset < std::size(puct)) return puct[offset];
 	if (fid == 0x6f7e) return offset == 10 ? 0x01 : (offset < 4 ? 0xff : 0x00);
 	if (fid == 0x6fae) return 0x02;
 	return 0xff;

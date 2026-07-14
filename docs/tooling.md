@@ -8,7 +8,8 @@
   environment variable (default points at `roms/3210f600a_swap16.bin`).
   - `disrom.py ADDR:LEN ...` — **the** disassembler. Thumb-1 (ARMv4T) correct:
     it rejects capstone's Thumb-2 mis-decodes and resolves pc-relative pool
-    literals (halfword-swapped). Prefer this over anything capstone-raw.
+    literals (halfword-swapped). It honors `NOKI_BIN`, including normalized
+    second-ROM images. Prefer this over anything capstone-raw.
   - `findcalls.py ADDR...` — find `bl`/branch callers of an address
   - `findptr.py VALUE...` — find pointer literals (raw LE and halfword-swapped)
   - `dump.py ADDR [LEN]` — dump words / halfword-swapped pointers
@@ -19,7 +20,10 @@
     subsystem; use `CENSUS_LOG=mame/error.log` only for ad-hoc unscoped work. Records
     retain `extracted_static`, `reviewed_static`, or `observed_runtime`
     provenance rather than presenting reviewed control-flow semantics as
-    mechanically recovered facts.
+    mechanically recovered facts. Requested status inventories also scan the
+    fixed variable-length sequence catalogue at `0x2cb968`, decoding packed
+    event argument counts and the `0x00dc` terminator. Inputs `0x213a`/`0x613a`
+    emit `0x089a, 0x08b0`, while `0x213b`/`0x613b` emit `0x08b0` directly.
   - `test_message_census.py` — byte-lane tests for MCU byte reads and rotated
     32-bit literal-pool values in the swap16 image, plus runtime-manifest isolation.
   - `validate_evidence.py` — validates `evidence/*.json` and runtime-manifest

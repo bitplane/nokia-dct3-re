@@ -41,8 +41,10 @@
 > DSP-downstream ownership prediction is falsified. The code-7 search must
 > return to the remaining unconditional ordinary-boot completion families.
 > That census is now complete: the current profile organically reaches the
-> controller family through `0x08ac`, then fails `0x287250(0)` and exits at
-> `0x27f16e` before `0x0795`. See “Current ordinary `0x08ac` route” below.
+> controller family through `0x08ac`. A valid CPHS/AoC card passes
+> `0x287250(0)`, but the next guard requires an active task-14 call-control
+> transaction. Ordinary boot correctly has none and exits before `0x0795`.
+> See “Classified conditional `0x08ac` route” below.
 > The fixed
 > startup-report bridge below satisfies neither predicate organically.
 
@@ -352,19 +354,47 @@ for the pre-existing `0x05e2` / message-type `0xfe` event; it never received `0x
 confirms that the periodic heartbeat may be necessary DSP behavior but is not the semantic
 telephony-control completion, so the temporary heartbeat model was removed again (**R**).
 
-## Current ordinary `0x08ac` route
+## Classified conditional `0x08ac` / AoC route
 
-The later coherent SIM profile changes the runtime conclusion without reviving
-the disproven callback-`0x1a` premise. It organically publishes `0x08ac` twice
-at about 5.65 s. Controller dispatcher `0x255b5e` calls `0x27f150`, which reads
-selector byte `[0x11fcfa] == 0` through `0x287216` and calls availability helper
-`0x287250(0)`. The helper returns zero twice and the handler exits through
-`0x27f16e`, before its activity-slot construction and any `0x0795` publication.
+The later coherent SIM profile organically publishes `0x08ac` twice.
+Controller dispatcher `0x255b5e` calls `0x27f150`, reads selector byte
+`[0x11fcfa] == 0`, and calls availability helper `0x287250(0)`.
 
-This is the first executed surviving code-7 route with a bounded missing
-predicate. The accompanying raw network/config word `[0x10d128]` is
-`0x28207c06`; that observation is not yet a decode of the helper contract and
-must not be reduced to a guessed single-bit requirement (**R**).
+The availability contract is fully decoded. Primary helper `0x26f5a4` first
+requires product-feature query `0x2b47a0(0x1a) == 0`: EEPROM record `0x150`,
+mirrored at `0x1124e8`, with `0x1124e9.bit0` clear. It then requires original
+CPU bit 19 in `[0x10d128]`, copies 40 bytes from `0x10d24c`, and tests output
+byte 8 bit 7. CPHS parser `0x20157e` maps `EF_CSP (6F15)` group `0x03` mask
+`0x20` to that bit and sets the completion-valid flag. CPHS 4.2 names the bit
+Advice of Charge.
+
+Fallback `0x26eef4` requires original bit 11 of `[0x10d126]`, copies 12 bytes
+from `0x10d130`, and requires output byte 1 bits 6 and 7 together. `EF_SST
+(6F38)` parser `0x201150` is the only semantic writer: it maps EF_SST byte 2
+bits 1 and 2 to those result bits and sets the consumed validity bit. Global
+RAM initialization is the only other writer class. This accounts for both
+ways selector 0 can succeed (**S**).
+
+The opt-in CPHS phase-2 card makes selector 0 succeed and advertises EF_SST
+service 5, causing ordinary reads of `EF_ACM`, `EF_ACMmax`, and `EF_PUCT`.
+Initializer `0x27f9e8`, not a missing `0x13fe` producer, owns the following
+guard `0x11fd04`. Zero ACMmax is GSM 11.11's valid "maximum not valid" value
+and leaves the guard clear. With a coherent exhausted-account fixture
+`ACM == ACMmax == 1`, the initializer sets the guard, `0x27f150` constructs
+the activity slot, computes zero remaining allowance, and reaches `0x27f23e`.
+That instruction constructs `0x019a`; it does not construct `0x0795`. This
+disproves the former controller-to-code-7 join (**R correction**).
+
+The real non-display `0x0795` producer is `0x28796a`. It requires selectors 0
+and 1 both unavailable and controller state `0x10fcd5 == 2`. Task-5 input
+`0x08b0` invokes reconciliation. The fixed catalogue at `0x2cb968` proves that
+packed `0x213a`/`0x613a` expands to `0x089a, 0x08b0`, while adjacent packed
+`0x213b`/`0x613b` emits `0x08b0` directly. Both status indexes belong to later
+framework-mode-11 paths: `0x013a` is consumed by callback `0x24`, and callback
+`0x013b` belongs to a resident descriptor registered by `0x28ba9a` only after
+input `0x03ab` establishes that mode. The coherent boot remains in mode 0. Together with the
+independently excluded display-state-7 producer, this exhausts literal
+`0x0795` producers and excludes it as ordinary mode-4 ownership (**S/R**).
 
 Callback-table index `0x5d` at `0x27b370` is not itself the missing activation.
 The initialization sequence reaches it with state byte `[0x11fcdd] == 0x0b`
@@ -442,6 +472,26 @@ census. The coherent runtime watch spans initialization, the chooser at
 1.146 s, and the later reset; it observes no nonzero value. Consequently there
 is no ordinary advancing writer whose prerequisite can be followed to a
 hardware boundary. The goal's conditional 3310 comparison is not activated.
+
+The subsequent direct-`0x05e1` census closes the next finite surface rather
+than reopening slot `0x45`. Ten calls belong to callbacks `0x4e`, `0x51`,
+`0x34`, `0x32`, `0x59`, `0x47` (three), `0x6d`, and `0x0f`; each is a
+completion or cleanup tail requiring an existing transaction. Callback `0x47`
+is the only owner selected in the coherent run. A second arithmetic audit
+corrects its shared completion branch to inputs `0x0578` and `0x1440`, not
+`0x0778` and `0x1441`. Input `0x05dc` organically starts a text/UI transaction
+through `0x24b174 -> 0x24af70`, which stores `0x0578` as its completion and
+publishes `0x057c` when presented. The run reaches `0x05dc` and `0x057c`, but
+not the interactive completion. This is a UI lifecycle, not evidence for a
+missing DSP/network response or the unconditional code-7 owner. See
+`resource_providers.md` for the complete owner table.
+
+The sequence catalogue contributes one additional indirect route: packed
+`0x212b`/`0x612b` (status index `0x012b`) expands to a sequence headed by
+`0x05e1`. Correct catalogue-mode decoding matters here: bare `0x012b` does not
+select the sequence. Automated producer coverage finds neither packed form in
+literal loads, recovered constant constructions, or direct packed-event calls,
+so this is not an evidenced ordinary predecessor.
 
 **Assessment for faithful emulation.** The mode-0d events fire because CCONT/startup complete;
 code 7 and the six checklist messages do **not**, because their subsystems never reach the

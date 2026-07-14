@@ -13,6 +13,13 @@ four-model Insert SIM profile against `oracles/noki3210-deep.struct`. That
 profile remains a regression artifact; it is not the current coherent
 contact-service acceptance profile.
 
+The default runner reseeds an isolated per-run NVRAM directory from the
+generated EEPROM profile. This prevents an old shared `mame/nvram` file from
+silently changing product data. Introducing that deterministic fixture added
+four stable EEPROM transactions and corresponding FIQ/CCONT accounting while
+preserving the exact LCD hash; the structural oracle records the profile-backed
+baseline rather than the former stale-NVRAM run.
+
 ## Summary fields
 
 The schema records:

@@ -106,6 +106,42 @@ owned and `0x263ba0` handles display-owned `0x0396`. The sole effective
 `0x0397` has no recovered direct publisher. Four of four effective `0x0795`
 literal sites are classified as one comparator and three producer paths.
 
+The direct `0x05e1` surface is also finite: ten calls owned by callbacks
+`0x4e`, `0x51`, `0x34`, `0x32`, `0x59`, `0x47` (three calls), `0x6d`, and
+`0x0f`. None is an autonomous ordinary-boot initializer:
+
+| Owner | Direct call(s) | Required lifecycle |
+|---|---|---|
+| `0x4e` | `0x248dfa` | downstream input `0x05eb`; republishes an already-complete lifecycle |
+| `0x51` | `0x25c88c` | object cleanup after `0x0bd6`, itself constructed from input `0x0bcc`; no direct in-ROM `0x0bcc` publisher recovered |
+| `0x34` | `0x2686bc` | input `0x00c8` with an outstanding stored transaction handle |
+| `0x32` | `0x27c090` | object-bearing input `0x13f8` with subtype `0x65` or `0x67`; no direct in-ROM `0x13f8` publisher recovered |
+| `0x59` | `0x288030` | input `0x0348` after registration/session work and local state `0x11fcc3 == 1`; no direct in-ROM `0x0348` publisher recovered |
+| `0x47` | `0x28f514`, `0x28f540`, `0x28f56a` | respectively text/UI transaction completions `0x0578`/`0x1440`, call-message inputs `0x138b`/`0x138c`, or the excluded local/test `0x05e7` lifecycle |
+| `0x6d` | `0x299122` | input `0x0546`, local state `0x0d`, and resource `0x25` available |
+| `0x0f` | `0x2a0dc8` | UI/session inputs `0x0274` or `0x0348` followed by teardown/resource release |
+
+The fixed sequence catalogue adds one indirect numeric route: catalogue-mode
+packed input `0x212b` or `0x612b` (status index `0x012b`) expands to a sequence
+headed by `0x05e1`. The census finds no literal load, recovered constant
+construction, or direct packed-event call for either invoking form. The table
+entry therefore proves a valid later transition, not an ordinary producer.
+
+The only owner selected in the coherent run is callback `0x47`. A corrected
+execution of its subtract cascade shows that the shared branch at `0x28f4e4`
+accepts `0x0578` and `0x1440`, not `0x0778` and `0x1441`. The adjacent
+`0x143f -> 0x28f6a4 -> 0x1440` path is therefore numerically relevant after
+all, although `0x1440` is not observed in the coherent boot.
+
+The observed input `0x05dc` instead enters `0x28f588` and starts the generic
+text/UI transaction manager through `0x24b174 -> 0x24af70`. That constructor
+stores `0x0578` as its completion status at `[0x110590 + 0x16]`, publishes
+`0x057c` when the editor is presented, and waits for the UI transaction to
+finish. The coherent run receives `0x05dc` at 4.557 s and `0x057c` shortly
+afterward, but no `0x0578`, `0x1440`, or `0x05e1`. This classifies the branch
+as an interactive UI lifecycle, not an absent radio/DSP reply and not an
+unconditional ordinary-boot hardware prerequisite.
+
 The transient and resident service-registration completion paths at `0x2632be` and
 `0x263e64` both publish readiness after
 `0x26265c` reports no registrations remain. The reviewed deep run executes
@@ -116,11 +152,38 @@ at `0x2298d2` consumes event
 service-command/session block and is not presently an ordinary-hardware
 candidate.
 
-The controller route is now the active frontier. The canonical eight-second
-profile produces `0x08ac` twice and enters `0x27f150` twice. Selector getter
-`0x287216` returns `0`; availability helper `0x287250(0)` returns zero; and the
-handler aborts at `0x27f16e` before building the activity slots that can
-publish `0x0795`. No registration completion tail, global `0x0395`, `0x05eb`,
-`0x06c5`, `0x0795`, or report code 7 is observed. The next investigation is
-therefore the bounded contract behind `0x287250` selector 0, not another
-search for an unexecuted reporter.
+The canonical profile produces `0x08ac` twice and enters `0x27f150` twice.
+Availability helper `0x287250(0)` has two card-provisioning success paths:
+
+- `0x26f5a4` first requires product-feature query `0x2b47a0(0x1a)` to return
+  zero (`EEPROM` record `0x150`, mirrored byte `0x1124e9.bit0 == 0`), then
+  requires parsed-valid CPHS `EF_CSP (6F15)` and tests group `0x03` mask
+  `0x20` in its 40-byte result;
+- fallback `0x26eef4` requires the parsed-valid flag for `EF_SST (6F38)` and
+  tests both bits `0xc0` in result byte 1. Parser `0x201150` derives those bits
+  from EF_SST byte 2 bits 1 and 2.
+
+The ordinary non-CPHS card correctly satisfies neither. An opt-in valid CPHS
+phase-2 profile with CSP allocated/activated and Advice of Charge enabled
+organically reads `6F16` and `6F15`, sets `[0x10d128].bit19`, and makes
+`0x287250(0)` return one. Enabling service 5 then makes firmware read
+`EF_ACM (6F39)`, `EF_ACMmax (6F37)`, and `EF_PUCT (6F41)` normally.
+
+Initializer `0x27f9e8` owns the following guard `0x11fd04`: it sets the byte
+only when an ACM maximum is active. GSM 11.11's zero value means the maximum
+is not valid and correctly leaves the guard clear. A diagnostic but
+standards-valid exhausted account (`ACM == ACMmax == 1`) makes `0x27f150`
+construct its activity slot and take `0x27f23e` without firmware mutation.
+That call publishes status `0x019a`, not `0x0795`. The former
+`0x13fe -> 0x0795` frontier was a false join between controller lifecycles.
+
+There are exactly two literal `0x0795` producers. The display producer at
+`0x28c2be` requires service/display state 7 and is excluded from mode 4. The
+other, `0x28796a`, requires selectors 0 and 1 both unavailable plus controller
+state `0x10fcd5 == 2`. Status `0x08b0` invokes that reconciliation; the fixed
+catalogue expands packed callback input `0x213a`/`0x613a` to
+`0x089a, 0x08b0`, and adjacent `0x213b`/`0x613b` directly to `0x08b0`.
+Status `0x013a` is a callback-`0x24` input in framework mode 11; callback
+`0x013b` belongs to a resident descriptor registered at `0x28ba9a` only after
+input `0x03ab` establishes the same mode. The coherent boot remains in mode 0, making
+this a later conditional route rather than the ordinary code-7 owner.
