@@ -39,14 +39,8 @@
     {
       "id": "task1_mode4_code7", "owner": "startup", "status": "unresolved",
       "predicate": "Task 1 receives organic report code 0x07 after entering startup mode 0x0004",
-      "current": "The coherent profile completes non-CPHS SIM initialization and enters mode 0x0004 with SIM ENABLE set, but receives no later code 7. Power, service/test, task-13, callback-0x1a and display-state-7 routes are excluded. Callback 0x5d is organically in state 0x0b. The context-completion chooser at 0x24d716 runs once with callback-state slot 0x45 at 0x11fcc5 equal to zero and emits ineligible sibling status 0x09d1. A nonzero ordinary state would select 0x09d0; its state-0x0b descriptor is eligible and carries action 0x00dc into callback 0x5d's mapped code-7 completion. A coherent array write-watch records initialization plus zero writes at 0x2aefa2 and 0x299ba0, but no nonzero slot-0x45 write. Selector-0x45 catalogue descriptors all specify new state 0x3f (no transition). The unresolved predicate is the legitimate direct/indexed writer or framework owner of slot 0x45 and its external prerequisite.",
+      "current": "The coherent profile completes non-CPHS SIM initialization and enters mode 0x0004 with SIM ENABLE set, but receives no later code 7. Power, service/test, task-13, callback-0x1a and display-state-7 routes are excluded. The 0x24d716 context chooser maps a possible route through 0x09d0 and callback 0x5d, but a quantified writer census rejects slot 0x45 as the active blocker: 46 catalogue rows preserve state, none of 46 generic initialization records targets selector 0x45, broad indexed stores clear it, and the sole exact direct store is the global-0x05e2 reset at 0x299ba0. Code 7 remains unresolved, but the search must return to the remaining unconditional ordinary-boot completion families rather than assume a missing slot-45 transition.",
       "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
-    },
-    {
-      "id": "callback45_ordinary_state", "owner": "unresolved", "status": "unresolved",
-      "predicate": "The ordinary context lifecycle advances callback-state slot 0x45 at 0x11fcc5 from reset state before the 0x24d716 completion chooser runs",
-      "current": "Runtime observes only zero writes and static catalogue descriptors for selector 0x45 all carry no-transition state 0x3f. A DSP-downstream completion is the registered working hypothesis because the MCU has transmitted its L1 configuration while the emulated DSP remains semantically incomplete, but no writer or transport edge yet proves DSP ownership. The next pass must enumerate direct and indexed writers with quantified coverage and treat absence as a valid result.",
-      "evidence": ["docs/interactive_handoff.md", "docs/dsp_interface.md"]
     },
     {
       "id": "generic_service_05e8_activation", "owner": "generic_service", "status": "unresolved",

@@ -14,14 +14,19 @@
 > mode `0x0004`; both this fallback and the SIM-ready/no-charger mode-`0x0007`
 > branch explicitly wait for report code 7 before the shared init burst.
 > Callback-table index `0x5d` is already exercised with state `0x0b`, but the
-> coherent run supplies only initialization status `0x05e2`. The strongest
-> ordinary predecessor is now the context-completion chooser at `0x24d716`.
+> coherent run supplies only initialization status `0x05e2`. A bounded census
+> has now demoted the context-completion chooser at `0x24d716` from ordinary
+> predecessor to a mapped but unproved alternative.
 > Callback-state slot `0x45` at `0x11fcc5` remains zero, so the chooser emits
 > sibling status `0x09d1`; state `0x0b` makes that descriptor ineligible while
 > accepting `0x09d0`. The accepted descriptor invokes callback `0x5d` with
 > action `0x00dc`, closing the mapped path to report code 7.
 > A coherent write-watch sees only array initialization and two later zero
-> writes to slot `0x45` (`0x2aefa2`, `0x299ba0`), with no nonzero write.
+> writes to slot `0x45` (`0x2aefa2`, `0x299ba0`), with no nonzero write. Static
+> enumeration finds no nonzero producer either: all 46 selector-`0x45`
+> catalogue rows preserve state; none of the 46 table initialization records
+> targets selector `0x45`; and the only exact direct store is the `0x05e2`
+> lifecycle reset at `0x299ba0`.
 > Task 13's separate direct-to-task-16 `0x05eb` route does not enter this chain.
 > Later producer analysis classifies the `0x0280`-`0x0282` path as a
 > service/test lifecycle, not the ordinary owner.
@@ -31,8 +36,10 @@
 > maintenance/cold charging in the ROM. The display-owned
 > `0x06ca -> 0x0795` alternative is excluded from the current mode-4 lifecycle:
 > it requires display startup state 7, while the ordinary fallback enters mode
-> 4 with state 3. The next bounded question is who legitimately owns and
-> advances callback-state slot `0x45`.
+> 4 with state 3. There is therefore no evidence that ordinary boot should
+> advance callback-state slot `0x45`, and its previously registered
+> DSP-downstream ownership prediction is falsified. The code-7 search must
+> return to the remaining unconditional ordinary-boot completion families.
 > The fixed
 > startup-report bridge below satisfies neither predicate organically.
 
@@ -367,7 +374,7 @@ transaction-engine states reached by local/test command handlers, and
 `0x253e20` never produces them during ordinary boot (**R**). The remaining
 question is which other global `0x05eb` producer represents ordinary readiness.
 
-### Current frontier: `0x09d0` versus `0x09d1`
+### Falsified frontier: `0x09d0` versus `0x09d1`
 
 The context manager at `0x24d588` scans four activity slots and reaches its
 completion tail at `0x24d716`. It reads callback-state slot `0x45` from
@@ -387,11 +394,37 @@ boot: its `0x06ca` case requires startup/display state 7, but task 1 sets state
 A bounded write-watch over the callback-state array records slot `0x45` being
 zeroed during initialization, then written as zero by catalogue commit
 `0x2aefa2` and callback path `0x299ba0`. No nonzero write occurs through the
-coherent three-second boot. All decoded catalogue descriptors for selector
-`0x45` carry new-state value `0x3f` (no state transition), so the missing owner
-must be a direct/indexed firmware writer or another framework operation. DSP
-ownership remains a hypothesis until that writer census reaches a transport
-boundary.
+coherent three-second boot. The corresponding static census covers 46
+selector-`0x45` catalogue rows, 46 generic initialization/reconciliation
+records, 47 exact `0x11fcc5` literal references, and 57 `0x11fc80` array-base
+literal references. All selector-`0x45` descriptors carry new-state value
+`0x3f` (no transition); the generic record table contains no selector `0x45`;
+the broad indexed stores at `0x291ff4`/`0x292016` only initialize the array to
+zero; and the sole exact direct store at `0x299ba0` handles global `0x05e2` by
+zeroing slots `0x45` through `0x48` before publishing `0x138e`/`0x1390`.
+
+This is a quantified absence result, not proof that no computed pointer could
+ever alias the byte. It is sufficient to reject the working premise: no
+identified MCU framework or ordinary runtime path advances slot `0x45`, and
+none reaches a DSP prerequisite. Treat `0x09d0` as a valid mapped completion
+route whose ordinary ownership is unproved, not as the current code-7 blocker.
+
+Writer classification:
+
+| Site/mechanism | Classification | Slot-`0x45` effect | Runtime coverage |
+|---|---|---|---|
+| `0x291ff4` broad indexed initializer | dormant alternative initialization branch | zero only | not selected in the coherent profile |
+| `0x292016` broad indexed initializer | ordinary initialization | zero only | observed twice at 0.232 s (the aligned-word watch reports both byte lanes) |
+| `0x29208a` table initializer | framework path, excluded for selector `0x45` | none; its complete 46-record key set omits `0x45` | no slot-`0x45` write |
+| `0x2924c2` table reconciler | framework path, excluded for selector `0x45` | none; it consumes the same key set | no slot-`0x45` write |
+| `0x2aefa2` catalogue commit | ordinary framework commit | preserve only; all 46 matching descriptors encode `0x3f` | observed at 0.853 s with value remaining zero |
+| `0x299ba0` global-`0x05e2` handler | ordinary lifecycle reset | explicitly zeros slots `0x45`-`0x48` | observed at 1.154 s with value remaining zero |
+
+No service/test writer, nonzero direct writer, or DSP-owned writer survives the
+census. The coherent runtime watch spans initialization, the chooser at
+1.146 s, and the later reset; it observes no nonzero value. Consequently there
+is no ordinary advancing writer whose prerequisite can be followed to a
+hardware boundary. The goal's conditional 3310 comparison is not activated.
 
 **Assessment for faithful emulation.** The mode-0d events fire because CCONT/startup complete;
 code 7 and the six checklist messages do **not**, because their subsystems never reach the

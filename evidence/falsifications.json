@@ -51,6 +51,12 @@
       "evidence": ["docs/interactive_handoff.md"]
     },
     {
+      "id": "callback45_is_ordinary_code7_blocker", "status": "disproven",
+      "hypothesis": "An ordinary DSP-downstream completion advances callback-state slot 0x45 and selects 0x09d0 as the missing report-code-7 predecessor",
+      "conclusion": "Runtime observes only zero writes. Static coverage comprises 46 selector-0x45 catalogue rows (all state 0x3f/preserve), all 46 generic initialization/reconciliation records (no selector 0x45), 47 exact-address literal references (one direct store, the global-0x05e2 reset at 0x299ba0), and 57 array-base literal references (broad indexed writers only clear the slot). No identified writer reaches a DSP prerequisite. The 0x09d0 path remains mapped but has no evidenced ordinary owner.",
+      "evidence": ["docs/interactive_handoff.md", "docs/sim_registration.md"]
+    },
+    {
       "id": "battery_callers_are_ordinary_code7_owner", "status": "disproven",
       "hypothesis": "A normal 3210 ADC value or calibration activates one of the two power-owned report-code-7 callers during ordinary boot",
       "conclusion": "The 0x21e40c caller is battery event 0x25 under the firmware string 'Check voltage level for shutdown'; selector 1 value 0x1b0 powers off before task 1, while 0x1c0 reaches mode 0x0004 with battery band 2 and no code 7. The 0x21f8de caller is also confined to the low-voltage/charger lifecycle. These are shutdown/power-event reporters, not the missing ordinary-ready producer",

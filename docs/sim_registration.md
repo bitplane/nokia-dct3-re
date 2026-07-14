@@ -153,14 +153,18 @@ returns that timeout as `0x06c5`, completing the same route. The earlier
 `0x06dc` interpretation was a subtract-cascade arithmetic error. Callback-table
 flags `0x01a00000` select initialization status `0x032d`, rather than automatic
 `0x05dc`, so organic activation does not itself start the completion timer.
-The later context-completion census narrows that owner further. Manager
+The later context-completion investigation maps another possible owner. Manager
 `0x24d588` reaches chooser `0x24d716` with callback-state slot `0x45`
 (`[0x11fcc5]`) still zero and emits `0x09d1`. For callback `0x5d` state `0x0b`,
 that sibling descriptor is ineligible; `0x09d0` is eligible and carries action
 `0x00dc` into the mapped completion. A coherent write-watch records no nonzero
-slot-`0x45` write, and selector-`0x45` catalogue descriptors all specify
-no-transition state `0x3f`. The missing fact is now the direct/indexed writer
-or framework owner that establishes slot `0x45` during ordinary boot.
+slot-`0x45` write. The completed bounded census finds that all 46
+selector-`0x45` catalogue descriptors specify no-transition state `0x3f`, none
+of the 46 generic initialization records targets selector `0x45`, broad
+indexed stores only clear it, and the only exact direct store is the global
+`0x05e2` reset at `0x299ba0`. The premise that ordinary boot must establish a
+nonzero slot `0x45` is therefore unsupported; this route is retained as mapped
+but is no longer the active code-7 frontier.
 A valid task-13 segmented transfer produces `0x05eb` directly for task 16 via
 `0x23e1a4`; it does not feed the global callback sweep or callback `0x5d`.
 Correlating such a transfer with the organic DSP `{0x0a, 0x09}` transaction
