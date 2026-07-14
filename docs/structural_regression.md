@@ -1,6 +1,9 @@
 # Structural boot regression
 
-The LCD frame oracle proves the final visible state. The structural oracle
+The LCD frame oracle proves the final visible state. Under `-video none`, the
+Lua harness mirrors the PCD8544 command/data stream and snapshots completed and
+frame-visible states; the phone driver has no parallel capture implementation.
+The structural oracle
 guards stable mid-boot behavior that can regress while still converging on the
 same frame.
 

@@ -16,15 +16,19 @@ explicitly documented research shortcuts:
 | `ram_w`   (≈10 lines) | `ram_w_firmware_traces` (write-side research observations) |
 | `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (read-side research observations) |
 
-The PCD8544 LCD and MAME `I2C_24C128` now model the display and external
-EEPROM. CCONT is an explicit local `nokia_ccont_device` owning its serial
+The PCD8544 LCD and MAME `I2C_24C128` model the display and external
+EEPROM. Headless LCD capture and scripted keypad input belong to the Lua
+acceptance harness; the production driver contains neither a second LCD parser
+nor synthetic key state. CCONT is an explicit local `nokia_ccont_device` owning its serial
 registers, ADC results, RTC, interrupt state and watchdog. Task 7 remains the
 firmware adapter to the external service/test peer; the request-driven
-DSP/contact prototype supplies observed peer transactions through the DSP ring.
+DSP/contact prototype is an explicit `nokia_dsp_peer_device`. It owns shared DSP
+RAM, MCU/DSP ring indices, service cadence, and the observed contact-session
+state, and returns peer transactions through FIQ0/IRQ4 callbacks.
 The provisional
 `nokia_sim_card_device` owns the verified SIMI register/FIQ transport and a synthetic GSM 11.11
 card. The phone state owns MAD2 interrupt routing and supplies power-scenario ADC inputs. The
-MAD2/DSP mailbox follows after its boundary stabilizes; MAD2 extraction should wait for the
+remaining MAD2 register block should wait for the
 cross-ROM pass to identify the genuinely shared contract.
 
 ## Rules

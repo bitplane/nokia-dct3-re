@@ -22,6 +22,7 @@
 #include "video/pcd8544.h"
 
 #include "nokia_ccont.h"
+#include "nokia_dsp_peer.h"
 #include "nokia_sim_card.h"
 
 #include "debugger.h"
@@ -136,15 +137,6 @@ constexpr offs_t FW_STARTUP_STATUS_WORD = 0x112448;
 constexpr offs_t FW_STARTUP_SERVICE_READY = FW_STARTUP_SERVICE_BUFFER;  // ready byte, gate input
 constexpr offs_t FW_STARTUP_SERVICE_STATUS = 0x110c2e;                  // service-startup status word (-> 0x8002)
 constexpr offs_t FW_STARTUP_PHASE = 0x112449;                          // startup phase byte (batch-2/task14 gate)
-constexpr unsigned DSP_SVC_PENDING_COUNTER_OFF = 0x0e4;                // DSP-shared RAM byte: lower-service pending count
-constexpr unsigned DSP_MCU_TX_PRODUCER_OFF = 0x0a4;
-constexpr unsigned DSP_MCU_TX_CONSUMER_OFF = 0x0a6;
-constexpr unsigned DSP_MCU_RX_RING_START = 0x100 / 2;
-constexpr unsigned DSP_MCU_RX_RING_END = 0x1c8 / 2;
-constexpr unsigned DSP_MCU_RX_PRODUCER_OFF = 0x1c8;
-constexpr unsigned DSP_MCU_RX_CONSUMER_OFF = 0x1ca;
-constexpr uint8_t DCT3_DISCOVERY_NODE = 0x02;
-constexpr int MAD2_IRQ_LINE_DSP_SERVICE = 4;                          // IRQ line 4 = DSP service-completion interrupt
 constexpr offs_t FW_POWER_STATE = 0x1100d0;
 constexpr offs_t FW_BATTERY_RECORD = 0x110434;
 constexpr offs_t FW_BATTERY_LEVEL_PERCENT = 0x110434;
@@ -243,6 +235,7 @@ public:
 		m_flash(*this, "flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
+		m_dsp_peer(*this, "dsp_peer"),
 		m_sim_card(*this, "sim_card"),
 		m_pcd8544(*this, "pcd8544"),
 		m_keypad(*this, "COL.%u", 0),
@@ -277,7 +270,6 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_mbus);
 	TIMER_CALLBACK_MEMBER(timer_power_irq);
 	TIMER_CALLBACK_MEMBER(timer_keypad);
-	TIMER_CALLBACK_MEMBER(timer_dsp_service);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	uint16_t ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask);
@@ -309,10 +301,9 @@ private:
 	void schedule_mbus_fiq(int num);
 	void signal_mbus_fiq(int num);
 	void complete_mbus_transfer();
-	bool dsp_enqueue_rx_packet(uint8_t type, const uint8_t *payload, unsigned payload_length);
+	void dsp_fiq0_w(int state);
+	void dsp_service_irq_w(int state);
 	uint8_t keypad_irq_state() const;
-	uint8_t synthetic_keypad_state() const;
-	bool synthetic_key_active(uint8_t &row, uint8_t &mask) const;
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
 	uint32_t fw_dword(offs_t address) const;
@@ -326,13 +317,13 @@ private:
 	required_device<intelfsh16_device> m_flash;
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
+	required_device<nokia_dsp_peer_device> m_dsp_peer;
 	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<pcd8544_device> m_pcd8544;
 	required_ioport_array<5> m_keypad;
 	required_ioport m_pwr;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
-	std::unique_ptr<uint16_t[]>   m_dsp_ram;
 
 	uint8_t       m_power_on;
 	uint16_t      m_fiq_status;
@@ -342,19 +333,8 @@ private:
 	uint8_t       m_timer0_divider;
 	bool          m_timer0_compare_latched;
 	uint8_t       m_keypad_irq_state;
-	bool          m_startup_latch_complete_seen;
-	bool          m_dsp_discovery_complete;
-	bool          m_dsp_contact_registration_sent;
-	bool          m_dsp_contact_registration_acknowledged;
-	bool          m_dsp_contact_channel_map_sent;
-	bool          m_dsp_contact_channel_map_acknowledged;
-	bool          m_dsp_contact_healthy_sent;
-	bool          m_dsp_contact_empty_ack_sent;
-	bool          m_dsp_contact_completion_sent;
-	unsigned      m_dsp_contact_registration_ticks;
 
 	uint32_t      m_power_irq_count;
-	attotime      m_startup_latch_complete_time;
 
 	emu_timer * m_timer0;
 	emu_timer * m_timer1;
@@ -363,7 +343,6 @@ private:
 	emu_timer * m_timer_mbus;
 	emu_timer * m_timer_power_irq;
 	emu_timer * m_timer_keypad;
-	emu_timer * m_timer_dsp_service;
 
 	uint8_t       m_mad2_regs[0x100];
 	bool          m_mad2_trace_read[0x100] = {false};
@@ -549,7 +528,6 @@ static unsigned nokia_env_u32(const char *name, unsigned fallback)
 void noki3310_state::machine_start()
 {
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
-	m_dsp_ram = std::make_unique<uint16_t[]>(0x800);      // DSP shared RAM
 
 	// allocate timers
 	m_timer0 = timer_alloc(FUNC(noki3310_state::timer0), this);
@@ -559,7 +537,6 @@ void noki3310_state::machine_start()
 	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
 	m_timer_power_irq = timer_alloc(FUNC(noki3310_state::timer_power_irq), this);
 	m_timer_keypad = timer_alloc(FUNC(noki3310_state::timer_keypad), this);
-	m_timer_dsp_service = timer_alloc(FUNC(noki3310_state::timer_dsp_service), this);
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -604,11 +581,6 @@ void noki3310_state::fw_byte_w(offs_t address, uint8_t data)
 void noki3310_state::machine_reset()
 {
 	std::fill_n(m_ram.get(), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1, 0);
-	std::fill_n(m_dsp_ram.get(), 0x800, 0);
-	// Power-on DSP status defaults. These must live in the backing store rather
-	// than be forced on reads: 0x100 becomes the live RX-ring base after DSP init.
-	m_dsp_ram[0x0fe >> 1] = 0x0001;
-	m_dsp_ram[0x100 >> 1] = 0x0001;
 
 	// according to the boot rom disassembly here http://www.nokix.pasjagsm.pl/help/blacksphere/sub_100hardware/sub_arm/sub_bootrom.htm
 	// flash entry point is at 0x200040, we can probably reassemble the above code, but for now this should be enough.
@@ -657,18 +629,7 @@ void noki3310_state::machine_reset()
 	m_timer0_divider = 255;
 	m_timer0_compare_latched = false;
 	m_keypad_irq_state = 0xff;
-	m_startup_latch_complete_seen = false;
-	m_dsp_discovery_complete = false;
-	m_dsp_contact_registration_sent = false;
-	m_dsp_contact_registration_acknowledged = false;
-	m_dsp_contact_channel_map_sent = false;
-	m_dsp_contact_channel_map_acknowledged = false;
-	m_dsp_contact_healthy_sent = false;
-	m_dsp_contact_empty_ack_sent = false;
-	m_dsp_contact_completion_sent = false;
-	m_dsp_contact_registration_ticks = 0;
 	m_power_irq_count = 0;
-	m_startup_latch_complete_time = attotime::never;
 
 	const unsigned timer0_hz = nokia_env_u32("NOKI3210_TIMER0_HZ", 33055);
 	const unsigned timer1_hz = nokia_env_u32("NOKI3210_TIMER1_HZ", 1057);
@@ -679,7 +640,6 @@ void noki3310_state::machine_reset()
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
 	m_timer_fiq8->adjust(attotime::from_hz(fiq8_hz), 0, attotime::from_hz(fiq8_hz));
 	m_timer_mbus->adjust(attotime::never);
-	m_timer_dsp_service->adjust(attotime::never);
 	m_timer_power_irq->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_POWER_IRQ_MS", 1000)));
 	m_timer_keypad->adjust(attotime::from_hz(200), 0, attotime::from_hz(200));
 
@@ -764,6 +724,18 @@ void noki3310_state::sim_irq_w(int state)
 		assert_fiq(6);
 }
 
+void noki3310_state::dsp_fiq0_w(int state)
+{
+	if (state)
+		assert_fiq(0);
+}
+
+void noki3310_state::dsp_service_irq_w(int state)
+{
+	if (state)
+		assert_irq(4);
+}
+
 uint8_t noki3310_state::keypad_irq_state() const
 {
 	uint8_t data = 0xff;
@@ -774,150 +746,7 @@ uint8_t noki3310_state::keypad_irq_state() const
 	data &= m_pwr->read() | 0xe0;
 	if (nokia_env_u32("NOKI3210_HOLD_POWER_KEY", 0) != 0)
 		data &= 0xfe;
-	data &= synthetic_keypad_state();
 	return data;
-}
-
-bool noki3310_state::synthetic_key_active(uint8_t &row, uint8_t &mask) const
-{
-	const char *key = std::getenv("NOKI3210_POST_READY_KEY");
-	if (key == nullptr || key[0] == '\0' || !m_startup_latch_complete_seen)
-		return false;
-
-	const unsigned delay_ms = nokia_env_u32("NOKI3210_POST_READY_KEY_DELAY_MS", 250);
-	const unsigned duration_ms = nokia_env_u32("NOKI3210_POST_READY_KEY_DURATION_MS", 750);
-	const unsigned period_ms = nokia_env_u32("NOKI3210_POST_READY_KEY_PERIOD_MS", 0);
-	const attotime start = m_startup_latch_complete_time + attotime::from_msec(delay_ms);
-	const attotime now = machine().time();
-	if (now < start)
-		return false;
-
-	if (period_ms == 0)
-	{
-		const attotime end = start + attotime::from_msec(duration_ms);
-		if (now >= end)
-			return false;
-	}
-	else
-	{
-		const unsigned elapsed_ms = (now - start).as_double() * 1000.0;
-		if ((elapsed_ms % period_ms) >= duration_ms)
-			return false;
-	}
-
-	if (!std::strcmp(key, "enter"))
-	{
-		row = 4;
-		mask = 0x08;
-		return true;
-	}
-	if (!std::strcmp(key, "up"))
-	{
-		row = 0;
-		mask = 0x02;
-		return true;
-	}
-	if (!std::strcmp(key, "down"))
-	{
-		row = 1;
-		mask = 0x02;
-		return true;
-	}
-	if (!std::strcmp(key, "0"))
-	{
-		row = 0;
-		mask = 0x04;
-		return true;
-	}
-	if (!std::strcmp(key, "1"))
-	{
-		row = 1;
-		mask = 0x10;
-		return true;
-	}
-	if (!std::strcmp(key, "2"))
-	{
-		row = 1;
-		mask = 0x08;
-		return true;
-	}
-	if (!std::strcmp(key, "3"))
-	{
-		row = 4;
-		mask = 0x02;
-		return true;
-	}
-	if (!std::strcmp(key, "4"))
-	{
-		row = 2;
-		mask = 0x10;
-		return true;
-	}
-	if (!std::strcmp(key, "5"))
-	{
-		row = 2;
-		mask = 0x08;
-		return true;
-	}
-	if (!std::strcmp(key, "6"))
-	{
-		row = 2;
-		mask = 0x04;
-		return true;
-	}
-	if (!std::strcmp(key, "7"))
-	{
-		row = 3;
-		mask = 0x10;
-		return true;
-	}
-	if (!std::strcmp(key, "8"))
-	{
-		row = 3;
-		mask = 0x08;
-		return true;
-	}
-	if (!std::strcmp(key, "9"))
-	{
-		row = 3;
-		mask = 0x04;
-		return true;
-	}
-	if (!std::strcmp(key, "del") || !std::strcmp(key, "c"))
-	{
-		row = 0;
-		mask = 0x10;
-		return true;
-	}
-	if (!std::strcmp(key, "minus"))
-	{
-		row = 4;
-		mask = 0x04;
-		return true;
-	}
-	if (!std::strcmp(key, "star"))
-	{
-		row = 4;
-		mask = 0x10;
-		return true;
-	}
-	if (!std::strcmp(key, "power"))
-	{
-		row = 0xff;
-		mask = 0x01;
-		return true;
-	}
-
-	return false;
-}
-
-uint8_t noki3310_state::synthetic_keypad_state() const
-{
-	uint8_t row = 0xff;
-	uint8_t mask = 0xff;
-	if (!synthetic_key_active(row, mask))
-		return 0xff;
-	return uint8_t(~mask) | 0xe0;
 }
 
 void noki3310_state::signal_mbus_fiq(int num)
@@ -947,34 +776,6 @@ void noki3310_state::complete_mbus_transfer()
 	m_mad2_regs[MAD2_MBUS_CTRL] &= ~MAD2_MBUS_BUSY_MASK;
 	m_mad2_regs[MAD2_FIQ_MASK] |= 0x08;
 	ack_fiq(MAD2_FIQ_MBUS_MASK);
-}
-
-bool noki3310_state::dsp_enqueue_rx_packet(uint8_t type, const uint8_t *payload, unsigned payload_length)
-{
-	const unsigned words = (payload_length + 3) / 2;
-	unsigned producer = m_dsp_ram[DSP_MCU_RX_PRODUCER_OFF >> 1];
-	const unsigned consumer = m_dsp_ram[DSP_MCU_RX_CONSUMER_OFF >> 1];
-	if (producer < DSP_MCU_RX_RING_START || producer >= DSP_MCU_RX_RING_END ||
-			consumer < DSP_MCU_RX_RING_START || consumer >= DSP_MCU_RX_RING_END)
-		return false;
-
-	const unsigned free_words = consumer > producer ? consumer - producer - 1 :
-			(DSP_MCU_RX_RING_END - producer) + (consumer - DSP_MCU_RX_RING_START) - 1;
-	if (words == 0 || words > free_words)
-		return false;
-
-	auto put = [&](uint16_t value)
-	{
-		m_dsp_ram[producer] = value;
-		if (++producer == DSP_MCU_RX_RING_END)
-			producer = DSP_MCU_RX_RING_START;
-	};
-
-	put((payload_length << 8) | type);
-	for (unsigned i = 0; i < payload_length; i += 2)
-		put((uint16_t(payload[i]) << 8) | (i + 1 < payload_length ? payload[i + 1] : 0));
-	m_dsp_ram[DSP_MCU_RX_PRODUCER_OFF >> 1] = producer;
-	return true;
 }
 
 void noki3310_state::ack_fiq(uint16_t mask)
@@ -1164,8 +965,9 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 		logerror("csstatus_write: pc=%08x data=%04x mask=%04x old=%04x task=%02x "
 				"svc_ready=%02x dsp=%04x/%04x/%04x t=%.6f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_byte(FW_SCHED_RUNNING_TASK_ID),
-				fw_byte(FW_STARTUP_SERVICE_READY), m_dsp_ram[0x0da >> 1],
-				m_dsp_ram[0x0e2 >> 1], m_dsp_ram[0x0e4 >> 1], machine().time().as_double());
+				fw_byte(FW_STARTUP_SERVICE_READY), m_dsp_peer->shared_r(0x0da >> 1),
+				m_dsp_peer->shared_r(0x0e2 >> 1), m_dsp_peer->shared_r(0x0e4 >> 1),
+				machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 &&
 			(address == 0x0011fedc || address == 0x0011fede))
 		logerror("csaddress_write: pc=%08x address=%08x data=%04x mask=%04x old=%04x "
@@ -1192,12 +994,6 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 				fw_byte(0x00100022), fw_word(FW_STARTUP_MODE), machine().time().as_double());
 	COMBINE_DATA(&m_ram[offset]);
 
-	if (!m_startup_latch_complete_seen && address == 0x112398 && ((m_ram[offset] & 0x00ff) == 0x000f))
-	{
-		m_startup_latch_complete_seen = true;
-		m_startup_latch_complete_time = machine().time();
-	}
-
 	}
 
 uint16_t noki3310_state::eeprom_r(offs_t offset, uint16_t mem_mask)
@@ -1215,345 +1011,15 @@ void noki3310_state::eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 }
 
-TIMER_CALLBACK_MEMBER(noki3310_state::timer_dsp_service)
-{
-	// The modelled DSP processes the queued lower-service work: drain the pending counter
-	// for real (so the service_ready gate at 0x291096 reads 0 honestly, with no read-time
-	// hack) and raise the service interrupt (MAD2 IRQ line 4).
-	//
-	// Then keep ticking. The firmware resets service_ready at the top of every startup
-	// phase (0x2a90d6) and only sets it back from inside the IRQ-4 service path, so it
-	// needs the interrupt to recur within each phase window — which is exactly how a
-	// continuously-running DSP behaves (a periodic per-frame service tick), not a single
-	// completion. Re-arm at the service-tick rate to model that. This replaces the blind
-	// wall-clock-gated EXPERIMENT_DSP_IRQ4 pulse, now causally anchored to the DSP being
-	// given work and draining real DSP RAM. See docs/service_bootstrap.md.
-	m_dsp_ram[DSP_SVC_PENDING_COUNTER_OFF >> 1] = 0;
-	// The MCU owns the producer index for the 0x000..0x0a2 transmit ring;
-	// the DSP owns the consumer index. Processing queued work releases every
-	// complete packet currently visible to the peer, without manufacturing an
-	// inbound payload.
-	const bool model_contact_peer = nokia_env_u32("NOKI3210_MODEL_DSP_CONTACT_PEER", 0) != 0;
-	if (model_contact_peer)
-	{
-		unsigned cursor = m_dsp_ram[DSP_MCU_TX_CONSUMER_OFF >> 1] % 0x52;
-		const unsigned producer = m_dsp_ram[DSP_MCU_TX_PRODUCER_OFF >> 1] % 0x52;
-		while (cursor != producer)
-		{
-			const uint16_t header = m_dsp_ram[cursor];
-			const unsigned payload_bytes = header >> 8;
-			const unsigned words = (payload_bytes + 3) / 2;
-			const unsigned available = producer >= cursor ? producer - cursor : 0x52 - cursor + producer;
-			if (words == 0 || words > available)
-				break;
-
-			// Contact commands returned by the firmware are the peer's transaction
-			// acknowledgements.  Advance only after observing them on the real TX
-			// ring, rather than timing later peer messages from wall-clock delays.
-			if (model_contact_peer && (header & 0xff) == 0x05 && payload_bytes >= 10)
-			{
-				auto payload_byte = [&](unsigned i)
-				{
-					const uint16_t packed = m_dsp_ram[(cursor + 1 + (i / 2)) % 0x52];
-					return uint8_t(BIT(i, 0) ? packed : packed >> 8);
-				};
-				auto acknowledge = [&]()
-				{
-					const uint8_t response[9] =
-					{
-						0x1e, payload_byte(2), payload_byte(1), 0x7f, 0x00, 0x02,
-						payload_byte(3), uint8_t(payload_byte(payload_bytes - 1) & 0x07),
-						payload_byte(8)
-					};
-					if (!dsp_enqueue_rx_packet(0x8e, response, std::size(response)))
-						return false;
-					if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-						logerror("dsp_boundary: RX transport ACK class=%02x sequence=%02x command=%02x t=%.6f\n",
-								response[6], response[7], response[8], machine().time().as_double());
-					assert_fiq(0);
-					return true;
-				};
-				if (m_dsp_contact_registration_sent && !m_dsp_contact_registration_acknowledged &&
-						payload_byte(3) == 0x40 && payload_byte(8) == 0x64)
-					m_dsp_contact_registration_acknowledged = true;
-				else if (payload_byte(3) == 0x40 && payload_byte(8) == 0x70 && payload_byte(9) != 0x00)
-					m_dsp_contact_channel_map_acknowledged = true;
-
-				if (payload_byte(3) == 0x40)
-					acknowledge();
-
-				// The contact task writes its D9/DA state to PM address 0x5f00.
-				// These are one-way reports, so the external service peer returns only
-				// the correlated lower-transport acknowledgement.
-				if (m_dsp_contact_channel_map_acknowledged && payload_bytes <= 32 &&
-						payload_byte(3) == 0x00 && payload_byte(8) == 0x5f &&
-						payload_byte(9) == 0x00)
-					acknowledge();
-
-				// A zero-payload 0x622a report is the final request made by the
-				// extended-task resume gate.  Acknowledge the exact transaction at
-				// the lower transport boundary: preserve its correlation, sequence,
-				// and fragment fields, and only reverse the learned node addresses.
-				// This deliberately supplies no semantic response object.
-				if (m_dsp_contact_healthy_sent && !m_dsp_contact_empty_ack_sent &&
-						payload_bytes <= 32 && payload_byte(3) == 0x00 &&
-						payload_byte(8) == 0x62 && payload_byte(9) == 0x2a)
-					m_dsp_contact_empty_ack_sent = acknowledge();
-			}
-
-			// Contact-service initialization posts a static task-3 request which the
-			// firmware serializes as DSP packet type 0x70, payload 0d 00.  The DSP
-			// returns it on result type 0x74 with both failure bits clear.  RX
-			// type 0x74 is decoded by 0x29bc00 into task 2's class-0x74 object;
-			// task 2 then owns the busy/present state transition at 0x2349c8.
-			if (model_contact_peer && !m_dsp_contact_completion_sent &&
-					(header & 0xff) == 0x70 && payload_bytes == 2)
-			{
-				const uint16_t request = m_dsp_ram[(cursor + 1) % 0x52];
-				if (uint8_t(request >> 8) == 0x0d && uint8_t(request) == 0x00)
-				{
-					const uint8_t completion[2] = { 0x0d, 0x00 };
-					if (dsp_enqueue_rx_packet(0x74, completion, std::size(completion)))
-					{
-						m_dsp_contact_completion_sent = true;
-						if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-							logerror("dsp_boundary: RX contact DSP completion request=0d00 status=00 t=%.6f\n",
-									machine().time().as_double());
-						assert_fiq(0);
-					}
-				}
-			}
-
-			// The task-8 discovery request is serialized as a type-05 DSP packet.
-			// A type-8e packet is the firmware's inverse path back to task 8.  Keep
-			// the response request-derived: preserve the complete inner frame and
-			// address it back to the phone from the discovered node before ringing
-			// FIQ0.  This completes lower-transport discovery; contact-session
-			// registration is a later class-40 exchange.
-			if ((header & 0xff) == 0x05 && payload_bytes >= 9 && payload_bytes <= 32)
-			{
-				uint8_t response[32];
-				for (unsigned i = 0; i < payload_bytes; i++)
-				{
-					const uint16_t packed = m_dsp_ram[(cursor + 1 + (i / 2)) % 0x52];
-					response[i] = BIT(i, 0) ? packed : packed >> 8;
-				}
-				// State 1 is the discovery request.  State 5 is the firmware's
-				// completion response; answering it would turn the exchange into a
-				// peer/firmware feedback loop.
-				if (response[0] == 0x1e && response[3] == 0xd0 && response[6] == 0x01)
-				{
-					response[1] = response[2];
-					response[2] = DCT3_DISCOVERY_NODE;
-					if (dsp_enqueue_rx_packet(0x8e, response, payload_bytes))
-					{
-						if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-						{
-							logerror("dsp_boundary: RX D0 reply type=8e data=");
-							for (unsigned i = 0; i < payload_bytes; i++)
-								logerror("%s%02x", i ? " " : "", response[i]);
-							logerror(" t=%.6f\n", machine().time().as_double());
-						}
-						// Bit 5 marks the transport acknowledgement.  The peer also
-						// returns the D0 data frame with that bit clear; task 8 then
-						// takes its receive/reassembly path instead of merely completing
-						// the outstanding transmit.
-						response[6] = 0x04;
-						response[8] = (response[8] & ~0x27) | ((response[8] + 1) & 0x07);
-						if (dsp_enqueue_rx_packet(0x8e, response, payload_bytes) &&
-								nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-							logerror("dsp_boundary: RX D0 data flags=%02x t=%.6f\n",
-									response[8], machine().time().as_double());
-						m_dsp_discovery_complete = true;
-						assert_fiq(0);
-					}
-				}
-			}
-
-			if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-			{
-				logerror("dsp_boundary: TX packet type=%02x payload=%u words=%u ring=%02x data=",
-						header & 0xff, payload_bytes, words, cursor);
-				const unsigned traced_words = (header & 0xff) == 0x1a ? words : std::min(words, 12U);
-				for (unsigned i = 0; i < traced_words; i++)
-					logerror("%s%04x", i ? " " : "", m_dsp_ram[(cursor + i) % 0x52]);
-				logerror("%s t=%.6f\n", traced_words < words ? " ..." : "", machine().time().as_double());
-				if ((header & 0xff) == 0x1a)
-				{
-					logerror("dsp_boundary: TX type1a context state=%02x seq=%02x%02x%02x "
-							"rx_counter=%04x radio=%02x/%02x t=%.6f\n",
-							debug_ram_byte(0x0010dbd2),
-							debug_ram_byte(0x0010dbd6), debug_ram_byte(0x0010dbd7),
-							debug_ram_byte(0x0010dbd8), debug_ram_word(0x0010db32),
-							debug_ram_byte(0x0010ef34), debug_ram_byte(0x0010ef35),
-							machine().time().as_double());
-				}
-			}
-			cursor = (cursor + words) % 0x52;
-		}
-		m_dsp_ram[DSP_MCU_TX_CONSUMER_OFF >> 1] = cursor;
-	}
-	if (model_contact_peer && m_dsp_discovery_complete && m_dsp_contact_completion_sent &&
-			!m_dsp_contact_registration_sent)
-	{
-		// Contact service initializes after lower-transport discovery.  A service
-		// peer starts its registration transaction after its own bounded startup
-		// delay; this leaves all task/header state firmware-owned.
-		if (++m_dsp_contact_registration_ticks >= 36)
-		{
-			uint8_t registration[12] = {};
-			registration[0] = 0x1e;
-			registration[1] = 0x00;
-			registration[2] = DCT3_DISCOVERY_NODE;
-			registration[3] = 0x40;
-			registration[5] = 0x06; // one-byte payload + three-byte contact header + two-byte transport trailer
-			registration[6] = 0x00;
-			registration[7] = 0x01;
-			registration[8] = 0x64;
-			registration[9] = 0x01; // session-ready; firmware returns a 0x64 acknowledgement
-			registration[10] = 0x01; // sole fragment
-			registration[11] = 0x42; // sequence 2, final-fragment bit
-			if (dsp_enqueue_rx_packet(0x8e, registration, std::size(registration)))
-			{
-				m_dsp_contact_registration_sent = true;
-				if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-					logerror("dsp_boundary: RX contact bootstrap command=64 result=01 bytes=%u t=%.6f\n",
-							unsigned(std::size(registration)), machine().time().as_double());
-				assert_fiq(0);
-			}
-		}
-	}
-	else if (model_contact_peer && m_dsp_contact_registration_sent && !m_dsp_contact_channel_map_sent)
-	{
-		// Register the peer's service-channel map through the same receive and
-		// reassembly path.  Command 0x70 is the firmware-defined owner of the
-		// 64-byte channel bitmap; without it, service_channel_request_if_enabled
-		// drops the later 0x622a empty/drain request before it reaches task 7.
-		uint8_t registration[75] = {};
-		registration[0] = 0x1e;
-		registration[1] = 0x00;
-		registration[2] = DCT3_DISCOVERY_NODE;
-		registration[3] = 0x40;
-		registration[5] = 0x45; // 64-byte map + three-byte contact header + trailer
-		registration[6] = 0x00;
-		registration[7] = 0x01;
-		registration[8] = 0x70;
-		// service_channel_lookup indexes the map with the request's high byte.
-		// Advertise the two contracts exercised by this startup session: the
-		// contact task's 0x5f00 PM validation and the extended-task gate's 0x622a
-		// report.  The ROM bit table is MSB-first within each byte.
-		registration[9 + (0x5f >> 3)] = 0x01;
-		registration[9 + (0x62 >> 3)] = 0x20;
-		registration[73] = 0x01;
-		registration[74] = 0x43;
-		if (dsp_enqueue_rx_packet(0x8e, registration, std::size(registration)))
-		{
-			m_dsp_contact_channel_map_sent = true;
-			if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-				logerror("dsp_boundary: RX contact channel-map command=70 bytes=%u t=%.6f\n",
-						unsigned(std::size(registration)), machine().time().as_double());
-			assert_fiq(0);
-		}
-	}
-	else if (model_contact_peer && m_dsp_contact_channel_map_sent && !m_dsp_contact_healthy_sent)
-	{
-		uint8_t healthy[12] = {};
-		healthy[0] = 0x1e;
-		healthy[1] = 0x00;
-		healthy[2] = DCT3_DISCOVERY_NODE;
-		healthy[3] = 0x40;
-		healthy[5] = 0x06;
-		healthy[6] = 0x00;
-		healthy[7] = 0x01;
-		healthy[8] = 0x64;
-		healthy[9] = 0x05;
-		healthy[10] = 0x01;
-		healthy[11] = 0x44;
-		if (dsp_enqueue_rx_packet(0x8e, healthy, std::size(healthy)))
-		{
-			m_dsp_contact_healthy_sent = true;
-			if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-				logerror("dsp_boundary: RX contact healthy command=64 result=05 bytes=%u t=%.6f\n",
-						unsigned(std::size(healthy)), machine().time().as_double());
-			assert_fiq(0);
-		}
-	}
-	assert_irq(MAD2_IRQ_LINE_DSP_SERVICE);
-	const unsigned default_tick_ms = model_contact_peer ? 4 : 5;
-	m_timer_dsp_service->adjust(attotime::from_msec(
-			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", default_tick_ms)));
-}
-
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
-	const u32 byte_offset = (offset & 0x7ff) << 1;
-	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 && byte_offset <= 0x004)
-	{
-		static unsigned bootstrap_count = 0;
-		if (bootstrap_count++ < 256)
-			logerror("dsp_boundary: bootstrap RAM R off=%03x backing=%04x returned=0001 "
-					"pc=%08x task=%02x t=%.6f\n", byte_offset,
-					m_dsp_ram[offset & 0x7ff], m_maincpu->pc() & ~u32(1),
-					fw_byte(0x00100022), machine().time().as_double());
-	}
-	// HACK: avoid hangs when ARM try to communicate with the DSP
-	if (offset <= 0x004 >> 1)   return 0x01;
-	if (offset == 0x0e0 >> 1)   return 0x00;
-	if (offset == 0x0fe >> 1)   return 0x01;
-	// During DSP bootstrap this word is a ready flag. Once the firmware has
-	// initialized both RX indices, the same shared word is ring storage and must
-	// be writable by the peer.
-	if (offset == 0x100 >> 1 &&
-			(m_dsp_ram[0x01c8 >> 1] < 0x0080 || m_dsp_ram[0x01ca >> 1] < 0x0080))
-		return 0x01;
-
-	const u16 value = m_dsp_ram[offset & 0x7ff];
-	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			(byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
-			 byte_offset == 0x1c8 || byte_offset == 0x1ca))
-	{
-		static unsigned count = 0;
-		if (count++ < 1024)
-			logerror("dsp_boundary: RAM R off=%03x data=%04x pc=%08x task=%02x t=%.6f\n",
-					byte_offset, value, m_maincpu->pc() & ~u32(1),
-					fw_byte(0x00100022), machine().time().as_double());
-	}
-	return value;
+	return m_dsp_peer->shared_r(offset);
 }
 
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	COMBINE_DATA(&m_dsp_ram[offset & 0x7ff]);
-	if (nokia_env_u32("NOKI3210_MODEL_DSP_CONTACT_PEER", 0) != 0 &&
-			(offset & 0x7ff) == (DSP_MCU_TX_PRODUCER_OFF >> 1))
-		m_timer_dsp_service->adjust(attotime::from_usec(100));
-	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-	{
-		static unsigned count = 0;
-		// Skip the power-on DSP program upload; this probe is for live mailbox traffic.
-		const u32 writer = m_maincpu->pc() & ~u32(1);
-		if (writer != 0x00290a96 && writer != 0x00290ab6 && writer != 0x00290ba6 && count++ < 2048)
-			logerror("dsp_boundary: RAM W off=%03x data=%04x mask=%04x pc=%08x task=%02x t=%.6f\n",
-					u32((offset & 0x7ff) << 1), data, mem_mask, writer,
-					fw_byte(0x00100022), machine().time().as_double());
-	}
-
-	// DSP service-completion model (opt-in): when the MCU queues lower-service work by
-	// writing a non-zero count to the pending counter (byte 0xe4, pc 0x290c98), the real
-	// MAD2 DSP processes it and signals completion by draining the counter and raising
-	// IRQ line 4. Model that: schedule a completion after a short processing delay. This
-	// is the faithful replacement for the EXPERIMENT_DSP_IRQ4 force (blind periodic pulse
-	// + read-time fake-zero). See docs/service_bootstrap.md.
-	if (nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0 &&
-			(offset & 0x7ff) == (DSP_SVC_PENDING_COUNTER_OFF >> 1) && data != 0)
-	{
-		const unsigned default_delay_ms =
-				nokia_env_u32("NOKI3210_MODEL_DSP_CONTACT_PEER", 0) != 0 ? 4 : 5;
-		m_timer_dsp_service->adjust(attotime::from_msec(
-				nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", default_delay_ms)));
-	}
+	m_dsp_peer->shared_w(offset, data, mem_mask);
 }
-
 // ============================================================================
 // Firmware-research traces for flash fetches. This is diagnostic observation,
 // not hardware behaviour, and never changes the fetched instruction.
@@ -1599,8 +1065,9 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R3),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-				m_dsp_ram[0x0a8 >> 1], m_dsp_ram[0x0ac >> 1], m_dsp_ram[0x0ae >> 1],
-				m_dsp_ram[0x0b6 >> 1], m_dsp_ram[0x0bc >> 1], fw_byte(0x00100022),
+				m_dsp_peer->shared_r(0x0a8 >> 1), m_dsp_peer->shared_r(0x0ac >> 1),
+				m_dsp_peer->shared_r(0x0ae >> 1), m_dsp_peer->shared_r(0x0b6 >> 1),
+				m_dsp_peer->shared_r(0x0bc >> 1), fw_byte(0x00100022),
 				machine().time().as_double());
 	// TRACE_TASKS (opt-in): app-task liveness tap. Log the first time each RTOS task reaches
 	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the deep profile
@@ -2471,14 +1938,6 @@ uint16_t noki3310_state::flash_r(offs_t offset, uint16_t mem_mask)
 
 void noki3310_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	static unsigned flash_write_log_count = 0;
-	const u32 pc = m_maincpu->pc();
-
-	if (flash_write_log_count < 200 || pc == 0x0026a648 || pc == 0x0026a64a)
-	{
-		flash_write_log_count++;
-	}
-
 	m_flash->write(offset, data);
 }
 
@@ -2554,20 +2013,6 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 					data &= m_keypad[i]->read() | 0xe0;
 
 			data &= m_pwr->read() | 0xe0;
-			{
-				uint8_t synth_row = 0xff;
-				uint8_t synth_mask = 0xff;
-				const bool synth_active = synthetic_key_active(synth_row, synth_mask);
-				const bool synth_selected = synth_active && (synth_row == 0xff || !(m_mad2_regs[0x28] & (1 << synth_row)));
-				if (synth_active && !synth_selected)
-				{
-				}
-				if (synth_selected)
-				{
-					data &= uint8_t(~synth_mask) | 0xe0;
-				}
-			}
-
 			if (m_power_on)
 			{
 				data &= m_power_on;
@@ -2750,110 +2195,7 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		case 0x2e:
 		case 0x6e:
 		{
-			static unsigned lcd_cmd_count = 0;
-			static unsigned lcd_data_count = 0;
-			static unsigned lcd_data_non_ff_count = 0;
-			static unsigned lcd_mirror_dump_count = 0;
-			static uint8_t lcd_mirror_vram[6 * 84] = { };
-			static uint8_t lcd_mirror_mode = 0x04;
-			static uint8_t lcd_mirror_control = 0x00;
-			static uint8_t lcd_mirror_x = 0;
-			static uint8_t lcd_mirror_y = 0;
 			const bool lcd_data = !(offset & 0x40);
-			const uint8_t old_lcd_mirror_x = lcd_mirror_x;
-			const uint8_t old_lcd_mirror_y = lcd_mirror_y;
-			if (lcd_data)
-			{
-				lcd_data_count++;
-				if (data != 0xff)
-					lcd_data_non_ff_count++;
-
-				lcd_mirror_vram[lcd_mirror_y * 84 + lcd_mirror_x] = data;
-				if (lcd_mirror_mode & 0x02)
-				{
-					lcd_mirror_y++;
-					if (lcd_mirror_y > 5)
-					{
-						lcd_mirror_y = 0;
-						lcd_mirror_x = (lcd_mirror_x + 1) % 84;
-					}
-				}
-				else
-				{
-					lcd_mirror_x++;
-					if (lcd_mirror_x > 83)
-					{
-						lcd_mirror_x = 0;
-						lcd_mirror_y = (lcd_mirror_y + 1) % 6;
-					}
-				}
-			}
-			else
-			{
-				lcd_cmd_count++;
-				if (lcd_mirror_mode & 0x01)
-				{
-					if (data & 0x20)
-						lcd_mirror_mode = data & 0x07;
-				}
-				else
-				{
-					if (data & 0x80)
-						lcd_mirror_x = (data & 0x7f) % 84;
-					else if (data & 0x40)
-						lcd_mirror_y = data & 0x07;
-					else if (data & 0x20)
-						lcd_mirror_mode = data & 0x07;
-					else if (data & 0x08)
-						lcd_mirror_control = ((data & 0x04) >> 1) | (data & 0x01);
-				}
-			}
-			unsigned lcd_mirror_zero = 0;
-			unsigned lcd_mirror_ff = 0;
-			unsigned lcd_mirror_other = 0;
-			for (uint8_t mirror_byte : lcd_mirror_vram)
-			{
-				if (mirror_byte == 0x00)
-					lcd_mirror_zero++;
-				else if (mirror_byte == 0xff)
-					lcd_mirror_ff++;
-				else
-					lcd_mirror_other++;
-			}
-			if (lcd_data && old_lcd_mirror_x == 83 && old_lcd_mirror_y == 5 && lcd_mirror_x == 0 && lcd_mirror_y == 0)
-			{
-				lcd_mirror_dump_count++;
-				const char *snapshot_dir = std::getenv("NOKI3210_SNAPSHOT_DIR");
-				if (!snapshot_dir || !*snapshot_dir)
-					snapshot_dir = ".";
-
-				char filename[512];
-				std::snprintf(filename, sizeof(filename), "%s/noki3210_lcdmirror_%04u_z%03u_ff%03u_o%03u.pgm",
-						snapshot_dir,
-						lcd_mirror_dump_count,
-						lcd_mirror_zero,
-						lcd_mirror_ff,
-						lcd_mirror_other);
-
-				if (FILE *file = std::fopen(filename, "wb"))
-				{
-					std::fprintf(file, "P5\n84 48\n255\n");
-					for (unsigned y = 0; y < 48; y++)
-					{
-						const unsigned row = y >> 3;
-						const unsigned bit = y & 7;
-						for (unsigned x = 0; x < 84; x++)
-						{
-							unsigned on = BIT(lcd_mirror_vram[row * 84 + x], bit);
-							if (lcd_mirror_control & 0x01)
-								on ^= 1;
-							const uint8_t pixel = on ? 0x00 : 0xff;
-							std::fwrite(&pixel, 1, 1, file);
-						}
-					}
-					std::fclose(file);
-				}
-			}
 			m_pcd8544->dc_w(lcd_data ? ASSERT_LINE : CLEAR_LINE);
 			for (int i=7; i>=0; i--)
 			{
@@ -2983,6 +2325,16 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_CCONT(config, m_ccont);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
+	NOKIA_DSP_PEER(config, m_dsp_peer);
+	const bool dsp_contact = nokia_env_u32("NOKI3210_MODEL_DSP_CONTACT_PEER", 0) != 0;
+	const unsigned dsp_default_ms = dsp_contact ? 4 : 5;
+	m_dsp_peer->set_service_enabled(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0);
+	m_dsp_peer->set_contact_enabled(dsp_contact);
+	m_dsp_peer->set_service_delay_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
+	m_dsp_peer->set_service_tick_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
+	m_dsp_peer->set_trace_enabled(nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0);
+	m_dsp_peer->fiq0_cb().set(FUNC(noki3310_state::dsp_fiq0_w));
+	m_dsp_peer->service_irq_cb().set(FUNC(noki3310_state::dsp_service_irq_w));
 	NOKIA_SIM_CARD(config, m_sim_card);
 	m_sim_card->irq_cb().set(FUNC(noki3310_state::sim_irq_w));
 }

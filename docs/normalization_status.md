@@ -59,9 +59,13 @@ one of them has yet been proved. The next static control is the same-product
 | SIM | `nokia_sim_card_device` owns stateful SIMI/FIQ6 transport and requested GSM 11.11 files. | Extend only for organically requested commands; validate FIFO flags. |
 | CCONT | `nokia_ccont_device` owns serial registers, ADC values, RTC, watchdog, power and IRQ output. | Complete GENSIO transaction/reset semantics and validate ADC IRQ behavior. |
 | EEPROM | Native MAME `I2C_24C128` plus generated profile. | Decode remaining security/product fields and parallel alias behavior. |
-| DSP/contact | Phone-owned request-driven DSP-ring peer. | Stabilize the wider mailbox contract and extract it without firmware addresses. |
-| MAD2 | Phone-owned timers, interrupt aggregation, GENSIO, SIMI and DSP windows. | Improve reset/decode fidelity before extracting shared blocks. |
+| DSP/contact | `nokia_dsp_peer_device` owns shared RAM, ring state, service timing, and the request-driven contact peer. | Stabilize and extend the wider mailbox contract from observed requests; validate it on a sibling ROM family. |
+| MAD2 | Phone-owned timers, interrupt aggregation, GENSIO, SIMI window and DSP control registers. | Improve reset/decode fidelity before extracting shared blocks. |
 | Display | Native PCD8544 plus firmware-selected display-type read shortcut. | Recover the real product-data source and remove the shortcut. |
+
+The headless LCD mirror and delayed-key fixture are acceptance tooling in
+`mame_noki3210_input_exerciser.lua`. They do not add device state or firmware
+shortcuts to the phone driver.
 
 Two RAM-read shortcuts remain explicitly quarantined: display-type selection and
 the startup event-14 latch. Neither is presented as hardware behavior.
