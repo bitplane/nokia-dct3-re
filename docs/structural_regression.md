@@ -10,6 +10,9 @@ same frame.
 `oracles/noki3210-default.struct` after checking the exact frame hash.
 `make verify-frontier` performs the corresponding check for the current
 request-driven contact/SIM profile against `oracles/noki3210-frontier.struct`.
+The final startup-event field is deliberately excluded from both subsets: the
+dispatcher continues receiving events after reaching the same accepted mode,
+flags, contact state, SIM state, and exact frame.
 
 The default runner reseeds an isolated per-run NVRAM directory from the
 generated EEPROM profile. This prevents an old shared `mame/nvram` file from

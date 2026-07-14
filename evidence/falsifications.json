@@ -168,7 +168,7 @@
       "id": "forced_registration_messages", "status": "disproven",
       "hypothesis": "Injected 0x1196 or replayed commit keys can establish coherent SIM registration",
       "conclusion": "They reach downstream handlers without the owned reply object and never set ENABLE organically",
-      "evidence": ["docs/removed_forcing_knobs.md", "docs/sim_registration.md"]
+      "evidence": ["docs/evidence_regime.md", "docs/sim_registration.md"]
     },
     {
       "id": "task8_8d_8e_peer", "status": "unsupported",

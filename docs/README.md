@@ -27,24 +27,22 @@ Documentation is organized by authority rather than investigation date.
 | `network_scouting.md` | Boundary between pre-idle startup and GSM/DSP work. |
 | `dsp_service_transport_contract.md` | Ownership and acceptance contract for the active DSP/generic-service frontier. |
 | `contact_service_topology.md` | Contact command producers, acknowledgements, and lower-service boundary. |
+| `service_bootstrap.md` | Current contact-startup prerequisites and acceptance contract. |
+| `service_firmware_map.md` | Concise lower-service/contact firmware address map. |
+| `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |
 
 ## Deep reverse-engineering references
 
-The following are address-heavy maps. They may contain dated checkpoints, but
-remain useful when working in the corresponding firmware subsystem:
+The following are detailed firmware maps that remain useful when working in the
+corresponding subsystem:
 
 - `sim_registration.md`
 - `sim_emulator_scope.md`
-- `boot_to_insert_sim.md`
-- `service_bootstrap.md`
-- `scheduler_delivery.md`
-- `static_branch_map.md`
-- `interactive_handoff.md`
 - `firmware_code_maps.md`
 
-Treat concise subsystem documents and current source code as authoritative
-when a deep reference conflicts with them. Absolute addresses apply to the
-3210 v6.00 firmware unless explicitly stated otherwise.
+Treat concise subsystem documents, normalized evidence, and current source code
+as authoritative. Absolute addresses apply to the 3210 v6.00 firmware unless
+explicitly stated otherwise.
 
 Normalized reviewed evidence lives in `evidence/*.json`; named runtime inputs
 live in `tools/run_manifests/*.json`. Run `make evidence-check` before banking a
@@ -68,5 +66,6 @@ Remove or condense:
 - raw trace dumps already represented by a table or conclusion; and
 - descriptions of probes or knobs that no longer exist.
 
-Failed forcing implementations are summarized in `removed_forcing_knobs.md`;
-their source code should not remain merely to preserve history.
+Failed forcing implementations live in Git history. Only reusable negative
+conclusions belong in `evidence/falsifications.json`; the current force policy
+lives in `evidence_regime.md`.

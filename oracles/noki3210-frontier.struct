@@ -4,7 +4,6 @@ gensio_controls=21,25
 startup_modes=0001,0004,000D
 final_current_task=01
 final_startup_mode=0004
-final_startup_event=00C3
 final_startup_flags=0F
 final_contact_status=0049
 final_no_sim=00

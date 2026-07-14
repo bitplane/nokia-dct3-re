@@ -48,9 +48,9 @@ address changed.
 ## Documentation authority
 
 Concise subsystem documents and normalized artifacts contain current
-conclusions. Address-heavy chronological documents remain research references:
-they preserve disassembly, failed paths and provenance that may still be useful,
-but do not override a normalized artifact or concise subsystem document.
+conclusions. Detailed firmware maps preserve addresses and reproducible
+control-flow conclusions, but chronological probe narratives belong in Git
+history and do not form a separate documentation authority.
 
 When a new dig closes:
 
@@ -59,3 +59,17 @@ When a new dig closes:
 3. update the concise subsystem conclusion;
 4. retain a negative result only when it prevents a plausible repeated mistake;
 5. do not preserve an implementation shim merely as history.
+
+## Research-force policy
+
+Supported behavior may model only a hardware-visible device, register, signal,
+or transport response. It must not advance boot by rewriting firmware RAM,
+substituting a firmware return value or instruction, replaying callback keys, or
+posting an internal message without a modeled external producer.
+
+Temporary probes are permitted when they are opt-in, answer one pre-registered
+question, and are deleted after their conclusion is normalized. A forced branch
+is evidence about that branch only; it is never evidence that the forcing
+mechanism belongs in the emulator. Disproven hypotheses worth retaining belong
+in `evidence/falsifications.json`. Exact deleted knob names and implementations
+belong in Git history, not current documentation.

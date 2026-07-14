@@ -2,7 +2,7 @@
 
 This document is the current contract for the Nokia 3210 v6.00 transition from
 provisioned startup to decoded keypad input. Historical forcing experiments are
-recorded in `evidence/falsifications.json` and `removed_forcing_knobs.md`; they
+recorded in `evidence/falsifications.json`; they
 are not alternate boot recipes.
 
 ## Current result

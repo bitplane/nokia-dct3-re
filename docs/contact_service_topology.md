@@ -76,6 +76,23 @@ conversation. Later SIM-card corrections now raise SIM enable organically and
 complete the non-CPHS SIM initialization pass before entering the timed
 card-presence monitor; it is no longer a contact-service blocker.
 
+## Extended-task readiness barrier
+
+The first Insert-SIM milestone established the post-contact firmware chain.
+Mode `0x000d` accumulates readiness bits in `0x112399`; event `0x15` supplies
+bit `0x04`. Producer `0x2af208`, called from `0x2521cc`, fires only when the
+eleven-byte application-task checklist at `0x112280` is complete.
+
+The scheduler creates every task, initially dormant. Supervisor
+`startup_power_service_init_gate 0x2a8ff2` resumes them in groups. Its second
+group contains the checklist writers and is gated at `0x2a9182`: firmware calls
+`service_channel_request_empty 0x2b13d4`, publishes report `0x622a`, and waits
+at `0x29bb06` for `0x11fed1` bit 2 to clear. Firmware seeded that bit during
+contact startup at `0x2347d0`. The coherent peer acknowledges the organic
+transaction; firmware clears its own state, resumes the tasks, completes the
+checklist, posts event `0x15`, and advances startup. This replaces the historical
+direct-drain experiment that first isolated the chain.
+
 ## Command inventory
 
 | Command | Incoming consumer | Sole MCU constructor | Constructor role | Initiating producer |

@@ -516,7 +516,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      TRACE_TASKS (app-task liveness + inter-task message edges).
 //      TRACE_SIM_RX covers the register/FIQ/APDU path and SIM reply milestones;
 //      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary.
-//      Retired forcing shims and one-off traces: docs/removed_forcing_knobs.md.
+//      Research-force policy: docs/evidence_regime.md.
 //
 // Traces are quarantined in flash_firmware_traces /
 // ram_w_firmware_traces. Add no forced firmware results or messages. See

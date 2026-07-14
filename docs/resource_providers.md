@@ -2,7 +2,7 @@
 
 This document records the current display-resource conclusion. Historical
 resource-enable injections and availability sweeps are summarized in
-`removed_forcing_knobs.md`; they are not part of the current driver strategy.
+`evidence/falsifications.json`; they are not part of the current driver strategy.
 
 ## Resource handles, not content providers
 
