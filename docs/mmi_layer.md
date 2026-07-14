@@ -1,5 +1,12 @@
 # The MMI / coherent-boot layer — "up but not alive"
 
+> **Historical multi-profile investigation.** The original observations below
+> use the bridge profile that painted **Insert SIM card**. The current coherent
+> SIM profile instead paints **Security code**, but reaches the same input
+> conclusion more precisely: task 1 remains in startup mode `0x0004`, receives
+> keypad event `0x72`, performs IRQ housekeeping, and does not forward a decoded
+> key until its missing report-code-`0x07` handoff completes.
+
 The boot reaches a complete **"Insert SIM card"** MMI screen (text + scrollbar +
 status-icon chrome; frames `blank → o058 → o074`). This documents the layer *above*
 that screen — why the phone doesn't advance to idle, a menu, or Snake — gathered by

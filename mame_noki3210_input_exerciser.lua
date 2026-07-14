@@ -351,7 +351,7 @@ local function press(name, field)
 	local col4_before = col4_port and (col4_port:read() & 0xff) or -1
 	local pwr_before = pwr_port and (pwr_port:read() & 0xff) or -1
 	local ok, err = pcall(function()
-		field:set_value(1)
+		field:set_value(0)
 	end)
 	if not ok then
 		emu.print_info(string.format("input-press-error:frame=%d name=%s err=%s", frames, name, tostring(err)))

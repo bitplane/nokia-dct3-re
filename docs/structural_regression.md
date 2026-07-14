@@ -85,7 +85,11 @@ writing firmware state. Its last clean five-second run ended with startup mode
 `0x0004`, flags `0x0f`, contact status `0x0049`, and normal SIM APDUs in progress.
 That path is now banked as `make verify-frontier`: its exact frame and
 eight-second semantic predicate set additionally record no-SIM clear and SIM
-enable set. Raw LCD-command and FIQ counts are excluded because equivalent
+enable set. The frame is the **Security code** prompt (`6471d1a5803619c2`), but
+the visible `OK` softkey is not interactive: scripted active-low keypad presses
+raise the expected additional IRQ bit while leaving every captured frame
+byte-identical and task 1 in mode `0x0004`. This is the startup-owned keypad
+behavior mapped in `mmi_layer.md`, not a later security-dialog stall. Raw LCD-command and FIQ counts are excluded because equivalent
 frontier runs vary those counts without changing the frame or final state. The default
 frame/structural oracle remains the conservative release regression, while the
 historical `verify-deep` oracle continues to protect the superseded bridge
