@@ -29,37 +29,29 @@ default profile deterministically reaches the authentic **CONTACT SERVICE** fram
 by a byte-exact LCD oracle. Opt-in peer prototypes can carry the firmware further and the ring-2
 SIM responder completes natural ATR and ICCID/ECC/PHASE APDU traffic.
 
-The phone does **not** yet reach the offline application desktop. The modeled SIM now completes
-the ordinary non-CPHS initialization pass, after which task 1 waits in mode `0x0004` for startup
-report code `0x07`. Callback `0x5d` is organically activated and can report code `0x07` either
-from direct completion `0x05eb` or from a task-local timeout started by `0x05e1`, `0x05e7`, or
-`0x05dc`. A mapped display lifecycle reaches the same callback but is service/test-owned.
-The selector-`0` contract at `0x287250` is now recovered. Its primary CPHS
-path combines EEPROM product-feature record `0x150`, parsed `EF_CSP` validity,
-and group-`03` mask `0x20`; its fallback uses the parsed `EF_SST` service-5
-pair. A coherent CPHS/AoC card drives both alternatives and the associated
-`EF_ACM`, `EF_ACMmax`, and `EF_PUCT` reads through the real SIM transport.
-That work also disproved the former frontier: `0x27f150` is an Advice-of-Charge
-limit controller. Its completion publishes `0x019a`, not `0x0795`.
+The phone does **not** yet reach a verified interactive desktop. The modeled
+SIM completes the ordinary non-CPHS initialization pass, after which task 1
+waits in startup mode `0x0004` for report code `0x07`. A provisioned EEPROM
+identity removes the phone-lock prompt and lets firmware paint an idle-like
+`Menu` frame, but that is presentation state: keypad IRQ6 and raw event `0x72`
+reach task 1, where mode 4 consumes the event before matrix scanning.
 
-The only non-display route to `0x0795` is a later framework cycle. Catalogue
-status index `0x013a` expands to `0x089a, 0x08b0`, while index `0x013b`
-expands directly to `0x08b0`; both belong to framework-mode-11 paths, including
-the resident callback registered after input `0x03ab`. Controller reconciliation may then publish
-`0x0795`. The coherent boot remains in framework mode `0`, so this is not
-ordinary startup ownership. The active RE frontier returns to the genuine
-callback-`0x5d` completion inputs that can report code `0x07`.
-See [`docs/resource_providers.md`](docs/resource_providers.md) and
-[`docs/sim_registration.md`](docs/sim_registration.md).
+For this 3210 v6.00 branch, code 7 is a proved prerequisite for the shared
+interactive initialization burst. Its four reporter callers are classified as
+two power outcomes, one callback/status completion, and one controller
+outcome. Extensive battery, charger, display/service, registration, security,
+contact-self-test, and guessed DSP reply candidates are excluded. The remaining
+task is to identify the external condition that makes one of those known owners
+complete organically, then verify the ordinary IRQ6-to-decoded-key path in the
+same boot. See [`docs/interactive_handoff.md`](docs/interactive_handoff.md) and
+[`docs/mmi_layer.md`](docs/mmi_layer.md).
 
 `make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
 research baseline for this boundary. It uses the request-driven contact peer
 and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with contact status
-`0x49`, no-SIM clear, and SIM enable set. Its `6471d1a5803619c2` frame is the
-**Security code** prompt. That prompt is presentation state, not proof of an
-interactive handoff: keypad IRQ/event delivery works, but mode `0x0004`
-consumes the event without decoding it until report code `0x07` arrives.
-`make verify-deep` is retained only for its historical bridge-profile oracle.
+`0x49`, no-SIM clear, and SIM enable set. The default synthetic identity yields
+the **Security code** frame (`6471d1a5803619c2`); a provisioned identity yields
+the idle-like `Menu` frame (`dbf2704cb945d56b`). Neither is yet interactive.
 
 Several surviving `MODEL_*` paths describe plausible absent peers but still operate at known
 firmware PCs. They are executable protocol hypotheses, not finished hardware emulation. No direct
@@ -79,13 +71,13 @@ The labels below have precise meanings:
 |---|---|---|
 | ARM7, flash, RAM mapping | Partial hardware | 3210 executes reliably; product layouts need cross-ROM validation. |
 | MAD2 timers and IRQ/FIQ | Partial hardware | Boot-critical paths work; several timings remain calibrated assumptions. |
-| PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames and input is scriptable. |
+| PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames; IRQ6/event delivery works, but decoded input remains startup-gated. |
 | 24C128 EEPROM | Partial hardware | MAME's native I2C device is wired through GenIO and passes the oracle; provisioning and the parallel alias need validation. |
 | CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; GENSIO transaction state and ADC completion IRQ behavior remain open. |
 | SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
 | Startup/contact peers | Prototype | Useful protocol behavior, still implemented through firmware hooks. |
-| Display/resource lifecycle | Mapped | Service/test `0x0280`-`0x0282` route excluded; identify the ordinary global `0x05eb` producer. |
+| Interactive startup | Mapped | Task 1 owns event `0x72`; identify the organic report-7 completion and verify matrix decode. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |
 

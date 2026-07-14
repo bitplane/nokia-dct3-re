@@ -20,8 +20,9 @@ Documentation is organized by authority rather than investigation date.
 
 | Document | Purpose |
 | --- | --- |
-| `boot_to_insert_sim.md` | Reproducible route and required models to the Insert SIM state. |
 | `sim_subsystem.md` | Concise SIM ownership and interface summary. |
+| `interactive_handoff.md` | Current task-1/report-7 startup contract. |
+| `mmi_layer.md` | Keypad IRQ, mailbox, matrix-scan and decoded-key acceptance path. |
 | `resource_providers.md` | Current organic GSM/resource-provider dependency chain. |
 | `network_scouting.md` | Boundary between pre-idle startup and GSM/DSP work. |
 | `dsp_service_transport_contract.md` | Ownership and acceptance contract for the active DSP/generic-service frontier. |
@@ -34,6 +35,7 @@ remain useful when working in the corresponding firmware subsystem:
 
 - `sim_registration.md`
 - `sim_emulator_scope.md`
+- `boot_to_insert_sim.md`
 - `service_bootstrap.md`
 - `scheduler_delivery.md`
 - `static_branch_map.md`

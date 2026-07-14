@@ -17,11 +17,11 @@ locally from the Nokia/3330 archive. It contains:
 | `NHM6NX04.50E` | 787,296 | `318fcc3fa9d2a926e574fea89af9d8cda81796acb904f196636b886ef4e6ce9e` |
 | `3330 virgin eeprom.pmm` | 65,608 | `83e58fe48153a7c1d60247ba7b80b72e05ddb8fd5443aa0d9ed976ec3ad88808` |
 
-These are Wintesla record streams. Every record is nine header bytes followed
-by `0x2000` payload bytes. Header byte 0 is type `0x0b`, bytes 1–3 are the
-big-endian target address, and bytes 5–7 are payload length `0x002000`.
-`tools/extract_dct3_wintesla.py` validates type, length and contiguous target
-addresses before extracting:
+These are Wintesla record streams. Each record is a nine-byte header followed
+by the payload length encoded in header bytes 5–7, up to `0x2000` bytes. Header
+byte 0 is type `0x0b`, and bytes 1–3 are the big-endian target address.
+`tools/extract_dct3_wintesla.py` validates type, length, truncation, ordering,
+and non-overlap before extracting:
 
 | Component | Target range | Raw size | SHA-1 |
 | --- | --- | ---: | --- |
@@ -62,9 +62,37 @@ that the four-owner code-7 topology is shared across the DCT3 firmware family;
 it does not identify which owner completes during an ordinary healthy boot.
 No 3330 firmware-PC hook was added.
 
+## Nokia 3210 NSE-8 v5.01
+
+An independent full-flash control is stored locally as
+`nokia_3210_nse-8_v05_01_full_hu.fls`:
+
+| Bytes | SHA-256 | Identification |
+| ---: | --- | --- |
+| 2,097,152 | `62de70cd5451444cfcd4ed6c6d8a9a84c0e783a557f8489f2dc5faa283b66272` | `V 05.01`, `NSE-8` |
+
+Its report-7 wrapper is at `0x2ac5bc`. It publishes resource `0x6a010000`,
+posts code 7 to task 1, and has exactly four callers at `0x21e22c`,
+`0x21f772`, `0x252a4a`, and `0x277d06`. This is a same-product control for the
+stable four-owner topology. The task-1 branch comparison remains pending; the
+static wrapper alone does not prove that v5.01 waits on code 7 identically.
+
+## Interactive sibling controls
+
+- A forcing-free Nokia 5110 v5.30 run in an independent message-level emulator
+  reaches its exact Security-code frame without executing its structurally
+  equivalent report-7 wrapper. The 5110 uses a serial-keypad lifecycle, so it
+  is a protocol-family negative control rather than a 3210 input-path oracle.
+- A Nokia 3310 v6.39 run reaches an interactive idle-like frame without
+  executing its equivalent report-7 wrapper.
+
+Report 7 is therefore not a generic DCT3 DSP/MMI-ready event. Any 3210 model
+that produces it must be derived from the 3210's own observed boundary.
+
 ## Acceptance criteria
 
-The next confidence increment is a 3330-specific structural summary: first
+The next confidence increments are the 3210 v5.01 task-1 branch alignment and
+a 3330-specific structural summary: first
 executed PC, interrupt activity, last stable startup phase and MAD2/CCONT
 requests. A useful failure is an organic firmware-visible hardware request; a
 firmware-PC hook added only for the 3330 is a portability failure.

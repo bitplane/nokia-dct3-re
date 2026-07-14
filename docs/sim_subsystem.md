@@ -180,7 +180,6 @@ ordinary boot does not organically request `0x1196`.
 ## Current acceptance gates
 
 - `make verify`: exact 3210 frame and structural oracle.
-- `make verify-deep`: historical bridge-profile frame and structural oracle.
 - `make run-frontier`: current request-driven contact/SIM research profile.
 - `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
 - Stateful-model trace: natural ATR/PPS and the ordinary non-CPHS EF pass, with

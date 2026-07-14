@@ -16,7 +16,7 @@ not compatibility mechanisms.
 | MBUS | MAD2 register/FIQ approximation | Model a peer only when firmware organically drains the receive task. |
 | DSP/DSPIF | Shared RAM with boot-oriented placeholders | Build a mailbox peer from observed commands; eventually emulate DSP behavior. |
 | SIM | Stateful `nokia_sim_card_device` on SIMI registers/FIQ6 | Extend the device only for organically requested card behavior. |
-| Startup/contact/GSM peers | Quarantined firmware hooks | Replace each with a bus, mailbox or device contract, then delete the hook. |
+| Startup/contact/GSM peers | Request-driven DSP-ring prototype plus quarantined traces | Stabilize the mailbox contract, then extract a device without firmware addresses. |
 
 See `mad2_fidelity.md` for register-level implementation status and
 `driver_structure.md` for ownership rules.
@@ -26,7 +26,6 @@ See `mad2_fidelity.md` for register-level implementation status and
 | Profile | Purpose | Acceptance condition |
 | --- | --- | --- |
 | Default `make verify` | Stable hardware regression | Exact CONTACT SERVICE frame SHA prefix `d8a9a7a58e587be8`. |
-| Deeper peer-model run | Exercise mapped startup/SIM contracts | Must be described by enabled models and structural markers; it is not the default oracle. |
 | Coherent frontier | Request-driven contact peer plus ordinary SIMI/FIQ6 card traffic | `make verify-frontier`; exact Security-code frame plus semantic structural predicates with SIM enabled; keypad delivery remains startup-owned in mode `0x0004`. |
 | New-ROM baseline | Detect product-specific assumptions | No firmware-address hooks; record first divergence even when no frame renders. |
 
@@ -43,7 +42,7 @@ Environment controls must fit one of five classes:
 | Machine/scenario configuration | display type, clock rates, battery state, EEPROM image | Keep, but prefer typed machine configuration or input data over individual register values. |
 | Device-boundary model | CCONT, request-driven SIM card behavior, DSP ring ownership | Keep only while it reacts to organic traffic through the real interface. |
 | Diagnostic trace/probe | `TRACE_*`, bounded MAD2 ledger | Opt-in, no state changes, and small enough to remove when no longer useful. |
-| Provisional firmware bridge | service-response trampoline, startup-report bridge | Quarantine, document the missing transport owner, and replace it when the contract is known. |
+| Provisional firmware bridge | none retained in the supported profiles | Do not reintroduce firmware calls, result substitution, or message injection. |
 | Shortcut/force | RAM-result override, forced event or task message | Add no new supported behavior in this class. Existing named shortcuts remain quarantined debt; a new diagnostic force must be bounded to one concrete question and then deleted. |
 
 The number of variables alone is not a sufficient debt metric. A display

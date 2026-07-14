@@ -120,17 +120,13 @@ return) when the `0x5f00` read is **dropped** (channel disabled). Enabling the s
 removes this clear (and the watchdog timeout) — but completion still needs the response. This is
 the remaining gate, below.
 
-## Historical branch-isolation responder (`MODEL_SVC_RESPONDER`)
+## Historical branch-isolation responder
 
 > **Correction:** the responder reaches the firmware's result-5 branch and lets the boot leave the
 > initial CONTACT SERVICE frame, but it does not complete a coherent service transaction.
-> **How it's built:** `nokia_service_transport_device` owns the response bytes,
-> readiness and peer state. At the contact-service loop top (`0x237bc6`, a safe
-> point), a narrow flash trampoline drives the firmware's *own* primitives in
-> sequence — `alloc 0x26afe0(0x14)` → device writes its response into the
-> firmware-owned allocation → `post 0x26a204(contact-service task, msg)` — each
-> call returning to a flash sentinel (`0x3ff000`) where the bridge advances;
-> finally the saved CPU state is restored and the loop resumes. The loop then
+> **How it worked:** at the contact-service loop top (`0x237bc6`), a flash
+> trampoline drove the firmware's allocation and post primitives to deliver a
+> synthetic response. The loop then
 > `recv`s the posted message and dispatches it (`[3]=0x40`→`0x237400`, `[8]=0x64`→`0x236dc4([9]=0x05)`
 > → substate 5, HEALTHY), which drives the downstream startup branch. Default boot
 > (responder off) remains unchanged, but the model is an isolation bridge rather
@@ -140,8 +136,8 @@ The missing header fields are behaviorally significant. In a six-second trace th
 injected allocation `0x101b60` was consumed once and freed. The firmware-generated
 status frame then acquired route selector `1` through task 7 and returned to task 2,
 where fresh allocations alternated between `0x101b60` and `0x101b88` while result
-`5` re-entered `0x236dc4`. Disabling `MODEL_SVC_CHANNEL_DRAIN` merely moved the loop
-earlier. The responder must not be treated as proof that an ordinary standalone
+`5` re-entered `0x236dc4`. Crossed runs with the separate drain merely moved the
+loop earlier. The responder must not be treated as proof that an ordinary standalone
 boot receives this command from a service box.
 
 The extended-task gate makes service report `0x622a` through the shared report
@@ -186,9 +182,9 @@ gone) — but the frame stays `d8a9a7`: watchdog-satisfied ≠ completed. No loc
 (`svc_response` count 0 in those configurations); the required lower-service behavior is absent
 from the driver.
 
-**Historical model:** `MODEL_SVC_RESPONDER` supplies one header-incomplete result-5 message at the
-task-message boundary. It neither models the lower-service session nor converges after the
-firmware's status response. It is retained only as a provisional branch-isolation model.
+**Historical result:** the deleted responder supplied one header-incomplete result-5 message at
+the task-message boundary. It neither modeled the lower-service session nor converged after the
+firmware's status response. Only its branch evidence is retained.
 
 **Response message spec (fully traced).** The contact-service task loop `0x237bb4` calls
 `recv 0x26a458` → `r4` = message, then dispatches on **`[msg+3]`**; `[msg+3]==0x40` →
@@ -349,7 +345,7 @@ contains type `0x70`, payload `0d 00`. The healthy peer response is RX type
 `0x74`, payload `0d 00`; `0x29bc00` translates it into the class-`0x74` task-2
 message consumed at `0x234954`. Its command-`0x0d` path clears
 `[0x11fed1]` bit 2 at `0x2349dc` while retaining bit 6. This supersedes
-`MODEL_SVC_CHANNEL_DRAIN` for the coherent contact-peer profile: the firmware
+the deleted direct-drain experiment for the coherent contact-peer profile: the firmware
 performs the flag transition itself, and the later `0x622a` transaction needs
 only its correlated transport acknowledgement.
 

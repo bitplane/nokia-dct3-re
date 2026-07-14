@@ -156,9 +156,9 @@ path never helps; the **raw** `0x15` comes only from `0x236bac`.)
 (`0x23741a ldrb r4,[r5,#8]`, then a subtract-cascade). **Command `0x65`** routes (via `0x237492 b 0x237840`)
 to the case that calls `0x236bac` — so command `0x65`, with `message[+9]` bit 2 set, is what emits the raw
 `0x15`. Tell-tale: entry special-cases `cmp r4,#0x64` — and **`0x64` is exactly the command our
-`MODEL_SVC_RESPONDER` injects** (`SVC_RESPONDER_B8=0x64`, the completion that leaves CONTACT SERVICE). So we
-deliver command `0x64` (completion) but **not `0x65`** (the sweep-event trigger), a sibling in the same
-command family.
+deleted branch-isolation responder supplied** (`0x64`, the completion that left CONTACT SERVICE). The
+experiment therefore delivered command `0x64` but **not `0x65`** (the sweep-event trigger), a sibling in
+the same command family.
 
 **Why our boot stalls at this branch:** we clear CONTACT SERVICE with one modelled lower-service response (command
 `0x64`) instead of driving the full lower-service exchange, so command `0x65` (with `message[+9]` bit 2) is never
@@ -166,7 +166,7 @@ delivered → `0x236bac` never emits `0x15` → bit `0x04` never sets → the ga
 genuinely clearing CONTACT SERVICE, now pinned at the instruction level as the `000d` gate too.
 
 **Build attempted (`MODEL_CMD65_RESPONDER`) — and it proved the producer is DEAD-GATED for `0x15`.** We
-built a `MODEL_SVC_RESPONDER`-style injection of a command-`0x65` message and verified the mechanism step by
+built a now-deleted injection of a command-`0x65` message and verified the mechanism step by
 step: the service loop keeps polling for non-completion commands (unlike `0x64`, which stops it), `0x65`
 dispatches, and — once the service-ready gate `[0x11fed1]` bit 0 is set (skipped otherwise at `0x23742a`) —
 it reaches `0x236bac(status)`. **But the `0x15` emit never fires.** Inside `0x236bac`:

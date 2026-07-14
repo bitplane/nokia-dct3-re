@@ -109,9 +109,9 @@ self-routed through task 7 and repeatedly re-entered task 2. That historical
 zero-header loop identified the address-learning point but is not present in
 the current request-derived session.
 
-The formerly reported 31,068-entry `0x64` loop is therefore model-induced. It
-occurs with or without `MODEL_SVC_CHANNEL_DRAIN`; the drain changes its start
-time but is not its cause. The responder fires before observing a request and
+The formerly reported 31,068-entry `0x64` loop was model-induced. Historical
+crossed runs showed that the separate drain changed its start time but was not
+its cause. The deleted responder fired before observing a request and
 writes only `{[3]=0x40,[8]=0x64,[9]=0x05}`, leaving address, route, sequence, and
 length fields zero. It proves the result-5 firmware branch in isolation, but not
 a coherent node-0x18 transaction or stable contact-service completion.

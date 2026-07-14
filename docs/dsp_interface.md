@@ -214,11 +214,12 @@ class-5 primitive set starts at `0x11` and does not include the task-15
 registration primitive `0x0b`. These are distinct protocols despite sharing a
 numeric class value.
 
-The old DSP model leaves TX consumer `0x0a6` at zero. The producer reaches `0x34`,
-free space collapses, and later firmware packets cannot be queued. The opt-in
-`MODEL_DSP_RING_DRAIN` candidate advances the DSP-owned consumer across complete
-packets on each service tick. It models consumption only: it writes no inbound packet
-or firmware state. The newly visible coherent stream is:
+The original DSP model left TX consumer `0x0a6` at zero. The producer reached
+`0x34`, free space collapsed, and later firmware packets could not be queued.
+An isolated ring-drain experiment proved that complete packets must be consumed,
+but that standalone model has been removed. The current request-driven contact
+peer owns consumption and any correlated response at the same boundary. The
+newly visible coherent stream is:
 
 ```text
 type 05: 0a05 1eff 00d0 0003 0101 e000

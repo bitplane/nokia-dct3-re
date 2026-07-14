@@ -9,8 +9,7 @@ PYTHON ?= python3
 VENV   := .venv
 DRIVER := driver/nokia_3310.cpp
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
-	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
-	driver/nokia_service_transport.cpp driver/nokia_service_transport.h
+	driver/nokia_sim_card.cpp driver/nokia_sim_card.h
 PHONE ?= noki3210
 BIOS ?=
 
@@ -35,21 +34,12 @@ FRAME_PNG ?= progress_latest_frame.png
 # A blank/un-provisioned 3210 deterministically reaches CONTACT SERVICE here.
 ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
-ORACLE_DEEP_FRAME_SHA ?= 90eb19a5478483ca
-ORACLE_DEEP_STRUCT ?= oracles/noki3210-deep.struct
 ORACLE_FRONTIER_FRAME_SHA ?= 6471d1a5803619c2
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 
-DEEP_ENV := \
-	NOKI3210_MODEL_DSP_SERVICE=1 \
-	NOKI3210_MODEL_CCONT_PRESENT=1 \
-	NOKI3210_MODEL_SVC_RESPONDER=1 \
-	NOKI3210_MODEL_SVC_CHANNEL_DRAIN=1
-
-# Current forcing-free research frontier.  The request-driven contact peer
+# Current forcing-free research frontier. The request-driven contact peer
 # subsumes DSP D0 discovery and TX-ring consumption, while the SIM model stays
-# behind the ordinary SIMI/FIQ6 boundary.  Keep DEEP_ENV above only for the
-# historical Insert SIM oracle.
+# behind the ordinary SIMI/FIQ6 boundary.
 FRONTIER_ENV := \
 	NOKI3210_MODEL_DSP_SERVICE=1 \
 	NOKI3210_MODEL_CCONT_PRESENT=1 \
@@ -60,8 +50,8 @@ FRONTIER_ENV := \
 # CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/ADC/
 # EEPROM) and the CCONT watchdog guard. Every NOKI3210_* var the driver reads is an
 # env knob; override
-# any on the command line — e.g. add MODEL_DSP_SERVICE/MODEL_CCONT_PRESENT/
-# MODEL_SVC_RESPONDER to clear CONTACT SERVICE, or any TRACE_* for diagnostics.
+# any on the command line — e.g. add MODEL_DSP_SERVICE/MODEL_CCONT_PRESENT or
+# any TRACE_* for diagnostics.
 # Trimmed 2026-07 (leave-one-out audit): removed 6 baked-in TRACE_* and the forcing
 # shims proven inert against both the oracle and the deep boot. See docs/driver_vision.md.
 BOOT_ENV := \
@@ -81,7 +71,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check prepare-run-nvram run run-deep run-frontier smoke smoke-3330e audit-roms frame watch verify verify-deep verify-frontier verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check prepare-run-nvram run run-frontier smoke smoke-3330e audit-roms frame watch verify verify-frontier verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -96,7 +86,6 @@ help:
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
-	@echo "make verify-deep    reproduce the Insert SIM frame and deep structural oracle"
 	@echo "make run-frontier   run the current coherent contact/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier oracles"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
@@ -147,7 +136,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_service_transport.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
@@ -189,7 +178,7 @@ run-manifest-deep-gsm: build
 	@mkdir -p run_manifest_deep_gsm
 	@$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 RUN_DIR=run_manifest_deep_gsm
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) \
-		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 NOKI3210_TRACE_GSM_LOWER=1 \
+		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 \
 		NOKI3210_TRACE_DSP_BOUNDARY=1 \
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_deep_gsm) \
 		NOKI3210_BOOT_SUMMARY=$(abspath run_manifest_deep_gsm)/boot_summary.txt \
@@ -229,9 +218,6 @@ run: build prepare-run-nvram
 		./mame $(MAME_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
-run-deep:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) RUN_ENV='$(DEEP_ENV)'
-
 run-frontier:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) RUN_ENV='$(FRONTIER_ENV)'
 
@@ -268,16 +254,6 @@ verify: run
 	if [ "$$got" = "$(ORACLE_FRAME_SHA)" ]; then echo "OK — oracle reproduced"; \
 	else echo "MISMATCH — boot diverged from the recorded CONTACT SERVICE state"; exit 1; fi
 	@$(MAKE) --no-print-directory verify-structure RUN_DIR=$(RUN_DIR)
-
-verify-deep: PHONE=noki3210
-verify-deep: run-deep
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
-	test -n "$$frame" || { echo "no LCD frame produced in $(RUN_DIR)"; exit 1; }; \
-	got=$$(sha256sum "$$frame" | cut -c1-16); \
-	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_DEEP_FRAME_SHA)"; \
-	if [ "$$got" = "$(ORACLE_DEEP_FRAME_SHA)" ]; then echo "OK — Insert SIM oracle reproduced"; \
-	else echo "MISMATCH — boot diverged from the recorded Insert SIM state"; exit 1; fi
-	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_DEEP_STRUCT)
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier

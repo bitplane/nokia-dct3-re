@@ -1,987 +1,159 @@
-# Historical interactive-boot handoff investigation
+# Interactive startup handoff
 
-> **Historical research reference.** This chronological investigation retains
-> useful addresses and negative results. Current subsystem conclusions and
-> normalized predicates/falsifications take precedence; see `README.md`,
-> `contact_service_topology.md`, `sim_subsystem.md`, and `evidence_regime.md`.
->
-> **Do not use the “current wall” headings below as current project status.**
-> They describe successive historical profiles that used responder, drain, and
-> startup-report bridges. The coherent contact profile now reaches mode `0x0004`,
-> starts SIM control (`0x32 -> 0x33 -> 0xb3 -> 0xe3`), and exchanges SELECT,
-> READ, GET RESPONSE, and STATUS APDUs. Two live predicates are now separated:
-> ordinary non-CPHS SIM initialization now completes organically. Task 1 enters
-> mode `0x0004`; both this fallback and the SIM-ready/no-charger mode-`0x0007`
-> branch explicitly wait for report code 7 before the shared init burst.
-> Callback-table index `0x5d` is already exercised with state `0x0b`, but the
-> coherent run supplies only initialization status `0x05e2`. A bounded census
-> has now demoted the context-completion chooser at `0x24d716` from ordinary
-> predecessor to a mapped but unproved alternative.
-> Callback-state slot `0x45` at `0x11fcc5` remains zero, so the chooser emits
-> sibling status `0x09d1`. The alternate `0x09d0` descriptor would invoke
-> callback `0x5d` with action `0x00dc`, but the completed writer census finds
-> no evidence that ordinary boot should select it.
-> A coherent write-watch sees only array initialization and two later zero
-> writes to slot `0x45` (`0x2aefa2`, `0x299ba0`), with no nonzero write. Static
-> enumeration finds no nonzero producer either: all 46 selector-`0x45`
-> catalogue rows preserve state; none of the 46 table initialization records
-> targets selector `0x45`; and the only exact direct store is the `0x05e2`
-> lifecycle reset at `0x299ba0`.
-> Task 13's separate direct-to-task-16 `0x05eb` route does not enter this chain.
-> Later producer analysis classifies the `0x0280`-`0x0282` path as a
-> service/test lifecycle, not the ordinary owner.
-> The power-owned callers are non-ordinary: `0x21e40c` and `0x21f8de` belong to
-> shutdown/charger state machines. The power task reaches and remains in its
-> normal no-charger state `0x04`; the `0x21f8de` route is explicitly labelled
-> "CHARGING COMPLETED" in the ROM. Its state `0x0c` handler waits for event
-> `0x42`; the coherent run receives that event while in state `0x04`, where it
-> is intentionally ignored. Static transition-stub recovery finds no ordinary
-> predecessor into `0x0c`, and runtime records the cold-boot sequence
-> `0x1a -> 0x1c -> 0x05 -> 0x04`. The other caller, `0x21e40c`, is reached only
-> on the at-or-below shutdown-voltage branch; a normal/high sample skips it.
-> IRQ0 does not supply a missing ordinary completion either. MAD2 line 0 reaches
-> `0x2b3084`, and `0x2b4662` posts event `0x41` to task 1 for the early startup
-> power-key scan. Holding the emulated power key raises and handles the interrupt
-> repeatedly without producing code 7 or moving task 1 out of mode `0x0004`.
-> Task 19 also recognizes numeric event `0x41`, but its state-4 branch is the
-> independently labelled `CHARGER CONNECTION` lifecycle; the shared number does
-> not establish a producer edge from PWRONX to that task.
-> The display-owned
-> `0x06ca -> 0x0795` alternative is excluded from the current mode-4 lifecycle:
-> it requires display startup state 7, while the ordinary fallback enters mode
-> 4 with state 3. There is therefore no evidence that ordinary boot should
-> advance callback-state slot `0x45`, and its previously registered
-> DSP-downstream ownership prediction is falsified. The code-7 search must
-> return to the remaining unconditional ordinary-boot completion families.
-> That census is now complete: the current profile organically reaches the
-> controller family through `0x08ac`. A valid CPHS/AoC card passes
-> `0x287250(0)`, but the next guard requires an active task-14 call-control
-> transaction. Ordinary boot correctly has none and exits before `0x0795`.
-> See “Classified conditional `0x08ac` route” below.
-> The contact/DSP self-test lifecycle is also complete rather than the missing
-> report owner. Contact init builds flags `0xc8`; RX class `0x74`, payload
-> `0x0d 00`, clears pending bit 2 to return to `0xc8`; task 5 later consumes ready
-> bit 7 at `0x29bc8c`, leaving the observed steady flags `0x49`. The associated
-> immediate event `0x1a` is a kernel completion signal, not a task-1 report.
-> Therefore neither another self-test reply nor a verdict-byte correction is a
-> justified code-7 fix. An earlier conclusion named an ordinary GSM-group
-> `POWER_ON_NORMAL` publication as the remaining target. That name came from a
-> 3310 HLE comment, not from 3210 ROM evidence, and is withdrawn. The 3210
-> reporter is a shared operational-state notification with four independent
-> owners; no single GSM/DSP producer has been established.
-> The fixed
-> startup-report bridge below satisfies neither predicate organically.
+This document is the current contract for the Nokia 3210 v6.00 transition from
+provisioned startup to decoded keypad input. Historical forcing experiments are
+recorded in `evidence/falsifications.json` and `removed_forcing_knobs.md`; they
+are not alternate boot recipes.
 
-### ROM-4 sibling control: report 7 is not a generic DSP completion
+## Current result
 
-A Nokia 5110 NSE-1 v5.30 full-flash image provides a same-generation ROM-4
-control. Static matching identifies its exact report-code-7 wrapper at
-`0x28f142`, with exactly four callers (`0x22cb7e`, `0x22dc62`, `0x246eaa`, and
-`0x26af8a`). A forcing-free 60-million-instruction run in an independent
-message-level harness reaches the byte-exact interactive Security-code frame
-without invoking that wrapper once.
+The coherent frontier profile completes contact service and ordinary non-CPHS
+SIM initialization. Task 1 advances to startup mode `0x0004`, while a
+provisioned EEPROM identity removes the phone-lock prompt and permits an
+idle-like frame with the `Menu` softkey to be painted.
 
-This narrows, rather than removes, the 3210 result. Code 7 is directly proved
-to gate the 3210's current mode-4 handler, but it is not a generic ROM-4 DSP
-startup acknowledgement that can be copied from a sibling. The wrappers also
-have different contracts: the 5110 wrapper only posts code 7 to task 1, while
-the 3210 wrapper first publishes resource `0x6a01` readiness through
-`0x2b5ae4`. The 5110's serial keypad scanner is a different consumer lifecycle
-from the 3210's IRQ6 -> event-`0x72` path. Therefore the sibling boot cannot
-name the missing 3210 producer, and no DSP response should be implemented from
-this comparison alone.
+That frame is not an interactive desktop. A delayed keypad press proves the
+electrical and RTOS delivery path is alive, but task 1 consumes the raw event in
+mode `0x0004` before the matrix scanner is called:
 
-A later-ROM sibling gives a closer control at the reporter boundary. Nokia
-3310 NHM-5 v6.39 contains the same four-family reporter shape at `0x2e83c8`;
-its resource is renumbered from the 3210's `0x6a01` to `0x6d01`, but it still
-reports task-1 code 7 and has exactly four callers. A forcing-free
-250-million-instruction boot in the independent message-level emulator reaches
-an interactive idle frame without executing `0x2e83c8`. Nokia 3330 v4.50
-retains the same `0x6d01`/code-7 wrapper at `0x386a94` and the same four caller
-families. This conservation validates the 3210 caller census while showing
-that report 7 is branch-specific, not a universal DCT3 DSP or MMI ready signal.
-It remains a direct prerequisite of the 3210 v6.00 mode-4 path we enter; the
-comparison does not authorize bypassing that path.
-
-### Callback `0x31` / status `0x0348` is not the ordinary predecessor
-
-A computed-return census recovered one route missed by literal-only scans:
-callback `0x31` returns `0x0348` for input `0x00ca` when its local gates pass.
-Callback `0x5d` consumes `0x0348` by reporting resource `0x6a00` and posting
-task-1 code `0x06`; it does not report code `0x07`.
-
-The coherent provisioned run observes task 15 posting scalar event `0x00ca`,
-but its ECB has no waiter and the event is intentionally dropped. Task 15 then
-reports the corresponding resource state through `0x281750`; `0x00ca` is absent
-from that mapper and falls back to report `0x010a`. The only generic packed
-`0x40ca` constructors belong to the external resource/contact-service channel,
-whose availability map is intentionally disabled on a standalone boot. No
-callback-`0x31` invocation, `0x0348`, or report-code transition occurs. This is
-a valid service/resource lifecycle, not missing ordinary hardware behavior;
-enabling the service map or replaying `0x00ca` would be another forcing shim.
-
-> ⚠️ **2026-07 caveat — read `docs/sim_emulator_scope.md` "Moves 1+2" first.** Many
-> conclusions below (idle content / camped state / DSP primitives "terminate at the RF/DSP
-> wall") were observed under the *full model profile*, where `MODEL_SIM_CARD`'s single-EF
-> injection + `SIM_CARD_CLEAR_NOSIM` poke short-circuit the SIM-init lifecycle — a confound.
-> The firmware's SIM manager is a passive request-server that reads **zero** files on its
-> own after ATR/PPS; the real blocker is the un-triggered **SIM-init read sequencer**, and
-> **milestone 2 (offline no-service menu) is not network-gated**. The RF-wall findings hold
-> only for milestone 3 (operator/signal). Treat the DSP/content/camped sections below as
-> milestone-3 background, not the near-term path.
-
-Every thread of this project (SIM acceptance, MMI state, keypad input, the display
-resource-enable, the idle repaint) ends at the same place: some post-startup transition
-into the interactive/idle UI never fires, so the screen holds at "Insert SIM card". This
-doc identifies that transition concretely and traces, on our full-SIM boot, exactly how
-far the boot sequencer gets and where it stops.
-
-Probed with the opt-in `NOKI3210_TRACE_HANDOFF` tap (three PC hooks: task-1 dispatcher
-`0x270c8e`, mode-0 interactive-init burst `0x270d1c`, display-manager idle call site
-`0x298000`). Oracle unchanged (`d8a9a7a58e587be8`); the tap is default-off.
-
-## The master sequencer is task 1
-
-Task 1 (`0x270170`) is the boot state machine. Its state struct is at **`0x1123ec`**; the
-current **mode** is a signed halfword at **`0x1123f0`** (`[state+4]`). Dispatcher
-`0x270c8e` reads the mode, bounds-checks `≤ 0xd`, and jumps through a **14-entry table
-`0x270ca8`** (modes 0..13). Mode handlers self-advance by writing the next mode into
-`[state+4]` in their epilogue (`movs r0,#N; strh r0,[r4,#4]`). Modes are *states*, not a
-linear count — mode 1 is early init, mode `0xd` is the CONTACT-SERVICE/limp supervisor,
-mode 0 is the interactive path (it holds the UI-subsystem init burst `0x270d1c`).
-
-## What our boot actually does (traced, full 20 s)
-
-```
-mode 0001  chk[112399]=00 ccont[11ff6c]=00   t=0.25   early init
-mode 000d  chk=00         ccont=06           t=0.33   enter CONTACT-SERVICE limp
-mode 000d  chk=08 → 09 → 0b                  t=0.33–0.83   startup events arrive
-mode 0004  chk=0f         ccont=03           t=0.91   ADVANCE out of the limp to mode 4
-(stays mode 0004 for the remaining ~19 s)
+```text
+active-low keypad input
+  -> MAD2 KBGPIO state
+  -> IRQ6
+  -> ISR 0x2b5da0
+  -> raw event 0x0072
+  -> task-1 mailbox
+  -> task-1 mode-4 dispatcher
+  -> fallback 0x2701b0
+  -> no matrix scan, no decoded MMI key
 ```
 
-Two corrections to earlier notes fall out of this:
+The remaining acceptance condition is an organic run in which the same input
+continues from event `0x72` into matrix scanning and produces a decoded MMI key.
+
+## Ownership
+
+Task 1 owns the startup consumer. Its state object is rooted at `0x1123ee`:
+
+| field | address | current value/role |
+| --- | --- | --- |
+| pending startup event | `0x1123ee` | current scalar input |
+| startup mode | `0x1123f0` | `0x0004` at the frontier |
+| readiness flags | `0x112399` | `0x0f` after mode `0x000d` |
+| substate | `0x11239c` | diagnostic context |
+
+The master dispatcher is `0x270c8e`, with a mode jump table at `0x270ca8`.
+Mode zero contains the shared interactive initialization burst at `0x270d1c`.
+The coherent boot does not enter that burst.
+
+Event `0x72` is not owned by a dormant keypad task. The IRQ handler posts it to
+mailbox 1, and task 1 receives it. The missing behavior is therefore a startup
+lifecycle transition, not IRQ routing or scheduler delivery.
+
+## Report code 7
+
+For this ROM and the currently selected branch, report code `0x07` is an actual
+prerequisite. Both branches leaving mode `0x000d` converge on it:
+
+- the ordinary fallback enters mode `0x0004` and waits for code 7;
+- the alternate SIM-ready/no-charger route enters mode `0x0007` and also waits
+  for code 7 before the shared initialization burst.
+
+Supplying code 7 diagnostically proves the immediate dependency: task 1 posts
+`0x0732`, starts task 6, and task 6 posts display/window event `0x0547`. The
+experiment does not compose. It leaves an earlier task-5 lifecycle active, and
+`0x0547` remains queued while repeated `0x0d16` timer traffic wins the receive
+path. No downstream result should be injected from that experiment.
+
+The v6.00 report wrapper is `0x2af190`. It publishes resource `0x6a01` and posts
+code 7 to task 1. It has exactly four callers:
+
+| owner family | caller | classification |
+| --- | --- | --- |
+| power/battery | `0x21e40c` | low-voltage shutdown outcome |
+| power/charger | `0x21f8de` | charging-completed outcome |
+| callback/status | `0x255c2e` | callback `0x5d` completion |
+| controller | `0x27f14e` | conditional/later controller outcome |
+
+Callback `0x5d` is organically active in state `0x0b`. Direct inputs `0x05eb`
+and `0x06c5` report code 7. Inputs `0x05e1`, `0x05e7`, and `0x05dc` start a
+task-local class-`0x52` timer whose recoded completion is `0x06c5`.
+
+All four callers are mapped, but no ordinary coherent producer has yet been
+proved. This is stronger than an unbounded “missing event” search: the open
+question is which valid external condition or transaction makes one of these
+already-known owners complete during a real 3210 boot.
+
+## Excluded owners
+
+The following candidates were tested or closed statically and must not be
+reintroduced without new evidence:
+
+- normal battery voltage, BSI, temperature, charger, or held-PWRONX values;
+- the pack-characterisation recovery route;
+- Advice-of-Charge initialization and exhausted-account completion;
+- display/service events `0x0280`-`0x0282` and the state-7 `0x06ca` route;
+- callback slot `0x45` and the `0x09d0`/`0x09d1` chooser;
+- callback `0x31`, status `0x00ca`, and resource result `0x0348`;
+- task-13 direct-to-task-16 `0x05eb` delivery;
+- the security editor and EEPROM/SIM identity comparison;
+- task-17 startup object `0x1587` and its `0x0a35`, `0x0a25`, `0x09ec`,
+  `0x043c` local transaction;
+- DSP heartbeat traffic, a guessed type-`0x74` `0a 09` echo, and ROM-4 class
+  `0x74` payload `13 00`;
+- contact/DSP self-test completion, which now clears organically before the
+  mode-4 wall;
+- generic-service registration paths that require later framework modes.
+
+The detailed evidence and exact fixtures live in `falsifications.json`,
+`resource_providers.md`, `battery_classifier_analysis.md`, and
+`sim_registration.md`.
+
+## Cross-ROM controls
+
+Report code 7 is not a universal DCT3 “DSP ready” report:
+
+- Nokia 5110 v5.30 has a structurally equivalent wrapper and four callers, but
+  an independent forcing-free boot reaches an interactive Security-code frame
+  without executing it. Its keypad lifecycle is serial and not a replay source
+  for the 3210 KBGPIO path.
+- Nokia 3310 v6.39 reaches an interactive idle-like frame in an independent
+  message-level emulator without executing its equivalent wrapper.
+- Nokia 3330 v4.50 retains the same four-owner reporter topology statically.
+- Nokia 3210 v5.01 contains the same resource-`0x6a01`/code-7 wrapper at
+  `0x2ac5bc`, with exactly four callers at `0x21e22c`, `0x21f772`, `0x252a4a`,
+  and `0x277d06`. Its task-1 branch still needs to be aligned before claiming
+  that it waits on code 7 identically.
+
+These controls reject generic peer traffic as justification for a synthetic
+report. The faithful correction must be observable by the 3210 firmware at a
+real hardware, transport, or nonvolatile-data boundary.
+
+## Retired bridge
 
-1. **The mode-`0xd` limp is passed, not stuck.** The old "stalls in the 000d limp because
-   CCONT battery-measurement events 0x15/0x16 are never delivered" was true of an earlier,
-   incorrect CCONT reset model. With PWRONX status `0x02`, an upper-source IRQ mask of
-   `0xf8`, and no battery/event-delay firmware bridge, the checklist byte `[0x112399]` climbs
-   `08→09→0b→0f` (all four startup events `0x14/0x17/0x16/0x15` → bits `0x1/0x8/0x2/0x4`),
-   the CCONT-state nibble `[0x11ff6c]` is `6`, and at t=0.91 task 1 **advances out of mode
-   `0xd`** into mode `0x4`. (A first pass with a 48-line trace cap stopped at t=0.6 and
-   missed this — hence a momentary "parked at 0x0d" misread, corrected here.)
-2. **The wall is mode `0x4`, one step further than any prior note placed it.**
+`MODEL_STARTUP_REPORTS` formerly returned code 7 and the later startup
+checklist directly from the task-1 getter. It established downstream control
+flow but was a firmware-result force and did not compose. It and the associated
+historical oracle have been removed.
 
-### The mode-`0xd` exit gate (for reference)
+## Active diagnostics
 
-Handler `0x270e22` accumulates the checklist: it dispatches on the message code and OR's a
-bit into `[0x112399]` — `0x14→0x01, 0x16→0x02, 0x15→0x04, 0x17→0x08`. The exit test at
-`0x270ec6` requires **all** of: `[0x11ff6c]&0xf == 6`, `[0x112399]&0xf == 0xf`,
-`0x2a6942() != 0`, `0x2b084c() == 0`; else it loops in mode `0xd`. On our boot all four
-hold by t=0.91, so the limp is cleared.
+`NOKI3210_TRACE_HANDOFF=1` retains only the current causal seams:
 
-## The current wall: task 1 parks in mode `0x4`
+- task-1 mode transitions and dispatcher state;
+- task-1 mailbox publications;
+- report-7 wrapper/caller and callback-`0x5d` activity;
+- event-`0x72` consumption versus scan/decode entry;
+- the small set of controller, power, and identity observations still needed
+  to reject accidental regressions in the classified surface.
 
-Mode `0x4` handler `0x271254` is **not** a dead park — on entry it runs a real
-subsystem-init burst (`0x25e4be`×3 with args 1/2/0, `0x25ff72`, `0x25f778`, `0x2601e8`,
-`0x2794d2`, `0x2a6646`, `0x29797c`, `0x29af90`, `0x2a102c`), clears the startup latch
-`[0x112398]=0`, sets sub-state `[0x11239a]=4`, posts a delayed event
-`0x2697aa(6, 0x0303)`, then enters an **inner message loop** (`0x2712cc`, dispatching on
-`[state+2]` message codes `0xd`, `6`, …) waiting for a trigger to advance. The mode value
-stays `4` for ~19 s while it services that loop — so the boot is **blocked on whatever
-message/event mode 4's inner loop is waiting for** to advance toward the interactive mode.
+The trace is read-only. A successful fix must work with it disabled.
 
-Downstream confirmation: the mode-0 interactive-init burst `0x270d1c` **never runs** (task
-1 never enters mode 0), and `display_idle` (`0x298000`) **never fires** — consistent with
-both being gated behind the mode-`0x4` → interactive transition.
+## Next bounded comparison
 
-## Why this unifies every other thread
-
-The resource-enable (contact-service cmd `0x70` → bitmap; `resource_providers.md`), the
-idle repaint (`[0x1116fd]=1` in the display manager; this doc's `0x298000` hook), the
-input-to-MMI translation (`mmi_layer.md`), and the post-SIM screen advance
-(`sim_emulator_scope.md`) are all **downstream of task 1 reaching the interactive mode**.
-The sequencer is the single junction; mode `0x4`'s inner-loop wait is the precise, current
-gate. This is the same *shape* as CONTACT SERVICE / `000d` / service-ready — a coherent
-boot-state handoff waiting on a message our reconstructed boot doesn't deliver — now
-localised one mode further along than before.
-
-## Follow-up: the mode-`0x4` gate is a single trigger — message code `7`, never delivered
-
-Traced mode `0x4` in detail (extended `TRACE_HANDOFF`: hooks at handler entry `0x271254`,
-mode-write `0x270184`, and the task-1 mailbox posts `0x26a204`/`0x26a354`). The result
-**re-frames the "6-message checklist" target**: that inner checklist (`0x112390..0x112395`,
-loop `0x2712cc`) is *downstream and never reached*. The actual gate is one step earlier.
-
-**Mode-`0x4` handler `0x271254` dispatches on the entry message code:**
-`3 → 0x2711f6`, `0xe → 0x271230`, `7 → the init burst 0x271266`, **else → `0x2701b0`**,
-which is a mode-set stub (`movs r0,#4; b 0x270184` = "stay in mode 4, yield"). So the init
-burst (and thus the inner 6-message checklist behind it) runs **only on entry message code
-`7`** (or 3/0xe).
-
-**What task 1 actually receives in mode 4:** codes `d5, 75, 33, c3` (c3 = the periodic
-tick) — **never `7`/`3`/`0xe`**. Every message hits the else-path → `0x2701b0` → re-arms
-mode 4. Confirmed by the mode-transition trace:
-
-```
-0001 -> 000d  via lr=0x270e3c   (mode-0d handler)
-000d -> 0004  via lr=0x271266   t=0.9127   (= return from bl 0x2701b0 at 0x271264)
-0004 -> 0004  via lr=0x271266             (stable park; re-armed every message)
-```
-
-**Why code 7 never comes:** inventory of every post to task 1's mailbox
-(`0x26a204`/`0x26a354`, `r0`=task, `r1`=code) over the whole boot yields exactly:
-`0x14 0x15 0x16 0x17` (the mode-0d checklist events — all arrive, which is why the limp
-clears) plus `0x32 0x33 0x37 0x75`. **Code `7` is never posted.** The event posters are
-small stubs at `0x2af074+` (`movs r0,#1; movs r1,#<code>; bl 0x26a354`; e.g. `0x2af086`→
-`0x17`, `0x2af09a`→`0x11`); no reachable stub posts `7` on our boot.
-
-Correction to the section above: the mode-`0x0d` exit gate `0x270ec6`→advance `0x270ee6`
-(and its *inline* copy of the burst) is **not** the path our boot takes — those hooks never
-fire; the `0x0d→0x4` transition happens via `lr=0x271266` (the mode-4 handler's own
-else-path), and `ccont[11ff6c]` moves 6→3 across it. So the gate documented earlier is one
-of several mode-0d branches, not the one exercised.
-
-**Net gate:** the interactive handoff is blocked because **message code `7` — the mode-`0x4`
-init-burst trigger — is never delivered to task 1.** Everything downstream (the 6-message
-subsystem-ready checklist, the mode-0 interactive-init burst `0x270d1c`, the idle repaint)
-waits behind it.
-
-## Follow-up (#28): the code-`7` trigger is armed by an advance gated on a SIM byte
-
-Traced *why* code 7 is never delivered. It is **not** an external subsystem post — it is
-**self-armed** by the mode-`0x0d` *proper* advance path, which our boot never takes.
-
-**The two mode-0d exits.** When the mode-0d checklist completes (`chk[112399]&f==f` and
-`ccont[11ff6c]&f==6`, both true at t=0.85), the handler reaches the gate `0x270ec6`, which
-then calls **`0x2a6942`**:
-- `0x2a6942 != 0` → **proper advance `0x270eee`** → runs the burst inline and, at `0x270f56`,
-  sets mode to **7** with code 7 armed;
-- `0x2a6942 == 0` → **fallback `0x270fa4`** → sets `ccont` state to 3 (`0x2af058(3)`, explains
-  the 6→3 move) and lands in the **dead-park mode 4** that waits forever for a code 7 nobody
-  sends.
-
-**The gate is a single SIM byte.** `0x2a6942` reads `0x27d654`, which returns byte
-**`[0x110436]`** (= field `+2` of the SIM struct at `0x110434`). It returns 0 (block) while
-`[0x110436] ∈ {1,2}`. Trace `simgate`: `[0x110436] == 1` for the entire boot, never changes.
-So the proper advance is blocked, mode falls to the dead park, and code 7 is never armed.
-This gate is checked at *two* task-1 transitions (`0x270edc` in mode-0d, `0x27139a` in
-mode-04) — it is the general "interactive-ready" predicate.
-
-**Confirmed by experiment.** `EXPERIMENT_SIMGATE_PASS` overrides `0x2a6942`'s read of
-`[0x110436]` from 1→0 at `0x2a6948`. Result: the advance fires and **mode goes `000d → 0007`
-via `lr=0x270f56`** (the code-7-armed path) instead of `→ 0004`. So `[0x110436]` is decisively
-*the* first blocker of the interactive handoff. (Mode 7 then parks — a further gate — so the
-chain is 0d→7→…, but the first, causal gate is this SIM byte.)
-
-**What `[0x110436]` is / the faithful fix.** It is a SIM/interactive-readiness enum (1 = "not
-ready"); the gate wants 0 or ≥3. Our synthetic SIM does ATR + a couple of EF reads only, so
-the firmware's SIM-init never advances this byte past 1. The faithful path is to complete more
-of the SIM initialisation conversation (the files/status the firmware reads to declare the SIM
-ready) so `[0x110436]` reaches its ready value naturally — the same shape as every prior gate.
-Knobs: `EXPERIMENT_SIMGATE_PASS` (diagnostic force), `TRACE_HANDOFF` (`simgate` tap on
-`0x27d654`).
-
-## Follow-up (#30): CORRECTION — the gate is a BATTERY/VBAT byte, not SIM
-
-Investigating how to make `[0x110436]` reach "ready" overturned its labelling. **It is not a
-SIM state.** The subsystem that owns struct `0x110434` and drives `[0x110436]` is the
-**battery / VBAT voltage monitor** at `0x21exxx` — its debug strings are "BATTERY VOLTAGE
-CHECK", "REGULAR COLD CHARGE CHECKS", "Initialise VBAT filter", "Start limited fast VBAT
-reads", "Check voltage level for shutdown". So the mode-0d→interactive advance is gated on a
-**battery-voltage confirmation**: the firmware won't proceed to full operational/interactive
-mode until the VBAT classification is out of the "checking/marginal" band {1,2}. (This
-corrects the `#28` section above and the earlier `EXPERIMENT_SIMGATE_PASS` name — both said
-"SIM"; it is VBAT. The knob is now `EXPERIMENT_VBAT_GATE_PASS`.)
-
-**How `[0x110436]` is computed.** Writer `0x27dcfa` stores `[0x110436] = 0x27cbec()`. The
-classifier `0x27cbec` compares a filtered voltage (`r1 = [0x110486] = 0x0995`) and a filter
-output `ip` (from `0x27d500`, a **15-tap moving-average**: ring index `[0x110434+0xb] mod 15`,
-accumulator `[+0x44]`, sample buffer `0x1104b4`) against **fixed thresholds**
-`[0x110494]=0x076c`, `[0x110496]=0x0910`, `[0x110498]=0x08b6`. On our boot `ip ≈ 0x09ac ≥
-0x0910`, so it structurally returns **1** and never changes over 20 s. Values 1/2 block the
-gate; 0 and 3 pass.
-
-**Not the battery ADC.** Sweeping the battery-voltage ADC (`NOKI3210_ADC2`) across its full
-range `0x120…0x3ff` leaves `[0x110436]=1` and `r1=0x0995` unchanged — the classifier's inputs
-are internal/calibration values, not the live ADC channel-2 reading. So **extending the SIM
-init (the original #30 framing) cannot affect it, and neither can a battery-voltage tweak.**
-
-**Verdict.** The faithful unblock of `[0x110436]` is a **battery/VBAT-subsystem** matter (the
-filter/classification reaching "confirmed"), not a SIM-model extension. It was partially
-explored before (`SKIP_SERVICE_E2_REARM`, the VBAT-pipeline probe) and is not resolved by any
-single value. The digital lever to explore *past* this gate remains the forced pass
-(`EXPERIMENT_VBAT_GATE_PASS`), which advances mode `0d→7` (confirmed) for use by `#31`.
-
-## Follow-up (#31): the mode-7+ chain — enumerated, and it does not reach pixels
-
-Used the two diagnostic force levers (`EXPERIMENT_VBAT_GATE_PASS` + `EXPERIMENT_FORCE_CODE7`,
-the latter forcing the advance's getmsg return `r0:=7` at the reliably-hooked post-`bl`
-point `0x270f4a`) to push the sequencer as far as it will go and map the gate chain:
-
-| # | gate | our boot | lever |
-|---|---|---|---|
-| 1 | mode-0d startup checklist (`[0x112399]` ← events `0x14/15/16/17`) | **satisfied** (limp clears) | — |
-| 2 | **VBAT voltage-confirmation** `[0x110436]` (via `0x2a6942`) | blocks (structurally 1) | `VBAT_GATE_PASS` |
-| 3 | **code-7 trigger** (msg code 7 to task 1 at the advance getmsg) | never posted (unrun subsystem) | `FORCE_CODE7` |
-| 4 | **mode-4 6-message ready checklist** `[0x112390..95]` (codes `9/a/b/c/d/1c`) | never all posted | — |
-| 5+ | mode-0 interactive-init `0x270d1c`, idle repaint `[0x1116fd]`, resource-provider graph | never reached | — |
-
-**Result of forcing gates 2 + 3:** the mode-0d advance and its init burst run, and the
-sequencer reaches **mode 4** (confirmed: the VBAT gate is consulted a second time from the
-mode-4 caller `0x27139a` at t=0.88). But it then parks on gate 4 (the 6-message checklist),
-and — decisively — **the display never changes: the frame stays `d8a9a7` ("Insert SIM
-card")**, with no interactive-init and no idle repaint.
-
-**Take-stock conclusion.** The visibly-interactive screen is not one or two gates away — it
-sits behind a **chain of subsystem-readiness gates**, each a signal our reconstructed boot
-does not produce (battery-voltage confirmation; the code-7 trigger from an unrun subsystem;
-six more subsystem-ready posts; then the resource-provider graph). Forcing the leading gates
-does **not** cascade to pixels, because each unblocked gate merely exposes the next, and the
-downstream subsystems (the ready-message posters, the resource providers) still are not
-running. This is the coherent-boot wall, now *enumerated* as a concrete gate sequence rather
-than a vague region: reaching the interactive screen requires coherent bring-up of that whole
-graph, not a bounded set of pokes. Levers (opt-in, diagnostic): `EXPERIMENT_VBAT_GATE_PASS`,
-`EXPERIMENT_FORCE_CODE7`.
-
-## Follow-up (#29, #32): the idle flag is downstream, and the VBAT gate is a fork not a wall
-
-**#29 — idle-repaint flag `[0x1116fd]`.** A ram-write watch shows it is written **only to 0**
-(pc `0x2982e8`, the display manager's "clear idle request") and to 2 (after a paint); **never
-to 1**. The display-manager loop's own idle-request accumulator (`[sp+4]`) stays 0, and no
-reachable code writes `[0x1116f8+5]=1`. So the idle repaint is never *requested*. That request
-is issued when the phone transitions into the idle state — which is behind the whole gate chain
-above. **#29 is the display-side manifestation of the same coherent-boot wall, not an
-independent seam** (confirmed: the forced #31 run, which reaches mode 4, still leaves the flag
-0 and the frame unchanged).
-
-**#32 — can the VBAT gate be unblocked faithfully?** Traced the classifier end-to-end:
-sample generator `0x27cc74` → raw reader **`0x2b1bb2(7)`** (a *different* source than CCONT ADC
-ch2 — which is why sweeping `NOKI3210_ADC2` did nothing; it returns a **ROM default** via
-`[0x2e742d+7]` when calibration flag `[0x1124d0]==0`, scaled `×1500/313` with cal words from
-`[0x11fde0]`) → accumulated into `[0x110454]`/`[0x11045c]` → ÷10 moving-average filter
-(`0x27d500`) → classified (`0x27cbec`) against **ROM-constant thresholds** (memcpy'd from ROM
-`0x2e1ff4`, *not* EEPROM) → **state 1**.
-
-Two conclusions:
-1. **It's not calibration/EEPROM data we can supply** — thresholds are ROM constants and the
-   reading is a ROM default; the classifier structurally returns 1.
-2. **More importantly, the VBAT gate is a *fork*, not the interactive blocker.** state 1/2 →
-   fallback → **mode 4**; state 0/3 → advance → **mode 7**. And *both* mode 4 and mode 7 then
-   wait on **message code 7** (mode-4 entry `0x27125e`, mode-7 handler `0x270f4c`). So our
-   unforced boot already takes a valid branch (mode 4); making VBAT "pass" only switches the
-   branch to mode 7, which hits the *same* code-7 wall. **`EXPERIMENT_VBAT_GATE_PASS` was
-   therefore a detour** — the real shared blocker on both branches is the code-7 trigger.
-
-**Verdict:** don't model VBAT (it is a fork, and mode 4 — our current unforced path — is a
-faithful branch); the single remaining shared blocker to advance the sequencer is **message
-code 7 arriving at task 1**, whose source is an unrun subsystem (per #27/#28). That is the
-correct next target, on the *unforced* boot.
-
-## Follow-up (#33): code 7 (and the 6-message checklist) are subsystem-ready reports — none fire
-
-Found the emitter of code 7: **`0x2af190`** (`post code 7 to task-1 mailbox`), one of a cluster
-of tiny **subsystem-ready reporter stubs at `0x2af01c…0x2af27a`**, each `report-state (0x2b5ae4)`
-+ `post <code> to task 1`. Crucially this one cluster emits **every** code in the chain:
-- the mode-0d startup events `0x14/15/16/17` (reporters `0x2af1da/216/03e/094`) — which **do**
-  fire (that's why the limp clears),
-- **code 7** (`0x2af190`),
-- and the **mode-4 6-message checklist** codes `9/0xa/0xb/0xc/0xd/0x1c` (reporters
-  `0x2af052/202/02a/1c6/1b2/1ee`),
-- plus 3 (`0x2af252`) and 0xe (`0x2af27a`).
-
-So the code-7 trigger and the 6-message checklist are the **same mechanism**: a subsystem calls
-its reporter stub when it reaches a state. Code 7's reporter `0x2af190` has **4 callers** —
-`0x21e40c` (the battery/charger state machine's "Check voltage level for shutdown" branch,
-gated on `0x27cd82()` seeing VBAT sample ≤ `[0x110494]+0xe9` = 2133), `0x21f8de`, `0x255c3c`,
-and `0x27b3b6` (a status dispatcher). The original hook for the third caller was incorrectly
-placed at `0x255c2e`; the dispatcher branches to `0x255c30`. Concrete execution maps that case
-to status `0x0795`, whose firmware producer sits downstream of callback-table index `0x1a`
-receiving status `0x1400` and emitting initializer status `0x08ac`. None of that chain is reached
-on our boot. Subsequent exhaustive backchaining showed that `0x1400` is task-5 mailbox ingress,
-not a callback return, and is absent from all 188 direct task-5 event-helper call sites; the only
-unresolved-destination sender does not route to task 5. This is a mapped dormant/service-specific
-contract, not evidence for ordinary boot. Code 7 is therefore never posted by any emitter. Each
-sits behind a subsystem state machine. The two power-owned callers are now
-excluded from ordinary boot: `0x21e40c` is the literal "Check voltage level for
-shutdown" event-`0x25` branch, and `0x21f8de` belongs to the low-voltage/charger
-lifecycle. Runtime ADC mapping proves logical source 7 uses CCONT selector 1;
-selector `0x1b0` powers off before task 1, while `0x1c0` reaches mode 4 with no
-code 7. Tuning battery inputs cannot faithfully satisfy the ordinary predicate.
-
-The adjacent L1 configuration machinery is not dormant. A coherent six-second
-`TRACE_DSP_BOUNDARY` run enters initializer `0x2a2074`, then engine `0x28d710`
-from tasks 0, 1, 9, 6, and 13. Task 9's first update builds six `0x54`-byte,
-class-`0x51` messages for task 3 between about 0.366 and 0.370 s; task 3's normal
-serializer drains them into the MCU-to-DSP TX ring. The task-13 update at about
-1.422 s, immediately before mode 4, also reaches the engine but emits no new
-batch. This rules out a missing L1 initializer as the direct code-7 cause. The
-remaining question is which real completion path independently arms callback
-`0x5d`, not whether the MCU constructs
-its initial DSP configuration stream (**R**).
-
-A targeted type-`0x03` DSP liveness retest delivered 182 header-only entries through the real
-empty-ring-gated RX/FIQ0 path during a coherent 12-second SIM run. Callback `0x1a` ran once only
-for the pre-existing `0x05e2` / message-type `0xfe` event; it never received `0x1400`, and neither
-`0x08ac`, `0x0795`, nor code 7 appeared in that heartbeat experiment. Task 1 remained in mode `0x0004`. This independently
-confirms that the periodic heartbeat may be necessary DSP behavior but is not the semantic
-telephony-control completion, so the temporary heartbeat model was removed again (**R**).
-
-## Classified conditional `0x08ac` / AoC route
-
-The later coherent SIM profile organically publishes `0x08ac` twice.
-Controller dispatcher `0x255b5e` calls `0x27f150`, reads selector byte
-`[0x11fcfa] == 0`, and calls availability helper `0x287250(0)`.
-
-The availability contract is fully decoded. Primary helper `0x26f5a4` first
-requires product-feature query `0x2b47a0(0x1a) == 0`: EEPROM record `0x150`,
-mirrored at `0x1124e8`, with `0x1124e9.bit0` clear. It then requires original
-CPU bit 19 in `[0x10d128]`, copies 40 bytes from `0x10d24c`, and tests output
-byte 8 bit 7. CPHS parser `0x20157e` maps `EF_CSP (6F15)` group `0x03` mask
-`0x20` to that bit and sets the completion-valid flag. CPHS 4.2 names the bit
-Advice of Charge.
-
-Fallback `0x26eef4` requires original bit 11 of `[0x10d126]`, copies 12 bytes
-from `0x10d130`, and requires output byte 1 bits 6 and 7 together. `EF_SST
-(6F38)` parser `0x201150` is the only semantic writer: it maps EF_SST byte 2
-bits 1 and 2 to those result bits and sets the consumed validity bit. Global
-RAM initialization is the only other writer class. This accounts for both
-ways selector 0 can succeed (**S**).
-
-The opt-in CPHS phase-2 card makes selector 0 succeed and advertises EF_SST
-service 5, causing ordinary reads of `EF_ACM`, `EF_ACMmax`, and `EF_PUCT`.
-Initializer `0x27f9e8`, not a missing `0x13fe` producer, owns the following
-guard `0x11fd04`. Zero ACMmax is GSM 11.11's valid "maximum not valid" value
-and leaves the guard clear. With a coherent exhausted-account fixture
-`ACM == ACMmax == 1`, the initializer sets the guard, `0x27f150` constructs
-the activity slot, computes zero remaining allowance, and reaches `0x27f23e`.
-That instruction constructs `0x019a`; it does not construct `0x0795`. This
-disproves the former controller-to-code-7 join (**R correction**).
-
-The real non-display `0x0795` producer is `0x28796a`. It requires selectors 0
-and 1 both unavailable and controller state `0x10fcd5 == 2`. Task-5 input
-`0x08b0` invokes reconciliation. The fixed catalogue at `0x2cb968` proves that
-packed `0x213a`/`0x613a` expands to `0x089a, 0x08b0`, while adjacent packed
-`0x213b`/`0x613b` emits `0x08b0` directly. Both status indexes belong to later
-framework-mode-11 paths: `0x013a` is consumed by callback `0x24`, and callback
-`0x013b` belongs to a resident descriptor registered by `0x28ba9a` only after
-input `0x03ab` establishes that mode. The coherent boot remains in mode 0. Together with the
-independently excluded display-state-7 producer, this exhausts literal
-`0x0795` producers and excludes it as ordinary mode-4 ownership (**S/R**).
-
-Callback-table index `0x5d` at `0x27b370` is not itself the missing activation.
-The initialization sequence reaches it with state byte `[0x11fcdd] == 0x0b`
-and input `0x05e2`. Inputs `0x05eb` and `0x06c5` call the reporter directly;
-inputs `0x05e1`, `0x05e7`, and `0x05dc` arm task-local class `0x52`, whose
-task-5 recode is `0x06c5`. None of those completion inputs reaches the callback.
-Flags `0x01a00000` intentionally select `0x032d`, not automatic `0x05dc`, at
-framework initialization. A valid type-`0x80`
-task-13 transfer correlated with the organic DSP type-`0x70` payload `{0x0a,
-0x09}` traversed FIQ0, normalized to `0x040b`, returned parser result `0x061a`,
-and published `0x05eb` directly to task 16 through `0x23e1a4`. It did not enter
-the global callback sweep, produce code 7, or advance mode 4. The diagnostic
-reply was removed; this excludes task 13 as the ordinary code-7 owner (**R**).
-
-One predecessor is mapped backward through task 5. Display
-dispatcher `0x28bddc` handles statuses `0x0280`-`0x0282` by calling `0x256f68`,
-which publishes `0x05e7`. Callback `0x57` can then publish `0x0389`; callback
-`0x31` converts that lifecycle to event `0x157e`; the catalogue maps `0x157e`
-to internal status `0x0396`; handler `0x2638e4` publishes `0x05eb`; and callback
-`0x5d` reports code 7. None of `0x0280`-`0x0282`, `0x0389`, `0x157e`, or
-`0x05eb` appears in the coherent run. Static ownership and a coherent runtime
-trace subsequently exclude this as the ordinary path: `0x0280`-`0x0282` are
-transaction-engine states reached by local/test command handlers, and
-`0x253e20` never produces them during ordinary boot (**R**). The remaining
-question is which other global `0x05eb` producer represents ordinary readiness.
-
-### Falsified frontier: `0x09d0` versus `0x09d1`
-
-The context manager at `0x24d588` scans four activity slots and reaches its
-completion tail at `0x24d716`. It reads callback-state slot `0x45` from
-`0x11fcc5`: values other than 0/5 (with one state-6 exception) select global
-status `0x09d0` at `0x24d762`; reset state 0 selects sibling `0x09d1` at
-`0x24d76c`. The coherent boot executes this chooser once at about 1.145 s,
-while task 5 is still in startup mode `0x000d`, with slot `0x45 == 0`, and
-therefore publishes `0x09d1`.
-
-Catalogue decoding makes the distinction causal rather than numerical. With
-callback `0x5d` already in state `0x0b`, the `0x09d0` descriptor is eligible
-and carries action `0x00dc`; the `0x09d1` descriptor uses the inverted state
-predicate and is ineligible. The display alternative does not rescue this
-boot: its `0x06ca` case requires startup/display state 7, but task 1 sets state
-3 on the ordinary fallback into mode 4.
-
-A bounded write-watch over the callback-state array records slot `0x45` being
-zeroed during initialization, then written as zero by catalogue commit
-`0x2aefa2` and callback path `0x299ba0`. No nonzero write occurs through the
-coherent three-second boot. The corresponding static census covers 46
-selector-`0x45` catalogue rows, 46 generic initialization/reconciliation
-records, 47 exact `0x11fcc5` literal references, and 57 `0x11fc80` array-base
-literal references. All selector-`0x45` descriptors carry new-state value
-`0x3f` (no transition); the generic record table contains no selector `0x45`;
-the broad indexed stores at `0x291ff4`/`0x292016` only initialize the array to
-zero; and the sole exact direct store at `0x299ba0` handles global `0x05e2` by
-zeroing slots `0x45` through `0x48` before publishing `0x138e`/`0x1390`.
-
-This is a quantified absence result, not proof that no computed pointer could
-ever alias the byte. It is sufficient to reject the working premise: no
-identified MCU framework or ordinary runtime path advances slot `0x45`, and
-none reaches a DSP prerequisite. Treat `0x09d0` as a valid mapped completion
-route whose ordinary ownership is unproved, not as the current code-7 blocker.
-
-Writer classification:
-
-| Site/mechanism | Classification | Slot-`0x45` effect | Runtime coverage |
-|---|---|---|---|
-| `0x291ff4` broad indexed initializer | dormant alternative initialization branch | zero only | not selected in the coherent profile |
-| `0x292016` broad indexed initializer | ordinary initialization | zero only | observed twice at 0.232 s (the aligned-word watch reports both byte lanes) |
-| `0x29208a` table initializer | framework path, excluded for selector `0x45` | none; its complete 46-record key set omits `0x45` | no slot-`0x45` write |
-| `0x2924c2` table reconciler | framework path, excluded for selector `0x45` | none; it consumes the same key set | no slot-`0x45` write |
-| `0x2aefa2` catalogue commit | ordinary framework commit | preserve only; all 46 matching descriptors encode `0x3f` | observed at 0.853 s with value remaining zero |
-| `0x299ba0` global-`0x05e2` handler | ordinary lifecycle reset | explicitly zeros slots `0x45`-`0x48` | observed at 1.154 s with value remaining zero |
-
-No service/test writer, nonzero direct writer, or DSP-owned writer survives the
-census. The coherent runtime watch spans initialization, the chooser at
-1.146 s, and the later reset; it observes no nonzero value. Consequently there
-is no ordinary advancing writer whose prerequisite can be followed to a
-hardware boundary. The goal's conditional 3310 comparison is not activated.
-
-The subsequent direct-`0x05e1` census closes the next finite surface rather
-than reopening slot `0x45`. Ten calls belong to callbacks `0x4e`, `0x51`,
-`0x34`, `0x32`, `0x59`, `0x47` (three), `0x6d`, and `0x0f`; each is a
-completion or cleanup tail requiring an existing transaction. Callback `0x47`
-is the only owner selected in the coherent run. A second arithmetic audit
-corrects its shared completion branch to inputs `0x0578` and `0x1440`, not
-`0x0778` and `0x1441`. Input `0x05dc` organically starts a text/UI transaction
-through `0x24b174 -> 0x24af70`, which stores `0x0578` as its completion and
-publishes `0x057c` when presented. The run reaches `0x05dc` and `0x057c`, but
-not the interactive completion. This is a UI lifecycle, not evidence for a
-missing DSP/network response or the unconditional code-7 owner. See
-`resource_providers.md` for the complete owner table.
-
-The sequence catalogue contributes one additional indirect route: packed
-`0x212b`/`0x612b` (status index `0x012b`) expands to a sequence headed by
-`0x05e1`. Correct catalogue-mode decoding matters here: bare `0x012b` does not
-select the sequence. Automated producer coverage finds neither packed form in
-literal loads, recovered constant constructions, or direct packed-event calls,
-so this is not an evidenced ordinary predecessor.
-
-**Assessment for faithful emulation.** The mode-0d events now fire from the corrected CCONT
-reset contract without firmware event rewriting; code 7 and the six checklist messages do **not**, because their subsystems never reach the
-reporting state. Emulating them faithfully is therefore **coherent bring-up of those subsystem
-state machines** (battery/charger, display, SIM-region dispatchers) — each a deep RE + model
-effort gated on hardware/charger state, not a bounded injection. This is the coherent-boot wall,
-now mapped to its finest grain: the `0x2af0xx` reporter cluster and the specific subsystem state
-machines that drive it. The mechanism is fully understood; the remaining work is per-subsystem
-bring-up, which is open-ended.
-
-### Security editor provisioning result
-
-The current Security-code frame is now explained without assigning code 7 to
-the editor. Callback `0x7c` receives `0x05dc` and calls `0x2ae61a`; a mismatch
-selects callback `0x47`, whose generic editor stores completion `0x0578` and
-publishes presentation status `0x057c`. The erased synthetic EEPROM has invalid
-identity/security records at `0x000c`, `0x0110`, and `0x06c8`, so the mismatch is
-expected.
-
-A firmware-derived provisioning fixture supplies a synthetic IMEI, the default
-phone code `12345`, and the matching derived state. Runtime then takes
-`0x2ae61a`'s equality branch (`computed == stored == 0x0317`), returns zero, and
-never selects callback `0x47`. The Security-code frame disappears and an
-idle-like `Menu` frame appears. No `0x0578 -> 0x05e1 -> 0x06c5` completion occurs,
-code 7 remains absent, and task 1 remains in mode `0x0004`. A delayed Menu-key
-press leaves the frame byte-identical. Therefore security mismatch is a real
-presentation blocker but is not the owner of the startup code-7 handoff.
-
-The provisioned run also closes two superficially promising task-5 streams.
-An organic `0x05e1` at about 4.90 s is delivered only to selected callback
-`0x2f`, whose documented initialization lifecycle expects `0x05e0`/`0x05e1`;
-it is not a global completion and never reaches callback `0x5d`. With callback
-`0x47` absent, callback `0x01` owns the later ordinary initialization traffic,
-while callback `0x5d` still sees only its early `0x05e2` initialization.
-
-The ordinary task-17 startup transaction is complete at its local boundary and
-does not supply report 7. Task 1 posts object `0x1587` through `0x2794c0`; task
-17 accepts it at `0x2253d0` and emits `0x0a35`, `0x0a25`, then `0x09ec`. The
-existing task-15/16/10 route immediately returns `0x043c` before publishing the
-uncorrelated DSP type-`0x1a` state object. A provisioned coherent run observes
-the acceptance and all three local outputs, but no code 7. This confirms that
-the constructor and immediate acknowledgement lifecycle are live; the later
-unresolved `0x0434` radio completion must not be treated as an implied reply to
-type `0x1a` or as the missing startup report.
-
-The later repeating `0x0d16` message is also unrelated. Task-5 timer class
-`0x3d` maps through the recode table at `0x2d71a8` to the ROM message object at
-`0x2e1a80`; call site `0x2b416e` rearms it with delay `0x80` from the periodic
-resource-`0x62` status poll at `0x2b412c`. It is normal background polling, not
-a missing callback-`0x5d` completion.
-
-The ROM-4 DSP fallback is also closed for the proposed payload. Inbound class
-`0x74` reaches `0x234954`; its recognized self-test/contact completion is payload
-`0x0d 00`, which clears the contact busy flag at `0x2349dc`. Payload `0x13 00`
-falls through the generic handler and has no static route to `0x05e1`, `0x05eb`,
-`0x06c5`, or any of the four code-7 reporters. Numeric group names from another
-firmware layer are not interchangeable with this ROM's first-level class byte.
-
-## HISTORICAL BRIDGE (MODEL_STARTUP_REPORTS): synthetic mode 4 → mode 0xc advance
-
-`MODEL_STARTUP_REPORTS` injects code 7 + the six checklist codes
-`9/a/b/c/d/1c` + the post-checklist `0x74` into task-1's
-mailbox via the firmware's **own** post `0x26a354(mailbox=1, code)`, chained through a sentinel
-trampoline (the `MODEL_SVC_RESPONDER` / `MODEL_RES_ENABLE` pattern), triggered once at task-1's
-getter `0x26ff14` after mode-0d completes.
-
-The current coherent ordering exposes a limitation in that historical proof:
-the fixed 950 ms bridge feeds the reports while task 1 is still in mode
-`0x000d`, so they are consumed by the wrong lifecycle and the later mode-4 wait
-remains parked. The model demonstrates the downstream sequence only when its
-timing happens to align; it cannot establish an organic producer or serve as a
-causal mode-4 experiment.
-
-**Result (traced):** the sequencer advances
-
-```
-mode 000d → 0004 (mode-0d limp cleared)   [pre-existing]
-reports injected (t≈0.95)
-mode 0004 → 000c (t≈1.06)   ← code 7 consumed, init burst ran, entered the checklist mode
-6-message checklist [0x112390..95] all set   (chk_w trace)
-mode-0xc completion reached, waited for + consumed 0x74   (mode0c_wait74 trace)
-```
-
-This demonstrated what the reports unlock, but not who owns or times them. A
-later coherent-contact run showed the fixed 950 ms bridge firing while task 1
-was still in mode `0x000d`, where the reports were consumed before mode 4. It
-is therefore a diagnostic firmware bridge, not faithful subsystem emulation.
-
-**Where it now stops — the VBAT confirmation gate, again.** Mode `0xc`'s exit (`0x27139a`) needs
-either `0x2a6942()==3` (VBAT classification **state 3**) or a keypad condition
-(`0x2b2f90()==0x80 && [0x11239d]==1`); otherwise it falls to `0x2714a4` → an idle getmsg drain.
-So the **VBAT voltage-confirmation** gate (goal item 1) is genuinely required *here* to reach
-mode 3 → mode-0 interactive-init. The classifier `0x27cbec` writes `[0x110436]`, and it does not
-reach state 3 from a simple `NOKI3210_VBAT_RAW` reading override (the classification is a
-multi-comparison over the moving-average vs ROM thresholds; a faithful state-3 needs the reading
-to converge into a specific band, still open). Knobs: `MODEL_STARTUP_REPORTS`,
-`STARTUP_REPORTS_MS`, `VBAT_RAW`.
-
-**Reactive feed (final form).** The one-shot mailbox injection hit an ordering problem (the
-`0x74`-wait and later discard-loops eat an all-at-once injection). The model was reworked to feed
-**reactively**: at task-1's getter `0x26ff14` (after mode-0d), it returns the next report code
-directly (`bx lr`), one per getmsg call, in the order the successive sub-phases wait for them.
-This carries the boot cleanly through the full message-gated startup handoff:
-
-```
-mode 4  (Insert-SIM park)
- feed 7          → code-7 trigger → init burst → mode 0xc
- feed 9,a,b,c,d,1c → 6-message ready checklist passes
- feed 0x74       → post-checklist report consumed
- [VBAT-confirm gate 0x27139a: model emulates 0x2a6942()==3, the confirmed value]
- → 0x2713b6 sub-phase → bl 0x2a12a0  ← HANGS
-```
-
-**The definitive terminus.** Past the VBAT-confirm gate, mode `0xc` calls the **display/UI
-subsystem init `0x2a12a0`** (r0=1 → `0x2a1300`), which reports a resource (`0x2b13d4`), posts
-three messages to **task 3**, and calls **`0x2355b6`** — and this long multi-step init **does not
-complete** (traced: reaches `0x2713b6`/`0x2713bc`, never `0x2713c2`; inside `0x2a1300`, reaches
-`0x2a1306`, never `0x2a130c`, even over a 60 s run).
-
-**Correction (task 3 IS alive).** An earlier note here said task 3 (the display/UI server) is
-"not functional". That is wrong — a liveness trace shows **task 3 runs and recv-loops throughout
-the boot**, processing many codes (`0x1740, 0x2b14, 0x2c48, …`), including during the mode-`0xc`
-display init. So the terminus is *not* a dead subsystem. `0x2355b6(2)` cooperatively **yields via
-the RTOS scheduler `0x269d00`** (the context-switch/dispatch, not an event-wait) and task 1
-progresses only slowly through the display init (a ~5 s gap between successive checkpoints),
-threading many scheduler yields and subsystem calls (`0x2795e6`, `0x2b28e0`, `0x2904c0`, the
-task-3 posts, resource acquisition). Over **60 s and 200 s** runs it still does not return to `0x2a130c`, mode-0 interactive-init
-(`0x270d1c`) never runs, and the frame never changes. So the ceiling is the **display-subsystem
-init being a deeply interconnected multi-step process that does not converge** on our reconstructed
-boot — the coherent-boot wall, reached *from above*. (Skipping the yield is not an option:
-`0x269d00` is core scheduler used across the whole system; forcing it past breaks the boot at
-mode-0d.)
-
-**What the init actually does (the root of the non-convergence).** `0x2355b6`, after the yield,
-calls `0x2795e6`, which **resumes/starts the application-task layer** — tasks **0xa..0x11 (10–17)**
-via `0x269bf4` (each `0x1093bc + id*0x10` TCB). So the mode-`0xc` display init is the "bring up the
-application/UI tasks" step. Those tasks then run their own inits (needing resources, the display
-render path, DSP/RF state). On our reconstructed boot that app-layer bring-up **does not converge**
-— which is exactly the resource-provider / coherent-boot wall, now seen to be *the app-task layer
-init*, not a single missing message. Emulating mode-0 interactive-init therefore requires driving
-~8 more application tasks to convergence (each with its own report/resource dependencies, and
-behind them the resource-content pipeline that blanks/crashes when forced) — an open-ended
-subsystem bring-up, the documented digital ceiling.
-
-**Historical status.** VBAT confirmation was bridged at its gate (`0x2a6942()==3`);
-code 7 and the mode-4 checklist were fed via `0x26ff14`; mode-0 interactive-init was
-**not reached** because it is behind the display/UI
-subsystem init `0x2a12a0` that hangs (needs the display/resource subsystem + task 3 functional,
-i.e. the coherent-boot wall). Three of the four gates are driven; the fourth (mode-0) is blocked
-not by another message but by a non-functional subsystem — the genuine, long-documented ceiling.
-These observations describe the historical bridge profile, not current modeled completeness.
-
-## Superseded next questions
-
-The questions below are retained as investigation history. The delivery census
-and backward chain in `resource_providers.md` supersede them.
-
-Two open threads for the code-`7` trigger:
-1. **Not yet traced:** the other post paths — delayed `0x2697aa`, immediate `0x2695f4`, ring
-   `0x26aac0` — and the getter `0x26ff14`'s *translation* (raw `0xc0/0xc1/0xc4/0xc6` return
-   RAM cells `[0x1123a0]/[0x112408]/[0x11245e]/[0x11239a]`, which could evaluate to 7).
-   Confirm code 7 is absent by *every* delivery mechanism, or find the one that carries it.
-2. **Who should emit it:** identify the subsystem whose "ready" report is code 7 (by analogy
-   with the `0x2af074+` posters for `0x14–0x17`) and why its path isn't taken on our boot.
-
-Knob: `NOKI3210_TRACE_HANDOFF` (opt-in; hooks `0x270c8e`, `0x270d1c`, `0x298000`,
-`0x271254`, `0x270184`, `0x26a204`/`0x26a354`).
-
-Symbols: `task1_sequencer 0x270170`, `task1_dispatch 0x270c8e`, `task1_mode_table 0x270ca8`,
-`task1_mode0d_limp 0x270e22`, `task1_mode0d_exit_gate 0x270ec6`, `task1_mode04 0x271254`,
-`task1_mode0_interactive_init 0x270d1c`, `display_mgr_idle_call 0x298000`. State:
-mode `0x1123f0`, checklist `0x112399`, CCONT-state `0x11ff6c`.
-
-## App-task forcing sweep (2026-07): the layer is ALIVE, not hung
-
-Ran a task-liveness + message-flow sweep (`NOKI3210_TRACE_TASKS`) with
-`MODEL_STARTUP_REPORTS` driving the boot. This overturns the "non-converging /
-hung" framing:
-
-- **All 22 RTOS tasks reach their recv loop.** The application tasks **10–17**
-  (resumed on the mode-0xc path) come alive at t≈0.84; every task 1–22 is scheduled
-  and running its message loop. Entry points (task-table `0x2d7090`, stride 0xc):
-  t10 `0x21bf60`, t11 `0x2159c4`, t12 `0x273ea0`, t13 `0x23ebd0`, t14 `0x248318`,
-  t15 `0x20a8a8`, t16 `0x24f5a0`, t17 `0x22391c`. Known hubs: t5 `0x2af630` (MMI VM),
-  t6 `0x297fc4` (display manager), t3 `0x2b18a0` (display/resource server),
-  t21 `0x27eae0` (SIM).
-- **They run a busy, continuous inter-task protocol.** Communication graph (edges,
-  deduped): `t5` is the central hub (receives from t0/t1/t17/t20/t21/t2/t6); `t13↔t16`
-  exchange bidirectionally; `t15→t16/t17`, `t16→t10/t11/t13`, `t17→t5/t15/t20/t3`,
-  `t20→t21/t5/t17`, `t21→t17/t5`, `t5→t6` (MMI→display). Message codes are per-message
-  **sequence ids** (`0x17xx→0x1axx`, monotonically increasing), i.e. genuine traffic.
-- **It reaches a STEADY STATE, it does not stall.** Post rate holds ~2000/s out to
-  t=16s+ (still active), but **no new communication edges appear after t≈6.4** — the
-  same task-pairs loop. A new phase engages at t≈6.38 (t6 display-manager → t5, t2→t5),
-  then it settles.
-
-**Reframe.** The interactive handoff is **not** blocked by a dead subsystem or a
-non-converging init. The whole task graph is alive and continuously messaging; it
-settles into an **intermediate steady state that still shows "Insert SIM card."**
-Reaching the interactive/idle screen therefore needs a **trigger that advances the MMI
-(t5) out of this steady state** — the same *kind* of missing-signal problem the reports
-solved for the earlier gates, not a hardware/convergence wall.
-
-**Next dig.** The MMI VM (t5) state machine: what state is it parked in, and what
-message/event moves it from "Insert SIM card" to the idle/menu screen. Likely a
-SIM-ready → MMI-idle transition (ties back to the SIM thread). Sweep knob:
-`NOKI3210_TRACE_TASKS` (task liveness + `msgedge`/`msgrate`).
-
-## MMI-VM (task 5) dig (2026-07): the idle transition IS reached — the wall is the idle render
-
-Traced the MMI VM's own event stream with `TRACE_MMIVM` (hook `0x2af582`, the post-recv
-point in the event fetch `0x2af57c`: `r0`=msg ptr, `[r0]`=raw 16-bit code → event =
-`code & 0x1fff`, params = `code>>14`). This resolves the "steady-state trigger" reframe
-above into a precise, and much more encouraging, statement.
-
-- **Task 5 is a low-rate event processor, not a busy loop.** It dequeues **< 200 events
-  in 25 s** (the ~2000 posts/s "steady state" is the *other* tasks; t5 sees only a
-  fraction). From t≈3.5 it runs a periodic UI cycle — events `138e / 1390 / 13b6 / 13b5`
-  every ~0.6 s (a refresh/poll animation while it waits).
-- **The boot REACHES the idle transition.** At **t≈6.38** `display_idle 0x2a255c` fires
-  **exactly once**, and task 5 dequeues render event **`0x0547`** exactly once (the
-  message `display_idle` render-posts via `0x2af6ea`). Immediately after, the periodic
-  `138e/1390/13b6/13b5` cycle **stops** — task 5 quiesces into "idle painted, waiting."
-  So the phone is further along than "up but not alive": it actively runs its idle-screen
-  *entry*. **This overturns the older claim that `display_idle` never fires / the idle flag
-  is never set** — that was a less-complete-config artifact; under the full SIM stack the
-  idle entry runs.
-- **The render fails at one gate: the idle window can't be acquired.** Hooking the
-  post-`bl` point `0x2a2566` shows **`resource-get(0x4c22) → r0 = 0`** (null handle).
-  `resource-get 0x2b257e` bails at its very first instruction: `bl 0x2b12b4` (availability)
-  returns 0 → `b 0x2b2690` (fail). Availability = `[0x11fee4]!=0 AND bitmap-bit(class)`;
-  on our boot `[0x11fee4]` (master resource-enable) is **0** because the faithful
-  contact-service cmd-`0x70` was never issued. `display_idle` **does not check the return**
-  — it render-posts `0x0547` regardless — so task 5 processes the render with a null idle
-  window and composes nothing → the frame stays "Insert SIM card."
-- **`MODEL_RES_ENABLE` doesn't rescue the *natural* idle draw.** Re-run with the faithful
-  cmd-`0x70` model: `resource-get(0x4c22)` **still returns null** because the default blob
-  enables class `0x22`, not class **`0x4c`** (the idle window). Enabling the 5 ROM-backed
-  classes (`0x4c/0x4f/0x50/0x52/0x56`) renders the "Insert SIM card" chrome; enabling all
-  ~18 idle-content classes blanks/crashes (the unbacked-provider dead-end already proven in
-  `docs/resource_providers.md`).
-
-**Convergence.** The "interactive handoff" thread and the "resource-provider" thread are
-now proven to be the **same wall**, meeting at one runtime instant:
-
-```
-t≈6.38  idle transition reached
-     → display_idle 0x2a255c
-       → resource-get(0x4c22)  [0x2b257e]
-         → availability 0x2b12b4  →  0   (because [0x11fee4]==0, cmd 0x70 never issued)
-       → null idle window
-     → render-post 0x0547 → task 5 composes nothing
-   ⇒ "Insert SIM card" persists
-```
-
-The last sweep's "missing trigger to advance the MMI" is resolved: the trigger
-(`display_idle → 0x0547`) **is** emitted and consumed. The single remaining blocker to a
-richer screen is the idle-window/content **resource acquisition** — the known
-`[0x11fee4]` / cmd-`0x70` + class-backing wall — now pinned to the real idle moment rather
-than a forced experiment. Diagnostic knob (curated, opt-in, log-only): `NOKI3210_TRACE_MMIVM`
-(`display_idle` entry, `resource-get(0x4c22)` result, event dequeue histogram / late-event
-cadence).
-
-## Resource-enable dig (2026-07): a swap16 mask-table bug — and the natural idle draw now proven to blank on content
-
-Followed the `resource-get(0x4c22)` failure into the resource-enable machinery. Findings,
-in order:
-
-- **The cmd-`0x70` enable is the *only* way to set the availability bitmap; there is no
-  self-issue init path.** The registrar `0x2b140a` has 4 callers; the two outside the
-  channel-map handler (`0x236e6c`, `0x236f10`) are both *disable* calls (all-zero args →
-  `config_ptr=0`). Enable comes only from a received `0x70` message dispatched through the
-  contact-service loop (`0x237bc6` recv → `0x237400` → `0x23670c`). On our boot only cmd
-  `0x64` is injected (`MODEL_SVC_RESPONDER`); current profiles never receive `0x70` + its
-  0x40-byte blob. The initiating producer is the external service/test peer behind task 7
-  (`contact_service_topology.md`). `MODEL_RES_ENABLE` synthesises the receive side.
-- **With `MODEL_RES_ENABLE`, `[0x11fee4]=1` and the class bitmap is written — yet
-  `resource-get(0x4c22)` still returned null.** Instrumenting inside `resource-get 0x2b257e`
-  showed `available(0x4c22)=0` even though enable and the bitmap byte `[0x11ff11]` were both
-  set. The formula is `enable!=0 AND (masktable[class&7] & bitmap[0x11ff08 + class>>3])`.
-- **Root cause: the mask table `0x2e2f5c` is a swap16 trap.** The swap16-image bytes read
-  `{40,80,10,20,04,08,01,02}` (recorded as "permuted" in older notes), but `ldrb` reads the
-  *real* rom byte `image[addr^1]`, so the firmware sees `{0x80,0x40,0x20,0x10,0x08,0x04,
-  0x02,0x01} = 0x80>>(class&7)`. Class `0x4c` (`class&7=4`) → real mask `0x08`, but the old
-  `MODEL_RES_ENABLE` sparse blob (built from the permuted table) set bit `0x04` → the
-  availability test `0x08 & 0x06 = 0` failed. The old blob had actually been enabling the
-  *wrong* classes `{0x4d,0x4e,0x51,0x53,0x57}`, so **`0x4c22` was never available in any
-  prior "sparse-5" run** — the display stayed on "Insert SIM card" precisely because the
-  idle draw failed at *window acquire* and never reached content.
-- **Fixed the blob to the real masks (byte9=`0x09`, byteA=`0xa2`, enabling
-  `{0x4c,0x4f,0x50,0x52,0x56}`).** Now — for the first time — the *natural* t≈6.43
-  `display_idle` acquires the idle window: `available(0x4c22)=1`, `resource-get(0x4c22)→5`
-  (non-null). The idle draw then proceeds into content composition and the **display blanks**
-  (uniform frame `94a2dc…`, all `o000`), because the ~13 idle-content classes
-  (fonts/icons/layout sub-windows) have no ROM backing.
-
-**Net.** This corrects a real bug (the swap16 mask-table trap, which had silently
-invalidated both the documented mask table *and* the sparse blob) and, more importantly,
-proves the content-backing wall **from the natural idle path** rather than a forced draw:
-with the idle window genuinely available, the real `display_idle → 0x0547` render advances
-one layer further and dies on the unbacked content classes. The two boot outcomes are now
-cleanly separated: **`0x4c22` unavailable → "Insert SIM card" persists (pre-idle screen);
-`0x4c22` available → idle draw proceeds → blank (content wall).** Neither reaches a real
-idle screen; the terminal blocker remains the unbacked ~13 content resource classes
-(`docs/resource_providers.md`), needing the display/font/window subsystems' coherent
-bring-up (no bitmap shortcut). `MODEL_RES_ENABLE`'s default blob is now the corrected one.
-
-## Content-backing wall dig (2026-07): the idle window is an empty *container*, not a failed content fetch
-
-Went at the content wall empirically (skeptical after the mask-table swap trap that the
-"~13 unbacked content classes queried by the render" framing might also be imprecise). It
-is imprecise. Findings:
-
-- **The idle render issues NO content resource-gets.** With the corrected blob so `0x4c22`
-  actually acquires, `TRACE_MMIVM` shows the *only* resource-get in the whole idle sequence
-  is `0x4c22` itself (the window). After task 5 dequeues the render event `0x0547`, it does
-  **no** `resource-get`/availability calls for fonts/icons/layout and then goes quiet. So
-  the earlier "the `0x0547` handler composes ~18 content classes via resource-get" model is
-  **wrong** — content is *not* resource-acquired inside the render.
-- **The idle window is a container that opens empty.** Over a 30 s run with `0x4c22`
-  available, the LCD does ~9 full refreshes and **every frame is blank** (`o000`; content
-  byte count 0) — the firmware composes an empty framebuffer and blits it, forever. No
-  content ever appears. The window's child content (clock / operator name / signal bars /
-  indicators) is drawn by **separate child render events that subsystems post** to task 5
-  after the window opens; on our boot none arrive (task 5 quiesces after `0x0547`), because
-  those producers are gated on live subsystem state (network/operator = RF; clock = RTC).
-- **"Insert SIM card" is the no-idle-window fallback.** Baseline (no `RES_ENABLE`) is
-  deterministic (45 MMI events/boot) and *does* reach the idle transition at t≈6.38, but
-  `resource-get(0x4c22)` fails (`[0x11fee4]==0`) → the pre-resource "Insert SIM card" screen
-  (which uses no resources) persists. Making `0x4c22` available flips the boot to draw the
-  empty idle container **instead of** "Insert SIM card". So "Insert SIM card" is precisely
-  what shows when the idle window can't open — the correct terminal for a no-network phone.
-
-**Refined verdict.** The content-backing wall is *not* "~13 resource classes with no ROM
-backing that the render tries to acquire" — the render acquires none of them. It is: **the
-idle window opens as an empty container, and its content is populated by child render
-events that live subsystems (network/operator/clock) post — which never fire without the
-SIM/network/RF bring-up.** Same terminal wall, more precisely mechanized: forcing the
-window open just yields an empty frame; the missing piece is the *content producers*, not a
-resource bitmap.
-
-*Harness note (important for reproducing).* `MODEL_RES_ENABLE` and `MODEL_SVC_RESPONDER`
-have a deliberate ordering interlock: SVC_RESPONDER's cmd-`0x64` completion waits for
-`m_resen_state==3` (so `0x70` lands before `0x64`). resen can only be injected in the early
-~0.45 s contact-service window (the trigger point `0x237bc6` is not re-entered later), so
-`RES_ENABLE_MS` must stay ≈440. A wrong (late) `RES_ENABLE_MS` → resen never delivers →
-SVC_RESPONDER stalls → the boot never reaches the idle transition at all (≤5 MMI events),
-while still showing "Insert SIM card" from the early render. The MS=440 run used for the
-findings above is clean (resen delivers → 0x64 fires → boot proceeds normally).
-
-## Content-producers dig (2026-07): the idle screen is a window *stack*; only the base is pushed
-
-Went after the content producers themselves — the subsystems that would fill the empty idle
-container. The display architecture and each producer's state:
-
-- **The display is a window STACK managed by task 6** (display manager `0x297fc4`). Two
-  structures: display state `0x1116f8` (idle-redraw flag at `+5` = `0x1116fd`) and the
-  window stack `0x111724` (0x1c-byte entries; active index at `[0x1116f9]`). Task 6's loop
-  recvs a display command (`[msg+5]`) and dispatches via a subtract-cascade; when the idle
-  flag `[0x1116fd]==1` it calls `display_idle`, then clears it to 2. Command `01` pushes /
-  activates a window and (sub `01`) sets the idle flag → redraw.
-- **On our boot task 6 receives only 5 display commands** (`TRACE_MMIVM` t6cmd tap at
-  `0x29800c`): `01/00`@0.57, `03/00`@0.84, `02/00`@4.45, `ff/ff`@4.45, and `01/01`@6.377 —
-  the last one pushes the **base idle window** and triggers the `t≈6.38` `display_idle`.
-  **No further `01` (window-push) commands ever arrive**, so no content windows
-  (clock/operator/signal/indicators) are stacked. The idle screen is a stack with only its
-  base layer → empty.
-- **Producer status, one by one:**
-  - **Clock** — reads the CCONT RTC (reg 8 min / reg 9 hour, via `ccont_reg_read 0x2afb44`
-    reg-indices 0x0a/0x0b; map table `0x2e2da8`, phys = reg<<3). `TRACE_CCONT_READ`: reg 7
-    (sec) is read **once** at t=0.23 (CCONT init); **regs 8/9 are never read** the whole
-    boot. The clock producer is dormant — it never even samples the time.
-  - **Operator name** — from network registration (GSM-L1/MM in `0x2b7xxx`, which never runs
-    — `docs/network_scouting.md`). Dormant.
-  - **Signal / battery** — CCONT ADC (regs 2/3, reg-indices 0x02/0x03). These **are** polled
-    constantly (~1358×/10 s), so the ADC producer *runs* — but signal bars are only rendered
-    into idle once camped. Producer alive, output not idle-rendered.
-
-**Verdict.** The content producers are all downstream of the **network-camped MMI state**.
-Without network registration (no L1/RF) the phone stays in "Insert SIM card", so nothing
-pushes content windows onto the display stack — even the RTC clock is never sampled, and the
-live ADC isn't rendered as bars. This is the same network/RF terminal as every other thread
-(`docs/network_scouting.md`), now mechanized down to the display-window-stack level: the idle
-container has exactly one layer because only the idle-entry pushes a window and no
-content-producer does. The clock is the only non-RF producer, but its display is gated on the
-camped state too (a real 3210 shows no clock without a SIM/network — the "Insert SIM card"
-modal). New diagnostic (opt-in, log-only): `TRACE_MMIVM` t6cmd tap (task-6 display commands).
-
-## Camped-state flag dig (2026-07): it is a *derived view*, not a flippable flag — forcing it does nothing
-
-Located the network service/camped state the content producers gate on, and tested forcing
-it. The state and the negative result:
-
-- **The camped state is `[0x11fce1]`** (a byte in the MMI state struct at `0x11fcce`). The
-  status-icon classifier `0x28f0f2` reads it: value `1` = no service (our boot), `4/5/6` =
-  registered service classes (→ different signal/service icon glyphs via `0x28fa4c`, called
-  from 15 sites in the idle-element render library `0x2a2xxx`).
-- **Its *source* is network-registration data in DSP shared RAM.** The classifier's
-  sub-reader `0x26f952` reads `[0x1028d1]` / `[0x107ed3]` (the `0x10xxxx` DSP-shared-RAM
-  region) — the actual registration status the GSM-L1/DSP layer writes. On our boot these
-  are **0** (L1/DSP network never runs), so `[0x11fce1]` is a *derived* "no service".
-  `TRACE_MMIVM` service snapshot at the idle moment: `[11fce1]=01 [1119fd]=00 [11fcce]=2f
-  netdsp[1028d1]=00000000 [107ed3]=00`.
-- **Forcing `[0x11fce1]=4` (registered) does nothing.** With the byte forced continuously
-  (and corrected `MODEL_RES_ENABLE` so the idle window opens): it **sticks** at 4 — *no
-  network handler overwrites it*, confirming the handler that would maintain it never runs —
-  but **task 6 receives the same 5 display commands, no content-window pushes appear, and the
-  screen stays blank**. The content producers don't gate on the derived byte; they read the
-  underlying network data (operator string, signal level, registration) from the DSP-shared
-  RAM, which is still empty.
-
-**Verdict.** The camped-state is **not a single flippable flag**. `[0x11fce1]` is a derived
-view of the network-registration data structure that the L1/DSP stack populates in shared
-RAM; forcing the view while its source stays empty produces nothing. So the "camped" gate is
-the same **GSM-L1/DSP/RF wall** (`docs/network_scouting.md`) — now located at the specific
-variables (`[0x11fce1]` derived from DSP-RAM `[0x1028d1]`/`[0x107ed3]`). To fake "camped"
-would mean populating the whole DSP-shared-RAM registration structure the way a real L1
-attach does — i.e. reimplementing the network state, not flipping a bit. `EXPERIMENT_CAMPED`
-(the force that produced this negative result) is retired; the `TRACE_MMIVM` service snapshot
-is kept as a diagnostic.
+Align the v5.01 task-1 mode-4/mode-7 handlers and the four caller families with
+v6.00. If the older ROM waits on the same report, use the stable cross-version
+caller structure to identify the missing external condition. If it bypasses
+the wait, recover the branch predicate and its hardware/configuration inputs.
+Only behavior supported by that static comparison and an organic runtime
+request should be implemented.
