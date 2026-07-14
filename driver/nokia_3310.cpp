@@ -289,7 +289,7 @@ private:
 	uint16_t dsp_ram_r(offs_t offset);
 	void dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t flash_r(offs_t offset, uint16_t mem_mask = ~0);
-	std::optional<uint16_t> flash_firmware_hooks(offs_t offset, u32 pc, u32 addr, uint16_t mem_mask);
+	void flash_firmware_traces(u32 pc, u32 addr);
 	void flash_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint32_t rom2_mirror_r(offs_t offset, uint32_t mem_mask = ~0);
 	void rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
@@ -505,7 +505,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      display variant (DISPLAY_TYPE), power/ADC (ADC_PROFILE, POWER_IRQ_*,
 //      DISABLE_CCONT_WATCHDOG),
 //      clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP, FIQ8_HZ), NV (EEPROM_PROFILE),
-//      SIM UART (SIM_PROFILE), reset (MAD2_SOFT_RESET*). The default boot (none set)
+	//      SIM UART/card fixture, reset (MAD2_SOFT_RESET*). The default boot (none set)
 //      reproduces the CONTACT SERVICE oracle frame byte-for-byte.
 //
 //   2. DEVICE-BOUNDARY MODELS — opt-in behavior behind an ordinary hardware
@@ -521,13 +521,13 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary.
 //      Retired forcing shims and one-off traces: docs/removed_forcing_knobs.md.
 //
-// Traces and provisional peer models are quarantined in flash_firmware_hooks /
+// Traces are quarantined in flash_firmware_traces /
 // ram_w_firmware_traces. Add no forced firmware results or messages. See
 // docs/driver_structure.md.
 // ============================================================================
 static unsigned nokia_env_u32(const char *name, unsigned fallback)
 {
-	// Env vars don't change during a run, so memoise per name: flash_firmware_hooks
+	// Env vars don't change during a run, so memoise per name: flash_firmware_traces
 	// fires this ~50x per instruction fetch, and an uncached getenv() there is the
 	// dominant cost of the whole emulation. Keyed by the literal pointer (every call
 	// site passes a string literal). See docs/driver_vision.md (hot-path config smell).
@@ -1236,16 +1236,6 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)) & 0xff,
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xff,
 				fw_byte(0x00100022), fw_word(FW_STARTUP_MODE), machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_CONTACT_DA_PRESERVE_READY_BIT", 0) != 0 &&
-			address == FW_CONTACT_SERVICE_STATUS &&
-			mem_mask == 0x00ff &&
-			(pc == 0x00237b04 || pc == 0x00237b0c) &&
-			(m_ram[offset] & 0x0040) != 0 &&
-			(data & 0x0040) == 0)
-	{
-		data |= 0x0040;
-	}
-
 	COMBINE_DATA(&m_ram[offset]);
 
 	if (!m_startup_latch_complete_seen && address == 0x112398 && ((m_ram[offset] & 0x00ff) == 0x000f))
@@ -1611,12 +1601,10 @@ void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 }
 
 // ============================================================================
-// Firmware-research hooks for flash fetches: provisional firmware bridges and
-// execution traces. This is NOT hardware behaviour. It returns an override
-// fetch value, or nullopt to let the real flash read proceed. It should shrink
-// toward empty as each bridge moves behind a proved hardware/transport model.
+// Firmware-research traces for flash fetches. This is diagnostic observation,
+// not hardware behaviour, and never changes the fetched instruction.
 // ============================================================================
-std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 pc, u32 addr, uint16_t mem_mask)
+void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
 	if (pc == addr && addr == 0x00290cf4 && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
 		logerror("dsp_boundary: service-command command=%08x arg=%08x payload=%08x caller=%08x "
@@ -2517,15 +2505,13 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	// Observe organic resource-manager requests independently of the provisional GSM-service
 	// responder. Callback 0x2f uses this API after its natural constructor, before any service-5
 	// or service-30 transaction exists.
-	return std::nullopt;
 }
 
 uint16_t noki3310_state::flash_r(offs_t offset, uint16_t mem_mask)
 {
 	const u32 pc = m_maincpu->pc();
 	const u32 addr = 0x00200000 + (offset << 1);
-	if (const std::optional<uint16_t> ov = flash_firmware_hooks(offset, pc, addr, mem_mask))
-		return *ov;
+	flash_firmware_traces(pc, addr);
 	return m_flash->read(offset) & mem_mask;
 }
 
@@ -2639,14 +2625,10 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		case 0x37:  // SIM UART RxD
 			if (m_sim_card->enabled())
 				data = m_sim_card->rxd_r();
-			else if (std::getenv("NOKI3210_SIM_PROFILE"))
-				data = nokia_env_u32("NOKI3210_SIM_RXD", 0xff) & 0xff;
 			break;
 		case 0x38:  // SIM UART interrupt identification
 			if (m_sim_card->enabled())
 				data = m_sim_card->iir_r();
-			else if (std::getenv("NOKI3210_SIM_PROFILE"))
-				data = nokia_env_u32("NOKI3210_SIM_IIR", 0x01) & 0xff;
 			break;
 		case 0x39:  // SIM control and live-interface status
 			if (m_sim_card->enabled())
@@ -2655,20 +2637,6 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		case 0x3c:  // SIM UART RxD queue fill
 			if (m_sim_card->enabled())
 				data = m_sim_card->rx_count_r();
-			else if (std::getenv("NOKI3210_SIM_PROFILE"))
-				data = nokia_env_u32("NOKI3210_SIM_RX_FILL", 0x00) & 0xff;
-			break;
-		case 0x3d:  // SIM RxD flags
-			if (std::getenv("NOKI3210_SIM_PROFILE"))
-				data = nokia_env_u32("NOKI3210_SIM_RX_FLAGS", 0x00) & 0xff;
-			break;
-		case 0x3e:  // SIM TxD flags
-			if (std::getenv("NOKI3210_SIM_PROFILE"))
-				data = nokia_env_u32("NOKI3210_SIM_TX_FLAGS", 0x20) & 0xff;
-			break;
-		case 0x3f:  // SIM UART TxD queue fill
-			if (std::getenv("NOKI3210_SIM_PROFILE"))
-				data = nokia_env_u32("NOKI3210_SIM_TX_FILL", 0x00) & 0xff;
 			break;
 		case 0x6c:
 			data = m_ccont->serial_r();

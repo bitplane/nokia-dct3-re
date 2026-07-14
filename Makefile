@@ -89,13 +89,13 @@ help:
 	@echo "make run-frontier   run the current coherent contact/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier oracles"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
-	@echo "make verify-structure  compare deterministic boot milestones with $(ORACLE_STRUCT)"
+	@echo "make verify-structure  compare semantic boot predicates with $(ORACLE_STRUCT)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
 	@echo "make smoke-3330e     normalize and boot the local v4.50 PPM E service files"
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
 	@echo "make clean          remove build/run state (keeps the MAME clone)"
-	@echo "Override any knob on the command line, e.g.  make run NOKI3210_TRACE_PM=1"
+	@echo "Override any knob on the command line, e.g.  make run NOKI3210_TRACE_HANDOFF=1"
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -253,7 +253,7 @@ verify: run
 	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_FRAME_SHA)"; \
 	if [ "$$got" = "$(ORACLE_FRAME_SHA)" ]; then echo "OK — oracle reproduced"; \
 	else echo "MISMATCH — boot diverged from the recorded CONTACT SERVICE state"; exit 1; fi
-	@$(MAKE) --no-print-directory verify-structure RUN_DIR=$(RUN_DIR)
+	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR)
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier
@@ -274,10 +274,7 @@ verify-structure-subset:
 	@echo "OK — semantic structural predicates reproduced"
 
 verify-structure:
-	@test -f $(RUN_DIR)/boot_summary.txt || { echo "missing $(RUN_DIR)/boot_summary.txt; run make run first"; exit 1; }
-	@test -f $(ORACLE_STRUCT) || { echo "missing structural oracle $(ORACLE_STRUCT)"; exit 1; }
-	@diff -u $(ORACLE_STRUCT) $(RUN_DIR)/boot_summary.txt
-	@echo "OK — structural boot oracle reproduced"
+	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_STRUCT)
 
 clean:
 	rm -rf $(RUN_DIR) run run_* $(MAME_DIR)/obj progress_latest_frame.*

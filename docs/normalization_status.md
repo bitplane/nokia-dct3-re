@@ -18,6 +18,8 @@ that the driver is ready for upstream submission.
 The historical responder/drain and startup-report bridge profile has been
 retired. Its direct message trampoline, service-state RAM completion, synthetic
 report sequence, Make targets, and structural oracle are no longer supported.
+The undocumented contact-ready write filter and pre-device `SIM_PROFILE`
+register harness are also removed.
 
 ## Current frontier
 

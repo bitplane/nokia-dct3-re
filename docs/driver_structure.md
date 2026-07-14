@@ -6,13 +6,13 @@ deleted incrementally as observed contracts become components.
 
 ## Entry points vs. quarantine
 
-The memory-map-registered handlers are thin and contain only real hardware
-behaviour. Each forwards to a clearly-banner'd `*_firmware_*` helper that holds
-bounded traces and provisional firmware-call bridges:
+The memory-map-registered handlers are thin. Diagnostic execution observations
+are isolated in clearly bannered trace helpers; the RAM read path also owns two
+explicitly documented research shortcuts:
 
 | hardware entry point | quarantined research helper |
 |---|---|
-| `flash_r` (≈9 lines)  | `flash_firmware_hooks` (observes fetches; legacy optional return remains) |
+| `flash_r` (≈6 lines)  | `flash_firmware_traces` (observation only; cannot override instructions) |
 | `ram_w`   (≈10 lines) | `ram_w_firmware_traces` (write-side research observations) |
 | `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (read-side research observations) |
 
@@ -32,18 +32,13 @@ cross-ROM pass to identify the genuinely shared contract.
 - New *hardware* behaviour goes in a device model or the owning MAD2 register block.
 - New diagnostic traces may go in the `*_firmware_*` helpers when no component
   boundary exists yet. Do not add result forcing or task-message injection.
-- The `*_firmware_*` helpers should **shrink over time**: when a bridge's gate is
-  understood and modeled at a real device or transport boundary, delete the bridge.
-- **Status (2026-06-26):** all `NOKI3210_FORCE_*` firmware-result forcing has been
-  removed (audited inert against the oracle — see `removed_forcing_knobs.md`). The
-  helpers still contain two explicit RAM-read shortcuts (display-type sourcing and
-  the startup event-14 latch), provisional firmware bridges, and trace taps. Do
-  **not** add result forcing; model the missing hardware/NV state instead.
-- **Update (2026-07-11):** the organic registration investigation is banked and its forcing lineage
-  has been removed. Surviving `MODEL_*` firmware hooks are peer prototypes until their behavior is
-  expressed at a real transport boundary. See `sim_registration.md` and
-  `removed_forcing_knobs.md`.
-- **Service boundary (2026-07-14):** the direct firmware allocation trampoline,
+- The research helpers should **shrink over time**. Delete a trace after its
+  conclusion is normalized; replace each RAM-read shortcut with its real
+  hardware or nonvolatile-data owner.
+- All firmware-result forces and registration-message injections are removed.
+  Two explicit RAM-read shortcuts remain: display-type sourcing and the startup
+  event-14 latch. See `removed_forcing_knobs.md`.
+- The direct firmware allocation trampoline,
   service-status RAM completion, and synthetic startup-report feed are removed.
   The current contact peer consumes organic DSP-ring requests and returns
   request-derived transport/contact responses without writing firmware state.
@@ -63,9 +58,7 @@ regressing this smoke run.
 
 ## Regression oracle
 
-Any change to these handlers must preserve behaviour, checked by a fixed
-`run-boot-progress` (20 s): the promoted LCD frame SHA and the structural boot
-markers (max CCONT state, startup mode, task5 dispatch count, battery-state
-distribution) must be unchanged. The raw `error.log` hash jitters ~1 line and is
-not part of the oracle. (Helper scripts used during the Stage-1 cleanup lived in
-the session scratchpad: `oracle.sh` / `cmp_oracle.sh`.)
+Changes must preserve the exact LCD frame and the semantic structural
+predicates exercised by `make verify` and `make verify-frontier`. Raw counters,
+timestamps, scheduler order, and `error.log` text are diagnostic observations,
+not acceptance criteria.

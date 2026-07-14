@@ -160,10 +160,10 @@ deleted branch-isolation responder supplied** (`0x64`, the completion that left 
 experiment therefore delivered command `0x64` but **not `0x65`** (the sweep-event trigger), a sibling in
 the same command family.
 
-**Why our boot stalls at this branch:** we clear CONTACT SERVICE with one modelled lower-service response (command
-`0x64`) instead of driving the full lower-service exchange, so command `0x65` (with `message[+9]` bit 2) is never
-delivered → `0x236bac` never emits `0x15` → bit `0x04` never sets → the gate never closes. Same boundary as
-genuinely clearing CONTACT SERVICE, now pinned at the instruction level as the `000d` gate too.
+**Historical stall:** the deleted branch-isolation profile cleared CONTACT SERVICE with one modeled
+lower-service response (`0x64`) instead of driving the full exchange. Command `0x65` was therefore absent.
+The later CCONT and coherent-contact work superseded this diagnosis; the paragraph records why the
+experiment was useful, not the current boot state.
 
 **Build attempted (`MODEL_CMD65_RESPONDER`) — and it proved the producer is DEAD-GATED for `0x15`.** We
 built a now-deleted injection of a command-`0x65` message and verified the mechanism step by

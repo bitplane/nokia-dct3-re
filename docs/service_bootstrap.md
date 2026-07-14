@@ -207,17 +207,16 @@ posting the three discriminating bytes is an isolation probe, not the remaining 
 
 ## Historical post-responder frontier
 
-With the responder (and the model stack), the boot **leaves CONTACT SERVICE** and advances the mode
-`0001 → 000d`, where it currently **holds**: the LCD cycles a white fill (`94a2dc`) / black fill
+With the responder (and the historical model stack), the boot **left CONTACT SERVICE** and advanced
+`0001 → 000d`, where that experiment **held**: the LCD cycled a white fill (`94a2dc`) / black fill
 (`4aab13`) display-init pattern. (The diagnostic forces `EXPERIMENT_DSP_IRQ4 EXPERIMENT_FORCE_ACK`
 reach the same limp by brute force; the responder reaches it *faithfully*.) The post-injection PC
 trace runs `0x236dc4` → `0x2af3ca` → `0x291068` (service-completion) then grinds the **sum16 loop
 `0x2a41de`** heavily — the service-startup re-running. PC sampler hot spots: `memset` `0x2b65e4`
 (the fills), sum16 `0x2a41d0`/`0x2a41de`, a render routine `0x25exxx` (4-bit type field at
 `0x25e682`), service-startup `0x290a94`. Task 0x14 (batch-2) also needs the startup **phase byte
-`0x112449` ∈ {0,2}** (currently `01`). So the *next* frontier (past CONTACT SERVICE) is the
-display-init / readiness re-run — it likely needs real calibration data and/or further readiness
-predicates, not more of the contact-service chain. (Note: long runs with the responder are slow to
+`0x112449` ∈ {0,2}** (then observed as `01`). At that point the next historical frontier was the
+display-init/readiness re-run. (Long runs with the responder were slow to
 emulate because this re-run is checksum-heavy; short windows complete and show the `94a2dc`/`4aab13`
 fills.)
 
@@ -359,16 +358,13 @@ only its correlated transport acknowledgement.
 `0xe4`=pending counter (`0x0002`), `0xa4/a6`=status/version, `0xda/e2`=channel counts/ptrs,
 `0xe0`=busy flag, `0xfe/0x100`=ready flags, DSPIF API reg at `0x30000` (stub).
 
-### Knobs & probes
+### Historical instrumentation
 
-- **Models (faithful, opt-in):** `MODEL_DSP_SERVICE` (+`_DELAY_MS`/`_TICK_MS`), `MODEL_CCONT_PRESENT`,
-  `EEPROM_PROFILE=selftest`.
-- **Diagnostic forces (not models):** `EXPERIMENT_FORCE_SVC_CHANNEL`, `EXPERIMENT_DSP_IRQ4`,
-  `EXPERIMENT_FORCE_ACK`, `EXPERIMENT_CLEAN_SVCCHAN`, `EXPERIMENT_RESUME_TASK14`.
-- **Traces/probes (`TRACE_CONTACT_COMMIT`, `TRACE_PM`, `TRACE_DSP`, `TRACE_CCONT_READ`, `TRACE_BUS`):**
-  `bit6_clear`, `bit6_svcready_check`, `svcchan_write`, `idx6_ccont_check`, `ccont_read_tbl`,
-  `ccont_shadow_write`, `ccont_reg_read`/`ccont_path`, `idx18_cksum`, `chan_open`/`chan_open_gate`,
-  `pm_valid`/`pm_request`, `cs_write`/`cs_disp`/`contact_commit`, `svc_disp`, `dspwr-pending`.
+The force and broad trace controls used to establish this map have been
+deleted. The supported coherent profile uses `MODEL_DSP_SERVICE`,
+`MODEL_CCONT_PRESENT`, the generated EEPROM fixture, and
+`MODEL_DSP_CONTACT_PEER`. Current contact observations use the bounded
+`TRACE_CSCMD` and `TRACE_DSP_BOUNDARY` taps.
 
 ## Bus-level view (actors, timeline, dead-end)
 

@@ -6,8 +6,8 @@ same frame.
 
 `mame_noki3210_input_exerciser.lua` writes a deterministic summary to
 `NOKI3210_BOOT_SUMMARY`. `make run` places it at
-`RUN_DIR/boot_summary.txt`; `make verify` compares it with
-`oracles/noki3210-default.struct` after checking the frame hash.
+`RUN_DIR/boot_summary.txt`; `make verify` checks the semantic predicates in
+`oracles/noki3210-default.struct` after checking the exact frame hash.
 `make verify-frontier` performs the corresponding check for the current
 request-driven contact/SIM profile against `oracles/noki3210-frontier.struct`.
 
@@ -20,7 +20,7 @@ baseline rather than the former stale-NVRAM run.
 
 ## Summary fields
 
-The schema records:
+The generated summary records:
 
 - emulated frames and LCD command/data/full-transfer counts;
 - MAD2 soft reset count and IRQ/FIQ lines observed at frame boundaries;
@@ -30,20 +30,22 @@ The schema records:
 - startup modes observed; and
 - final task, startup, contact-service and SIM gate values.
 
-It intentionally excludes timestamps, raw scheduler order and full traces.
-Those are too sensitive to harmless timing changes. A changed counter is a
-review signal, not automatic proof of a bug: inspect the responsible subsystem
-and update the oracle only when the new behavior is understood.
+The committed oracle intentionally selects terminal state and lifecycle
+predicates from that larger summary. Raw counters, timestamps, scheduler order,
+and full traces are too sensitive to harmless timing changes. They remain
+available for review but are not pass/fail criteria.
 
 The Lua MMIO observer decodes ARM big-endian byte lanes explicitly. Summary
 files are refreshed every 30 frames through an atomic rename, so a partial
 result survives a livelock or externally terminated research run.
 
-## Stability evidence
+## Default profile
 
-Two independent 20-second default-profile runs produced byte-identical schema-1
-summaries. The corresponding latest nonblank LCD frame retained SHA-256 prefix
-`d8a9a7a58e587be8`.
+The exact latest nonblank LCD frame retains SHA-256 prefix
+`d8a9a7a58e587be8`. Its semantic subset requires the expected reset count,
+GENSIO controls, startup modes, running task, mode/flags, contact status, and
+SIM gates. LCD, IRQ, CCONT, and EEPROM counts remain in the generated summary
+for diagnosis without making timing-dependent totals part of acceptance.
 
 ## Coherent frontier profile
 

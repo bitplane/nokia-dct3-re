@@ -30,7 +30,7 @@ Generated from Thumb disassembly of the swap16 firmware image. The purpose is to
 
 This supersedes the MBUS-centric reading further down. With all firmware forcing
 removed, the boot reaches CONTACT SERVICE and **the commit was traced empirically**
-(probe knob `NOKI3210_TRACE_CONTACT_COMMIT=1`, which logs the terminal handler,
+(using the now-deleted contact-commit probe, which logged the terminal handler,
 the D9 timeout builder, the contact-service state block, and MBUS register access).
 
 **Where it dies — a 140 ms internal watchdog, not a self-test failure:**
@@ -232,7 +232,7 @@ ROM). Predecessor knobs that used to *force* these flags (now removed) were
 `FORCE_TASK14_READY` / `FORCE_TASK14_READY_FLAGS`, confirming task-14 readiness was
 always the real, unmodeled dependency here.
 
-Dig-in findings (probes `t14_drive:` / `t14_tcb:`, `TRACE_CONTACT_COMMIT=1`):
+Dig-in findings (from the deleted `t14_drive` / `t14_tcb` / contact-commit probes):
 - `0x26a204(0x14, msg)` is `sched_post_task_message` → it indexes a 28-byte-per-task
   TCB array at base `0x101484`; task 0x14's TCB is `0x1016b4`.
 - The **task-14 notification chain is entirely dormant**: the message sender
@@ -368,7 +368,7 @@ naturally by mode 1; the experiment proves the payoff (boot advances past the fa
 screen) and that there are further boot phases beyond it (the 94a2dc blank screen is the
 next state to investigate).
 
-Diagnostic: `make run-boot-progress … TRACE_CONTACT_COMMIT=1` logs the predicate chain
+The deleted contact-commit trace logged the predicate chain
 (`cs_pred:`), the idle bytes (`cs_idle:`), the RX state machine (`rx_sm:`), the task
 input set (`cs_disp:`), and the commit (`contact_commit:`).
 

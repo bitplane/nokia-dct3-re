@@ -27,12 +27,16 @@ the current tree:
   SIM enable/no-SIM RAM writes.
 - Contact-service bridges: `MODEL_SVC_RESPONDER`,
   `MODEL_SVC_CHANNEL_DRAIN`, command-`0x65` injection, channel-ready writes, and
-  the standalone `nokia_service_transport_device`.
+  the standalone `nokia_service_transport_device`. The later undocumented
+  `CONTACT_DA_PRESERVE_READY_BIT` write filter was also removed; it prevented
+  firmware from clearing contact-ready RAM rather than modeling a peer.
 - Display and DSP shortcuts: forced LCD FIQ transfer, independent D0 injection,
   independent DSP-ring drain, heartbeat experiments, and guessed inbound DSP
   replies.
 - Broad one-off probe families: `PROBE_*`, resource/display peer probes,
   scheduler recodes, and callback-key replay.
+- The pre-device `SIM_PROFILE` register harness and its raw RX/IIR/FIFO value
+  controls; `nokia_sim_card_device` is now the only opt-in SIM responder.
 
 The durable conclusions from these experiments live in the subsystem documents
 and in `evidence/falsifications.json` and `evidence/state_predicates.json`.

@@ -53,9 +53,10 @@ and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with contact status
 the **Security code** frame (`6471d1a5803619c2`); a provisioned identity yields
 the idle-like `Menu` frame (`dbf2704cb945d56b`). Neither is yet interactive.
 
-Several surviving `MODEL_*` paths describe plausible absent peers but still operate at known
-firmware PCs. They are executable protocol hypotheses, not finished hardware emulation. No direct
-SIM-registration state forcing remains in the cleaned driver.
+The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
+executable protocol hypotheses, not finished hardware emulation, but do not
+call firmware handlers or write registration state. Firmware-PC conditions are
+confined to diagnostic traces and the two documented RAM-read shortcuts.
 
 ## Maturity
 
