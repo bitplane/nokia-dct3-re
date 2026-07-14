@@ -38,6 +38,12 @@ active RE frontier is the ordinary transaction that completes callback `0x5d`, o
 one of the independent controller-status callers owns the ordinary boot path. See [`docs/resource_providers.md`](docs/resource_providers.md) and
 [`docs/sim_registration.md`](docs/sim_registration.md).
 
+`make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
+research baseline for that boundary. It uses the request-driven contact peer
+and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with contact status
+`0x49`, no-SIM clear, and SIM enable set. `make verify-deep` is retained only
+for its historical bridge-profile oracle.
+
 Several surviving `MODEL_*` paths describe plausible absent peers but still operate at known
 firmware PCs. They are executable protocol hypotheses, not finished hardware emulation. No direct
 SIM-registration state forcing remains in the cleaned driver.

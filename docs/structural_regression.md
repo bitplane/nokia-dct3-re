@@ -63,22 +63,26 @@ mode `0x0004` with flags `0x0f`, contact status `0x0049`, no-SIM asserted and
 SIM-enable clear. That result is now recorded as a separate deep oracle; it
 does not replace or weaken the default CONTACT SERVICE acceptance test.
 
-As of 2026-07-13, repeated 20-second deep runs still reproduce the Insert SIM
-frame hash `90eb19a5478483ca` and every non-CCONT structural field, but report
-`ccont_bytes=5153` and `ccont_reads=4299`, ten above the recorded `5143`/`4289`.
-Restoring the old 5 ms DSP service cadence produces the same counts, while the
-default-profile structural oracle remains byte-identical. The drift therefore
-predates and is independent of the ring-drain cadence used by the current radio
-investigation. Do not update the deep oracle until the extra CCONT transaction
-has been identified or accepted as a deliberate model change.
+The former reported CCONT `+10` drift came from a recursive Make invocation
+which passed model names as Make variables without exporting them to MAME.
+After adding an explicit `RUN_ENV`, the 20-second historical deep profile
+reproduces its committed `ccont_bytes=1753` and `ccont_reads=877` values. Its
+exact frame also reproduces. Raw LCD-command and FIQ counts vary between
+otherwise equivalent runs, so those two timing counters are intentionally
+excluded from the semantic subset check.
 
 The responder and drain are superseded research bridges. Current acceptance
 uses `MODEL_DSP_CONTACT_PEER`, which answers observed DSP requests, delivers the
 external class-`0x40` session through task 7, and acknowledges `0x622a` without
 writing firmware state. Its last clean five-second run ended with startup mode
 `0x0004`, flags `0x0f`, contact status `0x0049`, and normal SIM APDUs in progress.
-The default frame/structural oracle remains the release regression until a
-separate coherent-peer manifest and oracle are deliberately banked.
+That path is now banked as `make verify-frontier`: its exact frame and
+eight-second semantic predicate set additionally record no-SIM clear and SIM
+enable set. Raw LCD-command and FIQ counts are excluded because equivalent
+frontier runs vary those counts without changing the frame or final state. The default
+frame/structural oracle remains the conservative release regression, while the
+historical `verify-deep` oracle continues to protect the superseded bridge
+profile without lending it current evidentiary status.
 
 `tools/find_literal_loads.py` scans Thumb-1 PC-relative literal loads while
 normalizing the swapped image's 32-bit halfword order. It is intended for static

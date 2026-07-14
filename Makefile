@@ -20,6 +20,7 @@ SWAP ?= roms/3210f600a_swap16.bin
 
 RUN_DIR ?= run
 SECONDS ?= 20
+RUN_ENV ?=
 CENSUS_LOG ?=
 CENSUS_MANIFESTS ?= tools/run_manifests/contact-service.json tools/run_manifests/deep-gsm.json
 
@@ -33,12 +34,24 @@ ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_DEEP_FRAME_SHA ?= 90eb19a5478483ca
 ORACLE_DEEP_STRUCT ?= oracles/noki3210-deep.struct
+ORACLE_FRONTIER_FRAME_SHA ?= 6471d1a5803619c2
+ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 
 DEEP_ENV := \
 	NOKI3210_MODEL_DSP_SERVICE=1 \
 	NOKI3210_MODEL_CCONT_PRESENT=1 \
 	NOKI3210_MODEL_SVC_RESPONDER=1 \
 	NOKI3210_MODEL_SVC_CHANNEL_DRAIN=1
+
+# Current forcing-free research frontier.  The request-driven contact peer
+# subsumes DSP D0 discovery and TX-ring consumption, while the SIM model stays
+# behind the ordinary SIMI/FIQ6 boundary.  Keep DEEP_ENV above only for the
+# historical Insert SIM oracle.
+FRONTIER_ENV := \
+	NOKI3210_MODEL_DSP_SERVICE=1 \
+	NOKI3210_MODEL_CCONT_PRESENT=1 \
+	NOKI3210_MODEL_DSP_CONTACT_PEER=1 \
+	NOKI3210_MODEL_SIM_DEVICE=1
 
 # Canonical "boot-progress" run profile — the minimal knob set that reproduces the
 # CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/adc/
@@ -67,7 +80,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check run run-deep smoke smoke-3330e audit-roms frame watch verify verify-deep verify-structure run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check run run-deep run-frontier smoke smoke-3330e audit-roms frame watch verify verify-deep verify-frontier verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -83,6 +96,8 @@ help:
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make verify-deep    reproduce the Insert SIM frame and deep structural oracle"
+	@echo "make run-frontier   run the current coherent contact/SIM research profile"
+	@echo "make verify-frontier reproduce the current coherent frontier oracles"
 	@echo "make verify-structure  compare deterministic boot milestones with $(ORACLE_STRUCT)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
 	@echo "make smoke-3330e     normalize and boot the local v4.50 PPM E service files"
@@ -169,7 +184,7 @@ run-manifest-default:
 
 run-manifest-deep-gsm: build
 	@mkdir -p run_manifest_deep_gsm
-	cd $(MAME_DIR) && env $(BOOT_ENV) $(DEEP_ENV) NOKI3210_MODEL_SIM_DEVICE=1 \
+	cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) \
 		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 NOKI3210_TRACE_GSM_LOWER=1 \
 		NOKI3210_TRACE_DSP_BOUNDARY=1 \
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_deep_gsm) \
@@ -183,7 +198,7 @@ run-manifest-contact: build
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_default) \
 		./mame $(MAME_ARGS) -seconds_to_run 1
 	cp $(MAME_DIR)/error.log run_manifest_contact_default/error.log
-	cd $(MAME_DIR) && env $(BOOT_ENV) $(DEEP_ENV) NOKI3210_TRACE_CSCMD=1 \
+	cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) NOKI3210_TRACE_CSCMD=1 \
 		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_deep) \
 		./mame $(MAME_ARGS) -seconds_to_run 6
 	cp $(MAME_DIR)/error.log run_manifest_contact_deep/error.log
@@ -194,13 +209,16 @@ run-manifest-3330:
 
 run: build
 	@mkdir -p $(RUN_DIR)
-	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKI3210_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
 run-deep:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) $(DEEP_ENV)
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) RUN_ENV='$(DEEP_ENV)'
+
+run-frontier:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) RUN_ENV='$(FRONTIER_ENV)'
 
 smoke: build
 	@mkdir -p $(RUN_DIR)
@@ -244,7 +262,25 @@ verify-deep: run-deep
 	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_DEEP_FRAME_SHA)"; \
 	if [ "$$got" = "$(ORACLE_DEEP_FRAME_SHA)" ]; then echo "OK — Insert SIM oracle reproduced"; \
 	else echo "MISMATCH — boot diverged from the recorded Insert SIM state"; exit 1; fi
-	@$(MAKE) --no-print-directory verify-structure RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_DEEP_STRUCT)
+	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_DEEP_STRUCT)
+
+verify-frontier: PHONE=noki3210
+verify-frontier: run-frontier
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no LCD frame produced in $(RUN_DIR)"; exit 1; }; \
+	got=$$(sha256sum "$$frame" | cut -c1-16); \
+	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_FRONTIER_FRAME_SHA)"; \
+	if [ "$$got" = "$(ORACLE_FRONTIER_FRAME_SHA)" ]; then echo "OK — coherent frontier oracle reproduced"; \
+	else echo "MISMATCH — boot diverged from the coherent frontier state"; exit 1; fi
+	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_FRONTIER_STRUCT)
+
+verify-structure-subset:
+	@test -f $(RUN_DIR)/boot_summary.txt || { echo "missing $(RUN_DIR)/boot_summary.txt; run make run first"; exit 1; }
+	@test -f $(ORACLE_STRUCT) || { echo "missing structural oracle $(ORACLE_STRUCT)"; exit 1; }
+	@while IFS= read -r expected; do \
+		grep -Fqx -- "$$expected" $(RUN_DIR)/boot_summary.txt || { echo "missing structural predicate: $$expected"; exit 1; }; \
+	done < $(ORACLE_STRUCT)
+	@echo "OK — semantic structural predicates reproduced"
 
 verify-structure:
 	@test -f $(RUN_DIR)/boot_summary.txt || { echo "missing $(RUN_DIR)/boot_summary.txt; run make run first"; exit 1; }

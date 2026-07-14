@@ -97,7 +97,7 @@
       "constructor_role": "acknowledgement built only after an incoming 0x70 applies its 0x40-byte channel map",
       "producer_class": "external service/test peer request; MCU acknowledgement",
 	  "confidence": "high",
-	  "evidence": "The sole constructor is dominated by the incoming 0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. No natural transaction occurs in the supplied profiles."
+	  "evidence": "The sole constructor is dominated by the incoming 0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. The canonical frontier profile observes one peer request, one firmware acknowledgement construction, and one send."
     },
     {
       "command": "0x71", "name": "channel_map_disable", "consumer": "0x23670c",
@@ -343,7 +343,7 @@
       "to": "service5_callback",
       "input_status": "callback-state slot 0x45 is neither 0 nor 5 (with state-6 active-slot exception)",
       "output_status": "0x09d0 -> eligible callback 0x5d action 0x00dc -> code-7 completion",
-      "classification": "dormant_missing_state_owner",
+      "classification": "mapped_nonordinary_unproved",
       "provenance": "reviewed_static_and_runtime",
       "anchors": [
         {"type": "decoded_address", "address": "0x24d716", "state_address": "0x11fcc5"},

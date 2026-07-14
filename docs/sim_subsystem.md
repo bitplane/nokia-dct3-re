@@ -160,18 +160,25 @@ delivered the object-bearing input which lets task 15 complete its local operati
 `0x208ee0(0x09ee, 0)`. Task 15 then forwards its own result to task 17, which constructs
 `0x0a2e` and returns it to task 15 before `0x299610` runs.
 
-## Reply-code 2
+## Deferred CHV transaction: reply code 2
+
+This is a mapped later card contract, not an outstanding ordinary-SIM-init
+gate. The non-CPHS initialization pass now raises SIM enable without traversing
+this path. Retain it for the first organic PIN/CHV lifecycle that requests it.
 
 The downstream card contract is already mapped. Organic `0x1196` enters `0x207234`, which calls
 `0x293f30`. That function constructs `A0 24` CHANGE CHV with a 16-byte body, posts it to task 21 and
-waits for the result. Success is return code `2`; only that branch reaches the ENABLE setter at
+waits for the result. Success is return code `2`; only that branch reaches its ENABLE setter at
 `0x20733c`. The stateful card implements the required header -> TX-ready -> procedure -> body ->
-TX-ready -> `9000` sequence. It still needs an organic `0x1196` run to prove the full path.
+TX-ready -> `9000` sequence. The full path remains unvalidated because current
+ordinary boot does not organically request `0x1196`.
 
-## Acceptance gates
+## Current acceptance gates
 
 - `make verify`: exact 3210 frame and structural oracle.
-- `make verify-deep`: exact deep frame and structural oracle.
+- `make verify-deep`: historical bridge-profile frame and structural oracle.
+- `make run-frontier`: current request-driven contact/SIM research profile.
 - `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
-- Stateful-model trace: natural ATR/PPS/APDUs, then organic `0x1196`, reply code `2`, and
-  `0x20733c`, with no injected messages or SIM-state RAM writes.
+- Stateful-model trace: natural ATR/PPS and the ordinary non-CPHS EF pass, with
+  SIM enable rising and the timed presence monitor starting without injected
+  messages or SIM-state RAM writes.

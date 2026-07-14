@@ -553,7 +553,6 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      effects through firmware-call boundaries. They are not final hardware
 //      models and must move behind a proved transport/device contract.
 //   4. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
-//      TRACE_CCONT_READ (power/ADC/RTC), TRACE_LIMP/TRACE_LIMP2 (the startup limp),
 //      TRACE_CSCMD (contact-service command stream), TRACE_HANDOFF (task-1 master
 //      sequencer mode + startup checklist; the post-SIM interactive handoff),
 //      TRACE_TASKS (app-task liveness + inter-task message edges), TRACE_MMIVM (the MMI VM
@@ -1285,22 +1284,6 @@ void noki3310_state::ram_w_firmware_overrides(offs_t offset, uint16_t data, uint
 		logerror("gsm_lower: status09cd-pending write pc=%08x data=%04x mask=%04x old=%04x "
 				"task=%02x t=%.4f\n", pc & ~u32(1), data, mem_mask, m_ram[offset],
 				fw_byte(0x00100022), machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 &&
-			address >= 0x0011fc80 && address < 0x0011fd00)
-	{
-		static unsigned code7_callback_state_write_count = 0;
-		const u16 old_word = m_ram[offset];
-		const u16 new_word = (old_word & ~mem_mask) | (data & mem_mask);
-		if (address == 0x0011fcc4 ||
-				(address != 0x0011fcce && old_word != new_word &&
-				 code7_callback_state_write_count++ < 256))
-		{
-			logerror("code7_callback_state_write: pc=%08x slots=%02x/%02x data=%04x mask=%04x "
-					"old=%04x new=%04x t=%.6f\n",
-					pc & ~u32(1), u32(address - 0x0011fc80), u32(address - 0x0011fc80 + 1),
-					data, mem_mask, old_word, new_word, machine().time().as_double());
-		}
-	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && address == 0x0010dcb6)
 		logerror("sim_contract: notify-latch write pc=%08x data=%04x mask=%04x old=%04x task=%02x t=%.6f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_byte(0x00100022),
@@ -1669,9 +1652,6 @@ void noki3310_state::service_channel_empty_w(int state)
 	const uint8_t status = debug_ram_byte(0x0011fed1);
 	const uint8_t completed = (status & ~0x04) | 0x40;
 	debug_ram_byte_w(0x0011fed1, completed);
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0)
-		logerror("svc_drain: peer completion busy-clear+present (%02x->%02x) t=%.8f\n",
-					status, completed, machine().time().as_double());
 }
 
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
@@ -1925,29 +1905,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 						machine().time().as_double());
 		}
-	}
-	// Callback 0x5d's current state 0x0b accepts catalogue status 0x09d0;
-	// sibling 0x09d1 is explicitly inverted for that state.  Both are selected
-	// by this context-completion block, so expose its firmware-owned predicates
-	// without changing the selected status or callback state.
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
-			(addr == 0x0024d716 || addr == 0x0024d762 || addr == 0x0024d76c))
-	{
-		static unsigned code7_status09d0_count = 0;
-		if (code7_status09d0_count++ < 128)
-			logerror("code7_status09d0: pc=%08x selected=%04x state45=%02x "
-					"r1=%08x r8=%08x fp=%08x sl=%08x task=%02x mode=%04x "
-					"caller=%08x t=%.6f\n",
-					addr, addr == 0x0024d762 ? 0x09d0 :
-						(addr == 0x0024d76c ? 0x09d1 : 0xffff),
-					debug_ram_byte(0x0011fcc5),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R8)),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R11)),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R10)),
-					debug_ram_byte(0x00100022), debug_ram_word(FW_STARTUP_MODE),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-					machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr && addr == 0x002a03b4)
 	{
@@ -2358,113 +2315,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 		}
 	}
 
-	// ccont_reg_read (0x2afb44) entry probe (opt-in): log arg r0 (packs reg-index<<8 | mask)
-	// and caller lr, so the idx6 call (lr~0x295ec3) and its early vs late behaviour is visible.
-	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0 && pc == addr && addr == 0x002afb44)
-	{
-		static unsigned e_log = 0;
-		if (e_log++ < 40)
-			logerror("ccont_reg_read: arg=%04x lr=%08x t=%.4f\n",
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), machine().time().as_double());
-	}
-
-	// limp probe (opt-in): the post-CONTACT-SERVICE loop grinds sum16 (0x2a41d0). Log its
-	// caller + (ptr,count) to see which block it re-validates, and whether the ADC monitor
-	// source walker (0x2a7230) is the loop.
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x0021c4a0)
-	{
-		static unsigned l1 = 0;
-		if (l1++ < 24)
-			logerror("limp_loop: cksum_refresh caller lr=%08x mode=%04x t=%.5f\n",
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-					debug_ram_word(0x001123f0), machine().time().as_double());
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x002a7230)
-	{
-		static unsigned l2 = 0;
-		if (l2++ < 8) logerror("limp_adcmon: 0x2a7230 reached t=%.4f\n", machine().time().as_double());
-	}
-	// charger-chain probes: does the detector run, and what event does the wait receive?
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x002b084c)
-	{
-		static unsigned c1 = 0;
-		if (c1++ < 6) logerror("limp_chgcheck: charger_present_check 0x2b084c runs t=%.4f\n", machine().time().as_double());
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x00271252)
-	{
-		static unsigned c2 = 0;
-		if (c2++ < 12) logerror("limp_chgwait: recv event=%u (3=present,7=absent->go,0xe=followup) t=%.4f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff, machine().time().as_double());
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP", 0) != 0 && pc == addr && addr == 0x00271266)
-	{
-		static unsigned c3 = 0;
-		if (c3++ < 4) logerror("limp_chgadvance: event 7 -> post_charger_continue 0x271266 t=%.4f\n", machine().time().as_double());
-	}
-
-	// limp2 probes (opt-in): what drives the mode-000d startup task. 0x2697aa = post_startup_event
-	// (r0=event id); the three call sites of charger-detect+post 0x2b09f2; and 0x2b09f2 itself with
-	// the charger-event latch word [0x1124c8]. Shows whether ANY event reaches the task in 000d.
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x002697aa)
-	{
-		static unsigned e1 = 0;
-		if (e1++ < 800)
-			logerror("limp2_evpost: ev=%u arg=%u mode=%04x latch=%04x lr=%08x t=%.5f\n",
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
-					debug_ram_word(0x001123f0), debug_ram_word(0x001124c8),
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-					machine().time().as_double());
-		// ECB waiter-branch state at delayed-post time for the four 000d sweep events.
-		// The delayed primitive 0x2697aa only delivers a raw code to the startup task if the
-		// task is a registered WAITER (ECB +0 head non-null) and (TCB.mask 0x100024 & ECB.flags
-		// +7) passes the 0x2697f2 bit test. Dump waithead/count/flags/state/mask to see whether
-		// 0x15/0x16 can EVER reach the mailbox on this (blank+faked) boot, vs the wheel-only 0xd5.
-		const u32 ev = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
-		if (ev >= 0x14 && ev <= 0x17)
-		{
-			static unsigned ec = 0;
-			if (ec++ < 40)
-			{
-				const offs_t r = 0x00100140 + ev * 0xc;
-				const u32 waithead = debug_ram_word(r + 0) | (u32(debug_ram_word(r + 2)) << 16);
-				const u32 tcbmask  = debug_ram_word(0x00100024) | (u32(debug_ram_word(0x00100026)) << 16);
-				const uint8_t flags = debug_ram_byte(r + 7);
-				logerror("limp2_ecb: ev=%02x waithead[+0]=%08x cnt[+4]=%04x flags[+7]=%02x state[+8]=%02x tcbmask=%08x mask&flags=%02x mode=%04x t=%.5f\n",
-						ev, waithead, debug_ram_word(r + 4), flags, debug_ram_byte(r + 8),
-						tcbmask, tcbmask & flags,
-						debug_ram_word(0x001123f0), machine().time().as_double());
-			}
-		}
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr &&
-			(addr == 0x002a912a || addr == 0x002a9132 || addr == 0x002a9182 ||
-			 addr == 0x002a9186 || addr == 0x002a91f0))
-	{
-		const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
-		const u32 r7 = m_maincpu->state_int(arm7_cpu_device::ARM7_R7);
-		const u32 r4 = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
-		logerror("resume_gate: pc=%08x r0=%08x r7=%08x r7[0]=%02x r7[1]=%02x r4=%08x r4[0]=%02x "
-				"svc_ready=%02x phase=%02x t=%.8f\n", addr, r0, r7, debug_ram_byte(r7),
-				debug_ram_byte(r7 + 1), r4, debug_ram_byte(r4), debug_ram_byte(0x00110c2c),
-				debug_ram_byte(0x0011239c), machine().time().as_double());
-	}
-	// task-message POST probe: at 0x26a204(r0=task, r1=msgptr) scan the message buffer for a
-	// sweep-event id (0x14/0x16/0x17); log offset, value, target task, and caller lr — finds the
-	// producers of the mailbox messages the 000d handler consumes.
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026a204)
-	{
-		static unsigned pp = 0;
-		const u32 task = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
-		const u32 msg  = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
-		if (task == 3 && msg >= 0x00100000 && msg < 0x00180000 && pp++ < 60)
-			logerror("limp2_post: task=3 hdr[0..6]=%02x %02x %02x %02x %02x %02x %02x lr=%08x t=%.5f\n",
-					debug_ram_byte(msg+0), debug_ram_byte(msg+1), debug_ram_byte(msg+2),
-					debug_ram_byte(msg+3), debug_ram_byte(msg+4), debug_ram_byte(msg+5),
-					debug_ram_byte(msg+6), m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-					machine().time().as_double());
-	}
 		// TRACE_CSCMD (opt-in, fetch side): log both sides of the contact-service transport.
 		// 0x234634 constructs an MCU-to-peer frame and 0x234684 queues it; the dispatcher below
 		// consumes peer-to-MCU frames. Keeping direction explicit prevents acknowledgements from
@@ -2679,10 +2529,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 	if (pc == addr && addr == 0x002b13d4 &&
 			(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0x622a)
 	{
-		if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0)
-			logerror("svc_request: channel-empty 622a lr=%08x task=%02x t=%.8f\n",
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)),
-					debug_ram_byte(0x00100022), machine().time().as_double());
 		m_service_transport->channel_busy();
 	}
 	// Diagnostic model of the MAD2 display-transfer completion. The firmware has
@@ -3632,118 +3478,6 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					(r5 >= 0x00100000 && r5 + 3 < 0x00180000) ? debug_ram_byte(r5 + 3) : 0xff,
 					args, object, m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					machine().time().as_double());
-		}
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0026ff1a)
-	{
-		static unsigned dq = 0;
-		const u32 id = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
-		if (dq++ < 200 && id != 0)
-			logerror("limp2_deq: msgid=%02x mode=%04x t=%.5f\n",
-					id, debug_ram_word(0x001123f0), machine().time().as_double());
-		// provisioning-gate check (one-shot at 000d): dump the channel-enable flags (the
-		// CONTACT-SERVICE provisioning state) and the per-event records at 0x100140+ev*0xc for the
-		// sweep events, to compare delivering (0x14/0x17) vs not (0x15/0x16).
-		static bool dumped = false;
-		if (!dumped && debug_ram_word(0x001123f0) == 0x000d)
-		{
-			dumped = true;
-			logerror("limp2_prov: chan_enable[11fee4]=%02x%02x mask[11ff08]=%02x%02x%02x%02x\n",
-					debug_ram_byte(0x0011fee4), debug_ram_byte(0x0011fee5),
-					debug_ram_byte(0x0011ff08), debug_ram_byte(0x0011ff09),
-					debug_ram_byte(0x0011ff0a), debug_ram_byte(0x0011ff0b));
-			for (uint8_t ev : { 0x14, 0x15, 0x16, 0x17 })
-			{
-				const offs_t r = 0x00100140 + ev * 0xc;
-				logerror("limp2_prov: ev=%02x rec@%06x: +6=%02x +7=%02x +8=%02x +9=%02x +a=%02x\n",
-						ev, r, debug_ram_byte(r+6), debug_ram_byte(r+7),
-						debug_ram_byte(r+8), debug_ram_byte(r+9), debug_ram_byte(r+0xa));
-			}
-		}
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x002b09f2)
-	{
-		static unsigned e2 = 0;
-		if (e2++ < 12)
-			logerror("limp2_chgdetect: 0x2b09f2 entry mode=%04x latch=%04x lr=%08x t=%.5f\n",
-					debug_ram_word(0x001123f0), debug_ram_word(0x001124c8),
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-					machine().time().as_double());
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr &&
-			(addr == 0x00270d54 || addr == 0x00270e0e || addr == 0x0027102a))
-	{
-		static unsigned e3 = 0;
-		if (e3++ < 12)
-			logerror("limp2_chgpost_site: pc=%08x reached mode=%04x t=%.5f\n",
-					pc, debug_ram_word(0x001123f0), machine().time().as_double());
-	}
-	// mode-000d advance gate: at the dispatch top (0x270e22) log the event the handler sees
-	// plus the two gate bytes — flag accumulator [0x112399] (needs low nibble 0xf = all of
-	// 0x14/0x15/0x16/0x17 seen) and FW_CCONT_STATE [0x11ff6c] (needs low nibble 6).
-	// mode-trajectory tracker (opt-in): log FW_STARTUP_MODE whenever it changes, sampled at
-	// the frequently-run cksum loop 0x21c4a0 — shows the full mode progression compactly.
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x0021c4a0)
-	{
-		static uint16_t last_mode = 0xffff;
-		const uint16_t m = debug_ram_word(0x001123f0);
-		if (m != last_mode)
-		{
-			logerror("limp2_mode: %04x -> %04x  flag[112399]=%02x ccont_state[11ff6c]=%02x t=%.5f\n",
-					last_mode, m, debug_ram_byte(0x00112399), debug_ram_byte(0x0011ff6c),
-					machine().time().as_double());
-			last_mode = m;
-		}
-	}
-	if (nokia_env_u32("NOKI3210_TRACE_LIMP2", 0) != 0 && pc == addr && addr == 0x00270e24)
-	{
-		static unsigned e4 = 0;
-		if (e4++ < 50)
-			logerror("limp2_000dgate: ev=%02x flag[112399]=%02x ccont_state[11ff6c]=%02x t=%.5f\n",
-					debug_ram_word(0x001123ee) & 0xffff,
-					debug_ram_byte(0x00112399), debug_ram_byte(0x0011ff6c),
-					machine().time().as_double());
-	}
-
-	// ccont_reg_read internal-path probe (opt-in): which branch the idx6 call (lr~0x295ec3)
-	// takes — cache (0x2afb60), live serial read (0x2afb76), or the return normaliser (0x2afbca).
-	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0 && pc == addr &&
-			(addr == 0x002afb60 || addr == 0x002afb76 || addr == 0x002afbca))
-	{
-		const u32 lr2 = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-		if (lr2 >= 0x00295ec0 && lr2 <= 0x00295ec4)
-			logerror("ccont_path: pc=%08x r4=%02x r5=%02x r6=%02x t=%.4f\n", pc,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R4) & 0xff,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R5) & 0xff,
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R6) & 0xff, machine().time().as_double());
-	}
-
-	// VBAT pipeline probe: at the sample generator (0x27cc74) log the live float
-	// and distinguish logical ADC-monitor sources from physical CCONT selectors.
-	// 0x2b52cc puts its selector directly into CCONT ADC control bits 4..6.
-	if (nokia_env_u32("NOKI3210_TRACE_CCONT_READ", 0) != 0 && pc == addr &&
-			(addr == 0x002b1bb2 || addr == 0x002b52cc))
-	{
-		static unsigned adc_log = 0;
-		if (adc_log < 160)
-		{
-			if (addr == 0x002b1bb2)
-			{
-				logerror("adc_source: logical=%u caller=%08x task=%02x mode=%04x t=%.6f\n",
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xff,
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-						debug_ram_byte(0x00100022), debug_ram_word(FW_STARTUP_MODE),
-						machine().time().as_double());
-			}
-			else if (addr == 0x002b52cc)
-			{
-				logerror("ccont_adc: begin selector=%u caller=%08x task=%02x mode=%04x t=%.6f\n",
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xff,
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-						debug_ram_byte(0x00100022),
-						debug_ram_word(FW_STARTUP_MODE), machine().time().as_double());
-			}
-			adc_log++;
 		}
 	}
 

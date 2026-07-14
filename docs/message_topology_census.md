@@ -8,7 +8,7 @@ This report separates extracted ROM facts, reviewed static semantics, and cohere
 - Callback-table entries: 126 (`0x2db720` through `0x2dbb0f`; index `0x28` is `0x2db860`)
 - Known consumer entries: 6 (6 entry addresses decode)
 - Descriptor registrations: 149 (112 ROM descriptors decoded, 37 RAM-built or unresolved)
-- Runtime observations: 49
+- Runtime observations: 59
 
 Descriptor storage: `dynamic_ram`=12, `fixed_ram`=6, `rom`=112, `stack`=18, `unresolved_pointer`=1.
 Service-5 candidacy among unresolved descriptors: `dynamic_service_unresolved`=7, `excluded_other_service`=30.
@@ -16,7 +16,7 @@ Service-5 candidacy among unresolved descriptors: `dynamic_service_unresolved`=7
 ## Runtime manifests
 
 - `contact-service` (available): Default and bounded deep contact-service command-direction traces [subsystems: contact_service]
-- `deep-gsm` (available): Coherent deep 3210 GSM/service trace with task and lower-boundary taps [subsystems: generic_service]
+- `deep-gsm` (available): Current coherent 3210 contact-peer, SIM and lower-service frontier trace [subsystems: generic_service]
 
 ## Dynamic descriptor assessment
 
@@ -135,6 +135,8 @@ Intersecting these constructors with callbacks that contain direct `0x05e8` publ
 - **PASS** `task5_13e2_to_task14_1776`: `0x13e2` -> `0x1776` (dormant, reviewed_static)
 - **PASS** `task14_opcode_3a_to_context_initialization`: `0x09d8 object opcode 0x3a` -> `0x0fc8 -> type-2 object -> 0x0ac8 command 0x16` (dormant_downstream_cycle, reviewed_static)
 - **PASS** `context_09cd_to_callback7_object`: `context slot matches 0x10e89a and callback-state slot 0x5d at 0x11fcdd is 1 or 2` -> `0x09cd -> 0x85e0(selector 7, object)` (dormant, reviewed_static_and_runtime)
+- **PASS** `context_09d0_to_callback5d_code7`: `callback-state slot 0x45 is neither 0 nor 5 (with state-6 active-slot exception)` -> `0x09d0 -> eligible callback 0x5d action 0x00dc -> code-7 completion` (mapped_nonordinary_unproved, reviewed_static_and_runtime)
+- **PASS** `callback5d_delayed_code7_completion`: `0x05e1/0x05e7/0x05dc -> task-local class 0x52; or direct 0x05eb/0x06c5` -> `0x06c5 -> report code 0x07` (dormant, reviewed_static_and_runtime)
 - **PASS** `sim_task_notification_120c`: `notification_byte_0x10dcb7` -> `0x120c` (dormant_sat, reviewed_static_and_runtime)
 - **PASS** `task20_120c_to_sim_a012`: `0x120c` -> `A0/12` (dormant_sat, reviewed_static)
 - **PASS** `sim_a012_response_to_d0_object`: `0x006a` -> `D0_object` (dormant_sat, reviewed_static)
@@ -150,21 +152,8 @@ The mapped task-21 `0x120c` -> `A0/12` -> D0 -> `0x177x` path is GSM 11.14 SIM T
 
 Observed service-5 callback inputs in supplied coherent logs: `0x05e2`, `0x05f3`.
 
-Callback `0x28`'s service-5 descriptor initializer is `0x2616bc`. It performs
-four statically decoded transient registrations at `0x2616e2`, `0x2616f4`,
-`0x261706`, and `0x261710`, then the callback's `0x05dc` branch starts the
-session through `0x263154(5, 1)`. No coherent run reaches that branch. Dispatcher
-status `0x05dc` is callback-selective: callback `0x2f` receives it through
-`0x2ac5cc`, while callback `0x28` receives `0x05f3` and `0x05e2`. The difference
-is intentional: terminal status `0x012f` selects normal application callback
-`0x2f` through a catalogue-generated `0x05e0` switch, after which the switch
-walker supplies `0x05dc`. No ordinary selector for callback `0x28` is mapped.
-Its service-5 initializer must not be treated as the code-7 frontier without such
-evidence.
-
 Reviewed runtime claims:
-- `deep_gsm_transient_registration_scope` (deep-gsm, reviewed_runtime): The eight-second coherent run executes transient registrations only for service 0x0a at callers 0x26341e, 0x296ec8 and 0x296f16; callback 0x28 never receives the `0x05dc` lifecycle input required to run its four mapped service-5 registrations.
-- `service_0394_not_service0a_activation` (static exhaustive): The only recovered packed-`0x0394` constructors select services 0x08, 0x19 and 0x1a; none selects the organically registered service 0x0a. The dynamic activation branch is not the ordinary code-7 predecessor.
+- `deep_gsm_transient_registration_scope` (deep-gsm, reviewed_runtime): The eight-second coherent run executes transient registrations only for service 0x0a at callers 0x26341e, 0x296ec8 and 0x296f16; no transient service-5 registration executes.
 - `deep_gsm_resident_registration_scope` (deep-gsm, reviewed_runtime): No resident registration through 0x263d30 executes in the eight-second coherent run, including the indirect callsite at 0x28c672.
 - `deep_gsm_service5_inputs` (deep-gsm, reviewed_runtime): An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no 0x05e8.
 - `deep_gsm_target_chain_absent` (deep-gsm, reviewed_runtime): No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained coherent-run analysis.
@@ -184,7 +173,7 @@ The ROM scan recovered 98 calls to `contact_message_alloc_234634`. The five targ
 - Incoming consumer: `0x236dc4`
 - MCU constructor(s): `0x236dd8`/len `9` (status/timeout frame built by the same routine that consumes the incoming completion code)
 - Initiating-producer classification: **organic MCU outbound status; external service peer is the counterparty** (high)
-- Runtime construct/send/receive occurrences: 257 / 257 / 80
+- Runtime construct/send/receive occurrences: 3 / 2 / 2
 - Evidence: The constructor is reachable from the D9 watchdog timeout and from received-command dispatch. With the service address learned, its frame is destination 0x02/source 0x00 (phone), matching an outbound service response; the model supplies the healthy inbound completion.
 
 ### Command `0x65`: startup_status_bits
@@ -200,8 +189,8 @@ The ROM scan recovered 98 calls to `contact_message_alloc_234634`. The five targ
 - Incoming consumer: `0x23670c`
 - MCU constructor(s): `0x236742`/len `1` (acknowledgement built only after an incoming 0x70 applies its 0x40-byte channel map)
 - Initiating-producer classification: **external service/test peer request; MCU acknowledgement** (high)
-- Runtime construct/send/receive occurrences: 0 / 0 / 0
-- Evidence: The sole constructor is dominated by the incoming 0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. No natural transaction occurs in the supplied profiles.
+- Runtime construct/send/receive occurrences: 1 / 1 / 1
+- Evidence: The sole constructor is dominated by the incoming 0x70 branch in handler 0x23670c. Contact frames pass through task 7's external service transport, and MCU output addresses the learned service node. The canonical frontier profile observes one peer request, one firmware acknowledgement construction, and one send.
 
 ### Command `0x71`: channel_map_disable
 

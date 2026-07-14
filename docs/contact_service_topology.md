@@ -95,25 +95,19 @@ contracts.
 
 ## Runtime evidence
 
-Two coherent profiles were traced without adding an emulation shim:
+The canonical contact manifest now combines a default one-second trace with a
+six-second `FRONTIER_ENV` trace. Across them the census records command `0x64`
+construct/send/receive counts `3/2/2` and command `0x70` counts `1/1/1`.
+The frontier run observes the peer's result-1 `0x64`, 64-byte `0x70` channel
+map, and result-5 `0x64`, together with the firmware acknowledgements described
+above. Commands `0x65`, `0x71`, and contact command `0x74` remain absent from
+these bounded boots; the static constructor census supplies their ROM coverage.
 
-- default four-second boot: one firmware `0x64` construct/send and no receive;
-- deep boot: the provisional model posts one header-incomplete healthy `0x64`
-  directly to task 2. The firmware consumes and frees that allocation once. Its
-  resulting status report is then routed through task 7, assigned route selector
-  `1`, and delivered back to task 2 as a fresh allocation. That self-delivery
-  repeats result `5`; it is not a watchdog result-`2` loop or repeated delivery
-  of the original allocation.
-
-Neither profile constructs, sends, or receives `0x65`, `0x70`, `0x71`, or
-command `0x74`. Absence from these two profiles proves dormancy in those boots,
-not absence from the ROM. The static constructor census supplies the latter
-coverage.
-
-A later request-derived DSP-ring run established the missing incoming
-class-`0x40` session and compact acknowledgement grammar. The earlier zero-header
-self-route is retained only as the falsification which identified the learning
-point; it is not present in the recovered session.
+The older bridge-profile trace posted one header-incomplete healthy `0x64`
+directly to task 2. Firmware consumed that allocation once, then its response
+self-routed through task 7 and repeatedly re-entered task 2. That historical
+zero-header loop identified the address-learning point but is not present in
+the current request-derived session.
 
 The formerly reported 31,068-entry `0x64` loop is therefore model-induced. It
 occurs with or without `MODEL_SVC_CHANNEL_DRAIN`; the drain changes its start

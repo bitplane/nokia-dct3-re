@@ -18,9 +18,9 @@
 > has now demoted the context-completion chooser at `0x24d716` from ordinary
 > predecessor to a mapped but unproved alternative.
 > Callback-state slot `0x45` at `0x11fcc5` remains zero, so the chooser emits
-> sibling status `0x09d1`; state `0x0b` makes that descriptor ineligible while
-> accepting `0x09d0`. The accepted descriptor invokes callback `0x5d` with
-> action `0x00dc`, closing the mapped path to report code 7.
+> sibling status `0x09d1`. The alternate `0x09d0` descriptor would invoke
+> callback `0x5d` with action `0x00dc`, but the completed writer census finds
+> no evidence that ordinary boot should select it.
 > A coherent write-watch sees only array initialization and two later zero
 > writes to slot `0x45` (`0x2aefa2`, `0x299ba0`), with no nonzero write. Static
 > enumeration finds no nonzero producer either: all 46 selector-`0x45`

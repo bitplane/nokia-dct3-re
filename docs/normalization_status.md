@@ -9,6 +9,12 @@ to end.
 
 - Four named runtime manifests define the default, deep-GSM, contact-service and
   3330 smoke profiles.
+- `make verify-frontier` is the canonical current research profile. It composes
+  `MODEL_DSP_SERVICE`, `MODEL_CCONT_PRESENT`, `MODEL_DSP_CONTACT_PEER`, and
+  `MODEL_SIM_DEVICE`; the request-driven peer replaces the legacy service
+  responder/drain pair. Its exact frame plus semantic structural predicates
+  end in mode `0x0004` with
+  contact status `0x49`, no-SIM clear, and SIM enable set.
 - The 3210 v6.00 topology profile has stable symbolic identities for the
   reviewed nodes and semantic edges across the active boot frontier.
 - Hardware contracts, state predicates and falsifications have machine-checked
@@ -69,17 +75,25 @@ The following opt-in paths remain useful, but are not final hardware models:
 `MODEL_CCONT_PRESENT` remains a scenario selection around a real extracted
 device, rather than direct proof that every CCONT register behavior is faithful.
 
+The historical `make verify-deep` profile intentionally retains
+`MODEL_SVC_RESPONDER` and `MODEL_SVC_CHANNEL_DRAIN` only to protect its older
+Insert SIM oracle. It is not a source of new frontier evidence.
+
 ## Instrumentation debt
 
-Fourteen `TRACE_*` environment switches remain. The active GSM and DSP boundary
-traces currently earn their keep; several older boot and UI traces are light but
-do not yet have an explicit owner or retirement condition. Future investigations
+Eleven `TRACE_*` environment switches remain. The completed slot-45 watcher and
+chooser plus the historical `TRACE_LIMP`, `TRACE_LIMP2`, and
+`TRACE_CCONT_READ` blocks have been retired. The active GSM, DSP, contact, SIM,
+task and UI traces currently earn their keep. Future investigations
 should extend a named manifest or add a narrowly scoped trace, then remove it or
 record why it remains part of a repeatable acceptance profile.
 
-The default frame and structural oracle reproduce exactly. The deeper CCONT
-profile still has the documented counter delta and must not be described as an
-exact oracle pass. That difference remains a state-predicate fidelity item.
+The default frame and structural oracle reproduce exactly. The historical deep
+profile reproduces its exact frame and stable semantic/CCONT predicates after
+the recursive Make wrapper was corrected to export its model variables.
+The deep and frontier profiles intentionally do not oracle raw LCD-command or FIQ counts: two
+equivalent runs produced the same exact frame and semantic state with different
+counts. Those counters remain timing diagnostics rather than correctness gates.
 
 ## Exit criteria for future normalization
 

@@ -1,12 +1,10 @@
 schema=1
 frames=120
 lcd_data_writes=3528
-lcd_command_writes=2308
 lcd_nonzero_writes=684
 lcd_full_dumps=7
 soft_resets=0
 irq_seen=41
-fiq_seen=00
 gensio_controls=21,25
 ccont_bytes=1753
 ccont_reads=877

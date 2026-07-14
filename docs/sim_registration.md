@@ -757,10 +757,14 @@ classifier exception in the non-SAT constructor proof.
 Completion requires one coherent boot with no injected task messages, forced
 callback events, forced return values, or writes to SIM/registration RAM.
 
-## Instrumentation worth retaining
+## Historical registration instrumentation
 
-- `NOKI3210_TRACE_SIM_RX`: register/FIQ/APDU path and the `0x1196` parser
-  milestones;
+The list below supported the now-closed non-SAT registration investigation.
+Keep an item only when a current manifest or a new organic request consumes it;
+it is not the active report-code-7 trace specification.
+
+- `NOKI3210_TRACE_SIM_RX`: register/FIQ/APDU path, including deferred `0x1196`
+  parser milestones;
 - `NOKI3210_TRACE_DSP_BOUNDARY`: shared-ring ownership and packets;
 - focused callback-7 constructor/object and packed-`0x5518` traces;
 - task-message traces around tasks 15, 17, 20, and 21;
@@ -769,7 +773,11 @@ callback events, forced return values, or writes to SIM/registration RAM.
 Broad callback-sweep and zero-initialization dumps are historical noise and
 should not be restored unless a new hypothesis specifically requires them.
 
-## Acceptance checklist
+## Superseded registration checklist
+
+This checklist describes the former `0x05dc -> 0x1196` hypothesis. Ordinary
+non-CPHS SIM initialization now completes without it, so these items are
+retained as a map for a later CHV/session lifecycle rather than current gates.
 
 - callback 7 receives organic `0x05dc` with a valid object;
 - firmware emits `0x5518` and task-17 `0x1583` without injection;

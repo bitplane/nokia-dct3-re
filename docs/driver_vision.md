@@ -27,6 +27,7 @@ See `mad2_fidelity.md` for register-level implementation status and
 | --- | --- | --- |
 | Default `make verify` | Stable hardware regression | Exact CONTACT SERVICE frame SHA prefix `d8a9a7a58e587be8`. |
 | Deeper peer-model run | Exercise mapped startup/SIM contracts | Must be described by enabled models and structural markers; it is not the default oracle. |
+| Coherent frontier | Request-driven contact peer plus ordinary SIMI/FIQ6 card traffic | `make verify-frontier`; exact frame plus semantic structural predicates with SIM enabled. |
 | New-ROM baseline | Detect product-specific assumptions | No firmware-address hooks; record first divergence even when no frame renders. |
 
 The default profile is deliberately conservative. A deeper experimental frame
