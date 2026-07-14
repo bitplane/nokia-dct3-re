@@ -192,7 +192,20 @@ Caveat: the response model is a faithful *mirror* of the request (good enough to
 satisfy the RX state machine and unblock two gates), not yet a byte-accurate model of
 the real bus device. Revisit if a later gate needs specific response content.
 
-### Mode-0x000d startup readiness gate chain (mapped)
+### Historical mode-0x000d readiness investigation (superseded)
+
+This section records the path that exposed the phased task-resume and service
+startup machinery. Its runtime conclusions predate the coherent contact/SIM
+model and are not the current boot state. In the current provisioned run task
+`0x14` executes normally: `[0x111c93]` is set at `0x208374` and cleared at
+`0x20837e` on an approximately 42 ms cycle, while task `0x15` updates the helper
+and final flags. The later supervisor call seam `0x2a931a` and predicate
+`0x28ff14` are not reached during the current mode-`0x0004` stall. Task-14
+readiness is therefore neither the active blocker nor a code-7 candidate.
+
+The old trace taps for these flags and call sites were removed after this
+correction was reproduced. The material below is retained only to explain the
+earlier CONTACT SERVICE bootstrap investigation.
 
 The loop at `0x2a92fc` must pass all of these (in order) before it advances out of
 mode 0x000d (`0x2a934c` path); any failure stalls it and the watchdog fires:
@@ -201,12 +214,12 @@ mode 0x000d (`0x2a934c` path); any failure stalls it and the watchdog fires:
 |---|---|---|---|
 | 1 | `service_context_ready_2b03d8` | lower-service idle + event queue empty | ✓ fixed (MBUS model) |
 | 2 | `display_init_ready_2a2680` | (the old `0x0199` display gate) | ✓ passing |
-| 3 | `task14_ready_28ff14` | task-14 ready flags set | ✗ **current blocker** |
+| 3 | `task14_ready_28ff14` | task-14 ready flags set | historical observation |
 | 4 | `pred_2a6566` | `func_2a64fa() == 0` | not yet reached |
 | 5 | `pred_2a0ec4` | a byte `== 0` | not yet reached |
 | 6 | `pred_279282` | always returns 1 | free pass |
 
-**Blocker 3 — `task14_ready_28ff14`** requires three conditions, all currently false:
+**Historical blocker 3 — `task14_ready_28ff14`** required three conditions in that run:
 - `[0x111c93]` (`FW_TASK14_READY_FLAG`) ≠ 0
 - `func_26ec10()` ≠ 0 — true when `([0x10d1c0 HELPER_MODE]==0 && [0x10dcae HELPER_READY]==1)`
   or `([0x10d1c0]!=0 && [0x10dcae]!=0)`

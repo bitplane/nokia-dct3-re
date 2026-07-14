@@ -116,7 +116,7 @@ The direct `0x05e1` surface is also finite: ten calls owned by callbacks
 | `0x51` | `0x25c88c` | object cleanup after `0x0bd6`, itself constructed from input `0x0bcc`; no direct in-ROM `0x0bcc` publisher recovered |
 | `0x34` | `0x2686bc` | input `0x00c8` with an outstanding stored transaction handle |
 | `0x32` | `0x27c090` | object-bearing input `0x13f8` with subtype `0x65` or `0x67`; no direct in-ROM `0x13f8` publisher recovered |
-| `0x59` | `0x288030` | input `0x0348` after registration/session work and local state `0x11fcc3 == 1`; no direct in-ROM `0x0348` publisher recovered |
+| `0x59` | `0x288030` | input `0x0348` after registration/session work and local state `0x11fcc3 == 1`; callback `0x31` can compute `0x0348` from scalar `0x00ca`, but the coherent task-15 post has no ECB waiter and the generic packed route is external service/resource traffic |
 | `0x47` | `0x28f514`, `0x28f540`, `0x28f56a` | respectively text/UI transaction completions `0x0578`/`0x1440`, call-message inputs `0x138b`/`0x138c`, or the excluded local/test `0x05e7` lifecycle |
 | `0x6d` | `0x299122` | input `0x0546`, local state `0x0d`, and resource `0x25` available |
 | `0x0f` | `0x2a0dc8` | UI/session inputs `0x0274` or `0x0348` followed by teardown/resource release |
@@ -151,6 +151,14 @@ at `0x2298d2` consumes event
 `0x0c20`, but its only recovered direct producer (`0x27616e`) sits in a
 service-command/session block and is not presently an ordinary-hardware
 candidate.
+
+A provisioned code-7 trace tightens this exclusion. Ordinary boot installs
+fourteen service-`0x0a` descriptors at about 0.864 s, but never calls transient
+handler `0x263154`, resident API `0x263d30`, pending predicate `0x26265c`, or
+any of the three `0x05eb` publication tails (`0x2632be`, `0x263bd4`,
+`0x263e64`). The only later registration-family observations are two unrelated
+`0x08ac` inputs. These completion tails are valid framework contracts, but are
+not the missing ordinary code-7 producer in the current lifecycle.
 
 The canonical profile produces `0x08ac` twice and enters `0x27f150` twice.
 Availability helper `0x287250(0)` has two card-provisioning success paths:

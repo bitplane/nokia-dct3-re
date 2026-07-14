@@ -136,19 +136,80 @@ The shutdown boundary is independently measured. Selector 1=`0x1b0` powers the
 handset off before task 1 starts. Selector 1=`0x1c0` remains valid, reaches mode
 `0x0004`, and produces band 2 without code 7. Reporter caller `0x21e40c` is the
 battery event-`0x25` branch under the literal firmware string "Check voltage
-level for shutdown" and reports only below its voltage gate. The adjacent
-caller `0x21f8de` belongs to the same low-voltage/charger lifecycle.
+level for shutdown". Predicate `0x27cd82` returns one when the selected sample
+is above `[0x110494] + 0xe9`; that normal/high result skips the reporter, while
+the at-or-below result reaches it. The adjacent caller `0x21f8de` is in power
+state `0x0c`, labelled "CHARGING COMPLETED" by the ROM, and waits for power
+event `0x42` before reporting. The coherent no-charger run instead follows
+states `0x1a -> 0x1c -> 0x05 -> 0x04` and remains in `0x04`. Both callers are
+abnormal power/charging outcomes rather than ordinary cold-boot readiness.
 
 ## Modeling status
 
 - The source-to-selector map and classifier arithmetic are validated.
 - The 3210 PCB signal names and real factory calibration values are not.
 - The generic driver channel labels must not be promoted to a 3210 wiring claim.
+- The current canonical `ADC_PROFILE=sane` labels are not a 3210 hardware
+  contract. This ROM's charge code directly samples selector 1 at `0x2a68c4`
+  and selector 4 at `0x2a90ac`; treating selector 1 only as RSSI is therefore
+  demonstrably incomplete.
 - A real EEPROM/PMM capture remains useful for physical fidelity.
 - Battery calibration is not the active code-7 hypothesis. Tuning ADC or NV
   values until report 7 appears would model a shutdown condition, not ordinary
   boot.
 
+### Bounded pack-input check
+
+Because analog readiness was a plausible missing hardware boundary, a bounded
+fixture sweep varied selector 1 over `{0x26,0x3e,0x42,0x100,0x150,0x180,
+0x200,0x280}` and selector 4 over `{0x180,0x200,0x220}`. Every value entered
+through the CCONT ADC register path. None reached any organic code-7 reporter.
+The sweep did classify boot sensitivity: lower selector-1 families stopped in
+mode `0x000d`, `0x150`/`0x180` stopped in mode `0x0001`, and
+`0x200`/`0x280` reached mode `0x0004`. This falsifies a simple recognized-pack
+value as the code-7 correction; it does not establish the physical 3210
+netlist or calibration.
+
+The former `BATTERY_PROFILE=charged` option was not a hardware-input test. It
+rewrote `FW_STARTUP_EVENT` during the charger/battery modes to replay a
+historical event sequence. Correcting the cold-boot CCONT status from upper IRQ
+bit `0x08` to the PWRONX reset-cause bit `0x02`, and restricting IRQ assertion
+to upper sources `0xf8`, lets the ROM complete the same sweep organically. The
+firmware bridge and its delayed-event literal override have therefore been
+removed. Raw ADC fixtures still enter only through CCONT registers.
+
+A follow-up tuple check held selector 0 at `0x2c0` and varied selector 1 around
+the boot boundary. Selector 1 values `0x1d0` and `0x1e0` stopped in mode
+`0x000d`; `0x1f0` reached the same provisioned mode `0x0004` as the canonical
+profile; `0x1b8` reached mode 4 transiently and then regressed to mode `0x000d`.
+Adding selector 4=`0x14` also regressed the earlier sweep. None fired a code-7
+reporter. Selector 0=`0x2c0` alone was behaviorally neutral. These fixtures
+reinforce that guessed pack tuples perturb an already-correct earlier power
+lifecycle rather than supply the later ordinary-ready report.
+
+The selector-4=`0x14` detour does not expose an unfinished normal pack
+characterization. Runtime tracing shows that it enters the task-19 recovery
+lifecycle through event `0x44`; the resulting event sequence is
+`0x31, 0x49, 0x28, 0x27`. Characterization state 6 has not started there: its
+entry waits for event `0x43`, whose only recovered organic poster is
+`0x2a6880`, called from the switch arm at `0x23587e`. Thus the low selector-4
+fixture selects an abnormal/recovery branch rather than supplying a missing
+ordinary-boot completion (**R**).
+
 `0x2a41d0` is a checksum over the threshold table, not an NV reader. Symbol
 `battery_adc_sample_counter_update_27d51c` is an instruction inside
 `battery_vbat_moving_average_27d500`, not a separate function entry.
+
+### Cross-project 3210 board tuple
+
+An independent 3210 hardware audit identifies CCONT channel 0 as VBATT and
+channel 1 as BSI, rather than the generic profile's accessory/RSSI labels. Its
+provisional values are VBATT `0x2c0`, BSI `0x150`, BTEMP `0x14`, and no charger.
+Testing that complete tuple through the CCONT device does not advance the
+coherent boot: task 19 enters the already-mapped pack-characterisation/recovery
+lifecycle, the startup checklist stops at `0x0b`, SIM initialization never
+starts, and task 1 remains in mode `0x000d`. The source itself labels BSI
+`0x150` and BTEMP `0x14` as placeholders, so this rejects the tuple, not the
+channel-routing evidence. Do not promote these values into the canonical
+profile until the ROM's recognized-pack table or real-hardware measurements
+supply a coherent pair.

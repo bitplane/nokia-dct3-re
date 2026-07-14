@@ -59,8 +59,14 @@
     {
       "id": "battery_callers_are_ordinary_code7_owner", "status": "disproven",
       "hypothesis": "A normal 3210 ADC value or calibration activates one of the two power-owned report-code-7 callers during ordinary boot",
-      "conclusion": "The 0x21e40c caller is battery event 0x25 under the firmware string 'Check voltage level for shutdown'; selector 1 value 0x1b0 powers off before task 1, while 0x1c0 reaches mode 0x0004 with battery band 2 and no code 7. The 0x21f8de caller is also confined to the low-voltage/charger lifecycle. These are shutdown/power-event reporters, not the missing ordinary-ready producer",
+      "conclusion": "The 0x21e40c caller is battery event 0x25 under the firmware string 'Check voltage level for shutdown'. Predicate 0x27cd82 returns one above the shutdown threshold and skips the reporter; only the at-or-below result reaches it. Selector 1 value 0x1b0 powers off before task 1, while 0x1c0 reaches mode 0x0004 with battery band 2 and no code 7. The 0x21f8de caller is power state 0x0c, labelled 'CHARGING COMPLETED', and reports after event 0x42. The coherent no-charger run instead follows 0x1a -> 0x1c -> 0x05 -> 0x04 and receives event 0x42 in state 0x04 without transitioning. These are shutdown/charging outcomes, not the missing ordinary-ready producer",
       "evidence": ["docs/battery_classifier_analysis.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "task19_state6_is_missing_pack_characterization", "status": "disproven",
+      "hypothesis": "The selector-4=0x14 detour reaches an unfinished normal task-19 pack-characterization state whose completion supplies report code 7",
+      "conclusion": "The fixture enters task 19 through abnormal/recovery event 0x44 and subsequently observes events 0x31, 0x49, 0x28, and 0x27. State 6 has not begun: its entry waits for distinct event 0x43, whose only recovered organic poster is 0x2a6880 via switch arm 0x23587e. Lowering selector 4 therefore diverts a previously coherent power lifecycle rather than revealing the ordinary code-7 predecessor.",
+      "evidence": ["docs/battery_classifier_analysis.md"]
     },
     {
       "id": "task5_1400_ordinary_code7_route", "status": "disproven",
@@ -135,6 +141,30 @@
       "evidence": ["docs/dsp_interface.md", "docs/interactive_handoff.md"]
     },
     {
+      "id": "callback2f_05e1_is_global_code7_completion", "status": "disproven",
+      "hypothesis": "The organic post-SIM 0x05e1 is a global completion that reaches callback 0x5d and supplies report code 7",
+      "conclusion": "In both unprovisioned and provisioned coherent runs, the observed 0x05e1 is delivered specifically to selected callback 0x2f, whose initialization lifecycle expects 0x05e0/0x05e1. Callback 0x5d receives only its early 0x05e2 initialization. The later repeating 0x0d16 is independently decoded as task-5 timer class 0x3d, rearmed by the resource-0x62 periodic poll, and is not a completion.",
+      "evidence": ["docs/interactive_handoff.md", "docs/resource_providers.md"]
+    },
+    {
+      "id": "forced_code7_proves_downstream_mmi_completion", "status": "disproven",
+      "hypothesis": "Supplying report code 7 in isolation creates a coherent MMI/display lifecycle whose later completion identifies the faithful missing boundary",
+      "conclusion": "The isolated report does prove code 7 is the mode-4 prerequisite: firmware posts 0x0732 to task 5, initializes task 6, and task 6 successfully posts 0x0547. It does not compose. The forced handoff occurs while task 5 retains its pre-handoff backlog; the 0x0547 object remains queued at pointer-ring slot 0x11 while repeating internal 0x0d16 timer traffic wins the receive path. No 0x079d, resource-0x6a02 readiness report, or code 0x0b follows. The downstream statuses must not be injected; code 7 must arise at its organic lifecycle point.",
+      "evidence": ["docs/mmi_layer.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "pwronx_repetition_supplies_code7", "status": "disproven",
+      "hypothesis": "A missing or insufficiently held PWRONX interrupt prevents the ordinary power-on completion from publishing report code 7",
+      "conclusion": "MAD2 IRQ line 0 is enabled and acknowledged through 0x2b3084. Its handler calls 0x2b4662, which posts event 0x41 to task 1 for the early power-key scan. Holding the emulated key raises 51 interrupts in a bounded run, but callback 0x5d still receives only 0x05e2, code 7 remains absent, and task 1 stays in mode 0x0004. Task 19's separate numeric event-0x41 branch is labelled CHARGER CONNECTION and has no producer edge from this IRQ.",
+      "evidence": ["docs/interactive_handoff.md"]
+    },
+    {
+      "id": "contact_selftest_verdict_is_missing_code7_boundary", "status": "disproven",
+      "hypothesis": "The contact/DSP self-test verdict remains incomplete and suppresses the ordinary code-7 publication",
+      "conclusion": "Firmware organically constructs contact flags 0xc8. The modeled request-derived RX class-0x74 payload 0d00 reaches 0x2349c8 and clears pending bit 2, after which task 5 consumes ready bit 7 at 0x29bc8c and leaves steady flags 0x49. The self-test completion and ready-bit lifecycle therefore execute before the code-7 wall; the associated immediate event 0x1a is a kernel completion, not a task-1 report.",
+      "evidence": ["docs/contact_service_topology.md", "docs/interactive_handoff.md"]
+    },
+    {
       "id": "forced_registration_messages", "status": "disproven",
       "hypothesis": "Injected 0x1196 or replayed commit keys can establish coherent SIM registration",
       "conclusion": "They reach downstream handlers without the owned reply object and never set ENABLE organically",
@@ -157,6 +187,12 @@
       "hypothesis": "The deep-profile command-0x64 storm is repeated watchdog result 2 or repeated consumption of the injected response allocation",
       "conclusion": "The injected result-5 allocation is consumed and freed once. Firmware-generated status frames then pass through task 7 with route selector 1 and return as fresh task-2 allocations, repeatedly re-entering 0x236dc4 with result 5. The anomaly is caused by the provisional responder's incomplete transport session, not the watchdog",
       "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
+    },
+    {
+      "id": "rom4_report7_is_generic_dsp_startup_completion", "status": "disproven",
+      "hypothesis": "Report code 7 is a generic ROM-4 DSP/startup completion and a healthy sibling boot can supply a replayable peer contract",
+      "conclusion": "NSE-1 v5.30 contains the exact report-7 wrapper at 0x28f142 and exactly four callers at 0x22cb7e, 0x22dc62, 0x246eaa, and 0x26af8a. A forcing-free 60-million-instruction sibling boot reaches its byte-exact interactive Security-code frame without executing the wrapper. The 5110 uses a serial-keypad scan lifecycle and its wrapper only posts code 7; the 3210 wrapper additionally publishes resource 0x6a01 readiness. This disproves a generic ROM-4/DSP completion but does not weaken the direct 3210 proof that code 7 gates its current mode-4 path.",
+      "evidence": ["docs/interactive_handoff.md"]
     }
   ]
 }

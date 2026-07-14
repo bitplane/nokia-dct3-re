@@ -225,27 +225,24 @@ predicates, not more of the contact-service chain. (Note: long runs with the res
 emulate because this re-run is checksum-heavy; short windows complete and show the `94a2dc`/`4aab13`
 fills.)
 
-**Diagnosed precisely — the mode-`000d` advance gate (historical `TRACE_LIMP2`).** The boot is **not frozen**:
+**Mode-`000d` advance gate (resolved).** The boot is **not frozen**:
 the startup/charger state machine runs a live loop every ~80 ms. The mode dispatcher is a **14-entry
 jump table** keyed on `FW_STARTUP_MODE`: the struct base `r4 = FW_STARTUP_DISPATCH_STATE (0x1123ec)`,
 so `[r4+2] = FW_STARTUP_EVENT (0x1123ee)` and `[r4+4] = FW_STARTUP_MODE (0x1123f0)`; mode `000d`
 dispatches to **`0x270e22`**. That branch is a **flag-accumulator wait**: it reads `FW_STARTUP_EVENT`
-(computed by the message→event translator `0x26ff14`, then written at `0x270e20` — the point the
-`BATTERY_PROFILE` model hooks) and, for events `0x14/0x16/0x15/0x17`, OR-s bits `1/2/4/8` into the
+(computed by the message→event translator `0x26ff14`, then written at `0x270e20`) and, for events
+`0x14/0x16/0x15/0x17`, OR-s bits `1/2/4/8` into the
 **flag byte `[0x112399]`**. Mode `000d` **advances** (`0x270edc`) only when **both** hold:
 
 1. `FW_CCONT_STATE [0x11ff6c]` low nibble `== 6` — **satisfied** (always `06`).
 2. flag byte `[0x112399]` low nibble `== 0xf` — i.e. all four sub-events `0x14/0x15/0x16/0x17`
-   delivered as `FW_STARTUP_EVENT` — **stuck at `0x08`–`0x09`**.
+   delivered as `FW_STARTUP_EVENT`.
 
-Root cause: **events `0x15` and `0x16` are posted to the event queue** (seen as `ev=21`/`ev=22` via
-`0x2697aa`) **but `0x26ff14` never dequeues them back to the `000d` handler**, so bits 1 & 2 never
-set. Events `0x14` and `0x17` *do* arrive (their bits set), so the path works for two of the four —
-the `0x15`/`0x16` delivery gap is the whole blocker. The charger latch (`0x1124c8`) **is** set
-(`0x2b09f2` writes it in mode `0001`), `charger_present_check 0x2b084c` runs (CCONT ADC ch5 = 0 →
-"absent"), and the `BATTERY_PROFILE=charged` model is **not** the saboteur (disabling it makes the
-flag byte *worse*, `0x08`). Note `0x15` = `FW_STARTUP_EVENT_CCONT_BATTERY_COMPLETE`; the driver
-already has partial `CCONT_EVENT15_DELAY` / `m_startup_event15_posted` scaffolding for it.
+The former `0x08`–`0x09` stall was an emulation artifact. CCONT register `0xe` had been reset to
+upper interrupt bit `0x08`, and every status bit asserted the IRQ output. Correct cold-boot PWRONX
+status `0x02` plus upper-source mask `0xf8` lets the ROM deliver all four events and advance to
+mode `0x0004` organically. The former battery-event RAM rewrite and event-delay literal override
+are removed. The checklist now progresses `0x08 -> 0x09 -> 0x0b -> 0x0f` without either shim.
 
 **Gate confirmed (`EXPERIMENT_FORCE_000D_EVENTS`).** Injecting `0x16` then `0x15` at the dispatch
 write (`0x270e20`) completes the flag byte to `0x0f` and **mode `000d` advances → `0004`
@@ -254,22 +251,11 @@ idle screen** (frame `4235fa`: battery indicator top-right, no network/SIM). So 
 principle; **`0004` is the next gate.** (The injection is a *diagnostic scaffold*, not a faithful
 model — opt-in, oracle-preserving.)
 
-**Producer found, fix is routing.** The events `0x15`/`0x16` are posted by the **CCONT interrupt
+**Producer.** The events `0x15`/`0x16` are posted by the **CCONT interrupt
 service routine `0x2b08c6`**: it reads the CCONT interrupt-status register (`ccont_reg_read 0x2afb44`),
-masks the active bits, and posts `0x15` (any bit) / `0x16` (charger bit) via `0x2697aa`. They *are*
-posted during `000d` — but never reach the startup task. The RTOS event router (`0x2697aa` enqueue /
-`0x26a458` dequeue) routes per-event via a runtime record table (`≈0x100140`, RAM); events `0x15`/`0x16`
-are routed away from the startup task while `0x17` reaches it. The translator `0x26ff14` has faithful
-identity cases for all of `0x14/0x15/0x16/0x17`, so the gap is purely delivery, not translation.
-
-**Open (the faithful fix):** model the missing routing/subscription so the CCONT-ISR's `0x15`/`0x16`
-posts reach the startup task's mailbox (needs runtime inspection of the per-event router records at
-`≈0x100140` — why `0x17` is delivered but `0x15`/`0x16` are not). The trace was retired after the
-request-driven contact peer closed this gate; use git history if the raw probe is needed again.
-(probes at `0x2697aa`, `0x2b09f2`, the charger-post sites, the `0x270e24` gate, and a `limp2_mode`
-trajectory tracker) and `NOKI3210_EXPERIMENT_FORCE_000D_EVENTS=1` (the confirmed gate scaffold).
-(Earlier notes here were superseded: the boot does **not** wait at `0x27124e`, and the readiness loop
-`0x2a92fc` is a *later* state — `000d` never gets that far.)
+masks the active upper bits, and posts `0x15` (any upper bit) / `0x16` (charger bit) via `0x2697aa`.
+The translator `0x26ff14` has identity cases for all four sweep events. Earlier routing-gap claims
+were observations of the incorrect CCONT reset lifecycle, not a missing RTOS subscription.
 
 ### The startup machine is a chain of event-gated modes (scaffold-march, `EXPERIMENT_SCAFFOLD_MARCH`)
 

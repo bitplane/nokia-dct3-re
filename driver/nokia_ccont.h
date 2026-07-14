@@ -32,7 +32,7 @@ private:
 	uint8_t m_watchdog = 0;
 	uint8_t m_regs[0x10] = {0};
 	uint16_t m_adc_source[8] = {0};
-	uint8_t m_boot_status = 0x08;
+	uint8_t m_boot_status = 0x02;
 	bool m_data_cycle = false;
 	bool m_present = false;
 };

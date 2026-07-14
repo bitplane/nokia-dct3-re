@@ -1,20 +1,71 @@
 # The MMI / coherent-boot layer — "up but not alive"
 
-> **Historical multi-profile investigation.** The original observations below
-> use the bridge profile that painted **Insert SIM card**. The current coherent
-> SIM profile instead paints **Security code**. A coherent identity/security
-> fixture removes that prompt and paints an idle-like `Menu` frame, but reaches
-> the same input conclusion: task 1 remains in startup mode `0x0004`, receives
-> keypad event `0x72`, performs IRQ housekeeping, and does not forward a decoded
-> key. Report code `0x07` is still absent, but is no longer assumed to be the
-> direct security-editor completion.
+> **Current conclusion.** A coherent identity/security fixture paints an
+> idle-like `Menu` frame while task 1 remains in startup mode `0x0004`. IRQ6 is
+> delivered, keypad ISR `0x2b5da0` posts raw event `0x72` to task 1's mailbox,
+> and task 1 consumes it. Mode 4 deliberately sends every event except
+> `0x03`, `0x0e`, and report code `0x07` to the stay-in-mode-4 path
+> `0x2701b0`; consequently the runtime matrix scanner is not called and no MMI
+> key is decoded. Code 7 is therefore a proved lifecycle prerequisite, not an
+> inferred correlation. Earlier claims below that the consumer was dormant or
+> that the settled task-1 mode was zero are historical and superseded.
+
+## Current provisioned keypad lifecycle
+
+The provisioned run establishes the chain without injecting a firmware message
+or changing firmware state:
+
+```text
+synthetic Menu-key matrix edge
+  -> MAD2 IRQ6 at 6.260010 s
+  -> keypad ISR 0x2b5da0 (mask IRQ6, post event 0x72, acknowledge IRQ6)
+  -> scheduler mailbox 1
+  -> task 1 consumes event 0x72 in startup mode 0x0004
+  -> mode-4 fallback 0x2701b0 at 6.265547 s
+  -> no post-key call to matrix scanner 0x2b2f90
+  -> no decoded MMI key
+```
+
+### Code-7 causal isolation and the downstream MMI initializer
+
+A bounded diagnostic supplied only report code `0x07` after task 1 had entered
+mode `0x0004`. This proves the dependency, but not an organic producer: task 1
+immediately executes the firmware-owned mode-4 initialization burst, posts
+status `0x0732` to task 5 through `0x2a26d4 -> 0x2af6ea`, and advances to mode
+`0x000c`. The other checklist reports (`09/0a/0c/0d/1c`) then arise
+organically; only report `0x0b` remains absent.
+
+Task 5 maps `0x0732` to `0x28c248`. That handler initializes the task-6
+display/window manager (`0x2b1e44` posts a command object to mailbox 6), resets
+the MMI tables through `0x2a7514`, and generates callback status `0x05e3`.
+Task 6 answers through the normal message API with `0x0547`. The sibling
+readiness reporter at `0x2af01c` reports resource **`0x6a02`** and posts startup
+code `0x0b`; older notes that called this resource `0x026a` read the swap16 pool
+literal in the wrong lane.
+
+The diagnostic does not compose into a faithful boot. At the forced handoff,
+task 5 still has the pre-handoff mailbox backlog. Its pointer ring contains the
+task-6 `0x0547` response at slot `0x11` (`write=0x11`, `read=0x10` after the
+older messages drain), but the repeating internal timer event `0x0d16` wins the
+receive path indefinitely. This is evidence that forcing code 7 starts the MMI
+lifecycle at an incoherent scheduling point, not evidence that `0x0547`,
+`0x079d`, resource `0x6a02`, or code `0x0b` should be injected. The faithful
+frontier remains the organic code-7 producer.
+
+Mailbox identity is not heuristic: `0x26aac0` takes task id `1`, and the receive
+primitive indexes the same TCB/mailbox array by current task id. Static decode of
+the handler at `0x271254` gives `3 -> 0x2711f6`, `0x0e -> 0x271230`, and
+`7 -> 0x271266`; all other messages call `0x2701b0`. This reconciles the older
+mode-0 observation: task 1 does have a functional mode-0 `0x72` housekeeping
+handler, but the coherent provisioned boot never reaches mode 0 because report
+code 7 is absent.
 
 The boot reaches a complete **"Insert SIM card"** MMI screen (text + scrollbar +
 status-icon chrome; frames `blank → o058 → o074`). This documents the layer *above*
 that screen — why the phone doesn't advance to idle, a menu, or Snake — gathered by
 driving it the way a user would (keys) rather than by forcing flags.
 
-## The MMI renders, but it does not process input
+## Historical investigation: the MMI renders, but does not process input
 
 Probe: inject the **Menu/select key** (`POST_READY_KEY=enter` → keypad row 4, mask
 `0x08`) repeatedly once the boot has settled (after the startup latch at t≈0.85), and
@@ -94,7 +145,7 @@ but the IRQ6 handler / input task that should read the latched key and post a ke
 *finer* than the outcome/mode: it is the **runtime input ISR / input task**, not the
 top-level state.
 
-## The IRQ6 keypad ISR chain — the ISR works, the consumer is dormant
+## Historical investigation: IRQ6 ISR chain
 
 Traced the whole keypad interrupt path (empirically via `TRACE_IRQ` on MAD2 status
 reg `0x09`, then statically):
@@ -130,12 +181,12 @@ targets) and confirm it is unscheduled / blocked elsewhere — then find what sh
 have activated it (the post-startup → interactive-app handoff). Knobs (reverted,
 git-recoverable): `TRACE_IRQ`, `TRACE_UIMODE`, `POST_READY_KEY`.
 
-## The `0x72` consumer, pinned — and a correction: the input path is NOT dormant
+## Historical mode-0 observation: the `0x72` consumer is task 1
 
 Pinned the consumer and it overturns the "dormant" reading above.
 
 - **Mailbox = task id.** recv `0x26a458` reads the current task id `[0x100022]` and
-  indexes `0x108414 + id*0x1c`. The keypad ISR posts to mailbox **1**, so the consumer
+  indexes `0x101484 + id*0x1c`. The keypad ISR posts to mailbox **1**, so the consumer
   is **task 1** (`0x270170`) — the startup state machine (dispatcher `0x270c8e` → mode
   jump table `0x270ca8`).
 - **Task 1 is alive** (`TRACE_RECV`: it recv's every ~1 s in the settled state) and it

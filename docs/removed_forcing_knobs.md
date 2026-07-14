@@ -70,11 +70,16 @@ Removed alongside: the dead param knobs `MODE5_CCONT_IRQ_STATUS` and
 orphaned `battery_startup_event_forced` bool.
 
 ## Kept (not FORCE_ knobs, left in place)
-`NOKI3210_BATTERY_PROFILE` (opt-in "charged" battery test profile, inert unless set),
 `DISPLAY_TYPE`, `CONTACT_DA_PRESERVE_READY_BIT`, `SERVICE72_RESPONSE_STATUS`,
 `CONTACT_D9_TIMEOUT_DELAY`, `STARTUP_EVENT15_DELAY_CLAMP`, and the unconditional
 `EVENT14_LATCH` read-mask shim. These are non-force research/test knobs or
 named hardware-source shims, out of scope for this audit.
+
+The later `NOKI3210_BATTERY_PROFILE` firmware bridge and
+`NOKI3210_CCONT_EVENT15_DELAY` ROM-literal override were removed after the
+CCONT reset contract was corrected. PWRONX is status bit `0x02`; only upper
+status sources `0xf8` assert the interrupt output. With that contract the ROM
+organically completes the mode-`0x000d` event sweep without either shim.
 
 ## Next real blocker
 With forcing gone, the honest state is unobstructed: the boot reaches **CONTACT

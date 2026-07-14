@@ -70,11 +70,12 @@ selection does not yet reset or validate that device phase.
 | `0x6` | RTC enable/control | Inferred storage. |
 | `0x7..0xa` | RTC second/minute/hour/day | Proven role; binary encoding is not independently confirmed. |
 | `0xb..0xd` | RTC alarm/calibration | Inferred storage. |
-| `0xe` | interrupt status | Proven role. Bit 0 is currently an opt-in presence/status overlay. |
+| `0xe` | interrupt/reset status | Proven role. Cold power-key reset latches PWRONX as bit 1 (`0x02`); upper bits `0xf8` are interrupt sources. Bit 0 remains an opt-in presence overlay. |
 | `0xf` | interrupt mask | Strongly inferred from firmware ISR behavior. |
 
-Writing interrupt-status bits clears them. The IRQ output is active whenever
-`status & ~mask` is nonzero. MAD2 owns the resulting CPU interrupt assertion.
+Writing interrupt-status bits clears them. The IRQ output is active when
+`status & ~mask & 0xf8` is nonzero; the low reset/presence bits do not assert
+it. MAD2 owns the resulting CPU interrupt assertion.
 
 ## ADC selectors
 
@@ -126,33 +127,50 @@ The four startup sweep events are:
 
 Mode `0x000d` is therefore a power-on/charger sweep, not a SIM or DSP gate.
 
+## Resolved startup-delivery defect
+
+The earlier model reset register `0xe` to `0x08`, treating a charger-class
+upper interrupt as the cold-boot indication, and asserted IRQ for every status
+bit. That produced a false interrupt lifecycle and made the ROM appear to lose
+the delayed `0x15`/`0x16` events. The corrected cold power-key state is PWRONX
+bit `0x02`; the IRQ output considers only upper sources `0xf8`.
+
+With those two device-boundary corrections, the provisioned boot reaches
+checklist `0x08 -> 0x09 -> 0x0b -> 0x0f` and mode `0x0004` with neither the
+former charged-battery RAM rewrite nor the event-15 delay-literal override.
+The IRQ count also falls from 51 to 11 because the low reset-cause bit no
+longer repeatedly enters the interrupt cascade. This supersedes the former
+claim that a routing/subscription defect prevented organic sweep completion.
+
 ## Important negative conclusions
 
 These conclusions are retained because repeating the experiments would be
 easy:
 
 - Events `0x14` and `0x17` use direct scheduler paths; `0x15` and `0x16` use
-  delayed scheduling. The observed delivery asymmetry is structural, not a
-  difference in event routing records.
+  delayed scheduling. Under the corrected reset contract all four arrive.
 - CCONT startup-event delivery is not controlled by service-channel
   provisioning flags. Contact-service provisioning and the CCONT sweep are
   separate subsystems.
-- Rewriting message classes, forcing service enable flags, shrinking the event
-  delay, suppressing the `0xd5` repost, and injecting a presumed task-285 reply
-  did not produce organic `0x15` delivery.
+- Rewriting message classes, forcing service enable flags, suppressing the
+  `0xd5` repost, and injecting a presumed task-285 reply did not address the
+  actual reset-status defect.
 - The old claim that emitter `0x264f30` produced the surfaced sweep IDs was
   false: its messages occur later and use a different path.
 
-These results mean the next CCONT change should come from new transaction/IRQ
-evidence, not another firmware event injection.
+The remaining code-7/keypad frontier is later than the completed CCONT startup
+sweep. Any further CCONT change must come from a separately evidenced
+transaction or IRQ contract, not another firmware event injection.
 
 ## Fidelity backlog
 
 1. Establish whether real GENSIO exposes a measurable busy interval and map
    the remaining endpoint-control bits.
 2. Reset or validate CCONT command/data phase at an evidenced boundary.
-3. Establish ADC request-to-result latency and which interrupt bit denotes
-   conversion completion. Do not add an arbitrary timer before both are known.
+3. Establish ADC request-to-result latency. Firmware routine `0x2b52cc` writes
+   the ADC control byte, polls GENSIO status, and reads the result registers;
+   it does not wait for a CCONT interrupt. A synthetic conversion-complete IRQ
+   is therefore excluded unless separate hardware evidence establishes one.
 4. Confirm reset values, RTC encoding, alarm behavior and watchdog tick source.
 5. Replace raw environment ADC overrides with typed battery, charger and RF
    scenario inputs while retaining deterministic tests.

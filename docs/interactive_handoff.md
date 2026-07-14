@@ -33,7 +33,20 @@
 > The power-owned callers are non-ordinary: `0x21e40c` and `0x21f8de` belong to
 > shutdown/charger state machines. The power task reaches and remains in its
 > normal no-charger state `0x04`; the `0x21f8de` route is explicitly labelled
-> maintenance/cold charging in the ROM. The display-owned
+> "CHARGING COMPLETED" in the ROM. Its state `0x0c` handler waits for event
+> `0x42`; the coherent run receives that event while in state `0x04`, where it
+> is intentionally ignored. Static transition-stub recovery finds no ordinary
+> predecessor into `0x0c`, and runtime records the cold-boot sequence
+> `0x1a -> 0x1c -> 0x05 -> 0x04`. The other caller, `0x21e40c`, is reached only
+> on the at-or-below shutdown-voltage branch; a normal/high sample skips it.
+> IRQ0 does not supply a missing ordinary completion either. MAD2 line 0 reaches
+> `0x2b3084`, and `0x2b4662` posts event `0x41` to task 1 for the early startup
+> power-key scan. Holding the emulated power key raises and handles the interrupt
+> repeatedly without producing code 7 or moving task 1 out of mode `0x0004`.
+> Task 19 also recognizes numeric event `0x41`, but its state-4 branch is the
+> independently labelled `CHARGER CONNECTION` lifecycle; the shared number does
+> not establish a producer edge from PWRONX to that task.
+> The display-owned
 > `0x06ca -> 0x0795` alternative is excluded from the current mode-4 lifecycle:
 > it requires display startup state 7, while the ordinary fallback enters mode
 > 4 with state 3. There is therefore no evidence that ordinary boot should
@@ -45,8 +58,67 @@
 > `0x287250(0)`, but the next guard requires an active task-14 call-control
 > transaction. Ordinary boot correctly has none and exits before `0x0795`.
 > See “Classified conditional `0x08ac` route” below.
+> The contact/DSP self-test lifecycle is also complete rather than the missing
+> report owner. Contact init builds flags `0xc8`; RX class `0x74`, payload
+> `0x0d 00`, clears pending bit 2 to return to `0xc8`; task 5 later consumes ready
+> bit 7 at `0x29bc8c`, leaving the observed steady flags `0x49`. The associated
+> immediate event `0x1a` is a kernel completion signal, not a task-1 report.
+> Therefore neither another self-test reply nor a verdict-byte correction is a
+> justified code-7 fix. An earlier conclusion named an ordinary GSM-group
+> `POWER_ON_NORMAL` publication as the remaining target. That name came from a
+> 3310 HLE comment, not from 3210 ROM evidence, and is withdrawn. The 3210
+> reporter is a shared operational-state notification with four independent
+> owners; no single GSM/DSP producer has been established.
 > The fixed
 > startup-report bridge below satisfies neither predicate organically.
+
+### ROM-4 sibling control: report 7 is not a generic DSP completion
+
+A Nokia 5110 NSE-1 v5.30 full-flash image provides a same-generation ROM-4
+control. Static matching identifies its exact report-code-7 wrapper at
+`0x28f142`, with exactly four callers (`0x22cb7e`, `0x22dc62`, `0x246eaa`, and
+`0x26af8a`). A forcing-free 60-million-instruction run in an independent
+message-level harness reaches the byte-exact interactive Security-code frame
+without invoking that wrapper once.
+
+This narrows, rather than removes, the 3210 result. Code 7 is directly proved
+to gate the 3210's current mode-4 handler, but it is not a generic ROM-4 DSP
+startup acknowledgement that can be copied from a sibling. The wrappers also
+have different contracts: the 5110 wrapper only posts code 7 to task 1, while
+the 3210 wrapper first publishes resource `0x6a01` readiness through
+`0x2b5ae4`. The 5110's serial keypad scanner is a different consumer lifecycle
+from the 3210's IRQ6 -> event-`0x72` path. Therefore the sibling boot cannot
+name the missing 3210 producer, and no DSP response should be implemented from
+this comparison alone.
+
+A later-ROM sibling gives a closer control at the reporter boundary. Nokia
+3310 NHM-5 v6.39 contains the same four-family reporter shape at `0x2e83c8`;
+its resource is renumbered from the 3210's `0x6a01` to `0x6d01`, but it still
+reports task-1 code 7 and has exactly four callers. A forcing-free
+250-million-instruction boot in the independent message-level emulator reaches
+an interactive idle frame without executing `0x2e83c8`. Nokia 3330 v4.50
+retains the same `0x6d01`/code-7 wrapper at `0x386a94` and the same four caller
+families. This conservation validates the 3210 caller census while showing
+that report 7 is branch-specific, not a universal DCT3 DSP or MMI ready signal.
+It remains a direct prerequisite of the 3210 v6.00 mode-4 path we enter; the
+comparison does not authorize bypassing that path.
+
+### Callback `0x31` / status `0x0348` is not the ordinary predecessor
+
+A computed-return census recovered one route missed by literal-only scans:
+callback `0x31` returns `0x0348` for input `0x00ca` when its local gates pass.
+Callback `0x5d` consumes `0x0348` by reporting resource `0x6a00` and posting
+task-1 code `0x06`; it does not report code `0x07`.
+
+The coherent provisioned run observes task 15 posting scalar event `0x00ca`,
+but its ECB has no waiter and the event is intentionally dropped. Task 15 then
+reports the corresponding resource state through `0x281750`; `0x00ca` is absent
+from that mapper and falls back to report `0x010a`. The only generic packed
+`0x40ca` constructors belong to the external resource/contact-service channel,
+whose availability map is intentionally disabled on a standalone boot. No
+callback-`0x31` invocation, `0x0348`, or report-code transition occurs. This is
+a valid service/resource lifecycle, not missing ordinary hardware behavior;
+enabling the service map or replaying `0x00ca` would be another forcing shim.
 
 > ⚠️ **2026-07 caveat — read `docs/sim_emulator_scope.md` "Moves 1+2" first.** Many
 > conclusions below (idle content / camped state / DSP primitives "terminate at the RF/DSP
@@ -92,7 +164,8 @@ Two corrections to earlier notes fall out of this:
 
 1. **The mode-`0xd` limp is passed, not stuck.** The old "stalls in the 000d limp because
    CCONT battery-measurement events 0x15/0x16 are never delivered" was true of an earlier,
-   less-complete boot. With the full model stack the checklist byte `[0x112399]` climbs
+   incorrect CCONT reset model. With PWRONX status `0x02`, an upper-source IRQ mask of
+   `0xf8`, and no battery/event-delay firmware bridge, the checklist byte `[0x112399]` climbs
    `08→09→0b→0f` (all four startup events `0x14/0x17/0x16/0x15` → bits `0x1/0x8/0x2/0x4`),
    the CCONT-state nibble `[0x11ff6c]` is `6`, and at t=0.91 task 1 **advances out of mode
    `0xd`** into mode `0x4`. (A first pass with a 48-line trace cap stopped at t=0.6 and
@@ -493,8 +566,8 @@ select the sequence. Automated producer coverage finds neither packed form in
 literal loads, recovered constant constructions, or direct packed-event calls,
 so this is not an evidenced ordinary predecessor.
 
-**Assessment for faithful emulation.** The mode-0d events fire because CCONT/startup complete;
-code 7 and the six checklist messages do **not**, because their subsystems never reach the
+**Assessment for faithful emulation.** The mode-0d events now fire from the corrected CCONT
+reset contract without firmware event rewriting; code 7 and the six checklist messages do **not**, because their subsystems never reach the
 reporting state. Emulating them faithfully is therefore **coherent bring-up of those subsystem
 state machines** (battery/charger, display, SIM-region dispatchers) — each a deep RE + model
 effort gated on hardware/charger state, not a bounded injection. This is the coherent-boot wall,
@@ -520,6 +593,29 @@ code 7 remains absent, and task 1 remains in mode `0x0004`. A delayed Menu-key
 press leaves the frame byte-identical. Therefore security mismatch is a real
 presentation blocker but is not the owner of the startup code-7 handoff.
 
+The provisioned run also closes two superficially promising task-5 streams.
+An organic `0x05e1` at about 4.90 s is delivered only to selected callback
+`0x2f`, whose documented initialization lifecycle expects `0x05e0`/`0x05e1`;
+it is not a global completion and never reaches callback `0x5d`. With callback
+`0x47` absent, callback `0x01` owns the later ordinary initialization traffic,
+while callback `0x5d` still sees only its early `0x05e2` initialization.
+
+The ordinary task-17 startup transaction is complete at its local boundary and
+does not supply report 7. Task 1 posts object `0x1587` through `0x2794c0`; task
+17 accepts it at `0x2253d0` and emits `0x0a35`, `0x0a25`, then `0x09ec`. The
+existing task-15/16/10 route immediately returns `0x043c` before publishing the
+uncorrelated DSP type-`0x1a` state object. A provisioned coherent run observes
+the acceptance and all three local outputs, but no code 7. This confirms that
+the constructor and immediate acknowledgement lifecycle are live; the later
+unresolved `0x0434` radio completion must not be treated as an implied reply to
+type `0x1a` or as the missing startup report.
+
+The later repeating `0x0d16` message is also unrelated. Task-5 timer class
+`0x3d` maps through the recode table at `0x2d71a8` to the ROM message object at
+`0x2e1a80`; call site `0x2b416e` rearms it with delay `0x80` from the periodic
+resource-`0x62` status poll at `0x2b412c`. It is normal background polling, not
+a missing callback-`0x5d` completion.
+
 The ROM-4 DSP fallback is also closed for the proposed payload. Inbound class
 `0x74` reaches `0x234954`; its recognized self-test/contact completion is payload
 `0x0d 00`, which clears the contact busy flag at `0x2349dc`. Payload `0x13 00`
@@ -534,6 +630,13 @@ firmware layer are not interchangeable with this ROM's first-level class byte.
 mailbox via the firmware's **own** post `0x26a354(mailbox=1, code)`, chained through a sentinel
 trampoline (the `MODEL_SVC_RESPONDER` / `MODEL_RES_ENABLE` pattern), triggered once at task-1's
 getter `0x26ff14` after mode-0d completes.
+
+The current coherent ordering exposes a limitation in that historical proof:
+the fixed 950 ms bridge feeds the reports while task 1 is still in mode
+`0x000d`, so they are consumed by the wrong lifecycle and the later mode-4 wait
+remains parked. The model demonstrates the downstream sequence only when its
+timing happens to align; it cannot establish an organic producer or serve as a
+causal mode-4 experiment.
 
 **Result (traced):** the sequencer advances
 

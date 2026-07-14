@@ -23,6 +23,7 @@ SECONDS ?= 20
 RUN_ENV ?=
 RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
 PRESERVE_NVRAM ?= 0
+PROVISIONED_IMEI_PREFIX ?=
 CENSUS_LOG ?=
 CENSUS_MANIFESTS ?= tools/run_manifests/contact-service.json tools/run_manifests/deep-gsm.json
 
@@ -56,9 +57,9 @@ FRONTIER_ENV := \
 	NOKI3210_MODEL_SIM_DEVICE=1
 
 # Canonical "boot-progress" run profile — the minimal knob set that reproduces the
-# CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/adc/
-# battery/eeprom), the CCONT watchdog guard, and CCONT_EVENT15_DELAY (needed by the
-# deeper MODEL_* boot). Every NOKI3210_* var the driver reads is an env knob; override
+# CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/ADC/
+# EEPROM) and the CCONT watchdog guard. Every NOKI3210_* var the driver reads is an
+# env knob; override
 # any on the command line — e.g. add MODEL_DSP_SERVICE/MODEL_CCONT_PRESENT/
 # MODEL_SVC_RESPONDER to clear CONTACT SERVICE, or any TRACE_* for diagnostics.
 # Trimmed 2026-07 (leave-one-out audit): removed 6 baked-in TRACE_* and the forcing
@@ -68,11 +69,9 @@ BOOT_ENV := \
 	NOKI3210_POWER_IRQ_MS=120 \
 	NOKI3210_POWER_IRQ_ASSERT=1 \
 	NOKI3210_ADC_PROFILE=sane \
-	NOKI3210_BATTERY_PROFILE=charged \
 	NOKI3210_TIMER0_HZ=20000000 \
 	NOKI3210_TIMER1_HZ=1057 \
 	NOKI3210_TIMER0_CATCHUP=1 \
-	NOKI3210_CCONT_EVENT15_DELAY=1 \
 	NOKI3210_DISABLE_CCONT_WATCHDOG=1 \
 	NOKI3210_LUA_QUIET=1 \
 	NOKI3210_INPUT_EXERCISER_PRESS=0
@@ -125,7 +124,8 @@ overlay: download-mame
 
 eeprom-profile:
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
-	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/3210 selftest eeprom.bin"
+	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/3210 selftest eeprom.bin" \
+		$(if $(PROVISIONED_IMEI_PREFIX),--provisioned-imei-prefix $(PROVISIONED_IMEI_PREFIX))
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \

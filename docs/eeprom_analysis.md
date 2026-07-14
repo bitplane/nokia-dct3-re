@@ -127,6 +127,10 @@ it does not copy a real handset identity or patch firmware state. The test
 prefix `49015420323751` produces check digit `8`, default security code `12345`,
 and derived record `32 d8 fa 97 00 00 03 17`.
 
+The same fixture is reproducible through
+`make eeprom-profile PROVISIONED_IMEI_PREFIX=49015420323751`. Omitting the
+variable preserves the erased-identity default used by the canonical oracle.
+
 That fixture makes the identity comparison succeed and removes the Security-code
 editor. It paints a new idle-like frame (SHA-256 prefix `dbf2704cb945d56b`) but
 does **not** publish report code 7, move task 1 out of mode `0x0004`, or make the

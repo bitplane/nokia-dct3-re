@@ -13,6 +13,7 @@ constexpr uint8_t ADC_MSB = 0x03;
 constexpr uint8_t WATCHDOG = 0x05;
 constexpr uint8_t IRQ_STATUS = 0x0e;
 constexpr uint8_t IRQ_MASK = 0x0f;
+constexpr uint8_t IRQ_SOURCE_MASK = 0xf8;
 }
 
 nokia_ccont_device::nokia_ccont_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
@@ -51,7 +52,7 @@ void nokia_ccont_device::set_adc_source(unsigned channel, uint16_t value)
 
 void nokia_ccont_device::update_irq()
 {
-	m_irq_cb((m_regs[IRQ_STATUS] & ~m_regs[IRQ_MASK]) != 0);
+	m_irq_cb((m_regs[IRQ_STATUS] & ~m_regs[IRQ_MASK] & IRQ_SOURCE_MASK) != 0);
 }
 
 void nokia_ccont_device::raise_boot_irq(unsigned pulse)

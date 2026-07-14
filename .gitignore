@@ -45,4 +45,4 @@ __pycache__/
 .DS_Store
 
 # runtime artifact (stray mame log in repo root)
-error.log
+*.log
