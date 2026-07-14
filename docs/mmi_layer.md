@@ -2,10 +2,12 @@
 
 > **Historical multi-profile investigation.** The original observations below
 > use the bridge profile that painted **Insert SIM card**. The current coherent
-> SIM profile instead paints **Security code**, but reaches the same input
-> conclusion more precisely: task 1 remains in startup mode `0x0004`, receives
+> SIM profile instead paints **Security code**. A coherent identity/security
+> fixture removes that prompt and paints an idle-like `Menu` frame, but reaches
+> the same input conclusion: task 1 remains in startup mode `0x0004`, receives
 > keypad event `0x72`, performs IRQ housekeeping, and does not forward a decoded
-> key until its missing report-code-`0x07` handoff completes.
+> key. Report code `0x07` is still absent, but is no longer assumed to be the
+> direct security-editor completion.
 
 The boot reaches a complete **"Insert SIM card"** MMI screen (text + scrollbar +
 status-icon chrome; frames `blank → o058 → o074`). This documents the layer *above*

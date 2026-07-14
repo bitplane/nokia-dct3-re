@@ -502,6 +502,31 @@ now mapped to its finest grain: the `0x2af0xx` reporter cluster and the specific
 machines that drive it. The mechanism is fully understood; the remaining work is per-subsystem
 bring-up, which is open-ended.
 
+### Security editor provisioning result
+
+The current Security-code frame is now explained without assigning code 7 to
+the editor. Callback `0x7c` receives `0x05dc` and calls `0x2ae61a`; a mismatch
+selects callback `0x47`, whose generic editor stores completion `0x0578` and
+publishes presentation status `0x057c`. The erased synthetic EEPROM has invalid
+identity/security records at `0x000c`, `0x0110`, and `0x06c8`, so the mismatch is
+expected.
+
+A firmware-derived provisioning fixture supplies a synthetic IMEI, the default
+phone code `12345`, and the matching derived state. Runtime then takes
+`0x2ae61a`'s equality branch (`computed == stored == 0x0317`), returns zero, and
+never selects callback `0x47`. The Security-code frame disappears and an
+idle-like `Menu` frame appears. No `0x0578 -> 0x05e1 -> 0x06c5` completion occurs,
+code 7 remains absent, and task 1 remains in mode `0x0004`. A delayed Menu-key
+press leaves the frame byte-identical. Therefore security mismatch is a real
+presentation blocker but is not the owner of the startup code-7 handoff.
+
+The ROM-4 DSP fallback is also closed for the proposed payload. Inbound class
+`0x74` reaches `0x234954`; its recognized self-test/contact completion is payload
+`0x0d 00`, which clears the contact busy flag at `0x2349dc`. Payload `0x13 00`
+falls through the generic handler and has no static route to `0x05e1`, `0x05eb`,
+`0x06c5`, or any of the four code-7 reporters. Numeric group names from another
+firmware layer are not interchangeable with this ROM's first-level class byte.
+
 ## HISTORICAL BRIDGE (MODEL_STARTUP_REPORTS): synthetic mode 4 → mode 0xc advance
 
 `MODEL_STARTUP_REPORTS` injects code 7 + the six checklist codes

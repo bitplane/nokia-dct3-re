@@ -106,11 +106,13 @@ dirty on a blank phone, each gated by one availability check (clean = `0x00`, el
   → **`MODEL_CCONT_PRESENT`**: report CCONT reg `0xe` bit 0 set (read-time only; the dispatcher
   ignores it, so it doesn't perturb the IRQ latch).
 
-- **idx18 `[0x11fc72]`** ← `0x295ea4: bl 0x264c56`, which checks `sum16(EEPROM_cache[0x00..0x11b])
-  == 32-bit big-endian word[0x11c]` (sum16 = `0x2a41d0`). Computed `0x1ae4` (exactly `0x11c × 0xff`
+- **idx18 `[0x11fc72]`** ← `0x295ea4: bl 0x264c56`, which reads `0x120` bytes and checks
+  `sum16(EEPROM_cache[0x000..0x11d]) == 32-bit big-endian word[0x11c]`
+  (sum16 = `0x2a41d0`). The checksum field overlaps the final two summed bytes;
+  those bytes are zero in the fixture. Computed `0x1ae4` (exactly `0x11c × 0xff`
   — the erased region) vs stored `0xffff` (virgin EEPROM).
-  → **`EEPROM_PROFILE=selftest`** supplies `0x11c..0x11f = 00 00 1a e4` (outside the summed range,
-  so the sum is unchanged). The init re-checks at `0x234796` and stamps `0x12` on failure.
+  → **`EEPROM_PROFILE=selftest`** computes and supplies `0x11c..0x11f = 00 00 1a e4`.
+  The init re-checks at `0x234796` and stamps `0x12` on failure.
 
 **(d) the PM-read re-clear `0x237b04`** — even with (a)–(c) satisfied (bit 6 builds to `0xcc` and
 survives the init), it is cleared again at `0x237b04` (`lr=0x2b13b0`, the PM service-read validity

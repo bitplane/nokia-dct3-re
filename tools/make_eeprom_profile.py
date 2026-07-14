@@ -7,9 +7,85 @@ from pathlib import Path
 
 SIZE = 0x4000
 FLASH_BASE = 0x200000
+TUNE_SECURITY_CHECKSUM_OFFSET = 0x011C
+TUNE_SECURITY_CHECKSUM_END = 0x0120
+CONFIG_START = 0x0120
+CONFIG_CHECKSUM_OFFSET = 0x0244
+IDENTITY_OFFSET = 0x000C
+SECURITY_CODE_OFFSET = 0x0110
+SECURITY_STATE_OFFSET = 0x06C8
+SECURITY_XOR = bytes((0x00, 0xFF, 0xFF, 0xFF))
+SECURITY_CALLBACK_STATE = 0x11
 
 
-def build_profile(flash: bytes) -> bytearray:
+def sum16(data: bytes) -> int:
+    return sum(data) & 0xFFFF
+
+
+def write_be32(image: bytearray, offset: int, value: int) -> None:
+    image[offset:offset + 4] = value.to_bytes(4, "big")
+
+
+def write_be16(image: bytearray, offset: int, value: int) -> None:
+    image[offset:offset + 2] = value.to_bytes(2, "big")
+
+
+def validate_checksums(image: bytes) -> None:
+    tune_security_sum = sum16(image[:TUNE_SECURITY_CHECKSUM_END - 2])
+    stored_tune_security = int.from_bytes(
+        image[TUNE_SECURITY_CHECKSUM_OFFSET:TUNE_SECURITY_CHECKSUM_END], "big")
+    if tune_security_sum != stored_tune_security:
+        raise ValueError(
+            f"tune/security checksum mismatch: 0x{tune_security_sum:04x} != "
+            f"0x{stored_tune_security:08x}")
+
+    config_sum = (sum(image[CONFIG_START:CONFIG_CHECKSUM_OFFSET])
+                  - image[0x0154] - image[0x0155]) & 0xFFFF
+    stored_config = int.from_bytes(image[CONFIG_CHECKSUM_OFFSET:CONFIG_CHECKSUM_OFFSET + 2], "big")
+    if config_sum != stored_config:
+        raise ValueError(f"config checksum mismatch: 0x{config_sum:04x} != 0x{stored_config:04x}")
+
+
+def imei_check_digit(first_fourteen: str) -> str:
+    if len(first_fourteen) != 14 or not first_fourteen.isdigit():
+        raise ValueError("IMEI identity must contain exactly fourteen digits")
+    total = 0
+    for index, digit in enumerate(map(int, first_fourteen)):
+        value = digit * 2 if index & 1 else digit
+        total += value // 10 + value % 10
+    return str((-total) % 10)
+
+
+def provision_security_identity(image: bytearray, first_fourteen: str,
+                                security_code: str = "12345") -> None:
+    """Create the records consumed by 0x29bb68/0x2ae61a.
+
+    EEPROM 0x000c holds the first fourteen IMEI digits as high-nibble-first
+    BCD. Firmware 0x265244 calculates digit fifteen. EEPROM 0x0110 similarly
+    stores the five-digit phone security code. Initializer 0x292350 derives the
+    eight-byte record at 0x06c8 through 0x2ae4e8 and 0x2ae598.
+    """
+    if len(security_code) != 5 or not security_code.isdigit():
+        raise ValueError("security code must contain exactly five digits")
+
+    identity = first_fourteen + imei_check_digit(first_fourteen)
+    identity_bcd = bytes((int(first_fourteen[index]) << 4) | int(first_fourteen[index + 1])
+                         for index in range(0, 14, 2)) + bytes(1)
+    code_bcd = bytes((int(security_code[0:2], 16),
+                      int(security_code[2:4], 16),
+                      int(security_code[4], 16) << 4))
+    image[IDENTITY_OFFSET:IDENTITY_OFFSET + 8] = identity_bcd
+    image[SECURITY_CODE_OFFSET:SECURITY_CODE_OFFSET + 3] = code_bcd
+
+    packed_code = bytes((5, code_bcd[0], code_bcd[1], code_bcd[2]))
+    encrypted = bytes(packed_code[index] ^ ord(identity[11 + index]) ^ SECURITY_XOR[index]
+                      for index in range(4))
+    identity_sum = sum16(identity.encode("ascii") + bytes((SECURITY_CALLBACK_STATE,)))
+    image[SECURITY_STATE_OFFSET:SECURITY_STATE_OFFSET + 8] = (
+        encrypted + bytes(2) + identity_sum.to_bytes(2, "big"))
+
+
+def build_profile(flash: bytes, provisioned_identity: str | None = None) -> bytearray:
     image = bytearray([0xFF]) * SIZE
 
     # Firmware fallback record for NV descriptor 0x0757, variant zero.
@@ -30,12 +106,6 @@ def build_profile(flash: bytes) -> bytearray:
         0x0153: 0x90,
         0x0170: 0x01,
         0x0171: 0x00,
-        0x0244: 0x1E,
-        0x0245: 0xE1,
-        0x011C: 0x00,
-        0x011D: 0x00,
-        0x011E: 0x1A,
-        0x011F: 0xE4,
         0x048C: 0x0A,
         0x048D: 0x00,
         0x048E: 0x0A,
@@ -52,15 +122,27 @@ def build_profile(flash: bytes) -> bytearray:
     for address, value in patches.items():
         image[address] = value
 
+    if provisioned_identity is not None:
+        provision_security_identity(image, provisioned_identity)
+
+    # Firmware 0x264c56 reads 0x120 bytes, sums the first 0x11e bytes, and
+    # compares the result with the big-endian 32-bit word at 0x011c. The two
+    # bytes of overlap are zero, so writing the 16-bit sum as a 32-bit value
+    # leaves the summed data unchanged.
+    image[TUNE_SECURITY_CHECKSUM_OFFSET:TUNE_SECURITY_CHECKSUM_END] = bytes(4)
+    write_be32(image, TUNE_SECURITY_CHECKSUM_OFFSET,
+               sum16(image[:TUNE_SECURITY_CHECKSUM_END - 2]))
+
     # The contact/config block checksum excludes the two correction bytes at
     # 0x0154..0x0155 even though they reside inside the summed range.
-    contact_sum = (sum(image[0x0120:0x0244]) - image[0x0154] - image[0x0155]) & 0xFFFF
-    image[0x0244] = contact_sum >> 8
-    image[0x0245] = contact_sum & 0xFF
+    contact_sum = (sum(image[CONFIG_START:CONFIG_CHECKSUM_OFFSET])
+                   - image[0x0154] - image[0x0155]) & 0xFFFF
+    write_be16(image, CONFIG_CHECKSUM_OFFSET, contact_sum)
 
     for start, end in ((0x02E0, 0x02EC), (0x0310, 0x0314), (0x0330, 0x0338)):
         image[start:end] = bytes(end - start)
 
+    validate_checksums(image)
     return image
 
 
@@ -68,9 +150,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--flash", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--provisioned-imei-prefix", metavar="DIGITS",
+                        help="provision a synthetic 14-digit IMEI prefix and matching security record")
     args = parser.parse_args()
 
-    profile = build_profile(args.flash.read_bytes())
+    profile = build_profile(args.flash.read_bytes(), args.provisioned_imei_prefix)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(profile)
     print(f"wrote {args.output} ({len(profile)} bytes)")

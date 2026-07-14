@@ -226,17 +226,13 @@ constexpr uint8_t FW_SERVICE_CHANNEL_READY_BOOT_BIT = 0x08;
 constexpr uint16_t PM_LOGICAL_CONTACT_COMMAND = 0x5f00;         // PM addr read for the command
 constexpr uint8_t  CONTACT_SVC_RESPONSE_CMD_HEALTHY = 0x05;     // response command that completes
 
-// EEPROM checksummed-block layout. Cross-validated between NokTool 1.8 (the
-// Delphi service tool: sub_0046AAA8 = 16-bit additive byte-sum, stored
-// big-endian at each block's end; TForm1.e2prom1Click validates the tune and
-// security blocks) and the 3210 firmware's own contact-service block check
-// (checksum routine 0x234588, compare at 0x234810). The blocks tile exactly:
-// each is data[start .. cksum-1] with a big-endian 16-bit sum at [cksum, cksum+1],
-// and the next block starts at cksum+2. See docs/eeprom_analysis.md.
-constexpr uint16_t FW_EEPROM_TUNE_BLOCK_START     = 0x0000;  // tune/calibration
-constexpr uint16_t FW_EEPROM_TUNE_BLOCK_CKSUM     = 0x003e;  // BE sum16 of [0x0000..0x003d]
-constexpr uint16_t FW_EEPROM_SECURITY_BLOCK_START = 0x0040;  // security/IMEI/locks
-constexpr uint16_t FW_EEPROM_SECURITY_BLOCK_CKSUM = 0x011e;  // BE sum16 of [0x0040..0x011d]
+// Checksums validated in the 3210 v6.00 firmware. Routine 0x264c56 reads
+// 0x0000..0x011f, sums 0x11e bytes, and compares the result with the 32-bit
+// big-endian word at 0x011c. The config block has a separate check at 0x234810.
+// Generic service tools describe finer tune/security sub-blocks, but those are
+// not firmware-validated contracts for this ROM. See docs/eeprom_analysis.md.
+constexpr uint16_t FW_EEPROM_TUNE_SECURITY_START  = 0x0000;
+constexpr uint16_t FW_EEPROM_TUNE_SECURITY_CKSUM  = 0x011c;
 constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_START   = 0x0120;  // contact-service config
 constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_CKSUM   = 0x0244;  // BE sum16(-corr) of [0x0120..0x0243]
 
@@ -1959,6 +1955,22 @@ std::optional<uint16_t> noki3310_state::flash_firmware_hooks(offs_t offset, u32 
 					fw_byte(0x00100022), machine().time().as_double());
 		const u16 callback47_input = u32(m_maincpu->state_int(addr == 0x0028f484 ?
 				arm7_cpu_device::ARM7_R0 : arm7_cpu_device::ARM7_R4)) & 0xffff;
+		if ((addr == 0x002ae62c || addr == 0x002ae63e || addr == 0x002ae642 || addr == 0x002ae6aa) &&
+				callback47_count++ < 64)
+		{
+			char identity[33] = {};
+			const u32 stack = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R13));
+			for (unsigned i = 0; i < 16; i++)
+				std::snprintf(identity + i * 2, sizeof(identity) - i * 2, "%02x", fw_byte(stack + i));
+			logerror("code7_identity_check: pc=%08x r0=%08x r1=%08x stored=%02x/%02x type=%02x/%02x "
+					"result=%08x identity=%s t=%.6f\n",
+					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+					fw_byte(0x00112466), fw_byte(0x00112467),
+					fw_byte(0x0011fcb4), fw_byte(0x0011fcb5),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R5)),
+					identity, machine().time().as_double());
+		}
 		const bool relevant_callback47_entry = addr == 0x0028f484 &&
 				(callback47_input == 0x05dc || callback47_input == 0x0578 ||
 				 callback47_input == 0x1440);

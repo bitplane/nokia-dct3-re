@@ -123,6 +123,18 @@
       "evidence": ["docs/resource_providers.md", "docs/interactive_handoff.md"]
     },
     {
+      "id": "security_identity_completion_owns_code7", "status": "disproven",
+      "hypothesis": "A valid phone identity/security profile completes callback 0x47 through 0x0578 -> 0x05e1 -> 0x06c5 and supplies startup report code 7",
+      "conclusion": "The default combined EEPROM checksums were already valid. A firmware-derived fixture supplies a synthetic IMEI, default phone code 12345, and matching derived record at 0x06c8. The 0x2ae61a comparison succeeds at 0x0317, callback 0x47 is not selected, and the Security-code prompt becomes an idle-like Menu frame. No 0x0578, 0x05e1, 0x06c5, code 7, mode-0x0004 exit, or interactive keypad decode follows. Security provisioning controls the prompt but does not own code 7.",
+      "evidence": ["docs/eeprom_analysis.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "rom4_dsp_74_1300_reaches_code7", "status": "disproven",
+      "hypothesis": "Inbound ROM-4 DSP group/class 0x74 payload 0x13 00 is the missing code-7 completion",
+      "conclusion": "In this ROM first-level class 0x74 reaches 0x234954. Its recognized contact/self-test completion payload is 0x0d 00 and clears the contact busy flag at 0x2349dc. Payload 0x13 00 falls through the generic path and has no static route to 0x05e1, 0x05eb, 0x06c5, or any code-7 reporter. Group labels from another decoder layer cannot be replayed as this class byte.",
+      "evidence": ["docs/dsp_interface.md", "docs/interactive_handoff.md"]
+    },
+    {
       "id": "forced_registration_messages", "status": "disproven",
       "hypothesis": "Injected 0x1196 or replayed commit keys can establish coherent SIM registration",
       "conclusion": "They reach downstream handlers without the owned reply object and never set ENABLE organically",

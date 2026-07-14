@@ -66,19 +66,42 @@ cover more than a thousand byte accesses. Important observed ranges include:
 
 The EEPROM is therefore part of early boot state, not a later optional feature.
 
-## Checksummed blocks
+The current security-lifecycle audit also identifies three related records:
 
-Firmware analysis and NokTool behavior agree that early permanent-memory data is
-organized as additive-checksummed blocks with big-endian stored sums:
+| Offset | Length | Firmware use |
+| --- | --- | --- |
+| `0x000c` | 8 | first fourteen IMEI digits in high-nibble-first BCD; `0x265244` calculates digit fifteen |
+| `0x0110` | 3 | five-digit phone security code in BCD |
+| `0x06c8` | 8 | identity-derived security state loaded into RAM `0x112460` |
+
+The selector at `0x2ae61a` formats the identity, adds callback state
+`[0x11fcb4]`, and compares that sum with the big-endian word in security-state
+bytes 6-7. An erased profile produces question-mark identity text and stored
+`0xffff`, so callback `0x47` legitimately presents **Security code**. This is
+phone-side provisioning, not a SIM PIN or a corrupt top-level EEPROM checksum.
+
+## Checksummed regions
+
+The 3210 v6.00 firmware validates two early permanent-memory regions:
 
 | Block | Data | Stored checksum | Algorithm |
 | --- | --- | --- | --- |
-| Tune/calibration | `0x0000..0x003d` | `0x003e..0x003f` | 16-bit byte sum |
-| Security/IMEI/locks | `0x0040..0x011d` | `0x011e..0x011f` | 16-bit byte sum |
+| Combined tune/security | `0x0000..0x011d` | `0x011c..0x011f` | `sum16` compared with a 32-bit big-endian word |
 | Contact/config | `0x0120..0x0243` | `0x0244..0x0245` | firmware sum with the observed correction at `0x154` |
 
-The contact-service check uses checksum routine `0x234588` and comparison site
-`0x234810`. A mismatch clears the service-present bit used by startup. EEPROM
+At `0x264c56`, the firmware reads `0x120` bytes from offset zero, sums the first
+`0x11e` bytes through `0x2a41d0`, and compares the 16-bit result with the
+big-endian 32-bit word at `0x011c`. The checksum field overlaps the last two
+summed bytes; the generated profile stores zero there and the sum in
+`0x011e..0x011f`. Its computed and stored values are both `0x1ae4`.
+
+NokTool describes independent tune and security sub-block checks at `0x003e`
+and `0x011e`. That is useful format evidence, but it is not the check executed
+by this ROM and must not be treated as a validated 3210 firmware contract.
+
+The contact/config check uses checksum routine `0x234588` and comparison site
+`0x234810`; its computed and stored values are both `0x1c25`. A mismatch clears
+the service-present bit used by startup. EEPROM
 validity is one real CONTACT SERVICE prerequisite, but not the only one. The
 native serial path now demonstrates this check organically; it is not satisfied
 by a firmware hook or RAM override.
@@ -97,6 +120,19 @@ by a firmware hook or RAM override.
 - initializes the ADC-monitor selector/weight records that cannot sensibly be
   all `0xff`.
 
+With `--provisioned-imei-prefix DIGITS`, it can additionally create a synthetic,
+internally consistent identity/security fixture. The generator follows the
+firmware transformations at `0x265244`, `0x2ae4e8`, `0x2ae598`, and `0x2ae61a`;
+it does not copy a real handset identity or patch firmware state. The test
+prefix `49015420323751` produces check digit `8`, default security code `12345`,
+and derived record `32 d8 fa 97 00 00 03 17`.
+
+That fixture makes the identity comparison succeed and removes the Security-code
+editor. It paints a new idle-like frame (SHA-256 prefix `dbf2704cb945d56b`) but
+does **not** publish report code 7, move task 1 out of mode `0x0004`, or make the
+keypad interactive. It is evidence about security provisioning, not the new
+default oracle.
+
 This profile is explicit test provisioning. It is not a factory EEPROM dump and
 does not belong in the hardware device. The generated image currently has:
 
@@ -107,7 +143,8 @@ does not belong in the hardware device. The generated image currently has:
 ## Remaining work
 
 1. Establish the purpose and checksum rules of records beyond `0x0245`.
-2. Separate calibration, identity/security and ordinary user settings into
+2. Decode the remaining fields in the identity-derived security record and
+   separate calibration, identity/security and ordinary user settings into
    documented data structures.
 3. Validate against a legitimately obtained provisioned EEPROM image without
    committing personal identifiers or calibration data.

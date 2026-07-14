@@ -41,14 +41,15 @@ functions and export analysis. The naming list is also exported as a
 - `tools/mame_noki3210_input_exerciser.lua` — MAME Lua harness used by the run
   targets to drive keypad input.
 
-## NokTool 1.8 (external — EEPROM/NV layout reference)
+## NokTool 1.8 (external — EEPROM/NV format reference)
 
 [NokTool 1.8](https://nokia-tuning.net/download/noktool18.zip) is a third-party
-Nokia service utility (Borland Delphi 7, Win32). It was a useful cross-check for
-the **EEPROM block layout and the 16-bit additive checksum algorithm** — see
-`docs/eeprom_analysis.md`, where the firmware's own checksum (`0x234588`) is
-cross-validated against NokTool's `sub_0046AAA8` and the tune/security block
-boundaries from `TForm1.e2prom1Click`.
+Nokia service utility (Borland Delphi 7, Win32). It was useful evidence for
+generic EEPROM sub-block boundaries and the 16-bit additive checksum algorithm.
+The 3210 v6.00 firmware itself validates a combined tune/security record at
+`0x264c56`, not NokTool's two independent sub-blocks; see
+`docs/eeprom_analysis.md`. Tool format evidence is kept distinct from a
+firmware-validated contract.
 
 The tool and any reconstruction of it are **proprietary and not included** in this
 repo. Only the *findings* (block layout, checksum algorithm — facts) are recorded
