@@ -236,13 +236,7 @@ local post_delay = env_number("NOKI3210_POST_READY_KEY_DELAY_MS", 250) / 1000
 local post_duration = env_number("NOKI3210_POST_READY_KEY_DURATION_MS", 750) / 1000
 local post_period = env_number("NOKI3210_POST_READY_KEY_PERIOD_MS", 0) / 1000
 
-emu.add_machine_frame_notifier(function()
-	frames = frames + 1
-	if lcd_dirty then
-		queue_lcd_dump()
-		lcd_dirty = false
-	end
-	write_lcd_dump()
+local function sample_structural_state()
 	structural.irq_seen = structural.irq_seen | space:read_u8(0x20009)
 	structural.fiq_seen = structural.fiq_seen | space:read_u8(0x20008)
 	structural.final_current_task = space:read_u8(0x100002)
@@ -253,6 +247,16 @@ emu.add_machine_frame_notifier(function()
 	structural.final_no_sim = space:read_u8(0x111c64)
 	structural.final_sim_enable = space:read_u8(0x111c79)
 	structural.startup_modes[structural.final_startup_mode] = true
+end
+
+emu.add_machine_frame_notifier(function()
+	frames = frames + 1
+	if lcd_dirty then
+		queue_lcd_dump()
+		lcd_dirty = false
+	end
+	write_lcd_dump()
+	sample_structural_state()
 	if frames % 30 == 0 then write_boot_summary() end
 
 	local legacy = exercise_input and legacy_input[frames] or nil
@@ -273,6 +277,13 @@ emu.add_machine_frame_notifier(function()
 			if active then press(post_key) else release(post_key) end
 		end
 	end
+end)
+
+-- Frame notifications stop while this firmware gates the LCD clock.  Keep the
+-- semantic oracle current independently of display activity.
+emu.register_periodic(function()
+	sample_structural_state()
+	write_boot_summary()
 end)
 
 emu.add_machine_stop_notifier(function()

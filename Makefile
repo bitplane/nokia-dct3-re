@@ -35,7 +35,6 @@ FRAME_PNG ?= progress_latest_frame.png
 # A blank/un-provisioned 3210 deterministically reaches CONTACT SERVICE here.
 ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
-ORACLE_FRONTIER_FRAME_SHA ?= 6471d1a5803619c2
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 
 # Current forcing-free research frontier. The request-driven contact peer
@@ -88,7 +87,7 @@ help:
 	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make run-frontier   run the current coherent contact/SIM research profile"
-	@echo "make verify-frontier reproduce the current coherent frontier oracles"
+	@echo "make verify-frontier reproduce the current coherent frontier predicates"
 	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
 	@echo "make verify-structure  compare semantic boot predicates with $(ORACLE_STRUCT)"
@@ -259,13 +258,8 @@ verify: run
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
-	test -n "$$frame" || { echo "no LCD frame produced in $(RUN_DIR)"; exit 1; }; \
-	got=$$(sha256sum "$$frame" | cut -c1-16); \
-	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_FRONTIER_FRAME_SHA)"; \
-	if [ "$$got" = "$(ORACLE_FRONTIER_FRAME_SHA)" ]; then echo "OK — coherent frontier oracle reproduced"; \
-	else echo "MISMATCH — boot diverged from the coherent frontier state"; exit 1; fi
 	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_FRONTIER_STRUCT)
+	@echo "OK — coherent frontier predicates reproduced"
 
 FRONTIER_STABILITY_RUNS ?= 3
 FRONTIER_STABILITY_STRICT ?= 0
@@ -283,7 +277,7 @@ verify-frontier-stability:
 			if [ "$(FRONTIER_STABILITY_STRICT)" = "1" ]; then exit 1; fi; \
 		fi; \
 	done; \
-	echo "OK — $(FRONTIER_STABILITY_RUNS) frontier runs reproduced the frame and semantic predicates"
+	echo "OK — $(FRONTIER_STABILITY_RUNS) frontier runs reproduced the semantic predicates"
 
 verify-structure-subset:
 	@test -f $(RUN_DIR)/boot_summary.txt || { echo "missing $(RUN_DIR)/boot_summary.txt; run make run first"; exit 1; }

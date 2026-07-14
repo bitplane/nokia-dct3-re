@@ -56,7 +56,8 @@ cover more than a thousand byte accesses. Important observed ranges include:
 
 | Range | Purpose |
 | --- | --- |
-| `0x0000..0x025b` | tune, security and startup configuration blocks |
+| `0x0000..0x0247` | tune, security and startup configuration blocks |
+| `0x0248..0x025b` | descriptors 2-4: ADC calibration fields loaded into `0x1122f8..0x11230b` |
 | `0x02e0..0x0353` | ADC-monitor calibration/configuration |
 | `0x0394..0x04ab` | configuration records |
 | `0x0544..0x05c6` | configuration records |
@@ -65,6 +66,12 @@ cover more than a thousand byte accesses. Important observed ranges include:
 | `0x18a8..0x18cb` | high-address record, semantics unknown |
 
 The EEPROM is therefore part of early boot state, not a later optional feature.
+
+Both collected 3210 images have erased bytes across the descriptor-2/3/4 range,
+so this ROM substitutes its validated defaults. The source-7 gain denominator is
+descriptor-2 bytes `0x024a..0x024b`; firmware uses gain `563.0 / denominator`
+and falls back to denominator `0x0233` (unity gain). See
+`battery_classifier_analysis.md` for the complete ranges and boot-safety result.
 
 The current security-lifecycle audit also identifies three related records:
 

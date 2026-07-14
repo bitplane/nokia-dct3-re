@@ -193,6 +193,12 @@
       "hypothesis": "Report code 7 is a generic ROM-4 DSP/startup completion and a healthy sibling boot can supply a replayable peer contract",
       "conclusion": "NSE-1 v5.30 contains the exact report-7 wrapper at 0x28f142 and exactly four callers at 0x22cb7e, 0x22dc62, 0x246eaa, and 0x26af8a. A forcing-free 60-million-instruction sibling boot reaches its byte-exact interactive Security-code frame without executing the wrapper. The 5110 uses a serial-keypad scan lifecycle and its wrapper only posts code 7; the 3210 wrapper additionally publishes resource 0x6a01 readiness. This disproves a generic ROM-4/DSP completion but does not weaken the direct 3210 proof that code 7 gates its current mode-4 path.",
       "evidence": ["docs/interactive_handoff.md"]
+    },
+    {
+      "id": "constant_calibrated_battery_produces_safe_band3", "status": "disproven",
+      "hypothesis": "A faithful 3210 ADC routing and factory calibration fixture can hold one constant source-7 value that survives cold boot, produces classifier state 3, and advances 0x2a6942",
+      "conclusion": "Both cold-boot safety 0x27d5fc and the later classifier consume source 7, which runtime maps to physical CCONT channel 1, through the same gain, zero offset, and 1500/313 scaling. Cold boot powers off below 0x0834, while state 3 requires a value below 0x076c. These ranges are disjoint by 200 scaled units for every common affine calibration. At unity gain the predicted minimum safe raw value is 0x1b7 and the maximum state-3 value is 0x18c; coherent runs confirm 0x1b6 powers off before task 1 and 0x1b7 reaches mode 0x000d. EEPROM descriptors 2/3/4 map to 0x0248..0x025b; both collected 3210 images are erased there and validly select ROM defaults. No safe constant-input fixture reached state 3 or a legitimate code-7 caller.",
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/interactive_handoff.md"]
     }
   ]
 }

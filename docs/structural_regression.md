@@ -11,15 +11,15 @@ same frame.
 `NOKI3210_BOOT_SUMMARY`. `make run` places it at
 `RUN_DIR/boot_summary.txt`; `make verify` checks the semantic predicates in
 `oracles/noki3210-default.struct` after checking the exact frame hash.
-`make verify-frontier` performs the corresponding check for the current
+`make verify-frontier` performs the corresponding semantic check for the current
 request-driven contact/SIM profile against `oracles/noki3210-frontier.struct`.
 The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.
 
 `make verify-frontier` checks the current request-driven contact/SIM profile's
-exact frame and stable semantic predicates. `make verify-frontier-stability`
-repeats that complete check with freshly seeded NVRAM. It reports full-summary
+stable semantic predicates. `make verify-frontier-stability` repeats that check
+with freshly seeded NVRAM. It reports full-summary
 hash drift without failing because LCD-command, CCONT-byte/read, and similar
 raw counters vary with harmless scheduling. Set `FRONTIER_STABILITY_STRICT=1`
 when investigating those counters specifically. Use the repeatability target
@@ -51,8 +51,10 @@ and full traces are too sensitive to harmless timing changes. They remain
 available for review but are not pass/fail criteria.
 
 The Lua MMIO observer decodes ARM big-endian byte lanes explicitly. Summary
-files are refreshed every 30 frames through an atomic rename, so a partial
-result survives a livelock or externally terminated research run.
+files are refreshed every 30 frames and from a display-independent periodic
+callback through an atomic rename. This keeps the terminal state current while
+firmware gates the LCD clock and lets a partial result survive a livelock or
+externally terminated research run.
 
 ## Default profile
 
@@ -67,11 +69,18 @@ for diagnosis without making timing-dependent totals part of acceptance.
 `make verify-frontier` enables the request-driven DSP/contact peer and the
 ordinary SIMI/FIQ6 card device. Its structural oracle records startup mode
 `0x0004`, flags `0x0f`, contact status `0x0049`, no-SIM clear, and SIM enable
-set. The default synthetic identity paints the Security-code frame with SHA-256
-prefix `6471d1a5803619c2`.
+set. This semantic state is the forcing-free frontier oracle.
 
-A separately generated provisioned EEPROM profile matches the synthetic phone
-identity and removes that prompt. It paints an idle-like `Menu` frame with
+Historical research runs painted a Security-code frame with SHA-256 prefix
+`6471d1a5803619c2`. The cleaned driver does not currently reproduce that frame:
+the retired display-transfer experiment supplied additional presentation
+progress, and the old frame artifacts were incorrectly retained as a supported
+acceptance condition. The hash remains evidence about the later MMI state, not
+part of `make verify-frontier` until the display/DSP transfer contract is
+implemented at a hardware boundary.
+
+A separately generated provisioned EEPROM profile matched the synthetic phone
+identity and removed that prompt in the same historical display setup. It painted an idle-like `Menu` frame with
 SHA-256 prefix `dbf2704cb945d56b`, while the structural state remains in mode
 `0x0004`. A scripted key adds the expected IRQ6 activity but does not reach
 matrix decode. This distinction prevents a visually plausible frame from being

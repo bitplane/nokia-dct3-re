@@ -49,9 +49,11 @@ same boot. See [`docs/interactive_handoff.md`](docs/interactive_handoff.md) and
 `make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
 research baseline for this boundary. It uses the request-driven contact peer
 and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with contact status
-`0x49`, no-SIM clear, and SIM enable set. The default synthetic identity yields
-the **Security code** frame (`6471d1a5803619c2`); a provisioned identity yields
-the idle-like `Menu` frame (`dbf2704cb945d56b`). Neither is yet interactive.
+`0x49`, no-SIM clear, and SIM enable set. Historical runs with the retired
+display-transfer experiment reached the **Security code** frame
+(`6471d1a5803619c2`) and, with a provisioned identity, the idle-like `Menu`
+frame (`dbf2704cb945d56b`). Those hashes remain investigation evidence rather
+than current acceptance oracles; neither state was interactive.
 
 The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
 executable protocol hypotheses, not finished hardware emulation, but do not

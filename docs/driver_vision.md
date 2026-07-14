@@ -26,7 +26,7 @@ See `mad2_fidelity.md` for register-level implementation status and
 | Profile | Purpose | Acceptance condition |
 | --- | --- | --- |
 | Default `make verify` | Stable hardware regression | Exact CONTACT SERVICE frame SHA prefix `d8a9a7a58e587be8`. |
-| Coherent frontier | Request-driven contact peer plus ordinary SIMI/FIQ6 card traffic | `make verify-frontier`; exact Security-code frame plus semantic structural predicates with SIM enabled; keypad delivery remains startup-owned in mode `0x0004`. |
+| Coherent frontier | Request-driven contact peer plus ordinary SIMI/FIQ6 card traffic | `make verify-frontier`; semantic predicates with SIM enabled and task 1 in mode `0x0004`. Historical Security-code presentation is not yet a supported display oracle. |
 | New-ROM baseline | Detect product-specific assumptions | No firmware-address hooks; record first divergence even when no frame renders. |
 
 The default profile is deliberately conservative. A deeper experimental frame

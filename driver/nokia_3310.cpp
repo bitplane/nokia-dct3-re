@@ -994,10 +994,12 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xff,
 				fw_byte(0x00100022), fw_word(FW_STARTUP_MODE), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_BATTERY_CAL", 0) != 0 &&
-			(address == 0x0011fe14 || address == 0x0011fe18 || address == 0x001124d0 ||
-			 address == 0x0011ff40 ||
+			(address == 0x0011fe14 || address == 0x0011fe18 || address == 0x0011fe52 ||
+			 address == 0x0011043c || address == 0x001124d0 ||
+			 address == 0x0011ff40 || address == 0x0011239c ||
 			 (address >= 0x00110422 && address <= 0x0011042a) ||
 			 (address >= 0x00110600 && address <= 0x00110630) ||
+			 (address >= 0x00112304 && address <= 0x0011230a) ||
 			 (address >= 0x001121d0 && address <= 0x001121f0)))
 		logerror("battery_cal_write: pc=%08x address=%08x data=%04x mask=%04x old=%04x "
 				"task=%02x t=%.6f\n",
@@ -1044,26 +1046,18 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
 	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_BATTERY_CAL", 0) != 0)
 	{
-		static bool calibration_pm_read = false;
 		const u32 r0 = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
 		const u32 r1 = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
 		const u32 r2 = m_maincpu->state_int(arm7_cpu_device::ARM7_R2);
-		const u32 r3 = m_maincpu->state_int(arm7_cpu_device::ARM7_R3);
-		if (addr == 0x002abbf4 && r1 == 0x074c)
-		{
-			calibration_pm_read = true;
-			logerror("battery_cal_pm: logical=074c variant=%u destination=%08x limit=%04x "
-					"task=%02x t=%.6f\n", r3, r0, r2 & 0xffff,
+		if (addr == 0x002abbf4 && r0 >= 0x001122f4 && r0 < 0x00112320)
+			logerror("battery_cal_pm: descriptor=%08x destination=%08x task=%02x t=%.6f\n",
+					r1, r0,
 					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-		}
-		else if (addr == 0x002abc24 && calibration_pm_read)
-		{
-			logerror("battery_cal_pm: physical=%04x destination=%08x length=%u t=%.6f\n",
-					r0 & 0xffff, r1, r2 & 0xffff, machine().time().as_double());
-			calibration_pm_read = false;
-		}
-		if ((addr == 0x002af8e2 || addr == 0x002af97a) &&
-				r0 >= 0x0d80 && r0 < 0x0dd0)
+		if (addr == 0x0027dd3e)
+			logerror("battery_init_mode: latch=%02x selected=%02x task=%02x t=%.6f\n",
+					fw_byte(FW_BATTERY_HW_MODE_LATCH), r0 & 0xff,
+					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+		if (addr == 0x002af97a && r1 >= 0x001122f4 && r1 < 0x00112320)
 			logerror("battery_cal_eeprom: pc=%08x physical=%04x destination=%08x length=%u "
 					"caller=%08x t=%.6f\n", addr, r0 & 0xffff, r1, r2 & 0xffff,
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),

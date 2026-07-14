@@ -53,7 +53,7 @@ Confidence labels:
 | Key GPIO `28..2b` | matrix scan and IRQ approximation | Partial | Implement row/column direction and interrupt masks instead of unconditional key IRQ. |
 | GENSIO `2c..2e`, `6c..6f` | CCONT and LCD endpoints; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready | Partial | Confirm busy timing, remaining control bits and SELECT routing. |
 | SELECT2/3 aliases `ad..af`, `ed..ef` | backing registers | Placeholder | Identify attached companion devices and alias/decode behavior. |
-| SIMI `36..3f` | configuration registers plus diagnostic ATR FIFO | Placeholder | Normal reception is DSP/service-message mediated; register FIFO model is not the organic path. |
+| SIMI `36..3f` | stateful SIM UART, FIFO/IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and the validated T=0 card lifecycle use the organic register/FIQ path; FIFO flag details remain open. |
 | UIF control pins `31..33`, `70..f3` | mostly backing registers | Placeholder | Map pin functions from service schematics and live access sequences. |
 
 ## Interrupt ownership
