@@ -277,7 +277,6 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_mbus);
 	TIMER_CALLBACK_MEMBER(timer_power_irq);
 	TIMER_CALLBACK_MEMBER(timer_keypad);
-	TIMER_CALLBACK_MEMBER(timer_mad2_soft_reset);
 	TIMER_CALLBACK_MEMBER(timer_dsp_service);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
@@ -344,7 +343,6 @@ private:
 	bool          m_timer0_compare_latched;
 	uint8_t       m_keypad_irq_state;
 	bool          m_startup_latch_complete_seen;
-	bool          m_after_mad2_soft_reset;
 	bool          m_dsp_discovery_complete;
 	bool          m_dsp_contact_registration_sent;
 	bool          m_dsp_contact_registration_acknowledged;
@@ -365,7 +363,6 @@ private:
 	emu_timer * m_timer_mbus;
 	emu_timer * m_timer_power_irq;
 	emu_timer * m_timer_keypad;
-	emu_timer * m_timer_mad2_soft_reset;
 	emu_timer * m_timer_dsp_service;
 
 	uint8_t       m_mad2_regs[0x100];
@@ -505,7 +502,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      display variant (DISPLAY_TYPE), power/ADC (ADC_PROFILE, POWER_IRQ_*,
 //      DISABLE_CCONT_WATCHDOG),
 //      clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP, FIQ8_HZ), NV (EEPROM_PROFILE),
-	//      SIM UART/card fixture, reset (MAD2_SOFT_RESET*). The default boot (none set)
+	//      SIM UART/card fixture. The default boot (none set)
 //      reproduces the CONTACT SERVICE oracle frame byte-for-byte.
 //
 //   2. DEVICE-BOUNDARY MODELS — opt-in behavior behind an ordinary hardware
@@ -562,7 +559,6 @@ void noki3310_state::machine_start()
 	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
 	m_timer_power_irq = timer_alloc(FUNC(noki3310_state::timer_power_irq), this);
 	m_timer_keypad = timer_alloc(FUNC(noki3310_state::timer_keypad), this);
-	m_timer_mad2_soft_reset = timer_alloc(FUNC(noki3310_state::timer_mad2_soft_reset), this);
 	m_timer_dsp_service = timer_alloc(FUNC(noki3310_state::timer_dsp_service), this);
 }
 
@@ -662,7 +658,6 @@ void noki3310_state::machine_reset()
 	m_timer0_compare_latched = false;
 	m_keypad_irq_state = 0xff;
 	m_startup_latch_complete_seen = false;
-	m_after_mad2_soft_reset = false;
 	m_dsp_discovery_complete = false;
 	m_dsp_contact_registration_sent = false;
 	m_dsp_contact_registration_acknowledged = false;
@@ -1089,47 +1084,6 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_keypad)
 	}
 
 	m_keypad_irq_state = state;
-}
-
-TIMER_CALLBACK_MEMBER(noki3310_state::timer_mad2_soft_reset)
-{
-	uint8_t reset_reg = uint8_t(param & 0xff) & ~0x04;
-	const char *reset_reg_override = std::getenv("NOKI3210_MAD2_SOFT_RESET_REG");
-	if (reset_reg_override != nullptr && reset_reg_override[0] != '\0')
-		reset_reg = nokia_env_u32("NOKI3210_MAD2_SOFT_RESET_REG", reset_reg) & 0xff;
-	m_after_mad2_soft_reset = true;
-
-	m_maincpu->reset();
-	m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, 0x200040);
-
-	if (nokia_env_u32("NOKI3210_MAD2_SOFT_RESET_CLEAR_RAM", 0) != 0)
-	{
-		std::fill_n(m_ram.get(), 0x40000, 0);
-		std::fill_n(m_dsp_ram.get(), 0x800, 0);
-	}
-	else if (nokia_env_u32("NOKI3210_MAD2_SOFT_RESET_CLEAR_STARTUP_STATE", 0) != 0)
-	{
-		std::fill_n(&m_ram[(0x112390 - 0x100000) >> 1], 0x80 >> 1, 0);
-		std::fill_n(&m_ram[(0x11ff60 - 0x100000) >> 1], 0x40 >> 1, 0);
-	}
-
-	memset(m_mad2_regs, 0, 0x100);
-	m_mad2_regs[0x01] = reset_reg;
-	m_mad2_regs[0x0c] = 0x0a;
-	m_mad2_regs[0x03] = 0xff;
-	m_fiq_status = 0;
-	m_irq_status = 0;
-	m_timer1_counter = 0;
-	m_timer0_counter = 0;
-	m_timer0_divider = 255;
-	m_timer0_compare_latched = false;
-	m_keypad_irq_state = 0xff;
-	m_power_irq_count = 0;
-	m_timer_mbus->adjust(attotime::never);
-	m_timer_dsp_service->adjust(attotime::never);
-	m_timer_power_irq->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_POWER_IRQ_MS", 1000)));
-	update_fiq_line();
-	update_irq_line();
 }
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
@@ -2734,13 +2688,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		const uint8_t direction = m_mad2_regs[0x24];
 		m_eeprom->write_sda(BIT(direction, 0) ? BIT(signal, 0) : 1);
 		m_eeprom->write_scl(BIT(signal, 3));
-	}
-
-	if (offset == 0x01 && (data & 0x04) != 0 && (old_data & 0x04) == 0 &&
-			nokia_env_u32("NOKI3210_MAD2_SOFT_RESET", 0) != 0)
-	{
-		m_timer_mad2_soft_reset->adjust(attotime::zero, data);
-		return;
 	}
 
 	switch(offset)

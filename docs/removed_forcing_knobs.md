@@ -37,6 +37,9 @@ the current tree:
   scheduler recodes, and callback-key replay.
 - The pre-device `SIM_PROFILE` register harness and its raw RX/IIR/FIFO value
   controls; `nokia_sim_card_device` is now the only opt-in SIM responder.
+- The `MAD2_SOFT_RESET` experiment family, including reset-register substitution
+  and whole/selective firmware-RAM clearing. No accepted profile or retained
+  evidence depended on it; real MAD2 reset semantics remain hardware-model work.
 
 The durable conclusions from these experiments live in the subsystem documents
 and in `evidence/falsifications.json` and `evidence/state_predicates.json`.
