@@ -64,18 +64,20 @@ class-2 message's selector and lifecycle-mask fields. Runtime state at
 is null, and selector `0x0f` deliberately leaves the four-entry table alone.
 It is not a close operation and no retained window blocks idle.
 
-The stronger ordinary-handoff candidate is callback-table entry `0x10` at
-`0x292878`. Its `0x05e7` case performs the full application/UI initialization
-sequence when context byte `0x110f1f` equals one. This includes the window
-initializer, application event generation, and follow-on display setup. The
-argument to `0x2b1e80` controls whether display configuration is reloaded; the
-message itself always carries class-1 mode zero. The next question is therefore
-which ordinary lifecycle selects callback `0x10` and supplies its `0x05e7`
-status, not which task-6 entry is retained or which hardware acknowledges an
-LCD transfer.
+Callback-table entry `0x10` at `0x292878` has a `0x05e7` case which performs a
+full application/UI **reinitialization** sequence when context byte `0x110f1f`
+equals one. It is not the ordinary cold-boot entrance. Like callback `0x01`,
+callback `0x10` is a fixed callback-plane entry with zero records in the
+complete 950-record transition table. A complete publisher census finds one
+global `0x05e7(argument 1)` publisher, `0x256f68`, and only two caller
+families: controller status `0x03e9`, the conditional navigation route below,
+and display statuses `0x0280/81/82`, already classified as local/service-test
+transactions. In an unattended coherent run callback `0x10` sees only startup
+status `0x05e2`; neither `0x256f68` nor its `0x05e7` case executes.
 
-Backward recovery closes that intermediate chain. Callback-table entry `0x01`
-at `0x29ea80` converts global status `0x0367` into `0x03e9` at `0x29efe6`.
+Backward recovery closes that intermediate chain. Fixed callback-table entry
+`0x01` at `0x29ea80` converts global status `0x0367` into `0x03e9` at
+`0x29efe6` when that callback is the active callback-plane entry.
 Exhaustive execution of controller dispatcher `0x253e20` proves `0x03e9` is the
 only input that reaches `0x255ebc`; that leaf calls `0x256f68(3, 4)`, which
 publishes global `0x05e7` with argument one. Callback `0x10` then takes the UI
@@ -101,14 +103,58 @@ hardware-ready report. The separate organic task-16-to-task-10 message `0x03e9`
 is numeric reuse in a task mailbox and does not enter controller dispatcher
 `0x253e20` in the coherent run.
 
-Every queued status passes through `0x2aefba`, then the callback, registration,
+Every queued status passes through `0x2aefba`, then the callback, descriptor,
 display, and controller stages at `0x2af646..0x2af66e`. A post-frontier Up cycle
 queues `0x40c8`, processes the logical input sequence, and then queues `0x0367`.
-The current descriptor set routes it through selector `0x75` state zero to
-`0x051d`, with `0x057c` also published; it does not reach controller `0x03e9`.
-The missing contract is therefore what registers/selects callback `0x01` for
-this status. The run also repeats the Up scan after release, which is a separate
-MAD2 keypad fidelity issue rather than the `0x0367` producer boundary.
+Descriptor selector `0x75` state zero maps that status to `0x051d`, with
+`0x057c` also published; it does not reach controller `0x03e9`.
+
+A bounded callback-plane audit falsifies the former missing-registration
+conclusion. Callback `0x01` has a fixed entry at `0x2db728` (handler
+`0x29ea81`, flags `0x01000000`) and **zero** records in the complete 950-record
+transition table. The active callback byte at `0x11fcce` is initialized to
+`0x01` and the engine at `0x2ac3f2` organically sweeps it through the callback
+table during startup; setter `0x2ac3e0` has only three ROM callers, all in that
+engine's initialization/wrap paths. The coherent trace observes `0x01`, the
+sequential sweep through `0x7d`, a wrap to `0x01`, and later callback choices
+`0x2f`, `0x7c`, and `0x47`. By the time Up generates `0x0367`, callback `0x01`
+is no longer selected. Selector `0x75` is a separate descriptor namespace: it
+has eleven transition records, including the state-zero `0x051d` mapping, and
+must not be confused with the active callback byte.
+
+There is therefore no missing hardware event or registration boundary between
+`0x0367` and callback `0x01` to emulate. The `0x0367 -> 0x03e9 -> 0x05e7` chain
+is a conditional key/navigation action available during callback `0x01`'s
+lifecycle, and the resulting callback-`0x10` path is conditional UI
+reinitialization rather than the ordinary startup trigger.
+
+The physical-key trace does not repeat the matrix decode. A 50 ms Up tap enters
+IRQ0 once on press and once on release, runs the firmware's `0x41/42/43` polling
+sequence, and reaches `0x2b4628` exactly once. Later repeated `0x0367`
+publications originate in persistent UI-context iterator
+`0x2a1b18 -> 0x2a1a80`; they are higher-level lifecycle replay, not repeated
+MAD2 scans or a missing release edge.
+
+The task-6 idle selector has now been separated from the setup constructor.
+`0x2b1e80` constructs class-1 mode zero. A second, tiny constructor at
+`0x2b1e44` constructs class 1 with byte `+6` equal to one and posts it directly
+to task 6. Task 6 receives that byte in the class-1 handler at `0x2982b4`; the
+one-valued path reaches `0x298346`, arms control byte `0x1116fd`, and on the
+next loop calls `display_idle_2a255c`, which requests resource `0x4c22` and
+posts `0x0547`. By contrast, standard class-2 constructor `0x2b1f24` always
+writes byte `+6` as zero, so the later editor/window lifecycle message cannot
+arm this path.
+
+The class-1 selector has three recovered ROM callers. Two are inside the
+conditional contact/service command handler rooted at `0x236f6c`. Exhaustive
+concrete execution of all 65,536 inputs to task-5 dispatcher `0x28bddc` proves
+that the third leaf, `0x28c248`, is selected by exactly one status: `0x0732`.
+That status is already owned by the physical-power/code-7 lifecycle, not
+unattended startup. In a coherent power-key run firmware organically posts
+`0x0732` and enters mode `0x000c`, but task 5 does not consume it during the
+bounded run; consequently `0x2b1e44`, resource `0x4c22`, and event `0x0547` do
+not execute. The open boundary is queue/context settlement upstream of the
+selector, not a missing idle-window producer or hardware acknowledgement.
 
 `0x2b4628` feeds the local input handlers at `0x2979d8` and `0x2a27de`, then
 mirrors the one-byte key through resource `0x6e02`. The mirror uses the optional
@@ -484,9 +530,11 @@ non-initialization selector are retired. That static correction does not make
 callback `0x5d` the current ordinary-hardware frontier.
 
 The same-product comparison leaves no justified software-side transition to
-synthesize. A real Up cycle now produces global status `0x0367`; the next
-decisive evidence is the registration/state predecessor that makes callback
-`0x01`, rather than the currently selected callback `0x75`, consume it. The
-repeated release scan remains a separate MAD2 keypad issue. Code 7, task-6
-retention, and the optional decoded-key resource mirror remain excluded from
-the ordinary-startup boundary.
+synthesize. Callback `0x10`/`0x05e7`, callback `0x01`/`0x0367`, and task-6
+selector `0x0732 -> 0x28c248 -> 0x2b1e44` are now all retired as ordinary
+startup candidates. The next bounded question is why task-5/MMI contexts do not
+settle: an organic `0x0732` remains queued after physical power, and the
+completed Up context repeatedly republishes `0x0367`. No class-1 message,
+`0x0547`, callback selection, or context state should be injected. Code 7,
+task-6 retention, keypad hardware, and the optional decoded-key resource mirror
+remain excluded from the ordinary-startup boundary.

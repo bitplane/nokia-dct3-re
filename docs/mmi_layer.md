@@ -29,9 +29,12 @@ delivery and the synthetic EEPROM security-code encoding are both validated.
 
 A post-frontier Up press additionally reaches `0x2a1a80`, which reads logical
 status `0x0367` from the active UI-context record and publishes it through
-`0x2af798`. This closes `0x0367` as firmware-owned key/navigation output. The
-current model repeats the Up scan after release; that keypad lifecycle anomaly
-is separate from the now-proved status producer.
+`0x2af798`. This closes `0x0367` as firmware-owned key/navigation output. A
+bounded 50 ms tap proves the physical lifecycle is already correct: IRQ0 fires
+once on press and once on release, the matrix scanner polls while held, and
+`0x2b4628` decodes exactly one key. Repeated later `0x0367` publications come
+from UI-context iterator `0x2a1b18 -> 0x2a1a80`, not repeated matrix scans. The
+remaining replay is MMI context-lifecycle debt, not MAD2 keypad debt.
 
 ## Hardware path
 

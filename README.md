@@ -41,13 +41,19 @@ Report code 7 is now observed organically after a physical power-key action and
 leads to the mode-`0x000c` shutdown sequence; it is not the boot blocker. The
 missing-producer premise for global status `0x0367` is now falsified. A physical
 Up-key cycle reaches firmware function `0x2a1a80`, reads `0x0367` from the active
-UI-context record, and publishes it through the task-5 event machinery. In the
-current lifecycle it selects callback `0x75` and editor/navigation events, not
-callback `0x01`, so the active frontier is the callback-`0x01` registration and
-state contract that makes the same status enter the ordinary UI-start chain.
-The repeated Up-key scan is a separate keypad-release fidelity issue. Task 6 is
-already live with an empty window table; no retained window or LCD
-acknowledgement blocks it. See
+UI-context record, and publishes it through the task-5 event machinery.
+Descriptor selector `0x75` maps it to editor/navigation events. Fixed callback
+`0x01` is already visited organically by the startup callback sweep and has no
+transition descriptors; its `0x0367 -> 0x03e9` case is a conditional navigation
+action, not a missing registration or the ordinary UI-start entrance. Callback
+`0x10`/`0x05e7` is likewise conditional reinitialization. Exhaustive execution
+proves the remaining task-6 selector leaf `0x28c248` belongs only to status
+`0x0732`, itself produced organically by the physical-power/shutdown lifecycle.
+The live frontier is therefore task-5/MMI lifecycle settlement: conditional
+`0x0732` remains queued, while a completed Up tap leaves its logical UI context
+replaying `0x0367` despite only one physical key decode. Task 6 is already live
+with an empty window table; no retained window or LCD acknowledgement blocks
+it. See
 [`docs/interactive_handoff.md`](docs/interactive_handoff.md) and
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
@@ -86,7 +92,7 @@ The labels below have precise meanings:
 | SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
 | Startup/contact peers | Prototype | Useful protocol behavior, still implemented through firmware hooks. |
-| Interactive startup | Mapped | Keypad and editor completion work in mode 4; Up produces global status `0x0367`, but the current callback set routes it to navigation/editor handling rather than callback `0x01`. |
+| Interactive startup | Mapped | Keypad and editor completion work in mode 4. Callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, and task-6 selector `0x0732 -> 0x2b1e44` are conditional UI/power lifecycle paths, not cold-boot entrances. Task-5/MMI context settlement is the smallest unresolved boundary. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |
 
