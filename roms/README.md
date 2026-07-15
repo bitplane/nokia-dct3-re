@@ -39,8 +39,10 @@ roms/
   noki3210/                 # MAME ROM set layout, for `make run`
 ```
 
-The EEPROM is a separate blank 24C128 (the 3210 keeps NV there); a blank/erased
-image (all `0xFF`) is what a fresh unit has — see `docs/eeprom_analysis.md`.
+The EEPROM is a separate 24C128 used for product, calibration, identity,
+security, and user NV data. An all-`0xFF` image represents an erased chip, not a
+factory-provisioned handset. The project normally generates an explicit test
+profile; see `docs/eeprom_analysis.md`.
 
 ## Portability ROMs
 

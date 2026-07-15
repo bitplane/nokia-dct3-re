@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "external-service",
+  "description": "Default and bounded deep external-service command-direction traces",
+  "phone": "noki3210",
+  "firmware": "noki3210_v600",
+  "subsystems": ["external_service"],
+  "logs": ["run_manifest_service_default/error.log", "run_manifest_service_deep/error.log"],
+  "artifacts": [],
+  "oracle": null
+}

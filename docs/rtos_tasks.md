@@ -51,22 +51,11 @@ entry stored in that table; it is not necessarily the main receive dispatcher.
 
 ## Naming cautions
 
-### `CONTACT SERVICE`
+### Service startup
 
-`CONTACT SERVICE` is the user-visible fault text rendered by the phone. It is
-not evidence that task 2, task 7, or the class-`0x40` protocol was named
-“contact service” by Nokia. Historical project names used that caption for the
-startup investigation and then leaked it into function and subsystem names.
-
-Current prose should distinguish:
-
-- the **`CONTACT SERVICE` fault screen**;
-- the **class-`0x40` service-command dispatcher** in task 2; and
-- the **external-service transport adapter** in task 7.
-
-Existing filenames and some trace/schema identifiers retain
-`contact_service` for compatibility. Treat that token as a historical project
-identifier, not a semantic claim.
+Task 2 is the class-`0x40` service-command dispatcher. Task 7 is the
+external-service transport adapter. The visible startup fault screen is an
+outcome of an incomplete service session, not a task or protocol name.
 
 ### Caller versus owner
 

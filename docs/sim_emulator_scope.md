@@ -12,13 +12,18 @@ Model a removable GSM SIM as a stateful device behind the MAD2 SIM interface.
 Firmware must perform its own reset, ATR/PPS negotiation, T=0 exchanges, file
 selection, parsing, registration state changes, and task-to-task messaging.
 
+The current implementation combines the MAD2 SIMI controller and removable
+card in one MAME device. The permissions below describe the **card** contract;
+FIFO registers, IIR causes, and FIQ generation are controller behavior retained
+temporarily in the same implementation.
+
 The device may provide behavior owned by a physical card:
 
 - activation and ATR;
 - T=0 procedure bytes and status words;
 - GSM 11.11 SELECT, STATUS, GET RESPONSE, READ BINARY/RECORD and CHV behavior;
 - persistent current DF/EF selection and coherent file metadata/content;
-- serial timing, ready/busy state, and interrupt generation.
+- card-side serial response timing and protocol state.
 
 It must not provide behavior owned by phone firmware or the GSM/baseband peer:
 
@@ -30,10 +35,10 @@ It must not provide behavior owned by phone firmware or the GSM/baseband peer:
 
 ## Implemented hardware path
 
-`nokia_sim_card_device` is connected to the MAD2 SIM register block. The
-firmware writes command bytes to the emulated UART, receives bytes at serial
-cadence, and is interrupted through the normal FIQ6 path. The device currently
-supports:
+`nokia_sim_card_device` currently implements both sides of the prototype seam:
+the driver forwards the MAD2 SIM register block into its UART/FIFO/IIR half,
+and its card half consumes and returns serial bytes. Firmware receives those
+bytes through the normal FIQ6 path. The combined device currently supports:
 
 - configurable ATR with the default `3b 10 05`;
 - PPS echo;
@@ -81,13 +86,16 @@ metadata correctly.
 The card filesystem is intentionally minimal. Extend it only when an organic
 firmware request establishes a concrete requirement. Likely later work includes:
 
-- separating current DF and selected EF explicitly if a cross-directory
-  sequence proves it necessary;
 - completing access-condition, invalidation, record-layout, and CHV semantics;
 - supplying coherent IMSI, SST, LOCI, Kc, FPLMN, AD, SPN and optional EFs;
 - testing card removal, reset, timeout, parity/error, and proactive-SIM status;
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
+
+The implementation already tracks current DF separately from selected EF; that
+item is no longer backlog. The architectural backlog is instead to separate the
+MAD2 SIMI controller from the removable card once their timing and error
+contract is stable.
 
 The organically requested initialization pass is complete for a non-CPHS
 synthetic card. Unsupported optional files return `94 04` and leave the current

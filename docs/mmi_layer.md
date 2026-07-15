@@ -4,6 +4,16 @@ This document summarizes the firmware-owned MMI input path at the current
 coherent Nokia 3210 v6.00 frontier. `interactive_handoff.md` owns the startup
 report investigation; this file owns the keypad hardware-to-firmware contract.
 
+## Contract audit
+
+| Boundary | Classification | What is established | What remains provisional |
+| --- | --- | --- | --- |
+| LCD controller | Reused device, partial integration | Firmware-generated command/data transfers reach MAME's PCD8544 device and reproduce a byte-exact visible frame. | Reset/electrical timing and product-panel variants have no focused component test. |
+| MAD2 LCD serialization | Derived hardware contract | GENSIO endpoint `0x21` and the command/data write paths clock the organic firmware stream into the LCD. | The immediate bit-clock implementation is functional timing, not a measured serial waveform. |
+| Display-type selection | Diagnostic/configuration shortcut | A quarantined RAM-read override selects the display type needed by the v6.00 profile. | Its real product-data or hardware source is unknown; this is not LCD behavior. |
+| MAD2 keypad matrix | Partial hardware, strong evidence | v6.00 and v5.01 agree on the 4x5 active-low scan, IRQ0 source, register sequence, ROM keymap and decoded-key path. | Electrical debounce, mask-edge corner cases and timing outside the exercised lifecycle remain unvalidated. |
+| Lua LCD mirror and key script | Acceptance tooling | The independent mirror makes headless frame hashes and the script supplies deterministic physical key edges. | Neither is emulated phone hardware; scripted delays are fixtures, not keypad debounce. |
+
 ## Current state
 
 The provisioned profile paints an idle-like frame with a `Menu` softkey while
@@ -14,7 +24,7 @@ A scripted logical press changes the active-low MAD2 keypad state and raises
 IRQ0. Handler `0x2b3084` starts the firmware's internal `0x41/0x42/0x43`
 sequence, which scans the matrix at `0x2b2f90`, decodes the ROM keymap, and
 publishes resource `0x6e02` at `0x2b4628`. This works while task 1 remains in
-mode `0x0004`; the former IRQ6/event-`0x72` route was a driver wiring error.
+mode `0x0004`; IRQ6 belongs to CCONT rather than the keypad.
 The same function first calls local key handlers `0x2979d8` and `0x2a27de`;
 `0x6e02` is an availability-gated resource mirror, not the sole input route.
 
@@ -27,30 +37,12 @@ and submission completes the transaction through `0x0578`. The callback returns
 therefore matches the firmware-derived value stored at RAM `0x112460`; keypad
 delivery and the synthetic EEPROM security-code encoding are both validated.
 
-A post-frontier Up press additionally reaches `0x2a1a80`, which reads logical
-status `0x0367` from the active UI-context record and publishes it through
-`0x2af798`. This closes `0x0367` as firmware-owned key/navigation output. A
-bounded 50 ms tap proves the physical lifecycle is already correct: IRQ0 fires
-once on press and once on release, the matrix scanner polls while held, and
-`0x2b4628` decodes exactly one key. Repeated later `0x0367` publications come
-from polling predicate `0x2a1a80`, selected by nested transition record `0x411`,
-not repeated matrix scans. Record `0x411` deliberately returns false after
-publishing the active context status, leaving selector `0x4b` unchanged. The
-replay is therefore firmware-owned polling, not MAD2 keypad debt. After an
-accepted `12345`, callback `0x47` returns `0x05e6` and disappears from the
-active callback sweep. A negative-control run containing only `12345` and one
-left-softkey submission reproduces the later `0x0384`, `0x05de`/`0x05e0`,
-`0x0598`, and `0x0578` activity. It is the transaction's ordinary
-post-acceptance tail, not the result of a second key.
-
-Status `0x00c8` is separate periodic traffic. Task 1 publishes packed `0x40c8`
-from `0x2a2838` with an incrementing argument at approximately one-second
-intervals. Its descriptor walk selects ordinary context-maintenance outputs
-`0x1b59`, direct `0x01f5`, and `0x1b5b`; none constructs a task-6 class-1
-window message. Repeating `0x05a7` is independently decoded as the three-slot
-timer manager at `0x2b3222`. Neither timer family is a stalled menu transaction
-or a missing hardware acknowledgement. The remaining startup question is no
-longer tied to a second softkey or descriptor `0x00c8`.
+A bounded 50 ms Up tap proves the physical lifecycle: IRQ0 fires on press and
+release, the matrix scanner polls while held, and `0x2b4628` decodes one key.
+Later `0x0367` polling, the accepted editor transaction and periodic `0x00c8`
+and `0x05a7` traffic are firmware-owned MMI lifecycle behavior, not repeated
+matrix scans or missing hardware acknowledgements. Their transition-level
+evidence belongs in `interactive_handoff.md`.
 
 ## Hardware path
 
@@ -122,3 +114,7 @@ PNG alone still does not prove an application desktop.
 scan/decode seam. `NOKI3210_TRACE_TASKS=1` provides generic
 mailbox-edge context. Both are read-only and must be disabled successfully in
 the final acceptance run.
+
+There is no focused component test for PCD8544 reset/command semantics or MAD2
+key-mask/debounce corner cases. The byte-exact frame and scripted editor run are
+end-to-end integration evidence, not substitutes for those tests.

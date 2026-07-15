@@ -423,10 +423,10 @@ def subsystem_runtime_available(manifests, subsystem):
 	return any(item["available"] and subsystem in item["subsystems"] for item in manifests)
 
 
-def contact_service_inventory(profile, calls, runtime):
+def external_service_inventory(profile, calls, runtime):
 	constructors = [call for call in calls if call["api"] == "contact_message_alloc"]
 	commands = []
-	for definition in profile.get("contact_service_commands", []):
+	for definition in profile.get("external_service_commands", []):
 		record = dict(definition)
 		command = number(record["command"])
 		record["command"] = command
@@ -765,7 +765,7 @@ def render_report(result):
 	if result["runtime_status_inventory"]:
 		lines += ["", "Target-chain statuses observed as task messages: " + ", ".join(
 			f"`{int(status):#06x}`={count}" for status, count in result["runtime_status_inventory"].items()) + "."]
-	contact = result["contact_service"]
+	contact = result["external_service"]
 	lines += ["", "## Contact-service command family", "",
 		f"The ROM scan recovered {contact['constructor_callsites_scanned']} calls to `contact_message_alloc_234634`. "
 		"The five target commands each have exactly one constructor; constructor existence is not treated as proof of an initiating producer.", ""]
@@ -779,10 +779,10 @@ def render_report(result):
 			f"- Runtime construct/send/receive occurrences: {runtime['contact_construct']['occurrences']} / {runtime['contact_send']['occurrences']} / {runtime['contact_receive']['occurrences']}",
 			f"- Evidence: {command['evidence']}", ""]
 	lines += ["## Contact-service transport boundary", "",
-		result["contact_service_boundary"]["statement"], "",
-		"The numeric command and scheduler event `0x74` are separate namespaces. The ROM contains direct MCU producers of scheduler event `0x74` at `0x213fcc` and `0x214836`; they do not construct contact-service command `0x74`.", ""]
+		result["external_service_boundary"]["statement"], "",
+		"The numeric command and scheduler event `0x74` are separate namespaces. The ROM contains direct MCU producers of scheduler event `0x74` at `0x213fcc` and `0x214836`; they do not construct external-service command `0x74`.", ""]
 	lines += ["", "## Phase-two decision", "",
-		"This bounded contact-service phase classifies the available MCU constructors and the observed transport behavior. A future full-ROM contract census can reuse the same distinction between an initiating request, a response/acknowledgement with the same id, and a scheduler event in another namespace.", ""]
+		"This bounded external-service phase classifies the available MCU constructors and the observed transport behavior. A future full-ROM contract census can reuse the same distinction between an initiating request, a response/acknowledgement with the same id, and a scheduler event in another namespace.", ""]
 	return "\n".join(lines)
 
 
@@ -834,7 +834,7 @@ def main():
 		print("message_census: required runtime subsystem(s) unavailable: " + ", ".join(missing_runtime),
 			file=sys.stderr)
 		return 2
-	contact_service = contact_service_inventory(profile, calls, runtime)
+	external_service = external_service_inventory(profile, calls, runtime)
 	catalogue_contract = profile.get("status_translation_table")
 	inventory_05e8 = status_inventory(instructions, calls, descriptors, data, base, 0x05e8,
 		catalogue_contract)
@@ -913,8 +913,8 @@ def main():
 		"dynamic_descriptor_assessments": profile.get("dynamic_descriptor_assessments", []),
 		"nodes": profile.get("nodes", [])
 	}
-	result["contact_service"] = contact_service
-	result["contact_service_boundary"] = profile["contact_service_boundary"]
+	result["external_service"] = external_service
+	result["external_service_boundary"] = profile["external_service_boundary"]
 	report = render_report(result)
 	if args.json:
 		args.json.parent.mkdir(parents=True, exist_ok=True)
@@ -926,15 +926,15 @@ def main():
 		print(report)
 	if args.check and (not all(edge["anchors_valid"] for edge in edges) or not callback_extent_valid or
 			not callback_transition_extent_valid or
-			not contact_service["all_constructor_anchors_valid"] or not lifecycle_05e0["coverage_complete"] or
+			not external_service["all_constructor_anchors_valid"] or not lifecycle_05e0["coverage_complete"] or
 			not dynamic_packed_events["coverage_complete"] or dynamic_packed_events["can_publish_05e0"]):
 		failed = [edge["id"] for edge in edges if not edge["anchors_valid"]]
 		if not callback_extent_valid:
 			failed.append("callback_table_extent")
 		if not callback_transition_extent_valid:
 			failed.append("callback_transition_table_extent")
-		if not contact_service["all_constructor_anchors_valid"]:
-			failed.append("contact_service_constructor_anchors")
+		if not external_service["all_constructor_anchors_valid"]:
+			failed.append("external_service_constructor_anchors")
 		if not lifecycle_05e0["coverage_complete"]:
 			failed.append("object_lifecycle_assessment_coverage")
 		if not dynamic_packed_events["coverage_complete"]:

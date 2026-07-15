@@ -138,8 +138,8 @@ constexpr offs_t FW_TASK5_STATUS_SEQUENCE = 0x110f28;
 constexpr offs_t FW_TASK7_QUEUE_BASE = 0x100e68;
 constexpr offs_t FW_STARTUP_SERVICE_BUFFER = 0x110c2c;
 constexpr offs_t FW_STARTUP_STATUS_WORD = 0x112448;
-// Service-ready / DSP-handshake chain (the CONTACT SERVICE root cause; see
-// docs/service_bootstrap.md). The startup service-ready byte (0x110c2c) is set =1 by
+// Service-ready / DSP-handshake chain; see docs/service_bootstrap.md. The
+// startup service-ready byte (0x110c2c) is set =1 by
 // the setter 0x291068 iff the DSP-shared pending counter (DSP RAM byte 0xe4) == 0; the
 // setter only runs when MAD2 IRQ line 4 (the DSP service-completion interrupt) fires.
 // The extended-task resume (incl. task 0x14, batch 2) also gates on the startup phase
@@ -188,15 +188,14 @@ constexpr offs_t FW_STARTUP_READY_SCHED_RECORD_A = 0x1126a0;
 constexpr offs_t FW_STARTUP_READY_SCHED_RECORD_B = 0x1126ac;
 constexpr offs_t FW_CCONT_STATE = 0x11ff6c;
 
-// Contact-service state reached during the startup watchdog path. The firmware
-// uses this block to accumulate test/status results before normal UI startup.
-constexpr offs_t FW_CONTACT_SERVICE_STATE = 0x11fecc;
-constexpr offs_t FW_CONTACT_SERVICE_STATUS = 0x11fed0;
-constexpr offs_t FW_CONTACT_SERVICE_RESULT = 0x11fed4;
-constexpr offs_t FW_CONTACT_SERVICE_COUNTER = 0x11fed6;
-constexpr offs_t FW_CONTACT_SERVICE_SUBSTATE = 0x11feda;
-constexpr offs_t FW_CONTACT_SERVICE_ACK = 0x11fedb;
-constexpr offs_t FW_CONTACT_SERVICE_REASON = 0x11ff50;
+// Service-session state reached during the startup watchdog path.
+constexpr offs_t FW_SERVICE_SESSION_STATE = 0x11fecc;
+constexpr offs_t FW_SERVICE_SESSION_STATUS = 0x11fed0;
+constexpr offs_t FW_SERVICE_SESSION_RESULT = 0x11fed4;
+constexpr offs_t FW_SERVICE_SESSION_COUNTER = 0x11fed6;
+constexpr offs_t FW_SERVICE_SESSION_SUBSTATE = 0x11feda;
+constexpr offs_t FW_SERVICE_SESSION_ACK = 0x11fedb;
+constexpr offs_t FW_SERVICE_SESSION_REASON = 0x11ff50;
 constexpr offs_t FW_RESOURCE_CHECK_STATUS_TABLE = 0x11fc60;
 constexpr offs_t FW_RESOURCE_CHECK_STATUS_INDEX = 0x11ff5a;
 
@@ -206,15 +205,15 @@ constexpr offs_t FW_SERVICE_CHANNEL_ENABLE_FLAGS = 0x11fee4;
 constexpr offs_t FW_SERVICE_CHANNEL_MASK_BASE = 0x11ff08;
 constexpr uint8_t FW_SERVICE_CHANNEL_READY_BOOT_BIT = 0x08;
 
-// Contact-service remote read (the deepest mapped layer; see docs/service_bootstrap.md).
-// The contact-service reads its command from PM logical address 0x5f00 via an async MBUS/PM
+// Service-session remote read (see docs/service_bootstrap.md). The firmware
+// reads its command from PM logical address 0x5f00 via an async MBUS/PM
 // request message. The request's dest node ([msg+1]) is sourced from the channel-enable flag
 // FW_SERVICE_CHANNEL_ENABLE_FLAGS (0x11fee4) — which is 0 on a blank phone, so the read is
 // dropped (no request sent). The response, when one arrives, is dispatched by command at
-// 0x236dc6; command 0x05 completes the contact-service healthily. Request frame format:
+// 0x236dc6; command 0x05 completes the service transaction. Request frame format:
 //   00 [node] 00 00 00 0a 00 01 [addr_hi] [addr_lo] [seq][seq] [ctr] [count] [data..]
-constexpr uint16_t PM_LOGICAL_CONTACT_COMMAND = 0x5f00;         // PM addr read for the command
-constexpr uint8_t  CONTACT_SVC_RESPONSE_CMD_HEALTHY = 0x05;     // response command that completes
+constexpr uint16_t PM_LOGICAL_SERVICE_COMMAND = 0x5f00;
+constexpr uint8_t  SERVICE_RESPONSE_CMD_HEALTHY = 0x05;
 
 // Checksums validated in the 3210 v6.00 firmware. Routine 0x264c56 reads
 // 0x0000..0x011f, sums 0x11e bytes, and compares the result with the 32-bit
@@ -223,7 +222,7 @@ constexpr uint8_t  CONTACT_SVC_RESPONSE_CMD_HEALTHY = 0x05;     // response comm
 // not firmware-validated contracts for this ROM. See docs/eeprom_analysis.md.
 constexpr uint16_t FW_EEPROM_TUNE_SECURITY_START  = 0x0000;
 constexpr uint16_t FW_EEPROM_TUNE_SECURITY_CKSUM  = 0x011c;
-constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_START   = 0x0120;  // contact-service config
+constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_START   = 0x0120;  // service-session config
 constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_CKSUM   = 0x0244;  // BE sum16(-corr) of [0x0120..0x0243]
 
 // Startup modes named from the traced boot progression.
@@ -503,10 +502,10 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //   2. DEVICE-BOUNDARY MODELS — opt-in behavior behind an ordinary hardware
 //      interface. MODEL_SIM_DEVICE owns SIMI/FIQ6. MODEL_CCONT_PRESENT selects
 //      the extracted CCONT device scenario. MODEL_DSP_SERVICE and
-//      MODEL_DSP_CONTACT_PEER model DSP-owned counters, ring consumption, and
-//      request-derived replies; their wider semantic contract remains incomplete.
+//      MODEL_EXTERNAL_SERVICE_PEER enables the aggregate DSP transport and
+//      external-service prototype; its wider contracts remain incomplete.
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
-//      TRACE_CSCMD (contact-service command stream), TRACE_HANDOFF (task-1 master
+//      TRACE_SERVICE_COMMAND (class-0x40 service command stream), TRACE_HANDOFF (task-1 master
 //      sequencer mode + startup checklist; the post-SIM interactive handoff),
 //      TRACE_TASKS (app-task liveness + inter-task message edges).
 //      TRACE_SIM_RX covers the register/FIQ/APDU path and SIM reply milestones;
@@ -1412,10 +1411,10 @@ void noki3310_state::noki3310(machine_config &config)
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
 	NOKIA_DSP_PEER(config, m_dsp_peer);
-	const bool dsp_contact = nokia_env_u32("NOKI3210_MODEL_DSP_CONTACT_PEER", 0) != 0;
-	const unsigned dsp_default_ms = dsp_contact ? 4 : 5;
+	const bool external_service_model = nokia_env_u32("NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 0) != 0;
+	const unsigned dsp_default_ms = external_service_model ? 4 : 5;
 	m_dsp_peer->set_service_enabled(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0);
-	m_dsp_peer->set_contact_enabled(dsp_contact);
+	m_dsp_peer->set_external_service_enabled(external_service_model);
 	m_dsp_peer->set_service_delay_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
 	m_dsp_peer->set_service_tick_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
 	m_dsp_peer->set_trace_enabled(nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0);

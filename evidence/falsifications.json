@@ -66,7 +66,7 @@
       "id": "task19_state6_is_missing_pack_characterization", "status": "disproven",
       "hypothesis": "The selector-4=0x14 detour reaches an unfinished normal task-19 pack-characterization state whose completion supplies report code 7",
       "conclusion": "Static correction shows low selector 4 is not intrinsically abnormal: below 39 selects init mode 4, and the independent consumer below 26 clears charge/fault state 0 and posts event 0x44. Mode 4 skips the 0x27d5fc source-7 guard, but its distinct completion state waits for event 0x43. A single statically derived fixture (selector 4=0x14, selector 1=0x180) selects mode 4 without poweroff but leaves the monitor uninitialized, checklist 0x0b, task 1 in mode 0x000d, and code 7 absent. Backward census proves the sole event-0x43 poster is selected by payload 3 of incoming class-`0x40` service command 0x8e; the handler's sole MCU 0x8e construction is its acknowledgement. This is a dormant external service/test request, not an ordinary battery completion, so neither event 0x43 nor mode 4 is a valid normal-boot escape.",
-      "evidence": ["docs/battery_classifier_analysis.md", "docs/contact_service_topology.md"]
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/external_service_topology.md"]
     },
     {
       "id": "task5_1400_ordinary_code7_route", "status": "disproven",
@@ -174,7 +174,7 @@
       "id": "contact_selftest_verdict_is_missing_code7_boundary", "status": "disproven",
       "hypothesis": "The contact/DSP self-test verdict remains incomplete and suppresses the ordinary code-7 publication",
       "conclusion": "Firmware organically constructs contact flags 0xc8. The modeled request-derived RX class-0x74 payload 0d00 reaches 0x2349c8 and clears pending bit 2, after which task 5 consumes ready bit 7 at 0x29bc8c and leaves steady flags 0x49. The self-test completion and ready-bit lifecycle therefore complete normally; the associated immediate event 0x1a is a kernel completion, not a task-1 report.",
-      "evidence": ["docs/contact_service_topology.md", "docs/interactive_handoff.md"]
+      "evidence": ["docs/external_service_topology.md", "docs/interactive_handoff.md"]
     },
     {
       "id": "forced_registration_messages", "status": "disproven",
@@ -192,13 +192,13 @@
       "id": "contact_command_74_is_event74", "status": "disproven",
       "hypothesis": "Scheduler event 0x74 producers also produce class-`0x40` service command 0x74",
       "conclusion": "They are separate namespaces and transports; the command is an external request with an MCU acknowledgement",
-      "evidence": ["docs/contact_service_topology.md"]
+      "evidence": ["docs/external_service_topology.md"]
     },
     {
       "id": "contact_064_storm_is_watchdog", "status": "disproven",
       "hypothesis": "The deep-profile command-0x64 storm is repeated watchdog result 2 or repeated consumption of the injected response allocation",
       "conclusion": "The injected result-5 allocation is consumed and freed once. Firmware-generated status frames then pass through task 7 with route selector 1 and return as fresh task-2 allocations, repeatedly re-entering 0x236dc4 with result 5. The anomaly is caused by the provisional responder's incomplete transport session, not the watchdog",
-      "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
+      "evidence": ["docs/external_service_topology.md", "docs/service_bootstrap.md"]
     },
     {
       "id": "rom4_report7_is_generic_dsp_startup_completion", "status": "disproven",
@@ -228,12 +228,12 @@
       "id": "mode0d_state0_ordering_unlocks_code7_handoff", "status": "disproven",
       "hypothesis": "Completing the application-readiness checklist before the first battery classification selects the accepted mode-0d branch and removes the code-7 boot wall",
       "conclusion": "The full checklist is delayed as one firmware task group behind the modeled external-service peer's service-empty 0x622a acknowledgement. Task 18 is merely the last task in the fixed resume order and posts code 0x12 immediately from its initializer. Although shortening the peer's calibrated delay could make 0x2a6942 observe accepted state 0 instead of state 1, the alternate tail at 0x270eee has its own mailbox receive and explicit code-7 comparison before shared interactive initialization. The coherently observed state-1 tail at 0x270fa4 waits for the same report. Timing therefore changes the selected wait but does not supply its prerequisite; no timing constant was changed.",
-      "evidence": ["docs/contact_service_topology.md", "docs/interactive_handoff.md", "docs/service_bootstrap.md"]
+      "evidence": ["docs/external_service_topology.md", "docs/interactive_handoff.md", "docs/service_bootstrap.md"]
     },
     {
       "id": "single_timer_dspif_doorbell_replaces_shared_triggers", "status": "disproven",
-      "hypothesis": "The current single-timer DSP peer can schedule all modeled contact-ring and shared-control completions solely from retained DSPIF command-4 doorbells",
-      "conclusion": "The peer was split into independent contact-ring and shared-service timers and reproduced the coherent frontier. Repeating the doorbell-only conversion still left task 1 in mode 0x000d with service-session status 0x0089 and SIM disabled: command 4 does not accompany every contact-ring producer commit. Restoring the independently validated ring-producer and service-pending scheduling edges reproduces the full frontier. DSPIF command 4 is a real observed control boundary, but it is not a universal replacement for both protocol triggers.",
+      "hypothesis": "The current single-timer DSP peer can schedule all modeled service-transport ring and shared-control completions solely from retained DSPIF command-4 doorbells",
+      "conclusion": "Independent service-transport ring and shared-service timers reproduce the coherent profile. A doorbell-only run leaves task 1 in mode 0x000d with service-session status 0x0089 and SIM disabled because command 4 does not accompany every ring commit. The observed ring-producer and service-pending scheduling edges remain required; DSPIF command 4 is real but is not a universal trigger for both protocols.",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/mad2_fidelity.md"]
     },
     {

@@ -1,8 +1,8 @@
 # Service-startup contract
 
-This document describes the current Nokia 3210 v6.00 prerequisites for leaving
-CONTACT SERVICE. Command direction and session ordering are authoritative in
-`contact_service_topology.md`; branch addresses are collected in
+This document describes the Nokia 3210 v6.00 service-session startup
+prerequisites. Command direction and session ordering are authoritative in
+`external_service_topology.md`; branch addresses are collected in
 `service_firmware_map.md`.
 
 ## Current status

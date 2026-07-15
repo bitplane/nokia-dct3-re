@@ -18,7 +18,7 @@ Documentation is organized by authority rather than investigation date.
 | `rtos_tasks.md` | Authoritative ROM-specific task identities, neutral aliases, and naming cautions. |
 | `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
 
-## Current boot boundary
+## Active UI boundary
 
 | Document | Purpose |
 | --- | --- |
@@ -26,9 +26,9 @@ Documentation is organized by authority rather than investigation date.
 | `interactive_handoff.md` | Task-1, security-editor, conditional power lifecycle, and current MMI settlement boundary. |
 | `mmi_layer.md` | Keypad IRQ, mailbox, matrix-scan and decoded-key acceptance path. |
 | `resource_providers.md` | Resource-provider ownership and excluded conditional startup paths. |
-| `contact_service_topology.md` | Class-`0x40` service-command producers, acknowledgements, and lower-service boundary. |
-| `service_bootstrap.md` | Current contact-startup prerequisites and acceptance contract. |
-| `service_firmware_map.md` | Concise lower-service/contact firmware address map. |
+| `external_service_topology.md` | Class-`0x40` service-command producers, acknowledgements, and external-service boundary. |
+| `service_bootstrap.md` | Service-session startup prerequisites and acceptance contract. |
+| `service_firmware_map.md` | Concise lower-service and service-session firmware address map. |
 | `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |
 
 ## Mapped downstream work

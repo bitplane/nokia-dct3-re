@@ -7,8 +7,8 @@ not in the Ghidra symbol DB) to meanings. Re-add a trace using these if needed.
 ## Class-`0x40` service-command codes (`response` byte)
 
 Map from the historically named service response dispatcher
-(`contact_service_response_dispatch_237400`). The current contract is documented
-in `contact_service_topology.md`.
+(`external_service_response_dispatch_237400`). The current contract is documented
+in `external_service_topology.md`.
 
 | code | meaning |
 |------|---------|

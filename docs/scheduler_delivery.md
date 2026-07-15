@@ -90,4 +90,4 @@ must use a real branch target, an MMIO/RAM watch, or static control-flow proof.
 
 Current task-1/report-7 and keypad behavior is documented in
 `interactive_handoff.md`; current contact ownership is documented in
-`contact_service_topology.md`.
+`external_service_topology.md`.

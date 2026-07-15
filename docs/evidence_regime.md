@@ -23,7 +23,7 @@ Runtime observations are scoped by manifests under `tools/run_manifests/`:
 
 - `default`: canonical CONTACT SERVICE oracle;
 - `deep-gsm`: coherent generic-service/GSM frontier trace;
-- `contact-service`: class-`0x40` constructor/send/receive traces; and
+- `external-service`: class-`0x40` constructor/send/receive traces; and
 - `3330-smoke`: bounded second-ROM portability run.
 
 Each runtime regex declares a subsystem. A manifest can only contribute to the

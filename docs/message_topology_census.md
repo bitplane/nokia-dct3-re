@@ -16,8 +16,8 @@ Service-5 candidacy among unresolved descriptors: `dynamic_service_unresolved`=7
 
 ## Runtime manifests
 
-- `contact-service` (available): Default and bounded deep class-`0x40` service command-direction traces [subsystems: contact_service]
-- `deep-gsm` (available): Current coherent 3210 contact-peer, SIM and lower-service frontier trace [subsystems: generic_service]
+- `external-service` (available): Default and bounded deep class-`0x40` service command-direction traces [subsystems: external_service]
+- `deep-gsm` (available): Current coherent 3210 external-service, SIM and lower-service trace [subsystems: generic_service]
 
 ## Dynamic descriptor assessment
 
@@ -288,7 +288,7 @@ Target-chain statuses observed as task messages: `0x05e8`=0, `0x05ea`=0, `0x07dd
 
 ## Class-`0x40` service command family
 
-The ROM scan recovered 98 calls to `contact_message_alloc_234634`. The five target commands each have exactly one constructor; constructor existence is not treated as proof of an initiating producer.
+The ROM scan recovered 98 calls to `service_message_alloc_234634`. The five target commands each have exactly one constructor; constructor existence is not treated as proof of an initiating producer.
 
 ### Command `0x64`: completion_or_timeout_status
 
@@ -336,7 +336,7 @@ The ROM scan recovered 98 calls to `contact_message_alloc_234634`. The five targ
 - MCU constructor(s): `0x2358a0`/len `1` (acknowledgement echoing the selector byte after the incoming command dispatches one of five service actions)
 - Initiating-producer classification: **external service/test peer request; MCU acknowledgement** (high static, dormant runtime)
 - Runtime construct/send/receive occurrences: 0 / 0 / 0
-- Evidence: The task-2 dispatcher selects 0x235848 only for incoming command 0x8e. Payload selector 3 calls 0x2a6880 to post task-19 event 0x43 and sets the associated state through 0x2a67d0; selector 4 analogously posts event 0x44. The sole 0x8e constructor at 0x2358a0 is dominated by this incoming handler and echoes the selector in its one-byte acknowledgement. No supplied coherent contact manifest observes the command.
+- Evidence: The task-2 dispatcher selects 0x235848 only for incoming command 0x8e. Payload selector 3 calls 0x2a6880 to post task-19 event 0x43 and sets the associated state through 0x2a67d0; selector 4 analogously posts event 0x44. The sole 0x8e constructor at 0x2358a0 is dominated by this incoming handler and echoes the selector in its one-byte acknowledgement. No supplied coherent external-service manifest observes the command.
 
 ## External-service transport boundary
 

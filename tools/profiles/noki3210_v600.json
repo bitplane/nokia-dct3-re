@@ -77,9 +77,9 @@
     {"address": "0x2632fc", "name": "service_register_transient", "kind": "descriptor_registration", "arguments": {"service": "r0", "callback": "r1", "descriptor": "r2"}, "descriptor_argument": "descriptor"},
     {"address": "0x263d30", "name": "service_register_resident", "kind": "descriptor_registration", "arguments": {"descriptor": "r0", "enable": "r1", "mask": "r2"}, "descriptor_argument": "descriptor"},
     {"address": "0x2b13d4", "name": "service_channel_report", "kind": "service_transport", "arguments": {"report": "r0"}},
-    {"address": "0x234634", "name": "contact_message_alloc", "kind": "contact_service_construct", "arguments": {"output": "r0", "command": "r1", "payload_length": "r2"}},
-    {"address": "0x234684", "name": "contact_message_send", "kind": "contact_service_transport", "arguments": {"message": "r0"}},
-    {"address": "0x2b0482", "name": "service_transport_queue", "kind": "contact_service_transport", "arguments": {"message": "r0"}}
+    {"address": "0x234634", "name": "service_message_alloc", "kind": "external_service_construct", "arguments": {"output": "r0", "command": "r1", "payload_length": "r2"}},
+    {"address": "0x234684", "name": "service_message_send", "kind": "external_service_transport", "arguments": {"message": "r0"}},
+    {"address": "0x2b0482", "name": "service_transport_queue", "kind": "external_service_transport", "arguments": {"message": "r0"}}
   ],
   "consumers": [
     {"address": "0x2618e8", "name": "service5_callback", "task": 5, "statuses": ["0x05e2", "0x05e8"], "provenance": "reviewed_static"},
@@ -89,7 +89,7 @@
     {"address": "0x21b790", "name": "task10_controller_update_dispatch", "task": 10, "statuses": ["0x1392", "0x1396"], "provenance": "reviewed_static"},
     {"address": "0x21b9b4", "name": "task10_completion_dispatch", "task": 10, "statuses": ["0x1391"], "provenance": "reviewed_static"}
   ],
-  "contact_service_commands": [
+  "external_service_commands": [
     {
       "command": "0x64", "name": "completion_or_timeout_status", "consumer": "0x236dc4",
       "expected_constructor": {"callsite": "0x236dd8", "payload_length": 9},
@@ -139,7 +139,7 @@
 	  "evidence": "The task-2 dispatcher selects 0x235848 only for incoming command 0x8e. Payload selector 3 calls 0x2a6880 to post task-19 event 0x43 and sets the associated state through 0x2a67d0; selector 4 analogously posts event 0x44. The sole 0x8e constructor at 0x2358a0 is dominated by this incoming handler and echoes the selector in its one-byte acknowledgement. No supplied coherent contact manifest observes the command."
     }
   ],
-  "contact_service_boundary": {
+  "external_service_boundary": {
     "statement": "The strongest evidenced boundary is the external service/test peer behind task 7's lower service transport. Task 2 builds class-0x40 frames at 0x234634; 0x234684 offers them to channel 0x6400 via 0x2b203e and queues them through 0x2b0482; 0x2b0482 routes ordinary frames to task 7. The frame header is [0]=destination, [1]=source: after service discovery, MCU output is destination 0x02/source 0x00 (phone). The ROM census finds organic MCU output for 0x64 and 0x65, while 0x70, 0x71, 0x74, and 0x8e are external requests whose sole MCU constructors are acknowledgements. Task 7 is the on-device transport adapter, not the semantic producer of those requests."
   },
   "semantic_edges": [
@@ -606,8 +606,8 @@
     {"kind": "message", "subsystem": "generic_service", "regex": "msgedge: t(?P<source>\\d+) -> t(?P<destination>\\d+) \\(first status=(?P<status>[0-9a-fA-F]{4})"},
     {"kind": "message", "subsystem": "generic_service", "regex": "sim_owner_post: t(?P<source>\\d+) -> t(?P<destination>\\d+) status=(?P<status>[0-9a-fA-F]{4})"},
     {"kind": "callback", "subsystem": "generic_service", "regex": "gsm_lower: service5 callback status=(?P<status>[0-9a-fA-F]{4}).*caller=(?P<caller>[0-9a-fA-F]{8})"},
-    {"kind": "contact_construct", "subsystem": "contact_service", "regex": "csconstruct: command=(?P<command>[0-9a-fA-F]{2}) payload=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
-    {"kind": "contact_send", "subsystem": "contact_service", "regex": "cssend: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
-    {"kind": "contact_receive", "subsystem": "contact_service", "regex": "cscmd: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*payload0=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"}
+    {"kind": "contact_construct", "subsystem": "external_service", "regex": "csconstruct: command=(?P<command>[0-9a-fA-F]{2}) payload=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
+    {"kind": "contact_send", "subsystem": "external_service", "regex": "cssend: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"},
+    {"kind": "contact_receive", "subsystem": "external_service", "regex": "cscmd: command=(?P<command>[0-9a-fA-F]{2}) class=(?P<class>[0-9a-fA-F]{2}) destination=(?P<destination_node>[0-9a-fA-F]{2}) source=(?P<source_node>[0-9a-fA-F]{2}).*payload0=(?P<payload>[0-9a-fA-F]{2}).*caller=(?P<caller>[0-9a-fA-F]{8}) task=(?P<task>[0-9a-fA-F]{2})"}
   ]
 }

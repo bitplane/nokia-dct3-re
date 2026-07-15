@@ -6,20 +6,14 @@ that the driver is ready for upstream submission.
 
 ## Normalized acceptance profiles
 
-- `make verify` protects the default CONTACT SERVICE frame and structural
+- `make verify` protects the default fault-screen frame and structural
   summary.
 - `make verify-frontier` protects the request-driven external-service peer plus ordinary
-  SIMI/FIQ6 card path. It ends in task-1 mode `0x0004`, flags `0x0f`, contact
+  SIMI/FIQ6 card path. It ends in task-1 mode `0x0004`, flags `0x0f`, service-session
   status `0x49`, no-SIM clear, and SIM enable set.
-- `run-manifest-contact` records the class-`0x40` service command directions.
+- `run-manifest-service` records the class-`0x40` service command directions.
 - `run-manifest-deep-gsm` records the coherent generic-service/SIM frontier.
 - `smoke-3330e` is the first cross-ROM portability probe.
-
-The historical responder/drain and startup-report bridge profile has been
-retired. Its direct message trampoline, service-state RAM completion, synthetic
-report sequence, Make targets, and structural oracle are no longer supported.
-The undocumented contact-ready write filter and pre-device `SIM_PROFILE`
-register harness are also removed.
 
 ## Current frontier
 
@@ -36,16 +30,10 @@ IRQ0 -> ISR 0x2b3084 -> task-1 event 0x41
      -> key decode 0x2b4628 -> resource 0x6e02
 ```
 
-The mode-4 dispatcher retains a report-code-`0x07` continuation, but it is a
-later power/shutdown listener rather than a boot prerequisite. A physical power
-key produces code 7 organically and enters mode `0x000c`; ordinary keypad and
-security-editor interaction already runs in mode 4. A deterministic `12345`
-plus one softkey submission completes the editor through `0x0578` and returns
-accepted result `0x05e6`. The later callback/event wave needs no second key.
-Periodic `0x00c8` and `0x05a7` traffic is independently classified and does not
-select an idle window. Callback `0x5d`, callback `0x01`/`0x0367`, callback
-`0x10`/`0x05e7`, and task-6 selector `0x0732` are closed conditional lifecycles,
-not missing ordinary-boot transitions.
+Mode 4 already runs keypad and security-editor interaction. Report code 7,
+callbacks `0x5d`, `0x01`, and `0x10`, and task-6 selector `0x0732` belong to
+conditional navigation, reinitialization, or shutdown lifecycles. The open
+question is the ordinary unattended idle-window selection.
 
 ## Evidence coverage
 
@@ -66,12 +54,12 @@ not missing ordinary-boot transitions.
 
 | Area | Current role | Remaining work |
 | --- | --- | --- |
-| SIM | `nokia_sim_card_device` owns stateful SIMI/FIQ6 transport and requested GSM 11.11 files. | Extend only for organically requested commands; validate FIFO flags. |
-| CCONT | `nokia_ccont_device` owns serial registers, raw ADC selectors, RTC, watchdog, power and IRQ output; v6.00/v5.01 share the transaction and IRQ contract. | Obtain board-level selector names, analog units, conversion timing and watchdog clock from hardware evidence. |
-| EEPROM | Native MAME `I2C_24C128` plus generated profile. | Decode remaining security/product fields and parallel alias behavior. |
-| DSP/external-service | `nokia_dsp_peer_device` owns shared RAM, ring state, service timing, and the request-driven external-service peer. | Stabilize and extend the wider mailbox contract from observed requests; validate it on a sibling ROM family. |
+| SIM | The combined `nokia_sim_card_device` prototypes MAD2 SIMI/FIQ6 controller behavior, T=0 card behavior, and synthetic GSM 11.11 provisioning. | Stabilize timing/error contracts, then separate the MAD2 controller from removable-card protocol/content; extend files only for organic requests. |
+| CCONT | `nokia_ccont_device` owns selected-device register behavior and output signals; MAD2 owns GENSIO status, while the phone supplies raw ADC scenarios and the provisional watchdog clock. v6.00/v5.01 share the observed register and IRQ contract. | Obtain board-level selector names, analog units, conversion timing, RTC encoding and watchdog clock from hardware evidence. |
+| EEPROM | Native MAME `I2C_24C128` on mapped GenIO pins plus a v6.00-oriented generated provisioning fixture; the parallel window is unproved. | Decode remaining fields, validate writes/timing and another product's storage placement, and make fallback-record extraction ROM-aware. |
+| DSP/external-service | `nokia_dsp_peer_device` currently aggregates shared RAM/DSPIF, DSP-owned ring and interrupt behavior, boot-subset DSP HLE, and a semantically separate request-driven service/test peer. | Add focused transport tests, validate another ROM family, then separate transport, DSP HLE and external peer without changing firmware-visible composition. |
 | MAD2 | Phone-owned timers, interrupt aggregation, GENSIO, SIMI window and DSP control registers. | Improve reset/decode fidelity before extracting shared blocks. |
-| Display | Native PCD8544 plus firmware-selected display-type read shortcut. | Recover the real product-data source and remove the shortcut. |
+| Display/input | Native PCD8544 and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures, while display type still comes from a RAM-read shortcut. | Add focused reset/command and mask/debounce tests, recover the real display-type source, then remove the shortcut. |
 
 The headless LCD mirror and delayed-key fixture are acceptance tooling in
 `mame_noki3210_input_exerciser.lua`. They do not add device state or firmware
@@ -82,6 +70,23 @@ It is not presented as hardware behavior; a leave-one-out run confirms that it
 still controls later LCD presentation even though the scheduler/SIM frontier
 otherwise survives.
 
+## Runtime-control ledger
+
+Every live `NOKI3210_*` control belongs to one of these classes:
+
+| Class | Controls | Status |
+| --- | --- | --- |
+| Hardware/product shortcut | `DISPLAY_TYPE` | Quarantined firmware RAM-read override; recover the product-data source. |
+| Hardware scenarios | `ADC_PROFILE`, `ADC0..7`, `SIM_ATR_HEX`, `SIM_CPHS_AOC` | Deterministic analog/card inputs, not inferred physical defaults. |
+| Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | Retain while visible as calibration debt; replace with recovered clocks/transactions. |
+| Safety/acceptance guard | `DISABLE_CCONT_WATCHDOG` | Prevents an incompletely timed watchdog from hiding the investigated state; not hardware fidelity. |
+| Device-boundary prototypes | `MODEL_CCONT_PRESENT`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE` | Supported deep profile only; organic interfaces, incomplete contracts. |
+| Read-only diagnostics | `TRACE_HANDOFF`, `TRACE_DISPLAY`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER` | Log-only and bounded or scoped to a named investigation. |
+| Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS` | Frame capture, summaries, and deterministic input fixtures outside the emulated hardware contract. |
+
+There are no retained firmware-result, callback-key, task-message, or direct
+registration-state forcing controls.
+
 ## Instrumentation debt
 
 The retained trace switches are scoped as follows:
@@ -91,25 +96,23 @@ The retained trace switches are scoped as follows:
 | `TRACE_HANDOFF` | task-1 modes/posts plus IRQ0 and keypad scan/decode seams |
 | `TRACE_DISPLAY` | active MMI context, resource/render entry points, and LCD/DSP transfer boundaries |
 | `TRACE_TASKS` | generic task liveness and mailbox edges |
-| `TRACE_CSCMD` | class-`0x40` service command direction and state |
+| `TRACE_SERVICE_COMMAND` | class-`0x40` service command direction and state |
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
 | `TRACE_GSM_SERVICE` | manifest-backed generic-service registrations/callbacks |
 | `TRACE_DSP_BOUNDARY` | shared-ring requests and request-derived peer responses |
 | `TRACE_GENSIO` | serial register transactions |
 | `TRACE_MAD2_LEDGER` | first-access MAD2 register census |
 
-The 60-block `TRACE_GSM_LOWER`, `TRACE_MMIVM`, and `TRACE_TASK5_REG` research
-weaves have been removed. Their durable conclusions remain in subsystem docs
-and evidence ledgers. Firmware-address-specific implementations of the retained
-traces live in `driver/nokia_3310_trace.inc`; ordinary MAD2 register taps remain
-beside their hardware handlers.
+Firmware-address-specific implementations of retained traces live in
+`driver/nokia_3310_trace.inc`; ordinary MAD2 register taps remain beside their
+hardware handlers.
 
 ## Topology gaps
 
 - Most mechanically recovered ROM edges are not yet promoted to reviewed
   semantic identities.
 - Dynamic generic-service descriptors are mapped far enough to exclude the
-  previously suspected registration paths, but the wider steady-state service
+  excluded registration paths, but the wider steady-state service
   topology remains incomplete.
 - The DSP/external-service peer contract is proved only for the requests exercised by
   the current boot.

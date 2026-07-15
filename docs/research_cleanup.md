@@ -46,7 +46,7 @@ Avoid subsystem ownership or lifecycle semantics until independently proved:
 - `display_window_task`
 - `radio_init`
 - `battery_ready`
-- `contact_service_server`
+- `fault_screen_server`
 - `normal_boot_completion`
 
 Names should mature with the evidence:

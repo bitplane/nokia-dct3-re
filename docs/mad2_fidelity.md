@@ -14,6 +14,12 @@ Confidence labels:
 - **Placeholder:** a constant, shortcut or incomplete peer used to keep the
   firmware running.
 
+The implementation is not one uniform MAD2 model. Timer 0, interrupt
+aggregation, keypad, GenIO/GENSIO and SIMI have derived contracts of differing
+depth; timer 1, FIQ8, reset/clock fields, audio outputs and several SELECT/UIF
+banks remain calibrated counters or backing latches. The address-map coverage
+therefore must not be read as peripheral completeness.
+
 ## Address-space boundary
 
 | Boundary | Implementation | Fidelity | Evidence / missing proof |
@@ -22,7 +28,7 @@ Confidence labels:
 | Internal boot ROM | mapped at low address | Placeholder | Execution is redirected to flash entry; the real reset/boot-ROM sequence is bypassed. |
 | Main RAM | 512 KiB backing store | Inferred | Firmware layout works; physical decode and model-specific sizes need cross-ROM proof. |
 | DSP shared RAM | 4 KiB backing store plus special reads | Placeholder | Several ready/status offsets are synthesized; no DSP core executes. |
-| DSPIF `0x30000` | four-byte peer-device register; command-4 doorbell observed | Partial | Coherent boot emits 26 command-4 strobes after initialization. Contact-ring and shared-service timers are split, but command 4 does not accompany every ring commit and cannot replace both observed work triggers. |
+| DSPIF `0x30000` | four-byte peer-device register; command-4 doorbell observed | Partial | Coherent boot emits 26 command-4 strobes after initialization. Service-transport ring and shared-service timers are split, but command 4 does not accompany every ring commit and cannot replace both observed work triggers. |
 | MCUIF `0x40000` | retained four-byte configuration register | Mapped latch | Boot writes `6a 0f 61 20` once and never reads it in the coherent run. Decode fields before applying window side effects. |
 | ROM2 window | modulo mirror of flash | Inferred | Matches current reads; decode/mirroring needs boot-ROM or second-ROM confirmation. |
 | EEPROM parallel window | read-only alias of input region | Placeholder | Serial 24C128 is faithful at GenIO; relationship of the parallel window to EEPROM hardware is unproven. |
@@ -80,12 +86,15 @@ Extraction is justified when each block has:
 4. a 3210 oracle plus at least one second-ROM execution trace; and
 5. a focused regression for timers, interrupt masking and serial selection.
 
+Those focused regressions do not yet exist. Current confidence comes from the
+coherent integration oracle, the bounded access census and selected v5.01
+alignment; this is sufficient to retain the block behavior, but not to promote
+the phone-owned switch statement into a reusable MAD2 device.
+
 Until the second ROM is normalized, `NOKI3210_TRACE_MAD2_LEDGER=1` provides the
 curated 3210 evidence pass: at most one read and one write record per MAD2 byte
 offset per reset, including value, previous value for writes, PC, time and the
-register description. It intentionally excludes RAM and firmware hooks. The
-old `TRACE_MMIO` documentation predates the instrumentation cleanup and is not
-currently implemented.
+register description. It intentionally excludes RAM and firmware hooks.
 
 Validation run (3210 v6.00 coherent profile, eight emulated seconds,
 2026-07-15): 104 bounded records were emitted, comprising 44 first reads and 60
@@ -93,8 +102,8 @@ first writes across IO, DSPIF and MCUIF. `tools/mad2_access_census.py` checks th
 contract and produces JSON plus Markdown through `make mad2-census
 MAD2_LOG=...`. The trace captures reset/UIF setup from `0x200068`, GENSIO/LCD
 initialization, CCONT selection, timer-0 setup, MBUS status, interrupt activity,
-watchdog service and the complete boot SIMI setup. The formerly unknown offset
-`0x31` is now classified as CTRL-I/O signal register 1.
+watchdog service and the complete boot SIMI setup. Offset `0x31` is classified
+as CTRL-I/O signal register 1.
 
 The `0x31` literal census is exhaustive: six loads, all followed by byte
 read-modify-write operations on bit 1. Five are in the power subsystem's
@@ -116,9 +125,9 @@ than being promoted into the device contract.
 The widened ledger observes one MCUIF dword write (`6a 0f 61 20`) from boot and
 no MCUIF reads. DSPIF receives its initial zero halfword and then 26 command-4
 writes from `0x29103c` and `0x290778`. `nokia_dsp_peer_device` now owns the
-register. Contact-ring parsing and delayed shared-service completion now use
+register. Service-transport ring parsing and delayed shared-service completion now use
 independent timers. Repeating the command-4-only experiment after that split
-still did not preserve the frontier: not every contact-ring producer commit is
+still did not preserve the frontier: not every service-transport producer commit is
 paired with command 4. The established ring-producer and service-pending
 triggers therefore remain.
 

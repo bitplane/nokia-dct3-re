@@ -27,7 +27,7 @@ PRESERVE_NVRAM ?= 0
 PROVISIONED_IMEI_PREFIX ?=
 EEPROM_BASENAME ?= $(if $(filter 501,$(BIOS)),3210 v501 eeprom.bin,3210 v600 eeprom.bin)
 CENSUS_LOG ?=
-CENSUS_MANIFESTS ?= tools/run_manifests/contact-service.json tools/run_manifests/deep-gsm.json
+CENSUS_MANIFESTS ?= tools/run_manifests/external-service.json tools/run_manifests/deep-gsm.json
 FRONTIER_EVENT_INVENTORIES := \
 	--inventory-status 0x0732 --inventory-status 0x03ab \
 	--inventory-status 0x12b4 --inventory-status 0x32b4 --inventory-status 0x72b4 \
@@ -45,23 +45,19 @@ ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 ORACLE_V501_STRUCT ?= oracles/noki3210-v501-smoke.struct
 
-# Current forcing-free research frontier. The request-driven contact peer
-# subsumes DSP D0 discovery and TX-ring consumption, while the SIM model stays
-# behind the ordinary SIMI/FIQ6 boundary.
+# Current forcing-free research profile. The aggregate DSP transport prototype
+# carries D0 discovery and the semantically separate external-service session;
+# the SIM model stays behind the ordinary SIMI/FIQ6 boundary.
 FRONTIER_ENV := \
 	NOKI3210_MODEL_DSP_SERVICE=1 \
 	NOKI3210_MODEL_CCONT_PRESENT=1 \
-	NOKI3210_MODEL_DSP_CONTACT_PEER=1 \
+	NOKI3210_MODEL_EXTERNAL_SERVICE_PEER=1 \
 	NOKI3210_MODEL_SIM_DEVICE=1
 
-# Canonical "boot-progress" run profile — the minimal knob set that reproduces the
+# Canonical default run profile — the minimal knob set that reproduces the
 # CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/ADC/
 # EEPROM) and the CCONT watchdog guard. Every NOKI3210_* var the driver reads is an
-# env knob; override
-# any on the command line — e.g. add MODEL_DSP_SERVICE/MODEL_CCONT_PRESENT or
-# any TRACE_* for diagnostics.
-# Trimmed 2026-07 (leave-one-out audit): removed 6 baked-in TRACE_* and the forcing
-# shims proven inert against both the oracle and the deep boot. See docs/driver_vision.md.
+# env knob; override any on the command line with its complete NOKI3210_* name.
 BOOT_ENV := \
 	NOKI3210_DISPLAY_TYPE=4 \
 	NOKI3210_ADC_PROFILE=sane \
@@ -76,7 +72,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -92,7 +88,7 @@ help:
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make run            run the selected phone/profile into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
-	@echo "make run-frontier   run the current coherent contact/SIM research profile"
+	@echo "make run-frontier   run the current external-service/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier predicates"
 	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
 	@echo "make mad2-census MAD2_LOG=... summarize a bounded MAD2 ledger trace"
@@ -185,7 +181,7 @@ census-docs:
 	$(VENV)/bin/python tools/message_census.py --check \
 		$(FRONTIER_EVENT_INVENTORIES) \
 		$(foreach manifest,$(CENSUS_MANIFESTS),--runtime-manifest $(manifest)) \
-		--require-runtime-subsystem contact_service \
+		--require-runtime-subsystem external_service \
 		--require-runtime-subsystem generic_service \
 		--json run_census/noki3210_v600.json \
 		--report docs/message_topology_census.md
@@ -206,13 +202,13 @@ run-manifest-deep-gsm:
 		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 NOKI3210_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log run_manifest_deep_gsm/error.log
 
-run-manifest-contact:
-	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_contact_default SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_CSCMD=1'
-	cp $(MAME_DIR)/error.log run_manifest_contact_default/error.log
-	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_contact_deep SECONDS=6 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_CSCMD=1'
-	cp $(MAME_DIR)/error.log run_manifest_contact_deep/error.log
+run-manifest-service:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_service_default SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_SERVICE_COMMAND=1'
+	cp $(MAME_DIR)/error.log run_manifest_service_default/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_service_deep SECONDS=6 \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_SERVICE_COMMAND=1'
+	cp $(MAME_DIR)/error.log run_manifest_service_deep/error.log
 
 run-manifest-3330:
 	@$(MAKE) --no-print-directory smoke-3330e RUN_DIR=run_manifest_3330 SECONDS=3

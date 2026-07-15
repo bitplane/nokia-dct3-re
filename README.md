@@ -37,41 +37,19 @@ mode 4 records a later continuation rather than blocking the UI. Correct MAD2
 IRQ0 keypad wiring reaches the firmware matrix scan and decoded key resources,
 and the Security-code editor accepts a physical `12345` sequence.
 
-Report code 7 is now observed organically after a physical power-key action and
-leads to the mode-`0x000c` shutdown sequence; it is not the boot blocker. The
-missing-producer premise for global status `0x0367` is now falsified. A physical
-Up-key cycle reaches firmware function `0x2a1a80`, reads `0x0367` from the active
-UI-context record, and publishes it through the task-5 event machinery.
-Descriptor selector `0x75` maps it to editor/navigation events. Fixed callback
-`0x01` is already visited organically by the startup callback sweep and has no
-transition descriptors; its `0x0367 -> 0x03e9` case is a conditional navigation
-action, not a missing registration or the ordinary UI-start entrance. Callback
-`0x10`/`0x05e7` is likewise conditional reinitialization. Exhaustive execution
-proves the remaining task-6 selector leaf `0x28c248` belongs only to status
-`0x0732`, itself produced organically by the physical-power/shutdown lifecycle.
-Longer traces now classify both apparent settlement symptoms. Shutdown begins
-before task 5's next receive, so its queued `0x0732` is expected ordering; and
-extended transition record `0x411` deliberately polls `0x2a1a80`, whose false
-return republishes the active context. Neither proves a missing hardware
-acknowledgement. The post-security transaction also closes normally: a
-negative-control run with only `12345` and its single submission reproduces the
-later callback/event wave. Overlapping `0x00c8` is task-1 periodic traffic from
-`0x2a2838`, and repeated `0x05a7` is the generic three-slot timer manager at
-`0x2b3222`; neither is a second-softkey transaction or a missing hardware
-completion. Task 6 remains live without an idle-window selection, but the
-second-softkey/descriptor path is no longer the frontier. See
+The remaining application-level question is the ordinary unattended
+UI/idle-window entrance. Report code 7 is a later power/shutdown report, and
+the mapped callback, descriptor, timer, and second-softkey paths are classified
+as conditional firmware lifecycles rather than missing
+hardware acknowledgements. Detailed exclusions and addresses live in
 [`docs/interactive_handoff.md`](docs/interactive_handoff.md) and
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
 `make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
 research baseline for this boundary. It uses the request-driven external-service peer
 and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with service-session status
-`0x49`, no-SIM clear, and SIM enable set. Historical runs with the retired
-display-transfer experiment reached the **Security code** frame
-(`6471d1a5803619c2`) and, with a provisioned identity, the idle-like `Menu`
-frame (`dbf2704cb945d56b`). Those hashes remain investigation evidence rather
-than current acceptance oracles. Keypad interaction has since been validated
-independently through MAD2 IRQ0.
+`0x49`, no-SIM clear, and SIM enable set. Keypad interaction is independently
+covered through MAD2 IRQ0 and the firmware matrix scanner.
 
 The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
 executable protocol hypotheses, not finished hardware emulation, but do not
@@ -94,8 +72,8 @@ The labels below have precise meanings:
 | MAD2 timers and IRQ/FIQ | Partial hardware | Boot-critical paths work; several timings remain calibrated assumptions. |
 | PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames; MAD2 IRQ0 reaches the matrix scanner and decoded input resources. |
 | 24C128 EEPROM | Partial hardware | MAME's native I2C device is wired through GenIO and passes the oracle; provisioning and the parallel alias need validation. |
-| CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; GENSIO transaction state and ADC completion IRQ behavior remain open. |
-| SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
+| CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; physical GENSIO/ADC latency, RTC encoding, watchdog clock and board-level analog signals remain open. |
+| SIM controller/card/profile | Partial hardware | Organic SIMI/FIQ6 and T=0 initialization work; controller, removable card, and synthetic provisioning are still combined. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
 | Startup/external-service peers | Prototype | Request-driven behavior is implemented in `nokia_dsp_peer_device` through shared DSP rings and interrupt callbacks; the wider peer contract remains incomplete. |
 | Interactive startup | Mapped | Keypad and editor completion work in mode 4. Callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, and task-6 selector `0x0732 -> 0x2b1e44` are conditional UI/power lifecycle paths, not cold-boot entrances. Task-5/MMI context settlement is the smallest unresolved boundary. |
@@ -123,8 +101,8 @@ supported, and it passes the reference and portability checks.
 1. Improve the extracted EEPROM and CCONT devices from observed transactions.
 2. Use the Nokia 3330 (NHM-6) as the first cross-ROM confidence target once its service files are normalized reproducibly.
 3. Stabilize MAD2 timer, interrupt and GENSIO contracts before extracting blocks.
-4. Consolidate SIM transport and card behavior behind one device boundary.
-5. Separate the DSP mailbox from phone configuration, then add further DCT3 products as evidence.
+4. Separate MAD2 SIMI controller behavior from removable-card protocol and provisioning.
+5. Separate DSP transport/HLE from the external-service peer, then add further DCT3 products as evidence.
 
 New phone support is initially a portability probe. A ROM that fails early is still valuable when
 it identifies a 3210-specific assumption.
@@ -146,7 +124,7 @@ Start with:
 - [`docs/hardware_atlas.md`](docs/hardware_atlas.md) for the firmware/hardware boundary.
 - [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
-- [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for CONTACT SERVICE.
+- [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for service-session startup.
 - [`docs/interactive_handoff.md`](docs/interactive_handoff.md) for the current UI-start boundary.
 - [`docs/sim_registration.md`](docs/sim_registration.md) for the SIM and generic-service findings.
 - [`docs/tooling.md`](docs/tooling.md) for the analysis tools.

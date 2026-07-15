@@ -25,9 +25,10 @@ firmware adapter to the external service/test peer; the request-driven
 DSP/external-service prototype is an explicit `nokia_dsp_peer_device`. It owns shared DSP
 RAM, MCU/DSP ring indices, service cadence, and the observed contact-session
 state, and returns peer transactions through FIQ0/IRQ4 callbacks.
-The provisional
-`nokia_sim_card_device` owns the verified SIMI register/FIQ transport and a synthetic GSM 11.11
-card. The phone state owns MAD2 interrupt routing, supplies power-scenario ADC inputs, and selects
+The provisional `nokia_sim_card_device` currently combines the verified MAD2
+SIMI register/FIQ transport with a synthetic GSM 11.11 card. This is explicit
+layering debt: the controller registers belong to MAD2 and the removable card
+owns only its serial protocol and contents. The phone state owns MAD2 interrupt routing, supplies power-scenario ADC inputs, and selects
 board differences through explicit product configurations rather than driver-name parsing. The
 remaining MAD2 register block should wait for the
 cross-ROM pass to identify the genuinely shared contract.

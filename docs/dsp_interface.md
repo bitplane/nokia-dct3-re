@@ -9,9 +9,10 @@ removed.
 **TL;DR for emulation:** at boot the MCU treats the DSP interface as (a) a RAM
 self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
 download target for coefficient/program blobs, and (d) bidirectional lower-service
-message rings. The request-driven external-service peer now answers the organic D0 discovery
-and type-`0x70` contact request through FIQ 0, proving that MCU-to-DSP requests and
-DSP-to-MCU replies compose in the normal scheduler. The later lower-radio
+message rings. The current aggregate device carries organic D0 discovery,
+type-`0x70` DSP completion and the separate external-service session through
+FIQ 0, proving that the transport composes in the normal scheduler. It does not
+prove that the external class-`0x40` peer is DSP-owned. The later lower-radio
 command/reply vocabulary remains incomplete, but it is no longer the immediate
 boot frontier: ordinary SIM initialization now runs after service startup.
 
@@ -36,11 +37,11 @@ The widened MAD2 access ledger records 27 DSPIF command writes in the coherent
 boot: one zero-valued initialization and 26 command-4 writes, chiefly from
 `0x29103c` with one from `0x290778`. The command halfword is followed by the
 MAD2 doorbell write, so DSPIF is now retained by the peer device rather than
-discarded. Contact-ring delivery and shared-control completion now use
+discarded. Service-transport ring delivery and shared-control completion now use
 independent timers, so neither activity can overwrite the other's deadline.
 Command 4 is still not the sole HLE scheduling edge: a repeat doorbell-only run
 left service-session status `0x0089`, task 1 in mode `0x000d`, and SIM disabled because
-not every contact-ring producer commit is paired with that command. The
+not every service-transport ring producer commit is paired with that command. The
 independently validated ring-producer and service-pending triggers therefore
 remain part of the partial peer contract.
 
@@ -115,8 +116,8 @@ packets in the shared transmit ring. The first captured pair is:
 ```
 
 The service submodel clears the pending count and raises IRQ4. The separate
-request-driven contact submodel consumes complete TX packets and returns
-correlated contact and transport responses through the inbound ring and FIQ0.
+request-driven external-service submodel consumes complete TX packets and returns
+correlated service and transport responses through the inbound ring and FIQ0.
 Neither is a complete DSP implementation. No derived lower-radio response has connected this traffic
 to `0x05ea`, task-15 `0x07dd`, or the SIM registration result, so treating the D0 packet
 as that request would be speculation.
@@ -231,8 +232,8 @@ numeric class value.
 The original DSP model left TX consumer `0x0a6` at zero. The producer reached
 `0x34`, free space collapsed, and later firmware packets could not be queued.
 An isolated ring-drain experiment proved that complete packets must be consumed,
-but that standalone model has been removed. The current request-driven contact
-peer owns consumption and any correlated response at the same boundary. The
+but that standalone model has been removed. The current request-driven external-service
+peer owns consumption and correlated responses at the same boundary. The
 newly visible coherent stream is:
 
 ```text

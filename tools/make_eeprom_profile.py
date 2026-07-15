@@ -97,7 +97,7 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None) -> byte
         image[0x0DB0 + index] = flash[raw]
 
     patches = {
-        # Firmware default written by the contact-service provisioning path at
+        # Firmware default written by the service-session provisioning path at
         # 0x236a78. Startup reloads this four-byte availability record from
         # EEPROM offset 0x0150 through 0x29bb98.
         0x0150: 0x30,

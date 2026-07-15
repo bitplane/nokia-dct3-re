@@ -6,21 +6,17 @@ incoming command consumer from an MCU constructor carrying the same command id.
 That distinction matters because several constructors are acknowledgements and
 therefore do not identify the initiating producer.
 
-The filename, trace flag, and several recovered-symbol labels retain the
-historical project term `contact_service`. That term originated while the
-visible `CONTACT SERVICE` fault screen was the boot frontier. No evidence shows
-that the screen caption is Nokia's name for this task or protocol. In current
-terminology, task 2 is the class-`0x40` service-command dispatcher and task 7 is
-the external-service transport adapter; the fault screen is a separate observed
-UI result.
+Task 2 is the class-`0x40` service-command dispatcher and task 7 is the
+external-service transport adapter. The fault-screen caption does not name the
+protocol.
 
 The machine-readable evidence is produced by `tools/message_census.py`. The ROM
-scan covers all 98 recovered calls to `contact_message_alloc_234634`; all five
+scan covers all 98 recovered calls to `service_message_alloc_234634`; all five
 target constructor callsites and payload lengths are checked by `--check`.
 
 ## Frame and transport path
 
-`contact_message_alloc_234634` builds a class-`0x40` frame:
+`service_message_alloc_234634` builds a class-`0x40` frame:
 
 ```text
 [0] destination node  [1] source node       [2] transport state
@@ -29,10 +25,10 @@ target constructor callsites and payload lengths are checked by `--check`.
 [9...] payload
 ```
 
-`contact_message_send_234684` reports the frame, offers it to service channel
+`service_message_send_234684` reports the frame, offers it to service channel
 `0x6400` through `0x2b203e`, and queues it through `0x2b0482`. For ordinary
 frames, `0x2b0482` posts the resulting message to task 7. Task 2 receives
-class-`0x40` frames in `contact_service_response_dispatch_237400` and dispatches
+class-`0x40` frames in `external_service_response_dispatch_237400` and dispatches
 on byte `[8]`.
 
 This is the strongest evidenced boundary: **the external service/test peer behind
@@ -161,7 +157,7 @@ writes only `{[3]=0x40,[8]=0x64,[9]=0x05}`, leaving address, route, sequence, an
 length fields zero. It proves the result-5 firmware branch in isolation, but not
 a coherent node-0x18 transaction or stable service-session completion.
 
-`TRACE_CSCMD` is observational only and is capped so later runs retain this
+`TRACE_SERVICE_COMMAND` is observational only and is capped so later runs retain this
 ownership and routing evidence without large logs.
 
 ## Separate `0x74` namespaces

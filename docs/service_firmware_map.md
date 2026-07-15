@@ -1,8 +1,7 @@
 # Service-startup firmware map
 
 This is the concise address map for the Nokia 3210 v6.00 lower-service and
-contact-startup path. It replaces the chronological static-branch investigation;
-full disassembly transcripts and deleted experiments remain in Git history.
+service-session startup path.
 
 ## Boundary summary
 
@@ -14,7 +13,7 @@ Startup spans three distinct peers:
    messages.
 
 The current coherent profile models these boundaries without writing firmware
-state. `contact_service_topology.md` owns command direction and session ordering;
+state. `external_service_topology.md` owns command direction and session ordering;
 this document owns the principal firmware branch and address map.
 
 ## Lower-service readiness
@@ -40,25 +39,25 @@ IRQ 4, or raising IRQ 4 without draining it, is insufficient.
 | `0x2af3ca` | MAD2 IRQ-4 completion handler |
 | `0x291068` | service-ready setter |
 
-## Contact watchdog
+## Service watchdog
 
 Task 2's D9 poll at `0x237b28` increments `0x11fed6`. If startup does not reach
-a healthy contact result, the terminal path calls `0x2b4dda` and presents
-CONTACT SERVICE. The watchdog is a symptom of the incomplete lower-service
+a healthy service result, the terminal path calls `0x2b4dda` and presents
+the startup fault screen. The watchdog is a symptom of the incomplete lower-service
 session, not an independent hardware device.
 
 Service-present bit 6 in `0x11fed0` determines whether the extended task startup
-path arms the watchdog. Contact initialization sets the bit, then may clear it
+path arms the watchdog. Service initialization sets the bit, then may clear it
 when DSP readiness, EEPROM checksums, CCONT presence, channel status, or the
 lower service transaction fails.
 
 | Address | Symbolic role |
 | --- | --- |
-| `0x237b28` | `contact_service_d9_watchdog_poll` |
-| `0x237ade` | `contact_service_da_status_update` |
-| `0x2379e8` | `contact_service_e2_event_source_update` |
+| `0x237b28` | `external_service_d9_watchdog_poll` |
+| `0x237ade` | `external_service_da_status_update` |
+| `0x2379e8` | `external_service_e2_event_source_update` |
 | `0x236dc4` | contact result/timeout handler |
-| `0x2b4dda` | terminal startup outcome/CONTACT SERVICE path |
+| `0x2b4dda` | terminal startup fault outcome path |
 
 ## External service session
 
@@ -68,7 +67,7 @@ therefore initiate the session through the lower transport; posting a task-2
 message bypasses address learning and completion ownership.
 
 `contact_response_code_70_71_handler_23670c` applies incoming channel maps.
-`contact_service_response_dispatch_237400` dispatches the command byte at
+`external_service_response_dispatch_237400` dispatches the command byte at
 `message[+8]`. The current peer supplies result-1 discovery, a `0x70` channel
 map, result-5 healthy completion, and correlated transport acknowledgements.
 

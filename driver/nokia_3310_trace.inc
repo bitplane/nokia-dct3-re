@@ -29,14 +29,14 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 					fw_byte(0x00110436), machine().time().as_double());
 		}
 	}
-	if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && address == FW_CONTACT_SERVICE_STATUS)
+	if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && address == FW_SERVICE_SESSION_STATUS)
 		logerror("csstatus_write: pc=%08x data=%04x mask=%04x old=%04x task=%02x "
 				"svc_ready=%02x dsp=%04x/%04x/%04x t=%.6f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				fw_byte(FW_STARTUP_SERVICE_READY), m_dsp_peer->shared_r(0x0da >> 1),
 				m_dsp_peer->shared_r(0x0e2 >> 1), m_dsp_peer->shared_r(0x0e4 >> 1),
 				machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 &&
+	if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 &&
 			(address == 0x0011fedc || address == 0x0011fede))
 		logerror("csaddress_write: pc=%08x address=%08x data=%04x mask=%04x old=%04x "
 				"task=%02x t=%.6f\n", pc & ~u32(1), u32(address), data, mem_mask,
@@ -444,11 +444,11 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				fw_byte(msg + 4), fw_byte(msg + 5), fw_byte(msg + 6), fw_byte(msg + 7),
 				machine().time().as_double());
 	}
-	// TRACE_CSCMD (opt-in, fetch side): log both sides of the contact-service transport.
+	// TRACE_SERVICE_COMMAND: log both sides of the class-0x40 external-service transport.
 	// 0x234634 constructs an MCU-to-peer frame and 0x234684 queues it; the dispatcher below
 	// consumes peer-to-MCU frames. Keeping direction explicit prevents acknowledgements from
 	// being mistaken for organic producers of inbound commands with the same numeric id.
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00234634)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x00234634)
 		{
 			static unsigned csconstruct_count = 0;
 			if (csconstruct_count++ < 256)
@@ -459,7 +459,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					debug_ram_byte(0x00100022), machine().time().as_double());
 		}
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00234826)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x00234826)
 		{
 			const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
 			logerror("cseeprom_fail: computed=%04x stored=%04x guard=%04x sp=%08x task=%02x t=%.6f\n",
@@ -467,7 +467,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					fw_word(sp + 4), fw_word(sp + 6), sp, fw_byte(FW_SCHED_RUNNING_TASK_ID),
 					machine().time().as_double());
 		}
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00234684)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x00234684)
 		{
 			static unsigned cssend_count = 0;
 			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
@@ -479,12 +479,12 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 						debug_ram_byte(0x00100022), machine().time().as_double());
 		}
-		// The contact-service command dispatcher 0x237400 reads the
+		// The class-0x40 service-command dispatcher 0x237400 reads the
 		// command byte [msg+8] into r4 at 0x23741a and binary-searches to a handler. cmd 0x70/0x71 route to
 		// the channel-map handler 0x23670c: 0x70 = resource ENABLE (-> 0x2b140a, config blob = msg+9),
-		// 0x71 = resource DISABLE. Log every command byte the contact-service processes -- confirms whether
+		// 0x71 = resource DISABLE. Log every command byte the service dispatcher processes -- confirms whether
 		// the resource-enable command 0x70 is ever delivered on our boot, and inventories the command set.
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x0023741a)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x0023741a)
 		{
 			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
 			constexpr u32 task2_tcb = 0x00101484 + 2 * 0x1c;
@@ -503,7 +503,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 						m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 						debug_ram_byte(0x00100022), machine().time().as_double());
 		}
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x002a5468)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x002a5468)
 		{
 			const u32 msg = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
 			static unsigned csroute_count = 0;
@@ -515,7 +515,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					fw_byte(0x00100022), machine().time().as_double());
 		}
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00237c8e)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x00237c8e)
 		{
 			static unsigned csfree_count = 0;
 			if (csfree_count++ < 256)
@@ -525,10 +525,10 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					debug_ram_byte(0x00100022), machine().time().as_double());
 		}
-		// Contact-session result handling and its watchdog share 0x236dc4.  Record
+		// Service-session result handling and its watchdog share 0x236dc4. Record
 		// which side actually drives repeated command-0x64 reports, together with
 		// the compact state block consumed by both paths.
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00236dc4)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x00236dc4)
 		{
 			static unsigned csresult_count = 0;
 			if (csresult_count++ < 256)
@@ -536,26 +536,26 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 						"present=%02x flags=%02x stored=%02x counter=%02x state=%02x ack=%02x enable=%02x t=%.6f\n",
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-					debug_ram_byte(0x00100022), debug_ram_byte(FW_CONTACT_SERVICE_STATUS),
-					debug_ram_byte(FW_CONTACT_SERVICE_STATUS + 1),
-					debug_ram_byte(FW_CONTACT_SERVICE_RESULT),
-					debug_ram_byte(FW_CONTACT_SERVICE_COUNTER),
-					debug_ram_byte(FW_CONTACT_SERVICE_SUBSTATE),
-					debug_ram_byte(FW_CONTACT_SERVICE_ACK),
+					debug_ram_byte(0x00100022), debug_ram_byte(FW_SERVICE_SESSION_STATUS),
+					debug_ram_byte(FW_SERVICE_SESSION_STATUS + 1),
+					debug_ram_byte(FW_SERVICE_SESSION_RESULT),
+					debug_ram_byte(FW_SERVICE_SESSION_COUNTER),
+					debug_ram_byte(FW_SERVICE_SESSION_SUBSTATE),
+					debug_ram_byte(FW_SERVICE_SESSION_ACK),
 					debug_ram_byte(FW_SERVICE_CHANNEL_ENABLE_FLAGS), machine().time().as_double());
 		}
-		if (nokia_env_u32("NOKI3210_TRACE_CSCMD", 0) != 0 && pc == addr && addr == 0x00237b80)
+		if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && pc == addr && addr == 0x00237b80)
 		{
 			static unsigned cswatch_count = 0;
 			if (cswatch_count++ < 256)
 				logerror("cswatch: present=%02x flags=%02x stored=%02x counter=%02x state=%02x ack=%02x enable=%02x "
 						"caller=%08x task=%02x t=%.6f\n",
-					debug_ram_byte(FW_CONTACT_SERVICE_STATUS),
-					debug_ram_byte(FW_CONTACT_SERVICE_STATUS + 1),
-					debug_ram_byte(FW_CONTACT_SERVICE_RESULT),
-					debug_ram_byte(FW_CONTACT_SERVICE_COUNTER),
-					debug_ram_byte(FW_CONTACT_SERVICE_SUBSTATE),
-					debug_ram_byte(FW_CONTACT_SERVICE_ACK),
+					debug_ram_byte(FW_SERVICE_SESSION_STATUS),
+					debug_ram_byte(FW_SERVICE_SESSION_STATUS + 1),
+					debug_ram_byte(FW_SERVICE_SESSION_RESULT),
+					debug_ram_byte(FW_SERVICE_SESSION_COUNTER),
+					debug_ram_byte(FW_SERVICE_SESSION_SUBSTATE),
+					debug_ram_byte(FW_SERVICE_SESSION_ACK),
 					debug_ram_byte(FW_SERVICE_CHANNEL_ENABLE_FLAGS),
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					debug_ram_byte(0x00100022), machine().time().as_double());

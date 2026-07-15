@@ -6,8 +6,6 @@ and reports interrupt causes to MAD2. CHAPS performs the physical charging;
 COBBA handles audio and RF conversion.
 
 This document records the current hardware contract and unresolved questions.
-Historical experiments have been removed except where a negative conclusion
-prevents a likely wrong turn.
 
 ## Confidence
 
@@ -19,18 +17,37 @@ prevents a likely wrong turn.
 
 `driver/nokia_ccont.{h,cpp}` implements a MAME device that owns:
 
-- alternating GENSIO command/data framing;
+- CCONT command/data phase after MAD2 selects the endpoint;
 - the 16-byte CCONT register file;
 - sampling configured ADC source values;
-- RTC reads from the emulated machine clock;
+- the current provisional RTC register response;
 - interrupt status, mask and IRQ output;
-- watchdog countdown; and
+- watchdog counter state; and
 - a power output asserted by the watchdog-register power-off command.
 
-The phone driver owns the battery/charger scenario, supplies the eight ADC
-inputs, and routes the CCONT IRQ into MAD2 line 6. This is the intended split:
-CCONT produces signals; MAD2 aggregates interrupts; firmware owns startup and
-power policy.
+The phone driver owns GENSIO endpoint selection and ready/data-available status,
+the battery/charger scenario, the eight raw ADC inputs, the one-hertz watchdog
+tick, and routing the CCONT IRQ into MAD2 line 6. This is the current split:
+CCONT produces register-visible state and output signals; MAD2 owns the serial
+controller and interrupt aggregation; firmware owns startup and power policy.
+
+## Contract audit
+
+The device boundary is classified by evidence level:
+
+| Surface | Classification | Basis and limitation |
+| --- | --- | --- |
+| CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status itself belongs to MAD2, not CCONT. |
+| Registers `0x2`/`0x3` ADC result | Derived contract | Firmware reads a ten-bit result through these registers. Immediate completion and the `0xb0` upper status bits remain inferred. |
+| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Derived contract | Firmware ISR behavior, coherent boot, and both ROMs agree. PWRONX bit 1 is established; the opt-in bit-0 presence overlay is provisional. |
+| ADC selector values | Working fixture | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. `ADC_PROFILE` is test provisioning, not a battery model. |
+| RTC registers `0x7..0xa` | Prototype | The device returns host-local binary time. Firmware register use is mapped, but encoding, rollover, persistence, and determinism are not hardware-validated. |
+| Watchdog/power register `0x5` | Partial contract | Command values and power-off effect are firmware-derived. The phone supplies an arbitrary one-hertz tick; physical rate and reload arithmetic are unverified. |
+| Other register storage | Compatibility behavior | Registers without mapped semantics retain written bytes so firmware-visible transactions compose. Storage must not be interpreted as a proved hardware contract. |
+
+No direct firmware state is changed by the CCONT device. The main fidelity risk
+is therefore not a forcing shim; it is that provisional timing, encoding, and
+analog fixtures can be mistaken for measured hardware behavior.
 
 ## GENSIO transport
 
@@ -57,8 +74,9 @@ selection, sets bit 2 after a CCONT transfer byte, and clears it when `0x6c` is
 consumed. Both ROMs select endpoint `0x25` before every register helper and
 send a command byte first. Endpoint selection therefore resets the device to
 command phase. Transfers remain synchronous because neither ROM exposes a
-conversion-complete interrupt or a firmware-visible minimum delay; no invented
-busy interval is represented.
+conversion-complete interrupt or a firmware-visible minimum delay. This proves
+only that the current firmware contract tolerates immediate completion; it does
+not prove that physical GENSIO or CCONT has zero latency.
 
 ## Register map
 
@@ -71,7 +89,7 @@ busy interval is represented.
 | `0x4` | charger control/status | Unknown storage. |
 | `0x5` | watchdog and power control | Proven role; reload command semantics inferred from firmware. |
 | `0x6` | RTC enable/control | Inferred storage. |
-| `0x7..0xa` | RTC second/minute/hour/day | Proven role; binary encoding is not independently confirmed. |
+| `0x7..0xa` | RTC second/minute/hour/day | Inferred role; host-local binary encoding is provisional. |
 | `0xb..0xd` | RTC alarm/calibration | Inferred storage. |
 | `0xe` | interrupt/reset status | Proven role. Cold power-key reset latches PWRONX as bit 1 (`0x02`); upper bits `0xf8` are interrupt sources. Bit 0 remains an opt-in presence overlay. |
 | `0xf` | interrupt mask | Strongly inferred from firmware ISR behavior. |
@@ -143,27 +161,14 @@ The four startup sweep events are:
 
 Mode `0x000d` is therefore a power-on/charger sweep, not a SIM or DSP gate.
 
-## Resolved startup-delivery defect
+## Startup and interrupt contract
 
-The earlier model reset register `0xe` to `0x08`, treating a charger-class
-upper interrupt as the cold-boot indication, and asserted IRQ for every status
-bit. That produced a false interrupt lifecycle and made the ROM appear to lose
-the delayed `0x15`/`0x16` events. The corrected cold power-key state is PWRONX
-bit `0x02`; the IRQ output considers only upper sources `0xf8`.
-
-With those two device-boundary corrections, the provisioned boot reaches
-checklist `0x08 -> 0x09 -> 0x0b -> 0x0f` and mode `0x0004` with neither the
-former charged-battery RAM rewrite nor the event-15 delay-literal override.
-The canonical IRQ count also falls from 51 to 10 because the low reset-cause bit no
-longer repeatedly enters the interrupt cascade. This supersedes the former
-claim that a routing/subscription defect prevented organic sweep completion.
-
-PWRONX is reset/input status, not a delayed MAD2 IRQ0 event. The CCONT now
-latches bit `0x02` when the phone configures the cold-boot scenario, before the
-firmware's first status read. The unevidenced delayed IRQ0 timer and its
-environment fixture are removed; ordinary power-button input uses the decoded
-KBGPIO column/IRQ0 contract. CCONT remains on the distinct IRQ6 source. Removing
-the timer preserves the contact/SIM frontier.
+Cold power-key state is PWRONX bit `0x02`; only upper status sources `0xf8`
+contribute to the CCONT IRQ output. PWRONX is reset/input status rather than a
+delayed MAD2 IRQ0 event. CCONT uses MAD2 IRQ6, while physical power-button input
+uses the KBGPIO column/IRQ0 path. Under this contract events `0x14` and `0x17`
+use direct scheduler paths, events `0x15` and `0x16` use delayed scheduling, and
+all four arrive organically.
 
 The power-key interrupt path is stable across the two ROMs: v6.00 handler
 `0x2b3084` aligns with v5.01 `0x2b02fc`, and each calls a tiny task-1 event
@@ -173,25 +178,9 @@ watchdog-register data `0x00` enters the hardware power-off path; `0x20`,
 `0x31`, and `0x3f` program, service, and disable the watchdog lifecycle in the
 shared helper block. Its physical clock remains unverified.
 
-## Important negative conclusions
-
-These conclusions are retained because repeating the experiments would be
-easy:
-
-- Events `0x14` and `0x17` use direct scheduler paths; `0x15` and `0x16` use
-  delayed scheduling. Under the corrected reset contract all four arrive.
-- CCONT startup-event delivery is not controlled by service-channel
-  provisioning flags. Service-channel provisioning and the CCONT sweep are
-  separate subsystems.
-- Rewriting message classes, forcing service enable flags, suppressing the
-  `0xd5` repost, and injecting a presumed task-285 reply did not address the
-  actual reset-status defect.
-- The old claim that emitter `0x264f30` produced the surfaced sweep IDs was
-  false: its messages occur later and use a different path.
-
-The keypad uses MAD2 IRQ0 independently of CCONT. Any further CCONT change must
-come from a separately evidenced transaction or IRQ contract, not a startup-event
-hypothesis.
+Service-channel provisioning does not control CCONT startup-event delivery.
+Any further CCONT change requires a separately evidenced register, timing, or
+IRQ contract.
 
 ## Fidelity backlog
 
@@ -208,4 +197,9 @@ hypothesis.
 5. Validate remaining register semantics against a working-phone trace or
    independent chip documentation; the v5.01 same-product control is complete.
 
-The 3210 oracle remains the regression gate for every behavior change.
+The structural summary records CCONT commands and read counts, but these totals
+are diagnostic rather than pass/fail predicates. The byte-exact default frame
+and coherent frontier protect integration behavior; there is not yet a focused
+CCONT device test for register reset values, mask/clear transitions, ADC result
+packing, RTC reads, or watchdog expiry. Add that focused test before changing
+the extracted register contract.

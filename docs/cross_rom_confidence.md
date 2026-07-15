@@ -37,7 +37,7 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
 
 ## Current result
 
-- 3210 v6.00: exact CONTACT SERVICE oracle reproduced after native 24C128 and
+- 3210 v6.00: exact default fault-screen oracle reproduced after native 24C128 and
   CCONT device extraction (`d8a9a7a58e587be8`).
 - 3330 v4.50 PPM E: `make smoke-3330e RUN_DIR=run_3330e_smoke SECONDS=3`
   completed three emulated seconds at 207% average speed. Firmware performed

@@ -16,7 +16,7 @@ constexpr unsigned RX_END = 0x1c8 / 2;
 constexpr unsigned RX_PRODUCER = 0x1c8 / 2;
 constexpr unsigned RX_CONSUMER = 0x1ca / 2;
 constexpr u8 DISCOVERY_NODE = 0x02;
-constexpr unsigned CONTACT_START_DELAY_TICKS = 36;
+constexpr unsigned SERVICE_START_DELAY_TICKS = 36;
 }
 
 nokia_dsp_peer_device::nokia_dsp_peer_device(
@@ -30,11 +30,11 @@ nokia_dsp_peer_device::nokia_dsp_peer_device(
 void nokia_dsp_peer_device::device_start()
 {
 	m_service_timer = timer_alloc(FUNC(nokia_dsp_peer_device::service_tick), this);
-	m_contact_timer = timer_alloc(FUNC(nokia_dsp_peer_device::contact_tick), this);
+	m_external_service_timer = timer_alloc(FUNC(nokia_dsp_peer_device::external_service_tick), this);
 	save_item(NAME(m_ram));
 	save_item(NAME(m_dspif));
 	save_item(NAME(m_service_enabled));
-	save_item(NAME(m_contact_enabled));
+	save_item(NAME(m_external_service_enabled));
 	save_item(NAME(m_trace_enabled));
 	save_item(NAME(m_service_delay_ms));
 	save_item(NAME(m_service_tick_ms));
@@ -45,7 +45,7 @@ void nokia_dsp_peer_device::device_start()
 	save_item(NAME(m_channel_map_acknowledged));
 	save_item(NAME(m_healthy_sent));
 	save_item(NAME(m_empty_ack_sent));
-	save_item(NAME(m_contact_completion_sent));
+	save_item(NAME(m_service_control_completion_sent));
 	save_item(NAME(m_registration_ticks));
 }
 
@@ -58,7 +58,7 @@ void nokia_dsp_peer_device::device_reset()
 	m_ram[0x0fe / 2] = 1;
 	m_ram[0x100 / 2] = 1;
 	m_service_timer->adjust(attotime::never);
-	m_contact_timer->adjust(attotime::never);
+	m_external_service_timer->adjust(attotime::never);
 	m_discovery_complete = false;
 	m_registration_sent = false;
 	m_registration_acknowledged = false;
@@ -66,7 +66,7 @@ void nokia_dsp_peer_device::device_reset()
 	m_channel_map_acknowledged = false;
 	m_healthy_sent = false;
 	m_empty_ack_sent = false;
-	m_contact_completion_sent = false;
+	m_service_control_completion_sent = false;
 	m_registration_ticks = 0;
 }
 
@@ -91,10 +91,10 @@ void nokia_dsp_peer_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 	offset &= 0x7ff;
 	COMBINE_DATA(&m_ram[offset]);
 	// Ring producer commits and shared-service pending counts are independent
-	// DSP work sources. Not every contact-ring commit is followed by DSPIF
+	// transport work sources. Not every service-transport ring commit is followed by DSPIF
 	// command 4, so retain their observed scheduling boundaries.
-	if (m_contact_enabled && offset == TX_PRODUCER)
-		m_contact_timer->adjust(attotime::from_usec(100));
+	if (m_external_service_enabled && offset == TX_PRODUCER)
+		m_external_service_timer->adjust(attotime::from_usec(100));
 	if (m_service_enabled && offset == SVC_PENDING && data != 0)
 		m_service_timer->adjust(attotime::from_msec(m_service_delay_ms));
 }
@@ -167,7 +167,7 @@ bool nokia_dsp_peer_device::enqueue_transport_ack(unsigned cursor, unsigned payl
 	return true;
 }
 
-bool nokia_dsp_peer_device::enqueue_contact_frame(u8 command, u8 result, u8 sequence)
+bool nokia_dsp_peer_device::enqueue_service_frame(u8 command, u8 result, u8 sequence)
 {
 	const u8 frame[12] = {
 		0x1e, 0x00, DISCOVERY_NODE, 0x40, 0x00, 0x06, 0x00, 0x01,
@@ -175,7 +175,7 @@ bool nokia_dsp_peer_device::enqueue_contact_frame(u8 command, u8 result, u8 sequ
 	};
 	if (!enqueue_rx_packet(0x8e, frame, std::size(frame))) return false;
 	if (m_trace_enabled)
-		logerror("dsp_boundary: RX contact command=%02x result=%02x sequence=%02x t=%.6f\n",
+		logerror("dsp_boundary: RX service command=%02x result=%02x sequence=%02x t=%.6f\n",
 				command, result, sequence, machine().time().as_double());
 	pulse_fiq0();
 	return true;
@@ -189,9 +189,9 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::service_tick)
 	m_service_timer->adjust(attotime::from_msec(m_service_tick_ms));
 }
 
-TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::contact_tick)
+TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::external_service_tick)
 {
-	if (m_contact_enabled)
+	if (m_external_service_enabled)
 	{
 		unsigned cursor = m_ram[TX_CONSUMER] % TX_WORDS;
 		const unsigned producer = m_ram[TX_PRODUCER] % TX_WORDS;
@@ -220,13 +220,13 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::contact_tick)
 					m_empty_ack_sent = enqueue_transport_ack(cursor, payload_bytes);
 			}
 
-			if (!m_contact_completion_sent && (header & 0xff) == 0x70 && payload_bytes == 2)
+			if (!m_service_control_completion_sent && (header & 0xff) == 0x70 && payload_bytes == 2)
 			{
 				const u16 request = m_ram[(cursor + 1) % TX_WORDS];
 				const u8 completion[2] = { 0x0d, 0x00 };
 				if (request == 0x0d00 && enqueue_rx_packet(0x74, completion, std::size(completion)))
 				{
-					m_contact_completion_sent = true;
+					m_service_control_completion_sent = true;
 					pulse_fiq0();
 				}
 			}
@@ -258,12 +258,12 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::contact_tick)
 		m_ram[TX_CONSUMER] = cursor;
 	}
 
-	if (m_contact_enabled && m_discovery_complete && m_contact_completion_sent && !m_registration_sent)
+	if (m_external_service_enabled && m_discovery_complete && m_service_control_completion_sent && !m_registration_sent)
 	{
-		if (++m_registration_ticks >= CONTACT_START_DELAY_TICKS)
-			m_registration_sent = enqueue_contact_frame(0x64, 0x01, 0x42);
+		if (++m_registration_ticks >= SERVICE_START_DELAY_TICKS)
+			m_registration_sent = enqueue_service_frame(0x64, 0x01, 0x42);
 	}
-	else if (m_contact_enabled && m_registration_sent && !m_channel_map_sent)
+	else if (m_external_service_enabled && m_registration_sent && !m_channel_map_sent)
 	{
 		u8 frame[75] = { 0 };
 		frame[0] = 0x1e; frame[2] = DISCOVERY_NODE; frame[3] = 0x40;
@@ -277,10 +277,10 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::contact_tick)
 			pulse_fiq0();
 		}
 	}
-	else if (m_contact_enabled && m_channel_map_sent && !m_healthy_sent)
+	else if (m_external_service_enabled && m_channel_map_sent && !m_healthy_sent)
 	{
-		m_healthy_sent = enqueue_contact_frame(0x64, 0x05, 0x44);
+		m_healthy_sent = enqueue_service_frame(0x64, 0x05, 0x44);
 	}
 
-	m_contact_timer->adjust(attotime::from_msec(m_service_tick_ms));
+	m_external_service_timer->adjust(attotime::from_msec(m_service_tick_ms));
 }

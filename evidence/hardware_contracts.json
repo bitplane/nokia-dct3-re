@@ -4,17 +4,32 @@
   "entries": [
     {
       "id": "mad2_gensio_ccont", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 GENSIO offsets 0x2c/0x6c/0x2d/0x6d select and transfer CCONT register bytes",
+      "boundary": "MAD2 owns GENSIO endpoint selection and ready/data-available status at 0x2d/0x6d; selected CCONT command/data bytes cross 0x2c/0x6c and endpoint 0x25 resets command phase",
       "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md", "docs/cross_rom_confidence.md"]
     },
     {
-      "id": "ccont_adc_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share ADC routing, polled GENSIO completion, upper-bit IRQ masking and write-one-to-clear acknowledgement",
+      "id": "ccont_register_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers, upper-bit IRQ masking, write-one-to-clear acknowledgement, PWRONX reset-cause bit 1 and MAD2 IRQ6 routing",
       "evidence": ["docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
     },
     {
-      "id": "mad2_kbgpio_matrix", "subsystem": "keypad", "status": "validated", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share a 4-row by 5-column scan; physical key edges use MAD2 IRQ0 and decode through the firmware 0x41/0x42/0x43 sequence, while CCONT remains on IRQ6",
+      "id": "ccont_adc_scenario_inputs", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
+      "boundary": "The phone supplies eight deterministic raw ten-bit selector fixtures; logical-source routing is ROM-proved but electrical signal names, units, calibration and physical battery relationships are unresolved",
+      "evidence": ["docs/ccont_subsystem.md", "docs/battery_classifier_analysis.md"]
+    },
+    {
+      "id": "ccont_rtc_watchdog_model", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
+      "boundary": "RTC registers currently return host-local binary fields and the phone advances the CCONT watchdog at one hertz; register use is mapped but encoding, persistence, tick rate and reload arithmetic are not hardware-validated",
+      "evidence": ["docs/ccont_subsystem.md"]
+    },
+    {
+      "id": "ccont_presence_overlay", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
+      "boundary": "The coherent profile can overlay status-register bit 0 as CCONT presence through MODEL_CCONT_PRESENT; firmware consumes the bit, but its physical meaning and reset behavior lack independent hardware evidence",
+      "evidence": ["docs/ccont_subsystem.md", "docs/service_bootstrap.md"]
+    },
+    {
+      "id": "mad2_kbgpio_matrix", "subsystem": "keypad", "status": "partial", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 share a 4-row by 5-column scan; physical key edges use MAD2 IRQ0 and decode through the firmware 0x41/0x42/0x43 sequence, while electrical debounce, mask corner cases and unexercised timing remain provisional",
       "evidence": ["docs/mmi_layer.md", "docs/mad2_fidelity.md"]
     },
     {
@@ -23,39 +38,84 @@
       "evidence": ["docs/mad2_fidelity.md", "docs/cross_rom_confidence.md"]
     },
     {
+      "id": "mad2_interrupt_aggregation", "subsystem": "interrupts", "status": "partial", "confidence": "strong",
+      "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component levels onto ARM lines; keypad IRQ0, CCONT IRQ6, DSP FIQ0, SIMI FIQ6 and timer FIQ4 are exercised, while reset polarity, priority and several line assignments remain unvalidated",
+      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
+    },
+    {
+      "id": "mad2_mbus_controller", "subsystem": "mbus", "status": "prototype", "confidence": "moderate",
+      "boundary": "MAD2 MBUS offsets retain byte/control/status state and schedule completion FIQs after a calibrated 5 ms delay; no physical bus peer, receive framing, collision or electrical timing is modeled",
+      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
+    },
+    {
+      "id": "mad2_mcuif_latch", "subsystem": "memory_control", "status": "prototype", "confidence": "moderate",
+      "boundary": "MCUIF retains the four boot-written bytes 6a 0f 61 20, but the fields and memory-window side effects are not decoded and the coherent run never reads them back",
+      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
+    },
+    {
       "id": "mad2_uif_ctrl1_latch", "subsystem": "power", "status": "mapped", "confidence": "strong",
       "boundary": "MAD2 offset 0x31 is a stored CTRL-I/O output latch; all six recovered accesses are bit-1 read-modify-writes owned by the power duty-cycle subsystem and no external-input or interrupt behavior is observed",
       "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
     },
     {
       "id": "mad2_simi_uart", "subsystem": "sim", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 SIMI offsets 0x36..0x3f plus FIQ line 6 carry asynchronous T=0 traffic; TXD enters a 16-byte FIFO, control 0x3e value 0x00 flushes it, 0x3f reports fill, and IIR 0x10 advances multi-chunk transmit",
+      "boundary": "MAD2 SIMI offsets 0x36..0x3f plus FIQ line 6 carry asynchronous card traffic; TXD enters a 16-byte FIFO, control 0x3e value 0x00 advances a chunk, 0x3f reports fill, and IIR causes 0x10/0x40 drive organic TX/RX progression",
       "evidence": ["docs/sim_subsystem.md"]
     },
     {
-      "id": "service_task7_external_peer", "subsystem": "contact_service", "status": "mapped", "confidence": "strong",
-      "boundary": "Task 7 adapts class-0x40 contact frames between task 2 and the external service/test peer",
-      "evidence": ["docs/contact_service_topology.md"]
+      "id": "sim_t0_card_transport", "subsystem": "sim", "status": "partial", "confidence": "strong",
+      "boundary": "ATR, PPS and the organically requested T=0 initialization exchange compose through SIMI and task 21 without firmware messages or RAM forcing; fixed response delays and unexercised timeout/error/card-removal behavior remain provisional",
+      "evidence": ["docs/sim_subsystem.md", "docs/sim_emulator_scope.md"]
+    },
+    {
+      "id": "sim_synthetic_profile", "subsystem": "sim", "status": "prototype", "confidence": "moderate",
+      "boundary": "The default Phase-2 and opt-in CPHS/AoC profiles provide synthetic subscriber identity, service and file data for coherent firmware transactions; this is test provisioning rather than phone hardware behavior",
+      "evidence": ["docs/sim_subsystem.md", "docs/sim_emulator_scope.md"]
+    },
+    {
+      "id": "service_task7_external_peer", "subsystem": "external_service", "status": "prototype", "confidence": "strong",
+      "boundary": "Task 7 is strongly mapped as the firmware adapter for class-0x40 frames, while the attached request-driven service/test peer is only a boot-subset prototype currently co-located with the DSP transport model",
+      "evidence": ["docs/external_service_topology.md", "docs/dsp_service_transport_contract.md"]
     },
     {
       "id": "dsp_shared_ring", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
-      "boundary": "MCU task 3 serializes outbound work to the DSP shared ring; FIQ 0 owns inbound delivery",
+      "boundary": "MCU task 3 serializes outbound work to the DSP shared ring and FIQ 0 owns inbound delivery; ownership and packet grammar are mapped, but bootstrap overrides, timing, reset and the wider reply vocabulary remain HLE prototypes",
       "evidence": ["docs/dsp_service_transport_contract.md", "docs/dsp_interface.md", "docs/sim_registration.md"]
     },
     {
+      "id": "dsp_bootstrap_status_hle", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
+      "boundary": "Fixed reads at shared offsets 0x000..0x004, 0x0e0, 0x0fe and conditionally 0x100 supply the firmware-visible DSP bootstrap state without executing the DSP; ownership is known but transition and reset timing are not",
+      "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md"]
+    },
+    {
       "id": "mad2_dspif_command4", "subsystem": "dsp", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 DSPIF is a retained four-byte peer register; command halfword 0x0004 marks shared-control and L1 DSP work, while independent contact/service timers and the observed ring-producer and service-pending triggers are required because command 4 does not accompany every contact-ring commit",
+      "boundary": "MAD2 DSPIF is a retained four-byte peer register; command halfword 0x0004 marks shared-control and L1 DSP work, while independent service-transport/shared-service timers and the observed ring-producer and service-pending triggers are required because command 4 does not accompany every ring commit",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/mad2_fidelity.md"]
     },
     {
-      "id": "external_eeprom_i2c", "subsystem": "eeprom", "status": "validated", "confidence": "strong",
-      "boundary": "A native MAME 24C128 device owns the external EEPROM I2C transaction boundary",
+      "id": "external_eeprom_i2c", "subsystem": "eeprom", "status": "partial", "confidence": "strong",
+      "boundary": "A native MAME 24C128 owns serial storage while MAD2 GenIO bit-bangs SDA on 0x20.bit0, SCL on 0x20.bit3 and open-drain SDA direction on 0x24.bit0; organic reads work, but project-level write timing and second-product placement remain unvalidated",
       "evidence": ["docs/eeprom_analysis.md", "docs/driver_structure.md"]
     },
     {
-      "id": "pcd8544_lcd", "subsystem": "display", "status": "validated", "confidence": "strong",
-      "boundary": "The PCD8544 device consumes firmware LCD transfers and supplies the byte-exact frame oracle",
-      "evidence": ["docs/driver_structure.md", "docs/structural_regression.md"]
+      "id": "eeprom_parallel_window", "subsystem": "eeprom", "status": "prototype", "confidence": "moderate",
+      "boundary": "The 0xa00000..0xa03fff handler exposes a read-only view of the immutable EEPROM input region rather than live 24C128 NVRAM; its relationship to physical hardware is unknown",
+      "evidence": ["docs/eeprom_analysis.md", "docs/mad2_fidelity.md"]
+    },
+    {
+      "id": "eeprom_synthetic_profile", "subsystem": "eeprom", "status": "prototype", "confidence": "moderate",
+      "boundary": "The generated 3210 profile contains firmware-derived checksums and fallback data plus synthetic identity and working configuration fixtures; accepted bytes are test provisioning, not a factory EEPROM dump",
+      "evidence": ["docs/eeprom_analysis.md"]
+    },
+    {
+      "id": "pcd8544_lcd", "subsystem": "display", "status": "partial", "confidence": "strong",
+      "boundary": "The native PCD8544 device consumes organic firmware command/data transfers and reproduces a byte-exact visible frame; reset/electrical timing and product-panel selection remain unvalidated",
+      "evidence": ["docs/mmi_layer.md", "docs/driver_structure.md", "docs/structural_regression.md"]
+    },
+    {
+      "id": "display_type_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
+      "boundary": "A quarantined firmware RAM-read override supplies the v6.00 display-type selection; its real product-data or hardware source is unknown and it is not part of the PCD8544 model",
+      "evidence": ["docs/mmi_layer.md", "docs/driver_structure.md", "docs/normalization_status.md"]
     }
   ]
 }

@@ -8,6 +8,12 @@ only conclusions that are implemented or directly observed.
 
 SIMI is the MAD2 SIM UART at `0x020036..0x02003f`:
 
+The current `nokia_sim_card_device` combines two conceptual layers: the SIMI
+UART/FIFO/IIR endpoint owned physically by MAD2 and the removable card's T=0
+protocol/filesystem behavior. This is a functioning prototype boundary, not a
+claim that the physical SIM card owns the phone's UART registers. Split the
+controller and card only after their interface and timing contract is stable.
+
 | Offset | Register | Verified behavior |
 | --- | --- | --- |
 | `0x36` | TXD | Firmware writes PPS, T=0 headers and command bodies here. |
@@ -31,9 +37,8 @@ FIQ dispatcher 0x2af49c
         -> allocate/post task-21 response through 0x26aac0
 ```
 
-The former conclusion that RXD is only a reset flush and SIM replies arrive through an unrelated
-DSP/service message was false. It came from confusing SIM structure offsets with MMIO references.
-The register/FIQ path above has now executed end to end.
+The register/FIQ path above executes end to end; SIM replies do not use the
+DSP/service message path.
 
 The complete v6.00 IIR cascade at `0x2a054a` aligns in v5.01 at
 `0x29da8a`. Its causes are finite:
@@ -80,7 +85,8 @@ trailing event when the RX FIFO empties.
 
 ## Stateful card device
 
-`nokia_sim_card_device` is enabled by `NOKI3210_MODEL_SIM_DEVICE=1`. It owns:
+`nokia_sim_card_device` is enabled by `NOKI3210_MODEL_SIM_DEVICE=1`. In the
+current combined prototype it implements:
 
 - activation, ready-status and ATR state;
 - SIMI IIR, RX FIFO and timed FIQ delivery;
@@ -93,10 +99,23 @@ It does not inject task messages, call firmware handlers, or write SIM/registrat
 device is disabled, SIMI reads and writes retain the legacy/default behavior so the ordinary boot
 profiles remain unaffected.
 
-The former `MODEL_SIM_CARD` message responder and `MODEL_SIM_ATR` FIFO probe have
-been removed. Their useful ATR, T=0, selected-file, FCP and synthetic-EF behavior
-is owned by this device. Their scratch-message injection, firmware trampolines and
-receive-result rewriting are not part of the supported SIM boundary.
+## Contract audit
+
+The implemented surface is classified by ownership and evidence:
+
+| Surface | Classification | Basis and limitation |
+| --- | --- | --- |
+| SIMI register window and FIQ6 route | Derived contract | Firmware traffic executes through offsets `0x36..0x3f`, the decoded IIR cascade, and FIQ6 in both mapped 3210 ROMs. These registers belong to MAD2 even though the combined device currently implements them. |
+| TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics and physical UART timing remain inferred. |
+| IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
+| ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Fixed 10/100 microsecond delays are calibrated scheduling choices, not measured card or UART timing. |
+| SELECT/STATUS/GET RESPONSE/READ behavior | Prototype card | It satisfies organically requested initialization and presence polling. Access conditions, invalidation, record semantics, CHV state, errors, reset, and removal are incomplete. |
+| Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
+| CHANGE CHV support | Dormant prototype | The procedure/body/status sequence is implemented, but the ordinary boot does not request it and no persistent credential semantics are validated. |
+
+The model does not force firmware state or inject RTOS messages. Its principal
+fidelity debt is layering and timing: MAD2 controller state, card protocol, and
+subscriber provisioning currently share one device implementation.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
 includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`, LOCI `6F7E`, and Phase
@@ -155,43 +174,11 @@ registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract
 by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
 
-The coherent contact profile also exposes the next task-1 predicate. Task 1 enters
-mode `0x0004` at about 1.436 s and waits for report code `0x07`; the reporter is
-`0x2af190`. Status dispatcher `0x27b370` is exercised during initialization
-with `0x05e2`, and callback state slot `0x5d` is already `0x0b`. Inputs
-`0x05eb` and `0x06c5` report ready directly. Inputs `0x05e1`, `0x05e7`, and
-`0x05dc` arm task-local timer class `0x52`, which returns to task 5 as
-`0x06c5`; none is observed. Flags `0x01a00000` intentionally select `0x032d`
-instead of an automatic `0x05dc` start. A valid task-13 segmented transaction
-publishes `0x05eb` directly to task 16 and does not enter this callback path.
-The only recovered non-initialization selector for callback `0x5d` is the
-slot-`0x45`/`0x09d0` context route, whose writer/producer census is closed.
-Consequently this callback is not an autonomous ordinary-boot initiator; its
-valid local timer contract must not be promoted into a missing hardware event.
-The separately mapped callback-`0x1a` chain (`0x1400 -> 0x08ac`) is dormant:
-`0x1400` is task-5 mailbox ingress, and exhaustive recovery of all 188 direct
-task-5 event-helper calls found no in-ROM producer. It is therefore not the
-owner of the current ordinary-boot path. A separate telephony/controller path
-produces `0x08ac` organically. Selector `0` accepts either an EEPROM-enabled
-CPHS CSP group-03 mask `0x20` or a parsed EF_SST service-5 pair; a valid
-CPHS/AoC profile passes it and causes the normal ACM/ACMmax/PUCT reads. The
-following `0x27f150` path is an Advice-of-Charge limit controller and publishes
-`0x019a` when an active limit is exhausted. It does not produce `0x0795`; the
-earlier connection was disproven by instruction and runtime tracing. A display
-lifecycle (`0x0280/81/82 -> 0x05e7
--> 0x0389 -> 0x157e -> 0x0396 -> 0x05eb`) is a valid service/test route, not
-the ordinary predecessor. The completed SIM file conversation is not the
-remaining unattended UI-start boundary.
-
-The descriptor factory is now identified as `0x24f120`. Its four known callers
-(`0x2996aa`, `0x2997dc`, `0x299860`, `0x2998a0`) sit immediately before the callback-7 handler and
-construct the same `0x18`-byte radio-session object later attached by `0x24f25c`. All four are
-branches of `0x299610`; every successful result is published through
-`0x2af798(0xca8a, 0x1e, object)`. The factory remains unexecuted because the lower peer has not
-delivered the object-bearing input which lets task 15 complete its local operation. Status
-`0x09ee` is not that peer input: seven branches inside the task-15 state machine call
-`0x208ee0(0x09ee, 0)`. Task 15 then forwards its own result to task 17, which constructs
-`0x0a2e` and returns it to task 15 before `0x299610` runs.
+Later registration, MMI callbacks, report 7, and the unattended UI handoff are
+outside the SIM boundary. Report 7 is a shutdown/power-lifecycle report, not a
+SIM-ready event. The mapped registration descriptor and callback chains remain
+in `sim_registration.md`, `interactive_handoff.md`, and normalized evidence;
+they are intentionally not repeated in this concise hardware/card contract.
 
 ## Deferred CHV transaction: reply code 2
 
@@ -209,8 +196,14 @@ ordinary boot does not organically request `0x1196`.
 ## Current acceptance gates
 
 - `make verify`: exact 3210 frame and structural oracle.
-- `make run-frontier`: current request-driven contact/SIM research profile.
+- `make run-frontier`: current external-service/SIM research profile.
 - `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
 - Stateful-model trace: natural ATR/PPS and the ordinary non-CPHS EF pass, with
   SIM enable rising and the timed presence monitor starting without injected
   messages or SIM-state RAM writes.
+
+The frontier predicate protects the final organic SIM-enabled state, but there
+is no focused device test for FIFO reset/fill behavior, IIR acknowledgement,
+multi-chunk ordering, T=0 procedure sequencing, file metadata, timeout/error
+causes, removal, or save-state resumption. Add that coverage before splitting
+or materially changing the combined controller/card implementation.

@@ -1,8 +1,8 @@
 # DSP and generic-service transport contract
 
 This document defines the boundaries relevant to the current radio-registration
-frontier. It separates mechanisms which earlier investigations sometimes grouped
-under “DSP service”. The separation is important: identical numeric classes or
+frontier. It separates mechanisms with distinct owners and transports. The
+separation is important: identical numeric classes or
 events do not imply a shared transport.
 
 ## Boundary inventory
@@ -16,11 +16,32 @@ events do not imply a shared transport.
 | Generic-service framework | Firmware registrations and queued objects | Firmware service framework | Task-5 dispatcher `0x2af652 -> 0x2638e4` | Runs organically; it is downstream of hardware ingress. |
 | External-service transport | Task 2 through task 7 | External service/test peer | Class-`0x40` framed responses | Separate protocol; not a DSP-radio completion path. |
 
+## Implementation audit
+
+`nokia_dsp_peer_device` currently aggregates four logical responsibilities:
+
+1. the DSP shared-memory and DSPIF register windows;
+2. DSP-owned ring indices, pending counters and IRQ/FIQ signaling;
+3. a small request-derived DSP HLE for the boot transactions exercised here;
+4. the semantically separate external service/test peer carried through that
+   transport.
+
+This co-location proves that the transactions compose through firmware-owned
+rings and tasks, but it is not evidence that the class-`0x40` peer is part of
+the DSP. Bootstrap-ready read overrides, a 100 us producer wakeup, 5 ms service
+ticks and the 36-tick external-session delay are calibrated prototype behavior.
+They must remain visible as fidelity debt rather than protocol constants.
+
+The eventual separation should preserve one shared-memory/DSPIF transport
+owner, attach a DSP HLE or core behind it, and attach the external service peer
+at its recovered logical boundary. Do not split it before focused ring,
+interrupt and session tests can protect the current composition.
+
 DSPIF command 4 is the hardware doorbell for several DSP-owned activities, but
-it is not the only observed work boundary. Contact-ring delivery and
+it is not the only observed work boundary. Service-transport ring delivery and
 shared-control completion now have independent device timers. After that split,
 a doorbell-only run still left service-session status `0x0089`, task 1 in mode `0x000d`,
-and SIM disabled: not every contact-ring producer commit is paired with command
+and SIM disabled: not every service-transport ring producer commit is paired with command
 4. The validated ring-producer and service-pending transitions remain the
 behavioral scheduling edges; DSPIF is retained and observed but is not yet a
 complete arbitration model.
@@ -134,9 +155,13 @@ absence proof.
 
 ## Next acceptance point
 
+There is no focused device test for ring wrap/full handling, partial packets,
+interrupt acknowledgement, reset state or external-session correlation. The
+coherent frontier and trace manifests are integration evidence only.
+
 A transport investigation succeeds when a peer-owned state change or inbound
 packet is correlated with a firmware consumer through the real hardware
 boundary and advances the ordinary task-17 registration lifecycle. Type `0x1a`
 and service-5 `0x05e8` must not be assumed to be the two ends of that contract:
-the former has no proved reply dependency, while the exhaustive non-SAT census
-does not establish the latter as an ordinary-registration requirement.
+type `0x1a` has no proved reply dependency, while the exhaustive non-SAT census
+does not establish `0x05e8` as an ordinary-registration requirement.

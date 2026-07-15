@@ -12,14 +12,14 @@ same frame.
 `RUN_DIR/boot_summary.txt`; `make verify` checks the semantic predicates in
 `oracles/noki3210-default.struct` after checking the exact frame hash.
 `make verify-frontier` performs the corresponding semantic check for the current
-request-driven contact/SIM profile against `oracles/noki3210-frontier.struct`.
+request-driven external-service/SIM profile against `oracles/noki3210-frontier.struct`.
 `make verify-3210-v501` runs the same-product v5.01 control with a BIOS-specific
 EEPROM profile and checks `oracles/noki3210-v501-smoke.struct`.
 The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.
 
-`make verify-frontier` checks the current request-driven contact/SIM profile's
+`make verify-frontier` checks the current request-driven external-service/SIM profile's
 stable semantic predicates. `make verify-frontier-stability` repeats that check
 with freshly seeded NVRAM. It reports full-summary
 hash drift without failing because LCD-command, CCONT-byte/read, and similar
@@ -91,7 +91,7 @@ the interactive sequence is not yet part of the structural oracle.
 `make verify-3210-v501` runs the independent NSE-8 v5.01 full flash with its
 own generated EEPROM profile. It is a same-product structural control, not a
 second supported frontier: the current model leaves its LCD blank and reaches
-less contact/SIM progress than v6.00.
+less external-service/SIM progress than v6.00.
 
 The useful invariants are the task-1 and SIM results. The run organically observes modes
 `0x0001`, `0x000d`, and `0x0004`, then remains in mode `0x0004` with readiness

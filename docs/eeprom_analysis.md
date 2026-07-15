@@ -14,17 +14,32 @@ MAME's `I2C_24C128` device is connected to MAD2 GenIO:
 - SDA direction: direction register `0x24`, bit 0, where input releases the
   open-drain line.
 
-This replaced the former firmware-PC-gated byte sequencer. Firmware now drives
-ordinary SDA/SCL transitions and receives acknowledgement/data from the MAME
-device.
+Firmware drives ordinary SDA/SCL transitions and receives acknowledgement/data
+from the MAME device.
+
+## Contract audit
+
+Transport, storage, and provisioning are classified separately:
+
+| Surface | Classification | Basis and limitation |
+| --- | --- | --- |
+| 24C128 storage device | Reused hardware model | MAME's native `I2C_24C128` owns serial address decoding, acknowledgement, reads, writes, and NVRAM persistence. This project does not independently validate its complete chip timing. |
+| GenIO SDA/SCL wiring | Derived contract | Firmware bit-bangs `0x20.bit0` SDA, `0x20.bit3` SCL, and `0x24.bit0` SDA direction. Organic reads and acknowledgements work with open-drain release semantics. Other GenIO pins and electrical timing remain outside this contract. |
+| Firmware read protocol | Derived contract | START, STOP, ACK sampling, device address `0xa0/0xa1`, and 16-bit byte addresses are mapped and exercised. EEPROM write-cycle timing and power-loss behavior are not covered by a focused test. |
+| Parallel window `0xa00000..0xa03fff` | Placeholder | It reads the immutable ROM input region, not live 24C128 NVRAM, and ignores writes. No evidence establishes that this is a physical EEPROM alias. |
+| Checksummed startup blocks | Derived data contract | Both checksum algorithms and the firmware comparisons are mapped and generator-tested. This validates the format used by the ROM, not the provenance of the generated contents. |
+| Fallback NV record copied from flash | ROM-derived fixture | The v6.00 fallback bytes are copied with the required byte-lane transform. The hard-coded source addresses have not been validated for v5.01 or another product. |
+| Identity/security profile | Synthetic provisioning | IMEI prefix, security code, and derived state are coherent with mapped firmware transformations but do not represent a dumped handset. |
+| ADC/config patches | Working fixture | Several non-erased values allow meaningful firmware paths. Until each field is decoded or sourced from legitimate PMM data, they are test inputs rather than factory defaults. |
+
+The transport is substantially stronger than the data profile. A valid checksum
+proves only that firmware accepts the supplied bytes; it does not make those
+bytes authentic calibration, identity, or product configuration.
 
 The GenIO input path must distinguish the output latch from the physical SDA
-level. When direction bit 0 is clear, the MCU has released SDA and reads the
-EEPROM's line directly; combining that level with the stale signal-register bit
-can hold SDA low after the MCU last transmitted a zero. That integration error
-previously made the firmware calculate `0x00ff` and read stored checksum/guard
-words as zero at `0x234810`, despite a correct backing image. With the released
-line read directly, the failure branch at `0x234826` is absent and service-session status
+level. When direction bit 0 is clear, the MCU has released SDA and must read the
+EEPROM's line directly rather than combine it with the output latch. With that
+open-drain behavior, the failure branch at `0x234826` is absent and service-session status
 keeps bit 6 through EEPROM validation (`0xc8` -> `0xcc`). The later clear at
 `0x237b04` is the independent disabled service-channel/PM-read predicate described
 in `service_bootstrap.md`.
@@ -109,7 +124,7 @@ by this ROM and must not be treated as a validated 3210 firmware contract.
 The contact/config check uses checksum routine `0x234588` and comparison site
 `0x234810`; its computed and stored values are both `0x1c25`. A mismatch clears
 the service-present bit used by startup. EEPROM
-validity is one real CONTACT SERVICE prerequisite, but not the only one. The
+validity is one real service-session startup prerequisite, but not the only one. The
 native serial path now demonstrates this check organically; it is not satisfied
 by a firmware hook or RAM override.
 
@@ -169,6 +184,16 @@ does not belong in the hardware device. The generated image currently has:
    boot-ROM behavior, or an incorrect legacy mapping.
 5. Define product-specific permanent-memory placement for phones that store it
    in flash.
+6. Parameterize or signature-locate the fallback-record source before treating
+   a v5.01-generated profile as a data-layout control; the current generator's
+   source addresses are v6.00-specific.
 
-The EEPROM component is considered validated only after both the serial
-protocol and data placement work across a second ROM/product.
+Generator unit tests cover both checksum algorithms and the synthetic
+identity/security derivation. Integration oracles exercise organic serial reads
+and deterministic NVRAM seeding, but raw I2C/EEPROM counters are diagnostic and
+there is no focused project test for open-drain transitions, page writes,
+write-cycle timing, persistence, the parallel window, or power interruption.
+
+The EEPROM boundary is considered validated only after both the serial
+protocol and data placement work across a second product. The current v5.01
+run is a same-product structural control and does not satisfy that criterion.

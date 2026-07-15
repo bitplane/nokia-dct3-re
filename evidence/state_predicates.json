@@ -5,25 +5,25 @@
     {
       "id": "lower_service_idle", "owner": "startup", "status": "modeled",
       "predicate": "service_context_ready_2b03d8 returns nonzero after the lower transmit queue drains",
-      "current": "Satisfied in the coherent contact profile; the DSP service model drains the observed pending counter and supplies recurring IRQ-4 completion while the request-driven external-service peer handles the distinct ring and external-session transactions", "evidence": ["docs/service_bootstrap.md", "docs/contact_service_topology.md"]
+      "current": "Satisfied in the coherent contact profile; the DSP service model drains the observed pending counter and supplies recurring IRQ-4 completion while the request-driven external-service peer handles the distinct ring and external-session transactions", "evidence": ["docs/service_bootstrap.md", "docs/external_service_topology.md"]
     },
     {
       "id": "contact_healthy_completion", "owner": "contact_task", "status": "modeled",
       "predicate": "class-0x40 command 0x64 with payload result 0x05 reaches 0x236dc4",
-      "current": "MODEL_DSP_CONTACT_PEER learns the session header through a peer-originated class-0x40 result-1 command, installs the channel map, then delivers result 5 through task 7; firmware replies receive request-correlated class-0x7f transport acknowledgements",
-      "evidence": ["docs/contact_service_topology.md", "docs/service_bootstrap.md"]
+      "current": "The aggregate DSP/external-service prototype learns the session header through a peer-originated class-0x40 result-1 command, installs the channel map, then delivers result 5 through task 7; firmware replies receive request-correlated class-0x7f transport acknowledgements",
+      "evidence": ["docs/external_service_topology.md", "docs/service_bootstrap.md"]
     },
     {
       "id": "contact_064_response_stability", "owner": "contact_task", "status": "modeled",
       "predicate": "After a peer-originated contact result, the firmware status report terminates at the peer instead of routing back to task 2",
       "current": "The learned address header sends firmware reports outward through task 7; compact class-0x7f acknowledgements complete those transactions without semantic echo or the former 0x64 self-delivery loop",
-      "evidence": ["docs/contact_service_topology.md"]
+      "evidence": ["docs/external_service_topology.md"]
     },
     {
       "id": "contact_dsp_busy_completion", "owner": "dsp_peer", "status": "modeled",
       "predicate": "Organic DSP TX type-0x70 payload 0d00 receives RX type-0x74 payload 0d00 and firmware clears contact busy bit 2 while retaining present bit 6",
       "current": "Observed in one coherent boot at 0x2349dc; final service-session status 0x49 and startup advances from mode 0x000d to 0x0004 before normal SIM APDUs begin",
-      "evidence": ["docs/contact_service_topology.md", "docs/dsp_interface.md"]
+      "evidence": ["docs/external_service_topology.md", "docs/dsp_interface.md"]
     },
     {
       "id": "sim_preliminary_lifecycle", "owner": "sim_task", "status": "satisfied",
