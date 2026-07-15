@@ -21,7 +21,7 @@ local pending_lcd = {}
 local lcd_dirty = false
 local active_fields = {}
 local startup_ready_time = nil
-local post_key_active = false
+local post_key_active = nil
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
@@ -49,15 +49,15 @@ local function field_by_mask(tag, mask)
 end
 
 local key_fields = {
-	enter = field_by_mask("COL.4", 0x08), up = field_by_mask("COL.0", 0x02),
-	down = field_by_mask("COL.1", 0x02), ["0"] = field_by_mask("COL.0", 0x04),
-	["1"] = field_by_mask("COL.1", 0x10), ["2"] = field_by_mask("COL.1", 0x08),
-	["3"] = field_by_mask("COL.4", 0x02), ["4"] = field_by_mask("COL.2", 0x10),
-	["5"] = field_by_mask("COL.2", 0x08), ["6"] = field_by_mask("COL.2", 0x04),
-	["7"] = field_by_mask("COL.3", 0x10), ["8"] = field_by_mask("COL.3", 0x08),
-	["9"] = field_by_mask("COL.3", 0x04), del = field_by_mask("COL.0", 0x10),
-	c = field_by_mask("COL.0", 0x10), minus = field_by_mask("COL.4", 0x04),
-	star = field_by_mask("COL.4", 0x10), power = field_by_mask("PWR", 0x01),
+	enter = field_by_mask("COL.1", 0x02), up = field_by_mask("COL.3", 0x02),
+	down = field_by_mask("COL.1", 0x04), ["0"] = field_by_mask("COL.2", 0x04),
+	["1"] = field_by_mask("COL.1", 0x08), ["2"] = field_by_mask("COL.1", 0x10),
+	["3"] = field_by_mask("COL.2", 0x08), ["4"] = field_by_mask("COL.3", 0x08),
+	["5"] = field_by_mask("COL.2", 0x10), ["6"] = field_by_mask("COL.4", 0x04),
+	["7"] = field_by_mask("COL.4", 0x08), ["8"] = field_by_mask("COL.3", 0x10),
+	["9"] = field_by_mask("COL.4", 0x10), del = field_by_mask("COL.2", 0x02),
+	c = field_by_mask("COL.2", 0x02), minus = field_by_mask("COL.3", 0x04),
+	star = field_by_mask("COL.4", 0x02), power = field_by_mask("PWR", 0x01),
 }
 
 local function press(name)
@@ -229,25 +229,38 @@ local function write_boot_summary()
 end
 
 local post_key = os.getenv("NOKI3210_POST_READY_KEY")
+local post_keys = {}
+for name in string.gmatch(os.getenv("NOKI3210_POST_READY_KEYS") or post_key or "", "[^,%s]+") do
+	post_keys[#post_keys + 1] = name
+end
 local post_delay = env_number("NOKI3210_POST_READY_KEY_DELAY_MS", 250) / 1000
-local post_duration = env_number("NOKI3210_POST_READY_KEY_DURATION_MS", 750) / 1000
+local post_duration = env_number("NOKI3210_POST_READY_KEY_DURATION_MS", 50) / 1000
+local post_gap = env_number("NOKI3210_POST_READY_KEY_GAP_MS", 100) / 1000
 local post_period = env_number("NOKI3210_POST_READY_KEY_PERIOD_MS", 0) / 1000
+local post_sequence_driven = #post_keys > 0 and post_period == 0
 
 local function update_post_ready_key()
-	if post_key and not startup_ready_time and (structural.final_startup_flags & 0x0f) == 0x0f then
+	if #post_keys > 0 and not startup_ready_time and (structural.final_startup_flags & 0x0f) == 0x0f then
 		startup_ready_time = emulation_seconds()
 	end
-	if not post_key or not startup_ready_time then return end
+	if #post_keys == 0 or not startup_ready_time then return end
 
 	local elapsed = emulation_seconds() - startup_ready_time
-	local active = false
+	local active = nil
 	if elapsed >= post_delay then
-		if post_period == 0 then active = elapsed < post_delay + post_duration
-		else active = ((elapsed - post_delay) % post_period) < post_duration end
+		if post_period ~= 0 and #post_keys == 1 then
+			if ((elapsed - post_delay) % post_period) < post_duration then active = post_keys[1] end
+		else
+			local sequence_elapsed = elapsed - post_delay
+			local slot_width = post_duration + post_gap
+			local slot = math.floor(sequence_elapsed / slot_width) + 1
+			if slot <= #post_keys and (sequence_elapsed % slot_width) < post_duration then active = post_keys[slot] end
+		end
 	end
 	if active ~= post_key_active then
+		if post_key_active then release(post_key_active) end
 		post_key_active = active
-		if active then press(post_key) else release(post_key) end
+		if active then press(active) end
 	end
 end
 
@@ -274,20 +287,34 @@ emu.add_machine_frame_notifier(function()
 	sample_structural_state()
 	if frames % 30 == 0 then write_boot_summary() end
 
-	update_post_ready_key()
+	if not post_sequence_driven then update_post_ready_key() end
 end)
 
 -- Frame notifications stop while this firmware gates the LCD clock.  Drive
 -- delayed input from an emulation-time coroutine so headless runs do not depend
 -- on either video frames or frontend periodic callbacks.
-if post_key then
+if #post_keys > 0 then
 	local input_timer = coroutine.create(function()
-		repeat
-			emu.wait(0.01)
-			sample_structural_state()
-			update_post_ready_key()
-		until post_period == 0 and startup_ready_time and not post_key_active and
-			emulation_seconds() >= startup_ready_time + post_delay + post_duration
+		if post_sequence_driven then
+			repeat
+				emu.wait(0.01)
+				sample_structural_state()
+			until (structural.final_startup_flags & 0x0f) == 0x0f
+			startup_ready_time = emulation_seconds()
+			emu.wait(post_delay)
+			for _, name in ipairs(post_keys) do
+				press(name)
+				emu.wait(post_duration)
+				release(name)
+				emu.wait(post_gap)
+			end
+		else
+			repeat
+				emu.wait(0.01)
+				sample_structural_state()
+				update_post_ready_key()
+			until false
+		end
 	end)
 	assert(coroutine.resume(input_timer))
 end

@@ -30,7 +30,9 @@ nokia_dsp_peer_device::nokia_dsp_peer_device(
 void nokia_dsp_peer_device::device_start()
 {
 	m_service_timer = timer_alloc(FUNC(nokia_dsp_peer_device::service_tick), this);
+	m_contact_timer = timer_alloc(FUNC(nokia_dsp_peer_device::contact_tick), this);
 	save_item(NAME(m_ram));
+	save_item(NAME(m_dspif));
 	save_item(NAME(m_service_enabled));
 	save_item(NAME(m_contact_enabled));
 	save_item(NAME(m_trace_enabled));
@@ -50,11 +52,13 @@ void nokia_dsp_peer_device::device_start()
 void nokia_dsp_peer_device::device_reset()
 {
 	std::fill(std::begin(m_ram), std::end(m_ram), 0);
+	std::fill(std::begin(m_dspif), std::end(m_dspif), 0);
 	// Power-on bootstrap-ready words. Once the firmware initializes the RX ring,
 	// 0x100 becomes ordinary shared storage.
 	m_ram[0x0fe / 2] = 1;
 	m_ram[0x100 / 2] = 1;
 	m_service_timer->adjust(attotime::never);
+	m_contact_timer->adjust(attotime::never);
 	m_discovery_complete = false;
 	m_registration_sent = false;
 	m_registration_acknowledged = false;
@@ -86,10 +90,32 @@ void nokia_dsp_peer_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 {
 	offset &= 0x7ff;
 	COMBINE_DATA(&m_ram[offset]);
+	// Ring producer commits and shared-service pending counts are independent
+	// DSP work sources. Not every contact-ring commit is followed by DSPIF
+	// command 4, so retain their observed scheduling boundaries.
 	if (m_contact_enabled && offset == TX_PRODUCER)
-		m_service_timer->adjust(attotime::from_usec(100));
+		m_contact_timer->adjust(attotime::from_usec(100));
 	if (m_service_enabled && offset == SVC_PENDING && data != 0)
 		m_service_timer->adjust(attotime::from_msec(m_service_delay_ms));
+}
+
+u8 nokia_dsp_peer_device::dspif_r(offs_t offset) const
+{
+	return m_dspif[offset & 3];
+}
+
+void nokia_dsp_peer_device::dspif_w(offs_t offset, u8 data)
+{
+	offset &= 3;
+	m_dspif[offset] = data;
+	if (offset != 1)
+		return;
+
+	const u16 command = (u16(m_dspif[0]) << 8) | m_dspif[1];
+	if (m_trace_enabled)
+		logerror("dsp_boundary: DSPIF command=%04x pending=%04x tx=%02x/%02x t=%.6f\n",
+				command, m_ram[SVC_PENDING], m_ram[TX_CONSUMER], m_ram[TX_PRODUCER],
+				machine().time().as_double());
 }
 
 void nokia_dsp_peer_device::pulse_fiq0()
@@ -155,6 +181,13 @@ bool nokia_dsp_peer_device::enqueue_contact_frame(u8 command, u8 result, u8 sequ
 TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::service_tick)
 {
 	m_ram[SVC_PENDING] = 0;
+	m_service_irq_cb(1);
+	m_service_irq_cb(0);
+	m_service_timer->adjust(attotime::from_msec(m_service_tick_ms));
+}
+
+TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::contact_tick)
+{
 	if (m_contact_enabled)
 	{
 		unsigned cursor = m_ram[TX_CONSUMER] % TX_WORDS;
@@ -246,7 +279,5 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_peer_device::service_tick)
 		m_healthy_sent = enqueue_contact_frame(0x64, 0x05, 0x44);
 	}
 
-	m_service_irq_cb(1);
-	m_service_irq_cb(0);
-	m_service_timer->adjust(attotime::from_msec(m_service_tick_ms));
+	m_contact_timer->adjust(attotime::from_msec(m_service_tick_ms));
 }

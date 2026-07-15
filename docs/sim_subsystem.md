@@ -16,7 +16,9 @@ SIMI is the MAD2 SIM UART at `0x020036..0x02003f`:
 | `0x39` | control/status | Firmware activation writes `0x32 -> 0x33 -> 0xb3`; live readback must include ready bit `0x40` while enabled. |
 | `0x3b` | TX low-water | Firmware programs `0x60` during activation. |
 | `0x3c` | RX fill | Number of readable bytes consumed by the receive FIQ loop. |
-| `0x3d..0x3f` | FIFO flags/fill | Not yet needed by the stateful model; retain as open SIMI detail. |
+| `0x3d` | RX FIFO control | Firmware programs `18,12,06` during activation and writes `06` before draining RX. Observed behavior requires a retained configuration latch but proves no destructive flush side effect. |
+| `0x3e` | TX FIFO control | `0x04` opens/fills a transmit chunk; `0x00` flushes it to the serial/card boundary and produces TX-empty progression. |
+| `0x3f` | TX fill | Live number of bytes waiting in the 16-byte SIMI TX FIFO. |
 
 FIQ line 6 is the SIMI interrupt. The firmware route is:
 
@@ -32,6 +34,25 @@ FIQ dispatcher 0x2af49c
 The former conclusion that RXD is only a reset flush and SIM replies arrive through an unrelated
 DSP/service message was false. It came from confusing SIM structure offsets with MMIO references.
 The register/FIQ path above has now executed end to end.
+
+The complete v6.00 IIR cascade at `0x2a054a` aligns in v5.01 at
+`0x29da8a`. Its causes are finite:
+
+| IIR bit | Firmware action |
+| ---: | --- |
+| `0x02` | post the static UART/error result at `0x2ccc00` |
+| `0x10` | run TX-empty progression at `0x2a033e` |
+| `0x20` | post static timeout result `0x06` through `0x2ca400` |
+| `0x40` | run RX FIFO dispatcher at `0x2a04c8` |
+| `0x80` | post the static terminal/error result at `0x2cc400` |
+
+The ISR reads IIR once and writes the same byte back, proving write-one-clear
+acknowledgement for every cause. The device currently generates only TX-empty
+and RX-ready. A T=0 work-waiting timeout would legitimately generate `0x20`
+only while a requested character is outstanding. The modeled card responds
+before that condition, so a periodic idle `0x20` source would be a recovery
+shim and is intentionally not implemented. Bits `0x02` and `0x80` remain
+fault-path contracts awaiting parity/framing or card-removal evidence.
 
 ## Firmware transaction contract
 
@@ -50,8 +71,12 @@ and only then does its caller consume the card response. Raising RX alone leaves
 stranded behind the missing TX event. IIR `0x20` is not TX completion: it posts static code `0x06`.
 
 Card responses must also be asynchronous. Raising FIQ from inside the final TXD write lets the
-handler observe the previous firmware descriptor. The device schedules TX-ready and RX-ready on a
-timer, exposes RX bytes only when ready, and cancels the trailing event when the FIFO empties.
+handler observe the previous firmware descriptor. TXD writes now enter a 16-byte UART FIFO rather
+than the APDU parser directly. Firmware opens the FIFO through `0x3e=0x04`, fills it, and flushes
+with `0x3e=0x00`; only the flush transfers the bytes to T=0 and schedules TX-empty. This permits a
+command body larger than one FIFO to advance through multiple TX-empty interrupts. The device
+schedules TX-ready and RX-ready on a timer, exposes RX bytes only when ready, and cancels the
+trailing event when the RX FIFO empties.
 
 ## Stateful card device
 
@@ -139,6 +164,10 @@ with `0x05e2`, and callback state slot `0x5d` is already `0x0b`. Inputs
 `0x06c5`; none is observed. Flags `0x01a00000` intentionally select `0x032d`
 instead of an automatic `0x05dc` start. A valid task-13 segmented transaction
 publishes `0x05eb` directly to task 16 and does not enter this callback path.
+The only recovered non-initialization selector for callback `0x5d` is the
+slot-`0x45`/`0x09d0` context route, whose writer/producer census is closed.
+Consequently this callback is not an autonomous ordinary-boot initiator; its
+valid local timer contract must not be promoted into a missing hardware event.
 The separately mapped callback-`0x1a` chain (`0x1400 -> 0x08ac`) is dormant:
 `0x1400` is task-5 mailbox ingress, and exhaustive recovery of all 188 direct
 task-5 event-helper calls found no in-ROM producer. It is therefore not the

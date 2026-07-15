@@ -76,6 +76,17 @@ posts code 7 to task 1, and has exactly four callers at `0x21e22c`,
 `0x21f772`, `0x252a4a`, and `0x277d06`. This is a same-product control for the
 stable four-owner topology.
 
+The caller comparison is also complete. The blocks around the first power
+caller preserve the same measurement predicate and shutdown outcome; the
+second power caller preserves the same charging-completed state update; and
+the controller caller preserves the same adjacent helper sequence before the
+report. Callback `0x5d` has the same subtract cascade, start statuses
+`0x05e1`/`0x05e7`/`0x05dc`, and terminal statuses `0x05eb`/`0x06c5`. Its only
+material local change is timer class `0x51` in v5.01 versus `0x52` in v6.00;
+the completion statuses and code-7 action are unchanged. The same-product
+comparison therefore exposes no alternate caller predicate, NV selector, or
+ordinary producer omitted from the v6.00 ownership analysis.
+
 The task-1 branch comparison is now complete. The v5.01 block at
 `0x26dc20..0x26df14` is instruction-for-instruction equivalent to v6.00
 `0x27120e..0x271502`, including both explicit code-7 waits, the six report
@@ -93,6 +104,12 @@ calculation and write-one-to-clear acknowledgement. The ADC route tables
 (`0x2e2d74`/`0x2d7770`) and CCONT shadow/default tables
 (`0x2e2da8`/`0x2d777c`) are byte-identical. This supports one shared 3210
 device contract; it does not establish analog units or timing.
+
+The MAD2 timer-0 setup is likewise stable. v6.00 `0x2aa934` aligns uniquely
+and byte-for-byte with v5.01 `0x2a75c4`: both program live divider `0xf9`, wait
+for it to reach `0xea`, compare at `counter+2`, consume FIQ4 and acknowledge it
+through the active-status register. This establishes the register protocol but
+not the physical timer input clock.
 
 The MAD2 power-key IRQ handler also aligns from v6.00 `0x2b3084` to v5.01
 `0x2b02fc`; both publish task-1 event `0x41` through corresponding wrappers

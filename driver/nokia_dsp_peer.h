@@ -19,6 +19,8 @@ public:
 
 	u16 shared_r(offs_t offset);
 	void shared_w(offs_t offset, u16 data, u16 mem_mask = ~0);
+	u8 dspif_r(offs_t offset) const;
+	void dspif_w(offs_t offset, u8 data);
 
 protected:
 	virtual void device_start() override;
@@ -26,6 +28,7 @@ protected:
 
 private:
 	TIMER_CALLBACK_MEMBER(service_tick);
+	TIMER_CALLBACK_MEMBER(contact_tick);
 	bool enqueue_rx_packet(u8 type, const u8 *payload, unsigned payload_length);
 	u8 tx_payload_byte(unsigned cursor, unsigned index) const;
 	bool enqueue_transport_ack(unsigned cursor, unsigned payload_bytes);
@@ -35,7 +38,9 @@ private:
 	devcb_write_line m_fiq0_cb;
 	devcb_write_line m_service_irq_cb;
 	emu_timer *m_service_timer = nullptr;
+	emu_timer *m_contact_timer = nullptr;
 	u16 m_ram[0x800] = { 0 };
+	u8 m_dspif[4] = { 0 };
 	bool m_service_enabled = false;
 	bool m_contact_enabled = false;
 	bool m_trace_enabled = false;

@@ -5,6 +5,11 @@
 
 DEFINE_DEVICE_TYPE(NOKIA_SIM_CARD, nokia_sim_card_device, "nokia_sim_card", "Nokia DCT3 SIM card")
 
+namespace {
+constexpr u8 SIMI_INT_TX_EMPTY = 0x10;
+constexpr u8 SIMI_INT_RX_READY = 0x40;
+}
+
 nokia_sim_card_device::nokia_sim_card_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_SIM_CARD, tag, owner, clock),
@@ -27,6 +32,10 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_rx_ready));
 	save_item(NAME(m_iir));
 	save_item(NAME(m_tx_ready_pending));
+	save_item(NAME(m_uart_tx_fifo));
+	save_item(NAME(m_uart_tx_count));
+	save_item(NAME(m_rx_fifo_control));
+	save_item(NAME(m_tx_fifo_control));
 	save_item(NAME(m_tx));
 	save_item(NAME(m_tx_len));
 	save_item(NAME(m_tx_expected));
@@ -44,6 +53,9 @@ void nokia_sim_card_device::device_reset()
 	m_rx_ready = false;
 	m_iir = 0;
 	m_tx_ready_pending = false;
+	m_uart_tx_count = 0;
+	m_rx_fifo_control = 0;
+	m_tx_fifo_control = 0;
 	m_tx_len = m_tx_expected = 0;
 	m_ins = 0;
 	m_selected_file = 0x3f00;
@@ -72,6 +84,7 @@ void nokia_sim_card_device::control_w(u8 data)
 		m_rx_ready = false;
 		m_iir = 0;
 		m_tx_ready_pending = false;
+		m_uart_tx_count = 0;
 		m_tx_len = m_tx_expected = 0;
 		m_selected_file = 0x3f00;
 		m_selected_df = 0x3f00;
@@ -107,7 +120,7 @@ TIMER_CALLBACK_MEMBER(nokia_sim_card_device::rx_ready)
 	if (m_tx_ready_pending)
 	{
 		m_tx_ready_pending = false;
-		m_iir |= 0x10;
+		m_iir |= SIMI_INT_TX_EMPTY;
 		m_irq_cb(1);
 		m_irq_cb(0);
 		m_rx_timer->adjust(attotime::from_usec(100));
@@ -116,7 +129,7 @@ TIMER_CALLBACK_MEMBER(nokia_sim_card_device::rx_ready)
 	if (m_rx_count != 0)
 	{
 		m_rx_ready = true;
-		m_iir |= 0x40;
+		m_iir |= SIMI_INT_RX_READY;
 		m_irq_cb(1);
 		m_irq_cb(0);
 	}
@@ -157,14 +170,51 @@ u8 nokia_sim_card_device::rx_count_r() const
 	return m_rx_ready ? std::min<u16>(m_rx_count, 0xff) : 0;
 }
 
-void nokia_sim_card_device::rx_ack_w(u8 data)
+void nokia_sim_card_device::rx_fifo_control_w(u8 data)
 {
+	// Activation programs 0x18, 0x12 and 0x06; receive rewrites 0x06 before
+	// each drain. No recovered path assigns a destructive flush side effect.
+	m_rx_fifo_control = data;
 }
 
 void nokia_sim_card_device::txd_w(u8 data)
 {
 	if (!m_enabled || !BIT(m_control, 7))
 		return;
+	if (m_uart_tx_count < std::size(m_uart_tx_fifo))
+		m_uart_tx_fifo[m_uart_tx_count++] = data;
+}
+
+void nokia_sim_card_device::tx_fifo_control_w(u8 data)
+{
+	const u8 old = m_tx_fifo_control;
+	m_tx_fifo_control = data;
+	if (!m_enabled || !BIT(m_control, 7))
+		return;
+
+	// The firmware sets bit 2 before filling TXD and clears the register to
+	// flush. A flush transfers the UART FIFO to the T=0 parser and raises the
+	// TX-empty cause even when a command body needs another FIFO-sized chunk.
+	if (data == 0 && old != 0)
+	{
+		for (unsigned i = 0; i < m_uart_tx_count; i++)
+			consume_txd(m_uart_tx_fifo[i]);
+		m_uart_tx_count = 0;
+		if (!m_tx_ready_pending)
+		{
+			m_tx_ready_pending = true;
+			m_rx_timer->adjust(attotime::from_usec(10));
+		}
+	}
+}
+
+u8 nokia_sim_card_device::tx_count_r() const
+{
+	return m_uart_tx_count;
+}
+
+void nokia_sim_card_device::consume_txd(u8 data)
+{
 
 	if (m_tx_len < std::size(m_tx))
 		m_tx[m_tx_len++] = data;

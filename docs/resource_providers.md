@@ -87,6 +87,16 @@ flags `0x01a00000` deliberately choose status `0x032d`, rather than automatic
 `0x05dc`, during framework selection, so callback activation alone does not
 start the timer.
 
+There is no separate object or peer acknowledgement hidden behind that timer.
+The three start statuses directly construct the local class-`0x52` timeout.
+A physical wrong-code control supplies an organic `0x05e1`, but the dispatcher
+routes it back to callback `0x47`, not callback `0x5d`; status values are scoped
+to the selected callback. The only mapped non-initialization selection of
+callback `0x5d` remains the `0x09d0` context route gated by state slot `0x45`.
+The completed slot census finds no organic writer. This closes callback `0x5d`
+as the present ordinary-hardware frontier while retaining its valid dormant
+service/test contract.
+
 The transaction engine around `0x264504` and `0x264c98` owns statuses
 `0x0280`-`0x0283`. Contact-service commands `0x81` and `0x82`, plus independent
 ASCII local/test command frontends around `0x27c270`, reach these functions.
@@ -137,10 +147,12 @@ The observed input `0x05dc` instead enters `0x28f588` and starts the generic
 text/UI transaction manager through `0x24b174 -> 0x24af70`. That constructor
 stores `0x0578` as its completion status at `[0x110590 + 0x16]`, publishes
 `0x057c` when the editor is presented, and waits for the UI transaction to
-finish. The coherent run receives `0x05dc` at 4.557 s and `0x057c` shortly
-afterward, but no `0x0578`, `0x1440`, or `0x05e1`. This classifies the branch
-as an interactive UI lifecycle, not an absent radio/DSP reply and not an
-unconditional ordinary-boot hardware prerequisite.
+finish. A deterministic physical `12345` plus softkey sequence now completes it
+through `0x0578`. Verifier `0x2ae704` returns one only when the transformed input
+matches the four stored bytes, selecting callback result `0x05e6`; mismatch
+instead posts `0x05e1`. This classifies the branch as a completed interactive UI
+lifecycle, not an absent radio/DSP reply or an unconditional ordinary-boot
+hardware prerequisite.
 
 The transient and resident service-registration completion paths at `0x2632be` and
 `0x263e64` both publish readiness after

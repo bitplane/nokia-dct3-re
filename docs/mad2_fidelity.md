@@ -22,8 +22,8 @@ Confidence labels:
 | Internal boot ROM | mapped at low address | Placeholder | Execution is redirected to flash entry; the real reset/boot-ROM sequence is bypassed. |
 | Main RAM | 512 KiB backing store | Inferred | Firmware layout works; physical decode and model-specific sizes need cross-ROM proof. |
 | DSP shared RAM | 4 KiB backing store plus special reads | Placeholder | Several ready/status offsets are synthesized; no DSP core executes. |
-| DSPIF `0x30000` | reads zero, writes discarded | Placeholder | Firmware touches it; command/status semantics are unknown. |
-| MCUIF `0x40000` | reads zero, writes discarded | Placeholder | Memory-window configuration semantics are unknown. |
+| DSPIF `0x30000` | four-byte peer-device register; command-4 doorbell observed | Partial | Coherent boot emits 26 command-4 strobes after initialization. Contact-ring and shared-service timers are split, but command 4 does not accompany every ring commit and cannot replace both observed work triggers. |
+| MCUIF `0x40000` | retained four-byte configuration register | Mapped latch | Boot writes `6a 0f 61 20` once and never reads it in the coherent run. Decode fields before applying window side effects. |
 | ROM2 window | modulo mirror of flash | Inferred | Matches current reads; decode/mirroring needs boot-ROM or second-ROM confirmation. |
 | EEPROM parallel window | read-only alias of input region | Placeholder | Serial 24C128 is faithful at GenIO; relationship of the parallel window to EEPROM hardware is unproven. |
 
@@ -40,7 +40,7 @@ Confidence labels:
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
 | `0d` clock control | stored only | Placeholder | Map clock domains and sleep transitions. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
-| `0f..13` timer 0 | divider/counter/compare model | Partial | Verify input clock, divider formula, compare edge and reload behavior. |
+| `0f..13` timer 0 | live divider/counter/compare model with FIQ4 | Cross-ROM semantics, calibrated clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge FIQ4 identically. Establish the input oscillator/divider formula and remove the frequency/catch-up knobs. |
 
 ## PUP, GPIO and serial blocks
 
@@ -50,23 +50,24 @@ Confidence labels:
 | MBUS `18..1a` | byte/status state plus scheduled FIQ | Partial | Capture complete request/reply framing and collision/timing behavior. |
 | Vibrator/buzzer `1b/1c/1e` | register storage only | Placeholder | Connect outputs and derive divider/volume mapping. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
-| Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, row direction/drive, masked falling-edge latch, shared IRQ6 acknowledgement | Cross-ROM contract | Confirm undocumented sibling registers and electrical debounce on hardware. |
+| Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, ROM-derived 3210 wiring, row direction/drive, physical press/release edges on IRQ0 | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |
 | GENSIO `2c..2e`, `6c..6f` | CCONT and LCD endpoints; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Partial | Confirm busy timing, remaining control bits and SELECT routing. |
 | SELECT2/3 aliases `ad..af`, `ed..ef` | backing registers | Placeholder | Identify attached companion devices and alias/decode behavior. |
-| SIMI `36..3f` | stateful SIM UART, FIFO/IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and the validated T=0 card lifecycle use the organic register/FIQ path; FIFO flag details remain open. |
-| UIF control pins `31..33`, `70..f3` | mostly backing registers | Placeholder | Map pin functions from service schematics and live access sequences. |
+| SIMI `36..3f` | stateful SIM UART, 16-byte TX FIFO, RX FIFO, IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and validated T=0 use the organic path; TX control `0x04`/`0x00`, live fill and multi-chunk TX-empty progression are modeled. All IIR causes are decoded; WWT and framing/error causes remain unexercised fault paths. |
+| UIF control pins `31..33`, `70..f3` | backing latches; `0x31.bit1` is power-duty-cycle owned | Partial | `0x31` has six exhaustive RMW sites and no external-input consumer; map physical pin nets and the remaining banks from schematics. |
 
 ## Interrupt ownership
 
-MAD2 owns aggregation and CPU-line assertion. Component devices should expose
-level callbacks and must not write MAD2 pending registers directly. The
-extracted CCONT follows this rule; DSP, MBUS and keypad currently remain inside
-the phone state. Known line assignments in the current model are DSP service 4,
-SIM probe 5, CCONT/keypad 6, with line 8 represented by the extended pending
-bit. The keypad's edge latch and CCONT's level are tracked independently and
-ORed onto shared line 6, so acknowledging a key cannot discard an active CCONT
-source. Only CCONT line 6 has a component boundary; the other assignments need
-hardware confirmation.
+MAD2 owns aggregation and CPU-line assertion. Component devices expose level
+callbacks and do not write MAD2 pending registers directly. The extracted
+CCONT and DSP peer follow this rule; MBUS and keypad remain inside the phone
+state. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ6,
+DSP receive FIQ0, SIMI FIQ6, timer compare FIQ4, and MBUS FIQ2/FIQ3, with line
+8 represented by the extended pending bit. The keypad edge latch and CCONT
+level are independent sources; acknowledging IRQ0 cannot discard an active
+CCONT IRQ6. The v5.01/v6.00 keypad and CCONT firmware paths support those two
+IRQ assignments. The remaining assignments still need a second runtime oracle
+or hardware documentation.
 
 ## Extraction gate
 
@@ -86,10 +87,40 @@ register description. It intentionally excludes RAM and firmware hooks. The
 old `TRACE_MMIO` documentation predates the instrumentation cleanup and is not
 currently implemented.
 
-Validation run (3210 v6.00, three emulated seconds, 2026-07-11): 86 bounded
-records were emitted, comprising 34 first reads and 52 first writes. The trace
-captured reset/UIF setup from `0x200068`, GENSIO/LCD initialization, CCONT
-selection, MBUS status, interrupt activity, watchdog service and SIMI setup.
+Validation run (3210 v6.00 coherent profile, eight emulated seconds,
+2026-07-15): 104 bounded records were emitted, comprising 44 first reads and 60
+first writes across IO, DSPIF and MCUIF. `tools/mad2_access_census.py` checks the one-record-per-direction
+contract and produces JSON plus Markdown through `make mad2-census
+MAD2_LOG=...`. The trace captures reset/UIF setup from `0x200068`, GENSIO/LCD
+initialization, CCONT selection, timer-0 setup, MBUS status, interrupt activity,
+watchdog service and the complete boot SIMI setup. The formerly unknown offset
+`0x31` is now classified as CTRL-I/O signal register 1.
+
+The `0x31` literal census is exhaustive: six loads, all followed by byte
+read-modify-write operations on bit 1. Five are in the power subsystem's
+duty-cycle update paths (`0x21c506`, `0x21c57a`, `0x21c5b8`, `0x21c724`, and
+`0x21c738`); initialization at `0x2a6664` sets the same bit. No site consumes
+an external pin level or associates an interrupt. The v5.01 initializer aligns
+at `0x2a3b26`. A stored output latch is therefore the complete currently
+observable contract, while the PCB signal name remains deliberately unknown.
+
+Timer-0 initialization at v6.00 `0x2aa934` aligns uniquely and byte-for-byte
+with v5.01 `0x2a75c4`. Both routines write divider `0xf9`, wait until the live
+divider is at most `0xea`, program a compare two counter ticks ahead, wait for
+FIQ4, and acknowledge it through status offset `0x08`. This validates the live
+divider, coherent 16-bit counter read, compare and write-one-clear contract.
+It does not reveal the physical input clock. The coherent profile's 20 MHz
+base and catch-up behavior therefore remain explicit calibration debt rather
+than being promoted into the device contract.
+
+The widened ledger observes one MCUIF dword write (`6a 0f 61 20`) from boot and
+no MCUIF reads. DSPIF receives its initial zero halfword and then 26 command-4
+writes from `0x29103c` and `0x290778`. `nokia_dsp_peer_device` now owns the
+register. Contact-ring parsing and delayed shared-service completion now use
+independent timers. Repeating the command-4-only experiment after that split
+still did not preserve the frontier: not every contact-ring producer commit is
+paired with command 4. The established ring-producer and service-pending
+triggers therefore remain.
 
 ## GENSIO focused trace
 

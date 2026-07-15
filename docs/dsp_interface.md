@@ -20,8 +20,8 @@ boot frontier: ordinary SIM initialization now runs after contact startup.
 | MMIO | region | driver | boot usage |
 |---|---|---|---|
 | `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `nokia_dsp_peer_device::shared_r/w` through `dsp_ram_r/w` | partial HLE — backing store, packet rings, service timing and request-derived contact replies |
-| `0x30000–0x30003` | **DSPIF** control register | `mad2_dspif_r/w` (stub: reads 0, writes no-op) | early initialization plus reachable command-4 doorbells from `0x290cf4`; wider L1 use remains unmapped at runtime |
-| `0x40000` | MCUIF (memory-range config) | `mad2_mcuif_r/w` (stub) | early config |
+| `0x30000–0x30003` | **DSPIF** control register | retained by `nokia_dsp_peer_device::dspif_r/w` | early initialization plus repeated command-4 doorbells from shared-control and L1 send paths |
+| `0x40000–0x40003` | MCUIF (memory-range config) | retained by `mad2_mcuif_r/w` | early config value `6a 0f 61 20` |
 
 The atlas counted ~444 references to the shared-RAM base and 42 pool-literal references
 to DSPIF across the image. Earlier boot-only traces saw just the initialization writes,
@@ -31,6 +31,18 @@ but a coherent stateful-SIM run reaches `0x290cf4` with service commands `0x30` 
 not a static-only future path. Those service commands remain useful lower-radio
 evidence; the distinct boot-critical contact completion is now mapped as type
 `0x70` TX / type `0x74` RX.
+
+The widened MAD2 access ledger records 27 DSPIF command writes in the coherent
+boot: one zero-valued initialization and 26 command-4 writes, chiefly from
+`0x29103c` with one from `0x290778`. The command halfword is followed by the
+MAD2 doorbell write, so DSPIF is now retained by the peer device rather than
+discarded. Contact-ring delivery and shared-control completion now use
+independent timers, so neither activity can overwrite the other's deadline.
+Command 4 is still not the sole HLE scheduling edge: a repeat doorbell-only run
+left contact status `0x0089`, task 1 in mode `0x000d`, and SIM disabled because
+not every contact-ring producer commit is paired with that command. The
+independently validated ring-producer and service-pending triggers therefore
+remain part of the partial peer contract.
 
 ## Shared-RAM layout at boot (`0x10000` base; offsets are byte offsets)
 

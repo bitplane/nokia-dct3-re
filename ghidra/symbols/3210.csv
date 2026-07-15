@@ -650,6 +650,8 @@ address,kind,name
 0x0027cd4c,function,vbat_sample_accumulate_27cd4c
 0x002982e8,label,display_idle_flag_clear_2982e8
 0x002af190,function,code7_reporter_post_2af190
+0x0021c4f2,function,power_duty_cycle_uif1_update_21c4f2
+0x002a665e,function,power_duty_cycle_uif1_init_2a665e
 0x002af17a,function,code6_resource6a00_reporter_2af17a
 0x0027cd82,function,vbat_code7_voltage_gate_27cd82
 0x0021e3f8,function,battery_shutdown_check_code7_21e3f8
@@ -684,3 +686,9 @@ address,kind,name
 0x0011239c,label,startup_classification_11239c
 0x0011239d,label,post74_keypad_scan_armed_11239d
 0x002b4652,label,decoded_key0d_arms_post74_keypad_scan_2b4652
+0x002ae4e8,function,security_code_transform_2ae4e8
+0x002ae6b0,function,security_code_attempt_state_2ae6b0
+0x002ae704,function,security_code_verify_2ae704
+0x002a033e,function,simi_tx_empty_progress_2a033e
+0x002a04c8,function,simi_rx_fifo_dispatch_2a04c8
+0x002a054a,function,simi_fiq6_iir_dispatch_2a054a

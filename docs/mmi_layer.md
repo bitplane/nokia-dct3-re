@@ -11,16 +11,19 @@ task 1 remains in startup mode `0x0004`. The screen is presentation state, not
 proof that the application desktop is interactive.
 
 A scripted logical press changes the active-low MAD2 keypad state and raises
-IRQ6. The
-firmware acknowledges the interrupt and posts event `0x72` to task 1. Task 1
-receives the event, but the mode-4 handler takes unhandled-event return `0x2701b0` instead of
-entering the matrix scanner. No decoded key event reaches the MMI.
+IRQ0. Handler `0x2b3084` starts the firmware's internal `0x41/0x42/0x43`
+sequence, which scans the matrix at `0x2b2f90`, decodes the ROM keymap, and
+publishes resource `0x6e02` at `0x2b4628`. This works while task 1 remains in
+mode `0x0004`; the former IRQ6/event-`0x72` route was a driver wiring error.
 
-The corrected coherent trace drives Enter 250 ms after readiness through
-MAME's ordinary input field. It observes one IRQ6/ISR delivery and one
-event-`0x72` return at `0x2701b0`, with zero post-press calls to matrix scanner
-`0x2b2f90`.
-The only scan in the run is the firmware's early mode-1 initialization scan.
+A coherent trace drives the left softkey 250 ms after readiness and decodes
+keycode `0x19` without posting report code 7. A scheduler-backed sequence can
+also drive `12345` plus the left softkey after the editor publishes `0x057c`.
+All physical press/release edges enter IRQ0, the digit path reaches the editor,
+and submission completes the transaction through `0x0578`. The callback returns
+`0x05e6`, the statically proved accepted-code result. The entered `12345`
+therefore matches the firmware-derived value stored at RAM `0x112460`; keypad
+delivery and the synthetic EEPROM security-code encoding are both validated.
 
 ## Hardware path
 
@@ -28,24 +31,23 @@ The only scan in the run is the firmware's early mode-1 initialization scan.
 MAME input ports COL.0..COL.4 (five columns, four row bits each)
   -> MAD2 row signal 0x28 / direction 0xa8
   -> active-low column input 0x2a / interrupt mask 0x6b
-  -> masked falling-edge latch
-  -> IRQ6 aggregation
-  -> firmware ISR 0x2b5da0
-  -> event 0x72
-  -> task-1 mailbox
+  -> physical press/release edge
+  -> MAD2 IRQ0
+  -> firmware ISR 0x2b3084
+  -> task-1 event 0x41
+  -> internal 0x41/0x42/0x43 scan/decode sequence
+  -> resource 0x6e02
 ```
 
 The IRQ source, polarity, acknowledgement, mailbox destination, and scheduler
-delivery are therefore proved. MAD2 line 6 is shared with CCONT, so the model
-keeps separate keypad-edge and CCONT-level sources and ORs them at the
-aggregator. The driver must not invent a separate keypad task or post a decoded
-MMI key directly.
+delivery are therefore proved. MAD2 IRQ6 belongs to CCONT and must remain
+separate. The driver does not post a decoded MMI key directly.
 
 ## Register contract
 
 The complete v6.00 matrix scanner `0x2b2f90` aligns uniquely with v5.01
 `0x2b0208`; the downstream decoder block `0x2b4628` aligns with `0x2b18b0`, and
-the IRQ ISR `0x2b5da0` aligns with `0x2b3200`. Both firmware versions implement
+the IRQ0 ISR `0x2b3084` aligns with `0x2b02fc`. Both firmware versions implement
 the same sequence:
 
 1. Save column-interrupt mask `0x6b` and set its low five bits to mask all.
@@ -58,29 +60,15 @@ the same sequence:
    mask.
 
 The five MAME `COL.n` ports are therefore columns, not rows. Their bits 1..4
-are the four row contacts; power is the direct bit-0 input. The former driver
-reversed these axes, ignored direction and interrupt mask, and asserted IRQ6
-both from an input callback and a 200 Hz poller. The corrected model derives
-columns from driven-low output rows and latches one IRQ only for an unmasked
-high-to-low column transition.
+are the four row contacts; power is the direct bit-0 input. Matrix positions
+come from the 25-byte ROM table at `0x2e2d58`. The corrected model derives
+columns from driven-low output rows and reports physical press and release
+edges through IRQ0.
 
 ## Firmware consumer
 
-Task 1 owns the raw event. Static and runtime evidence agree:
-
-- the ISR selects mailbox/task 1;
-- the universal receive path delivers `0x72` while task id 1 is running;
-- the task-1 startup dispatcher branches according to mode `0x1123f0`;
-- mode `0x0004` consumes the event without scanning;
-- the matrix scan/decode path is reachable only after the shared interactive
-  initialization lifecycle.
-
-The earlier claim that the consumer was dormant was wrong. The consumer is
-active but deliberately in a startup state that does not decode keys.
-
-Once the interactive lifecycle is active, event `0x72` enters the master input
-handler at `0x270a8c`, which publishes resource `0x7317` value 1 and starts the
-internal `0x41`/`0x42`/`0x43` key-state sequence. Those internal events call
+IRQ0 handler `0x2b3084` calls the task-1 event-`0x41` publisher directly.
+Those internal events call
 `0x2b46da`; it scans the matrix and translates the result through the selected
 keymap. Function `0x2b4628` then publishes decoded resource `0x6e02`. Its store
 at `0x2b4652` arms `0x11239d` when the previous decoded key is `0x0d` and the
@@ -89,18 +77,9 @@ event or a possible source of report code 7.
 
 ## Startup prerequisite
 
-For 3210 v6.00's current branch, report code `0x07` is a real prerequisite for
-leaving the mode-4 wait and running the shared initialization burst at
-`0x270d1c`. A diagnostic report proved that dependency, but the resulting boot
-was incoherent and is not a supported model.
-
-The faithful target is therefore not “make IRQ6 work”; it already works. It is:
-
-1. produce report code 7 through its organic firmware owner;
-2. observe task 1 enter the shared interactive initialization path;
-3. press a key through the ordinary MAME input port;
-4. observe matrix scanning and a decoded MMI key;
-5. observe a corresponding UI transition without firmware-state forcing.
+Report code `0x07` still selects a later mode-4 continuation, but it is not a
+prerequisite for keypad decoding or security-editor input. The earlier claim
+confused the misrouted IRQ6 event with the real keypad path.
 
 ## Acceptance evidence
 
@@ -108,17 +87,17 @@ A complete input milestone requires all of the following in one coherent run:
 
 - contact status remains healthy;
 - SIM initialization remains organic;
-- task 1 leaves mode `0x0004` without an injected report;
-- IRQ6 posts event `0x72` to task 1;
-- the firmware matrix scan executes after that event;
-- a decoded key reaches the MMI event layer;
-- the displayed frame changes consistently with the selected key.
+- IRQ0 enters `0x2b3084` on physical press and release;
+- the firmware matrix scan executes through the `0x41/0x42/0x43` sequence;
+- a decoded key reaches the MMI event layer; and
+- a multi-key editor transaction reaches its firmware-owned completion.
 
-An idle-looking PNG alone does not satisfy this contract.
+The hardware-to-editor contract now satisfies those conditions. An idle-looking
+PNG alone still does not prove an application desktop.
 
 ## Diagnostics
 
-`NOKI3210_TRACE_HANDOFF=1` records the task-1 mode, event-`0x72` branch, report
+`NOKI3210_TRACE_HANDOFF=1` records the task-1 mode, IRQ0 handler, report
 surface, and scan/decode seam. `NOKI3210_TRACE_TASKS=1` provides generic
 mailbox-edge context. Both are read-only and must be disabled successfully in
 the final acceptance run.

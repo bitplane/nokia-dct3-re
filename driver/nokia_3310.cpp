@@ -106,6 +106,7 @@ constexpr uint16_t MAD2_FIQ_MBUS_MASK = 0x0c;
 // PWRONX is latched as CCONT status bit 1 on a cold power-key boot. It is a
 // reset cause sampled by firmware, not one of the upper interrupt sources.
 constexpr uint8_t CCONT_BOOT_IRQ_DEFAULT = 0x02;
+constexpr uint8_t KEYPAD_IRQ_LINE_NUM = 0;        // MAD2 keypad/UIF interrupt
 constexpr uint8_t CCONT_IRQ_LINE_NUM = 6;         // MAD2 IRQ line the CCONT asserts
 
 // Firmware RAM locations used only by focused diagnostics and scoped boot shims.
@@ -302,7 +303,7 @@ private:
 	void dsp_service_irq_w(int state);
 	uint8_t keypad_columns_r(bool consume_power_on = false);
 	void update_keypad_columns();
-	void update_irq6_line();
+	void update_keypad_ccont_irqs();
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
 	uint32_t fw_dword(offs_t address) const;
@@ -341,6 +342,11 @@ private:
 	uint8_t       m_mad2_regs[0x100];
 	bool          m_mad2_trace_read[0x100] = {false};
 	bool          m_mad2_trace_write[0x100] = {false};
+	bool          m_dspif_trace_read[4] = {false};
+	bool          m_dspif_trace_write[4] = {false};
+	bool          m_mcuif_trace_read[4] = {false};
+	bool          m_mcuif_trace_write[4] = {false};
+	uint8_t       m_mcuif_regs[4] = {0};
 	unsigned      m_gensio_trace_count = 0;
 	uint8_t       m_gensio_status = 0x03;
 };
@@ -387,6 +393,7 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0x2C:  return "[UIF/GENSIO] CCont write (w)";
 	case 0x2D:  return "[UIF/GENSIO] GENSIO start transaction (w)";
 	case 0x2E:  return "[UIF/GENSIO] LCD data write (w)";
+	case 0x31:  return "[UIF] CTRL I/O 1 signal lines (rw)";
 	case 0x32:  return "[UIF] CTRL I/O 2 (rw)";
 	case 0x33:  return "[UIF] CTRL I/O 3 (rw)";
 	case 0x36:  return "[SIMI] SIM UART TxD (w)";
@@ -532,6 +539,7 @@ void noki3310_state::machine_start()
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
 	m_timer_fiq8 = timer_alloc(FUNC(noki3310_state::timer_fiq8), this);
 	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
+	save_item(NAME(m_mcuif_regs));
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -564,6 +572,11 @@ void noki3310_state::machine_reset()
 	memset(m_mad2_regs, 0, 0x100);
 	std::fill(std::begin(m_mad2_trace_read), std::end(m_mad2_trace_read), false);
 	std::fill(std::begin(m_mad2_trace_write), std::end(m_mad2_trace_write), false);
+	std::fill(std::begin(m_dspif_trace_read), std::end(m_dspif_trace_read), false);
+	std::fill(std::begin(m_dspif_trace_write), std::end(m_dspif_trace_write), false);
+	std::fill(std::begin(m_mcuif_trace_read), std::end(m_mcuif_trace_read), false);
+	std::fill(std::begin(m_mcuif_trace_write), std::end(m_mcuif_trace_write), false);
+	std::fill(std::begin(m_mcuif_regs), std::end(m_mcuif_regs), 0);
 	m_gensio_trace_count = 0;
 	m_gensio_status = 0x03;
 	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
@@ -677,7 +690,7 @@ void noki3310_state::update_irq_line()
 void noki3310_state::ccont_irq_w(int state)
 {
 	m_ccont_irq_state = bool(state);
-	update_irq6_line();
+	update_keypad_ccont_irqs();
 }
 
 void noki3310_state::ccont_power_w(int state)
@@ -728,13 +741,18 @@ uint8_t noki3310_state::keypad_columns_r(bool consume_power_on)
 	return data | 0xe0;
 }
 
-void noki3310_state::update_irq6_line()
+void noki3310_state::update_keypad_ccont_irqs()
 {
-	const uint16_t irq_mask = uint16_t(1) << CCONT_IRQ_LINE_NUM;
-	if (m_ccont_irq_state || m_keypad_irq_latched)
-		m_irq_status |= irq_mask;
+	const uint16_t keypad_mask = uint16_t(1) << KEYPAD_IRQ_LINE_NUM;
+	const uint16_t ccont_mask = uint16_t(1) << CCONT_IRQ_LINE_NUM;
+	if (m_keypad_irq_latched)
+		m_irq_status |= keypad_mask;
 	else
-		m_irq_status &= ~irq_mask;
+		m_irq_status &= ~keypad_mask;
+	if (m_ccont_irq_state)
+		m_irq_status |= ccont_mask;
+	else
+		m_irq_status &= ~ccont_mask;
 	update_irq_line();
 }
 
@@ -746,7 +764,7 @@ void noki3310_state::update_keypad_columns()
 	if (falling)
 	{
 		m_keypad_irq_latched = true;
-		update_irq6_line();
+		update_keypad_ccont_irqs();
 	}
 }
 
@@ -787,11 +805,11 @@ void noki3310_state::ack_fiq(uint16_t mask)
 
 void noki3310_state::ack_irq(uint16_t mask)
 {
-	if (mask & (uint16_t(1) << CCONT_IRQ_LINE_NUM))
+	if (mask & (uint16_t(1) << KEYPAD_IRQ_LINE_NUM))
 		m_keypad_irq_latched = false;
 	m_irq_status &= ~mask;
-	if (mask & (uint16_t(1) << CCONT_IRQ_LINE_NUM))
-		update_irq6_line();
+	if (mask & ((uint16_t(1) << KEYPAD_IRQ_LINE_NUM) | (uint16_t(1) << CCONT_IRQ_LINE_NUM)))
+		update_keypad_ccont_irqs();
 	else
 		update_irq_line();
 }
@@ -1130,12 +1148,12 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 					debug_ram_word(FW_STARTUP_MODE), machine().time().as_double());
 	}
-	// Keypad IRQ6 posts raw event 0x72 to task 1. In startup mode 4, task 1
-	// deliberately accepts only report code 7; this trace distinguishes that
-	// lifecycle gate from failed interrupt, queue, or matrix hardware.
+	// Keypad IRQ0 enters its own ISR and starts the firmware's 0x41/0x42/0x43
+	// scan/decode sequence. IRQ6 is the separate CCONT source.
 	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
-			(addr == 0x002b5da0 || addr == 0x002b5dba || addr == 0x00271256 ||
-			 addr == 0x002701b0 || addr == 0x00271266 || addr == 0x002b2f90))
+			(addr == 0x002b3084 || addr == 0x002b4628 || addr == 0x002b5da0 ||
+			 addr == 0x002b5dba || addr == 0x00271256 || addr == 0x002701b0 ||
+			 addr == 0x00271266 || addr == 0x002b2f90))
 	{
 		static unsigned keypad_handoff_count = 0;
 		const uint16_t event = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)) & 0xffff;
@@ -1145,7 +1163,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					"irq=%02x mask=%02x rows=%02x caller=%08x t=%.6f\n",
 					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
-					(addr == 0x002b5da0 || addr == 0x002b2f90) ?
+					(addr == 0x002b3084 || addr == 0x002b4628 || addr == 0x002b5da0 || addr == 0x002b2f90) ?
 						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff : event,
 					debug_ram_word(FW_STARTUP_MODE), debug_ram_byte(0x00100022),
 					m_irq_status, m_mad2_regs[MAD2_IRQ_MASK], m_mad2_regs[0x28],
@@ -1837,6 +1855,10 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			if (m_sim_card->enabled())
 				data = m_sim_card->rx_count_r();
 			break;
+		case 0x3f:  // SIM UART TxD queue fill
+			if (m_sim_card->enabled())
+				data = m_sim_card->tx_count_r();
+			break;
 		case 0x6c:
 			data = m_ccont->serial_r();
 			m_gensio_status &= ~0x04;
@@ -1902,7 +1924,9 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 	else if (offset == 0x39 && m_sim_card->enabled())
 		m_sim_card->control_w(data);
 	else if (offset == 0x3d && m_sim_card->enabled())
-		m_sim_card->rx_ack_w(data);
+		m_sim_card->rx_fifo_control_w(data);
+	else if (offset == 0x3e && m_sim_card->enabled())
+		m_sim_card->tx_fifo_control_w(data);
 	if (offset == 0x2d)
 	{
 		// Selecting a GENSIO endpoint leaves the controller idle and its
@@ -2017,27 +2041,61 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 {
+	offset &= 3;
+	const u8 data = m_dsp_peer->dspif_r(offset);
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_dspif_trace_read[offset])
+	{
+		m_dspif_trace_read[offset] = true;
+		logerror("mad2_ledger: R bus=DSPIF off=%02x data=%02x pc=%08x t=%.6f DSP API control\n",
+				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
+	}
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
-	return 0;
+	return data;
 }
 
 void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 {
+	offset &= 3;
+	const u8 old_data = m_dsp_peer->dspif_r(offset);
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_dspif_trace_write[offset])
+	{
+		m_dspif_trace_write[offset] = true;
+		logerror("mad2_ledger: W bus=DSPIF off=%02x data=%02x old=%02x pc=%08x t=%.6f DSP API control\n",
+				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
+	}
 	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
 		logerror("dsp_boundary: DSPIF W off=%x data=%02x pc=%08x task=%02x t=%.6f\n",
 				u32(offset), data, m_maincpu->pc() & ~u32(1), fw_byte(0x00100022),
 				machine().time().as_double());
+	m_dsp_peer->dspif_w(offset, data);
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
 }
 
 uint8_t noki3310_state::mad2_mcuif_r(offs_t offset)
 {
+	offset &= 3;
+	const u8 data = m_mcuif_regs[offset];
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mcuif_trace_read[offset])
+	{
+		m_mcuif_trace_read[offset] = true;
+		logerror("mad2_ledger: R bus=MCUIF off=%02x data=%02x pc=%08x t=%.6f memory-window control\n",
+				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
+	}
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x MCUIF\n", offset);
-	return 0;
+	return data;
 }
 
 void noki3310_state::mad2_mcuif_w(offs_t offset, uint8_t data)
 {
+	offset &= 3;
+	const u8 old_data = m_mcuif_regs[offset];
+	m_mcuif_regs[offset] = data;
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mcuif_trace_write[offset])
+	{
+		m_mcuif_trace_write[offset] = true;
+		logerror("mad2_ledger: W bus=MCUIF off=%02x data=%02x old=%02x pc=%08x t=%.6f memory-window control\n",
+				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
+	}
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x MCUIF\n", offset, data);
 }
 
@@ -2060,43 +2118,44 @@ void noki3310_state::noki3310_map(address_map &map)
 INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 {
 	update_keypad_columns();
+	// A physical matrix switch edge, including release, wakes the keypad ISR.
+	// Row-drive writes also recompute columns but must not manufacture edges.
+	m_keypad_irq_latched = true;
+	update_keypad_ccont_irqs();
 }
 
 static INPUT_PORTS_START( noki3310 )
 	PORT_START("COL.0")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_UP)       PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_0)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_DEL)      PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x1e, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_START("COL.1")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_DOWN)     PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_2)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_1)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_ENTER)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_DOWN)     PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_1)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_2)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
 
 	PORT_START("COL.2")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_6)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_5)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_4)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_DEL)      PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_0)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_3)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_5)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
 
 	PORT_START("COL.3")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_9)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_8)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_7)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_UP)       PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_MINUS)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_4)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_8)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
 
 	PORT_START("COL.4")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_3)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_MINUS)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_ENTER)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_6)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_7)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_9)        PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
 
 	PORT_START("PWR")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_SPACE)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)

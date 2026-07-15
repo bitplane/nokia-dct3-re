@@ -31,16 +31,21 @@ The keypad lifecycle is bounded and its MAD2 register contract is aligned in
 3210 v6.00 and v5.01:
 
 ```text
-IRQ6 -> ISR 0x2b5da0 -> event 0x72 -> mailbox/task 1
-     -> mode-4 unhandled-event return 0x2701b0 -> no matrix decode
+IRQ0 -> ISR 0x2b3084 -> task-1 event 0x41
+     -> firmware 0x41/0x42/0x43 sequence -> matrix scan 0x2b2f90
+     -> key decode 0x2b4628 -> resource 0x6e02
 ```
 
-Report code `0x07` is an actual prerequisite for this 3210 v6.00 branch. Its
-four reporter callers are classified. No ordinary external condition selecting
-one of them has yet been proved. The same task-1 wait and four-caller shape are
-aligned in 3210 v5.01. The active question is now the callback-`0x5d`
-transaction lifecycle that starts on `0x05e1`/`0x05e7` and should terminate on
-`0x05eb` or timer completion `0x06c5`.
+The mode-4 dispatcher still contains an explicit report-code-`0x07` continuation,
+but a corrected keypad source reaches the security editor without taking that
+continuation. A deterministic `12345` plus softkey sequence completes that
+editor through `0x0578` and returns the proved accepted-code result `0x05e6`
+without leaving mode 4. Code 7 is therefore not the prerequisite for editor
+interaction previously claimed. Its four reporter callers are classified.
+Callback `0x5d` accepts callback-scoped starts `0x05e1`/`0x05e7`/`0x05dc` and
+terminal `0x05eb`/timer completion `0x06c5`, but its only mapped
+non-initialization selector is the closed slot-`0x45` context route. It is a
+dormant service/test contract, not an unresolved autonomous boot transaction.
 
 ## Evidence coverage
 
@@ -81,7 +86,7 @@ The retained trace switches are scoped as follows:
 
 | Trace | Purpose |
 | --- | --- |
-| `TRACE_HANDOFF` | task-1 mode, report-7 surface, event-`0x72`, scan/decode seam |
+| `TRACE_HANDOFF` | task-1 mode, report-7 surface, IRQ0, scan/decode seam |
 | `TRACE_TASKS` | generic task liveness and mailbox edges |
 | `TRACE_CSCMD` | contact-service command direction and state |
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
@@ -103,7 +108,8 @@ and evidence ledgers.
   topology remains incomplete.
 - The DSP/contact peer contract is proved only for the requests exercised by
   the current boot.
-- The organic owner of the 3210 report-7 completion remains unresolved.
+- Which of the four classified report-7 callers executes on a healthy physical
+  3210, and the preceding hardware or transaction state, remains unresolved.
 
 ## Completion gate
 

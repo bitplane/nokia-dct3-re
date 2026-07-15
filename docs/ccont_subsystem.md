@@ -162,7 +162,7 @@ PWRONX is reset/input status, not a delayed MAD2 IRQ0 event. The CCONT now
 latches bit `0x02` when the phone configures the cold-boot scenario, before the
 firmware's first status read. The unevidenced delayed IRQ0 timer and its
 environment fixture are removed; ordinary power-button input uses the decoded
-KBGPIO column/IRQ6 contract. Removing the timer preserves the contact/SIM
+KBGPIO column/IRQ0 contract. CCONT remains on the distinct IRQ6 source. Removing the timer preserves the contact/SIM
 frontier and does not produce report code 7.
 
 The power-key interrupt path is stable across the two ROMs: v6.00 handler

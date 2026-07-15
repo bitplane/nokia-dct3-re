@@ -12,24 +12,28 @@ SIM initialization. Task 1 advances to startup mode `0x0004`, while a
 provisioned EEPROM identity removes the phone-lock prompt and permits an
 idle-like frame with the `Menu` softkey to be painted.
 
-That frame is not an interactive desktop. A delayed keypad press proves the
-electrical and RTOS delivery path is alive, but task 1 consumes the raw event in
-mode `0x0004` before the matrix scanner is called:
+The frame is not yet a proved desktop, but keypad decoding is live while task 1
+remains in mode `0x0004`:
 
 ```text
 active-low keypad input
   -> MAD2 KBGPIO state
-  -> IRQ6
-  -> ISR 0x2b5da0
-  -> raw event 0x0072
-  -> task-1 mailbox
-  -> task-1 mode-4 dispatcher
-  -> unhandled-event return 0x2701b0
-  -> no matrix scan, no decoded MMI key
+  -> IRQ0
+  -> ISR 0x2b3084
+  -> task-1 event 0x0041
+  -> internal 0x41/0x42/0x43 sequence
+  -> matrix scan 0x2b2f90
+  -> decoded resource 0x6e02 via 0x2b4628
 ```
 
-The remaining acceptance condition is an organic run in which the same input
-continues from event `0x72` into matrix scanning and produces a decoded MMI key.
+Stable multi-key delivery is now proved. After status `0x057c` presents the
+security editor, a single emulation-time coroutine supplies `12345` and the left
+softkey as non-overlapping physical taps. The transaction completes through
+`0x0578` and callback `0x47` returns `0x05e6`. That result does not post code 7
+or leave mode `0x0004`, but it is the accepted-code result: verifier `0x2ae704`
+returns one only when the five-character input transforms through `0x2ae4e8`
+to the four bytes stored at `0x112460`. The security editor, keypad delivery,
+and generated default code are therefore complete; startup remains separate.
 
 ## Ownership
 
@@ -208,7 +212,11 @@ Report code 7 is not a universal DCT3 “DSP ready” report:
   the same code-6/report-flag/event-`0x74` control flow. The state bytes are
   relocated from v6.00 `0x112390..0x11239d` to v5.01
   `0x1121bc..0x1121c9`. This proves the contract is stable across two 3210
-  firmware releases; it is not a v6.00-only lifecycle artifact.
+  firmware releases; it is not a v6.00-only lifecycle artifact. The four
+  caller bodies also retain their local predicates and outcomes. Callback
+  `0x5d` retains the same input cascade and terminal statuses, with only its
+  local timer class changing from `0x51` to `0x52`. No product-version branch
+  or additional NV/hardware predicate is exposed by the comparison.
 
 These controls reject generic peer traffic as justification for a synthetic
 report. The faithful correction must be observable by the 3210 firmware at a
@@ -228,21 +236,18 @@ historical oracle have been removed.
 - task-1 mode transitions and dispatcher state;
 - task-1 mailbox publications;
 - report-7 wrapper/caller and callback-`0x5d` activity;
-- event-`0x72` consumption versus scan/decode entry;
+- IRQ0 entry and the scan/decode seam;
 - the small set of controller, power, and identity observations still needed
   to reject accidental regressions in the classified surface.
 
 The trace is read-only. A successful fix must work with it disabled.
 
-The coherent release-to-key trace is now reproduced with a scheduler-backed
-Lua input timer. At `1.48 s` task 1 enters mode `0x0004`; a normal logical Enter
-press produces one IRQ6 entry and one event-`0x72` delivery to task 1. It takes
-mode-4 return `0x2701b0`; there are zero post-press matrix scans, zero
-code-7 posts, and no UI change. Contact status remains `0x49`, no-SIM is clear,
-and SIM ENABLE remains 1. This fixes the earliest divergence at the missing
-report-7 lifecycle rather than at keypad hardware or scheduler delivery. The
-former duplicate pair came from a callback plus a 200 Hz polling approximation;
-the cross-ROM register contract has replaced both with one masked edge latch.
+The corrected release-to-key trace uses the scheduler-backed Lua input timer.
+At `1.48 s` task 1 enters mode `0x0004`; a normal softkey press raises MAD2
+IRQ0, enters `0x2b3084`, runs the firmware `0x41/0x42/0x43` sequence, scans at
+`0x2b2f90`, and publishes decoded keycode `0x19` at `0x2b4628`. No code-7 post
+or mode change occurs. The former IRQ6/event-`0x72` result was caused by
+combining keypad and CCONT onto the same emulated source.
 
 ## Closed ownership and remaining lifecycle
 
@@ -257,25 +262,23 @@ itself has one consumer literal and no recovered in-ROM producer. This closes
 the independent `0x0794`/`0x0795` family without turning current-state absence
 into an invented transition.
 
-A fresh eight-second coherent trace fixes the runtime ordering. Callback
-`0x47` starts the security/text transaction at `5.041746 s`. A logical Enter
-press at `6.316699 s` raises IRQ6 once and delivers event `0x72` once, but the
-delivery takes mode-4 unhandled return `0x2701b0`; no matrix scan or decoded
-key follows. Thus the interactive editor cannot be the ordinary
-pre-input owner of code 7: a real locked phone must cross the report boundary
-before its editor can accept input.
+A fresh coherent trace corrects the runtime interpretation: the security/text
+transaction receives multi-key input and completes through `0x0578` while task
+1 remains in mode 4. Code 7 is not the input owner. The observed `0x05e6` is a
+successful security-code comparison, not evidence for synthesizing code 7.
 
 No faithful correction is proved yet. All four code-7 callers and both code-6
-callers are classified, but callback `0x5d` still exposes one bounded local
-question: which object/session starts on `0x05e1` or `0x05e7`, and which
-hardware, transport, timer, or task acknowledgement should terminate it on
-`0x05eb` or `0x06c5`? The retained handoff trace covers that status family and
-callback boundary without retaining the excluded power, registration,
-controller, identity, or battery-candidate taps.
+callers are classified. Callback `0x5d` no longer exposes an object/session
+question: its start statuses directly construct a local class-`0x52` timeout,
+and a wrong-code `0x05e1` control proves statuses remain scoped to callback
+`0x47`. Its only mapped non-initialization selector is the already-closed
+slot-`0x45`/`0x09d0` context route. Callback `0x5d` is therefore a valid dormant
+contract, not the current ordinary-hardware frontier.
 
-If that backward lifecycle census reaches an external boundary, the smallest
-confirming evidence is one real-3210 trace containing the executed report-7
-caller and ordered task-5 statuses around `0x0348`, `0x05e1`, `0x05e7`,
-`0x05eb`, and `0x06c5`. A provisioned 16 KiB EEPROM capture with personal
-identity bytes redacted but checksummed block structure preserved remains a
-secondary input if the lifecycle selects an NV predicate.
+The same-product comparison and the closed callback census leave no justified
+software-side transition to synthesize. The smallest decisive next evidence is
+one real-3210 trace identifying the executed report-7 caller and its preceding
+hardware or transaction state. A provisioned 16 KiB EEPROM capture with
+personal identity bytes redacted but checksummed block structure preserved is
+a useful secondary control, but no remaining caller currently proves an NV
+predicate to target.

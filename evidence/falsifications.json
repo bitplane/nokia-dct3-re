@@ -143,7 +143,7 @@
     {
       "id": "callback2f_05e1_is_global_code7_completion", "status": "disproven",
       "hypothesis": "The organic post-SIM 0x05e1 is a global completion that reaches callback 0x5d and supplies report code 7",
-      "conclusion": "In both unprovisioned and provisioned coherent runs, the observed 0x05e1 is delivered specifically to selected callback 0x2f, whose initialization lifecycle expects 0x05e0/0x05e1. Callback 0x5d receives only its early 0x05e2 initialization. The later repeating 0x0d16 is independently decoded as task-5 timer class 0x3d, rearmed by the resource-0x62 periodic poll, and is not a completion.",
+      "conclusion": "In both unprovisioned and provisioned coherent runs, the observed startup 0x05e1 is delivered specifically to selected callback 0x2f, whose initialization lifecycle expects 0x05e0/0x05e1. A new negative control enters wrong phone code 11111 through the physical keypad: verifier mismatch makes callback 0x47 publish 0x05e1, but the dispatcher selects callback 0x47 again and never callback 0x5d. Callback 0x5d receives only its early 0x05e2 initialization. The later repeating 0x0d16 is independently decoded as task-5 timer class 0x3d, rearmed by the resource-0x62 periodic poll, and is not a completion. Status values are callback-scoped, not global broadcasts.",
       "evidence": ["docs/interactive_handoff.md", "docs/resource_providers.md"]
     },
     {
@@ -219,9 +219,15 @@
       "evidence": ["docs/contact_service_topology.md", "docs/interactive_handoff.md", "docs/service_bootstrap.md"]
     },
     {
+      "id": "single_timer_dspif_doorbell_replaces_shared_triggers", "status": "disproven",
+      "hypothesis": "The current single-timer DSP peer can schedule all modeled contact-ring and shared-control completions solely from retained DSPIF command-4 doorbells",
+      "conclusion": "The peer was split into independent contact-ring and shared-service timers and reproduced the coherent frontier. Repeating the doorbell-only conversion still left task 1 in mode 0x000d with contact status 0x0089 and SIM disabled: command 4 does not accompany every contact-ring producer commit. Restoring the independently validated ring-producer and service-pending scheduling edges reproduces the full frontier. DSPIF command 4 is a real observed control boundary, but it is not a universal replacement for both protocol triggers.",
+      "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/mad2_fidelity.md"]
+    },
+    {
       "id": "status0794_0795_pair_is_ordinary_code7_owner", "status": "unsupported",
       "hypothesis": "The adjacent status-0x0794/code-6 and status-0x0795/code-7 routes form the missing ordinary bootstrap lifecycle",
-      "conclusion": "The pair is structurally real but has no evidenced ordinary initiator. Status 0x0794 selects 0x28c22c and code 6, but its sole predecessor is packed catalogue input 0x32b4/0x72b4, neither of which has an in-ROM producer. Both effective 0x0795 producers are later conditional routes. The non-display route requires framework mode 11 established by 0x03ab; 0x03ab has one consumer and no in-ROM producer. A fresh coherent trace confirms that the security editor starts before a real key reaches task 1, while mode 4 rejects the key without scanning, so editor completion cannot be the pre-input code-7 owner. No report, status, state, or timing correction is justified from this surface.",
+      "conclusion": "The pair is structurally real but has no evidenced ordinary initiator. Status 0x0794 selects 0x28c22c and code 6, but its sole predecessor is packed catalogue input 0x32b4/0x72b4, neither of which has an in-ROM producer. Both effective 0x0795 producers are later conditional routes. The non-display route requires framework mode 11 established by 0x03ab; 0x03ab has one consumer and no in-ROM producer. Correcting keypad ownership later proved that security-editor input is independent of this pair, so the pair remains excluded as the ordinary keypad/bootstrap owner.",
       "evidence": ["docs/interactive_handoff.md", "docs/resource_providers.md", "docs/message_topology_census.md"]
     }
   ]

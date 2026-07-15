@@ -26,7 +26,7 @@ instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
 | `0x000000–0x00ffff` (mirror `+0x80000`) | boot ROM / low RAM | `ram_r/w` | emulated |
 | `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `nokia_dsp_peer_device::shared_r/w` through `dsp_ram_r/w` | Partial HLE: real backing store, ring ownership, service timing and contact replies; DSP core absent |
 | `0x020000–0x0200ff` (mirror `+0x8ff00`) | **MAD2 I/O** (all peripherals) | `mad2_io_r/w` | emulated (per-register, below) |
-| `0x030000–0x030003` | **DSPIF** (DSP API control reg) | `mad2_dspif_r/w` | **STUB → 0** |
+| `0x030000–0x030003` | **DSPIF** (DSP API control reg) | `nokia_dsp_peer_device::dspif_r/w` | stored command-4 doorbell; HLE scheduling still partly shared-write driven |
 | `0x040000–0x040003` | **MCUIF** (memory-range config) | `mad2_mcuif_r/w` | **STUB → 0** |
 | `0x100000–0x17ffff` | main RAM | `ram_r/w` | emulated |
 | `0x200000–0x5fffff` | flash (the firmware) | `flash_r/w` | emulated (BYO dump) |
@@ -46,7 +46,7 @@ profile; — = not established.
 |---|---|---|
 | `0x00` | ASIC version (r, → `0x40`) | ✓ |
 | `0x01/0x02` | MCU / **DSP** reset control | ✓ |
-| `0x03` | ASIC watchdog write | — |
+| `0x03` | ASIC watchdog write | ✓ |
 | `0x04/0x05` | sleep-clock counter MSB/LSB | (timer1) |
 | `0x08/0x09` | FIQ / **IRQ lines active** | ✓ |
 | `0x0a/0x0b` | FIQ / IRQ mask | ✓ |
@@ -66,8 +66,9 @@ profile; — = not established.
 
 ### KBGPIO — keyboard (emulated ✓)
 ROW `0x28` signal / `0xa8` direction, COL `0x2a` active-low input / `0x6b`
-interrupt mask. Firmware drives a 4-row by 5-column matrix; unmasked falling
-column edges latch shared MAD2 IRQ6. Registers `0x29/0x68/0x69/0xa9` and
+interrupt mask. Firmware drives a 4-row by 5-column matrix; physical key edges
+latch MAD2 IRQ0, whose handler starts the firmware scan/decode sequence. CCONT
+uses the separate MAD2 IRQ6 source. Registers `0x29/0x68/0x69/0xa9` and
 `0x2b/0x6a/0xaa/0xab` remain backing storage with no established keypad role.
 
 ### GENSIO — multiplexed serial (CCONT, LCD, + SELECT-muxed)
@@ -82,11 +83,15 @@ column edges latch shared MAD2 IRQ6. Registers `0x29/0x68/0x69/0xa9` and
 `nokia_sim_card_device` owns the stateful UART/FIFO endpoint. ATR, PPS and the
 validated T=0 APDU lifecycle return through the organic SIMI register and FIQ6
 path. The former firmware-message and register-poke card harnesses are removed;
-see `sim_subsystem.md` and `sim_emulator_scope.md`.
+TXD writes enter a 16-byte hardware FIFO, `0x3e=0x00` flushes a chunk to the
+T=0 parser, and `0x3f` reports its live fill. See `sim_subsystem.md` and
+`sim_emulator_scope.md`.
 
 ### UIF — CTRL I/O pins (`0x32/0x33`, `0x70–0x73`, `0xb0–0xb3`, `0xf0–0xf3`)
-General control I/O + directions; partly emulated, touched ✓. (Register `0x31` is read/written but
-undocumented — `<Unknown>` in the desc table.)
+General control I/O + directions; partly emulated, touched ✓. Register `0x31`
+is CTRL-I/O signal register 1. Its six exhaustive firmware sites only
+read-modify-write bit 1 from the power duty-cycle subsystem, so the driver
+models it as an output latch; its physical PCB net remains unknown.
 
 ## CCONT — power / ADC / RTC / charger ASIC (serial, via GENSIO `0x2c`/`0x6c`)
 
@@ -122,9 +127,11 @@ phone-state constant shim:
   `0x100`. The device owns MCU/DSP ring indices `0xa4/a6` and `0x1c8/0x1ca`,
   drains service pending word `0xe4`, raises IRQ4, and delivers inbound packets
   through FIQ0.
-- **DSPIF `0x30000`** (stub → 0): written at boot (`pc 0x2001a4`) and by the reachable service
+- **DSPIF `0x30000`:** written at boot (`pc 0x2001a4`) and by the reachable service
   command path (`0x290cf4`; command 4 at `0x29103c`, followed by doorbell byte 2). Stateful-SIM
-  runs reach this path with service commands `0x30` and `0x32`; completion semantics are open.
+  runs reach this path with service commands `0x30` and `0x32`; the peer retains the register,
+  and contact-ring/service completion now use independent timers. Their observed
+  ring-producer and service-pending triggers remain distinct from command 4.
 
 The wider firmware contains roughly 287 DSPIF references and 444 shared-RAM
 base references, concentrated in the GSM-L1/audio layer at
@@ -154,11 +161,13 @@ organic owner of task-1 startup report code `0x07`. Task-13 status `0x05eb` can
 reach the task-16 path, but does not enter callback `0x5d` or reach the code-7
 reporter. Callback `0x5d`
 accepts direct `0x05eb`/`0x06c5` or starts a task-local completion timer on
-`0x05e1`/`0x05e7`/`0x05dc`; none is observed. A mapped
-display lifecycle beginning with status `0x0280`, `0x0281`, or `0x0282` is service/test-owned,
-not ordinary boot. The ordinary transaction owner, and whether callback `0x5d` or the independent
-controller-status route owns normal startup, remains unresolved;
-see `resource_providers.md`.
+callback-scoped `0x05e1`/`0x05e7`/`0x05dc`; none is observed for selector
+`0x5d`, and its only non-initialization selection route is already closed. A mapped
+display lifecycle beginning with status `0x0280`, `0x0281`, or `0x0282` is
+service/test-owned, not ordinary boot. Callback `0x5d` and the independent
+controller-status route are both classified dormant/later contracts rather
+than ordinary startup owners; no faithful report-code-7 correction is proved.
+See `resource_providers.md`.
 
 ## Knob
 

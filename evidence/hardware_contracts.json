@@ -14,12 +14,22 @@
     },
     {
       "id": "mad2_kbgpio_matrix", "subsystem": "keypad", "status": "validated", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share a 4-row by 5-column scan, column interrupt mask, falling-edge latch and MAD2 IRQ6 acknowledgement",
+      "boundary": "3210 v6.00 and v5.01 share a 4-row by 5-column scan; physical key edges use MAD2 IRQ0 and decode through the firmware 0x41/0x42/0x43 sequence, while CCONT remains on IRQ6",
       "evidence": ["docs/mmi_layer.md", "docs/mad2_fidelity.md"]
     },
     {
+      "id": "mad2_timer0_compare", "subsystem": "timer", "status": "partial", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 share the live timer-0 divider, coherent 16-bit counter, counter-plus-two compare, FIQ4 assertion and write-one-clear acknowledgement contract; the physical input clock remains unproved",
+      "evidence": ["docs/mad2_fidelity.md", "docs/cross_rom_confidence.md"]
+    },
+    {
+      "id": "mad2_uif_ctrl1_latch", "subsystem": "power", "status": "mapped", "confidence": "strong",
+      "boundary": "MAD2 offset 0x31 is a stored CTRL-I/O output latch; all six recovered accesses are bit-1 read-modify-writes owned by the power duty-cycle subsystem and no external-input or interrupt behavior is observed",
+      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
+    },
+    {
       "id": "mad2_simi_uart", "subsystem": "sim", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 SIMI offsets 0x36..0x3f plus FIQ line 6 carry asynchronous T=0 traffic",
+      "boundary": "MAD2 SIMI offsets 0x36..0x3f plus FIQ line 6 carry asynchronous T=0 traffic; TXD enters a 16-byte FIFO, control 0x3e value 0x00 flushes it, 0x3f reports fill, and IIR 0x10 advances multi-chunk transmit",
       "evidence": ["docs/sim_subsystem.md"]
     },
     {
@@ -31,6 +41,11 @@
       "id": "dsp_shared_ring", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
       "boundary": "MCU task 3 serializes outbound work to the DSP shared ring; FIQ 0 owns inbound delivery",
       "evidence": ["docs/dsp_service_transport_contract.md", "docs/dsp_interface.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "mad2_dspif_command4", "subsystem": "dsp", "status": "partial", "confidence": "strong",
+      "boundary": "MAD2 DSPIF is a retained four-byte peer register; command halfword 0x0004 marks shared-control and L1 DSP work, while independent contact/service timers and the observed ring-producer and service-pending triggers are required because command 4 does not accompany every contact-ring commit",
+      "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/mad2_fidelity.md"]
     },
     {
       "id": "external_eeprom_i2c", "subsystem": "eeprom", "status": "validated", "confidence": "strong",

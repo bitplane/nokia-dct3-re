@@ -21,7 +21,9 @@ public:
 	u8 iir_r() const;
 	void iir_w(u8 data);
 	u8 rx_count_r() const;
-	void rx_ack_w(u8 data);
+	void rx_fifo_control_w(u8 data);
+	void tx_fifo_control_w(u8 data);
+	u8 tx_count_r() const;
 
 protected:
 	virtual void device_start() override;
@@ -33,6 +35,7 @@ private:
 			attotime delay = attotime::from_usec(10));
 	void finish_header();
 	void finish_body();
+	void consume_txd(u8 data);
 	void queue_status(u8 sw1, u8 sw2);
 	void queue_fcp(u16 fid, unsigned requested);
 	void queue_read(u16 fid, unsigned requested);
@@ -55,6 +58,10 @@ private:
 	bool m_rx_ready = false;
 	u8 m_iir = 0;
 	bool m_tx_ready_pending = false;
+	u8 m_uart_tx_fifo[16] = { 0 };
+	u8 m_uart_tx_count = 0;
+	u8 m_rx_fifo_control = 0;
+	u8 m_tx_fifo_control = 0;
 	u8 m_tx[260] = { 0 };
 	u16 m_tx_len = 0;
 	u16 m_tx_expected = 0;

@@ -9,12 +9,21 @@ events do not imply a shared transport.
 
 | Boundary | MCU producer | Peer owner | Completion mechanism | Current status |
 | --- | --- | --- | --- | --- |
-| Shared-control service | `0x290cf4` updates DSP RAM control words and writes DSPIF command 4 | DSP | DSP-owned counts at shared offsets `0xda`, `0xe2`, and `0xe4`; MAD2 IRQ 4 enters `0x291068` | Consumption/interrupt partially modelled; reply state incomplete. |
+| Shared-control service | `0x290cf4` updates DSP RAM control words and writes retained DSPIF command 4 | DSP | DSP-owned counts at shared offsets `0xda`, `0xe2`, and `0xe4`; MAD2 IRQ 4 enters `0x291068` | Consumption/interrupt partially modelled; reply state incomplete. |
 | MCU-to-DSP packet ring | Task 3 calls `0x290840`; `0x2907c4` commits packets | DSP | DSP advances consumer `0x0a6` | Format and ownership mapped; current model only drains complete packets. |
 | DSP-to-MCU packet ring | DSP writes packets and advances producer `0x1c8` | MCU task 4 | FIQ 0, then `0x290904`; MCU advances consumer `0x1ca` | Delivery mechanism validated with probes; active reply format unknown. |
 | L1 mailbox | MCU L1 send stubs write DSPIF and ring the doorbell | DSP/task 22 | Task-22 class/primitive decoder `0x23d62c` | Decoder mapped; no normal downlink traffic in the coherent boot. |
 | Generic-service framework | Firmware registrations and queued objects | Firmware service framework | Task-5 dispatcher `0x2af652 -> 0x2638e4` | Runs organically; it is downstream of hardware ingress. |
 | Contact-service transport | Task 2 through task 7 | External service/test peer | Class-`0x40` framed responses | Separate protocol; not a DSP-radio completion path. |
+
+DSPIF command 4 is the hardware doorbell for several DSP-owned activities, but
+it is not the only observed work boundary. Contact-ring delivery and
+shared-control completion now have independent device timers. After that split,
+a doorbell-only run still left contact status `0x0089`, task 1 in mode `0x000d`,
+and SIM disabled: not every contact-ring producer commit is paired with command
+4. The validated ring-producer and service-pending transitions remain the
+behavioral scheduling edges; DSPIF is retained and observed but is not yet a
+complete arbitration model.
 
 ## Packet-ring ownership
 
