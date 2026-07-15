@@ -59,8 +59,8 @@
     },
     {
       "id": "mad2_simi_uart", "subsystem": "sim", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 SIMI offsets 0x36..0x3f plus FIQ line 6 carry asynchronous card traffic; TXD enters a 16-byte FIFO, control 0x3e value 0x00 advances a chunk, 0x3f reports fill, and IIR causes 0x10/0x40 drive organic TX/RX progression",
-      "evidence": ["docs/sim_subsystem.md"]
+      "boundary": "The extracted nokia_simi_device owns MAD2 offsets 0x36..0x3f, 16-byte TX FIFO, RX queue, IIR causes 0x10/0x40, response cadence and FIQ6; it exchanges only activation and bytes with the separate card device",
+      "evidence": ["docs/sim_subsystem.md", "tools/test_sim_device_split.py"]
     },
     {
       "id": "sim_t0_card_transport", "subsystem": "sim", "status": "partial", "confidence": "strong",

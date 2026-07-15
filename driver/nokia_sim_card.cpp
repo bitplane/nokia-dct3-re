@@ -5,37 +5,18 @@
 
 DEFINE_DEVICE_TYPE(NOKIA_SIM_CARD, nokia_sim_card_device, "nokia_sim_card", "Nokia DCT3 SIM card")
 
-namespace {
-constexpr u8 SIMI_INT_TX_EMPTY = 0x10;
-constexpr u8 SIMI_INT_RX_READY = 0x40;
-}
-
 nokia_sim_card_device::nokia_sim_card_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_SIM_CARD, tag, owner, clock),
-	m_irq_cb(*this)
+	m_response_cb(*this)
 {
 }
 
 void nokia_sim_card_device::device_start()
 {
-	m_rx_timer = timer_alloc(FUNC(nokia_sim_card_device::rx_ready), this);
-	save_item(NAME(m_enabled));
 	save_item(NAME(m_cphs_aoc));
-	save_item(NAME(m_control));
 	save_item(NAME(m_atr));
 	save_item(NAME(m_atr_len));
-	save_item(NAME(m_rx_fifo));
-	save_item(NAME(m_rx_head));
-	save_item(NAME(m_rx_tail));
-	save_item(NAME(m_rx_count));
-	save_item(NAME(m_rx_ready));
-	save_item(NAME(m_iir));
-	save_item(NAME(m_tx_ready_pending));
-	save_item(NAME(m_uart_tx_fifo));
-	save_item(NAME(m_uart_tx_count));
-	save_item(NAME(m_rx_fifo_control));
-	save_item(NAME(m_tx_fifo_control));
 	save_item(NAME(m_tx));
 	save_item(NAME(m_tx_len));
 	save_item(NAME(m_tx_expected));
@@ -47,15 +28,6 @@ void nokia_sim_card_device::device_start()
 
 void nokia_sim_card_device::device_reset()
 {
-	m_rx_timer->adjust(attotime::never);
-	m_control = 0;
-	m_rx_head = m_rx_tail = m_rx_count = 0;
-	m_rx_ready = false;
-	m_iir = 0;
-	m_tx_ready_pending = false;
-	m_uart_tx_count = 0;
-	m_rx_fifo_control = 0;
-	m_tx_fifo_control = 0;
 	m_tx_len = m_tx_expected = 0;
 	m_ins = 0;
 	m_selected_file = 0x3f00;
@@ -69,151 +41,22 @@ void nokia_sim_card_device::set_atr(const u8 *data, unsigned length)
 	std::copy_n(data, m_atr_len, m_atr);
 }
 
-u8 nokia_sim_card_device::control_r() const
+void nokia_sim_card_device::activate()
 {
-	return m_control | ((m_enabled && BIT(m_control, 7)) ? 0x40 : 0x00);
+	m_tx_len = m_tx_expected = 0;
+	m_selected_file = 0x3f00;
+	m_selected_df = 0x3f00;
+	m_receiving_body = false;
+	emit_response(m_atr, m_atr_len);
 }
 
-void nokia_sim_card_device::control_w(u8 data)
+void nokia_sim_card_device::emit_response(const u8 *data, unsigned length)
 {
-	const bool activate = m_enabled && BIT(data, 7) && !BIT(m_control, 7);
-	m_control = data;
-	if (activate)
-	{
-		m_rx_head = m_rx_tail = m_rx_count = 0;
-		m_rx_ready = false;
-		m_iir = 0;
-		m_tx_ready_pending = false;
-		m_uart_tx_count = 0;
-		m_tx_len = m_tx_expected = 0;
-		m_selected_file = 0x3f00;
-		m_selected_df = 0x3f00;
-		m_receiving_body = false;
-		// Deliver ATR outside the control-register write so its FIQ cannot
-		// re-enter the firmware's activation routine.
-		queue_rx(m_atr, m_atr_len, false, attotime::from_usec(10));
-	}
+	for (unsigned i = 0; i < length; i++)
+		m_response_cb(data[i]);
 }
 
-void nokia_sim_card_device::queue_rx(
-		const u8 *data, unsigned length, bool tx_complete, attotime delay)
-{
-	for (unsigned i = 0; i < length && m_rx_count < std::size(m_rx_fifo); i++)
-	{
-		m_rx_fifo[m_rx_tail] = data[i];
-		m_rx_tail = (m_rx_tail + 1) % std::size(m_rx_fifo);
-		m_rx_count++;
-	}
-	// A card cannot answer while the CPU is still writing the final transmit
-	// byte.  Deferring receive-ready also prevents the firmware's FIQ handler
-	// from observing the previous transaction descriptor during that write.
-	if (length != 0)
-	{
-		m_rx_ready = false;
-		m_tx_ready_pending = tx_complete;
-		m_rx_timer->adjust(delay);
-	}
-}
-
-TIMER_CALLBACK_MEMBER(nokia_sim_card_device::rx_ready)
-{
-	if (m_tx_ready_pending)
-	{
-		m_tx_ready_pending = false;
-		m_iir |= SIMI_INT_TX_EMPTY;
-		m_irq_cb(1);
-		m_irq_cb(0);
-		m_rx_timer->adjust(attotime::from_usec(100));
-		return;
-	}
-	if (m_rx_count != 0)
-	{
-		m_rx_ready = true;
-		m_iir |= SIMI_INT_RX_READY;
-		m_irq_cb(1);
-		m_irq_cb(0);
-	}
-}
-
-u8 nokia_sim_card_device::rxd_r()
-{
-	if (!m_rx_ready || m_rx_count == 0)
-		return 0;
-	const u8 data = m_rx_fifo[m_rx_head];
-	m_rx_head = (m_rx_head + 1) % std::size(m_rx_fifo);
-	m_rx_count--;
-	// SIMI services one received character per FIQ.  Present subsequent
-	// characters at serial cadence instead of treating a response as one
-	// edge with a pre-filled FIFO.
-	if (m_rx_count != 0)
-		m_rx_timer->adjust(attotime::from_usec(100));
-	else
-	{
-		m_rx_ready = false;
-		m_rx_timer->adjust(attotime::never);
-	}
-	return data;
-}
-
-u8 nokia_sim_card_device::iir_r() const
-{
-	return m_iir;
-}
-
-void nokia_sim_card_device::iir_w(u8 data)
-{
-	m_iir &= ~data;
-}
-
-u8 nokia_sim_card_device::rx_count_r() const
-{
-	return m_rx_ready ? std::min<u16>(m_rx_count, 0xff) : 0;
-}
-
-void nokia_sim_card_device::rx_fifo_control_w(u8 data)
-{
-	// Activation programs 0x18, 0x12 and 0x06; receive rewrites 0x06 before
-	// each drain. No recovered path assigns a destructive flush side effect.
-	m_rx_fifo_control = data;
-}
-
-void nokia_sim_card_device::txd_w(u8 data)
-{
-	if (!m_enabled || !BIT(m_control, 7))
-		return;
-	if (m_uart_tx_count < std::size(m_uart_tx_fifo))
-		m_uart_tx_fifo[m_uart_tx_count++] = data;
-}
-
-void nokia_sim_card_device::tx_fifo_control_w(u8 data)
-{
-	const u8 old = m_tx_fifo_control;
-	m_tx_fifo_control = data;
-	if (!m_enabled || !BIT(m_control, 7))
-		return;
-
-	// The firmware sets bit 2 before filling TXD and clears the register to
-	// flush. A flush transfers the UART FIFO to the T=0 parser and raises the
-	// TX-empty cause even when a command body needs another FIFO-sized chunk.
-	if (data == 0 && old != 0)
-	{
-		for (unsigned i = 0; i < m_uart_tx_count; i++)
-			consume_txd(m_uart_tx_fifo[i]);
-		m_uart_tx_count = 0;
-		if (!m_tx_ready_pending)
-		{
-			m_tx_ready_pending = true;
-			m_rx_timer->adjust(attotime::from_usec(10));
-		}
-	}
-}
-
-u8 nokia_sim_card_device::tx_count_r() const
-{
-	return m_uart_tx_count;
-}
-
-void nokia_sim_card_device::consume_txd(u8 data)
+void nokia_sim_card_device::rx_w(u8 data)
 {
 
 	if (m_tx_len < std::size(m_tx))
@@ -236,7 +79,7 @@ void nokia_sim_card_device::finish_header()
 {
 	if (m_tx[0] == 0xff)
 	{
-		queue_rx(m_tx, m_tx_len);
+		emit_response(m_tx, m_tx_len);
 		m_tx_len = m_tx_expected = 0;
 		return;
 	}
@@ -253,7 +96,7 @@ void nokia_sim_card_device::finish_header()
 		m_tx_len = 0;
 		m_tx_expected = p3;
 		m_receiving_body = true;
-		queue_rx(&procedure, 1);
+		emit_response(&procedure, 1);
 		return;
 	}
 
@@ -299,7 +142,7 @@ void nokia_sim_card_device::finish_body()
 void nokia_sim_card_device::queue_status(u8 sw1, u8 sw2)
 {
 	const u8 response[] = { sw1, sw2 };
-	queue_rx(response, std::size(response));
+	emit_response(response, std::size(response));
 }
 
 void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
@@ -340,7 +183,7 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 		}
 	}
 	response[n++] = 0x90; response[n++] = 0x00;
-	queue_rx(response, n);
+	emit_response(response, n);
 }
 
 void nokia_sim_card_device::queue_read(u16 fid, unsigned requested)
@@ -352,7 +195,7 @@ void nokia_sim_card_device::queue_read(u16 fid, unsigned requested)
 	for (unsigned offset = 0; offset < count && n < std::size(response) - 2; offset++)
 		response[n++] = ef_byte(fid, offset);
 	response[n++] = 0x90; response[n++] = 0x00;
-	queue_rx(response, n);
+	emit_response(response, n);
 }
 
 bool nokia_sim_card_device::is_directory(u16 fid)

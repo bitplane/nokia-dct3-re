@@ -12,10 +12,10 @@ Model a removable GSM SIM as a stateful device behind the MAD2 SIM interface.
 Firmware must perform its own reset, ATR/PPS negotiation, T=0 exchanges, file
 selection, parsing, registration state changes, and task-to-task messaging.
 
-The current implementation combines the MAD2 SIMI controller and removable
-card in one MAME device. The permissions below describe the **card** contract;
-FIFO registers, IIR causes, and FIQ generation are controller behavior retained
-temporarily in the same implementation.
+The implementation separates the MAD2 `nokia_simi_device` controller from the
+removable `nokia_sim_card_device`. The permissions below describe the **card**
+contract; FIFO registers, IIR causes, cadence and FIQ generation are controller
+behavior.
 
 The device may provide behavior owned by a physical card:
 
@@ -92,10 +92,9 @@ firmware request establishes a concrete requirement. Likely later work includes:
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 
-The implementation already tracks current DF separately from selected EF; that
-item is no longer backlog. The architectural backlog is instead to separate the
-MAD2 SIMI controller from the removable card once their timing and error
-contract is stable.
+The implementation tracks current DF separately from selected EF. Remaining
+architectural work is to stabilize controller/card timing and errors and move
+subscriber contents into reusable profiles.
 
 The organically requested initialization pass is complete for a non-CPHS
 synthetic card. Unsupported optional files return `94 04` and leave the current

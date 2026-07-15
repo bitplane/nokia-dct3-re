@@ -15,7 +15,7 @@ not compatibility mechanisms.
 | MAD2 | Monolithic phone-owned register handlers | Fill the fidelity ledger before extracting blocks. |
 | MBUS | MAD2 register/FIQ approximation | Model a peer only when firmware organically drains the receive task. |
 | DSP/DSPIF | `nokia_dsp_peer_device` aggregates shared RAM/DSPIF, rings, calibrated service timing, boot-subset DSP HLE and the separate external-service counterparty | Extend contracts only from organic requests; protect the transport with focused tests before separating the DSP and external peer roles. |
-| SIM | Combined MAD2 SIMI controller and stateful card prototype in `nokia_sim_card_device` | Stabilize and test the controller/card seam, then split it; extend card behavior only for organic requests. |
+| SIM | Separate `nokia_simi_device` controller and `nokia_sim_card_device` protocol/profile connected by reset/byte callbacks | Stabilize timing/error/removal behavior, then extract reusable provisioning profiles; extend card behavior only for organic requests. |
 | Startup/service/GSM peers | Request-driven external-service session carried through shared rings and interrupt callbacks, plus observation-only quarantined traces | Validate the transport and peer roles across the coherent 3210 profile and a sibling ROM family without treating their current co-location as hardware topology. |
 
 See `mad2_fidelity.md` for register-level implementation status and
@@ -60,8 +60,8 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
    behavior.
 3. Resume the ordinary unattended UI/idle-window entrance investigation without
    presuming that the missing transition is hardware-owned.
-4. Add focused transport tests, then split the combined SIM and DSP/external
-   peer implementations along their established ownership boundaries.
+4. Extend focused transport tests, then split the combined DSP/external peer
+   implementation along its established ownership boundaries.
 5. Use the 3330 as the first portability probe before treating MAD2 behavior as
    common DCT3 hardware.
 

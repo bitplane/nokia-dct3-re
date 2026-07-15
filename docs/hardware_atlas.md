@@ -77,14 +77,12 @@ uses the separate MAD2 IRQ6 source. Registers `0x29/0x68/0x69/0xa9` and
 | `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** lines | partial — GENSIO multiplexes other devices on the SELECT lines; **SELECT1/2 are touched at boot** (`0x6f`, `0xad/0xae`) but what sits on them past CCONT is unmapped. A deep-dive target (RF synth? audio codec control?). |
 
 ### SIMI — SIM UART (`0x36–0x3f`)
-The current `nokia_sim_card_device` combines the stateful MAD2 UART/FIFO
-endpoint with the removable card prototype. ATR, PPS and the
-validated T=0 APDU lifecycle return through the organic SIMI register and FIQ6
-path.
+`nokia_simi_device` owns the MAD2 UART/FIFO/IIR endpoint and FIQ6. The separate
+`nokia_sim_card_device` owns ATR, PPS and the T=0 APDU lifecycle; response bytes
+return through the organic SIMI register and FIQ6 path.
 TXD writes enter a 16-byte hardware FIFO, `0x3e=0x00` flushes a chunk to the
 T=0 parser, and `0x3f` reports its live fill. See `sim_subsystem.md` and
-`sim_emulator_scope.md`. This implementation boundary is layering debt, not a
-claim that UART registers belong physically to the card.
+`sim_emulator_scope.md`.
 
 ### UIF — CTRL I/O pins (`0x32/0x33`, `0x70–0x73`, `0xb0–0xb3`, `0xf0–0xf3`)
 General control I/O + directions; partly emulated, touched ✓. Register `0x31`

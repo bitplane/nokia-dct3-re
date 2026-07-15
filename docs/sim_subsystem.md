@@ -8,11 +8,10 @@ only conclusions that are implemented or directly observed.
 
 SIMI is the MAD2 SIM UART at `0x020036..0x02003f`:
 
-The current `nokia_sim_card_device` combines two conceptual layers: the SIMI
-UART/FIFO/IIR endpoint owned physically by MAD2 and the removable card's T=0
-protocol/filesystem behavior. This is a functioning prototype boundary, not a
-claim that the physical SIM card owns the phone's UART registers. Split the
-controller and card only after their interface and timing contract is stable.
+`nokia_simi_device` owns the MAD2 UART/FIFO/IIR registers, scheduling and FIQ6.
+It sends activation and transmitted bytes to `nokia_sim_card_device`; the card
+returns only response bytes. The card owns ATR/PPS, T=0 state, selected files,
+and the current synthetic filesystem.
 
 | Offset | Register | Verified behavior |
 | --- | --- | --- |
@@ -85,12 +84,10 @@ trailing event when the RX FIFO empties.
 
 ## Stateful card device
 
-`nokia_sim_card_device` is enabled by `NOKI3210_MODEL_SIM_DEVICE=1`. In the
-current combined prototype it implements:
+`NOKI3210_MODEL_SIM_DEVICE=1` enables the SIMI/card composition. The card
+implements:
 
-- activation, ready-status and ATR state;
-- SIMI IIR, RX FIFO and timed FIQ delivery;
-- PPS echo;
+- activation reset, ATR and PPS echo;
 - T=0 SELECT, STATUS, GET RESPONSE, READ BINARY/RECORD and CHANGE CHV sequencing;
 - selected-file state; and
 - synthetic GSM 11.11 file metadata and content.
@@ -105,7 +102,7 @@ The implemented surface is classified by ownership and evidence:
 
 | Surface | Classification | Basis and limitation |
 | --- | --- | --- |
-| SIMI register window and FIQ6 route | Derived contract | Firmware traffic executes through offsets `0x36..0x3f`, the decoded IIR cascade, and FIQ6 in both mapped 3210 ROMs. These registers belong to MAD2 even though the combined device currently implements them. |
+| SIMI register window and FIQ6 route | Extracted partial hardware | `nokia_simi_device` owns offsets `0x36..0x3f`, the decoded IIR cascade, timing and FIQ6; firmware traffic executes through it in both mapped 3210 ROMs. |
 | TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics and physical UART timing remain inferred. |
 | IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Fixed 10/100 microsecond delays are calibrated scheduling choices, not measured card or UART timing. |
@@ -113,9 +110,9 @@ The implemented surface is classified by ownership and evidence:
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
 | CHANGE CHV support | Dormant prototype | The procedure/body/status sequence is implemented, but the ordinary boot does not request it and no persistent credential semantics are validated. |
 
-The model does not force firmware state or inject RTOS messages. Its principal
-fidelity debt is layering and timing: MAD2 controller state, card protocol, and
-subscriber provisioning currently share one device implementation.
+The model does not force firmware state or inject RTOS messages. Controller and
+card ownership are separate; remaining fidelity debt is calibrated timing,
+unmodeled errors/removal, and card protocol mixed with subscriber provisioning.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
 includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`, LOCI `6F7E`, and Phase

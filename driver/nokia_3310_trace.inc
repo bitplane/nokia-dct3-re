@@ -281,7 +281,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		static unsigned sim_irq_count = 0;
 		if (sim_irq_count++ < 32)
 			logerror("sim_irq_dispatch: irq=%04x fiq=%04x fifo=%02x control=%02x t=%.8f\n",
-					m_irq_status, m_fiq_status, m_sim_card->rx_count_r(),
+					m_irq_status, m_fiq_status, m_simi->rx_count_r(),
 					debug_ram_byte(0x001106c3), machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr &&

@@ -54,7 +54,7 @@ question is the ordinary unattended idle-window selection.
 
 | Area | Current role | Remaining work |
 | --- | --- | --- |
-| SIM | The combined `nokia_sim_card_device` prototypes MAD2 SIMI/FIQ6 controller behavior, T=0 card behavior, and synthetic GSM 11.11 provisioning. | Stabilize timing/error contracts, then separate the MAD2 controller from removable-card protocol/content; extend files only for organic requests. |
+| SIM | `nokia_simi_device` owns MAD2 registers/FIFOs/IIR/timing/FIQ6 and connects by byte/reset callbacks to `nokia_sim_card_device`, which owns T=0 plus synthetic contents. | Stabilize timing/error/removal contracts and separate subscriber provisioning from card protocol; extend files only for organic requests. |
 | CCONT | `nokia_ccont_device` owns selected-device register behavior and output signals; MAD2 owns GENSIO status, while the phone supplies raw ADC scenarios and the provisional watchdog clock. v6.00/v5.01 share the observed register and IRQ contract. | Obtain board-level selector names, analog units, conversion timing, RTC encoding and watchdog clock from hardware evidence. |
 | EEPROM | Native MAME `I2C_24C128` on mapped GenIO pins plus a v6.00-oriented generated provisioning fixture; the parallel window is unproved. | Decode remaining fields, validate writes/timing and another product's storage placement, and make fallback-record extraction ROM-aware. |
 | DSP/external-service | `nokia_dsp_peer_device` currently aggregates shared RAM/DSPIF, DSP-owned ring and interrupt behavior, boot-subset DSP HLE, and a semantically separate request-driven service/test peer. | Add focused transport tests, validate another ROM family, then separate transport, DSP HLE and external peer without changing firmware-visible composition. |

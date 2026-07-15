@@ -24,6 +24,7 @@
 #include "nokia_ccont.h"
 #include "nokia_dsp_peer.h"
 #include "nokia_sim_card.h"
+#include "nokia_simi.h"
 
 #include "emupal.h"
 #include "screen.h"
@@ -244,6 +245,7 @@ public:
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
 		m_dsp_peer(*this, "dsp_peer"),
+		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
 		m_pcd8544(*this, "pcd8544"),
 		m_keypad(*this, "COL.%u", 0),
@@ -325,6 +327,7 @@ private:
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
 	required_device<nokia_dsp_peer_device> m_dsp_peer;
+	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<pcd8544_device> m_pcd8544;
 	required_ioport_array<5> m_keypad;
@@ -602,7 +605,7 @@ void noki3310_state::machine_reset()
 	}
 	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
 	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0);
-	m_sim_card->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", 0) != 0);
+	m_simi->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", 0) != 0);
 	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKI3210_SIM_CPHS_AOC", 0) != 0);
 	{
 		u8 atr[40] = { 0x3b, 0x10, 0x05 };
@@ -1065,24 +1068,24 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			data = keypad_columns_r(true);
 			break;
 		case 0x37:  // SIM UART RxD
-			if (m_sim_card->enabled())
-				data = m_sim_card->rxd_r();
+			if (m_simi->enabled())
+				data = m_simi->rxd_r();
 			break;
 		case 0x38:  // SIM UART interrupt identification
-			if (m_sim_card->enabled())
-				data = m_sim_card->iir_r();
+			if (m_simi->enabled())
+				data = m_simi->iir_r();
 			break;
 		case 0x39:  // SIM control and live-interface status
-			if (m_sim_card->enabled())
-				data = m_sim_card->control_r();
+			if (m_simi->enabled())
+				data = m_simi->control_r();
 			break;
 		case 0x3c:  // SIM UART RxD queue fill
-			if (m_sim_card->enabled())
-				data = m_sim_card->rx_count_r();
+			if (m_simi->enabled())
+				data = m_simi->rx_count_r();
 			break;
 		case 0x3f:  // SIM UART TxD queue fill
-			if (m_sim_card->enabled())
-				data = m_sim_card->tx_count_r();
+			if (m_simi->enabled())
+				data = m_simi->tx_count_r();
 			break;
 		case 0x6c:
 			data = m_ccont->serial_r();
@@ -1106,7 +1109,7 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		static unsigned sim_fifo_read_count = 0;
 		if (sim_fifo_read_count++ < 64)
 			logerror("sim_fifo_read: off=%02x data=%02x remaining=%u pc=%08x t=%.8f\n",
-					offset, data, m_sim_card->rx_count_r(), m_maincpu->pc(), machine().time().as_double());
+					offset, data, m_simi->rx_count_r(), m_maincpu->pc(), machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
 			(offset == 0x2c || offset == 0x2d || offset == 0x6c || offset == 0x6d) &&
@@ -1140,18 +1143,18 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		static unsigned sim_control_count = 0;
 		if (sim_control_count++ < 128)
 			logerror("sim_control_w: data=%02x old=%02x live=%02x pc=%08x t=%.8f\n", data,
-					old_data, m_sim_card->control_r(), m_maincpu->pc(), machine().time().as_double());
+					old_data, m_simi->control_r(), m_maincpu->pc(), machine().time().as_double());
 	}
-	if (offset == 0x36 && m_sim_card->enabled())
-		m_sim_card->txd_w(data);
-	else if (offset == 0x38 && m_sim_card->enabled())
-		m_sim_card->iir_w(data);
-	else if (offset == 0x39 && m_sim_card->enabled())
-		m_sim_card->control_w(data);
-	else if (offset == 0x3d && m_sim_card->enabled())
-		m_sim_card->rx_fifo_control_w(data);
-	else if (offset == 0x3e && m_sim_card->enabled())
-		m_sim_card->tx_fifo_control_w(data);
+	if (offset == 0x36 && m_simi->enabled())
+		m_simi->txd_w(data);
+	else if (offset == 0x38 && m_simi->enabled())
+		m_simi->iir_w(data);
+	else if (offset == 0x39 && m_simi->enabled())
+		m_simi->control_w(data);
+	else if (offset == 0x3d && m_simi->enabled())
+		m_simi->rx_fifo_control_w(data);
+	else if (offset == 0x3e && m_simi->enabled())
+		m_simi->tx_fifo_control_w(data);
 	if (offset == 0x2d)
 	{
 		// Selecting a GENSIO endpoint leaves the controller idle and its
@@ -1420,8 +1423,10 @@ void noki3310_state::noki3310(machine_config &config)
 	m_dsp_peer->set_trace_enabled(nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0);
 	m_dsp_peer->fiq0_cb().set(FUNC(noki3310_state::dsp_fiq0_w));
 	m_dsp_peer->service_irq_cb().set(FUNC(noki3310_state::dsp_service_irq_w));
+	NOKIA_SIMI(config, m_simi);
 	NOKIA_SIM_CARD(config, m_sim_card);
-	m_sim_card->irq_cb().set(FUNC(noki3310_state::sim_irq_w));
+	m_simi->irq_cb().set(FUNC(noki3310_state::sim_irq_w));
+	m_sim_card->response_cb().set(m_simi, FUNC(nokia_simi_device::card_rx_w));
 }
 
 void noki3310_state::noki3330(machine_config &config)
