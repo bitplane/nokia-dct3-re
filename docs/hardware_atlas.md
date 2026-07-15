@@ -12,18 +12,19 @@ Current fidelity claims are maintained in `mad2_fidelity.md`.
 
 ## The chip
 
-MAD2WD1 = **ARM7TDMI MCU** (emulated) **+ a DSP** (stubbed). The MCU runs the application/UI/control
-firmware; the **DSP runs the GSM Layer-1 baseband and the audio codec** — so "GSM and audio" ≈ "the
-DSP", and the DSP is a `return 0` shim. Companion chips reached over serial buses: **CCONT** (power /
-ADC / RTC / charger), the **PCD8544 LCD**, the **24C128 EEPROM** (I²C), and (not yet touched at boot)
-the **SIM** and the RF/synth path.
+MAD2WD1 contains the emulated **ARM7TDMI MCU** and an unemulated DSP core. The MCU
+runs the application/UI/control firmware; the DSP owns GSM Layer 1 and audio.
+`nokia_dsp_peer_device` models the firmware-visible shared-memory, packet-ring,
+service-interrupt and request-derived contact boundary without executing DSP
+instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
+**PCD8544 LCD**, **24C128 EEPROM** (I2C), and the SIM card behind MAD2 SIMI.
 
 ## CPU memory map (the emulated regions)
 
 | range | device | handler | status |
 |---|---|---|---|
 | `0x000000–0x00ffff` (mirror `+0x80000`) | boot ROM / low RAM | `ram_r/w` | emulated |
-| `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `dsp_ram_r/w` | **STUB** ("HACK: avoid hangs"); a few offsets hand-faked |
+| `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `nokia_dsp_peer_device::shared_r/w` through `dsp_ram_r/w` | Partial HLE: real backing store, ring ownership, service timing and contact replies; DSP core absent |
 | `0x020000–0x0200ff` (mirror `+0x8ff00`) | **MAD2 I/O** (all peripherals) | `mad2_io_r/w` | emulated (per-register, below) |
 | `0x030000–0x030003` | **DSPIF** (DSP API control reg) | `mad2_dspif_r/w` | **STUB → 0** |
 | `0x040000–0x040003` | **MCUIF** (memory-range config) | `mad2_mcuif_r/w` | **STUB → 0** |
@@ -37,7 +38,8 @@ the **SIM** and the RF/synth path.
 
 Blocks: **CTSI** (clock/timer/IRQ/reset), **PUP** (MBUS / vibrator / buzzer / GenIO), **KBGPIO**
 (keyboard), **GENSIO** (multiplexed serial: CCONT, LCD, + SELECT-muxed devices), **SIMI** (SIM UART),
-**UIF** (CTRL I/O pins). Touch column: ✓ = read/written during the boot-to-limp; — = not reached yet.
+**UIF** (CTRL I/O pins). Touch column: ✓ = read or written in a normalized
+profile; — = not established.
 
 ### CTSI — clock, timer, interrupts, reset (all emulated, all touched)
 | off | reg | touch |
@@ -76,11 +78,11 @@ column edges latch shared MAD2 IRQ6. Registers `0x29/0x68/0x69/0xa9` and
 | `0x2e` / `0x6e` | **LCD data / command write** (PCD8544) | emulated ✓ |
 | `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** lines | partial — GENSIO multiplexes other devices on the SELECT lines; **SELECT1/2 are touched at boot** (`0x6f`, `0xad/0xae`) but what sits on them past CCONT is unmapped. A deep-dive target (RF synth? audio codec control?). |
 
-### SIMI — SIM UART (`0x36–0x3f`) — **mapped, reception is not MCU-UART driven**
-The firmware configures and flushes these registers, but normal SIM reception is surfaced through
-the lower service/ring message path. The retained ring-2 card model completes ATR and T=0 APDU
-traffic. Register-level ATR injection is a diagnostic probe, not the faithful receive path; see
-`sim_emulator_scope.md` and `sim_registration.md`.
+### SIMI — SIM UART (`0x36–0x3f`)
+`nokia_sim_card_device` owns the stateful UART/FIFO endpoint. ATR, PPS and the
+validated T=0 APDU lifecycle return through the organic SIMI register and FIQ6
+path. The former firmware-message and register-poke card harnesses are removed;
+see `sim_subsystem.md` and `sim_emulator_scope.md`.
 
 ### UIF — CTRL I/O pins (`0x32/0x33`, `0x70–0x73`, `0xb0–0xb3`, `0xf0–0xf3`)
 General control I/O + directions; partly emulated, touched ✓. (Register `0x31` is read/written but
@@ -109,45 +111,33 @@ maps through ROM table `0x2e2d74` to selector 1. The complete logical-source tab
 3210 v5.01. Values come from `nokia_adc_override` (env `NOKI3210_ADC0..7`, profiles); electrical
 scaling and PCB net names remain open.
 
-## The DSP interface (the big stub — deep-dive target)
+## The DSP interface
 
-The MCU↔DSP boundary is **DSP shared RAM `0x10000`** + the **DSPIF control register `0x30000`** —
-and the DSP itself is unemulated. This is where GSM L1 and audio will land. What we know so far
-(from the CONTACT-SERVICE work, `service_bootstrap.md` "DSP service-area map"):
+The MCU-to-DSP boundary is shared RAM at `0x10000` plus DSPIF at `0x30000`.
+The DSP core remains unemulated, but the shared-memory peer is no longer a
+phone-state constant shim:
 
-- **DSP shared RAM `0x10000–0x10fff`** (`dsp_ram_r` HACK): `0x00..0x24` self-test echo; `0xa4/a6`
-  service status/version; `0xda/e2` lower-service channel counts; `0xe0` command-busy word
-  (MCU sets; driver currently masks idle, peer timing unresolved); **`0xe4` lower-service
-  pending counter** (MCU writes `0x0002` at pc `0x290c98`; `MODEL_DSP_SERVICE` drains it
-  + raises IRQ 4); `0xfe/0x100` ready flags.
+- **DSP shared RAM `0x10000–0x10fff`:** device-owned backing storage; bootstrap
+  ready overrides remain at `0x00..0x04`, `0xe0`, `0xfe` and conditionally
+  `0x100`. The device owns MCU/DSP ring indices `0xa4/a6` and `0x1c8/0x1ca`,
+  drains service pending word `0xe4`, raises IRQ4, and delivers inbound packets
+  through FIQ0.
 - **DSPIF `0x30000`** (stub → 0): written at boot (`pc 0x2001a4`) and by the reachable service
   command path (`0x290cf4`; command 4 at `0x29103c`, followed by doorbell byte 2). Stateful-SIM
   runs reach this path with service commands `0x30` and `0x32`; completion semantics are open.
 
-**Structural scope (deep-dive scout).** The DSP interface is **heavily referenced** in the firmware:
-**~287 references to DSPIF `0x30000`** and **~444 to the shared-RAM base `0x10000`**, clustered in a
-large driver layer at **`0x2b6xxx–0x2c8xxx`** — this is the **GSM-L1 / audio DSP driver**. Crucially,
-the **boot-to-limp only touches the tiny service-handshake corner** (`0x290xxx/0x291xxx`); the big
-driver layer is **not exercised until past the mode-`000d` limp**. So the DSP deep-dive has an
-**ordering dependency the atlas just surfaced**:
-- a *dynamic* deep-dive (trace the GSM/audio DSP protocol live) is **gated behind getting past the
-  limp** — the boot doesn't run that code yet;
-- a *static* deep-dive (RE the `0x2b6xxx+` driver layer cold) is possible now but is a **large,
-  multi-pass effort** (hundreds of references), and risks mapping code whose live behaviour we can't
-  yet confirm.
-Either way, the practical next move is to **get the boot past the limp first** (so the DSP driver
-actually runs and can be traced), *then* deep-dive the DSP dynamically. The shared-RAM mailbox layout
-and the service-handshake subset are already mapped (above + `service_bootstrap.md`).
-
-**Current update:** task 3 serializes DSP work into the TX ring and FIQ 0 owns inbound delivery.
+The wider firmware contains roughly 287 DSPIF references and 444 shared-RAM
+base references, concentrated in the GSM-L1/audio layer at
+`0x2b6xxx–0x2c8xxx`. The coherent boot now exercises more than the original
+service-handshake corner: task 3 serializes DSP work into the TX ring and FIQ0
+owns inbound delivery.
 The request-driven peer now completes the startup D0 exchange, the organic type-`0x70/0x74`
 contact completion, and the external task-7 service session in one boot. The generic-service
 `0x05e8` chain remains a mapped later radio/SAT path, not the current ordinary-SIM prerequisite.
 
 ## Current frontier
 
-The project now reaches substantially beyond the historical mode-`000d` observations below. The
-default oracle remains CONTACT SERVICE, while the coherent opt-in peer profile reaches mode
+The default oracle remains CONTACT SERVICE, while the coherent opt-in peer profile reaches mode
 `0x0004`, starts SIM control, and performs ordinary SELECT/STATUS/GET RESPONSE/READ traffic through
 the extended initialization pass. SIM enable rises organically, unsupported optional files are
 handled with `94 04`, and task 20 enters its normal timed presence monitor. The later
@@ -156,19 +146,13 @@ idle/resource transition remains incomplete.
 The component order is EEPROM, CCONT, then SIM. The Nokia 3330 is the first portability probe used
 to distinguish shared MAD2 behavior from 3210 firmware assumptions.
 
-## Historical boot boundary
+## Current boot boundary
 
-To the **mode-`000d` limp** (past CONTACT SERVICE) the firmware exercises: CTSI (clock/timer/IRQ),
-MBUS, CCONT (power/ADC/RTC), LCD, keypad, CTRL-I/O, and the DSP interface (stubbed). It does **not**
-yet touch: the **SIM** (`SIMI`), and — necessarily, since they come after the limp — the **RF/synth**
-(likely on a GENSIO SELECT line) and the **audio codec** (DSP). So the realistic phase-2 target is
-**"boots to idle, no SIM / no network"**; the open strategic question is how much of the DSP/RF/SIM
-the firmware *insists* on before idle vs *degrades* past.
-
-The mode-`000d` gate and its CCONT/startup events are retained below as historical mapping. They are
-satisfied in the coherent profile; they are not the immediate blocker. The current observed
-frontier is now the organic owner of task-1 startup report code `0x07`. Task-13 status `0x05eb` can reach the
-task-16 path, but does not enter callback `0x5d` or reach the code-7 reporter. Callback `0x5d`
+The coherent profile exercises CTSI, MBUS, CCONT, LCD, keypad, GenIO/EEPROM,
+SIMI and the modeled DSP/contact boundary. The current observed frontier is the
+organic owner of task-1 startup report code `0x07`. Task-13 status `0x05eb` can
+reach the task-16 path, but does not enter callback `0x5d` or reach the code-7
+reporter. Callback `0x5d`
 accepts direct `0x05eb`/`0x06c5` or starts a task-local completion timer on
 `0x05e1`/`0x05e7`/`0x05dc`; none is observed. A mapped
 display lifecycle beginning with status `0x0280`, `0x0281`, or `0x0282` is service/test-owned,

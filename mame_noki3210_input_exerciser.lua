@@ -4,7 +4,6 @@ local space = cpu.spaces["program"]
 local output_dir = os.getenv("NOKI3210_SNAPSHOT_DIR") or ".."
 local boot_summary_path = os.getenv("NOKI3210_BOOT_SUMMARY")
 local quiet = os.getenv("NOKI3210_LUA_QUIET") == "1"
-local exercise_input = os.getenv("NOKI3210_INPUT_EXERCISER_PRESS") ~= "0"
 
 if quiet then emu.print_info = function(...) end end
 
@@ -229,12 +228,6 @@ local function write_boot_summary()
 	if f then f:write(table.concat(summary, "\n"), "\n"); f:close(); os.rename(temporary, boot_summary_path) end
 end
 
-local legacy_input = {
-	[18] = {"enter", true}, [24] = {"enter", false}, [30] = {"enter", true}, [36] = {"enter", false},
-	[42] = {"power", true}, [48] = {"power", false}, [54] = {"enter", true}, [60] = {"enter", false},
-	[66] = {"enter", true}, [72] = {"enter", false},
-}
-
 local post_key = os.getenv("NOKI3210_POST_READY_KEY")
 local post_delay = env_number("NOKI3210_POST_READY_KEY_DELAY_MS", 250) / 1000
 local post_duration = env_number("NOKI3210_POST_READY_KEY_DURATION_MS", 750) / 1000
@@ -280,9 +273,6 @@ emu.add_machine_frame_notifier(function()
 	write_lcd_dump()
 	sample_structural_state()
 	if frames % 30 == 0 then write_boot_summary() end
-
-	local legacy = exercise_input and legacy_input[frames] or nil
-	if legacy then if legacy[2] then press(legacy[1]) else release(legacy[1]) end end
 
 	update_post_ready_key()
 end)

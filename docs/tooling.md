@@ -14,6 +14,13 @@
   - `find_thumb_signature.py REF TARGET ADDR:LEN` — locate a Thumb-1 region in
     another image while masking only relocated direct `BL`/`BLX` encodings;
     reports exact compared-byte coverage and every match.
+  - `find_scalar_uses.py VALUE...` — enumerate exact Thumb-1 immediate,
+    literal-pool and two-instruction scalar constructions with decode coverage.
+  - `find_struct_access.py OFFSET...` — find and contextualize Thumb-1 loads and
+    stores at selected structure offsets; `--clusters` requires related offsets
+    within one bounded window.
+  - `find_literal_loads.py VALUE` — scan PC-relative literal loads with the
+    swap16 word-lane correction applied by default.
   - `findptr.py VALUE...` — find pointer literals (raw LE and halfword-swapped)
   - `dump.py ADDR [LEN]` — dump words / halfword-swapped pointers
   - `message_census.py` — profile-driven 3210 v6.00 producer, callback-table,
@@ -27,8 +34,10 @@
     fixed variable-length sequence catalogue at `0x2cb968`, decoding packed
     event argument counts and the `0x00dc` terminator. Inputs `0x213a`/`0x613a`
     emit `0x089a, 0x08b0`, while `0x213b`/`0x613b` emit `0x08b0` directly.
-  - `test_message_census.py` — byte-lane tests for MCU byte reads and rotated
-    32-bit literal-pool values in the swap16 image, plus runtime-manifest isolation.
+  - `test_message_census.py`, `test_find_thumb_signature.py`, and
+    `test_make_eeprom_profile.py` cover byte lanes, signature relocation masks,
+    runtime-manifest isolation, and generated EEPROM checksums. Run all three
+    with `make test-tools`.
   - `validate_evidence.py` — validates `evidence/*.json` and runtime-manifest
     structure. `make evidence-check` runs it directly.
 - `ghidra/scripts/*.java` — headless Ghidra scripts (run via `analyzeHeadless`)

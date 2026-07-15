@@ -1,9 +1,10 @@
 # The MAD2 MCU↔DSP interface (DCT3 / Nokia 3210)
 
 A map of how the ARM7 MCU talks to the on-chip **DSP** (which runs the GSM Layer-1
-baseband + audio codec) in the Nokia 3210 firmware. Built from static disassembly
-(`tools/disrom.py`) + live tracing (`NOKI3210_TRACE_DSPIO`, which logs first-touch of
-every DSP shared-RAM offset and DSPIF register with direction/value/PC over the boot).
+baseband + audio codec) in the Nokia 3210 firmware. It combines static
+disassembly with the reviewed shared-ring and service-boundary traces. Use the
+current focused `NOKI3210_TRACE_DSP_BOUNDARY`; the former broad DSP-I/O probe is
+removed.
 
 **TL;DR for emulation:** at boot the MCU treats the DSP interface as (a) a RAM
 self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
@@ -18,7 +19,7 @@ boot frontier: ordinary SIM initialization now runs after contact startup.
 
 | MMIO | region | driver | boot usage |
 |---|---|---|---|
-| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `dsp_ram_r/w` (stub, real backing store `m_dsp_ram`) | heavy — self-test, config, blob download |
+| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `nokia_dsp_peer_device::shared_r/w` through `dsp_ram_r/w` | partial HLE — backing store, packet rings, service timing and request-derived contact replies |
 | `0x30000–0x30003` | **DSPIF** control register | `mad2_dspif_r/w` (stub: reads 0, writes no-op) | early initialization plus reachable command-4 doorbells from `0x290cf4`; wider L1 use remains unmapped at runtime |
 | `0x40000` | MCUIF (memory-range config) | `mad2_mcuif_r/w` (stub) | early config |
 
@@ -36,15 +37,15 @@ evidence; the distinct boot-critical contact completion is now mapped as type
 | offset | what | evidence |
 |---|---|---|
 | `[0x00–0x24]` | **self-test / RAM echo region** | written with a walking pattern at `0x295f48`, read back + compared at `0x295fc0`/`0x295fd6`. A RAM test of the shared window; passes trivially against a real backing store. |
-| `[0x00–0x04]` | **DSP status fakes** → `0x01` | `dsp_ram_r` HACK; the firmware reads these as "DSP alive". |
+| `[0x00–0x04]` | bootstrap-ready reads → `0x01` | explicit peer-device HLE; the firmware reads these as DSP-alive status. |
 | `[0xe0]` → `0x00`, `[0xfe]`/`[0x100]` → `0x01` | **DSP ready/busy flags** | `[0xe0]` is still a read override: firmware sets the backing word before DSPIF command 4, but the peer-clear timing is unresolved. `0xe4` is the lower-service pending counter. |
 | `[0xf6–0x102]` | **config words** (`0x0100 0x0300 0x0001 0x0000 0x0001 0x0001 0x0200`) | 7 individual writes at `0x290a44–0x290a64`. |
 | `[0x200–0x600]` | **coefficient/parameter table** (512 halfwords) | strided copy at `0x290a94`: reads one halfword per 0x20-byte record from flash `0x200040`, packs into `[0x200+]`. |
 | `[0xe00+]` | **second blob** (~240+ halfwords) | ARM block-copy (`stmia`) at `0x2b5bd0` (reached via `bx pc` ARM-mode switch). |
 
 So the MCU **stages DSP tables/program from flash into shared RAM** at boot — the DSP's
-data *is* in the image. On a real phone the DSP would then execute/consume it; with the
-DSP stubbed the blobs just sit in `m_dsp_ram`, harmless.
+data *is* in the image. On a real phone the DSP would execute or consume it;
+the current HLE peer stores the blobs but does not interpret them.
 
 ## The L1↔DSP mailbox protocol (2026-07 dig — both directions mapped)
 
@@ -85,25 +86,26 @@ GSM-L1 traffic flows** because nothing runs the L1 stack: there is no DSP execut
 interface to emit measurement/sync/registration primitives, and the MCU-side L1 senders sit
 behind the same coherent-boot/network-attach phase we never reach.
 
-This task's *housekeeping* use (SIM/CCONT/scheduler mailbox) is what keeps it alive; the
-Whether the `0x30`/`0x32` completion returns through task 22 or only through shared control
+Task 22's housekeeping use keeps it alive. Whether the `0x30`/`0x32`
+completion returns through task 22 or only through shared control
 state is unresolved. Use `NOKI3210_TRACE_DSP_BOUNDARY` for this boundary; the retired broad
 `TRACE_DSPMSG` history should not be restored without a specific mailbox hypothesis.
 
 ## What the reachable boot currently proves
 
-`TRACE_DSPIO` shows **no MCU reads of DSP-computed result words** beyond the self-test
-region and hardcoded ready flags. The MCU nevertheless queues lower-service packets in
-the shared transmit ring. The first captured pair is:
+Reviewed traces show no MCU reads of additional DSP-computed result words beyond
+the bootstrap/self-test region. The MCU nevertheless queues lower-service
+packets in the shared transmit ring. The first captured pair is:
 
 ```text
 00 02 0a 05 1e ff 00 d0 00 03 01 01 e0 00
 08 05 1e 14 00 f4 00 01 03 00
 ```
 
-The model currently acknowledges these only by zeroing the pending count and raising
-IRQ 4. It is enough to reach "Insert SIM card", but it is not a complete DSP peer.
-No derived response format or receive-ring transition has yet connected this traffic
+The service submodel clears the pending count and raises IRQ4. The separate
+request-driven contact submodel consumes complete TX packets and returns
+correlated contact and transport responses through the inbound ring and FIQ0.
+Neither is a complete DSP implementation. No derived lower-radio response has connected this traffic
 to `0x05ea`, task-15 `0x07dd`, or the SIM registration result, so treating the D0 packet
 as that request would be speculation.
 
@@ -383,7 +385,7 @@ contract can be traced at the current boot frontier.
   creates task 14 and its eight controller slots, but no task-14 input starts a resource-`0x35`
   operation. The concurrent type-`0x1a` DSP state block is not evidence of such an operation;
   the falsified type-`0x80`/`0x70` reply must not be restored.
-- **For the network (operator name + signal):** a message-boundary DSP stub (answer the L1
+- **For the network (operator name + signal):** extend the message-boundary DSP peer (answer the L1
   commands with "camped on a fake cell, operator X, RSSI y") is feasible *in principle* and
   is the right MAME approach — but it is **doubly blocked**: (1) the L1 protocol is
   static-only until coherent boot reaches it, so we can't observe the exact handshake to

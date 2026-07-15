@@ -160,10 +160,10 @@ claim that a routing/subscription defect prevented organic sweep completion.
 
 PWRONX is reset/input status, not a delayed MAD2 IRQ0 event. The CCONT now
 latches bit `0x02` when the phone configures the cold-boot scenario, before the
-firmware's first status read. The unevidenced 120 ms IRQ0 pulse is no longer in
-the canonical profile; an explicit `NOKI3210_POWER_IRQ_MS` remains available as
-a power-key-edge fixture and does not mutate CCONT state. Removing the pulse
-preserves the contact/SIM frontier and does not produce report code 7.
+firmware's first status read. The unevidenced delayed IRQ0 timer and its
+environment fixture are removed; ordinary power-button input uses the decoded
+KBGPIO column/IRQ6 contract. Removing the timer preserves the contact/SIM
+frontier and does not produce report code 7.
 
 The power-key interrupt path is stable across the two ROMs: v6.00 handler
 `0x2b3084` aligns with v5.01 `0x2b02fc`, and each calls a tiny task-1 event

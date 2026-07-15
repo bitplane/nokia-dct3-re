@@ -40,8 +40,8 @@ cross-ROM pass to identify the genuinely shared contract.
   conclusion is normalized; replace each RAM-read shortcut with its real
   hardware or nonvolatile-data owner.
 - All firmware-result forces and registration-message injections are removed.
-  Two explicit RAM-read shortcuts remain: display-type sourcing and the startup
-  event-14 latch. See `evidence_regime.md`.
+  One explicit RAM-read shortcut remains for display-type sourcing. See
+  `evidence_regime.md`.
 - The direct firmware allocation trampoline,
   service-status RAM completion, and synthetic startup-report feed are removed.
   The current contact peer consumes organic DSP-ring requests and returns

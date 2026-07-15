@@ -37,8 +37,10 @@ IRQ6 -> ISR 0x2b5da0 -> event 0x72 -> mailbox/task 1
 
 Report code `0x07` is an actual prerequisite for this 3210 v6.00 branch. Its
 four reporter callers are classified. No ordinary external condition selecting
-one of them has yet been proved. The next static control is the same-product
-3210 v5.01 task-1 branch and caller alignment.
+one of them has yet been proved. The same task-1 wait and four-caller shape are
+aligned in 3210 v5.01. The active question is now the callback-`0x5d`
+transaction lifecycle that starts on `0x05e1`/`0x05e7` and should terminate on
+`0x05eb` or timer completion `0x06c5`.
 
 ## Evidence coverage
 
@@ -68,8 +70,10 @@ The headless LCD mirror and delayed-key fixture are acceptance tooling in
 `mame_noki3210_input_exerciser.lua`. They do not add device state or firmware
 shortcuts to the phone driver.
 
-Two RAM-read shortcuts remain explicitly quarantined: display-type selection and
-the startup event-14 latch. Neither is presented as hardware behavior.
+One RAM-read shortcut remains explicitly quarantined for display-type selection.
+It is not presented as hardware behavior; a leave-one-out run confirms that it
+still controls later LCD presentation even though the scheduler/SIM frontier
+otherwise survives.
 
 ## Instrumentation debt
 

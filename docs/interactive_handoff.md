@@ -244,7 +244,7 @@ report-7 lifecycle rather than at keypad hardware or scheduler delivery. The
 former duplicate pair came from a callback plus a 200 Hz polling approximation;
 the cross-ROM register contract has replaced both with one masked edge latch.
 
-## Closed ownership and external evidence request
+## Closed ownership and remaining lifecycle
 
 The independent code-6 caller at `0x28c22c` is selected by status `0x0794`.
 The census finds no direct producer: its sole numeric predecessor is fixed
@@ -265,14 +265,17 @@ key follows. Thus the interactive editor cannot be the ordinary
 pre-input owner of code 7: a real locked phone must cross the report boundary
 before its editor can accept input.
 
-No faithful correction is decidable from the available ROMs, synthetic
-provisioning, or coherent traces. All four code-7 callers and both code-6
-callers are classified; both collected 3210 EEPROM images are erased in the
-remaining calibration/security records, while the valid synthetic identity
-fixture changes presentation without publishing code 7. The smallest useful
-external evidence is one trace from a real 3210 v5.01 or v6.00 from reset to
-the first accepted key, containing either (a) the PC of the executed report-7
-caller, or (b) the ordered task-5 statuses around `0x0794`, `0x0795`, `0x0348`,
-`0x05e1`, `0x05eb`, and `0x06c5`. A provisioned 16 KiB EEPROM capture with
-personal identity bytes redacted but checksummed block structure preserved is
-the next-smallest input if execution tracing is unavailable.
+No faithful correction is proved yet. All four code-7 callers and both code-6
+callers are classified, but callback `0x5d` still exposes one bounded local
+question: which object/session starts on `0x05e1` or `0x05e7`, and which
+hardware, transport, timer, or task acknowledgement should terminate it on
+`0x05eb` or `0x06c5`? The retained handoff trace covers that status family and
+callback boundary without retaining the excluded power, registration,
+controller, identity, or battery-candidate taps.
+
+If that backward lifecycle census reaches an external boundary, the smallest
+confirming evidence is one real-3210 trace containing the executed report-7
+caller and ordered task-5 statuses around `0x0348`, `0x05e1`, `0x05e7`,
+`0x05eb`, and `0x06c5`. A provisioned 16 KiB EEPROM capture with personal
+identity bytes redacted but checksummed block structure preserved remains a
+secondary input if the lifecycle selects an NV predicate.

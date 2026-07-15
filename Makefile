@@ -61,15 +61,14 @@ BOOT_ENV := \
 	NOKI3210_TIMER1_HZ=1057 \
 	NOKI3210_TIMER0_CATCHUP=1 \
 	NOKI3210_DISABLE_CCONT_WATCHDOG=1 \
-	NOKI3210_LUA_QUIET=1 \
-	NOKI3210_INPUT_EXERCISER_PRESS=0
+	NOKI3210_LUA_QUIET=1
 
 MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-keyboardprovider none -mouseprovider none -lightgunprovider none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check prepare-run-nvram run run-frontier smoke smoke-3330e audit-roms frame watch verify verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e audit-roms frame watch verify verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -79,6 +78,7 @@ help:
 	@echo "make controller-census exhaustively verify the 3210 controller dispatcher"
 	@echo "make census-docs    refresh the committed report; refuses missing scoped runtime"
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
+	@echo "make test-tools     run the static-tool and EEPROM-profile unit tests"
 	@echo "make run-manifest-* reproduce named default/deep-gsm/contact/3330 evidence runs"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
@@ -168,6 +168,9 @@ census-docs:
 
 evidence-check:
 	$(PYTHON) tools/validate_evidence.py
+
+test-tools:
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
