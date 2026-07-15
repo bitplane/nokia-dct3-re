@@ -109,7 +109,7 @@ constexpr uint8_t MAD2_MBUS_TX_READY = 0x10;
 constexpr uint8_t MAD2_MBUS_RX_READY = 0x20;
 constexpr uint8_t MAD2_MBUS_TX_ENABLE = 0x20;
 constexpr uint8_t MAD2_MBUS_RX_ENABLE = 0x40;
-constexpr uint16_t MAD2_FIQ_TIMER0_COMPARE = 0x04;
+constexpr uint16_t MAD2_FIQ_TIMER0_COMPARE = uint16_t(1) << 4;
 constexpr uint16_t MAD2_FIQ_MBUS_MASK = 0x0c;
 
 // CCONT serial command/status bits + fixed wiring (hardware constants, not configurable).
@@ -267,6 +267,7 @@ public:
 private:
 	virtual void machine_start() override ATTR_COLD;
 	virtual void machine_reset() override ATTR_COLD;
+	void post_load();
 
 	PCD8544_SCREEN_UPDATE(pcd8544_screen_update);
 
@@ -364,6 +365,7 @@ private:
 	bool          m_mcuif_trace_write[4] = {false};
 	uint8_t       m_mcuif_regs[4] = {0};
 	unsigned      m_gensio_trace_count = 0;
+	unsigned      m_mad2_timer_trace_count = 0;
 	uint8_t       m_gensio_status = 0x03;
 };
 
@@ -513,7 +515,8 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      sequencer mode + startup checklist; the post-SIM interactive handoff),
 //      TRACE_TASKS (app-task liveness + inter-task message edges).
 //      TRACE_SIM_RX covers the register/FIQ/APDU path and SIM reply milestones;
-//      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary.
+//      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary;
+//      TRACE_MAD2_TIMERS records the timer-0/FIQ register lifecycle.
 //      Research-force policy: docs/evidence_regime.md.
 //
 // Firmware-address traces are quarantined in nokia_3310_trace.inc. Add no
@@ -553,9 +556,27 @@ void noki3310_state::machine_start()
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
 	m_timer_fiq8 = timer_alloc(FUNC(noki3310_state::timer_fiq8), this);
 	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
+	save_pointer(NAME(m_ram), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
+	save_item(NAME(m_power_on));
+	save_item(NAME(m_fiq_status));
+	save_item(NAME(m_irq_status));
+	save_item(NAME(m_timer1_counter));
+	save_item(NAME(m_timer0_counter));
+	save_item(NAME(m_timer0_divider));
+	save_item(NAME(m_timer0_compare_latched));
+	save_item(NAME(m_keypad_columns));
+	save_item(NAME(m_keypad_irq_latched));
+	save_item(NAME(m_ccont_irq_state));
 	save_item(NAME(m_mad2_regs));
 	save_item(NAME(m_mcuif_regs));
 	save_item(NAME(m_gensio_status));
+	machine().save().register_postload(save_prepost_delegate(FUNC(noki3310_state::post_load), this));
+}
+
+void noki3310_state::post_load()
+{
+	update_keypad_ccont_irqs();
+	update_fiq_line();
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -594,6 +615,7 @@ void noki3310_state::machine_reset()
 	std::fill(std::begin(m_mcuif_trace_write), std::end(m_mcuif_trace_write), false);
 	std::fill(std::begin(m_mcuif_regs), std::end(m_mcuif_regs), 0);
 	m_gensio_trace_count = 0;
+	m_mad2_timer_trace_count = 0;
 	m_gensio_status = 0x03;
 	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
 	m_mad2_regs[MAD2_IRQ_CTRL] = 0x0a;         // disable FIQ and IRQ
@@ -810,8 +832,13 @@ void noki3310_state::complete_mbus_transfer()
 
 void noki3310_state::ack_fiq(uint16_t mask)
 {
+	const uint16_t before = m_fiq_status;
 	m_fiq_status &= ~mask;
 	update_fiq_line();
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
+			m_mad2_timer_trace_count++ < 4096)
+		logerror("mad2_timer: event=ack mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
+				mask, before, m_fiq_status, machine().time().as_double());
 }
 
 void noki3310_state::ack_irq(uint16_t mask)
@@ -859,8 +886,17 @@ void noki3310_state::update_timer0_compare()
 
 	m_timer0_compare_latched = true;
 
-	if (!(m_fiq_status & 0x04))
+	if (!(m_fiq_status & MAD2_FIQ_TIMER0_COMPARE))
+	{
 		assert_fiq(4);
+		if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
+				m_mad2_timer_trace_count++ < 4096)
+			logerror("mad2_timer: event=assert counter=%04x compare=%04x divider=%02x pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
+					m_timer0_counter,
+					(uint16_t(m_mad2_regs[0x12]) << 8) | m_mad2_regs[0x13],
+					m_timer0_divider, m_fiq_status, m_mad2_regs[MAD2_FIQ_MASK],
+					m_mad2_regs[MAD2_IRQ_CTRL], machine().time().as_double());
+	}
 }
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer0)
@@ -1119,6 +1155,11 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			m_gensio_trace_count++ < 20000)
 		logerror("gensio: R off=%02x data=%02x pc=%08x t=%.9f\n", offset, data,
 				m_maincpu->pc(), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
+			((offset >= 0x08 && offset <= 0x13) || offset == 0x0a) &&
+			m_mad2_timer_trace_count++ < 4096)
+		logerror("mad2_timer: event=R off=%02x data=%02x pc=%08x t=%.9f\n",
+				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
 
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mad2_trace_read[offset])
 	{
@@ -1134,6 +1175,11 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	uint8_t old_data = m_mad2_regs[offset];
 	m_mad2_regs[offset] = data;
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
+			(offset >= 0x08 && offset <= 0x13) &&
+			m_mad2_timer_trace_count++ < 4096)
+		logerror("mad2_timer: event=W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n",
+				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && offset == 0x36)
 	{
 		static unsigned sim_txd_count = 0;

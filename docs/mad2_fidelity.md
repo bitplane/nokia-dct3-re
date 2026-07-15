@@ -42,11 +42,11 @@ therefore must not be read as peripheral completeness.
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
 | `04..07` sleep timer | software counter and synthetic destination | Placeholder | Establish 32.768 kHz counter width, latch and compare behavior. |
-| `08..0b` FIQ/IRQ status and masks | latched bitfields | Partial | Verify write-one-clear behavior, priority and extended-line routing. |
+| `08..0b` FIQ/IRQ status and masks | latched bitfields | Partial | Timer-0 FIQ line 4 and CCONT IRQ6 mask/ack paths have focused regressions; verify priority, simultaneous sources and extended-line routing. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
 | `0d` clock control | stored only | Placeholder | Map clock domains and sleep transitions. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
-| `0f..13` timer 0 | live divider/counter/compare model with FIQ4 | Cross-ROM semantics, calibrated clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge FIQ4 identically. Establish the input oscillator/divider formula and remove the frequency/catch-up knobs. |
+| `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Establish the input oscillator/divider formula and remove the frequency/catch-up knobs. |
 
 ## PUP, GPIO and serial blocks
 
@@ -117,11 +117,20 @@ observable contract, while the PCB signal name remains deliberately unknown.
 Timer-0 initialization at v6.00 `0x2aa934` aligns uniquely and byte-for-byte
 with v5.01 `0x2a75c4`. Both routines write divider `0xf9`, wait until the live
 divider is at most `0xea`, program a compare two counter ticks ahead, wait for
-FIQ4, and acknowledge it through status offset `0x08`. This validates the live
-divider, coherent 16-bit counter read, compare and write-one-clear contract.
+FIQ line 4/status bit `0x10`, and acknowledge it through status offset `0x08`.
+`make verify-mad2` checks that complete lifecycle from a targeted organic trace.
+This validates the live divider, coherent 16-bit counter read, compare and
+write-one-clear contract. The previous unused `0x04` timer constant and matching
+pending guard were wrong; runtime assertion/status/acknowledgement all establish
+`0x10`.
 It does not reveal the physical input clock. The coherent profile's 20 MHz
 base and catch-up behavior therefore remain explicit calibration debt rather
 than being promoted into the device contract.
+
+The same target performs a scheduled save/load round trip. Main RAM, MAD2
+registers, IRQ/FIQ pending state, timer counters/divider/compare latch, keypad
+and CCONT aggregation, power-on state and GENSIO state are registered. Post-load
+reconstructs the CPU interrupt lines without manufacturing a new source.
 
 The widened ledger observes one MCUIF dword write (`6a 0f 61 20`) from boot and
 no MCUIF reads. DSPIF receives its initial zero halfword and then 26 command-4

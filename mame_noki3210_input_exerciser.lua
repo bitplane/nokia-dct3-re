@@ -37,6 +37,7 @@ local structural = {
 	ccont_bytes = 0, ccont_reads = 0, eeprom_starts = 0,
 	eeprom_signal_writes = 0, irq_seen = 0, fiq_seen = 0, soft_resets = 0,
 	final_irq_status = 0,
+	final_fiq_status = 0, state_roundtrip = "not-run",
 	final_current_task = 0, final_startup_mode = 0, final_startup_event = 0,
 	final_startup_flags = 0, final_contact_status = 0,
 	final_no_sim = 0, final_sim_enable = 0,
@@ -51,6 +52,7 @@ end
 
 charger_pulse_at = env_number("NOKI3210_CCONT_CHARGER_PULSE_AT", -1)
 local charger_pulse_duration = env_number("NOKI3210_CCONT_CHARGER_PULSE_DURATION", 0.05)
+local state_roundtrip_at = env_number("NOKI3210_STATE_ROUNDTRIP_AT", -1)
 
 local function emulation_seconds()
 	return machine.time:as_double()
@@ -226,6 +228,8 @@ local function write_boot_summary()
 		string.format("soft_resets=%d", structural.soft_resets),
 		string.format("irq_seen=%02X", structural.irq_seen), string.format("fiq_seen=%02X", structural.fiq_seen),
 		string.format("final_irq_status=%02X", structural.final_irq_status),
+		string.format("final_fiq_status=%02X", structural.final_fiq_status),
+		string.format("state_roundtrip=%s", structural.state_roundtrip),
 		string.format("gensio_controls=%s", hex_set(structural.gensio_controls, 2)),
 		string.format("ccont_bytes=%d", structural.ccont_bytes), string.format("ccont_reads=%d", structural.ccont_reads),
 		string.format("ccont_commands=%s", hex_set(structural.ccont_commands, 2)),
@@ -285,6 +289,7 @@ local function sample_structural_state()
 	structural.irq_seen = structural.irq_seen | space:read_u8(0x20009)
 	structural.final_irq_status = space:read_u8(0x20009)
 	structural.fiq_seen = structural.fiq_seen | space:read_u8(0x20008)
+	structural.final_fiq_status = space:read_u8(0x20008)
 	structural.final_current_task = space:read_u8(0x100002)
 	structural.final_startup_mode = space:read_u16(v501 and 0x11224c or 0x1123f0)
 	structural.final_startup_event = space:read_u16(v501 and 0x11224a or 0x1123ee)
@@ -345,6 +350,38 @@ if charger_pulse_at >= 0 and charger_field then
 		charger_field:clear_value()
 	end)
 	assert(coroutine.resume(charger_timer))
+end
+
+if state_roundtrip_at >= 0 then
+	local state_timer = coroutine.create(function()
+		emu.wait(state_roundtrip_at)
+		local snapshot = {
+			mode = space:read_u16(v501 and 0x11224c or 0x1123f0),
+			counter = space:read_u16(0x20010),
+			fiq_mask = space:read_u8(0x2000a),
+			irq_mask = space:read_u8(0x2000b),
+			irq_ctrl = space:read_u8(0x2000c),
+			gensio = space:read_u8(0x2006d),
+		}
+		machine:save("noki3210_mad2_contract")
+		emu.wait(0.05)
+		machine:load("noki3210_mad2_contract")
+		emu.wait(0.01)
+		local counter = space:read_u16(0x20010)
+		local counter_delta = (counter - snapshot.counter) & 0xffff
+		local passed =
+			space:read_u16(v501 and 0x11224c or 0x1123f0) == snapshot.mode and
+			space:read_u8(0x2000a) == snapshot.fiq_mask and
+			space:read_u8(0x2000b) == snapshot.irq_mask and
+			space:read_u8(0x2000c) == snapshot.irq_ctrl and
+			space:read_u8(0x2006d) == snapshot.gensio and
+			counter_delta < 0x1000
+		structural.state_roundtrip = passed and "pass" or "fail"
+		machine:logerror(string.format(
+			"state_roundtrip: result=%s timer_delta=%04x mode=%04x\n",
+			structural.state_roundtrip, counter_delta, snapshot.mode))
+	end)
+	assert(coroutine.resume(state_timer))
 end
 
 -- Keep the semantic oracle current independently of display activity.

@@ -39,7 +39,7 @@
     },
     {
       "id": "mad2_interrupt_aggregation", "subsystem": "interrupts", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component levels onto ARM lines; keypad IRQ0, CCONT IRQ6, DSP FIQ0, SIMI FIQ6 and timer FIQ4 are exercised, while reset polarity, priority and several line assignments remain unvalidated",
+      "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component levels onto ARM lines; timer FIQ line 4/status bit 0x10 and CCONT IRQ6 have focused mask/ack regressions, while priority, simultaneous sources, extended routing and several line assignments remain unvalidated",
       "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
     },
     {

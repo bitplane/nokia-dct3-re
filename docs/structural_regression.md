@@ -40,7 +40,8 @@ baseline rather than the former stale-NVRAM run.
 The generated summary records:
 
 - emulated frames and LCD command/data/full-transfer counts;
-- MAD2 soft reset count and IRQ/FIQ lines observed at frame boundaries;
+- MAD2 soft reset count, IRQ/FIQ lines observed at frame boundaries, final
+  pending status and optional save-state round-trip result;
 - GENSIO control values;
 - CCONT byte/read counts and command-byte set;
 - EEPROM START conditions and GenIO signal-write count;
