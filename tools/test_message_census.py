@@ -17,6 +17,26 @@ class ByteLaneTests(unittest.TestCase):
 	def test_effective_pool_literal_rotates_halfwords(self):
 		self.assertEqual(message_census.effective_u32(bytes((0x11, 0x22, 0x33, 0x44)), 0), 0x22114433)
 
+	def test_callback_transition_decodes_swap16_byte_lanes(self):
+		# CPU bytes are 5d,03,04,00 and the packed halfword is 0x551c.
+		data = bytes((0x03, 0x5d, 0x00, 0x04, 0x1c, 0x55, 0x00, 0x00))
+		profile = {"callback_transition_table": {
+			"address": "0x2000", "entries": 1, "entry_size": 8}}
+		self.assertEqual(message_census.extract_callback_transitions(profile, data, 0x2000), [{
+			"index": 0, "address": 0x2000, "selector": 0x5d,
+			"required_state": 3, "control": 4, "new_state": 4,
+			"inverted_match": False, "packed_event": 0x551c,
+			"event": 0x151c, "argument_count": 1,
+			"provenance": "extracted_static"}])
+
+	def test_status_descriptor_extent_uses_halfword_and_byte_lanes(self):
+		# Descriptor: status 0x0367, transition start 0x00eb, count 6.
+		data = bytes((0x67, 0x03, 0xeb, 0x00, 0x00, 0x06, 0x00, 0x00))
+		profile = {"status_descriptor_table": {
+			"address": "0x2000", "entries": 1, "entry_size": 8}}
+		self.assertEqual(message_census.status_descriptor_transition_extent(
+			profile, data, 0x2000), 0xf1)
+
 	def test_computed_r0_construction_tracks_straight_line_shift(self):
 		# movs r0,#0xef; lsls r0,r0,#3 -> 0x0778
 		data = bytes((0xef, 0x20, 0xc0, 0x00))
@@ -50,6 +70,25 @@ class ByteLaneTests(unittest.TestCase):
 		contract = {"address": 0x2000, "entries": 1, "entry_size": 4}
 		result = message_census.catalogue_predecessors(contract, data, 0x2000, 0x08b0)
 		self.assertEqual(result[0]["sequence_offset"], 1)
+
+	def test_status_inventory_accepts_decoded_packed_event(self):
+		calls = [{"callsite": 0x2000, "api": "task5_render_post", "arguments": {
+			"packed_event": 0x53f8, "event": 0x13f8, "argument_count": 1,
+			"argument_words": [None], "descriptor": None}}]
+		result = message_census.status_inventory([], calls, [], b"", 0x200000, 0x13f8)
+		self.assertEqual(result["call_arguments"], [{
+			"callsite": 0x2000, "api": "task5_render_post", "argument": "event"}])
+
+	def test_rom_encoding_inventory_separates_loaded_mcu_and_payload_words(self):
+		# ldr r0,[pc,#0] loads effective 0x53f8 at 0x2004; a second copy is payload.
+		data = bytes((0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x53,
+			0x00, 0x00, 0xf8, 0x53))
+		instructions = message_census.decode_image(data, 0x2000)
+		result = message_census.rom_encoding_inventory(
+			instructions, data, 0x2000, 0x13f8, mcu_limit=0x2008)
+		self.assertEqual(result["packed_words"], [
+			{"address": 0x2004, "value": 0x53f8, "region": "mcu", "literal_loads": [0x2000]},
+			{"address": 0x2008, "value": 0x53f8, "region": "ppm_or_payload", "literal_loads": []}])
 
 
 class ContactServiceTests(unittest.TestCase):

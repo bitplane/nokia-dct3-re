@@ -174,6 +174,9 @@ bool nokia_dsp_peer_device::enqueue_contact_frame(u8 command, u8 result, u8 sequ
 		command, result, 0x01, sequence
 	};
 	if (!enqueue_rx_packet(0x8e, frame, std::size(frame))) return false;
+	if (m_trace_enabled)
+		logerror("dsp_boundary: RX contact command=%02x result=%02x sequence=%02x t=%.6f\n",
+				command, result, sequence, machine().time().as_double());
 	pulse_fiq0();
 	return true;
 }

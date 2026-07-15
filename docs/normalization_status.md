@@ -57,8 +57,10 @@ dormant service/test contract, not an unresolved autonomous boot transaction.
   runtime manifests.
 - The 3330 remains a smoke input rather than a second supported semantic
   topology.
-- The 3210 v5.01 full flash is a local static control; its code-7 wrapper and
-  four callers are mapped, but its runtime profile is not yet normalized.
+- The 3210 v5.01 full flash is a same-product runtime control. Its structural
+  oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
+  and sets SIM ENABLE through relocated v5 state fields.
+  Contact ready-bit consumption and display progress are not yet equivalent to v6.00.
 
 ## Device and model debt
 

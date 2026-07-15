@@ -81,6 +81,15 @@ def literal_value(insn, data, base):
 	return effective_u32(data, offset)
 
 
+def literal_pool_address(insn):
+	if not insn or insn.mnemonic != "ldr" or len(insn.operands) != 2:
+		return None
+	mem = insn.operands[1]
+	if mem.type != capstone.arm.ARM_OP_MEM or mem.mem.base != capstone.arm.ARM_REG_PC:
+		return None
+	return ((insn.address + 4) & ~3) + mem.mem.disp
+
+
 def written_register(insn):
 	if not insn or not insn.operands:
 		return None
@@ -179,6 +188,50 @@ def extract_callbacks(profile, data, base):
 		records.append({"index": index, "address": address + index * table["entry_size"],
 			"pointer": pointer, "flags": flags, "provenance": "extracted_static"})
 	return records
+
+
+def extract_callback_transitions(profile, data, base):
+	table = profile.get("callback_transition_table")
+	if not table:
+		return []
+	address = number(table["address"])
+	entry_size = number(table.get("entry_size", 8))
+	records = []
+	for index in range(number(table["entries"])):
+		entry = address + index * entry_size
+		control = cpu_byte(data, base, entry + 2)
+		packed_event = u16(data, base, entry + 4)
+		records.append({
+			"index": index,
+			"address": entry,
+			"selector": cpu_byte(data, base, entry),
+			"required_state": cpu_byte(data, base, entry + 1),
+			"control": control,
+			"new_state": control & 0x3f,
+			"inverted_match": bool(control & 0x80),
+			"packed_event": packed_event,
+			"event": packed_event & 0x1fff,
+			"argument_count": (packed_event >> 14) & 3,
+			"provenance": "extracted_static"
+		})
+	return records
+
+
+def status_descriptor_transition_extent(profile, data, base):
+	table = profile.get("status_descriptor_table")
+	if not table:
+		return None
+	address = number(table["address"])
+	entry_size = number(table.get("entry_size", 8))
+	extent = 0
+	for index in range(number(table["entries"])):
+		entry = address + index * entry_size
+		start = u16(data, base, entry + 2)
+		count = cpu_byte(data, base, entry + 4)
+		if start is None or count is None:
+			return None
+		extent = max(extent, start + count)
+	return extent
 
 
 def extract_consumers(profile, instruction_by_address, instructions, data, base):
@@ -504,6 +557,31 @@ def status_inventory(instructions, calls, descriptors, data, base, status,
 			catalogue_contract, data, base, status, instructions, calls)}
 
 
+def rom_encoding_inventory(instructions, data, base, status, mcu_limit=0x300000):
+	"""Inventory raw status encodings without promoting them to producer edges."""
+	loads_by_pool = {}
+	for insn in instructions:
+		pool = literal_pool_address(insn)
+		if pool is not None:
+			loads_by_pool.setdefault(pool, []).append(insn.address)
+	packed_words = []
+	for offset in range(0, len(data) - 3, 4):
+		value = effective_u32(data, offset)
+		if value < 0x10000 and (value & 0x1fff) == status:
+			address = base + offset
+			packed_words.append({"address": address, "value": value,
+				"region": "mcu" if address < mcu_limit else "ppm_or_payload",
+				"literal_loads": loads_by_pool.get(address, [])})
+	halfwords = []
+	for offset in range(0, len(data) - 1, 2):
+		address = base + offset
+		if u16(data, base, address) == status:
+			halfwords.append({"address": address,
+				"region": "mcu" if address < mcu_limit else "ppm_or_payload"})
+	return {"status": status, "packed_words": packed_words, "halfwords": halfwords,
+		"mcu_limit": mcu_limit}
+
+
 def object_lifecycle_inventory(calls, assessments):
 	"""Inventory direct 0x05e0 lifecycle constructors that carry an object word."""
 	reviewed = {number(item["callsite"]): item for item in assessments}
@@ -568,6 +646,7 @@ def render_report(result):
 	lines += ["## Coverage", "",
 		f"- Known API callsites: {summary['calls']} ({summary['resolved_call_arguments']} / {summary['call_arguments']} arguments resolved, {summary['argument_coverage_percent']:.1f}%)",
 		f"- Callback-table entries: {summary['callbacks']} (`0x2db720` through `0x2dbb0f`; index `0x28` is `0x2db860`)",
+		f"- Callback transition records: {summary['callback_transitions']}",
 		f"- Known consumer entries: {summary['consumers']} ({summary['consumer_entries_decoded']} entry addresses decode)",
 		f"- Descriptor registrations: {summary['descriptor_registrations']} ({summary['rom_descriptors']} ROM descriptors decoded, {summary['unresolved_descriptors']} RAM-built or unresolved)",
 		f"- Runtime observations: {summary['runtime_observations']}", ""]
@@ -612,12 +691,24 @@ def render_report(result):
 			evidenced_catalogue = [item for item in catalogue if any(
 				item["producer_evidence"][field] for field in
 				("literal_loads", "computed_r0_constructions", "direct_calls"))]
+			encoding = inventory["rom_encodings"]
+			packed_loaded = sum(bool(item["literal_loads"]) for item in encoding["packed_words"])
+			mcu_halfwords = sum(item["region"] == "mcu" for item in encoding["halfwords"])
 			lines += [f"### Status `{key}`", "",
 				f"- Effective literal loads: {len(inventory['literal_loads'])}",
 				f"- Conservative computed-r0 constructions: {len(inventory['computed_r0_constructions'])}",
 				f"- Recovered direct API arguments: {len(inventory['call_arguments'])}",
 				f"- Descriptor fields: {len(inventory['descriptor_fields'])}",
-				f"- Fixed-sequence catalogue predecessors: {len(catalogue)} ({len(evidenced_catalogue)} with a recovered packed-input producer)", ""]
+				f"- Fixed-sequence catalogue predecessors: {len(catalogue)} ({len(evidenced_catalogue)} with a recovered packed-input producer)",
+				f"- Raw packed ROM words: {len(encoding['packed_words'])} ({packed_loaded} loaded by decoded MCU instructions)",
+				f"- Exact ROM halfwords: {len(encoding['halfwords'])} ({mcu_halfwords} in the MCU region; raw occurrences are not producer evidence)", ""]
+			for item in inventory["call_arguments"]:
+				call = next(call for call in result["calls"] if call["callsite"] == item["callsite"])
+				packed = call["arguments"].get("packed_event")
+				lines.append(f"  - `{item['api']}` at `{item['callsite']:#08x}`"
+					+ (f" uses packed `{packed:#06x}`." if packed is not None else "."))
+			if inventory["call_arguments"]:
+				lines.append("")
 	lifecycle = result["object_lifecycle_05e0"]
 	lines += ["## Object-bearing 0x05dc lifecycle constructors", "",
 		f"The ROM scan recovered {len(lifecycle['constructors'])} direct packed `0x05e0` constructors with at least two argument words. "
@@ -724,6 +815,10 @@ def main():
 	by_address = {insn.address: insn for insn in instructions if insn}
 	calls = extract_calls(profile, instructions, data, base)
 	callbacks = extract_callbacks(profile, data, base)
+	callback_transitions = extract_callback_transitions(profile, data, base)
+	status_descriptor_extent = status_descriptor_transition_extent(profile, data, base)
+	callback_transition_extent_valid = (status_descriptor_extent is None or
+		status_descriptor_extent == len(callback_transitions))
 	callback_table = profile["callback_table"]
 	next_callback_offset = number(callback_table["address"]) - base + callback_table["entries"] * callback_table["entry_size"]
 	next_callback_pointer = effective_u32(data, next_callback_offset)
@@ -748,6 +843,8 @@ def main():
 			catalogue_contract)
 		for status in dict.fromkeys(args.inventory_status)
 	}
+	for status, inventory in zip(dict.fromkeys(args.inventory_status), requested_status_inventories.values()):
+		inventory["rom_encodings"] = rom_encoding_inventory(instructions, data, base, status)
 	lifecycle_05e0 = object_lifecycle_inventory(calls, profile.get("object_lifecycle_assessments", []))
 	dynamic_packed_events = dynamic_packed_event_inventory(calls,
 		profile.get("dynamic_packed_event_assessments", []))
@@ -781,6 +878,9 @@ def main():
 			"unresolved_call_arguments": total - resolved,
 			"argument_coverage_percent": 100.0 * resolved / total if total else 100.0,
 			"callbacks": len(callbacks),
+			"callback_transitions": len(callback_transitions),
+			"status_descriptor_transition_extent": status_descriptor_extent,
+			"callback_transition_extent_valid": callback_transition_extent_valid,
 			"callback_extent_valid": callback_extent_valid,
 			"next_callback_word": next_callback_pointer,
 			"consumers": len(consumers),
@@ -795,7 +895,8 @@ def main():
 			"unresolved_descriptor_service5_candidacy": {kind: sum(item["resolution"] != "rom" and item["service5_candidacy"] == kind for item in descriptors)
 				for kind in sorted({item["service5_candidacy"] for item in descriptors if item["resolution"] != "rom"})},
 			"runtime_observations": len(runtime)},
-		"calls": calls, "callbacks": callbacks, "descriptor_registrations": descriptors,
+		"calls": calls, "callbacks": callbacks, "callback_transitions": callback_transitions,
+		"descriptor_registrations": descriptors,
 		"consumers": consumers, "semantic_edges": edges,
 		"status_inventory_05e8": inventory_05e8,
 		"requested_status_inventories": requested_status_inventories,
@@ -824,11 +925,14 @@ def main():
 	if not args.json and not args.report:
 		print(report)
 	if args.check and (not all(edge["anchors_valid"] for edge in edges) or not callback_extent_valid or
+			not callback_transition_extent_valid or
 			not contact_service["all_constructor_anchors_valid"] or not lifecycle_05e0["coverage_complete"] or
 			not dynamic_packed_events["coverage_complete"] or dynamic_packed_events["can_publish_05e0"]):
 		failed = [edge["id"] for edge in edges if not edge["anchors_valid"]]
 		if not callback_extent_valid:
 			failed.append("callback_table_extent")
+		if not callback_transition_extent_valid:
+			failed.append("callback_transition_table_extent")
 		if not contact_service["all_constructor_anchors_valid"]:
 			failed.append("contact_service_constructor_anchors")
 		if not lifecycle_05e0["coverage_complete"]:

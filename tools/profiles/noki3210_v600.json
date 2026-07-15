@@ -7,6 +7,16 @@
     "entries": 126,
     "entry_size": 8
   },
+  "callback_transition_table": {
+    "address": "0x2cc7f0",
+    "entries": 950,
+    "entry_size": 8
+  },
+  "status_descriptor_table": {
+    "address": "0x2cb218",
+    "entries": 234,
+    "entry_size": 8
+  },
   "status_translation_table": {
     "address": "0x2cb968",
     "entries": "0x2000",
@@ -62,7 +72,7 @@
     {"address": "0x2695f4", "name": "event_post_immediate", "kind": "event_transport", "arguments": {"event": "r0"}},
     {"address": "0x2697aa", "name": "event_post_delayed", "kind": "event_transport", "arguments": {"task": "r0", "event": "r1"}},
     {"address": "0x2698e4", "name": "event_table_service", "kind": "event_transport", "arguments": {"task": "r0"}},
-    {"address": "0x2af6ea", "name": "task5_render_post", "kind": "packed_event", "arguments": {"event": "r0", "descriptor": "r1"}},
+    {"address": "0x2af6ea", "name": "task5_render_post", "kind": "packed_event", "arguments": {"packed_event": "r0", "descriptor": "r1"}},
     {"address": "0x2af798", "name": "generic_event_generate", "kind": "packed_event", "arguments": {"packed_event": "r0"}},
     {"address": "0x2632fc", "name": "service_register_transient", "kind": "descriptor_registration", "arguments": {"service": "r0", "callback": "r1", "descriptor": "r2"}, "descriptor_argument": "descriptor"},
     {"address": "0x263d30", "name": "service_register_resident", "kind": "descriptor_registration", "arguments": {"descriptor": "r0", "enable": "r1", "mask": "r2"}, "descriptor_argument": "descriptor"},
@@ -355,14 +365,14 @@
       "from": "context_status09cd_producer",
       "to": "service5_callback",
       "input_status": "callback-state slot 0x45 is neither 0 nor 5 (with state-6 active-slot exception)",
-      "output_status": "0x09d0 -> eligible callback 0x5d action 0x00dc -> code-7 completion",
+      "output_status": "0x09d0 -> eligible callback 0x5d status lifecycle -> code-7 completion",
       "classification": "mapped_nonordinary_unproved",
       "provenance": "reviewed_static_and_runtime",
       "anchors": [
         {"type": "decoded_address", "address": "0x24d716", "state_address": "0x11fcc5"},
         {"type": "decoded_address", "address": "0x24d762", "output_status": "0x09d0"},
         {"type": "decoded_address", "address": "0x24d76c", "observed_output_status": "0x09d1"},
-        {"type": "callback_entry", "index": 93, "pointer": "0x27b371", "flags": "0x01a00000", "state": "0x0b", "action": "0x00dc"}
+        {"type": "callback_entry", "index": 93, "pointer": "0x27b371", "flags": "0x01a00000", "state": "0x0b"}
       ]
     },
     {

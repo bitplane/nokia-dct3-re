@@ -24,6 +24,7 @@ RUN_ENV ?=
 RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
 PRESERVE_NVRAM ?= 0
 PROVISIONED_IMEI_PREFIX ?=
+EEPROM_BASENAME ?= $(if $(filter 501,$(BIOS)),3210 v501 eeprom.bin,3210 v600 eeprom.bin)
 CENSUS_LOG ?=
 CENSUS_MANIFESTS ?= tools/run_manifests/contact-service.json tools/run_manifests/deep-gsm.json
 FRONTIER_EVENT_INVENTORIES := \
@@ -41,6 +42,7 @@ FRAME_PNG ?= progress_latest_frame.png
 ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
+ORACLE_V501_STRUCT ?= oracles/noki3210-v501-smoke.struct
 
 # Current forcing-free research frontier. The request-driven contact peer
 # subsumes DSP D0 discovery and TX-ring consumption, while the SIM model stays
@@ -118,7 +120,7 @@ overlay: download-mame
 
 eeprom-profile:
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
-	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/3210 selftest eeprom.bin" \
+	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/$(EEPROM_BASENAME)" \
 		$(if $(PROVISIONED_IMEI_PREFIX),--provisioned-imei-prefix $(PROVISIONED_IMEI_PREFIX))
 
 normalize-3330:
@@ -230,7 +232,7 @@ prepare-run-nvram:
 	@if [ "$(PHONE)" = "noki3210" ]; then \
 		mkdir -p "$(RUN_NVRAM_DIR)/$(PHONE)"; \
 		if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
-			cp "$(MAME_DIR)/roms/noki3210/3210 selftest eeprom.bin" \
+			cp "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)" \
 				"$(RUN_NVRAM_DIR)/$(PHONE)/eeprom"; \
 		fi; \
 	fi
@@ -253,15 +255,32 @@ smoke: build
 smoke-3330e: normalize-3330
 	@$(MAKE) --no-print-directory smoke PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
 
+smoke-3210-v501:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 \
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
+		RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) RUN_ENV='$(FRONTIER_ENV)'
+
+verify-3210-v501: smoke-3210-v501
+	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_V501_STRUCT)
+	@echo "OK — v5.01 same-product startup predicates reproduced"
+
 audit-roms: build
 	cd $(MAME_DIR) && ./mame -rompath roms -verifyroms $(PHONE)
 
-# Promote the latest non-blank LCD frame in RUN_DIR to FRAME_PNG (for chafa/preview).
+# Promote the latest informative LCD frame, falling back to the latest capture
+# so the progress preview never silently remains stale.
 frame:
-	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	fallback=0; \
+	if [ -z "$$f" ]; then \
+		f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+		fallback=1; \
+	fi; \
 	if [ -z "$$f" ]; then echo "frame: no LCD frame in $(RUN_DIR) yet"; else \
 		( magick "$$f" $(FRAME_PNG) 2>/dev/null || convert "$$f" $(FRAME_PNG) 2>/dev/null || pnmtopng "$$f" > $(FRAME_PNG) ) \
-		&& echo "frame: $(FRAME_PNG) <- $$f"; fi
+		&& { if [ $$fallback -eq 1 ]; then suffix=" (latest-capture fallback)"; fi; \
+			echo "frame: $(FRAME_PNG) <- $$f$$suffix"; }; fi
 
 # Live preview in this terminal (Ctrl-C to stop). External equivalent:
 #   watch -n0.5 chafa --size=84x48 progress_latest_frame.png

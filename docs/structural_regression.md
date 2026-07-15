@@ -13,6 +13,8 @@ same frame.
 `oracles/noki3210-default.struct` after checking the exact frame hash.
 `make verify-frontier` performs the corresponding semantic check for the current
 request-driven contact/SIM profile against `oracles/noki3210-frontier.struct`.
+`make verify-3210-v501` runs the same-product v5.01 control with a BIOS-specific
+EEPROM profile and checks `oracles/noki3210-v501-smoke.struct`.
 The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.
@@ -93,6 +95,21 @@ bridges. Its Insert-SIM frame was historically useful, but the request-driven
 frontier supersedes it and covers a deeper coherent state. The bridge target and
 its structural oracle have been removed rather than retained as a supported
 compatibility path.
+
+## Nokia 3210 v5.01 control
+
+`make verify-3210-v501` runs the independent NSE-8 v5.01 full flash with its
+own generated EEPROM profile. It is a same-product structural control, not a
+second supported frontier: the current model leaves its LCD blank and reaches
+less contact/SIM progress than v6.00.
+
+The useful invariants are the task-1 and SIM results. The run organically observes modes
+`0x0001`, `0x000d`, and `0x0004`, then remains in mode `0x0004` with readiness
+flags `0x0f`. At its relocated state block it also clears
+no-SIM and sets SIM ENABLE organically. This independently reproduces the v6.00
+code-7 wall and validates the shared SIM device contract. Contact status remains
+`0x00c9` and the LCD remains blank, so the oracle records those narrower v5.01
+terminal semantics without claiming presentation parity.
 
 `tools/find_literal_loads.py` scans Thumb-1 PC-relative literal loads while
 normalizing the swapped image's 32-bit halfword order. It is intended for static

@@ -24,6 +24,13 @@ The sole writer of the service availability flag and class bitmap is
 `service_channel_config_2b140a`. Enable is reached by receiving contact-service
 command `0x70` with a checksum-valid 0x40-byte map; `0x71` disables it.
 
+The `0x6a00..0x6a0d` resources are an optional external mirror of a subset of
+task-1 startup reports, not an internal content provider. Their compact wrapper
+farm at `0x2af01c..0x2af27e` posts the corresponding task-1 report regardless
+of whether `resource_available_2b12b4` permits the mirrored service request.
+In particular, `0x6a00`/`0x6a01` mirror reports `0x06`/`0x07`; absence of the
+external class-`0x6a` channel cannot explain a missing internal report `0x07`.
+
 The command census proves that the MCU constructors at `0x236742` and
 `0x236736` are acknowledgements. The initiating `0x70`/`0x71` producer is the
 external service/test peer behind task 7, not an organic MCU boot producer. A
@@ -91,11 +98,11 @@ There is no separate object or peer acknowledgement hidden behind that timer.
 The three start statuses directly construct the local class-`0x52` timeout.
 A physical wrong-code control supplies an organic `0x05e1`, but the dispatcher
 routes it back to callback `0x47`, not callback `0x5d`; status values are scoped
-to the selected callback. The only mapped non-initialization selection of
-callback `0x5d` remains the `0x09d0` context route gated by state slot `0x45`.
-The completed slot census finds no organic writer. This closes callback `0x5d`
-as the present ordinary-hardware frontier while retaining its valid dormant
-service/test contract.
+to the selected callback. A corrected bound now exposes 30 selector-`0x5d`
+records in the 950-record transition table, so the former claim that `0x09d0`
+was its only non-initialization selection is retired. Runtime evidence still
+closes report code 7 as a physical-power/shutdown result rather than the present
+ordinary-startup frontier.
 
 The transaction engine around `0x264504` and `0x264c98` owns statuses
 `0x0280`-`0x0283`. Contact-service commands `0x81` and `0x82`, plus independent
@@ -123,9 +130,9 @@ The direct `0x05e1` surface is also finite: ten calls owned by callbacks
 | Owner | Direct call(s) | Required lifecycle |
 |---|---|---|
 | `0x4e` | `0x248dfa` | downstream input `0x05eb`; republishes an already-complete lifecycle |
-| `0x51` | `0x25c88c` | object cleanup after `0x0bd6`, itself constructed from input `0x0bcc`; no direct in-ROM `0x0bcc` publisher recovered |
+| `0x51` | `0x25c88c` | object cleanup after `0x0bd6`, itself constructed from input `0x0bcc`; packed wrapper `0x2afd1a` publishes it from three conditional task-14 object-decoder branches, dormant in the coherent boot |
 | `0x34` | `0x2686bc` | input `0x00c8` with an outstanding stored transaction handle |
-| `0x32` | `0x27c090` | object-bearing input `0x13f8` with subtype `0x65` or `0x67`; no direct in-ROM `0x13f8` publisher recovered |
+| `0x32` | `0x27c090` | object-bearing input `0x13f8` with subtype `0x65` or `0x67`; wrapper `0x2a45c0` publishes it from three task-20/SIM-router sites, dormant in the coherent boot |
 | `0x59` | `0x288030` | input `0x0348` after registration/session work and local state `0x11fcc3 == 1`; callback `0x31` can compute `0x0348` from scalar `0x00ca`, but the coherent task-15 post has no ECB waiter and the generic packed route is external service/resource traffic |
 | `0x47` | `0x28f514`, `0x28f540`, `0x28f56a` | respectively text/UI transaction completions `0x0578`/`0x1440`, call-message inputs `0x138b`/`0x138c`, or the excluded local/test `0x05e7` lifecycle |
 | `0x6d` | `0x299122` | input `0x0546`, local state `0x0d`, and resource `0x25` available |
@@ -136,6 +143,14 @@ packed input `0x212b` or `0x612b` (status index `0x012b`) expands to a sequence
 headed by `0x05e1`. The census finds no literal load, recovered constant
 construction, or direct packed-event call for either invoking form. The table
 entry therefore proves a valid later transition, not an ordinary producer.
+
+The producer census corrects an API-profile blind spot: task-5 render post
+`0x2af6ea` accepts a packed event in `r0`, just like generic constructor
+`0x2af798`. Treating it as an unpacked ID hid `0x4bcc -> 0x0bcc` at callsites
+`0x2afd20`/`0x2afdc8` and `0x53f8 -> 0x13f8` at `0x2a45d4`. A filtered
+forcing-free frontier trace observes neither event, so these repairs close two
+false absence claims without promoting either later conditional lifecycle to
+the ordinary startup frontier.
 
 The only owner selected in the coherent run is callback `0x47`. A corrected
 execution of its subtract cascade shows that the shared branch at `0x28f4e4`

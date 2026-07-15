@@ -37,9 +37,9 @@
       "evidence": ["docs/sim_subsystem.md", "docs/sim_registration.md", "docs/sim_emulator_scope.md"]
     },
     {
-      "id": "task1_mode4_code7", "owner": "startup", "status": "unresolved",
-      "predicate": "Task 1 receives organic report code 0x07 after entering startup mode 0x0004",
-      "current": "The coherent profile completes SIM initialization and enters mode 0x0004 with SIM ENABLE set. Correcting keypad ownership from the CCONT IRQ6 path to MAD2 IRQ0 makes physical press/release edges enter 0x2b3084, run the firmware 0x41/0x42/0x43 sequence, scan the ROM-derived matrix, and publish decoded keys at 0x2b4628 without code 7 or a mode change. A single emulation-time coroutine supplies non-overlapping 12345 plus softkey taps after the editor presents status 0x057c; the transaction completes through 0x0578 and callback 0x47 returns 0x05e6 while mode 4 remains selected. Static decode proves 0x05e6 is the accepted-code result: verifier 0x2ae704 requires length five, transforms the input through 0x2ae4e8, and returns one only when all four bytes match RAM 0x112460; mismatch publishes 0x05e1 instead. Code 7 still selects a later mode-4 continuation and all four callers remain classified, but it is not a prerequisite for security-editor input or successful completion. Same-product v5.01 comparison preserves both explicit waits and all four caller predicates; callback 0x5d changes only its local timer class while retaining the same terminal statuses. Cross-ROM controls also show healthy 5110 and 3310 boots do not execute their code-7 wrappers. The callback-0x5d code-7 lifecycle remains a separate dormant contract.",
+      "id": "task1_mode4_code7", "owner": "power_shutdown", "status": "satisfied",
+      "predicate": "Organic report code 0x07 after mode 0x0004 belongs to a physical power/shutdown lifecycle rather than ordinary UI startup",
+      "current": "A post-frontier physical power-key press traverses MAD2 IRQ0, decodes key 0x0d, reaches controller status 0x0795, posts report 0x07, and moves task 1 from mode 0x0004 to mode 0x000c. Mode 0x000c then consumes report 0x74, tears services down, calls power-control tail 0x2b4e16, and waits. This closes code 7 as an organic shutdown/power result and excludes it as the boot-to-desktop blocker. Successful security-code completion remains independent and returns 0x05e6. Synthetic cold-boot key releases at four bounded hold times did not publish global 0x0367, so no calibrated timing model was retained.",
       "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/interactive_handoff.md"]
     },
     {
@@ -57,7 +57,7 @@
     {
       "id": "context_09cd_activation", "owner": "generic_service", "status": "unresolved",
       "predicate": "A firmware-owned context invokes 0x24d8e8 with the active slot selected and callback-state slot 0x5d at 0x11fcdd equal to 1 or 2, producing organic status 0x09cd",
-      "current": "0x11fcdd is populated by the generic catalogue descriptor transition mechanism, not a standalone pending selector. A current code-7 sweep observes state 0x0b, which still does not satisfy 0x24d8e8's required state 1 or 2; 0x24d8e8, 0x24df74 and callback-7 publication 0x24e754 remain dormant. A task-14 0x09d8 opcode-0x3a object can initialize the surrounding context, but its proved producer is downstream of the absent 0x05e8 chain, confirming this as a later cycle rather than a bootstrap correction",
+      "current": "0x11fcdd is populated by the generic catalogue descriptor transition mechanism, not a standalone pending selector. A corrected table census proves that 234 status descriptors reference 950 transition records, not 233. Thirty records select callback 0x5d across descriptor inputs including 0x00c9, 0x09d0..0x09d2, 0x0af0, 0x1391, 0x13ba, and 0x1527..0x1532; the former one-record ownership closure is invalid. Record 92 at 0x2ccad0 remains the mapped 0x151c context transition, but it is only one later lifecycle. Runtime independently closes report code 7 as an organic physical-power/shutdown result rather than the ordinary boot blocker.",
       "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
     },
     {
@@ -71,6 +71,18 @@
       "predicate": "Task 17 receives organic 0x0434 through task-10 completion status 0x1391",
       "current": "The task-10 jump table maps 0x1391 to 0x21b9b4, which can reach the 0x0434 producer. Task-14 object opcode 0x36 produces controller event 0x1033; the controller maps that event to lower-radio result 0x0fc1, which selects wrapper 0x2525be and organically publishes 0x1391. The object is a task-15 translator product downstream of the still-absent service-5 0x05e8 -> 0x05ea -> 0x07dd chain, not a raw DSP packet. Result 0x0fc2 instead publishes adjacent status 0x1392 and dispatches to the separate radio-state update path at 0x21b790. The previously linked 0x0fbf result selects context handler 0x253610 and reaches neither publisher. A provisioned coherent trace proves task 17 accepts startup object 0x1587 and emits local outputs 0x0a35, 0x0a25, and 0x09ec. The 0x09ec carries mode byte 0 and task 15 deliberately routes it through 0x07d6, task 16, and task 10. Task 17 then receives immediate status 0x043c. The resulting type-0x1a DSP packet is fire-and-forget state/control publication: its builder retains no reply correlation. It is not a proved direct predecessor of 0x1391 or 0x0434, and the completed local startup transaction supplies no report code 7.",
       "evidence": ["docs/sim_registration.md", "docs/dsp_interface.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "frontier_data_event_producer_census", "owner": "tooling", "status": "satisfied",
+      "predicate": "Direct, descriptor, fixed-catalogue, runtime-built and raw-ROM event sources are accounted for when classifying the producerless frontier inputs",
+      "current": "Correcting 0x2af6ea to a packed-event API recovers real in-ROM publishers for 0x0bcc (0x2afd20/0x2afdc8) and 0x13f8 (0x2a45d4). Both remain dormant in a filtered coherent frontier run. Status 0x03ab has one MCU literal used only by its consumer; 0x32b4/0x72b4 have no packed MCU word and occur only as raw PPM/payload halfwords; 0x0348 has five conservative computed constructions and nine fixed-catalogue predecessors, but no recovered producer for any catalogue packed input. Raw occurrences are reported separately and are never promoted to producer edges.",
+      "evidence": ["docs/message_topology_census.md", "docs/resource_providers.md"]
+    },
+    {
+      "id": "ui_start_global_0367", "owner": "startup_ui", "status": "unresolved",
+      "predicate": "Firmware publishes global status 0x0367, allowing the ordinary callback/controller chain to initialize the application UI",
+      "current": "Callback 0x01 at 0x29ea80 maps global 0x0367 to controller status 0x03e9. Exhaustive controller execution proves 0x03e9 alone reaches 0x255ebc, which calls 0x256f68 and publishes global 0x05e7 with argument one. Callback 0x10 at 0x292878 consumes that pair and performs the full application/UI initialization sequence. The static census still finds nine effective literal loads, all in consumers, and no direct API publication or fixed-catalogue predecessor. Runtime falsifies the missing-producer inference: a physical Up-key cycle queues 0x40c8, then function 0x2a1a80 reads 0x0367 from the active UI-context record and publishes it through 0x2af798. In the coherent lifecycle descriptor selector 0x75 state zero emits 0x051d and 0x057c also appears; controller 0x03e9 does not. The remaining question is the registration/state predecessor that makes callback 0x01 consume the already-organic status. Repeated Up scans after release are tracked separately as keypad fidelity debt. The separate organic task-16 message 0x03e9 is delivered to task 10 and is a distinct namespace occurrence.",
+      "evidence": ["docs/interactive_handoff.md", "docs/message_topology_census.md"]
     }
   ]
 }

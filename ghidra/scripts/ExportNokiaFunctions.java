@@ -592,8 +592,9 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Target("ccont_irq_callback_2af5aa", 0x002af5aaL),
 		new Target("ccont_reg_read_2afb44", 0x002afb44L),
 		new Target("ccont_reg_or_2afa74", 0x002afa74L),
-		new Target("ccont_reg_write_2b5ae4", 0x002b5ae4L),
-		new Target("ccont_reg_write_2b5b24", 0x002b5b24L),
+		new Target("ipc_send_u16_if_enabled_2b5ae4", 0x002b5ae4L),
+		new Target("ipc_send_u8_2b5b24", 0x002b5b24L),
+		new Target("task1_report6_7_status_dispatch_27b370", 0x0027b370L),
 		new Target("display_manager_297fc4", 0x00297fc4L),
 		new Target("display_recv_298008", 0x00298008L),
 		new Target("display_select_297c20", 0x00297c20L),
@@ -698,6 +699,8 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Target("sim_read_completion_handler_27ef34", 0x0027ef34L),
 		// APDU-out observation point: r1==0x2701, r2=APDU ptr, r0=len (the command the phone sends).
 		new Target("sim_apdu_out_observe_2aec34", 0x002aec34L),
+		new Target("task20_publish_packed_13f8_2a45c0", 0x002a45c0L),
+		new Target("task14_publish_packed_0bcc_2afd1a", 0x002afd1aL),
 	};
 
 	private Function prepareThumbFunction(Target target, Register tmode, RegisterValue thumbMode) throws Exception {

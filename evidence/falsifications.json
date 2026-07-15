@@ -147,6 +147,12 @@
       "evidence": ["docs/interactive_handoff.md", "docs/resource_providers.md"]
     },
     {
+      "id": "accepted_security_editor_result_requests_idle_display", "status": "disproven",
+      "hypothesis": "Callback 0x47's accepted-code result 0x05e6 reaches a missing display/DSP completion boundary that should select the idle window",
+      "conclusion": "The generic callback dispatcher handles 0x05e6 explicitly at 0x2ac54c by advancing its callback cursor. Task 6 later receives class-2 and class-3 editor-lifecycle messages, but no class-1 idle-window selection follows: control byte 0x1116fd never arms the 0x2a255c idle helper, resource 0x4c22 and event 0x0547 are absent, and no DSP TX is constructed. The accepted editor transaction closes within firmware and is not blocked on display hardware.",
+      "evidence": ["docs/interactive_handoff.md"]
+    },
+    {
       "id": "forced_code7_proves_downstream_mmi_completion", "status": "disproven",
       "hypothesis": "Supplying report code 7 in isolation creates a coherent MMI/display lifecycle whose later completion identifies the faithful missing boundary",
       "conclusion": "The isolated report does prove code 7 is the mode-4 prerequisite: firmware posts 0x0732 to task 5, initializes task 6, and task 6 successfully posts 0x0547. It does not compose. The forced handoff occurs while task 5 retains its pre-handoff backlog; the 0x0547 object remains queued at pointer-ring slot 0x11 while repeating internal 0x0d16 timer traffic wins the receive path. No 0x079d, resource-0x6a02 readiness report, or code 0x0b follows. The downstream statuses must not be injected; code 7 must arise at its organic lifecycle point.",

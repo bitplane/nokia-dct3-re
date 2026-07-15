@@ -6,6 +6,7 @@ This report separates extracted ROM facts, reviewed static semantics, and cohere
 
 - Known API callsites: 2739 (3296 / 4217 arguments resolved, 78.2%)
 - Callback-table entries: 126 (`0x2db720` through `0x2dbb0f`; index `0x28` is `0x2db860`)
+- Status descriptors: 234 at `0x2cb218`; their ranges prove that the callback-transition table contains 950 records at `0x2cc7f0`
 - Known consumer entries: 6 (6 entry addresses decode)
 - Descriptor registrations: 149 (112 ROM descriptors decoded, 37 RAM-built or unresolved)
 - Runtime observations: 59
@@ -62,6 +63,10 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 1
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 4 (3 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 8 (5 in the MCU region; raw occurrences are not producer evidence)
+
+  - `task5_render_post` at `0x2a26e0` uses packed `0x0732`.
 
 ### Status `0x03ab`
 
@@ -70,6 +75,8 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 1 (1 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 15 (4 in the MCU region; raw occurrences are not producer evidence)
 
 ### Status `0x12b4`
 
@@ -78,6 +85,8 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 0 (0 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 3 (1 in the MCU region; raw occurrences are not producer evidence)
 
 ### Status `0x32b4`
 
@@ -86,6 +95,8 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 0 (0 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 1 (0 in the MCU region; raw occurrences are not producer evidence)
 
 ### Status `0x72b4`
 
@@ -94,22 +105,33 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 0 (0 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 1 (0 in the MCU region; raw occurrences are not producer evidence)
 
 ### Status `0x0bcc`
 
 - Effective literal loads: 0
 - Conservative computed-r0 constructions: 0
-- Recovered direct API arguments: 0
+- Recovered direct API arguments: 2
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 1 (1 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 1 (1 in the MCU region; raw occurrences are not producer evidence)
+
+  - `task5_render_post` at `0x2afd20` uses packed `0x4bcc`.
+  - `task5_render_post` at `0x2afdca` uses packed `0x4bcc`.
 
 ### Status `0x13f8`
 
 - Effective literal loads: 0
 - Conservative computed-r0 constructions: 0
-- Recovered direct API arguments: 0
+- Recovered direct API arguments: 1
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 1 (1 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 8 (8 in the MCU region; raw occurrences are not producer evidence)
+
+  - `task5_render_post` at `0x2a45d4` uses packed `0x53f8`.
 
 ### Status `0x0348`
 
@@ -118,6 +140,8 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 9 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 0 (0 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 118 (106 in the MCU region; raw occurrences are not producer evidence)
 
 ### Status `0x012b`
 
@@ -126,6 +150,8 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 1 (0 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 9 (9 in the MCU region; raw occurrences are not producer evidence)
 
 ### Status `0x212b`
 
@@ -134,6 +160,8 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 0 (0 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 35 (32 in the MCU region; raw occurrences are not producer evidence)
 
 ### Status `0x612b`
 
@@ -142,6 +170,8 @@ These inventories combine direct/static constructions, registration descriptors,
 - Recovered direct API arguments: 0
 - Descriptor fields: 0
 - Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+- Raw packed ROM words: 0 (0 loaded by decoded MCU instructions)
+- Exact ROM halfwords: 3 (2 in the MCU region; raw occurrences are not producer evidence)
 
 ## Object-bearing 0x05dc lifecycle constructors
 
@@ -227,7 +257,7 @@ Intersecting these constructors with callbacks that contain direct `0x05e8` publ
 - **PASS** `task5_13e2_to_task14_1776`: `0x13e2` -> `0x1776` (dormant, reviewed_static)
 - **PASS** `task14_opcode_3a_to_context_initialization`: `0x09d8 object opcode 0x3a` -> `0x0fc8 -> type-2 object -> 0x0ac8 command 0x16` (dormant_downstream_cycle, reviewed_static)
 - **PASS** `context_09cd_to_callback7_object`: `context slot matches 0x10e89a and callback-state slot 0x5d at 0x11fcdd is 1 or 2` -> `0x09cd -> 0x85e0(selector 7, object)` (dormant, reviewed_static_and_runtime)
-- **PASS** `context_09d0_to_callback5d_code7`: `callback-state slot 0x45 is neither 0 nor 5 (with state-6 active-slot exception)` -> `0x09d0 -> eligible callback 0x5d action 0x00dc -> code-7 completion` (mapped_nonordinary_unproved, reviewed_static_and_runtime)
+- **PASS** `context_09d0_to_callback5d_code7`: `callback-state slot 0x45 is neither 0 nor 5 (with state-6 active-slot exception)` -> `0x09d0 -> eligible callback 0x5d status lifecycle -> code-7 completion` (mapped_nonordinary_unproved, reviewed_static_and_runtime)
 - **PASS** `callback5d_delayed_code7_completion`: `0x05e1/0x05e7/0x05dc -> task-local class 0x52; or direct 0x05eb/0x06c5` -> `0x06c5 -> report code 0x07` (dormant, reviewed_static_and_runtime)
 - **PASS** `sim_task_notification_120c`: `notification_byte_0x10dcb7` -> `0x120c` (dormant_sat, reviewed_static_and_runtime)
 - **PASS** `task20_120c_to_sim_a012`: `0x120c` -> `A0/12` (dormant_sat, reviewed_static)

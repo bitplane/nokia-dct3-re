@@ -129,6 +129,31 @@ The MAD2 power-key IRQ handler also aligns from v6.00 `0x2b3084` to v5.01
 transition stable. The optional edge-delay fixture is not enabled by the
 canonical profile because neither ROM provides a duration.
 
+The ROM is now also packaged as MAME BIOS `501` with a BIOS-specific generated
+EEPROM profile. `make verify-3210-v501` provides the first forcing-free runtime
+comparison. It observes startup modes `0x0001 -> 0x000d -> 0x0004` and
+readiness flags `0x0f`: the same task-1 code-7 wall as
+v6.00. The earlier lifecycle is not equivalent yet: v5.01 currently finishes
+with contact status `0x00c9`, SIM enable set, and no nonblank LCD frame. The
+SIM block is relocated by `-0x1d0`: v5.01 no-SIM/ENABLE are
+`0x111a94`/`0x111aa9`, corresponding to v6.00
+`0x111c64`/`0x111c79`. The valid-reply setter is instruction-equivalent and a
+forcing-free run proves both ROMs clear no-SIM and set ENABLE through the same
+device contract. This
+is therefore evidence that the blocking task-1 contract spans both 3210 ROMs,
+not a claim of general v5.01 support.
+
+A DSP-boundary trace confirms that this is not superficial state coincidence.
+The v5.01 firmware performs D0 discovery, the type-`0x70` self-test exchange,
+contact registration `0x64`, channel-map `0x70`, healthy result 5, transport
+acknowledgements, service-empty `0x622a`, and the later type-`0x1a` publication
+through the same shared-memory device. Its instruction-equivalent contact-ready
+consumer is `0x299314` (v6.00 `0x29bc70`), inside initialization loop
+`0x2a67aa` (v6.00 `0x2a92d2`). The v5 run does not consume ready bit 7 after
+the peer's healthy result and therefore retains `0xc9`; no timing change or
+firmware-state forcing has been introduced. This lifecycle difference and the
+blank display are now the v5 portability frontier.
+
 ## Interactive sibling controls
 
 - A forcing-free Nokia 5110 v5.30 run in an independent message-level emulator

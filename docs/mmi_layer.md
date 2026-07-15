@@ -15,6 +15,8 @@ IRQ0. Handler `0x2b3084` starts the firmware's internal `0x41/0x42/0x43`
 sequence, which scans the matrix at `0x2b2f90`, decodes the ROM keymap, and
 publishes resource `0x6e02` at `0x2b4628`. This works while task 1 remains in
 mode `0x0004`; the former IRQ6/event-`0x72` route was a driver wiring error.
+The same function first calls local key handlers `0x2979d8` and `0x2a27de`;
+`0x6e02` is an availability-gated resource mirror, not the sole input route.
 
 A coherent trace drives the left softkey 250 ms after readiness and decodes
 keycode `0x19` without posting report code 7. A scheduler-backed sequence can
@@ -24,6 +26,12 @@ and submission completes the transaction through `0x0578`. The callback returns
 `0x05e6`, the statically proved accepted-code result. The entered `12345`
 therefore matches the firmware-derived value stored at RAM `0x112460`; keypad
 delivery and the synthetic EEPROM security-code encoding are both validated.
+
+A post-frontier Up press additionally reaches `0x2a1a80`, which reads logical
+status `0x0367` from the active UI-context record and publishes it through
+`0x2af798`. This closes `0x0367` as firmware-owned key/navigation output. The
+current model repeats the Up scan after release; that keypad lifecycle anomaly
+is separate from the now-proved status producer.
 
 ## Hardware path
 

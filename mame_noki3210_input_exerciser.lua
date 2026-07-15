@@ -4,8 +4,12 @@ local space = cpu.spaces["program"]
 local output_dir = os.getenv("NOKI3210_SNAPSHOT_DIR") or ".."
 local boot_summary_path = os.getenv("NOKI3210_BOOT_SUMMARY")
 local quiet = os.getenv("NOKI3210_LUA_QUIET") == "1"
+local bios = machine.options.entries.bios:value()
+local v501 = bios == "501"
 
-if quiet then emu.print_info = function(...) end end
+local function info(message)
+	if not quiet then emu.print_info(message) end
+end
 
 local frames = 0
 local lcd_data_writes = 0
@@ -20,6 +24,10 @@ local lcd_y = 0
 local pending_lcd = {}
 local lcd_dirty = false
 local active_fields = {}
+-- Address-space taps must outlive the script chunk; otherwise their Lua
+-- callbacks can be collected while the CPU still holds the native tap.
+noki3210_oracle_taps = {}
+local taps = noki3210_oracle_taps
 local startup_ready_time = nil
 local post_key_active = nil
 
@@ -65,7 +73,7 @@ local function press(name)
 	if field and not active_fields[name] then
 		field:set_value(1)
 		active_fields[name] = field
-		emu.print_info(string.format("input-press:frame=%d name=%s", frames, name))
+		info(string.format("input-press:frame=%d name=%s", frames, name))
 	end
 end
 
@@ -74,7 +82,7 @@ local function release(name)
 	if field then
 		field:clear_value()
 		active_fields[name] = nil
-		emu.print_info(string.format("input-release:frame=%d name=%s", frames, name))
+		info(string.format("input-release:frame=%d name=%s", frames, name))
 	end
 end
 
@@ -137,7 +145,7 @@ local function queue_lcd_dump()
 	}
 end
 
-space:install_write_tap(0x20000, 0x200ff, "noki3210_oracle_mmio", function(offset, data, mask)
+taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "noki3210_oracle_mmio", function(offset, data, mask)
 	local address, value = bus_byte(offset, data, mask)
 	record_mmio(address, value)
 	local reg = address & 0xff
@@ -165,11 +173,13 @@ space:install_write_tap(0x20000, 0x200ff, "noki3210_oracle_mmio", function(offse
 		elseif (value & 0xf8) == 0x20 then lcd_mode = value & 0x07
 		elseif (value & 0xf8) == 0x08 then lcd_control = ((value & 0x04) >> 1) | (value & 0x01) end
 	end
+	return data
 end)
 
-space:install_read_tap(0x2006c, 0x2006f, "noki3210_oracle_ccont_read", function(offset, data, mask)
+taps[#taps + 1] = space:install_read_tap(0x2006c, 0x2006f, "noki3210_oracle_ccont_read", function(offset, data, mask)
 	local address = bus_byte(offset, data, mask)
 	if (address & 0xff) == 0x6c then structural.ccont_reads = structural.ccont_reads + 1 end
+	return data
 end)
 
 local function write_lcd_dump()
@@ -268,12 +278,12 @@ local function sample_structural_state()
 	structural.irq_seen = structural.irq_seen | space:read_u8(0x20009)
 	structural.fiq_seen = structural.fiq_seen | space:read_u8(0x20008)
 	structural.final_current_task = space:read_u8(0x100002)
-	structural.final_startup_mode = space:read_u16(0x1123f0)
-	structural.final_startup_event = space:read_u16(0x1123ee)
-	structural.final_startup_flags = space:read_u8(0x112399)
+	structural.final_startup_mode = space:read_u16(v501 and 0x11224c or 0x1123f0)
+	structural.final_startup_event = space:read_u16(v501 and 0x11224a or 0x1123ee)
+	structural.final_startup_flags = space:read_u8(v501 and 0x1121c5 or 0x112399)
 	structural.final_contact_status = space:read_u16(0x11fed0)
-	structural.final_no_sim = space:read_u8(0x111c64)
-	structural.final_sim_enable = space:read_u8(0x111c79)
+	structural.final_no_sim = space:read_u8(v501 and 0x111a94 or 0x111c64)
+	structural.final_sim_enable = space:read_u8(v501 and 0x111aa9 or 0x111c79)
 	structural.startup_modes[structural.final_startup_mode] = true
 end
 
@@ -331,5 +341,5 @@ emu.add_machine_stop_notifier(function()
 	write_boot_summary()
 end)
 
-emu.print_info("noki3210 oracle/input harness installed")
+info("noki3210 oracle/input harness installed")
 if cpu.debug then cpu.debug:go() end

@@ -35,6 +35,87 @@ returns one only when the five-character input transforms through `0x2ae4e8`
 to the four bytes stored at `0x112460`. The security editor, keypad delivery,
 and generated default code are therefore complete; startup remains separate.
 
+The accepted result has also been followed through the generic task-5 callback
+dispatcher. Status `0x05e6` has an explicit case at `0x2ac54c`: it advances the
+callback cursor and continues the ordinary callback sweep; it is not converted
+into a display or peer request. About 0.54 seconds later task 6 receives the
+editor's class-2 and class-3 window-lifecycle messages. Neither path selects the
+idle window. The idle helper `0x2a255c` is entered only when task-6 control byte
+`0x1116fd` is set to one by its class-1 window-selection path, and no such
+selection occurs after the accepted code. No resource `0x4c22`, event `0x0547`,
+or DSP TX follows. This closes the accepted editor result as a source of the
+missing handoff and rules out an LCD/DSP completion at that boundary.
+
+Producer-side tracing closes the task-6 message constructors. Initializer
+`0x2b1e80`, called from the main task-5 lifecycle at `0x28c96e`, allocates the
+class-1 setup message and posts it to task 6. Helpers `0x2b1f24` and `0x2b1f64`
+construct class-2 and class-3 window messages respectively. In the provisioned
+coherent run a class-2 lifecycle notification is called from `0x28c94a` with
+arguments `0, 2, 0x0f`; this is firmware-local task-5 state, not an LCD or DSP
+reply. The initial class-1 message carries zero in its selection byte, and the
+later traffic does not leave task-6 control byte `0x1116fd` armed for the idle
+helper.
+
+The class-2 notification is selected by status `0x0190`, the first entry in the
+`0x0190..0x019d` jump table of task-5 dispatcher `0x28bddc`. Handler `0x28c94a`
+copies the current context halfwords at `0x110f22` and `0x110f1e` into the
+class-2 message's selector and lifecycle-mask fields. Runtime state at
+`0x29817e` proves that the active index is already `0xff`, every object pointer
+is null, and selector `0x0f` deliberately leaves the four-entry table alone.
+It is not a close operation and no retained window blocks idle.
+
+The stronger ordinary-handoff candidate is callback-table entry `0x10` at
+`0x292878`. Its `0x05e7` case performs the full application/UI initialization
+sequence when context byte `0x110f1f` equals one. This includes the window
+initializer, application event generation, and follow-on display setup. The
+argument to `0x2b1e80` controls whether display configuration is reloaded; the
+message itself always carries class-1 mode zero. The next question is therefore
+which ordinary lifecycle selects callback `0x10` and supplies its `0x05e7`
+status, not which task-6 entry is retained or which hardware acknowledges an
+LCD transfer.
+
+Backward recovery closes that intermediate chain. Callback-table entry `0x01`
+at `0x29ea80` converts global status `0x0367` into `0x03e9` at `0x29efe6`.
+Exhaustive execution of controller dispatcher `0x253e20` proves `0x03e9` is the
+only input that reaches `0x255ebc`; that leaf calls `0x256f68(3, 4)`, which
+publishes global `0x05e7` with argument one. Callback `0x10` then takes the UI
+start case described above. The resulting forcing-free predecessor chain is:
+
+```text
+global 0x0367
+  -> callback 0x01 / 0x29ea80
+  -> controller status 0x03e9
+  -> 0x256f68 publishes global 0x05e7(argument 1)
+  -> callback 0x10 / 0x292878
+  -> application and UI initialization
+```
+
+The static census finds no literal/direct API publication, registration
+descriptor, or fixed-sequence catalogue predecessor for `0x0367`; its nine
+effective literal loads are consumers. Runtime has now proved why that absence
+was not a producer proof: a physical Up-key cycle reaches firmware function
+`0x2a1a80`, reads `0x0367` from the active UI-context record, and queues it
+through the generic event machinery. The event is a logical
+UI/navigation status produced through an indirect callback path, not a missing
+hardware-ready report. The separate organic task-16-to-task-10 message `0x03e9`
+is numeric reuse in a task mailbox and does not enter controller dispatcher
+`0x253e20` in the coherent run.
+
+Every queued status passes through `0x2aefba`, then the callback, registration,
+display, and controller stages at `0x2af646..0x2af66e`. A post-frontier Up cycle
+queues `0x40c8`, processes the logical input sequence, and then queues `0x0367`.
+The current descriptor set routes it through selector `0x75` state zero to
+`0x051d`, with `0x057c` also published; it does not reach controller `0x03e9`.
+The missing contract is therefore what registers/selects callback `0x01` for
+this status. The run also repeats the Up scan after release, which is a separate
+MAD2 keypad fidelity issue rather than the `0x0367` producer boundary.
+
+`0x2b4628` feeds the local input handlers at `0x2979d8` and `0x2a27de`, then
+mirrors the one-byte key through resource `0x6e02`. The mirror uses the optional
+class-availability map installed by contact-service command `0x70`; local editor
+input works without it. The Up result proves the local input/event path can
+produce `0x0367`; enabling class `0x6e` is unrelated.
+
 ## Ownership
 
 Task 1 owns the startup consumer. Its state object is rooted at `0x1123ee`:
@@ -47,8 +128,9 @@ Task 1 owns the startup consumer. Its state object is rooted at `0x1123ee`:
 | substate | `0x11239c` | diagnostic context |
 
 The master dispatcher is `0x270c8e`, with a mode jump table at `0x270ca8`.
-Mode zero contains the shared interactive initialization burst at `0x270d1c`.
-The coherent boot does not enter that burst.
+Mode zero contains an interactive initialization burst at `0x270d1c`. The
+coherent boot does not enter that exact block, but the mode-4 and mode-7 paths
+execute their equivalent shared tail before parking in the selected mode.
 
 Event `0x72` is not owned by a dormant keypad task. The IRQ handler posts it to
 mailbox 1, and task 1 receives it. The missing behavior is therefore a startup
@@ -56,14 +138,13 @@ lifecycle transition, not IRQ routing or scheduler delivery.
 
 ## Report code 7
 
-For this ROM and the currently selected branch, report code `0x07` is an actual
-prerequisite. Both branches leaving mode `0x000d` converge on it:
+Report code `0x07` selects a later startup continuation; it is not a prerequisite
+for initializing task 6, scanning the keypad, or completing the security editor.
+Both branches leaving mode `0x000d` compare their current message with code 7.
+When it differs, they record mode `0x0004` or `0x0007`; both outcomes then fall
+through into the same branch-local interactive initialization tail.
 
-- the coherently observed route enters mode `0x0004` and waits for code 7;
-- the alternate state-0 route enters mode `0x0007` and also waits
-  for code 7 before the shared initialization burst.
-
-Supplying code 7 diagnostically proves the immediate dependency: task 1 posts
+Supplying code 7 diagnostically proves the later continuation: task 1 posts
 `0x0732`, starts task 6, and task 6 posts display/window event `0x0547`. The
 experiment does not compose. It leaves an earlier task-5 lifecycle active, and
 `0x0547` remains queued while repeated `0x0d16` timer traffic wins the receive
@@ -109,10 +190,10 @@ readiness ordinal. Code 6 is not necessarily delivered first: task 1 uses code
 ### Task-1 report phase
 
 The task-1 consumer is now fully decoded across mode `0x0004`, the alternate
-mode-`0x0007` entry, and the phase opened by code 7. Both entry routes perform
-an explicit mailbox comparison with code 7 before shared initialization. Code
-7 then clears `0x11239d`, performs the initialization burst, and enters the
-following report phase.
+mode-`0x0007` entry, and the phase selected by code 7. Both entry routes perform
+an explicit mailbox comparison with code 7 before their shared tail. Code 7
+avoids recording the parked mode; a different message records mode 4 or 7 and
+then reaches the same initialization and following report phase.
 
 That phase has a finite event-to-state map:
 
@@ -144,6 +225,70 @@ be the missing pre-code-7 transition.
 Callback `0x5d` is organically active in state `0x0b`. Direct inputs `0x05eb`
 and `0x06c5` report code 7. Inputs `0x05e1`, `0x05e7`, and `0x05dc` start a
 task-local class-`0x52` timer whose recoded completion is `0x06c5`.
+
+The callback's narrow semantic ownership is established even though its
+product feature is not. It adapts a paired task-1 report lifecycle: input
+`0x0348` posts report `0x06`, while terminal input `0x05eb` or timer completion
+`0x06c5` posts report `0x07`. Each wrapper also mirrors the result to the
+optional external resource channel as `0x6a00` or `0x6a01` respectively.
+
+Class `0x6a` is not the owning hardware subsystem. The adjacent wrapper farm
+maps its resource ids onto task-1 reports as follows:
+
+| Resource | Task-1 report |
+| --- | --- |
+| `0x6a00`, `0x6a01`, `0x6a02`, `0x6a03` | `0x06`, `0x07`, `0x0b`, `0x0a` |
+| `0x6a04`, `0x6a05`, `0x6a06`, `0x6a07` | `0x0c`, `0x0d`, `0x1c`, `0x09` |
+| `0x6a08`, `0x6a09`, `0x6a0a`, `0x6a0b` | `0x03`, `0x02`, `0x0e`, `0x0f` |
+| `0x6a0c`, `0x6a0d` | `0x01`, `0x11` |
+
+The wrappers call the generic enabled-resource sender `0x2b5ae4`. Its
+availability check indexes the class bitmap installed by contact-service
+command `0x70`, and its request is queued through the external service
+transport. A standalone phone can therefore post the task-1 report while the
+optional `0x6a` mirror is disabled. Reports `0x14`-`0x19` use a different
+resource/channel family, further disproving `0x6a` as one subsystem's device
+contract.
+
+Callback-table neighbour `0x5c` shares flags `0x01a00000` but is a much larger,
+unrelated state machine, so table adjacency supplies no stronger identity.
+Naming callback `0x5d` as battery, display, DSP, or security remains
+speculative; its defensible name is the task-1 report-6/7 status dispatcher.
+
+### Callback-0x5d ownership boundary
+
+The callback selection and state-transition surfaces are now separately
+bounded. `0x00dc` is the generic terminator of a variable-length catalogue
+sequence, not a callback-specific action token, so it carries no subsystem
+ownership. The fixed callback table contains the handler and flags; calls reach
+it indirectly through the generic task-5 callback dispatcher.
+
+The old 233-record bound for this table was wrong: 233 was derived from the
+descriptor count, not the transition extent. The 234 status descriptors at
+`0x2cb218` reference records through exclusive index 950, so the transition
+table at `0x2cc7f0` contains 950 records. Thirty records select callback `0x5d`,
+owned by descriptor inputs including `0x00c9`, `0x09d0..0x09d2`, `0x0af0`,
+`0x1391`, `0x13ba`, and `0x1527..0x1532`. Record 92 remains:
+
+```text
+record 92 at 0x2ccad0
+selector 0x5d, required state 3, new state 4
+packed input 0x551c = event 0x151c with one argument
+```
+
+There is one direct MCU producer of `0x151c`, at `0x24d934`. The containing
+context routine emits `0x09c9`, `0x09cd`, then `0x151c` only when its active
+context matches and callback-state slot `0x5d` is already 1 or 2. The `0x09cd`
+handler constructs the later callback-7 object lifecycle; this is the same
+mapped context/session cycle already shown to depend on the absent
+`0x05e8 -> 0x05ea -> 0x07dd` service-object chain. It cannot bootstrap
+callback `0x5d` from the coherently observed state `0x0b`.
+
+Thus record 92 describes one dormant context/session cycle, not the sole
+non-initialization owner of callback `0x5d`. The wider table invalidates that
+ownership closure and must be used for any future static callback census. This
+correction does not reopen code 7 as the boot blocker: runtime still shows that
+a physical power action produces code 7 and enters the shutdown lifecycle.
 
 All four callers are mapped, but no ordinary coherent producer has yet been
 proved. This is stronger than an unbounded “missing event” search: the open
@@ -177,6 +322,43 @@ before the shared interactive initialization. The observed state-1 branch at
 delay solely to win the state-0 window would select a different dead wait, so
 the delay is ledgered as fidelity debt and the frontier returns to the organic
 code-7 owner.
+
+### Mode-transition cause
+
+A RAM write watch on the task-1 mode word closes the transition surface without
+relying on a linear-PC flash hook. The coherent v6.00 boot has only these
+firmware-owned changes after RAM initialization:
+
+```text
+mode 0001 -> 000d  store 270184, caller 270e3c, current message 00c9
+mode 000d -> 0004  store 270184, caller 271266, current message 00d5
+```
+
+The message shown by the watch is the current mailbox item, not a command that
+directly writes the mode. Mode `0x000d` waits until controller state
+`[0x11ff6c]&0x0f == 6` and readiness bits `[0x112399]&0x0f == 0x0f`, then
+selects one of two continuation families. `0x2a6942` supplies the battery-monitor
+classification described above. `0x2b084c` is the charger-presence classifier:
+it repeatedly samples analog selector 5, classifies six readings, converts the
+aggregate through the software-float helpers, compares it with the firmware
+threshold, and caches the boolean at `0x1124c8`.
+
+The accepted battery/no-charger family at `0x270eee` receives a message and, if
+it is not code 7, calls the mode-7 setter at `0x270f52`. The coherently selected
+state-1 family reaches the corresponding receive at `0x27124e` and, if the
+message is not code 7, calls the mode-4 setter at `0x271262`. Both calls return
+directly into their shared interactive-initialization tail; entering mode 4 or
+7 does **not** block that initialization. It records which later continuation
+is waiting for code 7. This explains why the security editor and keypad work
+while task 1 remains in mode 4.
+
+In the coherent run the first message at the mode-4 comparison is `0x00d5`.
+That is the scheduler's delayed form of report `0x15`, one of the four normal
+readiness reports just consumed by mode `0x000d`. Its arrival before code 7 is
+therefore ordinary queue ordering, not evidence that an ADC response explicitly
+requested a low-battery wait. The unresolved contract is narrower: what later
+power/charger lifecycle condition posts code 7 and resumes the already-running
+interactive system.
 
 ## Excluded owners
 
@@ -225,8 +407,9 @@ Report code 7 is not a universal DCT3 “DSP ready” report:
   `0x2ac5bc`, with exactly four callers at `0x21e22c`, `0x21f772`, `0x252a4a`,
   and `0x277d06`. Its task-1 state machine at `0x26dc20..0x26df14` is
   instruction-for-instruction equivalent to v6.00's
-  `0x27120e..0x271502`: both mode entries explicitly wait for code 7, then use
-  the same code-6/report-flag/event-`0x74` control flow. The state bytes are
+  `0x27120e..0x271502`: both mode entries compare against code 7, record their
+  parked mode only on a different message, then use the same
+  code-6/report-flag/event-`0x74` control flow. The state bytes are
   relocated from v6.00 `0x112390..0x11239d` to v5.01
   `0x1121bc..0x1121c9`. This proves the contract is stable across two 3210
   firmware releases; it is not a v6.00-only lifecycle artifact. The four
@@ -284,18 +467,26 @@ transaction receives multi-key input and completes through `0x0578` while task
 1 remains in mode 4. Code 7 is not the input owner. The observed `0x05e6` is a
 successful security-code comparison, not evidence for synthesizing code 7.
 
-No faithful correction is proved yet. All four code-7 callers and both code-6
-callers are classified. Callback `0x5d` no longer exposes an object/session
-question: its start statuses directly construct a local class-`0x52` timeout,
-and a wrong-code `0x05e1` control proves statuses remain scoped to callback
-`0x47`. Its only mapped non-initialization selector is the already-closed
-slot-`0x45`/`0x09d0` context route. Callback `0x5d` is therefore a valid dormant
-contract, not the current ordinary-hardware frontier.
+A physical power-key control now reaches code 7 organically and closes its
+ordinary ownership. Pressing power after the mode-4 frontier decodes key
+`0x0d`, later reaches controller status `0x0795`, posts report `0x07`, and moves
+task 1 to mode `0x000c`. That mode consumes report `0x74`, runs the service and
+display teardown sequence, calls the power-control tail at `0x2b4e16`, and
+waits. This is the shutdown lifecycle, not application startup. Synthetic
+cold-boot holds released at 0.5, 1.0, 1.5, and 2.0 seconds all traversed IRQ0
+without producing `0x0367`; no calibrated hold timer was retained.
 
-The same-product comparison and the closed callback census leave no justified
-software-side transition to synthesize. The smallest decisive next evidence is
-one real-3210 trace identifying the executed report-7 caller and its preceding
-hardware or transaction state. A provisioned 16 KiB EEPROM capture with
-personal identity bytes redacted but checksummed block structure preserved is
-a useful secondary control, but no remaining caller currently proves an NV
-predicate to target.
+No faithful correction is proved yet. All four code-7 callers and both code-6
+callers are classified, and runtime closes code 7 as a physical-power/shutdown
+result. The corrected 950-record table expands callback `0x5d`'s static
+contract, so earlier claims that slot `0x45`/`0x09d0` was its only
+non-initialization selector are retired. That static correction does not make
+callback `0x5d` the current ordinary-hardware frontier.
+
+The same-product comparison leaves no justified software-side transition to
+synthesize. A real Up cycle now produces global status `0x0367`; the next
+decisive evidence is the registration/state predecessor that makes callback
+`0x01`, rather than the currently selected callback `0x75`, consume it. The
+repeated release scan remains a separate MAD2 keypad issue. Code 7, task-6
+retention, and the optional decoded-key resource mirror remain excluded from
+the ordinary-startup boundary.
