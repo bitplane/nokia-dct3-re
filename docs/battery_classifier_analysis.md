@@ -110,9 +110,10 @@ The task-19 consumer gives the states their lifecycle meaning:
 | 3 | Low region; sets transition flag 2, arms the low-region timer/status path, and may reach the shutdown-level reporter. |
 | 4 | Defensive task-19 case; no recovered initialized-state writer produces it. |
 
-The report-code-7 call at `0x21e40c` is inside the shutdown-level branch. It is
-skipped when `0x27cd82` returns 1 (sample above the shutdown predicate), confirming
-that state 3 is a low-monitor lifecycle rather than an ordinary pack identity.
+The task-1 terminal-report call at `0x21e40c` is inside the shutdown-level
+branch. It is skipped when `0x27cd82` returns 1 (sample above the shutdown
+predicate), confirming that state 3 is a low-monitor lifecycle rather than an
+ordinary pack identity.
 
 ### Classifier flag ownership
 
@@ -142,8 +143,9 @@ accepted state-0 path makes the real boot contract non-contradictory without
 requiring an unsafe low sample, but it is not established as the ordinary route:
 it is selected only if the readiness checklist finishes before the first
 classifier publication. The ordering audit in `interactive_handoff.md` shows
-that the current contact-peer session releases the checklist group much later,
-and both routes subsequently wait for report code 7.
+that the current contact-peer session releases the checklist group much later.
+Both routes then continue into equivalent interactive-initialization tails, so
+the classifier's mode choice does not gate ordinary UI initialization.
 
 ## Pack-characterisation audit
 
@@ -234,7 +236,7 @@ coherent frontier profile; selector 5 remained zero for no charger.
 
 The eight-second run in `run_battery_mode4_state3` selected init mode 4 at
 `t=0.200674` and did not power off, proving the guard was skipped. It did not
-initialize the monitor or reach state 3: no `0x110436` transition or code-7 caller
+initialize the monitor or reach state 3: no `0x110436` transition or terminal-report caller
 occurred, task 1 remained in mode `0x000d`, and its checklist stopped at `0x0b`
 rather than the coherent frontier's `0x0f`. SIM initialization consequently did
 not begin. This is not an ADC-range failure; mode 4 remains waiting on its distinct
@@ -251,8 +253,7 @@ already run. The ordinary firmware therefore does not initiate this transition.
 Command `0x8e` belongs to the external service/test peer contract, is absent from
 the coherent contact manifests, and must not be added to the normal boot peer to
 advance startup. Mode 4 is consequently a service-controlled battery lifecycle,
-not an evidenced ordinary boot branch. The battery/event-`0x43` route is closed;
-report code 7 is independently proved as a later physical-power/shutdown result.
+not an evidenced ordinary boot branch. The battery/event-`0x43` route is closed.
 
 ## Cold-boot safety contradiction
 
@@ -278,9 +279,9 @@ consume the same calibrated/scaled source.
 
 This falsifies the pre-registered prediction that a constant, faithfully calibrated
 pack input can both survive cold boot and organically supply state 3. It also means
-calibration tuning cannot be used to obtain report code 7: all safe constant-input
-fixtures remain in states 1 or 2, while lower fixtures enter a genuine firmware
-shutdown path. The bounded ADC sweeps observed no legitimate code-7 caller. It
+calibration tuning cannot supply the shutdown-level result: all safe
+constant-input fixtures remain in states 1 or 2, while lower fixtures enter a
+genuine firmware shutdown path. It
 does not make the proper mode-0d advance impossible: unclassified state 0 is a
 separate accepted input to `0x2a6942`.
 

@@ -160,42 +160,6 @@ This exhausts the two literal `0x0795` producers and excludes the status as
 ordinary mode-4 ownership. See `interactive_handoff.md` for the selector,
 catalogue, and runtime evidence.
 
-Callback-table index `0x5d` at `0x27b370` is a mapped completion branch, not an
-established ordinary-boot owner. Initialization invokes it with `0x05e2`, and
-its state slot is already selected organically as `0x0b`. Direct inputs
-`0x05eb` and `0x06c5` call the code-7 reporter. Inputs `0x05e1`, `0x05e7`, and
-`0x05dc` instead schedule task-local class `0x52`; the task-5 recode table
-returns that timeout as `0x06c5`, completing the same route. The earlier
-`0x06dc` interpretation was a subtract-cascade arithmetic error. Callback-table
-flags `0x01a00000` select initialization status `0x032d`, rather than automatic
-`0x05dc`, so organic activation does not itself start the completion timer.
-The later context-completion investigation maps another possible owner. Manager
-`0x24d588` reaches chooser `0x24d716` with callback-state slot `0x45`
-(`[0x11fcc5]`) still zero and emits `0x09d1`. For callback `0x5d` state `0x0b`,
-that sibling descriptor is ineligible; `0x09d0` is eligible and carries action
-`0x00dc` into the mapped completion. A coherent write-watch records no nonzero
-slot-`0x45` write. The completed bounded census finds that all 46
-selector-`0x45` catalogue descriptors specify no-transition state `0x3f`, none
-of the 46 generic initialization records targets selector `0x45`, broad
-indexed stores only clear it, and the only exact direct store is the global
-`0x05e2` reset at `0x299ba0`. The premise that ordinary boot must establish a
-nonzero slot `0x45` is therefore unsupported; this route is retained as mapped
-but is no longer the active code-7 frontier.
-A valid task-13 segmented transfer produces `0x05eb` directly for task 16 via
-`0x23e1a4`; it does not feed the global callback sweep or callback `0x5d`.
-Correlating such a transfer with the organic DSP `{0x0a, 0x09}` transaction
-completed the parser without code 7 or a mode advance. Code 7 and SIM
-initialization remain parallel predicates. The display lifecycle documented in
-`resource_providers.md` is a valid service/test route to code 7, but is excluded
-as the ordinary predecessor. Its separate `0x06ca -> 0x0795` path requires
-startup/display state 7; the coherently observed mode-4 route establishes state 3.
-
-The historical `MODEL_STARTUP_REPORTS` run does not contradict this ownership.
-Under the coherent contact ordering its fixed 950 ms hook returns code 7 and all
-later reports while task 1 is still in mode `0x000d`; the wrong phase consumes
-them before mode 4 begins. It is a superseded timing bridge, not evidence that
-the mode-4 predicate has been satisfied.
-
 The corrected card now requests and reads `EF_IMSI (6F07)`. The older absence
 claim described the malformed-directory run and is superseded (**R**).
 
@@ -399,8 +363,8 @@ deliberately selects normal application callback `0x2f` through a catalogue-
 generated `0x05e0` switch; the switch walker then supplies that selected callback
 with `0x05dc`, and callback `0x2f` returns `0x05dd`. There is no equivalent
 ordinary selector for callback `0x28`, nor evidence that one is required.
-Service-5 initialization is therefore excluded from the immediate code-7
-frontier unless a separate ordinary selector is demonstrated.
+Service-5 initialization is therefore excluded from the ordinary non-SAT
+registration path unless a separate selector is demonstrated.
 
 The later service-`0x0a` activation hypothesis is also disproven. Although an
 ordinary coherent boot installs service-`0x0a` registrations and performs its
@@ -674,7 +638,7 @@ ordered sequence `0x09c9`, `0x09cd`, `0x151c`. In an earlier eight-second regist
 `0x11fcdd` was observed as zero after task-5 registration processing and never changed; none of
 `0x24d8e8`, `0x24df74`, or `0x24e754` executed. This confirms that the context
 route was dormant in that profile; it does not make that route the current
-bootstrap boundary. The later code-7 sweep observes slot `0x5d == 0x0b`, which
+bootstrap boundary. A later runtime control observes slot `0x5d == 0x0b`, which
 still does not satisfy this context routine's required state 1 or 2.
 
 `0x11fcdd` is not a pending selector. It is callback-state array slot `0x5d` at
@@ -682,7 +646,7 @@ still does not satisfy this context routine's required state 1 or 2.
 `0x2cc7f0`; eligibility helper `0x2aeda0` checks the old state, and `0x2aefa2`
 commits the descriptor's six-bit new state. The descriptors recovered for callback
 `0x5d` contain transitions from states `1`, `2`, `3`, `4`, or `0x0b`. The
-physical-power/code-7 run reaches state `0x0b`, while the later context producer still
+runtime control reaches state `0x0b`, while the later context producer still
 requires state 1 or 2. Callback 7 is therefore a
 configuration or later-session cycle, not the ordinary-registration bootstrap
 frontier.
@@ -772,33 +736,3 @@ classifier exception in the non-SAT constructor proof.
 
 Completion requires one coherent boot with no injected task messages, forced
 callback events, forced return values, or writes to SIM/registration RAM.
-
-## Historical registration instrumentation
-
-The list below supported the now-closed non-SAT registration investigation.
-Keep an item only when a current manifest or a new organic request consumes it;
-it is not the active report-code-7 trace specification.
-
-- `NOKI3210_TRACE_SIM_RX`: register/FIQ/APDU path, including deferred `0x1196`
-  parser milestones;
-- `NOKI3210_TRACE_DSP_BOUNDARY`: shared-ring ownership and packets;
-- focused callback-7 constructor/object and packed-`0x5518` traces;
-- task-message traces around tasks 15, 17, 20, and 21;
-- resource/service API traces which show real request construction.
-
-Broad callback-sweep and zero-initialization dumps are historical noise and
-should not be restored unless a new hypothesis specifically requires them.
-
-## Superseded registration checklist
-
-This checklist describes the former `0x05dc -> 0x1196` hypothesis. Ordinary
-non-CPHS SIM initialization now completes without it, so these items are
-retained as a map for a later CHV/session lifecycle rather than current gates.
-
-- callback 7 receives organic `0x05dc` with a valid object;
-- firmware emits `0x5518` and task-17 `0x1583` without injection;
-- firmware reaches `0x2902ac` and task 20 receives organic `0x1196`;
-- `0x293f30` returns 2 from coherent request/reply contents;
-- `0x20733c` sets ENABLE without a RAM write shim;
-- the extended EF pass begins and is served by `nokia_sim_card_device`;
-- both 3210 oracles and the 3330-E smoke baseline remain healthy.

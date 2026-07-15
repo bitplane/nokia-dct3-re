@@ -25,8 +25,8 @@
   - `dump.py ADDR [LEN]` — dump words / halfword-swapped pointers
   - `message_census.py` — profile-driven 3210 v6.00 producer, callback-table,
     generic-service descriptor, and runtime-edge census. `make census` writes
-    machine-readable JSON and a concise report under `run_census/`; set
-    Named inputs under `tools/run_manifests/` scope runtime evidence by
+    machine-readable JSON and a concise report under `run_census/`. Named
+    inputs under `tools/run_manifests/` scope runtime evidence by
     subsystem; use `CENSUS_LOG=mame/error.log` only for ad-hoc unscoped work. Records
     retain `extracted_static`, `reviewed_static`, or `observed_runtime`
     provenance rather than presenting reviewed control-flow semantics as
@@ -34,10 +34,11 @@
     fixed variable-length sequence catalogue at `0x2cb968`, decoding packed
     event argument counts and the `0x00dc` terminator. Inputs `0x213a`/`0x613a`
     emit `0x089a, 0x08b0`, while `0x213b`/`0x613b` emit `0x08b0` directly.
-  - `test_message_census.py`, `test_find_thumb_signature.py`, and
-    `test_make_eeprom_profile.py` cover byte lanes, signature relocation masks,
-    runtime-manifest isolation, and generated EEPROM checksums. Run all three
-    with `make test-tools`.
+  - `test_message_census.py`, `test_find_thumb_signature.py`,
+    `test_make_eeprom_profile.py`, and `test_mad2_access_census.py` cover byte
+    lanes, signature relocation masks, runtime-manifest isolation, generated
+    EEPROM checksums, and MAD2 trace parsing. Run all four with
+    `make test-tools`.
   - `validate_evidence.py` — validates `evidence/*.json` and runtime-manifest
     structure. `make evidence-check` runs it directly.
 - `ghidra/scripts/*.java` — headless Ghidra scripts (run via `analyzeHeadless`)

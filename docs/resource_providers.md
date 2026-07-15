@@ -62,11 +62,10 @@ requests a handle and fails availability. Until that observation exists:
 - do not treat idle content as a set of missing resource objects; and
 - trace the subsystem child-event producers instead of forcing a draw.
 
-## Task-1 code-7 service/test display lifecycle
+## Service/test display lifecycle
 
-Backward recovery from task 1's missing report code `0x07` identifies a valid
-firmware-internal display lifecycle. This is not the contact-service class
-bitmap described above, but its producers belong to local/test transactions:
+The firmware contains a display lifecycle whose producers belong to local/test
+transactions rather than ordinary startup or the contact-service class bitmap:
 
 ```text
 display status 0x0280 / 0x0281 / 0x0282
@@ -77,7 +76,7 @@ display status 0x0280 / 0x0281 / 0x0282
   -> catalogue maps 0x157e to internal status 0x0396
   -> task-5 handler 0x2638e4 emits event 0x05eb
   -> callback 0x5d at 0x27b370
-  -> reporter 0x2af190 posts code 0x07 to task 1
+  -> task-1 terminal-report wrapper 0x2af190
 ```
 
 The coherent run reaches callback `0x5d` organically during the status
@@ -101,7 +100,7 @@ routes it back to callback `0x47`, not callback `0x5d`; status values are scoped
 to the selected callback. A corrected bound now exposes 30 selector-`0x5d`
 records in the 950-record transition table, so the former claim that `0x09d0`
 was its only non-initialization selection is retired. Runtime evidence still
-closes report code 7 as a physical-power/shutdown result rather than the present
+classifies this display route as later service/test behavior rather than the
 ordinary-startup frontier.
 
 The transaction engine around `0x264504` and `0x264c98` owns statuses
@@ -110,7 +109,7 @@ ASCII local/test command frontends around `0x27c270`, reach these functions.
 There are no catalogue entries or literal producers establishing an ordinary
 boot source. A coherent trace of controller transform `0x253e20` also produces
 none of `0x0280`-`0x0282`. This route is therefore mapped but excluded as the
-ordinary code-7 owner.
+ordinary display entrance.
 
 The static producer inventory is now closed at the reporter boundary. Reporter
 `0x2af190` has four of four callers classified. The two power callers are
@@ -179,13 +178,13 @@ at `0x2298d2` consumes event
 service-command/session block and is not presently an ordinary-hardware
 candidate.
 
-A provisioned code-7 trace tightens this exclusion. Ordinary boot installs
+A provisioned runtime trace tightens this exclusion. Ordinary boot installs
 fourteen service-`0x0a` descriptors at about 0.864 s, but never calls transient
 handler `0x263154`, resident API `0x263d30`, pending predicate `0x26265c`, or
 any of the three `0x05eb` publication tails (`0x2632be`, `0x263bd4`,
 `0x263e64`). The only later registration-family observations are two unrelated
 `0x08ac` inputs. These completion tails are valid framework contracts, but are
-not the missing ordinary code-7 producer in the current lifecycle.
+not active in the current lifecycle.
 
 The post-`0x622a` audit reproduces that result with the application-release
 boundary timestamped. After the group begins at about 1.286 s, none of the six
@@ -229,7 +228,7 @@ catalogue expands packed callback input `0x213a`/`0x613a` to
 Status `0x013a` is a callback-`0x24` input in framework mode 11; callback
 `0x013b` belongs to a resident descriptor registered at `0x28ba9a` only after
 input `0x03ab` establishes the same mode. The coherent boot remains in mode 0, making
-this a later conditional route rather than the ordinary code-7 owner.
+this a later conditional route rather than the ordinary startup entrance.
 
 The adjacent start-side status is now closed as well. Display dispatcher
 `0x28bddc` selects `0x28c22c` on `0x0794`; that branch calls the code-6/resource

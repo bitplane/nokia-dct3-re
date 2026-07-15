@@ -97,7 +97,7 @@ The labels below have precise meanings:
 | CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; GENSIO transaction state and ADC completion IRQ behavior remain open. |
 | SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
-| Startup/contact peers | Prototype | Useful protocol behavior, still implemented through firmware hooks. |
+| Startup/contact peers | Prototype | Request-driven behavior is implemented in `nokia_dsp_peer_device` through shared DSP rings and interrupt callbacks; the wider peer contract remains incomplete. |
 | Interactive startup | Mapped | Keypad and editor completion work in mode 4. Callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, and task-6 selector `0x0732 -> 0x2b1e44` are conditional UI/power lifecycle paths, not cold-boot entrances. Task-5/MMI context settlement is the smallest unresolved boundary. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |

@@ -36,7 +36,8 @@ cross-ROM pass to identify the genuinely shared contract.
 
 - New *hardware* behaviour goes in a device model or the owning MAD2 register block.
 - New diagnostic traces may go in the `*_firmware_*` helpers when no component
-  boundary exists yet. Do not add result forcing or task-message injection.
+  boundary exists yet. Their firmware-address-specific implementation belongs
+  in `nokia_3310_trace.inc`. Do not add result forcing or task-message injection.
 - The research helpers should **shrink over time**. Delete a trace after its
   conclusion is normalized; replace each RAM-read shortcut with its real
   hardware or nonvolatile-data owner.

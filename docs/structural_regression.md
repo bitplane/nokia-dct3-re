@@ -107,7 +107,7 @@ The useful invariants are the task-1 and SIM results. The run organically observ
 `0x0001`, `0x000d`, and `0x0004`, then remains in mode `0x0004` with readiness
 flags `0x0f`. At its relocated state block it also clears
 no-SIM and sets SIM ENABLE organically. This independently reproduces the v6.00
-code-7 wall and validates the shared SIM device contract. Contact status remains
+task-1 terminal mode and validates the shared SIM device contract. Contact status remains
 `0x00c9` and the LCD remains blank, so the oracle records those narrower v5.01
 terminal semantics without claiming presentation parity.
 

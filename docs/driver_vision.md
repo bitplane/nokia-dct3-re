@@ -16,7 +16,7 @@ not compatibility mechanisms.
 | MBUS | MAD2 register/FIQ approximation | Model a peer only when firmware organically drains the receive task. |
 | DSP/DSPIF | `nokia_dsp_peer_device` owns shared RAM, rings, service timing and observed peer replies | Extend the mailbox contract only from organic requests; eventually emulate more DSP behavior. |
 | SIM | Stateful `nokia_sim_card_device` on SIMI registers/FIQ6 | Extend the device only for organically requested card behavior. |
-| Startup/contact/GSM peers | Request-driven contact session in the DSP peer plus quarantined traces | Validate the extracted contract across the coherent 3210 profile and a sibling ROM family. |
+| Startup/contact/GSM peers | Request-driven contact session in `nokia_dsp_peer_device` through shared rings and interrupt callbacks, plus observation-only quarantined traces | Validate the device-boundary contract across the coherent 3210 profile and a sibling ROM family. |
 
 See `mad2_fidelity.md` for register-level implementation status and
 `driver_structure.md` for ownership rules.

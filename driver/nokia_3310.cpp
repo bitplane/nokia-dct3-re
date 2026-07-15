@@ -29,6 +29,8 @@
 #include "screen.h"
 
 #include <cstdlib>
+#include <cstring>
+#include <string>
 
 #define LOG_MAD2_REGISTER_ACCESS    (1U << 1)
 
@@ -489,13 +491,13 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 
 // ============================================================================
 // NOKI3210_* environment knobs — the driver reads every runtime option from the
-// environment (overridable on the `make run` command line). Four kinds:
+// environment (pass overrides through `make run RUN_ENV='...'`). Three kinds:
 //
 //   1. HARDWARE CONFIG — selects a hardware *scenario*, not firmware behaviour:
 //      display variant (DISPLAY_TYPE), power/ADC (ADC_PROFILE,
 //      DISABLE_CCONT_WATCHDOG),
-//      clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP, FIQ8_HZ), NV (EEPROM_PROFILE),
-	//      SIM UART/card fixture. The default boot (none set)
+//      clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP, FIQ8_HZ), and the SIM
+//      UART/card fixture. The default boot (none set)
 //      reproduces the CONTACT SERVICE oracle frame byte-for-byte.
 //
 //   2. DEVICE-BOUNDARY MODELS — opt-in behavior behind an ordinary hardware
@@ -511,9 +513,8 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary.
 //      Research-force policy: docs/evidence_regime.md.
 //
-// Traces are quarantined in flash_firmware_traces /
-// ram_w_firmware_traces. Add no forced firmware results or messages. See
-// docs/driver_structure.md.
+// Firmware-address traces are quarantined in nokia_3310_trace.inc. Add no
+// forced firmware results or messages. See docs/driver_structure.md.
 // ============================================================================
 static unsigned nokia_env_u32(const char *name, unsigned fallback)
 {

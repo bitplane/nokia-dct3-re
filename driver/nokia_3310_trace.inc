@@ -776,7 +776,4 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					addr, reg(0), reg(1), reg(2), reg(3), machine().time().as_double());
 		}
 	}
-	// Observe organic resource-manager requests independently of the provisional GSM-service
-	// responder. Callback 0x2f uses this API after its natural constructor, before any service-5
-	// or service-30 transaction exists.
 }

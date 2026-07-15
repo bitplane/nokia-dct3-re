@@ -19,8 +19,8 @@ The same function first calls local key handlers `0x2979d8` and `0x2a27de`;
 `0x6e02` is an availability-gated resource mirror, not the sole input route.
 
 A coherent trace drives the left softkey 250 ms after readiness and decodes
-keycode `0x19` without posting report code 7. A scheduler-backed sequence can
-also drive `12345` plus the left softkey after the editor publishes `0x057c`.
+keycode `0x19`. A scheduler-backed sequence can also drive `12345` plus the
+left softkey after the editor publishes `0x057c`.
 All physical press/release edges enter IRQ0, the digit path reaches the editor,
 and submission completes the transaction through `0x0578`. The callback returns
 `0x05e6`, the statically proved accepted-code result. The entered `12345`
@@ -100,13 +100,7 @@ Those internal events call
 keymap. Function `0x2b4628` then publishes decoded resource `0x6e02`. Its store
 at `0x2b4652` arms `0x11239d` when the previous decoded key is `0x0d` and the
 display state is 1. It is downstream of scanning, not a pre-input hardware
-event or a possible source of report code 7.
-
-## Startup prerequisite
-
-Report code `0x07` still selects a later mode-4 continuation, but it is not a
-prerequisite for keypad decoding or security-editor input. The earlier claim
-confused the misrouted IRQ6 event with the real keypad path.
+event.
 
 ## Acceptance evidence
 

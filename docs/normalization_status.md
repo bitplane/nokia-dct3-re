@@ -89,6 +89,7 @@ The retained trace switches are scoped as follows:
 | Trace | Purpose |
 | --- | --- |
 | `TRACE_HANDOFF` | task-1 modes/posts plus IRQ0 and keypad scan/decode seams |
+| `TRACE_DISPLAY` | active MMI context, resource/render entry points, and LCD/DSP transfer boundaries |
 | `TRACE_TASKS` | generic task liveness and mailbox edges |
 | `TRACE_CSCMD` | contact-service command direction and state |
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
@@ -99,7 +100,9 @@ The retained trace switches are scoped as follows:
 
 The 60-block `TRACE_GSM_LOWER`, `TRACE_MMIVM`, and `TRACE_TASK5_REG` research
 weaves have been removed. Their durable conclusions remain in subsystem docs
-and evidence ledgers.
+and evidence ledgers. Firmware-address-specific implementations of the retained
+traces live in `driver/nokia_3310_trace.inc`; ordinary MAD2 register taps remain
+beside their hardware handlers.
 
 ## Topology gaps
 

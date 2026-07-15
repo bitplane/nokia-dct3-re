@@ -162,8 +162,8 @@ PWRONX is reset/input status, not a delayed MAD2 IRQ0 event. The CCONT now
 latches bit `0x02` when the phone configures the cold-boot scenario, before the
 firmware's first status read. The unevidenced delayed IRQ0 timer and its
 environment fixture are removed; ordinary power-button input uses the decoded
-KBGPIO column/IRQ0 contract. CCONT remains on the distinct IRQ6 source. Removing the timer preserves the contact/SIM
-frontier and does not produce report code 7.
+KBGPIO column/IRQ0 contract. CCONT remains on the distinct IRQ6 source. Removing
+the timer preserves the contact/SIM frontier.
 
 The power-key interrupt path is stable across the two ROMs: v6.00 handler
 `0x2b3084` aligns with v5.01 `0x2b02fc`, and each calls a tiny task-1 event
@@ -189,10 +189,9 @@ easy:
 - The old claim that emitter `0x264f30` produced the surfaced sweep IDs was
   false: its messages occur later and use a different path.
 
-Report code 7 and the keypad path are now classified independently of CCONT:
-the keypad uses MAD2 IRQ0, while code 7 is an organic physical-power/shutdown
-result. Any further CCONT change must come from a separately evidenced
-transaction or IRQ contract, not a startup-event hypothesis.
+The keypad uses MAD2 IRQ0 independently of CCONT. Any further CCONT change must
+come from a separately evidenced transaction or IRQ contract, not a startup-event
+hypothesis.
 
 ## Fidelity backlog
 

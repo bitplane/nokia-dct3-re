@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-# Pinned MAME — fetched from upstream, our single driver overlaid onto it.
+# Pinned MAME — fetched from upstream, with the local Nokia driver source set overlaid.
 MAME_REPO   ?= https://github.com/mamedev/mame.git
 MAME_COMMIT ?= 58fca9a8a20f75ac2010980e1a2ec0465c595583
 MAME_DIR    ?= mame
@@ -114,7 +114,7 @@ download-mame:
 		git clone $(MAME_REPO) $(MAME_DIR) && git -C $(MAME_DIR) checkout $(MAME_COMMIT); \
 	fi
 
-# Overlay our single driver onto the upstream tree (MAME is not vendored).
+# Overlay the local driver and component sources onto the upstream tree (MAME is not vendored).
 overlay: download-mame
 	install -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_3310.cpp
 	@for src in $(DRIVER_COMPONENTS); do install -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done

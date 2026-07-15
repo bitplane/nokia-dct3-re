@@ -47,32 +47,16 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
   multi-source/multi-ROM capable; the first two extracted hardware components
   contain no 3210 firmware addresses.
 
-### Static code-7 topology
+### Conditional power lifecycle control
 
-A signature search independent of absolute addresses finds the task-1 report
-code-7 stub at `0x386a94` in 3330 v4.50. Like the 3210 stub at `0x2af190`, it
-has exactly four callers. The 3330 callback caller at `0x25fc86` sits in a
-dispatcher structurally identical to 3210 callback `0x5d`: the same
-`0x05e1`/`0x05e7` timer-start branches and direct `0x05eb`/`0x06c5` completion
-branches are present. Two other callers remain power/charger owned and the
-fourth remains controller owned, matching the 3210 ownership split.
-
-This is static portability evidence, not a successful-boot oracle. It proves
-that the four-owner code-7 topology is shared across the DCT3 firmware family;
-it does not identify which owner completes during an ordinary healthy boot.
-No 3330 firmware-PC hook was added.
-
-### Nokia 5110 healthy-run control
-
-A forcing-free NSE-1 v5.30 run with its native DSP execution was traced through
-the Security-code editor, accepted `12345`, and reached standby. Across 53
-task-1 posts, report code `0x07` occurred zero times. The ROM's fifteen report
-stubs were enumerated; only `0x14`, `0x15`, `0x16`, and `0x17` fired during the
-healthy startup. Code `0x14` and the dormant code-7 call are adjacent branches
-of the same battery/charger dispatcher. Predicate `0x260cea` skips code 7 when
-the selected measurement exceeds its stored threshold plus `0x15e`. This is a
-behavioral cross-ROM control for conditional power ownership, not evidence that
-3210 report numbers or startup-state transitions are interchangeable.
+Signature matching finds the same four-owner report-7 topology in 3330 v4.50,
+including a callback dispatcher equivalent to 3210 callback `0x5d`. A
+forcing-free 5110 v5.30 run reaches standby while posting none of these reports;
+its healthy startup uses reports `0x14`-`0x17`, and its dormant report-7 branch
+is measurement-gated inside the battery/charger dispatcher. This is portability
+evidence for a conditional power lifecycle, not a shared boot-readiness event.
+Exact 3210 ownership and consumer semantics remain authoritative in
+`interactive_handoff.md`. No firmware-PC hook was added for either sibling ROM.
 
 ## Nokia 3210 NSE-8 v5.01
 
@@ -83,29 +67,13 @@ An independent full-flash control is stored locally as
 | ---: | --- | --- |
 | 2,097,152 | `62de70cd5451444cfcd4ed6c6d8a9a84c0e783a557f8489f2dc5faa283b66272` | `V 05.01`, `NSE-8` |
 
-Its report-7 wrapper is at `0x2ac5bc`. It publishes resource `0x6a010000`,
-posts code 7 to task 1, and has exactly four callers at `0x21e22c`,
-`0x21f772`, `0x252a4a`, and `0x277d06`. This is a same-product control for the
-stable four-owner topology.
-
-The caller comparison is also complete. The blocks around the first power
-caller preserve the same measurement predicate and shutdown outcome; the
-second power caller preserves the same charging-completed state update; and
-the controller caller preserves the same adjacent helper sequence before the
-report. Callback `0x5d` has the same subtract cascade, start statuses
-`0x05e1`/`0x05e7`/`0x05dc`, and terminal statuses `0x05eb`/`0x06c5`. Its only
-material local change is timer class `0x51` in v5.01 versus `0x52` in v6.00;
-the completion statuses and code-7 action are unchanged. The same-product
-comparison therefore exposes no alternate caller predicate, NV selector, or
-ordinary producer omitted from the v6.00 ownership analysis.
-
-The task-1 branch comparison is now complete. The v5.01 block at
-`0x26dc20..0x26df14` is instruction-for-instruction equivalent to v6.00
-`0x27120e..0x271502`, including both explicit code-7 waits, the six report
-flags, code-6 exit-selector path, event-`0x74` gate, and final mode-`0x000c`
-tail. The corresponding v5.01 state block is `0x1121bc..0x1121c9`, relocated
-from v6.00 `0x112390..0x11239d`. Code 7 is therefore a stable 3210 contract,
-not an isolated v6.00 branch choice.
+The conditional power-report wrapper is at `0x2ac5bc`, with the same four
+caller families and local predicates as v6.00. Callback `0x5d` preserves its
+start and terminal statuses; only timer class `0x51` changes to `0x52` in
+v6.00. The task-1 block at `0x26dc20..0x26df14` is instruction-equivalent to
+v6.00 `0x27120e..0x271502`, including the continuation comparisons, report
+flags, exit selector, event-`0x74` gate, and mode-`0x000c` tail. This confirms a
+stable same-product shutdown contract without making it a startup frontier.
 
 The CCONT comparison is also complete at the firmware boundary. The v6.00 ADC
 reader `0x2b52cc`, register read/write helpers `0x2afb44`/`0x2afa74`, and IRQ
@@ -132,8 +100,8 @@ canonical profile because neither ROM provides a duration.
 The ROM is now also packaged as MAME BIOS `501` with a BIOS-specific generated
 EEPROM profile. `make verify-3210-v501` provides the first forcing-free runtime
 comparison. It observes startup modes `0x0001 -> 0x000d -> 0x0004` and
-readiness flags `0x0f`: the same task-1 code-7 wall as
-v6.00. The earlier lifecycle is not equivalent yet: v5.01 currently finishes
+readiness flags `0x0f`: the same task-1 terminal mode as v6.00. The earlier
+lifecycle is not equivalent yet: v5.01 currently finishes
 with contact status `0x00c9`, SIM enable set, and no nonblank LCD frame. The
 SIM block is relocated by `-0x1d0`: v5.01 no-SIM/ENABLE are
 `0x111a94`/`0x111aa9`, corresponding to v6.00

@@ -146,7 +146,7 @@ variable preserves the erased-identity default used by the canonical oracle.
 
 That fixture makes the identity comparison succeed and removes the Security-code
 editor. It paints a new idle-like frame (SHA-256 prefix `dbf2704cb945d56b`) but
-does **not** publish report code 7 or move task 1 out of mode `0x0004`. Keypad
+does not move task 1 out of mode `0x0004`. Keypad
 interaction is independently functional on the unprovisioned editor path; the
 fixture is evidence about security provisioning, not the new default oracle.
 
