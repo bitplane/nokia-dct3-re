@@ -33,8 +33,24 @@ status `0x0367` from the active UI-context record and publishes it through
 bounded 50 ms tap proves the physical lifecycle is already correct: IRQ0 fires
 once on press and once on release, the matrix scanner polls while held, and
 `0x2b4628` decodes exactly one key. Repeated later `0x0367` publications come
-from UI-context iterator `0x2a1b18 -> 0x2a1a80`, not repeated matrix scans. The
-remaining replay is MMI context-lifecycle debt, not MAD2 keypad debt.
+from polling predicate `0x2a1a80`, selected by nested transition record `0x411`,
+not repeated matrix scans. Record `0x411` deliberately returns false after
+publishing the active context status, leaving selector `0x4b` unchanged. The
+replay is therefore firmware-owned polling, not MAD2 keypad debt. After an
+accepted `12345`, callback `0x47` returns `0x05e6` and disappears from the
+active callback sweep. A negative-control run containing only `12345` and one
+left-softkey submission reproduces the later `0x0384`, `0x05de`/`0x05e0`,
+`0x0598`, and `0x0578` activity. It is the transaction's ordinary
+post-acceptance tail, not the result of a second key.
+
+Status `0x00c8` is separate periodic traffic. Task 1 publishes packed `0x40c8`
+from `0x2a2838` with an incrementing argument at approximately one-second
+intervals. Its descriptor walk selects ordinary context-maintenance outputs
+`0x1b59`, direct `0x01f5`, and `0x1b5b`; none constructs a task-6 class-1
+window message. Repeating `0x05a7` is independently decoded as the three-slot
+timer manager at `0x2b3222`. Neither timer family is a stalled menu transaction
+or a missing hardware acknowledgement. The remaining startup question is no
+longer tied to a second softkey or descriptor `0x00c8`.
 
 ## Hardware path
 

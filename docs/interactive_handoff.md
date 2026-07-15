@@ -132,8 +132,13 @@ The physical-key trace does not repeat the matrix decode. A 50 ms Up tap enters
 IRQ0 once on press and once on release, runs the firmware's `0x41/42/43` polling
 sequence, and reaches `0x2b4628` exactly once. Later repeated `0x0367`
 publications originate in persistent UI-context iterator
-`0x2a1b18 -> 0x2a1a80`; they are higher-level lifecycle replay, not repeated
-MAD2 scans or a missing release edge.
+predicate `0x2a1a80`, not repeated MAD2 scans or a missing release edge. The
+earlier `0x2a1b18 -> 0x2a1a80` attribution was an address-boundary error:
+`0x2a1b18` is an instruction inside a neighboring routine. Runtime identifies
+nested transition index `0x411` (`selector 0xc0`, required result one, terminal
+packed value `0xffff`) as the caller-side predicate record. `0x2a1a80`
+publishes the active context status and returns zero, so the record is designed
+to remain unsatisfied and be polled again.
 
 The task-6 idle selector has now been separated from the setup constructor.
 `0x2b1e80` constructs class-1 mode zero. A second, tiny constructor at
@@ -153,8 +158,11 @@ That status is already owned by the physical-power/code-7 lifecycle, not
 unattended startup. In a coherent power-key run firmware organically posts
 `0x0732` and enters mode `0x000c`, but task 5 does not consume it during the
 bounded run; consequently `0x2b1e44`, resource `0x4c22`, and event `0x0547` do
-not execute. The open boundary is queue/context settlement upstream of the
-selector, not a missing idle-window producer or hardware acknowledgement.
+not execute. A 20-second receive trace and a second run after organically
+accepting `12345` show why: task 1 begins the shutdown/service teardown before
+task 5 performs another outer receive. The queued `0x0732` is therefore part of
+shutdown ordering, not evidence of a missing idle-window producer, task-5
+queue primitive, or hardware acknowledgement.
 
 `0x2b4628` feeds the local input handlers at `0x2979d8` and `0x2a27de`, then
 mirrors the one-byte key through resource `0x6e02`. The mirror uses the optional
@@ -532,9 +540,29 @@ callback `0x5d` the current ordinary-hardware frontier.
 The same-product comparison leaves no justified software-side transition to
 synthesize. Callback `0x10`/`0x05e7`, callback `0x01`/`0x0367`, and task-6
 selector `0x0732 -> 0x28c248 -> 0x2b1e44` are now all retired as ordinary
-startup candidates. The next bounded question is why task-5/MMI contexts do not
-settle: an organic `0x0732` remains queued after physical power, and the
-completed Up context repeatedly republishes `0x0367`. No class-1 message,
-`0x0547`, callback selection, or context state should be injected. Code 7,
-task-6 retention, keypad hardware, and the optional decoded-key resource mirror
-remain excluded from the ordinary-startup boundary.
+startup candidates. The post-security callback lifecycle settles cleanly:
+callback `0x47` returns accepted result `0x05e6`, the engine handles that result
+explicitly at `0x2ac54c`, and callback `0x47` leaves the active sweep. A
+negative-control run containing only `12345` and its single submission still
+produces the later `0x0384`, `0x05de`/`0x05e0`, `0x0598`, and `0x0578` wave.
+It is therefore the firmware-owned post-acceptance tail, not a second-softkey
+transaction. Callback-plane entries `0x01` and `0x02` mostly pass those statuses
+through; later pipeline stages consume or transform them, so their callback
+returns are not missing acknowledgements.
+
+The overlapping `0x00c8` activity is independently owned. Task 1 publishes
+packed `0x40c8` at `0x2a2838` with an incrementing argument at approximately
+one-second intervals. Its 81-record descriptor walk reads transient context
+byte `0x110f1f`; in the coherent run the selected expansions emit `0x1b59`,
+direct `0x01f5`, and `0x1b5b`. These are periodic context-maintenance outputs
+and do not reach the task-6 class-1 constructor. The earlier attribution of
+`0x00c8` to the second softkey was a timing correlation, not a producer edge.
+
+The repeated `0x05a7` was a second address-boundary trap. Dispatcher target
+`0x28c43c` belongs exclusively to status `0x05f3`; `0x05a7` instead reaches
+`0x28c480` and calls `0x2b3222`, which updates three timer slots and posts task
+5 timer work when required. It is normal timer activity, not a UI transaction
+retry. The `0x411`/`0x2a1a80` polling, periodic `0x00c8` descriptor walk, and
+shutdown-queued `0x0732` are classified behavior. None is the ordinary
+cold-boot window entrance. No class-1 message, `0x0547`, callback selection,
+context state, or timer result should be injected.

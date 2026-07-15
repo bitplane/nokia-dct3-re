@@ -49,11 +49,17 @@ action, not a missing registration or the ordinary UI-start entrance. Callback
 `0x10`/`0x05e7` is likewise conditional reinitialization. Exhaustive execution
 proves the remaining task-6 selector leaf `0x28c248` belongs only to status
 `0x0732`, itself produced organically by the physical-power/shutdown lifecycle.
-The live frontier is therefore task-5/MMI lifecycle settlement: conditional
-`0x0732` remains queued, while a completed Up tap leaves its logical UI context
-replaying `0x0367` despite only one physical key decode. Task 6 is already live
-with an empty window table; no retained window or LCD acknowledgement blocks
-it. See
+Longer traces now classify both apparent settlement symptoms. Shutdown begins
+before task 5's next receive, so its queued `0x0732` is expected ordering; and
+extended transition record `0x411` deliberately polls `0x2a1a80`, whose false
+return republishes the active context. Neither proves a missing hardware
+acknowledgement. The post-security transaction also closes normally: a
+negative-control run with only `12345` and its single submission reproduces the
+later callback/event wave. Overlapping `0x00c8` is task-1 periodic traffic from
+`0x2a2838`, and repeated `0x05a7` is the generic three-slot timer manager at
+`0x2b3222`; neither is a second-softkey transaction or a missing hardware
+completion. Task 6 remains live without an idle-window selection, but the
+second-softkey/descriptor path is no longer the frontier. See
 [`docs/interactive_handoff.md`](docs/interactive_handoff.md) and
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
