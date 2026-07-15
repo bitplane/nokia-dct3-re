@@ -251,9 +251,8 @@ already run. The ordinary firmware therefore does not initiate this transition.
 Command `0x8e` belongs to the external service/test peer contract, is absent from
 the coherent contact manifests, and must not be added to the normal boot peer to
 advance startup. Mode 4 is consequently a service-controlled battery lifecycle,
-not an evidenced ordinary boot branch. The battery/event-`0x43` route is closed
-for code 7; the next frontier returns to the independently mapped transaction
-completion paths in `interactive_handoff.md`.
+not an evidenced ordinary boot branch. The battery/event-`0x43` route is closed;
+report code 7 is independently proved as a later physical-power/shutdown result.
 
 ## Cold-boot safety contradiction
 

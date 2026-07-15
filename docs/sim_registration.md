@@ -682,7 +682,7 @@ still does not satisfy this context routine's required state 1 or 2.
 `0x2cc7f0`; eligibility helper `0x2aeda0` checks the old state, and `0x2aefa2`
 commits the descriptor's six-bit new state. The descriptors recovered for callback
 `0x5d` contain transitions from states `1`, `2`, `3`, `4`, or `0x0b`. The
-current code-7 run reaches state `0x0b`, while the later context producer still
+physical-power/code-7 run reaches state `0x0b`, while the later context producer still
 requires state 1 or 2. Callback 7 is therefore a
 configuration or later-session cycle, not the ordinary-registration bootstrap
 frontier.

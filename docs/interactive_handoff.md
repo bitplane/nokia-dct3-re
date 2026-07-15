@@ -410,9 +410,9 @@ In the coherent run the first message at the mode-4 comparison is `0x00d5`.
 That is the scheduler's delayed form of report `0x15`, one of the four normal
 readiness reports just consumed by mode `0x000d`. Its arrival before code 7 is
 therefore ordinary queue ordering, not evidence that an ADC response explicitly
-requested a low-battery wait. The unresolved contract is narrower: what later
-power/charger lifecycle condition posts code 7 and resumes the already-running
-interactive system.
+requested a low-battery wait. The later owner is now observed directly: a
+physical power-key action reaches controller status `0x0795`, posts code 7, and
+enters shutdown mode `0x000c`.
 
 ## Excluded owners
 
@@ -489,10 +489,8 @@ historical oracle have been removed.
 
 - task-1 mode transitions and dispatcher state;
 - task-1 mailbox publications;
-- report-7 wrapper/caller and callback-`0x5d` activity;
 - IRQ0 entry and the scan/decode seam;
-- the small set of controller, power, and identity observations still needed
-  to reject accidental regressions in the classified surface.
+- mode-0 interactive-init and task-6 idle-helper entry points.
 
 The trace is read-only. A successful fix must work with it disabled.
 

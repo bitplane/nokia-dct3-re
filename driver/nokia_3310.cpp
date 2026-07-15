@@ -1237,34 +1237,6 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					machine().time().as_double());
 		}
 	}
-	// Task 1 advances from both startup modes 4 and 7 on report code 7. Trace
-	// branch targets around every organic reporter caller and the real getter
-	// entry; hooks at the former mid-function 0x26ff14 seam are not reliable.
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
-			(addr == 0x0021e3f8 || addr == 0x0021f830 || addr == 0x00255c30 ||
-			 addr == 0x0027b370 || addr == 0x0026ff14 || addr == 0x0026ff1a))
-	{
-		static unsigned code7_owner_count = 0;
-		static unsigned task1_getter_count = 0;
-		const bool task1_getter = addr == 0x0026ff14 || addr == 0x0026ff1a;
-		unsigned &count = task1_getter ? task1_getter_count : code7_owner_count;
-		if (count++ < (task1_getter ? 32U : 128U))
-			logerror("code7_owner: pc=%08x r0=%08x r1=%08x mode=%04x task=%02x "
-					"sim-enable=%02x no-sim=%02x caller=%08x t=%.6f\n",
-					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
-					debug_ram_word(FW_STARTUP_MODE), debug_ram_byte(0x00100022),
-					debug_ram_byte(0x00111c79), debug_ram_byte(0x00111c64),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-					machine().time().as_double());
-		if (addr == 0x0026ff1a &&
-				(u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff) == 0x00ca)
-			logerror("code7_eventca_recv: task=%02x event=%04x caller=%08x mode=%04x t=%.6f\n",
-					debug_ram_byte(0x00100022),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-					debug_ram_word(FW_STARTUP_MODE), machine().time().as_double());
-	}
 	// Keypad IRQ0 enters its own ISR and starts the firmware's 0x41/0x42/0x43
 	// scan/decode sequence. IRQ6 is the separate CCONT source.
 	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
@@ -1286,51 +1258,6 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					m_irq_status, m_mad2_regs[MAD2_IRQ_MASK], m_mad2_regs[0x28],
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 					machine().time().as_double());
-	}
-	// Keep the finite boot-readiness owner surface observable without tracing
-	// the full callback engine.  The listed callbacks are every direct 0x05e1
-	// publisher recovered statically, plus callback 0x5d which reports code 7.
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
-			(addr == 0x002ac652 || addr == 0x002ac65e))
-	{
-		const u32 record = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R5));
-		const u8 selector = (record >= NOKIA_RAM_BASE && record + 3 < NOKIA_RAM_END) ?
-			debug_ram_byte(record + 3) : 0xff;
-		const bool code7_owner = selector == 0x0f || selector == 0x10 || selector == 0x13 ||
-			selector == 0x2f || selector == 0x31 ||
-			selector == 0x32 || selector == 0x34 || selector == 0x47 ||
-			selector == 0x4e || selector == 0x51 || selector == 0x55 || selector == 0x59 ||
-			selector == 0x5d || selector == 0x6d;
-		if (code7_owner)
-		{
-			static unsigned code7_callback_count = 0;
-			if (code7_callback_count++ < 512)
-				logerror("code7_callback: pc=%08x phase=%s selector=%02x status=%04x return=%04x "
-						"state=%02x gate31=%02x/%02x task=%02x mode=%04x caller=%08x t=%.6f\n",
-						addr, addr == 0x002ac652 ? "call" : "return",
-						selector,
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R6)) & 0xffff,
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
-						debug_ram_byte(0x0011fc80 + selector), debug_ram_byte(0x00111e72),
-						debug_ram_byte(0x00110f1f), debug_ram_byte(0x00100022),
-						debug_ram_word(FW_STARTUP_MODE),
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-						machine().time().as_double());
-		}
-	}
-	// Observe only the callback-0x5d transaction family at the packed-status
-	// publication boundary. This is the active code-7 predecessor question.
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr && addr == 0x002af798)
-	{
-		const u16 packed = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff;
-		const u16 status = packed & 0x1fff;
-		if (status == 0x0348 || status == 0x05e1 || status == 0x05e7 ||
-				status == 0x05eb || status == 0x06c5)
-			logerror("code7_status: status=%04x packed=%04x source=%08x caller=%08x "
-					"task=%02x mode=%04x t=%.6f\n",
-					status, packed, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-					fw_byte(0x00100022), fw_word(FW_STARTUP_MODE), machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_DISPLAY", 0) != 0 && pc == addr && addr == 0x002af798)
 	{
@@ -1694,8 +1621,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					logerror("handoff: display_idle FIRED (idle repaint) [1116fd]=%02x t=%.4f\n",
 							debug_ram_byte(0x001116fd), machine().time().as_double());
 			}
-			// Inventory: every RTOS post to task 1 (0x26a204/0x26a354, r0=taskid, r1=msgptr; code=[msg+0]),
-			// deduped by (code, caller). Does anything ever post code 7 (the mode-0x04 burst trigger)?
+			// Inventory every RTOS post to task 1, deduplicated by (code, caller).
 			else if (addr == 0x0026a204 || addr == 0x0026a354)
 			{
 				const u32 task = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;

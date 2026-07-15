@@ -21,9 +21,9 @@ Documentation is organized by authority rather than investigation date.
 | Document | Purpose |
 | --- | --- |
 | `sim_subsystem.md` | Concise SIM ownership and interface summary. |
-| `interactive_handoff.md` | Current task-1/report-7 startup contract. |
+| `interactive_handoff.md` | Task-1, report-7, security-editor, and conditional UI lifecycle contract. |
 | `mmi_layer.md` | Keypad IRQ, mailbox, matrix-scan and decoded-key acceptance path. |
-| `resource_providers.md` | Current organic GSM/resource-provider dependency chain. |
+| `resource_providers.md` | Resource-provider ownership and excluded conditional startup paths. |
 | `network_scouting.md` | Boundary between pre-idle startup and GSM/DSP work. |
 | `dsp_service_transport_contract.md` | Ownership and acceptance contract for the active DSP/generic-service frontier. |
 | `contact_service_topology.md` | Contact command producers, acknowledgements, and lower-service boundary. |

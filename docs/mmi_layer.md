@@ -124,7 +124,7 @@ PNG alone still does not prove an application desktop.
 
 ## Diagnostics
 
-`NOKI3210_TRACE_HANDOFF=1` records the task-1 mode, IRQ0 handler, report
-surface, and scan/decode seam. `NOKI3210_TRACE_TASKS=1` provides generic
+`NOKI3210_TRACE_HANDOFF=1` records task-1 modes/posts, the IRQ0 handler, and the
+scan/decode seam. `NOKI3210_TRACE_TASKS=1` provides generic
 mailbox-edge context. Both are read-only and must be disabled successfully in
 the final acceptance run.

@@ -147,7 +147,7 @@ Start with:
 - [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
 - [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for CONTACT SERVICE.
-- [`docs/resource_providers.md`](docs/resource_providers.md) for the current boot frontier.
+- [`docs/interactive_handoff.md`](docs/interactive_handoff.md) for the current UI-start boundary.
 - [`docs/sim_registration.md`](docs/sim_registration.md) for the SIM and generic-service findings.
 - [`docs/tooling.md`](docs/tooling.md) for the analysis tools.
 

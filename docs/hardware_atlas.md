@@ -156,18 +156,16 @@ to distinguish shared MAD2 behavior from 3210 firmware assumptions.
 ## Current boot boundary
 
 The coherent profile exercises CTSI, MBUS, CCONT, LCD, keypad, GenIO/EEPROM,
-SIMI and the modeled DSP/contact boundary. The current observed frontier is the
-organic owner of task-1 startup report code `0x07`. Task-13 status `0x05eb` can
-reach the task-16 path, but does not enter callback `0x5d` or reach the code-7
-reporter. Callback `0x5d`
-accepts direct `0x05eb`/`0x06c5` or starts a task-local completion timer on
-callback-scoped `0x05e1`/`0x05e7`/`0x05dc`; none is observed for selector
-`0x5d`, and its only non-initialization selection route is already closed. A mapped
-display lifecycle beginning with status `0x0280`, `0x0281`, or `0x0282` is
-service/test-owned, not ordinary boot. Callback `0x5d` and the independent
-controller-status route are both classified dormant/later contracts rather
-than ordinary startup owners; no faithful report-code-7 correction is proved.
-See `resource_providers.md`.
+SIMI and the modeled DSP/contact boundary. Report code `0x07` is now observed
+organically after a physical power-key action and belongs to the later
+shutdown/power lifecycle; it is not the boot-to-desktop blocker. Keypad scanning
+and the security editor work through their normal firmware paths, and accepted
+`12345` returns `0x05e6` without a missing completion. Callback `0x5d`,
+callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, the service/test display
+statuses, and task-6 selector `0x0732` are all classified conditional paths.
+The remaining boot boundary is the ordinary unattended UI/idle-window entrance,
+not a hardware acknowledgement currently justified for synthesis. See
+`interactive_handoff.md` and `mmi_layer.md`.
 
 ## Knob
 

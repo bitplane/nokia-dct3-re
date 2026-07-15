@@ -36,16 +36,16 @@ IRQ0 -> ISR 0x2b3084 -> task-1 event 0x41
      -> key decode 0x2b4628 -> resource 0x6e02
 ```
 
-The mode-4 dispatcher still contains an explicit report-code-`0x07` continuation,
-but a corrected keypad source reaches the security editor without taking that
-continuation. A deterministic `12345` plus softkey sequence completes that
-editor through `0x0578` and returns the proved accepted-code result `0x05e6`
-without leaving mode 4. Code 7 is therefore not the prerequisite for editor
-interaction previously claimed. Its four reporter callers are classified.
-Callback `0x5d` accepts callback-scoped starts `0x05e1`/`0x05e7`/`0x05dc` and
-terminal `0x05eb`/timer completion `0x06c5`, but its only mapped
-non-initialization selector is the closed slot-`0x45` context route. It is a
-dormant service/test contract, not an unresolved autonomous boot transaction.
+The mode-4 dispatcher retains a report-code-`0x07` continuation, but it is a
+later power/shutdown listener rather than a boot prerequisite. A physical power
+key produces code 7 organically and enters mode `0x000c`; ordinary keypad and
+security-editor interaction already runs in mode 4. A deterministic `12345`
+plus one softkey submission completes the editor through `0x0578` and returns
+accepted result `0x05e6`. The later callback/event wave needs no second key.
+Periodic `0x00c8` and `0x05a7` traffic is independently classified and does not
+select an idle window. Callback `0x5d`, callback `0x01`/`0x0367`, callback
+`0x10`/`0x05e7`, and task-6 selector `0x0732` are closed conditional lifecycles,
+not missing ordinary-boot transitions.
 
 ## Evidence coverage
 
@@ -88,7 +88,7 @@ The retained trace switches are scoped as follows:
 
 | Trace | Purpose |
 | --- | --- |
-| `TRACE_HANDOFF` | task-1 mode, report-7 surface, IRQ0, scan/decode seam |
+| `TRACE_HANDOFF` | task-1 modes/posts plus IRQ0 and keypad scan/decode seams |
 | `TRACE_TASKS` | generic task liveness and mailbox edges |
 | `TRACE_CSCMD` | contact-service command direction and state |
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
@@ -110,8 +110,9 @@ and evidence ledgers.
   topology remains incomplete.
 - The DSP/contact peer contract is proved only for the requests exercised by
   the current boot.
-- Which of the four classified report-7 callers executes on a healthy physical
-  3210, and the preceding hardware or transaction state, remains unresolved.
+- The ordinary unattended UI/idle-window entrance is not yet identified. The
+  accepted security transaction, periodic UI timers, and conditional
+  reinitialization/shutdown selectors are excluded.
 
 ## Completion gate
 

@@ -105,8 +105,10 @@ the complete application group is held behind the service-empty transaction.
 The current contact peer deliberately waits 36 service ticks before beginning
 the external session. That calibrated delay contributes to this ordering and
 remains hardware-fidelity debt, but is not adjusted merely to select a different
-firmware branch. The alternate mode-`0x000d` tail also waits explicitly for
-report code 7 and therefore does not remove the current boot frontier.
+firmware branch. The alternate mode-`0x000d` tail has the same report-code-7
+listener. Both branches nevertheless enter their shared interactive
+initialization before recording mode 4 or 7, so this ordering is fidelity debt
+rather than the current UI-start boundary.
 
 ## Command inventory
 

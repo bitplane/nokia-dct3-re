@@ -189,9 +189,10 @@ easy:
 - The old claim that emitter `0x264f30` produced the surfaced sweep IDs was
   false: its messages occur later and use a different path.
 
-The remaining code-7/keypad frontier is later than the completed CCONT startup
-sweep. Any further CCONT change must come from a separately evidenced
-transaction or IRQ contract, not another firmware event injection.
+Report code 7 and the keypad path are now classified independently of CCONT:
+the keypad uses MAD2 IRQ0, while code 7 is an organic physical-power/shutdown
+result. Any further CCONT change must come from a separately evidenced
+transaction or IRQ contract, not a startup-event hypothesis.
 
 ## Fidelity backlog
 

@@ -180,8 +180,8 @@ following `0x27f150` path is an Advice-of-Charge limit controller and publishes
 earlier connection was disproven by instruction and runtime tracing. A display
 lifecycle (`0x0280/81/82 -> 0x05e7
 -> 0x0389 -> 0x157e -> 0x0396 -> 0x05eb`) is a valid service/test route, not
-the ordinary predecessor. The completed SIM file conversation is no longer
-the current code-7 frontier.
+the ordinary predecessor. The completed SIM file conversation is not the
+remaining unattended UI-start boundary.
 
 The descriptor factory is now identified as `0x24f120`. Its four known callers
 (`0x2996aa`, `0x2997dc`, `0x299860`, `0x2998a0`) sit immediately before the callback-7 handler and
