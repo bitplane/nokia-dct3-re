@@ -153,6 +153,12 @@
       "evidence": ["docs/mmi_layer.md", "docs/interactive_handoff.md"]
     },
     {
+      "id": "ordinary_handoff_bypasses_code7_via_alternate_0732", "status": "disproven",
+      "hypothesis": "A healthy 3210 starts task 6 or posts 0x0732 through an ordinary entrance independent of task 1's code-7 branches",
+      "conclusion": "The exhaustive effective-literal inventory contains four 0x0732 sites. Three populate event fields or registration structures. The sole direct publisher is 0x2a26d4, whose only callers are 0x270f7a and 0x271292 immediately after the two explicit task-1 code-7 receives. Task 6's idle-window helper is reachable only from its own receive loop after startup. No independent ordinary entrance is present in this statically enumerable surface.",
+      "evidence": ["docs/interactive_handoff.md", "docs/message_topology_census.md"]
+    },
+    {
       "id": "pwronx_repetition_supplies_code7", "status": "disproven",
       "hypothesis": "A missing or insufficiently held PWRONX interrupt prevents the ordinary power-on completion from publishing report code 7",
       "conclusion": "MAD2 IRQ line 0 is enabled and acknowledged through 0x2b3084. Its handler calls 0x2b4662, which posts event 0x41 to task 1 for the early power-key scan. Holding the emulated key raises 51 interrupts in a bounded run, but callback 0x5d still receives only 0x05e2, code 7 remains absent, and task 1 stays in mode 0x0004. Task 19's separate numeric event-0x41 branch is labelled CHARGER CONNECTION and has no producer edge from this IRQ.",

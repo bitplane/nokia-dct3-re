@@ -51,6 +51,98 @@ Service-5 candidacy among unresolved descriptors: `dynamic_service_unresolved`=7
 - callback `0x52` / `0x28882c`: `0x2888d2`; triggers `0x035c`; status-specific fallback.
 - callback `0x65` / `0x29a3a4`: `0x29a4dc`; triggers `multiple`; multi-status state-machine fallback.
 
+## Requested frontier-event inventories
+
+These inventories combine direct/static constructions, registration descriptors, and the decoded fixed-sequence catalogue. A catalogue predecessor is not an initiating producer unless one of its packed inputs also has producer evidence.
+
+### Status `0x0732`
+
+- Effective literal loads: 4
+- Conservative computed-r0 constructions: 1
+- Recovered direct API arguments: 1
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x03ab`
+
+- Effective literal loads: 1
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x12b4`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x32b4`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x72b4`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x0bcc`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x13f8`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x0348`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 5
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 9 (0 with a recovered packed-input producer)
+
+### Status `0x012b`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 7
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x212b`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
+### Status `0x612b`
+
+- Effective literal loads: 0
+- Conservative computed-r0 constructions: 0
+- Recovered direct API arguments: 0
+- Descriptor fields: 0
+- Fixed-sequence catalogue predecessors: 0 (0 with a recovered packed-input producer)
+
 ## Object-bearing 0x05dc lifecycle constructors
 
 The ROM scan recovered 38 direct packed `0x05e0` constructors with at least two argument words. Argumentless and selector-only lifecycle events are excluded.

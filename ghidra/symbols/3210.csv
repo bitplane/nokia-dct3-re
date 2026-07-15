@@ -692,3 +692,6 @@ address,kind,name
 0x002a033e,function,simi_tx_empty_progress_2a033e
 0x002a04c8,function,simi_rx_fifo_dispatch_2a04c8
 0x002a054a,function,simi_fiq6_iir_dispatch_2a054a
+0x002a26d4,function,task6_resource_4c0b_post_0732_2a26d4
+0x00270f7a,label,mode7_post_code7_task6_start_270f7a
+0x00271292,label,mode4_post_code7_task6_start_271292

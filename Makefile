@@ -26,6 +26,11 @@ PRESERVE_NVRAM ?= 0
 PROVISIONED_IMEI_PREFIX ?=
 CENSUS_LOG ?=
 CENSUS_MANIFESTS ?= tools/run_manifests/contact-service.json tools/run_manifests/deep-gsm.json
+FRONTIER_EVENT_INVENTORIES := \
+	--inventory-status 0x0732 --inventory-status 0x03ab \
+	--inventory-status 0x12b4 --inventory-status 0x32b4 --inventory-status 0x72b4 \
+	--inventory-status 0x0bcc --inventory-status 0x13f8 --inventory-status 0x0348 \
+	--inventory-status 0x012b --inventory-status 0x212b --inventory-status 0x612b
 
 # Stable, git-ignored PNG of the latest LCD frame — promoted after every run so an
 # external `watch chafa progress_latest_frame.png` updates live.
@@ -146,11 +151,20 @@ census:
 	@mkdir -p run_census
 	$(PYTHON) tools/validate_evidence.py
 	$(VENV)/bin/python tools/message_census.py --check \
+		$(FRONTIER_EVENT_INVENTORIES) \
 		$(foreach manifest,$(CENSUS_MANIFESTS),--runtime-manifest $(manifest)) \
 		$(if $(CENSUS_LOG),--runtime-log $(CENSUS_LOG)) \
 		--json run_census/noki3210_v600.json \
 		--report run_census/noki3210_v600.md
 	@echo "census: run_census/noki3210_v600.json and run_census/noki3210_v600.md"
+
+frontier-event-census:
+	@mkdir -p run_census
+	$(VENV)/bin/python tools/message_census.py \
+		$(FRONTIER_EVENT_INVENTORIES) \
+		--json run_census/frontier_events.json \
+		--report run_census/frontier_events.md
+	@echo "frontier-event-census: run_census/frontier_events.json and run_census/frontier_events.md"
 
 controller-census:
 	$(VENV)/bin/python tools/controller_dispatch_census.py --check
@@ -166,6 +180,7 @@ census-docs:
 	$(PYTHON) tools/validate_evidence.py
 	$(VENV)/bin/python tools/controller_dispatch_census.py --check
 	$(VENV)/bin/python tools/message_census.py --check \
+		$(FRONTIER_EVENT_INVENTORIES) \
 		$(foreach manifest,$(CENSUS_MANIFESTS),--runtime-manifest $(manifest)) \
 		--require-runtime-subsystem contact_service \
 		--require-runtime-subsystem generic_service \

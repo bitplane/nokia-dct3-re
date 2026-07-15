@@ -62,6 +62,18 @@ that the four-owner code-7 topology is shared across the DCT3 firmware family;
 it does not identify which owner completes during an ordinary healthy boot.
 No 3330 firmware-PC hook was added.
 
+### Nokia 5110 healthy-run control
+
+A forcing-free NSE-1 v5.30 run with its native DSP execution was traced through
+the Security-code editor, accepted `12345`, and reached standby. Across 53
+task-1 posts, report code `0x07` occurred zero times. The ROM's fifteen report
+stubs were enumerated; only `0x14`, `0x15`, `0x16`, and `0x17` fired during the
+healthy startup. Code `0x14` and the dormant code-7 call are adjacent branches
+of the same battery/charger dispatcher. Predicate `0x260cea` skips code 7 when
+the selected measurement exceeds its stored threshold plus `0x15e`. This is a
+behavioral cross-ROM control for conditional power ownership, not evidence that
+3210 report numbers or startup-state transitions are interchangeable.
+
 ## Nokia 3210 NSE-8 v5.01
 
 An independent full-flash control is stored locally as

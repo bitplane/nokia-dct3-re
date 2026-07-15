@@ -603,6 +603,21 @@ def render_report(result):
 			callsites = ", ".join(f"`{value}`" for value in item["callsites"])
 			lines.append(f"- callback `{item['callback_index']}` / `{item['entry']}`: {callsites}; triggers {triggers}; {item['role']}.")
 		lines.append("")
+	requested = result.get("requested_status_inventories", {})
+	if requested:
+		lines += ["## Requested frontier-event inventories", "",
+			"These inventories combine direct/static constructions, registration descriptors, and the decoded fixed-sequence catalogue. A catalogue predecessor is not an initiating producer unless one of its packed inputs also has producer evidence.", ""]
+		for key, inventory in requested.items():
+			catalogue = inventory["catalogue_predecessors"]
+			evidenced_catalogue = [item for item in catalogue if any(
+				item["producer_evidence"][field] for field in
+				("literal_loads", "computed_r0_constructions", "direct_calls"))]
+			lines += [f"### Status `{key}`", "",
+				f"- Effective literal loads: {len(inventory['literal_loads'])}",
+				f"- Conservative computed-r0 constructions: {len(inventory['computed_r0_constructions'])}",
+				f"- Recovered direct API arguments: {len(inventory['call_arguments'])}",
+				f"- Descriptor fields: {len(inventory['descriptor_fields'])}",
+				f"- Fixed-sequence catalogue predecessors: {len(catalogue)} ({len(evidenced_catalogue)} with a recovered packed-input producer)", ""]
 	lifecycle = result["object_lifecycle_05e0"]
 	lines += ["## Object-bearing 0x05dc lifecycle constructors", "",
 		f"The ROM scan recovered {len(lifecycle['constructors'])} direct packed `0x05e0` constructors with at least two argument words. "

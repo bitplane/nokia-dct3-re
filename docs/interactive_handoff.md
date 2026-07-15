@@ -69,6 +69,17 @@ experiment does not compose. It leaves an earlier task-5 lifecycle active, and
 `0x0547` remains queued while repeated `0x0d16` timer traffic wins the receive
 path. No downstream result should be injected from that experiment.
 
+The ordinary-entrance census closes an apparent alternative to code 7. There
+are four effective `0x0732` literal loads in the ROM. Sites `0x2762cc` and
+`0x2763ee` populate event fields in allocated structures, and `0x2921c4`
+populates a registration/event set. The sole direct publisher is helper
+`0x2a26d4`, which acquires resource `0x4c0b` and posts `0x0732`; its only two
+callers are `0x270f7a` and `0x271292`, the two task-1 branches immediately after
+their explicit code-7 receive. Task 6's idle-window helper `0x2a255c` is called
+only from its own receive loop at `0x298000` after that task has been started.
+No independent ordinary `0x0732` or task-6 window-manager entrance is present
+in the statically enumerable surface.
+
 The v6.00 report wrapper is `0x2af190`. It publishes resource `0x6a01` and posts
 code 7 to task 1. It has exactly four callers:
 
@@ -197,10 +208,16 @@ The detailed evidence and exact fixtures live in `falsifications.json`,
 
 Report code 7 is not a universal DCT3 “DSP ready” report:
 
-- Nokia 5110 v5.30 has a structurally equivalent wrapper and four callers, but
-  an independent forcing-free boot reaches an interactive Security-code frame
-  without executing it. Its keypad lifecycle is serial and not a replay source
-  for the 3210 KBGPIO path.
+- Nokia 5110 v5.30 has a structurally equivalent wrapper and four callers. A
+  traced forcing-free boot, physical-code unlock, and transition to standby
+  posts zero code-7 reports across 53 task-1 messages. Its complete report-stub
+  farm contains fifteen codes, while healthy startup fires only `0x14`,
+  `0x15`, `0x16`, and `0x17`. The fired `0x14` block and dormant code-7 block
+  share one battery/charger dispatcher; code 7 is skipped when predicate
+  `0x260cea` finds its selected measurement above threshold+`0x15e`. This is
+  protocol-family evidence that code 7 is conditional power lifecycle, not a
+  universal DSP-ready report. The 5110 task-1 state machine and serial keypad
+  remain product-specific and are not replay sources for the 3210.
 - Nokia 3310 v6.39 reaches an interactive idle-like frame in an independent
   message-level emulator without executing its equivalent wrapper.
 - Nokia 3330 v4.50 retains the same four-owner reporter topology statically.
