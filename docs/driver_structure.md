@@ -22,7 +22,7 @@ acceptance harness; the production driver contains neither a second LCD parser
 nor synthetic key state. CCONT is an explicit local `nokia_ccont_device` owning its serial
 registers, ADC results, RTC, interrupt state and watchdog. Task 7 remains the
 firmware adapter to the external service/test peer; the request-driven
-DSP/contact prototype is an explicit `nokia_dsp_peer_device`. It owns shared DSP
+DSP/external-service prototype is an explicit `nokia_dsp_peer_device`. It owns shared DSP
 RAM, MCU/DSP ring indices, service cadence, and the observed contact-session
 state, and returns peer transactions through FIQ0/IRQ4 callbacks.
 The provisional
@@ -46,7 +46,7 @@ cross-ROM pass to identify the genuinely shared contract.
   `evidence_regime.md`.
 - The direct firmware allocation trampoline,
   service-status RAM completion, and synthetic startup-report feed are removed.
-  The current contact peer consumes organic DSP-ring requests and returns
+  The current external-service peer consumes organic DSP-ring requests and returns
   request-derived transport/contact responses without writing firmware state.
 
 ## Component completion gate

@@ -102,7 +102,7 @@ EEPROM profile. `make verify-3210-v501` provides the first forcing-free runtime
 comparison. It observes startup modes `0x0001 -> 0x000d -> 0x0004` and
 readiness flags `0x0f`: the same task-1 terminal mode as v6.00. The earlier
 lifecycle is not equivalent yet: v5.01 currently finishes
-with contact status `0x00c9`, SIM enable set, and no nonblank LCD frame. The
+with service-session status `0x00c9`, SIM enable set, and no nonblank LCD frame. The
 SIM block is relocated by `-0x1d0`: v5.01 no-SIM/ENABLE are
 `0x111a94`/`0x111aa9`, corresponding to v6.00
 `0x111c64`/`0x111c79`. The valid-reply setter is instruction-equivalent and a

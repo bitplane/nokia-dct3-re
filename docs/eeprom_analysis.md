@@ -24,7 +24,7 @@ EEPROM's line directly; combining that level with the stale signal-register bit
 can hold SDA low after the MCU last transmitted a zero. That integration error
 previously made the firmware calculate `0x00ff` and read stored checksum/guard
 words as zero at `0x234810`, despite a correct backing image. With the released
-line read directly, the failure branch at `0x234826` is absent and contact status
+line read directly, the failure branch at `0x234826` is absent and service-session status
 keeps bit 6 through EEPROM validation (`0xc8` -> `0xcc`). The later clear at
 `0x237b04` is the independent disabled service-channel/PM-read predicate described
 in `service_bootstrap.md`.

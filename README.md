@@ -24,7 +24,7 @@ special cases.
 ## Current State
 
 The 3210 firmware executes deeply enough to initialize the CPU, MAD2 peripherals, CCONT, display,
-EEPROM paths, RTOS tasks, contact-service machinery, and a substantial SIM conversation. The
+EEPROM paths, RTOS tasks, external-service machinery, and a substantial SIM conversation. The
 default profile deterministically reaches the authentic **CONTACT SERVICE** frame and is protected
 by a byte-exact LCD oracle. Opt-in peer prototypes can carry the firmware further and the ring-2
 SIM responder completes natural ATR and ICCID/ECC/PHASE APDU traffic.
@@ -64,8 +64,8 @@ second-softkey/descriptor path is no longer the frontier. See
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
 `make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
-research baseline for this boundary. It uses the request-driven contact peer
-and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with contact status
+research baseline for this boundary. It uses the request-driven external-service peer
+and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with service-session status
 `0x49`, no-SIM clear, and SIM enable set. Historical runs with the retired
 display-transfer experiment reached the **Security code** frame
 (`6471d1a5803619c2`) and, with a provisioned identity, the idle-like `Menu`
@@ -97,7 +97,7 @@ The labels below have precise meanings:
 | CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; GENSIO transaction state and ADC completion IRQ behavior remain open. |
 | SIM transport/filesystem | Partial hardware | Ring-2 ATR and multi-file GSM 11.11 responder work; consolidate later. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
-| Startup/contact peers | Prototype | Request-driven behavior is implemented in `nokia_dsp_peer_device` through shared DSP rings and interrupt callbacks; the wider peer contract remains incomplete. |
+| Startup/external-service peers | Prototype | Request-driven behavior is implemented in `nokia_dsp_peer_device` through shared DSP rings and interrupt callbacks; the wider peer contract remains incomplete. |
 | Interactive startup | Mapped | Keypad and editor completion work in mode 4. Callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, and task-6 selector `0x0732 -> 0x2b1e44` are conditional UI/power lifecycle paths, not cold-boot entrances. Task-5/MMI context settlement is the smallest unresolved boundary. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |

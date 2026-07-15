@@ -1,6 +1,6 @@
 # Hardware atlas — the firmware↔hardware boundary (Nokia 3210, MAD2)
 
-The boot is fundamentally the firmware *feeling around for hardware*. Every CONTACT-SERVICE gate
+The boot is fundamentally the firmware *feeling around for hardware*. Every startup fault gate
 we cleared was a hardware-interaction gap (a DSP IRQ that never fired, a CCONT bit nobody set, a
 charger ADC reading zero). This atlas maps that boundary — what MMIO the firmware touches, what is
 **emulated / partial / stubbed**, and where in the boot it's reached — so the *next* mystery hang
@@ -139,13 +139,13 @@ base references, concentrated in the GSM-L1/audio layer at
 service-handshake corner: task 3 serializes DSP work into the TX ring and FIQ0
 owns inbound delivery.
 The request-driven peer now completes the startup D0 exchange, the organic type-`0x70/0x74`
-contact completion, and the external task-7 service session in one boot. The generic-service
+service-session completion, and the external task-7 service session in one boot. The generic-service
 `0x05e8` chain remains a mapped later radio/SAT path, not the current ordinary-SIM prerequisite.
 
 ## Current boot boundary
 
 The coherent profile exercises CTSI, MBUS, CCONT, LCD, keypad, GenIO/EEPROM,
-SIMI and the modeled DSP/contact boundary. It completes ordinary SIM file
+SIMI and the modeled DSP/external-service boundary. It completes ordinary SIM file
 traffic, clears no-SIM, sets SIM enable, scans the keypad, and accepts the
 security transaction through normal firmware paths. Conditional power,
 reinitialization, and service/test display routes are classified separately.

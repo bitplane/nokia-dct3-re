@@ -45,6 +45,12 @@ Topology nodes use symbolic IDs such as `task14_object_decoder` and
 the node absent; it must not create a second conceptual node merely because an
 address changed.
 
+Task aliases are evidence claims, not recovered Nokia symbols. The canonical
+identity is the ROM plus numeric task/mailbox id; `docs/rtos_tasks.md` owns the
+current human-readable aliases. Machine-readable IDs may retain historical
+wording for compatibility, but prose must not infer whole-subsystem ownership
+from one message, readiness report, screen caption, or nearby address range.
+
 ## Documentation authority
 
 Concise subsystem documents and normalized artifacts contain current

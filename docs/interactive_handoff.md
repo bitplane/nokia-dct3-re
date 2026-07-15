@@ -7,7 +7,7 @@ are not alternate boot recipes.
 
 ## Current result
 
-The coherent frontier profile completes contact service and ordinary non-CPHS
+The coherent frontier profile completes the external service session and ordinary non-CPHS
 SIM initialization. Task 1 advances to startup mode `0x0004`, while a
 provisioned EEPROM identity removes the phone-lock prompt and permits an
 idle-like frame with the `Menu` softkey to be painted.
@@ -166,7 +166,7 @@ queue primitive, or hardware acknowledgement.
 
 `0x2b4628` feeds the local input handlers at `0x2979d8` and `0x2a27de`, then
 mirrors the one-byte key through resource `0x6e02`. The mirror uses the optional
-class-availability map installed by contact-service command `0x70`; local editor
+class-availability map installed by class-`0x40` service command `0x70`; local editor
 input works without it. The Up result proves the local input/event path can
 produce `0x0367`; enabling class `0x6e` is unrelated.
 

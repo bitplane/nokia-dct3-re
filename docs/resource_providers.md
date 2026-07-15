@@ -18,11 +18,11 @@ The ROM definition table at `0x2e0a50` describes the statically backed classes
 `{80,40,20,10,08,04,02,01}`, not the byte-paired order visible in a raw swap16
 dump.
 
-## Contact-service configuration
+## Service-channel configuration
 
 The sole writer of the service availability flag and class bitmap is
-`service_channel_config_2b140a`. Enable is reached by receiving contact-service
-command `0x70` with a checksum-valid 0x40-byte map; `0x71` disables it.
+`service_channel_config_2b140a`. Enable is reached by receiving class-`0x40`
+service command `0x70` with a checksum-valid 0x40-byte map; `0x71` disables it.
 
 The `0x6a00..0x6a0d` resources are an optional external mirror of a subset of
 task-1 startup reports, not an internal content provider. Their compact wrapper
@@ -65,7 +65,7 @@ requests a handle and fails availability. Until that observation exists:
 ## Service/test display lifecycle
 
 The firmware contains a display lifecycle whose producers belong to local/test
-transactions rather than ordinary startup or the contact-service class bitmap:
+transactions rather than ordinary startup or the external-service class bitmap:
 
 ```text
 display status 0x0280 / 0x0281 / 0x0282
@@ -104,7 +104,7 @@ classifies this display route as later service/test behavior rather than the
 ordinary-startup frontier.
 
 The transaction engine around `0x264504` and `0x264c98` owns statuses
-`0x0280`-`0x0283`. Contact-service commands `0x81` and `0x82`, plus independent
+`0x0280`-`0x0283`. Class-`0x40` service commands `0x81` and `0x82`, plus independent
 ASCII local/test command frontends around `0x27c270`, reach these functions.
 There are no catalogue entries or literal producers establishing an ordinary
 boot source. A coherent trace of controller transform `0x253e20` also produces

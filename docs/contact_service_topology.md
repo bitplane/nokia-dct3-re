@@ -1,10 +1,18 @@
-# Contact-service command topology
+# Class-`0x40` service-command topology
 
-This document is the authoritative 3210 v6.00 map for contact-service class
+This document is the authoritative 3210 v6.00 map for service class
 `0x40` commands `0x64`, `0x65`, `0x70`, `0x71`, `0x74`, and `0x8e`. It distinguishes an
 incoming command consumer from an MCU constructor carrying the same command id.
 That distinction matters because several constructors are acknowledgements and
 therefore do not identify the initiating producer.
+
+The filename, trace flag, and several recovered-symbol labels retain the
+historical project term `contact_service`. That term originated while the
+visible `CONTACT SERVICE` fault screen was the boot frontier. No evidence shows
+that the screen caption is Nokia's name for this task or protocol. In current
+terminology, task 2 is the class-`0x40` service-command dispatcher and task 7 is
+the external-service transport adapter; the fault screen is a separate observed
+UI result.
 
 The machine-readable evidence is produced by `tools/message_census.py`. The ROM
 scan covers all 98 recovered calls to `contact_message_alloc_234634`; all five
@@ -38,7 +46,7 @@ The current DSP-ring model sharpens the ordering.  The startup D0 exchange is
 serialized by task 8/task 3 as DSP packet type `0x05`; a type-`0x8e` reply reaches
 task 8 through FIQ0 and task 7 accepts the state-`4` D0 data frame organically.
 That exchange is finite when the model answers only the state-`1` discovery
-request.  It does **not** populate the contact-service header globals: task-2
+request.  It does **not** populate the service-frame header globals: task-2
 initialization clears `0x11fedd..0x11fedf` about 130 ms after the D0 exchange and
 they remain zero through the first `0x64` construction.
 
@@ -69,12 +77,12 @@ The forcing-free contact path now composes in one boot:
 5. The final `0x622a` report is likewise acknowledged at the transport boundary.
    No semantic echo is needed and no firmware state is written by the model.
 
-In the five-second acceptance run this leaves contact status `0x49`, advances
+In the five-second acceptance run this leaves service-session status `0x49`, advances
 startup `0x000d -> 0x0004`, activates SIM control
 `0x32 -> 0x33 -> 0xb3 -> 0xe3`, and begins the normal SIM SELECT/READ/STATUS
 conversation. Later SIM-card corrections now raise SIM enable organically and
 complete the non-CPHS SIM initialization pass before entering the timed
-card-presence monitor; it is no longer a contact-service blocker.
+card-presence monitor; the service session is no longer a boot blocker.
 
 ## Extended-task readiness barrier
 
@@ -88,7 +96,7 @@ The scheduler creates every task, initially dormant. Supervisor
 group contains the checklist writers and is gated at `0x2a9182`: firmware calls
 `service_channel_request_empty 0x2b13d4`, publishes report `0x622a`, and waits
 at `0x29bb06` for `0x11fed1` bit 2 to clear. Firmware seeded that bit during
-contact startup at `0x2347d0`. The coherent peer acknowledges the organic
+service startup at `0x2347d0`. The coherent peer acknowledges the organic
 transaction; firmware clears its own state, resumes the tasks, completes the
 checklist, posts event `0x15`, and advances startup. This replaces the historical
 direct-drain experiment that first isolated the chain.
@@ -102,7 +110,7 @@ posts the final code at `0x285c5e`, and task 1 evaluates `0x2a6942` at
 `t=1.298045`. There is no independently late checklist owner or ADC completion:
 the complete application group is held behind the service-empty transaction.
 
-The current contact peer deliberately waits 36 service ticks before beginning
+The current external-service peer deliberately waits 36 service ticks before beginning
 the external session. That calibrated delay contributes to this ordering and
 remains hardware-fidelity debt, but is not adjusted merely to select a different
 firmware branch. The alternate mode-`0x000d` tail has the same report-code-7
@@ -151,14 +159,14 @@ crossed runs showed that the separate drain changed its start time but was not
 its cause. The deleted responder fired before observing a request and
 writes only `{[3]=0x40,[8]=0x64,[9]=0x05}`, leaving address, route, sequence, and
 length fields zero. It proves the result-5 firmware branch in isolation, but not
-a coherent node-0x18 transaction or stable contact-service completion.
+a coherent node-0x18 transaction or stable service-session completion.
 
 `TRACE_CSCMD` is observational only and is capped so later runs retain this
 ownership and routing evidence without large logs.
 
 ## Separate `0x74` namespaces
 
-Contact-service command `0x74` is not scheduler event `0x74`. The scheduler event
+Class-`0x40` service command `0x74` is not scheduler event `0x74`. The scheduler event
 has direct organic MCU producers at `0x213fcc` and `0x214836`; those sites call
 the event transport and never construct a class-`0x40` contact frame. A command
 census must not use those sites as evidence for the command producer.

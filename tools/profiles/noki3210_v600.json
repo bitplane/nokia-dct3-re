@@ -50,10 +50,10 @@
     {"id": "lower_radio_result_dispatch", "kind": "firmware_dispatch", "rom_addresses": {"noki3210_v600": "0x245a84"}},
     {"id": "lower_radio_context_handler", "kind": "firmware_dispatch", "rom_addresses": {"noki3210_v600": "0x253610"}},
     {"id": "task10_status_dispatch", "kind": "firmware_dispatch", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b468"}},
-    {"id": "task10_radio_update_dispatch", "kind": "rtos_consumer", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b790"}},
+    {"id": "task10_controller_update_dispatch", "kind": "rtos_consumer", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b790"}},
     {"id": "task10_completion_dispatch", "kind": "rtos_consumer", "task": 10, "rom_addresses": {"noki3210_v600": "0x21b9b4"}},
-    {"id": "task17_radio_init", "kind": "rtos_consumer", "task": 17, "rom_addresses": {"noki3210_v600": "0x223964"}},
-    {"id": "task5_session_dispatch", "kind": "rtos_consumer", "task": 5, "rom_addresses": {"noki3210_v600": "0x255124"}},
+    {"id": "task17_registration_control", "kind": "rtos_consumer", "task": 17, "rom_addresses": {"noki3210_v600": "0x223964"}},
+    {"id": "task5_context_dispatch", "kind": "rtos_consumer", "task": 5, "rom_addresses": {"noki3210_v600": "0x255124"}},
     {"id": "task14_session_request", "kind": "rtos_consumer", "task": 14, "rom_addresses": {"noki3210_v600": "0x238a24"}},
     {"id": "sim_task", "kind": "rtos_task", "task": 21, "rom_addresses": {"noki3210_v600": "0x27defc"}},
     {"id": "task20_sim_router", "kind": "rtos_consumer", "task": 20, "rom_addresses": {"noki3210_v600": "0x2085ce"}},
@@ -86,7 +86,7 @@
     {"address": "0x28d29c", "name": "generic_service_provider_dispatch", "task": 5, "statuses": ["0x05ea"], "provenance": "reviewed_static"},
     {"address": "0x209978", "name": "task15_object_parser", "task": 15, "statuses": ["0x07dd"], "provenance": "reviewed_static"},
     {"address": "0x267258", "name": "task14_object_decoder", "task": 14, "statuses": ["0x09d8", "0x09de"], "provenance": "reviewed_static"},
-    {"address": "0x21b790", "name": "task10_radio_update_dispatch", "task": 10, "statuses": ["0x1392", "0x1396"], "provenance": "reviewed_static"},
+    {"address": "0x21b790", "name": "task10_controller_update_dispatch", "task": 10, "statuses": ["0x1392", "0x1396"], "provenance": "reviewed_static"},
     {"address": "0x21b9b4", "name": "task10_completion_dispatch", "task": 10, "statuses": ["0x1391"], "provenance": "reviewed_static"}
   ],
   "contact_service_commands": [
@@ -186,7 +186,7 @@
     {
       "id": "task10_1391_completion_0434",
       "from": "task10_completion_dispatch",
-      "to": "task17_radio_init",
+      "to": "task17_registration_control",
       "input_status": "0x1391",
       "output_status": "0x0434",
       "classification": "dormant",
@@ -272,7 +272,7 @@
     {
       "id": "lower_result_0fc2_to_task10_1392_update",
       "from": "lower_radio_result_dispatch",
-      "to": "task10_radio_update_dispatch",
+      "to": "task10_controller_update_dispatch",
       "input_status": "0x0fc2",
       "output_status": "0x1392",
       "classification": "dormant",
@@ -286,7 +286,7 @@
     {
       "id": "corrected_task10_1392_dispatch",
       "from": "task10_status_dispatch",
-      "to": "task10_radio_update_dispatch",
+      "to": "task10_controller_update_dispatch",
       "input_status": "0x1392",
       "output_status": "dispatch 0x21b790",
       "classification": "disproven_alternative",
@@ -300,8 +300,8 @@
     },
     {
       "id": "task17_completion_to_task5_13e2",
-      "from": "task17_radio_init",
-      "to": "task5_session_dispatch",
+      "from": "task17_registration_control",
+      "to": "task5_context_dispatch",
       "input_status": "0x0434",
       "output_status": "0x13e2",
       "classification": "dormant",
@@ -313,7 +313,7 @@
     },
     {
       "id": "task5_13e2_to_task14_1776",
-      "from": "task5_session_dispatch",
+      "from": "task5_context_dispatch",
       "to": "task14_session_request",
       "input_status": "0x13e2",
       "output_status": "0x1776",

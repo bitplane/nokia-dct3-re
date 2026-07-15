@@ -8,10 +8,10 @@ that the driver is ready for upstream submission.
 
 - `make verify` protects the default CONTACT SERVICE frame and structural
   summary.
-- `make verify-frontier` protects the request-driven contact peer plus ordinary
+- `make verify-frontier` protects the request-driven external-service peer plus ordinary
   SIMI/FIQ6 card path. It ends in task-1 mode `0x0004`, flags `0x0f`, contact
   status `0x49`, no-SIM clear, and SIM enable set.
-- `run-manifest-contact` records the contact-service command directions.
+- `run-manifest-contact` records the class-`0x40` service command directions.
 - `run-manifest-deep-gsm` records the coherent generic-service/SIM frontier.
 - `smoke-3330e` is the first cross-ROM portability probe.
 
@@ -53,7 +53,7 @@ not missing ordinary-boot transitions.
   runtime-pattern scope are machine validated by `make evidence-check`.
 - The message census includes reviewed producers/consumers, descriptor-derived
   edges, positive fixtures, and negative fixtures for known decode traps.
-- Contact-service, SIM, DSP-ring, and task-mailbox conclusions have named
+- Class-`0x40` service, SIM, DSP-ring, and task-mailbox conclusions have named
   runtime manifests.
 - The 3330 remains a smoke input rather than a second supported semantic
   topology.
@@ -69,7 +69,7 @@ not missing ordinary-boot transitions.
 | SIM | `nokia_sim_card_device` owns stateful SIMI/FIQ6 transport and requested GSM 11.11 files. | Extend only for organically requested commands; validate FIFO flags. |
 | CCONT | `nokia_ccont_device` owns serial registers, raw ADC selectors, RTC, watchdog, power and IRQ output; v6.00/v5.01 share the transaction and IRQ contract. | Obtain board-level selector names, analog units, conversion timing and watchdog clock from hardware evidence. |
 | EEPROM | Native MAME `I2C_24C128` plus generated profile. | Decode remaining security/product fields and parallel alias behavior. |
-| DSP/contact | `nokia_dsp_peer_device` owns shared RAM, ring state, service timing, and the request-driven contact peer. | Stabilize and extend the wider mailbox contract from observed requests; validate it on a sibling ROM family. |
+| DSP/external-service | `nokia_dsp_peer_device` owns shared RAM, ring state, service timing, and the request-driven external-service peer. | Stabilize and extend the wider mailbox contract from observed requests; validate it on a sibling ROM family. |
 | MAD2 | Phone-owned timers, interrupt aggregation, GENSIO, SIMI window and DSP control registers. | Improve reset/decode fidelity before extracting shared blocks. |
 | Display | Native PCD8544 plus firmware-selected display-type read shortcut. | Recover the real product-data source and remove the shortcut. |
 
@@ -91,7 +91,7 @@ The retained trace switches are scoped as follows:
 | `TRACE_HANDOFF` | task-1 modes/posts plus IRQ0 and keypad scan/decode seams |
 | `TRACE_DISPLAY` | active MMI context, resource/render entry points, and LCD/DSP transfer boundaries |
 | `TRACE_TASKS` | generic task liveness and mailbox edges |
-| `TRACE_CSCMD` | contact-service command direction and state |
+| `TRACE_CSCMD` | class-`0x40` service command direction and state |
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
 | `TRACE_GSM_SERVICE` | manifest-backed generic-service registrations/callbacks |
 | `TRACE_DSP_BOUNDARY` | shared-ring requests and request-derived peer responses |
@@ -111,7 +111,7 @@ beside their hardware handlers.
 - Dynamic generic-service descriptors are mapped far enough to exclude the
   previously suspected registration paths, but the wider steady-state service
   topology remains incomplete.
-- The DSP/contact peer contract is proved only for the requests exercised by
+- The DSP/external-service peer contract is proved only for the requests exercised by
   the current boot.
 - The ordinary unattended UI/idle-window entrance is not yet identified. The
   accepted security transaction, periodic UI timers, and conditional

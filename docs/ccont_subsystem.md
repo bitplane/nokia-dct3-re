@@ -181,7 +181,7 @@ easy:
 - Events `0x14` and `0x17` use direct scheduler paths; `0x15` and `0x16` use
   delayed scheduling. Under the corrected reset contract all four arrive.
 - CCONT startup-event delivery is not controlled by service-channel
-  provisioning flags. Contact-service provisioning and the CCONT sweep are
+  provisioning flags. Service-channel provisioning and the CCONT sweep are
   separate subsystems.
 - Rewriting message classes, forcing service enable flags, suppressing the
   `0xd5` repost, and injecting a presumed task-285 reply did not address the

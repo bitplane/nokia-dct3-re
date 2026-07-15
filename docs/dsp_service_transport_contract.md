@@ -14,12 +14,12 @@ events do not imply a shared transport.
 | DSP-to-MCU packet ring | DSP writes packets and advances producer `0x1c8` | MCU task 4 | FIQ 0, then `0x290904`; MCU advances consumer `0x1ca` | Delivery mechanism validated with probes; active reply format unknown. |
 | L1 mailbox | MCU L1 send stubs write DSPIF and ring the doorbell | DSP/task 22 | Task-22 class/primitive decoder `0x23d62c` | Decoder mapped; no normal downlink traffic in the coherent boot. |
 | Generic-service framework | Firmware registrations and queued objects | Firmware service framework | Task-5 dispatcher `0x2af652 -> 0x2638e4` | Runs organically; it is downstream of hardware ingress. |
-| Contact-service transport | Task 2 through task 7 | External service/test peer | Class-`0x40` framed responses | Separate protocol; not a DSP-radio completion path. |
+| External-service transport | Task 2 through task 7 | External service/test peer | Class-`0x40` framed responses | Separate protocol; not a DSP-radio completion path. |
 
 DSPIF command 4 is the hardware doorbell for several DSP-owned activities, but
 it is not the only observed work boundary. Contact-ring delivery and
 shared-control completion now have independent device timers. After that split,
-a doorbell-only run still left contact status `0x0089`, task 1 in mode `0x000d`,
+a doorbell-only run still left service-session status `0x0089`, task 1 in mode `0x000d`,
 and SIM disabled: not every contact-ring producer commit is paired with command
 4. The validated ring-producer and service-pending transitions remain the
 behavioral scheduling edges; DSPIF is retained and observed but is not yet a
@@ -128,7 +128,7 @@ absence proof.
   evidence.
 - Do not use IRQ 4 for packet-ring receive delivery; the validated inbound ring
   notification is FIQ 0.
-- Do not conflate task-22 class 5, generic service 5, contact-service command
+- Do not conflate task-22 class 5, generic service 5, class-`0x40` service command
   numbers, and DSP packet type 5.
 - Do not make packet consumption timing responsible for semantic completion.
 

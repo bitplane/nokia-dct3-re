@@ -106,7 +106,7 @@ event.
 
 A complete input milestone requires all of the following in one coherent run:
 
-- contact status remains healthy;
+- service-session status remains healthy;
 - SIM initialization remains organic;
 - IRQ0 enters `0x2b3084` on physical press and release;
 - the firmware matrix scan executes through the `0x41/0x42/0x43` sequence;

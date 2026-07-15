@@ -14,6 +14,7 @@ Documentation is organized by authority rather than investigation date.
 | `cross_rom_confidence.md` | 3210/3330 portability evidence and ROM-input status. |
 | `structural_regression.md` | Default mid-boot oracle and current deep-profile result. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
+| `rtos_tasks.md` | Authoritative ROM-specific task identities, neutral aliases, and naming cautions. |
 | `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
 
 ## Current boot boundary
@@ -24,7 +25,7 @@ Documentation is organized by authority rather than investigation date.
 | `interactive_handoff.md` | Task-1, security-editor, conditional power lifecycle, and current MMI settlement boundary. |
 | `mmi_layer.md` | Keypad IRQ, mailbox, matrix-scan and decoded-key acceptance path. |
 | `resource_providers.md` | Resource-provider ownership and excluded conditional startup paths. |
-| `contact_service_topology.md` | Contact command producers, acknowledgements, and lower-service boundary. |
+| `contact_service_topology.md` | Class-`0x40` service-command producers, acknowledgements, and lower-service boundary. |
 | `service_bootstrap.md` | Current contact-startup prerequisites and acceptance contract. |
 | `service_firmware_map.md` | Concise lower-service/contact firmware address map. |
 | `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |

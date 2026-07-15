@@ -45,7 +45,7 @@ The generated summary records:
 - CCONT byte/read counts and command-byte set;
 - EEPROM START conditions and GenIO signal-write count;
 - startup modes observed; and
-- final task, startup, contact-service and SIM gate values.
+- final task, startup, service-session and SIM gate values.
 
 The committed oracle intentionally selects terminal state and lifecycle
 predicates from that larger summary. Raw counters, timestamps, scheduler order,
@@ -62,15 +62,15 @@ externally terminated research run.
 
 The exact latest nonblank LCD frame retains SHA-256 prefix
 `d8a9a7a58e587be8`. Its semantic subset requires the expected reset count,
-GENSIO controls, startup modes, running task, mode/flags, contact status, and
+GENSIO controls, startup modes, running task, mode/flags, service-session status, and
 SIM gates. LCD, IRQ, CCONT, and EEPROM counts remain in the generated summary
 for diagnosis without making timing-dependent totals part of acceptance.
 
 ## Coherent frontier profile
 
-`make verify-frontier` enables the request-driven DSP/contact peer and the
+`make verify-frontier` enables the request-driven DSP/external-service peer and the
 ordinary SIMI/FIQ6 card device. Its structural oracle records startup mode
-`0x0004`, flags `0x0f`, contact status `0x0049`, no-SIM clear, and SIM enable
+`0x0004`, flags `0x0f`, service-session status `0x0049`, no-SIM clear, and SIM enable
 set. This semantic state is the forcing-free frontier oracle.
 
 Non-oracle research evidence includes a Security-code frame with SHA-256 prefix
@@ -97,7 +97,7 @@ The useful invariants are the task-1 and SIM results. The run organically observ
 `0x0001`, `0x000d`, and `0x0004`, then remains in mode `0x0004` with readiness
 flags `0x0f`. At its relocated state block it also clears
 no-SIM and sets SIM ENABLE organically. This independently reproduces the v6.00
-task-1 terminal mode and validates the shared SIM device contract. Contact status remains
+task-1 terminal mode and validates the shared SIM device contract. Service-session status remains
 `0x00c9` and the LCD remains blank, so the oracle records those narrower v5.01
 terminal semantics without claiming presentation parity.
 

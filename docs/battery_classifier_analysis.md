@@ -245,7 +245,7 @@ event `0x44`.
 
 The fixture therefore falsifies the remaining constant-input escape hatch. A
 backward census then closes the apparent event-`0x43` boundary: `0x2a6880` is
-called only by payload selector 3 of incoming contact-service command `0x8e`.
+called only by payload selector 3 of incoming class-`0x40` service command `0x8e`.
 Task 2 dispatches that command to `0x235848`; the handler's sole MCU construction
 is a one-byte `0x8e` acknowledgement at `0x2358a0`, after the service action has
 already run. The ordinary firmware therefore does not initiate this transition.

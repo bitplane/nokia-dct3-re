@@ -82,17 +82,17 @@ map, result-5 healthy completion, and correlated transport acknowledgements.
 | `0x2b0482` | lower service queue entry |
 | `0x2b140a` | service channel-open writer |
 
-## DSP contact completion
+## DSP service-session completion
 
 Contact initialization posts task-3 object `0x2db250`, serialized as DSP TX
 type `0x70`, payload `0d 00`. RX type `0x74`, payload `0d 00`, reaches decoder
 `0x29bc00`, which builds the class-`0x74` task-2 message consumed at `0x234954`.
 Command `0x0d` clears contact busy bit 2 at `0x2349dc` while retaining present
-bit 6. This is distinct from contact-service command `0x74`.
+bit 6. This is distinct from class-`0x40` service command `0x74`.
 
 ## Extended-task resume
 
-After contact completion, supervisor `0x2a8ff2` requests channel-empty report
+After service-session completion, supervisor `0x2a8ff2` requests channel-empty report
 `0x622a` through `0x2b13d4` and waits at `0x29bb06` for the transaction to
 complete. Its second resume group activates the application tasks that fill the
 checklist at `0x112280`. Checklist completion posts event `0x15`; startup mode
@@ -120,7 +120,7 @@ ordinary device inputs, not service messages.
 The coherent profile must demonstrate, in one boot:
 
 - DSP pending work drains with IRQ-4 completion;
-- contact status reaches `0x49` without a firmware write;
+- service-session status reaches `0x49` without a firmware write;
 - class-`0x40` header learning and channel-map traffic pass through task 7;
 - the final `0x622a` transaction completes;
 - startup advances `0x000d -> 0x0004`; and

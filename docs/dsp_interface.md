@@ -9,11 +9,11 @@ removed.
 **TL;DR for emulation:** at boot the MCU treats the DSP interface as (a) a RAM
 self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
 download target for coefficient/program blobs, and (d) bidirectional lower-service
-message rings. The request-driven contact peer now answers the organic D0 discovery
+message rings. The request-driven external-service peer now answers the organic D0 discovery
 and type-`0x70` contact request through FIQ 0, proving that MCU-to-DSP requests and
 DSP-to-MCU replies compose in the normal scheduler. The later lower-radio
 command/reply vocabulary remains incomplete, but it is no longer the immediate
-boot frontier: ordinary SIM initialization now runs after contact startup.
+boot frontier: ordinary SIM initialization now runs after service startup.
 
 ## The two hardware windows
 
@@ -29,7 +29,7 @@ but a coherent stateful-SIM run reaches `0x290cf4` with service commands `0x30` 
 `0x32`. That function updates DSP shared control words, writes command 4 to DSPIF at
 `0x29103c`, and rings doorbell byte 2 at `0x20008`. DSPIF is therefore a live boundary,
 not a static-only future path. Those service commands remain useful lower-radio
-evidence; the distinct boot-critical contact completion is now mapped as type
+evidence; the distinct boot-critical service-session completion is now mapped as type
 `0x70` TX / type `0x74` RX.
 
 The widened MAD2 access ledger records 27 DSPIF command writes in the coherent
@@ -39,7 +39,7 @@ MAD2 doorbell write, so DSPIF is now retained by the peer device rather than
 discarded. Contact-ring delivery and shared-control completion now use
 independent timers, so neither activity can overwrite the other's deadline.
 Command 4 is still not the sole HLE scheduling edge: a repeat doorbell-only run
-left contact status `0x0089`, task 1 in mode `0x000d`, and SIM disabled because
+left service-session status `0x0089`, task 1 in mode `0x000d`, and SIM disabled because
 not every contact-ring producer commit is paired with that command. The
 independently validated ring-producer and service-pending triggers therefore
 remain part of the partial peer contract.
