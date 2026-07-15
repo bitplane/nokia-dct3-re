@@ -282,7 +282,7 @@ Reviewed runtime claims:
 - `deep_gsm_task14_dormant` (deep-gsm, reviewed_runtime): Task 14 initialized its controller slots but received no subsequent message; decoder 0x267258 did not execute.
 - `deep_gsm_05e8_publishers_dormant` (deep-gsm, reviewed_runtime): All 13 callback owners containing the 16 direct 0x05e8 publishers received the global 0x05e2 sweep once; none generated 0x05e8.
 - `deep_gsm_callback24_lifecycle_dormant` (deep-gsm, reviewed_runtime): Callback 0x24 receives only the global 0x05e2 sweep with framework mode 0. Its mode-9 callback-0x21 constructor and mode-11 0x0388 publishers do not execute; callback 0x21 and 0x26 therefore cannot reach their 0x05e8 fallback branches in the coherent boot.
-- `deep_gsm_sim_registration_notification_dormant` (deep-gsm, reviewed_runtime): Ordinary task-21 SIM traffic executes, while the EF_PHASE=2 card correctly produces no TERMINAL PROFILE, 0x120c, FETCH A0/12, or proactive D0 command. A phase-3 isolation card cannot reach the downstream profile-download function before the registration wall.
+- `deep_gsm_sim_registration_notification_dormant` (deep-gsm, reviewed_runtime): Ordinary task-21 SIM traffic executes, while the EF_PHASE=2 card correctly produces no TERMINAL PROFILE, 0x120c, FETCH A0/12, or proactive D0 command. A phase-3 isolation card still does not reach the later profile-download lifecycle.
 
 Target-chain statuses observed as task messages: `0x05e8`=0, `0x05ea`=0, `0x07dd`=0, `0x09d8`=0, `0x0434`=0.
 

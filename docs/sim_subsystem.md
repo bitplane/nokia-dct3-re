@@ -148,7 +148,7 @@ Callback 7 currently receives only the global `0x05e2` sweep, not constructor
 11.14 SIM Toolkit: TERMINAL PROFILE arms latch `0x10dcb7`, `91xx` advertises a
 proactive command, and `A0/12` FETCH retrieves it. The current EF_PHASE=2 card
 correctly leaves this path dormant, and firmware's profile-download function is
-downstream of the current registration wall even with a phase-3 isolation card.
+part of a later session lifecycle even with a phase-3 isolation card.
 This route is therefore excluded as the ordinary registration predecessor.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`

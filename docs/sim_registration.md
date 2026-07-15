@@ -381,7 +381,7 @@ ROM contains loads of `0x05e2`, `0x05e7`, and `0x05ea`, but no instruction loads
 descriptors as a callback/event field. For example callback-table index `0x24`
 (`0x28b844`) handles the global `0x05e8` transition and only then registers a
 resident descriptor through `0x28ba9a -> 0x263d30`; that call is absent from the
-coherent boot and is downstream, not the missing producer. Future census tooling
+coherent boot and is downstream, not an initiating producer. Future census tooling
 must therefore recover descriptor fields and indirect event generation in addition
 to direct `0x2af798` call sites.
 
@@ -462,8 +462,8 @@ through the ordinary task-21/SIMI transport.
 The emulated card reports EF_PHASE `0x02`, correctly declaring a Phase-2 card
 without profile download. Firmware gate `0x203906` calls TERMINAL PROFILE only
 for parsed phase >= 3. An isolation run made EF_PHASE return 3, but the current
-boot never reached function `0x2038ec`: profile download is downstream of the
-registration wall. Therefore no hardware or scheduling correction is missing
+boot never reached function `0x2038ec`: profile download belongs to a later
+session lifecycle. Therefore no hardware or scheduling correction is missing
 at this latch, and manufacturing `91xx`, `0x120c`, or a D0 object would bypass
 the firmware lifecycle rather than repair it.
 
@@ -588,13 +588,12 @@ task 15 itself after its `0x07dd` object parser succeeds and returns internal re
 earlier generic-service object remains unresolved. The prior task-8 `0x8d`/`0x8e`
 hypothesis is not linked to this path and is not a valid peer model yet.
 
-## Current boundary and next acceptance point
+## Mapped downstream session lifecycle
 
-The card-side preliminary transaction is functional. The `0x120c` latch is not
-the immediate boundary: it belongs to downstream SIM Toolkit operation and is
-correctly dormant for the current Phase-2 card. The ordinary-registration
-frontier therefore returns to the mapped lower-radio/session paths which can
-construct callback lifecycle `0x05dc` without SAT.
+The card-side preliminary transaction is functional. The `0x120c` latch belongs
+to downstream SIM Toolkit operation and is correctly dormant for the current
+Phase-2 card. The following lower-radio/session paths are retained for later
+network work; they are not the current offline boot boundary.
 
 An eight-second coherent deep boot proves ordinary task-21 requests work. Its
 lack of `0x10dcb7`/`0x120c` activity is expected and must not be treated as a
@@ -648,8 +647,7 @@ commits the descriptor's six-bit new state. The descriptors recovered for callba
 `0x5d` contain transitions from states `1`, `2`, `3`, `4`, or `0x0b`. The
 runtime control reaches state `0x0b`, while the later context producer still
 requires state 1 or 2. Callback 7 is therefore a
-configuration or later-session cycle, not the ordinary-registration bootstrap
-frontier.
+configuration or later-session cycle, not an ordinary-registration prerequisite.
 
 The external callers are now connected to one concrete context-initialization cycle. A task-14
 `0x09d8` object with opcode byte `0x3a` selects decoder branch `0x267414`, which parses field
@@ -661,7 +659,7 @@ handshake which can ultimately call `0x24d8e8`, emit `0x09cd`, and construct cal
 This route is **not** the first bootstrap producer. The only proved `0x09d8` constructor is
 task-15 translator `0x208ee0`, reached after the absent `0x05e8 -> 0x05ea -> 0x07dd` service
 object has already parsed successfully. The opcode-`0x3a` route is therefore a valid later
-session cycle but circular as a correction for the initial `0x05e8` wall. Status `0x09de`
+session cycle but circular as a producer for the initial `0x05e8` transition. Status `0x09de`
 is another output of the same task-15 translator: input `0x0a0c` reaches `0x209116`, where
 task-15 mode `0x1f` selects `0x09de` (modes `0x20` and `0x21` select `0x09eb` and `0x09ca`).
 No immediate, PC-relative ROM literal, or statically recovered call argument supplies

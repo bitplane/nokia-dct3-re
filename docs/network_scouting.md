@@ -1,10 +1,9 @@
 # Network and registration boundary
 
-This document records the current conclusion for reaching the classic operator
-idle screen. Earlier scouting based on the former `MODEL_SIM_CARD` comparison
-harness and the removed `MODEL_RES_ENABLE` and `TRACE_DSPDRV` probes is
-superseded by the organic SIM and lower-radio work in `sim_subsystem.md`,
-`sim_registration.md`, and `dsp_interface.md`.
+This document records the later lower-radio contract needed for network
+registration, operator identity, and signal content. Offline MMI settlement is
+the immediate boot boundary; this map becomes active after that lifecycle is
+stable.
 
 ## Current division of responsibility
 
@@ -19,12 +18,10 @@ superseded by the organic SIM and lower-radio work in `sim_subsystem.md`,
 - **Idle presentation:** task-5/MMI child events render operator, signal and
   status content after the corresponding live subsystems publish it.
 
-## Mapped later radio frontier
+## Mapped later radio lifecycle
 
-This is not the immediate SIM-init blocker. It is the strongest mapped later
-generic-service/lower-radio lifecycle, retained for the point where ordinary SIM
-acceptance completes. The current firmware does not receive the owned object
-which would complete this chain:
+Ordinary SIM acceptance already completes. The current firmware does not yet
+receive the owned object which would complete this downstream chain:
 
 ```text
 service-5 status 0x05e8
@@ -39,7 +36,7 @@ separate unresolved completion:
 ```
 
 The static portions are normalized in `tools/profiles/noki3210_v600.json` and
-checked by `message_census.py`. The missing predecessor is now the organic path
+checked by `message_census.py`. The unobserved predecessor is the organic path
 to one of the recovered `0x05e8` publishers plus entry `0x28`'s downstream
 readiness state; reviewed runtime does not execute that transition.
 

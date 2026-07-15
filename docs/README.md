@@ -16,20 +16,26 @@ Documentation is organized by authority rather than investigation date.
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
 | `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
 
-## Current boot frontier
+## Current boot boundary
 
 | Document | Purpose |
 | --- | --- |
 | `sim_subsystem.md` | Concise SIM ownership and interface summary. |
-| `interactive_handoff.md` | Task-1, report-7, security-editor, and conditional UI lifecycle contract. |
+| `interactive_handoff.md` | Task-1, security-editor, conditional power lifecycle, and current MMI settlement boundary. |
 | `mmi_layer.md` | Keypad IRQ, mailbox, matrix-scan and decoded-key acceptance path. |
 | `resource_providers.md` | Resource-provider ownership and excluded conditional startup paths. |
-| `network_scouting.md` | Boundary between pre-idle startup and GSM/DSP work. |
-| `dsp_service_transport_contract.md` | Ownership and acceptance contract for the active DSP/generic-service frontier. |
 | `contact_service_topology.md` | Contact command producers, acknowledgements, and lower-service boundary. |
 | `service_bootstrap.md` | Current contact-startup prerequisites and acceptance contract. |
 | `service_firmware_map.md` | Concise lower-service/contact firmware address map. |
 | `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |
+
+## Mapped downstream work
+
+| Document | Purpose |
+| --- | --- |
+| `network_scouting.md` | Later GSM registration and operator-content lifecycle. |
+| `dsp_interface.md` | Detailed MCU/DSP transport and later lower-radio maps. |
+| `dsp_service_transport_contract.md` | DSP/generic-service ownership and acceptance contract. |
 
 ## Deep reverse-engineering references
 

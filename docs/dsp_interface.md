@@ -248,7 +248,7 @@ not evidence for a D0 response or a SIM-registration fix. It remains separate fr
 the established deep profile because enabling it preserves the final LCD hash but
 changes the structural oracle's repeated-work counters.
 
-### Organic radio-init queue frontier
+### Organic radio-init queue lifecycle
 
 The radio-initialization chain reaches this ring without an isolated producer probe.
 Task 17 sends `0x09ec`; task 15 case 6 sends `0x07d6`; task 16 sends `0x03e9` to
@@ -341,7 +341,7 @@ false lead. Task 17's initializer enters its long-lived event loop at
 only after that loop returns. It is therefore downstream of the awaited
 `0x0434`, not its missing predecessor. DSP packet type `0x89` can also produce
 `0x138f`, but only while task 4's initialization flag `[0x112501]` is zero. A
-real FIQ-0 type-`0x89` probe at the current frontier was rejected after that flag
+real FIQ-0 type-`0x89` probe in the coherent profile was rejected after that flag
 became one, so the probe was removed.
 
 The relevant task-10 completion is status `0x1391`. The dispatcher jump table
@@ -387,21 +387,20 @@ The wider **bidirectional L1 protocol** — MCU sends "search/sync/measure/attac
 cell/RSSI/registration — lives largely in the `0x2b7xxx–0x2c9xxx` driver and is not yet
 observed carrying task-22 messages. The narrower shared-control path at `0x290cf4` is live,
 however, so DSP work is no longer wholly static: its `0x30`/`0x32` request and IRQ-4 completion
-contract can be traced at the current boot frontier.
+contract can be traced in the current coherent profile.
 
-## Emulation feasibility & the dependency re-ordering
+## Later network-emulation dependencies
 
 - **To reach where we are:** the current echo, ready flags, queue drain, and IRQ model are
   sufficient, but they are not a completed DSP contract.
-- **The lower-radio session start is the proven bounded frontier.** Organic initialization
+- **The lower-radio session start is a bounded downstream lifecycle.** Organic initialization
   creates task 14 and its eight controller slots, but no task-14 input starts a resource-`0x35`
   operation. The concurrent type-`0x1a` DSP state block is not evidence of such an operation;
   the falsified type-`0x80`/`0x70` reply must not be restored.
 - **For the network (operator name + signal):** extend the message-boundary DSP peer (answer the L1
   commands with "camped on a fake cell, operator X, RSSI y") is feasible *in principle* and
-  is the right MAME approach — but it is **doubly blocked**: (1) the L1 protocol is
-  static-only until coherent boot reaches it, so we can't observe the exact handshake to
-  stub it; (2) it is behind the same MMI/coherent-boot wall. Signal RSSI itself is separately
+  is the right MAME approach, but the L1 protocol is static-only until coherent
+  execution reaches it and offline MMI settlement currently has priority. Signal RSSI is separately
   injectable (CCONT ADC ch1, `network_scouting.md`).
 - **Full DSP-core emulation** (a TI Lead core running the downloaded blobs) is a much larger
   project and would still need a faked air interface; not warranted given the above ordering.
@@ -418,8 +417,8 @@ producer is `0x2b3f60`, called by task 17 at `0x225b8c` after the phase handler 
 `0x0434`/`0x0a22` (and at `0x223a28` after the phase loop returns). It publishes packed
 `0x53e2` with one firmware-owned pointer; the consumer path
 `0x255124 -> 0x28a4a8 -> 0x238a24` then constructs `0x1776` for decimal task 14
-(ID `0x0e`). The runtime never reaches it because `0x0434` is still absent. The leading
-frontier therefore remains the missing organic producer of lower result
+(ID `0x0e`). The runtime never reaches it because `0x0434` is still absent. The
+unresolved downstream predecessor is the organic producer of lower result
 `0x0fc1`, which selects completion status `0x1391`. The `0x0fbf` context path
 and `0x0fc2 -> 0x1392` radio-state path are separate and do not reach `0x0434`;
 only after the `0x0fc1` contract is pinned should the proven bidirectional

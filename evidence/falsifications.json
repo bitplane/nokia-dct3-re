@@ -101,7 +101,7 @@
     {
       "id": "sat_fetch_is_registration_predecessor", "status": "disproven",
       "hypothesis": "The task-21 0x120c -> A0/12 -> D0 path is the missing ordinary SIM-registration predecessor",
-      "conclusion": "A0/12 and D0 are the GSM 11.14 FETCH/proactive-command protocol. Firmware arms it only after TERMINAL PROFILE for phase >=3, and the profile-download function is itself downstream of the current registration wall",
+      "conclusion": "A0/12 and D0 are the GSM 11.14 FETCH/proactive-command protocol. Firmware arms it only after TERMINAL PROFILE for phase >=3, and the profile-download function belongs to a later session lifecycle",
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
@@ -173,7 +173,7 @@
     {
       "id": "contact_selftest_verdict_is_missing_code7_boundary", "status": "disproven",
       "hypothesis": "The contact/DSP self-test verdict remains incomplete and suppresses the ordinary code-7 publication",
-      "conclusion": "Firmware organically constructs contact flags 0xc8. The modeled request-derived RX class-0x74 payload 0d00 reaches 0x2349c8 and clears pending bit 2, after which task 5 consumes ready bit 7 at 0x29bc8c and leaves steady flags 0x49. The self-test completion and ready-bit lifecycle therefore execute before the code-7 wall; the associated immediate event 0x1a is a kernel completion, not a task-1 report.",
+      "conclusion": "Firmware organically constructs contact flags 0xc8. The modeled request-derived RX class-0x74 payload 0d00 reaches 0x2349c8 and clears pending bit 2, after which task 5 consumes ready bit 7 at 0x29bc8c and leaves steady flags 0x49. The self-test completion and ready-bit lifecycle therefore complete normally; the associated immediate event 0x1a is a kernel completion, not a task-1 report.",
       "evidence": ["docs/contact_service_topology.md", "docs/interactive_handoff.md"]
     },
     {

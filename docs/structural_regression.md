@@ -73,13 +73,9 @@ ordinary SIMI/FIQ6 card device. Its structural oracle records startup mode
 `0x0004`, flags `0x0f`, contact status `0x0049`, no-SIM clear, and SIM enable
 set. This semantic state is the forcing-free frontier oracle.
 
-Historical research runs painted a Security-code frame with SHA-256 prefix
-`6471d1a5803619c2`. The cleaned driver does not currently reproduce that frame:
-the retired display-transfer experiment supplied additional presentation
-progress, and the old frame artifacts were incorrectly retained as a supported
-acceptance condition. The hash remains evidence about the later MMI state, not
-part of `make verify-frontier` until the display/DSP transfer contract is
-implemented at a hardware boundary.
+Non-oracle research evidence includes a Security-code frame with SHA-256 prefix
+`6471d1a5803619c2`. It is not part of `make verify-frontier` because the current
+hardware-boundary profile does not reproduce the additional display transfer.
 
 A separately generated provisioned EEPROM profile matched the synthetic phone
 identity and removed that prompt in the same historical display setup. It painted an idle-like `Menu` frame with
@@ -89,12 +85,6 @@ publishes decoded keys while that mode remains selected. A deterministic
 `12345` plus softkey sequence completes the editor through `0x0578`; its
 `0x05e6` callback result is the statically proved accepted-code branch, though
 the interactive sequence is not yet part of the structural oracle.
-
-The former `verify-deep` profile used direct firmware-call and RAM-completion
-bridges. Its Insert-SIM frame was historically useful, but the request-driven
-frontier supersedes it and covers a deeper coherent state. The bridge target and
-its structural oracle have been removed rather than retained as a supported
-compatibility path.
 
 ## Nokia 3210 v5.01 control
 

@@ -57,13 +57,13 @@
     {
       "id": "context_09cd_activation", "owner": "generic_service", "status": "unresolved",
       "predicate": "A firmware-owned context invokes 0x24d8e8 with the active slot selected and callback-state slot 0x5d at 0x11fcdd equal to 1 or 2, producing organic status 0x09cd",
-      "current": "0x11fcdd is populated by the generic catalogue descriptor transition mechanism, not a standalone pending selector. A corrected table census proves that 234 status descriptors reference 950 transition records, not 233. Thirty records select callback 0x5d across descriptor inputs including 0x00c9, 0x09d0..0x09d2, 0x0af0, 0x1391, 0x13ba, and 0x1527..0x1532; the former one-record ownership closure is invalid. Record 92 at 0x2ccad0 remains the mapped 0x151c context transition, but it is only one later lifecycle. Runtime independently closes report code 7 as an organic physical-power/shutdown result rather than the ordinary boot blocker.",
+      "current": "0x11fcdd is populated by the generic catalogue descriptor transition mechanism, not a standalone pending selector. A corrected table census proves that 234 status descriptors reference 950 transition records, not 233. Thirty records select callback 0x5d across descriptor inputs including 0x00c9, 0x09d0..0x09d2, 0x0af0, 0x1391, 0x13ba, and 0x1527..0x1532; the former one-record ownership closure is invalid. Record 92 at 0x2ccad0 remains the mapped 0x151c context transition, but it is only one later lifecycle. Runtime independently identifies report code 7 as an organic physical-power/shutdown result.",
       "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md"]
     },
     {
       "id": "sim_toolkit_proactive_notification", "owner": "sim_task", "status": "satisfied",
       "predicate": "A Phase-2+ SAT card completes TERMINAL PROFILE, advertises a proactive command with 91xx, and task 21 organically posts 0x120c before FETCH A0/12",
-      "current": "The current card advertises EF_PHASE=2, so firmware correctly performs no TERMINAL PROFILE and no 0x120c; a phase-3 isolation profile still cannot reach the downstream profile-download function before the registration wall",
+      "current": "The current card advertises EF_PHASE=2, so firmware correctly performs no TERMINAL PROFILE and no 0x120c; a phase-3 isolation profile still does not reach the later profile-download lifecycle",
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
@@ -93,7 +93,7 @@
     {
       "id": "post_security_ui_window_selection", "owner": "startup_ui", "status": "satisfied",
       "predicate": "Post-security transaction traffic is separated from periodic descriptor/timer traffic without injecting a task-6 window selection",
-      "current": "Accepted 0x0578 makes callback 0x47 return 0x05e6 and leave the active callback sweep. A negative-control run containing only 12345 and its single submission reproduces the later 0x0384, 0x05de/0x05e0, 0x0598, and 0x0578 wave, proving it is the ordinary post-acceptance tail rather than a second-key transaction. Overlapping 0x00c8 is published approximately once per second by task 1 at 0x2a2838 with an incrementing argument. Its descriptor selects context-maintenance outputs 0x1b59, direct 0x01f5, and 0x1b5b; none constructs a class-1 window message. Repeating 0x05a7 is the independent three-slot timer manager at 0x2b3222. The second-softkey/descriptor frontier is closed and no keypad, timer, callback, context state, or hardware acknowledgement should be synthesized.",
+      "current": "Accepted 0x0578 makes callback 0x47 return 0x05e6 and leave the active callback sweep. A negative-control run containing only 12345 and its single submission reproduces the later 0x0384, 0x05de/0x05e0, 0x0598, and 0x0578 wave, proving it is the ordinary post-acceptance tail rather than a second-key transaction. Overlapping 0x00c8 is published approximately once per second by task 1 at 0x2a2838 with an incrementing argument. Its descriptor selects context-maintenance outputs 0x1b59, direct 0x01f5, and 0x1b5b; none constructs a class-1 window message. Repeating 0x05a7 is the independent three-slot timer manager at 0x2b3222. The second-softkey/descriptor question is closed and no keypad, timer, callback, context state, or hardware acknowledgement should be synthesized.",
       "evidence": ["docs/interactive_handoff.md", "docs/mmi_layer.md", "docs/resource_providers.md"]
     }
   ]

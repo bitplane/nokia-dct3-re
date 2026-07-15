@@ -142,30 +142,18 @@ The request-driven peer now completes the startup D0 exchange, the organic type-
 contact completion, and the external task-7 service session in one boot. The generic-service
 `0x05e8` chain remains a mapped later radio/SAT path, not the current ordinary-SIM prerequisite.
 
-## Current frontier
-
-The default oracle remains CONTACT SERVICE, while the coherent opt-in peer profile reaches mode
-`0x0004`, starts SIM control, and performs ordinary SELECT/STATUS/GET RESPONSE/READ traffic through
-the extended initialization pass. SIM enable rises organically, unsupported optional files are
-handled with `94 04`, and task 20 enters its normal timed presence monitor. The later
-idle/resource transition remains incomplete.
-
-The component order is EEPROM, CCONT, then SIM. The Nokia 3330 is the first portability probe used
-to distinguish shared MAD2 behavior from 3210 firmware assumptions.
-
 ## Current boot boundary
 
 The coherent profile exercises CTSI, MBUS, CCONT, LCD, keypad, GenIO/EEPROM,
-SIMI and the modeled DSP/contact boundary. Report code `0x07` is now observed
-organically after a physical power-key action and belongs to the later
-shutdown/power lifecycle; it is not the boot-to-desktop blocker. Keypad scanning
-and the security editor work through their normal firmware paths, and accepted
-`12345` returns `0x05e6` without a missing completion. Callback `0x5d`,
-callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, the service/test display
-statuses, and task-6 selector `0x0732` are all classified conditional paths.
-The remaining boot boundary is the ordinary unattended UI/idle-window entrance,
-not a hardware acknowledgement currently justified for synthesis. See
-`interactive_handoff.md` and `mmi_layer.md`.
+SIMI and the modeled DSP/contact boundary. It completes ordinary SIM file
+traffic, clears no-SIM, sets SIM enable, scans the keypad, and accepts the
+security transaction through normal firmware paths. Conditional power,
+reinitialization, and service/test display routes are classified separately.
+The remaining boot boundary is unattended task-5/MMI context settlement and
+idle-window selection, not a hardware acknowledgement currently justified for
+synthesis. The default CONTACT SERVICE oracle and coherent frontier profile
+remain separate acceptance baselines; the Nokia 3330 remains the first
+portability probe. See `interactive_handoff.md` and `mmi_layer.md`.
 
 ## Knob
 

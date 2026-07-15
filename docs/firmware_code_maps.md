@@ -6,9 +6,9 @@ not in the Ghidra symbol DB) to meanings. Re-add a trace using these if needed.
 
 ## Contact-service response codes (`response` byte)
 
-Historical map from the task-7 contact response dispatch
-(`contact_service_response_dispatch_237400`). The current contact frontier is
-documented in `contact_service_topology.md`.
+Map from the task-7 contact response dispatcher
+(`contact_service_response_dispatch_237400`). The current contract is documented
+in `contact_service_topology.md`.
 
 | code | meaning |
 |------|---------|
