@@ -58,6 +58,11 @@ conclusions. Detailed firmware maps preserve addresses and reproducible
 control-flow conclusions, but chronological probe narratives belong in Git
 history and do not form a separate documentation authority.
 
+`docs/research_cleanup.md` defines the cleanup process used to compile working
+hypotheses and investigation history into this authoritative layer. Apply it
+after a substantial investigation, before changing frontier, or whenever
+terminology begins to imply ownership beyond the evidence.
+
 When a new dig closes:
 
 1. add or update one normalized artifact;

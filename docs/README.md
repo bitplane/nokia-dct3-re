@@ -14,6 +14,7 @@ Documentation is organized by authority rather than investigation date.
 | `cross_rom_confidence.md` | 3210/3330 portability evidence and ROM-input status. |
 | `structural_regression.md` | Default mid-boot oracle and current deep-profile result. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
+| `research_cleanup.md` | Repeatable cleanup protocol for hypotheses, naming residue, diagnostics, and evidence retention. |
 | `rtos_tasks.md` | Authoritative ROM-specific task identities, neutral aliases, and naming cautions. |
 | `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
 
