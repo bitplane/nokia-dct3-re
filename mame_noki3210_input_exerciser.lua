@@ -31,6 +31,9 @@ local taps = noki3210_oracle_taps
 local startup_ready_time = nil
 local post_key_active = nil
 local charger_pulse_at
+local irq_overlap_at
+local irq_mask_fixture_at
+local fiq8_fixture_at
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
@@ -52,6 +55,9 @@ end
 
 charger_pulse_at = env_number("NOKI3210_CCONT_CHARGER_PULSE_AT", -1)
 local charger_pulse_duration = env_number("NOKI3210_CCONT_CHARGER_PULSE_DURATION", 0.05)
+irq_overlap_at = env_number("NOKI3210_MAD2_IRQ_OVERLAP_AT", -1)
+irq_mask_fixture_at = env_number("NOKI3210_MAD2_IRQ_MASK_FIXTURE_AT", -1)
+fiq8_fixture_at = env_number("NOKI3210_MAD2_FIQ8_FIXTURE_AT", -1)
 local state_roundtrip_at = env_number("NOKI3210_STATE_ROUNDTRIP_AT", -1)
 
 local function emulation_seconds()
@@ -350,6 +356,66 @@ if charger_pulse_at >= 0 and charger_field then
 		charger_field:clear_value()
 	end)
 	assert(coroutine.resume(charger_timer))
+end
+
+-- Focused MAD2 conformance fixtures use physical inputs or the mapped MAD2
+-- registers only. They never write firmware RAM or construct RTOS messages.
+if irq_overlap_at >= 0 and charger_field and key_fields.up then
+	local overlap_timer = coroutine.create(function()
+		emu.wait(irq_overlap_at)
+		charger_field:set_value(1)
+		press("up")
+		emu.wait(0.05)
+		release("up")
+		charger_field:clear_value()
+	end)
+	assert(coroutine.resume(overlap_timer))
+end
+
+if irq_mask_fixture_at >= 0 and key_fields.up then
+	local mask_timer = coroutine.create(function()
+		emu.wait(irq_mask_fixture_at)
+		local old_mask = space:read_u8(0x2000b)
+		local old_ctrl = space:read_u8(0x2000c) & 0xdf
+		-- Keep global delivery disabled while creating a masked pending IRQ0.
+		space:write_u8(0x2000c, old_ctrl & 0xfb)
+		space:write_u8(0x2000b, old_mask | 0x01)
+		press("up")
+		-- Hold across a video/input sampling boundary while delivery is gated.
+		emu.wait(0.02)
+		space:write_u8(0x2000b, old_mask & 0xfe)
+		space:write_u8(0x2000c, old_ctrl | 0x04)
+		-- Disable delivery and acknowledge before firmware can consume the key.
+		space:write_u8(0x2000c, old_ctrl & 0xfb)
+		space:write_u8(0x20009, 0x01)
+		release("up")
+		emu.wait(0.02)
+		space:write_u8(0x20009, 0x01)
+		space:write_u8(0x2000b, old_mask)
+		space:write_u8(0x2000c, old_ctrl)
+	end)
+	assert(coroutine.resume(mask_timer))
+end
+
+if fiq8_fixture_at >= 0 then
+	local fiq8_timer = coroutine.create(function()
+		emu.wait(fiq8_fixture_at)
+		local old_ctrl = space:read_u8(0x2000c) & 0xdf
+		local old_fiq8 = space:read_u8(0x20016) & 0x05
+		-- Enable FIQ8 while both its local mask and the global FIQ gate are set.
+		space:write_u8(0x2000c, old_ctrl & 0xfe)
+		space:write_u8(0x20016, 0x05)
+		emu.wait(0.003)
+		space:read_u8(0x20016)
+		space:write_u8(0x20016, 0x01)
+		space:write_u8(0x2000c, old_ctrl | 0x01)
+		-- Remove delivery before acknowledging the extended pending bit.
+		space:write_u8(0x2000c, old_ctrl & 0xfe)
+		space:write_u8(0x20016, 0x07)
+		space:write_u8(0x20016, old_fiq8)
+		space:write_u8(0x2000c, old_ctrl)
+	end)
+	assert(coroutine.resume(fiq8_timer))
 end
 
 if state_roundtrip_at >= 0 then

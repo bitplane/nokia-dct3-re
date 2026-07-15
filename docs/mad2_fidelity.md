@@ -42,7 +42,7 @@ therefore must not be read as peripheral completeness.
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
 | `04..07` sleep timer | software counter and synthetic destination | Placeholder | Establish 32.768 kHz counter width, latch and compare behavior. |
-| `08..0b` FIQ/IRQ status and masks | latched bitfields | Partial | Timer-0 FIQ line 4 and CCONT IRQ6 mask/ack paths have focused regressions; verify priority, simultaneous sources and extended-line routing. |
+| `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ6, masked-pending retention and acknowledgement have focused regressions. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
 | `0d` clock control | stored only | Placeholder | Map clock domains and sleep transitions. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
@@ -52,7 +52,7 @@ therefore must not be read as peripheral completeness.
 
 | Block | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
-| FIQ8 `15/16` | periodic timer when enabled | Placeholder | Identify source clock and acknowledgement semantics. |
+| FIQ8 `15/16` | periodic timer when enabled; extended pending/status/mask routing | Partial routing, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery and acknowledgement. Identify the source clock and physical timer semantics. |
 | MBUS `18..1a` | byte/status state plus scheduled FIQ | Partial | Capture complete request/reply framing and collision/timing behavior. |
 | Vibrator/buzzer `1b/1c/1e` | register storage only | Placeholder | Connect outputs and derive divider/volume mapping. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
@@ -71,9 +71,20 @@ state. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ6,
 DSP receive FIQ0, SIMI FIQ6, timer compare FIQ4, and MBUS FIQ2/FIQ3, with line
 8 represented by the extended pending bit. The keypad edge latch and CCONT
 level are independent sources; acknowledging IRQ0 cannot discard an active
-CCONT IRQ6. The v5.01/v6.00 keypad and CCONT firmware paths support those two
-IRQ assignments. The remaining assignments still need a second runtime oracle
-or hardware documentation.
+CCONT IRQ6. A physical overlap fixture observes pending status `0x41`; firmware
+acknowledges IRQ0 first and leaves IRQ6 pending. This is observed firmware
+service order, not a claimed MAD2 priority encoder. A separate fixture proves
+that a masked IRQ0 remains pending and is delivered immediately when its mask
+and global gate permit it. The v5.01/v6.00 keypad and CCONT firmware paths
+support those two IRQ assignments. The remaining assignments still need a
+second runtime oracle or hardware documentation.
+
+FIQ8 uses the ninth internal pending bit (`0x100`). Register `0x16.bit1`
+projects that pending state, bit 2 masks its CPU delivery, and writing bit 1
+acknowledges it. `make verify-mad2-interrupts` exercises this routing while the
+periodic source is explicitly enabled through the mapped register. The source
+clock remains calibrated and the extended IRQ projection at `0x0c.bit5` has no
+legitimate modeled producer, so extended IRQ remains an unvalidated decode.
 
 ## Extraction gate
 
@@ -86,8 +97,9 @@ Extraction is justified when each block has:
 4. a 3210 oracle plus at least one second-ROM execution trace; and
 5. a focused regression for timers, interrupt masking and serial selection.
 
-GENSIO selection and the CCONT IRQ6 route now have a focused regression. Timer
-and general interrupt-mask regressions remain outstanding. Current confidence
+GENSIO selection, CCONT IRQ6, timer 0, simultaneous IRQ aggregation,
+masked-pending delivery and extended FIQ routing now have focused regressions.
+Current confidence
 also comes from the coherent integration oracle, bounded access census and
 selected v5.01 alignment; this is sufficient to retain the block behavior, but
 not to promote the phone-owned switch statement into a reusable MAD2 device.
@@ -131,6 +143,14 @@ The same target performs a scheduled save/load round trip. Main RAM, MAD2
 registers, IRQ/FIQ pending state, timer counters/divider/compare latch, keypad
 and CCONT aggregation, power-on state and GENSIO state are registered. Post-load
 reconstructs the CPU interrupt lines without manufacturing a new source.
+
+`NOKI3210_TRACE_MAD2_INTERRUPTS=1` records source assertions and level
+recomputation, pending masks, write-one-clear acknowledgements, relevant
+register accesses and only actual CPU-line transitions. It is capped at 4,096
+records per reset. The paired conformance target runs three scenarios through
+physical inputs or mapped MAD2 registers: overlapping keypad/charger sources,
+IRQ0 held pending behind its mask/global gate, and FIQ8 held behind its local
+mask/global gate. These are controller tests, not firmware-state fixtures.
 
 The widened ledger observes one MCUIF dword write (`6a 0f 61 20`) from boot and
 no MCUIF reads. DSPIF receives its initial zero halfword and then 26 command-4

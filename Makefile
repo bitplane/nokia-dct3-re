@@ -73,7 +73,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-mad2 verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-mad2 verify-mad2-interrupts verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -91,6 +91,7 @@ help:
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
 	@echo "make verify-mad2    check timer-0/FIQ and save-state restoration contracts"
+	@echo "make verify-mad2-interrupts check simultaneous, masked-pending and extended-FIQ routing"
 	@echo "make run-frontier   run the current external-service/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier predicates"
 	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
@@ -194,7 +195,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -306,6 +307,22 @@ verify-mad2:
 		RUN_ENV='NOKI3210_STATE_ROUNDTRIP_AT=0.4'
 	@grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_state/boot_summary.txt
 	@echo "OK — MAD2 state round trip restored RAM, timer and controller state"
+
+verify-mad2-interrupts:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_overlap SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_IRQ_OVERLAP_AT=0.2'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_overlap/error.log
+	$(PYTHON) tools/mad2_interrupt_trace_check.py overlap $(RUN_DIR)_overlap/error.log \
+		--summary $(RUN_DIR)_overlap/boot_summary.txt
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mask SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_IRQ_MASK_FIXTURE_AT=0.2'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_mask/error.log
+	$(PYTHON) tools/mad2_interrupt_trace_check.py mask $(RUN_DIR)_mask/error.log
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_fiq8 SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_FIQ8_FIXTURE_AT=0.2'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_fiq8/error.log
+	$(PYTHON) tools/mad2_interrupt_trace_check.py fiq8 $(RUN_DIR)_fiq8/error.log
+	@echo "OK — MAD2 simultaneous, masked-pending and extended-FIQ routing contracts reproduced"
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier
