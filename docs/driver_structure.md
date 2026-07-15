@@ -7,13 +7,13 @@ deleted incrementally as observed contracts become components.
 ## Entry points vs. quarantine
 
 The memory-map-registered handlers are thin. Diagnostic execution observations
-are isolated in clearly bannered trace helpers; the RAM read path also owns two
+are isolated in `driver/nokia_3310_trace.inc`; the RAM read path also owns two
 explicitly documented research shortcuts:
 
 | hardware entry point | quarantined research helper |
 |---|---|
-| `flash_r` (≈6 lines)  | `flash_firmware_traces` (observation only; cannot override instructions) |
-| `ram_w`   (≈10 lines) | `ram_w_firmware_traces` (write-side research observations) |
+| `flash_r` (≈6 lines)  | `nokia_3310_trace.inc::flash_firmware_traces` (observation only; cannot override instructions) |
+| `ram_w`   (≈10 lines) | `nokia_3310_trace.inc::ram_w_firmware_traces` (write-side research observations) |
 | `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (read-side research observations) |
 
 The PCD8544 LCD and MAME `I2C_24C128` model the display and external
@@ -27,7 +27,8 @@ RAM, MCU/DSP ring indices, service cadence, and the observed contact-session
 state, and returns peer transactions through FIQ0/IRQ4 callbacks.
 The provisional
 `nokia_sim_card_device` owns the verified SIMI register/FIQ transport and a synthetic GSM 11.11
-card. The phone state owns MAD2 interrupt routing and supplies power-scenario ADC inputs. The
+card. The phone state owns MAD2 interrupt routing, supplies power-scenario ADC inputs, and selects
+board differences through explicit product configurations rather than driver-name parsing. The
 remaining MAD2 register block should wait for the
 cross-ROM pass to identify the genuinely shared contract.
 

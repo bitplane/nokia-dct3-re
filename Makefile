@@ -10,7 +10,8 @@ VENV   := .venv
 DRIVER := driver/nokia_3310.cpp
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dsp_peer.cpp driver/nokia_dsp_peer.h \
-	driver/nokia_sim_card.cpp driver/nokia_sim_card.h
+	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
+	driver/nokia_3310_trace.inc
 PHONE ?= noki3210
 BIOS ?=
 
@@ -75,7 +76,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e audit-roms frame watch verify verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-contact run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -89,7 +90,7 @@ help:
 	@echo "make run-manifest-* reproduce named default/deep-gsm/contact/3330 evidence runs"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
-	@echo "make run            boot to the CONTACT SERVICE oracle frame into RUN_DIR=$(RUN_DIR)"
+	@echo "make run            run the selected phone/profile into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make run-frontier   run the current coherent contact/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier predicates"
@@ -102,7 +103,7 @@ help:
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
 	@echo "make clean          remove build/run state (keeps the MAME clone)"
-	@echo "Override any knob on the command line, e.g.  make run NOKI3210_TRACE_HANDOFF=1"
+	@echo "Override runtime knobs with RUN_ENV, e.g.  make run RUN_ENV='NOKI3210_TRACE_HANDOFF=1'"
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -200,28 +201,17 @@ run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
 	cp $(MAME_DIR)/error.log run_manifest_default/error.log
 
-run-manifest-deep-gsm: build
-	@mkdir -p run_manifest_deep_gsm
-	@$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 RUN_DIR=run_manifest_deep_gsm
-	cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) \
-		NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 \
-		NOKI3210_TRACE_DSP_BOUNDARY=1 \
-		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_deep_gsm) \
-		NOKI3210_BOOT_SUMMARY=$(abspath run_manifest_deep_gsm)/boot_summary.txt \
-		./mame $(MAME_ARGS) -nvram_directory $(abspath run_manifest_deep_gsm)/nvram -seconds_to_run 8
+run-manifest-deep-gsm:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_deep_gsm SECONDS=8 \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 NOKI3210_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log run_manifest_deep_gsm/error.log
 
-run-manifest-contact: build
-	@mkdir -p run_manifest_contact_default run_manifest_contact_deep
-	@$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 RUN_DIR=run_manifest_contact_default
-	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_TRACE_CSCMD=1 \
-		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_default) \
-		./mame $(MAME_ARGS) -nvram_directory $(abspath run_manifest_contact_default)/nvram -seconds_to_run 1
+run-manifest-contact:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_contact_default SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_CSCMD=1'
 	cp $(MAME_DIR)/error.log run_manifest_contact_default/error.log
-	@$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 RUN_DIR=run_manifest_contact_deep
-	cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) NOKI3210_TRACE_CSCMD=1 \
-		NOKI3210_SNAPSHOT_DIR=$(abspath run_manifest_contact_deep) \
-		./mame $(MAME_ARGS) -nvram_directory $(abspath run_manifest_contact_deep)/nvram -seconds_to_run 6
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_contact_deep SECONDS=6 \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_CSCMD=1'
 	cp $(MAME_DIR)/error.log run_manifest_contact_deep/error.log
 
 run-manifest-3330:
