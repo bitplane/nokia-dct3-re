@@ -23,6 +23,7 @@
 
 #include "nokia_ccont.h"
 #include "nokia_dsp_peer.h"
+#include "nokia_mad2.h"
 #include "nokia_sim_card.h"
 #include "nokia_simi.h"
 
@@ -97,12 +98,7 @@ enum mad2_reg : uint8_t
 	MAD2_SIM_TX_FILL = 0x3f
 };
 
-// MAD2 interrupt and MBUS control bits observed during the 3210 boot path.
-constexpr uint16_t MAD2_LINE_EXTENDED = 0x100;
-constexpr uint8_t MAD2_IRQ_CTRL_FIQ_ENABLE = 0x01;
-constexpr uint8_t MAD2_IRQ_CTRL_IRQ_ENABLE = 0x04;
-constexpr uint8_t MAD2_IRQ_CTRL_EXT_IRQ_MASK = 0x40;
-constexpr uint8_t MAD2_FIQ8_MASKED = 0x04;
+// MAD2 MBUS control bits observed during the 3210 boot path.
 constexpr uint8_t MAD2_MBUS_BUSY_MASK = 0x60;
 constexpr uint8_t MAD2_MBUS_DONE_FLAGS = 0xc0;
 constexpr uint8_t MAD2_MBUS_TX_READY = 0x10;
@@ -244,6 +240,7 @@ public:
 		m_flash(*this, "flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
+		m_mad2(*this, "mad2"),
 		m_dsp_peer(*this, "dsp_peer"),
 		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
@@ -278,10 +275,7 @@ private:
 	uint8_t mad2_mcuif_r(offs_t offset);
 	void mad2_mcuif_w(offs_t offset, uint8_t data);
 
-	TIMER_CALLBACK_MEMBER(timer0);
-	TIMER_CALLBACK_MEMBER(timer1);
 	TIMER_CALLBACK_MEMBER(timer_watchdog);
-	TIMER_CALLBACK_MEMBER(timer_fiq8);
 	TIMER_CALLBACK_MEMBER(timer_mbus);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
@@ -300,18 +294,13 @@ private:
 
 	void noki3310_map(address_map &map) ATTR_COLD;
 
-	void assert_fiq(int num);
-	void assert_irq(int num);
-	void ack_fiq(uint16_t mask);
-	void ack_irq(uint16_t mask);
-	void update_fiq_line();
-	void update_irq_line();
 	void trace_interrupt_register(char operation, offs_t offset, uint8_t data);
+	void mad2_fiq_w(int state);
+	void mad2_irq_w(int state);
+	void mad2_irq_ack_w(u16 mask);
 	void ccont_irq_w(int state);
 	void ccont_power_w(int state);
 	void sim_irq_w(int state);
-	bool timer0_compare_due() const;
-	void update_timer0_compare();
 	void schedule_mbus_fiq(int num);
 	void signal_mbus_fiq(int num);
 	void complete_mbus_transfer();
@@ -329,6 +318,7 @@ private:
 	required_device<intelfsh16_device> m_flash;
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
+	required_device<nokia_mad2_device> m_mad2;
 	required_device<nokia_dsp_peer_device> m_dsp_peer;
 	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
@@ -340,23 +330,11 @@ private:
 
 	nokia_product_config m_product = PRODUCT_DEFAULT;
 	uint8_t       m_power_on;
-	uint16_t      m_fiq_status;
-	uint16_t      m_irq_status;
-	uint16_t      m_timer1_counter;
-	uint16_t      m_timer0_counter;
-	uint8_t       m_timer0_divider;
-	bool          m_timer0_compare_latched;
 	uint8_t       m_keypad_columns;
 	bool          m_keypad_irq_latched;
 	bool          m_ccont_irq_state;
-	bool          m_fiq_line_state;
-	bool          m_irq_line_state;
 
-
-	emu_timer * m_timer0;
-	emu_timer * m_timer1;
 	emu_timer * m_timer_watchdog;
-	emu_timer * m_timer_fiq8;
 	emu_timer * m_timer_mbus;
 
 	uint8_t       m_mad2_regs[0x100];
@@ -370,6 +348,7 @@ private:
 	unsigned      m_gensio_trace_count = 0;
 	unsigned      m_mad2_timer_trace_count = 0;
 	unsigned      m_mad2_interrupt_trace_count = 0;
+	unsigned      m_mad2_clock_trace_count = 0;
 	uint8_t       m_gensio_status = 0x03;
 };
 
@@ -555,25 +534,13 @@ void noki3310_state::machine_start()
 {
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 
-	// allocate timers
-	m_timer0 = timer_alloc(FUNC(noki3310_state::timer0), this);
-	m_timer1 = timer_alloc(FUNC(noki3310_state::timer1), this);
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
-	m_timer_fiq8 = timer_alloc(FUNC(noki3310_state::timer_fiq8), this);
 	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
 	save_pointer(NAME(m_ram), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 	save_item(NAME(m_power_on));
-	save_item(NAME(m_fiq_status));
-	save_item(NAME(m_irq_status));
-	save_item(NAME(m_timer1_counter));
-	save_item(NAME(m_timer0_counter));
-	save_item(NAME(m_timer0_divider));
-	save_item(NAME(m_timer0_compare_latched));
 	save_item(NAME(m_keypad_columns));
 	save_item(NAME(m_keypad_irq_latched));
 	save_item(NAME(m_ccont_irq_state));
-	save_item(NAME(m_fiq_line_state));
-	save_item(NAME(m_irq_line_state));
 	save_item(NAME(m_mad2_regs));
 	save_item(NAME(m_mcuif_regs));
 	save_item(NAME(m_gensio_status));
@@ -583,7 +550,6 @@ void noki3310_state::machine_start()
 void noki3310_state::post_load()
 {
 	update_keypad_ccont_irqs();
-	update_fiq_line();
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -624,10 +590,8 @@ void noki3310_state::machine_reset()
 	m_gensio_trace_count = 0;
 	m_mad2_timer_trace_count = 0;
 	m_mad2_interrupt_trace_count = 0;
+	m_mad2_clock_trace_count = 0;
 	m_gensio_status = 0x03;
-	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
-	m_mad2_regs[MAD2_IRQ_CTRL] = 0x0a;         // disable FIQ and IRQ
-	m_mad2_regs[MAD2_WATCHDOG] = 0xff;         // disable MAD2 watchdog
 	// Load deterministic raw selector inputs. The firmware-observable selector
 	// contract is known; physical 3210 net names and analog units are not.
 	{
@@ -654,105 +618,32 @@ void noki3310_state::machine_reset()
 	m_eeprom->write_scl(1);
 	m_eeprom->write_sda(1);
 
-	m_fiq_status = 0;
-	m_irq_status = 0;
-	m_timer1_counter = 0;
-	m_timer0_counter = 0;
-	m_timer0_divider = 255;
-	m_timer0_compare_latched = false;
 	m_keypad_columns = 0x1f;
 	m_keypad_irq_latched = false;
 	m_ccont_irq_state = false;
-	m_fiq_line_state = false;
-	m_irq_line_state = false;
-
-	const unsigned timer0_hz = nokia_env_u32("NOKI3210_TIMER0_HZ", 33055);
-	const unsigned timer1_hz = nokia_env_u32("NOKI3210_TIMER1_HZ", 1057);
-	const unsigned fiq8_hz = nokia_env_u32("NOKI3210_FIQ8_HZ", 1000);
-
-	m_timer0->adjust(attotime::from_hz(timer0_hz), 0, attotime::from_hz(timer0_hz));    // programmable divider through port 0x0f
-	m_timer1->adjust(attotime::from_hz(timer1_hz), 0, attotime::from_hz(timer1_hz));
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
-	m_timer_fiq8->adjust(attotime::from_hz(fiq8_hz), 0, attotime::from_hz(fiq8_hz));
 	m_timer_mbus->adjust(attotime::never);
 
 	// Simulate the product-specific keypad column used by the power-on input.
 	m_power_on = ~m_product.power_on_column_mask;
 }
 
-void noki3310_state::assert_fiq(int num)
+void noki3310_state::mad2_fiq_w(int state)
 {
-	const uint16_t before = m_fiq_status;
-	if (num < 8)
-		m_fiq_status |= 1 << num;
-	else
-		m_fiq_status |= MAD2_LINE_EXTENDED;
-	if (nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
-			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=assert domain=FIQ line=%d pending_before=%03x pending_after=%03x t=%.9f\n",
-				num, before, m_fiq_status, machine().time().as_double());
-
-	update_fiq_line();
+	m_maincpu->set_input_line(1, state ? ASSERT_LINE : CLEAR_LINE);
 }
 
-void noki3310_state::update_fiq_line()
+void noki3310_state::mad2_irq_w(int state)
 {
-	bool active = false;
-
-	if (m_mad2_regs[MAD2_IRQ_CTRL] & MAD2_IRQ_CTRL_FIQ_ENABLE)
-	{
-		active = (m_fiq_status & ~m_mad2_regs[MAD2_FIQ_MASK] & 0xff) != 0;
-
-		if ((m_fiq_status & MAD2_LINE_EXTENDED) && !(m_mad2_regs[MAD2_FIQ8_CTRL] & MAD2_FIQ8_MASKED))
-			active = true;
-	}
-	if (active != m_fiq_line_state &&
-			nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
-			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=route domain=FIQ active=%u pending=%03x mask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
-				active, m_fiq_status, m_mad2_regs[MAD2_FIQ_MASK],
-				m_mad2_regs[MAD2_IRQ_CTRL], m_mad2_regs[MAD2_FIQ8_CTRL],
-				machine().time().as_double());
-	m_fiq_line_state = active;
-
-	m_maincpu->set_input_line(1, active ? ASSERT_LINE : CLEAR_LINE);
+	m_maincpu->set_input_line(0, state ? ASSERT_LINE : CLEAR_LINE);
 }
 
-void noki3310_state::assert_irq(int num)
+void noki3310_state::mad2_irq_ack_w(u16 mask)
 {
-	const uint16_t before = m_irq_status;
-	if (num < 8)
-		m_irq_status |= 1 << num;
-	else
-		m_irq_status |= MAD2_LINE_EXTENDED;
-	if (nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
-			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=assert domain=IRQ line=%d pending_before=%03x pending_after=%03x t=%.9f\n",
-				num, before, m_irq_status, machine().time().as_double());
-
-	update_irq_line();
-}
-
-void noki3310_state::update_irq_line()
-{
-	bool active = false;
-
-	if (m_mad2_regs[MAD2_IRQ_CTRL] & MAD2_IRQ_CTRL_IRQ_ENABLE)
-	{
-		active = (m_irq_status & ~m_mad2_regs[MAD2_IRQ_MASK] & 0xff) != 0;
-
-		if ((m_irq_status & MAD2_LINE_EXTENDED) && !(m_mad2_regs[MAD2_IRQ_CTRL] & MAD2_IRQ_CTRL_EXT_IRQ_MASK))
-			active = true;
-	}
-	if (active != m_irq_line_state &&
-			nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
-			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=route domain=IRQ active=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
-				active, m_irq_status, m_mad2_regs[MAD2_IRQ_MASK],
-				m_mad2_regs[MAD2_IRQ_CTRL], machine().time().as_double());
-	m_irq_line_state = active;
-
-	m_maincpu->set_input_line(0, active ? ASSERT_LINE : CLEAR_LINE);
+	if (mask & (u16(1) << KEYPAD_IRQ_LINE_NUM))
+		m_keypad_irq_latched = false;
+	if (mask & ((u16(1) << KEYPAD_IRQ_LINE_NUM) | (u16(1) << CCONT_IRQ_LINE_NUM)))
+		update_keypad_ccont_irqs();
 }
 
 void noki3310_state::ccont_irq_w(int state)
@@ -770,19 +661,19 @@ void noki3310_state::ccont_power_w(int state)
 void noki3310_state::sim_irq_w(int state)
 {
 	if (state)
-		assert_fiq(6);
+		m_mad2->assert_fiq(6);
 }
 
 void noki3310_state::dsp_fiq0_w(int state)
 {
 	if (state)
-		assert_fiq(0);
+		m_mad2->assert_fiq(0);
 }
 
 void noki3310_state::dsp_service_irq_w(int state)
 {
 	if (state)
-		assert_irq(4);
+		m_mad2->assert_irq(4);
 }
 
 uint8_t noki3310_state::keypad_columns_r(bool consume_power_on)
@@ -811,24 +702,16 @@ uint8_t noki3310_state::keypad_columns_r(bool consume_power_on)
 
 void noki3310_state::update_keypad_ccont_irqs()
 {
-	const uint16_t before = m_irq_status;
-	const uint16_t keypad_mask = uint16_t(1) << KEYPAD_IRQ_LINE_NUM;
-	const uint16_t ccont_mask = uint16_t(1) << CCONT_IRQ_LINE_NUM;
-	if (m_keypad_irq_latched)
-		m_irq_status |= keypad_mask;
-	else
-		m_irq_status &= ~keypad_mask;
-	if (m_ccont_irq_state)
-		m_irq_status |= ccont_mask;
-	else
-		m_irq_status &= ~ccont_mask;
-	if (before != m_irq_status &&
+	const u16 before = m_mad2->irq_status();
+	m_mad2->set_irq_line(KEYPAD_IRQ_LINE_NUM, m_keypad_irq_latched);
+	m_mad2->set_irq_line(CCONT_IRQ_LINE_NUM, m_ccont_irq_state);
+	const u16 after = m_mad2->irq_status();
+	if (before != after &&
 			nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
 			m_mad2_interrupt_trace_count++ < 4096)
 		logerror("mad2_interrupt: event=levels domain=IRQ keypad=%u ccont=%u pending_before=%03x pending_after=%03x t=%.9f\n",
-				m_keypad_irq_latched, m_ccont_irq_state, before, m_irq_status,
+				m_keypad_irq_latched, m_ccont_irq_state, before, after,
 				machine().time().as_double());
-	update_irq_line();
 }
 
 void noki3310_state::update_keypad_columns()
@@ -857,7 +740,7 @@ void noki3310_state::signal_mbus_fiq(int num)
 		return;
 	}
 
-	assert_fiq(num);
+	m_mad2->assert_fiq(num);
 }
 
 void noki3310_state::schedule_mbus_fiq(int num)
@@ -868,39 +751,8 @@ void noki3310_state::schedule_mbus_fiq(int num)
 void noki3310_state::complete_mbus_transfer()
 {
 	m_mad2_regs[MAD2_MBUS_CTRL] &= ~MAD2_MBUS_BUSY_MASK;
-	m_mad2_regs[MAD2_FIQ_MASK] |= 0x08;
-	ack_fiq(MAD2_FIQ_MBUS_MASK);
-}
-
-void noki3310_state::ack_fiq(uint16_t mask)
-{
-	const uint16_t before = m_fiq_status;
-	m_fiq_status &= ~mask;
-	update_fiq_line();
-	if (nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
-			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=ack domain=FIQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
-				mask, before, m_fiq_status, machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
-			m_mad2_timer_trace_count++ < 4096)
-		logerror("mad2_timer: event=ack mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
-				mask, before, m_fiq_status, machine().time().as_double());
-}
-
-void noki3310_state::ack_irq(uint16_t mask)
-{
-	const uint16_t before = m_irq_status;
-	if (mask & (uint16_t(1) << KEYPAD_IRQ_LINE_NUM))
-		m_keypad_irq_latched = false;
-	m_irq_status &= ~mask;
-	if (mask & ((uint16_t(1) << KEYPAD_IRQ_LINE_NUM) | (uint16_t(1) << CCONT_IRQ_LINE_NUM)))
-		update_keypad_ccont_irqs();
-	else
-		update_irq_line();
-	if (mask != 0 && nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
-			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=ack domain=IRQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
-				mask, before, m_irq_status, machine().time().as_double());
+	m_mad2->set_fiq_mask_bits(0x08);
+	m_mad2->ack_fiq(MAD2_FIQ_MBUS_MASK);
 }
 
 void noki3310_state::trace_interrupt_register(char operation, offs_t offset, uint8_t data)
@@ -908,9 +760,9 @@ void noki3310_state::trace_interrupt_register(char operation, offs_t offset, uin
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
 			m_mad2_interrupt_trace_count++ < 4096)
 		logerror("mad2_interrupt: event=reg_%c off=%02x data=%02x fiq=%03x irq=%03x fiqmask=%02x irqmask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
-				operation, u32(offset), data, m_fiq_status, m_irq_status,
-				m_mad2_regs[MAD2_FIQ_MASK], m_mad2_regs[MAD2_IRQ_MASK],
-				m_mad2_regs[MAD2_IRQ_CTRL], m_mad2_regs[MAD2_FIQ8_CTRL],
+				operation, u32(offset), data, m_mad2->fiq_status(), m_mad2->irq_status(),
+				m_mad2->reg(MAD2_FIQ_MASK), m_mad2->reg(MAD2_IRQ_MASK),
+				m_mad2->reg(MAD2_IRQ_CTRL), m_mad2->reg(MAD2_FIQ8_CTRL),
 				machine().time().as_double());
 }
 
@@ -929,69 +781,6 @@ PCD8544_SCREEN_UPDATE(noki3310_state::pcd8544_screen_update)
 		}
 }
 
-bool noki3310_state::timer0_compare_due() const
-{
-	const uint16_t compare = (uint16_t(m_mad2_regs[0x12]) << 8) | m_mad2_regs[0x13];
-	if (compare == 0)
-		return false;
-
-	if (nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 0) == 0)
-		return m_timer0_counter == compare;
-
-	return int16_t(m_timer0_counter - compare) >= 0;
-}
-
-void noki3310_state::update_timer0_compare()
-{
-	if (m_timer0_compare_latched || !timer0_compare_due())
-		return;
-
-	m_timer0_compare_latched = true;
-
-	if (!(m_fiq_status & MAD2_FIQ_TIMER0_COMPARE))
-	{
-		assert_fiq(4);
-		if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
-				m_mad2_timer_trace_count++ < 4096)
-			logerror("mad2_timer: event=assert counter=%04x compare=%04x divider=%02x pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
-					m_timer0_counter,
-					(uint16_t(m_mad2_regs[0x12]) << 8) | m_mad2_regs[0x13],
-					m_timer0_divider, m_fiq_status, m_mad2_regs[MAD2_FIQ_MASK],
-					m_mad2_regs[MAD2_IRQ_CTRL], machine().time().as_double());
-	}
-}
-
-TIMER_CALLBACK_MEMBER(noki3310_state::timer0)
-{
-	if (m_mad2_regs[0x0f] != 0)
-	{
-		m_mad2_regs[0x0f]--;
-		return;
-	}
-
-	m_mad2_regs[0x0f] = m_timer0_divider;
-
-	m_timer0_counter++;
-	update_timer0_compare();
-}
-
-TIMER_CALLBACK_MEMBER(noki3310_state::timer1)
-{
-	m_timer1_counter++;
-
-	if (m_timer1_counter == 0x8000)
-	{
-		assert_fiq(5);
-		m_timer1_counter = 0;
-	}
-}
-
-TIMER_CALLBACK_MEMBER(noki3310_state::timer_fiq8)
-{
-	if (m_mad2_regs[0x16] & 0x01)
-		assert_fiq(8);
-}
-
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_mbus)
 {
 	signal_mbus_fiq(param);
@@ -1003,19 +792,17 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 	if (nokia_env_u32("NOKI3210_DISABLE_CCONT_WATCHDOG", 0) == 0 && m_ccont->watchdog_tick())
 	{
 		m_maincpu->reset();
+		m_mad2->reset();
 		machine_reset();
 	}
 
 	// MAD2 watchdog
-	if (m_mad2_regs[0x03] != 0xff)
+	if (m_mad2->watchdog_tick())
 	{
-		m_mad2_regs[0x03]--;
-		if (m_mad2_regs[0x03] == 0)
-		{
-			m_maincpu->reset();
-			machine_reset();
-			m_mad2_regs[0x01] |= 0x02;  // Last reset was by watchdog
-		}
+		m_maincpu->reset();
+		m_mad2->reset();
+		machine_reset();
+		m_mad2->set_reset_cause(0x02);
 	}
 }
 
@@ -1122,43 +909,10 @@ void noki3310_state::rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_ma
 
 uint8_t noki3310_state::mad2_io_r(offs_t offset)
 {
-	uint8_t data = m_mad2_regs[offset];
+	uint8_t data = offset <= MAD2_FIQ8_CTRL ? m_mad2->read(offset) : m_mad2_regs[offset];
 
 	switch(offset)
 	{
-		case 0x00:
-			data = 0x40;    // ASIC version
-			break;
-		case 0x04:
-			data = m_timer1_counter >> 8;
-			break;
-		case 0x05:
-			data = m_timer1_counter;
-			break;
-		case 0x06:
-			data = (m_timer1_counter + 0x40) >> 8;
-			break;
-		case 0x07:
-			data = m_timer1_counter + 0x40;
-			break;
-		case 0x08:
-			data = m_fiq_status & 0xff;
-			break;
-		case 0x09:
-			data = m_irq_status & 0xff;
-			break;
-		case 0x0c:
-			data = (data & (~0x20)) | ((m_irq_status >> 3) & 0x20);
-			break;
-		case 0x10:
-			data = m_timer0_counter >> 8;
-			break;
-		case 0x11:
-			data = m_timer0_counter;
-			break;
-		case 0x16:
-			data = (data & (~0x02)) | ((m_fiq_status >> 7) & 0x02);
-			break;
 		case 0x18:
 			data &= 0x7f;
 			break;
@@ -1222,6 +976,12 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			m_mad2_timer_trace_count++ < 4096)
 		logerror("mad2_timer: event=R off=%02x data=%02x pc=%08x t=%.9f\n",
 				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_CLOCKS", 0) != 0 &&
+			(offset == MAD2_MCU_RESET_CTRL || offset == MAD2_WATCHDOG ||
+			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_COMPARE_LSB) ||
+			 offset == 0x0d) && m_mad2_clock_trace_count++ < 4096)
+		logerror("mad2_clock: event=R off=%02x data=%02x counter=%04x pc=%08x t=%.9f\n",
+				u32(offset), data, m_mad2->timer1_counter(), m_maincpu->pc(), machine().time().as_double());
 	if (offset == MAD2_FIQ_STATUS || offset == MAD2_IRQ_STATUS ||
 			offset == MAD2_FIQ_MASK || offset == MAD2_IRQ_MASK ||
 			offset == MAD2_IRQ_CTRL || offset == MAD2_FIQ8_CTRL)
@@ -1239,13 +999,23 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 
 void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
-	uint8_t old_data = m_mad2_regs[offset];
-	m_mad2_regs[offset] = data;
+	const bool core_register = offset <= MAD2_FIQ8_CTRL;
+	uint8_t old_data = core_register ? m_mad2->read(offset) : m_mad2_regs[offset];
+	if (core_register)
+		m_mad2->write(offset, data);
+	else
+		m_mad2_regs[offset] = data;
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
 			(offset >= 0x08 && offset <= 0x13) &&
 			m_mad2_timer_trace_count++ < 4096)
 		logerror("mad2_timer: event=W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n",
 				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_MAD2_CLOCKS", 0) != 0 &&
+			(offset == MAD2_MCU_RESET_CTRL || offset == MAD2_WATCHDOG ||
+			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_COMPARE_LSB) ||
+			 offset == 0x0d) && m_mad2_clock_trace_count++ < 4096)
+		logerror("mad2_clock: event=W off=%02x data=%02x old=%02x counter=%04x pc=%08x t=%.9f\n",
+				u32(offset), data, old_data, m_mad2->timer1_counter(), m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && offset == 0x36)
 	{
 		static unsigned sim_txd_count = 0;
@@ -1308,41 +1078,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 
 	switch(offset)
 	{
-		case 0x02:
-			break;
-		case 0x08:
-			ack_fiq(data);
-			break;
-		case 0x09:
-			ack_irq(data);
-			break;
-		case 0x0a:
-			update_fiq_line();
-			break;
-		case 0x0b:
-			update_irq_line();
-			break;
-		case 0x0c:
-			ack_irq((data << 3) & 0x100);
-			update_fiq_line();
-			update_irq_line();
-			break;
-		case 0x0f:
-			m_timer0_divider = data;
-			break;
-		case 0x12:
-			m_timer0_compare_latched = false;
-			break;
-		case 0x13:
-			m_timer0_compare_latched = false;
-			if (nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 0) != 0 ||
-					m_timer0_counter == ((uint16_t(m_mad2_regs[0x12]) << 8) | m_mad2_regs[0x13]))
-				update_timer0_compare();
-			break;
-		case 0x16:
-			ack_fiq((data << 7) & 0x100);
-			update_fiq_line();
-			break;
 		case 0x18:
 			if (data & 0x20)
 				schedule_mbus_fiq(2);
@@ -1540,6 +1275,16 @@ void noki3310_state::noki3310(machine_config &config)
 
 	INTEL_TE28F160(config, "flash");
 	I2C_24C128(config, m_eeprom);
+	NOKIA_MAD2(config, m_mad2);
+	m_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 33055));
+	m_mad2->set_timer1_hz(nokia_env_u32("NOKI3210_TIMER1_HZ", 1057));
+	m_mad2->set_fiq8_hz(nokia_env_u32("NOKI3210_FIQ8_HZ", 1000));
+	m_mad2->set_timer0_catchup(nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 0) != 0);
+	m_mad2->set_timer_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0);
+	m_mad2->set_interrupt_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0);
+	m_mad2->fiq_cb().set(FUNC(noki3310_state::mad2_fiq_w));
+	m_mad2->irq_cb().set(FUNC(noki3310_state::mad2_irq_w));
+	m_mad2->irq_ack_cb().set(FUNC(noki3310_state::mad2_irq_ack_w));
 	NOKIA_CCONT(config, m_ccont);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));

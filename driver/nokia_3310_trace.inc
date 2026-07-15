@@ -229,7 +229,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					(addr == 0x002b3084 || addr == 0x002b4628 || addr == 0x002b5da0 || addr == 0x002b2f90) ?
 						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff : event,
 					debug_ram_word(FW_STARTUP_MODE), debug_ram_byte(0x00100022),
-					m_irq_status, m_mad2_regs[MAD2_IRQ_MASK], m_mad2_regs[0x28],
+					m_mad2->irq_status(), m_mad2->reg(MAD2_IRQ_MASK), m_mad2_regs[0x28],
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 					machine().time().as_double());
 	}
@@ -248,7 +248,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		static unsigned sim_rx_count = 0;
 		if (sim_rx_count++ < 64)
 			logerror("sim_rx_isr: irq=%04x fiq=%04x byte=%02x state=%02x remaining=%04x received=%04x t=%.8f\n",
-					m_irq_status, m_fiq_status, debug_ram_byte(0x001106c4),
+					m_mad2->irq_status(), m_mad2->fiq_status(), debug_ram_byte(0x001106c4),
 					debug_ram_byte(0x001106d4), debug_ram_word(0x001106d6),
 					debug_ram_word(0x001106d8), machine().time().as_double());
 	}
@@ -281,7 +281,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		static unsigned sim_irq_count = 0;
 		if (sim_irq_count++ < 32)
 			logerror("sim_irq_dispatch: irq=%04x fiq=%04x fifo=%02x control=%02x t=%.8f\n",
-					m_irq_status, m_fiq_status, m_simi->rx_count_r(),
+					m_mad2->irq_status(), m_mad2->fiq_status(), m_simi->rx_count_r(),
 					debug_ram_byte(0x001106c3), machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 && pc == addr &&

@@ -12,7 +12,7 @@ not compatibility mechanisms.
 | PCD8544 display | MAME device | Add other display controllers per product configuration. |
 | External EEPROM | MAME `I2C_24C128` on mapped MAD2 GenIO pins plus generated provisioning input | Validate write/timing behavior, legitimate provisioning, ROM-aware fallback extraction, and parallel-window semantics. |
 | CCONT | Local `nokia_ccont_device`; organic GENSIO phase/status regression | Establish physical GENSIO/ADC latency, RTC encoding, watchdog clock, and board-level ADC signals. Do not assume a conversion-complete IRQ absent hardware evidence. |
-| MAD2 | Monolithic phone-owned register handlers | Fill the fidelity ledger before extracting blocks. |
+| MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller and CPU routing; board/peripheral windows remain phone-owned or extracted separately | Recover physical clocks and reset domains; move further windows only after their individual contracts pass the same gate. |
 | MBUS | MAD2 register/FIQ approximation | Model a peer only when firmware organically drains the receive task. |
 | DSP/DSPIF | `nokia_dsp_peer_device` aggregates shared RAM/DSPIF, rings, calibrated service timing, boot-subset DSP HLE and the separate external-service counterparty | Extend contracts only from organic requests; protect the transport with focused tests before separating the DSP and external peer roles. |
 | SIM | Separate `nokia_simi_device` controller and `nokia_sim_card_device` protocol/profile connected by reset/byte callbacks | Stabilize timing/error/removal behavior, then extract reusable provisioning profiles; extend card behavior only for organic requests. |
@@ -56,8 +56,8 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 ## Modularization order
 
 1. Improve CCONT and GENSIO from observed transactions.
-2. Document and stabilize MAD2 timers, interrupt aggregation and serial select
-   behavior.
+2. Extend the extracted MAD2 core only from observed reset, clock and peripheral
+   contracts; timer 1 remains an explicitly unexercised placeholder.
 3. Resume the ordinary unattended UI/idle-window entrance investigation without
    presuming that the missing transition is hardware-owned.
 4. Extend focused transport tests, then split the combined DSP/external peer
@@ -65,9 +65,9 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 5. Use the 3330 as the first portability probe before treating MAD2 behavior as
    common DCT3 hardware.
 
-MAD2 should not be extracted by copying the current switch statement into a
-device. Each block needs reset semantics, callbacks, focused tests and freedom
-from firmware-address conditions first.
+The CTSI core met the extraction gate without moving unresolved peripheral
+windows. Each additional MAD2 block still needs reset semantics, callbacks,
+focused tests and freedom from firmware-address conditions first.
 
 ## Engineering rules
 

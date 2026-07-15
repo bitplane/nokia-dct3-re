@@ -14,11 +14,13 @@ Confidence labels:
 - **Placeholder:** a constant, shortcut or incomplete peer used to keep the
   firmware running.
 
-The implementation is not one uniform MAD2 model. Timer 0, interrupt
-aggregation, keypad, GenIO/GENSIO and SIMI have derived contracts of differing
-depth; timer 1, FIQ8, reset/clock fields, audio outputs and several SELECT/UIF
-banks remain calibrated counters or backing latches. The address-map coverage
-therefore must not be read as peripheral completeness.
+The extracted `nokia_mad2_device` owns the CTSI core at offsets `0x00..0x16`:
+reset/clock/watchdog latches, timer state, interrupt pending/masks and CPU-line
+routing. Keypad, GenIO/GENSIO, MBUS and other board peripherals remain outside
+that core; SIMI is a separate device. Timer 1, FIQ8 timing, reset/clock effects,
+audio outputs and several SELECT/UIF banks remain calibrated counters or
+backing latches. Address-map coverage therefore must not be read as peripheral
+completeness.
 
 ## Address-space boundary
 
@@ -38,13 +40,13 @@ therefore must not be read as peripheral completeness.
 | Offsets | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
 | `00` ASIC version | constant `0x40` | Inferred | Compare MAD2 revisions across phone service manuals/ROM checks. |
-| `01` MCU reset | stores bits; optional firmware-specific soft-reset model | Partial | Establish reset bit effects and remove PC-oriented reset options. |
+| `01` MCU reset | extracted reset-cause latch; optional phone-level soft-reset policy | Partial | Establish reset domains and remove PC-oriented reset options. |
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
-| `04..07` sleep timer | software counter and synthetic destination | Placeholder | Establish 32.768 kHz counter width, latch and compare behavior. |
+| `04..07` sleep timer | software counter and synthetic destination | Unexercised placeholder | Neither 3210 ROM accesses these offsets during a one- or eight-second coherent boot. Establish 32.768 kHz counter width, latch and compare behavior before changing it. |
 | `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ6, masked-pending retention and acknowledgement have focused regressions. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
-| `0d` clock control | stored only | Placeholder | Map clock domains and sleep transitions. |
+| `0d` clock control | extracted stored latch | Observed writes, unknown effects | Both ROMs write `0x0c` then `0x2c`; map clock domains and sleep transitions before adding side effects. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
 | `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Establish the input oscillator/divider formula and remove the frequency/catch-up knobs. |
 
@@ -88,8 +90,8 @@ legitimate modeled producer, so extended IRQ remains an unvalidated decode.
 
 ## Extraction gate
 
-Do not extract a general MAD2 device by copying the present switch statement.
-Extraction is justified when each block has:
+The CTSI core was extracted only after satisfying this gate. It does not imply
+that the remaining MAD2 peripheral windows are ready to move. Each block needs:
 
 1. reset values and read/write semantics separated from phone scenarios;
 2. callbacks for attached components and CPU interrupt lines;
@@ -98,11 +100,18 @@ Extraction is justified when each block has:
 5. a focused regression for timers, interrupt masking and serial selection.
 
 GENSIO selection, CCONT IRQ6, timer 0, simultaneous IRQ aggregation,
-masked-pending delivery and extended FIQ routing now have focused regressions.
-Current confidence
-also comes from the coherent integration oracle, bounded access census and
-selected v5.01 alignment; this is sufficient to retain the block behavior, but
-not to promote the phone-owned switch statement into a reusable MAD2 device.
+masked-pending delivery and extended FIQ routing have focused regressions.
+The extracted core contains no firmware addresses and exposes callbacks for
+CPU routing and attached interrupt sources. GENSIO and other windows remain in
+the phone until their own contracts meet the same standard.
+
+`make verify-mad2-clocks` adds a two-ROM boot contract for the remaining core
+latches. v6.00 and v5.01 each read reset cause four times, write it once from
+`0x01` to `0x05`, service watchdog offset `0x03` fifteen times with `0x31`, and
+write clock control `0x00 -> 0x0c -> 0x2c`. Neither accesses timer-1 offsets
+`0x04..0x07`. The sequence justifies retained latches and the negative timer-1
+classification; it does not establish reset side effects, watchdog frequency,
+clock-domain behavior or sleep-timer semantics.
 
 Until the second ROM is normalized, `NOKI3210_TRACE_MAD2_LEDGER=1` provides the
 curated 3210 evidence pass: at most one read and one write record per MAD2 byte

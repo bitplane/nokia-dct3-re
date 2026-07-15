@@ -27,10 +27,12 @@ RAM, MCU/DSP ring indices, service cadence, and the observed contact-session
 state, and returns peer transactions through FIQ0/IRQ4 callbacks.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
 connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0 and
-the synthetic GSM 11.11 contents. The phone state owns MAD2 interrupt routing, supplies power-scenario ADC inputs, and selects
-board differences through explicit product configurations rather than driver-name parsing. The
-remaining MAD2 register block should wait for the
-cross-ROM pass to identify the genuinely shared contract.
+the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI core at
+offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrupt
+pending/masks, and ARM IRQ/FIQ routing. Attached devices signal it through
+callbacks; the phone state retains board wiring, physical-input latches, MBUS,
+GENSIO and the less-established peripheral windows. Product differences use
+explicit configurations rather than driver-name parsing.
 
 ## Rules
 

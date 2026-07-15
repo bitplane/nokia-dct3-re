@@ -38,6 +38,16 @@
       "evidence": ["docs/mad2_fidelity.md", "docs/cross_rom_confidence.md"]
     },
     {
+      "id": "mad2_ctsi_core", "subsystem": "system_controller", "status": "partial", "confidence": "strong",
+      "boundary": "The extracted nokia_mad2_device owns CTSI offsets 0x00..0x16, reset/clock/watchdog latches, timer state, interrupt pending/masks and ARM IRQ/FIQ routing; board wiring and less-established peripheral windows remain outside the device",
+      "evidence": ["docs/mad2_fidelity.md", "docs/driver_structure.md", "docs/structural_regression.md"]
+    },
+    {
+      "id": "mad2_reset_clock_boot_sequence", "subsystem": "system_controller", "status": "mapped", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 share four reset-cause reads, one 0x01-to-0x05 reset write, fifteen watchdog reloads of 0x31 and clock-control writes 0x00-to-0x0c-to-0x2c during the focused boot; register side effects and physical clocks remain unknown, and neither ROM accesses timer 1",
+      "evidence": ["docs/mad2_fidelity.md", "tools/mad2_clock_trace_check.py"]
+    },
+    {
       "id": "mad2_interrupt_aggregation", "subsystem": "interrupts", "status": "partial", "confidence": "strong",
       "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component levels onto ARM lines; focused fixtures validate simultaneous keypad IRQ0/CCONT IRQ6 without destructive acknowledgement, pending retention across masks, immediate delivery on unmask/global enable, and FIQ8 ninth-bit projection/mask/ack routing; extended IRQ ownership and several line assignments remain unvalidated",
       "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]

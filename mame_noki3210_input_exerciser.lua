@@ -375,6 +375,8 @@ end
 if irq_mask_fixture_at >= 0 and key_fields.up then
 	local mask_timer = coroutine.create(function()
 		emu.wait(irq_mask_fixture_at)
+		-- This fixture assumes firmware does not intentionally reprogram these
+		-- controller gates during its bounded 40 ms test window.
 		local old_mask = space:read_u8(0x2000b)
 		local old_ctrl = space:read_u8(0x2000c) & 0xdf
 		-- Keep global delivery disabled while creating a masked pending IRQ0.

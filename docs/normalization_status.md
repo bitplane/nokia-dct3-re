@@ -58,7 +58,7 @@ question is the ordinary unattended idle-window selection.
 | CCONT | `nokia_ccont_device` owns selected-device register behavior and output signals; MAD2 owns GENSIO status, while the phone supplies raw ADC scenarios and the provisional watchdog clock. v6.00/v5.01 share the observed register and IRQ contract. | Obtain board-level selector names, analog units, conversion timing, RTC encoding and watchdog clock from hardware evidence. |
 | EEPROM | Native MAME `I2C_24C128` on mapped GenIO pins plus a v6.00-oriented generated provisioning fixture; the parallel window is unproved. | Decode remaining fields, validate writes/timing and another product's storage placement, and make fallback-record extraction ROM-aware. |
 | DSP/external-service | `nokia_dsp_peer_device` currently aggregates shared RAM/DSPIF, DSP-owned ring and interrupt behavior, boot-subset DSP HLE, and a semantically separate request-driven service/test peer. | Add focused transport tests, validate another ROM family, then separate transport, DSP HLE and external peer without changing firmware-visible composition. |
-| MAD2 | Phone-owned timers, interrupt aggregation, GENSIO, SIMI window and DSP control registers; timer-0/FIQ4, simultaneous IRQ0/IRQ6, masked-pending delivery, extended FIQ routing and save-state restoration have focused regressions. | Establish extended IRQ ownership, timer clocks and reset/decode fidelity before extracting shared blocks. |
+| MAD2 | `nokia_mad2_device` owns CTSI offsets `0x00..0x16`, timer-0/FIQ4, pending/masks, IRQ/FIQ aggregation and save-state restoration. SIMI is separate; GENSIO, MBUS and other peripheral windows remain phone-owned. | Establish extended IRQ ownership, physical timer clocks and reset domains; do not promote the unexercised timer-1 approximation. |
 | Display/input | Native PCD8544 and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures, while display type still comes from a RAM-read shortcut. | Add focused reset/command and mask/debounce tests, recover the real display-type source, then remove the shortcut. |
 
 The headless LCD mirror and delayed-key fixture are acceptance tooling in
@@ -81,7 +81,7 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 | Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | Retain while visible as calibration debt; replace with recovered clocks/transactions. |
 | Safety/acceptance guard | `DISABLE_CCONT_WATCHDOG` | Prevents an incompletely timed watchdog from hiding the investigated state; not hardware fidelity. |
 | Device-boundary prototypes | `MODEL_CCONT_PRESENT`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE` | Supported deep profile only; organic interfaces, incomplete contracts. |
-| Read-only diagnostics | `TRACE_HANDOFF`, `TRACE_DISPLAY`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS` | Log-only and bounded or scoped to a named investigation. |
+| Read-only diagnostics | `TRACE_HANDOFF`, `TRACE_DISPLAY`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS` | Log-only and bounded or scoped to a named investigation. |
 | Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
@@ -104,6 +104,7 @@ The retained trace switches are scoped as follows:
 | `TRACE_MAD2_LEDGER` | first-access MAD2 register census |
 | `TRACE_MAD2_TIMERS` | timer-0 divider/counter/compare and FIQ assertion/acknowledgement lifecycle |
 | `TRACE_MAD2_INTERRUPTS` | MAD2 source, pending, mask, acknowledgement and CPU-line routing transitions |
+| `TRACE_MAD2_CLOCKS` | reset-cause, watchdog, clock-control and timer-1 boot accesses |
 
 Firmware-address-specific implementations of retained traces live in
 `driver/nokia_3310_trace.inc`; ordinary MAD2 register taps remain beside their

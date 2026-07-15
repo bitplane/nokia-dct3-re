@@ -20,6 +20,10 @@ fixtures: overlapping physical keypad/charger sources, an IRQ held pending
 behind its masks, and register-enabled extended FIQ8 routing. The fixtures use
 only input ports and mapped MAD2 registers; their bounded trace checker does
 not treat timing-sensitive interrupt totals as structural-oracle fields.
+`make verify-mad2-clocks` checks both 3210 ROMs against the observed reset,
+watchdog and clock-control boot sequence and asserts that timer 1 remains
+unexercised. This is a negative coverage contract, not validation of timer-1
+semantics.
 The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.
