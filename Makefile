@@ -289,7 +289,12 @@ verify: run
 verify-ccont:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKI3210_TRACE_GENSIO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
-	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)/error.log --adc-profile sane
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_irq SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_PULSE_AT=0.2'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_irq/error.log
+	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log --adc-profile sane \
+		--require-charger-irq --summary $(RUN_DIR)_irq/boot_summary.txt
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier

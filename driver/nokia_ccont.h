@@ -16,12 +16,14 @@ public:
 	void select_w(bool selected);
 	void set_adc_source(unsigned channel, uint16_t value);
 	void set_boot_status(uint8_t status);
+	void latch_irq_sources(uint8_t sources);
 	void set_present(bool present) { m_present = present; }
 	bool watchdog_tick();
 
 protected:
 	virtual void device_start() override ATTR_COLD;
 	virtual void device_reset() override ATTR_COLD;
+	virtual void device_post_load() override;
 
 private:
 	void update_irq();

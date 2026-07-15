@@ -30,11 +30,13 @@ noki3210_oracle_taps = {}
 local taps = noki3210_oracle_taps
 local startup_ready_time = nil
 local post_key_active = nil
+local charger_pulse_at
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
 	ccont_bytes = 0, ccont_reads = 0, eeprom_starts = 0,
 	eeprom_signal_writes = 0, irq_seen = 0, fiq_seen = 0, soft_resets = 0,
+	final_irq_status = 0,
 	final_current_task = 0, final_startup_mode = 0, final_startup_event = 0,
 	final_startup_flags = 0, final_contact_status = 0,
 	final_no_sim = 0, final_sim_enable = 0,
@@ -46,6 +48,9 @@ local function env_number(name, fallback)
 	local value = tonumber(os.getenv(name) or "")
 	return value or fallback
 end
+
+charger_pulse_at = env_number("NOKI3210_CCONT_CHARGER_PULSE_AT", -1)
+local charger_pulse_duration = env_number("NOKI3210_CCONT_CHARGER_PULSE_DURATION", 0.05)
 
 local function emulation_seconds()
 	return machine.time:as_double()
@@ -67,6 +72,7 @@ local key_fields = {
 	c = field_by_mask("COL.2", 0x02), minus = field_by_mask("COL.3", 0x04),
 	star = field_by_mask("COL.4", 0x02), power = field_by_mask("PWR", 0x01),
 }
+local charger_field = field_by_mask("CHARGER", 0x01)
 
 local function press(name)
 	local field = key_fields[name]
@@ -219,6 +225,7 @@ local function write_boot_summary()
 		string.format("lcd_full_dumps=%d", lcd_full_dumps),
 		string.format("soft_resets=%d", structural.soft_resets),
 		string.format("irq_seen=%02X", structural.irq_seen), string.format("fiq_seen=%02X", structural.fiq_seen),
+		string.format("final_irq_status=%02X", structural.final_irq_status),
 		string.format("gensio_controls=%s", hex_set(structural.gensio_controls, 2)),
 		string.format("ccont_bytes=%d", structural.ccont_bytes), string.format("ccont_reads=%d", structural.ccont_reads),
 		string.format("ccont_commands=%s", hex_set(structural.ccont_commands, 2)),
@@ -276,6 +283,7 @@ end
 
 local function sample_structural_state()
 	structural.irq_seen = structural.irq_seen | space:read_u8(0x20009)
+	structural.final_irq_status = space:read_u8(0x20009)
 	structural.fiq_seen = structural.fiq_seen | space:read_u8(0x20008)
 	structural.final_current_task = space:read_u8(0x100002)
 	structural.final_startup_mode = space:read_u16(v501 and 0x11224c or 0x1123f0)
@@ -327,6 +335,16 @@ if #post_keys > 0 then
 		end
 	end)
 	assert(coroutine.resume(input_timer))
+end
+
+if charger_pulse_at >= 0 and charger_field then
+	local charger_timer = coroutine.create(function()
+		emu.wait(charger_pulse_at)
+		charger_field:set_value(1)
+		emu.wait(charger_pulse_duration)
+		charger_field:clear_value()
+	end)
+	assert(coroutine.resume(charger_timer))
 end
 
 -- Keep the semantic oracle current independently of display activity.

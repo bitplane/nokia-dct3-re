@@ -262,6 +262,7 @@ public:
 	void noki8xxx(machine_config &config);
 
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
+	DECLARE_INPUT_CHANGED_MEMBER(charger_irq);
 
 private:
 	virtual void machine_start() override ATTR_COLD;
@@ -1352,6 +1353,14 @@ INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 	update_keypad_ccont_irqs();
 }
 
+INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )
+{
+	// CCONT status bit 3 is the firmware-established charger event. The source
+	// is latched on connection and remains set until firmware acknowledges it.
+	if (newval)
+		m_ccont->latch_irq_sources(0x08);
+}
+
 static INPUT_PORTS_START( noki3310 )
 	PORT_START("COL.0")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
@@ -1388,6 +1397,9 @@ static INPUT_PORTS_START( noki3310 )
 	PORT_START("PWR")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_CODE(KEYCODE_SPACE)    PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)
 	PORT_BIT( 0x1e, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::charger_irq), 0)
 INPUT_PORTS_END
 
 void noki3310_state::noki3310(machine_config &config)

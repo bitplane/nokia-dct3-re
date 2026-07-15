@@ -9,7 +9,7 @@
     },
     {
       "id": "ccont_register_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers, upper-bit IRQ masking, write-one-to-clear acknowledgement, PWRONX reset-cause bit 1 and MAD2 IRQ6 routing",
+      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers, upper-bit IRQ masking, write-one-to-clear acknowledgement, PWRONX reset-cause bit 1 and MAD2 IRQ6 routing; focused organic traces validate all eight configured ADC selectors plus charger-source assertion, acknowledgement and deassertion",
       "evidence": ["docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
     },
     {

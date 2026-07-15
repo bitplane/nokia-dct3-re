@@ -86,10 +86,11 @@ Extraction is justified when each block has:
 4. a 3210 oracle plus at least one second-ROM execution trace; and
 5. a focused regression for timers, interrupt masking and serial selection.
 
-Those focused regressions do not yet exist. Current confidence comes from the
-coherent integration oracle, the bounded access census and selected v5.01
-alignment; this is sufficient to retain the block behavior, but not to promote
-the phone-owned switch statement into a reusable MAD2 device.
+GENSIO selection and the CCONT IRQ6 route now have a focused regression. Timer
+and general interrupt-mask regressions remain outstanding. Current confidence
+also comes from the coherent integration oracle, bounded access census and
+selected v5.01 alignment; this is sufficient to retain the block behavior, but
+not to promote the phone-owned switch statement into a reusable MAD2 device.
 
 Until the second ROM is normalized, `NOKI3210_TRACE_MAD2_LEDGER=1` provides the
 curated 3210 evidence pass: at most one read and one write record per MAD2 byte
@@ -146,9 +147,12 @@ tracing establish:
 The causal status model returns `0x03` after selection, `0x07` after a CCONT
 command byte and `0x03` after consuming `0x6c`. A one-second trace produced
 both complete read and write transactions and exercised both values.
-`make verify-ccont` validates the phase/status grammar from this bounded organic
-trace, and the MAD2 endpoint/status state is registered for save states alongside
-the CCONT device state. The byte-exact 20-second oracle was unchanged. An
+`make verify-ccont` validates the phase/status grammar and all eight configured
+ADC selectors from this bounded organic trace. A second physical-input fixture
+latches charger source bit 3 and proves firmware-visible status, MAD2 IRQ6
+routing, write-one-clear acknowledgement and final deassertion. The MAD2
+endpoint/status state is registered for save states alongside the CCONT device
+state. The byte-exact 20-second oracle was unchanged. An
 earlier interpretation that firmware polled status bit 3 was
 incorrect: Thumb `LSRS #3` exposes original bit 2 through carry.
 

@@ -1,6 +1,12 @@
 import unittest
 
-from tools.gensio_trace_check import check_accesses, parse_accesses
+from tools.gensio_trace_check import (
+    check_accesses,
+    check_adc,
+    check_charger_irq,
+    decode_transactions,
+    parse_accesses,
+)
 
 
 class GensioTraceCheckTest(unittest.TestCase):
@@ -38,6 +44,58 @@ class GensioTraceCheckTest(unittest.TestCase):
         ]
         errors, _ = check_accesses(accesses)
         self.assertIn("CCONT data read without a pending read command", errors)
+
+    def test_adc_result_packing(self):
+        transactions = []
+        values = tuple((selector << 8) | selector for selector in range(8))
+        for selector, value in enumerate(values):
+            transactions.extend(
+                (
+                    ("W", 0, selector << 4),
+                    ("R", 2, value & 0xFF),
+                    ("R", 3, 0xB0 | ((value >> 8) & 0x03)),
+                )
+            )
+        errors, counts = check_adc(transactions, values)
+        self.assertEqual([], errors)
+        self.assertEqual({"adc_reads": 16, "adc_selectors": 8}, counts)
+
+    def test_adc_detects_bad_upper_bits(self):
+        transactions = [("W", 0, selector << 4) for selector in range(8)]
+        transactions.extend((("W", 0, 0x20), ("R", 3, 0xB0)))
+        errors, _ = check_adc(transactions, (0, 0, 0x300, 0, 0, 0, 0, 0))
+        self.assertIn(
+            "ADC selector 2 register 3 returned 0xb0, expected 0xb3", errors
+        )
+
+    def test_charger_irq_lifecycle(self):
+        transactions = [
+            ("W", 0x0F, 0xF0),
+            ("R", 0x0E, 0x0A),
+            ("W", 0x0E, 0x08),
+            ("R", 0x0E, 0x02),
+        ]
+        summary = "irq_seen=40\nfinal_irq_status=00\n"
+        errors, counts = check_charger_irq(transactions, summary)
+        self.assertEqual([], errors)
+        self.assertEqual(
+            {"charger_status": 1, "charger_ack": 1, "charger_clear_read": 1},
+            counts,
+        )
+
+    def test_decoder_exposes_register_transactions(self):
+        accesses = [
+            ("W", 0x2D, 0x25),
+            ("W", 0x2C, 0x54),
+            ("R", 0x6D, 0x07),
+            ("R", 0x6C, 0x0F),
+            ("W", 0x2D, 0x25),
+            ("W", 0x2C, 0x28),
+            ("W", 0x2C, 0x31),
+        ]
+        errors, _, transactions = decode_transactions(accesses)
+        self.assertEqual([], errors)
+        self.assertEqual([("R", 0x0A, 0x0F), ("W", 0x05, 0x31)], transactions)
 
 
 if __name__ == "__main__":

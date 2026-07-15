@@ -38,8 +38,8 @@ The device boundary is classified by evidence level:
 | Surface | Classification | Basis and limitation |
 | --- | --- | --- |
 | CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status itself belongs to MAD2, not CCONT. |
-| Registers `0x2`/`0x3` ADC result | Derived contract | Firmware reads a ten-bit result through these registers. Immediate completion and the `0xb0` upper status bits remain inferred. |
-| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Derived contract | Firmware ISR behavior, coherent boot, and both ROMs agree. PWRONX bit 1 is established; the opt-in bit-0 presence overlay is provisional. |
+| Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
+| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | A charger-input fixture latches established source bit 3, exercises MAD2 IRQ6 and the firmware ISR, and proves write-one-clear acknowledgement and deassertion. PWRONX bit 1 is established; the opt-in bit-0 presence overlay is provisional. |
 | ADC selector values | Working fixture | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. `ADC_PROFILE` is test provisioning, not a battery model. |
 | RTC registers `0x7..0xa` | Prototype | The device returns host-local binary time. Firmware register use is mapped, but encoding, rollover, persistence, and determinism are not hardware-validated. |
 | Watchdog/power register `0x5` | Partial contract | Command values and power-off effect are firmware-derived. The phone supplies an arbitrary one-hertz tick; physical rate and reload arithmetic are unverified. |
@@ -96,7 +96,9 @@ not prove that physical GENSIO or CCONT has zero latency.
 
 Writing interrupt-status bits clears them. The IRQ output is active when
 `status & ~mask & 0xf8` is nonzero; the low reset/presence bits do not assert
-it. MAD2 owns the resulting CPU interrupt assertion.
+it. MAD2 owns the resulting CPU interrupt assertion. The default-inactive
+`CHARGER` input latches established source bit 3 on connection; disconnection
+has no assigned status effect pending hardware evidence.
 
 The complete v6.00 CCONT helper block `0x2b061c..0x2b0a16` aligns with v5.01
 `0x2ada48..0x2ade42`. This covers register reads/writes, RTC helpers, watchdog
@@ -198,13 +200,16 @@ IRQ contract.
    independent chip documentation; the v5.01 same-product control is complete.
 
 The structural summary records CCONT commands and read counts, but those totals
-remain diagnostic. `make verify-ccont RUN_DIR=<dir>` is the focused transport
-gate: it runs an organic one-second firmware trace and requires endpoint
-selection, command/data pairing, idle status `0x03`, read-ready status `0x07`,
-and completion of both read and write transactions. MAD2 endpoint/status state
-and the CCONT command phase are save-state registered together.
+remain diagnostic. `make verify-ccont RUN_DIR=<dir>` is the focused
+transport/register gate. Its ordinary run requires endpoint selection,
+command/data pairing, status values `0x03`/`0x07`, both transaction directions,
+and correct ADC packing for all eight `sane` selector fixtures. Its second run
+pulses the charger input and requires status bit 3, MAD2 IRQ6, firmware
+write-one-clear acknowledgement and final IRQ deassertion. MAD2 endpoint/status
+state and CCONT register, command and IRQ state are save-state registered
+together; post-load reconstructs the IRQ output.
 
-The focused gate does not yet validate register reset values, mask/clear
-transitions, ADC result packing, RTC reads, watchdog expiry, or save-state
+The focused gate does not yet validate every register reset value, mask changes
+while a source is pending, RTC encoding, watchdog expiry, or full save-state
 resumption. The byte-exact default frame and coherent frontier continue to
 protect those behaviors only at integration level.
