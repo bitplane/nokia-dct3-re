@@ -160,6 +160,14 @@ any of the three `0x05eb` publication tails (`0x2632be`, `0x263bd4`,
 `0x08ac` inputs. These completion tails are valid framework contracts, but are
 not the missing ordinary code-7 producer in the current lifecycle.
 
+The post-`0x622a` audit reproduces that result with the application-release
+boundary timestamped. After the group begins at about 1.286 s, none of the six
+registration entry/predicate/tail sites executes during the eight-second run.
+Callback `0x5d` receives only its earlier initialization sweep `0x05e2` at
+1.255 s. The later organic `0x05e1` at 3.964 s belongs specifically to callback
+`0x2f`'s private initialization lifecycle, as previously falsified; it is not a
+global completion lost before callback `0x5d`.
+
 The canonical profile produces `0x08ac` twice and enters `0x27f150` twice.
 Availability helper `0x287250(0)` has two card-provisioning success paths:
 
@@ -195,3 +203,13 @@ Status `0x013a` is a callback-`0x24` input in framework mode 11; callback
 `0x013b` belongs to a resident descriptor registered at `0x28ba9a` only after
 input `0x03ab` establishes the same mode. The coherent boot remains in mode 0, making
 this a later conditional route rather than the ordinary code-7 owner.
+
+The adjacent start-side status is now closed as well. Display dispatcher
+`0x28bddc` selects `0x28c22c` on `0x0794`; that branch calls the code-6/resource
+`0x6a00` wrapper. The status census finds no direct `0x0794` producer. Its sole
+predecessor is catalogue input `0x32b4`/`0x72b4` (index `0x12b4`), and no
+in-ROM producer exists for either packed form. The `0x0794`/`0x0795` adjacency
+therefore confirms a start/terminal controller lifecycle, but not an ordinary
+bootstrap source. Likewise, `0x03ab` has one consumer at `0x28ba64` and no
+recovered in-ROM producer; it cannot be promoted from an external contract to
+a normal startup event by observing that the stalled run remains in mode 0.

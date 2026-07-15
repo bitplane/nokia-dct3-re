@@ -65,8 +65,8 @@
     {
       "id": "task19_state6_is_missing_pack_characterization", "status": "disproven",
       "hypothesis": "The selector-4=0x14 detour reaches an unfinished normal task-19 pack-characterization state whose completion supplies report code 7",
-      "conclusion": "The fixture enters task 19 through abnormal/recovery event 0x44 and subsequently observes events 0x31, 0x49, 0x28, and 0x27. State 6 has not begun: its entry waits for distinct event 0x43, whose only recovered organic poster is 0x2a6880 via switch arm 0x23587e. Lowering selector 4 therefore diverts a previously coherent power lifecycle rather than revealing the ordinary code-7 predecessor.",
-      "evidence": ["docs/battery_classifier_analysis.md"]
+      "conclusion": "Static correction shows low selector 4 is not intrinsically abnormal: below 39 selects init mode 4, and the independent consumer below 26 clears charge/fault state 0 and posts event 0x44. Mode 4 skips the 0x27d5fc source-7 guard, but its distinct completion state waits for event 0x43. A single statically derived fixture (selector 4=0x14, selector 1=0x180) selects mode 4 without poweroff but leaves the monitor uninitialized, checklist 0x0b, task 1 in mode 0x000d, and code 7 absent. Backward census proves the sole event-0x43 poster is selected by payload 3 of incoming contact-service command 0x8e; the handler's sole MCU 0x8e construction is its acknowledgement. This is a dormant external service/test request, not an ordinary battery completion, so neither event 0x43 nor mode 4 is a valid normal-boot escape.",
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/contact_service_topology.md"]
     },
     {
       "id": "task5_1400_ordinary_code7_route", "status": "disproven",
@@ -83,7 +83,7 @@
     {
       "id": "display_06ca_0795_mode4_route", "status": "disproven",
       "hypothesis": "Display status 0x06ca supplies ordinary report code 7 through 0x0795 while task 1 is parked in mode 0x0004",
-      "conclusion": "The 0x06ca case at 0x28c268 reaches the 0x0795 generator only when getter 0x2af066 returns startup/display state 7. The ordinary fallback enters mode 0x0004 after setter 0x2af058 establishes state 3; state 7 belongs a separate mode-2 branch after input code 0x10. Coherent runtime observes state 3 and no 0x06ca/0x0795 publication.",
+      "conclusion": "The 0x06ca case at 0x28c268 reaches the 0x0795 generator only when getter 0x2af066 returns startup/display state 7. The coherently observed mode-0x0004 route establishes state 3 through setter 0x2af058; state 7 belongs a separate mode-2 branch after input code 0x10. Coherent runtime observes state 3 and no 0x06ca/0x0795 publication.",
       "evidence": ["docs/interactive_handoff.md"]
     },
     {
@@ -199,6 +199,30 @@
       "hypothesis": "A faithful 3210 ADC routing and factory calibration fixture can hold one constant source-7 value that survives cold boot, produces classifier state 3, and advances 0x2a6942",
       "conclusion": "Both cold-boot safety 0x27d5fc and the later classifier consume source 7, which runtime maps to physical CCONT channel 1, through the same gain, zero offset, and 1500/313 scaling. Cold boot powers off below 0x0834, while state 3 requires a value below 0x076c. These ranges are disjoint by 200 scaled units for every common affine calibration. At unity gain the predicted minimum safe raw value is 0x1b7 and the maximum state-3 value is 0x18c; coherent runs confirm 0x1b6 powers off before task 1 and 0x1b7 reaches mode 0x000d. EEPROM descriptors 2/3/4 map to 0x0248..0x025b; both collected 3210 images are erased there and validly select ROM defaults. No safe constant-input fixture reached state 3 or a legitimate code-7 caller.",
       "evidence": ["docs/battery_classifier_analysis.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "selector1_selector4_pair_recognition_table", "status": "disproven",
+      "hypothesis": "Reader 0x2a68c4 and helpers 0x2b64fc/0x2b59e0/0x2b5446/0x2b63cc interpolate a selector-1/selector-4 pair into a recognized-pack class that can supply an ordinary fixture",
+      "conclusion": "The complete 0x2a68c4 path reads selector 1 once and applies scalar integer-to-float, division by coefficient [0x11fde0+0x34], multiplication by coefficient [0x11fde0+0x38], and float-to-integer conversion. Selector 4 is handled independently by 0x2b4f2c using one raw threshold: below 39 stores 0x141 and selects init mode 4; otherwise it stores 0x4fb and selects mode 1. All 11 selector-1 reader callers, all five selector-4 decision callers, the sole 0x27cbec caller, and the sole recovered event-0x43 poster were classified. No two-input table or unique recognized region exists in this surface, so no non-swept coherent fixture can be derived from it.",
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/ccont_subsystem.md"]
+    },
+    {
+      "id": "mode0d_proper_advance_requires_classifier_state3", "status": "disproven",
+      "hypothesis": "The proper mode-0d advance requires monitor state 3, making the safe mode-1 guard and later gate statically disjoint",
+      "conclusion": "Exhaustive decode of 0x2a6942 proves state 0 returns 2, states 1/2 return 0, state 3 returns 1 or 3 according to flag bit 5, and every other byte returns 2. The mode-0d caller at 0x270edc accepts every nonzero result. Writer coverage shows 0x27ddfa initializes 0x110436 to state 0 and the sole later writer 0x27dcfa stores classifier states 1/2/3; no initialized writer produces state 4. Coherent runtime reaches the gate after state 1 has been published, but the accepted pre-classification state 0 removes the claimed static contradiction and points to readiness-versus-monitor ordering instead of an impossible ADC value.",
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/interactive_handoff.md"]
+    },
+    {
+      "id": "mode0d_state0_ordering_unlocks_code7_handoff", "status": "disproven",
+      "hypothesis": "Completing the application-readiness checklist before the first battery classification selects the accepted mode-0d branch and removes the code-7 boot wall",
+      "conclusion": "The full checklist is delayed as one firmware task group behind the modeled contact peer's service-empty 0x622a acknowledgement. Task 18 is merely the last task in the fixed resume order and posts code 0x12 immediately from its initializer. Although shortening the peer's calibrated delay could make 0x2a6942 observe accepted state 0 instead of state 1, the alternate tail at 0x270eee has its own mailbox receive and explicit code-7 comparison before shared interactive initialization. The coherently observed state-1 tail at 0x270fa4 waits for the same report. Timing therefore changes the selected wait but does not supply its prerequisite; no timing constant was changed.",
+      "evidence": ["docs/contact_service_topology.md", "docs/interactive_handoff.md", "docs/service_bootstrap.md"]
+    },
+    {
+      "id": "status0794_0795_pair_is_ordinary_code7_owner", "status": "unsupported",
+      "hypothesis": "The adjacent status-0x0794/code-6 and status-0x0795/code-7 routes form the missing ordinary bootstrap lifecycle",
+      "conclusion": "The pair is structurally real but has no evidenced ordinary initiator. Status 0x0794 selects 0x28c22c and code 6, but its sole predecessor is packed catalogue input 0x32b4/0x72b4, neither of which has an in-ROM producer. Both effective 0x0795 producers are later conditional routes. The non-display route requires framework mode 11 established by 0x03ab; 0x03ab has one consumer and no in-ROM producer. A fresh coherent trace confirms that the security editor starts before a real key reaches task 1, while mode 4 rejects the key without scanning, so editor completion cannot be the pre-input code-7 owner. No report, status, state, or timing correction is justified from this surface.",
+      "evidence": ["docs/interactive_handoff.md", "docs/resource_providers.md", "docs/message_topology_census.md"]
     }
   ]
 }

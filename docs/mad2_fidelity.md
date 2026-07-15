@@ -50,8 +50,8 @@ Confidence labels:
 | MBUS `18..1a` | byte/status state plus scheduled FIQ | Partial | Capture complete request/reply framing and collision/timing behavior. |
 | Vibrator/buzzer `1b/1c/1e` | register storage only | Placeholder | Connect outputs and derive divider/volume mapping. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
-| Key GPIO `28..2b` | matrix scan and IRQ approximation | Partial | Implement row/column direction and interrupt masks instead of unconditional key IRQ. |
-| GENSIO `2c..2e`, `6c..6f` | CCONT and LCD endpoints; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready | Partial | Confirm busy timing, remaining control bits and SELECT routing. |
+| Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, row direction/drive, masked falling-edge latch, shared IRQ6 acknowledgement | Cross-ROM contract | Confirm undocumented sibling registers and electrical debounce on hardware. |
+| GENSIO `2c..2e`, `6c..6f` | CCONT and LCD endpoints; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Partial | Confirm busy timing, remaining control bits and SELECT routing. |
 | SELECT2/3 aliases `ad..af`, `ed..ef` | backing registers | Placeholder | Identify attached companion devices and alias/decode behavior. |
 | SIMI `36..3f` | stateful SIM UART, FIFO/IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and the validated T=0 card lifecycle use the organic register/FIQ path; FIFO flag details remain open. |
 | UIF control pins `31..33`, `70..f3` | mostly backing registers | Placeholder | Map pin functions from service schematics and live access sequences. |
@@ -63,7 +63,9 @@ level callbacks and must not write MAD2 pending registers directly. The
 extracted CCONT follows this rule; DSP, MBUS and keypad currently remain inside
 the phone state. Known line assignments in the current model are DSP service 4,
 SIM probe 5, CCONT/keypad 6, with line 8 represented by the extended pending
-bit. Only CCONT line 6 has a component boundary; the other assignments need
+bit. The keypad's edge latch and CCONT's level are tracked independently and
+ORed onto shared line 6, so acknowledging a key cannot discard an active CCONT
+source. Only CCONT line 6 has a component boundary; the other assignments need
 hardware confirmation.
 
 ## Extraction gate
@@ -106,3 +108,9 @@ command byte and `0x03` after consuming `0x6c`. A one-second trace produced
 1,978 records and exercised both values; the byte-exact 20-second oracle was
 unchanged. An earlier interpretation that firmware polled status bit 3 was
 incorrect: Thumb `LSRS #3` exposes original bit 2 through carry.
+
+The v5.01 firmware repeats the same polling and transaction grammar
+instruction-for-instruction. Endpoint `0x25` selection is the observable
+transaction boundary in both ROMs. ADC result delivery remains synchronous in
+the model because neither firmware exposes a conversion-complete interrupt or
+a minimum busy duration that could be implemented without calibration.

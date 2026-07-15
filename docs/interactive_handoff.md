@@ -24,7 +24,7 @@ active-low keypad input
   -> raw event 0x0072
   -> task-1 mailbox
   -> task-1 mode-4 dispatcher
-  -> fallback 0x2701b0
+  -> unhandled-event return 0x2701b0
   -> no matrix scan, no decoded MMI key
 ```
 
@@ -55,8 +55,8 @@ lifecycle transition, not IRQ routing or scheduler delivery.
 For this ROM and the currently selected branch, report code `0x07` is an actual
 prerequisite. Both branches leaving mode `0x000d` converge on it:
 
-- the ordinary fallback enters mode `0x0004` and waits for code 7;
-- the alternate SIM-ready/no-charger route enters mode `0x0007` and also waits
+- the coherently observed route enters mode `0x0004` and waits for code 7;
+- the alternate state-0 route enters mode `0x0007` and also waits
   for code 7 before the shared initialization burst.
 
 Supplying code 7 diagnostically proves the immediate dependency: task 1 posts
@@ -72,8 +72,59 @@ code 7 to task 1. It has exactly four callers:
 | --- | --- | --- |
 | power/battery | `0x21e40c` | low-voltage shutdown outcome |
 | power/charger | `0x21f8de` | charging-completed outcome |
-| callback/status | `0x255c2e` | callback `0x5d` completion |
-| controller | `0x27f14e` | conditional/later controller outcome |
+| callback/status | `0x27b3b6` | callback `0x5d` completion |
+| controller | `0x255c3c` | status-`0x0795` controller completion |
+
+This report namespace is separate from the application-readiness selectors at
+`0x2520ec`. In particular, task 18's selector `0x12` marks checklist byte
+`0x112288`; it is not a neighboring task-1 report and says nothing directly
+about report code 7.
+
+Within the task-1 report family, code 7 has a genuine paired status.
+Wrapper `0x2af17a` publishes resource `0x6a00` and posts code 6. Callback
+`0x5d` emits that pair's code 6 on input `0x0348`, starts timer class `0x52` on
+`0x05e1` or `0x05e7`, and emits code 7/resource `0x6a01` only on terminal
+`0x05eb` or recoded timer completion `0x06c5`. This constrains code 7 to the
+terminal side of one startup resource lifecycle; it is not a generic per-task
+readiness ordinal. Code 6 is not necessarily delivered first: task 1 uses code
+7 to enter the following startup phase, then accepts code 6 together with codes
+`0x09`-`0x0d`, `0x0b`, and `0x1b`-`0x1c` while filling the six flags at
+`0x112390..0x112395`.
+
+### Task-1 report phase
+
+The task-1 consumer is now fully decoded across mode `0x0004`, the alternate
+mode-`0x0007` entry, and the phase opened by code 7. Both entry routes perform
+an explicit mailbox comparison with code 7 before shared initialization. Code
+7 then clears `0x11239d`, performs the initialization burst, and enters the
+following report phase.
+
+That phase has a finite event-to-state map:
+
+| Report | State effect |
+| --- | --- |
+| `0x09` | set `0x112390 = 1` |
+| `0x0a` | set `0x112394 = 1` |
+| `0x0b` | set `0x112393 = 1` |
+| `0x0c` | set `0x112392 = 1` |
+| `0x0d` | set `0x112391 = 1` |
+| `0x1c` | set `0x112395 = 1` |
+| `0x06` | set exit selector `0x112398 = 1` and leave the phase |
+| `0x1b` | set exit selector `0x112398 = 2` |
+| `0x04` | re-evaluate the six flags and exit selector |
+
+Once all six one-byte flags are set, selector 1 exits through the common
+mode-`0x000c` tail; selector 2 uses byte `0x11ff50`; selector 0 continues into
+the later event-`0x74` and display/keypad gates. Thus code 6/resource `0x6a00`
+is a decisive post-code-7 outcome, not a chronological prerequisite for code
+7. Byte `0x112396` is a later halfword state set at `0x271426`; `0x112397` and
+`0x11239b` have no recovered direct references. Byte `0x11239c` stores the
+startup classification selected by `0x2af0ae` and is also read by the startup
+supervisor. Byte `0x11239d` is cleared on code-7 entry and set only by
+`0x2b4652` when the previous keymap-decoded value is `0x0d` while display state
+is 1; the later event-`0x74` path uses it to permit the keypad scan fallback.
+This store is downstream of `0x2b46da -> 0x2b2f90` matrix scanning and cannot
+be the missing pre-code-7 transition.
 
 Callback `0x5d` is organically active in state `0x0b`. Direct inputs `0x05eb`
 and `0x06c5` report code 7. Inputs `0x05e1`, `0x05e7`, and `0x05dc` start a
@@ -84,13 +135,42 @@ proved. This is stronger than an unbounded “missing event” search: the open
 question is which valid external condition or transaction makes one of these
 already-known owners complete during a real 3210 boot.
 
+The alternate mode-0d exit no longer forms a static impossibility. Full decode
+of `0x2a6942` proves monitor state 0 returns 2 and is accepted; only initialized
+states 1 and 2 return zero. Battery initialization clears the state to 0 before
+the sole classifier writer publishes 1, 2, or 3. The coherent run reaches the
+gate after state 1 is published. A real boot may therefore avoid mode 4 through
+different ordering between the readiness checklist and the first monitor sample,
+without requiring the unsafe state-3 ADC region. That observation motivated the
+bounded timing audit below; it did not establish that the alternate branch would
+remove the report-code-7 dependency.
+
+That contract is now resolved for the emulated boot. Battery initialization
+holds state 0 from `0.200664 s`; the first classifier publication changes it to
+state 1 at `0.364121 s`. The eleven application-readiness writers do not begin
+until the modeled contact peer acknowledges the final service-empty `0x622a`
+transaction at `1.285269 s`. Firmware then resumes the complete second task
+group in a fixed order; task 18's immediate code-`0x12` call at `0x285c5e` is
+last at `1.297865 s`, and task 1 evaluates the gate at `1.298045 s`.
+
+This is a contact-peer timing dependency, not a uniquely late battery, CCONT,
+or task-18 response. It also is not the code-7 breakthrough: static comparison
+of the two mode-`0x000d` tails shows that the accepted state-0 branch at
+`0x270eee` performs its own mailbox receive and explicit comparison with code 7
+before the shared interactive initialization. The observed state-1 branch at
+`0x270fa4` waits for the same report in mode 4. Changing the peer's calibrated
+delay solely to win the state-0 window would select a different dead wait, so
+the delay is ledgered as fidelity debt and the frontier returns to the organic
+code-7 owner.
+
 ## Excluded owners
 
 The following candidates were tested or closed statically and must not be
 reintroduced without new evidence:
 
 - normal battery voltage, BSI, temperature, charger, or held-PWRONX values;
-- the pack-characterisation recovery route;
+- the mode-4 battery-characterisation route: its event `0x43` is selected only
+  by external contact-service command `0x8e` payload 3, not ordinary boot;
 - Advice-of-Charge initialization and exhausted-account completion;
 - display/service events `0x0280`-`0x0282` and the state-7 `0x06ca` route;
 - callback slot `0x45` and the `0x09d0`/`0x09d1` chooser;
@@ -122,8 +202,13 @@ Report code 7 is not a universal DCT3 “DSP ready” report:
 - Nokia 3330 v4.50 retains the same four-owner reporter topology statically.
 - Nokia 3210 v5.01 contains the same resource-`0x6a01`/code-7 wrapper at
   `0x2ac5bc`, with exactly four callers at `0x21e22c`, `0x21f772`, `0x252a4a`,
-  and `0x277d06`. Its task-1 branch still needs to be aligned before claiming
-  that it waits on code 7 identically.
+  and `0x277d06`. Its task-1 state machine at `0x26dc20..0x26df14` is
+  instruction-for-instruction equivalent to v6.00's
+  `0x27120e..0x271502`: both mode entries explicitly wait for code 7, then use
+  the same code-6/report-flag/event-`0x74` control flow. The state bytes are
+  relocated from v6.00 `0x112390..0x11239d` to v5.01
+  `0x1121bc..0x1121c9`. This proves the contract is stable across two 3210
+  firmware releases; it is not a v6.00-only lifecycle artifact.
 
 These controls reject generic peer traffic as justification for a synthetic
 report. The faithful correction must be observable by the 3210 firmware at a
@@ -149,11 +234,45 @@ historical oracle have been removed.
 
 The trace is read-only. A successful fix must work with it disabled.
 
-## Next bounded comparison
+The coherent release-to-key trace is now reproduced with a scheduler-backed
+Lua input timer. At `1.48 s` task 1 enters mode `0x0004`; a normal logical Enter
+press produces one IRQ6 entry and one event-`0x72` delivery to task 1. It takes
+mode-4 return `0x2701b0`; there are zero post-press matrix scans, zero
+code-7 posts, and no UI change. Contact status remains `0x49`, no-SIM is clear,
+and SIM ENABLE remains 1. This fixes the earliest divergence at the missing
+report-7 lifecycle rather than at keypad hardware or scheduler delivery. The
+former duplicate pair came from a callback plus a 200 Hz polling approximation;
+the cross-ROM register contract has replaced both with one masked edge latch.
 
-Align the v5.01 task-1 mode-4/mode-7 handlers and the four caller families with
-v6.00. If the older ROM waits on the same report, use the stable cross-version
-caller structure to identify the missing external condition. If it bypasses
-the wait, recover the branch predicate and its hardware/configuration inputs.
-Only behavior supported by that static comparison and an organic runtime
-request should be implemented.
+## Closed ownership and external evidence request
+
+The independent code-6 caller at `0x28c22c` is selected by status `0x0794`.
+The census finds no direct producer: its sole numeric predecessor is fixed
+catalogue input `0x32b4`/`0x72b4` (status index `0x12b4`), for which there is no
+in-ROM initiating producer. The adjacent code-7 status `0x0795` is a real
+terminal pair, but both of its effective producers are already classified as
+later conditional paths. One requires display state 7; the other requires
+framework mode 11 reached through external status `0x03ab`. Status `0x03ab`
+itself has one consumer literal and no recovered in-ROM producer. This closes
+the independent `0x0794`/`0x0795` family without turning current-state absence
+into an invented transition.
+
+A fresh eight-second coherent trace fixes the runtime ordering. Callback
+`0x47` starts the security/text transaction at `5.041746 s`. A logical Enter
+press at `6.316699 s` raises IRQ6 once and delivers event `0x72` once, but the
+delivery takes mode-4 unhandled return `0x2701b0`; no matrix scan or decoded
+key follows. Thus the interactive editor cannot be the ordinary
+pre-input owner of code 7: a real locked phone must cross the report boundary
+before its editor can accept input.
+
+No faithful correction is decidable from the available ROMs, synthetic
+provisioning, or coherent traces. All four code-7 callers and both code-6
+callers are classified; both collected 3210 EEPROM images are erased in the
+remaining calibration/security records, while the valid synthetic identity
+fixture changes presentation without publishing code 7. The smallest useful
+external evidence is one trace from a real 3210 v5.01 or v6.00 from reset to
+the first accepted key, containing either (a) the PC of the executed report-7
+caller, or (b) the ordered task-5 statuses around `0x0794`, `0x0795`, `0x0348`,
+`0x05e1`, `0x05eb`, and `0x06c5`. A provisioned 16 KiB EEPROM capture with
+personal identity bytes redacted but checksummed block structure preserved is
+the next-smallest input if execution tracing is unavailable.

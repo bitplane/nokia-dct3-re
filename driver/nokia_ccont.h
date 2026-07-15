@@ -13,10 +13,10 @@ public:
 	auto power_cb() { return m_power_cb.bind(); }
 	void serial_w(uint8_t data);
 	uint8_t serial_r();
+	void select_w(bool selected);
 	void set_adc_source(unsigned channel, uint16_t value);
-	void set_boot_status(uint8_t status) { m_boot_status = status; }
+	void set_boot_status(uint8_t status);
 	void set_present(bool present) { m_present = present; }
-	void raise_boot_irq(unsigned pulse);
 	bool watchdog_tick();
 
 protected:

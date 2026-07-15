@@ -155,14 +155,14 @@ constexpr offs_t FW_BATTERY_SOURCE_TABLE = 0x111488;
 constexpr offs_t FW_BATTERY_SOURCE_WEIGHT_TABLE = 0x111d5c;
 constexpr offs_t FW_BATTERY_SOURCE_REGION_END = 0x111d7f;
 constexpr offs_t FW_BATTERY_HW_MODE_LATCH = 0x11fe52;
-constexpr offs_t FW_STARTUP_WAIT_STATUS = 0x112398;
-constexpr offs_t FW_POST74_KEYPAD_FALLBACK_FLAG = 0x11239d;
-constexpr offs_t FW_STARTUP_MODE4_FLAG_RADIO = 0x112390;
-constexpr offs_t FW_STARTUP_MODE4_FLAG_INITIAL = 0x112391;
-constexpr offs_t FW_STARTUP_MODE4_FLAG_DISPLAY = 0x112392;
-constexpr offs_t FW_STARTUP_MODE4_FLAG_SERVICE = 0x112393;
-constexpr offs_t FW_STARTUP_MODE4_FLAG_BATTERY = 0x112394;
-constexpr offs_t FW_STARTUP_MODE4_FLAG_UI = 0x112395;
+constexpr offs_t FW_STARTUP_PHASE_EXIT_SELECTOR = 0x112398;
+constexpr offs_t FW_POST74_KEYPAD_SCAN_ARMED = 0x11239d;
+constexpr offs_t FW_STARTUP_PHASE_FLAG_CODE09 = 0x112390;
+constexpr offs_t FW_STARTUP_PHASE_FLAG_CODE0D = 0x112391;
+constexpr offs_t FW_STARTUP_PHASE_FLAG_CODE0C = 0x112392;
+constexpr offs_t FW_STARTUP_PHASE_FLAG_CODE0B = 0x112393;
+constexpr offs_t FW_STARTUP_PHASE_FLAG_CODE0A = 0x112394;
+constexpr offs_t FW_STARTUP_PHASE_FLAG_CODE1C = 0x112395;
 constexpr offs_t FW_STARTUP_DISPATCH_STATE = 0x1123ec;
 constexpr offs_t FW_STARTUP_EVENT = 0x1123ee;
 constexpr offs_t FW_STARTUP_MODE = 0x1123f0;
@@ -269,7 +269,6 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_fiq8);
 	TIMER_CALLBACK_MEMBER(timer_mbus);
 	TIMER_CALLBACK_MEMBER(timer_power_irq);
-	TIMER_CALLBACK_MEMBER(timer_keypad);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	uint16_t ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask);
@@ -303,7 +302,9 @@ private:
 	void complete_mbus_transfer();
 	void dsp_fiq0_w(int state);
 	void dsp_service_irq_w(int state);
-	uint8_t keypad_irq_state() const;
+	uint8_t keypad_columns_r(bool consume_power_on = false);
+	void update_keypad_columns();
+	void update_irq6_line();
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
 	uint32_t fw_dword(offs_t address) const;
@@ -332,9 +333,10 @@ private:
 	uint16_t      m_timer0_counter;
 	uint8_t       m_timer0_divider;
 	bool          m_timer0_compare_latched;
-	uint8_t       m_keypad_irq_state;
+	uint8_t       m_keypad_columns;
+	bool          m_keypad_irq_latched;
+	bool          m_ccont_irq_state;
 
-	uint32_t      m_power_irq_count;
 
 	emu_timer * m_timer0;
 	emu_timer * m_timer1;
@@ -342,7 +344,6 @@ private:
 	emu_timer * m_timer_fiq8;
 	emu_timer * m_timer_mbus;
 	emu_timer * m_timer_power_irq;
-	emu_timer * m_timer_keypad;
 
 	uint8_t       m_mad2_regs[0x100];
 	bool          m_mad2_trace_read[0x100] = {false};
@@ -456,16 +457,18 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 	{
 		if (!std::strcmp(profile, "sane") || !std::strcmp(profile, "charged"))
 		{
+			// Stable raw-selector fixtures. Electrical signal names and units are
+			// deliberately not assigned until a 3210 board-level source confirms them.
 			switch(id & 0x07)
 			{
-				case 0: return 0x000; // Accessory Detect: none
-				case 1: return 0x200; // RSSI: mid-scale
-				case 2: return 0x2d0; // Battery voltage: plausible charged pack
-				case 3: return 0x280; // Battery type
-				case 4: return 0x200; // Battery temperature
-				case 5: return std::strcmp(profile, "charged") ? 0x000 : 0x200; // Charger voltage
-				case 6: return 0x200; // VCXO temperature
-				case 7: return std::strcmp(profile, "charged") ? 0x000 : 0x120; // Charging current
+				case 0: return 0x000;
+				case 1: return 0x200;
+				case 2: return 0x2d0;
+				case 3: return 0x280;
+				case 4: return 0x200;
+				case 5: return std::strcmp(profile, "charged") ? 0x000 : 0x200;
+				case 6: return 0x200;
+				case 7: return std::strcmp(profile, "charged") ? 0x000 : 0x120;
 			}
 		}
 	}
@@ -537,7 +540,6 @@ void noki3310_state::machine_start()
 	m_timer_fiq8 = timer_alloc(FUNC(noki3310_state::timer_fiq8), this);
 	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
 	m_timer_power_irq = timer_alloc(FUNC(noki3310_state::timer_power_irq), this);
-	m_timer_keypad = timer_alloc(FUNC(noki3310_state::timer_keypad), this);
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -595,10 +597,8 @@ void noki3310_state::machine_reset()
 	m_mad2_regs[MAD2_MCU_RESET_CTRL] = 0x01;   // power-on flag
 	m_mad2_regs[MAD2_IRQ_CTRL] = 0x0a;         // disable FIQ and IRQ
 	m_mad2_regs[MAD2_WATCHDOG] = 0xff;         // disable MAD2 watchdog
-	// Load the ADC source model from the power scenario. Per-channel defaults are the
-	// chip's "battery present, no charger" rest state; nokia_adc_override applies the
-	// NOKI3210_ADC_PROFILE / ADCn knobs on top, so values are identical to before (the
-	// override is constant for a run). The scenario will become a typed object later.
+	// Load deterministic raw selector inputs. The firmware-observable selector
+	// contract is known; physical 3210 net names and analog units are not.
 	{
 		static const uint16_t adc_default[8] =
 				{ 0x000, 0x3ff, 0x3ff, 0x280, 0x200, 0x000, 0x200, 0x000 };
@@ -629,8 +629,9 @@ void noki3310_state::machine_reset()
 	m_timer0_counter = 0;
 	m_timer0_divider = 255;
 	m_timer0_compare_latched = false;
-	m_keypad_irq_state = 0xff;
-	m_power_irq_count = 0;
+	m_keypad_columns = 0x1f;
+	m_keypad_irq_latched = false;
+	m_ccont_irq_state = false;
 
 	const unsigned timer0_hz = nokia_env_u32("NOKI3210_TIMER0_HZ", 33055);
 	const unsigned timer1_hz = nokia_env_u32("NOKI3210_TIMER1_HZ", 1057);
@@ -641,8 +642,10 @@ void noki3310_state::machine_reset()
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
 	m_timer_fiq8->adjust(attotime::from_hz(fiq8_hz), 0, attotime::from_hz(fiq8_hz));
 	m_timer_mbus->adjust(attotime::never);
-	m_timer_power_irq->adjust(attotime::from_msec(nokia_env_u32("NOKI3210_POWER_IRQ_MS", 1000)));
-	m_timer_keypad->adjust(attotime::from_hz(200), 0, attotime::from_hz(200));
+	if (const char *delay = std::getenv("NOKI3210_POWER_IRQ_MS"))
+		m_timer_power_irq->adjust(attotime::from_msec(std::strtoul(delay, nullptr, 0)));
+	else
+		m_timer_power_irq->adjust(attotime::never);
 
 	// simulate power-on input
 	if (machine().system().name[4] == '8' || machine().system().name[4] == '5')
@@ -705,12 +708,8 @@ void noki3310_state::update_irq_line()
 
 void noki3310_state::ccont_irq_w(int state)
 {
-	const uint16_t irq_mask = uint16_t(1) << CCONT_IRQ_LINE_NUM;
-	if (state)
-		m_irq_status |= irq_mask;
-	else
-		m_irq_status &= ~irq_mask;
-	update_irq_line();
+	m_ccont_irq_state = bool(state);
+	update_irq6_line();
 }
 
 void noki3310_state::ccont_power_w(int state)
@@ -737,17 +736,50 @@ void noki3310_state::dsp_service_irq_w(int state)
 		assert_irq(4);
 }
 
-uint8_t noki3310_state::keypad_irq_state() const
+uint8_t noki3310_state::keypad_columns_r(bool consume_power_on)
 {
-	uint8_t data = 0xff;
+	uint8_t data = 0x1f;
+	const uint8_t rows_low = m_mad2_regs[0xa8] & ~m_mad2_regs[0x28] & 0x0f;
 
-	for (int i = 0; i < 5; i++)
-		data &= m_keypad[i]->read() | 0xe0;
+	for (unsigned column = 0; column < 5; column++)
+	{
+		const uint8_t keys = m_keypad[column]->read();
+		for (unsigned row = 0; row < 4; row++)
+			if (BIT(rows_low, row) && !BIT(keys, row + 1))
+				data &= ~(uint8_t(1) << column);
+	}
 
-	data &= m_pwr->read() | 0xe0;
-	if (nokia_env_u32("NOKI3210_HOLD_POWER_KEY", 0) != 0)
+	if (!BIT(m_pwr->read(), 0) || nokia_env_u32("NOKI3210_HOLD_POWER_KEY", 0) != 0)
 		data &= 0xfe;
-	return data;
+	if (m_power_on)
+	{
+		data &= m_power_on;
+		if (consume_power_on)
+			m_power_on = 0;
+	}
+	return data | 0xe0;
+}
+
+void noki3310_state::update_irq6_line()
+{
+	const uint16_t irq_mask = uint16_t(1) << CCONT_IRQ_LINE_NUM;
+	if (m_ccont_irq_state || m_keypad_irq_latched)
+		m_irq_status |= irq_mask;
+	else
+		m_irq_status &= ~irq_mask;
+	update_irq_line();
+}
+
+void noki3310_state::update_keypad_columns()
+{
+	const uint8_t columns = keypad_columns_r();
+	const uint8_t falling = m_keypad_columns & ~columns & ~m_mad2_regs[0x6b] & 0x1f;
+	m_keypad_columns = columns & 0x1f;
+	if (falling)
+	{
+		m_keypad_irq_latched = true;
+		update_irq6_line();
+	}
 }
 
 void noki3310_state::signal_mbus_fiq(int num)
@@ -787,8 +819,13 @@ void noki3310_state::ack_fiq(uint16_t mask)
 
 void noki3310_state::ack_irq(uint16_t mask)
 {
+	if (mask & (uint16_t(1) << CCONT_IRQ_LINE_NUM))
+		m_keypad_irq_latched = false;
 	m_irq_status &= ~mask;
-	update_irq_line();
+	if (mask & (uint16_t(1) << CCONT_IRQ_LINE_NUM))
+		update_irq6_line();
+	else
+		update_irq_line();
 }
 
 PCD8544_SCREEN_UPDATE(noki3310_state::pcd8544_screen_update)
@@ -867,25 +904,9 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_mbus)
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_power_irq)
 {
-	const unsigned pulse = m_power_irq_count++;
 	const bool assert_power_irq = nokia_env_u32("NOKI3210_POWER_IRQ_ASSERT", 1) != 0;
 	if (assert_power_irq)
 		assert_irq(0);
-
-	m_ccont->raise_boot_irq(pulse);
-}
-
-TIMER_CALLBACK_MEMBER(noki3310_state::timer_keypad)
-{
-	const uint8_t state = keypad_irq_state();
-	const uint8_t falling = m_keypad_irq_state & ~state & 0x1f;
-
-	if (falling != 0)
-	{
-		assert_irq(6);
-	}
-
-	m_keypad_irq_state = state;
 }
 
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
@@ -1730,7 +1751,9 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		//  (b) mode-0 interactive-init burst 0x270d1c / display_idle 0x298000 -- did they run? (not yet);
 		//  (c) 0x270184 -- every task-1 mode transition + caller lr;
 		//  (d) 0x26a204/0x26a354 -- inventory of codes posted to task-1's mailbox;
-		//  (e) 0x27d654 -- VBAT voltage-confirmation gate byte [0x110436] trajectory.
+		//  (e) 0x27d654 -- VBAT voltage-confirmation gate byte [0x110436] trajectory;
+		//  (f) 0x2520ec -- all eleven application-readiness checklist writes;
+		//  (g) 0x27dd30/0x27de48, 0x27dcf4, 0x2a6942 -- battery init, first classifier change, gate ordering.
 		if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr)
 		{
 			if (addr == 0x00270c8e)
@@ -1792,6 +1815,42 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					last = v;
 					logerror("vbatgate: [0x110436]=%02x t=%.4f\n", v, machine().time().as_double());
 				}
+			}
+			else if (addr == 0x002520ec)
+			{
+				const u32 code = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
+				const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+				logerror("readiness: code=%02x caller=%08x task=%02x "
+						"slots=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x "
+						"battery=%02x flags=%02x t=%.6f\n",
+						code, lr, debug_ram_byte(0x00100022),
+						debug_ram_byte(0x00112280), debug_ram_byte(0x00112281),
+						debug_ram_byte(0x00112282), debug_ram_byte(0x00112283),
+						debug_ram_byte(0x00112284), debug_ram_byte(0x00112285),
+						debug_ram_byte(0x00112286), debug_ram_byte(0x00112287),
+						debug_ram_byte(0x00112288), debug_ram_byte(0x00112289),
+						debug_ram_byte(0x0011228a), debug_ram_byte(FW_BATTERY_STATE),
+						debug_ram_byte(0x00112399), machine().time().as_double());
+			}
+			else if (addr == 0x0027dd30 || addr == 0x0027de48)
+			{
+				logerror("battery_order: phase=%s state=%02x task=%02x t=%.6f\n",
+						addr == 0x0027dd30 ? "init-entry" : "init-exit",
+						debug_ram_byte(FW_BATTERY_STATE), debug_ram_byte(0x00100022),
+						machine().time().as_double());
+			}
+			else if (addr == 0x0027dcf4)
+			{
+				logerror("battery_order: phase=classifier-change old=%02x new=%02x task=%02x t=%.6f\n",
+						debug_ram_byte(FW_BATTERY_STATE),
+						m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+						debug_ram_byte(0x00100022), machine().time().as_double());
+			}
+			else if (addr == 0x002a6942)
+			{
+				logerror("battery_order: phase=mode0d-gate state=%02x ready=%02x task=%02x t=%.6f\n",
+						debug_ram_byte(FW_BATTERY_STATE), debug_ram_byte(0x00112399),
+						debug_ram_byte(0x00100022), machine().time().as_double());
 			}
 			// mode-write epilogue 0x270184 (strh r0,[r4,#4]): every task-1 mode transition + its caller lr.
 			else if (addr == 0x00270184)
@@ -2062,19 +2121,7 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			data |= 0xc0;
 			break;
 		case 0x2a:
-			data = 0xff;
-			for(int i=0; i<5; i++)
-				if (!(m_mad2_regs[0x28] & (1 <<i)))
-					data &= m_keypad[i]->read() | 0xe0;
-
-			data &= m_pwr->read() | 0xe0;
-			if (m_power_on)
-			{
-				data &= m_power_on;
-				m_power_on = 0;
-			}
-			if (nokia_env_u32("NOKI3210_HOLD_POWER_KEY", 0) != 0)
-				data &= 0xfe;
+			data = keypad_columns_r(true);
 			break;
 		case 0x37:  // SIM UART RxD
 			if (m_sim_card->enabled())
@@ -2161,13 +2208,15 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 	if (offset == 0x2d)
 	{
 		// Selecting a GENSIO endpoint leaves the controller idle and its
-		// transmit path available. Read-data-ready is transaction-local.
+		// transmit path available. Endpoint 0x25 also starts a new CCONT
+		// command phase; both supported 3210 ROMs rely on that boundary.
 		m_gensio_status = 0x03;
+		m_ccont->select_w(BIT(data, 2));
 	}
 	else if (offset == 0x2c && (m_mad2_regs[0x2d] & 0x04))
 	{
-		// CCONT transfers complete synchronously for now; the firmware polls
-		// status bit 2 before consuming a register byte from 0x6c.
+		// Both 3210 ROMs poll status bit 2 before consuming a CCONT register
+		// byte. No separate ADC-completion IRQ or minimum delay is observable.
 		m_gensio_status |= 0x04;
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
@@ -2189,6 +2238,8 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		m_eeprom->write_sda(BIT(direction, 0) ? BIT(signal, 0) : 1);
 		m_eeprom->write_scl(BIT(signal, 3));
 	}
+	if (offset == 0x28 || offset == 0x6b || offset == 0xa8)
+		update_keypad_columns();
 
 	switch(offset)
 	{
@@ -2310,8 +2361,7 @@ void noki3310_state::noki3310_map(address_map &map)
 
 INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 {
-	if (!newval)    // TODO: COL/ROW IRQ mask
-		assert_irq(6);
+	update_keypad_columns();
 }
 
 static INPUT_PORTS_START( noki3310 )

@@ -27,11 +27,12 @@ The ordinary SIM initialization contract is satisfied. With provisioned phone
 identity data, firmware paints an idle-like `Menu` frame, but task 1 remains in
 startup mode `0x0004`.
 
-The keypad lifecycle is bounded:
+The keypad lifecycle is bounded and its MAD2 register contract is aligned in
+3210 v6.00 and v5.01:
 
 ```text
 IRQ6 -> ISR 0x2b5da0 -> event 0x72 -> mailbox/task 1
-     -> mode-4 fallback 0x2701b0 -> no matrix decode
+     -> mode-4 unhandled-event return 0x2701b0 -> no matrix decode
 ```
 
 Report code `0x07` is an actual prerequisite for this 3210 v6.00 branch. Its
@@ -57,7 +58,7 @@ one of them has yet been proved. The next static control is the same-product
 | Area | Current role | Remaining work |
 | --- | --- | --- |
 | SIM | `nokia_sim_card_device` owns stateful SIMI/FIQ6 transport and requested GSM 11.11 files. | Extend only for organically requested commands; validate FIFO flags. |
-| CCONT | `nokia_ccont_device` owns serial registers, ADC values, RTC, watchdog, power and IRQ output. | Complete GENSIO transaction/reset semantics and validate ADC IRQ behavior. |
+| CCONT | `nokia_ccont_device` owns serial registers, raw ADC selectors, RTC, watchdog, power and IRQ output; v6.00/v5.01 share the transaction and IRQ contract. | Obtain board-level selector names, analog units, conversion timing and watchdog clock from hardware evidence. |
 | EEPROM | Native MAME `I2C_24C128` plus generated profile. | Decode remaining security/product fields and parallel alias behavior. |
 | DSP/contact | `nokia_dsp_peer_device` owns shared RAM, ring state, service timing, and the request-driven contact peer. | Stabilize and extend the wider mailbox contract from observed requests; validate it on a sibling ROM family. |
 | MAD2 | Phone-owned timers, interrupt aggregation, GENSIO, SIMI window and DSP control registers. | Improve reset/decode fidelity before extracting shared blocks. |

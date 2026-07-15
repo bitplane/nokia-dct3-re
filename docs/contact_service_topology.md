@@ -1,7 +1,7 @@
 # Contact-service command topology
 
 This document is the authoritative 3210 v6.00 map for contact-service class
-`0x40` commands `0x64`, `0x65`, `0x70`, `0x71`, and `0x74`. It distinguishes an
+`0x40` commands `0x64`, `0x65`, `0x70`, `0x71`, `0x74`, and `0x8e`. It distinguishes an
 incoming command consumer from an MCU constructor carrying the same command id.
 That distinction matters because several constructors are acknowledgements and
 therefore do not identify the initiating producer.
@@ -93,6 +93,21 @@ transaction; firmware clears its own state, resumes the tasks, completes the
 checklist, posts event `0x15`, and advances startup. This replaces the historical
 direct-drain experiment that first isolated the chain.
 
+A timestamped coherent run closes the ordering contract. The peer acknowledges
+the final `0x622a` transaction at `t=1.285269`; firmware begins the second task
+group immediately, and its checklist calls follow the supervisor's static
+resume order: `0x0a`, `0x0b`, `0x0c`, `0x0d`, `0x10`, `0x0f`, `0x0e`, `0x15`,
+`0x14`, `0x11`, then `0x12`. Task 18's straight-line initializer at `0x285c14`
+posts the final code at `0x285c5e`, and task 1 evaluates `0x2a6942` at
+`t=1.298045`. There is no independently late checklist owner or ADC completion:
+the complete application group is held behind the service-empty transaction.
+
+The current contact peer deliberately waits 36 service ticks before beginning
+the external session. That calibrated delay contributes to this ordering and
+remains hardware-fidelity debt, but is not adjusted merely to select a different
+firmware branch. The alternate mode-`0x000d` tail also waits explicitly for
+report code 7 and therefore does not remove the current boot frontier.
+
 ## Command inventory
 
 | Command | Incoming consumer | Sole MCU constructor | Constructor role | Initiating producer |
@@ -102,11 +117,14 @@ direct-drain experiment that first isolated the chain.
 | `0x70` | `0x23670c` | `0x236742`, len 1 | ack after applying incoming 0x40-byte channel map | **external service/test peer request**, MCU ack |
 | `0x71` | `0x23670c` | `0x236736`, len 0 | ack after disabling channel map | **external service/test peer request**, MCU ack |
 | `0x74` | `0x236560` | `0x23662c`, len 0 | completion ack after incoming indexed NV operation | **external service/test peer request**, MCU ack |
+| `0x8e` | `0x235848` | `0x2358a0`, len 1 | echoes the selector after executing its service action | **external service/test peer request**, MCU ack |
 
 The `0x65` constructor has callers at `0x236c52`, `0x2379f4`, and `0x292462`.
 The latter establishes an MCU-side initiating path independently of receipt of a
-same-id contact command. By contrast, the `0x70`, `0x71`, and `0x74`
-constructors are dominated by their incoming handlers. Combined with their
+same-id contact command. By contrast, the `0x70`, `0x71`, `0x74`, and `0x8e`
+constructors are dominated by their incoming handlers. Command `0x8e` selector
+3 posts task-19 event `0x43`, selector 4 posts event `0x44`, and the handler then
+acknowledges the selector. Combined with their
 external-service transport destination, they are the reply side of peer-initiated
 contracts.
 
@@ -117,7 +135,7 @@ six-second `FRONTIER_ENV` trace. Across them the census records command `0x64`
 construct/send/receive counts `3/2/2` and command `0x70` counts `1/1/1`.
 The frontier run observes the peer's result-1 `0x64`, 64-byte `0x70` channel
 map, and result-5 `0x64`, together with the firmware acknowledgements described
-above. Commands `0x65`, `0x71`, and contact command `0x74` remain absent from
+above. Commands `0x65`, `0x71`, contact command `0x74`, and command `0x8e` remain absent from
 these bounded boots; the static constructor census supplies their ROM coverage.
 
 The older bridge-profile trace posted one header-incomplete healthy `0x64`

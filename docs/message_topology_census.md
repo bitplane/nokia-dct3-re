@@ -208,9 +208,17 @@ The ROM scan recovered 98 calls to `contact_message_alloc_234634`. The five targ
 - Runtime construct/send/receive occurrences: 0 / 0 / 0
 - Evidence: The sole command constructor is inside the incoming indexed-operation handler. Contact frames pass through task 7's external service transport. It is unrelated to the direct scheduler-event 0x74 producers at 0x213fcc and 0x214836.
 
+### Command `0x8e`: battery_service_control
+
+- Incoming consumer: `0x235848`
+- MCU constructor(s): `0x2358a0`/len `1` (acknowledgement echoing the selector byte after the incoming command dispatches one of five service actions)
+- Initiating-producer classification: **external service/test peer request; MCU acknowledgement** (high static, dormant runtime)
+- Runtime construct/send/receive occurrences: 0 / 0 / 0
+- Evidence: The task-2 dispatcher selects 0x235848 only for incoming command 0x8e. Payload selector 3 calls 0x2a6880 to post task-19 event 0x43 and sets the associated state through 0x2a67d0; selector 4 analogously posts event 0x44. The sole 0x8e constructor at 0x2358a0 is dominated by this incoming handler and echoes the selector in its one-byte acknowledgement. No supplied coherent contact manifest observes the command.
+
 ## Contact-service transport boundary
 
-The strongest evidenced boundary is the external service/test peer behind task 7's lower service transport. Task 2 builds class-0x40 frames at 0x234634; 0x234684 offers them to channel 0x6400 via 0x2b203e and queues them through 0x2b0482; 0x2b0482 routes ordinary frames to task 7. The frame header is [0]=destination, [1]=source: after service discovery, MCU output is destination 0x02/source 0x00 (phone). The ROM census finds organic MCU output for 0x64 and 0x65, while 0x70, 0x71, and command 0x74 are external requests whose sole MCU constructors are acknowledgements. Task 7 is the on-device transport adapter, not the semantic producer of those requests.
+The strongest evidenced boundary is the external service/test peer behind task 7's lower service transport. Task 2 builds class-0x40 frames at 0x234634; 0x234684 offers them to channel 0x6400 via 0x2b203e and queues them through 0x2b0482; 0x2b0482 routes ordinary frames to task 7. The frame header is [0]=destination, [1]=source: after service discovery, MCU output is destination 0x02/source 0x00 (phone). The ROM census finds organic MCU output for 0x64 and 0x65, while 0x70, 0x71, 0x74, and 0x8e are external requests whose sole MCU constructors are acknowledgements. Task 7 is the on-device transport adapter, not the semantic producer of those requests.
 
 The numeric command and scheduler event `0x74` are separate namespaces. The ROM contains direct MCU producers of scheduler event `0x74` at `0x213fcc` and `0x214836`; they do not construct contact-service command `0x74`.
 

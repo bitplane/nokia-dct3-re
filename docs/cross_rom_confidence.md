@@ -74,8 +74,31 @@ An independent full-flash control is stored locally as
 Its report-7 wrapper is at `0x2ac5bc`. It publishes resource `0x6a010000`,
 posts code 7 to task 1, and has exactly four callers at `0x21e22c`,
 `0x21f772`, `0x252a4a`, and `0x277d06`. This is a same-product control for the
-stable four-owner topology. The task-1 branch comparison remains pending; the
-static wrapper alone does not prove that v5.01 waits on code 7 identically.
+stable four-owner topology.
+
+The task-1 branch comparison is now complete. The v5.01 block at
+`0x26dc20..0x26df14` is instruction-for-instruction equivalent to v6.00
+`0x27120e..0x271502`, including both explicit code-7 waits, the six report
+flags, code-6 exit-selector path, event-`0x74` gate, and final mode-`0x000c`
+tail. The corresponding v5.01 state block is `0x1121bc..0x1121c9`, relocated
+from v6.00 `0x112390..0x11239d`. Code 7 is therefore a stable 3210 contract,
+not an isolated v6.00 branch choice.
+
+The CCONT comparison is also complete at the firmware boundary. The v6.00 ADC
+reader `0x2b52cc`, register read/write helpers `0x2afb44`/`0x2afa74`, and IRQ
+ISR `0x2b08c6` align uniquely with v5.01 `0x2b2680`, `0x2acf70`/`0x2acea0`,
+and `0x2adcf2`. The wider helper blocks are instruction-equivalent, including
+GENSIO polling, command construction, watchdog/power helpers, status/mask
+calculation and write-one-to-clear acknowledgement. The ADC route tables
+(`0x2e2d74`/`0x2d7770`) and CCONT shadow/default tables
+(`0x2e2da8`/`0x2d777c`) are byte-identical. This supports one shared 3210
+device contract; it does not establish analog units or timing.
+
+The MAD2 power-key IRQ handler also aligns from v6.00 `0x2b3084` to v5.01
+`0x2b02fc`; both publish task-1 event `0x41` through corresponding wrappers
+`0x2b4662` and `0x2b18ea`. This makes the line ownership and firmware-visible
+transition stable. The optional edge-delay fixture is not enabled by the
+canonical profile because neither ROM provides a duration.
 
 ## Interactive sibling controls
 
@@ -91,8 +114,7 @@ that produces it must be derived from the 3210's own observed boundary.
 
 ## Acceptance criteria
 
-The next confidence increments are the 3210 v5.01 task-1 branch alignment and
-a 3330-specific structural summary: first
+The next confidence increment is a 3330-specific structural summary: first
 executed PC, interrupt activity, last stable startup phase and MAD2/CCONT
 requests. A useful failure is an organic firmware-visible hardware request; a
 firmware-PC hook added only for the 3330 is a portability failure.

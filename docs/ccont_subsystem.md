@@ -45,17 +45,20 @@ CCONT is selected through MAD2 GENSIO:
 
 The command selects `address = (command >> 3) & 0x0f`; bit `0x04` selects a
 read. Firmware helpers include `ccont_reg_read` at `0x2afb44` and the write path
-at `0x2afa74`. The older `0x2b5ae4` label was incorrect; that address is an IPC
-message-send wrapper, not CCONT transport.
+at `0x2afa74`. The v5.01 equivalents are `0x2acf70` and `0x2acea0` and are
+instruction-equivalent apart from relocated calls and literals. The older
+`0x2b5ae4` label was incorrect; that address is an IPC message-send wrapper,
+not CCONT transport.
 
 Firmware establishes three status predicates: bit 0 is polled before endpoint
 writes, bit 1 by controller-availability helper `0x2b642a`, and bit 2 after a
 CCONT read command. MAD2 starts at `0x03`, resets to `0x03` on endpoint
 selection, sets bit 2 after a CCONT transfer byte, and clears it when `0x6c` is
-consumed. Transfers remain synchronous, so no busy interval is represented.
-
-The CCONT device still assumes command/data alternation internally. GENSIO mode
-selection does not yet reset or validate that device phase.
+consumed. Both ROMs select endpoint `0x25` before every register helper and
+send a command byte first. Endpoint selection therefore resets the device to
+command phase. Transfers remain synchronous because neither ROM exposes a
+conversion-complete interrupt or a firmware-visible minimum delay; no invented
+busy interval is represented.
 
 ## Register map
 
@@ -77,29 +80,42 @@ Writing interrupt-status bits clears them. The IRQ output is active when
 `status & ~mask & 0xf8` is nonzero; the low reset/presence bits do not assert
 it. MAD2 owns the resulting CPU interrupt assertion.
 
+The complete v6.00 CCONT helper block `0x2b061c..0x2b0a16` aligns with v5.01
+`0x2ada48..0x2ade42`. This covers register reads/writes, RTC helpers, watchdog
+commands, power helpers and the IRQ acknowledge loop. The ROM shadow/default
+tables at v6.00 `0x2e2da8` and v5.01 `0x2d777c` are byte-identical. These are
+same-product controls for the register grammar, not independent chip
+documentation; command meanings that firmware never observes remain inferred.
+
 ## ADC selectors
 
-The table below is the current generic driver profile, not a validated 3210
-board netlist. The 3210 v6.00 firmware directly calls `0x2b52cc` with selector
-`0` in boot battery reader `0x2a84b0`, while the later ADC monitor maps logical
-source 7 through ROM table `0x2e2d74` to selector 1. Those are distinct paths;
-the electrical signal attached to each selector remains under validation.
+The 3210 v6.00 firmware directly calls `0x2b52cc` with selector `0` in boot
+battery reader `0x2a84b0`, while the later ADC monitor maps logical source 7
+through ROM table `0x2e2d74` to selector 1. Those are distinct paths; the
+electrical signal attached to each selector remains under validation.
 
-| Channel | Signal |
+The eight-byte route table is byte-identical in both firmware versions:
+v6.00 `0x2e2d74` and v5.01 `0x2d7770` contain
+`04 00 06 05 03 07 01 02`. This proves stable logical-source routing across
+the two 3210 builds, but it does not name the PCB nets behind the selectors.
+
+| Selector | Board-level interpretation |
 | ---: | --- |
-| 0 | accessory detection |
-| 1 | RSSI |
-| 2 | battery voltage |
-| 3 | battery type / BSI |
-| 4 | battery temperature |
-| 5 | charger voltage |
-| 6 | VCXO temperature |
-| 7 | charging current |
+| 0 | unresolved; consumed by the early battery reader |
+| 1 | unresolved; BSI is a corroborated hypothesis |
+| 2 | unresolved |
+| 3 | unresolved; battery-type/BSI is a generic DCT3 hypothesis |
+| 4 | temperature-like charging input; PCB net unresolved |
+| 5 | unresolved; consumed by charger-detection firmware |
+| 6 | unresolved |
+| 7 | unresolved |
 
-This generic mapping is consistent with some DCT3 service documentation, but it
-is not yet established for the 3210 PCB. Exact electrical scaling is likewise
-open. Environment profiles populate raw ten-bit values; this is scenario input,
-not a finished physical battery model.
+Static audit proves that selector 1 passes
+through affine calibration at `0x2a68c4`, while selector 4 independently selects
+battery-init mode 4 below raw 39 and mode 1 otherwise at `0x2b4f2c`. Neither
+function implements the hypothesised two-input pack-recognition table. Exact
+electrical naming and scaling remain open. Environment profiles populate raw
+ten-bit values; this is scenario input, not a finished physical battery model.
 
 ## Interrupt-to-firmware behavior
 
@@ -138,9 +154,24 @@ bit `0x02`; the IRQ output considers only upper sources `0xf8`.
 With those two device-boundary corrections, the provisioned boot reaches
 checklist `0x08 -> 0x09 -> 0x0b -> 0x0f` and mode `0x0004` with neither the
 former charged-battery RAM rewrite nor the event-15 delay-literal override.
-The IRQ count also falls from 51 to 11 because the low reset-cause bit no
+The canonical IRQ count also falls from 51 to 10 because the low reset-cause bit no
 longer repeatedly enters the interrupt cascade. This supersedes the former
 claim that a routing/subscription defect prevented organic sweep completion.
+
+PWRONX is reset/input status, not a delayed MAD2 IRQ0 event. The CCONT now
+latches bit `0x02` when the phone configures the cold-boot scenario, before the
+firmware's first status read. The unevidenced 120 ms IRQ0 pulse is no longer in
+the canonical profile; an explicit `NOKI3210_POWER_IRQ_MS` remains available as
+a power-key-edge fixture and does not mutate CCONT state. Removing the pulse
+preserves the contact/SIM frontier and does not produce report code 7.
+
+The power-key interrupt path is stable across the two ROMs: v6.00 handler
+`0x2b3084` aligns with v5.01 `0x2b02fc`, and each calls a tiny task-1 event
+`0x41` publisher (`0x2b4662`/`0x2b18ea`). This proves IRQ ownership and the
+firmware transition, but no default edge timing. CCONT
+watchdog-register data `0x00` enters the hardware power-off path; `0x20`,
+`0x31`, and `0x3f` program, service, and disable the watchdog lifecycle in the
+shared helper block. Its physical clock remains unverified.
 
 ## Important negative conclusions
 
@@ -166,14 +197,15 @@ transaction or IRQ contract, not another firmware event injection.
 
 1. Establish whether real GENSIO exposes a measurable busy interval and map
    the remaining endpoint-control bits.
-2. Reset or validate CCONT command/data phase at an evidenced boundary.
-3. Establish ADC request-to-result latency. Firmware routine `0x2b52cc` writes
+2. Establish ADC request-to-result latency. Firmware routine `0x2b52cc` writes
    the ADC control byte, polls GENSIO status, and reads the result registers;
    it does not wait for a CCONT interrupt. A synthetic conversion-complete IRQ
    is therefore excluded unless separate hardware evidence establishes one.
-4. Confirm reset values, RTC encoding, alarm behavior and watchdog tick source.
-5. Replace raw environment ADC overrides with typed battery, charger and RF
+3. Confirm RTC encoding, alarm behavior, watchdog tick source and the physical
+   timing of the MAD2 power-key edge.
+4. Replace raw environment ADC overrides with typed battery, charger and RF
    scenario inputs while retaining deterministic tests.
-6. Validate register semantics against a second ROM or working-phone trace.
+5. Validate remaining register semantics against a working-phone trace or
+   independent chip documentation; the v5.01 same-product control is complete.
 
 The 3210 oracle remains the regression gate for every behavior change.

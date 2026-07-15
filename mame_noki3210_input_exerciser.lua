@@ -40,6 +40,10 @@ local function env_number(name, fallback)
 	return value or fallback
 end
 
+local function emulation_seconds()
+	return machine.time:as_double()
+end
+
 local function field_by_mask(tag, mask)
 	local port = machine.ioport.ports[":" .. tag] or machine.ioport.ports[tag]
 	return port and port:field(mask) or nil
@@ -60,7 +64,7 @@ local key_fields = {
 local function press(name)
 	local field = key_fields[name]
 	if field and not active_fields[name] then
-		field:set_value(0)
+		field:set_value(1)
 		active_fields[name] = field
 		emu.print_info(string.format("input-press:frame=%d name=%s", frames, name))
 	end
@@ -236,6 +240,24 @@ local post_delay = env_number("NOKI3210_POST_READY_KEY_DELAY_MS", 250) / 1000
 local post_duration = env_number("NOKI3210_POST_READY_KEY_DURATION_MS", 750) / 1000
 local post_period = env_number("NOKI3210_POST_READY_KEY_PERIOD_MS", 0) / 1000
 
+local function update_post_ready_key()
+	if post_key and not startup_ready_time and (structural.final_startup_flags & 0x0f) == 0x0f then
+		startup_ready_time = emulation_seconds()
+	end
+	if not post_key or not startup_ready_time then return end
+
+	local elapsed = emulation_seconds() - startup_ready_time
+	local active = false
+	if elapsed >= post_delay then
+		if post_period == 0 then active = elapsed < post_delay + post_duration
+		else active = ((elapsed - post_delay) % post_period) < post_duration end
+	end
+	if active ~= post_key_active then
+		post_key_active = active
+		if active then press(post_key) else release(post_key) end
+	end
+end
+
 local function sample_structural_state()
 	structural.irq_seen = structural.irq_seen | space:read_u8(0x20009)
 	structural.fiq_seen = structural.fiq_seen | space:read_u8(0x20008)
@@ -262,25 +284,25 @@ emu.add_machine_frame_notifier(function()
 	local legacy = exercise_input and legacy_input[frames] or nil
 	if legacy then if legacy[2] then press(legacy[1]) else release(legacy[1]) end end
 
-	if post_key and not startup_ready_time and (structural.final_startup_flags & 0x0f) == 0x0f then
-		startup_ready_time = machine.time.seconds
-	end
-	if post_key and startup_ready_time then
-		local elapsed = machine.time.seconds - startup_ready_time
-		local active = false
-		if elapsed >= post_delay then
-			if post_period == 0 then active = elapsed < post_delay + post_duration
-			else active = ((elapsed - post_delay) % post_period) < post_duration end
-		end
-		if active ~= post_key_active then
-			post_key_active = active
-			if active then press(post_key) else release(post_key) end
-		end
-	end
+	update_post_ready_key()
 end)
 
--- Frame notifications stop while this firmware gates the LCD clock.  Keep the
--- semantic oracle current independently of display activity.
+-- Frame notifications stop while this firmware gates the LCD clock.  Drive
+-- delayed input from an emulation-time coroutine so headless runs do not depend
+-- on either video frames or frontend periodic callbacks.
+if post_key then
+	local input_timer = coroutine.create(function()
+		repeat
+			emu.wait(0.01)
+			sample_structural_state()
+			update_post_ready_key()
+		until post_period == 0 and startup_ready_time and not post_key_active and
+			emulation_seconds() >= startup_ready_time + post_delay + post_duration
+	end)
+	assert(coroutine.resume(input_timer))
+end
+
+-- Keep the semantic oracle current independently of display activity.
 emu.register_periodic(function()
 	sample_structural_state()
 	write_boot_summary()

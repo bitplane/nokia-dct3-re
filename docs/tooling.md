@@ -11,6 +11,9 @@
     literals (halfword-swapped). It honors `NOKI_BIN`, including normalized
     second-ROM images. Prefer this over anything capstone-raw.
   - `findcalls.py ADDR...` — find `bl`/branch callers of an address
+  - `find_thumb_signature.py REF TARGET ADDR:LEN` — locate a Thumb-1 region in
+    another image while masking only relocated direct `BL`/`BLX` encodings;
+    reports exact compared-byte coverage and every match.
   - `findptr.py VALUE...` — find pointer literals (raw LE and halfword-swapped)
   - `dump.py ADDR [LEN]` — dump words / halfword-swapped pointers
   - `message_census.py` — profile-driven 3210 v6.00 producer, callback-table,
@@ -38,8 +41,11 @@ byte-paired incorrectly and must not be used as evidence. The Ghidra scripts nam
 functions and export analysis. The naming list is also exported as a
   portable symbol map at `ghidra/symbols/3210.csv` (address, kind, name) so you
   get the names without running Ghidra.
-- `tools/mame_noki3210_input_exerciser.lua` — MAME Lua harness used by the run
-  targets to drive keypad input.
+- `mame_noki3210_input_exerciser.lua` — MAME Lua harness used by the run targets
+  to capture structural/LCD evidence and drive keypad input. Delayed input uses
+  a scheduler-backed `emu.wait()` coroutine because LCD frame callbacks stop
+  when this firmware gates its display clock. `input_field:set_value(1)` is the
+  logical pressed state; MAME applies the port's active-low polarity.
 
 ## NokTool 1.8 (external — EEPROM/NV format reference)
 

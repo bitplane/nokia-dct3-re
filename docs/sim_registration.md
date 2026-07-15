@@ -188,7 +188,7 @@ completed the parser without code 7 or a mode advance. Code 7 and SIM
 initialization remain parallel predicates. The display lifecycle documented in
 `resource_providers.md` is a valid service/test route to code 7, but is excluded
 as the ordinary predecessor. Its separate `0x06ca -> 0x0795` path requires
-startup/display state 7; the ordinary mode-4 fallback establishes state 3.
+startup/display state 7; the coherently observed mode-4 route establishes state 3.
 
 The historical `MODEL_STARTUP_REPORTS` run does not contradict this ownership.
 Under the coherent contact ordering its fixed 950 ms hook returns code 7 and all

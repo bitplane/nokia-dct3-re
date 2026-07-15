@@ -56,8 +56,6 @@ FRONTIER_ENV := \
 # shims proven inert against both the oracle and the deep boot. See docs/driver_vision.md.
 BOOT_ENV := \
 	NOKI3210_DISPLAY_TYPE=4 \
-	NOKI3210_POWER_IRQ_MS=120 \
-	NOKI3210_POWER_IRQ_ASSERT=1 \
 	NOKI3210_ADC_PROFILE=sane \
 	NOKI3210_TIMER0_HZ=20000000 \
 	NOKI3210_TIMER1_HZ=1057 \

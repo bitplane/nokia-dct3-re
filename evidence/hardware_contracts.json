@@ -5,7 +5,17 @@
     {
       "id": "mad2_gensio_ccont", "subsystem": "ccont", "status": "partial", "confidence": "strong",
       "boundary": "MAD2 GENSIO offsets 0x2c/0x6c/0x2d/0x6d select and transfer CCONT register bytes",
-      "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md"]
+      "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md", "docs/cross_rom_confidence.md"]
+    },
+    {
+      "id": "ccont_adc_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 share ADC routing, polled GENSIO completion, upper-bit IRQ masking and write-one-to-clear acknowledgement",
+      "evidence": ["docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
+    },
+    {
+      "id": "mad2_kbgpio_matrix", "subsystem": "keypad", "status": "validated", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 share a 4-row by 5-column scan, column interrupt mask, falling-edge latch and MAD2 IRQ6 acknowledgement",
+      "evidence": ["docs/mmi_layer.md", "docs/mad2_fidelity.md"]
     },
     {
       "id": "mad2_simi_uart", "subsystem": "sim", "status": "partial", "confidence": "strong",

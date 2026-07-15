@@ -50,18 +50,22 @@ void nokia_ccont_device::set_adc_source(unsigned channel, uint16_t value)
 		m_adc_source[channel] = value & 0x3ff;
 }
 
+void nokia_ccont_device::select_w(bool selected)
+{
+	if (selected)
+		m_data_cycle = false;
+}
+
+void nokia_ccont_device::set_boot_status(uint8_t status)
+{
+	m_boot_status = status;
+	m_regs[IRQ_STATUS] = (m_regs[IRQ_STATUS] & IRQ_SOURCE_MASK) | status;
+	update_irq();
+}
+
 void nokia_ccont_device::update_irq()
 {
 	m_irq_cb((m_regs[IRQ_STATUS] & ~m_regs[IRQ_MASK] & IRQ_SOURCE_MASK) != 0);
-}
-
-void nokia_ccont_device::raise_boot_irq(unsigned pulse)
-{
-	if (pulse == 0 && m_boot_status != 0)
-	{
-		m_regs[IRQ_STATUS] |= m_boot_status;
-		update_irq();
-	}
 }
 
 void nokia_ccont_device::serial_w(uint8_t data)

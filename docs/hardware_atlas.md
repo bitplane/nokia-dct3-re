@@ -63,7 +63,10 @@ Blocks: **CTSI** (clock/timer/IRQ/reset), **PUP** (MBUS / vibrator / buzzer / Ge
 | `0x20/0x22/0x24` | McuGenIO signal / ? / direction | emulated ✓ |
 
 ### KBGPIO — keyboard (emulated ✓)
-ROW `0x28/0x29/0x68/0x69/0xa8/0xa9`, COL `0x2a/0x2b/0x6a/0x6b/0xaa/0xab` (signal / interrupt / direction).
+ROW `0x28` signal / `0xa8` direction, COL `0x2a` active-low input / `0x6b`
+interrupt mask. Firmware drives a 4-row by 5-column matrix; unmasked falling
+column edges latch shared MAD2 IRQ6. Registers `0x29/0x68/0x69/0xa9` and
+`0x2b/0x6a/0xaa/0xab` remain backing storage with no established keypad role.
 
 ### GENSIO — multiplexed serial (CCONT, LCD, + SELECT-muxed)
 | off | reg | status |
@@ -99,12 +102,12 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0xe` | **interrupt lines (status)** | bit 0 = present-status (`MODEL_CCONT_PRESENT`, idx6); bits 0–2 ignored by the IRQ dispatcher |
 | `0xf` | interrupt mask | |
 
-**ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver currently uses the generic profile
-`0`=accessory, `1`=RSSI, `2`=battery V, `3`=battery type, `4`=battery temp, `5`=charger V,
-`6`=VCXO temp, `7`=charging current. This is not yet a validated 3210 board mapping. Firmware boot
-reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7 maps through
-ROM table `0x2e2d74` to selector 1. Values come from `nokia_adc_override` (env
-`NOKI3210_ADC0..7`, profiles); electrical scaling and the 3210-specific routing remain open.
+**ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver deliberately exposes raw selectors
+`0..7`; the former generic signal labels were not a validated 3210 board map and have been removed.
+Firmware boot reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7
+maps through ROM table `0x2e2d74` to selector 1. The complete logical-source table is identical in
+3210 v5.01. Values come from `nokia_adc_override` (env `NOKI3210_ADC0..7`, profiles); electrical
+scaling and PCB net names remain open.
 
 ## The DSP interface (the big stub — deep-dive target)
 

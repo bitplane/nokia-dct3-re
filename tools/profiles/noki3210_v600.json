@@ -119,10 +119,18 @@
 	  "producer_class": "external service/test peer request; MCU acknowledgement",
 	  "confidence": "high",
 	  "evidence": "The sole command constructor is inside the incoming indexed-operation handler. Contact frames pass through task 7's external service transport. It is unrelated to the direct scheduler-event 0x74 producers at 0x213fcc and 0x214836."
+    },
+    {
+      "command": "0x8e", "name": "battery_service_control", "consumer": "0x235848",
+      "expected_constructor": {"callsite": "0x2358a0", "payload_length": 1},
+      "constructor_role": "acknowledgement echoing the selector byte after the incoming command dispatches one of five service actions",
+      "producer_class": "external service/test peer request; MCU acknowledgement",
+	  "confidence": "high static, dormant runtime",
+	  "evidence": "The task-2 dispatcher selects 0x235848 only for incoming command 0x8e. Payload selector 3 calls 0x2a6880 to post task-19 event 0x43 and sets the associated state through 0x2a67d0; selector 4 analogously posts event 0x44. The sole 0x8e constructor at 0x2358a0 is dominated by this incoming handler and echoes the selector in its one-byte acknowledgement. No supplied coherent contact manifest observes the command."
     }
   ],
   "contact_service_boundary": {
-    "statement": "The strongest evidenced boundary is the external service/test peer behind task 7's lower service transport. Task 2 builds class-0x40 frames at 0x234634; 0x234684 offers them to channel 0x6400 via 0x2b203e and queues them through 0x2b0482; 0x2b0482 routes ordinary frames to task 7. The frame header is [0]=destination, [1]=source: after service discovery, MCU output is destination 0x02/source 0x00 (phone). The ROM census finds organic MCU output for 0x64 and 0x65, while 0x70, 0x71, and command 0x74 are external requests whose sole MCU constructors are acknowledgements. Task 7 is the on-device transport adapter, not the semantic producer of those requests."
+    "statement": "The strongest evidenced boundary is the external service/test peer behind task 7's lower service transport. Task 2 builds class-0x40 frames at 0x234634; 0x234684 offers them to channel 0x6400 via 0x2b203e and queues them through 0x2b0482; 0x2b0482 routes ordinary frames to task 7. The frame header is [0]=destination, [1]=source: after service discovery, MCU output is destination 0x02/source 0x00 (phone). The ROM census finds organic MCU output for 0x64 and 0x65, while 0x70, 0x71, 0x74, and 0x8e are external requests whose sole MCU constructors are acknowledgements. Task 7 is the on-device transport adapter, not the semantic producer of those requests."
   },
   "semantic_edges": [
     {
