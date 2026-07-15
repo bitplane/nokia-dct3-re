@@ -69,7 +69,9 @@ void nokia_simi_device::control_w(u8 data)
 	m_tx_ready_pending = false;
 	m_uart_tx_count = 0;
 	m_card->activate();
-	schedule_card_bytes(false);
+	// Deliver ATR outside the control-register write so its FIQ cannot
+	// re-enter the firmware's activation routine.
+	schedule_card_bytes(false, true);
 }
 
 void nokia_simi_device::card_rx_w(u8 data)
@@ -81,11 +83,28 @@ void nokia_simi_device::card_rx_w(u8 data)
 	m_rx_count++;
 }
 
-void nokia_simi_device::schedule_card_bytes(bool tx_complete, attotime delay)
+void nokia_simi_device::schedule_card_bytes(
+		bool tx_complete, bool response_added, attotime delay)
 {
-	m_rx_ready = false;
-	m_tx_ready_pending = tx_complete;
-	if (tx_complete || m_rx_count != 0)
+	// A card cannot answer while the CPU is still writing the final transmit
+	// byte. Deferring receive-ready also prevents the firmware's FIQ handler
+	// from observing the previous transaction descriptor during that write.
+	if (response_added)
+	{
+		m_rx_ready = false;
+		m_tx_ready_pending = tx_complete;
+	}
+	else if (tx_complete && !m_tx_ready_pending)
+	{
+		// A TX-only completion must not hide an unread RX character.
+		m_tx_ready_pending = true;
+	}
+	else
+	{
+		return;
+	}
+
+	if (m_tx_ready_pending || (response_added && m_rx_count != 0))
 		m_rx_timer->adjust(delay);
 }
 
@@ -116,6 +135,9 @@ u8 nokia_simi_device::rxd_r()
 	const u8 data = m_rx_fifo[m_rx_head];
 	m_rx_head = (m_rx_head + 1) % std::size(m_rx_fifo);
 	m_rx_count--;
+	// SIMI services one received character per FIQ. Present subsequent
+	// characters at serial cadence instead of treating a response as one edge
+	// with a pre-filled FIFO.
 	if (m_rx_count != 0)
 		m_rx_timer->adjust(attotime::from_usec(100));
 	else
@@ -129,6 +151,14 @@ u8 nokia_simi_device::rxd_r()
 u8 nokia_simi_device::rx_count_r() const
 {
 	return m_rx_ready ? std::min<u16>(m_rx_count, 0xff) : 0;
+}
+
+void nokia_simi_device::rx_fifo_control_w(u8 data)
+{
+	// Activation programs 0x18, 0x12 and 0x06; receive rewrites 0x06 before
+	// each drain. No recovered firmware path assigns a destructive flush side
+	// effect, so this remains a configuration latch.
+	m_rx_fifo_control = data;
 }
 
 void nokia_simi_device::txd_w(u8 data)
@@ -146,8 +176,9 @@ void nokia_simi_device::tx_fifo_control_w(u8 data)
 	if (!m_enabled || !BIT(m_control, 7) || data != 0 || old == 0)
 		return;
 
+	const u16 rx_count_before = m_rx_count;
 	for (unsigned i = 0; i < m_uart_tx_count; i++)
 		m_card->rx_w(m_uart_tx_fifo[i]);
 	m_uart_tx_count = 0;
-	schedule_card_bytes(true);
+	schedule_card_bytes(true, m_rx_count != rx_count_before);
 }

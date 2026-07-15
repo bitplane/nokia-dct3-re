@@ -21,7 +21,7 @@ public:
 	u8 iir_r() const { return m_iir; }
 	void iir_w(u8 data) { m_iir &= ~data; }
 	u8 rx_count_r() const;
-	void rx_fifo_control_w(u8 data) { m_rx_fifo_control = data; }
+	void rx_fifo_control_w(u8 data);
 	void tx_fifo_control_w(u8 data);
 	u8 tx_count_r() const { return m_uart_tx_count; }
 
@@ -33,7 +33,8 @@ protected:
 
 private:
 	TIMER_CALLBACK_MEMBER(rx_ready);
-	void schedule_card_bytes(bool tx_complete, attotime delay = attotime::from_usec(10));
+	void schedule_card_bytes(bool tx_complete, bool response_added,
+			attotime delay = attotime::from_usec(10));
 
 	required_device<nokia_sim_card_device> m_card;
 	devcb_write_line m_irq_cb;

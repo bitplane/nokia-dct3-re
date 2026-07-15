@@ -80,7 +80,9 @@ than the APDU parser directly. Firmware opens the FIFO through `0x3e=0x04`, fill
 with `0x3e=0x00`; only the flush transfers the bytes to T=0 and schedules TX-empty. This permits a
 command body larger than one FIFO to advance through multiple TX-empty interrupts. The device
 schedules TX-ready and RX-ready on a timer, exposes RX bytes only when ready, and cancels the
-trailing event when the RX FIFO empties.
+trailing event when the RX FIFO empties. A TX-only completion does not hide an
+already-readable character; newly returned card bytes are deferred before they
+become visible.
 
 ## Stateful card device
 
@@ -202,5 +204,9 @@ ordinary boot does not organically request `0x1196`.
 The frontier predicate protects the final organic SIM-enabled state, but there
 is no focused device test for FIFO reset/fill behavior, IIR acknowledgement,
 multi-chunk ordering, T=0 procedure sequencing, file metadata, timeout/error
-causes, removal, or save-state resumption. Add that coverage before splitting
-or materially changing the combined controller/card implementation.
+causes, removal, or save-state resumption. Add that coverage before materially
+changing the controller/card contract.
+
+The controller currently locates the card through the sibling tag
+`^sim_card`. Replace this with a configurable finder or transmit callback before
+reusing SIMI in a machine whose card topology or tag differs.
