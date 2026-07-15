@@ -552,7 +552,9 @@ void noki3310_state::machine_start()
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
 	m_timer_fiq8 = timer_alloc(FUNC(noki3310_state::timer_fiq8), this);
 	m_timer_mbus = timer_alloc(FUNC(noki3310_state::timer_mbus), this);
+	save_item(NAME(m_mad2_regs));
 	save_item(NAME(m_mcuif_regs));
+	save_item(NAME(m_gensio_status));
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const

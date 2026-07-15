@@ -11,7 +11,7 @@ not compatibility mechanisms.
 | ARM7, flash and RAM | MAME CPU/flash devices plus phone-owned maps | Validate decode and reset path with another ROM. |
 | PCD8544 display | MAME device | Add other display controllers per product configuration. |
 | External EEPROM | MAME `I2C_24C128` on mapped MAD2 GenIO pins plus generated provisioning input | Validate write/timing behavior, legitimate provisioning, ROM-aware fallback extraction, and parallel-window semantics. |
-| CCONT | Local `nokia_ccont_device` | Establish physical GENSIO/ADC latency, ready-status timing, RTC encoding, watchdog clock, and board-level ADC signals. Do not assume a conversion-complete IRQ absent hardware evidence. |
+| CCONT | Local `nokia_ccont_device`; organic GENSIO phase/status regression | Establish physical GENSIO/ADC latency, RTC encoding, watchdog clock, and board-level ADC signals. Do not assume a conversion-complete IRQ absent hardware evidence. |
 | MAD2 | Monolithic phone-owned register handlers | Fill the fidelity ledger before extracting blocks. |
 | MBUS | MAD2 register/FIQ approximation | Model a peer only when firmware organically drains the receive task. |
 | DSP/DSPIF | `nokia_dsp_peer_device` aggregates shared RAM/DSPIF, rings, calibrated service timing, boot-subset DSP HLE and the separate external-service counterparty | Extend contracts only from organic requests; protect the transport with focused tests before separating the DSP and external peer roles. |

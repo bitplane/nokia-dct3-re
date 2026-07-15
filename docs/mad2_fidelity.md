@@ -145,8 +145,11 @@ tracing establish:
 
 The causal status model returns `0x03` after selection, `0x07` after a CCONT
 command byte and `0x03` after consuming `0x6c`. A one-second trace produced
-1,978 records and exercised both values; the byte-exact 20-second oracle was
-unchanged. An earlier interpretation that firmware polled status bit 3 was
+both complete read and write transactions and exercised both values.
+`make verify-ccont` validates the phase/status grammar from this bounded organic
+trace, and the MAD2 endpoint/status state is registered for save states alongside
+the CCONT device state. The byte-exact 20-second oracle was unchanged. An
+earlier interpretation that firmware polled status bit 3 was
 incorrect: Thumb `LSRS #3` exposes original bit 2 through carry.
 
 The v5.01 firmware repeats the same polling and transaction grammar

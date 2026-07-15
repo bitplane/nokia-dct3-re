@@ -197,9 +197,14 @@ IRQ contract.
 5. Validate remaining register semantics against a working-phone trace or
    independent chip documentation; the v5.01 same-product control is complete.
 
-The structural summary records CCONT commands and read counts, but these totals
-are diagnostic rather than pass/fail predicates. The byte-exact default frame
-and coherent frontier protect integration behavior; there is not yet a focused
-CCONT device test for register reset values, mask/clear transitions, ADC result
-packing, RTC reads, or watchdog expiry. Add that focused test before changing
-the extracted register contract.
+The structural summary records CCONT commands and read counts, but those totals
+remain diagnostic. `make verify-ccont RUN_DIR=<dir>` is the focused transport
+gate: it runs an organic one-second firmware trace and requires endpoint
+selection, command/data pairing, idle status `0x03`, read-ready status `0x07`,
+and completion of both read and write transactions. MAD2 endpoint/status state
+and the CCONT command phase are save-state registered together.
+
+The focused gate does not yet validate register reset values, mask/clear
+transitions, ADC result packing, RTC reads, watchdog expiry, or save-state
+resumption. The byte-exact default frame and coherent frontier continue to
+protect those behaviors only at integration level.
