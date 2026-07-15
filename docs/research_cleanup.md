@@ -130,6 +130,21 @@ Use this sequence for a deliberate cleanup.
     recoverable from Git history and every retained assertion has one
     authoritative home.
 
+## Proof obligations
+
+Some recurring mistakes need stronger checks than ordinary source review:
+
+- A static "no producer" result closes only the source classes actually
+  searched. Quantify coverage of literal call sites, computed arguments,
+  descriptor or interpreter tables, context-derived events, and external
+  inputs before claiming producer absence.
+- A comparison in a wait-shaped block is not necessarily a blocking gate.
+  Decode both successors and their side effects before deciding whether it
+  waits, selects a continuation, records state, or falls through.
+- An address hit does not establish dispatcher or subsystem ownership. Confirm
+  the containing function boundary and exhaustively decode the relevant
+  dispatch extent or caller set before assigning an input to a handler.
+
 ## Protect surprising facts
 
 Compression is most likely to discard rare, counterintuitive facts. Preserve a

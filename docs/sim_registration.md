@@ -157,7 +157,7 @@ input to callback `0x24` in that mode, while callback `0x013b` is registered
 only after input `0x03ab` establishes the same mode. The coherent boot remains
 in mode 0.
 This exhausts the two literal `0x0795` producers and excludes the status as
-ordinary mode-4 ownership. See `interactive_handoff.md` for the selector,
+ordinary mode-4 ownership. See `mmi_settlement.md` for the selector,
 catalogue, and runtime evidence.
 
 The corrected card now requests and reads `EF_IMSI (6F07)`. The older absence

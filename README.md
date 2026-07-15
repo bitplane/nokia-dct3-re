@@ -42,7 +42,7 @@ UI/idle-window entrance. Report code 7 is a later power/shutdown report, and
 the mapped callback, descriptor, timer, and second-softkey paths are classified
 as conditional firmware lifecycles rather than missing
 hardware acknowledgements. Detailed exclusions and addresses live in
-[`docs/interactive_handoff.md`](docs/interactive_handoff.md) and
+[`docs/mmi_settlement.md`](docs/mmi_settlement.md) and
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
 `make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
@@ -125,7 +125,7 @@ Start with:
 - [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
 - [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for service-session startup.
-- [`docs/interactive_handoff.md`](docs/interactive_handoff.md) for the current UI-start boundary.
+- [`docs/mmi_settlement.md`](docs/mmi_settlement.md) for the current MMI settlement boundary.
 - [`docs/sim_registration.md`](docs/sim_registration.md) for the SIM and generic-service findings.
 - [`docs/tooling.md`](docs/tooling.md) for the analysis tools.
 

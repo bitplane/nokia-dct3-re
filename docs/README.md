@@ -23,7 +23,7 @@ Documentation is organized by authority rather than investigation date.
 | Document | Purpose |
 | --- | --- |
 | `sim_subsystem.md` | Concise SIM ownership and interface summary. |
-| `interactive_handoff.md` | Task-1, security-editor, conditional power lifecycle, and current MMI settlement boundary. |
+| `mmi_settlement.md` | Task-1, security-editor, conditional power lifecycle, and current MMI settlement boundary. |
 | `mmi_layer.md` | Keypad IRQ, mailbox, matrix-scan and decoded-key acceptance path. |
 | `resource_providers.md` | Resource-provider ownership and excluded conditional startup paths. |
 | `external_service_topology.md` | Class-`0x40` service-command producers, acknowledgements, and external-service boundary. |

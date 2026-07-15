@@ -150,7 +150,7 @@ The remaining application boundary is unattended task-5/MMI context settlement a
 idle-window selection, not a hardware acknowledgement currently justified for
 synthesis. The default fault-screen oracle and coherent frontier profile
 remain separate acceptance baselines; the Nokia 3330 remains the first
-portability probe. See `interactive_handoff.md` and `mmi_layer.md`.
+portability probe. See `mmi_settlement.md` and `mmi_layer.md`.
 
 ## Diagnostic
 

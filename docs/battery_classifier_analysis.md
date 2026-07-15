@@ -142,7 +142,7 @@ state 1, so `0x2a6942` returns zero and takes the observed mode-4 route. The
 accepted state-0 path makes the real boot contract non-contradictory without
 requiring an unsafe low sample, but it is not established as the ordinary route:
 it is selected only if the readiness checklist finishes before the first
-classifier publication. The ordering audit in `interactive_handoff.md` shows
+classifier publication. The ordering audit in `mmi_settlement.md` shows
 that the current contact-peer session releases the checklist group much later.
 Both routes then continue into equivalent interactive-initialization tails, so
 the classifier's mode choice does not gate ordinary UI initialization.

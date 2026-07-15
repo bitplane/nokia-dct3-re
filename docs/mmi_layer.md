@@ -1,7 +1,7 @@
 # MMI and keypad lifecycle
 
 This document summarizes the firmware-owned MMI input path at the current
-coherent Nokia 3210 v6.00 frontier. `interactive_handoff.md` owns the startup
+coherent Nokia 3210 v6.00 frontier. `mmi_settlement.md` owns the startup
 report investigation; this file owns the keypad hardware-to-firmware contract.
 
 ## Contract audit
@@ -42,7 +42,7 @@ release, the matrix scanner polls while held, and `0x2b4628` decodes one key.
 Later `0x0367` polling, the accepted editor transaction and periodic `0x00c8`
 and `0x05a7` traffic are firmware-owned MMI lifecycle behavior, not repeated
 matrix scans or missing hardware acknowledgements. Their transition-level
-evidence belongs in `interactive_handoff.md`.
+evidence belongs in `mmi_settlement.md`.
 
 ## Hardware path
 

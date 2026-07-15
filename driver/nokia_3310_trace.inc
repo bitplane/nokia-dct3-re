@@ -198,7 +198,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 	// TRACE_TASKS (opt-in): app-task liveness tap. Log the first time each RTOS task reaches
 	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the deep profile
 	// stack this shows which of the app tasks 10-17 (resumed by mode-0xc's 0x2795e6) actually come
-	// alive. Task id = [0x100022]. docs/interactive_handoff.md app-task sweep.
+	// alive. Task id = [0x100022]. docs/mmi_settlement.md app-task sweep.
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x0026a458)
 	{
 		static u32 seen = 0;
@@ -560,7 +560,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					debug_ram_byte(0x00100022), machine().time().as_double());
 		}
-		// TRACE_HANDOFF (opt-in): the post-SIM interactive/idle handoff (docs/interactive_handoff.md).
+		// TRACE_HANDOFF (opt-in): post-SIM MMI settlement (docs/mmi_settlement.md).
 		// Curated task-1 mode, mailbox, and interactive-init seams:
 		//  (a) task-1 dispatcher 0x270c8e -- mode [0x1123f0], mode-0d checklist [0x112399], CCONT [0x11ff6c];
 		//  (b) mode-0 interactive-init burst 0x270d1c / display_idle 0x298000 -- did they run? (not yet);

@@ -56,7 +56,7 @@ its healthy startup uses reports `0x14`-`0x17`, and its dormant report-7 branch
 is measurement-gated inside the battery/charger dispatcher. This is portability
 evidence for a conditional power lifecycle, not a shared boot-readiness event.
 Exact 3210 ownership and consumer semantics remain authoritative in
-`interactive_handoff.md`. No firmware-PC hook was added for either sibling ROM.
+`mmi_settlement.md`. No firmware-PC hook was added for either sibling ROM.
 
 ## Nokia 3210 NSE-8 v5.01
 

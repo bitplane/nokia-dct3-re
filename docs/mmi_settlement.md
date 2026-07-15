@@ -1,9 +1,17 @@
-# Interactive startup handoff
+# MMI context settlement
 
-This document is the current contract for the Nokia 3210 v6.00 transition from
-provisioned startup to decoded keypad input. Historical forcing experiments are
-recorded in `evidence/falsifications.json`; they
-are not alternate boot recipes.
+This document is the current contract for Nokia 3210 v6.00 task-5/MMI context
+settlement after provisioned startup. Historical forcing experiments are
+recorded in `evidence/falsifications.json`; they are not alternate boot recipes.
+
+## Open question
+
+Which firmware-owned task-5/MMI state or transition selects the unattended
+idle window after the accepted security transaction?
+
+The remaining boundary is firmware-internal. Current evidence does not justify
+synthesizing a class-1 message, event `0x0547`, callback selection, context
+state, timer result, hardware event, or peer response.
 
 ## Current result
 
