@@ -99,7 +99,7 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0x0` | control | |
 | `0x1` | PWM (charger) — **write-only** | (the idx6 service-channel check reads a *cached* value here; see service_bootstrap.md) |
 | `0x2/0x3` | ADC read LSB / MSB | |
-| `0x5` | watchdog (WDReg) | nonzero data reloads an eight-bit seconds counter; `0x00` powers down; expiry remains guarded pending the missing steady-state firmware service |
+| `0x5` | watchdog (WDReg) | nonzero data reloads an eight-bit seconds counter; `0x00` powers down; firmware helper `0x2b4dc0` services it for input-mask bit 1, but its post-startup schedule remains missing and expiry is guarded |
 | `0x6` | RTC enable | |
 | `0x7–0xa` | RTC sec/min/hour/day | served from host clock |
 | `0xb–0xd` | RTC alarm / calibration | |

@@ -190,6 +190,17 @@ guard therefore represents a missing software-timing/service lifecycle, not
 uncertainty about the CCONT counter arithmetic; it must not be removed by
 lengthening or freezing the hardware counter.
 
+The firmware service helper at `0x2b4dc0` accepts a mask: bit 0 reloads the
+MAD2 watchdog and bit 1 writes `0x31` through logical CCONT descriptor 6,
+which GENSIO maps to physical register 5. A focused v6.00 run observes three
+CCONT-only calls from the startup/NV state machine at 12--13 ms and one
+combined MAD2/CCONT call from task 2 at 0.834 s. It observes no later call
+before expiry. The helper also appears as Thumb pointer `0x2b4dc1` in the ROM
+function table at `0x2dfc80`, but that table membership alone does not prove a
+periodic owner. Direct callers cover startup/NV work and the external-service
+D9 poll; the remaining question is which firmware-owned schedule should invoke
+the exported helper after startup.
+
 Service-channel provisioning does not control CCONT startup-event delivery.
 Any further CCONT change requires a separately evidenced register, timing, or
 IRQ contract.
@@ -202,9 +213,9 @@ IRQ contract.
    the ADC control byte, polls GENSIO status, and reads the result registers;
    it does not wait for a CCONT interrupt. A synthetic conversion-complete IRQ
    is therefore excluded unless separate hardware evidence establishes one.
-3. Recover the firmware timer/event path that regularly services the CCONT
-   watchdog, then remove the guard. Confirm RTC encoding, alarm behavior and
-   the physical timing of the MAD2 power-key edge separately.
+3. Recover the post-startup schedule or callback owner of exported helper
+   `0x2b4dc0`, then remove the watchdog guard. Confirm RTC encoding, alarm
+   behavior and the physical timing of the MAD2 power-key edge separately.
 4. Replace raw environment ADC overrides with typed battery, charger and RF
    scenario inputs while retaining deterministic tests.
 5. Validate remaining register semantics against a working-phone trace or

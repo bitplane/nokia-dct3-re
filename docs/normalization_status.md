@@ -90,7 +90,7 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 | Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MBUS_BYTE_DELAY_MS`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | Retain while visible as calibration debt; replace with recovered clocks/transactions. |
 | Safety/acceptance guard | `DISABLE_CCONT_WATCHDOG` | Prevents the correctly loaded CCONT counter from powering down before the still-missing periodic firmware service; not hardware fidelity. |
 | Device-boundary prototypes | `MODEL_CCONT_PRESENT`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE` | Enabled by the 3210 product profile; overrides remain for negative tests. Organic interfaces, incomplete wider contracts. |
-| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS` | Log-only and bounded or scoped to a named investigation. |
+| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_CCONT_WATCHDOG`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS` | Log-only and bounded or scoped to a named investigation. |
 | Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `POST_READY_CAPTURE_DELAY_MS`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
@@ -111,6 +111,7 @@ The retained trace switches are scoped as follows:
 | `TRACE_GSM_SERVICE` | manifest-backed generic-service registrations/callbacks |
 | `TRACE_DSP_BOUNDARY` | shared-ring requests and request-derived peer responses |
 | `TRACE_GENSIO` | serial register transactions |
+| `TRACE_CCONT_WATCHDOG` | combined firmware service-helper calls and logical-descriptor writes to physical CCONT watchdog register 5 |
 | `TRACE_MAD2_LEDGER` | first-access MAD2 register census |
 | `TRACE_MAD2_TIMERS` | timer-0 divider/counter/compare and FIQ assertion/acknowledgement lifecycle |
 | `TRACE_MAD2_INTERRUPTS` | MAD2 source, pending, mask, acknowledgement and CPU-line routing transitions |

@@ -24,7 +24,7 @@
     },
     {
       "id": "ccont_rtc_watchdog_model", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
-      "boundary": "RTC registers currently return host-local binary fields. Nokia's NSE-8/9 hardware documentation establishes CCONT's eight-bit seconds down-counter: every nonzero watchdog-register write reloads the byte value and zero requests power-down; WDDISX is a separate physical disable input. The emulator still lacks the steady-state firmware service that should occur before the observed 0x31 load expires",
+      "boundary": "RTC registers currently return host-local binary fields. Nokia's NSE-8/9 hardware documentation establishes CCONT's eight-bit seconds down-counter: every nonzero watchdog-register write reloads the byte value and zero requests power-down; WDDISX is a separate physical disable input. Firmware helper 0x2b4dc0 services MAD2 for mask bit 0 and physical CCONT watchdog register 5 for bit 1; observed direct callers cover startup/NV and external-service work, but the emulator run still lacks its steady-state schedule before the 0x31 load expires",
       "evidence": ["docs/ccont_subsystem.md"]
     },
     {

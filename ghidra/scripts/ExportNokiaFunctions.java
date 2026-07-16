@@ -505,7 +505,7 @@ public class ExportNokiaFunctions extends GhidraScript {
 		new Target("service_context_event_bit_clear_2b03f2", 0x002b03f2L),
 		new Target("service_context_event_bit_set_2b0444", 0x002b0444L),
 		new Target("service_session_ui_gate_2b4696", 0x002b4696L),
-		new Target("service_session_display_enable_2b4dc0", 0x002b4dc0L),
+		new Target("system_watchdog_service_2b4dc0", 0x002b4dc0L),
 		new Target("service_session_reset_or_display_status_2b4dda", 0x002b4ddaL),
 		new Target("ccont_poweroff_write_2b4e4a", 0x002b4e4aL),
 		new Target("service_session_draw_begin_260144", 0x00260144L),

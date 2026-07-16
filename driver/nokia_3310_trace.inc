@@ -38,6 +38,32 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 // ============================================================================
 void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
+	// CCONT watchdog-service provenance. 0x2b4dc0 services MAD2 for input bit 0
+	// and CCONT for bit 1; descriptor 6 at the generic masked-write entry maps
+	// through GENSIO to physical CCONT register 5. These values are lost before
+	// the byte reaches the device.
+	if (pc == addr && addr == 0x002b4dc0 &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_WATCHDOG", 0) != 0)
+	{
+		const u32 mask = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		logerror("ccont_watchdog_service: mask=%02x caller=%08x task=%02x t=%.6f\n",
+				mask & 0xff, lr, fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x002afa74 &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_WATCHDOG", 0) != 0)
+	{
+		const u32 descriptor = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 value = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		if ((descriptor & 0xff) == 6 || ((descriptor >> 24) & 0xff) == 6)
+			logerror("ccont_watchdog_write: descriptor=%08x physical_reg=5 value=%02x "
+					"caller=%08x task=%02x t=%.6f\n",
+					descriptor, value & 0xff, lr, fw_byte(FW_SCHED_RUNNING_TASK_ID),
+					machine().time().as_double());
+	}
+
 	// Display-profile provenance: NV descriptor 0x0749 supplies three 12-byte
 	// records at 0x112188.  Observe the load/update/copy boundaries without
 	// changing either the stored records or the active record at 0x11fc80.
