@@ -119,13 +119,13 @@
     },
     {
       "id": "pcd8544_lcd", "subsystem": "display", "status": "partial", "confidence": "strong",
-      "boundary": "The native PCD8544 device consumes organic firmware command/data transfers and reproduces a byte-exact visible frame; reset/electrical timing and product-panel selection remain unvalidated",
+      "boundary": "The native PCD8544 device consumes organic firmware command/data transfers; both 3210 ROMs select endpoint 0x21, emit command prefix 24 40 80 and transfer a complete 504-byte image, while reset/electrical timing remains unvalidated",
       "evidence": ["docs/mmi_layer.md", "docs/driver_structure.md", "docs/structural_regression.md"]
     },
     {
-      "id": "display_type_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
-      "boundary": "A quarantined firmware RAM-read override supplies the v6.00 display-type selection; its real product-data or hardware source is unknown and it is not part of the PCD8544 model",
-      "evidence": ["docs/mmi_layer.md", "docs/driver_structure.md", "docs/normalization_status.md"]
+      "id": "display_profile_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
+      "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; record-0 byte 5 becomes active slot 7 at 0x11fc87, but all collected records are erased so a quarantined initializer-read override still supplies value 4",
+      "evidence": ["docs/eeprom_analysis.md", "docs/mmi_layer.md", "docs/normalization_status.md"]
     }
   ]
 }

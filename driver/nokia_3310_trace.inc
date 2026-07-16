@@ -54,6 +54,28 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 // ============================================================================
 void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
+	// Display-profile provenance: NV descriptor 0x0749 supplies three 12-byte
+	// records at 0x112188.  Observe the load/update/copy boundaries without
+	// changing either the stored records or the active record at 0x11fc80.
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DISPLAY_PROFILE", 0) != 0 &&
+			(addr == 0x0029a996 || addr == 0x0029ae68 ||
+			 addr == 0x0029a768 || addr == 0x002b1e80 || addr == 0x002af2ac))
+	{
+		logerror("display_profile: pc=%08x "
+				"source0=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x "
+				"active=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x task=%02x t=%.6f\n",
+				addr,
+				fw_byte(0x00112188), fw_byte(0x00112189), fw_byte(0x0011218a),
+				fw_byte(0x0011218b), fw_byte(0x0011218c), fw_byte(0x0011218d),
+				fw_byte(0x0011218e), fw_byte(0x0011218f), fw_byte(0x00112190),
+				fw_byte(0x00112191), fw_byte(0x00112192), fw_byte(0x00112193),
+				fw_byte(0x0011fc80), fw_byte(0x0011fc81), fw_byte(0x0011fc82),
+				fw_byte(0x0011fc83), fw_byte(0x0011fc84), fw_byte(0x0011fc85),
+				fw_byte(0x0011fc86), fw_byte(0x0011fc87), fw_byte(0x0011fc88),
+				fw_byte(0x0011fc89), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				machine().time().as_double());
+	}
+
 	// Post-editor display frontier: observe firmware-owned render, resource,
 	// window-manager, and DSP-TX boundaries without completing any operation.
 	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DISPLAY", 0) != 0 &&

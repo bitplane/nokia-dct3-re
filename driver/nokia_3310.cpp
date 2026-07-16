@@ -350,6 +350,7 @@ private:
 	bool          m_mcuif_trace_write[4] = {false};
 	uint8_t       m_mcuif_regs[4] = {0};
 	unsigned      m_gensio_trace_count = 0;
+	unsigned      m_display_io_trace_count = 0;
 	unsigned      m_mad2_timer_trace_count = 0;
 	unsigned      m_mad2_interrupt_trace_count = 0;
 	unsigned      m_mad2_clock_trace_count = 0;
@@ -486,8 +487,8 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 // NOKI3210_* environment knobs — the driver reads every runtime option from the
 // environment (pass overrides through `make run RUN_ENV='...'`). Three kinds:
 //
-//   1. HARDWARE CONFIG — selects a hardware *scenario*, not firmware behaviour:
-//      display variant (DISPLAY_TYPE), power/ADC (ADC_PROFILE,
+//   1. HARDWARE/PRODUCT CONFIG — selects a scenario, not firmware behaviour:
+//      erased-NV display-profile fallback (DISPLAY_TYPE), power/ADC (ADC_PROFILE,
 //      DISABLE_CCONT_WATCHDOG),
 //      clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP, FIQ8_HZ), and the SIM
 //      UART/card fixture. The default boot (none set)
@@ -593,6 +594,7 @@ void noki3310_state::machine_reset()
 	std::fill(std::begin(m_mcuif_trace_write), std::end(m_mcuif_trace_write), false);
 	std::fill(std::begin(m_mcuif_regs), std::end(m_mcuif_regs), 0);
 	m_gensio_trace_count = 0;
+	m_display_io_trace_count = 0;
 	m_mad2_timer_trace_count = 0;
 	m_mad2_interrupt_trace_count = 0;
 	m_mad2_clock_trace_count = 0;
@@ -850,11 +852,13 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 			(pc >= 0x002af2ac && pc <= 0x002af34e);   // 3210 v5.01
 	if (display_initializer && address >= 0x11fc80 && address <= 0x11fc90)
 	{
-		// Boot-research shim: force the firmware-selected display type while
-		// the real board/NV source for this byte is still unidentified.
-		const unsigned display_type = nokia_env_u32("NOKI3210_DISPLAY_TYPE", 0xff) & 0xff;
-		if (display_type != 0xff && address == 0x11fc86 && mem_mask == 0x00ff)
-			data = (data & 0xff00) | display_type;
+		// Product-provisioning shim: descriptor 0x0749 record-0 byte 5 should
+		// populate logical byte 0x11fc87, but every collected record is erased.
+		// The low lane of halfword 0x11fc86 is logical byte 0x11fc87 on this
+		// big-endian ARM mapping. Do not move this value into the LCD device.
+		const unsigned profile_slot7 = nokia_env_u32("NOKI3210_DISPLAY_TYPE", 0xff) & 0xff;
+		if (profile_slot7 != 0xff && address == 0x11fc86 && mem_mask == 0x00ff)
+			data = (data & 0xff00) | profile_slot7;
 	}
 	return data & mem_mask;
 }
@@ -1092,6 +1096,11 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 			m_gensio_trace_count++ < 20000)
 		logerror("gensio: W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset, data,
 				old_data, m_maincpu->pc(), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_DISPLAY_IO", 0) != 0 &&
+			(offset == 0x2d || offset == 0x2e || offset == 0x6e) &&
+			m_display_io_trace_count++ < 4096)
+		logerror("display_io: off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset,
+				data, old_data, m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_mad2_trace_write[offset])
 	{
 		m_mad2_trace_write[offset] = true;

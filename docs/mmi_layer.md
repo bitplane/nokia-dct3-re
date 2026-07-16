@@ -8,9 +8,9 @@ report investigation; this file owns the keypad hardware-to-firmware contract.
 
 | Boundary | Classification | What is established | What remains provisional |
 | --- | --- | --- | --- |
-| LCD controller | Reused device, partial integration | Firmware-generated command/data transfers reach MAME's PCD8544 device and reproduce a byte-exact visible frame. | Reset/electrical timing and product-panel variants have no focused component test. |
-| MAD2 LCD serialization | Derived hardware contract | GENSIO endpoint `0x21` and the command/data write paths clock the organic firmware stream into the LCD. | The immediate bit-clock implementation is functional timing, not a measured serial waveform. |
-| Display-type selection | Diagnostic/configuration shortcut | A quarantined RAM-read override selects the display type needed by the v6.00 profile. | Its real product-data or hardware source is unknown; this is not LCD behavior. |
+| LCD controller | Reused device, partial integration | Firmware-generated command/data transfers reach MAME's PCD8544 device and reproduce a byte-exact visible frame. | Reset/electrical timing remains unmeasured. |
+| MAD2 LCD serialization | Derived hardware contract | Both 3210 ROMs select GENSIO endpoint `0x21`, send command prefix `24 40 80`, and transfer at least one complete 504-byte LCD RAM image MSB-first. | The immediate bit-clock implementation is functional timing, not a measured serial waveform. |
+| Display profile | Recovered NV boundary, missing data | Descriptor `0x0749` supplies three 12-byte profiles; record-0 byte 5 becomes active-profile slot 7 and the setup-message initializer tests it against `4`. | Every collected EEPROM has the descriptor erased. A quarantined read override still supplies `4`; no factory record is available to replace it honestly. |
 | MAD2 keypad matrix | Partial hardware, strong evidence | v6.00 and v5.01 agree on the 4x5 active-low scan, IRQ0 source, register sequence, ROM keymap and decoded-key path. | Electrical debounce, mask-edge corner cases and timing outside the exercised lifecycle remain unvalidated. |
 | Lua LCD mirror and key script | Acceptance tooling | The independent mirror makes headless frame hashes and the script supplies deterministic physical key edges. | Neither is emulated phone hardware; scripted delays are fixtures, not keypad debounce. |
 
@@ -115,6 +115,9 @@ scan/decode seam. `NOKI3210_TRACE_TASKS=1` provides generic
 mailbox-edge context. Both are read-only and must be disabled successfully in
 the final acceptance run.
 
-There is no focused component test for PCD8544 reset/command semantics or MAD2
-key-mask/debounce corner cases. The byte-exact frame and scripted editor run are
-end-to-end integration evidence, not substitutes for those tests.
+`NOKI3210_TRACE_DISPLAY_PROFILE=1` records the descriptor-load, profile-update,
+active-profile copy and setup-message boundaries. `NOKI3210_TRACE_DISPLAY_IO=1`
+records only endpoint selection and LCD command/data bytes. `make verify-display`
+checks both ROMs' NV descriptor layouts and serial transfers; its v6.00 leg also
+locks down the currently erased record and absent profile-update handler. The
+byte-exact frame remains the end-to-end rendering oracle.

@@ -34,6 +34,9 @@
     fixed variable-length sequence catalogue at `0x2cb968`, decoding packed
     event argument counts and the `0x00dc` terminator. Inputs `0x213a`/`0x613a`
     emit `0x089a, 0x08b0`, while `0x213b`/`0x613b` emit `0x08b0` directly.
+  - `display_trace_check.py` — validates the version-specific NV descriptor
+    `0x0749` mapping and the selected PCD8544 command/data stream captured by
+    `make verify-display`.
   - `test_message_census.py`, `test_find_thumb_signature.py`,
     `test_make_eeprom_profile.py`, and `test_mad2_access_census.py` cover byte
     lanes, signature relocation masks, runtime-manifest isolation, generated

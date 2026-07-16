@@ -60,16 +60,17 @@ question is the ordinary unattended idle-window selection.
 | DSP/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns boot-subset DSP behavior; `nokia_external_service_peer_device` owns the separate request-driven service/test session. | Recover bootstrap transition timing and add wrap/full/fault transport cases; extend peer vocabulary only for organic requests. |
 | MAD2 | `nokia_mad2_device` owns CTSI offsets `0x00..0x16`, timer-0/FIQ4, pending/masks, IRQ/FIQ aggregation and save-state restoration. SIMI and MBUS are separate; GENSIO and other peripheral windows remain phone-owned. | Establish extended IRQ ownership, physical timer clocks and reset domains; do not promote the unexercised timer-1 approximation. |
 | MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, calibrated byte timing and FIQ2/FIQ3 callbacks; ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing. | Recover physical baud/FIQ3 timing, collision/error behavior and attach a counterparty only for organic frames. |
-| Display/input | Native PCD8544 and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures, while display type still comes from a RAM-read shortcut. | Add focused reset/command and mask/debounce tests, recover the real display-type source, then remove the shortcut. |
+| Display/input | Native PCD8544, a cross-ROM LCD transport check, and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures. Descriptor `0x0749` owns the missing display-profile byte, but all collected records are erased. | Obtain an authentic `0x0749` profile before removing the shortcut; recover reset timing and mask/debounce edge cases separately. |
 
 The headless LCD mirror and delayed-key fixture are acceptance tooling in
 `mame_noki3210_input_exerciser.lua`. They do not add device state or firmware
 shortcuts to the phone driver.
 
-One RAM-read shortcut remains explicitly quarantined for display-type selection.
-It is not presented as hardware behavior; a leave-one-out run confirms that it
-still controls later LCD presentation even though the scheduler/SIM frontier
-otherwise survives.
+One RAM-read shortcut remains explicitly quarantined for display-profile slot 7.
+It changes logical byte `0x11fc87` only while the v5.01/v6.00 setup initializer
+reads it. NV descriptor `0x0749` is the recovered owner; the shortcut remains
+because every available record is erased, not because the source is still
+attributed to unknown hardware.
 
 ## Runtime-control ledger
 
@@ -77,12 +78,12 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 
 | Class | Controls | Status |
 | --- | --- | --- |
-| Hardware/product shortcut | `DISPLAY_TYPE` | Quarantined firmware RAM-read override; recover the product-data source. |
+| Product-provisioning shortcut | `DISPLAY_TYPE` | Quarantined read override for active display-profile slot 7; remove only when an authentic descriptor-`0x0749` record is available. |
 | Hardware scenarios | `ADC_PROFILE`, `ADC0..7`, `SIM_ATR_HEX`, `SIM_CPHS_AOC` | Deterministic analog/card inputs, not inferred physical defaults. |
 | Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MBUS_BYTE_DELAY_MS`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | Retain while visible as calibration debt; replace with recovered clocks/transactions. |
 | Safety/acceptance guard | `DISABLE_CCONT_WATCHDOG` | Prevents an incompletely timed watchdog from hiding the investigated state; not hardware fidelity. |
 | Device-boundary prototypes | `MODEL_CCONT_PRESENT`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE` | Supported deep profile only; organic interfaces, incomplete contracts. |
-| Read-only diagnostics | `TRACE_HANDOFF`, `TRACE_DISPLAY`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS` | Log-only and bounded or scoped to a named investigation. |
+| Read-only diagnostics | `TRACE_HANDOFF`, `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS` | Log-only and bounded or scoped to a named investigation. |
 | Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
@@ -96,6 +97,8 @@ The retained trace switches are scoped as follows:
 | --- | --- |
 | `TRACE_HANDOFF` | task-1 modes/posts plus IRQ0 and keypad scan/decode seams |
 | `TRACE_DISPLAY` | active MMI context, resource/render entry points, and LCD/DSP transfer boundaries |
+| `TRACE_DISPLAY_PROFILE` | descriptor-`0x0749` load/update/copy and setup-message boundaries |
+| `TRACE_DISPLAY_IO` | GENSIO LCD endpoint selection and command/data transfers |
 | `TRACE_TASKS` | generic task liveness and mailbox edges |
 | `TRACE_SERVICE_COMMAND` | class-`0x40` service command direction and state |
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |

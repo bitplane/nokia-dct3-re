@@ -78,9 +78,32 @@ cover more than a thousand byte accesses. Important observed ranges include:
 | `0x0544..0x05c6` | configuration records |
 | `0x06c8..0x06fb` | unknown record |
 | `0x0db0..0x0f3f` | generated NV descriptor `0x0757`, variant zero |
-| `0x18a8..0x18cb` | high-address record, semantics unknown |
+| `0x18a8..0x18cb` | v6.00 display-profile descriptor `0x0749`: three 12-byte records |
 
 The EEPROM is therefore part of early boot state, not a later optional feature.
+
+## Display profiles
+
+The v6.00 descriptor table entry at `0x2dad78` maps NV id `0x0749` to EEPROM
+offset `0x18a8` with a 12-byte record length. The aligned v5.01 entry at
+`0x2cf510` maps the same id and length to `0x18a0`; this address difference is
+firmware-version data, not a board-register difference. Initializer `0x29a996`
+loads variants 0..2 into three records at RAM `0x112188`.
+
+For the active v6.00 path, `0x29a768` copies record-0 byte 5 (`0x11218d`) to
+active-profile byte 7 (`0x11fc87`). Setup-message initializer `0x2b1e80` tests
+that byte against `4`. The driver override is implemented on the low byte lane
+of the halfword at `0x11fc86`; it therefore changes logical byte `0x11fc87`,
+not byte `0x11fc86`.
+
+All four collected 3210 EEPROM images and both generated BIOS profiles have
+the applicable three-record range erased. In a coherent v6.00 run the NV read
+produces twelve `0xff` bytes, the later profile-update handler `0x29ae68` does
+not execute, and the backing active slot remains `0xff`. No authentic record or
+firmware-selected fallback currently establishes the required value `4`.
+Consequently the generator deliberately does not invent descriptor contents,
+and the quarantined read override remains an explicit product-provisioning
+gap. `make verify-display` makes this stop boundary reproducible.
 
 Both collected 3210 images have erased bytes across the descriptor-2/3/4 range,
 so this ROM substitutes its validated defaults. The source-7 gain denominator is

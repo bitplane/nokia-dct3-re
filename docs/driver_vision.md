@@ -39,7 +39,7 @@ Environment controls must fit one of five classes:
 
 | Class | Examples | Policy |
 | --- | --- | --- |
-| Machine/scenario configuration | display type, clock rates, battery state, EEPROM image | Keep, but prefer typed machine configuration or input data over individual register values. |
+| Machine/scenario configuration | display profile, clock rates, battery state, EEPROM image | Keep, but prefer typed machine configuration or input data over individual register values. |
 | Device-boundary model | CCONT, request-driven SIM card behavior, DSP ring ownership | Keep only while it reacts to organic traffic through the real interface. |
 | Diagnostic trace/probe | `TRACE_*`, bounded MAD2 ledger | Opt-in, no state changes, and small enough to remove when no longer useful. |
 | Provisional firmware bridge | none retained in the supported profiles | Do not reintroduce firmware calls, result substitution, or message injection. |

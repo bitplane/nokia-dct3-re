@@ -48,7 +48,9 @@ explicit configurations rather than driver-name parsing.
   conclusion is normalized; replace each RAM-read shortcut with its real
   hardware or nonvolatile-data owner.
 - All firmware-result forces and registration-message injections are removed.
-  One explicit RAM-read shortcut remains for display-type sourcing. See
+  One explicit RAM-read shortcut remains for erased NV display-profile
+  descriptor `0x0749`; it overrides logical byte `0x11fc87` during the setup
+  initializer and is not LCD hardware behavior. See
   `evidence_regime.md`.
 - The direct firmware allocation trampoline,
   service-status RAM completion, and synthetic startup-report feed are removed.

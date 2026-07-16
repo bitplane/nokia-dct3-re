@@ -54,7 +54,8 @@ covered through MAD2 IRQ0 and the firmware matrix scanner.
 The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
 executable protocol hypotheses, not finished hardware emulation, but do not
 call firmware handlers or write registration state. Firmware-PC conditions are
-confined to diagnostic traces and the documented display-type RAM-read shortcut.
+confined to diagnostic traces and the documented erased-NV display-profile
+RAM-read shortcut.
 
 ## Maturity
 
