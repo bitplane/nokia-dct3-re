@@ -16,9 +16,11 @@ report investigation; this file owns the keypad hardware-to-firmware contract.
 
 ## Current state
 
-The provisioned profile paints an idle-like frame with a `Menu` softkey while
-task 1 remains in startup mode `0x0004`. The screen is presentation state, not
-proof that the application desktop is interactive.
+The provisioned profile paints an idle frame with a `Menu` softkey while task 1
+remains in mode `0x0004`. A physical left-softkey fixture follows the firmware
+key/event pipeline and opens the `Phone book` menu with a `Select` softkey.
+This proves that the application desktop is interactive and that mode `0x0004`
+is not a blocked pre-desktop state.
 
 A scripted logical press changes the active-low MAD2 keypad state and raises
 IRQ0. Handler `0x2b3084` starts the firmware's internal `0x41/0x42/0x43`
@@ -105,15 +107,16 @@ A complete input milestone requires all of the following in one coherent run:
 - a decoded key reaches the MMI event layer; and
 - a multi-key editor transaction reaches its firmware-owned completion.
 
-The hardware-to-editor contract now satisfies those conditions. An idle-looking
-PNG alone still does not prove an application desktop.
+The hardware-to-editor contract satisfies those conditions. The provisioned
+left-softkey run additionally proves the application desktop by opening the
+firmware-owned `Phone book` menu; the PNG is corroborating output from that
+organic transaction rather than the sole evidence.
 
 ## Diagnostics
 
-`NOKI3210_TRACE_HANDOFF=1` records task-1 modes/posts, the IRQ0 handler, and the
-scan/decode seam. `NOKI3210_TRACE_TASKS=1` provides generic
-mailbox-edge context. Both are read-only and must be disabled successfully in
-the final acceptance run.
+`NOKI3210_TRACE_TASKS=1` provides generic mailbox-edge context for future
+application work. The former MMI-specific handoff trace was retired when
+`make verify-mmi-menu` closed the keypad-to-menu lifecycle.
 
 `NOKI3210_TRACE_DISPLAY_PROFILE=1` records the descriptor-load, profile-update,
 active-profile copy and setup-message boundaries. `NOKI3210_TRACE_DISPLAY_IO=1`

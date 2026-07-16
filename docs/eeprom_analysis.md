@@ -183,17 +183,28 @@ The same fixture is reproducible through
 variable preserves the erased-identity default used by the canonical oracle.
 
 That fixture makes the identity comparison succeed and removes the Security-code
-editor. It paints a new idle-like frame (SHA-256 prefix `dbf2704cb945d56b`) but
-does not move task 1 out of mode `0x0004`. Keypad
-interaction is independently functional on the unprovisioned editor path; the
-fixture is evidence about security provisioning, not the new default oracle.
+editor. It paints the idle frame (SHA-256 prefix `dbf2704cb945d56b`) without
+moving task 1 out of mode `0x0004`. A physical left-softkey fixture opens the
+firmware-owned `Phone book` menu from that frame, proving the UI is interactive
+and mode `0x0004` is not a blocked startup state. The provisioned profile and
+menu interaction remain acceptance fixtures rather than the default oracle.
 
 This profile is explicit test provisioning. It is not a factory EEPROM dump and
-does not belong in the hardware device. The generated image currently has:
+does not belong in the hardware device. The default, unprovisioned image loaded
+by the MAME ROM definition currently has:
 
 - CRC32 `7f7fd703`;
 - SHA-1 `3402e47e133dc74c7fa03863fee44a171f15100e`; and
 - SHA-256 `d7561ddd13d5c1c584bc785514102e68de5a39c3f1078467f769ef47e4850d67`.
+
+With test prefix `49015420323751`, the provisioned fixture instead has CRC32
+`c6c04a5e`, SHA-1 `3ddb5b76fed37970fb2ae6e0e9e213b7ed19257a`, and SHA-256
+`3b3ee14965e53241038fbdebff52efe73261eda8f5bc65830ff4342cd3adada6`.
+
+The `run` target serializes profile generation, copying and NVRAM seeding.
+This ordering is required: parallel `build` and `prepare-run-nvram` targets can
+otherwise seed MAME from the previous EEPROM image and misclassify a provisioned
+run as an unprovisioned security-editor result.
 
 ## Remaining work
 

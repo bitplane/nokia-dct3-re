@@ -13,22 +13,6 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 {
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 &&
-			(address == 0x001123f0 || address == 0x0011224c))
-	{
-		const u16 old_mode = m_ram[offset];
-		const u16 new_mode = (old_mode & ~mem_mask) | (data & mem_mask);
-		if (old_mode != new_mode)
-		{
-			const offs_t message_address = address - 2;
-			logerror("t1mode: %04x -> %04x pc=%08x caller=%08x message=%04x task=%02x "
-					"ccont=%02x battery=%02x t=%.6f\n",
-					old_mode, new_mode, pc & ~u32(1),
-					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1), fw_word(message_address),
-					fw_byte(FW_SCHED_RUNNING_TASK_ID), fw_byte(0x0011ff6c),
-					fw_byte(0x00110436), machine().time().as_double());
-		}
-	}
 	if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && address == FW_SERVICE_SESSION_STATUS)
 		logerror("csstatus_write: pc=%08x data=%04x mask=%04x old=%04x task=%02x "
 				"svc_ready=%02x dsp=%04x/%04x/%04x t=%.6f\n",
@@ -232,28 +216,6 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 					machine().time().as_double());
 		}
-	}
-	// Keypad IRQ0 enters its own ISR and starts the firmware's 0x41/0x42/0x43
-	// scan/decode sequence. IRQ6 is the separate CCONT source.
-	if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr &&
-			(addr == 0x002b3084 || addr == 0x002b4628 || addr == 0x002b5da0 ||
-			 addr == 0x002b5dba || addr == 0x00271256 || addr == 0x002701b0 ||
-			 addr == 0x00271266 || addr == 0x002b2f90))
-	{
-		static unsigned keypad_handoff_count = 0;
-		const uint16_t event = u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)) & 0xffff;
-		const bool startup_dispatch = addr == 0x00271256 || addr == 0x002701b0;
-		if ((!startup_dispatch || event == 0x0072 || event == 0x0007) && keypad_handoff_count++ < 128)
-			logerror("keypad_handoff: pc=%08x r0=%08x r1=%08x event=%04x mode=%04x task=%02x "
-					"irq=%02x mask=%02x rows=%02x caller=%08x t=%.6f\n",
-					addr, u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
-					(addr == 0x002b3084 || addr == 0x002b4628 || addr == 0x002b5da0 || addr == 0x002b2f90) ?
-						u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff : event,
-					debug_ram_word(FW_STARTUP_MODE), debug_ram_byte(0x00100022),
-					m_mad2->irq_status(), m_mad2->reg(MAD2_IRQ_MASK), m_mad2_regs[0x28],
-					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
-					machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_DISPLAY", 0) != 0 && pc == addr && addr == 0x002af798)
 	{
@@ -581,60 +543,6 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 					debug_ram_byte(FW_SERVICE_CHANNEL_ENABLE_FLAGS),
 					m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 					debug_ram_byte(0x00100022), machine().time().as_double());
-		}
-		// TRACE_HANDOFF (opt-in): post-SIM MMI settlement (docs/mmi_settlement.md).
-		// Curated task-1 mode, mailbox, and interactive-init seams:
-		//  (a) task-1 dispatcher 0x270c8e -- mode [0x1123f0], mode-0d checklist [0x112399], CCONT [0x11ff6c];
-		//  (b) mode-0 interactive-init burst 0x270d1c / display_idle 0x298000 -- did they run? (not yet);
-		//  (c) RAM write watch on the v6/v5 task-1 mode word -- every mode transition;
-		//  (d) 0x26a204/0x26a354 -- inventory of codes posted to task-1's mailbox.
-		if (nokia_env_u32("NOKI3210_TRACE_HANDOFF", 0) != 0 && pc == addr)
-		{
-			if (addr == 0x00270c8e)
-			{
-				static unsigned h1 = 0; static u32 h1_last = 0xffffffff;
-				const u32 key = (u32(debug_ram_word(0x001123f0)) << 16) | (u32(debug_ram_byte(0x00112399)) << 8)
-						| debug_ram_byte(0x0011ff6c);
-				if (key != h1_last && h1++ < 60)
-				{
-					h1_last = key;
-					logerror("handoff: t1_dispatch mode=%04x chk[112399]=%02x ccont[11ff6c]=%02x sub[11239c]=%02x t=%.4f\n",
-							debug_ram_word(0x001123f0), debug_ram_byte(0x00112399), debug_ram_byte(0x0011ff6c),
-							debug_ram_byte(0x0011239c), machine().time().as_double());
-				}
-			}
-			else if (addr == 0x00270d1c)
-			{
-				static unsigned h2 = 0;
-				if (h2++ < 8)
-					logerror("handoff: mode0 INTERACTIVE-INIT burst 0x270d1c ENTERED t=%.4f\n",
-							machine().time().as_double());
-			}
-			else if (addr == 0x00298000)
-			{
-				static unsigned h3 = 0;
-				if (h3++ < 8)
-					logerror("handoff: display_idle FIRED (idle repaint) [1116fd]=%02x t=%.4f\n",
-							debug_ram_byte(0x001116fd), machine().time().as_double());
-			}
-			// Inventory every RTOS post to task 1, deduplicated by (code, caller).
-			else if (addr == 0x0026a204 || addr == 0x0026a354)
-			{
-				const u32 task = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff;
-				if (task == 1)
-				{
-					const u32 code = m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff;
-					const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-					static u32 seen[96]; static unsigned nseen = 0;
-					const u32 kv = (code << 12) ^ lr;
-					bool dup = false; for (unsigned i = 0; i < nseen; i++) if (seen[i] == kv) { dup = true; break; }
-					if (!dup && nseen < 96)
-					{
-						seen[nseen++] = kv;
-						logerror("t1post: code=%04x via=%08x lr=%08x t=%.4f\n", code, addr, lr, machine().time().as_double());
-					}
-				}
-			}
 		}
 	// Observe the lower GSM receive path without participating in it.  Task 15 receives event 0x07dd
 	// at 0x20a026; its payload pointer at message+8 is parsed by 0x209978 and converted to an

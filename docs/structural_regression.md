@@ -13,6 +13,12 @@ same frame.
 `oracles/noki3210-default.struct` after checking the exact frame hash.
 `make verify-frontier` performs the corresponding semantic check for the current
 request-driven external-service/SIM profile against `oracles/noki3210-frontier.struct`.
+`make verify-mmi-menu` adds provisioned identity data and one delayed physical
+left-softkey press. It requires the same coherent structural predicates and an
+exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon
+region is excluded; the text, softkey, layout and remaining pixels are protected.
+This is the interactive MMI oracle rather than a replacement for the default
+fault-frame oracle.
 `make verify-3210-v501` runs the same-product v5.01 control with a BIOS-specific
 EEPROM profile and checks `oracles/noki3210-v501-smoke.struct`.
 `make verify-mad2-interrupts` runs three non-oracle controller conformance
@@ -103,13 +109,15 @@ Non-oracle research evidence includes a Security-code frame with SHA-256 prefix
 hardware-boundary profile does not reproduce the additional display transfer.
 
 A separately generated provisioned EEPROM profile matched the synthetic phone
-identity and removed that prompt in the same historical display setup. It painted an idle-like `Menu` frame with
-SHA-256 prefix `dbf2704cb945d56b`, while the structural state remains in mode
-`0x0004`. The corrected IRQ0 keypad source reaches the real matrix scanner and
-publishes decoded keys while that mode remains selected. A deterministic
-`12345` plus softkey sequence completes the editor through `0x0578`; its
-`0x05e6` callback result is the statically proved accepted-code branch, though
-the interactive sequence is not yet part of the structural oracle.
+identity and removed that prompt. It painted the idle `Menu` frame with SHA-256
+prefix `dbf2704cb945d56b`, while the structural state remains in mode `0x0004`.
+The corrected IRQ0 keypad source reaches the real matrix scanner and publishes
+decoded keys while that mode remains selected. A physical left-softkey fixture
+then opens the firmware-owned `Phone book` menu; a one-shot mirror capture has
+SHA-256 `9b2ac7477b5be11aa6b4f178f781ff2799754b0b5ff6ce8f66221564d0f914d1`.
+The menu fixture is acceptance evidence but is not yet part of the canonical
+structural oracle. The separate unprovisioned `12345` fixture completes the
+security editor through `0x0578` and its accepted `0x05e6` callback branch.
 
 ## Nokia 3210 v5.01 control
 

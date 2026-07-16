@@ -131,7 +131,7 @@
     {
       "id": "security_identity_completion_owns_code7", "status": "disproven",
       "hypothesis": "A valid phone identity/security profile completes callback 0x47 through 0x0578 -> 0x05e1 -> 0x06c5 and supplies startup report code 7",
-      "conclusion": "The default combined EEPROM checksums were already valid. A firmware-derived fixture supplies a synthetic IMEI, default phone code 12345, and matching derived record at 0x06c8. The 0x2ae61a comparison succeeds at 0x0317, callback 0x47 is not selected, and the Security-code prompt becomes an idle-like Menu frame. No 0x0578, 0x05e1, 0x06c5, code 7, mode-0x0004 exit, or interactive keypad decode follows. Security provisioning controls the prompt but does not own code 7.",
+      "conclusion": "The default combined EEPROM checksums were already valid. A firmware-derived fixture supplies a synthetic IMEI, default phone code 12345, and matching derived record at 0x06c8. The 0x2ae61a comparison succeeds at 0x0317, callback 0x47 is not selected, and the Security-code prompt becomes the idle Menu frame. A later physical left-softkey fixture proves that frame is interactive and opens Phone book while task 1 remains in mode 0x0004. No 0x05e1, 0x06c5, code 7, or mode exit is required. Security provisioning controls the prompt but does not own code 7.",
       "evidence": ["docs/eeprom_analysis.md", "docs/mmi_settlement.md"]
     },
     {
@@ -155,7 +155,7 @@
     {
       "id": "forced_code7_proves_downstream_mmi_completion", "status": "disproven",
       "hypothesis": "Supplying report code 7 in isolation creates a coherent MMI/display lifecycle whose later completion identifies the faithful missing boundary",
-      "conclusion": "The isolated report does prove code 7 is the mode-4 prerequisite: firmware posts 0x0732 to task 5, initializes task 6, and task 6 successfully posts 0x0547. It does not compose. The forced handoff occurs while task 5 retains its pre-handoff backlog; the 0x0547 object remains queued at pointer-ring slot 0x11 while repeating internal 0x0d16 timer traffic wins the receive path. No 0x079d, resource-0x6a02 readiness report, or code 0x0b follows. The downstream statuses must not be injected; code 7 must arise at its organic lifecycle point.",
+      "conclusion": "The isolated report enters the conditional mode-4 continuation: firmware posts 0x0732 to task 5, initializes task 6, and task 6 posts 0x0547. It does not compose. The forced path runs while task 5 retains its existing backlog; the 0x0547 object remains queued while internal timer traffic wins the receive path. Later consumer-side decode proved that ordinary interactive initialization already falls through without code 7, and physical power input identifies code 7 as a shutdown continuation. Neither the report nor its downstream statuses should be injected.",
       "evidence": ["docs/mmi_layer.md", "docs/mmi_settlement.md"]
     },
     {
@@ -203,7 +203,7 @@
     {
       "id": "rom4_report7_is_generic_dsp_startup_completion", "status": "disproven",
       "hypothesis": "Report code 7 is a generic ROM-4 DSP/startup completion and a healthy sibling boot can supply a replayable peer contract",
-      "conclusion": "NSE-1 v5.30 contains the exact report-7 wrapper at 0x28f142 and exactly four callers at 0x22cb7e, 0x22dc62, 0x246eaa, and 0x26af8a. A forcing-free 60-million-instruction sibling boot reaches its byte-exact interactive Security-code frame without executing the wrapper. The 5110 uses a serial-keypad scan lifecycle and its wrapper only posts code 7; the 3210 wrapper additionally publishes resource 0x6a01 readiness. This disproves a generic ROM-4/DSP completion but does not weaken the direct 3210 proof that code 7 gates its current mode-4 path.",
+      "conclusion": "NSE-1 v5.30 contains the exact report-7 wrapper at 0x28f142 and exactly four callers at 0x22cb7e, 0x22dc62, 0x246eaa, and 0x26af8a. A forcing-free 60-million-instruction sibling boot reaches its byte-exact interactive Security-code frame without executing the wrapper. The 5110 uses a serial-keypad scan lifecycle and its wrapper only posts code 7; the 3210 wrapper additionally publishes resource 0x6a01 readiness. This disproves a generic ROM-4/DSP completion and agrees with the later 3210 result that code 7 belongs to conditional power/shutdown continuation rather than ordinary boot.",
       "evidence": ["docs/mmi_settlement.md"]
     },
     {
@@ -227,7 +227,7 @@
     {
       "id": "mode0d_state0_ordering_unlocks_code7_handoff", "status": "disproven",
       "hypothesis": "Completing the application-readiness checklist before the first battery classification selects the accepted mode-0d branch and removes the code-7 boot wall",
-      "conclusion": "The full checklist is delayed as one firmware task group behind the modeled external-service peer's service-empty 0x622a acknowledgement. Task 18 is merely the last task in the fixed resume order and posts code 0x12 immediately from its initializer. Although shortening the peer's calibrated delay could make 0x2a6942 observe accepted state 0 instead of state 1, the alternate tail at 0x270eee has its own mailbox receive and explicit code-7 comparison before shared interactive initialization. The coherently observed state-1 tail at 0x270fa4 waits for the same report. Timing therefore changes the selected wait but does not supply its prerequisite; no timing constant was changed.",
+      "conclusion": "The full checklist is delayed as one firmware task group behind the modeled external-service peer's service-empty 0x622a acknowledgement. Task 18 is merely the last task in the fixed resume order and posts code 0x12 immediately from its initializer. Shortening the peer's calibrated delay could change which tail 0x2a6942 selects, but both tails compare a mailbox report before falling through to equivalent interactive initialization. Timing changes the recorded continuation, not whether the UI starts; no timing constant was changed.",
       "evidence": ["docs/external_service_topology.md", "docs/mmi_settlement.md", "docs/service_bootstrap.md"]
     },
     {

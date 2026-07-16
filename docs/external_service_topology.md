@@ -112,7 +112,7 @@ remains hardware-fidelity debt, but is not adjusted merely to select a different
 firmware branch. The alternate mode-`0x000d` tail has the same report-code-7
 listener. Both branches nevertheless enter their shared interactive
 initialization before recording mode 4 or 7, so this ordering is fidelity debt
-rather than the current UI-start boundary.
+rather than an application-start blocker.
 
 ## Command inventory
 

@@ -139,18 +139,18 @@ The request-driven peer now completes the startup D0 exchange, the organic type-
 service-session completion, and the external task-7 service session in one boot. The generic-service
 `0x05e8` chain remains a mapped later radio/SAT path, not the current ordinary-SIM prerequisite.
 
-## Current application boundary
+## Current application coverage
 
 The coherent profile exercises CTSI, MBUS, CCONT, LCD, keypad, GenIO/EEPROM,
-SIMI and the modeled DSP/external-service boundary. It completes ordinary SIM file
-traffic, clears no-SIM, sets SIM enable, scans the keypad, and accepts the
-security transaction through normal firmware paths. Conditional power,
+SIMI and the modeled DSP/external-service boundary. It completes ordinary SIM
+file traffic, clears no-SIM, sets SIM enable, scans the keypad, reaches the idle
+screen, and opens `Phone book` through physical input. The optional security
+transaction also completes through normal firmware paths. Conditional power,
 reinitialization, and service/test display routes are classified separately.
-The remaining application boundary is unattended task-5/MMI context settlement and
-idle-window selection, not a hardware acknowledgement currently justified for
-synthesis. The default fault-screen oracle and coherent frontier profile
-remain separate acceptance baselines; the Nokia 3330 remains the first
-portability probe. See `mmi_settlement.md` and `mmi_layer.md`.
+The next boundary is application coverage and whichever hardware contract each
+application exercises organically. The default fault-screen, coherent frontier,
+and interactive menu remain separate acceptance baselines; the Nokia 3330 is
+the first portability probe. See `mmi_settlement.md` and `mmi_layer.md`.
 
 ## Diagnostic
 

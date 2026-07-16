@@ -29,27 +29,26 @@ default profile deterministically reaches the authentic **CONTACT SERVICE** fram
 by a byte-exact LCD oracle. Opt-in peer prototypes can carry the firmware further and the ring-2
 SIM responder completes natural ATR and ICCID/ECC/PHASE APDU traffic.
 
-The phone does **not** yet reach a verified interactive desktop. The modeled
-SIM completes the ordinary non-CPHS initialization pass and task 1 selects
-startup mode `0x0004`. Instruction and runtime traces prove that both the
-code-7 and non-code-7 branches execute the same interactive-initialization tail;
-mode 4 records a later continuation rather than blocking the UI. Correct MAD2
-IRQ0 keypad wiring reaches the firmware matrix scan and decoded key resources,
-and the Security-code editor accepts a physical `12345` sequence.
+The coherent modeled profile reaches a verified interactive desktop. The SIM
+completes ordinary non-CPHS initialization, provisioned identity data removes
+the phone-lock prompt, and a physical left-softkey press opens the firmware's
+`Phone book` menu. Task 1 remains in mode `0x0004`; that mode records a later
+power/shutdown continuation and does not block the UI. Correct MAD2 IRQ0 keypad
+wiring reaches the firmware matrix scanner and decoded key resources. The
+unprovisioned Security-code editor also accepts a physical `12345` sequence.
 
-The remaining application-level question is the ordinary unattended
-UI/idle-window entrance. Report code 7 is a later power/shutdown report, and
-the mapped callback, descriptor, timer, and second-softkey paths are classified
-as conditional firmware lifecycles rather than missing
-hardware acknowledgements. Detailed exclusions and addresses live in
+Report code 7 is a later power/shutdown report. Mapped callback, descriptor,
+timer, and task-6 selector paths are conditional firmware lifecycles rather
+than missing hardware acknowledgements. Detailed contracts live in
 [`docs/mmi_settlement.md`](docs/mmi_settlement.md) and
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
-`make verify-frontier RUN_DIR=run_frontier SECONDS=8` is the authoritative
-research baseline for this boundary. It uses the request-driven external-service peer
+`make verify-frontier RUN_DIR=run_frontier` is the authoritative modeled
+hardware baseline. It uses the request-driven external-service peer
 and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with service-session status
 `0x49`, no-SIM clear, and SIM enable set. Keypad interaction is independently
-covered through MAD2 IRQ0 and the firmware matrix scanner.
+covered through MAD2 IRQ0 and the firmware matrix scanner. `make verify-mmi-menu`
+adds provisioned identity and protects the interactive menu transaction.
 
 The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
 executable protocol hypotheses, not finished hardware emulation, but do not
@@ -78,7 +77,7 @@ The labels below have precise meanings:
 | SIMI controller and SIM card | Partial hardware | Separate devices compose through byte/reset callbacks; organic SIMI/FIQ6 and T=0 initialization work, while timing, errors and synthetic provisioning remain incomplete. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
 | Startup/external-service peers | Prototype | Request-driven behavior composes through the DSPIF, DSP HLE and external-service devices; the wider peer contract remains incomplete. |
-| Interactive startup | Mapped | Keypad and editor completion work in mode 4. Callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, and task-6 selector `0x0732 -> 0x2b1e44` are conditional UI/power lifecycle paths, not cold-boot entrances. Task-5/MMI context settlement is the smallest unresolved boundary. |
+| Interactive startup | Mapped | Provisioned boot reaches the idle screen and opens `Phone book` through a protected physical-keypad oracle. Mode 4 is compatible with the UI; cross-ROM presentation parity remains open. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |
 
@@ -127,7 +126,7 @@ Start with:
 - [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
 - [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for service-session startup.
-- [`docs/mmi_settlement.md`](docs/mmi_settlement.md) for the current MMI settlement boundary.
+- [`docs/mmi_settlement.md`](docs/mmi_settlement.md) for the validated idle/menu lifecycle and excluded conditional paths.
 - [`docs/sim_registration.md`](docs/sim_registration.md) for the SIM and generic-service findings.
 - [`docs/tooling.md`](docs/tooling.md) for the analysis tools.
 

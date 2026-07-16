@@ -47,6 +47,7 @@ FRAME_PNG ?= progress_latest_frame.png
 # Regression oracle: sha256 prefix of the promoted LCD frame from `make run`.
 # A blank/un-provisioned 3210 deterministically reaches CONTACT SERVICE here.
 ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
+ORACLE_MMI_MENU_STABLE_SHA ?= 305c12459700027431ef9c04132bcceb7e2157ef87debf2cdf1ae438b8bd8d3f
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 ORACLE_V501_STRUCT ?= oracles/noki3210-v501-smoke.struct
@@ -78,7 +79,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -105,6 +106,7 @@ help:
 	@echo "make run-frontier   run the current external-service/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier predicates"
 	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
+	@echo "make verify-mmi-menu reproduce the provisioned interactive Phone book menu"
 	@echo "make mad2-census MAD2_LOG=... summarize a bounded MAD2 ledger trace"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
 	@echo "make verify-structure  compare semantic boot predicates with $(ORACLE_STRUCT)"
@@ -113,7 +115,7 @@ help:
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
 	@echo "make clean          remove build/run state (keeps the MAME clone)"
-	@echo "Override runtime knobs with RUN_ENV, e.g.  make run RUN_ENV='NOKI3210_TRACE_HANDOFF=1'"
+	@echo "Override runtime knobs with RUN_ENV, e.g.  make run RUN_ENV='NOKI3210_TRACE_DISPLAY=1'"
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -205,7 +207,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -228,7 +230,7 @@ run-manifest-3330:
 	@$(MAKE) --no-print-directory smoke-3330e RUN_DIR=run_manifest_3330 SECONDS=3
 	cp $(MAME_DIR)/error.log run_manifest_3330/error.log
 
-prepare-run-nvram:
+prepare-run-nvram: build
 	@if [ "$(PHONE)" = "noki3210" ]; then \
 		mkdir -p "$(RUN_NVRAM_DIR)/$(PHONE)"; \
 		if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
@@ -237,7 +239,7 @@ prepare-run-nvram:
 		fi; \
 	fi
 
-run: build prepare-run-nvram
+run: prepare-run-nvram
 	@mkdir -p $(RUN_DIR)
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKI3210_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
@@ -412,6 +414,24 @@ verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier
 	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_FRONTIER_STRUCT)
 	@echo "OK — coherent frontier predicates reproduced"
+
+verify-mmi-menu:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR) SECONDS=12 \
+		PROVISIONED_IMEI_PREFIX=49015420323751 \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=5000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1000'; \
+	$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_FRONTIER_STRUCT); \
+	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative LCD frame produced in $(RUN_DIR)"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --mask 23,23,20,12 \
+		--sha256 $(ORACLE_MMI_MENU_STABLE_SHA)
+	@echo "OK — interactive Phone book menu reproduced"
 
 FRONTIER_STABILITY_RUNS ?= 3
 FRONTIER_STABILITY_STRICT ?= 0

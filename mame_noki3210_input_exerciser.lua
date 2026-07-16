@@ -264,6 +264,7 @@ local post_delay = env_number("NOKI3210_POST_READY_KEY_DELAY_MS", 250) / 1000
 local post_duration = env_number("NOKI3210_POST_READY_KEY_DURATION_MS", 50) / 1000
 local post_gap = env_number("NOKI3210_POST_READY_KEY_GAP_MS", 100) / 1000
 local post_period = env_number("NOKI3210_POST_READY_KEY_PERIOD_MS", 0) / 1000
+local post_capture_delay = env_number("NOKI3210_POST_READY_CAPTURE_DELAY_MS", -1) / 1000
 local post_sequence_driven = #post_keys > 0 and post_period == 0
 
 local function update_post_ready_key()
@@ -336,6 +337,12 @@ if #post_keys > 0 then
 				emu.wait(post_duration)
 				release(name)
 				emu.wait(post_gap)
+			end
+			if post_capture_delay >= 0 then
+				emu.wait(post_capture_delay)
+				pending_lcd = {}
+				queue_lcd_dump()
+				write_lcd_dump()
 			end
 		else
 			repeat

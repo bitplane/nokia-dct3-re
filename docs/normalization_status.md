@@ -15,11 +15,13 @@ that the driver is ready for upstream submission.
 - `run-manifest-deep-gsm` records the coherent generic-service/SIM frontier.
 - `smoke-3330e` is the first cross-ROM portability probe.
 
-## Current frontier
+## Current application baseline
 
 The ordinary SIM initialization contract is satisfied. With provisioned phone
-identity data, firmware paints an idle-like `Menu` frame, but task 1 remains in
-startup mode `0x0004`.
+identity data, firmware paints the idle `Menu` frame and a physical left-softkey
+press opens the `Phone book` menu organically. Task 1 remains in mode `0x0004`,
+which is now validated as compatible with the interactive UI rather than a
+blocked startup state.
 
 The keypad lifecycle is bounded and its MAD2 register contract is aligned in
 3210 v6.00 and v5.01:
@@ -32,8 +34,12 @@ IRQ0 -> ISR 0x2b3084 -> task-1 event 0x41
 
 Mode 4 already runs keypad and security-editor interaction. Report code 7,
 callbacks `0x5d`, `0x01`, and `0x10`, and task-6 selector `0x0732` belong to
-conditional navigation, reinitialization, or shutdown lifecycles. The open
-question is the ordinary unattended idle-window selection.
+conditional navigation, reinitialization, or shutdown lifecycles. They are not
+missing cold-boot entrances; MMI settlement is closed.
+
+The active frontier is now application coverage: deterministic menu traversal,
+user-data persistence, audio, and built-in applications. Missing behavior should
+be investigated only when an organic application path reaches its boundary.
 
 ## Evidence coverage
 
@@ -83,8 +89,8 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 | Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MBUS_BYTE_DELAY_MS`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | Retain while visible as calibration debt; replace with recovered clocks/transactions. |
 | Safety/acceptance guard | `DISABLE_CCONT_WATCHDOG` | Prevents an incompletely timed watchdog from hiding the investigated state; not hardware fidelity. |
 | Device-boundary prototypes | `MODEL_CCONT_PRESENT`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE` | Supported deep profile only; organic interfaces, incomplete contracts. |
-| Read-only diagnostics | `TRACE_HANDOFF`, `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS` | Log-only and bounded or scoped to a named investigation. |
-| Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
+| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS` | Log-only and bounded or scoped to a named investigation. |
+| Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `POST_READY_CAPTURE_DELAY_MS`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
 registration-state forcing controls.
@@ -95,7 +101,6 @@ The retained trace switches are scoped as follows:
 
 | Trace | Purpose |
 | --- | --- |
-| `TRACE_HANDOFF` | task-1 modes/posts plus IRQ0 and keypad scan/decode seams |
 | `TRACE_DISPLAY` | active MMI context, resource/render entry points, and LCD/DSP transfer boundaries |
 | `TRACE_DISPLAY_PROFILE` | descriptor-`0x0749` load/update/copy and setup-message boundaries |
 | `TRACE_DISPLAY_IO` | GENSIO LCD endpoint selection and command/data transfers |
@@ -124,9 +129,10 @@ hardware handlers.
   topology remains incomplete.
 - The DSP/external-service peer contract is proved only for the requests exercised by
   the current boot.
-- The ordinary unattended UI/idle-window entrance is not yet identified. The
-  accepted security transaction, periodic UI timers, and conditional
-  reinitialization/shutdown selectors are excluded.
+- The exact internal cold-boot UI selector remains unnamed, but its behavior is
+  no longer a topology gap: provisioned boot reaches an interactive idle screen
+  and opens the menu organically. Accepted-security, periodic-timer, conditional
+  reinitialization and shutdown paths remain separately classified.
 
 ## Completion gate
 

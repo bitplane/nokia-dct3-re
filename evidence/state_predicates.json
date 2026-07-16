@@ -95,6 +95,12 @@
       "predicate": "Post-security transaction traffic is separated from periodic descriptor/timer traffic without injecting a task-6 window selection",
       "current": "Accepted 0x0578 makes callback 0x47 return 0x05e6 and leave the active callback sweep. A negative-control run containing only 12345 and its single submission reproduces the later 0x0384, 0x05de/0x05e0, 0x0598, and 0x0578 wave, proving it is the ordinary post-acceptance tail rather than a second-key transaction. Overlapping 0x00c8 is published approximately once per second by task 1 at 0x2a2838 with an incrementing argument. Its descriptor selects context-maintenance outputs 0x1b59, direct 0x01f5, and 0x1b5b; none constructs a class-1 window message. Repeating 0x05a7 is the independent three-slot timer manager at 0x2b3222. The second-softkey/descriptor question is closed and no keypad, timer, callback, context state, or hardware acknowledgement should be synthesized.",
       "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md", "docs/resource_providers.md"]
+    },
+    {
+      "id": "mmi_idle_menu_interaction", "owner": "startup_ui", "status": "satisfied",
+      "predicate": "A provisioned coherent boot accepts a physical left-softkey press and opens a firmware-owned menu without injected firmware state",
+      "current": "After serializing EEPROM generation and NVRAM seeding, the provisioned identity profile removes the security editor. Firmware decodes left softkey 0x19, posts packed press/release inputs 0x40c8/0x40c9, produces 0x0598 then 0x0578, selects callback 0x02, and settles the pipeline at 0x00dc. A one-shot LCD mirror after the transaction shows the Phone book menu and Select softkey. Task 1 remains in mode 0x0004, proving that mode is compatible with ordinary interactive UI and is not a blocked pre-desktop state. No task-6 idle selector, callback state, message, rendered pixels, or hardware result is injected.",
+      "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md", "docs/structural_regression.md"]
     }
   ]
 }

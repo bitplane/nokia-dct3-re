@@ -58,8 +58,9 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 1. Improve the extracted CCONT and GENSIO devices only from observed transactions.
 2. Extend the extracted MAD2 core only from observed reset, clock and peripheral
    contracts; timer 1 remains an explicitly unexercised placeholder.
-3. Resume the ordinary unattended UI/idle-window entrance investigation without
-   presuming that the missing transition is hardware-owned.
+3. Extend deterministic physical-key fixtures into menu and application
+   traversal, adding device behavior only when firmware reaches an evidenced
+   hardware boundary.
 4. Extend focused DSPIF transport tests to wrap/full/fault cases and replace
    calibrated HLE scheduling only when peer timing is recovered.
 5. Use the 3330 as the first portability probe before treating MAD2 behavior as

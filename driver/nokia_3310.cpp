@@ -502,8 +502,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //      HLE; MODEL_EXTERNAL_SERVICE_PEER enables the separate service peer
 //      behind the DSP transport. Their wider contracts remain incomplete.
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
-//      TRACE_SERVICE_COMMAND (class-0x40 service command stream), TRACE_HANDOFF (task-1 master
-//      sequencer mode + startup checklist; the post-SIM interactive handoff),
+//      TRACE_SERVICE_COMMAND (class-0x40 service command stream),
 //      TRACE_TASKS (app-task liveness + inter-task message edges).
 //      TRACE_SIM_RX covers the register/FIQ/APDU path and SIM reply milestones;
 //      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary;

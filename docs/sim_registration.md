@@ -553,7 +553,7 @@ its long-lived event loop through `0x223964 -> 0x2271c6`; `0x2222fc` and the
 `0x138f` callback family occur only after that loop returns, so they cannot
 produce the `0x0434` the loop is awaiting. The similarly numbered DSP packet
 type `0x89` is also an initialization-only route (`[0x112501] == 0`); a real
-FIQ-0 probe at the current frontier was rejected and removed.
+FIQ-0 probe during the registration investigation was rejected and removed.
 
 The task-10 jump table at `0x21b4a0` maps `0x1391` to `0x21b9b4`, which can
 reach `0x21b198` and the `0x0434` producer at `0x219e30`. Its adjacent entry
@@ -593,7 +593,7 @@ hypothesis is not linked to this path and is not a valid peer model yet.
 The card-side preliminary transaction is functional. The `0x120c` latch belongs
 to downstream SIM Toolkit operation and is correctly dormant for the current
 Phase-2 card. The following lower-radio/session paths are retained for later
-network work; they are not the current offline boot boundary.
+network work; they do not block the validated offline UI.
 
 An eight-second coherent deep boot proves ordinary task-21 requests work. Its
 lack of `0x10dcb7`/`0x120c` activity is expected and must not be treated as a
