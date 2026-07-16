@@ -53,9 +53,9 @@
       "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
     },
     {
-      "id": "mad2_mbus_controller", "subsystem": "mbus", "status": "prototype", "confidence": "moderate",
-      "boundary": "MAD2 MBUS offsets retain byte/control/status state and schedule completion FIQs after a calibrated 5 ms delay; no physical bus peer, receive framing, collision or electrical timing is modeled",
-      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
+      "id": "mad2_mbus_controller", "subsystem": "mbus", "status": "partial", "confidence": "strong",
+      "boundary": "The extracted nokia_mbus_device owns MAD2 PUP offsets 0x18..0x1a, RX/TX holding state and FIQ2/FIQ3 callbacks; v6.00/v5.01 share receive-mode initialization and no organic boot TX, while an external-byte fixture validates RX-ready, firmware consumption and FIQ2 acknowledgement; baud, FIQ3 timing, collision and electrical behavior remain unknown",
+      "evidence": ["docs/mbus_controller.md", "docs/mad2_fidelity.md", "tools/mbus_trace_check.py"]
     },
     {
       "id": "mad2_mcuif_latch", "subsystem": "memory_control", "status": "prototype", "confidence": "moderate",

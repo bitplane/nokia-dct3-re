@@ -56,7 +56,7 @@ profile; — = not established.
 | off | reg | status / touch |
 |---|---|---|
 | `0x15/0x16` | PUP control / FIQ8 ctrl | periodic placeholder ✓ |
-| `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | partial controller with calibrated 5 ms completion; no bus peer ✓ |
+| `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | extracted controller with byte attachment, FIQ2 RX/TX lifecycle and calibrated timing; no bus peer ✓ |
 | `0x1b` | vibrator | backing latch ✓ (read) |
 | `0x1c/0x1e` | buzzer divider / volume | backing latches — |
 | `0x20/0x22/0x24` | McuGenIO signal / ? / direction | partial: native EEPROM pins plus unknown stored bits ✓ |

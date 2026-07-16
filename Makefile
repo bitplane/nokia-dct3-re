@@ -11,6 +11,7 @@ DRIVER := driver/nokia_3310.cpp
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dsp_peer.cpp driver/nokia_dsp_peer.h \
 	driver/nokia_mad2.cpp driver/nokia_mad2.h \
+	driver/nokia_mbus.cpp driver/nokia_mbus.h \
 	driver/nokia_simi.cpp driver/nokia_simi.h \
 	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
 	driver/nokia_3310_trace.inc
@@ -74,7 +75,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -94,6 +95,7 @@ help:
 	@echo "make verify-mad2    check timer-0/FIQ and save-state restoration contracts"
 	@echo "make verify-mad2-interrupts check simultaneous, masked-pending and extended-FIQ routing"
 	@echo "make verify-mad2-clocks check reset/clock/watchdog boot contracts in both 3210 ROMs"
+	@echo "make verify-mbus    check two-ROM MBUS init and external RX/FIQ2 contracts"
 	@echo "make run-frontier   run the current external-service/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier predicates"
 	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
@@ -146,7 +148,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_peer.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_peer.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
@@ -197,7 +199,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -337,6 +339,21 @@ verify-mad2-clocks:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v501/error.log
 	@echo "OK — MAD2 reset, clock-control and watchdog boot contracts reproduced across both 3210 ROMs"
+
+verify-mbus:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v600 SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_MBUS=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v600/error.log
+	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v600/error.log
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v501 SECONDS=1 BIOS=501 \
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKI3210_TRACE_MBUS=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v501/error.log
+	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v501/error.log
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_rx SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_MBUS=1 NOKI3210_MBUS_RX_FIXTURE=0xa5 NOKI3210_MBUS_RX_FIXTURE_AT_MS=300'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_rx/error.log
+	$(PYTHON) tools/mbus_trace_check.py rx $(RUN_DIR)_mbus_rx/error.log
+	@echo "OK — MBUS initialization, idle TX and external RX/FIQ2 contracts reproduced"
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier

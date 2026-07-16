@@ -24,6 +24,10 @@ not treat timing-sensitive interrupt totals as structural-oracle fields.
 watchdog and clock-control boot sequence and asserts that timer 1 remains
 unexercised. This is a negative coverage contract, not validation of timer-1
 semantics.
+`make verify-mbus` checks the identical v6.00/v5.01 receive-mode
+initialization, asserts that ordinary boot transmits no bytes, and uses one
+external byte to verify RX-ready, firmware consumption and FIQ2 acknowledgement.
+The arbitrary byte's later parser outcome is not an acceptance predicate.
 The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.

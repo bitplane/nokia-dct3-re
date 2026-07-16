@@ -55,7 +55,7 @@ completeness.
 | Block | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
 | FIQ8 `15/16` | periodic timer when enabled; extended pending/status/mask routing | Partial routing, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery and acknowledgement. Identify the source clock and physical timer semantics. |
-| MBUS `18..1a` | byte/status state plus scheduled FIQ | Partial | Capture complete request/reply framing and collision/timing behavior. |
+| MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, calibrated timing | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover baud, FIQ3 clock, collision and error behavior. |
 | Vibrator/buzzer `1b/1c/1e` | register storage only | Placeholder | Connect outputs and derive divider/volume mapping. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
 | Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, ROM-derived 3210 wiring, row direction/drive, physical press/release edges on IRQ0 | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |

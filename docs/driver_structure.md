@@ -30,8 +30,10 @@ connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0 and
 the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI core at
 offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrupt
 pending/masks, and ARM IRQ/FIQ routing. Attached devices signal it through
-callbacks; the phone state retains board wiring, physical-input latches, MBUS,
-GENSIO and the less-established peripheral windows. Product differences use
+callbacks. `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, RX/TX holding
+state, byte callbacks and FIQ2/FIQ3 outputs without supplying a peer. The phone
+state retains board wiring, physical-input latches, GENSIO and the
+less-established peripheral windows. Product differences use
 explicit configurations rather than driver-name parsing.
 
 ## Rules
