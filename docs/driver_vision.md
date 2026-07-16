@@ -14,9 +14,9 @@ not compatibility mechanisms.
 | CCONT | Local `nokia_ccont_device`; organic GENSIO phase/status regression | Establish physical GENSIO/ADC latency, RTC encoding, watchdog clock, and board-level ADC signals. Do not assume a conversion-complete IRQ absent hardware evidence. |
 | MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller and CPU routing; board/peripheral windows remain phone-owned or extracted separately | Recover physical clocks and reset domains; move further windows only after their individual contracts pass the same gate. |
 | MBUS | Extracted `nokia_mbus_device` with RX/TX byte attachment and FIQ2/FIQ3 callbacks; no default peer | Recover physical baud/FIQ3 timing and attach a peer only when firmware organically transmits a supported frame. |
-| DSP/DSPIF | `nokia_dsp_peer_device` aggregates shared RAM/DSPIF, rings, calibrated service timing, boot-subset DSP HLE and the separate external-service counterparty | Extend contracts only from organic requests; protect the transport with focused tests before separating the DSP and external peer roles. |
+| DSP/DSPIF | `nokia_dspif_device` owns shared RAM, DSPIF, packet rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the boot-subset DSP responses | Recover bootstrap publication transitions, physical timing and wider DSP vocabulary only from organic traffic. |
 | SIM | Separate `nokia_simi_device` controller and `nokia_sim_card_device` protocol/profile connected by reset/byte callbacks | Stabilize timing/error/removal behavior, then extract reusable provisioning profiles; extend card behavior only for organic requests. |
-| Startup/service/GSM peers | Request-driven external-service session carried through shared rings and interrupt callbacks, plus observation-only quarantined traces | Validate the transport and peer roles across the coherent 3210 profile and a sibling ROM family without treating their current co-location as hardware topology. |
+| Startup/service/GSM peers | `nokia_external_service_peer_device` owns the request-driven class-`0x40` session carried through the DSP transport | Validate the logical peer against another ROM family without treating its transport as peer ownership. |
 
 See `mad2_fidelity.md` for register-level implementation status and
 `driver_structure.md` for ownership rules.
@@ -60,8 +60,8 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
    contracts; timer 1 remains an explicitly unexercised placeholder.
 3. Resume the ordinary unattended UI/idle-window entrance investigation without
    presuming that the missing transition is hardware-owned.
-4. Extend focused transport tests, then split the combined DSP/external peer
-   implementation along its established ownership boundaries.
+4. Extend focused DSPIF transport tests to wrap/full/fault cases and replace
+   calibrated HLE scheduling only when peer timing is recovered.
 5. Use the 3330 as the first portability probe before treating MAD2 behavior as
    common DCT3 hardware.
 

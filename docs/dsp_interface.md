@@ -20,8 +20,8 @@ boot frontier: ordinary SIM initialization now runs after service startup.
 
 | MMIO | region | driver | boot usage |
 |---|---|---|---|
-| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `nokia_dsp_peer_device::shared_r/w` through `dsp_ram_r/w` | partial HLE — backing store, packet rings, service timing and request-derived contact replies |
-| `0x30000–0x30003` | **DSPIF** control register | retained by `nokia_dsp_peer_device::dspif_r/w` | early initialization plus repeated command-4 doorbells from shared-control and L1 send paths |
+| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | extracted partial transport; DSP HLE supplies the explicit bootstrap read overlay |
+| `0x30000–0x30003` | **DSPIF** control register | retained by `nokia_dspif_device::dspif_r/w` | early initialization plus repeated command-4 doorbells from shared-control and L1 send paths |
 | `0x40000–0x40003` | MCUIF (memory-range config) | retained by `mad2_mcuif_r/w` | early config value `6a 0f 61 20` |
 
 The atlas counted ~444 references to the shared-RAM base and 42 pool-literal references

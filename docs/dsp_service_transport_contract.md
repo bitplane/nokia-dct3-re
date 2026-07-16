@@ -11,31 +11,27 @@ events do not imply a shared transport.
 | --- | --- | --- | --- | --- |
 | Shared-control service | `0x290cf4` updates DSP RAM control words and writes retained DSPIF command 4 | DSP | DSP-owned counts at shared offsets `0xda`, `0xe2`, and `0xe4`; MAD2 IRQ 4 enters `0x291068` | Consumption/interrupt partially modelled; reply state incomplete. |
 | MCU-to-DSP packet ring | Task 3 calls `0x290840`; `0x2907c4` commits packets | DSP | DSP advances consumer `0x0a6` | Format and ownership mapped; current model only drains complete packets. |
-| DSP-to-MCU packet ring | DSP writes packets and advances producer `0x1c8` | MCU task 4 | FIQ 0, then `0x290904`; MCU advances consumer `0x1ca` | Delivery mechanism validated with probes; active reply format unknown. |
+| DSP-to-MCU packet ring | DSP writes packets and advances producer `0x1c8` | MCU task 4 | FIQ 0, then `0x290904`; MCU advances consumer `0x1ca` | Boot-subset replies are focused-tested; wider reply vocabulary remains unknown. |
 | L1 mailbox | MCU L1 send stubs write DSPIF and ring the doorbell | DSP/task 22 | Task-22 class/primitive decoder `0x23d62c` | Decoder mapped; no normal downlink traffic in the coherent boot. |
 | Generic-service framework | Firmware registrations and queued objects | Firmware service framework | Task-5 dispatcher `0x2af652 -> 0x2638e4` | Runs organically; it is downstream of hardware ingress. |
 | External-service transport | Task 2 through task 7 | External service/test peer | Class-`0x40` framed responses | Separate protocol; not a DSP-radio completion path. |
 
 ## Implementation audit
 
-`nokia_dsp_peer_device` currently aggregates four logical responsibilities:
+The implementation now has three explicit owners:
 
-1. the DSP shared-memory and DSPIF register windows;
-2. DSP-owned ring indices, pending counters and IRQ/FIQ signaling;
-3. a small request-derived DSP HLE for the boot transactions exercised here;
-4. the semantically separate external service/test peer carried through that
-   transport.
+1. `nokia_dspif_device` owns shared RAM, DSPIF, ring indices, packet framing and
+   FIQ0/IRQ4-facing completion;
+2. `nokia_dsp_hle_device` owns shared-service cadence, bootstrap read
+   publications and the established type-`0x70` completion;
+3. `nokia_external_service_peer_device` owns discovery, class-`0x40` session
+   correlation, channel map and healthy-state sequencing.
 
-This co-location proves that the transactions compose through firmware-owned
-rings and tasks, but it is not evidence that the class-`0x40` peer is part of
-the DSP. Bootstrap-ready read overrides, a 100 us producer wakeup, 5 ms service
-ticks and the 36-tick external-session delay are calibrated prototype behavior.
-They must remain visible as fidelity debt rather than protocol constants.
-
-The eventual separation should preserve one shared-memory/DSPIF transport
-owner, attach a DSP HLE or core behind it, and attach the external service peer
-at its recovered logical boundary. Do not split it before focused ring,
-interrupt and session tests can protect the current composition.
+The transport contains no service commands or session state. The external peer
+contains no shared-RAM offsets, ring arithmetic or interrupt ownership. The
+100 us producer wakeup, 5 ms service ticks, bootstrap read overlay and 36-tick
+external-session delay remain calibrated prototype behavior rather than
+protocol constants.
 
 DSPIF command 4 is the hardware doorbell for several DSP-owned activities, but
 it is not the only observed work boundary. Service-transport ring delivery and
@@ -155,9 +151,13 @@ absence proof.
 
 ## Next acceptance point
 
-There is no focused device test for ring wrap/full handling, partial packets,
-interrupt acknowledgement, reset state or external-session correlation. The
-coherent frontier and trace manifests are integration evidence only.
+`make verify-dsp-transport` now covers wraparound, full-ring rejection and
+partial-packet retention as transport-only conformance fixtures, plus the organic complete-packet lifecycle,
+consumer advancement, RX publication followed by FIQ0, shared-service
+completion through IRQ4, the established type-`0x70` reply, external-session
+correlation, v5.01 doorbell/service mechanics and active-profile save/load.
+Layering tests prevent protocol vocabulary from leaking back into the transport.
+Malformed-packet fault reporting and physical timing remain unexercised gaps.
 
 A transport investigation succeeds when a peer-owned state change or inbound
 packet is correlated with a firmware consumer through the real hardware

@@ -33,8 +33,8 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 		logerror("csstatus_write: pc=%08x data=%04x mask=%04x old=%04x task=%02x "
 				"svc_ready=%02x dsp=%04x/%04x/%04x t=%.6f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_byte(FW_SCHED_RUNNING_TASK_ID),
-				fw_byte(FW_STARTUP_SERVICE_READY), m_dsp_peer->shared_r(0x0da >> 1),
-				m_dsp_peer->shared_r(0x0e2 >> 1), m_dsp_peer->shared_r(0x0e4 >> 1),
+				fw_byte(FW_STARTUP_SERVICE_READY), m_dspif->shared_r(0x0da >> 1),
+				m_dspif->shared_r(0x0e2 >> 1), m_dspif->shared_r(0x0e4 >> 1),
 				machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 &&
 			(address == 0x0011fedc || address == 0x0011fede))
@@ -191,9 +191,9 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R3),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-				m_dsp_peer->shared_r(0x0a8 >> 1), m_dsp_peer->shared_r(0x0ac >> 1),
-				m_dsp_peer->shared_r(0x0ae >> 1), m_dsp_peer->shared_r(0x0b6 >> 1),
-				m_dsp_peer->shared_r(0x0bc >> 1), fw_byte(0x00100022),
+				m_dspif->shared_r(0x0a8 >> 1), m_dspif->shared_r(0x0ac >> 1),
+				m_dspif->shared_r(0x0ae >> 1), m_dspif->shared_r(0x0b6 >> 1),
+				m_dspif->shared_r(0x0bc >> 1), fw_byte(0x00100022),
 				machine().time().as_double());
 	// TRACE_TASKS (opt-in): app-task liveness tap. Log the first time each RTOS task reaches
 	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the deep profile

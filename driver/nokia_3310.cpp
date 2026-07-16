@@ -22,7 +22,9 @@
 #include "video/pcd8544.h"
 
 #include "nokia_ccont.h"
-#include "nokia_dsp_peer.h"
+#include "nokia_dsp_hle.h"
+#include "nokia_dspif.h"
+#include "nokia_external_service.h"
 #include "nokia_mad2.h"
 #include "nokia_mbus.h"
 #include "nokia_sim_card.h"
@@ -235,7 +237,9 @@ public:
 		m_ccont(*this, "ccont"),
 		m_mad2(*this, "mad2"),
 		m_mbus(*this, "mbus"),
-		m_dsp_peer(*this, "dsp_peer"),
+		m_dspif(*this, "dspif"),
+		m_dsp_hle(*this, "dsp_hle"),
+		m_external_service_peer(*this, "external_service_peer"),
 		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
 		m_pcd8544(*this, "pcd8544"),
@@ -300,6 +304,9 @@ private:
 	void mbus_tx_w(u8 data);
 	void dsp_fiq0_w(int state);
 	void dsp_service_irq_w(int state);
+	void dsp_tx_commit_w(int state);
+	void dsp_service_pending_w(int state);
+	void dsp_doorbell_w(int state);
 	uint8_t keypad_columns_r(bool consume_power_on = false);
 	void update_keypad_columns();
 	void update_keypad_ccont_irqs();
@@ -314,7 +321,9 @@ private:
 	required_device<nokia_ccont_device> m_ccont;
 	required_device<nokia_mad2_device> m_mad2;
 	required_device<nokia_mbus_device> m_mbus;
-	required_device<nokia_dsp_peer_device> m_dsp_peer;
+	required_device<nokia_dspif_device> m_dspif;
+	required_device<nokia_dsp_hle_device> m_dsp_hle;
+	required_device<nokia_external_service_peer_device> m_external_service_peer;
 	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<pcd8544_device> m_pcd8544;
@@ -486,9 +495,9 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //
 //   2. DEVICE-BOUNDARY MODELS — opt-in behavior behind an ordinary hardware
 //      interface. MODEL_SIM_DEVICE owns SIMI/FIQ6. MODEL_CCONT_PRESENT selects
-//      the extracted CCONT device scenario. MODEL_DSP_SERVICE and
-//      MODEL_EXTERNAL_SERVICE_PEER enables the aggregate DSP transport and
-//      external-service prototype; its wider contracts remain incomplete.
+//      the extracted CCONT device scenario. MODEL_DSP_SERVICE enables the DSP
+//      HLE; MODEL_EXTERNAL_SERVICE_PEER enables the separate service peer
+//      behind the DSP transport. Their wider contracts remain incomplete.
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
 //      TRACE_SERVICE_COMMAND (class-0x40 service command stream), TRACE_HANDOFF (task-1 master
 //      sequencer mode + startup checklist; the post-SIM interactive handoff),
@@ -589,6 +598,8 @@ void noki3310_state::machine_reset()
 	m_mad2_clock_trace_count = 0;
 	m_mbus_trace_count = 0;
 	m_gensio_status = 0x03;
+	if (nokia_env_u32("NOKI3210_DSPIF_CONFORMANCE", 0) != 0)
+		logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
 	// Load deterministic raw selector inputs. The firmware-observable selector
 	// contract is known; physical 3210 net names and analog units are not.
 	{
@@ -676,6 +687,21 @@ void noki3310_state::dsp_service_irq_w(int state)
 {
 	if (state)
 		m_mad2->assert_irq(4);
+}
+
+void noki3310_state::dsp_tx_commit_w(int state)
+{
+	m_dsp_hle->tx_commit_w(state);
+}
+
+void noki3310_state::dsp_service_pending_w(int state)
+{
+	m_dsp_hle->service_pending_w(state);
+}
+
+void noki3310_state::dsp_doorbell_w(int state)
+{
+	m_dsp_hle->doorbell_w(state);
 }
 
 uint8_t noki3310_state::keypad_columns_r(bool consume_power_on)
@@ -858,12 +884,12 @@ void noki3310_state::eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
-	return m_dsp_peer->shared_r(offset);
+	return m_dsp_hle->bootstrap_r(offset, m_dspif->shared_r(offset));
 }
 
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	m_dsp_peer->shared_w(offset, data, mem_mask);
+	m_dspif->shared_w(offset, data, mem_mask);
 }
 
 #include "nokia_3310_trace.inc"
@@ -1114,7 +1140,7 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 {
 	offset &= 3;
-	const u8 data = m_dsp_peer->dspif_r(offset);
+	const u8 data = m_dspif->dspif_r(offset);
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_dspif_trace_read[offset])
 	{
 		m_dspif_trace_read[offset] = true;
@@ -1128,7 +1154,7 @@ uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 {
 	offset &= 3;
-	const u8 old_data = m_dsp_peer->dspif_r(offset);
+	const u8 old_data = m_dspif->dspif_r(offset);
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0 && !m_dspif_trace_write[offset])
 	{
 		m_dspif_trace_write[offset] = true;
@@ -1139,7 +1165,7 @@ void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 		logerror("dsp_boundary: DSPIF W off=%x data=%02x pc=%08x task=%02x t=%.6f\n",
 				u32(offset), data, m_maincpu->pc() & ~u32(1), fw_byte(0x00100022),
 				machine().time().as_double());
-	m_dsp_peer->dspif_w(offset, data);
+	m_dspif->dspif_w(offset, data);
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
 }
 
@@ -1286,16 +1312,25 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_CCONT(config, m_ccont);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
-	NOKIA_DSP_PEER(config, m_dsp_peer);
+	NOKIA_DSPIF(config, m_dspif);
+	NOKIA_DSP_HLE(config, m_dsp_hle);
+	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	const bool external_service_model = nokia_env_u32("NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 0) != 0;
 	const unsigned dsp_default_ms = external_service_model ? 4 : 5;
-	m_dsp_peer->set_service_enabled(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0);
-	m_dsp_peer->set_external_service_enabled(external_service_model);
-	m_dsp_peer->set_service_delay_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
-	m_dsp_peer->set_service_tick_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
-	m_dsp_peer->set_trace_enabled(nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0);
-	m_dsp_peer->fiq0_cb().set(FUNC(noki3310_state::dsp_fiq0_w));
-	m_dsp_peer->service_irq_cb().set(FUNC(noki3310_state::dsp_service_irq_w));
+	const bool dsp_trace = nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0;
+	m_dspif->set_trace_enabled(dsp_trace);
+	m_dspif->tx_commit_cb().set(FUNC(noki3310_state::dsp_tx_commit_w));
+	m_dspif->service_pending_cb().set(FUNC(noki3310_state::dsp_service_pending_w));
+	m_dspif->doorbell_cb().set(FUNC(noki3310_state::dsp_doorbell_w));
+	m_dspif->fiq0_cb().set(FUNC(noki3310_state::dsp_fiq0_w));
+	m_dspif->service_irq_cb().set(FUNC(noki3310_state::dsp_service_irq_w));
+	m_dsp_hle->set_service_enabled(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0);
+	m_dsp_hle->set_external_service_enabled(external_service_model);
+	m_dsp_hle->set_service_delay_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
+	m_dsp_hle->set_service_tick_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
+	m_dsp_hle->set_trace_enabled(dsp_trace);
+	m_external_service_peer->set_enabled(external_service_model);
+	m_external_service_peer->set_trace_enabled(dsp_trace);
 	NOKIA_SIMI(config, m_simi);
 	NOKIA_SIM_CARD(config, m_sim_card);
 	m_simi->irq_cb().set(FUNC(noki3310_state::sim_irq_w));

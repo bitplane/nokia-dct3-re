@@ -84,13 +84,13 @@
     },
     {
       "id": "service_task7_external_peer", "subsystem": "external_service", "status": "prototype", "confidence": "strong",
-      "boundary": "Task 7 is strongly mapped as the firmware adapter for class-0x40 frames, while the attached request-driven service/test peer is only a boot-subset prototype currently co-located with the DSP transport model",
+      "boundary": "Task 7 is strongly mapped as the firmware adapter for class-0x40 frames; the request-driven service/test session now has a separate device behind the DSP transport, while its vocabulary and calibrated sequencing remain boot-subset prototypes",
       "evidence": ["docs/external_service_topology.md", "docs/dsp_service_transport_contract.md"]
     },
     {
       "id": "dsp_shared_ring", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
-      "boundary": "MCU task 3 serializes outbound work to the DSP shared ring and FIQ 0 owns inbound delivery; ownership and packet grammar are mapped, but bootstrap overrides, timing, reset and the wider reply vocabulary remain HLE prototypes",
-      "evidence": ["docs/dsp_service_transport_contract.md", "docs/dsp_interface.md", "docs/sim_registration.md"]
+      "boundary": "The extracted DSPIF device owns shared RAM, DSPIF, packet framing and ring indices; MCU task 3 serializes outbound work and FIQ 0 owns inbound delivery. Complete TX consumption and RX publication are focused-tested, while wrap/full/fault behavior remains open",
+      "evidence": ["docs/dsp_service_transport_contract.md", "docs/dsp_interface.md", "tools/dsp_transport_trace_check.py"]
     },
     {
       "id": "dsp_bootstrap_status_hle", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",

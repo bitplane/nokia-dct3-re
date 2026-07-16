@@ -10,7 +10,7 @@
     {
       "id": "contact_healthy_completion", "owner": "contact_task", "status": "modeled",
       "predicate": "class-0x40 command 0x64 with payload result 0x05 reaches 0x236dc4",
-      "current": "The aggregate DSP/external-service prototype learns the session header through a peer-originated class-0x40 result-1 command, installs the channel map, then delivers result 5 through task 7; firmware replies receive request-correlated class-0x7f transport acknowledgements",
+      "current": "The external-service device learns the session header through a peer-originated class-0x40 result-1 command, installs the channel map, then delivers result 5 through task 7 over the separate DSPIF transport; firmware replies receive request-correlated class-0x7f transport acknowledgements",
       "evidence": ["docs/external_service_topology.md", "docs/service_bootstrap.md"]
     },
     {

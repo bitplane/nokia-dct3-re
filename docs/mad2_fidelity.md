@@ -30,7 +30,7 @@ completeness.
 | Internal boot ROM | mapped at low address | Placeholder | Execution is redirected to flash entry; the real reset/boot-ROM sequence is bypassed. |
 | Main RAM | 512 KiB backing store | Inferred | Firmware layout works; physical decode and model-specific sizes need cross-ROM proof. |
 | DSP shared RAM | 4 KiB backing store plus special reads | Placeholder | Several ready/status offsets are synthesized; no DSP core executes. |
-| DSPIF `0x30000` | four-byte peer-device register; command-4 doorbell observed | Partial | Coherent boot emits 26 command-4 strobes after initialization. Service-transport ring and shared-service timers are split, but command 4 does not accompany every ring commit and cannot replace both observed work triggers. |
+| DSPIF `0x30000` | extracted four-byte transport register; command-4 doorbell callback | Cross-ROM partial | Focused v6.00/v5.01 runs cover doorbells, service-pending completion and IRQ4; v6.00 additionally covers complete TX consumption, RX publication and FIQ0. Controller fixtures cover wrap/full/partial handling; fault reporting remains open. |
 | MCUIF `0x40000` | retained four-byte configuration register | Mapped latch | Boot writes `6a 0f 61 20` once and never reads it in the coherent run. Decode fields before applying window side effects. |
 | ROM2 window | modulo mirror of flash | Inferred | Matches current reads; decode/mirroring needs boot-ROM or second-ROM confirmation. |
 | EEPROM parallel window | read-only alias of input region | Placeholder | Serial 24C128 is faithful at GenIO; relationship of the parallel window to EEPROM hardware is unproven. |
@@ -68,8 +68,8 @@ completeness.
 
 MAD2 owns aggregation and CPU-line assertion. Component devices expose level
 callbacks and do not write MAD2 pending registers directly. The extracted
-CCONT and DSP peer follow this rule; MBUS and keypad remain inside the phone
-state. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ6,
+CCONT, DSP peer and MBUS devices follow this rule; keypad remains inside the
+phone state. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ6,
 DSP receive FIQ0, SIMI FIQ6, timer compare FIQ4, and MBUS FIQ2/FIQ3, with line
 8 represented by the extended pending bit. The keypad edge latch and CCONT
 level are independent sources; acknowledging IRQ0 cannot discard an active
@@ -163,7 +163,7 @@ mask/global gate. These are controller tests, not firmware-state fixtures.
 
 The widened ledger observes one MCUIF dword write (`6a 0f 61 20`) from boot and
 no MCUIF reads. DSPIF receives its initial zero halfword and then 26 command-4
-writes from `0x29103c` and `0x290778`. `nokia_dsp_peer_device` now owns the
+writes from `0x29103c` and `0x290778`. `nokia_dspif_device` now owns the
 register. Service-transport ring parsing and delayed shared-service completion now use
 independent timers. Repeating the command-4-only experiment after that split
 still did not preserve the frontier: not every service-transport producer commit is

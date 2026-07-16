@@ -22,9 +22,11 @@ acceptance harness; the production driver contains neither a second LCD parser
 nor synthetic key state. CCONT is an explicit local `nokia_ccont_device` owning its serial
 registers, ADC results, RTC, interrupt state and watchdog. Task 7 remains the
 firmware adapter to the external service/test peer; the request-driven
-DSP/external-service prototype is an explicit `nokia_dsp_peer_device`. It owns shared DSP
-RAM, MCU/DSP ring indices, service cadence, and the observed contact-session
-state, and returns peer transactions through FIQ0/IRQ4 callbacks.
+DSP behavior is split at its evidenced boundaries: `nokia_dspif_device` owns
+shared RAM, DSPIF, packet rings and FIQ0/IRQ4 signaling;
+`nokia_dsp_hle_device` owns the boot-subset DSP behavior; and
+`nokia_external_service_peer_device` owns the separate class-`0x40` service
+session. The phone state only wires their callbacks to MAD2.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
 connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0 and
 the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI core at

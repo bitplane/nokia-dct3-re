@@ -87,6 +87,13 @@ ordinary SIMI/FIQ6 card device. Its structural oracle records startup mode
 `0x0004`, flags `0x0f`, service-session status `0x0049`, no-SIM clear, and SIM enable
 set. This semantic state is the forcing-free frontier oracle.
 
+`make verify-dsp-transport` protects the separated transport/HLE/peer
+composition. It requires complete-packet TX consumption, RX publication before
+FIQ0, shared-service completion through IRQ4, the established type-`0x70`
+completion, and the request-correlated external session. Its v5.01 leg checks
+only the common doorbell/service-completion mechanics. An active coherent run
+also crosses a save/load boundary.
+
 Non-oracle research evidence includes a Security-code frame with SHA-256 prefix
 `6471d1a5803619c2`. It is not part of `make verify-frontier` because the current
 hardware-boundary profile does not reproduce the additional display transfer.

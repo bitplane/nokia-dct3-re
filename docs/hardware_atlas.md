@@ -11,9 +11,9 @@ Current fidelity claims are maintained in `mad2_fidelity.md`.
 
 MAD2WD1 contains the emulated **ARM7TDMI MCU** and an unemulated DSP core. The MCU
 runs the application/UI/control firmware; the DSP owns GSM Layer 1 and audio.
-`nokia_dsp_peer_device` models the firmware-visible shared-memory, packet-ring,
-service-interrupt and request-derived contact boundary without executing DSP
-instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
+`nokia_dspif_device` models firmware-visible shared memory, DSPIF and packet
+rings. Separate DSP-HLE and external-service devices attach the two semantic
+peers without executing DSP instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
 **PCD8544 LCD**, **24C128 EEPROM** (I2C), and the SIM card behind MAD2 SIMI.
 
 ## CPU memory map (the emulated regions)
@@ -21,9 +21,9 @@ instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
 | range | device | handler | status |
 |---|---|---|---|
 | `0x000000–0x00ffff` (mirror `+0x80000`) | boot ROM / low RAM | `ram_r/w` | emulated |
-| `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `nokia_dsp_peer_device::shared_r/w` through `dsp_ram_r/w` | Partial HLE: real backing store, ring ownership, service timing and contact replies; DSP core absent |
+| `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | Extracted partial transport; peer-owned bootstrap reads remain an explicit DSP-HLE overlay |
 | `0x020000–0x0200ff` (mirror `+0x8ff00`) | **MAD2 I/O** (all peripherals) | `mad2_io_r/w` | Mixed partial hardware, calibrated behavior and backing latches; see per-block ledger |
-| `0x030000–0x030003` | **DSPIF** (DSP API control reg) | `nokia_dsp_peer_device::dspif_r/w` | stored command-4 doorbell; HLE scheduling still partly shared-write driven |
+| `0x030000–0x030003` | **DSPIF** (DSP API control reg) | `nokia_dspif_device::dspif_r/w` | stored command-4 doorbell; HLE scheduling still partly shared-write driven |
 | `0x040000–0x040003` | **MCUIF** (memory-range config) | `mad2_mcuif_r/w` | Retained four-byte configuration latch; no decoded side effects |
 | `0x100000–0x17ffff` | main RAM | `ram_r/w` | emulated |
 | `0x200000–0x5fffff` | flash (the firmware) | `flash_r/w` | emulated (BYO dump) |
