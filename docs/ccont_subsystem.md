@@ -27,7 +27,7 @@ This document records the current hardware contract and unresolved questions.
 
 `nokia_gensio_device` owns endpoint selection, ready/data-available status and
 the serial callbacks into CCONT. The phone driver owns the battery/charger
-scenario, eight raw ADC inputs, provisional one-hertz watchdog tick, and board
+scenario, eight raw ADC inputs, one-hertz watchdog tick, and board
 routing into MAD2 IRQ6. Firmware owns startup and power policy.
 
 ## Contract audit
@@ -175,9 +175,20 @@ The power-key interrupt path is stable across the two ROMs: v6.00 handler
 `0x2b3084` aligns with v5.01 `0x2b02fc`, and each calls a tiny task-1 event
 `0x41` publisher (`0x2b4662`/`0x2b18ea`). This proves IRQ ownership and the
 firmware transition, but no default edge timing. CCONT
-watchdog-register data `0x00` enters the hardware power-off path; `0x20`,
-`0x31`, and `0x3f` program, service, and disable the watchdog lifecycle in the
-shared helper block. Its physical clock remains unverified.
+watchdog-register data `0x00` enters the hardware power-off path. CCONT's
+watchdog is an eight-bit down-counter: every nonzero register write directly
+loads that many seconds, so the observed `0x20` and `0x31` writes select 32- and
+49-second windows. `0x3f` is therefore a 63-second load, not a disable command;
+hardware watchdog disable belongs to the separate board-level `WDDISX` pin.
+These semantics and the 32-second default/64-second maximum are documented in
+the [Nokia NSE-8/9 System Module technical documentation](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/3210/ch2sys%20%5B103%5D.pdf).
+
+An unguarded coherent run now survives the former 32-second false expiry, but
+no steady-state firmware service occurs before the corrected 49-second window
+expires. The restart replays the startup `0x20`/`0x31` sequence. The retained
+guard therefore represents a missing software-timing/service lifecycle, not
+uncertainty about the CCONT counter arithmetic; it must not be removed by
+lengthening or freezing the hardware counter.
 
 Service-channel provisioning does not control CCONT startup-event delivery.
 Any further CCONT change requires a separately evidenced register, timing, or
@@ -191,8 +202,9 @@ IRQ contract.
    the ADC control byte, polls GENSIO status, and reads the result registers;
    it does not wait for a CCONT interrupt. A synthetic conversion-complete IRQ
    is therefore excluded unless separate hardware evidence establishes one.
-3. Confirm RTC encoding, alarm behavior, watchdog tick source and the physical
-   timing of the MAD2 power-key edge.
+3. Recover the firmware timer/event path that regularly services the CCONT
+   watchdog, then remove the guard. Confirm RTC encoding, alarm behavior and
+   the physical timing of the MAD2 power-key edge separately.
 4. Replace raw environment ADC overrides with typed battery, charger and RF
    scenario inputs while retaining deterministic tests.
 5. Validate remaining register semantics against a working-phone trace or

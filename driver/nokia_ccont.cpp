@@ -101,12 +101,14 @@ void nokia_ccont_device::serial_w(uint8_t data)
 		case WATCHDOG:
 			if (data == 0x00)
 				m_power_cb(0);
-			else if (data == 0x20)
+			else
+			{
 				m_regs[address] = data;
-			else if (data == 0x31)
-				m_watchdog = m_regs[address];
-			else if (data == 0x3f)
-				m_watchdog = 0;
+				// CCONT has an eight-bit, one-second down-counter. Every
+				// non-zero write reloads it directly; watchdog disable is the
+				// separate board-level WDDISX input, not a register command.
+				m_watchdog = data;
+			}
 			break;
 		case IRQ_STATUS:
 			m_regs[address] &= ~data;
