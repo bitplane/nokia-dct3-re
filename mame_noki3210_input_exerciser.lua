@@ -80,6 +80,15 @@ local key_fields = {
 	c = field_by_mask("COL.2", 0x02), minus = field_by_mask("COL.3", 0x04),
 	star = field_by_mask("COL.4", 0x02), power = field_by_mask("PWR", 0x01),
 }
+key_fields.navi = key_fields.enter
+key_fields.select = key_fields.enter
+key_fields.left = key_fields.enter
+key_fields.soft1 = key_fields.enter
+key_fields.clear = key_fields.c
+key_fields.back = key_fields.c
+key_fields.right = key_fields.c
+key_fields.soft2 = key_fields.c
+key_fields.hash = key_fields.minus
 local charger_field = field_by_mask("CHARGER", 0x01)
 
 local function press(name)

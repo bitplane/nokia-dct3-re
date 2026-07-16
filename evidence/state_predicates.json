@@ -101,6 +101,12 @@
       "predicate": "A provisioned coherent boot accepts a physical left-softkey press and opens a firmware-owned menu without injected firmware state",
       "current": "After serializing EEPROM generation and NVRAM seeding, the provisioned identity profile removes the security editor. Firmware decodes left softkey 0x19, posts packed press/release inputs 0x40c8/0x40c9, produces 0x0598 then 0x0578, selects callback 0x02, and settles the pipeline at 0x00dc. A one-shot LCD mirror after the transaction shows the Phone book menu and Select softkey. Task 1 remains in mode 0x0004, proving that mode is compatible with ordinary interactive UI and is not a blocked pre-desktop state. No task-6 idle selector, callback state, message, rendered pixels, or hardware result is injected.",
       "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md", "docs/structural_regression.md"]
+    },
+    {
+      "id": "v501_mmi_menu_interaction", "owner": "cross_rom_ui", "status": "satisfied",
+      "predicate": "The same 3210 hardware and peer model boots NSE-8 v5.01 to an interactive firmware menu without version-specific execution behavior",
+      "current": "With a BIOS-specific generated EEPROM, provisioned identity, and the shared coherent device profile, v5.01 reaches modes 0x0001/0x000d/0x0004, flags 0x0f, clears no-SIM, and sets SIM ENABLE. A physical left-softkey press opens Phone book and reproduces the v6.00 stable-pixel oracle exactly. Service-session status remains 0x00c9 rather than v6.00's 0x0049, proving that difference is not an offline UI blocker. The run uses the common machine devices and differs only in selected BIOS, EEPROM input, diagnostic oracle addresses, and firmware-owned layout.",
+      "evidence": ["docs/cross_rom_confidence.md", "docs/structural_regression.md", "docs/normalization_status.md"]
     }
   ]
 }

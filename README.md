@@ -49,6 +49,8 @@ and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with service-session 
 `0x49`, no-SIM clear, and SIM enable set. Keypad interaction is independently
 covered through MAD2 IRQ0 and the firmware matrix scanner. `make verify-mmi-menu`
 adds provisioned identity and protects the interactive menu transaction.
+For direct use, `make run-interactive` opens a normal MAME window with standard
+remappable inputs and persistent NVRAM; it does not drive scripted keys.
 
 The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
 executable protocol hypotheses, not finished hardware emulation, but do not

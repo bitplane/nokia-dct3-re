@@ -53,8 +53,9 @@ be investigated only when an organic application path reaches its boundary.
   topology.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
-  and sets SIM ENABLE through relocated v5 state fields.
-  Contact ready-bit consumption and display progress are not yet equivalent to v6.00.
+  and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu
+  oracle matches v6.00 exactly outside the shared animated-icon mask. The
+  retained service status `0x00c9` versus `0x0049` is not UI-blocking.
 
 ## Device and model debt
 

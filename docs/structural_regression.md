@@ -122,17 +122,19 @@ security editor through `0x0578` and its accepted `0x05e6` callback branch.
 ## Nokia 3210 v5.01 control
 
 `make verify-3210-v501` runs the independent NSE-8 v5.01 full flash with its
-own generated EEPROM profile. It is a same-product structural control, not a
-second supported frontier: the current model leaves its LCD blank and reaches
-less external-service/SIM progress than v6.00.
+own generated EEPROM profile as a same-product structural control.
+`make verify-mmi-menu-501` adds provisioned identity and physical left-softkey
+input, opening the same `Phone book` menu as v6.00 with the same stable-pixel
+oracle.
 
 The useful invariants are the task-1 and SIM results. The run organically observes modes
 `0x0001`, `0x000d`, and `0x0004`, then remains in mode `0x0004` with readiness
 flags `0x0f`. At its relocated state block it also clears
 no-SIM and sets SIM ENABLE organically. This independently reproduces the v6.00
-task-1 terminal mode and validates the shared SIM device contract. Service-session status remains
-`0x00c9` and the LCD remains blank, so the oracle records those narrower v5.01
-terminal semantics without claiming presentation parity.
+task-1 terminal mode and validates the shared SIM device contract.
+Service-session status remains `0x00c9`, but presentation and interaction now
+match v6.00 under the provisioned fixture. The status difference remains a
+transport/lifecycle observation, not evidence of a blocked UI.
 
 `tools/find_literal_loads.py` scans Thumb-1 PC-relative literal loads while
 normalizing the swapped image's 32-bit halfword order. It is intended for static

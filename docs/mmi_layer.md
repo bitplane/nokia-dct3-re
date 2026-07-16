@@ -86,6 +86,32 @@ come from the 25-byte ROM table at `0x2e2d58`. The corrected model derives
 columns from driven-low output rows and reports physical press and release
 edges through IRQ0.
 
+## MAME controls
+
+The driver exposes handset buttons as ordinary remappable MAME inputs. Host
+bindings are defaults, not part of the emulated electrical contract:
+
+| Handset control | Host default | Matrix input |
+| --- | --- | --- |
+| Navi / left softkey | Enter | `COL.1` bit 1 |
+| C / right softkey | Backspace or Delete | `COL.2` bit 1 |
+| Scroll up / down | Up / Down | `COL.3` bit 1 / `COL.1` bit 2 |
+| Digits `0..9` | matching number keys | ROM-derived matrix positions |
+| `*` / `#` | Asterisk / Minus | `COL.4` bit 1 / `COL.3` bit 2 |
+| Power | Space | special direct input |
+
+The Lua acceptance harness addresses the same fields using semantic aliases
+`navi`, `select`, `left`, `soft1`, `clear`, `back`, `right`, `soft2`, `up`,
+`down`, `star`, `hash`, `power`, and the digit strings. It does not bypass the
+MAME ports or firmware scan.
+
+`make run-interactive` opens the provisioned v6.00 phone in a normal MAME
+window without scripted input. Its NVRAM lives under `run_interactive/nvram`
+and is preserved between launches so firmware-owned phonebook/settings writes
+can be tested across restarts. MAME's Input Settings menu can remap every
+handset control. The headless `run` and `verify-*` targets remain isolated and
+deterministically reseed their own NVRAM.
+
 ## Firmware consumer
 
 IRQ0 handler `0x2b3084` calls the task-1 event-`0x41` publisher directly.
