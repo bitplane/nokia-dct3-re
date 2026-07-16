@@ -73,10 +73,11 @@ The labels below have precise meanings:
 | MAD2 timers and IRQ/FIQ | Partial hardware | Boot-critical paths work; several timings remain calibrated assumptions. |
 | PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames; MAD2 IRQ0 reaches the matrix scanner and decoded input resources. |
 | 24C128 EEPROM | Partial hardware | MAME's native I2C device is wired through GenIO and passes the oracle; provisioning and the parallel alias need validation. |
-| CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; physical GENSIO/ADC latency, RTC encoding, watchdog clock and board-level analog signals remain open. |
+| CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; physical ADC latency, RTC encoding, watchdog clock and board-level analog signals remain open. |
+| GENSIO serial/SELECT | Partial hardware | Extracted endpoint/status/LCD/CCONT transport passes two 3210 ROMs; physical timing and SELECT-attached peers remain open. |
 | SIMI controller and SIM card | Partial hardware | Separate devices compose through byte/reset callbacks; organic SIMI/FIQ6 and T=0 initialization work, while timing, errors and synthetic provisioning remain incomplete. |
 | DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
-| Startup/external-service peers | Prototype | Request-driven behavior is implemented in `nokia_dsp_peer_device` through shared DSP rings and interrupt callbacks; the wider peer contract remains incomplete. |
+| Startup/external-service peers | Prototype | Request-driven behavior composes through the DSPIF, DSP HLE and external-service devices; the wider peer contract remains incomplete. |
 | Interactive startup | Mapped | Keypad and editor completion work in mode 4. Callback `0x01`/`0x0367`, callback `0x10`/`0x05e7`, and task-6 selector `0x0732 -> 0x2b1e44` are conditional UI/power lifecycle paths, not cold-boot entrances. Task-5/MMI context settlement is the smallest unresolved boundary. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |
@@ -99,9 +100,9 @@ supported, and it passes the reference and portability checks.
 
 ### Platform work
 
-1. Improve the extracted EEPROM and CCONT devices from observed transactions.
+1. Improve the extracted EEPROM, CCONT and GENSIO devices from observed transactions.
 2. Use the Nokia 3330 (NHM-6) as the first cross-ROM confidence target once its service files are normalized reproducibly.
-3. Stabilize MAD2 timer, interrupt and GENSIO contracts before extracting blocks.
+3. Recover MAD2 physical clocks/reset domains and identify GENSIO SELECT peers from hardware evidence.
 4. Stabilize the extracted SIMI/card seam, then separate synthetic card provisioning into reusable profiles.
 5. Separate DSP transport/HLE from the external-service peer, then add further DCT3 products as evidence.
 

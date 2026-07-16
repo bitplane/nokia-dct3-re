@@ -25,6 +25,7 @@
 #include "nokia_dsp_hle.h"
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
+#include "nokia_gensio.h"
 #include "nokia_mad2.h"
 #include "nokia_mbus.h"
 #include "nokia_sim_card.h"
@@ -235,6 +236,7 @@ public:
 		m_flash(*this, "flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
+		m_gensio(*this, "gensio"),
 		m_mad2(*this, "mad2"),
 		m_mbus(*this, "mbus"),
 		m_dspif(*this, "dspif"),
@@ -319,6 +321,7 @@ private:
 	required_device<intelfsh16_device> m_flash;
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
+	required_device<nokia_gensio_device> m_gensio;
 	required_device<nokia_mad2_device> m_mad2;
 	required_device<nokia_mbus_device> m_mbus;
 	required_device<nokia_dspif_device> m_dspif;
@@ -355,7 +358,6 @@ private:
 	unsigned      m_mad2_interrupt_trace_count = 0;
 	unsigned      m_mad2_clock_trace_count = 0;
 	unsigned      m_mbus_trace_count = 0;
-	uint8_t       m_gensio_status = 0x03;
 };
 
 static const char * nokia_mad2_reg_desc(uint8_t offset)
@@ -549,7 +551,6 @@ void noki3310_state::machine_start()
 	save_item(NAME(m_ccont_irq_state));
 	save_item(NAME(m_mad2_regs));
 	save_item(NAME(m_mcuif_regs));
-	save_item(NAME(m_gensio_status));
 	machine().save().register_postload(save_prepost_delegate(FUNC(noki3310_state::post_load), this));
 }
 
@@ -599,7 +600,6 @@ void noki3310_state::machine_reset()
 	m_mad2_interrupt_trace_count = 0;
 	m_mad2_clock_trace_count = 0;
 	m_mbus_trace_count = 0;
-	m_gensio_status = 0x03;
 	if (nokia_env_u32("NOKI3210_DSPIF_CONFORMANCE", 0) != 0)
 		logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
 	// Load deterministic raw selector inputs. The firmware-observable selector
@@ -934,7 +934,8 @@ void noki3310_state::rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_ma
 uint8_t noki3310_state::mad2_io_r(offs_t offset)
 {
 	uint8_t data = offset <= MAD2_FIQ8_CTRL ? m_mad2->read(offset) :
-			(offset >= MAD2_MBUS_CTRL && offset <= 0x1a ? m_mbus->read(offset - MAD2_MBUS_CTRL) : m_mad2_regs[offset]);
+			(offset >= MAD2_MBUS_CTRL && offset <= 0x1a ? m_mbus->read(offset - MAD2_MBUS_CTRL) :
+			(nokia_gensio_device::owns(offset) ? m_gensio->read(offset) : m_mad2_regs[offset]));
 
 	switch(offset)
 	{
@@ -961,13 +962,6 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 			if (m_simi->enabled())
 				data = m_simi->tx_count_r();
 			break;
-		case 0x6c:
-			data = m_ccont->serial_r();
-			m_gensio_status &= ~0x04;
-			break;
-		case 0x6d:
-			data = m_gensio_status;
-			break;
 	}
 
 	if (offset == 0x20)
@@ -986,7 +980,7 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 					offset, data, m_simi->rx_count_r(), m_maincpu->pc(), machine().time().as_double());
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
-			(offset == 0x2c || offset == 0x2d || offset == 0x6c || offset == 0x6d) &&
+			nokia_gensio_device::owns(offset) &&
 			m_gensio_trace_count++ < 20000)
 		logerror("gensio: R off=%02x data=%02x pc=%08x t=%.9f\n", offset, data,
 				m_maincpu->pc(), machine().time().as_double());
@@ -1026,14 +1020,18 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	const bool core_register = offset <= MAD2_FIQ8_CTRL;
 	const bool mbus_register = offset >= MAD2_MBUS_CTRL && offset <= 0x1a;
+	const bool gensio_register = nokia_gensio_device::owns(offset);
 	uint8_t old_data = core_register ? m_mad2->read(offset) :
 			(mbus_register ? (offset == MAD2_MBUS_CTRL ? m_mbus->control() :
-				offset == MAD2_MBUS_STATUS ? m_mbus->status() : m_mbus->data()) :
+				offset == MAD2_MBUS_STATUS ? m_mbus->status() : m_mbus->data()) : gensio_register ?
+				m_gensio->peek(offset) :
 				m_mad2_regs[offset]);
 	if (core_register)
 		m_mad2->write(offset, data);
 	else if (mbus_register)
 		m_mbus->write(offset - MAD2_MBUS_CTRL, data);
+	else if (gensio_register)
+		m_gensio->write(offset, data);
 	else
 		m_mad2_regs[offset] = data;
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
@@ -1077,22 +1075,8 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		m_simi->rx_fifo_control_w(data);
 	else if (offset == 0x3e && m_simi->enabled())
 		m_simi->tx_fifo_control_w(data);
-	if (offset == 0x2d)
-	{
-		// Selecting a GENSIO endpoint leaves the controller idle and its
-		// transmit path available. Endpoint 0x25 also starts a new CCONT
-		// command phase; both supported 3210 ROMs rely on that boundary.
-		m_gensio_status = 0x03;
-		m_ccont->select_w(BIT(data, 2));
-	}
-	else if (offset == 0x2c && (m_mad2_regs[0x2d] & 0x04))
-	{
-		// Both 3210 ROMs poll status bit 2 before consuming a CCONT register
-		// byte. No separate ADC-completion IRQ or minimum delay is observable.
-		m_gensio_status |= 0x04;
-	}
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
-			(offset == 0x2c || offset == 0x2d || offset == 0x6c || offset == 0x6d) &&
+			gensio_register &&
 			m_gensio_trace_count++ < 20000)
 		logerror("gensio: W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset, data,
 				old_data, m_maincpu->pc(), machine().time().as_double());
@@ -1118,26 +1102,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 	if (offset == 0x28 || offset == 0x6b || offset == 0xa8)
 		update_keypad_columns();
 
-	switch(offset)
-	{
-		case 0x2c:
-			m_ccont->serial_w(data);
-			break;
-		case 0x2e:
-		case 0x6e:
-		{
-			const bool lcd_data = !(offset & 0x40);
-			m_pcd8544->dc_w(lcd_data ? ASSERT_LINE : CLEAR_LINE);
-			for (int i=7; i>=0; i--)
-			{
-				m_pcd8544->sclk_w(CLEAR_LINE);
-				m_pcd8544->sdin_w(BIT(data, i));
-				m_pcd8544->sclk_w(ASSERT_LINE);
-			}
-			m_pcd8544->dc_w(ASSERT_LINE);
-			break;
-		}
-	}
 	if (offset == MAD2_FIQ_STATUS || offset == MAD2_IRQ_STATUS ||
 			offset == MAD2_FIQ_MASK || offset == MAD2_IRQ_MASK ||
 			offset == MAD2_IRQ_CTRL || offset == MAD2_FIQ8_CTRL)
@@ -1321,6 +1285,13 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_CCONT(config, m_ccont);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
+	NOKIA_GENSIO(config, m_gensio);
+	m_gensio->ccont_read_cb().set(m_ccont, FUNC(nokia_ccont_device::serial_r));
+	m_gensio->ccont_write_cb().set(m_ccont, FUNC(nokia_ccont_device::serial_w));
+	m_gensio->ccont_select_cb().set(m_ccont, FUNC(nokia_ccont_device::select_w));
+	m_gensio->lcd_dc_cb().set(m_pcd8544, FUNC(pcd8544_device::dc_w));
+	m_gensio->lcd_sdin_cb().set(m_pcd8544, FUNC(pcd8544_device::sdin_w));
+	m_gensio->lcd_sclk_cb().set(m_pcd8544, FUNC(pcd8544_device::sclk_w));
 	NOKIA_DSPIF(config, m_dspif);
 	NOKIA_DSP_HLE(config, m_dsp_hle);
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);

@@ -25,11 +25,10 @@ This document records the current hardware contract and unresolved questions.
 - watchdog counter state; and
 - a power output asserted by the watchdog-register power-off command.
 
-The phone driver owns GENSIO endpoint selection and ready/data-available status,
-the battery/charger scenario, the eight raw ADC inputs, the one-hertz watchdog
-tick, and routing the CCONT IRQ into MAD2 line 6. This is the current split:
-CCONT produces register-visible state and output signals; MAD2 owns the serial
-controller and interrupt aggregation; firmware owns startup and power policy.
+`nokia_gensio_device` owns endpoint selection, ready/data-available status and
+the serial callbacks into CCONT. The phone driver owns the battery/charger
+scenario, eight raw ADC inputs, provisional one-hertz watchdog tick, and board
+routing into MAD2 IRQ6. Firmware owns startup and power policy.
 
 ## Contract audit
 
@@ -37,7 +36,7 @@ The device boundary is classified by evidence level:
 
 | Surface | Classification | Basis and limitation |
 | --- | --- | --- |
-| CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status itself belongs to MAD2, not CCONT. |
+| CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status belongs to the separate serial controller, not CCONT. |
 | Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
 | Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | A charger-input fixture latches established source bit 3, exercises MAD2 IRQ6 and the firmware ISR, and proves write-one-clear acknowledgement and deassertion. PWRONX bit 1 is established; the opt-in bit-0 presence overlay is provisional. |
 | ADC selector values | Working fixture | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. `ADC_PROFILE` is test provisioning, not a battery model. |
@@ -69,7 +68,7 @@ not CCONT transport.
 
 Firmware establishes three status predicates: bit 0 is polled before endpoint
 writes, bit 1 by controller-availability helper `0x2b642a`, and bit 2 after a
-CCONT read command. MAD2 starts at `0x03`, resets to `0x03` on endpoint
+CCONT read command. GENSIO starts at `0x03`, resets to `0x03` on endpoint
 selection, sets bit 2 after a CCONT transfer byte, and clears it when `0x6c` is
 consumed. Both ROMs select endpoint `0x25` before every register helper and
 send a command byte first. Endpoint selection therefore resets the device to
@@ -205,7 +204,7 @@ transport/register gate. Its ordinary run requires endpoint selection,
 command/data pairing, status values `0x03`/`0x07`, both transaction directions,
 and correct ADC packing for all eight `sane` selector fixtures. Its second run
 pulses the charger input and requires status bit 3, MAD2 IRQ6, firmware
-write-one-clear acknowledgement and final IRQ deassertion. MAD2 endpoint/status
+write-one-clear acknowledgement and final IRQ deassertion. GENSIO endpoint/status
 state and CCONT register, command and IRQ state are save-state registered
 together; post-load reconstructs the IRQ output.
 

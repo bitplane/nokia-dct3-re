@@ -4,6 +4,7 @@ from tools.gensio_trace_check import (
     check_accesses,
     check_adc,
     check_charger_irq,
+    check_select_contract,
     decode_transactions,
     parse_accesses,
 )
@@ -96,6 +97,17 @@ class GensioTraceCheckTest(unittest.TestCase):
         errors, _, transactions = decode_transactions(accesses)
         self.assertEqual([], errors)
         self.assertEqual([("R", 0x0A, 0x0F), ("W", 0x05, 0x31)], transactions)
+
+    def test_cross_rom_select_contract(self):
+        accesses = [
+            ("W", 0xAF, 0x00), ("W", 0x6F, 0x00), ("W", 0xEF, 0x00),
+            ("W", 0xAD, 0xC4), ("W", 0xED, 0x21), ("W", 0xAE, 0x20),
+            ("W", 0xEE, 0x80), ("R", 0xAF, 0x00), ("W", 0xAF, 0x00),
+            ("R", 0x6F, 0x00), ("W", 0x6F, 0x01),
+        ]
+        errors, counts = check_select_contract(accesses)
+        self.assertEqual([], errors)
+        self.assertEqual({"select_registers": 7, "select_reads": 2}, counts)
 
 
 if __name__ == "__main__":

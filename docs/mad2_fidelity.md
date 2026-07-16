@@ -16,8 +16,8 @@ Confidence labels:
 
 The extracted `nokia_mad2_device` owns the CTSI core at offsets `0x00..0x16`:
 reset/clock/watchdog latches, timer state, interrupt pending/masks and CPU-line
-routing. Keypad, GenIO/GENSIO, MBUS and other board peripherals remain outside
-that core; SIMI is a separate device. Timer 1, FIQ8 timing, reset/clock effects,
+routing. Keypad, GenIO and other board peripherals remain outside that core;
+GENSIO, MBUS and SIMI are separate devices. Timer 1, FIQ8 timing, reset/clock effects,
 audio outputs and several SELECT/UIF banks remain calibrated counters or
 backing latches. Address-map coverage therefore must not be read as peripheral
 completeness.
@@ -59,8 +59,8 @@ completeness.
 | Vibrator/buzzer `1b/1c/1e` | register storage only | Placeholder | Connect outputs and derive divider/volume mapping. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
 | Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, ROM-derived 3210 wiring, row direction/drive, physical press/release edges on IRQ0 | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |
-| GENSIO `2c..2e`, `6c..6f` | CCONT and LCD endpoints; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Partial | Confirm busy timing, remaining control bits and SELECT routing. |
-| SELECT2/3 aliases `ad..af`, `ed..ef` | backing registers | Placeholder | Identify attached companion devices and alias/decode behavior. |
+| GENSIO `2c..2e`, `6c..6f` | extracted CCONT/LCD controller; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Cross-ROM partial | Confirm physical busy timing and remaining control bits. |
+| SELECT2/3 aliases `ad..af`, `ed..ef` | extracted saved latches; cross-ROM startup and RMW behavior mapped | Mapped | Identify attached companion devices and alias/decode behavior. |
 | SIMI `36..3f` | stateful SIM UART, 16-byte TX FIFO, RX FIFO, IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and validated T=0 use the organic path; TX control `0x04`/`0x00`, live fill and multi-chunk TX-empty progression are modeled. All IIR causes are decoded; WWT and framing/error causes remain unexercised fault paths. |
 | UIF control pins `31..33`, `70..f3` | backing latches; `0x31.bit1` is power-duty-cycle owned | Partial | `0x31` has six exhaustive RMW sites and no external-input consumer; map physical pin nets and the remaining banks from schematics. |
 
@@ -102,8 +102,9 @@ that the remaining MAD2 peripheral windows are ready to move. Each block needs:
 GENSIO selection, CCONT IRQ6, timer 0, simultaneous IRQ aggregation,
 masked-pending delivery and extended FIQ routing have focused regressions.
 The extracted core contains no firmware addresses and exposes callbacks for
-CPU routing and attached interrupt sources. GENSIO and other windows remain in
-the phone until their own contracts meet the same standard.
+CPU routing and attached interrupt sources. Other unresolved windows remain in
+the phone until their own contracts meet the same standard. GENSIO now meets
+the gate through separate callbacks, two-ROM traces and focused regression.
 
 `make verify-mad2-clocks` adds a two-ROM boot contract for the remaining core
 latches. v6.00 and v5.01 each read reset cause four times, write it once from
@@ -172,7 +173,7 @@ triggers therefore remain.
 
 ## GENSIO focused trace
 
-`NOKI3210_TRACE_GENSIO=1` logs value-level accesses to `0x2c/0x2d/0x6c/0x6d`
+`NOKI3210_TRACE_GENSIO=1` logs value-level CCONT/LCD and SELECT-bank accesses
 and is capped at 20,000 records per reset. Firmware disassembly and runtime
 tracing establish:
 
@@ -188,8 +189,8 @@ both complete read and write transactions and exercised both values.
 `make verify-ccont` validates the phase/status grammar and all eight configured
 ADC selectors from this bounded organic trace. A second physical-input fixture
 latches charger source bit 3 and proves firmware-visible status, MAD2 IRQ6
-routing, write-one-clear acknowledgement and final deassertion. The MAD2
-endpoint/status state is registered for save states alongside the CCONT device
+routing, write-one-clear acknowledgement and final deassertion. The GENSIO
+endpoint/status and SELECT state is registered alongside the CCONT device
 state. The byte-exact 20-second oracle was unchanged. An
 earlier interpretation that firmware polled status bit 3 was
 incorrect: Thumb `LSRS #3` exposes original bit 2 through carry.
@@ -199,3 +200,8 @@ instruction-for-instruction. Endpoint `0x25` selection is the observable
 transaction boundary in both ROMs. ADC result delivery remains synchronous in
 the model because neither firmware exposes a conversion-complete interrupt or
 a minimum busy duration that could be implemented without calibration.
+
+`make verify-gensio` checks both ROMs' endpoint traffic and SELECT latches.
+They initialize `ad/ed/ae/ee` to `c4/21/20/80`, clear `af/6f/ef`, later mask
+`af`, and set `6f.bit0` through instruction-equivalent routines. This does not
+identify the components attached to those lines.

@@ -11,7 +11,7 @@ not compatibility mechanisms.
 | ARM7, flash and RAM | MAME CPU/flash devices plus phone-owned maps | Validate decode and reset path with another ROM. |
 | PCD8544 display | MAME device | Add other display controllers per product configuration. |
 | External EEPROM | MAME `I2C_24C128` on mapped MAD2 GenIO pins plus generated provisioning input | Validate write/timing behavior, legitimate provisioning, ROM-aware fallback extraction, and parallel-window semantics. |
-| CCONT | Local `nokia_ccont_device`; organic GENSIO phase/status regression | Establish physical GENSIO/ADC latency, RTC encoding, watchdog clock, and board-level ADC signals. Do not assume a conversion-complete IRQ absent hardware evidence. |
+| CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression | Establish physical GENSIO/ADC latency, RTC encoding, watchdog clock, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |
 | MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller and CPU routing; board/peripheral windows remain phone-owned or extracted separately | Recover physical clocks and reset domains; move further windows only after their individual contracts pass the same gate. |
 | MBUS | Extracted `nokia_mbus_device` with RX/TX byte attachment and FIQ2/FIQ3 callbacks; no default peer | Recover physical baud/FIQ3 timing and attach a peer only when firmware organically transmits a supported frame. |
 | DSP/DSPIF | `nokia_dspif_device` owns shared RAM, DSPIF, packet rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the boot-subset DSP responses | Recover bootstrap publication transitions, physical timing and wider DSP vocabulary only from organic traffic. |
@@ -55,7 +55,7 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 
 ## Modularization order
 
-1. Improve CCONT and GENSIO from observed transactions.
+1. Improve the extracted CCONT and GENSIO devices only from observed transactions.
 2. Extend the extracted MAD2 core only from observed reset, clock and peripheral
    contracts; timer 1 remains an explicitly unexercised placeholder.
 3. Resume the ordinary unattended UI/idle-window entrance investigation without

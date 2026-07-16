@@ -3,9 +3,14 @@
   "kind": "hardware_contracts",
   "entries": [
     {
-      "id": "mad2_gensio_ccont", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 owns GENSIO endpoint selection and ready/data-available status at 0x2d/0x6d; selected CCONT command/data bytes cross 0x2c/0x6c and endpoint 0x25 resets command phase",
-      "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md", "docs/cross_rom_confidence.md"]
+      "id": "mad2_gensio_ccont", "subsystem": "gensio", "status": "partial", "confidence": "strong",
+      "boundary": "The extracted GENSIO device owns endpoint selection and ready/data-available status at 0x2d/0x6d; selected CCONT command/data bytes cross callbacks at 0x2c/0x6c and endpoint 0x25 resets command phase",
+      "evidence": ["docs/gensio_controller.md", "docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
+    },
+    {
+      "id": "mad2_gensio_select_latches", "subsystem": "gensio", "status": "mapped", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 share instruction-equivalent SELECT-latch initialization, 0xaf masking and 0x6f.bit0 assertion; saved latch behavior is extracted, while the attached board peripherals remain unidentified and unmodeled",
+      "evidence": ["docs/gensio_controller.md", "docs/cross_rom_confidence.md", "tools/gensio_trace_check.py"]
     },
     {
       "id": "ccont_register_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",

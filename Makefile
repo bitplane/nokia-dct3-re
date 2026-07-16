@@ -12,6 +12,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
 	driver/nokia_dspif.cpp driver/nokia_dspif.h \
 	driver/nokia_external_service.cpp driver/nokia_external_service.h \
+	driver/nokia_gensio.cpp driver/nokia_gensio.h \
 	driver/nokia_mad2.cpp driver/nokia_mad2.h \
 	driver/nokia_mbus.cpp driver/nokia_mbus.h \
 	driver/nokia_simi.cpp driver/nokia_simi.h \
@@ -77,7 +78,7 @@ MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-3210-v501 verify-frontier verify-frontier-stability verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -94,6 +95,7 @@ help:
 	@echo "make run            run the selected phone/profile into RUN_DIR=$(RUN_DIR)"
 	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
+	@echo "make verify-gensio  check two-ROM endpoint and SELECT-register contracts"
 	@echo "make verify-display check display-profile provenance and LCD serial transport"
 	@echo "make verify-dsp-transport check DSPIF rings, completion and peer layering"
 	@echo "make verify-mad2    check timer-0/FIQ and save-state restoration contracts"
@@ -152,7 +154,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
@@ -203,7 +205,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_display_path.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -305,6 +307,19 @@ verify-ccont:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_irq/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log --adc-profile sane \
 		--require-charger-irq --summary $(RUN_DIR)_irq/boot_summary.txt
+
+verify-gensio:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v600 SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_GENSIO=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v600/error.log
+	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v600/error.log \
+		--require-select-contract
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v501 SECONDS=1 BIOS=501 \
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKI3210_TRACE_GENSIO=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v501/error.log
+	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v501/error.log \
+		--require-select-contract
+	@echo "OK — GENSIO endpoint/status and SELECT-latch contracts reproduced across both 3210 ROMs"
 
 verify-display:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_display_v600 SECONDS=3 \

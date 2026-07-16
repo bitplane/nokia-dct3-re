@@ -85,6 +85,13 @@ calculation and write-one-to-clear acknowledgement. The ADC route tables
 (`0x2e2da8`/`0x2d777c`) are byte-identical. This supports one shared 3210
 device contract; it does not establish analog units or timing.
 
+The GENSIO SELECT setup is also instruction-equivalent. v6.00 `0x2afbf2`,
+`0x2a31fa`, and `0x2a1450` relocate to v5.01 `0x2ad01e`, `0x2a06ce`, and
+`0x29e974`; both initialize the same seven latches, mask `0xaf`, and assert
+`0x6f.bit0`. `make verify-gensio` covers the runtime contract. The attached
+SELECT peripherals remain unknown, so the evidence supports shared latches but
+not a shared peer model.
+
 The MAD2 timer-0 setup is likewise stable. v6.00 `0x2aa934` aligns uniquely
 and byte-for-byte with v5.01 `0x2a75c4`: both program live divider `0xf9`, wait
 for it to reach `0xea`, compare at `counter+2`, consume FIQ4 and acknowledge it

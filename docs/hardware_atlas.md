@@ -71,10 +71,10 @@ uses the separate MAD2 IRQ6 source. Registers `0x29/0x68/0x69/0xa9` and
 ### GENSIO — multiplexed serial (CCONT, LCD, + SELECT-muxed)
 | off | reg | status |
 |---|---|---|
-| `0x2c` / `0x6c` | **CCONT write / read** | emulated (serial protocol; see CCONT below) |
-| `0x2d` / `0x6d` | GENSIO endpoint control / status | partial: LCD=`0x21`, CCONT=`0x25`; status tracks idle/TX-ready and synchronous CCONT RX-ready |
-| `0x2e` / `0x6e` | **LCD data / command write** (PCD8544) | emulated ✓ |
-| `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** lines | partial — GENSIO multiplexes other devices on the SELECT lines; **SELECT1/2 are touched at boot** (`0x6f`, `0xad/0xae`) but what sits on them past CCONT is unmapped. A deep-dive target (RF synth? audio codec control?). |
+| `0x2c` / `0x6c` | **CCONT write / read** | extracted serial protocol; see CCONT below |
+| `0x2d` / `0x6d` | GENSIO endpoint control / status | extracted partial hardware: LCD=`0x21`, CCONT=`0x25`, synchronous ready state |
+| `0x2e` / `0x6e` | **LCD data / command write** (PCD8544) | extracted MSB-first pin serialization |
+| `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** latches | cross-ROM startup/RMW behavior mapped; attached peripherals remain unidentified |
 
 ### SIMI — SIM UART (`0x36–0x3f`)
 `nokia_simi_device` owns the MAD2 UART/FIFO/IIR endpoint and FIQ6. The separate

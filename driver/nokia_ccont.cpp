@@ -55,7 +55,7 @@ void nokia_ccont_device::set_adc_source(unsigned channel, uint16_t value)
 		m_adc_source[channel] = value & 0x3ff;
 }
 
-void nokia_ccont_device::select_w(bool selected)
+void nokia_ccont_device::select_w(int selected)
 {
 	if (selected)
 		m_data_cycle = false;

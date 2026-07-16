@@ -15,6 +15,16 @@ ADC_PROFILES = {
     "sane": (0x000, 0x200, 0x2D0, 0x280, 0x200, 0x000, 0x200, 0x000),
 }
 
+SELECT_INIT = {
+    0x6F: 0x00,
+    0xAD: 0xC4,
+    0xAE: 0x20,
+    0xAF: 0x00,
+    0xED: 0x21,
+    0xEE: 0x80,
+    0xEF: 0x00,
+}
+
 
 def parse_accesses(text):
     return [
@@ -100,6 +110,34 @@ def check_accesses(accesses):
     return errors, counts
 
 
+def check_select_contract(accesses):
+    errors = []
+    writes = {}
+    reads = set()
+    for direction, offset, data in accesses:
+        if offset not in SELECT_INIT:
+            continue
+        if direction == "W":
+            writes.setdefault(offset, []).append(data)
+        else:
+            reads.add(offset)
+
+    for offset, expected in SELECT_INIT.items():
+        values = writes.get(offset, [])
+        if expected not in values:
+            errors.append(
+                f"SELECT register 0x{offset:02x} never received 0x{expected:02x}"
+            )
+    if 0xAF not in reads:
+        errors.append("SELECT2 control register 0xaf was never read back")
+    if 0x6F not in reads or 0x01 not in writes.get(0x6F, []):
+        errors.append("SELECT1 control register 0x6f did not perform its bit-0 update")
+    return errors, {
+        "select_registers": len(writes),
+        "select_reads": len(reads),
+    }
+
+
 def check_adc(transactions, values):
     errors = []
     selector = None
@@ -176,6 +214,7 @@ def main(argv=None):
     parser.add_argument("--adc-profile", choices=sorted(ADC_PROFILES))
     parser.add_argument("--require-charger-irq", action="store_true")
     parser.add_argument("--summary", type=pathlib.Path)
+    parser.add_argument("--require-select-contract", action="store_true")
     args = parser.parse_args(argv)
 
     accesses = parse_accesses(args.log.read_text(errors="replace"))
@@ -203,6 +242,14 @@ def main(argv=None):
             "CCONT charger IRQ: "
             f"status={irq_counts['charger_status']} ack={irq_counts['charger_ack']} "
             f"clear-read={irq_counts['charger_clear_read']}"
+        )
+    if args.require_select_contract:
+        select_errors, select_counts = check_select_contract(accesses)
+        errors.extend(select_errors)
+        print(
+            "GENSIO SELECT contract: "
+            f"registers={select_counts['select_registers']} "
+            f"read-back={select_counts['select_reads']}"
         )
     if errors:
         for error in errors:

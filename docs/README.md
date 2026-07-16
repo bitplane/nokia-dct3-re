@@ -11,6 +11,7 @@ Documentation is organized by authority rather than investigation date.
 | `driver_structure.md` | Code ownership and quarantine rules. |
 | `driver_vision.md` | Current modularization path and configuration taxonomy. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
+| `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |
 | `cross_rom_confidence.md` | 3210/3330 portability evidence and ROM-input status. |
 | `structural_regression.md` | Default mid-boot oracle and current deep-profile result. |

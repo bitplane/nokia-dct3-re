@@ -13,7 +13,7 @@ public:
 	auto power_cb() { return m_power_cb.bind(); }
 	void serial_w(uint8_t data);
 	uint8_t serial_r();
-	void select_w(bool selected);
+	void select_w(int selected);
 	void set_adc_source(unsigned channel, uint16_t value);
 	void set_boot_status(uint8_t status);
 	void latch_irq_sources(uint8_t sources);
