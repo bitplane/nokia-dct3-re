@@ -9,6 +9,7 @@ mad2_clock: event=W off=0d data=0c old=00 counter=0006 pc=002b6442 t=0.2
 mad2_clock: event=W off=03 data=31 old=ff counter=0010 pc=002b4dca t=0.3
 mad2_clock: event=W off=0d data=2c old=0c counter=0020 pc=002a0616 t=0.4
 mad2_clock: event=W off=01 data=05 old=01 counter=0021 pc=002b4e12 t=0.5
+mad2_clock: event=W off=0d data=0c old=2c counter=0022 pc=002a0106 t=0.6
 """
 
 
@@ -17,11 +18,33 @@ class Mad2ClockTraceCheckTest(unittest.TestCase):
         errors, counts = check(parse(VALID))
         self.assertEqual([], errors)
         self.assertEqual(0, counts["timer1_accesses"])
+        self.assertTrue(counts["sim_clock_lifecycle"])
+
+    def test_requires_sim_clock_gate_close(self):
+        events = parse(VALID.replace(
+            "mad2_clock: event=W off=0d data=0c old=2c counter=0022 pc=002a0106 t=0.6\n", ""))
+        errors, _ = check(events)
+        self.assertIn(
+            "SIM clock gate did not complete the observed 0x0c -> 0x2c -> 0x0c lifecycle",
+            errors,
+        )
 
     def test_rejects_new_timer1_access(self):
         events = parse(VALID + "mad2_clock: event=R off=04 data=00 counter=0022 pc=00200000 t=0.6\n")
         errors, _ = check(events)
         self.assertIn("Timer1 offsets 0x04..0x07 unexpectedly became active in the boot contract", errors)
+
+    def test_reset_write_is_optional(self):
+        errors, _ = check(parse(VALID.replace(
+            "mad2_clock: event=W off=01 data=05 old=01 counter=0021 pc=002b4e12 t=0.5\n", "")))
+        self.assertEqual([], errors)
+
+    def test_rejects_unknown_reset_write(self):
+        errors, _ = check(parse(VALID.replace("data=05 old=01", "data=04 old=01")))
+        self.assertIn(
+            "reset-control write differed from the observed 0x01 -> 0x05 lifecycle transition",
+            errors,
+        )
 
 
 if __name__ == "__main__":

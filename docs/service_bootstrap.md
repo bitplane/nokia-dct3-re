@@ -14,7 +14,7 @@ request-driven peer:
 1. answers organic DSP D0 discovery;
 2. completes the DSP type-`0x70`/`0x74` service-control transaction;
 3. initiates the external class-`0x40` service session through task 7;
-4. supplies the channel map and healthy result; and
+4. supplies the channel map and correlated transport replies; and
 5. acknowledges the final `0x622a` service-empty transaction.
 
 Firmware retains service-present bit 6, clears busy bit 2, resumes the extended
@@ -37,11 +37,11 @@ of an incomplete startup contract, not the root hardware boundary.
 | Prerequisite | Firmware observation | Current owner |
 | --- | --- | --- |
 | DSP lower-service completion | pending counter `0x100e4` drains and MAD2 IRQ 4 invokes `0x2af3ca`; `0x291068` sets `0x110c2c = 1` | `MODEL_DSP_SERVICE` prototype |
-| CCONT presence | live serial read of CCONT register `0x0e`, bit 0 | `nokia_ccont_device` with the CCONT-present scenario |
+| CCONT readiness | live serial read of CCONT register `0x0e`, bit 0 | persistent reset status owned by `nokia_ccont_device` |
 | EEPROM configuration | checksum over `0x120..0x243` matches stored value at `0x244` | generated EEPROM profile through native `I2C_24C128` |
 | EEPROM tune/security block | checksum over the security/tune region matches the stored word at `0x11c` | generated EEPROM profile |
 | DSP service-control completion | TX type `0x70`, payload `0d00`, receives RX type `0x74`, payload `0d00` | request-driven DSP/external-service peer |
-| External service session | class-`0x40` address learning, channel map, healthy result, and correlated acknowledgements through task 7 | request-driven external-service peer |
+| External service session | class-`0x40` address learning, channel map, and correlated acknowledgements through task 7 | request-driven external-service peer |
 
 The DSP service ready byte is reset during startup phases, so the completion is
 not a one-shot boot constant. Both counter drain and IRQ 4 are required; crossed
@@ -61,9 +61,11 @@ security identity fields are documented in `eeprom_analysis.md`.
 ## CCONT gate
 
 The service status loop reads CCONT register `0x0e` through the serial command
-path and requires bit 0. This is a presence/status bit, distinct from the upper
-interrupt-source bits consumed by the CCONT IRQ dispatcher. The extracted CCONT
-device owns the register and interrupt behavior.
+path and requires bit 0. Both 3210 ROMs observe `0x03` after reset: ready bit 0
+and PWRONX cause bit 1. Ready persists; PWRONX and the upper interrupt sources
+are write-one-to-clear. The extracted CCONT device owns the reset
+value, register storage and acknowledgement behavior; `CCONT_READY=0` is an
+explicit missing/unready-device fault fixture.
 
 ## Lower-service and external-service ordering
 
@@ -93,8 +95,8 @@ to clear. Once the organic transaction completes, its second resume group wakes
 the application tasks. Their initialization fills the checklist at `0x112280`,
 posts event `0x15`, and lets mode `0x000d` advance.
 
-This task lifecycle is part of service-session completion. A healthy result delivered
-without the corresponding transport completion is insufficient.
+This task lifecycle is part of service-session completion. Registration alone
+without the corresponding channel-map and transport completion is insufficient.
 
 The ordering run records the `0x622a` transport acknowledgement at `1.285269 s`,
 the first group-two checklist write at `1.286232 s`, and the final task-18 write
@@ -120,7 +122,7 @@ service-gated resume group, not by a slow task-18 initializer.
 
 ## Acceptance
 
-`make verify` protects the authentic peer-disabled CONTACT SERVICE frame. The 3210
+`make verify` protects the explicit missing-hardware semantic profile. The 3210
 machine profile is accepted only when `make verify-frontier` and the contact runtime
 manifest show:
 

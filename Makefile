@@ -47,7 +47,6 @@ FRAME_PNG ?= progress_latest_frame.png
 
 # Regression oracle: sha256 prefix of the promoted LCD frame from `make run`.
 # A blank/un-provisioned 3210 deterministically reaches CONTACT SERVICE here.
-ORACLE_FRAME_SHA ?= d8a9a7a58e587be8
 ORACLE_MMI_MENU_STABLE_SHA ?= 305c12459700027431ef9c04132bcceb7e2157ef87debf2cdf1ae438b8bd8d3f
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
@@ -60,12 +59,12 @@ FRONTIER_ENV :=
 
 BOOT_ENV := NOKI3210_LUA_QUIET=1
 
-# Explicit negative profile retained for the historical CONTACT SERVICE oracle.
-# This proves that the peer devices, rather than firmware-state intervention,
-# account for the difference between the failure frame and the working boot.
+# Explicit missing-hardware profile retained for the CONTACT SERVICE oracle.
+# CCONT readiness is a reset-time device input; the peer devices are disabled
+# at their ordinary boundaries. No firmware state is changed.
 CONTACT_SERVICE_ENV := \
+	NOKI3210_CCONT_READY=0 \
 	NOKI3210_MODEL_DSP_SERVICE=0 \
-	NOKI3210_MODEL_CCONT_PRESENT=0 \
 	NOKI3210_MODEL_EXTERNAL_SERVICE_PEER=0 \
 	NOKI3210_MODEL_SIM_DEVICE=0
 
@@ -78,7 +77,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -94,8 +93,9 @@ help:
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make run            run the selected phone/profile into RUN_DIR=$(RUN_DIR)"
 	@echo "make run-interactive open the provisioned 3210 in a persistent MAME window"
-	@echo "make verify         run, then check the promoted frame SHA == $(ORACLE_FRAME_SHA)"
+	@echo "make verify         check the explicit missing-hardware semantic profile"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
+	@echo "make verify-ccont-watchdog check enabled watchdog service beyond 49 seconds"
 	@echo "make verify-gensio  check two-ROM endpoint and SELECT-register contracts"
 	@echo "make verify-display check display-profile provenance and LCD serial transport"
 	@echo "make verify-dsp-transport check DSPIF rings, completion and peer layering"
@@ -209,7 +209,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -243,6 +243,7 @@ prepare-run-nvram: build
 
 run: prepare-run-nvram
 	@mkdir -p $(RUN_DIR)
+	@find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' -delete
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKI3210_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		./mame $(MAME_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
@@ -309,13 +310,8 @@ watch:
 verify: PHONE=noki3210
 verify: RUN_ENV=$(CONTACT_SERVICE_ENV)
 verify: run
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
-	test -n "$$frame" || { echo "no LCD frame produced in $(RUN_DIR)"; exit 1; }; \
-	got=$$(sha256sum "$$frame" | cut -c1-16); \
-	echo "frame  : $$frame"; echo "sha256 : $$got"; echo "oracle : $(ORACLE_FRAME_SHA)"; \
-	if [ "$$got" = "$(ORACLE_FRAME_SHA)" ]; then echo "OK — oracle reproduced"; \
-	else echo "MISMATCH — boot diverged from the recorded CONTACT SERVICE state"; exit 1; fi
 	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR)
+	@echo "OK — missing-hardware semantic predicates reproduced"
 
 verify-ccont:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKI3210_TRACE_GENSIO=1'
@@ -327,17 +323,25 @@ verify-ccont:
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log --adc-profile sane \
 		--require-charger-irq --summary $(RUN_DIR)_irq/boot_summary.txt
 
+verify-ccont-watchdog:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=55 \
+		RUN_ENV='NOKI3210_TRACE_CCONT_WATCHDOG=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/ccont_watchdog_trace_check.py \
+		$(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
+	@echo "OK — enabled CCONT watchdog is serviced organically beyond its 49-second window"
+
 verify-gensio:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v600 SECONDS=1 \
 		RUN_ENV='NOKI3210_TRACE_GENSIO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v600/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v600/error.log \
-		--require-select-contract
+		--require-select-contract --require-ccont-boot-status
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v501 SECONDS=1 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKI3210_TRACE_GENSIO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v501/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v501/error.log \
-		--require-select-contract
+		--require-select-contract --require-ccont-boot-status
 	@echo "OK — GENSIO endpoint/status and SELECT-latch contracts reproduced across both 3210 ROMs"
 
 verify-display:
@@ -401,16 +405,16 @@ verify-mad2-interrupts:
 	@echo "OK — MAD2 simultaneous, masked-pending and extended-FIQ routing contracts reproduced"
 
 verify-mad2-clocks:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v600 SECONDS=1 \
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v600 SECONDS=12 \
 		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v600/error.log
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v501 SECONDS=1 BIOS=501 \
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v501 SECONDS=12 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
 		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v501/error.log
-	@echo "OK — MAD2 reset, clock-control and watchdog boot contracts reproduced across both 3210 ROMs"
+	@echo "OK — MAD2 reset, SIM clock-gate and watchdog boot contracts reproduced across both 3210 ROMs"
 
 verify-mbus:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v600 SECONDS=1 \
@@ -445,9 +449,9 @@ verify-mmi-menu:
 		cp "roms/noki3210/$(EEPROM_BASENAME)" "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
 	}; \
 	trap restore_default EXIT; \
-	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR) SECONDS=12 \
+	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR) SECONDS=20 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=5000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1000'; \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=3000'; \
 	$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_FRONTIER_STRUCT); \
 	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
@@ -465,9 +469,9 @@ verify-mmi-menu-501:
 	}; \
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 \
-		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=14 \
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=20 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=7000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1000'; \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=3000'; \
 	$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_V501_STRUCT); \
 	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \

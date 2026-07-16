@@ -22,7 +22,6 @@ void nokia_external_service_peer_device::device_start()
 	save_item(NAME(m_registration_acknowledged));
 	save_item(NAME(m_channel_map_sent));
 	save_item(NAME(m_channel_map_acknowledged));
-	save_item(NAME(m_healthy_sent));
 	save_item(NAME(m_empty_ack_sent));
 	save_item(NAME(m_registration_ticks));
 	save_item(NAME(m_queue_type));
@@ -41,7 +40,6 @@ void nokia_external_service_peer_device::device_reset()
 	m_registration_acknowledged = false;
 	m_channel_map_sent = false;
 	m_channel_map_acknowledged = false;
-	m_healthy_sent = false;
 	m_empty_ack_sent = false;
 	m_registration_ticks = 0;
 	m_queue_head = 0;
@@ -105,7 +103,7 @@ void nokia_external_service_peer_device::receive_frame(const u8 *payload, unsign
 	{
 		queue_transport_ack(payload, length);
 	}
-	if (m_healthy_sent && !m_empty_ack_sent && length >= 10 && length <= 32 && frame_class == 0x00 &&
+	if (m_channel_map_acknowledged && !m_empty_ack_sent && length >= 10 && length <= 32 && frame_class == 0x00 &&
 			command == 0x62 && payload[9] == 0x2a)
 	{
 		m_empty_ack_sent = queue_transport_ack(payload, length);
@@ -141,7 +139,7 @@ void nokia_external_service_peer_device::tick()
 		if (++m_registration_ticks >= SERVICE_START_DELAY_TICKS)
 			m_registration_sent = queue_service_frame(0x64, 0x01, 0x42);
 	}
-	else if (m_registration_sent && !m_channel_map_sent)
+	else if (m_registration_acknowledged && !m_channel_map_sent)
 	{
 		u8 frame[75] = { 0 };
 		frame[0] = 0x1e; frame[2] = DISCOVERY_NODE; frame[3] = 0x40;
@@ -150,10 +148,6 @@ void nokia_external_service_peer_device::tick()
 		frame[9 + (0x62 >> 3)] = 0x20;
 		frame[73] = 0x01; frame[74] = 0x43;
 		m_channel_map_sent = queue_response(frame, std::size(frame));
-	}
-	else if (m_channel_map_sent && !m_healthy_sent)
-	{
-		m_healthy_sent = queue_service_frame(0x64, 0x05, 0x44);
 	}
 }
 

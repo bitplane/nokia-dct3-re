@@ -26,10 +26,10 @@ be read as peripheral completeness.
 
 | Boundary | Implementation | Fidelity | Evidence / missing proof |
 | --- | --- | --- | --- |
-| ARM7TDMI, big-endian | MAME ARM7 core at 13 MHz | Observed/inferred | Core and entry point work; clock division and sleep clock are not hardware-validated. |
+| ARM7TDMI, big-endian | MAME ARM7 core at 13 MHz | Observed/inferred | Core and entry point work; ARM sleep entry and clock switching are not hardware-validated. |
 | Internal boot ROM | mapped at low address | Placeholder | Execution is redirected to flash entry; the real reset/boot-ROM sequence is bypassed. |
 | Main RAM | 512 KiB backing store | Inferred | Firmware layout works; physical decode and model-specific sizes need cross-ROM proof. |
-| DSP shared RAM | 4 KiB backing store plus special reads | Placeholder | Several ready/status offsets are synthesized; no DSP core executes. |
+| DSP shared RAM | 4 KiB backing store plus peer-owned writes | Partial HLE | MCU RAM tests use ordinary storage; the peer publishes the cross-ROM bootstrap handshake and busy/ready status, but no DSP core executes and physical response latency is unknown. |
 | DSPIF `0x30000` | extracted four-byte transport register; command-4 doorbell callback | Cross-ROM partial | Focused v6.00/v5.01 runs cover doorbells, service-pending completion and IRQ4; v6.00 additionally covers complete TX consumption, RX publication and FIQ0. Controller fixtures cover wrap/full/partial handling; fault reporting remains open. |
 | MCUIF `0x40000` | retained four-byte configuration register | Mapped latch | Boot writes `6a 0f 61 20` once and never reads it in the coherent run. Decode fields before applying window side effects. |
 | ROM2 window | modulo mirror of flash | Inferred | Matches current reads; decode/mirroring needs boot-ROM or second-ROM confirmation. |
@@ -44,9 +44,9 @@ be read as peripheral completeness.
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
 | `04..07` timer 1 | 33,055 Hz free-running counter; FIQ5 on 16-bit wrap; stored destination latch | Partial | Overflow timing composes with the menu oracle. Neither ROM accesses the destination latch during boot; establish its compare and reset-enable behavior before adding side effects. |
-| `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ6, masked-pending retention and acknowledgement have focused regressions. Other source assignments still need independent evidence. |
+| `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ6, masked-pending retention and acknowledgement have focused regressions. The overlap fixture briefly gates CPU delivery through MAD2 MMIO so two physical input callbacks compose deterministically. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
-| `0d` clock control | extracted stored latch | Observed writes, unknown effects | Both ROMs write `0x0c` then `0x2c`; map clock domains and sleep transitions before adding side effects. |
+| `0d` peripheral clock gates | extracted stored latch | Cross-ROM mapped | Both ROMs set bit 5 for SIM activation and clear it after SIM initialization. Other bit ownership and electrical clock effects remain unknown. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
 | `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated input clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Recover the physical input/divider relationship without regressing the boot lifecycle. |
 
@@ -62,7 +62,7 @@ be read as peripheral completeness.
 | Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, ROM-derived 3210 wiring, row direction/drive, physical press/release edges on IRQ0 | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |
 | GENSIO `2c..2e`, `6c..6f` | extracted CCONT/LCD controller; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Cross-ROM partial | Confirm physical busy timing and remaining control bits. |
 | SELECT2/3 aliases `ad..af`, `ed..ef` | extracted saved latches; cross-ROM startup and RMW behavior mapped | Mapped | Identify attached companion devices and alias/decode behavior. |
-| SIMI `36..3f` | stateful SIM UART, 16-byte TX FIFO, RX FIFO, IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and validated T=0 use the organic path; TX control `0x04`/`0x00`, live fill and multi-chunk TX-empty progression are modeled. All IIR causes are decoded; WWT and framing/error causes remain unexercised fault paths. |
+| SIMI `36..3f` | stateful SIM UART, 16-byte TX FIFO, one-character RX holding state, IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and validated T=0 use the organic 9,600-bit/s path; larger card replies remain private serialization state. TX control `0x04`/`0x00`, live fill and multi-chunk TX-empty progression are modeled. All IIR causes are decoded; WWT and framing/error causes remain unexercised fault paths. |
 | UIF control pins `31..33`, `70..f3` | backing latches; `0x31.bit1` is power-duty-cycle owned | Partial | `0x31` has six exhaustive RMW sites and no external-input consumer; map physical pin nets and the remaining banks from schematics. |
 
 ## Interrupt ownership
@@ -108,13 +108,19 @@ the phone until their own contracts meet the same standard. GENSIO now meets
 the gate through separate callbacks, two-ROM traces and focused regression.
 
 `make verify-mad2-clocks` adds a two-ROM boot contract for the remaining core
-latches. v6.00 and v5.01 each read reset cause four times, write it once from
-`0x01` to `0x05`, service watchdog offset `0x03` fifteen times with `0x31`, and
-write clock control `0x00 -> 0x0c -> 0x2c`. Neither accesses timer-1 offsets
-`0x04..0x07`; that is a negative register-access assertion, not evidence that
-the free-running Timer-1 overflow source is inactive. The sequence does not
-establish reset side effects, watchdog frequency, clock-domain behavior or the
-destination-latch semantics.
+latches. v6.00 and v5.01 read reset cause `0x01`, organically service watchdog
+offset `0x03` with `0x31`, and complete the peripheral clock-gate lifecycle
+`0x00 -> 0x0c -> 0x2c -> 0x0c`. Static decode establishes that bit 5 is set by
+SIM activation and cleared after SIM initialization; it is not an ARM sleep
+selector.
+Neither accesses timer-1 offsets `0x04..0x07`; that is a negative
+register-access assertion, not evidence that the free-running Timer-1 overflow
+source is inactive. Timer-1 registers do not establish the separate ARM sleep
+mechanism. The former required reset write `0x01 -> 0x05` belonged to
+the unsupported external-service result-5 lifecycle; it is now accepted if
+observed but is not required during ordinary startup. The sequence does not
+establish reset side effects, the remaining clock-gate bits, ARM sleep behavior
+or the destination-latch semantics.
 
 Until the second ROM is normalized, `NOKI3210_TRACE_MAD2_LEDGER=1` provides the
 curated 3210 evidence pass: at most one read and one write record per MAD2 byte
@@ -148,16 +154,21 @@ write-one-clear contract. The previous unused `0x04` timer constant and matching
 pending guard were wrong; runtime assertion/status/acknowledgement all establish
 `0x10`.
 The NSE-8/9 system-module clocking scheme establishes a 13 MHz ARM system
-clock at MAD2PR1, but it does not by itself establish Timer 0's input. With the
-working 13 MHz timer input and divider `0xf9`, the modeled counter advances at
-about 52 kHz; a focused trace shows no task-0 flash execution after second 2
-and CCONT expiry at exactly 49 seconds. With a 33,055 Hz timer input before the
-same divider, task 0 instead dominates steady state and the phone does not
-reset during 55 seconds, but the coherent SIM/UI lifecycle does not complete.
-The product profile therefore retains 13 MHz as an explicit calibrated Timer-0
-value. Timer 1 now runs independently at 33,055 Hz, wraps at 16 bits and raises
-FIQ5; that composition reproduces the interactive menu but does not restore the
-missing periodic CCONT watchdog service. Catch-up remains disabled, and this
+clock at MAD2PR1; both MAD2 timer models use the recovered 33,055 Hz CTSI input.
+With divider `0xf9`, exact compare/ack cycles continue and task 2 organically
+services both watchdogs at roughly four-second intervals. The former 13 MHz
+Timer-0 setting starved task 2 and expired CCONT at exactly 49 seconds.
+
+The initial 33,055 Hz experiment exposed task 17 suspended when `0x1587`
+arrived. Scheduler-state comparison established that the ordinary post API was
+correct: the external-service prototype had sent command `0x64`, result `5`,
+which runs a five-tick delay and deliberately suspends tasks 10--17. Removing
+that unsupported lifecycle request leaves task 17 in receive-wait state `4`;
+`0x1587` wakes it, SIM initialization completes, and watchdog service continues.
+No scheduler wake or firmware state is synthesized. `NOKI3210_TIMER0_HZ`
+remains available only for bounded clock comparisons.
+Timer 1 runs independently at 33,055 Hz, wraps at 16 bits and raises FIQ5.
+Catch-up remains disabled, and this
 does not establish other MAD2 revisions' clocks.
 
 The same target performs a scheduled save/load round trip. Main RAM, MAD2
@@ -199,8 +210,9 @@ command byte and `0x03` after consuming `0x6c`. A one-second trace produced
 both complete read and write transactions and exercised both values.
 `make verify-ccont` validates the phase/status grammar and all eight configured
 ADC selectors from this bounded organic trace. A second physical-input fixture
-latches charger source bit 3 and proves firmware-visible status, MAD2 IRQ6
-routing, write-one-clear acknowledgement and final deassertion. The GENSIO
+latches charger source bit 3 and proves edge-latched MAD2 IRQ6 routing,
+controller acknowledgement and final deassertion. It does not claim a CCONT
+serial-status transaction during this bounded firmware lifecycle. The GENSIO
 endpoint/status and SELECT state is registered alongside the CCONT device
 state. The byte-exact 20-second oracle was unchanged. An
 earlier interpretation that firmware polled status bit 3 was

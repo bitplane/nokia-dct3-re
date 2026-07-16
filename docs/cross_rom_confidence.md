@@ -122,15 +122,13 @@ spans both 3210 ROMs, not a claim of general v5.01 support.
 
 A DSP-boundary trace confirms that this is not superficial state coincidence.
 The v5.01 firmware performs D0 discovery, the type-`0x70` self-test exchange,
-contact registration `0x64`, channel-map `0x70`, healthy result 5, transport
-acknowledgements, service-empty `0x622a`, and the later type-`0x1a` publication
-through the same shared-memory device. Its instruction-equivalent contact-ready
+contact registration `0x64`, channel-map `0x70`, transport acknowledgements,
+service-empty `0x622a`, and the later type-`0x1a` publication through the same
+shared-memory device. Its instruction-equivalent contact-ready
 consumer is `0x299314` (v6.00 `0x29bc70`), inside initialization loop
-`0x2a67aa` (v6.00 `0x2a92d2`). The v5 run does not consume ready bit 7 after
-the peer's healthy result and therefore retains `0xc9`; no timing change or
-firmware-state forcing has been introduced. The remaining status-byte difference
-is later service-session fidelity debt rather than an offline application
-frontier.
+`0x2a67aa` (v6.00 `0x2a92d2`). Removing the unsupported result-5 lifecycle
+transition makes both revisions settle at service status `0x49`. No
+firmware-state forcing is involved.
 
 ## Interactive sibling controls
 

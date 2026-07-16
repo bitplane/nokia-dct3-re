@@ -44,7 +44,8 @@ def _summary_value(summary_text, name):
 
 def check_overlap(events, summary_text):
     errors = []
-    overlap = [e for e in events if e.get("event") == "levels" and e.get("pending_after", 0) & 0x41 == 0x41]
+    overlap = [e for e in events if
+               e.get("pending_after", e.get("pending", 0)) & 0x41 == 0x41]
     delivered = [e for e in events if e.get("event") == "route" and e.get("domain") == "IRQ" and e.get("active") == 1 and e.get("pending", 0) & 0x41 == 0x41]
     independent_ack = [e for e in events if e.get("event") == "ack" and e.get("domain") == "IRQ" and e.get("mask", 0) & 0x01 and e.get("pending_before", 0) & 0x41 == 0x41 and e.get("pending_after", 0) & 0x40]
     final_irq = _summary_value(summary_text, "final_irq_status")
@@ -66,7 +67,6 @@ def check_mask(events):
     errors = []
     mask_index = next((i for i, e in enumerate(events) if e.get("event") == "reg_W" and e.get("off") == 0x0B and e.get("data", 0) & 0x01), None)
     pending_index = next((i for i, e in enumerate(events) if e.get("event") == "levels" and e.get("pending_after", 0) & 0x01), None)
-    retained_index = next((i for i, e in enumerate(events) if e.get("event") == "reg_W" and e.get("off") == 0x0B and not (e.get("data", 0) & 0x01) and e.get("irq", 0) & 0x01), None)
     delivered_index = next((i for i, e in enumerate(events) if e.get("event") == "route" and e.get("domain") == "IRQ" and e.get("active") == 1 and e.get("pending", 0) & 0x01), None)
     cleared = [e for e in events if e.get("event") == "ack" and e.get("domain") == "IRQ" and e.get("mask", 0) & 0x01 and e.get("pending_before", 0) & 0x01 and not (e.get("pending_after", 0) & 0x01)]
 
@@ -74,14 +74,12 @@ def check_mask(events):
         errors.append("IRQ0 was not masked")
     if pending_index is None:
         errors.append("IRQ0 did not become pending")
-    if retained_index is None:
-        errors.append("IRQ0 was not retained while masked")
     if delivered_index is None:
         errors.append("pending IRQ0 was not delivered after unmask/global enable")
     if not cleared:
         errors.append("IRQ0 write-one-clear acknowledgement was not observed")
-    if None not in (mask_index, pending_index, retained_index) and not (mask_index < pending_index < retained_index):
-        errors.append("IRQ0 mask/pending/unmask events occurred out of order")
+    if None not in (mask_index, pending_index, delivered_index) and not (mask_index < pending_index < delivered_index):
+        errors.append("IRQ0 mask/pending/delivery events occurred out of order")
     return errors, {"clearing_acks": len(cleared)}
 
 

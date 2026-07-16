@@ -4,6 +4,14 @@ from tools.dsp_transport_trace_check import check
 
 
 FULL = """
+dspif_transport: peer RAM W off=000 data=0001
+dspif_transport: peer RAM W off=002 data=0001
+dspif_transport: peer RAM W off=004 data=0001
+dspif_transport: peer RAM W off=0e0 data=0000
+dspif_transport: peer RAM W off=0fe data=0001
+dspif_transport: peer RAM W off=100 data=0001
+dspif_transport: RAM W off=0fe data=0000
+dspif_transport: RAM W off=100 data=0000
 dspif_transport: doorbell command=0004 pending=0000
 dspif_transport: RAM W off=0e4 data=0002
 dspif_transport: IRQ4 service-complete

@@ -80,7 +80,15 @@ u8 nokia_mad2_device::read(offs_t offset)
 	case 0x0c: return (m_regs[offset] & ~0x20) | ((m_irq_status >> 3) & 0x20);
 	case 0x10: return m_timer0_counter >> 8;
 	case 0x11: return m_timer0_counter;
-	case 0x16: return (m_regs[offset] & ~0x02) | ((m_fiq_status >> 7) & 0x02);
+	case 0x16:
+	{
+		const u8 data = (m_regs[offset] & ~0x02) | ((m_fiq_status >> 7) & 0x02);
+		if (m_interrupt_trace && m_interrupt_trace_count++ < 4096)
+			logerror("mad2_interrupt: event=reg_R off=16 data=%02x fiq=%03x irq=%03x fiqmask=%02x irqmask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
+					data, m_fiq_status, m_irq_status, m_regs[0x0a], m_regs[0x0b],
+					m_regs[0x0c], m_regs[0x16], machine().time().as_double());
+		return data;
+	}
 	default: return m_regs[offset];
 	}
 }
@@ -137,10 +145,14 @@ void nokia_mad2_device::assert_irq(unsigned line)
 void nokia_mad2_device::set_irq_line(unsigned line, bool state)
 {
 	const u16 mask = line < 8 ? u16(1) << line : LINE_EXTENDED;
+	const u16 before = m_irq_status;
 	if (state)
 		m_irq_status |= mask;
 	else
 		m_irq_status &= ~mask;
+	if (before != m_irq_status && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
+		logerror("mad2_interrupt: event=levels domain=IRQ line=%u active=%u pending_before=%03x pending_after=%03x t=%.9f\n",
+				line, state, before, m_irq_status, machine().time().as_double());
 	update_irq_line();
 }
 

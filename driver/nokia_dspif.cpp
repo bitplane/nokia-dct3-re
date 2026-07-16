@@ -12,6 +12,8 @@ nokia_dspif_device::nokia_dspif_device(
 	m_tx_commit_cb(*this),
 	m_service_pending_cb(*this),
 	m_doorbell_cb(*this),
+	m_bootstrap_fe_cb(*this),
+	m_bootstrap_100_cb(*this),
 	m_fiq0_cb(*this),
 	m_service_irq_cb(*this)
 {
@@ -27,10 +29,6 @@ void nokia_dspif_device::device_reset()
 {
 	std::fill(std::begin(m_ram), std::end(m_ram), 0);
 	std::fill(std::begin(m_dspif), std::end(m_dspif), 0);
-	// These are DSP-owned bootstrap publications. Their transition timing is not
-	// recovered, so the HLE-visible reset state remains explicit here for now.
-	m_ram[0x0fe / 2] = 1;
-	m_ram[0x100 / 2] = 1;
 }
 
 u16 nokia_dspif_device::shared_r(offs_t offset)
@@ -38,7 +36,9 @@ u16 nokia_dspif_device::shared_r(offs_t offset)
 	offset &= 0x7ff;
 	const unsigned byte_offset = offset << 1;
 	const u16 value = m_ram[offset];
-	if (m_trace_enabled && (byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
+	if (m_trace_enabled && (byte_offset <= 0x004 || byte_offset == 0x0e0 ||
+			byte_offset == 0x0fe || byte_offset == 0x100 ||
+			byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
 			byte_offset == 0x1c8 || byte_offset == 0x1ca || byte_offset == 0x0e4))
 		logerror("dspif_transport: RAM R off=%03x data=%04x t=%.6f\n",
 				byte_offset, value, machine().time().as_double());
@@ -49,7 +49,9 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 {
 	offset &= 0x7ff;
 	COMBINE_DATA(&m_ram[offset]);
-	if (m_trace_enabled && (offset == TX_PRODUCER || offset == TX_CONSUMER ||
+	if (m_trace_enabled && ((offset << 1) <= 0x004 || (offset << 1) == 0x0e0 ||
+			(offset << 1) == 0x0fe || (offset << 1) == 0x100 ||
+			offset == TX_PRODUCER || offset == TX_CONSUMER ||
 			offset == RX_PRODUCER || offset == RX_CONSUMER || offset == SVC_PENDING))
 		logerror("dspif_transport: RAM W off=%03x data=%04x t=%.6f\n",
 				offset << 1, m_ram[offset], machine().time().as_double());
@@ -63,6 +65,25 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 		m_service_pending_cb(1);
 		m_service_pending_cb(0);
 	}
+	if (offset == (0x0fe / 2) && m_ram[offset] == 0)
+	{
+		m_bootstrap_fe_cb(1);
+		m_bootstrap_fe_cb(0);
+	}
+	if (offset == (0x100 / 2) && m_ram[offset] == 0)
+	{
+		m_bootstrap_100_cb(1);
+		m_bootstrap_100_cb(0);
+	}
+}
+
+void nokia_dspif_device::peer_shared_w(offs_t offset, u16 data)
+{
+	offset &= 0x7ff;
+	m_ram[offset] = data;
+	if (m_trace_enabled)
+		logerror("dspif_transport: peer RAM W off=%03x data=%04x t=%.6f\n",
+				offset << 1, data, machine().time().as_double());
 }
 
 u8 nokia_dspif_device::dspif_r(offs_t offset) const

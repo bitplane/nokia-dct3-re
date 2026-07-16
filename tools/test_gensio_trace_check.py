@@ -4,6 +4,7 @@ from tools.gensio_trace_check import (
     check_accesses,
     check_adc,
     check_charger_irq,
+    check_ccont_boot_status,
     check_select_contract,
     decode_transactions,
     parse_accesses,
@@ -80,9 +81,29 @@ class GensioTraceCheckTest(unittest.TestCase):
         errors, counts = check_charger_irq(transactions, summary)
         self.assertEqual([], errors)
         self.assertEqual(
-            {"charger_status": 1, "charger_ack": 1, "charger_clear_read": 1},
+            {"serial_status": 1, "serial_ack": 1, "serial_clear_read": 1},
             counts,
         )
+
+    def test_charger_irq_does_not_require_immediate_serial_service(self):
+        errors, counts = check_charger_irq(
+            [("W", 0x0F, 0xF0)],
+            "irq_seen=40\nfinal_irq_status=00\n",
+        )
+        self.assertEqual([], errors)
+        self.assertEqual(
+            {"serial_status": 0, "serial_ack": 0, "serial_clear_read": 0},
+            counts,
+        )
+
+    def test_ccont_reset_status(self):
+        errors, counts = check_ccont_boot_status([("R", 0x0E, 0x03)])
+        self.assertEqual([], errors)
+        self.assertEqual({"boot_status_reads": 1}, counts)
+
+    def test_ccont_reset_status_rejects_missing_ready_bit(self):
+        errors, _ = check_ccont_boot_status([("R", 0x0E, 0x02)])
+        self.assertIn("CCONT reset status was 0x02, expected 0x03", errors)
 
     def test_decoder_exposes_register_transactions(self):
         accesses = [

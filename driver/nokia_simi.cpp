@@ -10,10 +10,9 @@ DEFINE_DEVICE_TYPE(NOKIA_SIMI, nokia_simi_device, "nokia_simi", "Nokia MAD2 SIMI
 namespace {
 constexpr u8 SIMI_INT_TX_EMPTY = 0x10;
 constexpr u8 SIMI_INT_RX_READY = 0x40;
-// The synthetic ATR advertises TA1=0x05: default Fi=372 with Di=16.  At the
-// standard 3.579545 MHz SIM clock this is approximately 153.6 kbit/s, or one
-// ten-bit T=0 character every 65 microseconds.
-const attotime SIMI_CHARACTER_TIME = attotime::from_hz(15'360);
+// The firmware answers ATR TA1=0x05 with PPS ff 00 ff, retaining default
+// parameters. Model one ten-bit character at 9,600 bit/s throughout.
+const attotime SIMI_CHARACTER_TIME = attotime::from_hz(960);
 }
 
 nokia_simi_device::nokia_simi_device(
@@ -139,6 +138,7 @@ u8 nokia_simi_device::rxd_r()
 	const u8 data = m_rx_fifo[m_rx_head];
 	m_rx_head = (m_rx_head + 1) % std::size(m_rx_fifo);
 	m_rx_count--;
+	m_rx_ready = false;
 	// SIMI services one received character per FIQ. Present subsequent
 	// characters at serial cadence instead of treating a response as one edge
 	// with a pre-filled FIFO.
@@ -146,7 +146,6 @@ u8 nokia_simi_device::rxd_r()
 		m_rx_timer->adjust(SIMI_CHARACTER_TIME);
 	else
 	{
-		m_rx_ready = false;
 		m_rx_timer->adjust(attotime::never);
 	}
 	return data;
@@ -154,7 +153,9 @@ u8 nokia_simi_device::rxd_r()
 
 u8 nokia_simi_device::rx_count_r() const
 {
-	return m_rx_ready ? std::min<u16>(m_rx_count, 0xff) : 0;
+	// The response queue is private serialization state. Firmware sees the one
+	// character currently transferred into the SIMI receive holding register.
+	return m_rx_ready && m_rx_count != 0 ? 1 : 0;
 }
 
 void nokia_simi_device::rx_fifo_control_w(u8 data)

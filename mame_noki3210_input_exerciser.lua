@@ -397,8 +397,14 @@ end
 if irq_overlap_at >= 0 and charger_field and key_fields.up then
 	local overlap_timer = coroutine.create(function()
 		emu.wait(irq_overlap_at)
-		charger_field:set_value(1)
+		-- Input callbacks can let the CPU service the first edge before Lua
+		-- asserts the second. Gate delivery briefly so both physical sources
+		-- reach MAD2 pending state before testing aggregation.
+		local old_ctrl = space:read_u8(0x2000c) & 0xdf
+		space:write_u8(0x2000c, old_ctrl & 0xfb)
 		press("up")
+		charger_field:set_value(1)
+		space:write_u8(0x2000c, old_ctrl | 0x04)
 		emu.wait(0.05)
 		release("up")
 		charger_field:clear_value()

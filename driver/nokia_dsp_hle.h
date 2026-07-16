@@ -19,7 +19,8 @@ public:
 	void tx_commit_w(int state);
 	void service_pending_w(int state);
 	void doorbell_w(int state);
-	u16 bootstrap_r(offs_t offset, u16 backing);
+	void bootstrap_fe_w(int state);
+	void bootstrap_100_w(int state);
 
 protected:
 	virtual void device_start() override;
@@ -28,18 +29,23 @@ protected:
 private:
 	TIMER_CALLBACK_MEMBER(service_tick);
 	TIMER_CALLBACK_MEMBER(packet_tick);
+	TIMER_CALLBACK_MEMBER(response_tick);
 	void drain_responses();
+	void schedule_response();
+	void publish_bootstrap_state();
 
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_external_service_peer_device> m_external_peer;
 	emu_timer *m_service_timer = nullptr;
 	emu_timer *m_packet_timer = nullptr;
+	emu_timer *m_response_timer = nullptr;
 	bool m_service_enabled = false;
 	bool m_external_service_enabled = false;
 	bool m_trace_enabled = false;
 	unsigned m_service_delay_ms = 5;
 	unsigned m_service_tick_ms = 5;
 	bool m_service_control_completion_sent = false;
+	unsigned m_bootstrap_exchange_count = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_DSP_HLE, nokia_dsp_hle_device)

@@ -11,11 +11,11 @@ not compatibility mechanisms.
 | ARM7, flash and RAM | MAME CPU/flash devices plus phone-owned maps | Validate decode and reset path with another ROM. |
 | PCD8544 display | MAME device | Add other display controllers per product configuration. |
 | External EEPROM | MAME `I2C_24C128` on mapped MAD2 GenIO pins plus generated provisioning input | Validate write/timing behavior, legitimate provisioning, ROM-aware fallback extraction, and parallel-window semantics. |
-| CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression; deterministic binary RTC and documented watchdog/WDDISX boundary | Establish physical GENSIO/ADC latency, the missing steady-state watchdog service, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |
+| CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression; deterministic binary RTC and enabled documented watchdog/WDDISX boundary | Establish physical GENSIO/ADC latency, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |
 | MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller and CPU routing; board/peripheral windows remain phone-owned or extracted separately | Recover physical clocks and reset domains; move further windows only after their individual contracts pass the same gate. |
 | MBUS | Extracted `nokia_mbus_device` with 9,600-baud RX/TX byte attachment and FIQ2/FIQ3 callbacks; no default peer | Recover FIQ3 phase/source and attach a peer only when firmware organically transmits a supported frame. |
-| DSP/DSPIF | `nokia_dspif_device` owns shared RAM, DSPIF, packet rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the boot-subset DSP responses | Recover bootstrap publication transitions, physical timing and wider DSP vocabulary only from organic traffic. |
-| SIM | Separate `nokia_simi_device` controller with the synthetic card's advertised `TA1=0x05` timing and `nokia_sim_card_device` protocol/profile connected by reset/byte callbacks | Derive controller timing from negotiated card parameters; recover ATR/turnaround and error/removal behavior, then extract reusable provisioning profiles; extend card behavior only for organic requests. |
+| DSP/DSPIF | `nokia_dspif_device` owns shared RAM, DSPIF, packet rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the cross-ROM 64-exchange bootstrap publication and boot-subset DSP responses | Recover physical response timing and wider DSP vocabulary only from organic traffic. |
+| SIM | Separate `nokia_simi_device` controller using the default rate retained by firmware PPS `ff 00 ff`, and `nokia_sim_card_device` protocol/profile connected by reset/byte callbacks | Generalize timing beyond the fixed ATR/PPS profile; recover ATR-start/turnaround and error/removal behavior, then extract reusable provisioning profiles; extend card behavior only for organic requests. |
 | Buzzer | MZT-03C represented by a MAME beeper driven from MAD2 PUP enable and the 13 MHz divider; mapped-MMIO conformance is regression-tested | Exercise an organic ringer path and recover volume/acoustic response. Keypad tones belong behind the DSP/COBBA boundary. |
 | Startup/service/GSM peers | `nokia_external_service_peer_device` owns the request-driven class-`0x40` session carried through the DSP transport | Validate the logical peer against another ROM family without treating its transport as peer ownership. |
 
@@ -27,7 +27,7 @@ See `mad2_fidelity.md` for register-level implementation status and
 | Profile | Purpose | Acceptance condition |
 | --- | --- | --- |
 | 3210 machine default | Request-driven external-service peer plus ordinary SIMI/FIQ6 card traffic | `make verify-frontier`; semantic predicates with SIM enabled and task 1 in mode `0x0004`. |
-| Peer-disabled negative baseline (`make verify`) | Preserve the known failure comparison | Exact CONTACT SERVICE frame SHA prefix `d8a9a7a58e587be8`. |
+| Missing-hardware negative baseline (`make verify`) | Preserve a known failure comparison | Semantic startup predicates; no required LCD frame. |
 | New-ROM baseline | Detect product-specific assumptions | No firmware-address hooks; record first divergence even when no frame renders. |
 
 Only the Nokia 3210 product profile enables the validated composition. Other
@@ -58,8 +58,9 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 
 1. Improve the extracted CCONT and GENSIO devices only from observed transactions.
 2. Extend the extracted MAD2 core only from observed reset, clock and peripheral
-   contracts; Timer-1 overflow is modeled, while its destination registers and
-   clock-control/reset effects remain provisional.
+   contracts; Timer-1 overflow is modeled, while its destination registers,
+   ARM sleep behavior and reset effects remain provisional. Clock-gate bit 5 is
+   mapped to the SIM lifecycle; the other gate bits remain unidentified.
 3. Extend deterministic physical-key fixtures into menu and application
    traversal, adding device behavior only when firmware reaches an evidenced
    hardware boundary.
@@ -77,6 +78,6 @@ focused tests and freedom from firmware-address conditions first.
 - Model hardware and nonvolatile data; do not model desired firmware results.
 - Product differences belong in machine configuration or input data.
 - Hardware components emit signals; firmware owns RTOS and application state.
-- Keep both the machine-default semantic oracle and peer-disabled fault oracle stable through refactors.
+- Keep both the machine-default semantic oracle and missing-hardware fault oracle stable through refactors.
 - Record useful negative conclusions, but remove chronological experiment logs.
 - Require a second-ROM confidence pass before calling shared behavior validated.

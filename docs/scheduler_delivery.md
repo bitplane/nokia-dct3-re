@@ -67,6 +67,19 @@ message after dispatch; scratch RAM or a borrowed pointer is never a faithful
 substitute. Any external peer model must enter through its hardware or transport
 boundary and let the firmware allocate, route, and release internal objects.
 
+## Receive-wait and suspend states
+
+Task scheduler records are `0x10` bytes at `0x1093bc`; task mailbox descriptors
+are `0x1c` bytes at `0x101484`. An empty receive through `0x26a458` leaves the
+task in scheduler state `4`. Posting through `0x26a204` queues the message and
+wakes a destination in that state. Scheduler state `5` is suspended and is not
+woken by an ordinary message post.
+
+The APIs at `0x269bf4` and `0x269c6e` suspend and resume a named task,
+respectively. Routine `0x2795e6` is a bulk suspend of tasks 10--17, not a resume
+group. This distinction explained why an otherwise valid `0x1587` object could
+remain queued when the external-service prototype requested lifecycle state 5.
+
 ## Tooling caveat
 
 Instruction-fetch hooks fire at actual fetched branch targets. A hook placed at

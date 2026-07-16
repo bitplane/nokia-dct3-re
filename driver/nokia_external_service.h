@@ -48,7 +48,6 @@ private:
 	bool m_registration_acknowledged = false;
 	bool m_channel_map_sent = false;
 	bool m_channel_map_acknowledged = false;
-	bool m_healthy_sent = false;
 	bool m_empty_ack_sent = false;
 	unsigned m_registration_ticks = 0;
 	u8 m_queue_type[QUEUE_SIZE] = { 0 };

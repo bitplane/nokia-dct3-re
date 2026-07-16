@@ -25,6 +25,16 @@ class DspDeviceSplitTest(unittest.TestCase):
         for token in ("registration_sent", "channel_map_sent", "DISCOVERY_NODE"):
             self.assertNotIn(token, self.hle)
 
+    def test_bootstrap_is_peer_publication_not_read_overlay(self):
+        self.assertIn("peer_shared_w", self.transport)
+        self.assertIn("publish_bootstrap_state", self.hle)
+        self.assertNotIn("bootstrap_r", self.hle + self.phone)
+
+    def test_external_peer_uses_acknowledged_startup_phases(self):
+        self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)
+        self.assertIn("m_channel_map_acknowledged && !m_empty_ack_sent", self.external)
+        self.assertNotIn("queue_service_frame(0x64, 0x05", self.external)
+
     def test_phone_composes_three_devices(self):
         for token in (
             "required_device<nokia_dspif_device> m_dspif",

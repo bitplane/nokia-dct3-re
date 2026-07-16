@@ -15,9 +15,8 @@ public:
 	uint8_t serial_r();
 	void select_w(int selected);
 	void set_adc_source(unsigned channel, uint16_t value);
-	void set_boot_status(uint8_t status);
 	void latch_irq_sources(uint8_t sources);
-	void set_present(bool present) { m_present = present; }
+	void set_ready(bool ready) { m_ready = ready; }
 	void set_wddisx_grounded(bool grounded) { m_wddisx_grounded = grounded; }
 	bool watchdog_tick();
 
@@ -37,9 +36,8 @@ private:
 	uint8_t m_watchdog = 0;
 	uint8_t m_regs[0x10] = {0};
 	uint16_t m_adc_source[8] = {0};
-	uint8_t m_boot_status = 0x02;
 	bool m_data_cycle = false;
-	bool m_present = false;
+	bool m_ready = true;
 	bool m_wddisx_grounded = false;
 	bool m_rtc_alarm_armed = false;
 	emu_timer *m_rtc_timer = nullptr;

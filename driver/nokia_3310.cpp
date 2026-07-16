@@ -59,7 +59,7 @@ struct nokia_product_config
 	bool ccont_wddisx_grounded;
 };
 
-constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true };
+constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, false };
 constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false };
 constexpr nokia_product_config PRODUCT_5X10 = { 0x10, false, false, false };
 constexpr nokia_product_config PRODUCT_8XXX = { 0x10, false, false, false };
@@ -114,7 +114,6 @@ constexpr uint16_t MAD2_FIQ_TIMER0_COMPARE = uint16_t(1) << 4;
 // CCONT serial command/status bits + fixed wiring (hardware constants, not configurable).
 // PWRONX is latched as CCONT status bit 1 on a cold power-key boot. It is a
 // reset cause sampled by firmware, not one of the upper interrupt sources.
-constexpr uint8_t CCONT_BOOT_IRQ_DEFAULT = 0x02;
 constexpr uint8_t KEYPAD_IRQ_LINE_NUM = 0;        // MAD2 keypad/UIF interrupt
 constexpr uint8_t CCONT_IRQ_LINE_NUM = 6;         // MAD2 IRQ line the CCONT asserts
 
@@ -377,16 +376,16 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0x01:  return "[CTSI] MCU reset control register (rw)";
 	case 0x02:  return "[CTSI] DSP reset control register (rw)";
 	case 0x03:  return "[CTSI] ASIC watchdog write register (w)";
-	case 0x04:  return "[CTSI] Sleep clock counter (MSB) (r)";
-	case 0x05:  return "[CTSI] Sleep clock counter (LSB) (r)";
-	case 0x06:  return "[CTSI] ? (sleep) clock destination (LSB) (r)";
-	case 0x07:  return "[CTSI] ? (sleep) clock destination (MSB) (r)";
+	case 0x04:  return "[CTSI] Timer 1 counter (MSB) (r)";
+	case 0x05:  return "[CTSI] Timer 1 counter (LSB) (r)";
+	case 0x06:  return "[CTSI] Timer 1 destination (LSB) (r)";
+	case 0x07:  return "[CTSI] Timer 1 destination (MSB) (r)";
 	case 0x08:  return "[CTSI] FIQ lines active (rw)";
 	case 0x09:  return "[CTSI] IRQ lines active (rw)";
 	case 0x0A:  return "[CTSI] FIQ lines mask (rw)";
 	case 0x0B:  return "[CTSI] IRQ lines mask (rw)";
 	case 0x0C:  return "[CTSI] Interrupt control register (rw)";
-	case 0x0D:  return "[CTSI] Clock control register (rw)";
+	case 0x0D:  return "[CTSI] Peripheral clock gates (bit 5 SIM clock) (rw)";
 	case 0x0E:  return "[CTSI] Interrupt trigger register (r)";
 	case 0x0F:  return "[CTSI] Programmable timer clock divider (rw)";
 	case 0x10:  return "[CTSI] Programmable timer counter (MSB) (r)";
@@ -502,7 +501,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback, bool sane_def
 // environment (pass overrides through `make run RUN_ENV='...'`). Three kinds:
 //
 //   1. HARDWARE/PRODUCT CONFIG — selects a scenario, not firmware behaviour:
-	//      power/ADC (ADC_PROFILE, CCONT_WDDISX_GROUNDED), clocks
+//      power/ADC (ADC_PROFILE, CCONT_READY, CCONT_WDDISX_GROUNDED), clocks
 //      (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP,
 //      FIQ8_HZ), and the SIM UART/card fixture. The 3210's documented timer-0
 //      clock is fixed in its product configuration; remaining environment
@@ -511,8 +510,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback, bool sane_def
 //   2. DEVICE-BOUNDARY MODELS — behavior behind an ordinary hardware interface.
 //      The 3210 enables the validated composition by default; MODEL_* can still
 //      disable individual peers for negative tests. MODEL_SIM_DEVICE owns
-//      SIMI/FIQ6. MODEL_CCONT_PRESENT selects
-//      the extracted CCONT device scenario. MODEL_DSP_SERVICE enables the DSP
+//      SIMI/FIQ6. MODEL_DSP_SERVICE enables the DSP
 //      HLE; MODEL_EXTERNAL_SERVICE_PEER enables the separate service peer
 //      behind the DSP transport. Their wider contracts remain incomplete.
 //   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
@@ -625,8 +623,6 @@ void noki3310_state::machine_reset()
 		for (unsigned id = 0; id < 8; id++)
 			m_ccont->set_adc_source(id, nokia_adc_override(id, adc_default[id], m_product.sane_adc_defaults));
 	}
-	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
-	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", m_product.boot_devices) != 0);
 	m_ccont->set_wddisx_grounded(nokia_env_u32("NOKI3210_CCONT_WDDISX_GROUNDED",
 			m_product.ccont_wddisx_grounded) != 0);
 	m_simi->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", m_product.boot_devices) != 0);
@@ -673,15 +669,20 @@ void noki3310_state::mad2_irq_w(int state)
 void noki3310_state::mad2_irq_ack_w(u16 mask)
 {
 	if (mask & (u16(1) << KEYPAD_IRQ_LINE_NUM))
+	{
 		m_keypad_irq_latched = false;
-	if (mask & ((u16(1) << KEYPAD_IRQ_LINE_NUM) | (u16(1) << CCONT_IRQ_LINE_NUM)))
 		update_keypad_ccont_irqs();
+	}
 }
 
 void noki3310_state::ccont_irq_w(int state)
 {
+	// MAD2 latches the rising CCONT indication. Its IRQ acknowledgement clears
+	// that pending edge; CCONT retains the source in register 0x0e until the
+	// deferred firmware service acknowledges it through GENSIO.
+	if (state && !m_ccont_irq_state)
+		m_mad2->assert_irq(CCONT_IRQ_LINE_NUM);
 	m_ccont_irq_state = bool(state);
-	update_keypad_ccont_irqs();
 }
 
 void noki3310_state::ccont_power_w(int state)
@@ -751,7 +752,6 @@ void noki3310_state::update_keypad_ccont_irqs()
 {
 	const u16 before = m_mad2->irq_status();
 	m_mad2->set_irq_line(KEYPAD_IRQ_LINE_NUM, m_keypad_irq_latched);
-	m_mad2->set_irq_line(CCONT_IRQ_LINE_NUM, m_ccont_irq_state);
 	const u16 after = m_mad2->irq_status();
 	if (before != after &&
 			nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0 &&
@@ -878,7 +878,7 @@ void noki3310_state::eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
-	return m_dsp_hle->bootstrap_r(offset, m_dspif->shared_r(offset));
+	return m_dspif->shared_r(offset);
 }
 
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
@@ -1294,6 +1294,9 @@ void noki3310_state::noki3310(machine_config &config)
 	m_mbus->fiq2_cb().set(FUNC(noki3310_state::mbus_fiq2_w));
 	m_mbus->fiq3_cb().set(FUNC(noki3310_state::mbus_fiq3_w));
 	NOKIA_CCONT(config, m_ccont);
+	// The low status bit is persistent CCONT reset state, not an IRQ source.
+	// Clearing it provides the explicit missing/unready-CCONT fault fixture.
+	m_ccont->set_ready(nokia_env_u32("NOKI3210_CCONT_READY", 1) != 0);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
 	NOKIA_GENSIO(config, m_gensio);
@@ -1313,6 +1316,8 @@ void noki3310_state::noki3310(machine_config &config)
 	m_dspif->tx_commit_cb().set(FUNC(noki3310_state::dsp_tx_commit_w));
 	m_dspif->service_pending_cb().set(FUNC(noki3310_state::dsp_service_pending_w));
 	m_dspif->doorbell_cb().set(FUNC(noki3310_state::dsp_doorbell_w));
+	m_dspif->bootstrap_fe_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::bootstrap_fe_w));
+	m_dspif->bootstrap_100_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::bootstrap_100_w));
 	m_dspif->fiq0_cb().set(FUNC(noki3310_state::dsp_fiq0_w));
 	m_dspif->service_irq_cb().set(FUNC(noki3310_state::dsp_service_irq_w));
 	m_dsp_hle->set_service_enabled(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0);
@@ -1343,10 +1348,9 @@ void noki3310_state::noki3210(machine_config &config)
 	// Both supported 3210 firmware revisions use this validated composition.
 	// Other DCT3 products retain the conservative base-device defaults until
 	// their corresponding hardware and peer contracts have been exercised.
-	// Timer 0 retains the boot-validated scheduler calibration. Timer 1 is the
-	// 33,055 Hz free-running CTSI counter and raises FIQ5 on 16-bit overflow.
-	// See docs/mad2_fidelity.md for the remaining Timer-0 clock question.
-	m_mad2->set_timer0_hz(13'000'000);
+	// Both MAD2 timers use the 33,055 Hz CTSI source recovered for this product.
+	// Timer 1 raises FIQ5 on 16-bit overflow; Timer 0 applies its programmed divider.
+	m_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 33'055));
 	m_mad2->set_timer1_hz(33'055);
 	m_mad2->set_timer0_catchup(false);
 

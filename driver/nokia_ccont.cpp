@@ -19,6 +19,8 @@ constexpr uint8_t RTC_ALARM_MINUTE = 0x0b;
 constexpr uint8_t RTC_ALARM_HOUR = 0x0c;
 constexpr uint8_t IRQ_STATUS = 0x0e;
 constexpr uint8_t IRQ_MASK = 0x0f;
+constexpr uint8_t RESET_READY = 0x01;
+constexpr uint8_t RESET_PWRONX = 0x02;
 constexpr uint8_t IRQ_SOURCE_MASK = 0xf8;
 constexpr uint8_t IRQ_RTC_SECOND = 0x10;
 constexpr uint8_t IRQ_RTC_MINUTE = 0x20;
@@ -39,9 +41,7 @@ void nokia_ccont_device::device_start()
 	save_item(NAME(m_watchdog));
 	save_item(NAME(m_regs));
 	save_item(NAME(m_adc_source));
-	save_item(NAME(m_boot_status));
 	save_item(NAME(m_data_cycle));
-	save_item(NAME(m_present));
 	save_item(NAME(m_wddisx_grounded));
 	save_item(NAME(m_rtc_alarm_armed));
 }
@@ -51,6 +51,9 @@ void nokia_ccont_device::device_reset()
 	m_cmd = 0;
 	m_watchdog = 0;
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
+	// Ordinary cold start exposes the persistent CCONT-ready bit together with
+	// the PWRONX reset cause. Both 3210 ROMs require this 0x03 reset value.
+	m_regs[IRQ_STATUS] = (m_ready ? RESET_READY : 0) | RESET_PWRONX;
 	// Use a fixed epoch rather than the host clock.  The firmware consumes these
 	// registers as binary counters, and deterministic reset state keeps frames
 	// and save states reproducible across hosts.
@@ -80,13 +83,6 @@ void nokia_ccont_device::select_w(int selected)
 {
 	if (selected)
 		m_data_cycle = false;
-}
-
-void nokia_ccont_device::set_boot_status(uint8_t status)
-{
-	m_boot_status = status;
-	m_regs[IRQ_STATUS] = (m_regs[IRQ_STATUS] & IRQ_SOURCE_MASK) | status;
-	update_irq();
 }
 
 void nokia_ccont_device::latch_irq_sources(uint8_t sources)
@@ -174,7 +170,10 @@ void nokia_ccont_device::serial_w(uint8_t data)
 			m_rtc_alarm_armed = true;
 			break;
 		case IRQ_STATUS:
-			m_regs[address] &= ~data;
+			// Ready bit 0 is persistent device status. PWRONX bit 1 is a
+			// clearable reset cause, and the upper bits are IRQ-source latches.
+			m_regs[address] = (m_regs[address] & RESET_READY) |
+				((m_regs[address] & ~RESET_READY) & ~data);
 			update_irq();
 			break;
 		default:
@@ -196,7 +195,6 @@ uint8_t nokia_ccont_device::serial_r()
 		switch (address)
 		{
 		case ADC_MSB: data = 0xb0 | (data & 0x03); break;
-		case IRQ_STATUS: if (m_present) data |= 0x01; break;
 		}
 	}
 	m_data_cycle = !m_data_cycle;

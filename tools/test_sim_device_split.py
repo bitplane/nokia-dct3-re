@@ -39,9 +39,11 @@ class SimDeviceSplitTest(unittest.TestCase):
         ):
             self.assertIn(f"m_simi->{method}", self.phone)
 
-    def test_character_timing_matches_advertised_ta1(self):
+    def test_character_timing_matches_observed_default_pps(self):
         self.assertIn("TA1=0x05", self.simi)
-        self.assertIn("attotime::from_hz(15'360)", self.simi)
+        self.assertIn("attotime::from_hz(960)", self.simi)
+        self.assertNotIn("attotime::from_hz(15'360)", self.simi)
+        self.assertIn("m_rx_ready && m_rx_count != 0 ? 1 : 0", self.simi)
         self.assertNotIn("from_usec(10)", self.simi + self.simi_header)
         self.assertNotIn("from_usec(100)", self.simi + self.simi_header)
 

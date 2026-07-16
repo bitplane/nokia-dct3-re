@@ -82,7 +82,16 @@ command body larger than one FIFO to advance through multiple TX-empty interrupt
 schedules TX-ready and RX-ready on a timer, exposes RX bytes only when ready, and cancels the
 trailing event when the RX FIFO empties. A TX-only completion does not hide an
 already-readable character; newly returned card bytes are deferred before they
-become visible.
+become visible. The card may construct a complete T=0 response synchronously,
+so the controller retains a private serialization queue, but `0x39` exposes
+only the single character currently transferred to its receive holding register.
+
+Activation and T=0 traffic use the default ten-bit 9,600-bit/s character time.
+Although the synthetic ATR advertises TA1 `0x05`, both ROMs answer with
+`ff 00 ff`; that PPS exchange retains default parameters rather than selecting
+the former fixed 65 us model. A bounded v6.00 trace observes consecutive ATR
+and PPS receive-register reads approximately 1.065 ms apart, with RX count one
+for each character.
 
 ## Stateful card device
 
@@ -97,7 +106,7 @@ implements:
 
 It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
 device is disabled, SIMI reads and writes retain the legacy behavior used by the
-peer-disabled failure baseline.
+missing-hardware failure baseline.
 
 ## Contract audit
 
@@ -108,13 +117,13 @@ The implemented surface is classified by ownership and evidence:
 | SIMI register window and FIQ6 route | Extracted partial hardware | `nokia_simi_device` owns offsets `0x36..0x3f`, the decoded IIR cascade, timing and FIQ6; firmware traffic executes through it in both mapped 3210 ROMs. |
 | TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics remain inferred. |
 | IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
-| ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Controller delivery uses the approximately 65 us ten-bit character time selected by the synthetic ATR's `TA1=0x05`; ATR start and card turnaround delays remain approximations. |
+| ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
 | SELECT/STATUS/GET RESPONSE/READ behavior | Prototype card | It satisfies organically requested initialization and presence polling. Access conditions, invalidation, record semantics, CHV state, errors, reset, and removal are incomplete. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
 | CHANGE CHV support | Dormant prototype | The procedure/body/status sequence is implemented, but the ordinary boot does not request it and no persistent credential semantics are validated. |
 
 The model does not force firmware state or inject RTOS messages. Controller and
-card ownership are separate; remaining fidelity debt is ATR/turnaround timing,
+card ownership are separate; remaining fidelity debt is ATR start/turnaround timing,
 unmodeled errors/removal, and card protocol mixed with subscriber provisioning.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
@@ -195,7 +204,7 @@ ordinary boot does not organically request `0x1196`.
 
 ## Current acceptance gates
 
-- `make verify`: exact 3210 frame and structural oracle.
+- `make verify`: explicit missing-hardware structural oracle.
 - `make run-frontier`: current external-service/SIM research profile.
 - `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
 - Stateful-model trace: natural ATR/PPS and the ordinary non-CPHS EF pass, with

@@ -28,6 +28,7 @@ class CcontWatchdogTest(unittest.TestCase):
         phone = (ROOT / "driver/nokia_3310.cpp").read_text()
         self.assertIn("set_wddisx_grounded", phone)
         self.assertNotIn("NOKI3210_DISABLE_CCONT_WATCHDOG", phone)
+        self.assertIn("PRODUCT_3210 = { 0x01, true, true, false }", phone)
 
     def test_rtc_is_internal_and_deterministic(self):
         self.assertNotIn("current_datetime", self.source)

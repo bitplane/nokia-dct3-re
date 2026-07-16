@@ -67,7 +67,7 @@ structural oracles enforce that observation.
 | range | device | handler | status |
 |---|---|---|---|
 | `0x000000–0x00ffff` (mirror `+0x80000`) | boot ROM / low RAM | `ram_r/w` | emulated |
-| `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | Extracted partial transport; peer-owned bootstrap reads remain an explicit DSP-HLE overlay |
+| `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | Extracted partial transport; peer-owned bootstrap state is published into backing RAM |
 | `0x020000–0x0200ff` (mirror `+0x8ff00`) | **MAD2 I/O** (all peripherals) | `mad2_io_r/w` | Mixed partial hardware, calibrated behavior and backing latches; see per-block ledger |
 | `0x030000–0x030003` | **DSPIF** (DSP API control reg) | `nokia_dspif_device::dspif_r/w` | stored command-4 doorbell; HLE scheduling still partly shared-write driven |
 | `0x040000–0x040003` | **MCUIF** (memory-range config) | `mad2_mcuif_r/w` | Retained four-byte configuration latch; no decoded side effects |
@@ -90,20 +90,21 @@ profile; — = not established.
 | `0x00` | ASIC version (r, → `0x40`) | ✓ |
 | `0x01/0x02` | MCU / **DSP** reset control | ✓ |
 | `0x03` | ASIC watchdog write | ✓ |
-| `0x04/0x05` | sleep-clock counter MSB/LSB | (timer1) |
+| `0x04/0x05` | timer-1 free-running counter MSB/LSB | (timer1) |
 | `0x06/0x07` | timer-1 destination MSB/LSB | stored latch; no boot access in either 3210 ROM, compare behavior unmodeled |
 | `0x08/0x09` | FIQ / **IRQ lines active** | ✓ |
 | `0x0a/0x0b` | FIQ / IRQ mask | ✓ |
 | `0x0c` | interrupt control | ✓ |
-| `0x0d` | clock control | ✓ |
+| `0x0d` | peripheral clock gates; bit 5 gates the SIM clock | ✓ |
 | `0x0e` | **interrupt trigger** (r; read-only — why `assert_irq(4)` can't be SW-triggered) | ✓ |
 | `0x0f–0x13` | programmable timer (divider/counter/compare) | ✓ |
 
-Timer 0's divider/counter/compare behavior is modeled, but its input clock is
-still calibrated. The working 13 MHz setting reproduces both supported ROMs;
-a 33,055 Hz Timer-0 input changes scheduler ownership and prevents SIM startup.
-Timer 1 is a separate free-running 33,055 Hz counter with FIQ5 on 16-bit wrap;
-its register-window destination semantics remain provisional.
+Timer 0's divider/counter/compare behavior is modeled with the 33,055 Hz CTSI
+input. At that rate task 2 services both watchdogs organically. The former
+13 MHz calibration only appeared necessary because an invented external-service
+result suspended the application tasks when scheduler delays ran at their real
+rate. Timer 1 is a separate free-running 33,055 Hz counter with FIQ5 on 16-bit
+wrap; its register-window destination semantics remain provisional.
 
 ### PUP — MBUS, vibrator, buzzer, GenIO
 | off | reg | status / touch |
@@ -158,7 +159,7 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0x7–0xa` | RTC sec/min/hour/day | deterministic binary counters; second/minute IRQs |
 | `0xb–0xc` | RTC alarm minute/hour | partial one-shot comparator |
 | `0xd` | clock gates | stored latch; effects unknown |
-| `0xe` | **interrupt lines (status)** | bit 0 = present-status (`MODEL_CCONT_PRESENT`, idx6); bits 0–2 ignored by the IRQ dispatcher |
+| `0xe` | **interrupt/reset status** | reset `0x03`: persistent bit 0 ready, clearable bit 1 PWRONX cause; upper bits `0xf8` are write-one-to-clear IRQ sources |
 | `0xf` | interrupt mask | |
 
 **ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver deliberately exposes raw selectors
@@ -174,9 +175,9 @@ The MCU-to-DSP boundary is shared RAM at `0x10000` plus DSPIF at `0x30000`.
 The DSP core remains unemulated, but the shared-memory peer is no longer a
 phone-state constant shim:
 
-- **DSP shared RAM `0x10000–0x10fff`:** device-owned backing storage; bootstrap
-  ready overrides remain at `0x00..0x04`, `0xe0`, `0xfe` and conditionally
-  `0x100`. The device owns MCU/DSP ring indices `0xa4/a6` and `0x1c8/0x1ca`,
+- **DSP shared RAM `0x10000–0x10fff`:** device-owned backing storage; the HLE
+  peer publishes bootstrap-ready and busy transitions at `0x00..0x04`, `0xe0`,
+  `0xfe` and `0x100`. The device owns MCU/DSP ring indices `0xa4/a6` and `0x1c8/0x1ca`,
   drains service pending word `0xe4`, raises IRQ4, and delivers inbound packets
   through FIQ0.
 - **DSPIF `0x30000`:** written at boot (`pc 0x2001a4`) and by the reachable service

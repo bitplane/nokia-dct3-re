@@ -67,11 +67,16 @@ The forcing-free contact path now composes in one boot:
    busy bit 2 at `0x2349dc` and leaves service-present bit 6 set. The two payload
    bits are failure indicators, so zero is the healthy result.
 4. Only after that DSP completion does the external peer send class-`0x40`
-   command `0x64` result 1, command `0x70` with the `0x5f`/`0x62` channel map,
-   and command `0x64` result 5. Firmware replies through task 7; the peer returns
+   command `0x64` result 1 and command `0x70` with the `0x5f`/`0x62` channel
+   map. Firmware replies through task 7; the peer returns
    compact class-`0x7f` acknowledgements derived from each outgoing transaction.
 5. The final `0x622a` report is likewise acknowledged at the transport boundary.
    No semantic echo is needed and no firmware state is written by the model.
+
+Peer-to-MCU frames are delivered serially at 9600 baud with ten wire bits per
+byte. The DSP HLE uses a separate response timer, so a response generated while
+consuming TX cannot re-enter the MCU-facing RX ring in the same callback and
+only one queued frame completes per wire interval.
 
 In the five-second acceptance run this leaves service-session status `0x49`, advances
 startup `0x000d -> 0x0004`, activates SIM control
@@ -114,6 +119,12 @@ listener. Both branches nevertheless enter their shared interactive
 initialization before recording mode 4 or 7, so this ordering is fidelity debt
 rather than an application-start blocker.
 
+Command `0x64`, result `5`, is not an ordinary healthy-startup response. Its
+firmware handler enters lifecycle state 5, delays five scheduler ticks and calls
+the bulk suspend routine `0x2795e6` for tasks 10--17. The earlier peer model
+sent it speculatively; at the correct Timer-0 rate that suspended task 17 before
+the later `0x1587` post. The supported peer no longer invents that transition.
+
 ## Command inventory
 
 | Command | Incoming consumer | Sole MCU constructor | Constructor role | Initiating producer |
@@ -136,12 +147,12 @@ contracts.
 
 ## Runtime evidence
 
-The canonical contact manifest combines a peer-disabled one-second trace with a
+The canonical contact manifest combines a missing-hardware one-second trace with a
 six-second machine-default trace. Across them the census records command `0x64`
 construct/send/receive counts `3/2/2` and command `0x70` counts `1/1/1`.
-The frontier run observes the peer's result-1 `0x64`, 64-byte `0x70` channel
-map, and result-5 `0x64`, together with the firmware acknowledgements described
-above. Commands `0x65`, `0x71`, contact command `0x74`, and command `0x8e` remain absent from
+The frontier run observes the peer's result-1 `0x64` and 64-byte `0x70` channel
+map together with the firmware acknowledgements described above. Commands
+`0x65`, result-5 `0x64`, `0x71`, contact command `0x74`, and command `0x8e` remain absent from
 these bounded boots; the static constructor census supplies their ROM coverage.
 
 The older bridge-profile trace posted one header-incomplete healthy `0x64`

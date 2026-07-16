@@ -14,7 +14,7 @@
     },
     {
       "id": "ccont_register_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers, upper-bit IRQ masking, write-one-to-clear acknowledgement, PWRONX reset-cause bit 1 and MAD2 IRQ6 routing; focused organic traces validate all eight configured ADC selectors plus charger-source assertion, acknowledgement and deassertion",
+      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers, reset status and MAD2 IRQ6 routing; focused organic traces validate all eight configured ADC selectors plus edge-latched charger delivery, MAD2 acknowledgement and settled controller state. CCONT source-bit serial acknowledgement is not exercised by the bounded charger lifecycle",
       "evidence": ["docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
     },
     {
@@ -28,9 +28,9 @@
       "evidence": ["docs/ccont_subsystem.md"]
     },
     {
-      "id": "ccont_presence_overlay", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
-      "boundary": "The coherent profile can overlay status-register bit 0 as CCONT presence through MODEL_CCONT_PRESENT; firmware consumes the bit, but its physical meaning and reset behavior lack independent hardware evidence",
-      "evidence": ["docs/ccont_subsystem.md", "docs/service_bootstrap.md"]
+      "id": "ccont_reset_ready_status", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "3210 v6.00 and v5.01 both read CCONT reset status 0x03: persistent ready bit 0 plus clearable PWRONX cause bit 1. The device owns this stored reset state; an explicit ready-low fault reproduces the CONTACT SERVICE failure frame without a read overlay",
+      "evidence": ["docs/ccont_subsystem.md", "docs/service_bootstrap.md", "tools/gensio_trace_check.py"]
     },
     {
       "id": "mad2_kbgpio_matrix", "subsystem": "keypad", "status": "partial", "confidence": "strong",
@@ -49,7 +49,7 @@
     },
     {
       "id": "mad2_reset_clock_boot_sequence", "subsystem": "system_controller", "status": "mapped", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share four reset-cause reads, one 0x01-to-0x05 reset write, fifteen watchdog reloads of 0x31 and clock-control writes 0x00-to-0x0c-to-0x2c during the focused boot; register side effects and physical clocks remain unknown, and neither ROM accesses timer 1",
+      "boundary": "3210 v6.00 and v5.01 share reset-cause reads, organic watchdog reloads of 0x31, and the peripheral clock-gate lifecycle 0x00-to-0x0c-to-0x2c-to-0x0c; static decode maps bit 5 to SIM activation and shutdown, while other bits and ARM sleep remain unknown, and neither ROM accesses timer-1 registers during boot",
       "evidence": ["docs/mad2_fidelity.md", "tools/mad2_clock_trace_check.py"]
     },
     {
@@ -99,7 +99,7 @@
     },
     {
       "id": "dsp_bootstrap_status_hle", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
-      "boundary": "Fixed reads at shared offsets 0x000..0x004, 0x0e0, 0x0fe and conditionally 0x100 supply the firmware-visible DSP bootstrap state without executing the DSP; ownership is known but transition and reset timing are not",
+      "boundary": "The DSP HLE publishes state into DSPIF-owned shared RAM rather than overriding reads: both 3210 ROMs complete 64 alternating 0x0fe/0x100 acknowledgements before the peer publishes ready words 0x000..0x004, and command 4 clears busy word 0x0e0; no DSP core executes and physical response timing remains unknown",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md"]
     },
     {
@@ -129,7 +129,7 @@
     },
     {
       "id": "display_profile_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
-      "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; record-0 byte 5 becomes active slot 7 at 0x11fc87. All collected records are erased, so the generated EEPROM supplies only this recovered field as value 4 through the normal NV path and leaves unknown bytes erased",
+      "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; record-0 byte 5 becomes active slot 7 at 0x11fc87. An erased-profile control loads 0xff with no firmware fallback and leaves the panel blank, so the generated EEPROM supplies only the recovered value 4 through normal NV loading and leaves unknown bytes erased",
       "evidence": ["docs/eeprom_analysis.md", "docs/mmi_layer.md", "docs/normalization_status.md"]
     }
   ]

@@ -229,7 +229,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				machine().time().as_double());
 	// TRACE_TASKS (opt-in): app-task liveness tap. Log the first time each RTOS task reaches
 	// the universal recv 0x26a458 (i.e. is scheduled and runs its message loop). Under the deep profile
-	// stack this shows which of the app tasks 10-17 (resumed by mode-0xc's 0x2795e6) actually come
+	// stack this shows which of the app tasks 10-17 actually reach their receive loops.
 	// alive. Task id = [0x100022]. docs/mmi_settlement.md app-task sweep.
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x0026a458)
 	{

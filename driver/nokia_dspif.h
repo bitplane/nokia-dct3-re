@@ -21,6 +21,8 @@ public:
 	auto tx_commit_cb() { return m_tx_commit_cb.bind(); }
 	auto service_pending_cb() { return m_service_pending_cb.bind(); }
 	auto doorbell_cb() { return m_doorbell_cb.bind(); }
+	auto bootstrap_fe_cb() { return m_bootstrap_fe_cb.bind(); }
+	auto bootstrap_100_cb() { return m_bootstrap_100_cb.bind(); }
 	auto fiq0_cb() { return m_fiq0_cb.bind(); }
 	auto service_irq_cb() { return m_service_irq_cb.bind(); }
 
@@ -28,6 +30,7 @@ public:
 
 	u16 shared_r(offs_t offset);
 	void shared_w(offs_t offset, u16 data, u16 mem_mask = ~0);
+	void peer_shared_w(offs_t offset, u16 data);
 	u8 dspif_r(offs_t offset) const;
 	void dspif_w(offs_t offset, u8 data);
 
@@ -36,7 +39,6 @@ public:
 	bool enqueue_rx_packet(u8 type, const u8 *payload, unsigned payload_length);
 	void notify_rx();
 	u16 service_pending() const;
-	u16 shared_value(offs_t offset) const { return m_ram[offset & 0x7ff]; }
 	void complete_service();
 	u8 run_conformance_checks();
 
@@ -59,6 +61,8 @@ private:
 	devcb_write_line m_tx_commit_cb;
 	devcb_write_line m_service_pending_cb;
 	devcb_write_line m_doorbell_cb;
+	devcb_write_line m_bootstrap_fe_cb;
+	devcb_write_line m_bootstrap_100_cb;
 	devcb_write_line m_fiq0_cb;
 	devcb_write_line m_service_irq_cb;
 	u16 m_ram[0x800] = { 0 };

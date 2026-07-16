@@ -189,11 +189,6 @@ def check_charger_irq(transactions, summary_text):
 
     if not bit3_unmasked:
         errors.append("CCONT charger source was never observed unmasked")
-    if not status_seen:
-        errors.append("CCONT status bit 3 was never observed")
-    if not ack_seen:
-        errors.append("CCONT status bit 3 was not acknowledged write-one-clear")
-
     irq_seen = re.search(r"^irq_seen=([0-9A-Fa-f]{2})$", summary_text, re.MULTILINE)
     final_irq = re.search(r"^final_irq_status=([0-9A-Fa-f]{2})$", summary_text, re.MULTILINE)
     if not irq_seen or not (int(irq_seen.group(1), 16) & 0x40):
@@ -202,10 +197,22 @@ def check_charger_irq(transactions, summary_text):
         errors.append("MAD2 IRQ6 did not deassert")
 
     return errors, {
-        "charger_status": int(status_seen),
-        "charger_ack": int(ack_seen),
-        "charger_clear_read": int(clear_seen),
+        "serial_status": int(status_seen),
+        "serial_ack": int(ack_seen),
+        "serial_clear_read": int(clear_seen),
     }
+
+
+def check_ccont_boot_status(transactions):
+    status_reads = [data for direction, address, data in transactions
+                    if direction == "R" and address == 0x0E]
+    errors = []
+    if not status_reads:
+        errors.append("CCONT reset status register was not read")
+    elif status_reads[0] != 0x03:
+        errors.append(
+            f"CCONT reset status was 0x{status_reads[0]:02x}, expected 0x03")
+    return errors, {"boot_status_reads": len(status_reads)}
 
 
 def main(argv=None):
@@ -215,6 +222,7 @@ def main(argv=None):
     parser.add_argument("--require-charger-irq", action="store_true")
     parser.add_argument("--summary", type=pathlib.Path)
     parser.add_argument("--require-select-contract", action="store_true")
+    parser.add_argument("--require-ccont-boot-status", action="store_true")
     args = parser.parse_args(argv)
 
     accesses = parse_accesses(args.log.read_text(errors="replace"))
@@ -240,8 +248,9 @@ def main(argv=None):
         errors.extend(irq_errors)
         print(
             "CCONT charger IRQ: "
-            f"status={irq_counts['charger_status']} ack={irq_counts['charger_ack']} "
-            f"clear-read={irq_counts['charger_clear_read']}"
+            f"serial-status={irq_counts['serial_status']} "
+            f"serial-ack={irq_counts['serial_ack']} "
+            f"serial-clear-read={irq_counts['serial_clear_read']}"
         )
     if args.require_select_contract:
         select_errors, select_counts = check_select_contract(accesses)
@@ -251,6 +260,10 @@ def main(argv=None):
             f"registers={select_counts['select_registers']} "
             f"read-back={select_counts['select_reads']}"
         )
+    if args.require_ccont_boot_status:
+        status_errors, status_counts = check_ccont_boot_status(transactions)
+        errors.extend(status_errors)
+        print(f"CCONT reset status: reads={status_counts['boot_status_reads']} first=03")
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)

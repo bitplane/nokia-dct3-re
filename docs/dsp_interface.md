@@ -20,7 +20,7 @@ boot frontier: ordinary SIM initialization now runs after service startup.
 
 | MMIO | region | driver | boot usage |
 |---|---|---|---|
-| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | extracted partial transport; DSP HLE supplies the explicit bootstrap read overlay |
+| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | extracted partial transport; DSP HLE publishes bootstrap state into the same backing RAM |
 | `0x30000–0x30003` | **DSPIF** control register | retained by `nokia_dspif_device::dspif_r/w` | early initialization plus repeated command-4 doorbells from shared-control and L1 send paths |
 | `0x40000–0x40003` | MCUIF (memory-range config) | retained by `mad2_mcuif_r/w` | early config value `6a 0f 61 20` |
 
@@ -50,8 +50,8 @@ remain part of the partial peer contract.
 | offset | what | evidence |
 |---|---|---|
 | `[0x00–0x24]` | **self-test / RAM echo region** | written with a walking pattern at `0x295f48`, read back + compared at `0x295fc0`/`0x295fd6`. A RAM test of the shared window; passes trivially against a real backing store. |
-| `[0x00–0x04]` | bootstrap-ready reads → `0x01` | explicit peer-device HLE; the firmware reads these as DSP-alive status. |
-| `[0xe0]` → `0x00`, `[0xfe]`/`[0x100]` → `0x01` | **DSP ready/busy flags** | `[0xe0]` is still a read override: firmware sets the backing word before DSPIF command 4, but the peer-clear timing is unresolved. `0xe4` is the lower-service pending counter. |
+| `[0x00–0x04]` | bootstrap-ready words → `0x01` | the peer publishes all three after the observed 64-exchange download handshake; firmware reads ordinary shared RAM. |
+| `[0xe0]` → `0x00`, `[0xfe]`/`[0x100]` → `0x01` | **DSP ready/busy flags** | MCU zero-writes to `0xfe`/`0x100` request peer acknowledgements. DSPIF command 4 clears peer-owned busy word `0xe0`; `0xe4` is the lower-service pending counter. |
 | `[0xf6–0x102]` | **config words** (`0x0100 0x0300 0x0001 0x0000 0x0001 0x0001 0x0200`) | 7 individual writes at `0x290a44–0x290a64`. |
 | `[0x200–0x600]` | **coefficient/parameter table** (512 halfwords) | strided copy at `0x290a94`: reads one halfword per 0x20-byte record from flash `0x200040`, packs into `[0x200+]`. |
 | `[0xe00+]` | **second blob** (~240+ halfwords) | ARM block-copy (`stmia`) at `0x2b5bd0` (reached via `bx pc` ARM-mode switch). |
@@ -142,8 +142,9 @@ writes command 4 to DSPIF, and rings doorbell byte 2 at `0x20008`.
 IRQ 4 enters `0x291068`. That routine handles the shared service counts at `[0xda]`,
 `[0xe2]`, and `[0xe4]`; it does not parse a command-`0x30`/`0x32` reply payload. A trial which
 exposed `[0xe0]=1` until the existing 5 ms service tick regressed the deep boot, so that delay
-is disproved. The historical idle read override remains until the actual doorbell-completion
-timing is recovered; do not tune a delay merely to reproduce the oracle.
+is disproved. The HLE peer now acknowledges command 4 by publishing zero into
+the backing word synchronously. The physical DSP latency remains unknown; do
+not tune a delay merely to reproduce the oracle.
 
 ### Shared packet rings
 

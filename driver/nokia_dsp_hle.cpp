@@ -16,18 +16,32 @@ void nokia_dsp_hle_device::device_start()
 {
 	m_service_timer = timer_alloc(FUNC(nokia_dsp_hle_device::service_tick), this);
 	m_packet_timer = timer_alloc(FUNC(nokia_dsp_hle_device::packet_tick), this);
+	m_response_timer = timer_alloc(FUNC(nokia_dsp_hle_device::response_tick), this);
 	save_item(NAME(m_service_enabled));
 	save_item(NAME(m_external_service_enabled));
 	save_item(NAME(m_service_delay_ms));
 	save_item(NAME(m_service_tick_ms));
 	save_item(NAME(m_service_control_completion_sent));
+	save_item(NAME(m_bootstrap_exchange_count));
 }
 
 void nokia_dsp_hle_device::device_reset()
 {
 	m_service_timer->adjust(attotime::never);
 	m_packet_timer->adjust(attotime::never);
+	m_response_timer->adjust(attotime::never);
 	m_service_control_completion_sent = false;
+	m_bootstrap_exchange_count = 0;
+	publish_bootstrap_state();
+}
+
+void nokia_dsp_hle_device::publish_bootstrap_state()
+{
+	// Transition timing is not recovered. Publish the minimum reset-visible DSP
+	// state synchronously, through DSPIF-owned shared RAM, before the MCU starts.
+	m_transport->peer_shared_w(0x0e0 / 2, 0);
+	m_transport->peer_shared_w(0x0fe / 2, 1);
+	m_transport->peer_shared_w(0x100 / 2, 1);
 }
 
 void nokia_dsp_hle_device::tx_commit_w(int state)
@@ -44,25 +58,30 @@ void nokia_dsp_hle_device::service_pending_w(int state)
 
 void nokia_dsp_hle_device::doorbell_w(int state)
 {
+	if (state && m_transport->dspif_r(0) == 0 && m_transport->dspif_r(1) == 4)
+		m_transport->peer_shared_w(0x0e0 / 2, 0);
 	if (state && m_trace_enabled)
 		logerror("dsp_hle: doorbell pending=%04x t=%.6f\n",
 				m_transport->service_pending(), machine().time().as_double());
 }
 
-u16 nokia_dsp_hle_device::bootstrap_r(offs_t offset, u16 backing)
+void nokia_dsp_hle_device::bootstrap_fe_w(int state)
 {
-	offset &= 0x7ff;
-	if (offset <= (0x004 / 2))
-		return 1;
-	if (offset == (0x0e0 / 2))
-		return 0;
-	if (offset == (0x0fe / 2))
-		return 1;
-	if (offset == (0x100 / 2) &&
-			(m_transport->shared_value(0x1c8 / 2) < (0x100 / 2) ||
-			 m_transport->shared_value(0x1ca / 2) < (0x100 / 2)))
-		return 1;
-	return backing;
+	if (state)
+		m_transport->peer_shared_w(0x0fe / 2, 1);
+}
+
+void nokia_dsp_hle_device::bootstrap_100_w(int state)
+{
+	if (state)
+	{
+		m_transport->peer_shared_w(0x100 / 2, 1);
+		if (++m_bootstrap_exchange_count == 64)
+		{
+			for (offs_t offset = 0; offset <= (0x004 / 2); offset++)
+				m_transport->peer_shared_w(offset, 1);
+		}
+	}
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
@@ -74,14 +93,40 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
 void nokia_dsp_hle_device::drain_responses()
 {
 	nokia_external_service_peer_device::response response;
-	while (m_external_peer->peek_response(response))
+	// The DSP-facing service link is serialized. Delivering the entire peer
+	// queue on one timer edge can reorder firmware lifecycle work around its
+	// scheduler delays even though the individual frames are valid.
+	if (m_external_peer->peek_response(response) &&
+			m_transport->enqueue_rx_packet(response.type, response.payload.data(), response.length))
 	{
-		if (!m_transport->enqueue_rx_packet(response.type, response.payload.data(), response.length))
-			break;
+		if (m_trace_enabled)
+			logerror("dsp_hle: peer RX type=%02x length=%u t=%.6f\n",
+					response.type, response.length, machine().time().as_double());
 		m_external_peer->consume_response();
 		if (response.notify)
 			m_transport->notify_rx();
 	}
+}
+
+void nokia_dsp_hle_device::schedule_response()
+{
+	nokia_external_service_peer_device::response response;
+	if (m_response_timer->remaining().is_never() && m_external_peer->peek_response(response))
+	{
+		if (m_trace_enabled)
+			logerror("dsp_hle: peer RX scheduled length=%u delay=%.6f t=%.6f\n",
+					response.length, attotime::from_ticks(response.length * 10, 9'600).as_double(),
+					machine().time().as_double());
+		m_response_timer->adjust(attotime::from_ticks(response.length * 10, 9'600));
+	}
+}
+
+TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::response_tick)
+{
+	drain_responses();
+	nokia_external_service_peer_device::response response;
+	if (m_external_peer->peek_response(response))
+		m_response_timer->adjust(attotime::from_ticks(response.length * 10, 9'600));
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
@@ -110,7 +155,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 			m_transport->consume_tx_packet(packet);
 		}
 		m_external_peer->tick();
-		drain_responses();
+		schedule_response();
 	}
 	m_packet_timer->adjust(attotime::from_msec(m_service_tick_ms));
 }

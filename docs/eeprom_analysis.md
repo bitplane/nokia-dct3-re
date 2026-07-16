@@ -92,9 +92,8 @@ loads variants 0..2 into three records at RAM `0x112188`.
 
 For the active v6.00 path, `0x29a768` copies record-0 byte 5 (`0x11218d`) to
 active-profile byte 7 (`0x11fc87`). Setup-message initializer `0x2b1e80` tests
-that byte against `4`. The driver override is implemented on the low byte lane
-of the halfword at `0x11fc86`; it therefore changes logical byte `0x11fc87`,
-not byte `0x11fc86`.
+that byte against `4`. The generated EEPROM supplies the source byte; the
+driver does not intercept the later RAM read.
 
 All four collected 3210 EEPROM images have the applicable three-record range
 erased, so no complete factory record is available. The generated profile now
@@ -103,6 +102,14 @@ the field whose ownership and consumer are statically recovered. Firmware loads
 that byte through I2C/NV, copies it to active slot 7 and selects the 3210 LCD
 setup without a RAM-read override. The later profile-update handler `0x29ae68`
 does not execute during coherent boot. `make verify-display` checks this path.
+
+An otherwise identical negative-control run with all three records left erased
+loaded `0xff` into active slot 7 and did not enter the update handler or any
+firmware fallback. The later setup emitted commands that the PCD8544 rejected
+and the final panel remained blank. Descriptor `0x0749` is therefore required
+product provisioning rather than a hardware register default. Until an
+authentic configured record is available, supplying only the recovered value
+`4` and leaving the other 35 bytes erased is the smallest evidenced fixture.
 
 Both collected 3210 images have erased bytes across the descriptor-2/3/4 range,
 so this ROM substitutes its validated defaults. The source-7 gain denominator is

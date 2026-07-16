@@ -10,7 +10,7 @@ same frame.
 `mame_noki3210_input_exerciser.lua` writes a deterministic summary to
 `NOKI3210_BOOT_SUMMARY`. `make run` places it at
 `RUN_DIR/boot_summary.txt`; `make verify` checks the semantic predicates in
-`oracles/noki3210-default.struct` after checking the exact frame hash. That target
+`oracles/noki3210-default.struct` without requiring an LCD frame. That target
 explicitly disables the 3210 peer devices and is a negative failure baseline.
 `make verify-frontier` checks the machine-default request-driven
 external-service/SIM composition against `oracles/noki3210-frontier.struct`.
@@ -18,8 +18,14 @@ external-service/SIM composition against `oracles/noki3210-frontier.struct`.
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon
 region is excluded; the text, softkey, layout and remaining pixels are protected.
-This is the interactive MMI oracle; the fault-frame oracle remains a useful
-explicit negative control.
+This is the interactive MMI oracle; the semantic missing-hardware profile remains
+an explicit negative control.
+The task running at the final emulation tick is deliberately excluded. Moving
+DSP bootstrap-ready state from read overlays to the observed 64-exchange peer
+handshake shifted boot by about 140 ms without changing durable state or the
+stable menu frame; the fixed cutoff consequently sampled scheduler idle
+`0xff` instead of task 1. Startup mode, service/SIM state, resets and hardware
+activity remain protected.
 `make verify-3210-v501` runs the same-product v5.01 control with a BIOS-specific
 EEPROM profile and checks `oracles/noki3210-v501-smoke.struct`.
 `make verify-mad2-interrupts` runs three non-oracle controller conformance
@@ -27,9 +33,10 @@ fixtures: overlapping physical keypad/charger sources, an IRQ held pending
 behind its masks, and register-enabled extended FIQ8 routing. The fixtures use
 only input ports and mapped MAD2 registers; their bounded trace checker does
 not treat timing-sensitive interrupt totals as structural-oracle fields.
-`make verify-mad2-clocks` checks both 3210 ROMs against the observed reset,
-watchdog and clock-control boot sequence and asserts that neither boot accesses
-the timer-1 register window. This is a negative register-coverage contract, not
+`make verify-mad2-clocks` checks both 3210 ROMs against the observed reset-cause
+read, organic watchdog service and SIM peripheral-clock gate lifecycle, and asserts that
+neither boot accesses the timer-1 register window. Its 12-second window reflects
+physical Timer-0 pacing. This is a negative register-coverage contract, not
 validation of the independently running timer-1 overflow source.
 `make verify-mbus` checks the identical v6.00/v5.01 receive-mode
 initialization, asserts that ordinary boot transmits no bytes, and uses one
@@ -93,8 +100,9 @@ externally terminated research run.
 
 ## Default profile
 
-The exact latest nonblank LCD frame retains SHA-256 prefix
-`d8a9a7a58e587be8`. Its semantic subset requires the expected reset count,
+The historical CONTACT SERVICE frame with SHA-256 prefix `d8a9a7a58e587be8`
+is not an acceptance oracle: corrected watchdog and peer startup behavior makes
+the missing-hardware profile stop before that presentation state. Its semantic subset requires
 GENSIO controls, startup modes, running task, mode/flags, service-session status, and
 SIM gates. LCD, IRQ, CCONT, and EEPROM counts remain in the generated summary
 for diagnosis without making timing-dependent totals part of acceptance.

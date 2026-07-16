@@ -38,10 +38,10 @@ The device boundary is classified by evidence level:
 | --- | --- | --- |
 | CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status belongs to the separate serial controller, not CCONT. |
 | Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
-| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | A charger-input fixture latches established source bit 3, exercises MAD2 IRQ6 and the firmware ISR, and proves write-one-clear acknowledgement and deassertion. PWRONX bit 1 is established; the opt-in bit-0 presence overlay is provisional. |
+| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. A charger-input fixture exercises edge-latched MAD2 IRQ6 delivery and controller acknowledgement; the bounded firmware lifecycle does not serially consume source bit 3. |
 | ADC selector values | Working fixture | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. `ADC_PROFILE` is test provisioning, not a battery model. |
 | RTC registers `0x7..0xa` | Partial | A deterministic one-second clock supplies binary second/minute/hour/day counters. ROM arithmetic establishes binary encoding; month/calendar persistence remains outside the recovered interface. |
-| Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input; the default profile grounds it pending the missing steady-state firmware service. |
+| Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input and is released in the 3210 profile; both ROMs survive beyond the maximum window through organic reloads. |
 | Other register storage | Compatibility behavior | Registers without mapped semantics retain written bytes so firmware-visible transactions compose. Storage must not be interpreted as a proved hardware contract. |
 
 No direct firmware state is changed by the CCONT device. The main fidelity risk
@@ -91,10 +91,10 @@ not prove that physical GENSIO or CCONT has zero latency.
 | `0x7..0xa` | RTC second/minute/hour/day | Binary counters; roles and encoding established from the firmware helper block. |
 | `0xb..0xc` | RTC alarm minute/hour | Partial one-shot comparison; programming either field arms it. |
 | `0xd` | clock gates | Stored latch; effects not recovered. |
-| `0xe` | interrupt/reset status | Proven role. Cold power-key reset latches PWRONX as bit 1 (`0x02`); upper bits `0xf8` are interrupt sources. Bit 0 remains an opt-in presence overlay. |
+| `0xe` | interrupt/reset status | Cold power-key reset exposes ready bit 0 and PWRONX cause bit 1 (`0x03`); bit 0 persists while bit 1 and upper interrupt sources are write-one-to-clear. |
 | `0xf` | interrupt mask | Strongly inferred from firmware ISR behavior. |
 
-Writing interrupt-status bits clears them. The IRQ output is active when
+Writing PWRONX or upper interrupt-status bits clears them. The IRQ output is active when
 `status & ~mask & 0xf8` is nonzero; the low reset/presence bits do not assert
 it. MAD2 owns the resulting CPU interrupt assertion. The default-inactive
 `CHARGER` input latches established source bit 3 on connection; disconnection
@@ -201,36 +201,31 @@ hardware watchdog disable belongs to the separate board-level `WDDISX` pin.
 These semantics and the 32-second default/64-second maximum are documented in
 the [Nokia NSE-8/9 System Module technical documentation](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/3210/ch2sys%20%5B103%5D.pdf).
 
-An enabled-watchdog coherent run now survives the former 32-second false expiry, but
-no steady-state firmware service occurs before the corrected 49-second window
-expires. The restart replays the startup `0x20`/`0x31` sequence. The retained
-default WDDISX-grounded scenario therefore represents a missing
-software-timing/service lifecycle, not uncertainty about the CCONT counter
-arithmetic; it must not be replaced by lengthening or freezing the counter.
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
-phone has the watchdog enabled, so the grounded default is explicitly debt,
-not a recovered board strap.
+phone has the watchdog enabled, so the 3210 product profile leaves WDDISX
+released. `NOKI3210_CCONT_WDDISX_GROUNDED=1` remains a physical-input scenario
+for negative comparisons, not the boot default.
 
 The firmware service helper at `0x2b4dc0` accepts a mask: bit 0 reloads the
 MAD2 watchdog and bit 1 writes `0x31` through logical CCONT descriptor 6,
 which GENSIO maps to physical register 5. A focused v6.00 run observes three
 CCONT-only calls from the startup/NV state machine at 12--13 ms and one
 combined MAD2/CCONT call from task 2 at 0.834 s. It observes no later call
-before expiry. The helper also appears as Thumb pointer `0x2b4dc1` in the ROM
-function table at `0x2dfc80`, but that table membership alone does not prove a
-periodic owner. Direct callers cover startup/NV work and the external-service
-D9 poll; the remaining question is which firmware-owned schedule should invoke
-the exported helper after startup.
+before expiry at the retained Timer-0 calibration. The earlier claimed Thumb
+pointer at `0x2dfc80` was an unaligned halfword match, not a function-table
+entry. All nine direct calls are classified: six belong to one-shot boot/NV
+callback `0x296428`; the steady-state combined call is task 2 at `0x237b2e`.
 
-The working 13 MHz Timer-0 calibration plus a corrected 33,055 Hz free-running
-Timer 1 preserves the interactive menu oracle. An unguarded direct run still
-expires at exactly 49.000 seconds and restarts, proving that Timer-1 overflow
-was not the missing watchdog-service owner. Supplying 33,055 Hz to Timer 0 as
-well makes task 0 dominate and eventually reaches the task-2 reload path, but
-starves the task-17 -> task-20 -> task-21 SIM startup chain and never composes
-with the UI lifecycle. No periodic reload is synthesized pending evidence for
-the firmware-owned schedule.
+Both MAD2 timers now use 33,055 Hz. Task 2 performs combined MAD2/CCONT reloads
+at approximately 3.965-second intervals. With WDDISX released, v6.00 remains
+coherent through a 75-second run and v5.01 through 65 seconds; neither expires
+or resets. The earlier task-17 failure at this rate was not scheduler or
+CCONT behavior: the external-service prototype sent an unsupported command
+`0x64`, result `5`, whose firmware handler deliberately suspends application
+tasks after five scheduler ticks. Without that lifecycle request, task 17
+receives `0x1587`, the task-17 -> task-20 -> task-21 SIM chain completes, and
+no periodic reload or firmware wake is synthesized.
 
 Service-channel provisioning does not control CCONT startup-event delivery.
 Any further CCONT change requires a separately evidenced register, timing, or
@@ -244,9 +239,7 @@ IRQ contract.
    the ADC control byte, polls GENSIO status, and reads the result registers;
    it does not wait for a CCONT interrupt. A synthetic conversion-complete IRQ
    is therefore excluded unless separate hardware evidence establishes one.
-3. Recover the post-startup schedule or callback owner of exported helper
-   `0x2b4dc0`, then stop grounding WDDISX in the default profile. Recover the
-   physical timing of the MAD2 power-key edge separately.
+3. Recover the physical timing of the MAD2 power-key edge separately.
 4. Replace raw environment ADC overrides with typed battery, charger and RF
    scenario inputs while retaining deterministic tests.
 5. Validate remaining register semantics against a working-phone trace or
@@ -257,10 +250,15 @@ remain diagnostic. `make verify-ccont RUN_DIR=<dir>` is the focused
 transport/register gate. Its ordinary run requires endpoint selection,
 command/data pairing, status values `0x03`/`0x07`, both transaction directions,
 and correct ADC packing for all eight `sane` selector fixtures. Its second run
-pulses the charger input and requires status bit 3, MAD2 IRQ6, firmware
-write-one-clear acknowledgement and final IRQ deassertion. GENSIO endpoint/status
+pulses the charger input and requires MAD2 IRQ6 delivery, firmware controller
+acknowledgement and final IRQ deassertion. It records any serial source-bit
+service without requiring one in this bounded lifecycle. GENSIO endpoint/status
 state and CCONT register, command and IRQ state are save-state registered
 together; post-load reconstructs the IRQ output.
+
+`make verify-ccont-watchdog RUN_DIR=<dir>` runs for 55 seconds with WDDISX
+released and requires at least ten combined task-2 reloads, no gap over five
+seconds, no watchdog expiry, and no soft reset.
 
 The focused gate does not yet validate every register reset value, mask changes
 while a source is pending, alarm reprogramming, watchdog expiry, or full

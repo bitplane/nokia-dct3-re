@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the observed MAD2 reset/clock/watchdog boot contract."""
+"""Validate the observed MAD2 reset/peripheral-clock/watchdog boot contract."""
 
 import argparse
 import pathlib
@@ -40,10 +40,16 @@ def check(events):
 
     if not reset_reads or reset_reads[0]["data"] != 0x01:
         errors.append("power-on reset-control value 0x01 was not observed")
-    if not any(e["old"] == 0x01 and e["data"] == 0x05 for e in reset_writes):
-        errors.append("reset-control bit-2 lifecycle write 0x01 -> 0x05 was not observed")
+    if any(e["old"] != 0x01 or e["data"] != 0x05 for e in reset_writes):
+        errors.append("reset-control write differed from the observed 0x01 -> 0x05 lifecycle transition")
     if clock_writes[:2] != [0x0C, 0x2C]:
-        errors.append(f"clock-control boot sequence was {clock_writes[:2]}, expected [12, 44]")
+        errors.append(f"clock-gate boot sequence was {clock_writes[:2]}, expected [12, 44]")
+    try:
+        sim_clock_on = clock_writes.index(0x2C)
+        sim_clock_off = clock_writes.index(0x0C, sim_clock_on + 1)
+    except ValueError:
+        errors.append("SIM clock gate did not complete the observed 0x0c -> 0x2c -> 0x0c lifecycle")
+        sim_clock_on = sim_clock_off = None
     if not watchdog_writes or any(e["data"] != 0x31 for e in watchdog_writes):
         errors.append("MAD2 watchdog service writes were absent or not 0x31")
     if timer1_accesses:
@@ -53,6 +59,7 @@ def check(events):
         "reset_reads": len(reset_reads),
         "reset_writes": len(reset_writes),
         "clock_writes": len(clock_writes),
+        "sim_clock_lifecycle": sim_clock_on is not None and sim_clock_off is not None,
         "watchdog_writes": len(watchdog_writes),
         "timer1_accesses": len(timer1_accesses),
     }

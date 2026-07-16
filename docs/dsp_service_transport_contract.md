@@ -22,16 +22,23 @@ The implementation now has three explicit owners:
 
 1. `nokia_dspif_device` owns shared RAM, DSPIF, ring indices, packet framing and
    FIQ0/IRQ4-facing completion;
-2. `nokia_dsp_hle_device` owns shared-service cadence, bootstrap read
+2. `nokia_dsp_hle_device` owns shared-service cadence, stateful bootstrap
    publications and the established type-`0x70` completion;
 3. `nokia_external_service_peer_device` owns discovery, class-`0x40` session
    correlation, channel map and healthy-state sequencing.
 
 The transport contains no service commands or session state. The external peer
 contains no shared-RAM offsets, ring arithmetic or interrupt ownership. The
-100 us producer wakeup, 5 ms service ticks, bootstrap read overlay and 36-tick
+100 us producer wakeup, 5 ms service ticks, synchronous bootstrap replies and 36-tick
 external-session delay remain calibrated prototype behavior rather than
 protocol constants.
+
+Bootstrap no longer overlays MCU reads. The MCU first verifies ordinary shared
+RAM, then performs 64 alternating zero-write/peer-acknowledgement exchanges at
+`0x0fe` and `0x100`. The peer publishes ready words `0x000..0x004 = 1` when the
+exchange completes. Both 3210 ROMs reproduce this state transition. Command 4
+similarly causes the peer to clear busy word `0x0e0` in backing RAM. Publication
+latency remains HLE policy because no DSP timing oracle is available.
 
 DSPIF command 4 is the hardware doorbell for several DSP-owned activities, but
 it is not the only observed work boundary. Service-transport ring delivery and

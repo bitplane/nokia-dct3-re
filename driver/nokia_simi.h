@@ -40,6 +40,7 @@ private:
 	emu_timer *m_rx_timer = nullptr;
 	bool m_enabled = false;
 	u8 m_control = 0;
+	// Card-response serialization queue, not firmware-visible FIFO capacity.
 	u8 m_rx_fifo[320] = { 0 };
 	u16 m_rx_head = 0;
 	u16 m_rx_tail = 0;

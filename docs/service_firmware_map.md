@@ -68,8 +68,10 @@ message bypasses address learning and completion ownership.
 
 `contact_response_code_70_71_handler_23670c` applies incoming channel maps.
 `external_service_response_dispatch_237400` dispatches the command byte at
-`message[+8]`. The current peer supplies result-1 discovery, a `0x70` channel
-map, result-5 healthy completion, and correlated transport acknowledgements.
+`message[+8]`. The current peer supplies result-1 registration, a `0x70` channel
+map, and correlated transport acknowledgements. It does not send result 5:
+that result requests a delayed application-task suspension rather than ordinary
+startup completion.
 
 | Address | Symbolic role |
 | --- | --- |

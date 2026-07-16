@@ -26,8 +26,8 @@ special cases.
 The 3210 firmware executes deeply enough to initialize the CPU, MAD2 peripherals, CCONT, display,
 EEPROM paths, RTOS tasks, external-service machinery, and a substantial SIM conversation. The
 validated CCONT, DSP-service, external-service and SIM devices are enabled by the 3210 machine
-profile rather than an environment-variable stack. An explicit peer-disabled negative profile
-still reproduces the authentic **CONTACT SERVICE** frame and is protected by a byte-exact oracle.
+profile rather than an environment-variable stack. An explicit missing-hardware negative profile
+is protected by semantic boot predicates without requiring a particular failure screen.
 
 The coherent modeled profile reaches a verified interactive desktop. The SIM
 completes ordinary non-CPHS initialization, provisioned identity data removes
@@ -152,8 +152,8 @@ make verify
 make swap16
 ```
 
-`make verify` boots the default 3210 profile and checks the promoted LCD frame against oracle
-`d8a9a7a58e587be8`. Peer models and diagnostic traces are opt-in through `NOKI3210_*` environment
+`make verify` boots the explicit missing-hardware profile and checks its semantic predicates.
+Peer models and diagnostic traces are opt-in through `NOKI3210_*` environment
 variables. They must not be enabled when establishing a new ROM's hardware baseline.
 
 ## Engineering Rules

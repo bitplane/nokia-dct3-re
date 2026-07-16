@@ -13,14 +13,16 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_3210_owns_validated_boot_defaults(self):
         self.assertIn(
-            "constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true };",
+            "constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, false };",
             self.driver,
         )
         profile = self.driver.split("void noki3310_state::noki3210(machine_config &config)", 1)[1]
         profile = profile.split("void noki3310_state::noki5210", 1)[0]
-        self.assertIn("m_mad2->set_timer0_hz(13'000'000);", profile)
+        self.assertIn(
+            'm_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 33\'055));',
+            profile,
+        )
         self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
-        self.assertNotIn('"NOKI3210_TIMER0_HZ"', profile)
         self.assertNotIn('"NOKI3210_TIMER0_CATCHUP"', profile)
         self.assertIn('"NOKI3210_MODEL_DSP_SERVICE", 1', profile)
         self.assertIn('"NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 1', profile)
@@ -35,11 +37,11 @@ class MachineProfileTest(unittest.TestCase):
         target = self.makefile.split("CONTACT_SERVICE_ENV :=", 1)[1].split("\n\n", 1)[0]
         for model in (
             "MODEL_DSP_SERVICE",
-            "MODEL_CCONT_PRESENT",
             "MODEL_EXTERNAL_SERVICE_PEER",
             "MODEL_SIM_DEVICE",
         ):
             self.assertIn(f"NOKI3210_{model}=0", target)
+        self.assertIn("NOKI3210_CCONT_READY=0", target)
         self.assertIn("verify: RUN_ENV=$(CONTACT_SERVICE_ENV)", self.makefile)
 
     def test_3210_buzzer_uses_mad2_pup_and_divider(self):
