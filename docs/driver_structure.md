@@ -28,7 +28,8 @@ shared RAM, DSPIF, packet rings and FIQ0/IRQ4 signaling;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
 session. The phone state only wires their callbacks to MAD2.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
-connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0 and
+connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0,
+declared file metadata, persistent mutable card records and
 the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI core at
 offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrupt
 pending/masks, and ARM IRQ/FIQ routing. Attached devices signal it through

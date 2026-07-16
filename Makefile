@@ -77,7 +77,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -109,6 +109,7 @@ help:
 	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
 	@echo "make verify-mmi-menu reproduce the provisioned interactive Phone book menu"
 	@echo "make verify-mmi-menu-501 reproduce the same menu under the v5.01 BIOS"
+	@echo "make verify-sim-phonebook save and reload an organic persistent SIM contact"
 	@echo "make verify-buzzer exercise the MAD2 piezo gate/divider MMIO contract"
 	@echo "make mad2-census MAD2_LOG=... summarize a bounded MAD2 ledger trace"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
@@ -210,7 +211,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -236,6 +237,9 @@ run-manifest-3330:
 prepare-run-nvram: build
 	@if [ "$(PHONE)" = "noki3210" ]; then \
 		mkdir -p "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)"; \
+		if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
+			rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card"; \
+		fi; \
 		if [ "$(PRESERVE_NVRAM)" != "1" ] || [ ! -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom" ]; then \
 			cp "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)" \
 				"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
@@ -498,6 +502,32 @@ verify-mmi-menu-501:
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --mask 23,23,20,12 \
 		--sha256 $(ORACLE_MMI_MENU_STABLE_SHA)
 	@echo "OK — v5.01 interactive Phone book menu reproduced"
+
+verify-sim-phonebook:
+	@set -e; \
+	save_dir="$(RUN_DIR)_phonebook_save"; \
+	reload_dir="$(RUN_DIR)_phonebook_reload"; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR="$$save_dir" SECONDS=32 \
+		PRESERVE_NVRAM=0 PROVISIONED_IMEI_PREFIX=49015420323751 \
+		RUN_ENV='NOKI3210_TRACE_SIM_RX=1 NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=70 NOKI3210_POST_READY_KEY_GAP_MS=180 NOKI3210_POST_READY_KEYS=enter,wait700,enter,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKI3210_POST_READY_CAPTURE_DELAY_MS=2500'; \
+	cp "$(MAME_DIR)/error.log" "$$save_dir/error.log"; \
+	$(PYTHON) tools/sim_phonebook_check.py "$$save_dir/error.log" \
+		"$$save_dir/nvram/$(NVRAM_SYSTEM)/sim_card"; \
+	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR="$$reload_dir" SECONDS=24 \
+		PRESERVE_NVRAM=1 PROVISIONED_IMEI_PREFIX=49015420323751 \
+		RUN_NVRAM_DIR="$(abspath $(RUN_DIR)_phonebook_save/nvram)" \
+		RUN_ENV='NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEYS=enter,wait700,enter,wait700,enter,wait700,enter NOKI3210_POST_READY_CAPTURE_DELAY_MS=2500'; \
+	frame=$$(find "$$reload_dir" -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no reloaded phonebook frame produced"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --mask 23,23,20,12 \
+		--sha256 c496d0162ee327f35d8e8440535fd70462263f034cdd7fffde5db2872e754a07
+	@echo "OK — firmware saved ADA/123 to EF_ADN and rendered it after a SIM-NVRAM reload"
 
 FRONTIER_STABILITY_RUNS ?= 3
 FRONTIER_STABILITY_STRICT ?= 0

@@ -35,18 +35,20 @@ It must not provide behavior owned by phone firmware or the GSM/baseband peer:
 
 ## Implemented hardware path
 
-`nokia_sim_card_device` currently implements both sides of the prototype seam:
-the driver forwards the MAD2 SIM register block into its UART/FIFO/IIR half,
-and its card half consumes and returns serial bytes. Firmware receives those
-bytes through the normal FIQ6 path. The combined device currently supports:
+The implementation has two composed devices. `nokia_simi_device` owns the
+MAD2 UART/FIFO/IIR register block and FIQ6. `nokia_sim_card_device` consumes
+and returns serial bytes at that boundary and owns the removable card state.
+The card currently supports:
 
 - configurable ATR with the default `3b 10 05`;
 - PPS echo;
 - T=0 command header/body sequencing;
 - SELECT and GET RESPONSE for MF, DF_GSM, and known EFs;
 - STATUS for the current directory;
-- READ BINARY/RECORD with a minimal coherent GSM filesystem;
-- save-state coverage for transport and selection state.
+- READ BINARY and linear-fixed READ/UPDATE RECORD with a declared GSM
+  filesystem;
+- a persistent 50-record `EF_ADN` synthetic profile; and
+- save-state coverage for transport, selection and mutable card contents.
 
 The organic 3210 conversation currently reaches:
 
@@ -81,20 +83,38 @@ MF/DF GSM-specific response layout let firmware leave that preliminary cycle.
 Do not suppress a STATUS command ad hoc; model its response and the directory
 metadata correctly.
 
+## Persistent ADN contract
+
+The base synthetic profile allocates and activates GSM 11.11 service 2 in
+`EF_SST`. `EF_ADN (6F3A)` belongs to `DF_TELECOM (7F10)` and contains 50
+32-byte linear-fixed records. The capacity is test-profile policy rather than
+a property of the handset: real SIMs choose their own record count and length.
+
+Firmware discovers the service, reads the EF metadata, scans the records with
+absolute `READ RECORD`, and writes through `UPDATE RECORD`. Mutable records
+are MAME device NVRAM, separate from the handset's 24C128. The card stores the
+32-byte GSM record opaquely; alpha and BCD encoding remain firmware-owned.
+`make verify-sim-phonebook` saves `ADA`/`123` through physical keypad input,
+checks the resulting GSM 11.11 record, restarts with the same card NVRAM and
+requires firmware Search to render the saved name.
+
 ## Remaining card work
 
-The card filesystem is intentionally minimal. Extend it only when an organic
-firmware request establishes a concrete requirement. Likely later work includes:
+The card filesystem covers boot and one complete mutable linear-record path.
+Extend it when an organic firmware request or focused protocol conformance test
+establishes a concrete requirement. Later work includes:
 
-- completing access-condition, invalidation, record-layout, and CHV semantics;
+- completing UPDATE BINARY, SEEK, cyclic/INCREASE, invalidation and CHV
+  semantics;
 - supplying coherent IMSI, SST, LOCI, Kc, FPLMN, AD, SPN and optional EFs;
 - testing card removal, reset, timeout, parity/error, and proactive-SIM status;
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 
-The implementation tracks current DF separately from selected EF. Remaining
+The implementation tracks current DF separately from selected EF and declares
+file parent, size, structure and record length as profile metadata. Remaining
 architectural work is to stabilize controller/card timing and errors and move
-subscriber contents into reusable profiles.
+the remaining subscriber constants into reusable profiles.
 
 The organically requested initialization pass is complete for a non-CPHS
 synthetic card. Unsupported optional files return `94 04` and leave the current

@@ -47,6 +47,14 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertNotIn("from_usec(10)", self.simi + self.simi_header)
         self.assertNotIn("from_usec(100)", self.simi + self.simi_header)
 
+    def test_card_owns_persistent_linear_fixed_adn(self):
+        self.assertIn("public device_nvram_interface", self.card_header)
+        self.assertIn("{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true }", self.card)
+        self.assertIn("Service 2: ADN allocated and activated", self.card)
+        self.assertIn("fcp[8] = 0x01", self.card)
+        self.assertIn("void nokia_sim_card_device::update_record()", self.card)
+        self.assertIn("save_item(NAME(m_adn))", self.card)
+
 
 if __name__ == "__main__":
     unittest.main()

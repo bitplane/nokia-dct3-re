@@ -360,10 +360,15 @@ if #post_keys > 0 then
 			startup_ready_time = emulation_seconds()
 			emu.wait(post_delay)
 			for _, name in ipairs(post_keys) do
-				press(name)
-				emu.wait(post_duration)
-				release(name)
-				emu.wait(post_gap)
+				local wait_ms = string.match(name, "^wait(%d+)$")
+				if wait_ms then
+					emu.wait(tonumber(wait_ms) / 1000)
+				else
+					press(name)
+					emu.wait(post_duration)
+					release(name)
+					emu.wait(post_gap)
+				end
 			end
 			if post_capture_delay >= 0 then
 				emu.wait(post_capture_delay)
@@ -510,12 +515,22 @@ end
 
 -- Keep the semantic oracle current independently of display activity.
 emu.register_periodic(function()
+	if lcd_dirty then
+		pending_lcd = {}
+		queue_lcd_dump()
+		write_lcd_dump()
+		lcd_dirty = false
+	end
 	sample_structural_state()
 	write_boot_summary()
 end)
 
 emu.add_machine_stop_notifier(function()
 	for name in pairs(active_fields) do release(name) end
+	-- Always publish the terminal mirror. Some firmware states update only
+	-- part of the LCD, so no later 504-byte wrap exists for make frame to use.
+	pending_lcd = {}
+	queue_lcd_dump()
 	write_lcd_dump()
 	write_boot_summary()
 end)

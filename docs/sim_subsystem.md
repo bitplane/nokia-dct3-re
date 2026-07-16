@@ -100,9 +100,11 @@ The 3210 machine profile enables the SIMI/card composition. Setting
 implements:
 
 - activation reset, ATR and PPS echo;
-- T=0 SELECT, STATUS, GET RESPONSE, READ BINARY/RECORD and CHANGE CHV sequencing;
-- selected-file state; and
-- synthetic GSM 11.11 file metadata and content.
+- T=0 SELECT, STATUS, GET RESPONSE, READ BINARY, linear-fixed READ/UPDATE
+  RECORD and CHANGE CHV sequencing;
+- current DF, selected EF and record-pointer state;
+- declared GSM 11.11 file metadata and synthetic profile content; and
+- persistent mutable `EF_ADN` contents through MAME device NVRAM.
 
 It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
 device is disabled, SIMI reads and writes retain the legacy behavior used by the
@@ -118,7 +120,8 @@ The implemented surface is classified by ownership and evidence:
 | TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics remain inferred. |
 | IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
-| SELECT/STATUS/GET RESPONSE/READ behavior | Prototype card | It satisfies organically requested initialization and presence polling. Access conditions, invalidation, record semantics, CHV state, errors, reset, and removal are incomplete. |
+| SELECT/STATUS/GET RESPONSE/READ behavior | Prototype card | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. Invalidation, full CHV state, errors and removal are incomplete. |
+| UPDATE RECORD and ADN persistence | Partial card contract | Firmware organically writes a standard 32-byte ADN record and reads it after a card-NVRAM reload. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
 | CHANGE CHV support | Dormant prototype | The procedure/body/status sequence is implemented, but the ordinary boot does not request it and no persistent credential semantics are validated. |
 
@@ -132,6 +135,13 @@ includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`, LOCI `6F7
 prevents the validated preliminary lifecycle from composing. MF/DF STATUS data uses the GSM 11.11
 directory layout, including a `0x15` GSM-specific-data length and CHV status fields; the earlier
 shifted layout caused the firmware to repeat the preliminary pass.
+
+The base `EF_SST` also allocates and activates service 2. `EF_ADN (6F3A)` is
+a synthetic 50-by-32-byte linear-fixed EF under `DF_TELECOM`; its count is card
+profile policy, not handset hardware. The EF response reports structure and
+record length, and the card stores firmware-produced alpha/BCD records without
+interpreting their contents. Ordinary deterministic runs reset this card
+NVRAM; `PRESERVE_NVRAM=1` and `run-interactive` retain it.
 
 ## Current organic result
 
@@ -147,6 +157,12 @@ ATR -> PPS -> preliminary SELECT/STATUS/READ pass
 Observed reads include ICCID, ECC, Phase, LP, SST, IMSI and ACC. SIM-enable byte `[0x111c79]`
 changes to 1 organically at about 1.309 s. This is the first coherent run to pass the preliminary
 card-acceptance transition without firmware-state forcing.
+
+With service 2 advertised, firmware later selects `DF_TELECOM/EF_ADN` and
+scans all 50 records through absolute `A0 B2`. Adding a contact produces
+`A0 DC 01 04 20`; the validated fixture writes `ADA` and number `123` to
+record 1, receives `9000`, displays `Saved`, and renders `ADA` from the same
+card after restart.
 
 `6F14` is the optional CPHS Operator Name String, a transparent default-alphabet field of up to
 the 24 bytes accepted by parser `0x201876`. The card does not advertise CPHS and need not provide
@@ -206,6 +222,8 @@ ordinary boot does not organically request `0x1196`.
 
 - `make verify`: explicit missing-hardware structural oracle.
 - `make run-frontier`: current external-service/SIM research profile.
+- `make verify-sim-phonebook`: organic two-launch ADN update and persistence
+  oracle.
 - `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
 - Stateful-model trace: natural ATR/PPS and the ordinary non-CPHS EF pass, with
   SIM enable rising and the timed presence monitor starting without injected

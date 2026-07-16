@@ -3,6 +3,9 @@
 The LCD frame oracle proves the final visible state. Under `-video none`, the
 Lua harness mirrors the PCD8544 command/data stream and snapshots completed and
 frame-visible states; the phone driver has no parallel capture implementation.
+When firmware gates video frame notifications but continues partial LCD writes,
+the periodic oracle publishes the dirty terminal mirror so `make frame` cannot
+fall back to an early blank boot image.
 The structural oracle
 guards stable mid-boot behavior that can regress while still converging on the
 same frame.
@@ -20,6 +23,12 @@ exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon
 region is excluded; the text, softkey, layout and remaining pixels are protected.
 This is the interactive MMI oracle; the semantic missing-hardware profile remains
 an explicit negative control.
+`make verify-sim-phonebook` extends the interactive gate across a mutable card
+transaction. It enters `ADA`/`123` through physical keypad input, requires the
+firmware to issue an absolute 32-byte `UPDATE RECORD` for `EF_ADN`, validates
+that only record 1 changed, then restarts with the same SIM NVRAM and matches
+the stable pixels of the firmware-rendered `ADA` search result. It does not
+inject an APDU or conflate card storage with the handset EEPROM.
 The task running at the final emulation tick is deliberately excluded. Moving
 DSP bootstrap-ready state from read overlays to the observed 64-exchange peer
 handshake shifted boot by about 140 ms without changing durable state or the

@@ -34,6 +34,20 @@ class KeypadInputTest(unittest.TestCase):
             self.assertIn(f"key_fields.{alias} = key_fields.c", self.harness)
         self.assertIn("key_fields.hash = key_fields.minus", self.harness)
 
+    def test_scripted_sequences_support_emulation_time_waits(self):
+        self.assertIn('string.match(name, "^wait(%d+)$")', self.harness)
+        self.assertIn("emu.wait(tonumber(wait_ms) / 1000)", self.harness)
+
+    def test_shutdown_publishes_the_terminal_lcd_mirror(self):
+        stop = self.harness.split("emu.add_machine_stop_notifier", 1)[1]
+        self.assertIn("queue_lcd_dump()", stop)
+        self.assertLess(stop.index("queue_lcd_dump()"), stop.index("write_lcd_dump()"))
+
+    def test_periodic_oracle_captures_when_video_frames_stop(self):
+        periodic = self.harness.split("emu.register_periodic", 1)[1]
+        self.assertIn("if lcd_dirty then", periodic)
+        self.assertLess(periodic.index("queue_lcd_dump()"), periodic.index("write_lcd_dump()"))
+
     def test_input_remains_physical_matrix_driven(self):
         self.assertIn("field:set_value(1)", self.harness)
         self.assertIn("PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)", self.driver)

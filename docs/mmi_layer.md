@@ -107,10 +107,12 @@ MAME ports or firmware scan.
 
 `make run-interactive` opens the provisioned v6.00 phone in a normal MAME
 window without scripted input. Its NVRAM lives under `run_interactive/nvram`
-and is preserved between launches so firmware-owned phonebook/settings writes
-can be tested across restarts. MAME's Input Settings menu can remap every
-handset control. The headless `run` and `verify-*` targets remain isolated and
-deterministically reseed their own NVRAM.
+and is preserved between launches. Handset settings persist in the emulated
+24C128 EEPROM; SIM phonebook records persist independently in the removable
+card device's NVRAM. MAME's Input Settings menu can remap every handset
+control. The headless `run` and `verify-*` targets remain isolated and
+deterministically reseed their own NVRAM unless a persistence test explicitly
+requests reuse.
 
 ## Firmware consumer
 
