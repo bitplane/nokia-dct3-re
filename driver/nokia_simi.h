@@ -33,8 +33,7 @@ protected:
 
 private:
 	TIMER_CALLBACK_MEMBER(rx_ready);
-	void schedule_card_bytes(bool tx_complete, bool response_added,
-			attotime delay = attotime::from_usec(10));
+	void schedule_card_bytes(bool tx_complete, bool response_added);
 
 	required_device<nokia_sim_card_device> m_card;
 	devcb_write_line m_irq_cb;

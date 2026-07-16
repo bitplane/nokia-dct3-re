@@ -11,7 +11,6 @@ public:
 	auto fiq2_cb() { return m_fiq2_cb.bind(); }
 	auto fiq3_cb() { return m_fiq3_cb.bind(); }
 
-	void set_byte_delay(attotime delay) { m_byte_delay = delay; }
 	void set_trace(bool enabled) { m_trace = enabled; }
 
 	u8 read(offs_t offset);
@@ -39,7 +38,7 @@ private:
 	devcb_write_line m_fiq3_cb;
 	emu_timer *m_byte_timer = nullptr;
 	emu_timer *m_fiq3_timer = nullptr;
-	attotime m_byte_delay = attotime::from_msec(5);
+	attotime m_byte_delay = attotime::from_hz(960); // 10 bits at 9,600 baud
 	u8 m_control = 0;
 	u8 m_status_latch = 0;
 	u8 m_data = 0;

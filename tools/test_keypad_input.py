@@ -39,6 +39,12 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn("PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)", self.driver)
         self.assertNotIn("debug_ram", self.harness)
 
+    def test_harness_audits_the_physical_3210_sram_boundary(self):
+        self.assertIn("install_read_tap(0x120000, 0x17ffff", self.harness)
+        self.assertIn("install_write_tap(0x120000, 0x17ffff", self.harness)
+        self.assertIn("upper_ram_reads", self.harness)
+        self.assertIn("upper_ram_writes", self.harness)
+
     def test_interactive_target_uses_standard_mame_input(self):
         makefile = (ROOT / "Makefile").read_text()
         target = makefile.split("run-interactive:", 1)[1].split("\n\n", 1)[0]

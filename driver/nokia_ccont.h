@@ -18,6 +18,7 @@ public:
 	void set_boot_status(uint8_t status);
 	void latch_irq_sources(uint8_t sources);
 	void set_present(bool present) { m_present = present; }
+	void set_wddisx_grounded(bool grounded) { m_wddisx_grounded = grounded; }
 	bool watchdog_tick();
 
 protected:
@@ -26,7 +27,9 @@ protected:
 	virtual void device_post_load() override;
 
 private:
+	TIMER_CALLBACK_MEMBER(rtc_tick);
 	void update_irq();
+	void advance_rtc();
 
 	devcb_write_line m_irq_cb;
 	devcb_write_line m_power_cb;
@@ -37,6 +40,9 @@ private:
 	uint8_t m_boot_status = 0x02;
 	bool m_data_cycle = false;
 	bool m_present = false;
+	bool m_wddisx_grounded = false;
+	bool m_rtc_alarm_armed = false;
+	emu_timer *m_rtc_timer = nullptr;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_CCONT, nokia_ccont_device)

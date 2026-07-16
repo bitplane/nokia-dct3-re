@@ -11,9 +11,18 @@ constexpr uint8_t ADC_CTRL = 0x00;
 constexpr uint8_t ADC_LSB = 0x02;
 constexpr uint8_t ADC_MSB = 0x03;
 constexpr uint8_t WATCHDOG = 0x05;
+constexpr uint8_t RTC_SECOND = 0x07;
+constexpr uint8_t RTC_MINUTE = 0x08;
+constexpr uint8_t RTC_HOUR = 0x09;
+constexpr uint8_t RTC_DAY = 0x0a;
+constexpr uint8_t RTC_ALARM_MINUTE = 0x0b;
+constexpr uint8_t RTC_ALARM_HOUR = 0x0c;
 constexpr uint8_t IRQ_STATUS = 0x0e;
 constexpr uint8_t IRQ_MASK = 0x0f;
 constexpr uint8_t IRQ_SOURCE_MASK = 0xf8;
+constexpr uint8_t IRQ_RTC_SECOND = 0x10;
+constexpr uint8_t IRQ_RTC_MINUTE = 0x20;
+constexpr uint8_t IRQ_RTC_ALARM = 0x80;
 }
 
 nokia_ccont_device::nokia_ccont_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
@@ -25,6 +34,7 @@ nokia_ccont_device::nokia_ccont_device(const machine_config &mconfig, const char
 
 void nokia_ccont_device::device_start()
 {
+	m_rtc_timer = timer_alloc(FUNC(nokia_ccont_device::rtc_tick), this);
 	save_item(NAME(m_cmd));
 	save_item(NAME(m_watchdog));
 	save_item(NAME(m_regs));
@@ -32,6 +42,8 @@ void nokia_ccont_device::device_start()
 	save_item(NAME(m_boot_status));
 	save_item(NAME(m_data_cycle));
 	save_item(NAME(m_present));
+	save_item(NAME(m_wddisx_grounded));
+	save_item(NAME(m_rtc_alarm_armed));
 }
 
 void nokia_ccont_device::device_reset()
@@ -39,7 +51,16 @@ void nokia_ccont_device::device_reset()
 	m_cmd = 0;
 	m_watchdog = 0;
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
+	// Use a fixed epoch rather than the host clock.  The firmware consumes these
+	// registers as binary counters, and deterministic reset state keeps frames
+	// and save states reproducible across hosts.
+	m_regs[RTC_SECOND] = 0;
+	m_regs[RTC_MINUTE] = 0;
+	m_regs[RTC_HOUR] = 12;
+	m_regs[RTC_DAY] = 1;
+	m_rtc_alarm_armed = false;
 	m_data_cycle = false;
+	m_rtc_timer->adjust(attotime::from_seconds(1), 0, attotime::from_seconds(1));
 	m_irq_cb(0);
 	m_power_cb(1);
 }
@@ -79,6 +100,43 @@ void nokia_ccont_device::update_irq()
 	m_irq_cb((m_regs[IRQ_STATUS] & ~m_regs[IRQ_MASK] & IRQ_SOURCE_MASK) != 0);
 }
 
+void nokia_ccont_device::advance_rtc()
+{
+	latch_irq_sources(IRQ_RTC_SECOND);
+	if (++m_regs[RTC_SECOND] < 60)
+		return;
+
+	m_regs[RTC_SECOND] = 0;
+	latch_irq_sources(IRQ_RTC_MINUTE);
+	if (++m_regs[RTC_MINUTE] >= 60)
+	{
+		m_regs[RTC_MINUTE] = 0;
+		if (++m_regs[RTC_HOUR] >= 24)
+		{
+			m_regs[RTC_HOUR] = 0;
+			// The recovered interface exposes only a day counter here.  Month
+			// rollover remains outside the established CCONT contract.
+			if (++m_regs[RTC_DAY] == 0 || m_regs[RTC_DAY] > 31)
+				m_regs[RTC_DAY] = 1;
+		}
+	}
+
+	// ROM IRQ dispatch identifies bit 7 as the alarm source, and the recovered
+	// alarm helper programs the minute/hour pair without a separate enable bit.
+	if (m_rtc_alarm_armed &&
+		m_regs[RTC_MINUTE] == m_regs[RTC_ALARM_MINUTE] &&
+		m_regs[RTC_HOUR] == m_regs[RTC_ALARM_HOUR])
+	{
+		latch_irq_sources(IRQ_RTC_ALARM);
+		m_rtc_alarm_armed = false;
+	}
+}
+
+TIMER_CALLBACK_MEMBER(nokia_ccont_device::rtc_tick)
+{
+	advance_rtc();
+}
+
 void nokia_ccont_device::serial_w(uint8_t data)
 {
 	if (!m_data_cycle)
@@ -110,6 +168,11 @@ void nokia_ccont_device::serial_w(uint8_t data)
 				m_watchdog = data;
 			}
 			break;
+		case RTC_ALARM_MINUTE:
+		case RTC_ALARM_HOUR:
+			m_regs[address] = data;
+			m_rtc_alarm_armed = true;
+			break;
 		case IRQ_STATUS:
 			m_regs[address] &= ~data;
 			update_irq();
@@ -130,15 +193,9 @@ uint8_t nokia_ccont_device::serial_r()
 	uint8_t data = m_regs[address];
 	if ((m_cmd & CMD_READ) != 0)
 	{
-		system_time systime;
-		machine().current_datetime(systime);
 		switch (address)
 		{
 		case ADC_MSB: data = 0xb0 | (data & 0x03); break;
-		case 0x07: data = systime.local_time.second; break;
-		case 0x08: data = systime.local_time.minute; break;
-		case 0x09: data = systime.local_time.hour; break;
-		case 0x0a: data = systime.local_time.mday; break;
 		case IRQ_STATUS: if (m_present) data |= 0x01; break;
 		}
 	}
@@ -148,7 +205,7 @@ uint8_t nokia_ccont_device::serial_r()
 
 bool nokia_ccont_device::watchdog_tick()
 {
-	if (m_watchdog == 0)
+	if (m_wddisx_grounded || m_watchdog == 0)
 		return false;
 	return --m_watchdog == 0;
 }

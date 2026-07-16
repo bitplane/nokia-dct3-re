@@ -10,6 +10,10 @@ DEFINE_DEVICE_TYPE(NOKIA_SIMI, nokia_simi_device, "nokia_simi", "Nokia MAD2 SIMI
 namespace {
 constexpr u8 SIMI_INT_TX_EMPTY = 0x10;
 constexpr u8 SIMI_INT_RX_READY = 0x40;
+// The synthetic ATR advertises TA1=0x05: default Fi=372 with Di=16.  At the
+// standard 3.579545 MHz SIM clock this is approximately 153.6 kbit/s, or one
+// ten-bit T=0 character every 65 microseconds.
+const attotime SIMI_CHARACTER_TIME = attotime::from_hz(15'360);
 }
 
 nokia_simi_device::nokia_simi_device(
@@ -84,7 +88,7 @@ void nokia_simi_device::card_rx_w(u8 data)
 }
 
 void nokia_simi_device::schedule_card_bytes(
-		bool tx_complete, bool response_added, attotime delay)
+		bool tx_complete, bool response_added)
 {
 	// A card cannot answer while the CPU is still writing the final transmit
 	// byte. Deferring receive-ready also prevents the firmware's FIQ handler
@@ -105,7 +109,7 @@ void nokia_simi_device::schedule_card_bytes(
 	}
 
 	if (m_tx_ready_pending || (response_added && m_rx_count != 0))
-		m_rx_timer->adjust(delay);
+		m_rx_timer->adjust(SIMI_CHARACTER_TIME);
 }
 
 TIMER_CALLBACK_MEMBER(nokia_simi_device::rx_ready)
@@ -116,7 +120,7 @@ TIMER_CALLBACK_MEMBER(nokia_simi_device::rx_ready)
 		m_iir |= SIMI_INT_TX_EMPTY;
 		m_irq_cb(1);
 		m_irq_cb(0);
-		m_rx_timer->adjust(attotime::from_usec(100));
+		m_rx_timer->adjust(SIMI_CHARACTER_TIME);
 		return;
 	}
 	if (m_rx_count != 0)
@@ -139,7 +143,7 @@ u8 nokia_simi_device::rxd_r()
 	// characters at serial cadence instead of treating a response as one edge
 	// with a pre-filled FIFO.
 	if (m_rx_count != 0)
-		m_rx_timer->adjust(attotime::from_usec(100));
+		m_rx_timer->adjust(SIMI_CHARACTER_TIME);
 	else
 	{
 		m_rx_ready = false;

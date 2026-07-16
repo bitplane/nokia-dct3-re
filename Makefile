@@ -29,6 +29,7 @@ RUN_DIR ?= run
 SECONDS ?= 20
 RUN_ENV ?=
 RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
+NVRAM_SYSTEM := $(if $(and $(filter noki3210,$(PHONE)),$(filter 501,$(BIOS))),noki3210_1,$(PHONE))
 PRESERVE_NVRAM ?= 0
 PROVISIONED_IMEI_PREFIX ?=
 EEPROM_BASENAME ?= $(if $(filter 501,$(BIOS)),3210 v501 eeprom.bin,3210 v600 eeprom.bin)
@@ -232,10 +233,10 @@ run-manifest-3330:
 
 prepare-run-nvram: build
 	@if [ "$(PHONE)" = "noki3210" ]; then \
-		mkdir -p "$(RUN_NVRAM_DIR)/$(PHONE)"; \
-		if [ "$(PRESERVE_NVRAM)" != "1" ] || [ ! -f "$(RUN_NVRAM_DIR)/$(PHONE)/eeprom" ]; then \
+		mkdir -p "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)"; \
+		if [ "$(PRESERVE_NVRAM)" != "1" ] || [ ! -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom" ]; then \
 			cp "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)" \
-				"$(RUN_NVRAM_DIR)/$(PHONE)/eeprom"; \
+				"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 		fi; \
 	fi
 
@@ -457,9 +458,9 @@ verify-mmi-menu-501:
 	}; \
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 \
-		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=12 \
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=14 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=5000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1000'; \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=7000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1000'; \
 	$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_V501_STRUCT); \
 	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \

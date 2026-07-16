@@ -106,15 +106,15 @@ The implemented surface is classified by ownership and evidence:
 | Surface | Classification | Basis and limitation |
 | --- | --- | --- |
 | SIMI register window and FIQ6 route | Extracted partial hardware | `nokia_simi_device` owns offsets `0x36..0x3f`, the decoded IIR cascade, timing and FIQ6; firmware traffic executes through it in both mapped 3210 ROMs. |
-| TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics and physical UART timing remain inferred. |
+| TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics remain inferred. |
 | IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
-| ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Fixed 10/100 microsecond delays are calibrated scheduling choices, not measured card or UART timing. |
+| ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Controller delivery uses the approximately 65 us ten-bit character time selected by the synthetic ATR's `TA1=0x05`; ATR start and card turnaround delays remain approximations. |
 | SELECT/STATUS/GET RESPONSE/READ behavior | Prototype card | It satisfies organically requested initialization and presence polling. Access conditions, invalidation, record semantics, CHV state, errors, reset, and removal are incomplete. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
 | CHANGE CHV support | Dormant prototype | The procedure/body/status sequence is implemented, but the ordinary boot does not request it and no persistent credential semantics are validated. |
 
 The model does not force firmware state or inject RTOS messages. Controller and
-card ownership are separate; remaining fidelity debt is calibrated timing,
+card ownership are separate; remaining fidelity debt is ATR/turnaround timing,
 unmodeled errors/removal, and card protocol mixed with subscriber provisioning.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content

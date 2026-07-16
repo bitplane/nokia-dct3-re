@@ -68,13 +68,13 @@ u8 nokia_mad2_device::read(offs_t offset)
 	switch (offset)
 	{
 	case 0x00: return 0x40;
-	// No coherent v5.01 or v6.00 boot access reaches timer 1. Preserve the
-	// historical approximation, but do not treat its destination latch as a
-	// recovered MAD2 contract.
+	// Timer 1 runs independently of register access. Offsets 0x06/0x07 form
+	// the stored destination latch; no observed firmware path programs it, so
+	// do not synthesize elapsed time or compare behavior here.
 	case 0x04: return m_timer1_counter >> 8;
 	case 0x05: return m_timer1_counter;
-	case 0x06: return (m_timer1_counter + 0x40) >> 8;
-	case 0x07: return m_timer1_counter + 0x40;
+	case 0x06: return m_regs[offset];
+	case 0x07: return m_regs[offset];
 	case 0x08: return m_fiq_status;
 	case 0x09: return m_irq_status;
 	case 0x0c: return (m_regs[offset] & ~0x20) | ((m_irq_status >> 3) & 0x20);
@@ -244,13 +244,11 @@ TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer0_tick)
 
 TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)
 {
-	// Placeholder until a ROM or hardware trace exercises the sleep timer.
+	// Timer 1 is free-running; its overflow is the FIQ5 source. Firmware does
+	// not need to touch the counter window for the overflow interrupt to run.
 	m_timer1_counter++;
-	if (m_timer1_counter == 0x8000)
-	{
+	if (m_timer1_counter == 0)
 		assert_fiq(5);
-		m_timer1_counter = 0;
-	}
 }
 
 TIMER_CALLBACK_MEMBER(nokia_mad2_device::fiq8_tick)

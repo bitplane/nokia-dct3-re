@@ -30,6 +30,11 @@ class MbusDeviceSplitTest(unittest.TestCase):
         self.assertNotRegex(source, r"0x2[0-9a-f]{5}")
         self.assertNotIn("service", source.lower())
 
+    def test_character_timing_is_physical_not_an_environment_knob(self):
+        self.assertIn("attotime::from_hz(960)", self.header)
+        self.assertNotIn("MBUS_BYTE_DELAY_MS", self.phone)
+        self.assertNotIn("set_byte_delay", self.header)
+
 
 if __name__ == "__main__":
     unittest.main()

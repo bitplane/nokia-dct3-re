@@ -42,6 +42,12 @@ class MachineProfileTest(unittest.TestCase):
             self.assertIn(f"NOKI3210_{model}=0", target)
         self.assertIn("verify: RUN_ENV=$(CONTACT_SERVICE_ENV)", self.makefile)
 
+    def test_3210_buzzer_uses_mad2_pup_and_divider(self):
+        self.assertIn("BEEP(config, m_buzzer)", self.driver)
+        self.assertIn("BIT(m_mad2_regs[0x15], 5)", self.driver)
+        self.assertIn("(u16(m_mad2_regs[0x1c]) << 8) | m_mad2_regs[0x1d]", self.driver)
+        self.assertIn("m_buzzer->set_clock(13'000'000 / divider)", self.driver)
+
 
 if __name__ == "__main__":
     unittest.main()

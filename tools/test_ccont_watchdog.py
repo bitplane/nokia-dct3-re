@@ -23,6 +23,25 @@ class CcontWatchdogTest(unittest.TestCase):
         self.assertNotIn("data == 0x3f", watchdog_case)
         self.assertNotIn("m_watchdog = 0", watchdog_case)
 
+    def test_wddisx_is_a_device_input(self):
+        self.assertIn("m_wddisx_grounded || m_watchdog == 0", self.source)
+        phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        self.assertIn("set_wddisx_grounded", phone)
+        self.assertNotIn("NOKI3210_DISABLE_CCONT_WATCHDOG", phone)
+
+    def test_rtc_is_internal_and_deterministic(self):
+        self.assertNotIn("current_datetime", self.source)
+        self.assertIn("m_regs[RTC_HOUR] = 12", self.source)
+        self.assertIn("attotime::from_seconds(1)", self.source)
+        self.assertIn("++m_regs[RTC_SECOND] < 60", self.source)
+
+    def test_rtc_sources_use_recovered_status_bits(self):
+        self.assertIn("IRQ_RTC_SECOND = 0x10", self.source)
+        self.assertIn("IRQ_RTC_MINUTE = 0x20", self.source)
+        self.assertIn("IRQ_RTC_ALARM = 0x80", self.source)
+        self.assertIn("m_rtc_alarm_armed", self.source)
+        self.assertIn("case RTC_ALARM_MINUTE:", self.source)
+
 
 if __name__ == "__main__":
     unittest.main()

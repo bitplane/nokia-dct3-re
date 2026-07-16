@@ -29,9 +29,10 @@ controller acceptance contract.
 
 ## Remaining uncertainty
 
-The 5 ms byte/FIQ3 delay is retained as an explicit calibration because the
-physical baud and FIQ3 clock have not been recovered. Collision, line echo,
-framing errors, overrun behavior, and multi-byte buffering are not modeled.
+The controller now uses the physical 9,600-baud rate with a ten-bit character
+time (approximately 1.042 ms) for byte completion and the currently coupled
+FIQ3 event. The precise FIQ3 source/phase, collision, line echo, framing
+errors, overrun behavior, and multi-byte buffering are not modeled.
 The lower service/test protocol behind task 7 is mapped separately; ordinary
 boot provides no evidence that it is an always-present MBUS peer. A future
 tool or peer must attach through the byte callbacks and may respond only to

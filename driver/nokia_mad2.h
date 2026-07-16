@@ -64,7 +64,7 @@ private:
 	bool m_fiq_line_state = false;
 	bool m_irq_line_state = false;
 	u32 m_timer0_hz = 33055;
-	u32 m_timer1_hz = 1057;
+	u32 m_timer1_hz = 33055;
 	u32 m_fiq8_hz = 1000;
 	bool m_timer0_catchup = false;
 	bool m_timer_trace = false;

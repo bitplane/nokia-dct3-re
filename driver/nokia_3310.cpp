@@ -1,7 +1,9 @@
 // license:BSD-3-Clause
 // copyright-holders:Sandro Ronco
 /*
-    Driver for Nokia phones based on Texas Instrument MAD2WD1 (ARM7TDMI + DSP)
+    Driver for Nokia phones based on the Texas Instruments MAD2 family
+    (ARM7TDMI + DSP). The Nokia 3210 uses MAD2PR1; later products use other
+    revisions, including MAD2WD1.
 
     Driver based on documentations found here:
         http://nokix.sourceforge.net/help/blacksphere/sub_050main.htm
@@ -19,6 +21,8 @@
 #include "cpu/arm7/arm7.h"
 #include "machine/i2cmem.h"
 #include "machine/intelfsh.h"
+#include "sound/beep.h"
+#include "speaker.h"
 #include "video/pcd8544.h"
 
 #include "nokia_ccont.h"
@@ -52,7 +56,7 @@ struct nokia_product_config
 	u8 power_on_column_mask;
 	bool boot_devices;
 	bool sane_adc_defaults;
-	bool disable_ccont_watchdog;
+	bool ccont_wddisx_grounded;
 };
 
 constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true };
@@ -248,6 +252,7 @@ public:
 		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
 		m_pcd8544(*this, "pcd8544"),
+		m_buzzer(*this, "buzzer"),
 		m_keypad(*this, "COL.%u", 0),
 		m_pwr(*this, "PWR")
 	{ }
@@ -314,6 +319,7 @@ private:
 	uint8_t keypad_columns_r(bool consume_power_on = false);
 	void update_keypad_columns();
 	void update_keypad_ccont_irqs();
+	void update_buzzer();
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
 	uint32_t fw_dword(offs_t address) const;
@@ -332,6 +338,7 @@ private:
 	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<pcd8544_device> m_pcd8544;
+	required_device<beep_device> m_buzzer;
 	required_ioport_array<5> m_keypad;
 	required_ioport m_pwr;
 
@@ -392,7 +399,8 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0x19:  return "[PUP] MBUS status (rw)";
 	case 0x1A:  return "[PUP] MBUS RX/TX (rw)";
 	case 0x1B:  return "[PUP] Vibrator (w)";
-	case 0x1C:  return "[PUP] Buzzer clock divider (w)";
+	case 0x1C:  return "[PUP] Buzzer clock divider high (w)";
+	case 0x1D:  return "[PUP] Buzzer clock divider low (w)";
 	case 0x1E:  return "[PUP] Buzzer volume (w)";
 	case 0x20:  return "[PUP] McuGenIO signal lines (rw)";
 	case 0x22:  return "[PUP] ? (?)";
@@ -494,7 +502,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback, bool sane_def
 // environment (pass overrides through `make run RUN_ENV='...'`). Three kinds:
 //
 //   1. HARDWARE/PRODUCT CONFIG — selects a scenario, not firmware behaviour:
-//      power/ADC (ADC_PROFILE, DISABLE_CCONT_WATCHDOG), clocks
+	//      power/ADC (ADC_PROFILE, CCONT_WDDISX_GROUNDED), clocks
 //      (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP,
 //      FIQ8_HZ), and the SIM UART/card fixture. The 3210's documented timer-0
 //      clock is fixed in its product configuration; remaining environment
@@ -562,6 +570,7 @@ void noki3310_state::machine_start()
 void noki3310_state::post_load()
 {
 	update_keypad_ccont_irqs();
+	update_buzzer();
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -592,6 +601,7 @@ void noki3310_state::machine_reset()
 	m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, NOKIA_FLASH_ENTRY);
 
 	memset(m_mad2_regs, 0, 0x100);
+	update_buzzer();
 	std::fill(std::begin(m_mad2_trace_read), std::end(m_mad2_trace_read), false);
 	std::fill(std::begin(m_mad2_trace_write), std::end(m_mad2_trace_write), false);
 	std::fill(std::begin(m_dspif_trace_read), std::end(m_dspif_trace_read), false);
@@ -617,6 +627,8 @@ void noki3310_state::machine_reset()
 	}
 	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
 	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", m_product.boot_devices) != 0);
+	m_ccont->set_wddisx_grounded(nokia_env_u32("NOKI3210_CCONT_WDDISX_GROUNDED",
+			m_product.ccont_wddisx_grounded) != 0);
 	m_simi->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", m_product.boot_devices) != 0);
 	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKI3210_SIM_CPHS_AOC", 0) != 0);
 	{
@@ -816,8 +828,10 @@ PCD8544_SCREEN_UPDATE(noki3310_state::pcd8544_screen_update)
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 {
 	// CCONT watchdog
-	if (nokia_env_u32("NOKI3210_DISABLE_CCONT_WATCHDOG", m_product.disable_ccont_watchdog) == 0 && m_ccont->watchdog_tick())
+	if (m_ccont->watchdog_tick())
 	{
+		if (nokia_env_u32("NOKI3210_TRACE_CCONT_WATCHDOG", 0) != 0)
+			logerror("ccont_watchdog_expired: t=%.6f\n", machine().time().as_double());
 		m_maincpu->reset();
 		m_mad2->reset();
 		machine_reset();
@@ -1010,6 +1024,8 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		m_gensio->write(offset, data);
 	else
 		m_mad2_regs[offset] = data;
+	if (offset == 0x15 || offset == 0x1c || offset == 0x1d || offset == 0x1e)
+		update_buzzer();
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
 			(offset >= 0x08 && offset <= 0x13) &&
 			m_mad2_timer_trace_count++ < 4096)
@@ -1084,6 +1100,14 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		trace_interrupt_register('W', offset, data);
 
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
+}
+
+void noki3310_state::update_buzzer()
+{
+	const u16 divider = (u16(m_mad2_regs[0x1c]) << 8) | m_mad2_regs[0x1d];
+	if (divider != 0)
+		m_buzzer->set_clock(13'000'000 / divider);
+	m_buzzer->set_state(BIT(m_mad2_regs[0x15], 5) && divider != 0);
 }
 
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
@@ -1244,6 +1268,9 @@ void noki3310_state::noki3310(machine_config &config)
 	PCD8544(config, m_pcd8544);
 	m_pcd8544->set_screen_update_cb(FUNC(noki3310_state::pcd8544_screen_update));
 
+	SPEAKER(config, "mono").front_center();
+	BEEP(config, m_buzzer).add_route(ALL_OUTPUTS, "mono", 0.25);
+
 	INTEL_TE28F160(config, "flash");
 	I2C_24C128(config, m_eeprom);
 	NOKIA_MAD2(config, m_mad2);
@@ -1257,7 +1284,6 @@ void noki3310_state::noki3310(machine_config &config)
 	m_mad2->irq_cb().set(FUNC(noki3310_state::mad2_irq_w));
 	m_mad2->irq_ack_cb().set(FUNC(noki3310_state::mad2_irq_ack_w));
 	NOKIA_MBUS(config, m_mbus);
-	m_mbus->set_byte_delay(attotime::from_msec(nokia_env_u32("NOKI3210_MBUS_BYTE_DELAY_MS", 5)));
 	m_mbus->set_trace(nokia_env_u32("NOKI3210_TRACE_MBUS", 0) != 0);
 	m_mbus->tx_cb().set(FUNC(noki3310_state::mbus_tx_w));
 	m_mbus->fiq2_cb().set(FUNC(noki3310_state::mbus_fiq2_w));
@@ -1312,10 +1338,11 @@ void noki3310_state::noki3210(machine_config &config)
 	// Both supported 3210 firmware revisions use this validated composition.
 	// Other DCT3 products retain the conservative base-device defaults until
 	// their corresponding hardware and peer contracts have been exercised.
-	// NSE-8/9 system-module documentation establishes a 13 MHz MAD2PR1
-	// system clock. Timer 0 applies its programmed divider internally.
+	// Timer 0 retains the boot-validated scheduler calibration. Timer 1 is the
+	// 33,055 Hz free-running CTSI counter and raises FIQ5 on 16-bit overflow.
+	// See docs/mad2_fidelity.md for the remaining Timer-0 clock question.
 	m_mad2->set_timer0_hz(13'000'000);
-	m_mad2->set_timer1_hz(nokia_env_u32("NOKI3210_TIMER1_HZ", 1057));
+	m_mad2->set_timer1_hz(33'055);
 	m_mad2->set_timer0_catchup(false);
 
 	const bool external_service_model =
@@ -1503,7 +1530,7 @@ ROM_END
 } // anonymous namespace
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
-SYST( 1999, noki3210, 0,      0,      noki3210, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 3210", MACHINE_NO_SOUND )
+SYST( 1999, noki3210, 0,      0,      noki3210, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 3210", 0 )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8xxx, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, noki3310_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

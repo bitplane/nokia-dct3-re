@@ -17,10 +17,10 @@ Confidence labels:
 The extracted `nokia_mad2_device` owns the CTSI core at offsets `0x00..0x16`:
 reset/clock/watchdog latches, timer state, interrupt pending/masks and CPU-line
 routing. Keypad, GenIO and other board peripherals remain outside that core;
-GENSIO, MBUS and SIMI are separate devices. Timer 1, FIQ8 timing, reset/clock effects,
-audio outputs and several SELECT/UIF banks remain calibrated counters or
-backing latches. Address-map coverage therefore must not be read as peripheral
-completeness.
+GENSIO, MBUS and SIMI are separate devices. Timer-1 destination reads, FIQ8
+timing, reset/clock effects, audio outputs and several SELECT/UIF banks remain
+calibrated counters or backing latches. Address-map coverage therefore must not
+be read as peripheral completeness.
 
 ## Address-space boundary
 
@@ -43,20 +43,21 @@ completeness.
 | `01` MCU reset | extracted reset-cause latch; optional phone-level soft-reset policy | Partial | Establish reset domains and remove PC-oriented reset options. |
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
-| `04..07` sleep timer | software counter and synthetic destination | Unexercised placeholder | Neither 3210 ROM accesses these offsets during a one- or eight-second coherent boot. Establish 32.768 kHz counter width, latch and compare behavior before changing it. |
+| `04..07` timer 1 | 33,055 Hz free-running counter; FIQ5 on 16-bit wrap; stored destination latch | Partial | Overflow timing composes with the menu oracle. Neither ROM accesses the destination latch during boot; establish its compare and reset-enable behavior before adding side effects. |
 | `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ6, masked-pending retention and acknowledgement have focused regressions. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
 | `0d` clock control | extracted stored latch | Observed writes, unknown effects | Both ROMs write `0x0c` then `0x2c`; map clock domains and sleep transitions before adding side effects. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
-| `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, documented 13 MHz input | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Wider MAD2-family clock selection remains product-specific. |
+| `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated input clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Recover the physical input/divider relationship without regressing the boot lifecycle. |
 
 ## PUP, GPIO and serial blocks
 
 | Block | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
 | FIQ8 `15/16` | periodic timer when enabled; extended pending/status/mask routing | Partial routing, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery and acknowledgement. Identify the source clock and physical timer semantics. |
-| MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, calibrated timing | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover baud, FIQ3 clock, collision and error behavior. |
-| Vibrator/buzzer `1b/1c/1e` | register storage only | Placeholder | Connect outputs and derive divider/volume mapping. |
+| MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, physical character rate | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover FIQ3 phase/source, collision and error behavior. |
+| Buzzer `15/1c/1d/1e` | PUP bit-5 enable and 13 MHz divider drive a MAME beeper | Partial hardware | Validate volume transfer and ringtone paths; the MZT-03C acoustic response is not modeled. |
+| Vibrator `15/1b` | register storage only | Placeholder | Connect an output and recover frequency/mode semantics. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
 | Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, ROM-derived 3210 wiring, row direction/drive, physical press/release edges on IRQ0 | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |
 | GENSIO `2c..2e`, `6c..6f` | extracted CCONT/LCD controller; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Cross-ROM partial | Confirm physical busy timing and remaining control bits. |
@@ -110,9 +111,10 @@ the gate through separate callbacks, two-ROM traces and focused regression.
 latches. v6.00 and v5.01 each read reset cause four times, write it once from
 `0x01` to `0x05`, service watchdog offset `0x03` fifteen times with `0x31`, and
 write clock control `0x00 -> 0x0c -> 0x2c`. Neither accesses timer-1 offsets
-`0x04..0x07`. The sequence justifies retained latches and the negative timer-1
-classification; it does not establish reset side effects, watchdog frequency,
-clock-domain behavior or sleep-timer semantics.
+`0x04..0x07`; that is a negative register-access assertion, not evidence that
+the free-running Timer-1 overflow source is inactive. The sequence does not
+establish reset side effects, watchdog frequency, clock-domain behavior or the
+destination-latch semantics.
 
 Until the second ROM is normalized, `NOKI3210_TRACE_MAD2_LEDGER=1` provides the
 curated 3210 evidence pass: at most one read and one write record per MAD2 byte
@@ -145,12 +147,18 @@ This validates the live divider, coherent 16-bit counter read, compare and
 write-one-clear contract. The previous unused `0x04` timer constant and matching
 pending guard were wrong; runtime assertion/status/acknowledgement all establish
 `0x10`.
-The NSE-8/9 system-module clocking scheme establishes a 13 MHz system clock at
-MAD2PR1. A provisioned coherent run reproduces the menu oracle with that input,
-the programmed divider and exact compare semantics; catch-up is not required.
-The 3210 product profile therefore uses 13 MHz directly and no longer accepts
-the earlier calibrated `TIMER0_HZ`/`TIMER0_CATCHUP` overrides. This does not
-establish clock selection for other MAD2 revisions.
+The NSE-8/9 system-module clocking scheme establishes a 13 MHz ARM system
+clock at MAD2PR1, but it does not by itself establish Timer 0's input. With the
+working 13 MHz timer input and divider `0xf9`, the modeled counter advances at
+about 52 kHz; a focused trace shows no task-0 flash execution after second 2
+and CCONT expiry at exactly 49 seconds. With a 33,055 Hz timer input before the
+same divider, task 0 instead dominates steady state and the phone does not
+reset during 55 seconds, but the coherent SIM/UI lifecycle does not complete.
+The product profile therefore retains 13 MHz as an explicit calibrated Timer-0
+value. Timer 1 now runs independently at 33,055 Hz, wraps at 16 bits and raises
+FIQ5; that composition reproduces the interactive menu but does not restore the
+missing periodic CCONT watchdog service. Catch-up remains disabled, and this
+does not establish other MAD2 revisions' clocks.
 
 The same target performs a scheduled save/load round trip. Main RAM, MAD2
 registers, IRQ/FIQ pending state, timer counters/divider/compare latch, keypad

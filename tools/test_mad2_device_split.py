@@ -33,6 +33,20 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertNotIn("pc()", source)
         self.assertNotRegex(source, r"0x2[0-9a-f]{5}")
 
+    def test_timer1_is_free_running_and_interrupts_on_wrap(self):
+        callback = self.device.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)", 1)[1]
+        callback = callback.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::fiq8_tick)", 1)[0]
+        self.assertIn("m_timer1_counter++;", callback)
+        self.assertIn("if (m_timer1_counter == 0)", callback)
+        self.assertIn("assert_fiq(5);", callback)
+        self.assertNotIn("m_timer1_counter = 0;", callback)
+        self.assertIn("m_mad2->set_timer1_hz(33'055);", self.phone)
+
+    def test_timer1_destination_is_a_latch_not_synthetic_time(self):
+        self.assertIn("case 0x06: return m_regs[offset];", self.device)
+        self.assertIn("case 0x07: return m_regs[offset];", self.device)
+        self.assertNotIn("m_timer1_counter + 0x40", self.device)
+
 
 if __name__ == "__main__":
     unittest.main()

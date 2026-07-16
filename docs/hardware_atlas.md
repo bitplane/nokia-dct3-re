@@ -24,7 +24,7 @@ address decoding:
 | Samsung KM68U1000 | 128K x 8 static RAM | confirms 128 KiB of physical SRAM; current wider CPU window decode remains provisional |
 | BGY252 / BGY262 | UHF power-amplifier modules | analog RF chain, not electrically simulated |
 | Hitachi HWYN202A | 900 MHz duplexer | analog RF chain, not electrically simulated |
-| MZT-03C | piezoelectric buzzer | transducer is not yet connected; MAD2/UI-switch control path must be recovered first |
+| MZT-03C | piezoelectric buzzer | MAME beeper driven from MAD2 PUP enable and 13 MHz divider; volume response remains unmodeled |
 
 The Nokia NSE-8/9 system-module documentation is the stronger architectural
 source. It describes MAD2PR1 as one ASIC containing the ARM MCU, TMS320C542 DSP,
@@ -58,6 +58,12 @@ peers without executing DSP instructions. Companion devices are **CCONT** (power
 
 ## CPU memory map (the emulated regions)
 
+The driver still maps the wider `0x100000..0x17ffff` provisional family window
+rather than asserting unrecovered address-line mirroring for the 3210's 128 KiB
+KM68U1000. Runtime structural taps cover `0x120000..0x17ffff`; ordinary v6.00
+and v5.01 boots perform zero reads and zero writes there, and all three
+structural oracles enforce that observation.
+
 | range | device | handler | status |
 |---|---|---|---|
 | `0x000000–0x00ffff` (mirror `+0x80000`) | boot ROM / low RAM | `ram_r/w` | emulated |
@@ -85,6 +91,7 @@ profile; — = not established.
 | `0x01/0x02` | MCU / **DSP** reset control | ✓ |
 | `0x03` | ASIC watchdog write | ✓ |
 | `0x04/0x05` | sleep-clock counter MSB/LSB | (timer1) |
+| `0x06/0x07` | timer-1 destination MSB/LSB | stored latch; no boot access in either 3210 ROM, compare behavior unmodeled |
 | `0x08/0x09` | FIQ / **IRQ lines active** | ✓ |
 | `0x0a/0x0b` | FIQ / IRQ mask | ✓ |
 | `0x0c` | interrupt control | ✓ |
@@ -92,17 +99,20 @@ profile; — = not established.
 | `0x0e` | **interrupt trigger** (r; read-only — why `assert_irq(4)` can't be SW-triggered) | ✓ |
 | `0x0f–0x13` | programmable timer (divider/counter/compare) | ✓ |
 
-The 3210 product supplies MAD2PR1's documented 13 MHz system clock to timer 0;
-the firmware-programmed divider then produces counter ticks. Exact compare
-semantics reproduce both supported ROMs without the former catch-up option.
+Timer 0's divider/counter/compare behavior is modeled, but its input clock is
+still calibrated. The working 13 MHz setting reproduces both supported ROMs;
+a 33,055 Hz Timer-0 input changes scheduler ownership and prevents SIM startup.
+Timer 1 is a separate free-running 33,055 Hz counter with FIQ5 on 16-bit wrap;
+its register-window destination semantics remain provisional.
 
 ### PUP — MBUS, vibrator, buzzer, GenIO
 | off | reg | status / touch |
 |---|---|---|
-| `0x15/0x16` | PUP control / FIQ8 ctrl | periodic placeholder ✓ |
-| `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | extracted controller with byte attachment, FIQ2 RX/TX lifecycle and calibrated timing; no bus peer ✓ |
+| `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable; periodic FIQ8 remains provisional ✓ |
+| `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | extracted controller with byte attachment, FIQ2 RX/TX lifecycle and 9,600-baud character timing; no bus peer ✓ |
 | `0x1b` | vibrator | backing latch ✓ (read) |
-| `0x1c/0x1e` | buzzer divider / volume | backing latches — |
+| `0x1c/0x1d` | buzzer divider high/low | MZT-03C square-wave frequency = 13 MHz / divider |
+| `0x1e` | buzzer volume | stored; acoustic response unmodeled |
 | `0x20/0x22/0x24` | McuGenIO signal / ? / direction | partial: native EEPROM pins plus unknown stored bits ✓ |
 
 ### KBGPIO — keyboard (partial hardware ✓)
@@ -145,8 +155,9 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0x2/0x3` | ADC read LSB / MSB | |
 | `0x5` | watchdog (WDReg) | nonzero data reloads an eight-bit seconds counter; `0x00` powers down; firmware helper `0x2b4dc0` services it for input-mask bit 1, but its post-startup schedule remains missing and expiry is guarded |
 | `0x6` | RTC enable | |
-| `0x7–0xa` | RTC sec/min/hour/day | served from host clock |
-| `0xb–0xd` | RTC alarm / calibration | |
+| `0x7–0xa` | RTC sec/min/hour/day | deterministic binary counters; second/minute IRQs |
+| `0xb–0xc` | RTC alarm minute/hour | partial one-shot comparator |
+| `0xd` | clock gates | stored latch; effects unknown |
 | `0xe` | **interrupt lines (status)** | bit 0 = present-status (`MODEL_CCONT_PRESENT`, idx6); bits 0–2 ignored by the IRQ dispatcher |
 | `0xf` | interrupt mask | |
 

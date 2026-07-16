@@ -44,6 +44,7 @@ local structural = {
 	final_current_task = 0, final_startup_mode = 0, final_startup_event = 0,
 	final_startup_flags = 0, final_contact_status = 0,
 	final_no_sim = 0, final_sim_enable = 0,
+	upper_ram_reads = 0, upper_ram_writes = 0, upper_ram_highest = 0,
 }
 
 for i = 0, (84 * 6) - 1 do lcd_vram[i] = 0 end
@@ -205,6 +206,18 @@ taps[#taps + 1] = space:install_read_tap(0x2006c, 0x2006f, "noki3210_oracle_ccon
 	return data
 end)
 
+-- The 3210 carries a 128 KiB KM68U1000 SRAM. Keep the wider provisional map
+-- observable until its address-line mirroring is modeled, so ordinary boot
+-- cannot silently depend on storage that does not exist on the board.
+taps[#taps + 1] = space:install_read_tap(0x120000, 0x17ffff, "noki3210_upper_ram_read", function(offset, data, mask)
+	structural.upper_ram_reads = structural.upper_ram_reads + 1
+	if offset > structural.upper_ram_highest then structural.upper_ram_highest = offset end
+end)
+taps[#taps + 1] = space:install_write_tap(0x120000, 0x17ffff, "noki3210_upper_ram_write", function(offset, data, mask)
+	structural.upper_ram_writes = structural.upper_ram_writes + 1
+	if offset > structural.upper_ram_highest then structural.upper_ram_highest = offset end
+end)
+
 local function write_lcd_dump()
 	while #pending_lcd > 0 do
 	local pending = table.remove(pending_lcd, 1)
@@ -258,6 +271,9 @@ local function write_boot_summary()
 		string.format("final_contact_status=%04X", structural.final_contact_status),
 		string.format("final_no_sim=%02X", structural.final_no_sim),
 		string.format("final_sim_enable=%02X", structural.final_sim_enable),
+		string.format("upper_ram_reads=%d", structural.upper_ram_reads),
+		string.format("upper_ram_writes=%d", structural.upper_ram_writes),
+		string.format("upper_ram_highest=%06X", structural.upper_ram_highest),
 	}
 	local temporary = boot_summary_path .. ".tmp"
 	local f = io.open(temporary, "w")

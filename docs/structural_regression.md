@@ -28,9 +28,9 @@ behind its masks, and register-enabled extended FIQ8 routing. The fixtures use
 only input ports and mapped MAD2 registers; their bounded trace checker does
 not treat timing-sensitive interrupt totals as structural-oracle fields.
 `make verify-mad2-clocks` checks both 3210 ROMs against the observed reset,
-watchdog and clock-control boot sequence and asserts that timer 1 remains
-unexercised. This is a negative coverage contract, not validation of timer-1
-semantics.
+watchdog and clock-control boot sequence and asserts that neither boot accesses
+the timer-1 register window. This is a negative register-coverage contract, not
+validation of the independently running timer-1 overflow source.
 `make verify-mbus` checks the identical v6.00/v5.01 receive-mode
 initialization, asserts that ordinary boot transmits no bytes, and uses one
 external byte to verify RX-ready, firmware consumption and FIQ2 acknowledgement.
@@ -59,6 +59,11 @@ four stable EEPROM transactions and corresponding FIQ/CCONT accounting while
 preserving the exact LCD hash; the structural oracle records the profile-backed
 baseline rather than the former stale-NVRAM run.
 
+MAME names the alternate v5.01 BIOS NVRAM system `noki3210_1`; the Makefile
+seeds that directory explicitly rather than the default `noki3210` directory.
+This distinction is load-bearing: regenerating a v5.01 EEPROM while retaining
+an older `noki3210_1/eeprom` silently runs the stale product state.
+
 ## Summary fields
 
 The generated summary records:
@@ -69,13 +74,16 @@ The generated summary records:
 - GENSIO control values;
 - CCONT byte/read counts and command-byte set;
 - EEPROM START conditions and GenIO signal-write count;
+- reads and writes above the 3210's physical 128 KiB SRAM boundary;
 - startup modes observed; and
 - final task, startup, service-session and SIM gate values.
 
 The committed oracle intentionally selects terminal state and lifecycle
-predicates from that larger summary. Raw counters, timestamps, scheduler order,
-and full traces are too sensitive to harmless timing changes. They remain
-available for review but are not pass/fail criteria.
+predicates from that larger summary. It also requires both upper-SRAM access
+counts to remain zero while the provisional wider map exists. Other raw
+counters, timestamps, scheduler order, and full traces are too sensitive to
+harmless timing changes. They remain available for review but are not pass/fail
+criteria.
 
 The Lua MMIO observer decodes ARM big-endian byte lanes explicitly. Summary
 files are refreshed every 30 frames and from a display-independent periodic
@@ -126,7 +134,9 @@ security editor through `0x0578` and its accepted `0x05e6` callback branch.
 own generated EEPROM profile as a same-product structural control.
 `make verify-mmi-menu-501` adds provisioned identity and physical left-softkey
 input, opening the same `Phone book` menu as v6.00 with the same stable-pixel
-oracle.
+oracle. Its input is delayed until seven seconds and the run lasts fourteen
+seconds because periodic CCONT RTC work shifts the v5.01 editor-ready schedule;
+the v6.00 fixture retains its five-second input.
 
 The useful invariants are the task-1 and SIM results. The run organically observes modes
 `0x0001`, `0x000d`, and `0x0004`, then remains in mode `0x0004` with readiness

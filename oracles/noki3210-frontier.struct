@@ -8,3 +8,5 @@ final_startup_flags=0F
 final_contact_status=0049
 final_no_sim=00
 final_sim_enable=01
+upper_ram_reads=0
+upper_ram_writes=0
