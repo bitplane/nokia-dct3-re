@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "default",
-  "description": "Canonical 3210 CONTACT SERVICE boot and structural oracle",
+  "description": "Peer-disabled 3210 CONTACT SERVICE negative boot and structural oracle",
   "phone": "noki3210",
   "firmware": "noki3210_v600",
   "subsystems": [],

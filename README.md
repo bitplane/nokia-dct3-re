@@ -25,9 +25,9 @@ special cases.
 
 The 3210 firmware executes deeply enough to initialize the CPU, MAD2 peripherals, CCONT, display,
 EEPROM paths, RTOS tasks, external-service machinery, and a substantial SIM conversation. The
-default profile deterministically reaches the authentic **CONTACT SERVICE** frame and is protected
-by a byte-exact LCD oracle. Opt-in peer prototypes can carry the firmware further and the ring-2
-SIM responder completes natural ATR and ICCID/ECC/PHASE APDU traffic.
+validated CCONT, DSP-service, external-service and SIM devices are enabled by the 3210 machine
+profile rather than an environment-variable stack. An explicit peer-disabled negative profile
+still reproduces the authentic **CONTACT SERVICE** frame and is protected by a byte-exact oracle.
 
 The coherent modeled profile reaches a verified interactive desktop. The SIM
 completes ordinary non-CPHS initialization, provisioned identity data removes
@@ -43,8 +43,8 @@ than missing hardware acknowledgements. Detailed contracts live in
 [`docs/mmi_settlement.md`](docs/mmi_settlement.md) and
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
-`make verify-frontier RUN_DIR=run_frontier` is the authoritative modeled
-hardware baseline. It uses the request-driven external-service peer
+`make verify-frontier RUN_DIR=run_frontier` is the authoritative 3210 hardware
+baseline. It uses the request-driven external-service peer
 and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with service-session status
 `0x49`, no-SIM clear, and SIM enable set. Keypad interaction is independently
 covered through MAD2 IRQ0 and the firmware matrix scanner. `make verify-mmi-menu`

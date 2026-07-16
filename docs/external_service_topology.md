@@ -136,8 +136,8 @@ contracts.
 
 ## Runtime evidence
 
-The canonical contact manifest now combines a default one-second trace with a
-six-second `FRONTIER_ENV` trace. Across them the census records command `0x64`
+The canonical contact manifest combines a peer-disabled one-second trace with a
+six-second machine-default trace. Across them the census records command `0x64`
 construct/send/receive counts `3/2/2` and command `0x70` counts `1/1/1`.
 The frontier run observes the peer's result-1 `0x64`, 64-byte `0x70` channel
 map, and result-5 `0x64`, together with the firmware acknowledgements described

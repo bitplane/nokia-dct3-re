@@ -25,13 +25,13 @@ See `mad2_fidelity.md` for register-level implementation status and
 
 | Profile | Purpose | Acceptance condition |
 | --- | --- | --- |
-| Default `make verify` | Stable hardware regression | Exact CONTACT SERVICE frame SHA prefix `d8a9a7a58e587be8`. |
-| Coherent frontier | Request-driven external-service peer plus ordinary SIMI/FIQ6 card traffic | `make verify-frontier`; semantic predicates with SIM enabled and task 1 in mode `0x0004`. No deep-profile display frame is currently promoted as an oracle. |
+| 3210 machine default | Request-driven external-service peer plus ordinary SIMI/FIQ6 card traffic | `make verify-frontier`; semantic predicates with SIM enabled and task 1 in mode `0x0004`. |
+| Peer-disabled negative baseline (`make verify`) | Preserve the known failure comparison | Exact CONTACT SERVICE frame SHA prefix `d8a9a7a58e587be8`. |
 | New-ROM baseline | Detect product-specific assumptions | No firmware-address hooks; record first divergence even when no frame renders. |
 
-The default profile is deliberately conservative. A deeper experimental frame
-does not supersede it until the responsible peers use ordinary hardware
-interfaces.
+Only the Nokia 3210 product profile enables the validated composition. Other
+DCT3 products retain conservative device defaults until their hardware and peer
+contracts have independent evidence.
 
 ## Configuration taxonomy
 
@@ -75,6 +75,6 @@ focused tests and freedom from firmware-address conditions first.
 - Model hardware and nonvolatile data; do not model desired firmware results.
 - Product differences belong in machine configuration or input data.
 - Hardware components emit signals; firmware owns RTOS and application state.
-- Keep the default oracle byte-exact through refactors.
+- Keep both the machine-default semantic oracle and peer-disabled fault oracle stable through refactors.
 - Record useful negative conclusions, but remove chronological experiment logs.
 - Require a second-ROM confidence pass before calling shared behavior validated.

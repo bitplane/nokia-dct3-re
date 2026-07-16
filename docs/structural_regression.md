@@ -10,15 +10,16 @@ same frame.
 `mame_noki3210_input_exerciser.lua` writes a deterministic summary to
 `NOKI3210_BOOT_SUMMARY`. `make run` places it at
 `RUN_DIR/boot_summary.txt`; `make verify` checks the semantic predicates in
-`oracles/noki3210-default.struct` after checking the exact frame hash.
-`make verify-frontier` performs the corresponding semantic check for the current
-request-driven external-service/SIM profile against `oracles/noki3210-frontier.struct`.
+`oracles/noki3210-default.struct` after checking the exact frame hash. That target
+explicitly disables the 3210 peer devices and is a negative failure baseline.
+`make verify-frontier` checks the machine-default request-driven
+external-service/SIM composition against `oracles/noki3210-frontier.struct`.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon
 region is excluded; the text, softkey, layout and remaining pixels are protected.
-This is the interactive MMI oracle rather than a replacement for the default
-fault-frame oracle.
+This is the interactive MMI oracle; the fault-frame oracle remains a useful
+explicit negative control.
 `make verify-3210-v501` runs the same-product v5.01 control with a BIOS-specific
 EEPROM profile and checks `oracles/noki3210-v501-smoke.struct`.
 `make verify-mad2-interrupts` runs three non-oracle controller conformance
@@ -42,7 +43,7 @@ The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.
 
-`make verify-frontier` checks the current request-driven external-service/SIM profile's
+`make verify-frontier` checks the 3210 request-driven external-service/SIM composition's
 stable semantic predicates. `make verify-frontier-stability` repeats that check
 with freshly seeded NVRAM. It reports full-summary
 hash drift without failing because LCD-command, CCONT-byte/read, and similar

@@ -52,27 +52,21 @@ ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 ORACLE_V501_STRUCT ?= oracles/noki3210-v501-smoke.struct
 
-# Current forcing-free research profile. The DSPIF transport carries D0
-# discovery to the separate external-service session;
-# the SIM model stays behind the ordinary SIMI/FIQ6 boundary.
-FRONTIER_ENV := \
-	NOKI3210_MODEL_DSP_SERVICE=1 \
-	NOKI3210_MODEL_CCONT_PRESENT=1 \
-	NOKI3210_MODEL_EXTERNAL_SERVICE_PEER=1 \
-	NOKI3210_MODEL_SIM_DEVICE=1
+# The validated 3210 device composition and calibrated boot values are product
+# defaults in the machine configuration. Keep this alias while named research
+# targets are normalized; it intentionally contributes no state-changing knobs.
+FRONTIER_ENV :=
 
-# Canonical default run profile — the minimal knob set that reproduces the
-# CONTACT SERVICE oracle frame: genuine hardware config (display/clocks/power/ADC/
-# EEPROM) and the CCONT watchdog guard. Every NOKI3210_* var the driver reads is an
-# env knob; override any on the command line with its complete NOKI3210_* name.
-BOOT_ENV := \
-	NOKI3210_DISPLAY_TYPE=4 \
-	NOKI3210_ADC_PROFILE=sane \
-	NOKI3210_TIMER0_HZ=20000000 \
-	NOKI3210_TIMER1_HZ=1057 \
-	NOKI3210_TIMER0_CATCHUP=1 \
-	NOKI3210_DISABLE_CCONT_WATCHDOG=1 \
-	NOKI3210_LUA_QUIET=1
+BOOT_ENV := NOKI3210_LUA_QUIET=1
+
+# Explicit negative profile retained for the historical CONTACT SERVICE oracle.
+# This proves that the peer devices, rather than firmware-state intervention,
+# account for the difference between the failure frame and the working boot.
+CONTACT_SERVICE_ENV := \
+	NOKI3210_MODEL_DSP_SERVICE=0 \
+	NOKI3210_MODEL_CCONT_PRESENT=0 \
+	NOKI3210_MODEL_EXTERNAL_SERVICE_PEER=0 \
+	NOKI3210_MODEL_SIM_DEVICE=0
 
 MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-keyboardprovider none -mouseprovider none -lightgunprovider none \
@@ -213,7 +207,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -311,6 +305,7 @@ watch:
 	@while :; do clear; chafa --size=84x48 $(FRAME_PNG) 2>/dev/null || echo "no $(FRAME_PNG) yet"; sleep 0.5; done
 
 verify: PHONE=noki3210
+verify: RUN_ENV=$(CONTACT_SERVICE_ENV)
 verify: run
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' ! -name '*_o000.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no LCD frame produced in $(RUN_DIR)"; exit 1; }; \

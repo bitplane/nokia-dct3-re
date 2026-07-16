@@ -1,0 +1,45 @@
+import pathlib
+import unittest
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+
+class MachineProfileTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.driver = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.makefile = (ROOT / "Makefile").read_text()
+
+    def test_3210_owns_validated_boot_defaults(self):
+        self.assertIn(
+            "constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true, 4 };",
+            self.driver,
+        )
+        profile = self.driver.split("void noki3310_state::noki3210(machine_config &config)", 1)[1]
+        profile = profile.split("void noki3310_state::noki5210", 1)[0]
+        self.assertIn('"NOKI3210_TIMER0_HZ", 20000000', profile)
+        self.assertIn('"NOKI3210_TIMER0_CATCHUP", 1', profile)
+        self.assertIn('"NOKI3210_MODEL_DSP_SERVICE", 1', profile)
+        self.assertIn('"NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 1', profile)
+
+    def test_other_products_keep_conservative_defaults(self):
+        self.assertIn(
+            "constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false, 0xff };",
+            self.driver,
+        )
+
+    def test_contact_service_oracle_is_explicit_negative_profile(self):
+        target = self.makefile.split("CONTACT_SERVICE_ENV :=", 1)[1].split("\n\n", 1)[0]
+        for model in (
+            "MODEL_DSP_SERVICE",
+            "MODEL_CCONT_PRESENT",
+            "MODEL_EXTERNAL_SERVICE_PEER",
+            "MODEL_SIM_DEVICE",
+        ):
+            self.assertIn(f"NOKI3210_{model}=0", target)
+        self.assertIn("verify: RUN_ENV=$(CONTACT_SERVICE_ENV)", self.makefile)
+
+
+if __name__ == "__main__":
+    unittest.main()

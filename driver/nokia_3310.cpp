@@ -50,12 +50,16 @@ static unsigned nokia_env_u32(const char *name, unsigned fallback);
 struct nokia_product_config
 {
 	u8 power_on_column_mask;
+	bool boot_devices;
+	bool sane_adc_defaults;
+	bool disable_ccont_watchdog;
+	u8 display_profile_slot7;
 };
 
-constexpr nokia_product_config PRODUCT_3210 = { 0x01 };
-constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04 };
-constexpr nokia_product_config PRODUCT_5X10 = { 0x10 };
-constexpr nokia_product_config PRODUCT_8XXX = { 0x10 };
+constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true, 4 };
+constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false, 0xff };
+constexpr nokia_product_config PRODUCT_5X10 = { 0x10, false, false, false, 0xff };
+constexpr nokia_product_config PRODUCT_8XXX = { 0x10, false, false, false, 0xff };
 
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
@@ -449,7 +453,7 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	}
 }
 
-static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
+static uint16_t nokia_adc_override(unsigned id, uint16_t fallback, bool sane_default)
 {
 	char name[] = "NOKI3210_ADC0";
 	name[12] = '0' + (id & 0x07);
@@ -462,9 +466,11 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 			return parsed & 0x03ff;
 	}
 
-	if (const char *profile = std::getenv("NOKI3210_ADC_PROFILE"))
+	const char *profile = std::getenv("NOKI3210_ADC_PROFILE");
+	if (profile || sane_default)
 	{
-		if (!std::strcmp(profile, "sane") || !std::strcmp(profile, "charged"))
+		const bool charged = profile && !std::strcmp(profile, "charged");
+		if (!profile || !std::strcmp(profile, "sane") || charged)
 		{
 			// Stable raw-selector fixtures. Electrical signal names and units are
 			// deliberately not assigned until a 3210 board-level source confirms them.
@@ -475,9 +481,9 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 				case 2: return 0x2d0;
 				case 3: return 0x280;
 				case 4: return 0x200;
-				case 5: return std::strcmp(profile, "charged") ? 0x000 : 0x200;
+				case 5: return charged ? 0x200 : 0x000;
 				case 6: return 0x200;
-				case 7: return std::strcmp(profile, "charged") ? 0x000 : 0x120;
+				case 7: return charged ? 0x120 : 0x000;
 			}
 		}
 	}
@@ -491,13 +497,14 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 //
 //   1. HARDWARE/PRODUCT CONFIG — selects a scenario, not firmware behaviour:
 //      erased-NV display-profile fallback (DISPLAY_TYPE), power/ADC (ADC_PROFILE,
-//      DISABLE_CCONT_WATCHDOG),
-//      clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP, FIQ8_HZ), and the SIM
-//      UART/card fixture. The default boot (none set)
-//      reproduces the CONTACT SERVICE oracle frame byte-for-byte.
+//      DISABLE_CCONT_WATCHDOG), clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP,
+//      FIQ8_HZ), and the SIM UART/card fixture. The validated 3210 values are
+//      product defaults; environment values remain research overrides.
 //
-//   2. DEVICE-BOUNDARY MODELS — opt-in behavior behind an ordinary hardware
-//      interface. MODEL_SIM_DEVICE owns SIMI/FIQ6. MODEL_CCONT_PRESENT selects
+//   2. DEVICE-BOUNDARY MODELS — behavior behind an ordinary hardware interface.
+//      The 3210 enables the validated composition by default; MODEL_* can still
+//      disable individual peers for negative tests. MODEL_SIM_DEVICE owns
+//      SIMI/FIQ6. MODEL_CCONT_PRESENT selects
 //      the extracted CCONT device scenario. MODEL_DSP_SERVICE enables the DSP
 //      HLE; MODEL_EXTERNAL_SERVICE_PEER enables the separate service peer
 //      behind the DSP transport. Their wider contracts remain incomplete.
@@ -607,11 +614,11 @@ void noki3310_state::machine_reset()
 		static const uint16_t adc_default[8] =
 				{ 0x000, 0x3ff, 0x3ff, 0x280, 0x200, 0x000, 0x200, 0x000 };
 		for (unsigned id = 0; id < 8; id++)
-			m_ccont->set_adc_source(id, nokia_adc_override(id, adc_default[id]));
+			m_ccont->set_adc_source(id, nokia_adc_override(id, adc_default[id], m_product.sane_adc_defaults));
 	}
 	m_ccont->set_boot_status(CCONT_BOOT_IRQ_DEFAULT);
-	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", 0) != 0);
-	m_simi->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", 0) != 0);
+	m_ccont->set_present(nokia_env_u32("NOKI3210_MODEL_CCONT_PRESENT", m_product.boot_devices) != 0);
+	m_simi->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", m_product.boot_devices) != 0);
 	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKI3210_SIM_CPHS_AOC", 0) != 0);
 	{
 		u8 atr[40] = { 0x3b, 0x10, 0x05 };
@@ -810,7 +817,7 @@ PCD8544_SCREEN_UPDATE(noki3310_state::pcd8544_screen_update)
 TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 {
 	// CCONT watchdog
-	if (nokia_env_u32("NOKI3210_DISABLE_CCONT_WATCHDOG", 0) == 0 && m_ccont->watchdog_tick())
+	if (nokia_env_u32("NOKI3210_DISABLE_CCONT_WATCHDOG", m_product.disable_ccont_watchdog) == 0 && m_ccont->watchdog_tick())
 	{
 		m_maincpu->reset();
 		m_mad2->reset();
@@ -855,7 +862,7 @@ uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_ma
 		// populate logical byte 0x11fc87, but every collected record is erased.
 		// The low lane of halfword 0x11fc86 is logical byte 0x11fc87 on this
 		// big-endian ARM mapping. Do not move this value into the LCD device.
-		const unsigned profile_slot7 = nokia_env_u32("NOKI3210_DISPLAY_TYPE", 0xff) & 0xff;
+		const unsigned profile_slot7 = nokia_env_u32("NOKI3210_DISPLAY_TYPE", m_product.display_profile_slot7) & 0xff;
 		if (profile_slot7 != 0xff && address == 0x11fc86 && mem_mask == 0x00ff)
 			data = (data & 0xff00) | profile_slot7;
 	}
@@ -970,7 +977,7 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		data = (data & 0xfe) | sda;
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 &&
-			nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", 0) != 0 &&
+			m_simi->enabled() &&
 			(offset == 0x37 || offset == 0x38 || offset == 0x3c))
 	{
 		static unsigned sim_fifo_read_count = 0;
@@ -1331,6 +1338,25 @@ void noki3310_state::noki3210(machine_config &config)
 {
 	noki3310(config);
 	m_product = PRODUCT_3210;
+
+	// Both supported 3210 firmware revisions use this validated composition.
+	// Other DCT3 products retain the conservative base-device defaults until
+	// their corresponding hardware and peer contracts have been exercised.
+	m_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 20000000));
+	m_mad2->set_timer1_hz(nokia_env_u32("NOKI3210_TIMER1_HZ", 1057));
+	m_mad2->set_timer0_catchup(nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 1) != 0);
+
+	const bool external_service_model =
+			nokia_env_u32("NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 1) != 0;
+	const bool dsp_service_model = nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 1) != 0;
+	const unsigned dsp_default_ms = external_service_model ? 4 : 5;
+	m_dsp_hle->set_service_enabled(dsp_service_model);
+	m_dsp_hle->set_external_service_enabled(external_service_model);
+	m_dsp_hle->set_service_delay_ms(
+			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
+	m_dsp_hle->set_service_tick_ms(
+			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
+	m_external_service_peer->set_enabled(external_service_model);
 }
 
 void noki3310_state::noki5210(machine_config &config)

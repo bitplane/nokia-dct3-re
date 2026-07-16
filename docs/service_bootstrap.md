@@ -120,8 +120,8 @@ service-gated resume group, not by a slow task-18 initializer.
 
 ## Acceptance
 
-`make verify` protects the authentic default CONTACT SERVICE frame. The coherent
-profile is accepted only when `make verify-frontier` and the contact runtime
+`make verify` protects the authentic peer-disabled CONTACT SERVICE frame. The 3210
+machine profile is accepted only when `make verify-frontier` and the contact runtime
 manifest show:
 
 - no firmware result or RAM-state force;

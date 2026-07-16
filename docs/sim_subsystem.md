@@ -86,7 +86,8 @@ become visible.
 
 ## Stateful card device
 
-`NOKI3210_MODEL_SIM_DEVICE=1` enables the SIMI/card composition. The card
+The 3210 machine profile enables the SIMI/card composition. Setting
+`NOKI3210_MODEL_SIM_DEVICE=0` disables it for negative tests. The card
 implements:
 
 - activation reset, ATR and PPS echo;
@@ -95,8 +96,8 @@ implements:
 - synthetic GSM 11.11 file metadata and content.
 
 It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
-device is disabled, SIMI reads and writes retain the legacy/default behavior so the ordinary boot
-profiles remain unaffected.
+device is disabled, SIMI reads and writes retain the legacy behavior used by the
+peer-disabled failure baseline.
 
 ## Contract audit
 

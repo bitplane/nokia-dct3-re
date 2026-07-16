@@ -77,7 +77,7 @@ It consumes an already-produced descriptor; it is not a hidden session creator.
 
 ## Organic card conversation
 
-With `NOKI3210_MODEL_SIM_DEVICE=1`, the stateful device and firmware complete
+With the 3210 machine profile's stateful SIM device enabled, the device and firmware complete
 this conversation through MAD2 registers and FIQ6 (**R**):
 
 ```text
