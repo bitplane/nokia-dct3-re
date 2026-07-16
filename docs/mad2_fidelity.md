@@ -48,7 +48,7 @@ completeness.
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
 | `0d` clock control | extracted stored latch | Observed writes, unknown effects | Both ROMs write `0x0c` then `0x2c`; map clock domains and sleep transitions before adding side effects. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
-| `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Establish the input oscillator/divider formula and remove the frequency/catch-up knobs. |
+| `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, documented 13 MHz input | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Wider MAD2-family clock selection remains product-specific. |
 
 ## PUP, GPIO and serial blocks
 
@@ -145,9 +145,12 @@ This validates the live divider, coherent 16-bit counter read, compare and
 write-one-clear contract. The previous unused `0x04` timer constant and matching
 pending guard were wrong; runtime assertion/status/acknowledgement all establish
 `0x10`.
-It does not reveal the physical input clock. The coherent profile's 20 MHz
-base and catch-up behavior therefore remain explicit calibration debt rather
-than being promoted into the device contract.
+The NSE-8/9 system-module clocking scheme establishes a 13 MHz system clock at
+MAD2PR1. A provisioned coherent run reproduces the menu oracle with that input,
+the programmed divider and exact compare semantics; catch-up is not required.
+The 3210 product profile therefore uses 13 MHz directly and no longer accepts
+the earlier calibrated `TIMER0_HZ`/`TIMER0_CATCHUP` overrides. This does not
+establish clock selection for other MAD2 revisions.
 
 The same target performs a scheduled save/load round trip. Main RAM, MAD2
 registers, IRQ/FIQ pending state, timer counters/divider/compare latch, keypad

@@ -16,6 +16,10 @@ SECURITY_CODE_OFFSET = 0x0110
 SECURITY_STATE_OFFSET = 0x06C8
 SECURITY_XOR = bytes((0x00, 0xFF, 0xFF, 0xFF))
 SECURITY_CALLBACK_STATE = 0x11
+DISPLAY_PROFILE_KEY = 0x0749
+DISPLAY_PROFILE_LENGTH = 12
+DISPLAY_PROFILE_SLOT7_OFFSET = 5
+DISPLAY_PROFILE_SLOT7_VALUE = 4
 
 
 def sum16(data: bytes) -> int:
@@ -28,6 +32,23 @@ def write_be32(image: bytearray, offset: int, value: int) -> None:
 
 def write_be16(image: bytearray, offset: int, value: int) -> None:
     image[offset:offset + 2] = value.to_bytes(2, "big")
+
+
+def find_nv_descriptor(flash: bytes, key: int, length: int) -> int:
+    matches = []
+    for offset in range(0, len(flash) - 7, 4):
+        # The profile builder consumes the original big-endian .fls image,
+        # unlike the swap16 analysis image used by the static tools.
+        if int.from_bytes(flash[offset:offset + 4], "big") != key:
+            continue
+        location_length = int.from_bytes(flash[offset + 4:offset + 8], "big")
+        location = location_length >> 16
+        if (location_length & 0xFFFF) == length and location + length <= SIZE:
+            matches.append(location)
+    if len(matches) != 1:
+        raise ValueError(
+            f"NV descriptor 0x{key:04x}/{length} has {len(matches)} usable matches")
+    return matches[0]
 
 
 def validate_checksums(image: bytes) -> None:
@@ -121,6 +142,15 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None) -> byte
     }
     for address, value in patches.items():
         image[address] = value
+
+    # Descriptor 0x0749 owns three display-profile records. No complete factory
+    # record is available, so retain erased bytes and provision only the one
+    # recovered field: record-0 byte 5 is copied to active slot 7 and value 4
+    # selects the 3210 LCD setup. Firmware consumes it through normal I2C/NV
+    # loading; no firmware RAM or LCD-device state is overridden.
+    display_profile = find_nv_descriptor(
+        flash, DISPLAY_PROFILE_KEY, DISPLAY_PROFILE_LENGTH)
+    image[display_profile + DISPLAY_PROFILE_SLOT7_OFFSET] = DISPLAY_PROFILE_SLOT7_VALUE
 
     if provisioned_identity is not None:
         provision_security_identity(image, provisioned_identity)

@@ -13,19 +13,21 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_3210_owns_validated_boot_defaults(self):
         self.assertIn(
-            "constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true, 4 };",
+            "constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true };",
             self.driver,
         )
         profile = self.driver.split("void noki3310_state::noki3210(machine_config &config)", 1)[1]
         profile = profile.split("void noki3310_state::noki5210", 1)[0]
-        self.assertIn('"NOKI3210_TIMER0_HZ", 20000000', profile)
-        self.assertIn('"NOKI3210_TIMER0_CATCHUP", 1', profile)
+        self.assertIn("m_mad2->set_timer0_hz(13'000'000);", profile)
+        self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
+        self.assertNotIn('"NOKI3210_TIMER0_HZ"', profile)
+        self.assertNotIn('"NOKI3210_TIMER0_CATCHUP"', profile)
         self.assertIn('"NOKI3210_MODEL_DSP_SERVICE", 1', profile)
         self.assertIn('"NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 1', profile)
 
     def test_other_products_keep_conservative_defaults(self):
         self.assertIn(
-            "constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false, 0xff };",
+            "constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false };",
             self.driver,
         )
 

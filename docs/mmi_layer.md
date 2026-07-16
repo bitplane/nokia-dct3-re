@@ -10,7 +10,7 @@ report investigation; this file owns the keypad hardware-to-firmware contract.
 | --- | --- | --- | --- |
 | LCD controller | Reused device, partial integration | Firmware-generated command/data transfers reach MAME's PCD8544 device and reproduce a byte-exact visible frame. | Reset/electrical timing remains unmeasured. |
 | MAD2 LCD serialization | Derived hardware contract | Both 3210 ROMs select GENSIO endpoint `0x21`, send command prefix `24 40 80`, and transfer at least one complete 504-byte LCD RAM image MSB-first. | The immediate bit-clock implementation is functional timing, not a measured serial waveform. |
-| Display profile | Recovered NV boundary, missing data | Descriptor `0x0749` supplies three 12-byte profiles; record-0 byte 5 becomes active-profile slot 7 and the setup-message initializer tests it against `4`. | Every collected EEPROM has the descriptor erased. A quarantined read override still supplies `4`; no factory record is available to replace it honestly. |
+| Display profile | Recovered NV boundary, synthetic field | Descriptor `0x0749` supplies three 12-byte profiles; record-0 byte 5 becomes active-profile slot 7 and the setup-message initializer tests it against `4`. | Every collected EEPROM has the descriptor erased. The generated EEPROM supplies only this recovered field and leaves unknown bytes erased; no complete factory record is available. |
 | MAD2 keypad matrix | Partial hardware, strong evidence | v6.00 and v5.01 agree on the 4x5 active-low scan, IRQ0 source, register sequence, ROM keymap and decoded-key path. | Electrical debounce, mask-edge corner cases and timing outside the exercised lifecycle remain unvalidated. |
 | Lua LCD mirror and key script | Acceptance tooling | The independent mirror makes headless frame hashes and the script supplies deterministic physical key edges. | Neither is emulated phone hardware; scripted delays are fixtures, not keypad debounce. |
 
@@ -148,5 +148,6 @@ application work. The former MMI-specific handoff trace was retired when
 active-profile copy and setup-message boundaries. `NOKI3210_TRACE_DISPLAY_IO=1`
 records only endpoint selection and LCD command/data bytes. `make verify-display`
 checks both ROMs' NV descriptor layouts and serial transfers; its v6.00 leg also
-locks down the currently erased record and absent profile-update handler. The
+locks down the minimal synthetic field, its firmware-owned copy and the absent
+profile-update handler. The
 byte-exact frame remains the end-to-end rendering oracle.

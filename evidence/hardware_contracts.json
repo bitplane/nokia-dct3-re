@@ -129,7 +129,7 @@
     },
     {
       "id": "display_profile_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
-      "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; record-0 byte 5 becomes active slot 7 at 0x11fc87, but all collected records are erased so a quarantined initializer-read override still supplies value 4",
+      "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; record-0 byte 5 becomes active slot 7 at 0x11fc87. All collected records are erased, so the generated EEPROM supplies only this recovered field as value 4 through the normal NV path and leaves unknown bytes erased",
       "evidence": ["docs/eeprom_analysis.md", "docs/mmi_layer.md", "docs/normalization_status.md"]
     }
   ]

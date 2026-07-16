@@ -67,17 +67,15 @@ be investigated only when an organic application path reaches its boundary.
 | DSP/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns boot-subset DSP behavior; `nokia_external_service_peer_device` owns the separate request-driven service/test session. | Recover bootstrap transition timing and add wrap/full/fault transport cases; extend peer vocabulary only for organic requests. |
 | MAD2 | `nokia_mad2_device` owns CTSI offsets `0x00..0x16`, timer-0/FIQ4, pending/masks, IRQ/FIQ aggregation and save-state restoration. SIMI, MBUS and GENSIO are separate devices; other peripheral windows remain phone-owned. | Establish extended IRQ ownership, physical timer clocks and reset domains; do not promote the unexercised timer-1 approximation. |
 | MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, calibrated byte timing and FIQ2/FIQ3 callbacks; ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing. | Recover physical baud/FIQ3 timing, collision/error behavior and attach a counterparty only for organic frames. |
-| Display/input | Native PCD8544, a cross-ROM LCD transport check, and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures. Descriptor `0x0749` owns the missing display-profile byte, but all collected records are erased. | Obtain an authentic `0x0749` profile before removing the shortcut; recover reset timing and mask/debounce edge cases separately. |
+| Display/input | Native PCD8544, a cross-ROM LCD transport check, and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures. The generated EEPROM supplies the one recovered descriptor-`0x0749` field through normal NV loading. | Obtain a complete authentic `0x0749` profile to replace the minimal synthetic field; recover reset timing and mask/debounce edge cases separately. |
 
 The headless LCD mirror and delayed-key fixture are acceptance tooling in
 `mame_noki3210_input_exerciser.lua`. They do not add device state or firmware
 shortcuts to the phone driver.
 
-One RAM-read shortcut remains explicitly quarantined for display-profile slot 7.
-It changes logical byte `0x11fc87` only while the v5.01/v6.00 setup initializer
-reads it. NV descriptor `0x0749` is the recovered owner; the shortcut remains
-because every available record is erased, not because the source is still
-attributed to unknown hardware.
+The synthetic EEPROM provisions the single recovered display-profile field at
+ROM-described descriptor `0x0749`; firmware loads and copies it organically.
+Unknown bytes remain erased because no complete factory record is available.
 
 ## Runtime-control ledger
 
@@ -85,9 +83,8 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 
 | Class | Controls | Status |
 | --- | --- | --- |
-| Product-provisioning shortcut | `DISPLAY_TYPE` | Quarantined read override for active display-profile slot 7; remove only when an authentic descriptor-`0x0749` record is available. |
 | Hardware scenarios | `ADC_PROFILE`, `ADC0..7`, `SIM_ATR_HEX`, `SIM_CPHS_AOC` | Deterministic analog/card inputs, not inferred physical defaults. |
-| Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MBUS_BYTE_DELAY_MS`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | Retain while visible as calibration debt; replace with recovered clocks/transactions. |
+| Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MBUS_BYTE_DELAY_MS`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | Timer-0 overrides remain available to unfinished non-3210 profiles; the 3210 uses its documented 13 MHz clock and exact compare. Retain the others while visible as calibration debt. |
 | Safety/acceptance guard | `DISABLE_CCONT_WATCHDOG` | Prevents the correctly loaded CCONT counter from powering down before the still-missing periodic firmware service; not hardware fidelity. |
 | Device-boundary prototypes | `MODEL_CCONT_PRESENT`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE` | Enabled by the 3210 product profile; overrides remain for negative tests. Organic interfaces, incomplete wider contracts. |
 | Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_CCONT_WATCHDOG`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS` | Log-only and bounded or scoped to a named investigation. |

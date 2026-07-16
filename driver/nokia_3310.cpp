@@ -53,13 +53,12 @@ struct nokia_product_config
 	bool boot_devices;
 	bool sane_adc_defaults;
 	bool disable_ccont_watchdog;
-	u8 display_profile_slot7;
 };
 
-constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true, 4 };
-constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false, 0xff };
-constexpr nokia_product_config PRODUCT_5X10 = { 0x10, false, false, false, 0xff };
-constexpr nokia_product_config PRODUCT_8XXX = { 0x10, false, false, false, 0xff };
+constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, true };
+constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false };
+constexpr nokia_product_config PRODUCT_5X10 = { 0x10, false, false, false };
+constexpr nokia_product_config PRODUCT_8XXX = { 0x10, false, false, false };
 
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
@@ -283,7 +282,6 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_mbus_rx_fixture);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
-	uint16_t ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask);
 	void ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	void ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_t mem_mask);
 	uint16_t eeprom_r(offs_t offset, uint16_t mem_mask = ~0);
@@ -496,10 +494,11 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback, bool sane_def
 // environment (pass overrides through `make run RUN_ENV='...'`). Three kinds:
 //
 //   1. HARDWARE/PRODUCT CONFIG — selects a scenario, not firmware behaviour:
-//      erased-NV display-profile fallback (DISPLAY_TYPE), power/ADC (ADC_PROFILE,
-//      DISABLE_CCONT_WATCHDOG), clocks (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP,
-//      FIQ8_HZ), and the SIM UART/card fixture. The validated 3210 values are
-//      product defaults; environment values remain research overrides.
+//      power/ADC (ADC_PROFILE, DISABLE_CCONT_WATCHDOG), clocks
+//      (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP,
+//      FIQ8_HZ), and the SIM UART/card fixture. The 3210's documented timer-0
+//      clock is fixed in its product configuration; remaining environment
+//      values are research overrides for unfinished profiles or scenarios.
 //
 //   2. DEVICE-BOUNDARY MODELS — behavior behind an ordinary hardware interface.
 //      The 3210 enables the validated composition by default; MODEL_* can still
@@ -834,39 +833,10 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 	}
 }
 
-// Hardware RAM read entry point (registered in the address map). The real
-// backing read plus firmware-research shortcuts/traces live in the
-// quarantined ram_r_firmware_overrides below.
+// Hardware RAM read entry point (registered in the address map).
 uint16_t noki3310_state::ram_r(offs_t offset, uint16_t mem_mask)
 {
-	return ram_r_firmware_overrides(offset, mem_mask);
-}
-
-// ============================================================================
-// Firmware-research RAM-read path: backing read + an explicit shortcut which
-// can rewrite the returned value + execution traces. NOT clean hardware
-// behaviour; should shrink as their real hardware/NV owners are established.
-// ============================================================================
-uint16_t noki3310_state::ram_r_firmware_overrides(offs_t offset, uint16_t mem_mask)
-{
-	uint16_t data = m_ram[offset];
-	const offs_t address = 0x100000 + (offset << 1);
-	const u32 pc = m_maincpu->pc();
-
-	const bool display_initializer =
-			(pc >= 0x002b1e80 && pc <= 0x002b1f22) || // 3210 v6.00
-			(pc >= 0x002af2ac && pc <= 0x002af34e);   // 3210 v5.01
-	if (display_initializer && address >= 0x11fc80 && address <= 0x11fc90)
-	{
-		// Product-provisioning shim: descriptor 0x0749 record-0 byte 5 should
-		// populate logical byte 0x11fc87, but every collected record is erased.
-		// The low lane of halfword 0x11fc86 is logical byte 0x11fc87 on this
-		// big-endian ARM mapping. Do not move this value into the LCD device.
-		const unsigned profile_slot7 = nokia_env_u32("NOKI3210_DISPLAY_TYPE", m_product.display_profile_slot7) & 0xff;
-		if (profile_slot7 != 0xff && address == 0x11fc86 && mem_mask == 0x00ff)
-			data = (data & 0xff00) | profile_slot7;
-	}
-	return data & mem_mask;
+	return m_ram[offset] & mem_mask;
 }
 
 // Hardware RAM write entry point (registered in the address map). The backing
@@ -1342,9 +1312,11 @@ void noki3310_state::noki3210(machine_config &config)
 	// Both supported 3210 firmware revisions use this validated composition.
 	// Other DCT3 products retain the conservative base-device defaults until
 	// their corresponding hardware and peer contracts have been exercised.
-	m_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 20000000));
+	// NSE-8/9 system-module documentation establishes a 13 MHz MAD2PR1
+	// system clock. Timer 0 applies its programmed divider internally.
+	m_mad2->set_timer0_hz(13'000'000);
 	m_mad2->set_timer1_hz(nokia_env_u32("NOKI3210_TIMER1_HZ", 1057));
-	m_mad2->set_timer0_catchup(nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 1) != 0);
+	m_mad2->set_timer0_catchup(false);
 
 	const bool external_service_model =
 			nokia_env_u32("NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 1) != 0;
@@ -1412,8 +1384,8 @@ ROM_START( noki3210 )
 	ROMX_LOAD("3210f501.fls", 0x000000, 0x200000, CRC(e8d904a6) SHA1(8ad137c6aba9eb27bef067458d23016843f7fad5), ROM_BIOS(1))
 
 	ROM_REGION(0x04000, "eeprom", ROMREGION_ERASEFF)
-	ROMX_LOAD("3210 v600 eeprom.bin", 0x00000, 0x04000, CRC(7f7fd703) SHA1(3402e47e133dc74c7fa03863fee44a171f15100e), ROM_BIOS(0))
-	ROMX_LOAD("3210 v501 eeprom.bin", 0x00000, 0x04000, CRC(d20bc7da) SHA1(94893cc6cf9e822683c50599b731e8f872fcd56c), ROM_BIOS(1))
+	ROMX_LOAD("3210 v600 eeprom.bin", 0x00000, 0x04000, CRC(f0153eaa) SHA1(ed1075357d3ee11cb1e532dc4b8ebd69b6c255ec), ROM_BIOS(0))
+	ROMX_LOAD("3210 v501 eeprom.bin", 0x00000, 0x04000, CRC(6be8d3c6) SHA1(15cfad891555bb138a03d2398dfb0bdabaeab813), ROM_BIOS(1))
 ROM_END
 
 ROM_START( noki3310 )

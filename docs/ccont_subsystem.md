@@ -201,6 +201,12 @@ periodic owner. Direct callers cover startup/NV work and the external-service
 D9 poll; the remaining question is which firmware-owned schedule should invoke
 the exported helper after startup.
 
+Replacing the former calibrated timer-0 input with MAD2PR1's documented 13 MHz
+system clock preserves the interactive boot but does not change this result:
+the combined service remains at 0.838 s and an unguarded run still restarts at
+49 s. The missing reload is therefore not an artifact of the old 20 MHz timer
+calibration. No periodic reload is synthesized pending evidence for its owner.
+
 Service-channel provisioning does not control CCONT startup-event delivery.
 Any further CCONT change requires a separately evidenced register, timing, or
 IRQ contract.

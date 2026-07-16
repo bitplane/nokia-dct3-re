@@ -63,10 +63,12 @@ def check_v600_profile(text: str):
     for pc in (0x29A996, 0x29A768, 0x2B1E80):
         if pc not in profiles:
             errors.append(f"missing display-profile boundary 0x{pc:08x}")
-    if 0x29A768 in profiles and profiles[0x29A768][0] != bytes([0xFF]) * 12:
-        errors.append("NV descriptor 0x0749 did not yield the expected erased record")
-    if 0x2B1E80 in profiles and profiles[0x2B1E80][1][7] != 0xFF:
-        errors.append("active backing slot 7 changed before the quarantined read override")
+    expected = bytearray([0xFF]) * 12
+    expected[5] = 4
+    if 0x29A768 in profiles and profiles[0x29A768][0] != expected:
+        errors.append("NV descriptor 0x0749 did not yield the synthetic display field")
+    if 0x2B1E80 in profiles and profiles[0x2B1E80][1][7] != 4:
+        errors.append("firmware did not copy display-profile byte 5 to active slot 7")
     if 0x29AE68 in profiles:
         errors.append("display-profile update handler unexpectedly ran during coherent boot")
     return errors, {"boundaries": len(profiles), "update_seen": int(0x29AE68 in profiles)}

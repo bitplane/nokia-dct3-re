@@ -96,14 +96,13 @@ that byte against `4`. The driver override is implemented on the low byte lane
 of the halfword at `0x11fc86`; it therefore changes logical byte `0x11fc87`,
 not byte `0x11fc86`.
 
-All four collected 3210 EEPROM images and both generated BIOS profiles have
-the applicable three-record range erased. In a coherent v6.00 run the NV read
-produces twelve `0xff` bytes, the later profile-update handler `0x29ae68` does
-not execute, and the backing active slot remains `0xff`. No authentic record or
-firmware-selected fallback currently establishes the required value `4`.
-Consequently the generator deliberately does not invent descriptor contents,
-and the quarantined read override remains an explicit product-provisioning
-gap. `make verify-display` makes this stop boundary reproducible.
+All four collected 3210 EEPROM images have the applicable three-record range
+erased, so no complete factory record is available. The generated profile now
+leaves every unknown byte erased and supplies only record-0 byte 5 as value `4`,
+the field whose ownership and consumer are statically recovered. Firmware loads
+that byte through I2C/NV, copies it to active slot 7 and selects the 3210 LCD
+setup without a RAM-read override. The later profile-update handler `0x29ae68`
+does not execute during coherent boot. `make verify-display` checks this path.
 
 Both collected 3210 images have erased bytes across the descriptor-2/3/4 range,
 so this ROM substitutes its validated defaults. The source-7 gain denominator is

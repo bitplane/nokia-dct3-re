@@ -14,7 +14,7 @@ explicitly documented research shortcuts:
 |---|---|
 | `flash_r` (≈6 lines)  | `nokia_3310_trace.inc::flash_firmware_traces` (observation only; cannot override instructions) |
 | `ram_w`   (≈10 lines) | `nokia_3310_trace.inc::ram_w_firmware_traces` (write-side research observations) |
-| `ram_r`   (≈10 lines) | `ram_r_firmware_overrides` (read-side research observations) |
+| `ram_r`   (≈2 lines)  | none; display provisioning now arrives through EEPROM/NV |
 
 The PCD8544 LCD and MAME `I2C_24C128` model the display and external
 EEPROM. Headless LCD capture and scripted keypad input belong to the Lua
@@ -48,11 +48,10 @@ explicit configurations rather than driver-name parsing.
 - The research helpers should **shrink over time**. Delete a trace after its
   conclusion is normalized; replace each RAM-read shortcut with its real
   hardware or nonvolatile-data owner.
-- All firmware-result forces and registration-message injections are removed.
-  One explicit RAM-read shortcut remains for erased NV display-profile
-  descriptor `0x0749`; it overrides logical byte `0x11fc87` during the setup
-  initializer and is not LCD hardware behavior. See
-  `evidence_regime.md`.
+- All firmware-result forces, registration-message injections and firmware RAM
+  read overrides are removed. The synthetic EEPROM provisions only the
+  recovered descriptor-`0x0749` display-selection field; firmware loads and
+  copies it through its ordinary NV path. See `evidence_regime.md`.
 - The direct firmware allocation trampoline,
   service-status RAM completion, and synthetic startup-report feed are removed.
   The current external-service peer consumes organic DSP-ring requests and returns

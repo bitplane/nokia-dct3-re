@@ -7,9 +7,49 @@ becomes "look up which stub the firmware is poking" instead of a fresh labyrinth
 
 Current fidelity claims are maintained in `mad2_fidelity.md`.
 
+## Physical board anchor
+
+The [iFixit Nokia 3210 teardown](https://www.ifixit.com/Teardown/Nokia%2B3210%2BTeardown/11328)
+identifies the following packages on the photographed board. This is useful
+package-identification evidence, not a specification of internal behavior or
+address decoding:
+
+| Marking / part | Physical role | Emulator relationship |
+|---|---|---|
+| TI MAD2PR1 | system ASIC containing MCU, DSP and system logic | decomposed into the ARM core, MAD2 peripheral devices, DSP transport and DSP HLE |
+| CCONT NMP70467 | multifunction power-management ASIC | separate `nokia_ccont_device`, connected through MAD2 GENSIO |
+| NMP0581 | power-supply component (teardown description) | power conversion is not modeled as a separate firmware-visible device |
+| Intel F160B3TA | flash memory | 2 MiB firmware input/ROM region |
+| Atmel 24C128 | external serial EEPROM | native MAME `I2C_24C128` device |
+| Samsung KM68U1000 | 128K x 8 static RAM | confirms 128 KiB of physical SRAM; current wider CPU window decode remains provisional |
+| BGY252 / BGY262 | UHF power-amplifier modules | analog RF chain, not electrically simulated |
+| Hitachi HWYN202A | 900 MHz duplexer | analog RF chain, not electrically simulated |
+| MZT-03C | piezoelectric buzzer | transducer is not yet connected; MAD2/UI-switch control path must be recovered first |
+
+The Nokia NSE-8/9 system-module documentation is the stronger architectural
+source. It describes MAD2PR1 as one ASIC containing the ARM MCU, TMS320C542 DSP,
+API shared memory and system peripherals, and identifies separate CCONT,
+COBBA_GJP, EEPROM, SRAM, flash and UI-switch components. In particular, COBBA
+is a mixed-signal RF/audio codec connected to MAD2 by serial-RF and PCM buses;
+the current DSP HLE covers only the boot-visible behavior observed across that
+larger DSP/codec boundary. It is not complete digital-baseband emulation.
+
+Sources:
+
+- [Nokia 3210 NSE-8/9 system-module technical documentation](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/3210/ch2sys%20%5B103%5D.pdf)
+- [Samsung SRAM databook: KM68U1000 family organization](https://bitsavers.trailing-edge.com/components/samsung/_Databooks/1996_Samsung_SRAM_Data_Book.pdf)
+
+MAME device boundaries intentionally follow independently stateful interfaces,
+not package count. The MAD2 internal blocks therefore remain separate reusable
+devices wired by the phone driver; a package-level MAD2 aggregate is deferred
+until those ownership boundaries stabilize.
+
 ## The chip
 
-MAD2WD1 contains the emulated **ARM7TDMI MCU** and an unemulated DSP core. The MCU
+The 3210 board uses MAD2PR1, containing the emulated **ARM7TDMI MCU** and an
+unemulated DSP core. Other DCT3 products use related MAD2 revisions, including
+MAD2WD1; shared behavior must be established per block rather than inferred
+from the family name. The MCU
 runs the application/UI/control firmware; the DSP owns GSM Layer 1 and audio.
 `nokia_dspif_device` models firmware-visible shared memory, DSPIF and packet
 rings. Separate DSP-HLE and external-service devices attach the two semantic
@@ -51,6 +91,10 @@ profile; — = not established.
 | `0x0d` | clock control | ✓ |
 | `0x0e` | **interrupt trigger** (r; read-only — why `assert_irq(4)` can't be SW-triggered) | ✓ |
 | `0x0f–0x13` | programmable timer (divider/counter/compare) | ✓ |
+
+The 3210 product supplies MAD2PR1's documented 13 MHz system clock to timer 0;
+the firmware-programmed divider then produces counter ticks. Exact compare
+semantics reproduce both supported ROMs without the former catch-up option.
 
 ### PUP — MBUS, vibrator, buzzer, GenIO
 | off | reg | status / touch |

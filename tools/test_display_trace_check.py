@@ -26,12 +26,12 @@ class DisplayTraceCheckTests(unittest.TestCase):
         )
         self.assertTrue(any("without select" in error for error in errors))
 
-    def test_v600_profile_records_erased_nv_boundary(self):
+    def test_v600_profile_uses_synthetic_nv_field(self):
         text = "\n".join((
             "display_profile: pc=0029a996 source0=" + "00" * 12 + " active=" + "00" * 10,
-            "display_profile: pc=0029a768 source0=" + "ff" * 12 + " active=" + "00" * 10,
-            "display_profile: pc=002b1e80 source0=" + "ff" * 12 +
-                " active=" + "ff" * 8 + "00ff",
+            "display_profile: pc=0029a768 source0=ffffffffff04ffffffffffff active=" + "00" * 10,
+            "display_profile: pc=002b1e80 source0=ffffffffff04ffffffffffff"
+                " active=" + "ff" * 7 + "0400ff",
         ))
         errors, counts = display_trace_check.check_v600_profile(text)
         self.assertEqual(errors, [])
