@@ -56,7 +56,7 @@ be read as peripheral completeness.
 | --- | --- | --- | --- |
 | FIQ8 `15/16` | periodic timer when enabled; extended pending/status/mask routing | Partial routing, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery and acknowledgement. Identify the source clock and physical timer semantics. |
 | MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, physical character rate | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover FIQ3 phase/source, collision and error behavior. |
-| Buzzer `15/1c/1d/1e` | PUP bit-5 enable and 13 MHz divider drive a MAME beeper | Partial hardware | Validate volume transfer and ringtone paths; the MZT-03C acoustic response is not modeled. |
+| Buzzer `15/1c/1d/1e` | PUP bit-5 enable and 13 MHz divider drive a MAME beeper; `make verify-buzzer` validates a 2 kHz enable/disable transaction through mapped MMIO | Partial hardware | Validate an organic ringer path and volume transfer; keypad tones are DSP/COBBA-owned and the MZT-03C acoustic response is not modeled. |
 | Vibrator `15/1b` | register storage only | Placeholder | Connect an output and recover frequency/mode semantics. |
 | GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
 | Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, ROM-derived 3210 wiring, row direction/drive, physical press/release edges on IRQ0 | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |

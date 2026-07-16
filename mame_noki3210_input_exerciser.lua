@@ -34,6 +34,7 @@ local charger_pulse_at
 local irq_overlap_at
 local irq_mask_fixture_at
 local fiq8_fixture_at
+local buzzer_fixture_at
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
@@ -59,6 +60,7 @@ local charger_pulse_duration = env_number("NOKI3210_CCONT_CHARGER_PULSE_DURATION
 irq_overlap_at = env_number("NOKI3210_MAD2_IRQ_OVERLAP_AT", -1)
 irq_mask_fixture_at = env_number("NOKI3210_MAD2_IRQ_MASK_FIXTURE_AT", -1)
 fiq8_fixture_at = env_number("NOKI3210_MAD2_FIQ8_FIXTURE_AT", -1)
+buzzer_fixture_at = env_number("NOKI3210_BUZZER_FIXTURE_AT", -1)
 local state_roundtrip_at = env_number("NOKI3210_STATE_ROUNDTRIP_AT", -1)
 
 local function emulation_seconds()
@@ -450,6 +452,22 @@ if fiq8_fixture_at >= 0 then
 		space:write_u8(0x2000c, old_ctrl)
 	end)
 	assert(coroutine.resume(fiq8_timer))
+end
+
+if buzzer_fixture_at >= 0 then
+	local buzzer_timer = coroutine.create(function()
+		emu.wait(buzzer_fixture_at)
+		local old_pup = space:read_u8(0x20015)
+		-- 13 MHz / 6500 = 2 kHz. This is a controller conformance fixture,
+		-- not an emulated firmware ringtone or application-state shortcut.
+		space:write_u8(0x2001c, 0x19)
+		space:write_u8(0x2001d, 0x64)
+		space:write_u8(0x2001e, 0x7f)
+		space:write_u8(0x20015, old_pup | 0x20)
+		emu.wait(0.05)
+		space:write_u8(0x20015, old_pup & 0xdf)
+	end)
+	assert(coroutine.resume(buzzer_timer))
 end
 
 if state_roundtrip_at >= 0 then

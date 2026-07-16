@@ -78,7 +78,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -108,6 +108,7 @@ help:
 	@echo "make verify-frontier-stability repeat the frontier and require semantic stability"
 	@echo "make verify-mmi-menu reproduce the provisioned interactive Phone book menu"
 	@echo "make verify-mmi-menu-501 reproduce the same menu under the v5.01 BIOS"
+	@echo "make verify-buzzer exercise the MAD2 piezo gate/divider MMIO contract"
 	@echo "make mad2-census MAD2_LOG=... summarize a bounded MAD2 ledger trace"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
 	@echo "make verify-structure  compare semantic boot predicates with $(ORACLE_STRUCT)"
@@ -425,6 +426,12 @@ verify-mbus:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_rx/error.log
 	$(PYTHON) tools/mbus_trace_check.py rx $(RUN_DIR)_mbus_rx/error.log
 	@echo "OK — MBUS initialization, idle TX and external RX/FIQ2 contracts reproduced"
+
+verify-buzzer:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_buzzer SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_BUZZER=1 NOKI3210_BUZZER_FIXTURE_AT=0.3'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_buzzer/error.log
+	$(PYTHON) tools/buzzer_trace_check.py $(RUN_DIR)_buzzer/error.log
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier

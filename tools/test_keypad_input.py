@@ -45,6 +45,11 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn("upper_ram_reads", self.harness)
         self.assertIn("upper_ram_writes", self.harness)
 
+    def test_buzzer_fixture_uses_only_mapped_mad2_registers(self):
+        self.assertIn("NOKI3210_BUZZER_FIXTURE_AT", self.harness)
+        for address in ("0x20015", "0x2001c", "0x2001d", "0x2001e"):
+            self.assertIn(f"space:write_u8({address}", self.harness)
+
     def test_interactive_target_uses_standard_mame_input(self):
         makefile = (ROOT / "Makefile").read_text()
         target = makefile.split("run-interactive:", 1)[1].split("\n\n", 1)[0]

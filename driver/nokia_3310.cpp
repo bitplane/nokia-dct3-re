@@ -1107,7 +1107,12 @@ void noki3310_state::update_buzzer()
 	const u16 divider = (u16(m_mad2_regs[0x1c]) << 8) | m_mad2_regs[0x1d];
 	if (divider != 0)
 		m_buzzer->set_clock(13'000'000 / divider);
-	m_buzzer->set_state(BIT(m_mad2_regs[0x15], 5) && divider != 0);
+	const bool enabled = BIT(m_mad2->reg(0x15), 5) && divider != 0;
+	m_buzzer->set_state(enabled);
+	if (nokia_env_u32("NOKI3210_TRACE_BUZZER", 0) != 0)
+		logerror("buzzer: enabled=%u divider=%u frequency=%u volume=%u t=%.6f\n",
+				enabled, divider, divider ? 13'000'000 / divider : 0,
+				m_mad2_regs[0x1e], machine().time().as_double());
 }
 
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
