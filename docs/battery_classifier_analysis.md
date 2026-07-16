@@ -226,7 +226,7 @@ sweep under a different name. The separate lifecycle audit below later justified
 one fixture from two independently decoded scalar thresholds; it does not revive
 the disproven pair-recognition premise.
 
-## Mode-4 state-3 fixture
+## Service-controlled mode 4
 
 The wider lifecycle audit subsequently supplied one unique, non-swept fixture:
 selector 4 `0x14` is below both independently decoded healthy thresholds, and
@@ -234,8 +234,8 @@ selector 1 `0x180` scales to 1840 at the ROM-default unity calibration, below th
 state-3 boundary 1900. Selector 0 and all unrelated channels remained at the
 coherent frontier profile; selector 5 remained zero for no charger.
 
-The eight-second run in `run_battery_mode4_state3` selected init mode 4 at
-`t=0.200674` and did not power off, proving the guard was skipped. It did not
+The bounded fixture selected init mode 4 at about `0.201 s` and did not power
+off, proving the guard was skipped. It did not
 initialize the monitor or reach state 3: no `0x110436` transition or terminal-report caller
 occurred, task 1 remained in mode `0x000d`, and its checklist stopped at `0x0b`
 rather than the coherent frontier's `0x0f`. SIM initialization consequently did
@@ -255,7 +255,7 @@ the coherent contact manifests, and must not be added to the normal boot peer to
 advance startup. Mode 4 is consequently a service-controlled battery lifecycle,
 not an evidenced ordinary boot branch. The battery/event-`0x43` route is closed.
 
-## Cold-boot safety contradiction
+## Cold-boot safety contract
 
 Ordinary battery init mode 1 calls `0x27d5fc`. It takes five source-7 samples,
 averages the primary scaled result, and powers the handset off when the average is
@@ -277,15 +277,13 @@ after the retry watchdog; `0x01b7` reaches startup mode `0x000d`. Changing a val
 gain or common offset cannot remove the ordered 200-unit gap because both checks
 consume the same calibrated/scaled source.
 
-This falsifies the pre-registered prediction that a constant, faithfully calibrated
+This falsifies the hypothesis that a constant, faithfully calibrated
 pack input can both survive cold boot and organically supply state 3. It also means
 calibration tuning cannot supply the shutdown-level result: all safe
 constant-input fixtures remain in states 1 or 2, while lower fixtures enter a
-genuine firmware shutdown path. It
-does not make the proper mode-0d advance impossible: unclassified state 0 is a
-separate accepted input to `0x2a6942`.
-
-The unresolved question is now narrower: why the emulated readiness checklist
-completes only after the first state-1 publication, and whether real hardware
-ordinarily reaches the same gate while state 0 is still current. This is an
-ordering/lifecycle question, not evidence for changing ADC values.
+genuine firmware shutdown path. Unclassified state 0 remains a separate
+accepted input to `0x2a6942`. However, the mode-`0x000d` consumer audit proves
+that this result selects a continuation; it is not a cold-boot completion gate.
+The coherent phone remains interactive after the ordinary state-1 result
+selects mode `0x0004`. Battery inputs must therefore be modeled from their
+physical contract, not tuned to select state 0 or state 3 during boot.

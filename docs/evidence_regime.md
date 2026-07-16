@@ -63,7 +63,7 @@ hypotheses and investigation history into this authoritative layer. Apply it
 after a substantial investigation, before changing frontier, or whenever
 terminology begins to imply ownership beyond the evidence.
 
-When a new dig closes:
+When an investigation closes:
 
 1. add or update one normalized artifact;
 2. attach static or runtime provenance and confidence;

@@ -1,0 +1,2454 @@
+{
+  "schema": 1,
+  "records": 272,
+  "accesses": [
+    {
+      "profile": "v600",
+      "offset": 0,
+      "data": 234,
+      "pc": 2711510,
+      "time": 0.01151,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 2,
+      "data": 255,
+      "pc": 2711510,
+      "time": 0.011513,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 4,
+      "data": 255,
+      "pc": 2711510,
+      "time": 0.011517,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 6,
+      "data": 234,
+      "pc": 2711510,
+      "time": 0.01152,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 8,
+      "data": 234,
+      "pc": 2711510,
+      "time": 0.011523,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 10,
+      "data": 234,
+      "pc": 2711510,
+      "time": 0.011527,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 12,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.01153,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 14,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011534,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 16,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011537,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 18,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011541,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 20,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011544,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 22,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011548,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 24,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011551,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 26,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011555,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 28,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011558,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 30,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011562,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 32,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011565,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 34,
+      "data": 0,
+      "pc": 2711510,
+      "time": 0.011568,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 36,
+      "data": 0,
+      "pc": 2711542,
+      "time": 0.011572,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "data": 1,
+      "pc": 2689710,
+      "time": 0.015967,
+      "role": "bootstrap_ack_or_rx_ring_base",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "data": 1,
+      "pc": 2689722,
+      "time": 0.017035,
+      "role": "bootstrap_ack",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "data": 1,
+      "pc": 2689782,
+      "time": 0.151247,
+      "role": "bootstrap_ack",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 2,
+      "data": 1,
+      "pc": 2689788,
+      "time": 0.151248,
+      "role": "bootstrap_ready",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 2,
+      "data": 1,
+      "pc": 2689796,
+      "time": 0.151249,
+      "role": "bootstrap_ready",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 0,
+      "data": 1,
+      "pc": 2689802,
+      "time": 0.15125,
+      "role": "bootstrap_ready",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 228,
+      "data": 0,
+      "pc": 2691222,
+      "time": 0.189193,
+      "role": "service_counter",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 218,
+      "data": 0,
+      "pc": 2691244,
+      "time": 0.189196,
+      "role": "service_counter",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 226,
+      "data": 0,
+      "pc": 2691290,
+      "time": 0.189197,
+      "role": "service_counter",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "data": 0,
+      "pc": 2690314,
+      "time": 0.24929,
+      "role": "shared_control_busy",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 164,
+      "data": 0,
+      "pc": 2689436,
+      "time": 0.267754,
+      "role": "tx_producer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "data": 0,
+      "pc": 2689438,
+      "time": 0.267754,
+      "role": "tx_consumer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "data": 0,
+      "pc": 2689454,
+      "time": 0.267755,
+      "role": "tx_consumer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 164,
+      "data": 0,
+      "pc": 2689456,
+      "time": 0.267755,
+      "role": "tx_producer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v600",
+      "offset": 164,
+      "data": 0,
+      "pc": 2688978,
+      "time": 0.267766,
+      "role": "tx_producer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v600",
+      "offset": 458,
+      "data": 128,
+      "pc": 2689142,
+      "time": 0.288844,
+      "role": "rx_consumer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "data": 140,
+      "pc": 2689146,
+      "time": 0.288844,
+      "role": "rx_producer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 458,
+      "data": 128,
+      "pc": 2689180,
+      "time": 0.288849,
+      "role": "rx_consumer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "data": 140,
+      "pc": 2689192,
+      "time": 0.28885,
+      "role": "rx_producer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "data": 2702,
+      "pc": 2689208,
+      "time": 0.288851,
+      "role": "bootstrap_ack_or_rx_ring_base",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 458,
+      "data": 129,
+      "pc": 2689334,
+      "time": 0.288899,
+      "role": "rx_consumer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v600",
+      "offset": 258,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 0.288904,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 260,
+      "data": 720,
+      "pc": 2689372,
+      "time": 0.288907,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 262,
+      "data": 3,
+      "pc": 2689372,
+      "time": 0.28891,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 264,
+      "data": 257,
+      "pc": 2689372,
+      "time": 0.288914,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 266,
+      "data": 57344,
+      "pc": 2689372,
+      "time": 0.288917,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 268,
+      "data": 2702,
+      "pc": 2689208,
+      "time": 0.289,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 270,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 0.289052,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 272,
+      "data": 720,
+      "pc": 2689372,
+      "time": 0.289056,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 274,
+      "data": 3,
+      "pc": 2689372,
+      "time": 0.289059,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 276,
+      "data": 1025,
+      "pc": 2689372,
+      "time": 0.289063,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 278,
+      "data": 49408,
+      "pc": 2689372,
+      "time": 0.289066,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 280,
+      "data": 628,
+      "pc": 2689208,
+      "time": 0.384828,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 282,
+      "data": 3328,
+      "pc": 2689372,
+      "time": 0.38488,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 284,
+      "data": 3214,
+      "pc": 2689208,
+      "time": 0.533405,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 286,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 0.533459,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 288,
+      "data": 576,
+      "pc": 2689372,
+      "time": 0.533463,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 290,
+      "data": 6,
+      "pc": 2689372,
+      "time": 0.533466,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 292,
+      "data": 1,
+      "pc": 2689372,
+      "time": 0.533469,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 294,
+      "data": 25601,
+      "pc": 2689372,
+      "time": 0.533473,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 296,
+      "data": 322,
+      "pc": 2689372,
+      "time": 0.533476,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 298,
+      "data": 2446,
+      "pc": 2689208,
+      "time": 1.79542,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 300,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 1.795472,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 302,
+      "data": 639,
+      "pc": 2689372,
+      "time": 1.795475,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 304,
+      "data": 2,
+      "pc": 2689372,
+      "time": 1.795479,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 306,
+      "data": 16386,
+      "pc": 2689372,
+      "time": 1.795482,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 308,
+      "data": 25600,
+      "pc": 2689372,
+      "time": 1.795486,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 310,
+      "data": 19342,
+      "pc": 2689208,
+      "time": 1.873545,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 312,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 1.873604,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 314,
+      "data": 576,
+      "pc": 2689372,
+      "time": 1.873607,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 316,
+      "data": 69,
+      "pc": 2689372,
+      "time": 1.873611,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 318,
+      "data": 1,
+      "pc": 2689372,
+      "time": 1.873614,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 320,
+      "data": 28672,
+      "pc": 2689372,
+      "time": 1.873618,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 322,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873621,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 324,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873624,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 326,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873628,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 328,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873631,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 330,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873635,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 332,
+      "data": 288,
+      "pc": 2689372,
+      "time": 1.873638,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 334,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873642,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 336,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873645,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 338,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873649,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 340,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873652,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 342,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873656,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 344,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873659,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 346,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873663,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 348,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873666,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 350,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873669,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 352,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873673,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 354,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873676,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 356,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.87368,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 358,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873683,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 360,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873687,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 362,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.87369,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 364,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873694,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 366,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873697,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 368,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873701,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 370,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873704,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 372,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873708,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 374,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873711,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 376,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873714,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 378,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873718,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 380,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873721,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 382,
+      "data": 0,
+      "pc": 2689372,
+      "time": 1.873725,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 384,
+      "data": 1,
+      "pc": 2689372,
+      "time": 1.873728,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 386,
+      "data": 17152,
+      "pc": 2689372,
+      "time": 1.873732,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 388,
+      "data": 2446,
+      "pc": 2689208,
+      "time": 1.886685,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 390,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 1.886737,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 392,
+      "data": 639,
+      "pc": 2689372,
+      "time": 1.886741,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 394,
+      "data": 2,
+      "pc": 2689372,
+      "time": 1.886744,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 396,
+      "data": 16388,
+      "pc": 2689372,
+      "time": 1.886748,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 398,
+      "data": 28672,
+      "pc": 2689372,
+      "time": 1.886751,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 220,
+      "data": 0,
+      "pc": 2688872,
+      "time": 4.588314,
+      "role": "shared_control_request",
+      "owner": "MCU request / DSP completion"
+    },
+    {
+      "profile": "v600",
+      "offset": 400,
+      "data": 2446,
+      "pc": 2689208,
+      "time": 7.941225,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 402,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 7.941277,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 404,
+      "data": 639,
+      "pc": 2689372,
+      "time": 7.94128,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 406,
+      "data": 2,
+      "pc": 2689372,
+      "time": 7.941284,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 408,
+      "data": 5,
+      "pc": 2689372,
+      "time": 7.941287,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 410,
+      "data": 24320,
+      "pc": 2689372,
+      "time": 7.941291,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 412,
+      "data": 2446,
+      "pc": 2689208,
+      "time": 11.906451,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 414,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 11.906503,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 416,
+      "data": 639,
+      "pc": 2689372,
+      "time": 11.906507,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 418,
+      "data": 2,
+      "pc": 2689372,
+      "time": 11.90651,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 420,
+      "data": 6,
+      "pc": 2689372,
+      "time": 11.906514,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 422,
+      "data": 24320,
+      "pc": 2689372,
+      "time": 11.906517,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 424,
+      "data": 2446,
+      "pc": 2689208,
+      "time": 15.871824,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 426,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 15.871876,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 428,
+      "data": 639,
+      "pc": 2689372,
+      "time": 15.871879,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 430,
+      "data": 2,
+      "pc": 2689372,
+      "time": 15.871883,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 432,
+      "data": 7,
+      "pc": 2689372,
+      "time": 15.871886,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 434,
+      "data": 24320,
+      "pc": 2689372,
+      "time": 15.87189,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 436,
+      "data": 2446,
+      "pc": 2689208,
+      "time": 19.837016,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 438,
+      "data": 7680,
+      "pc": 2689372,
+      "time": 19.837068,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 440,
+      "data": 639,
+      "pc": 2689372,
+      "time": 19.837071,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 442,
+      "data": 2,
+      "pc": 2689372,
+      "time": 19.837075,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 444,
+      "data": 0,
+      "pc": 2689372,
+      "time": 19.837078,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v600",
+      "offset": 446,
+      "data": 24320,
+      "pc": 2689372,
+      "time": 19.837082,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 0,
+      "data": 234,
+      "pc": 2701122,
+      "time": 0.010205,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 2,
+      "data": 255,
+      "pc": 2701122,
+      "time": 0.010209,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 4,
+      "data": 255,
+      "pc": 2701122,
+      "time": 0.010212,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 6,
+      "data": 234,
+      "pc": 2701122,
+      "time": 0.010215,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 8,
+      "data": 234,
+      "pc": 2701122,
+      "time": 0.010219,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 10,
+      "data": 234,
+      "pc": 2701122,
+      "time": 0.010222,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 12,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010226,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 14,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010229,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 16,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010233,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 18,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010236,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 20,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.01024,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 22,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010243,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 24,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010247,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 26,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.01025,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 28,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010254,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 30,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010257,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 32,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.01026,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 34,
+      "data": 0,
+      "pc": 2701122,
+      "time": 0.010264,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 36,
+      "data": 0,
+      "pc": 2701154,
+      "time": 0.010268,
+      "role": "shared_ram_self_test",
+      "owner": "MCU echo"
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "data": 1,
+      "pc": 2688102,
+      "time": 0.014774,
+      "role": "bootstrap_ack_or_rx_ring_base",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "data": 1,
+      "pc": 2688114,
+      "time": 0.015959,
+      "role": "bootstrap_ack",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "data": 1,
+      "pc": 2688176,
+      "time": 0.165178,
+      "role": "bootstrap_ack",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 2,
+      "data": 1,
+      "pc": 2688182,
+      "time": 0.165178,
+      "role": "bootstrap_ready",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 2,
+      "data": 1,
+      "pc": 2688192,
+      "time": 0.16518,
+      "role": "bootstrap_ready",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 0,
+      "data": 1,
+      "pc": 2688196,
+      "time": 0.16518,
+      "role": "bootstrap_ready",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 228,
+      "data": 0,
+      "pc": 2689606,
+      "time": 0.203129,
+      "role": "service_counter",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 218,
+      "data": 0,
+      "pc": 2689628,
+      "time": 0.203131,
+      "role": "service_counter",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 226,
+      "data": 0,
+      "pc": 2689674,
+      "time": 0.203132,
+      "role": "service_counter",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "data": 0,
+      "pc": 2688702,
+      "time": 0.263222,
+      "role": "shared_control_busy",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 164,
+      "data": 0,
+      "pc": 2687888,
+      "time": 0.281678,
+      "role": "tx_producer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "data": 0,
+      "pc": 2687890,
+      "time": 0.281678,
+      "role": "tx_consumer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "data": 0,
+      "pc": 2687906,
+      "time": 0.281679,
+      "role": "tx_consumer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 164,
+      "data": 0,
+      "pc": 2687908,
+      "time": 0.281679,
+      "role": "tx_producer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v501",
+      "offset": 164,
+      "data": 0,
+      "pc": 2687430,
+      "time": 0.28169,
+      "role": "tx_producer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v501",
+      "offset": 458,
+      "data": 128,
+      "pc": 2687594,
+      "time": 0.302767,
+      "role": "rx_consumer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "data": 140,
+      "pc": 2687598,
+      "time": 0.302768,
+      "role": "rx_producer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 458,
+      "data": 128,
+      "pc": 2687632,
+      "time": 0.302773,
+      "role": "rx_consumer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "data": 140,
+      "pc": 2687644,
+      "time": 0.302774,
+      "role": "rx_producer",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "data": 2702,
+      "pc": 2687660,
+      "time": 0.302775,
+      "role": "bootstrap_ack_or_rx_ring_base",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 458,
+      "data": 129,
+      "pc": 2687786,
+      "time": 0.302823,
+      "role": "rx_consumer",
+      "owner": "MCU"
+    },
+    {
+      "profile": "v501",
+      "offset": 258,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 0.302827,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 260,
+      "data": 720,
+      "pc": 2687824,
+      "time": 0.302831,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 262,
+      "data": 3,
+      "pc": 2687824,
+      "time": 0.302834,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 264,
+      "data": 257,
+      "pc": 2687824,
+      "time": 0.302838,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 266,
+      "data": 57344,
+      "pc": 2687824,
+      "time": 0.302841,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 268,
+      "data": 2702,
+      "pc": 2687660,
+      "time": 0.302924,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 270,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 0.302976,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 272,
+      "data": 720,
+      "pc": 2687824,
+      "time": 0.30298,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 274,
+      "data": 3,
+      "pc": 2687824,
+      "time": 0.302983,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 276,
+      "data": 1025,
+      "pc": 2687824,
+      "time": 0.302987,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 278,
+      "data": 49408,
+      "pc": 2687824,
+      "time": 0.30299,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 280,
+      "data": 628,
+      "pc": 2687660,
+      "time": 0.398726,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 282,
+      "data": 3328,
+      "pc": 2687824,
+      "time": 0.398778,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 284,
+      "data": 3214,
+      "pc": 2687660,
+      "time": 0.547294,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 286,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 0.547347,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 288,
+      "data": 576,
+      "pc": 2687824,
+      "time": 0.54735,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 290,
+      "data": 6,
+      "pc": 2687824,
+      "time": 0.547353,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 292,
+      "data": 1,
+      "pc": 2687824,
+      "time": 0.547357,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 294,
+      "data": 25601,
+      "pc": 2687824,
+      "time": 0.54736,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 296,
+      "data": 322,
+      "pc": 2687824,
+      "time": 0.547364,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 298,
+      "data": 2446,
+      "pc": 2687660,
+      "time": 1.79424,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 300,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 1.794292,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 302,
+      "data": 639,
+      "pc": 2687824,
+      "time": 1.794295,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 304,
+      "data": 2,
+      "pc": 2687824,
+      "time": 1.794299,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 306,
+      "data": 16386,
+      "pc": 2687824,
+      "time": 1.794302,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 308,
+      "data": 25600,
+      "pc": 2687824,
+      "time": 1.794306,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 310,
+      "data": 19342,
+      "pc": 2687660,
+      "time": 1.872365,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 312,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 1.872424,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 314,
+      "data": 576,
+      "pc": 2687824,
+      "time": 1.872427,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 316,
+      "data": 69,
+      "pc": 2687824,
+      "time": 1.872431,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 318,
+      "data": 1,
+      "pc": 2687824,
+      "time": 1.872434,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 320,
+      "data": 28672,
+      "pc": 2687824,
+      "time": 1.872438,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 322,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872441,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 324,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872445,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 326,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872448,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 328,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872452,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 330,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872455,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 332,
+      "data": 288,
+      "pc": 2687824,
+      "time": 1.872458,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 334,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872462,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 336,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872465,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 338,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872469,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 340,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872472,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 342,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872476,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 344,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872479,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 346,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872483,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 348,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872486,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 350,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.87249,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 352,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872493,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 354,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872497,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 356,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.8725,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 358,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872503,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 360,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872507,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 362,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.87251,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 364,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872514,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 366,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872517,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 368,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872521,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 370,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872524,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 372,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872528,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 374,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872531,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 376,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872535,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 378,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872538,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 380,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872542,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 382,
+      "data": 0,
+      "pc": 2687824,
+      "time": 1.872545,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 384,
+      "data": 1,
+      "pc": 2687824,
+      "time": 1.872548,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 386,
+      "data": 17152,
+      "pc": 2687824,
+      "time": 1.872552,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 388,
+      "data": 2446,
+      "pc": 2687660,
+      "time": 1.885547,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 390,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 1.885599,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 392,
+      "data": 639,
+      "pc": 2687824,
+      "time": 1.885602,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 394,
+      "data": 2,
+      "pc": 2687824,
+      "time": 1.885606,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 396,
+      "data": 16388,
+      "pc": 2687824,
+      "time": 1.885609,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 398,
+      "data": 28672,
+      "pc": 2687824,
+      "time": 1.885613,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 220,
+      "data": 0,
+      "pc": 2687324,
+      "time": 4.584044,
+      "role": "shared_control_request",
+      "owner": "MCU request / DSP completion"
+    },
+    {
+      "profile": "v501",
+      "offset": 400,
+      "data": 2446,
+      "pc": 2687660,
+      "time": 7.941225,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 402,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 7.941277,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 404,
+      "data": 639,
+      "pc": 2687824,
+      "time": 7.94128,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 406,
+      "data": 2,
+      "pc": 2687824,
+      "time": 7.941284,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 408,
+      "data": 5,
+      "pc": 2687824,
+      "time": 7.941287,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 410,
+      "data": 24320,
+      "pc": 2687824,
+      "time": 7.941291,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 412,
+      "data": 2446,
+      "pc": 2687660,
+      "time": 11.906451,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 414,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 11.906503,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 416,
+      "data": 639,
+      "pc": 2687824,
+      "time": 11.906507,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 418,
+      "data": 2,
+      "pc": 2687824,
+      "time": 11.90651,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 420,
+      "data": 6,
+      "pc": 2687824,
+      "time": 11.906514,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 422,
+      "data": 24320,
+      "pc": 2687824,
+      "time": 11.906517,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 424,
+      "data": 2446,
+      "pc": 2687660,
+      "time": 15.871779,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 426,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 15.871831,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 428,
+      "data": 639,
+      "pc": 2687824,
+      "time": 15.871835,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 430,
+      "data": 2,
+      "pc": 2687824,
+      "time": 15.871838,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 432,
+      "data": 7,
+      "pc": 2687824,
+      "time": 15.871842,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 434,
+      "data": 24320,
+      "pc": 2687824,
+      "time": 15.871845,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 436,
+      "data": 2446,
+      "pc": 2687660,
+      "time": 19.837058,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 438,
+      "data": 7680,
+      "pc": 2687824,
+      "time": 19.837111,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 440,
+      "data": 639,
+      "pc": 2687824,
+      "time": 19.837114,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 442,
+      "data": 2,
+      "pc": 2687824,
+      "time": 19.837117,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 444,
+      "data": 0,
+      "pc": 2687824,
+      "time": 19.837121,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    },
+    {
+      "profile": "v501",
+      "offset": 446,
+      "data": 24320,
+      "pc": 2687824,
+      "time": 19.837124,
+      "role": "rx_ring_payload",
+      "owner": "DSP peer"
+    }
+  ]
+}

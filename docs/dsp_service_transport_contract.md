@@ -1,7 +1,7 @@
 # DSP and generic-service transport contract
 
-This document defines the boundaries relevant to the current radio-registration
-frontier. It separates mechanisms with distinct owners and transports. The
+This document defines the mapped DSP, lower-service, and generic-service
+boundaries. It separates mechanisms with distinct owners and transports. The
 separation is important: identical numeric classes or
 events do not imply a shared transport.
 
@@ -22,14 +22,14 @@ The implementation now has three explicit owners:
 
 1. `nokia_dspif_device` owns shared RAM, DSPIF, ring indices, packet framing and
    FIQ0/IRQ4-facing completion;
-2. `nokia_dsp_hle_device` owns shared-service cadence, stateful bootstrap
+2. `nokia_dsp_hle_device` owns request-triggered shared-service completion, stateful bootstrap
    publications and the established type-`0x70` completion;
 3. `nokia_external_service_peer_device` owns discovery, class-`0x40` session
    correlation, channel map and healthy-state sequencing.
 
 The transport contains no service commands or session state. The external peer
 contains no shared-RAM offsets, ring arithmetic or interrupt ownership. The
-100 us producer wakeup, 5 ms service ticks, synchronous bootstrap replies and 36-tick
+100 us producer wakeup, 5 ms peer packet poll, synchronous bootstrap replies and 36-tick
 external-session delay remain calibrated prototype behavior rather than
 protocol constants.
 
@@ -58,6 +58,8 @@ All offsets below are byte offsets in the DSP shared window at `0x10000`.
 | `0x000..0x0a2` | MCU | DSP | Outbound packet data. |
 | `0x0a4` | MCU | DSP | Outbound producer index. |
 | `0x0a6` | DSP | MCU | Outbound consumer index. |
+| `0x0dc` / `0x0e0` | MCU request, DSP completion | MCU | Shared-control request/busy words selected by the command-4 helper. |
+| `0x0da` / `0x0e2` / `0x0e4` | DSP | MCU | Shared-service counters consumed by IRQ4 handling. |
 | `0x100..0x1c6` | DSP | MCU | Inbound packet data. |
 | `0x1c8` | DSP | MCU | Inbound producer index. |
 | `0x1ca` | MCU | DSP | Inbound consumer index. |
@@ -66,7 +68,7 @@ Packet header halfword `LLTT` contains payload length `LL` and packet type `TT`.
 The occupied size is `(LL + 3) / 2` halfwords. The peer must never advance a
 consumer over a partial packet or overwrite a producer owned by the other side.
 
-## Current organic state publication
+## Current organic channel-set publication
 
 The deep profile reaches the peer without an isolated producer probe:
 
@@ -74,7 +76,8 @@ The deep profile reaches the peer without an isolated producer probe:
 task 17 0x09ec -> task 15 case 6 -> task 16 0x07d6
   -> task 10 0x03e9 -> 72-byte work object
   -> task 3 -> MCU-to-DSP packet ring
-  -> type 0x1a, payload 68, prefix 44 1a 00 81 98 00
+  -> task-3 object length 0x44/type 0x1a
+  -> wire payload 68 bytes, prefix 00 81 98 00
 ```
 
 The task-15 leg is firmware-selected, not an emulation divergence: the organic
@@ -86,13 +89,19 @@ this packet to become visible. Consumption is not completion: advancing `0x0a6`
 must not synthesize a firmware result, queued generic-service object, or inbound
 packet.
 
-No response contract is established for type `0x1a`. Builder `0x219f0c` is
+Type `0x1a` publishes a GSM ARFCN set. Builder `0x219f0c` accepts GSM 900
+channel numbers `0..124` and DCS 1800 numbers `512..885`, remaps the latter by
+subtracting 383, and encodes the resulting 503-position domain in a reversed
+63-byte bitmap with control bytes. These ranges match 3GPP TS 45.005. The
+coherent boot's mode-2 source is rejected by the density check, producing flag
+`0x81` and a zero bitmap: an organic no-usable-channel-set state.
+
+No response contract exists for this publication. Builder `0x219f0c` is
 called only from task-10 state dispatcher `0x21ba54`; after posting the packet it
 retains no transaction identifier, reply object, or task-3 completion callback.
 It arms the global DSP-service timer, clears the activity counter, and returns.
 Task 17 has already received the immediate `0x043c` acknowledgement. The packet
-is therefore a fire-and-forget state/control publication unless later evidence
-identifies a correlated inbound transition.
+is therefore a fire-and-forget channel-set publication.
 
 The type-`0x80` inner-command-`0x60` decoder does test a byte against `0x1a`,
 but the byte is radio-controller state at `0x10dbd2`. It is `0x00` when the
@@ -105,9 +114,9 @@ global DSP-service cadence. It expires and rearms through task 4 at roughly
 34 ms intervals without delivering a task-10 status. It is not the missing
 semantic acknowledgement.
 
-## Expected firmware-side completion
+## Unreached lower-radio lifecycle
 
-The downstream chain is mapped independently of its missing ingress:
+The downstream chain is mapped independently of its ingress:
 
 ```text
 service-5 status 0x05e8 -> 0x05ea -> task-15 0x07dd
@@ -119,12 +128,10 @@ service-5 status 0x05e8 -> 0x05ea -> task-15 0x07dd
 Opcode `0x2a` is an adjacent context path which produces event `0x102f`, result
 `0x0fbf`, and context-handler dispatch `0x253610`; it is not the completion.
 The opcode-`0x36` object is a firmware translator product, not a raw peer packet,
-so this corrected chain still does not prove that type `0x1a` directly produces
-`0x05e8`. The relationship
-between the organic request and the firmware state which activates a recovered
-argumentless publisher remains unresolved. A valid peer model must establish
-that relationship from request/response evidence rather than inject any member
-of the downstream chain.
+so this chain does not prove that type `0x1a` produces `0x05e8`. No evidence
+links the ARFCN publication to this lifecycle. If an organic application path
+later requires it, a peer model must establish the ingress from an observed
+request/response contract rather than inject a downstream event.
 
 ## Descriptor evidence
 
@@ -138,8 +145,8 @@ callbacks other than `0x05e8` and are excluded by their fields. The final site,
 In the named eight-second deep-GSM run, transient-registration tracing observes
 only service `0x0a`: callers `0x26341e`, `0x296ec8`, and `0x296f16`, all with
 event `0x0114`. No transient service-5 registration executes, and no resident
-registration through `0x263d30` executes. Therefore the unresolved descriptors
-do not explain organic `0x05e8` publication in the current boot. The indirect
+registration through `0x263d30` executes. Therefore those descriptors do not
+produce organic `0x05e8` in the measured boot. The indirect
 resident site may execute in another firmware state, so this is not a global
 absence proof.
 
@@ -166,9 +173,28 @@ correlation, v5.01 doorbell/service mechanics and active-profile save/load.
 Layering tests prevent protocol vocabulary from leaking back into the transport.
 Malformed-packet fault reporting and physical timing remain unexercised gaps.
 
-A transport investigation succeeds when a peer-owned state change or inbound
-packet is correlated with a firmware consumer through the real hardware
-boundary and advances the ordinary task-17 registration lifecycle. Type `0x1a`
-and service-5 `0x05e8` must not be assumed to be the two ends of that contract:
-type `0x1a` has no proved reply dependency, while the exhaustive non-SAT census
-does not establish `0x05e8` as an ordinary-registration requirement.
+The paired packet census observes the same semantic sequence in both ROMs:
+34 MCU-to-peer packets and 11 peer-to-MCU packets. Request-derived behavior is
+limited to discovery echo/completion, external transport acknowledgements and
+the type-`0x70/0x74` `0d00` completion. External registration and the channel
+map remain peer-initiated canned frames. All observed MCU-to-peer packets now
+have classified MCU-side semantics. Twenty-four are one-way publications or
+transport acknowledgements and receive no peer packet response. This includes one segmented
+type-`0x51` DSP memory image and the five non-`0d00` type-`0x70` one-way
+publications. See `dsp_packet_semantics.md` for the complete vocabulary rather
+than inferring request/reply behavior from packet type alone.
+
+The shared-service timer is one-shot: a nonzero MCU publication at `0x0e4`
+schedules one counter clear and one IRQ4 completion. The transition census
+found that the former periodic implementation generated roughly 4,955
+zero-to-zero "completions" per ROM in 20 seconds. Removing those idle IRQs
+preserves both ROM transport gates and the interactive menu oracle. The retained
+`MODEL_DSP_SERVICE_TICK_MS` name controls peer packet polling for compatibility;
+it no longer creates periodic service completions.
+
+A future lower-radio investigation succeeds only when a peer-owned state change
+or inbound packet correlates with a firmware consumer through the real hardware
+boundary. Type `0x1a` and service-5 `0x05e8` must not be assumed to be the two
+ends of such a contract: type `0x1a` has no reply dependency, while the
+exhaustive non-SAT census does not establish `0x05e8` as an ordinary-registration
+requirement.

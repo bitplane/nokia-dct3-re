@@ -47,8 +47,8 @@
     {
       "id": "dsp_type70_0a09_task13_reply", "status": "disproven",
       "hypothesis": "The organic outbound DSP type-0x70 payload 0a 09 expects a type-0x74 echo which completes task 13 and reports startup code 7",
-      "conclusion": "An empty-ring-gated type-0x74 payload 0a 09 was delivered through the real DSP RX/FIQ0 path immediately after the organic request. It produced no task-13 message, 0x05eb, code 7, or mode advance; task 1 remained in mode 0x0004. This disproves that response shape, not the broader type-0x70 request family",
-      "evidence": ["docs/mmi_settlement.md"]
+      "conclusion": "An empty-ring-gated type-0x74 payload 0a 09 was delivered through the real DSP RX/FIQ0 path and produced no task-13 message, 0x05eb, code 7, or mode advance. The later owner census closes the premise statically: handler 0x234954 posts 0a09 only after it has consumed the correlated type-0x74/0d00 completion, making 0a09 a one-way post-completion publication rather than another request.",
+      "evidence": ["docs/dsp_interface.md", "docs/dsp_packet_semantics.md", "docs/mmi_settlement.md"]
     },
     {
       "id": "callback45_is_ordinary_code7_blocker", "status": "disproven",
@@ -95,7 +95,7 @@
     {
       "id": "dsp_type1a_direct_registration_request", "status": "disproven",
       "hypothesis": "The organic outbound DSP type-0x1a packet is a request whose direct inbound reply supplies task-17 registration completion",
-      "conclusion": "The sole caller of builder 0x219f0c is task-10 state dispatcher 0x21ba54; after posting the packet the builder retains no transaction token, reply object, or task-3 callback, arms only the global DSP cadence timer, clears the activity counter, and returns after task 17 has already received 0x043c. The apparent type-0x80 correlation at 0x284c74 instead tests radio-controller state 0x10dbd2, observed as 0x00 at the send, against later state 0x1a and can publish 0x1395 rather than 0x1391. Type 0x1a is a fire-and-forget state/control publication, not the missing direct registration request",
+      "conclusion": "The sole caller of builder 0x219f0c is task-10 state dispatcher 0x21ba54; after posting the packet the builder retains no transaction token, reply object, or task-3 callback, arms only the global DSP cadence timer, clears the activity counter, and returns after task 17 has already received 0x043c. Full builder decode identifies the payload as a 503-position GSM 900/DCS 1800 ARFCN bitmap; the coherent offline source is rejected by its density guard and publishes a zero channel set with flag 0x81. The apparent type-0x80 correlation at 0x284c74 instead tests radio-controller state 0x10dbd2, observed as 0x00 at the send, against later state 0x1a and can publish 0x1395 rather than 0x1391. Type 0x1a is a fire-and-forget channel-set publication, not the missing direct registration request",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/sim_registration.md"]
     },
     {
@@ -227,7 +227,7 @@
     {
       "id": "mode0d_state0_ordering_unlocks_code7_handoff", "status": "disproven",
       "hypothesis": "Completing the application-readiness checklist before the first battery classification selects the accepted mode-0d branch and removes the code-7 boot wall",
-      "conclusion": "The full checklist is delayed as one firmware task group behind the modeled external-service peer's service-empty 0x622a acknowledgement. Task 18 is merely the last task in the fixed resume order and posts code 0x12 immediately from its initializer. Shortening the peer's calibrated delay could change which tail 0x2a6942 selects, but both tails compare a mailbox report before falling through to equivalent interactive initialization. Timing changes the recorded continuation, not whether the UI starts; no timing constant was changed.",
+      "conclusion": "The full checklist is delayed as one firmware task group behind completion of the modeled service-empty 0x622a transaction. The serialized type-0x05 report is one-way; completion uses the separate DSPIF shared-control path, not an RX packet acknowledgement. Task 18 is merely the last task in the fixed resume order and posts code 0x12 immediately from its initializer. Shortening the peer's calibrated delay could change which tail 0x2a6942 selects, but both tails compare a mailbox report before falling through to equivalent interactive initialization. Timing changes the recorded continuation, not whether the UI starts; no timing constant was changed.",
       "evidence": ["docs/external_service_topology.md", "docs/mmi_settlement.md", "docs/service_bootstrap.md"]
     },
     {

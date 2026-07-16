@@ -15,7 +15,8 @@ request-driven peer:
 2. completes the DSP type-`0x70`/`0x74` service-control transaction;
 3. initiates the external class-`0x40` service session through task 7;
 4. supplies the channel map and correlated transport replies; and
-5. acknowledges the final `0x622a` service-empty transaction.
+5. completes the final `0x622a` service-empty transaction through DSPIF shared
+   control (the type-`0x05` report itself is one-way).
 
 Firmware retains service-present bit 6, clears busy bit 2, resumes the extended
 application tasks, and starts ordinary SIM traffic.
@@ -98,7 +99,7 @@ posts event `0x15`, and lets mode `0x000d` advance.
 This task lifecycle is part of service-session completion. Registration alone
 without the corresponding channel-map and transport completion is insufficient.
 
-The ordering run records the `0x622a` transport acknowledgement at `1.285269 s`,
+The ordering run records the `0x622a` shared-control completion at `1.285269 s`,
 the first group-two checklist write at `1.286232 s`, and the final task-18 write
 at `1.297865 s`. The first battery classification has already changed state
 `0 -> 1` at `0.364121 s`. Thus the ordering difference is owned by the whole

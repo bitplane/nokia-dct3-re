@@ -2,8 +2,8 @@
 
 This document records the later lower-radio contract needed for network
 registration, operator identity, and signal content. Offline MMI settlement is
-the immediate boot boundary; this map becomes active after that lifecycle is
-stable.
+validated; this map applies when extending the interactive phone into networked
+features.
 
 ## Current division of responsibility
 

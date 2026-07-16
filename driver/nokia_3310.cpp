@@ -357,6 +357,7 @@ private:
 	bool          m_mad2_trace_write[0x100] = {false};
 	bool          m_dspif_trace_read[4] = {false};
 	bool          m_dspif_trace_write[4] = {false};
+	std::unordered_map<uint64_t, uint16_t> m_dsp_shared_trace_reads;
 	bool          m_mcuif_trace_read[4] = {false};
 	bool          m_mcuif_trace_write[4] = {false};
 	uint8_t       m_mcuif_regs[4] = {0};
@@ -604,6 +605,7 @@ void noki3310_state::machine_reset()
 	std::fill(std::begin(m_mad2_trace_write), std::end(m_mad2_trace_write), false);
 	std::fill(std::begin(m_dspif_trace_read), std::end(m_dspif_trace_read), false);
 	std::fill(std::begin(m_dspif_trace_write), std::end(m_dspif_trace_write), false);
+	m_dsp_shared_trace_reads.clear();
 	std::fill(std::begin(m_mcuif_trace_read), std::end(m_mcuif_trace_read), false);
 	std::fill(std::begin(m_mcuif_trace_write), std::end(m_mcuif_trace_write), false);
 	std::fill(std::begin(m_mcuif_regs), std::end(m_mcuif_regs), 0);
@@ -878,7 +880,28 @@ void noki3310_state::eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 
 uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 {
-	return m_dspif->shared_r(offset);
+	offset &= 0x7ff;
+	const uint16_t data = m_dspif->shared_r(offset);
+	const uint32_t pc = m_maincpu->pc();
+	const uint64_t trace_key = (uint64_t(pc) << 11) | offset;
+	const unsigned byte_offset = offset << 1;
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_SHARED_TRANSITIONS", 0) != 0 &&
+			(byte_offset <= 0x004 || byte_offset == 0x0a6 || byte_offset == 0x0e0 ||
+			 byte_offset == 0x0e4 || byte_offset == 0x0fe || byte_offset == 0x100 ||
+			 byte_offset == 0x1c8))
+		logerror("dsp_shared_observe: off=%03x data=%04x pc=%08x t=%.6f\n",
+				byte_offset, data, pc, machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_SHARED_READS", 0) != 0)
+	{
+		auto [trace_item, inserted] = m_dsp_shared_trace_reads.emplace(trace_key, data);
+		if (inserted || trace_item->second != data)
+		{
+			trace_item->second = data;
+			logerror("dsp_shared_read: off=%03x data=%04x pc=%08x t=%.6f\n",
+					byte_offset, data, pc, machine().time().as_double());
+		}
+	}
+	return data;
 }
 
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
@@ -1323,7 +1346,7 @@ void noki3310_state::noki3310(machine_config &config)
 	m_dsp_hle->set_service_enabled(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", 0) != 0);
 	m_dsp_hle->set_external_service_enabled(external_service_model);
 	m_dsp_hle->set_service_delay_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
-	m_dsp_hle->set_service_tick_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
+	m_dsp_hle->set_peer_poll_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
 	m_dsp_hle->set_trace_enabled(dsp_trace);
 	m_external_service_peer->set_enabled(external_service_model);
 	m_external_service_peer->set_trace_enabled(dsp_trace);
@@ -1362,7 +1385,7 @@ void noki3310_state::noki3210(machine_config &config)
 	m_dsp_hle->set_external_service_enabled(external_service_model);
 	m_dsp_hle->set_service_delay_ms(
 			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
-	m_dsp_hle->set_service_tick_ms(
+	m_dsp_hle->set_peer_poll_ms(
 			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
 	m_external_service_peer->set_enabled(external_service_model);
 }

@@ -13,7 +13,7 @@ public:
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_delay_ms(unsigned delay) { m_service_delay_ms = delay; }
-	void set_service_tick_ms(unsigned period) { m_service_tick_ms = period; }
+	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
 	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
 
 	void tx_commit_w(int state);
@@ -43,7 +43,7 @@ private:
 	bool m_external_service_enabled = false;
 	bool m_trace_enabled = false;
 	unsigned m_service_delay_ms = 5;
-	unsigned m_service_tick_ms = 5;
+	unsigned m_peer_poll_ms = 5;
 	bool m_service_control_completion_sent = false;
 	unsigned m_bootstrap_exchange_count = 0;
 };

@@ -64,7 +64,7 @@ be investigated only when an organic application path reaches its boundary.
 | SIM | `nokia_simi_device` owns MAD2 registers/FIFOs/IIR, the default character rate retained by firmware PPS `ff 00 ff`, and FIQ6, connected by byte/reset callbacks to `nokia_sim_card_device`, which owns T=0 plus synthetic contents. | Generalize timing beyond the current fixed ATR/PPS profile; recover ATR-start/turnaround and error/removal contracts; separate subscriber provisioning from card protocol and extend files only for organic requests. |
 | CCONT/GENSIO | `nokia_ccont_device` owns selected-device registers and outputs, a deterministic binary RTC, recovered periodic IRQ sources, the documented watchdog counter and its WDDISX pin; `nokia_gensio_device` owns serial selection/status, LCD pins and SELECT latches. Both ROMs service the enabled watchdog organically. | Obtain board-level selector names, analog units, physical timing and SELECT peer identities. |
 | EEPROM | Native MAME `I2C_24C128` on mapped GenIO pins plus a v6.00-oriented generated provisioning fixture; the parallel window is unproved. | Decode remaining fields, validate writes/timing and another product's storage placement, and make fallback-record extraction ROM-aware. |
-| DSP/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the cross-ROM 64-exchange bootstrap publication and boot-subset DSP behavior; `nokia_external_service_peer_device` owns the separate request-driven service/test session. | Recover physical bootstrap response timing and add wrap/full/fault transport cases; extend peer vocabulary only for organic requests. |
+| DSP/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the cross-ROM 64-exchange bootstrap publication and boot-subset DSP behavior; `nokia_external_service_peer_device` owns the separate request-driven service/test session. Both ROMs have a complete MCU-side census of the observed outbound packet vocabulary. | Recover physical bootstrap response timing and malformed-packet behavior; identify DSP-side consumers for the mapped memory/table uploads; extend inbound peer vocabulary only when an organic application path requires it. |
 | MAD2 | `nokia_mad2_device` owns CTSI offsets `0x00..0x16`, timer-0/FIQ4, free-running timer-1/FIQ5, pending/masks, IRQ/FIQ aggregation and save-state restoration. SIMI, MBUS and GENSIO are separate devices; other peripheral windows remain phone-owned. | Establish extended IRQ ownership, Timer-0's physical input, Timer-1 destination compare behavior and reset domains. |
 | MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, 9,600-baud character timing and FIQ2/FIQ3 callbacks; ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing. | Recover FIQ3 phase/source and collision/error behavior; attach a counterparty only for organic frames. |
 | Display/input | Native PCD8544, a cross-ROM LCD transport check, and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures. The generated EEPROM supplies the one recovered descriptor-`0x0749` field through normal NV loading; an erased-profile control proves firmware has no usable fallback. | Obtain a complete authentic `0x0749` profile to replace the minimal synthetic field; recover reset timing and mask/debounce edge cases separately. |
@@ -85,10 +85,10 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 | Class | Controls | Status |
 | --- | --- | --- |
 | Hardware scenarios | `ADC_PROFILE`, `ADC0..7`, `SIM_ATR_HEX`, `SIM_CPHS_AOC` | Deterministic analog/card inputs, not inferred physical defaults. |
-| Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | The 3210 now defaults both MAD2 timers to the recovered 33,055 Hz CTSI rate. `TIMER0_HZ` remains an A/B override; the other knobs remain visible calibration debt. |
+| Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | The 3210 now defaults both MAD2 timers to the recovered 33,055 Hz CTSI rate. `MODEL_DSP_SERVICE_DELAY_MS` controls the one-shot shared-service completion delay; the legacy `TICK_MS` name controls peer packet polling only. The remaining knobs stay visible calibration debt. |
 | Hardware scenarios | `CCONT_READY`, `CCONT_WDDISX_GROUNDED` | Reset-time CCONT readiness and the documented physical watchdog-disable pin. The 3210 profile defaults to ready with WDDISX released. |
 | Device-boundary prototypes | `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE` | Enabled by the 3210 product profile; overrides remain for negative tests. Organic interfaces, incomplete wider contracts. |
-| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_GENSIO`, `TRACE_CCONT_WATCHDOG`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER` | Log-only and bounded or scoped to a named investigation. |
+| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_DSP_SHARED_READS`, `TRACE_DSP_SHARED_TRANSITIONS`, `TRACE_GENSIO`, `TRACE_CCONT_WATCHDOG`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER` | Log-only and bounded or scoped to a named investigation. |
 | Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `POST_READY_CAPTURE_DELAY_MS`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `BUZZER_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
@@ -108,6 +108,8 @@ The retained trace switches are scoped as follows:
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
 | `TRACE_GSM_SERVICE` | manifest-backed generic-service registrations/callbacks |
 | `TRACE_DSP_BOUNDARY` | shared-ring requests and request-derived peer responses |
+| `TRACE_DSP_SHARED_READS` | first read and value transitions for each firmware PC/DSP-shared-memory offset pair |
+| `TRACE_DSP_SHARED_TRANSITIONS` | every firmware observation of the small peer-owned scalar set, for request/completion correlation |
 | `TRACE_GENSIO` | serial register transactions |
 | `TRACE_CCONT_WATCHDOG` | combined firmware service-helper calls and logical-descriptor writes to physical CCONT watchdog register 5 |
 | `TRACE_MAD2_LEDGER` | first-access MAD2 register census |
@@ -128,7 +130,8 @@ hardware handlers.
   excluded registration paths, but the wider steady-state service
   topology remains incomplete.
 - The DSP/external-service peer contract is proved only for the requests exercised by
-  the current boot.
+  the current boot; outbound semantics are complete at the MCU boundary, while
+  wider inbound radio/L1 behavior remains unmapped.
 - The exact internal cold-boot UI selector remains unnamed, but its behavior is
   no longer a topology gap: provisioned boot reaches an interactive idle screen
   and opens the menu organically. Accepted-security, periodic-timer, conditional

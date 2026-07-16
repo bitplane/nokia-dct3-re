@@ -118,47 +118,11 @@ take steady exit `0x20290a` and none takes changed-directory exit `0x2028f4`.
 roughly 42 ms cadence. The repeated APDU remains because real firmware polls
 the card; the initialization loop and false directory-change handling are gone (**R**).
 
-In the coherent contact profile task 1 enters mode `0x0004` at about 1.435 s. Its next
-firmware predicate is report code `0x07`, posted by `0x2af190`. Runtime reaches
-the reporter's status-dispatch caller `0x27b370` with the normal global status
-`0x05e2`; that dispatch does not report ready. Backward mapping of all four
-callers identified this additional dormant route (**S/R**):
-
-```text
-callback-table index 0x1a receives status 0x1400
-  + message type 0x85 + state [0x11fced] == 2
-  -> controller status 0x08ac
-  -> conditional Advice-of-Charge controller 0x27f150
-```
-
-The old trace hook at `0x255c2e` was two bytes before the branch target and
-therefore could not fire; the concrete dispatcher census proves `0x0795`
-selects `0x255c30`. Further backchaining corrected the route's priority:
-`0x1400` is the event decoded from an argumentless task-5 mailbox message at
-`0x2af57c`, not a callback return. All 188 direct calls to task-5's event helper
-`0x2af6ea` have recoverable constants and none emits `0x1400`; the remaining
-unresolved-destination send is a service router whose table does not target
-task 5. This makes callback `0x1a` a mapped dormant/service-specific contract,
-not the owner of the current ordinary-startup path (**R**).
-
-The current coherent profile does produce `0x08ac` twice, but through a later
-telephony/controller owner rather than through `0x1400`. Dispatcher `0x255b5e`
-calls `0x27f150`. Selector `0` is backed by the EEPROM product gate plus CPHS
-CSP, or by SIM service-table provisioning. Coherent service-5 initialization
-reads ACM, ACMmax, and PUCT and proves `0x27f150` is an Advice-of-Charge limit
-controller. An exhausted-account fixture reaches its completion organically;
-the function publishes `0x019a`, not `0x0795` (**R correction**).
-
-The non-display `0x0795` producer at `0x28796a` belongs to another controller
-lifecycle. Catalogue-mode packed input `0x213a`/`0x613a` (status index
-`0x013a`) expands to `0x089a, 0x08b0`; adjacent `0x213b`/`0x613b` expands
-directly to `0x08b0`. Both are later framework-mode-11 paths: `0x013a` is an
-input to callback `0x24` in that mode, while callback `0x013b` is registered
-only after input `0x03ab` establishes the same mode. The coherent boot remains
-in mode 0.
-This exhausts the two literal `0x0795` producers and excludes the status as
-ordinary mode-4 ownership. See `mmi_settlement.md` for the selector,
-catalogue, and runtime evidence.
+Task 1 enters mode `0x0004` after this conversation and remains interactive.
+Report code `0x07`, callback `0x5d`, controller status `0x0795`, and the
+Advice-of-Charge lifecycle are not SIM-registration prerequisites. Their closed
+ownership and conditional power/UI semantics are authoritative in
+`mmi_settlement.md`; they are intentionally not duplicated in this map.
 
 The corrected card now requests and reads `EF_IMSI (6F07)`. The older absence
 claim described the malformed-directory run and is superseded (**R**).
@@ -510,15 +474,16 @@ The coherent run also pins a separate radio state-publication path at the DSP bo
 work through `0x290840` into the MCU-owned DSP TX ring. With the DSP peer cadence
 decoupled from the old 5 ms phase-lock (the opt-in model now defaults to 4 ms),
 the earlier type-`0x51`/`0x70` backlog drains and this object appears organically
-as `type 0x1a, payload 68`, beginning `441a 0081 9800`.
+as `type 0x1a, payload 68`, beginning `0081 9800`; `441a` belongs to the
+task-3 length/type header, not the wire payload.
 
 This packet is not a proved request for the missing completion. Builder
 `0x219f0c` is called only by the task-10 state dispatcher at `0x21ba54`. It
 retains no transaction token, reply object, or task-3 completion callback after
 posting the packet; it arms the global DSP cadence timer, clears the activity
 counter, and returns. Task 17 has already received `0x043c`. Type `0x1a` is thus
-classified as a fire-and-forget DSP state/control publication unless a future
-consumer correlation proves otherwise.
+classified as a fire-and-forget GSM ARFCN bitmap publication. The builder's
+accepted channel ranges and bitmap layout are documented in `dsp_interface.md`.
 
 The apparent type-`0x80` correlation at `0x284c74` is numeric coincidence. It
 tests radio-controller state byte `0x10dbd2`, which is `0x00` at this organic

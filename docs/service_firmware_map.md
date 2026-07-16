@@ -95,7 +95,8 @@ bit 6. This is distinct from class-`0x40` service command `0x74`.
 
 After service-session completion, supervisor `0x2a8ff2` requests channel-empty report
 `0x622a` through `0x2b13d4` and waits at `0x29bb06` for the transaction to
-complete. Its second resume group activates the application tasks that fill the
+complete through the DSPIF shared-control path. The serialized type-`0x05`
+report is one-way and receives no RX packet. Its second resume group activates the application tasks that fill the
 checklist at `0x112280`. Checklist completion posts event `0x15`; startup mode
 `0x000d` then advances.
 

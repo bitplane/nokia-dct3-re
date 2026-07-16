@@ -1,0 +1,7915 @@
+{
+  "schema": 1,
+  "peer_writes": 404,
+  "records": 400,
+  "transitions": [
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.0,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": null,
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.0,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": null,
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.015967,
+        "latency": 0.015967
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.015967,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.015967,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.017035,
+        "latency": 0.001068000000000003
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.017034,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.017034,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.018102,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.018101,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.018101,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.019169,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.019168,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.019168,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.020236,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.020236,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.020236,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.021303,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.021303,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.021303,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.02237,
+        "latency": 0.001067000000000002
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.02237,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.02237,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.023437,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.023437,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.023437,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.024504,
+        "latency": 0.001067000000000002
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.024504,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.024504,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.025571,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.025571,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.025571,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.026638,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.026638,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.026638,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.027706,
+        "latency": 0.001068000000000003
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.027705,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.027705,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.028772,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.028772,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.028772,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.02984,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.029839,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.029839,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.030907,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.030906,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.030906,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.031974,
+        "latency": 0.001068000000000003
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.031973,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.031973,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.033041,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.03304,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.03304,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.034108,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.034108,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.034108,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.035175,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.035175,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.035175,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.036242,
+        "latency": 0.0010670000000000054
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.036242,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.036242,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.037309,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.037309,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.037309,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.038376,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.038376,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.038376,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.039443,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.039443,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.039443,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.04051,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.04051,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.04051,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.041577,
+        "latency": 0.0010670000000000054
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.041577,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.041577,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.042645,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.042644,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.042644,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.043711,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.043711,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.043711,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.044779,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.044778,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.044778,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.045846,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.045845,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.045845,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.046913,
+        "latency": 0.0010680000000000064
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.046912,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.046912,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.04798,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.04798,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.04798,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.049047,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.049047,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.049047,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.050114,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.050114,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.050114,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.051181,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.051181,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.051181,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.052248,
+        "latency": 0.0010670000000000054
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.052248,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.052248,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.053315,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.053315,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.053315,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.054382,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.054382,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.054382,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.05545,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.055449,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.055449,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.056516,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.056516,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.056516,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.057584,
+        "latency": 0.0010680000000000064
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.057583,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.057583,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.058651,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.05865,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.05865,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.059718,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.059717,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.059717,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.060785,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.060784,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.060784,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.061852,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.061852,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.061852,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.062919,
+        "latency": 0.0010670000000000054
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.062919,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.062919,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.063986,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.063986,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.063986,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.065053,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.065053,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.065053,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.06612,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.06612,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.06612,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.067187,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.067187,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.067187,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.068254,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.068254,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.068254,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.069321,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.069321,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.069321,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.070389,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.070388,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.070388,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.071455,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.071455,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.071455,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.072523,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.072522,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.072522,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.07359,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.073589,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.073589,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.074657,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.074656,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.074656,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.075724,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.075724,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.075724,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.076791,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.076791,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.076791,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.077858,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.077858,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.077858,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.078925,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.078925,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.078925,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.079992,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.079992,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.079992,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.081059,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.081059,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.081059,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.082126,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.082126,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.082126,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.083194,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.083193,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.083193,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.08426,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.08426,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.08426,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.085328,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.085327,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.085327,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.086395,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.086394,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.086394,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.087462,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.087461,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.087461,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.088529,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.088528,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.088528,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.089596,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.089596,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.089596,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.090663,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.090663,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.090663,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.09173,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.09173,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.09173,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.092797,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.092797,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.092797,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.093864,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.093864,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.093864,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.094931,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.094931,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.094931,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.095998,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.095998,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.095998,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.097065,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.097065,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.097065,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.098133,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.098132,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.098132,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.099199,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.099199,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.099199,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.100267,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.100266,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.100266,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.101334,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.101333,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.101333,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.102401,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.1024,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.1024,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.103468,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.103468,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.103468,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.104535,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.104535,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.104535,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.105602,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.105602,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.105602,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.106669,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.106669,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.106669,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.107736,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.107736,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.107736,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.108803,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.108803,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.108803,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.10987,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.10987,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.10987,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.110938,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.110937,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.110937,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.112004,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.112004,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.112004,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.113072,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.113071,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.113071,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.114139,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.114138,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.114138,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.115206,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.115205,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.115205,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.116273,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.116272,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.116272,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.11734,
+        "latency": 0.0010679999999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.11734,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.11734,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.118407,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.118407,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.118407,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.119474,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.119474,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.119474,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.120541,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.120541,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.120541,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.121608,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.121608,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.121608,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.122675,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.122675,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.122675,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.123742,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.123742,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.123742,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.124809,
+        "latency": 0.0010669999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.124809,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.124809,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.125877,
+        "latency": 0.0010679999999999856
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.125876,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.125876,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.126943,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.126943,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.126943,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.128011,
+        "latency": 0.0010680000000000134
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.12801,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.12801,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.129078,
+        "latency": 0.0010679999999999856
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.129077,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.129077,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.130145,
+        "latency": 0.0010680000000000134
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.130144,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.130144,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.131212,
+        "latency": 0.0010679999999999856
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.131212,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.131212,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.132279,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.132279,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.132279,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.133346,
+        "latency": 0.0010669999999999846
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.133346,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.133346,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.134413,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.134413,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.134413,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.13548,
+        "latency": 0.0010669999999999846
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.13548,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.13548,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.136547,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.136547,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.136547,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.137614,
+        "latency": 0.0010669999999999846
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.137614,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.137614,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.138682,
+        "latency": 0.0010680000000000134
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.138681,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.138681,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.139748,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.139748,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.139748,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.140816,
+        "latency": 0.0010679999999999856
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.140815,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.140815,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.141883,
+        "latency": 0.0010680000000000134
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.141882,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.141882,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.14295,
+        "latency": 0.0010679999999999856
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.142949,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.142949,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.144017,
+        "latency": 0.0010680000000000134
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.144016,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.144016,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.145084,
+        "latency": 0.0010679999999999856
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.145084,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.145084,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.146151,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.146151,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.146151,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.147218,
+        "latency": 0.0010669999999999846
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.147218,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.147218,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.148285,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.148285,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.148285,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689722,
+        "time": 0.149352,
+        "latency": 0.0010670000000000124
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.149352,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.149352,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689710,
+        "time": 0.150419,
+        "latency": 0.0010669999999999846
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.150419,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.150419,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689782,
+        "time": 0.151247,
+        "latency": 0.0008279999999999954
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.151247,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.151247,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 0,
+      "old": 0,
+      "data": 1,
+      "time": 0.151247,
+      "role": "bootstrap_ready",
+      "trigger_class": "64 bootstrap exchanges complete",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.151247,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689802,
+        "time": 0.15125,
+        "latency": 3.0000000000030003e-06
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 2,
+      "old": 65535,
+      "data": 1,
+      "time": 0.151247,
+      "role": "bootstrap_ready",
+      "trigger_class": "64 bootstrap exchanges complete",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.151247,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2689788,
+        "time": 0.151248,
+        "latency": 1.000000000001e-06
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 4,
+      "old": 255,
+      "data": 1,
+      "time": 0.151247,
+      "role": "bootstrap_ready",
+      "trigger_class": "64 bootstrap exchanges complete",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.151247,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.178749,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.178749,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.178752,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.178752,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 228,
+      "old": 2,
+      "data": 0,
+      "time": 0.189141,
+      "role": "service_counter",
+      "trigger_class": "peer completes pending service work",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.185141,
+        "offset": 228,
+        "data": 2
+      },
+      "consumer": {
+        "pc": 2691222,
+        "time": 0.189193,
+        "latency": 5.1999999999996493e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.248656,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.248656,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 0.248699,
+        "latency": 4.300000000001525e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.248707,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.248707,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 0.248778,
+        "latency": 7.099999999998774e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.248928,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.248928,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 0.336781,
+        "latency": 0.08785299999999999
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 0,
+      "data": 6,
+      "time": 0.267082,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.266982,
+        "offset": 164,
+        "data": 6
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.267169,
+        "latency": 8.700000000000374e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 6,
+      "data": 11,
+      "time": 0.267306,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.267206,
+        "offset": 164,
+        "data": 11
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.289764,
+        "latency": 0.022458000000000033
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 128,
+      "data": 134,
+      "time": 0.277499,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.267206,
+        "offset": 164,
+        "data": 11
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 134,
+      "data": 140,
+      "time": 0.287915,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.267206,
+        "offset": 164,
+        "data": 11
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 0.28803,
+        "latency": 0.00011500000000003174
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 11,
+      "data": 17,
+      "time": 0.289906,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.289806,
+        "offset": 164,
+        "data": 17
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.373758,
+        "latency": 0.08385199999999998
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.336837,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.336837,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 0.337004,
+        "latency": 0.00016700000000002824
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.33706,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.33706,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 0.795611,
+        "latency": 0.45855099999999993
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 17,
+      "data": 21,
+      "time": 0.37389,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.37379,
+        "offset": 164,
+        "data": 21
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.375723,
+        "latency": 0.0018329999999999735
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 21,
+      "data": 29,
+      "time": 0.375876,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.375776,
+        "offset": 164,
+        "data": 29
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.379025,
+        "latency": 0.003149000000000013
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 29,
+      "data": 41,
+      "time": 0.379199,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.379099,
+        "offset": 164,
+        "data": 41
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.382212,
+        "latency": 0.003012999999999988
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 41,
+      "data": 55,
+      "time": 0.382396,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.382296,
+        "offset": 164,
+        "data": 55
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.382497,
+        "latency": 0.00010099999999996223
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 140,
+      "data": 142,
+      "time": 0.382618,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.382518,
+        "offset": 164,
+        "data": 57
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 0.382764,
+        "latency": 0.00014599999999997948
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 55,
+      "data": 57,
+      "time": 0.382618,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.382518,
+        "offset": 164,
+        "data": 57
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.434085,
+        "latency": 0.051466999999999985
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 57,
+      "data": 54,
+      "time": 0.434615,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.434515,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.449468,
+        "latency": 0.014853000000000005
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 54,
+      "data": 51,
+      "time": 0.449998,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.449898,
+        "offset": 164,
+        "data": 51
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.535067,
+        "latency": 0.08506899999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 142,
+      "data": 149,
+      "time": 0.534498,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.449898,
+        "offset": 164,
+        "data": 51
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 0.534612,
+        "latency": 0.00011399999999994748
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 51,
+      "data": 57,
+      "time": 0.535209,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.535109,
+        "offset": 164,
+        "data": 57
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.779663,
+        "latency": 0.24445399999999995
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 57,
+      "data": 63,
+      "time": 0.779805,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.779705,
+        "offset": 164,
+        "data": 63
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.791446,
+        "latency": 0.011641000000000012
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 63,
+      "data": 15,
+      "time": 0.791737,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.791637,
+        "offset": 164,
+        "data": 15
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.791933,
+        "latency": 0.00019599999999997397
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 15,
+      "data": 49,
+      "time": 0.792224,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.792124,
+        "offset": 164,
+        "data": 49
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.792421,
+        "latency": 0.00019700000000000273
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 49,
+      "data": 1,
+      "time": 0.792712,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.792612,
+        "offset": 164,
+        "data": 1
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.792908,
+        "latency": 0.00019599999999997397
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 1,
+      "data": 35,
+      "time": 0.793198,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.793098,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 0.793354,
+        "latency": 0.000156000000000045
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 35,
+      "data": 37,
+      "time": 0.793475,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.793375,
+        "offset": 164,
+        "data": 37
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 1.27883,
+        "latency": 0.48535499999999987
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.795621,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.795621,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 0.795658,
+        "latency": 3.6999999999953737e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.795668,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.795668,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 0.795735,
+        "latency": 6.699999999992823e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.795745,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.795745,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 1.310251,
+        "latency": 0.514506
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 37,
+      "data": 43,
+      "time": 1.278972,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.278872,
+        "offset": 164,
+        "data": 43
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 1.778192,
+        "latency": 0.49922
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.310307,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.310307,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 1.310489,
+        "latency": 0.00018199999999990446
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.310546,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.310546,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 1.63212,
+        "latency": 0.321574
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.632128,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.632128,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 1.64943,
+        "latency": 0.01730199999999993
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.649438,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.649438,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 1.649487,
+        "latency": 4.899999999996574e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.649658,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.649658,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 1.770488,
+        "latency": 0.12082999999999999
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.770496,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.770496,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 1.770545,
+        "latency": 4.899999999996574e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.770716,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.770716,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 2.390623,
+        "latency": 0.6199070000000002
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 43,
+      "data": 54,
+      "time": 1.778361,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.778261,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 1.866545,
+        "latency": 0.08818399999999982
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 149,
+      "data": 155,
+      "time": 1.787736,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.778261,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 1.787849,
+        "latency": 0.00011300000000002974
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 155,
+      "data": 194,
+      "time": 1.865861,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.787926,
+        "offset": 458,
+        "data": 155
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 1.865974,
+        "latency": 0.00011300000000002974
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 54,
+      "data": 60,
+      "time": 1.866687,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.866587,
+        "offset": 164,
+        "data": 60
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 1.868419,
+        "latency": 0.0017320000000000668
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 60,
+      "data": 69,
+      "time": 1.868577,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.868477,
+        "offset": 164,
+        "data": 69
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 1.869479,
+        "latency": 0.0009019999999999584
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 69,
+      "data": 76,
+      "time": 1.869626,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.869526,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 2.194303,
+        "latency": 0.3246770000000001
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 194,
+      "data": 200,
+      "time": 1.879001,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.869526,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 1.879114,
+        "latency": 0.00011300000000002974
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 76,
+      "data": 35,
+      "time": 2.194631,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.194531,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 2.195044,
+        "latency": 0.0004129999999999967
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 35,
+      "data": 76,
+      "time": 2.195371,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.195271,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 2.195785,
+        "latency": 0.0004139999999996924
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 76,
+      "data": 35,
+      "time": 2.196113,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.196013,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 2.196527,
+        "latency": 0.0004140000000001365
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 35,
+      "data": 76,
+      "time": 2.196854,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.196754,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 2.197268,
+        "latency": 0.0004140000000001365
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 76,
+      "data": 35,
+      "time": 2.197596,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.197496,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 2.198009,
+        "latency": 0.0004129999999999967
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 35,
+      "data": 76,
+      "time": 2.198336,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.198236,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 2.198577,
+        "latency": 0.0002409999999999357
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 76,
+      "data": 9,
+      "time": 2.198767,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.198667,
+        "offset": 164,
+        "data": 9
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 4.779173,
+        "latency": 2.580406
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 2.390678,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 2.390678,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 4.765533,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 4.765533,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 4.765579,
+        "latency": 4.600000000021254e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 4.765587,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 4.765587,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 4.765639,
+        "latency": 5.200000000016303e-05
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 4.76572,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 4.76572,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 15.865537,
+        "latency": 11.099817
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 9,
+      "data": 44,
+      "time": 4.779469,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 4.779369,
+        "offset": 164,
+        "data": 44
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 7.931523,
+        "latency": 3.1520540000000006
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 44,
+      "data": 54,
+      "time": 7.931686,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 7.931586,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 11.896793,
+        "latency": 3.9651070000000006
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 200,
+      "data": 206,
+      "time": 7.941061,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 7.931586,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 7.941174,
+        "latency": 0.0001129999999998077
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 54,
+      "data": 64,
+      "time": 11.896956,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 11.896856,
+        "offset": 164,
+        "data": 64
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 15.862122,
+        "latency": 3.965166
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 206,
+      "data": 212,
+      "time": 11.906331,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 11.896856,
+        "offset": 164,
+        "data": 64
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 11.906444,
+        "latency": 0.00011300000000069588
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 64,
+      "data": 74,
+      "time": 15.862285,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 15.862185,
+        "offset": 164,
+        "data": 74
+      },
+      "consumer": {
+        "pc": 2689438,
+        "time": 19.827356,
+        "latency": 3.965071000000002
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 15.865593,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 15.865593,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2690314,
+        "time": 15.865762,
+        "latency": 0.00016899999999964166
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 15.865818,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 15.865818,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 212,
+      "data": 218,
+      "time": 15.87166,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 15.865818,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 15.871773,
+        "latency": 0.00011299999999891952
+      }
+    },
+    {
+      "profile": "v600",
+      "offset": 166,
+      "old": 74,
+      "data": 2,
+      "time": 19.82752,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 19.82742,
+        "offset": 164,
+        "data": 2
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v600",
+      "offset": 456,
+      "old": 218,
+      "data": 224,
+      "time": 19.836895,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 19.82742,
+        "offset": 164,
+        "data": 2
+      },
+      "consumer": {
+        "pc": 2689146,
+        "time": 19.837008,
+        "latency": 0.00011300000000247223
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.0,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": null,
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.0,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": null,
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.014774,
+        "latency": 0.014774
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.014774,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.014774,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.015959,
+        "latency": 0.0011850000000000003
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.015958,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.015958,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.017143,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.017143,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.017143,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.018327,
+        "latency": 0.001184000000000001
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.018327,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.018327,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.019511,
+        "latency": 0.001184000000000001
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.019511,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.019511,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.020696,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.020695,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.020695,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.02188,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.02188,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.02188,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.023065,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.023064,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.023064,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.024249,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.024248,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.024248,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.025433,
+        "latency": 0.001185000000000002
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.025433,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.025433,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.026617,
+        "latency": 0.0011839999999999976
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.026617,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.026617,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.027802,
+        "latency": 0.001185000000000002
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.027801,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.027801,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.028986,
+        "latency": 0.001185000000000002
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.028986,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.028986,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.03017,
+        "latency": 0.0011839999999999976
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.03017,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.03017,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.031354,
+        "latency": 0.001184000000000001
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.031354,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.031354,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.032539,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.032539,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.032539,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.033723,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.033723,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.033723,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.034908,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.034907,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.034907,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.036092,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.036091,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.036091,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.037276,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.037276,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.037276,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.03846,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.03846,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.03846,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.039645,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.039644,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.039644,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.040829,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.040829,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.040829,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.042013,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.042013,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.042013,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.043198,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.043197,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.043197,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.044382,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.044382,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.044382,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.045566,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.045566,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.045566,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.046751,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.04675,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.04675,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.047935,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.047935,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.047935,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.049119,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.049119,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.049119,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.050303,
+        "latency": 0.0011839999999999976
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.050303,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.050303,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.051488,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.051487,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.051487,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.052672,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.052672,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.052672,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.053857,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.053856,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.053856,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.055041,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.05504,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.05504,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.056225,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.056225,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.056225,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.057409,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.057409,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.057409,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.058594,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.058593,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.058593,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.059778,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.059778,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.059778,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.060962,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.060962,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.060962,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.062146,
+        "latency": 0.0011839999999999976
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.062146,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.062146,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.063331,
+        "latency": 0.0011849999999999986
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.063331,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.063331,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.064515,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.064515,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.064515,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.0657,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.065699,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.065699,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.066884,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.066883,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.066883,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.068068,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.068068,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.068068,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.069252,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.069252,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.069252,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.070437,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.070436,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.070436,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.071621,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.071621,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.071621,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.072805,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.072805,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.072805,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.07399,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.073989,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.073989,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.075174,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.075174,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.075174,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.076358,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.076358,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.076358,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.077543,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.077542,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.077542,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.078727,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.078727,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.078727,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.079911,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.079911,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.079911,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.081095,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.081095,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.081095,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.08228,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.082279,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.082279,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.083464,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.083464,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.083464,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.084649,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.084648,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.084648,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.085833,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.085832,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.085832,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.087017,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.087017,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.087017,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.088201,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.088201,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.088201,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.089386,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.089385,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.089385,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.09057,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.09057,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.09057,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.091754,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.091754,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.091754,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.092938,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.092938,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.092938,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.094123,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.094123,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.094123,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.095307,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.095307,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.095307,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.096492,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.096491,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.096491,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.097676,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.097675,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.097675,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.09886,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.09886,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.09886,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.100044,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.100044,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.100044,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.101229,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.101228,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.101228,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.102413,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.102413,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.102413,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.103597,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.103597,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.103597,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.104782,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.104781,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.104781,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.105966,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.105966,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.105966,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.10715,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.10715,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.10715,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.108335,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.108334,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.108334,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.109519,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.109519,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.109519,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.110703,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.110703,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.110703,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.111887,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.111887,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.111887,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.113072,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.113071,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.113071,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.114256,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.114256,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.114256,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.115441,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.11544,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.11544,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.116625,
+        "latency": 0.0011850000000000055
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.116624,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.116624,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.117809,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.117809,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.117809,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.118993,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.118993,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.118993,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.120178,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.120177,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.120177,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.121362,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.121362,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.121362,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.122546,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.122546,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.122546,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.12373,
+        "latency": 0.0011840000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.12373,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.12373,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.124915,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.124915,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.124915,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.126099,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.126099,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.126099,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.127284,
+        "latency": 0.0011850000000000194
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.127283,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.127283,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.128468,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.128467,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.128467,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.129652,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.129652,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.129652,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.130836,
+        "latency": 0.0011840000000000184
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.130836,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.130836,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.132021,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.13202,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.13202,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.133205,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.133205,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.133205,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.134389,
+        "latency": 0.0011840000000000184
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.134389,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.134389,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.135574,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.135573,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.135573,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.136758,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.136758,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.136758,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.137942,
+        "latency": 0.0011840000000000184
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.137942,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.137942,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.139127,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.139126,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.139126,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.140311,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.140311,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.140311,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.141495,
+        "latency": 0.0011840000000000184
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.141495,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.141495,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.142679,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.142679,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.142679,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.143864,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.143863,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.143863,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.145048,
+        "latency": 0.0011850000000000194
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.145048,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.145048,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.146233,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.146232,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.146232,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.147417,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.147416,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.147416,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.148601,
+        "latency": 0.0011850000000000194
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.148601,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.148601,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.149785,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.149785,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.149785,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.15097,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.150969,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.150969,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.152154,
+        "latency": 0.0011850000000000194
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.152154,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.152154,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.153338,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.153338,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.153338,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.154522,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.154522,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.154522,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.155707,
+        "latency": 0.0011850000000000194
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.155707,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.155707,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.156891,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.156891,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.156891,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.158076,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.158075,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.158075,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.15926,
+        "latency": 0.0011850000000000194
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.159259,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.159259,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.160444,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.160444,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.160444,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.161628,
+        "latency": 0.0011839999999999906
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.161628,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.161628,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688114,
+        "time": 0.162813,
+        "latency": 0.0011850000000000194
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.162812,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.162812,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688102,
+        "time": 0.163997,
+        "latency": 0.0011849999999999916
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.163997,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.163997,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688176,
+        "time": 0.165178,
+        "latency": 0.0011809999999999876
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.165178,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.165178,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 0,
+      "old": 0,
+      "data": 1,
+      "time": 0.165178,
+      "role": "bootstrap_ready",
+      "trigger_class": "64 bootstrap exchanges complete",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.165178,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688196,
+        "time": 0.16518,
+        "latency": 2.000000000002e-06
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 2,
+      "old": 65535,
+      "data": 1,
+      "time": 0.165178,
+      "role": "bootstrap_ready",
+      "trigger_class": "64 bootstrap exchanges complete",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.165178,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": {
+        "pc": 2688182,
+        "time": 0.165178,
+        "latency": 0.0
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 4,
+      "old": 255,
+      "data": 1,
+      "time": 0.165178,
+      "role": "bootstrap_ready",
+      "trigger_class": "64 bootstrap exchanges complete",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.165178,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 254,
+      "old": 0,
+      "data": 1,
+      "time": 0.192693,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.192693,
+        "offset": 254,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 256,
+      "old": 0,
+      "data": 1,
+      "time": 0.192696,
+      "role": "bootstrap_ack",
+      "trigger_class": "MCU zero-write request",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.192696,
+        "offset": 256,
+        "data": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 228,
+      "old": 2,
+      "data": 0,
+      "time": 0.203076,
+      "role": "service_counter",
+      "trigger_class": "peer completes pending service work",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.199076,
+        "offset": 228,
+        "data": 2
+      },
+      "consumer": {
+        "pc": 2689606,
+        "time": 0.203129,
+        "latency": 5.2999999999997494e-05
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.262588,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.262588,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 0.262633,
+        "latency": 4.500000000001725e-05
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.262853,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.262853,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 0.350703,
+        "latency": 0.08784999999999998
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 0,
+      "data": 6,
+      "time": 0.281006,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.280906,
+        "offset": 164,
+        "data": 6
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.281093,
+        "latency": 8.700000000000374e-05
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 6,
+      "data": 11,
+      "time": 0.28123,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.28113,
+        "offset": 164,
+        "data": 11
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.303688,
+        "latency": 0.022458000000000033
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 128,
+      "data": 134,
+      "time": 0.291423,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.28113,
+        "offset": 164,
+        "data": 11
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 134,
+      "data": 140,
+      "time": 0.301839,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.28113,
+        "offset": 164,
+        "data": 11
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 0.301954,
+        "latency": 0.00011499999999997623
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 11,
+      "data": 17,
+      "time": 0.30383,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.30373,
+        "offset": 164,
+        "data": 17
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.387658,
+        "latency": 0.08382800000000001
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.35076,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.35076,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 0.350922,
+        "latency": 0.00016199999999999548
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.350978,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.350978,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 0.809493,
+        "latency": 0.458515
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 17,
+      "data": 21,
+      "time": 0.387789,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.387689,
+        "offset": 164,
+        "data": 21
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.389623,
+        "latency": 0.0018340000000000023
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 21,
+      "data": 29,
+      "time": 0.389776,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.389676,
+        "offset": 164,
+        "data": 29
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.392925,
+        "latency": 0.003149000000000013
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 29,
+      "data": 41,
+      "time": 0.393098,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.392998,
+        "offset": 164,
+        "data": 41
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.396111,
+        "latency": 0.003012999999999988
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 41,
+      "data": 55,
+      "time": 0.396296,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.396196,
+        "offset": 164,
+        "data": 55
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.396397,
+        "latency": 0.00010100000000001774
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 140,
+      "data": 142,
+      "time": 0.396518,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.396418,
+        "offset": 164,
+        "data": 57
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 0.396662,
+        "latency": 0.000144000000000033
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 55,
+      "data": 57,
+      "time": 0.396518,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.396418,
+        "offset": 164,
+        "data": 57
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.44798,
+        "latency": 0.05146200000000001
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 57,
+      "data": 54,
+      "time": 0.44851,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.44841,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.463358,
+        "latency": 0.014847999999999972
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 54,
+      "data": 51,
+      "time": 0.463888,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.463788,
+        "offset": 164,
+        "data": 51
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.548955,
+        "latency": 0.08506699999999995
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 142,
+      "data": 149,
+      "time": 0.548388,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.463788,
+        "offset": 164,
+        "data": 51
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 0.548502,
+        "latency": 0.0001140000000000585
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 51,
+      "data": 57,
+      "time": 0.549097,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.548997,
+        "offset": 164,
+        "data": 57
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.79361,
+        "latency": 0.2445130000000001
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 57,
+      "data": 63,
+      "time": 0.793752,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.793652,
+        "offset": 164,
+        "data": 63
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.805326,
+        "latency": 0.011573999999999973
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 63,
+      "data": 15,
+      "time": 0.805617,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.805517,
+        "offset": 164,
+        "data": 15
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.805813,
+        "latency": 0.00019599999999997397
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 15,
+      "data": 49,
+      "time": 0.806104,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.806004,
+        "offset": 164,
+        "data": 49
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.806301,
+        "latency": 0.00019700000000000273
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 49,
+      "data": 1,
+      "time": 0.806591,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.806491,
+        "offset": 164,
+        "data": 1
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.806788,
+        "latency": 0.00019700000000000273
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 1,
+      "data": 35,
+      "time": 0.807078,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.806978,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 0.807234,
+        "latency": 0.000156000000000045
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 35,
+      "data": 37,
+      "time": 0.807354,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 0.807254,
+        "offset": 164,
+        "data": 37
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 1.285213,
+        "latency": 0.4778589999999999
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.809504,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.809504,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 0.809541,
+        "latency": 3.6999999999953737e-05
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.809551,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.809551,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 0.809618,
+        "latency": 6.699999999992823e-05
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 0.809628,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 0.809628,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 1.31663,
+        "latency": 0.507002
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 37,
+      "data": 43,
+      "time": 1.285355,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.285255,
+        "offset": 164,
+        "data": 43
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 1.784576,
+        "latency": 0.4992209999999999
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.316687,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.316687,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 1.316867,
+        "latency": 0.000180000000000069
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.316923,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.316923,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 1.63852,
+        "latency": 0.3215969999999999
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.638528,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.638528,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 1.655838,
+        "latency": 0.017309999999999937
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.656056,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.656056,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 1.776897,
+        "latency": 0.12084099999999998
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 1.777116,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 1.777116,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 2.397028,
+        "latency": 0.6199120000000002
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 43,
+      "data": 54,
+      "time": 1.784744,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.784644,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 1.872928,
+        "latency": 0.08818399999999982
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 149,
+      "data": 155,
+      "time": 1.794119,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.784644,
+        "offset": 164,
+        "data": 54
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 1.794232,
+        "latency": 0.00011300000000002974
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 155,
+      "data": 194,
+      "time": 1.872244,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.79431,
+        "offset": 458,
+        "data": 155
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 1.872357,
+        "latency": 0.00011300000000002974
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 54,
+      "data": 60,
+      "time": 1.87307,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.87297,
+        "offset": 164,
+        "data": 60
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 1.874801,
+        "latency": 0.001730999999999927
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 60,
+      "data": 69,
+      "time": 1.874959,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.874859,
+        "offset": 164,
+        "data": 69
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 1.875861,
+        "latency": 0.0009019999999999584
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 69,
+      "data": 76,
+      "time": 1.876008,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.875908,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 2.200738,
+        "latency": 0.32472999999999996
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 194,
+      "data": 200,
+      "time": 1.885383,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 1.875908,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 1.885496,
+        "latency": 0.00011300000000002974
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 76,
+      "data": 35,
+      "time": 2.201066,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.200966,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 2.201532,
+        "latency": 0.0004659999999998554
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 35,
+      "data": 76,
+      "time": 2.20186,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.20176,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 2.202327,
+        "latency": 0.0004669999999999952
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 76,
+      "data": 35,
+      "time": 2.202655,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.202555,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 2.203122,
+        "latency": 0.0004669999999999952
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 35,
+      "data": 76,
+      "time": 2.20345,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.20335,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 2.203917,
+        "latency": 0.0004669999999999952
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 76,
+      "data": 35,
+      "time": 2.204245,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.204145,
+        "offset": 164,
+        "data": 35
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 2.204711,
+        "latency": 0.0004660000000002995
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 35,
+      "data": 76,
+      "time": 2.205039,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.204939,
+        "offset": 164,
+        "data": 76
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 2.205249,
+        "latency": 0.0002099999999995994
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 76,
+      "data": 3,
+      "time": 2.205407,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 2.205307,
+        "offset": 164,
+        "data": 3
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 4.783443,
+        "latency": 2.578036
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 2.397082,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 2.397082,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 3,
+      "data": 38,
+      "time": 4.783739,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 4.783639,
+        "offset": 164,
+        "data": 38
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 7.931523,
+        "latency": 3.1477840000000006
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 4.787121,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 4.787121,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 4.787169,
+        "latency": 4.7999999999603915e-05
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 4.787298,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 4.787298,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 15.865534,
+        "latency": 11.078236
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 38,
+      "data": 48,
+      "time": 7.931686,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 7.931586,
+        "offset": 164,
+        "data": 48
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 11.896793,
+        "latency": 3.9651070000000006
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 200,
+      "data": 206,
+      "time": 7.941061,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 7.931586,
+        "offset": 164,
+        "data": 48
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 7.941174,
+        "latency": 0.0001129999999998077
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 48,
+      "data": 58,
+      "time": 11.896956,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 11.896856,
+        "offset": 164,
+        "data": 58
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 15.862121,
+        "latency": 3.9651650000000007
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 206,
+      "data": 212,
+      "time": 11.906331,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 11.896856,
+        "offset": 164,
+        "data": 58
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 11.906444,
+        "latency": 0.00011300000000069588
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 58,
+      "data": 68,
+      "time": 15.862284,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 15.862184,
+        "offset": 164,
+        "data": 68
+      },
+      "consumer": {
+        "pc": 2687890,
+        "time": 19.827356,
+        "latency": 3.965072000000001
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 15.86559,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 15.86559,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2688702,
+        "time": 15.865758,
+        "latency": 0.00016800000000039006
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 224,
+      "old": 1,
+      "data": 0,
+      "time": 15.865814,
+      "role": "shared_control_busy",
+      "trigger_class": "DSPIF command-4 doorbell",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 15.865814,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 212,
+      "data": 218,
+      "time": 15.871659,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "doorbell",
+        "time": 15.865814,
+        "command": 4,
+        "pending": 0
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 15.871772,
+        "latency": 0.00011300000000069588
+      }
+    },
+    {
+      "profile": "v501",
+      "offset": 166,
+      "old": 68,
+      "data": 78,
+      "time": 19.82752,
+      "role": "tx_consumer",
+      "trigger_class": "peer consumes committed TX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 19.82742,
+        "offset": 164,
+        "data": 78
+      },
+      "consumer": null
+    },
+    {
+      "profile": "v501",
+      "offset": 456,
+      "old": 218,
+      "data": 224,
+      "time": 19.836895,
+      "role": "rx_producer",
+      "trigger_class": "peer enqueues RX packet",
+      "trigger": {
+        "kind": "mcu_write",
+        "time": 19.82742,
+        "offset": 164,
+        "data": 78
+      },
+      "consumer": {
+        "pc": 2687598,
+        "time": 19.837008,
+        "latency": 0.00011300000000247223
+      }
+    }
+  ]
+}

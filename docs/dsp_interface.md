@@ -60,7 +60,7 @@ So the MCU **stages DSP tables/program from flash into shared RAM** at boot — 
 data *is* in the image. On a real phone the DSP would execute or consume it;
 the current HLE peer stores the blobs but does not interpret them.
 
-## The L1↔DSP mailbox protocol (2026-07 dig — both directions mapped)
+## L1-to-DSP mailbox protocol
 
 Task **22** (`dsp_if_task_2b6548`) is the DSP-interface RTOS task. Its loop: `recv`
 (`0x26a458`) → if the code < `0xc0` call the dispatch `0x23d62c` (`0x2b6564`); codes
@@ -106,9 +106,20 @@ state is unresolved. Use `NOKI3210_TRACE_DSP_BOUNDARY` for this boundary; the re
 
 ## What the reachable boot currently proves
 
-Reviewed traces show no MCU reads of additional DSP-computed result words beyond
-the bootstrap/self-test region. The MCU nevertheless queues lower-service
-packets in the shared transmit ring. The first captured pair is:
+The two-ROM 20-second census in `dsp_shared_memory_inventory.md` records 272
+distinct `(profile, PC, offset)` read observations covering the same 125 byte
+offsets in v5.01 and v6.00. Every reachable read belongs to the RAM self-test,
+bootstrap flags, shared-control words, packet-ring indices, or inbound packet
+contents. No phone-side read override remains, and no unexplained computed-result
+word appears in the reachable run. The MCU queues lower-service packets in the
+shared transmit ring. The first captured pair is:
+
+The paired transition census narrows active peer-owned scalar publication to
+nine offsets: bootstrap words `0x000/0x002/0x004/0x0fe/0x100`, TX consumer
+`0x0a6`, shared busy/pending words `0x0e0/0x0e4`, and RX producer `0x1c8`.
+Both ROMs use the same set and structurally matching consumers. Bootstrap word
+`0x004` is published after the 64-exchange sequence but is not subsequently
+read in either measured lifecycle.
 
 ```text
 00 02 0a 05 1e ff 00 d0 00 03 01 01 e0 00
@@ -140,7 +151,11 @@ offset `0xa8`. The observed `0xfff5` argument produces the successive values `0x
 writes command 4 to DSPIF, and rings doorbell byte 2 at `0x20008`.
 
 IRQ 4 enters `0x291068`. That routine handles the shared service counts at `[0xda]`,
-`[0xe2]`, and `[0xe4]`; it does not parse a command-`0x30`/`0x32` reply payload. A trial which
+`[0xe2]`, and `[0xe4]`; it does not parse a command-`0x30`/`0x32` reply payload.
+The adjacent `[0xdc]` word is selected alongside `[0xe0]` by the common
+shared-control request helper: the MCU requires zero, writes the request, then
+rings DSPIF command 4. No later read requiring its completion is reached in the
+20-second census. A trial which
 exposed `[0xe0]=1` until the existing 5 ms service tick regressed the deep boot, so that delay
 is disproved. The HLE peer now acknowledges command 4 by publishing zero into
 the backing word synchronously. The physical DSP latency remains unknown; do
@@ -230,25 +245,43 @@ class-5 primitive set starts at `0x11` and does not include the task-15
 registration primitive `0x0b`. These are distinct protocols despite sharing a
 numeric class value.
 
-The original DSP model left TX consumer `0x0a6` at zero. The producer reached
-`0x34`, free space collapsed, and later firmware packets could not be queued.
-An isolated ring-drain experiment proved that complete packets must be consumed,
-but that standalone model has been removed. The current request-driven external-service
-peer owns consumption and correlated responses at the same boundary. The
-newly visible coherent stream is:
+The peer consumes only complete packets and advances TX consumer `0x0a6`; it
+correlates responses separately at the protocol boundary. The paired 20-second
+packet census records the complete measured vocabulary. Each ROM emits
+34 outbound packets across types `0x05/0x0d/0x1a/0x3c/0x51/0x70`; type `0x05`
+continues after startup with four recurring service-`0x5f` polls. Consumption
+alone produces none of `0x0588`, `0x05ea`, or `0x07dd`. Every observed outbound
+packet now has classified MCU-side semantics, including the fire-and-forget
+type-`0x1a` ARFCN bitmap publication.
 
-```text
-type 05: 0a05 1eff 00d0 0003 0101 e000
-type 05: 0805 1e14 00f4 0001 0300
-type 51: seven configuration/coefficient packets (six 80-byte, one 28-byte)
-type 70: three control packets (6, 14, and 22 payload bytes)
-```
+The structural census further classifies type `0x0d` as four indexed 64-byte
+block uploads and type `0x3c` as two selector-keyed 154-byte lookup-table
+uploads. Both are one-way DSP configuration publications. Their ROM-4 DSP
+consumer and physical purpose remain unidentified, so stronger subsystem names
+would be speculation. Five type-`0x05` packets also need no packet response:
+one discovery-side control publication, three state-5 acknowledgements of the
+peer's state-4 D0 completion, and the `0x622a` one-way report whose transaction
+completes through DSPIF shared control.
 
-No later type-`0x05` transaction appears, and consumption alone produces none of
-`0x0588`, `0x05ea`, or `0x07dd`. This makes the ring drain a fidelity correction,
-not evidence for a D0 response or a SIM-registration fix. It remains separate from
-the established deep profile because enabling it preserves the final LCD hash but
-changes the structural oracle's repeated-work counters.
+Type `0x70` is now closed at the MCU boundary. Task-2 initializer `0x2346b2`
+calls the single constructor `0x264f30`, which publishes selectors `0x13`--`0x16`:
+`0x13` carries one four-byte platform value selected from a ROM default or a
+hardware-derived helper, while `0x14`, `0x15`, and `0x16` carry staged 12-, 20-,
+and 24-byte bootstrap tables. These four objects retain no reply token. The
+static object at `0x2db250` is different: task 2 posts its `0d 00` request at
+`0x2347e4` and consumes the correlated type-`0x74` completion. Only after that
+completion, handler `0x234954` posts static object `0x2db234`, payload `0a 09`,
+as a one-way follow-up. Thus `0a 09` must not receive the formerly tested echo.
+
+Type `0x51` is likewise one transaction rather than seven independent requests.
+Task 9's `0x28d710` selects a ROM profile descriptor containing a DSP word
+address, a word count, and the data. Its sole packet post at `0x28d880` emits
+command `0x22`, the current big-endian DSP word address, and at most 39 data
+words. Successive v6 packets address `0x2206, 0x222d, ... 0x22f0`, uploading
+247 contiguous words; v5.01 analogously uploads 241 words from `0x2286` through
+`0x2370`. The constructor advances through the descriptor and retains no
+per-packet reply token. The physical purpose of this version-specific DSP memory
+image remains unknown, so it is not labelled as audio, radio, or coefficients.
 
 ### Organic radio-init queue lifecycle
 
@@ -265,14 +298,14 @@ message is `09 ec 00 ...`; task 15 copies byte `+2` to protocol mode
 path requires mode `0x10` and does not describe this boot transaction.
 
 Task 3 does not immediately serialize that object. Its FIFO first releases the
-type-`0x51` coefficient/configuration stream and five type-`0x70` control packets.
-The old 5 ms peer cadence can phase-lock against task 3's immediate free-space
-recheck and strand the FIFO after sequence `0x22a2`. A 4 ms cadence avoids that
-model artifact: all earlier packets drain and the organic request reaches the
+type-`0x51` segmented DSP memory upload and five type-`0x70` control packets.
+Packet consumption remains polling-based prototype behavior. The retained 4 ms
+cadence drains the preceding queue so the organic publication reaches the
 DSP boundary as a 35-word packet:
 
 ```text
-type 0x1a, payload 68: 441a 0081 9800 0000 ...
+task-3 object: length 0x44, type 0x1a
+wire payload 68: 0081 9800 0000 ...
 ```
 
 No firmware message, callback, or RAM state is injected to produce it. The
@@ -280,14 +313,21 @@ driver's opt-in DSP service defaults now use the empirically stable 4 ms cadence
 the eventual DSP peer should own TX consumption independently of the service-IRQ
 timer so correctness does not depend on this scheduling phase.
 
-Static control flow does not establish a request/reply contract for this packet.
+Builder `0x219f0c` accepts GSM 900 ARFCNs `0..124` and DCS 1800 ARFCNs
+`512..885` (upper bound 886 exclusive), remaps the upper band by subtracting
+383, and stores the unified 503-position domain in a reversed 63-byte bitmap.
+These ranges match 3GPP TS 45.005. The observed mode-2 source is rejected by the
+builder's dense/all-ones guard, which clears the map and sets flag byte `0x81`;
+the coherent offline boot therefore publishes no usable channel set.
+
+Static control flow establishes no request/reply contract for this packet.
 The only call to builder `0x219f0c` is task-10 state dispatcher `0x21ba54`.
 After posting the packet, the builder retains no transaction token, reply object,
 or task-3 completion callback. It schedules the global DSP-service timer, clears
 the DSP-activity counter, and returns. Task 10 has already sent task 17 the
-immediate `0x043c` acknowledgement. Type `0x1a` is therefore best classified as
-a fire-and-forget DSP state/control publication; it is not evidence that an
-inbound packet should directly complete task 17.
+immediate `0x043c` acknowledgement. Type `0x1a` is therefore a fire-and-forget
+channel-set publication; it is not evidence that an inbound packet should
+directly complete task 17.
 
 The type-`0x80` structured decoder contains a superficially similar test at
 `0x284c74`, but it compares radio-controller state byte `0x10dbd2` with `0x1a`,
@@ -397,24 +437,21 @@ contract can be traced in the current coherent profile.
   sufficient, but they are not a completed DSP contract.
 - **The lower-radio session start is a bounded downstream lifecycle.** Organic initialization
   creates task 14 and its eight controller slots, but no task-14 input starts a resource-`0x35`
-  operation. The concurrent type-`0x1a` DSP state block is not evidence of such an operation;
+  operation. The concurrent type-`0x1a` ARFCN bitmap is not evidence of such an operation;
   the falsified type-`0x80`/`0x70` reply must not be restored.
 - **For the network (operator name + signal):** extend the message-boundary DSP peer (answer the L1
   commands with "camped on a fake cell, operator X, RSSI y") is feasible *in principle* and
   is the right MAME approach, but the L1 protocol is static-only until coherent
-  execution reaches it and offline MMI settlement currently has priority. Signal RSSI is separately
+  execution reaches it and an organic application path requires it. Signal RSSI is separately
   injectable (CCONT ADC ch1, `network_scouting.md`).
 - **Full DSP-core emulation** (a TI Lead core running the downloaded blobs) is a much larger
   project and would still need a faked air interface; not warranted given the above ordering.
 
-An eight-second coherent deep run with DSP-ring draining established that the organic
-type-`0x1a` packet is **not** the resource-`0x35` transaction. Its complete contents are
-`44 1a 00 81 98 00` followed by zeroes (35 ring words total), consistent with a fixed-size
-DSP state/control block. The lower-radio controller initializes at about 0.814 s, but task
-14 receives no message and neither `0x282238` (resource-`0x35` transmit) nor `0x267258`
-(object receive) runs.
+The ARFCN publication is not the resource-`0x35` transaction. In the measured
+boot task 14 receives no message and neither `0x282238` (resource-`0x35`
+transmit) nor `0x267258` (object receive) runs.
 
-**Net:** task-5 status `0x13e2` is downstream, not the missing radio transition. Its natural
+Task-5 status `0x13e2` is downstream, not an absent radio transition. Its natural
 producer is `0x2b3f60`, called by task 17 at `0x225b8c` after the phase handler accepts
 `0x0434`/`0x0a22` (and at `0x223a28` after the phase loop returns). It publishes packed
 `0x53e2` with one firmware-owned pointer; the consumer path
@@ -426,13 +463,13 @@ and `0x0fc2 -> 0x1392` radio-state path are separate and do not reach `0x0434`;
 only after the `0x0fc1` contract is pinned should the proven bidirectional
 contract move into a DSP peer device.
 
-## Per-primitive payload semantics (2026-07 — handler `0x23cde0`, classes 5/7/0xa)
+## Per-primitive payload semantics
 
 Decoded the primitive dispatch of `0x23cde0` (`[msg+9]` = primitive; `r5` = `msg+9`). **The
 key finding: most primitives forward straight into the `0x2a2xxx` idle-element render
 library — the DSP L1 layer *is* the idle content producer.** Each `0x2a2xxx` target opens
-with a call to the status classifier `0x28fa4c` (the same one that reads the camped/service
-state `[0x11fce1]`, from the camped-state dig) and then render-posts to task 5. So the full
+with a call to status classifier `0x28fa4c`, which reads camped/service state
+`[0x11fce1]`, and then render-posts to task 5. The full
 producer chain is:
 
 ```
@@ -460,19 +497,18 @@ Primitive table (payload = byte fields at fixed offsets, big-endian 16-bit lengt
 So the primitives split into **display-update** (`0x10–0x1c`, `0x25` → `0x2a2xxx` render) and
 **L1 data-block** (`0x30/0x33/0x36` → `0x2b2exx`, carrying big-endian length-prefixed blobs
 up to 300 bytes — measurement/frame data). Big-endian multi-byte fields (`b[n]<<8|b[n+1]`)
-confirm GSM network-byte-order framing. This mechanizes *why* forcing the camped-state byte
-did nothing (previous dig): the content is produced by these DSP primitives arriving and
-being rendered — not by the state byte — and **no primitive ever arrives** (`TRACE_DSPMSG`:
-`0x23d62c` runs 0 times).
+confirm GSM network-byte-order framing. The content is produced by these DSP primitives
+arriving and being rendered, not by the camped-state byte alone. In the reviewed boot no
+such primitive arrives (`TRACE_DSPMSG`: `0x23d62c` runs 0 times).
 
-⚠️ **swap16 correction to the camped-state dig:** the network-registration data it read as
+**Byte-lane caution:** network-registration data previously read as
 `[0x1028d1]`/`[0x107ed3]` is really the struct at **`0x10d124`** (literal `d1280010` →
 `0x0010d128`) / **`0x10d37e`** — a network/registration struct (field `+2` a status halfword,
 message chunks memcpy'd to `+0x34`), accessed from `0x26f1b8`/`0x208110`/`0x26f608`. The
-camped-dig *conclusion* (forcing `[0x11fce1]` changes nothing) stands; only the auxiliary
-net-data address was mis-swapped.
+state byte is insufficient to produce content; the auxiliary addresses must be decoded with
+the corrected swap16 byte lanes.
 
-### The `0x2b2exx` "data-block processors" are thin routers (2026-07)
+### `0x2b2exx` data-block routers
 
 Followed the data-block primitives (`0x30/0x33/0x36`) into their `0x2b2exx` targets. They do
 **no processing** — each is a 3-instruction thunk that render-posts the parsed descriptor to
@@ -501,10 +537,10 @@ they fall through to the VM's general action pipeline. Their blobs' exact semant
 ≤300-byte payloads *are* — cell-broadcast text? measurement lists?) cannot be pinned
 statically without a spec or a live trace; the code never runs on our boot.
 
-**This thread bottoms out here:** the data path is thin routing into a dormant MMI-VM event,
-not a decodable processor. Further decode would be guessing at never-executed code.
+The data path terminates in a dormant MMI-VM event rather than a statically decodable
+processor. Further semantic claims require an organic packet or an external protocol source.
 
-## Open items (future deep-dives)
+## Unresolved contracts
 - Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the
   full `0x2b66b0` routing table (same caveat: dormant, no runtime to validate).
 - Static RE of the `0x2b7xxx–0x2c9xxx` L1 driver *send* side: enumerate the 287 DSPIF

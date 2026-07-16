@@ -20,7 +20,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_service_enabled));
 	save_item(NAME(m_external_service_enabled));
 	save_item(NAME(m_service_delay_ms));
-	save_item(NAME(m_service_tick_ms));
+	save_item(NAME(m_peer_poll_ms));
 	save_item(NAME(m_service_control_completion_sent));
 	save_item(NAME(m_bootstrap_exchange_count));
 }
@@ -87,7 +87,6 @@ void nokia_dsp_hle_device::bootstrap_100_w(int state)
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
 {
 	m_transport->complete_service();
-	m_service_timer->adjust(attotime::from_msec(m_service_tick_ms));
 }
 
 void nokia_dsp_hle_device::drain_responses()
@@ -141,8 +140,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 			if (!m_service_control_completion_sent && packet.type == 0x70 && packet.length == 2 &&
 					packet.payload[0] == 0x0d && packet.payload[1] == 0x00)
 			{
-				const u8 completion[2] = { 0x0d, 0x00 };
-				if (m_transport->enqueue_rx_packet(0x74, completion, std::size(completion)))
+				if (m_transport->enqueue_rx_packet(0x74, packet.payload.data(), packet.length))
 				{
 					m_service_control_completion_sent = true;
 					m_external_peer->set_service_control_complete();
@@ -157,5 +155,5 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 		m_external_peer->tick();
 		schedule_response();
 	}
-	m_packet_timer->adjust(attotime::from_msec(m_service_tick_ms));
+	m_packet_timer->adjust(attotime::from_msec(m_peer_poll_ms));
 }

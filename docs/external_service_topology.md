@@ -70,8 +70,9 @@ The forcing-free contact path now composes in one boot:
    command `0x64` result 1 and command `0x70` with the `0x5f`/`0x62` channel
    map. Firmware replies through task 7; the peer returns
    compact class-`0x7f` acknowledgements derived from each outgoing transaction.
-5. The final `0x622a` report is likewise acknowledged at the transport boundary.
-   No semantic echo is needed and no firmware state is written by the model.
+5. The final `0x622a` report is a one-way type-`0x05` packet. Its associated
+   channel-empty transaction completes through the separate DSPIF shared-control
+   pending/completion path; no RX packet or semantic echo acknowledges the frame.
 
 Peer-to-MCU frames are delivered serially at 9600 baud with ten wire bits per
 byte. The DSP HLE uses a separate response timer, so a response generated while
@@ -83,11 +84,10 @@ startup `0x000d -> 0x0004`, activates SIM control
 `0x32 -> 0x33 -> 0xb3 -> 0xe3`, and begins the normal SIM SELECT/READ/STATUS
 conversation. Later SIM-card corrections now raise SIM enable organically and
 complete the non-CPHS SIM initialization pass before entering the timed
-card-presence monitor; the service session is no longer a boot blocker.
+card-presence monitor; the modeled service session completes its startup contract.
 
-## Extended-task readiness barrier
+## Extended-task readiness contract
 
-The first Insert-SIM milestone established the post-contact firmware chain.
 Mode `0x000d` accumulates readiness bits in `0x112399`; event `0x15` supplies
 bit `0x04`. Producer `0x2af208`, called from `0x2521cc`, fires only when the
 eleven-byte application-task checklist at `0x112280` is complete.
@@ -97,13 +97,13 @@ The scheduler creates every task, initially dormant. Supervisor
 group contains the checklist writers and is gated at `0x2a9182`: firmware calls
 `service_channel_request_empty 0x2b13d4`, publishes report `0x622a`, and waits
 at `0x29bb06` for `0x11fed1` bit 2 to clear. Firmware seeded that bit during
-service startup at `0x2347d0`. The coherent peer acknowledges the organic
+service startup at `0x2347d0`. The DSP HLE completes the organic shared-control
 transaction; firmware clears its own state, resumes the tasks, completes the
 checklist, posts event `0x15`, and advances startup. This replaces the historical
 direct-drain experiment that first isolated the chain.
 
-A timestamped coherent run closes the ordering contract. The peer acknowledges
-the final `0x622a` transaction at `t=1.285269`; firmware begins the second task
+A timestamped coherent run closes the ordering contract. The DSP shared-control
+completion occurs at `t=1.285269`; firmware begins the second task
 group immediately, and its checklist calls follow the supervisor's static
 resume order: `0x0a`, `0x0b`, `0x0c`, `0x0d`, `0x10`, `0x0f`, `0x0e`, `0x15`,
 `0x14`, `0x11`, then `0x12`. Task 18's straight-line initializer at `0x285c14`
@@ -155,18 +155,11 @@ map together with the firmware acknowledgements described above. Commands
 `0x65`, result-5 `0x64`, `0x71`, contact command `0x74`, and command `0x8e` remain absent from
 these bounded boots; the static constructor census supplies their ROM coverage.
 
-The older bridge-profile trace posted one header-incomplete healthy `0x64`
-directly to task 2. Firmware consumed that allocation once, then its response
-self-routed through task 7 and repeatedly re-entered task 2. That historical
-zero-header loop identified the address-learning point but is not present in
-the current request-derived session.
-
-The formerly reported 31,068-entry `0x64` loop was model-induced. Historical
-crossed runs showed that the separate drain changed its start time but was not
-its cause. The deleted responder fired before observing a request and
-writes only `{[3]=0x40,[8]=0x64,[9]=0x05}`, leaving address, route, sequence, and
-length fields zero. It proves the result-5 firmware branch in isolation, but not
-a coherent node-0x18 transaction or stable service-session completion.
+**Framing caution:** a class-`0x40` reply cannot be constructed from only class,
+command, and result bytes. Address, route, sequence, and length are learned by
+the receive path and are required to prevent the firmware response from routing
+back into task 2. The supported peer therefore responds only to an observed,
+fully framed request; unsolicited mailbox-level construction is invalid.
 
 `TRACE_SERVICE_COMMAND` is observational only and is capped so later runs retain this
 ownership and routing evidence without large logs.

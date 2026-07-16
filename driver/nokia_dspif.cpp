@@ -3,6 +3,21 @@
 #include "nokia_dspif.h"
 
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
+
+namespace {
+
+std::string packet_hex(const u8 *payload, unsigned length)
+{
+	std::ostringstream result;
+	result << std::hex << std::setfill('0');
+	for (unsigned index = 0; index < length; index++)
+		result << std::setw(2) << unsigned(payload[index]);
+	return result.str();
+}
+
+} // anonymous namespace
 
 DEFINE_DEVICE_TYPE(NOKIA_DSPIF, nokia_dspif_device, "nokia_dspif", "Nokia DCT3 DSP interface")
 
@@ -80,10 +95,11 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 void nokia_dspif_device::peer_shared_w(offs_t offset, u16 data)
 {
 	offset &= 0x7ff;
+	const u16 old_data = m_ram[offset];
 	m_ram[offset] = data;
 	if (m_trace_enabled)
-		logerror("dspif_transport: peer RAM W off=%03x data=%04x t=%.6f\n",
-				offset << 1, data, machine().time().as_double());
+		logerror("dspif_transport: peer RAM W off=%03x old=%04x data=%04x t=%.6f\n",
+				offset << 1, old_data, data, machine().time().as_double());
 }
 
 u8 nokia_dspif_device::dspif_r(offs_t offset) const
@@ -131,10 +147,11 @@ bool nokia_dspif_device::peek_tx_packet(packet &result) const
 
 void nokia_dspif_device::consume_tx_packet(const packet &value)
 {
-	m_ram[TX_CONSUMER] = (m_ram[TX_CONSUMER] + value.words) % TX_WORDS;
+	peer_shared_w(TX_CONSUMER, (m_ram[TX_CONSUMER] + value.words) % TX_WORDS);
 	if (m_trace_enabled)
-		logerror("dspif_transport: TX consume type=%02x payload=%u words=%u consumer=%02x t=%.6f\n",
+		logerror("dspif_transport: TX consume type=%02x payload=%u words=%u consumer=%02x data=%s t=%.6f\n",
 				value.type, value.length, value.words, m_ram[TX_CONSUMER],
+				packet_hex(value.payload.data(), value.length).c_str(),
 				machine().time().as_double());
 }
 
@@ -160,10 +177,11 @@ bool nokia_dspif_device::enqueue_rx_packet(u8 type, const u8 *payload, unsigned 
 	put((payload_length << 8) | type);
 	for (unsigned i = 0; i < payload_length; i += 2)
 		put((u16(payload[i]) << 8) | (i + 1 < payload_length ? payload[i + 1] : 0));
-	m_ram[RX_PRODUCER] = producer;
+	peer_shared_w(RX_PRODUCER, producer);
 	if (m_trace_enabled)
-		logerror("dspif_transport: RX enqueue type=%02x payload=%u producer=%03x t=%.6f\n",
-				type, payload_length, producer, machine().time().as_double());
+		logerror("dspif_transport: RX enqueue type=%02x payload=%u producer=%03x data=%s t=%.6f\n",
+				type, payload_length, producer, packet_hex(payload, payload_length).c_str(),
+				machine().time().as_double());
 	return true;
 }
 
@@ -183,7 +201,7 @@ u16 nokia_dspif_device::service_pending() const
 
 void nokia_dspif_device::complete_service()
 {
-	m_ram[SVC_PENDING] = 0;
+	peer_shared_w(SVC_PENDING, 0);
 	if (m_trace_enabled)
 		logerror("dspif_transport: IRQ4 service-complete t=%.6f\n", machine().time().as_double());
 	m_service_irq_cb(1);

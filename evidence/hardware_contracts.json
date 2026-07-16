@@ -100,7 +100,22 @@
     {
       "id": "dsp_bootstrap_status_hle", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
       "boundary": "The DSP HLE publishes state into DSPIF-owned shared RAM rather than overriding reads: both 3210 ROMs complete 64 alternating 0x0fe/0x100 acknowledgements before the peer publishes ready words 0x000..0x004, and command 4 clears busy word 0x0e0; no DSP core executes and physical response timing remains unknown",
-      "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md"]
+      "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/dsp_shared_memory_inventory.md", "evidence/runtime/dsp_shared_reads.json"]
+    },
+    {
+      "id": "dsp_shared_read_inventory", "subsystem": "dsp", "status": "mapped", "confidence": "strong",
+      "boundary": "Matched 20-second v5.01/v6.00 runs expose the same 125 firmware-read byte offsets. All reachable reads are classified as self-test/bootstrap, shared-control, packet-ring indices or peer-produced RX contents; no phone-side synthesized read remains. Offset 0x0dc is a mapped shared-control request/completion word but no later completion-dependent read is reached",
+      "evidence": ["docs/dsp_shared_memory_inventory.md", "evidence/runtime/dsp_shared_reads.json", "tools/dsp_shared_read_census.py"]
+    },
+    {
+      "id": "dsp_shared_transition_inventory", "subsystem": "dsp", "status": "partial", "confidence": "strong",
+      "boundary": "Matched 20-second v5.01/v6.00 runs reduce the active DSP-owned scalar contract to the same nine offsets with relocated matching consumers. Service pending 0x0e4 is request-triggered and one-shot; removing about 4,955 idle zero-to-zero IRQ4 completions per ROM preserves the transport and interactive-menu gates. Bootstrap word 0x004 is published but has no post-bootstrap reader in either run",
+      "evidence": ["docs/dsp_shared_memory_transitions.md", "evidence/runtime/dsp_shared_transitions.json", "tools/dsp_shared_transition_census.py"]
+    },
+    {
+      "id": "dsp_packet_semantics_inventory", "subsystem": "dsp", "status": "partial", "confidence": "strong",
+      "boundary": "Matched 20-second v5.01/v6.00 traces each contain 34 outbound and 11 inbound packets with the same semantic families, now all classified at the MCU boundary. Discovery, transport acknowledgements and type-0x70/0x74 0d00 are request-derived; registration and channel-map frames are canned peer initiations. Type-0x70 selectors 0x13..0x16 are one-way task-2 bootstrap publications and 0x0a09 is a one-way post-completion follow-up. Seven type-0x51 packets form one command-0x22 DSP memory-image upload: v6 writes 247 words from 0x2206 and v5.01 writes 241 words from 0x2286. Type-0x1a publishes a reply-free 503-position GSM 900/DCS 1800 ARFCN bitmap; the coherent offline boot marks its dense sentinel source invalid and sends a zero channel set",
+      "evidence": ["docs/dsp_packet_semantics.md", "evidence/runtime/dsp_packets.json", "tools/dsp_packet_semantics_census.py"]
     },
     {
       "id": "mad2_dspif_command4", "subsystem": "dsp", "status": "partial", "confidence": "strong",

@@ -20,7 +20,7 @@ Documentation is organized by authority rather than investigation date.
 | `rtos_tasks.md` | Authoritative ROM-specific task identities, neutral aliases, and naming cautions. |
 | `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
 
-## Active UI boundary
+## Validated startup and UI boundaries
 
 | Document | Purpose |
 | --- | --- |
@@ -39,6 +39,9 @@ Documentation is organized by authority rather than investigation date.
 | --- | --- |
 | `network_scouting.md` | Later GSM registration and operator-content lifecycle. |
 | `dsp_interface.md` | Detailed MCU/DSP transport and later lower-radio maps. |
+| `dsp_shared_memory_inventory.md` | Generated two-ROM inventory of reachable firmware reads from DSP shared RAM. |
+| `dsp_shared_memory_transitions.md` | Generated two-ROM transaction census for DSP-owned shared-RAM scalar state. |
+| `dsp_packet_semantics.md` | Generated two-ROM inventory of DSP packet vocabulary and current HLE disposition. |
 | `dsp_service_transport_contract.md` | DSP/generic-service ownership and acceptance contract. |
 
 ## Deep reverse-engineering references
