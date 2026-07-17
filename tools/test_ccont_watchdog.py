@@ -34,11 +34,16 @@ class CcontWatchdogTest(unittest.TestCase):
         self.assertNotIn("current_datetime", self.source)
         self.assertIn("m_regs[RTC_HOUR] = 12", self.source)
         self.assertIn("attotime::from_seconds(1)", self.source)
-        self.assertIn("++m_regs[RTC_SECOND] < 60", self.source)
+        self.assertIn("++m_regs[RTC_SECOND] >= 60", self.source)
+        self.assertIn("RTC_SECOND = 0x07", self.source)
+        self.assertIn("RTC_DAY = 0x0a", self.source)
+        self.assertIn("Reading the selected register completes", self.source)
+        self.assertIn("if (m_regs[RTC_SECOND] != 0)", self.source)
 
     def test_rtc_sources_use_recovered_status_bits(self):
         self.assertIn("IRQ_RTC_SECOND = 0x10", self.source)
         self.assertIn("IRQ_RTC_MINUTE = 0x20", self.source)
+
         self.assertIn("IRQ_RTC_ALARM = 0x80", self.source)
         self.assertIn("m_rtc_alarm_armed", self.source)
         self.assertIn("case RTC_ALARM_MINUTE:", self.source)

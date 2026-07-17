@@ -11,9 +11,9 @@ from tools.mad2_interrupt_trace_check import (
 class Mad2InterruptTraceCheckTest(unittest.TestCase):
     def test_overlap_and_independent_ack(self):
         events = parse("""
-mad2_interrupt: event=levels domain=IRQ keypad=1 ccont=1 pending_before=040 pending_after=041 t=1
-mad2_interrupt: event=route domain=IRQ active=1 pending=041 mask=8e ctrl=05 t=1
-mad2_interrupt: event=ack domain=IRQ mask=001 pending_before=041 pending_after=040 t=1
+mad2_interrupt: event=levels domain=IRQ keypad=1 ccont=1 pending_before=004 pending_after=005 t=1
+mad2_interrupt: event=route domain=IRQ active=1 pending=005 mask=8a ctrl=05 t=1
+mad2_interrupt: event=ack domain=IRQ mask=001 pending_before=005 pending_after=004 t=1
 """)
         errors, counts = check_overlap(events, "final_irq_status=00\n")
         self.assertEqual([], errors)
@@ -22,7 +22,7 @@ mad2_interrupt: event=ack domain=IRQ mask=001 pending_before=041 pending_after=0
     def test_overlap_requires_both_sources(self):
         events = parse("mad2_interrupt: event=levels domain=IRQ keypad=1 ccont=0 pending_before=000 pending_after=001 t=1")
         errors, _ = check_overlap(events, "final_irq_status=00\n")
-        self.assertIn("keypad IRQ0 and CCONT IRQ6 were never pending simultaneously", errors)
+        self.assertIn("keypad IRQ0 and CCONT IRQ2 were never pending simultaneously", errors)
 
     def test_masked_pending_delivery(self):
         events = parse("""

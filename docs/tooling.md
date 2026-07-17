@@ -66,6 +66,16 @@ functions and export analysis. The naming list is also exported as a
   delayed key sequence; this observes a post-input UI even when no later LCD
   frame callback occurs. `input_field:set_value(1)` is the logical pressed
   state; MAME applies the port's active-low polarity.
+  Firmware editors retain their real completion rules: for example, the first
+  clock setup requires four time digits and all eight date digits before `OK`
+  completes. Harness waits do not fill untouched fields or bypass validation.
+- `make verify-alarm` uses that organic input path to set the clock/date and a
+  12:02 alarm, then requires the firmware to program CCONT, consume its alarm
+  IRQ, clear the software deadline, and drive the MAD2 buzzer. It is distinct
+  from the direct-MMIO `make verify-ccont-rtc` controller fixture.
+- `make verify-power-lifecycle` applies only the physical power-key input. It
+  checks that a short press remains an interactive UI action and that a
+  two-second hold enters the firmware-owned shutdown/teardown continuation.
 
 ## NokTool 1.8 (external — EEPROM/NV format reference)
 

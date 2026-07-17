@@ -44,7 +44,7 @@ be read as peripheral completeness.
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
 | `04..07` timer 1 | 33,055 Hz free-running counter; FIQ5 on 16-bit wrap; stored destination latch | Partial | Overflow timing composes with the menu oracle. Neither ROM accesses the destination latch during boot; establish its compare and reset-enable behavior before adding side effects. |
-| `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ6, masked-pending retention and acknowledgement have focused regressions. The overlap fixture briefly gates CPU delivery through MAD2 MMIO so two physical input callbacks compose deterministically. Other source assignments still need independent evidence. |
+| `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ2, masked-pending retention and acknowledgement have focused regressions. The overlap fixture briefly gates CPU delivery through MAD2 MMIO so two physical input callbacks compose deterministically. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
 | `0d` peripheral clock gates | extracted stored latch | Cross-ROM mapped | Both ROMs set bit 5 for SIM activation and clear it after SIM initialization. Other bit ownership and electrical clock effects remain unknown. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
@@ -56,9 +56,9 @@ be read as peripheral completeness.
 | --- | --- | --- | --- |
 | FIQ8 `15/16` | periodic timer when enabled; extended pending/status/mask routing | Partial routing, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery and acknowledgement. Identify the source clock and physical timer semantics. |
 | MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, physical character rate | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover FIQ3 phase/source, collision and error behavior. |
-| Buzzer `15/1c/1d/1e` | PUP bit-5 enable and 13 MHz divider drive a MAME beeper; `make verify-buzzer` validates a 2 kHz enable/disable transaction through mapped MMIO | Partial hardware | Validate an organic ringer path and volume transfer; keypad tones are DSP/COBBA-owned and the MZT-03C acoustic response is not modeled. |
-| Vibrator `15/1b` | register storage only | Placeholder | Connect an output and recover frequency/mode semantics. |
-| GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven; other pins and electrical behavior remain unknown. |
+| Buzzer `15/1c/1d/1e` | PUP bit-5 enable and 13 MHz divider drive a MAME beeper; `make verify-buzzer` validates mapped MMIO and `make verify-alarm` validates the organic keypad-to-CCONT-to-ringtone path | Partial hardware | Recover volume/acoustic transfer; keypad tones are DSP/COBBA-owned and the MZT-03C acoustic response is not modeled. |
+| Vibrator `15/1b` | PUP bit-4 enable drives the named MAME `vibration` output; `0x1b` remains the independent frequency/mode latch; `make verify-vibrator` checks enable/control/disable through mapped MMIO. An organic RTC alarm remains silent at this output even after the firmware UI enables `Vibrating alert`. | Partial hardware | Exercise the optional vibra battery pack from an organic incoming-call lifecycle and recover `0x1b` semantics. |
+| GenIO `20/24` | register storage plus open-drain 24C128 SDA/SCL | Partial | EEPROM line mapping is firmware-proven. Neither v5.01 nor v6.00 changes proposed backlight bit 6 during a physical keypress plus 35-second timeout; the 3210 manual instead places LCD/key-light control behind COBBA and the UI-Switch. |
 | Key GPIO `28/2a/6b/a8` | 4x5 active-low matrix, ROM-derived 3210 wiring, row direction/drive, physical press/release edges on IRQ0 | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |
 | GENSIO `2c..2e`, `6c..6f` | extracted CCONT/LCD controller; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Cross-ROM partial | Confirm physical busy timing and remaining control bits. |
 | SELECT2/3 aliases `ad..af`, `ed..ef` | extracted saved latches; cross-ROM startup and RMW behavior mapped | Mapped | Identify attached companion devices and alias/decode behavior. |
@@ -70,12 +70,12 @@ be read as peripheral completeness.
 MAD2 owns aggregation and CPU-line assertion. Component devices expose level
 callbacks and do not write MAD2 pending registers directly. The extracted
 CCONT, DSP peer and MBUS devices follow this rule; keypad remains inside the
-phone state. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ6,
+phone state. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ2,
 DSP receive FIQ0, SIMI FIQ6, timer compare FIQ4, and MBUS FIQ2/FIQ3, with line
 8 represented by the extended pending bit. The keypad edge latch and CCONT
 level are independent sources; acknowledging IRQ0 cannot discard an active
-CCONT IRQ6. A physical overlap fixture observes pending status `0x41`; firmware
-acknowledges IRQ0 first and leaves IRQ6 pending. This is observed firmware
+CCONT IRQ2. A physical overlap fixture observes pending status `0x05`; firmware
+acknowledges IRQ0 first and leaves IRQ2 pending. This is observed firmware
 service order, not a claimed MAD2 priority encoder. A separate fixture proves
 that a masked IRQ0 remains pending and is delivered immediately when its mask
 and global gate permit it. The v5.01/v6.00 keypad and CCONT firmware paths
@@ -100,7 +100,7 @@ that the remaining MAD2 peripheral windows are ready to move. Each block needs:
 4. a 3210 oracle plus at least one second-ROM execution trace; and
 5. a focused regression for timers, interrupt masking and serial selection.
 
-GENSIO selection, CCONT IRQ6, timer 0, simultaneous IRQ aggregation,
+GENSIO selection, CCONT IRQ2, timer 0, simultaneous IRQ aggregation,
 masked-pending delivery and extended FIQ routing have focused regressions.
 The extracted core contains no firmware addresses and exposes callbacks for
 CPU routing and attached interrupt sources. Other unresolved windows remain in
@@ -210,9 +210,9 @@ command byte and `0x03` after consuming `0x6c`. A one-second trace produced
 both complete read and write transactions and exercised both values.
 `make verify-ccont` validates the phase/status grammar and all eight configured
 ADC selectors from this bounded organic trace. A second physical-input fixture
-latches charger source bit 3 and proves edge-latched MAD2 IRQ6 routing,
-controller acknowledgement and final deassertion. It does not claim a CCONT
-serial-status transaction during this bounded firmware lifecycle. The GENSIO
+latches charger source bit 3 and proves MAD2 IRQ2 routing plus firmware-owned
+CCONT status read, write-one-clear acknowledgement, cleared follow-up read and
+final deassertion. The GENSIO
 endpoint/status and SELECT state is registered alongside the CCONT device
 state. The byte-exact 20-second oracle was unchanged. An
 earlier interpretation that firmware polled status bit 3 was

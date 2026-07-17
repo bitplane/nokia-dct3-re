@@ -37,6 +37,7 @@ nokia_ccont_device::nokia_ccont_device(const machine_config &mconfig, const char
 void nokia_ccont_device::device_start()
 {
 	m_rtc_timer = timer_alloc(FUNC(nokia_ccont_device::rtc_tick), this);
+	m_rtc_alarm_latch_timer = timer_alloc(FUNC(nokia_ccont_device::rtc_alarm_latch_complete), this);
 	save_item(NAME(m_cmd));
 	save_item(NAME(m_watchdog));
 	save_item(NAME(m_regs));
@@ -62,6 +63,7 @@ void nokia_ccont_device::device_reset()
 	m_regs[RTC_HOUR] = 12;
 	m_regs[RTC_DAY] = 1;
 	m_rtc_alarm_armed = false;
+	m_rtc_alarm_latch_timer->adjust(attotime::never);
 	m_data_cycle = false;
 	m_rtc_timer->adjust(attotime::from_seconds(1), 0, attotime::from_seconds(1));
 	m_irq_cb(0);
@@ -88,6 +90,10 @@ void nokia_ccont_device::select_w(int selected)
 void nokia_ccont_device::latch_irq_sources(uint8_t sources)
 {
 	m_regs[IRQ_STATUS] |= sources & IRQ_SOURCE_MASK;
+	if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+		logerror("ccont_input: irq_latch=%02x status=%02x mask=%02x t=%.9f\n",
+			sources & IRQ_SOURCE_MASK, m_regs[IRQ_STATUS], m_regs[IRQ_MASK],
+			machine().time().as_double());
 	update_irq();
 }
 
@@ -99,10 +105,14 @@ void nokia_ccont_device::update_irq()
 void nokia_ccont_device::advance_rtc()
 {
 	latch_irq_sources(IRQ_RTC_SECOND);
-	if (++m_regs[RTC_SECOND] < 60)
+	if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+		logerror("ccont_rtc: event=second time=%02u:%02u:%02u day=%u status=%02x mask=%02x t=%.9f\n",
+			m_regs[RTC_HOUR], m_regs[RTC_MINUTE], m_regs[RTC_SECOND], m_regs[RTC_DAY],
+			m_regs[IRQ_STATUS], m_regs[IRQ_MASK], machine().time().as_double());
+	if (++m_regs[RTC_SECOND] >= 60)
+		m_regs[RTC_SECOND] = 0;
+	if (m_regs[RTC_SECOND] != 0)
 		return;
-
-	m_regs[RTC_SECOND] = 0;
 	latch_irq_sources(IRQ_RTC_MINUTE);
 	if (++m_regs[RTC_MINUTE] >= 60)
 	{
@@ -120,17 +130,23 @@ void nokia_ccont_device::advance_rtc()
 	// ROM IRQ dispatch identifies bit 7 as the alarm source, and the recovered
 	// alarm helper programs the minute/hour pair without a separate enable bit.
 	if (m_rtc_alarm_armed &&
-		m_regs[RTC_MINUTE] == m_regs[RTC_ALARM_MINUTE] &&
-		m_regs[RTC_HOUR] == m_regs[RTC_ALARM_HOUR])
+		m_regs[RTC_MINUTE] == (m_regs[RTC_ALARM_MINUTE] & 0x3f) &&
+		m_regs[RTC_HOUR] == (m_regs[RTC_ALARM_HOUR] & 0x1f))
 	{
 		latch_irq_sources(IRQ_RTC_ALARM);
 		m_rtc_alarm_armed = false;
+		m_regs[RTC_ALARM_HOUR] &= 0x7f;
 	}
 }
 
 TIMER_CALLBACK_MEMBER(nokia_ccont_device::rtc_tick)
 {
 	advance_rtc();
+}
+
+TIMER_CALLBACK_MEMBER(nokia_ccont_device::rtc_alarm_latch_complete)
+{
+	m_regs[RTC_ALARM_HOUR] &= 0x7f;
 }
 
 void nokia_ccont_device::serial_w(uint8_t data)
@@ -146,10 +162,14 @@ void nokia_ccont_device::serial_w(uint8_t data)
 		{
 		case ADC_CTRL:
 		{
-			const uint16_t value = m_adc_source[(data >> 4) & 0x07];
+			const unsigned channel = (data >> 4) & 0x07;
+			const uint16_t value = m_adc_source[channel];
 			m_regs[address] = data;
 			m_regs[ADC_LSB] = value & 0xff;
 			m_regs[ADC_MSB] = (value >> 8) & 0x03;
+			if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+				logerror("ccont_input: adc_select=%u raw=%03x ctrl=%02x t=%.9f\n",
+					channel, value, data, machine().time().as_double());
 			break;
 		}
 		case WATCHDOG:
@@ -164,14 +184,45 @@ void nokia_ccont_device::serial_w(uint8_t data)
 				m_watchdog = data;
 			}
 			break;
+		case RTC_SECOND:
+		case RTC_MINUTE:
+		case RTC_HOUR:
+		case RTC_DAY:
+			m_regs[address] = data;
+			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+				logerror("ccont_rtc: event=counter_write reg=%02x data=%02x t=%.9f\n",
+					address, data, machine().time().as_double());
+			break;
 		case RTC_ALARM_MINUTE:
+			m_regs[address] = data & 0x3f;
+			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+				logerror("ccont_rtc: event=alarm_write reg=%02x data=%02x armed=%u t=%.9f\n",
+					address, data, m_rtc_alarm_armed, machine().time().as_double());
+			break;
 		case RTC_ALARM_HOUR:
 			m_regs[address] = data;
-			m_rtc_alarm_armed = true;
+			if (BIT(data, 7))
+			{
+				m_rtc_alarm_armed = false;
+				// Bit 7 is the disable/update strobe. Firmware polls it as a
+				// busy indication before programming a new alarm.
+				m_rtc_alarm_latch_timer->adjust(attotime::from_msec(1));
+			}
+			else
+			{
+				m_regs[address] &= 0x1f;
+				m_rtc_alarm_armed = true;
+			}
+			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+				logerror("ccont_rtc: event=alarm_write reg=%02x data=%02x armed=%u t=%.9f\n",
+					address, data, m_rtc_alarm_armed, machine().time().as_double());
 			break;
 		case IRQ_STATUS:
 			// Ready bit 0 is persistent device status. PWRONX bit 1 is a
 			// clearable reset cause, and the upper bits are IRQ-source latches.
+			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+				logerror("ccont_rtc: event=status_ack data=%02x old=%02x t=%.9f\n",
+					data, m_regs[address], machine().time().as_double());
 			m_regs[address] = (m_regs[address] & RESET_READY) |
 				((m_regs[address] & ~RESET_READY) & ~data);
 			update_irq();
@@ -195,9 +246,16 @@ uint8_t nokia_ccont_device::serial_r()
 		switch (address)
 		{
 		case ADC_MSB: data = 0xb0 | (data & 0x03); break;
+		case RTC_SECOND: data |= 0x80; break;
 		}
 	}
-	m_data_cycle = !m_data_cycle;
+	if (std::getenv("NOKI3210_TRACE_CCONT_RTC") &&
+			((address >= RTC_SECOND && address <= RTC_ALARM_HOUR) || address == IRQ_STATUS))
+		logerror("ccont_rtc: event=read reg=%02x data=%02x t=%.9f\n",
+			address, data, machine().time().as_double());
+	// Reading the selected register completes the serial transaction.  A later
+	// cleanup byte starts a fresh phase; it is not data for this register.
+	m_data_cycle = false;
 	return data;
 }
 

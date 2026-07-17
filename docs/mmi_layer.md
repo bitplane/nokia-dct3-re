@@ -26,7 +26,7 @@ A scripted logical press changes the active-low MAD2 keypad state and raises
 IRQ0. Handler `0x2b3084` starts the firmware's internal `0x41/0x42/0x43`
 sequence, which scans the matrix at `0x2b2f90`, decodes the ROM keymap, and
 publishes resource `0x6e02` at `0x2b4628`. This works while task 1 remains in
-mode `0x0004`; IRQ6 belongs to CCONT rather than the keypad.
+mode `0x0004`; the keypad uses IRQ0 rather than the unrelated IRQ6 path.
 The same function first calls local key handlers `0x2979d8` and `0x2a27de`;
 `0x6e02` is an availability-gated resource mirror, not the sole input route.
 
@@ -61,8 +61,8 @@ MAME input ports COL.0..COL.4 (five columns, four row bits each)
 ```
 
 The IRQ source, polarity, acknowledgement, mailbox destination, and scheduler
-delivery are therefore proved. MAD2 IRQ6 belongs to CCONT and must remain
-separate. The driver does not post a decoded MMI key directly.
+delivery are therefore proved. CCONT uses the separate MAD2 IRQ2 source. The
+driver does not post a decoded MMI key directly.
 
 ## Register contract
 

@@ -77,7 +77,7 @@ class GensioTraceCheckTest(unittest.TestCase):
             ("W", 0x0E, 0x08),
             ("R", 0x0E, 0x02),
         ]
-        summary = "irq_seen=40\nfinal_irq_status=00\n"
+        summary = "irq_seen=04\nfinal_irq_status=00\n"
         errors, counts = check_charger_irq(transactions, summary)
         self.assertEqual([], errors)
         self.assertEqual(
@@ -85,12 +85,14 @@ class GensioTraceCheckTest(unittest.TestCase):
             counts,
         )
 
-    def test_charger_irq_does_not_require_immediate_serial_service(self):
+    def test_charger_irq_requires_firmware_serial_service(self):
         errors, counts = check_charger_irq(
             [("W", 0x0F, 0xF0)],
-            "irq_seen=40\nfinal_irq_status=00\n",
+            "irq_seen=04\nfinal_irq_status=00\n",
         )
-        self.assertEqual([], errors)
+        self.assertIn("firmware did not read the asserted CCONT charger source", errors)
+        self.assertIn("firmware did not acknowledge CCONT charger source bit 3", errors)
+        self.assertIn("CCONT charger source did not read clear after acknowledgement", errors)
         self.assertEqual(
             {"serial_status": 0, "serial_ack": 0, "serial_clear_read": 0},
             counts,

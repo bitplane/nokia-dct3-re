@@ -104,7 +104,10 @@ and posts the report to task 1. Its v6.00 caller surface is closed:
 
 A physical power-key action exercises the observed route: decoded key `0x0d`
 reaches `0x0795`, posts report 7, changes task 1 to mode `0x000c`, and begins
-service/display teardown. Healthy sibling boots reach standby without posting
+service/display teardown. `make verify-power-lifecycle` additionally proves
+that a short press stays in interactive mode `0x0004`, while a two-second hold
+reaches mode `0x000c`, terminal event `0x0074`, clears SIM enable and blanks the
+LCD through firmware-owned teardown. Healthy sibling boots reach standby without posting
 their equivalent report. Code 7 must not be injected or treated as cold-boot
 readiness.
 

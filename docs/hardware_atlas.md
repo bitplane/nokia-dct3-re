@@ -109,18 +109,18 @@ wrap; its register-window destination semantics remain provisional.
 ### PUP — MBUS, vibrator, buzzer, GenIO
 | off | reg | status / touch |
 |---|---|---|
-| `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable; periodic FIQ8 remains provisional ✓ |
+| `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable, bit 4 optional vibra-pack enable; periodic FIQ8 remains provisional ✓ |
 | `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | extracted controller with byte attachment, FIQ2 RX/TX lifecycle and 9,600-baud character timing; no bus peer ✓ |
-| `0x1b` | vibrator | backing latch ✓ (read) |
+| `0x1b` | vibrator frequency/mode | stored independently of the `0x15.bit4` enable; MAME `vibration` output and mapped-MMIO gate test ✓ |
 | `0x1c/0x1d` | buzzer divider high/low | MZT-03C square-wave frequency = 13 MHz / divider |
 | `0x1e` | buzzer volume | stored; acoustic response unmodeled |
-| `0x20/0x22/0x24` | McuGenIO signal / ? / direction | partial: native EEPROM pins plus unknown stored bits ✓ |
+| `0x20/0x22/0x24` | McuGenIO signal / ? / direction | partial: native EEPROM pins plus unknown stored bits ✓; paired-ROM physical-key traces do not corroborate the sibling emulator's proposed 3210 backlight bit 6 |
 
 ### KBGPIO — keyboard (partial hardware ✓)
 ROW `0x28` signal / `0xa8` direction, COL `0x2a` active-low input / `0x6b`
 interrupt mask. Firmware drives a 4-row by 5-column matrix; physical key edges
 latch MAD2 IRQ0, whose handler starts the firmware scan/decode sequence. CCONT
-uses the separate MAD2 IRQ6 source. Registers `0x29/0x68/0x69/0xa9` and
+uses the separate MAD2 IRQ2 source. Registers `0x29/0x68/0x69/0xa9` and
 `0x2b/0x6a/0xaa/0xab` remain backing storage with no established keypad role.
 
 ### GENSIO — multiplexed serial (CCONT, LCD, + SELECT-muxed)
@@ -145,6 +145,35 @@ is CTRL-I/O signal register 1. Its six exhaustive firmware sites only
 read-modify-write bit 1 from the power duty-cycle subsystem, so the driver
 models it as an output latch; its physical PCB net remains unknown.
 
+The NSE-8/9 service manual places both illumination outputs beyond COBBA_GJP:
+COBBA emits separate `LCD_light` and `Key_light` signals to the N400 UI-Switch,
+which supplies the LCD and keyboard LED current sinks. This rules out a direct
+MAD2 GenIO backlight model for the 3210. It also agrees with the firmware
+evidence: a v5.01/v6.00 trace drove a physical key after startup and observed
+the candidate PUP/UIF output latches through a further 35-second timeout;
+neither ROM changed bit 6 or any other candidate output in that interval.
+Boot-time `0x20020` bit-3 traffic is the proven EEPROM clock, not illumination.
+The remaining direct CTRL-I/O candidates are also closed: `0x20031` bit 1 is
+owned by the power duty-cycle subsystem, while `0x20033` bit 3 is changed
+alongside DSP/service serial control. The 3210 light-command semantics at the
+MAD2-to-COBBA boundary remain unmapped, so no backlight state is synthesized.
+A changed-write census of the complete MCU-visible DSP shared window adds a
+negative boundary result: a physical key and the following timeout introduce
+no distinct shared-word command. The only later writes are the already-mapped
+packet-ring cadence and charger-report control words. Consequently the light
+state must not be inferred from those transactions; its DSP/COBBA-side producer
+or a lower serial-control surface remains to be recovered.
+
+Physical source: Nokia NSE-8/9 Service Manual, System Module, issue 1 (07/99),
+baseband description and Backlight section:
+<https://manualmachine.com/nokia/3210/8179317-service-manual/>.
+
+The optional 3210 vibra battery pack uses a separate, internally consistent
+PUP contract: `0x20015.bit4` is the output gate and `0x2001b` stores its
+frequency/mode control. The named MAME output and mapped-MMIO conformance test
+validate that boundary. No current organic application run enables it, so
+incoming-call ownership and the control-byte encoding remain open.
+
 ## CCONT — power / ADC / RTC / charger ASIC (serial, via GENSIO `0x2c`/`0x6c`)
 
 Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial command (`addr = (cmd>>3)&0xf`):
@@ -154,10 +183,10 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0x0` | control | |
 | `0x1` | PWM (charger) — **write-only** | (the idx6 service-channel check reads a *cached* value here; see service_bootstrap.md) |
 | `0x2/0x3` | ADC read LSB / MSB | |
-| `0x5` | watchdog (WDReg) | nonzero data reloads an eight-bit seconds counter; `0x00` powers down; firmware helper `0x2b4dc0` services it for input-mask bit 1, but its post-startup schedule remains missing and expiry is guarded |
+| `0x5` | watchdog (WDReg) | nonzero data reloads an eight-bit seconds counter; `0x00` powers down; firmware helper `0x2b4dc0` services it organically in both supported 3210 ROMs with WDDISX released |
 | `0x6` | RTC enable | |
-| `0x7–0xa` | RTC sec/min/hour/day | deterministic binary counters; second/minute IRQs |
-| `0xb–0xc` | RTC alarm minute/hour | partial one-shot comparator |
+| `0x7–0xa` | RTC second/minute/hour/day read surface | deterministic binary counters and second/minute IRQs; firmware keeps calendar epoch state in software |
+| `0xb–0xc` | RTC alarm minute/hour | partial one-shot comparator; hour bit 7 is a self-clearing disable/update strobe |
 | `0xd` | clock gates | stored latch; effects unknown |
 | `0xe` | **interrupt/reset status** | reset `0x03`: persistent bit 0 ready, clearable bit 1 PWRONX cause; upper bits `0xf8` are write-one-to-clear IRQ sources |
 | `0xf` | interrupt mask | |
@@ -168,6 +197,14 @@ Firmware boot reader `0x2a84b0` directly samples selector 0, whereas the later A
 maps through ROM table `0x2e2d74` to selector 1. The complete logical-source table is identical in
 3210 v5.01. Values come from `nokia_adc_override` (env `NOKI3210_ADC0..7`, profiles); electrical
 scaling and PCB net names remain open.
+
+A physical charger edge establishes selector 5 more narrowly: CCONT source bit 3 wakes the
+firmware, which continues sampling selector 5 for the connected state. The MAME input now drives
+that selector from zero to the explicit raw `CHARGER_ADC` scenario value and latches source bit 3
+on both connection and removal. This is an electrically coherent input contract, not a recovered
+voltage scale or charging-current/battery-dynamics model. MAD2 IRQ2 posts task-1 event `0x51`;
+firmware reads and clears CCONT source bit 3, enters its charging lifecycle, and consumes a second
+edge on removal.
 
 ## The DSP interface
 

@@ -27,6 +27,7 @@ protected:
 
 private:
 	TIMER_CALLBACK_MEMBER(rtc_tick);
+	TIMER_CALLBACK_MEMBER(rtc_alarm_latch_complete);
 	void update_irq();
 	void advance_rtc();
 
@@ -41,6 +42,7 @@ private:
 	bool m_wddisx_grounded = false;
 	bool m_rtc_alarm_armed = false;
 	emu_timer *m_rtc_timer = nullptr;
+	emu_timer *m_rtc_alarm_latch_timer = nullptr;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_CCONT, nokia_ccont_device)

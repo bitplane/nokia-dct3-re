@@ -28,7 +28,7 @@ This document records the current hardware contract and unresolved questions.
 `nokia_gensio_device` owns endpoint selection, ready/data-available status and
 the serial callbacks into CCONT. The phone driver owns the battery/charger
 scenario, eight raw ADC inputs, one-hertz watchdog tick, and board
-routing into MAD2 IRQ6. Firmware owns startup and power policy.
+routing into MAD2 IRQ2. Firmware owns startup and power policy.
 
 ## Contract audit
 
@@ -38,9 +38,9 @@ The device boundary is classified by evidence level:
 | --- | --- | --- |
 | CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status belongs to the separate serial controller, not CCONT. |
 | Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
-| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. A charger-input fixture exercises edge-latched MAD2 IRQ6 delivery and controller acknowledgement; the bounded firmware lifecycle does not serially consume source bit 3. |
+| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. A charger-input fixture exercises MAD2 IRQ2 delivery; firmware receives task-1 event `0x51`, reads source bit 3, acknowledges it through register `0x0e`, and observes the cleared status. |
 | ADC selector values | Working fixture | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. `ADC_PROFILE` is test provisioning, not a battery model. |
-| RTC registers `0x7..0xa` | Partial | A deterministic one-second clock supplies binary second/minute/hour/day counters. ROM arithmetic establishes binary encoding; month/calendar persistence remains outside the recovered interface. |
+| RTC counters and alarm (`0x07..0x0c`) | Tested partial hardware | Deterministic binary counters produce second/minute sources; ROM arithmetic establishes binary encoding. Physical `0x07..0x0a` are second/minute/hour/day. A controller fixture proves the comparator and IRQ route; an organic keypad workflow programs a user alarm, receives the CCONT IRQ, and starts the ringtone. Month/calendar persistence remains outside the recovered interface. |
 | Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input and is released in the 3210 profile; both ROMs survive beyond the maximum window through organic reloads. |
 | Other register storage | Compatibility behavior | Registers without mapped semantics retain written bytes so firmware-visible transactions compose. Storage must not be interpreted as a proved hardware contract. |
 
@@ -88,8 +88,8 @@ not prove that physical GENSIO or CCONT has zero latency.
 | `0x4` | charger control/status | Unknown storage. |
 | `0x5` | watchdog and power control | Proven role; reload command semantics inferred from firmware. |
 | `0x6` | RTC enable/control | Inferred storage. |
-| `0x7..0xa` | RTC second/minute/hour/day | Binary counters; roles and encoding established from the firmware helper block. |
-| `0xb..0xc` | RTC alarm minute/hour | Partial one-shot comparison; programming either field arms it. |
+| `0x7..0xa` | RTC second/minute/hour/day read surface | The reader at `0x2b068c` weights these fields by 1, 60, 3,600 and 86,400 respectively. Firmware polls the seconds field and separately writes zero to the day/epoch field during its software-date lifecycle. |
+| `0xb..0xc` | RTC alarm minute/hour | Partial one-shot comparison; hour bit 7 is a self-clearing disable/update strobe. An ordinary hour write arms the comparator. |
 | `0xd` | clock gates | Stored latch; effects not recovered. |
 | `0xe` | interrupt/reset status | Cold power-key reset exposes ready bit 0 and PWRONX cause bit 1 (`0x03`); bit 0 persists while bit 1 and upper interrupt sources are write-one-to-clear. |
 | `0xf` | interrupt mask | Strongly inferred from firmware ISR behavior. |
@@ -107,8 +107,36 @@ wall-clock time, making runs and save states reproducible. Firmware helpers at
 `0x2b068c..0x2b080c` multiply the returned fields directly by 60 and 3600 and
 bound the seconds field at `0x3a`; this establishes binary rather than BCD
 encoding. The recovered alarm helper programs the minute/hour pair without a
-separate enable register, so writing either field arms a one-shot comparison;
-register `0xd` remains a clock-gate latch with unknown side effects.
+separate enable register. Alarm-hour bit 7 requests disable/update and clears
+after the latch settles; a normal hour write arms the one-shot comparison.
+Register `0xd` remains a clock-gate latch with unknown side effects.
+
+The seconds register exposes bit 7 as the RTC-running status. Firmware checks
+that bit before accepting the physical clock, masks it from the numeric seconds,
+and uses bit 7 of the alarm-hour register as a polled disable/update strobe.
+These two status semantics are required for task 1 to program an organic user
+alarm.
+
+The user-alarm lifecycle is distinct from the controller alarm fixture. Organic
+menu input configures clock state `2` with flag byte `0x20` and commits an
+absolute software deadline through `0x29b1ec`; a disabled alarm uses sentinel
+`0x7fffffff`. Task 1 converts the selected deadline to seconds-of-day, programs
+CCONT alarm minute/hour, and consumes the resulting bit-7 alarm IRQ. On each
+minute source, `0x29b082` obtains the current-time scalar
+from `0x29afe8` and publishes packed one-argument event `0x46bc` (base event
+`0x06bc`) through `0x2a25c4`. This corrects the former scheduled-time reading of
+that payload. Setting the clock temporarily selects a cached scalar while the
+task-1 validator at `0x270550..0x2705a8` compares CCONT and cache at minute
+resolution. A coherent 12:01 fixture proves that the validator clears fallback
+bit `0x10` when both reach minute `721`; later minute publications then advance
+from the physical counter. The keypad fixture must populate all eight date
+digits before the editor accepts `OK`; with that contract respected, it
+organically commits a 12:02 deadline of `0xa0124338`. With the RTC-running and
+alarm update-bit contracts modeled, firmware writes alarm minute `0x02` and
+hour `0x0c`; CCONT raises bit 7 at 12:02, firmware clears the deadline, and the
+ringtone path drives the modeled buzzer. This is an organic keypad-to-hardware-
+IRQ-to-audio acceptance chain; the direct controller fixture remains only its
+focused conformance test.
 
 With periodic delivery enabled, the v5.01 structural run observes MAD2 IRQ bit
 `0x10` and still reaches the same interactive menu. Its physical-key fixture is
@@ -156,7 +184,7 @@ ten-bit values; this is scenario input, not a finished physical battery model.
 
 ## Interrupt-to-firmware behavior
 
-Firmware ISR `0x2b08c6` reads status register `0xe`, applies mask register
+Firmware policy routine `0x2b08c6` reads status register `0xe`, applies mask register
 `0xf`, and handles the upper five bits. It posts startup events and `0x77xx`
 power-management messages:
 
@@ -184,7 +212,7 @@ Mode `0x000d` is therefore a power-on/charger sweep, not a SIM or DSP gate.
 
 Cold power-key state is PWRONX bit `0x02`; only upper status sources `0xf8`
 contribute to the CCONT IRQ output. PWRONX is reset/input status rather than a
-delayed MAD2 IRQ0 event. CCONT uses MAD2 IRQ6, while physical power-button input
+delayed MAD2 IRQ0 event. CCONT uses MAD2 IRQ2, while physical power-button input
 uses the KBGPIO column/IRQ0 path. Under this contract events `0x14` and `0x17`
 use direct scheduler paths, events `0x15` and `0x16` use delayed scheduling, and
 all four arrive organically.
@@ -192,7 +220,10 @@ all four arrive organically.
 The power-key interrupt path is stable across the two ROMs: v6.00 handler
 `0x2b3084` aligns with v5.01 `0x2b02fc`, and each calls a tiny task-1 event
 `0x41` publisher (`0x2b4662`/`0x2b18ea`). This proves IRQ ownership and the
-firmware transition, but no default edge timing. CCONT
+firmware transition, but no default edge timing. A focused physical-input
+regression distinguishes the ordinary short-press UI action from a two-second
+hold: the latter reaches task-1 mode `0x000c`, terminal event `0x0074`, clears
+SIM enable and tears down the display organically. CCONT
 watchdog-register data `0x00` enters the hardware power-off path. CCONT's
 watchdog is an eight-bit down-counter: every nonzero register write directly
 loads that many seconds, so the observed `0x20` and `0x31` writes select 32- and
@@ -200,6 +231,15 @@ loads that many seconds, so the observed `0x20` and `0x31` writes select 32- and
 hardware watchdog disable belongs to the separate board-level `WDDISX` pin.
 These semantics and the 32-second default/64-second maximum are documented in
 the [Nokia NSE-8/9 System Module technical documentation](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/3210/ch2sys%20%5B103%5D.pdf).
+
+An operational-time charger connection proves the complete interrupt path. The
+input sets ADC selector 5, latches CCONT source bit 3 and raises MAD2 IRQ2.
+Firmware's IRQ2 top half posts task-1 event `0x51`; task 1 calls policy routine
+`0x2b08c6`, reads and write-one-clears CCONT register `0x0e`, schedules events
+`0x15` and `0x16`, and enters its charging lifecycle. Removal latches a second
+source-3 edge, follows the same register-owned path, and returns task 1 to mode
+`0x0004`. The former IRQ6 route produced event `0x72` and only restarted the
+analog-monitor sequence; it was a board-wiring error, not a missing consumer.
 
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
@@ -250,9 +290,9 @@ remain diagnostic. `make verify-ccont RUN_DIR=<dir>` is the focused
 transport/register gate. Its ordinary run requires endpoint selection,
 command/data pairing, status values `0x03`/`0x07`, both transaction directions,
 and correct ADC packing for all eight `sane` selector fixtures. Its second run
-pulses the charger input and requires MAD2 IRQ6 delivery, firmware controller
-acknowledgement and final IRQ deassertion. It records any serial source-bit
-service without requiring one in this bounded lifecycle. GENSIO endpoint/status
+pulses the charger input and requires MAD2 IRQ2 delivery, firmware CCONT status
+read, write-one-clear acknowledgement, cleared follow-up read, and final IRQ
+deassertion. GENSIO endpoint/status
 state and CCONT register, command and IRQ state are save-state registered
 together; post-load reconstructs the IRQ output.
 
@@ -261,7 +301,8 @@ released and requires at least ten combined task-2 reloads, no gap over five
 seconds, no watchdog expiry, and no soft reset.
 
 The focused gate does not yet validate every register reset value, mask changes
-while a source is pending, alarm reprogramming, watchdog expiry, or full
-save-state resumption. RTC determinism and source assignments have source-level
+while a source is pending, alarm reprogramming, the `0x06bc` consumer,
+register-`0x0a` write semantics, watchdog expiry, or full save-state resumption.
+RTC determinism and source assignments have source-level
 regressions; the byte-exact default frame and coherent frontier protect their
 integration behavior.

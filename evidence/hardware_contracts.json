@@ -14,7 +14,7 @@
     },
     {
       "id": "ccont_register_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers, reset status and MAD2 IRQ6 routing; focused organic traces validate all eight configured ADC selectors plus edge-latched charger delivery, MAD2 acknowledgement and settled controller state. CCONT source-bit serial acknowledgement is not exercised by the bounded charger lifecycle",
+      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers and reset status. On v6.00, operational charger connection and removal route through MAD2 IRQ2, task-1 event 0x51 and firmware policy 0x2b08c6; focused traces validate source-bit read, write-one-clear acknowledgement, cleared status and settled controller state",
       "evidence": ["docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
     },
     {
@@ -24,7 +24,7 @@
     },
     {
       "id": "ccont_rtc_watchdog_model", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
-      "boundary": "CCONT now owns a deterministic binary RTC with ROM-mapped second, minute and alarm interrupt sources, plus the documented eight-bit seconds watchdog: every nonzero watchdog-register write reloads the byte value and zero requests power-down. WDDISX is a modeled physical input, currently grounded by the default 3210 profile because the emulation still lacks the steady-state firmware service before the 0x31 load expires; this is explicit compatibility debt, not a production-board claim",
+      "boundary": "CCONT owns a deterministic binary RTC with ROM-mapped second, minute and alarm interrupt sources, plus the documented eight-bit seconds watchdog: every nonzero watchdog-register write reloads the byte value and zero requests power-down. WDDISX is a modeled physical input and the default 3210 profile leaves it released; both supported 3210 ROMs service the enabled watchdog organically",
       "evidence": ["docs/ccont_subsystem.md"]
     },
     {
@@ -54,7 +54,7 @@
     },
     {
       "id": "mad2_interrupt_aggregation", "subsystem": "interrupts", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component levels onto ARM lines; focused fixtures validate simultaneous keypad IRQ0/CCONT IRQ6 without destructive acknowledgement, pending retention across masks, immediate delivery on unmask/global enable, and FIQ8 ninth-bit projection/mask/ack routing; extended IRQ ownership and several line assignments remain unvalidated",
+      "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component sources onto ARM lines; focused fixtures validate simultaneous keypad IRQ0/CCONT IRQ2 without destructive acknowledgement, pending retention across masks, immediate delivery on unmask/global enable, and FIQ8 ninth-bit projection/mask/ack routing; extended IRQ ownership and several line assignments remain unvalidated",
       "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
     },
     {

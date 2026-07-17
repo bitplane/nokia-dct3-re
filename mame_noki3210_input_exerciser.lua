@@ -35,6 +35,8 @@ local irq_overlap_at
 local irq_mask_fixture_at
 local fiq8_fixture_at
 local buzzer_fixture_at
+local vibrator_fixture_at
+local rtc_fixture_at
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
@@ -61,6 +63,8 @@ irq_overlap_at = env_number("NOKI3210_MAD2_IRQ_OVERLAP_AT", -1)
 irq_mask_fixture_at = env_number("NOKI3210_MAD2_IRQ_MASK_FIXTURE_AT", -1)
 fiq8_fixture_at = env_number("NOKI3210_MAD2_FIQ8_FIXTURE_AT", -1)
 buzzer_fixture_at = env_number("NOKI3210_BUZZER_FIXTURE_AT", -1)
+vibrator_fixture_at = env_number("NOKI3210_VIBRATOR_FIXTURE_AT", -1)
+rtc_fixture_at = env_number("NOKI3210_CCONT_RTC_FIXTURE_AT", -1)
 local state_roundtrip_at = env_number("NOKI3210_STATE_ROUNDTRIP_AT", -1)
 
 local function emulation_seconds()
@@ -479,6 +483,46 @@ if buzzer_fixture_at >= 0 then
 		space:write_u8(0x20015, old_pup & 0xdf)
 	end)
 	assert(coroutine.resume(buzzer_timer))
+end
+
+if vibrator_fixture_at >= 0 then
+	local vibrator_timer = coroutine.create(function()
+		emu.wait(vibrator_fixture_at)
+		local old_pup = space:read_u8(0x20015)
+		local old_control = space:read_u8(0x2001b)
+		-- Controller conformance only: the firmware-owned incoming-call path has
+		-- not yet exercised these registers organically.
+		space:write_u8(0x2001b, 0x55)
+		space:write_u8(0x20015, old_pup | 0x10)
+		emu.wait(0.05)
+		space:write_u8(0x20015, old_pup & 0xef)
+		emu.wait(0.01)
+		space:write_u8(0x2001b, old_control)
+	end)
+	assert(coroutine.resume(vibrator_timer))
+end
+
+if rtc_fixture_at >= 0 then
+	local rtc_timer = coroutine.create(function()
+		emu.wait(rtc_fixture_at)
+		local old_control = space:read_u8(0x2002d)
+		local function ccont_write(reg, value)
+			-- Re-selecting CCONT begins a two-byte register transaction.
+			space:write_u8(0x2002d, old_control | 0x04)
+			space:write_u8(0x2002c, reg << 3)
+			space:write_u8(0x2002c, value)
+		end
+		-- Cross 12:00:58 -> 12:01 and assert the matching alarm. This is a
+		-- controller conformance fixture, not a firmware clock-state shortcut.
+		ccont_write(0x07, 58)
+		ccont_write(0x08, 0)
+		ccont_write(0x09, 12)
+		ccont_write(0x0b, 1)
+		ccont_write(0x0c, 12)
+		ccont_write(0x0f, 0x50) -- unmask alarm bit 7 for this controller test
+		space:write_u8(0x2002d, old_control)
+	end)
+	assert(coroutine.resume(rtc_timer))
 end
 
 if state_roundtrip_at >= 0 then

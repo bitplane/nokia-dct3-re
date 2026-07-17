@@ -51,6 +51,14 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("m_buzzer->set_clock(13'000'000 / divider)", self.driver)
         self.assertIn('NOKI3210_TRACE_BUZZER', self.driver)
 
+    def test_charger_input_updates_vchar_and_latches_both_edges(self):
+        body = self.driver.split("INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )", 1)[1]
+        body = body.split("static INPUT_PORTS_START", 1)[0]
+        self.assertIn("set_adc_source(5", body)
+        self.assertIn('NOKI3210_CHARGER_ADC', body)
+        self.assertIn("latch_irq_sources(0x08)", body)
+        self.assertNotIn("if (newval)", body)
+
 
 if __name__ == "__main__":
     unittest.main()

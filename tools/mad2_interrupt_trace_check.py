@@ -45,21 +45,21 @@ def _summary_value(summary_text, name):
 def check_overlap(events, summary_text):
     errors = []
     overlap = [e for e in events if
-               e.get("pending_after", e.get("pending", 0)) & 0x41 == 0x41]
-    delivered = [e for e in events if e.get("event") == "route" and e.get("domain") == "IRQ" and e.get("active") == 1 and e.get("pending", 0) & 0x41 == 0x41]
-    independent_ack = [e for e in events if e.get("event") == "ack" and e.get("domain") == "IRQ" and e.get("mask", 0) & 0x01 and e.get("pending_before", 0) & 0x41 == 0x41 and e.get("pending_after", 0) & 0x40]
+               e.get("pending_after", e.get("pending", 0)) & 0x05 == 0x05]
+    delivered = [e for e in events if e.get("event") == "route" and e.get("domain") == "IRQ" and e.get("active") == 1 and e.get("pending", 0) & 0x05 == 0x05]
+    independent_ack = [e for e in events if e.get("event") == "ack" and e.get("domain") == "IRQ" and e.get("mask", 0) & 0x01 and e.get("pending_before", 0) & 0x05 == 0x05 and e.get("pending_after", 0) & 0x04]
     final_irq = _summary_value(summary_text, "final_irq_status")
 
     if not overlap:
-        errors.append("keypad IRQ0 and CCONT IRQ6 were never pending simultaneously")
+        errors.append("keypad IRQ0 and CCONT IRQ2 were never pending simultaneously")
     if not delivered:
-        errors.append("simultaneous IRQ0/IRQ6 pending state was not routed to the CPU")
+        errors.append("simultaneous IRQ0/IRQ2 pending state was not routed to the CPU")
     if not independent_ack:
-        errors.append("acknowledging IRQ0 did not preserve pending CCONT IRQ6")
+        errors.append("acknowledging IRQ0 did not preserve pending CCONT IRQ2")
     if final_irq is None:
         errors.append("boot summary does not record final IRQ status")
-    elif final_irq & 0x41:
-        errors.append("physical IRQ0/IRQ6 sources did not settle")
+    elif final_irq & 0x05:
+        errors.append("physical IRQ0/IRQ2 sources did not settle")
     return errors, {"overlap": len(overlap), "independent_acks": len(independent_ack)}
 
 

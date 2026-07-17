@@ -191,10 +191,16 @@ def check_charger_irq(transactions, summary_text):
         errors.append("CCONT charger source was never observed unmasked")
     irq_seen = re.search(r"^irq_seen=([0-9A-Fa-f]{2})$", summary_text, re.MULTILINE)
     final_irq = re.search(r"^final_irq_status=([0-9A-Fa-f]{2})$", summary_text, re.MULTILINE)
-    if not irq_seen or not (int(irq_seen.group(1), 16) & 0x40):
-        errors.append("MAD2 IRQ6 was not observed")
-    if not final_irq or (int(final_irq.group(1), 16) & 0x40):
-        errors.append("MAD2 IRQ6 did not deassert")
+    if not irq_seen or not (int(irq_seen.group(1), 16) & 0x04):
+        errors.append("MAD2 IRQ2 was not observed")
+    if not final_irq or (int(final_irq.group(1), 16) & 0x04):
+        errors.append("MAD2 IRQ2 did not deassert")
+    if not status_seen:
+        errors.append("firmware did not read the asserted CCONT charger source")
+    if not ack_seen:
+        errors.append("firmware did not acknowledge CCONT charger source bit 3")
+    if not clear_seen:
+        errors.append("CCONT charger source did not read clear after acknowledgement")
 
     return errors, {
         "serial_status": int(status_seen),

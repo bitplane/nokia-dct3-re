@@ -64,6 +64,15 @@ class KeypadInputTest(unittest.TestCase):
         for address in ("0x20015", "0x2001c", "0x2001d", "0x2001e"):
             self.assertIn(f"space:write_u8({address}", self.harness)
 
+    def test_rtc_fixture_uses_ccont_gensio_transactions(self):
+        fixture = self.harness.split("if rtc_fixture_at >= 0 then", 1)[1]
+        fixture = fixture.split("if state_roundtrip_at >= 0 then", 1)[0]
+        self.assertIn("space:write_u8(0x2002d", fixture)
+        self.assertIn("space:write_u8(0x2002c", fixture)
+        self.assertIn("ccont_write(0x0b, 1)", fixture)
+        self.assertIn("ccont_write(0x0c, 12)", fixture)
+        self.assertIn("ccont_write(0x0f, 0x50)", fixture)
+
     def test_interactive_target_uses_standard_mame_input(self):
         makefile = (ROOT / "Makefile").read_text()
         target = makefile.split("run-interactive:", 1)[1].split("\n\n", 1)[0]

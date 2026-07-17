@@ -141,6 +141,20 @@ The temporary isolation switches used for that experiment were removed; the resu
 narrows `MODEL_DSP_SERVICE` to one coherent hardware transaction rather than two
 independent conveniences.
 
+### COBBA tone control
+
+The MCU also uses shared RAM as an audio-control surface without committing a
+ring packet. Words `0x0ae` and `0x0b0` program two oscillator frequencies in
+quarter-Hz units; `0x0b6` is the amplitude gate. Ordinary v5.01 and v6.00 boot
+organically writes oscillator 1 as `0x0e10`, enables amplitude `0x65ac` for
+about 121 ms, then clears both, proving a 900 Hz start/stop command.
+
+With no DSP codec core, two low-fidelity MAME tone voices expose those
+firmware-owned commands. They are separate from the MAD2 PUP piezo. Organic
+navigation reaches the Ringing-tone selector but produces neither this
+shared-word sequence nor a PUP transaction, so the missing ringtone preview is
+still upstream in firmware/resource handling.
+
 ### Reachable shared-control commands
 
 The stateful-SIM path calls `0x290cf4` with command `0x30`, then command `0x32`.

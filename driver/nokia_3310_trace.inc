@@ -38,6 +38,106 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 // ============================================================================
 void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_CCONT_ADC", 0) != 0 &&
+			addr == 0x002b08c6)
+	{
+		logerror("ccont_charger_policy: mode=%04x event=%04x flags=%02x "
+				"task=%02x caller=%08x t=%.9f\n",
+			fw_word(FW_STARTUP_MODE), fw_word(FW_STARTUP_EVENT),
+			fw_byte(0x00112399), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+			machine().time().as_double());
+	}
+	// Keep the CCONT policy and alarm publisher visible without tracing the
+	// surrounding task-1 dispatcher.
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0 &&
+			(addr == 0x002b08c6 || addr == 0x002b0942))
+	{
+		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		logerror("ccont_policy: pc=%08x caller=%08x r0=%08x task=%02x t=%.9f\n",
+			addr, lr, m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x002b13d4 &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0)
+	{
+		const u32 event = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
+		if (event >= 0x7701 && event <= 0x7708)
+			logerror("ccont_policy: pc=%08x event=%04x caller=%08x task=%02x t=%.9f\n",
+				addr, event, m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x002b13b0 &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0)
+	{
+		const u32 event = m_maincpu->state_int(arm7_cpu_device::ARM7_R5) & 0xffff;
+		if (event >= 0x7701 && event <= 0x7708)
+			logerror("ccont_policy: event=%04x available=%u task=%02x t=%.9f\n",
+				event, m_maincpu->state_int(arm7_cpu_device::ARM7_R0) != 0,
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x0029b082 &&
+				nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0)
+	{
+		logerror("rtc_minute_policy: pc=%08x state=%02x flags=%02x/%02x base=%08x offset=%08x deadline=%08x task=%02x t=%.9f\n",
+			addr,
+			fw_byte(0x001121d2), fw_byte(0x001121d5), fw_byte(0x001121d6),
+			fw_dword(0x001121d8), fw_dword(0x001121e0), fw_dword(0x001121e4),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x0029b1ec &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0)
+	{
+		logerror("rtc_alarm_match: candidate=%08x current=%08x state=%02x flags=%02x/%02x task=%02x caller=%08x t=%.9f\n",
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
+			fw_byte(0x001121d3), fw_byte(0x001121d5), fw_byte(0x001121d6),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID),
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+			machine().time().as_double());
+	}
+	if (pc == addr && (addr == 0x0029b4d8 || addr == 0x0029b580) &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0)
+	{
+		logerror("rtc_alarm_state: pc=%08x state=%02x flags=%02x/%02x deadline=%08x previous=%08x task=%02x caller=%08x t=%.9f\n",
+			addr, fw_byte(0x001121d3), fw_byte(0x001121d5), fw_byte(0x001121d6),
+			fw_dword(0x001121e4), fw_dword(0x001121dc),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID),
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+			machine().time().as_double());
+	}
+	// Observe the branch target before the 0x46bc publication wrapper.  The
+	// wrapper entry itself is not a stable flash-tap boundary on ARM7 fetches.
+	if (pc == addr && addr == 0x0029b0d4 &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0)
+	{
+		logerror("rtc_minute_policy: event=46bc payload=%08x task=%02x t=%.9f\n",
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R4),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0 &&
+			addr == 0x002af77c &&
+			(m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff) == 0x46bc)
+	{
+		logerror("rtc_alarm_route: packed=46bc caller=%08x task=%02x t=%.9f\n",
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x002af646 &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0 &&
+			fw_word(0x00110f1a) == 0x06bc)
+	{
+		logerror("rtc_alarm_route: map-input=06bc task=%02x t=%.9f\n",
+			fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x002af64a &&
+			nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0 &&
+			fw_word(0x00110f1a) == 0x06bc)
+		logerror("rtc_alarm_route: map-output=%04x base=%08x offset=%08x deadline=%08x task=%02x t=%.9f\n",
+			m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+			fw_dword(0x001121d8), fw_dword(0x001121e0), fw_dword(0x001121e4),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+
 	// CCONT watchdog-service provenance. 0x2b4dc0 services MAD2 for input bit 0
 	// and CCONT for bit 1; descriptor 6 at the generic masked-write entry maps
 	// through GENSIO to physical CCONT register 5. These values are lost before

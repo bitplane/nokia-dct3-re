@@ -148,8 +148,14 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 				}
 			}
 			if (m_trace_enabled)
-				logerror("dsp_hle: TX packet type=%02x payload=%u words=%u t=%.6f\n",
-						packet.type, packet.length, packet.words, machine().time().as_double());
+			{
+				std::string payload_hex;
+				for (unsigned index = 0; index < packet.length; ++index)
+					payload_hex += util::string_format("%02x", packet.payload[index]);
+				logerror("dsp_hle: TX packet type=%02x payload=%u words=%u data=%s t=%.6f\n",
+						packet.type, packet.length, packet.words, payload_hex,
+						machine().time().as_double());
+			}
 			m_transport->consume_tx_packet(packet);
 		}
 		m_external_peer->tick();

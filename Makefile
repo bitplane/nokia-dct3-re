@@ -77,7 +77,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-gensio verify-display verify-dsp-transport verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -97,9 +97,13 @@ help:
 	@echo "make verify         check the explicit missing-hardware semantic profile"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
 	@echo "make verify-ccont-watchdog check enabled watchdog service beyond 49 seconds"
+	@echo "make verify-ccont-rtc check CCONT alarm programming and MAD2 IRQ2 delivery"
+	@echo "make verify-alarm    set and ring a user alarm through organic keypad input"
+	@echo "make verify-power-lifecycle check short-press UI and long-press shutdown behavior"
 	@echo "make verify-gensio  check two-ROM endpoint and SELECT-register contracts"
 	@echo "make verify-display check display-profile provenance and LCD serial transport"
 	@echo "make verify-dsp-transport check DSPIF rings, completion and peer layering"
+	@echo "make verify-dsp-tone check the organic ROM-4 COBBA tone command"
 	@echo "make verify-mad2    check timer-0/FIQ and save-state restoration contracts"
 	@echo "make verify-mad2-interrupts check simultaneous, masked-pending and extended-FIQ routing"
 	@echo "make verify-mad2-clocks check reset/clock/watchdog boot contracts in both 3210 ROMs"
@@ -111,6 +115,7 @@ help:
 	@echo "make verify-mmi-menu-501 reproduce the same menu under the v5.01 BIOS"
 	@echo "make verify-sim-phonebook save and reload an organic persistent SIM contact"
 	@echo "make verify-buzzer exercise the MAD2 piezo gate/divider MMIO contract"
+	@echo "make verify-vibrator exercise the MAD2 vibrator gate/control MMIO contract"
 	@echo "make mad2-census MAD2_LOG=... summarize a bounded MAD2 ledger trace"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
 	@echo "make verify-structure  compare semantic boot predicates with $(ORACLE_STRUCT)"
@@ -211,7 +216,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -322,10 +327,10 @@ verify-ccont:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKI3210_TRACE_GENSIO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)/error.log --adc-profile sane
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_irq SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_PULSE_AT=0.2'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_irq SECONDS=4 \
+		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_PULSE_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_irq/error.log
-	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log --adc-profile sane \
+	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log \
 		--require-charger-irq --summary $(RUN_DIR)_irq/boot_summary.txt
 
 verify-ccont-watchdog:
@@ -412,8 +417,8 @@ verify-mad2:
 	@echo "OK — MAD2 state round trip restored RAM, timer and controller state"
 
 verify-mad2-interrupts:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_overlap SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_IRQ_OVERLAP_AT=0.2'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_overlap SECONDS=4 \
+		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_IRQ_OVERLAP_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_overlap/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py overlap $(RUN_DIR)_overlap/error.log \
 		--summary $(RUN_DIR)_overlap/boot_summary.txt
@@ -459,6 +464,45 @@ verify-buzzer:
 		RUN_ENV='NOKI3210_TRACE_BUZZER=1 NOKI3210_BUZZER_FIXTURE_AT=0.3'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_buzzer/error.log
 	$(PYTHON) tools/buzzer_trace_check.py $(RUN_DIR)_buzzer/error.log
+
+verify-vibrator:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_vibrator SECONDS=1 \
+		RUN_ENV='NOKI3210_TRACE_PUP_OUTPUTS=1 NOKI3210_VIBRATOR_FIXTURE_AT=0.3'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_vibrator/error.log
+	$(PYTHON) tools/vibrator_trace_check.py $(RUN_DIR)_vibrator/error.log
+
+verify-dsp-tone:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v600 SECONDS=3 \
+		RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v600/error.log
+	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v600/error.log
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v501 SECONDS=3 BIOS=501 \
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
+		RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v501/error.log
+	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v501/error.log
+
+verify-ccont-rtc:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_rtc SECONDS=19 \
+		RUN_ENV='NOKI3210_TRACE_CCONT_RTC=1 NOKI3210_CCONT_RTC_FIXTURE_AT=15'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_rtc/error.log
+	$(PYTHON) tools/ccont_rtc_trace_check.py $(RUN_DIR)_rtc/error.log
+
+verify-alarm:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_alarm SECONDS=135 \
+		PROVISIONED_IMEI_PREFIX=49015420323751 \
+		RUN_ENV='NOKI3210_TRACE_CCONT_RTC=1 NOKI3210_TRACE_BUZZER=1 NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=70 NOKI3210_POST_READY_KEY_GAP_MS=180 NOKI3210_POST_READY_KEYS=enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,1,wait400,2,wait400,0,wait400,1,wait400,enter,wait700,enter,wait700,0,wait400,1,wait400,0,wait400,1,wait400,1,wait400,9,wait400,9,wait400,9,wait400,enter,wait900,c,wait900,enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,2,wait400,0,wait400,2,wait400,enter'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_alarm/error.log
+	$(PYTHON) tools/alarm_trace_check.py $(RUN_DIR)_alarm/error.log
+
+verify-power-lifecycle:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_short SECONDS=18 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=250 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
+	$(PYTHON) tools/power_lifecycle_check.py short $(RUN_DIR)_power_short/boot_summary.txt
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_long SECONDS=20 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=2000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
+	$(PYTHON) tools/power_lifecycle_check.py long $(RUN_DIR)_power_long/boot_summary.txt
+	@echo "OK — physical power-key short/long firmware lifecycles reproduced"
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier

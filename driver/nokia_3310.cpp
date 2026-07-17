@@ -115,7 +115,7 @@ constexpr uint16_t MAD2_FIQ_TIMER0_COMPARE = uint16_t(1) << 4;
 // PWRONX is latched as CCONT status bit 1 on a cold power-key boot. It is a
 // reset cause sampled by firmware, not one of the upper interrupt sources.
 constexpr uint8_t KEYPAD_IRQ_LINE_NUM = 0;        // MAD2 keypad/UIF interrupt
-constexpr uint8_t CCONT_IRQ_LINE_NUM = 6;         // MAD2 IRQ line the CCONT asserts
+constexpr uint8_t CCONT_IRQ_LINE_NUM = 2;         // MAD2 IRQ line the CCONT asserts
 
 // Firmware RAM locations used only by focused diagnostics and scoped boot shims.
 constexpr offs_t FW_CURRENT_TASK_ID = 0x100002;
@@ -252,6 +252,9 @@ public:
 		m_sim_card(*this, "sim_card"),
 		m_pcd8544(*this, "pcd8544"),
 		m_buzzer(*this, "buzzer"),
+		m_dsp_tone1(*this, "dsp_tone1"),
+		m_dsp_tone2(*this, "dsp_tone2"),
+		m_vibration(*this, "vibration"),
 		m_keypad(*this, "COL.%u", 0),
 		m_pwr(*this, "PWR")
 	{ }
@@ -319,6 +322,8 @@ private:
 	void update_keypad_columns();
 	void update_keypad_ccont_irqs();
 	void update_buzzer();
+	void update_vibrator();
+	void update_dsp_tones();
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
 	uint32_t fw_dword(offs_t address) const;
@@ -338,6 +343,9 @@ private:
 	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<pcd8544_device> m_pcd8544;
 	required_device<beep_device> m_buzzer;
+	required_device<beep_device> m_dsp_tone1;
+	required_device<beep_device> m_dsp_tone2;
+	output_finder<> m_vibration;
 	required_ioport_array<5> m_keypad;
 	required_ioport m_pwr;
 
@@ -570,6 +578,8 @@ void noki3310_state::post_load()
 {
 	update_keypad_ccont_irqs();
 	update_buzzer();
+	update_vibrator();
+	update_dsp_tones();
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -588,7 +598,7 @@ uint8_t noki3310_state::fw_byte(offs_t address) const
 
 uint32_t noki3310_state::fw_dword(offs_t address) const
 {
-	return uint32_t(fw_word(address)) | (uint32_t(fw_word(address + 2)) << 16);
+	return (uint32_t(fw_word(address)) << 16) | uint32_t(fw_word(address + 2));
 }
 
 void noki3310_state::machine_reset()
@@ -601,6 +611,8 @@ void noki3310_state::machine_reset()
 
 	memset(m_mad2_regs, 0, 0x100);
 	update_buzzer();
+	update_vibrator();
+	update_dsp_tones();
 	std::fill(std::begin(m_mad2_trace_read), std::end(m_mad2_trace_read), false);
 	std::fill(std::begin(m_mad2_trace_write), std::end(m_mad2_trace_write), false);
 	std::fill(std::begin(m_dspif_trace_read), std::end(m_dspif_trace_read), false);
@@ -684,6 +696,10 @@ void noki3310_state::ccont_irq_w(int state)
 	// deferred firmware service acknowledges it through GENSIO.
 	if (state && !m_ccont_irq_state)
 		m_mad2->assert_irq(CCONT_IRQ_LINE_NUM);
+	if (nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0 && state != m_ccont_irq_state)
+		logerror("ccont_route: state=%u irq_line=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
+			state, CCONT_IRQ_LINE_NUM, m_mad2->irq_status(), m_mad2->reg(MAD2_IRQ_MASK),
+			m_mad2->reg(MAD2_IRQ_CTRL), machine().time().as_double());
 	m_ccont_irq_state = bool(state);
 }
 
@@ -907,6 +923,9 @@ uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 void noki3310_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	m_dspif->shared_w(offset, data, mem_mask);
+	const unsigned byte_offset = (offset & 0x7ff) << 1;
+	if (byte_offset == 0x0ae || byte_offset == 0x0b0 || byte_offset == 0x0b6)
+		update_dsp_tones();
 }
 
 #include "nokia_3310_trace.inc"
@@ -994,7 +1013,7 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 	}
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
 			nokia_gensio_device::owns(offset) &&
-			m_gensio_trace_count++ < 20000)
+			m_gensio_trace_count++ < nokia_env_u32("NOKI3210_TRACE_GENSIO_LIMIT", 20000))
 		logerror("gensio: R off=%02x data=%02x pc=%08x t=%.9f\n", offset, data,
 				m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
@@ -1049,6 +1068,17 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		m_mad2_regs[offset] = data;
 	if (offset == 0x15 || offset == 0x1c || offset == 0x1d || offset == 0x1e)
 		update_buzzer();
+	if (offset == 0x15 || offset == 0x1b)
+		update_vibrator();
+	const bool pup_output_change =
+		(offset == 0x15 && ((old_data ^ data) & 0x30) != 0) ||
+		(offset >= 0x1b && offset <= 0x1e && old_data != data) ||
+		(offset == 0x20 && ((old_data ^ data) & 0x40) != 0);
+	if (nokia_env_u32("NOKI3210_TRACE_PUP_OUTPUTS", 0) != 0 && pup_output_change)
+		logerror("pup_output: off=%02x data=%02x old=%02x buzzer=%u vibra=%u backlight6=%u pc=%08x t=%.9f\n",
+			u32(offset), data, old_data, BIT(m_mad2->reg(0x15), 5),
+			BIT(m_mad2->reg(0x15), 4), BIT(m_mad2_regs[0x20], 6),
+			m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0 &&
 			(offset >= 0x08 && offset <= 0x13) &&
 			m_mad2_timer_trace_count++ < 4096)
@@ -1092,7 +1122,7 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		m_simi->tx_fifo_control_w(data);
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
 			gensio_register &&
-			m_gensio_trace_count++ < 20000)
+			m_gensio_trace_count++ < nokia_env_u32("NOKI3210_TRACE_GENSIO_LIMIT", 20000))
 		logerror("gensio: W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset, data,
 				old_data, m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_DISPLAY_IO", 0) != 0 &&
@@ -1121,6 +1151,10 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 			offset == MAD2_FIQ_MASK || offset == MAD2_IRQ_MASK ||
 			offset == MAD2_IRQ_CTRL || offset == MAD2_FIQ8_CTRL)
 		trace_interrupt_register('W', offset, data);
+	if (nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0 &&
+			offset == MAD2_IRQ_STATUS && BIT(data, CCONT_IRQ_LINE_NUM))
+		logerror("ccont_route: event=mad_ack data=%02x pc=%08x t=%.9f\n",
+			data, m_maincpu->pc(), machine().time().as_double());
 
 	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
 }
@@ -1136,6 +1170,40 @@ void noki3310_state::update_buzzer()
 		logerror("buzzer: enabled=%u divider=%u frequency=%u volume=%u t=%.6f\n",
 				enabled, divider, divider ? 13'000'000 / divider : 0,
 				m_mad2_regs[0x1e], machine().time().as_double());
+}
+
+void noki3310_state::update_vibrator()
+{
+	// PUP control bit 4 gates the output; register 0x1b carries the separate
+	// frequency/mode setting. The 3210 used an optional vibra battery pack.
+	const bool enabled = BIT(m_mad2->reg(0x15), 4);
+	m_vibration = enabled;
+	if (nokia_env_u32("NOKI3210_TRACE_PUP_OUTPUTS", 0) != 0)
+		logerror("vibrator: enabled=%u control=%02x t=%.6f\n",
+			enabled, m_mad2_regs[0x1b], machine().time().as_double());
+}
+
+void noki3310_state::update_dsp_tones()
+{
+	// The ROM-4 MCU programs the COBBA tone oscillators in quarter-Hz units.
+	// A real DSP renders them through the codec; this HLE voice exposes the same
+	// firmware-owned command while no DSP core or codec PCM backend is present.
+	const u16 oscillator1 = m_dspif->shared_r(0x0ae >> 1);
+	const u16 oscillator2 = m_dspif->shared_r(0x0b0 >> 1);
+	const u16 amplitude = m_dspif->shared_r(0x0b6 >> 1);
+	const unsigned frequency1 = oscillator1 >> 2;
+	const unsigned frequency2 = oscillator2 >> 2;
+	if (frequency1 != 0)
+		m_dsp_tone1->set_clock(frequency1);
+	if (frequency2 != 0)
+		m_dsp_tone2->set_clock(frequency2);
+	m_dsp_tone1->set_state(amplitude != 0 && frequency1 != 0);
+	m_dsp_tone2->set_state(amplitude != 0 && frequency2 != 0);
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("dsp_tone: oscillator=%04x/%04x frequency=%u/%u amplitude=%04x active=%u/%u t=%.6f\n",
+				oscillator1, oscillator2, frequency1, frequency2, amplitude,
+				amplitude != 0 && frequency1 != 0, amplitude != 0 && frequency2 != 0,
+				machine().time().as_double());
 }
 
 uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
@@ -1225,10 +1293,12 @@ INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 
 INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )
 {
-	// CCONT status bit 3 is the firmware-established charger event. The source
-	// is latched on connection and remains set until firmware acknowledges it.
-	if (newval)
-		m_ccont->latch_irq_sources(0x08);
+	// CCONT status bit 3 reports a physical charger edge.  Firmware determines
+	// the new state by sampling selector 5, so keep the analog input coherent
+	// with the edge instead of posting a status interrupt with a zero VCHAR.
+	m_ccont->set_adc_source(5, newval ?
+			nokia_env_u32("NOKI3210_CHARGER_ADC", 0x3ff) : 0);
+	m_ccont->latch_irq_sources(0x08);
 }
 
 static INPUT_PORTS_START( noki3310 )
@@ -1279,7 +1349,7 @@ INPUT_PORTS_END
 void noki3310_state::noki3310(machine_config &config)
 {
 	/* basic machine hardware */
-	ARM7_BE(config, m_maincpu, 26000000 / 2);  // MAD2WD1 13 MHz, clock internally supplied to ARM core can be divided by 2, in sleep mode a 32768 Hz clock is used
+	ARM7_BE(config, m_maincpu, 26000000 / 2);  // MAD2-family 13 MHz ARM clock; sleep uses the 32.768 kHz domain
 	m_maincpu->set_addrmap(AS_PROGRAM, &noki3310_state::noki3310_map);
 
 	/* video hardware */
@@ -1298,6 +1368,8 @@ void noki3310_state::noki3310(machine_config &config)
 
 	SPEAKER(config, "mono").front_center();
 	BEEP(config, m_buzzer).add_route(ALL_OUTPUTS, "mono", 0.25);
+	BEEP(config, m_dsp_tone1).add_route(ALL_OUTPUTS, "mono", 0.12);
+	BEEP(config, m_dsp_tone2).add_route(ALL_OUTPUTS, "mono", 0.12);
 
 	INTEL_TE28F160(config, "flash");
 	I2C_24C128(config, m_eeprom);
