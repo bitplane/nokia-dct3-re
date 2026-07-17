@@ -5,9 +5,8 @@
 // instructions, synthesize messages, or force firmware-owned state.
 
 // ============================================================================
-// Firmware-research RAM-write path: execution traces around the real backing
-// store (COMBINE_DATA). NOT hardware behaviour; should shrink as investigations
-// close.
+// Firmware-research RAM-write observations. The real backing-store write stays
+// in noki3310_state::ram_w so removing this file cannot change emulation.
 // ============================================================================
 void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
@@ -29,7 +28,6 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 		logerror("sim_contract: notify-latch write pc=%08x data=%04x mask=%04x old=%04x task=%02x t=%.6f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_byte(0x00100022),
 				machine().time().as_double());
-	COMBINE_DATA(&m_ram[offset]);
 }
 
 // ============================================================================
@@ -320,6 +318,26 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 			logerror(" controller=%02x task=%02x t=%.6f\n", fw_byte(0x0010d0e2),
 					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 		}
+	}
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
+			(addr == 0x0023471e || addr == 0x00237c5a || addr == 0x002831a8 ||
+			 addr == 0x0028316c || addr == 0x002824e4 ||
+			 addr == 0x00282734 || addr == 0x00282a76))
+	{
+		const u32 message = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		logerror("dsp_boundary: framed-session pc=%08x phase=%02x index=%02x "
+				"envelope=%02x/%02x/%02x msg=%08x task=%02x t=%.6f\n",
+				addr, fw_byte(0x0011fedb), fw_byte(0x0011fedc),
+				fw_byte(0x0011fe6a), fw_byte(0x0011fe6b), fw_byte(0x0011fe6c),
+				message, fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x002a8ca4 &&
+			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+	{
+		logerror("dsp_boundary: callback0a status=%04x object=%08x state=%02x task=%02x t=%.6f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1), fw_byte(0x0011fc8a),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	}
 	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
 			(addr == 0x002a2074 || addr == 0x0028d710 || addr == 0x0028d7fe || addr == 0x0028d886))

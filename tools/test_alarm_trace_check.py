@@ -1,6 +1,6 @@
 import unittest
 
-from alarm_trace_check import check_trace
+from tools.alarm_trace_check import check_trace
 
 
 class AlarmTraceCheckTest(unittest.TestCase):

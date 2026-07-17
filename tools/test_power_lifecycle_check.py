@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from power_lifecycle_check import check, parse_summary
+from tools.power_lifecycle_check import check, parse_summary
 
 
 class PowerLifecycleCheckTest(unittest.TestCase):

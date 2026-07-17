@@ -901,11 +901,12 @@ uint16_t noki3310_state::ram_r(offs_t offset, uint16_t mem_mask)
 	return m_ram[offset] & mem_mask;
 }
 
-// Hardware RAM write entry point (registered in the address map). The backing
-// store plus firmware-research traces live in nokia_3310_trace.inc.
+// Hardware RAM write entry point (registered in the address map). Research
+// traces observe the old value before the real backing-store write.
 void noki3310_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	ram_w_firmware_traces(offset, data, mem_mask);
+	COMBINE_DATA(&m_ram[offset]);
 }
 
 

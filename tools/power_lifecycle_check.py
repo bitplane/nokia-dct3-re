@@ -2,6 +2,7 @@
 """Check the firmware-owned short/long power-key lifecycle."""
 
 import argparse
+import sys
 from pathlib import Path
 
 
@@ -49,7 +50,7 @@ def main() -> int:
     errors = check(args.kind, parse_summary(args.summary))
     if errors:
         for error in errors:
-            print(f"error: {error}")
+            print(f"error: {error}", file=sys.stderr)
         return 1
     print(f"power lifecycle: {args.kind} press reproduced")
     return 0

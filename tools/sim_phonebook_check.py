@@ -2,6 +2,7 @@
 """Validate the organic EF_ADN write produced by the phonebook fixture."""
 
 import argparse
+import sys
 from pathlib import Path
 
 
@@ -32,7 +33,11 @@ def main() -> int:
     parser.add_argument("trace", type=Path)
     parser.add_argument("nvram", type=Path)
     args = parser.parse_args()
-    validate_phonebook(args.trace.read_text(errors="replace"), args.nvram.read_bytes())
+    try:
+        validate_phonebook(args.trace.read_text(errors="replace"), args.nvram.read_bytes())
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
     print("OK - EF_ADN record 1 contains ADA/123 and the remaining 49 records are erased")
     return 0
 

@@ -243,6 +243,64 @@ object's leading status and delivers it through the ordinary task mailbox.
 | `0x99` | `0x28464c` | structured measurement/report decoder |
 | other | `0x2b3730` | generic invalid/diagnostic path, then free |
 
+### Type `0x86` controller protocol
+
+The structured type-`0x86` decoder is closed at its first protocol boundary.
+It is a lower controller/transfer multiplexer, not the constructor for the
+type-`0x8e` framed session:
+
+- direct DSP ingress reaches `0x284316` from the task-4 type switch at
+  `0x2b4070`; the other calls at `0x2845d4` and `0x284fb4` replay firmware ROM
+  descriptors while handling task callbacks;
+- byte `+4` selects exactly four accepted subtypes: `0x70`, `0x80`, `0xb0`,
+  and `0xb1`; all other values are freed without a transaction;
+- `0x70` owns the queued channel context and its task-14/task-15 completion
+  notifications; `0x80`, `0xb0`, and `0xb1` select task-3 transaction
+  descriptors according to the active controller/configuration state;
+- type `0x89` handler `0x284f74`, not type `0x86`, establishes controller state
+  3 after posting status `0x1393` to task 10. The type-`0x86` callback paths can
+  subsequently operate when that controller reaches state 7;
+- every accepted direct packet eventually runs `0x2841e4`, the independent
+  ten-sample measurement publication to task 8, and then frees the broker
+  object.
+
+The entire type-`0x86` implementation and its two internal callers use the
+controller context rooted near `0x10d0db` and queued channel objects near
+`0x11281f`/`0x11381f`. They contain no load from, store to, or call into the
+framed-session phase byte `0x11fedb` or its state machine at `0x2824e4`.
+Consequently a valid type-`0x86` exchange cannot directly bootstrap acceptance
+of type-`0x8e` class-`0x47` traffic. Any indirect relationship would have to be
+a new, independently evidenced task-level contract; none is present in this
+closed decoder.
+
+### Framed call/session startup
+
+The phase byte at `0x11fedb` is firmware-owned. Task 7 initialization clears it
+at `0x23471e`; no DSP packet is required to manufacture phase 1. Callback
+`0x0a` (`0x2a8ca4`) handles event `0x06a9` by entering validator `0x2831a8`.
+When its firmware-side checks succeed, it calls `0x28316c`, which:
+
+- marks the session/control state active and initializes context offset
+  `+0x72`;
+- posts task-`0x1a` event `0x0202`;
+- clears the framed-session index at `+0x74` and sets phase `+0x73` to 1;
+- queues descriptor `0x2e0023f0` through `0x2b0482`.
+
+The callback-table pointer at `0x2db770` establishes ownership of dispatcher
+`0x2a8ca4`; the starter is therefore application/firmware initiated rather
+than a hidden direct DSP callback. The coherent eight-second offline boot does
+not execute callback event `0x06a9`, the validator, the starter, or constructor
+`0x2824e4`.
+
+Once active, task 7 sends supported framed classes through the phase machine.
+Class `0x42` is decoded by `0x2827f8`. Its command `0x64` branch accepts payload
+byte `+0x0b == 0x45` while phase equals 1, increments the phase to 2, clears the
+per-phase index and calls outbound constructor `0x2824e4`. A different phase
+selects the phase-20 recovery path; other payload values reset/terminate the
+session. Thus the first legal peer acknowledgement is known, but it must only
+be produced in response to an organic session start. It is not a registration
+or idle-boot stimulus.
+
 No simple fixed-status handler produces the required `0x1391`. Thus the organic
 `0x1391 -> 0x0434` completion must be derived by one of the structured decoders
 or by a later controller transition, rather than encoded as a bare first-level

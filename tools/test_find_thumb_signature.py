@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import unittest
 
-from find_thumb_signature import relocation_mask
+from tools.find_thumb_signature import relocation_mask
 
 
 class RelocationMaskTests(unittest.TestCase):

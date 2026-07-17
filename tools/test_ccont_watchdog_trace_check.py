@@ -21,6 +21,14 @@ class CcontWatchdogTraceCheckTest(unittest.TestCase):
         self.assertIn("CCONT watchdog expired", errors)
         self.assertIn("run did not retain zero soft resets", errors)
 
+    def test_rejects_reset_count_with_zero_prefix(self):
+        log = "\n".join(
+            f"ccont_watchdog_service: mask=03 caller=0 task=02 t={index * 3.0:.6f}"
+            for index in range(12)
+        )
+        errors, _ = check(log, "soft_resets=01\n")
+        self.assertIn("run did not retain zero soft resets", errors)
+
 
 if __name__ == "__main__":
     unittest.main()

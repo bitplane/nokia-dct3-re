@@ -64,16 +64,27 @@ through MDIRCV/FIQ0. Static classification narrows the receive surface:
 
 - type `0x99` (`0x28464c`) is a five-sample measurement accumulator which
   publishes class `0x04`, command `0x4a` to task 8, not a camp transition;
-- type `0x86` (`0x284316`) is a controller/transfer state machine for subtypes
-  `0x70`, `0x80`, `0xb0`, and `0xb1`, and remains a possible prerequisite for
-  accepting later framed traffic;
+- type `0x86` (`0x284316`) is a separate controller/transfer state machine for
+  subtypes `0x70`, `0x80`, `0xb0`, and `0xb1`. Its controller state is
+  established by type `0x89`; exhaustive decode found no access to the
+  type-`0x8e` framed-session phase, so it is not that session's bootstrap;
 - type `0x8e` reaches task 7 and the task-22 class dispatcher, but the observed
   zero session phase rejects a standalone class-`0x47` candidate.
 
-The next bounded question is which valid type-`0x86` exchange, if any, advances
-the firmware-owned session phase so that type-`0x8e` traffic is accepted. If no
-such path exists, record the quantified absence and begin at the type-`0x8e`
-session constructor rather than guessing a registration-success payload.
+The type-`0x86` bootstrap hypothesis is closed by quantified absence. The
+type-`0x8e` session is instead started by firmware callback `0x0a`: event
+`0x06a9` reaches `0x2831a8`, whose successful validation path calls
+`0x28316c`. That routine initializes the session context, posts task-`0x1a`
+event `0x0202`, sets phase `0x11fedb` to 1, and queues the first outbound
+descriptor. There is no direct caller from the DSP receive machinery.
+
+The first phase transition is also bounded. Inbound class `0x42`, command
+`0x64`, payload byte `+0x0b == 0x45` is accepted only while phase is 1; it
+advances phase to 2 and invokes outbound constructor `0x2824e4`. Other payload
+values terminate or reset the session. This is a call/session protocol
+contract, not evidence that ordinary offline boot should synthesize it. The
+next useful experiment must start from an organic callback-`0x0a` request or a
+network peer attached at the framed transport boundary.
 
 ## Acceptance
 

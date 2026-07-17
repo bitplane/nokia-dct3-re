@@ -297,6 +297,12 @@
       "evidence": ["docs/sim_subsystem.md", "docs/sim_emulator_scope.md"]
     },
     {
+      "id": "dsp_type86_bootstraps_framed_session", "status": "disproven",
+      "hypothesis": "A valid DSP RX type-0x86 controller exchange advances the phase required for later type-0x8e class-0x47 traffic",
+      "conclusion": "Complete decode of 0x284316 and all three call sites shows a separate controller/transfer protocol with subtypes 0x70, 0x80, 0xb0 and 0xb1. Its controller state is established by RX type 0x89; its outputs are task-3 transactions, task-13/14/15 completions and an independent task-8 measurement publication. The closed implementation contains no access to framed-session phase 0x11fedb or its state machine, so type 0x86 cannot directly bootstrap type-0x8e acceptance",
+      "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md"]
+    },
+    {
       "id": "genio_bit6_backlight", "status": "disproven",
       "hypothesis": "MAD2 GenIO signal-register bit 6 (0x20020) drives the 3210 LCD/keypad backlight",
       "conclusion": "The NSE-8/9 service manual routes both illumination outputs behind COBBA_GJP into the N400 UI-Switch. Paired v5.01/v6.00 traces covering a physical key press plus a 35-second timeout show no change on bit 6 or any candidate PUP/UIF output latch, and a changed-write census of the complete MCU-visible DSP shared window finds no key- or timeout-specific light command. Boot-time 0x20020 bit-3 traffic is the proven EEPROM clock. The MAD2-to-COBBA light command remains unmapped; no backlight state is synthesized",

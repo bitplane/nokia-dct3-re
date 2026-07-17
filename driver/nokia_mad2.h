@@ -54,7 +54,7 @@ private:
 	emu_timer *m_timer0 = nullptr;
 	emu_timer *m_timer1 = nullptr;
 	emu_timer *m_fiq8 = nullptr;
-	u8 m_regs[0x17] = { 0 };
+	u8 m_regs[0x20] = { 0 };
 	u16 m_fiq_status = 0;
 	u16 m_irq_status = 0;
 	u16 m_timer0_counter = 0;

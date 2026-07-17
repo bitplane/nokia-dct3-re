@@ -4,6 +4,7 @@
 import argparse
 import pathlib
 import re
+import sys
 
 
 RELOAD_RE = re.compile(r"ccont_watchdog_service: mask=03 .*? t=([0-9.]+)")
@@ -18,7 +19,7 @@ def check(log_text: str, summary_text: str):
         errors.append("combined watchdog reload gap exceeded five seconds")
     if "ccont_watchdog_expired" in log_text:
         errors.append("CCONT watchdog expired")
-    if "soft_resets=0" not in summary_text:
+    if re.search(r"(?m)^soft_resets=0$", summary_text) is None:
         errors.append("run did not retain zero soft resets")
     return errors, times
 
@@ -35,7 +36,7 @@ def main() -> int:
     print(f"CCONT watchdog contract: reloads={len(times)} first={times[0] if times else 0:.6f} "
           f"last={times[-1] if times else 0:.6f}")
     for error in errors:
-        print(f"error: {error}")
+        print(f"error: {error}", file=sys.stderr)
     return int(bool(errors))
 
 

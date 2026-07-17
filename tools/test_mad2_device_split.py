@@ -33,6 +33,10 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertNotIn("pc()", source)
         self.assertNotRegex(source, r"0x2[0-9a-f]{5}")
 
+    def test_register_storage_covers_masked_window(self):
+        self.assertIn("m_regs[0x20]", self.header)
+        self.assertIn("offset & 0x1f", self.header)
+
     def test_timer1_is_free_running_and_interrupts_on_wrap(self):
         callback = self.device.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)", 1)[1]
         callback = callback.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::fiq8_tick)", 1)[0]
