@@ -36,6 +36,14 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 // ============================================================================
 void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
+			(addr == 0x0021ba08 || addr == 0x0021ba22 || addr == 0x0021ba36 || addr == 0x00219e30))
+	{
+		logerror("radio_finalize: pc=%08x work20=%08x work30=%08x count=%04x limit=%04x flags=%02x ctrl=%02x t=%.6f\n",
+				pc, fw_dword(0x0010d938), fw_dword(0x0010d948), fw_word(0x0010dc90),
+				fw_word(0x00110156), fw_byte(0x0010dca3), fw_byte(0x0010dbdb),
+				machine().time().as_double());
+	}
 	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_CCONT_ADC", 0) != 0 &&
 			addr == 0x002b08c6)
 	{

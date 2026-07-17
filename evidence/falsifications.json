@@ -327,6 +327,12 @@
       "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md"]
     },
     {
+      "id": "task17_0434_unconditionally_publishes_13e2", "status": "disproven",
+      "hypothesis": "Any task-17 0x0434 completion immediately publishes task-5 status 0x13e2 and constructs task-14 request 0x1776",
+      "conclusion": "An opt-in DSP-boundary diagnostic delivers two type-0x87 reports through MDIRCV/FIQ0 after the organic type-0x1a publication. Task 10 enters finalizer 0x219e30 and organically posts 0x0434. Task 17 consumes it at comparison 0x225240, runs handler 0x225b6c and continues at 0x226348, but emits neither 0x13e2 nor 0x1776. Full local decode proves input 0x09d6 is compared at 0x22522c and selects adjacent handler 0x225b82, whose call at 0x225b8c publishes 0x13e2. The former chain joined two dispatcher arms.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md", "docs/sim_registration.md"]
+    },
+    {
       "id": "genio_bit6_backlight", "status": "disproven",
       "hypothesis": "MAD2 GenIO signal-register bit 6 (0x20020) drives the 3210 LCD/keypad backlight",
       "conclusion": "The NSE-8/9 service manual routes both illumination outputs behind COBBA_GJP into the N400 UI-Switch. Paired v5.01/v6.00 traces covering a physical key press plus a 35-second timeout show no change on bit 6 or any candidate PUP/UIF output latch, and a changed-write census of the complete MCU-visible DSP shared window finds no key- or timeout-specific light command. Boot-time 0x20020 bit-3 traffic is the proven EEPROM clock. The MAD2-to-COBBA light command remains unmapped; no backlight state is synthesized",

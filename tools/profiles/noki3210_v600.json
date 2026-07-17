@@ -299,14 +299,16 @@
       ]
     },
     {
-      "id": "task17_completion_to_task5_13e2",
+      "id": "task17_09d6_to_task5_13e2",
       "from": "task17_registration_control",
       "to": "task5_context_dispatch",
-      "input_status": "0x0434",
+      "input_status": "0x09d6",
       "output_status": "0x13e2",
       "classification": "dormant",
-      "provenance": "reviewed_static",
+      "provenance": "reviewed_static_and_runtime",
+      "note": "The dispatcher compares 0x09d6 at 0x22522c and calls handler 0x225b82, which invokes 0x2b3f60 at 0x225b8c. Adjacent inputs 0x0a22 and 0x0434 instead call 0x225b6c.",
       "anchors": [
+        {"type": "effective_literal_load", "address": "0x22522c", "value": "0x09d6"},
         {"type": "call", "address": "0x225b8c", "target": "0x2b3f60"},
         {"type": "effective_literal_load", "address": "0x2b3f64", "value": "0x53e2"}
       ]
@@ -569,7 +571,7 @@
     {
       "id": "deep_gsm_target_chain_absent", "manifest": "deep-gsm", "subsystem": "generic_service",
       "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
-      "statement": "No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained coherent-run analysis."
+      "statement": "No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained unassisted coherent-run analysis; a later opt-in DSP-boundary diagnostic reaches 0x0434 but not 0x13e2."
     },
     {
       "id": "deep_gsm_task14_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",

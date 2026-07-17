@@ -21,7 +21,10 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_external_service_enabled));
 	save_item(NAME(m_service_delay_ms));
 	save_item(NAME(m_peer_poll_ms));
+	save_item(NAME(m_radio_scenario));
 	save_item(NAME(m_service_control_completion_sent));
+	save_item(NAME(m_radio_reports_sent));
+	save_item(NAME(m_radio_reports_pending));
 	save_item(NAME(m_bootstrap_exchange_count));
 }
 
@@ -31,6 +34,8 @@ void nokia_dsp_hle_device::device_reset()
 	m_packet_timer->adjust(attotime::never);
 	m_response_timer->adjust(attotime::never);
 	m_service_control_completion_sent = false;
+	m_radio_reports_sent = 0;
+	m_radio_reports_pending = 0;
 	m_bootstrap_exchange_count = 0;
 	publish_bootstrap_state();
 }
@@ -147,6 +152,12 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 					m_transport->notify_rx();
 				}
 			}
+			// Diagnostic radio-contract scenarios. Both are tied to the firmware's
+			// organic channel-bitmap publication, use the real MDIRCV/FIQ0 path and
+			// remain disabled by default. They distinguish the terminal type-0x87
+			// report from the counted type-0x8a report without touching MCU state.
+			if (m_radio_scenario != 0 && packet.type == 0x1a && m_radio_reports_pending == 0)
+				m_radio_reports_pending = m_radio_scenario == 1 ? 2 : 64;
 			if (m_trace_enabled)
 			{
 				std::string payload_hex;
@@ -157,6 +168,20 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 						machine().time().as_double());
 			}
 			m_transport->consume_tx_packet(packet);
+		}
+		if (m_radio_reports_pending != 0)
+		{
+			const u8 payload[8] = { 0 };
+			const u8 report_type = m_radio_scenario == 1 ? 0x87 : 0x8a;
+			if (m_transport->enqueue_rx_packet(report_type, payload, std::size(payload)))
+			{
+				++m_radio_reports_sent;
+				--m_radio_reports_pending;
+				m_transport->notify_rx();
+				if (m_trace_enabled)
+					logerror("dsp_hle: diagnostic radio RX type=%02x sequence=%u t=%.6f\n",
+							report_type, m_radio_reports_sent, machine().time().as_double());
+			}
 		}
 		m_external_peer->tick();
 		schedule_response();

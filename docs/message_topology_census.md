@@ -253,7 +253,7 @@ Intersecting these constructors with callbacks that contain direct `0x05e8` publ
 - **PASS** `task14_opcode_36_to_lower_result_0fc1`: `0x09d8 object opcode 0x36` -> `0x1033 -> 0x0fc1` (dormant, reviewed_static)
 - **PASS** `lower_result_0fc2_to_task10_1392_update`: `0x0fc2` -> `0x1392` (dormant, reviewed_static)
 - **PASS** `corrected_task10_1392_dispatch`: `0x1392` -> `dispatch 0x21b790` (disproven_alternative, reviewed_static)
-- **PASS** `task17_completion_to_task5_13e2`: `0x0434` -> `0x13e2` (dormant, reviewed_static)
+- **PASS** `task17_09d6_to_task5_13e2`: `0x09d6` -> `0x13e2` (dormant, reviewed_static_and_runtime)
 - **PASS** `task5_13e2_to_task14_1776`: `0x13e2` -> `0x1776` (dormant, reviewed_static)
 - **PASS** `task14_opcode_3a_to_context_initialization`: `0x09d8 object opcode 0x3a` -> `0x0fc8 -> type-2 object -> 0x0ac8 command 0x16` (dormant_downstream_cycle, reviewed_static)
 - **PASS** `context_09cd_to_callback7_object`: `context slot matches 0x10e89a and callback-state slot 0x5d at 0x11fcdd is 1 or 2` -> `0x09cd -> 0x85e0(selector 7, object)` (dormant, reviewed_static_and_runtime)
@@ -278,13 +278,13 @@ Reviewed runtime claims:
 - `deep_gsm_transient_registration_scope` (deep-gsm, reviewed_runtime): The eight-second coherent run executes transient registrations only for service 0x0a at callers 0x26341e, 0x296ec8 and 0x296f16; no transient service-5 registration executes.
 - `deep_gsm_resident_registration_scope` (deep-gsm, reviewed_runtime): No resident registration through 0x263d30 executes in the eight-second coherent run, including the indirect callsite at 0x28c672.
 - `deep_gsm_service5_inputs` (deep-gsm, reviewed_runtime): An unforced coherent deep run delivered service-5 callback inputs 0x05f3 and 0x05e2, but no 0x05e8.
-- `deep_gsm_target_chain_absent` (deep-gsm, reviewed_runtime): No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained coherent-run analysis.
+- `deep_gsm_target_chain_absent` (deep-gsm, reviewed_runtime): No 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434 target-chain message was observed in the retained unassisted coherent-run analysis. A later opt-in DSP-boundary diagnostic reaches 0x0434 but not 0x13e2.
 - `deep_gsm_task14_dormant` (deep-gsm, reviewed_runtime): Task 14 initialized its controller slots but received no subsequent message; decoder 0x267258 did not execute.
 - `deep_gsm_05e8_publishers_dormant` (deep-gsm, reviewed_runtime): All 13 callback owners containing the 16 direct 0x05e8 publishers received the global 0x05e2 sweep once; none generated 0x05e8.
 - `deep_gsm_callback24_lifecycle_dormant` (deep-gsm, reviewed_runtime): Callback 0x24 receives only the global 0x05e2 sweep with framework mode 0. Its mode-9 callback-0x21 constructor and mode-11 0x0388 publishers do not execute; callback 0x21 and 0x26 therefore cannot reach their 0x05e8 fallback branches in the coherent boot.
 - `deep_gsm_sim_registration_notification_dormant` (deep-gsm, reviewed_runtime): Ordinary task-21 SIM traffic executes, while the EF_PHASE=2 card correctly produces no TERMINAL PROFILE, 0x120c, FETCH A0/12, or proactive D0 command. A phase-3 isolation card still does not reach the later profile-download lifecycle.
 
-Target-chain statuses observed as task messages: `0x05e8`=0, `0x05ea`=0, `0x07dd`=0, `0x09d8`=0, `0x0434`=0.
+Target-chain statuses in the retained unassisted coherent run: `0x05e8`=0, `0x05ea`=0, `0x07dd`=0, `0x09d8`=0, `0x0434`=0. The separate diagnostic run observes `0x0434` once and no `0x13e2`/`0x1776`.
 
 ## Class-`0x40` service command family
 

@@ -554,13 +554,15 @@ boot task 14 receives no message and neither `0x282238` (resource-`0x35`
 transmit) nor `0x267258` (object receive) runs.
 
 Task-5 status `0x13e2` is downstream, not an absent radio transition. Its natural
-producer is `0x2b3f60`, called by task 17 at `0x225b8c` after the phase handler accepts
-`0x0434`/`0x0a22` (and at `0x223a28` after the phase loop returns). It publishes packed
+producer is `0x2b3f60`, called by task 17 at `0x225b8c` from the dispatcher arm for
+input `0x09d6` (and at `0x223a28` after the phase loop returns). It publishes packed
 `0x53e2` with one firmware-owned pointer; the consumer path
 `0x255124 -> 0x28a4a8 -> 0x238a24` then constructs `0x1776` for decimal task 14
-(ID `0x0e`). The runtime never reaches it because `0x0434` is absent. The
-unresolved downstream predecessor is the organic producer of lower result
-`0x0fc1`, which selects completion status `0x1391`. The `0x0fbf` context path
+(ID `0x0e`). A boundary diagnostic now reaches `0x0434` through direct type-`0x87`
+completion. Task 17 consumes it at `0x225240`, runs `0x225b6c`, and continues at
+`0x226348` without reaching `0x2b3f60`. The missing predecessor of `0x13e2` is therefore
+the organic producer of task-17 input `0x09d6`, not the arrival of `0x0434`. The
+`0x0fbf` context path
 and `0x0fc2 -> 0x1392` radio-state path are separate and do not reach `0x0434`;
 only after the `0x0fc1` contract is pinned should the proven bidirectional
 contract move into a DSP peer device.

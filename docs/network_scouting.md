@@ -32,7 +32,10 @@ service-5 status 0x05e8
 
 separate unresolved completion:
   lower result 0x0fc1 -> task-10 0x1391 -> task-17 0x0434
-  -> task-5 0x13e2 -> task-14 0x1776 session request
+  -> task-17 phase-dependent acknowledgement/restart work
+
+separate task-17 registration request:
+  task-17 0x09d6 -> task-5 0x13e2 -> task-14 0x1776 session request
 
 direct DSP completion family:
   RX 0x87 -> task-10 0x138f -> empty-work gate -> common finalizer
@@ -44,6 +47,31 @@ The static portions are normalized in `tools/profiles/noki3210_v600.json` and
 checked by `message_census.py`. The unobserved predecessor is the organic path
 to one of the recovered `0x05e8` publishers plus entry `0x28`'s downstream
 readiness state; reviewed runtime does not execute that transition.
+
+An opt-in boundary diagnostic now proves the direct completion route
+end-to-end without touching MCU state. Two type-`0x87` reports, delivered after
+the organic type-`0x1a` publication through MDIRCV/FIQ0, make task 10 enter
+`0x219e30` and post `0x0434` to task 17. A single report is queued but does not
+wake the task-10 consumer in this scheduler state; the reason a real peer
+supplies the additional wake remains unresolved. Repeating type `0x8a` instead
+increments its counter toward limit `0x01f2` while the controller gate remains
+clear. These runs identify `0x87` as the short terminal completion family and
+`0x8a` as a counted report family, but do not establish their RF names or make
+either suitable for default emulation.
+
+The same run corrects the former downstream assumption. Task 17 consumes
+`0x0434` at the dispatcher comparison `0x225240`, enters handler `0x225b6c`,
+performs local acknowledgement/restart work, and continues at `0x226348`.
+It does not publish `0x13e2` or construct `0x1776` in the active startup phase.
+The `0x225b8c -> 0x2b3f60` publisher is selected by adjacent dispatcher input
+`0x09d6`, not by `0x0434` or `0x0a22`. The former static chain joined separate
+dispatcher arms.
+
+The retained instrument is disabled by default. Setting
+`NOKI3210_DIAG_RADIO_SCENARIO=1` schedules the two type-`0x87` reports after
+each organic type-`0x1a` packet; value `2` schedules 64 type-`0x8a` reports.
+It is a transport/consumer isolation scenario, not a fake-cell model or a
+supported machine profile, and may be removed once the real sequence is known.
 
 ## Emulation direction
 
@@ -133,7 +161,8 @@ Network work becomes composable when one coherent run:
    result `0x0fc1 -> 0x1391` or the now-mapped direct `0x87`/`0x8a` completion
    family, without conflating the separate `0x0fbf` context and
    `0x0fc2 -> 0x1392` radio-state paths;
-3. publishes `0x13e2` and constructs task-14 `0x1776` without intervention;
+3. supplies task-17 input `0x09d6` through its organic owner, publishes
+   `0x13e2`, then constructs task-14 `0x1776` without intervention;
 4. continues through SIM registration and emits operator/signal child content;
 5. preserves both 3210 oracles and the 3330 smoke baseline.
 

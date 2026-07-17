@@ -412,8 +412,8 @@ network work and do not block the validated offline UI; the mapped task-14/DSP
 radio-completion path is valid adjacent evidence and a candidate for ordinary registration,
 subject to an evidenced producer/consumer edge.
 
-Task 17 owns the natural producer of `0x13e2`. Once it accepts `0x0434` (or parallel `0x0a22`),
-its phase handler can call `0x2b3f60` from `0x225b8c`; the same publisher is called at
+Task 17 owns the natural producer of `0x13e2`. Dispatcher input `0x09d6` selects handler
+`0x225b82`, which calls `0x2b3f60` at `0x225b8c`; the same publisher is called at
 `0x223a28` after the long-lived phase loop returns. `0x2b3f60` publishes packed `0x53e2` with
 one firmware-owned pointer:
 
@@ -427,9 +427,13 @@ task-17 completion branch -> 0x2b3f60(packed 0x53e2, firmware pointer)
 ```
 
 `0x13e2` is a real three-byte entry in the ROM message catalogue at `0x2cb810`; its packed
-one-argument producer literal `0x53e2` is at `0x2b3f64`. It is absent at runtime because task
-17 never receives the preceding `0x0434`; the task-5 dispatcher and `0x28aXXX` consumer are
-not the broken boundary (**S/R**). Caution: a scheduler-only trace misattributes live `0x13b5`
+one-argument producer literal `0x53e2` is at `0x2b3f64`. An opt-in DSP-boundary diagnostic now
+delivers type `0x87` through MDIRCV/FIQ0 and makes task 10 publish `0x0434` organically. In the
+active startup phase task 17 accepts it at `0x225240`, runs handler `0x225b6c`, and continues
+at `0x226348` without publishing `0x13e2`. The task-5 dispatcher and `0x28aXXX` consumer remain
+valid dormant downstream code, but `0x0434 -> 0x13e2` is not an edge: it joined the
+`0x0434` arm at `0x225b6c` to the adjacent `0x09d6` arm at `0x225b82` (**S/R**).
+Caution: a scheduler-only trace misattributes live `0x13b5`
 to task 20 because `0x2af6ea` allocates and can reschedule before posting; sample task
 identity at publisher entry, not after allocation.
 
