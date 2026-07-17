@@ -23,7 +23,8 @@ This document records the current hardware contract and unresolved questions.
 - the deterministic binary RTC counters and recovered periodic IRQ sources;
 - interrupt status, mask and IRQ output;
 - watchdog counter state; and
-- a power output asserted by the watchdog-register power-off command.
+- a retained power-domain latch whose output is cleared by the watchdog-register
+  power-off command and restored by a charger edge.
 
 `nokia_gensio_device` owns endpoint selection, ready/data-available status and
 the serial callbacks into CCONT. The phone driver owns the battery/charger
@@ -38,7 +39,7 @@ The device boundary is classified by evidence level:
 | --- | --- | --- |
 | CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status belongs to the separate serial controller, not CCONT. |
 | Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
-| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. A charger-input fixture exercises MAD2 IRQ2 delivery; firmware receives task-1 event `0x51`, reads source bit 3, acknowledges it through register `0x0e`, and observes the cleared status. |
+| Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. Charger-originated restart exposes cause bit 2, while an operational charger edge uses source bit 3 and MAD2 IRQ2. Firmware reads and clears both forms through register `0x0e`. |
 | ADC selector values | Working fixture | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. `ADC_PROFILE` is test provisioning, not a battery model. |
 | RTC counters and alarm (`0x07..0x0c`) | Tested partial hardware | Deterministic binary counters produce second/minute sources; ROM arithmetic establishes binary encoding. Physical `0x07..0x0a` are second/minute/hour/day. A controller fixture proves the comparator and IRQ route; an organic keypad workflow programs a user alarm, receives the CCONT IRQ, and starts the ringtone. Month/calendar persistence remains outside the recovered interface. |
 | Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input and is released in the 3210 profile; both ROMs survive beyond the maximum window through organic reloads. |
@@ -171,9 +172,9 @@ the two 3210 builds, but it does not name the PCB nets behind the selectors.
 | 2 | unresolved |
 | 3 | unresolved; battery-type/BSI is a generic DCT3 hypothesis |
 | 4 | temperature-like charging input; PCB net unresolved |
-| 5 | unresolved; consumed by charger-detection firmware |
+| 5 | VCHAR/charger voltage. `0x2b084c` takes six samples, separates them at raw `0x64`, averages a stable-side set, and publishes the debounced present state. |
 | 6 | unresolved |
-| 7 | unresolved |
+| 7 | unresolved; observed once during early initialization, but not consumed by the organic connect/remove lifecycle. |
 
 Static audit proves that selector 1 passes
 through affine calibration at `0x2a68c4`, while selector 4 independently selects
@@ -241,6 +242,37 @@ source-3 edge, follows the same register-owned path, and returns task 1 to mode
 `0x0004`. The former IRQ6 route produced event `0x72` and only restarted the
 analog-monitor sequence; it was a board-wiring error, not a missing consumer.
 
+The charger input is a typed CCONT boundary: one physical edge atomically
+changes selector-5 VCHAR and latches source bit 3. A focused connect/remove run
+observes 151 selector-5 conversions, including values on both sides of the
+firmware's `0x64` threshold. Selector 7 appears only once at 13 ms during early
+initialization and is not re-read during either edge. Consequently the driver
+does not yet synthesize charge current, battery-voltage ramping or full-battery
+taper behavior; those remain hypotheses until a firmware consumer or hardware
+source establishes their channel contract.
+
+### Charger-present task-1 lifecycle
+
+Holding the physical charger input from reset selects task-1 mode `0x0009` and
+keeps the ordinary SIM lifecycle enabled. The task-1 mode table maps mode 9 to
+handler `0x2711fc`. That handler accepts reports `0x0e` and `0x02`; it does not
+consume shutdown report `0x07` directly. A sustained physical power-key hold
+nonetheless drives the separate controller/teardown lifecycle through mode
+`0x000c`, disables the SIM and lands in mode `0x0005`; its handler is
+`0x27144c`. A two-second hold lies on a timing-sensitive recognition boundary,
+so the focused gate uses four seconds.
+
+`make run` truncates MAME's append-only error log before every launch, so
+multi-run evidence cannot leak between fixtures. Watchdog data `0x00` now
+removes the complete MAD2 digital baseband domain while CCONT remains alive. A
+subsequent physical charger edge restores that domain, exposes CCONT cause bit
+2 (`0x04`) and restarts the CPU, MAD2 core, GENSIO, MBUS, DSPIF/peer, SIMI/card
+protocol state and LCD controller. Flash and EEPROM retain their contents;
+CCONT retains its RTC and reset-cause state. Both 3210 ROMs read the charger
+cause, sample selector-5 VCHAR above `0x64`, and settle organically in
+acting-dead mode `0x0005`. Resetting only the ARM and MAD2 core left attached
+peripherals in stale protocol states and was rejected.
+
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
 phone has the watchdog enabled, so the 3210 product profile leaves WDDISX
@@ -299,6 +331,15 @@ together; post-load reconstructs the IRQ output.
 `make verify-ccont-watchdog RUN_DIR=<dir>` runs for 55 seconds with WDDISX
 released and requires at least ten combined task-2 reloads, no gap over five
 seconds, no watchdog expiry, and no soft reset.
+
+`make verify-charger-lifecycle RUN_DIR=<dir>` separately proves charger-present
+startup, selector-5/IRQ2 service and the physical mode-`0x0009` -> `0x000c` ->
+`0x0005` acting-dead transition.
+
+`make verify-charger-wake RUN_DIR=<dir>` proves the powered-off lifecycle:
+CCONT removes power, a later charger edge raises cause `0x04`, firmware reads
+that cause and VCHAR after a complete digital-domain reset, and the restarted
+phone settles in mode `0x0005`. The same gate passes v6.00 and v5.01.
 
 The focused gate does not yet validate every register reset value, mask changes
 while a source is pending, alarm reprogramming, the `0x06bc` consumer,

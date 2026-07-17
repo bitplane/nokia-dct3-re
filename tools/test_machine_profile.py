@@ -9,6 +9,7 @@ class MachineProfileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.driver = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.ccont = (ROOT / "driver/nokia_ccont.cpp").read_text()
         cls.makefile = (ROOT / "Makefile").read_text()
 
     def test_3210_owns_validated_boot_defaults(self):
@@ -54,10 +55,35 @@ class MachineProfileTest(unittest.TestCase):
     def test_charger_input_updates_vchar_and_latches_both_edges(self):
         body = self.driver.split("INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )", 1)[1]
         body = body.split("static INPUT_PORTS_START", 1)[0]
-        self.assertIn("set_adc_source(5", body)
+        self.assertIn("set_charger_input(newval != 0", body)
         self.assertIn('NOKI3210_CHARGER_ADC', body)
-        self.assertIn("latch_irq_sources(0x08)", body)
+        self.assertNotIn("latch_irq_sources", body)
         self.assertNotIn("if (newval)", body)
+
+        ccont_body = self.ccont.split(
+            "void nokia_ccont_device::set_charger_input", 1
+        )[1].split("void nokia_ccont_device::select_w", 1)[0]
+        self.assertIn("set_adc_source(5, connected ? vchar : 0)", ccont_body)
+        self.assertIn("latch_irq_sources(0x08)", ccont_body)
+
+    def test_charger_wake_resets_the_digital_baseband_domain(self):
+        ccont_body = self.ccont.split(
+            "void nokia_ccont_device::set_charger_input", 1
+        )[1].split("void nokia_ccont_device::select_w", 1)[0]
+        self.assertIn("connected && !m_charger_connected && !m_powered", ccont_body)
+        self.assertIn("RESET_CHARGER", ccont_body)
+        self.assertIn("m_power_cb(1)", ccont_body)
+
+        power_body = self.driver.split("void noki3310_state::ccont_power_w", 1)[1]
+        power_body = power_body.split("void noki3310_state::sim_irq_w", 1)[0]
+        for device in (
+            "m_maincpu", "m_mad2", "m_gensio", "m_mbus", "m_dspif",
+            "m_dsp_hle", "m_external_service_peer", "m_simi", "m_sim_card",
+            "m_pcd8544",
+        ):
+            self.assertIn(f"{device}->reset()", power_body)
+        self.assertIn("machine_reset()", power_body)
+        self.assertIn("m_power_on = 0", power_body)
 
 
 if __name__ == "__main__":

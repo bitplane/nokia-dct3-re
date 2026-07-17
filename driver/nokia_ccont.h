@@ -15,6 +15,7 @@ public:
 	uint8_t serial_r();
 	void select_w(int selected);
 	void set_adc_source(unsigned channel, uint16_t value);
+	void set_charger_input(bool connected, uint16_t vchar);
 	void latch_irq_sources(uint8_t sources);
 	void set_ready(bool ready) { m_ready = ready; }
 	void set_wddisx_grounded(bool grounded) { m_wddisx_grounded = grounded; }
@@ -39,6 +40,8 @@ private:
 	uint16_t m_adc_source[8] = {0};
 	bool m_data_cycle = false;
 	bool m_ready = true;
+	bool m_powered = true;
+	bool m_charger_connected = false;
 	bool m_wddisx_grounded = false;
 	bool m_rtc_alarm_armed = false;
 	emu_timer *m_rtc_timer = nullptr;

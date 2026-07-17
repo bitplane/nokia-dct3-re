@@ -169,15 +169,27 @@ def check_adc(transactions, values):
     return errors, {"adc_reads": sample_reads, "adc_selectors": len(observed)}
 
 
-def check_charger_irq(transactions, summary_text):
+def check_charger_irq(transactions, summary_text, require_absent=True):
     errors = []
     status_seen = False
     ack_seen = False
     clear_seen = False
     bit3_unmasked = False
+    adc_selector = None
+    adc_low = None
+    vchar_samples = []
 
     for direction, address, data in transactions:
-        if direction == "W" and address == 0x0F and not (data & 0x08):
+        if direction == "W" and address == 0x00:
+            adc_selector = (data >> 4) & 0x07
+            adc_low = None
+        elif direction == "R" and address == 0x02 and adc_selector == 5:
+            adc_low = data
+        elif (direction == "R" and address == 0x03 and adc_selector == 5
+              and adc_low is not None):
+            vchar_samples.append(adc_low | ((data & 0x03) << 8))
+            adc_low = None
+        elif direction == "W" and address == 0x0F and not (data & 0x08):
             bit3_unmasked = True
         elif direction == "R" and address == 0x0E:
             if data & 0x08:
@@ -201,11 +213,16 @@ def check_charger_irq(transactions, summary_text):
         errors.append("firmware did not acknowledge CCONT charger source bit 3")
     if not clear_seen:
         errors.append("CCONT charger source did not read clear after acknowledgement")
+    if not any(sample > 0x64 for sample in vchar_samples):
+        errors.append("firmware never observed charger-present VCHAR on ADC selector 5")
+    if require_absent and not any(sample <= 0x64 for sample in vchar_samples):
+        errors.append("firmware never observed charger-absent VCHAR on ADC selector 5")
 
     return errors, {
         "serial_status": int(status_seen),
         "serial_ack": int(ack_seen),
         "serial_clear_read": int(clear_seen),
+        "vchar_samples": len(vchar_samples),
     }
 
 
@@ -226,6 +243,7 @@ def main(argv=None):
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("--adc-profile", choices=sorted(ADC_PROFILES))
     parser.add_argument("--require-charger-irq", action="store_true")
+    parser.add_argument("--charger-present-only", action="store_true")
     parser.add_argument("--summary", type=pathlib.Path)
     parser.add_argument("--require-select-contract", action="store_true")
     parser.add_argument("--require-ccont-boot-status", action="store_true")
@@ -249,7 +267,8 @@ def main(argv=None):
         if not args.summary:
             parser.error("--require-charger-irq requires --summary")
         irq_errors, irq_counts = check_charger_irq(
-            transactions, args.summary.read_text(errors="replace")
+            transactions, args.summary.read_text(errors="replace"),
+            not args.charger_present_only,
         )
         errors.extend(irq_errors)
         print(

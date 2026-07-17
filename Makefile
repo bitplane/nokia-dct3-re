@@ -77,7 +77,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -100,6 +100,8 @@ help:
 	@echo "make verify-ccont-rtc check CCONT alarm programming and MAD2 IRQ2 delivery"
 	@echo "make verify-alarm    set and ring a user alarm through organic keypad input"
 	@echo "make verify-power-lifecycle check short-press UI and long-press shutdown behavior"
+	@echo "make verify-charger-lifecycle check charger-present startup and power-key policy"
+	@echo "make verify-charger-wake check powered-off charger restart and reset cause"
 	@echo "make verify-gensio  check two-ROM endpoint and SELECT-register contracts"
 	@echo "make verify-display check display-profile provenance and LCD serial transport"
 	@echo "make verify-dsp-transport check DSPIF rings, completion and peer layering"
@@ -216,7 +218,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -254,6 +256,7 @@ prepare-run-nvram: build
 run: prepare-run-nvram
 	@mkdir -p $(RUN_DIR)
 	@find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' -delete
+	@truncate -s 0 $(MAME_DIR)/error.log
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKI3210_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		./mame $(MAME_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
@@ -503,6 +506,30 @@ verify-power-lifecycle:
 		RUN_ENV='NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=2000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
 	$(PYTHON) tools/power_lifecycle_check.py long $(RUN_DIR)_power_long/boot_summary.txt
 	@echo "OK — physical power-key short/long firmware lifecycles reproduced"
+
+verify-charger-lifecycle:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_connected SECONDS=18 \
+		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_INITIAL=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_connected/error.log
+	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_charger_connected/error.log \
+		--require-charger-irq --charger-present-only \
+		--summary $(RUN_DIR)_charger_connected/boot_summary.txt
+	$(PYTHON) tools/charger_lifecycle_check.py connected \
+		$(RUN_DIR)_charger_connected/boot_summary.txt
+	-@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_acting_dead SECONDS=22 \
+		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_INITIAL=1 NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=4000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_acting_dead/error.log
+	$(PYTHON) tools/charger_lifecycle_check.py acting-dead \
+		$(RUN_DIR)_acting_dead/boot_summary.txt
+	@echo "OK — charger-present startup and acting-dead lifecycle reproduced"
+
+verify-charger-wake:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_wake SECONDS=35 \
+		RUN_ENV='NOKI3210_TRACE_CCONT_ADC=1 NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=4000 NOKI3210_CCONT_CHARGER_PULSE_AT=13 NOKI3210_CCONT_CHARGER_PULSE_DURATION=30'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_wake/error.log
+	$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)_charger_wake/error.log \
+		$(RUN_DIR)_charger_wake/boot_summary.txt
+	@echo "OK — powered-off charger edge restarted the digital baseband into acting-dead mode"
 
 verify-frontier: PHONE=noki3210
 verify-frontier: run-frontier

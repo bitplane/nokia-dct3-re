@@ -14,8 +14,13 @@
     },
     {
       "id": "ccont_register_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers and reset status. On v6.00, operational charger connection and removal route through MAD2 IRQ2, task-1 event 0x51 and firmware policy 0x2b08c6; focused traces validate source-bit read, write-one-clear acknowledgement, cleared status and settled controller state",
+      "boundary": "3210 v6.00 and v5.01 share ten-bit ADC result registers and reset status. On v6.00, selector 5 is VCHAR: firmware routine 0x2b084c takes six samples and debounces presence around raw 0x64. Operational connection and removal route through MAD2 IRQ2, task-1 event 0x51 and policy 0x2b08c6; focused traces validate source-bit read, write-one-clear acknowledgement, cleared status and settled controller state",
       "evidence": ["docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
+    },
+    {
+      "id": "ccont_charger_power_lifecycle", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "VCHAR present from reset selects task-1 mode 0x0009, whose handler at 0x2711fc accepts reports 0x0e and 0x02 rather than shutdown report 0x07 directly. A sustained physical power hold follows a separate controller/teardown route through mode 0x000c into acting-dead mode 0x0005. Post-power-off charger insertion now restarts the retained CCONT plus reset MAD2 domain through the separately validated charger-wake contract",
+      "evidence": ["docs/ccont_subsystem.md", "tools/charger_lifecycle_check.py"]
     },
     {
       "id": "ccont_adc_scenario_inputs", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
@@ -146,6 +151,11 @@
       "id": "display_profile_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
       "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; record-0 byte 5 becomes active slot 7 at 0x11fc87. An erased-profile control loads 0xff with no firmware fallback and leaves the panel blank, so the generated EEPROM supplies only the recovered value 4 through normal NV loading and leaves unknown bytes erased",
       "evidence": ["docs/eeprom_analysis.md", "docs/mmi_layer.md", "docs/normalization_status.md"]
+    },
+    {
+      "id": "ccont_charger_power_wake", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "CCONT watchdog data 0x00 removes the MAD2 digital baseband domain while CCONT and nonvolatile storage persist. A later physical charger edge exposes reset-cause bit 2, resets the CPU and attached MAD2 peripheral domain, and both 3210 v6.00 and v5.01 organically read the cause and VCHAR before settling in acting-dead mode 0x0005. Physical rail timing and battery/current dynamics remain unmodeled",
+      "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md", "tools/charger_wake_check.py"]
     }
   ]
 }

@@ -37,8 +37,8 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
 
 ## Current result
 
-- 3210 v6.00: exact default fault-screen oracle reproduced after native 24C128 and
-  CCONT device extraction (`d8a9a7a58e587be8`).
+- 3210 v6.00: the default profile reproduces the exact fault-screen oracle
+  (`d8a9a7a58e587be8`) with the native 24C128 and extracted CCONT devices.
 - 3330 v4.50 PPM E: `make smoke-3330e RUN_DIR=run_3330e_smoke SECONDS=3`
   completed three emulated seconds at 207% average speed. Firmware performed
   one soft reset and issued a blank LCD transfer (`f102/z504`); no phone-specific
@@ -104,6 +104,12 @@ The MAD2 power-key IRQ handler also aligns from v6.00 `0x2b3084` to v5.01
 transition stable. The optional edge-delay fixture is not enabled by the
 canonical profile because neither ROM provides a duration.
 
+The CCONT power domain is also shared at runtime. After an organic shutdown,
+`make verify-charger-wake` connects VCHAR and both ROMs observe CCONT cause bit
+2, restart the CPU and attached MAD2 peripherals, resample selector 5 and settle
+in acting-dead mode `0x0005`. This establishes reset-domain composition, not
+physical rail timing or a battery charging model.
+
 The ROM is packaged as MAME BIOS `501` with a BIOS-specific generated EEPROM
 profile. `make verify-3210-v501` provides the forcing-free structural runtime
 comparison. It observes startup modes `0x0001 -> 0x000d -> 0x0004` and
@@ -126,9 +132,10 @@ contact registration `0x64`, channel-map `0x70`, transport acknowledgements,
 service-empty `0x622a`, and the later type-`0x1a` publication through the same
 shared-memory device. Its instruction-equivalent contact-ready
 consumer is `0x299314` (v6.00 `0x29bc70`), inside initialization loop
-`0x2a67aa` (v6.00 `0x2a92d2`). Removing the unsupported result-5 lifecycle
-transition makes both revisions settle at service status `0x49`. No
-firmware-state forcing is involved.
+`0x2a67aa` (v6.00 `0x2a92d2`). Both revisions settle at service status `0x49`
+without the unsupported result-5 lifecycle transition (falsifications ledger:
+`external_service_result5_ordinary_startup`). No firmware-state forcing is
+involved.
 
 ## Interactive sibling controls
 

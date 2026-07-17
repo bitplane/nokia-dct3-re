@@ -122,6 +122,13 @@ observed but is not required during ordinary startup. The sequence does not
 establish reset side effects, the remaining clock-gate bits, ARM sleep behavior
 or the destination-latch semantics.
 
+The CCONT power-domain gate establishes one reset boundary separately from the
+reset-control register. Watchdog-register data `0x00` holds the digital
+baseband off; a later charger edge resets the CPU, MAD2, GENSIO, MBUS, DSPIF,
+SIMI and LCD domains together while CCONT and nonvolatile storage persist.
+Both 3210 ROMs restart through MAD2 reset value `0x01`, consume CCONT charger
+cause `0x04` and reach acting-dead mode. Exact rail sequencing remains unknown.
+
 Until the second ROM is normalized, `NOKI3210_TRACE_MAD2_LEDGER=1` provides the
 curated 3210 evidence pass: at most one read and one write record per MAD2 byte
 offset per reset, including value, previous value for writes, PC, time and the

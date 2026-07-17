@@ -37,6 +37,13 @@ class Mad2TimerTraceCheckTest(unittest.TestCase):
         errors, _ = check(parse(trace), "final_fiq_status=00\n", expected_line=4)
         self.assertIn("FIQ line 4 was never unmasked", errors)
 
+    def test_accepts_unmasked_assertion_without_mask_write(self):
+        trace = GOOD_TRACE.replace(
+            "mad2_timer: event=W off=0a data=ef old=ff pc=1 t=0.100004\n", ""
+        ).replace("pending=010 mask=ff", "pending=010 mask=ef")
+        errors, _ = check(parse(trace), "final_fiq_status=00\n", expected_line=4)
+        self.assertEqual([], errors)
+
     def test_rejects_missing_ack(self):
         trace = GOOD_TRACE.replace(
             "mad2_timer: event=ack mask=010 pending_before=010 pending_after=000 t=0.100005\n",

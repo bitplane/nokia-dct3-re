@@ -119,7 +119,11 @@ def check(events, summary_text, expected_line=4):
         event for event in events
         if event["event"] == "W" and event.get("offset") == 0x0A and not (event["data"] & bit)
     ]
-    if not unmask_writes:
+    # A focused trace can start after firmware programmed the interrupt mask.
+    # The mask captured with each compare assertion is equally direct evidence
+    # that the source was unmasked during the observed transaction.
+    unmasked_assertions = [event for event in assertions if not (event["mask"] & bit)]
+    if not unmask_writes and not unmasked_assertions:
         errors.append(f"FIQ line {expected_line} was never unmasked")
 
     clearing_acks = [

@@ -59,6 +59,7 @@ end
 
 charger_pulse_at = env_number("NOKI3210_CCONT_CHARGER_PULSE_AT", -1)
 local charger_pulse_duration = env_number("NOKI3210_CCONT_CHARGER_PULSE_DURATION", 0.05)
+local charger_initial = env_number("NOKI3210_CCONT_CHARGER_INITIAL", 0) ~= 0
 irq_overlap_at = env_number("NOKI3210_MAD2_IRQ_OVERLAP_AT", -1)
 irq_mask_fixture_at = env_number("NOKI3210_MAD2_IRQ_MASK_FIXTURE_AT", -1)
 fiq8_fixture_at = env_number("NOKI3210_MAD2_FIQ8_FIXTURE_AT", -1)
@@ -97,6 +98,7 @@ key_fields.right = key_fields.c
 key_fields.soft2 = key_fields.c
 key_fields.hash = key_fields.minus
 local charger_field = field_by_mask("CHARGER", 0x01)
+if charger_initial and charger_field then charger_field:set_value(1) end
 
 local function press(name)
 	local field = key_fields[name]

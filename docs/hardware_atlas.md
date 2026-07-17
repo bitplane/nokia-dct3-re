@@ -192,7 +192,8 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0xf` | interrupt mask | |
 
 **ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver deliberately exposes raw selectors
-`0..7`; no validated 3210 board-level signal names are assigned.
+`0..7`; selector 5 is now identified as VCHAR, while the other board-level
+signal names remain incomplete.
 Firmware boot reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7
 maps through ROM table `0x2e2d74` to selector 1. The complete logical-source table is identical in
 3210 v5.01. Values come from `nokia_adc_override` (env `NOKI3210_ADC0..7`, profiles); electrical
@@ -201,10 +202,21 @@ scaling and PCB net names remain open.
 A physical charger edge establishes selector 5 more narrowly: CCONT source bit 3 wakes the
 firmware, which continues sampling selector 5 for the connected state. The MAME input now drives
 that selector from zero to the explicit raw `CHARGER_ADC` scenario value and latches source bit 3
-on both connection and removal. This is an electrically coherent input contract, not a recovered
-voltage scale or charging-current/battery-dynamics model. MAD2 IRQ2 posts task-1 event `0x51`;
+on both connection and removal through a typed CCONT input. Firmware routine `0x2b084c` takes six
+VCHAR readings and debounces presence around raw `0x64`. This is an electrically coherent input
+contract, not a recovered voltage scale or charging-current/battery-dynamics model; the organic
+lifecycle does not re-read selector 7. MAD2 IRQ2 posts task-1 event `0x51`;
 firmware reads and clears CCONT source bit 3, enters its charging lifecycle, and consumes a second
 edge on removal.
+
+With VCHAR present from reset, task 1 remains in charger mode `0x0009`; its
+handler accepts reports `0x0e` and `0x02`, not the ordinary power-key shutdown
+report `0x07` directly. A sustained physical power hold follows a separate
+controller route through mode `0x000c` into acting-dead mode `0x0005`.
+Post-power-off charger insertion now restores the complete MAD2 digital domain.
+CCONT retains power and exposes reset-cause bit 2; both 3210 ROMs restart,
+sample the connected VCHAR input and settle in acting-dead mode `0x0005`.
+Battery-voltage/current evolution and physical rail timing remain unmodeled.
 
 ## The DSP interface
 

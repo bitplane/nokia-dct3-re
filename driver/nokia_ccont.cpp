@@ -21,6 +21,7 @@ constexpr uint8_t IRQ_STATUS = 0x0e;
 constexpr uint8_t IRQ_MASK = 0x0f;
 constexpr uint8_t RESET_READY = 0x01;
 constexpr uint8_t RESET_PWRONX = 0x02;
+constexpr uint8_t RESET_CHARGER = 0x04;
 constexpr uint8_t IRQ_SOURCE_MASK = 0xf8;
 constexpr uint8_t IRQ_RTC_SECOND = 0x10;
 constexpr uint8_t IRQ_RTC_MINUTE = 0x20;
@@ -43,6 +44,8 @@ void nokia_ccont_device::device_start()
 	save_item(NAME(m_regs));
 	save_item(NAME(m_adc_source));
 	save_item(NAME(m_data_cycle));
+	save_item(NAME(m_powered));
+	save_item(NAME(m_charger_connected));
 	save_item(NAME(m_wddisx_grounded));
 	save_item(NAME(m_rtc_alarm_armed));
 }
@@ -55,6 +58,8 @@ void nokia_ccont_device::device_reset()
 	// Ordinary cold start exposes the persistent CCONT-ready bit together with
 	// the PWRONX reset cause. Both 3210 ROMs require this 0x03 reset value.
 	m_regs[IRQ_STATUS] = (m_ready ? RESET_READY : 0) | RESET_PWRONX;
+	m_powered = true;
+	m_charger_connected = false;
 	// Use a fixed epoch rather than the host clock.  The firmware consumes these
 	// registers as binary counters, and deterministic reset state keeps frames
 	// and save states reproducible across hosts.
@@ -73,12 +78,35 @@ void nokia_ccont_device::device_reset()
 void nokia_ccont_device::device_post_load()
 {
 	update_irq();
+	m_power_cb(m_powered ? 1 : 0);
 }
 
 void nokia_ccont_device::set_adc_source(unsigned channel, uint16_t value)
 {
 	if (channel < std::size(m_adc_source))
 		m_adc_source[channel] = value & 0x3ff;
+}
+
+void nokia_ccont_device::set_charger_input(bool connected, uint16_t vchar)
+{
+	// The firmware determines the new charger state by debouncing VCHAR on ADC
+	// selector 5 after either edge of CCONT interrupt source 3.
+	const bool wake = connected && !m_charger_connected && !m_powered;
+	m_charger_connected = connected;
+	if (wake)
+	{
+		// CCONT remains powered after it removes the digital baseband rails. A
+		// charger edge restores those rails and exposes the distinct bit-2
+		// power-on cause consumed by the 3210 startup classifier.
+		m_powered = true;
+		m_regs[IRQ_STATUS] = (m_ready ? RESET_READY : 0) | RESET_CHARGER;
+		if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+			logerror("ccont_power: event=wake cause=%02x t=%.9f\n",
+				RESET_CHARGER, machine().time().as_double());
+		m_power_cb(1);
+	}
+	set_adc_source(5, connected ? vchar : 0);
+	latch_irq_sources(0x08);
 }
 
 void nokia_ccont_device::select_w(int selected)
@@ -174,7 +202,12 @@ void nokia_ccont_device::serial_w(uint8_t data)
 		}
 		case WATCHDOG:
 			if (data == 0x00)
+			{
+				m_powered = false;
+				if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+					logerror("ccont_power: event=off t=%.9f\n", machine().time().as_double());
 				m_power_cb(0);
+			}
 			else
 			{
 				m_regs[address] = data;
@@ -218,8 +251,8 @@ void nokia_ccont_device::serial_w(uint8_t data)
 					address, data, m_rtc_alarm_armed, machine().time().as_double());
 			break;
 		case IRQ_STATUS:
-			// Ready bit 0 is persistent device status. PWRONX bit 1 is a
-			// clearable reset cause, and the upper bits are IRQ-source latches.
+			// Ready bit 0 is persistent device status. Bits 1/2 are clearable
+			// power-key/charger reset causes; upper bits are IRQ-source latches.
 			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
 				logerror("ccont_rtc: event=status_ack data=%02x old=%02x t=%.9f\n",
 					data, m_regs[address], machine().time().as_double());
@@ -253,6 +286,9 @@ uint8_t nokia_ccont_device::serial_r()
 			((address >= RTC_SECOND && address <= RTC_ALARM_HOUR) || address == IRQ_STATUS))
 		logerror("ccont_rtc: event=read reg=%02x data=%02x t=%.9f\n",
 			address, data, machine().time().as_double());
+	if (std::getenv("NOKI3210_TRACE_CCONT_ADC") && address == IRQ_STATUS)
+		logerror("ccont_power: event=cause_read data=%02x t=%.9f\n",
+			data, machine().time().as_double());
 	// Reading the selected register completes the serial transaction.  A later
 	// cleanup byte starts a fresh phase; it is not data for this register.
 	m_data_cycle = false;

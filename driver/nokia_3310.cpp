@@ -224,15 +224,6 @@ constexpr uint16_t FW_EEPROM_TUNE_SECURITY_CKSUM  = 0x011c;
 constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_START   = 0x0120;  // service-session config
 constexpr uint16_t FW_EEPROM_CONFIG_BLOCK_CKSUM   = 0x0244;  // BE sum16(-corr) of [0x0120..0x0243]
 
-// Startup modes named from the traced boot progression.
-constexpr uint16_t FW_STARTUP_MODE_POST_SELFTEST = 0x0004;
-constexpr uint16_t FW_STARTUP_MODE_READY_GATE = 0x0005;
-constexpr uint16_t FW_STARTUP_MODE_SERVICE_QUIESCE_GATE = 0x0006;
-constexpr uint16_t FW_STARTUP_MODE_BATTERY_READY_GATE = 0x0007;
-
-constexpr uint16_t FW_STARTUP_EVENT_CCONT_BATTERY_COMPLETE = 0x0015;
-constexpr uint16_t FW_STARTUP_EVENT_PHASE5_CONTINUE = 0x0003;
-
 class noki3310_state : public driver_device
 {
 public:
@@ -356,6 +347,7 @@ private:
 	uint8_t       m_keypad_columns;
 	bool          m_keypad_irq_latched;
 	bool          m_ccont_irq_state;
+	bool          m_phone_powered = true;
 
 	emu_timer * m_timer_watchdog;
 	emu_timer * m_timer_mbus_rx_fixture;
@@ -569,6 +561,7 @@ void noki3310_state::machine_start()
 	save_item(NAME(m_keypad_columns));
 	save_item(NAME(m_keypad_irq_latched));
 	save_item(NAME(m_ccont_irq_state));
+	save_item(NAME(m_phone_powered));
 	save_item(NAME(m_mad2_regs));
 	save_item(NAME(m_mcuif_regs));
 	machine().save().register_postload(save_prepost_delegate(FUNC(noki3310_state::post_load), this));
@@ -705,8 +698,31 @@ void noki3310_state::ccont_irq_w(int state)
 
 void noki3310_state::ccont_power_w(int state)
 {
-	if (!state)
+	if (!state && m_phone_powered)
+	{
+		m_phone_powered = false;
 		m_maincpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
+	}
+	else if (state && !m_phone_powered)
+	{
+		// CCONT controls the digital baseband rails. A charger-originated rising
+		// edge restarts the complete MAD2 digital domain; CCONT itself retains
+		// the reset-cause latch, while flash and EEPROM retain their contents.
+		m_maincpu->reset();
+		m_mad2->reset();
+		m_gensio->reset();
+		m_mbus->reset();
+		m_dspif->reset();
+		m_dsp_hle->reset();
+		m_external_service_peer->reset();
+		m_simi->reset();
+		m_sim_card->reset();
+		m_pcd8544->reset();
+		machine_reset();
+		m_power_on = 0;
+		m_phone_powered = true;
+		m_maincpu->set_input_line(INPUT_LINE_RESET, CLEAR_LINE);
+	}
 }
 
 void noki3310_state::sim_irq_w(int state)
@@ -1293,12 +1309,8 @@ INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 
 INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )
 {
-	// CCONT status bit 3 reports a physical charger edge.  Firmware determines
-	// the new state by sampling selector 5, so keep the analog input coherent
-	// with the edge instead of posting a status interrupt with a zero VCHAR.
-	m_ccont->set_adc_source(5, newval ?
-			nokia_env_u32("NOKI3210_CHARGER_ADC", 0x3ff) : 0);
-	m_ccont->latch_irq_sources(0x08);
+	m_ccont->set_charger_input(newval != 0,
+			nokia_env_u32("NOKI3210_CHARGER_ADC", 0x3ff));
 }
 
 static INPUT_PORTS_START( noki3310 )

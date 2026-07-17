@@ -73,15 +73,18 @@ class GensioTraceCheckTest(unittest.TestCase):
     def test_charger_irq_lifecycle(self):
         transactions = [
             ("W", 0x0F, 0xF0),
+            ("W", 0x00, 0x58), ("R", 0x02, 0xFF), ("R", 0x03, 0xB3),
             ("R", 0x0E, 0x0A),
             ("W", 0x0E, 0x08),
             ("R", 0x0E, 0x02),
+            ("W", 0x00, 0x5C), ("R", 0x02, 0x00), ("R", 0x03, 0xB0),
         ]
         summary = "irq_seen=04\nfinal_irq_status=00\n"
         errors, counts = check_charger_irq(transactions, summary)
         self.assertEqual([], errors)
         self.assertEqual(
-            {"serial_status": 1, "serial_ack": 1, "serial_clear_read": 1},
+            {"serial_status": 1, "serial_ack": 1, "serial_clear_read": 1,
+             "vchar_samples": 2},
             counts,
         )
 
@@ -94,9 +97,21 @@ class GensioTraceCheckTest(unittest.TestCase):
         self.assertIn("firmware did not acknowledge CCONT charger source bit 3", errors)
         self.assertIn("CCONT charger source did not read clear after acknowledgement", errors)
         self.assertEqual(
-            {"serial_status": 0, "serial_ack": 0, "serial_clear_read": 0},
+            {"serial_status": 0, "serial_ack": 0, "serial_clear_read": 0,
+             "vchar_samples": 0},
             counts,
         )
+
+    def test_charger_present_startup_does_not_require_removal(self):
+        transactions = [
+            ("W", 0x0F, 0xF0),
+            ("W", 0x00, 0x58), ("R", 0x02, 0xFF), ("R", 0x03, 0xB3),
+            ("R", 0x0E, 0x0A), ("W", 0x0E, 0x08), ("R", 0x0E, 0x02),
+        ]
+        errors, _ = check_charger_irq(
+            transactions, "irq_seen=04\nfinal_irq_status=00\n", False
+        )
+        self.assertEqual([], errors)
 
     def test_ccont_reset_status(self):
         errors, counts = check_ccont_boot_status([("R", 0x0E, 0x03)])
