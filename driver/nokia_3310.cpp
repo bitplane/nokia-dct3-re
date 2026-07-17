@@ -271,6 +271,12 @@ private:
 
 	uint8_t mad2_io_r(offs_t offset);
 	void mad2_io_w(offs_t offset, uint8_t data);
+	uint8_t mad2_register_r(offs_t offset);
+	uint8_t mad2_register_peek(offs_t offset);
+	void mad2_register_w(offs_t offset, uint8_t data);
+	void mad2_board_outputs_w(offs_t offset);
+	void trace_mad2_read(offs_t offset, uint8_t data);
+	void trace_mad2_write(offs_t offset, uint8_t data, uint8_t old_data);
 	uint8_t mad2_dspif_r(offs_t offset);
 	void mad2_dspif_w(offs_t offset, uint8_t data);
 	uint8_t mad2_mcuif_r(offs_t offset);
@@ -300,6 +306,7 @@ private:
 	void mad2_irq_ack_w(u16 mask);
 	void ccont_irq_w(int state);
 	void ccont_power_w(int state);
+	void reset_digital_baseband();
 	void sim_irq_w(int state);
 	void mbus_fiq2_w(int state);
 	void mbus_fiq3_w(int state);
@@ -347,7 +354,7 @@ private:
 	uint8_t       m_keypad_columns;
 	bool          m_keypad_irq_latched;
 	bool          m_ccont_irq_state;
-	bool          m_phone_powered = true;
+	bool          m_baseband_powered = true;
 
 	emu_timer * m_timer_watchdog;
 	emu_timer * m_timer_mbus_rx_fixture;
@@ -561,7 +568,7 @@ void noki3310_state::machine_start()
 	save_item(NAME(m_keypad_columns));
 	save_item(NAME(m_keypad_irq_latched));
 	save_item(NAME(m_ccont_irq_state));
-	save_item(NAME(m_phone_powered));
+	save_item(NAME(m_baseband_powered));
 	save_item(NAME(m_mad2_regs));
 	save_item(NAME(m_mcuif_regs));
 	machine().save().register_postload(save_prepost_delegate(FUNC(noki3310_state::post_load), this));
@@ -698,31 +705,38 @@ void noki3310_state::ccont_irq_w(int state)
 
 void noki3310_state::ccont_power_w(int state)
 {
-	if (!state && m_phone_powered)
+	if (!state && m_baseband_powered)
 	{
-		m_phone_powered = false;
+		m_baseband_powered = false;
 		m_maincpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
 	}
-	else if (state && !m_phone_powered)
+	else if (state && !m_baseband_powered)
 	{
 		// CCONT controls the digital baseband rails. A charger-originated rising
 		// edge restarts the complete MAD2 digital domain; CCONT itself retains
 		// the reset-cause latch, while flash and EEPROM retain their contents.
-		m_maincpu->reset();
-		m_mad2->reset();
-		m_gensio->reset();
-		m_mbus->reset();
-		m_dspif->reset();
-		m_dsp_hle->reset();
-		m_external_service_peer->reset();
-		m_simi->reset();
-		m_sim_card->reset();
-		m_pcd8544->reset();
-		machine_reset();
-		m_power_on = 0;
-		m_phone_powered = true;
+		reset_digital_baseband();
+		m_baseband_powered = true;
 		m_maincpu->set_input_line(INPUT_LINE_RESET, CLEAR_LINE);
 	}
+}
+
+void noki3310_state::reset_digital_baseband()
+{
+	// These blocks share the switched digital-baseband domain. CCONT, flash and
+	// EEPROM intentionally survive this reset and retain their state.
+	m_maincpu->reset();
+	m_mad2->reset();
+	m_gensio->reset();
+	m_mbus->reset();
+	m_dspif->reset();
+	m_dsp_hle->reset();
+	m_external_service_peer->reset();
+	m_simi->reset();
+	m_sim_card->reset();
+	m_pcd8544->reset();
+	machine_reset();
+	m_power_on = 0;
 }
 
 void noki3310_state::sim_irq_w(int state)
@@ -981,6 +995,14 @@ void noki3310_state::rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_ma
 
 uint8_t noki3310_state::mad2_io_r(offs_t offset)
 {
+	const uint8_t data = mad2_register_r(offset);
+	trace_mad2_read(offset, data);
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
+	return data;
+}
+
+uint8_t noki3310_state::mad2_register_r(offs_t offset)
+{
 	uint8_t data = offset <= MAD2_FIQ8_CTRL ? m_mad2->read(offset) :
 			(offset >= MAD2_MBUS_CTRL && offset <= 0x1a ? m_mbus->read(offset - MAD2_MBUS_CTRL) :
 			(nokia_gensio_device::owns(offset) ? m_gensio->read(offset) : m_mad2_regs[offset]));
@@ -1018,6 +1040,11 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		const int sda = sda_output ? (BIT(data, 0) & m_eeprom->read_sda()) : m_eeprom->read_sda();
 		data = (data & 0xfe) | sda;
 	}
+	return data;
+}
+
+void noki3310_state::trace_mad2_read(offs_t offset, uint8_t data)
+{
 	if (nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0 &&
 			m_simi->enabled() &&
 			(offset == 0x37 || offset == 0x38 || offset == 0x3c))
@@ -1060,20 +1087,34 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 		logerror("mad2_ledger: R off=%02x data=%02x pc=%08x t=%.6f %s\n", offset, data,
 				m_maincpu->pc(), machine().time().as_double(), nokia_mad2_reg_desc(offset));
 	}
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
-	return data;
 }
 
 void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 {
+	const uint8_t old_data = mad2_register_peek(offset);
+	mad2_register_w(offset, data);
+	mad2_board_outputs_w(offset);
+	trace_mad2_write(offset, data, old_data);
+	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
+}
+
+uint8_t noki3310_state::mad2_register_peek(offs_t offset)
+{
 	const bool core_register = offset <= MAD2_FIQ8_CTRL;
 	const bool mbus_register = offset >= MAD2_MBUS_CTRL && offset <= 0x1a;
 	const bool gensio_register = nokia_gensio_device::owns(offset);
-	uint8_t old_data = core_register ? m_mad2->read(offset) :
+	return core_register ? m_mad2->read(offset) :
 			(mbus_register ? (offset == MAD2_MBUS_CTRL ? m_mbus->control() :
 				offset == MAD2_MBUS_STATUS ? m_mbus->status() : m_mbus->data()) : gensio_register ?
 				m_gensio->peek(offset) :
 				m_mad2_regs[offset]);
+}
+
+void noki3310_state::mad2_register_w(offs_t offset, uint8_t data)
+{
+	const bool core_register = offset <= MAD2_FIQ8_CTRL;
+	const bool mbus_register = offset >= MAD2_MBUS_CTRL && offset <= 0x1a;
+	const bool gensio_register = nokia_gensio_device::owns(offset);
 	if (core_register)
 		m_mad2->write(offset, data);
 	else if (mbus_register)
@@ -1082,10 +1123,40 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 		m_gensio->write(offset, data);
 	else
 		m_mad2_regs[offset] = data;
+
+	if (offset == MAD2_SIM_TXD && m_simi->enabled())
+		m_simi->txd_w(data);
+	else if (offset == MAD2_SIM_IIR && m_simi->enabled())
+		m_simi->iir_w(data);
+	else if (offset == MAD2_SIM_CONTROL && m_simi->enabled())
+		m_simi->control_w(data);
+	else if (offset == MAD2_SIM_RX_FLAGS && m_simi->enabled())
+		m_simi->rx_fifo_control_w(data);
+	else if (offset == MAD2_SIM_TX_FLAGS && m_simi->enabled())
+		m_simi->tx_fifo_control_w(data);
+}
+
+void noki3310_state::mad2_board_outputs_w(offs_t offset)
+{
 	if (offset == 0x15 || offset == 0x1c || offset == 0x1d || offset == 0x1e)
 		update_buzzer();
 	if (offset == 0x15 || offset == 0x1b)
 		update_vibrator();
+
+	if (offset == 0x20 || offset == 0x24)
+	{
+		const uint8_t signal = m_mad2_regs[0x20];
+		const uint8_t direction = m_mad2_regs[0x24];
+		m_eeprom->write_sda(BIT(direction, 0) ? BIT(signal, 0) : 1);
+		m_eeprom->write_scl(BIT(signal, 3));
+	}
+	if (offset == MAD2_KEYBOARD_ROWS || offset == 0x6b || offset == 0xa8)
+		update_keypad_columns();
+}
+
+void noki3310_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old_data)
+{
+	const bool gensio_register = nokia_gensio_device::owns(offset);
 	const bool pup_output_change =
 		(offset == 0x15 && ((old_data ^ data) & 0x30) != 0) ||
 		(offset >= 0x1b && offset <= 0x1e && old_data != data) ||
@@ -1126,16 +1197,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 			logerror("sim_control_w: data=%02x old=%02x live=%02x pc=%08x t=%.8f\n", data,
 					old_data, m_simi->control_r(), m_maincpu->pc(), machine().time().as_double());
 	}
-	if (offset == 0x36 && m_simi->enabled())
-		m_simi->txd_w(data);
-	else if (offset == 0x38 && m_simi->enabled())
-		m_simi->iir_w(data);
-	else if (offset == 0x39 && m_simi->enabled())
-		m_simi->control_w(data);
-	else if (offset == 0x3d && m_simi->enabled())
-		m_simi->rx_fifo_control_w(data);
-	else if (offset == 0x3e && m_simi->enabled())
-		m_simi->tx_fifo_control_w(data);
 	if (nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0 &&
 			gensio_register &&
 			m_gensio_trace_count++ < nokia_env_u32("NOKI3210_TRACE_GENSIO_LIMIT", 20000))
@@ -1153,16 +1214,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 				data, old_data, m_maincpu->pc(), machine().time().as_double(), nokia_mad2_reg_desc(offset));
 	}
 
-	if (offset == 0x20 || offset == 0x24)
-	{
-		const uint8_t signal = m_mad2_regs[0x20];
-		const uint8_t direction = m_mad2_regs[0x24];
-		m_eeprom->write_sda(BIT(direction, 0) ? BIT(signal, 0) : 1);
-		m_eeprom->write_scl(BIT(signal, 3));
-	}
-	if (offset == 0x28 || offset == 0x6b || offset == 0xa8)
-		update_keypad_columns();
-
 	if (offset == MAD2_FIQ_STATUS || offset == MAD2_IRQ_STATUS ||
 			offset == MAD2_FIQ_MASK || offset == MAD2_IRQ_MASK ||
 			offset == MAD2_IRQ_CTRL || offset == MAD2_FIQ8_CTRL)
@@ -1171,8 +1222,6 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 			offset == MAD2_IRQ_STATUS && BIT(data, CCONT_IRQ_LINE_NUM))
 		logerror("ccont_route: event=mad_ack data=%02x pc=%08x t=%.9f\n",
 			data, m_maincpu->pc(), machine().time().as_double());
-
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
 }
 
 void noki3310_state::update_buzzer()

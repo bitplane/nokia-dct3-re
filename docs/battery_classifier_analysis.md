@@ -1,8 +1,10 @@
 # Nokia 3210 battery ADC and classifier contract
 
-This note records the current 3210 v6.00 firmware contract. It intentionally omits
-the earlier service-72 and generic-channel-label hypotheses that runtime tracing
-disproved.
+This is the detailed 3210 v6.00 firmware map for the battery ADC and classifier.
+The ordinary-boot investigation is closed: current inputs select a safe monitor
+state and do not block the interactive UI. Remaining work is physical: identify
+selector nets and units from board evidence, then model battery dynamics only
+when an organic application or charging path requires them.
 
 ## Signal path
 
@@ -147,113 +149,49 @@ that the current contact-peer session releases the checklist group much later.
 Both routes then continue into equivalent interactive-initialization tails, so
 the classifier's mode choice does not gate ordinary UI initialization.
 
-## Pack-characterisation audit
+## Battery-initialization modes
 
-The proposed pair-recognition boundary at `0x2a68c4` was audited exhaustively.
-It has 11 direct callers:
+The complete caller audit disproves a two-input pack-recognition table. Function
+`0x2a68c4` has 11 direct callers and is only an affine selector-1 reader:
 
 ```
 21c796 21cfac 21d67c 21ea3c 21efbe 220584
 2205f6 220cca 220d94 230b16 23579e
 ```
 
-The function does not interpolate a `(selector 1, selector 4)` pair. Its complete
-data path is:
-
 ```
-selector 1 raw
-  -> 0x2b64fc (signed integer to software float)
-  -> 0x2b59e0 (divide by [0x11fde0 + 0x34])
-  -> 0x2b5446 (multiply by [0x11fde0 + 0x38])
-  -> 0x2b63cc (software float to integer)
+raw -> signed-to-float -> divide by [0x11fde0+0x34]
+    -> multiply by [0x11fde0+0x38] -> float-to-integer
 ```
 
-Thus `0x2a68c4` is an affine calibrated selector-1 reader. The two structure
-fields are coefficients, not axes or table pointers. There is no selector-4
-read, lookup table, loop, piecewise interval, or recognition result.
-
-Selector 4 is handled separately by `0x2b4f2c`, which has five direct callers
-at `0x220576`, `0x22071e`, `0x22087e`, `0x220da6`, and `0x2a6734`. Its complete
-decision is a single threshold:
+Its structure fields are coefficients, not table axes. Selector 4 is consumed
+separately by `0x2b4f2c`; its five direct callers are `0x220576`, `0x22071e`,
+`0x22087e`, `0x220da6`, and `0x2a6734`:
 
 | Raw selector 4 | Stored `0x11fde0+0x66` | Init mode at `+0x72` |
 | --- | --- | --- |
 | `< 39` | `0x0141` | 4 |
 | `>= 39` | `0x04fb` | 1 |
 
-The subsequent range test merely recognizes the stored sentinel interval
-`0x0140..0x0171`, so only the `< 39` branch selects mode 4. This supports a
-temperature-like interpretation for selector 4 from its surrounding charging
-uses, but it does not implement pair recognition. The electrical name still
-requires a 3210 schematic or measured hardware trace.
+Initialization at `0x27dd30` copies the mode to `0x11043d`. Modes 1, 2, 5,
+and 6 run cold-boot guard `0x27d5fc`; modes 0 and 4 skip it. An independent
+selector-4 consumer at `0x2a90ac` treats values below 26 as its non-fault path,
+clears state `0x112448`, and posts task-19 event `0x44`. This supports a
+temperature-like interpretation but does not prove the PCB net name.
 
-The initialization function at `0x27dd30` copies that mode to `0x11043d`. Modes
-1 and 5 load one calibration record; modes 2 and 6 load two. The cold-boot guard
-`0x27d5fc` is called for every nonzero mode except mode 4, so modes 1, 2, 5, and
-6 consume five selector-1 samples and enforce the `0x0834` floor. Modes 0 and 4
-skip the guard. Mode 4 is therefore the only selector-4-selected lifecycle in
-which a constant selector-1 value can reach state 3 without first failing that
-guard.
+Mode 4 has a distinct, external completion contract. Its event `0x43` has one
+recovered poster, `0x2a6880`, selected only by payload 3 of incoming class-`0x40`
+service command `0x8e`. The sole MCU construction of `0x8e` is the reply after
+that service action. A threshold-derived mode-4 fixture reached healthy event
+`0x44` but remained at checklist `0x0b`, with no monitor initialization or SIM
+start. Command `0x8e` is absent from coherent manifests and must not be supplied
+during normal boot. Thus mode 4 is a service-controlled battery lifecycle, not
+an ordinary-pack escape path.
 
-The independent selector-4 consumer at `0x2a90ac` supplies the direction check:
-
-| Raw selector 4 | State `0x112448` | Event producer |
-| --- | --- | --- |
-| `< 26` | 0 | calls `0x2a689c`, posting task-19 event `0x44` |
-| `>= 26` | 2 | no event-`0x44` post on this branch |
-
-Both consumers therefore identify low selector 4 as the non-fault direction:
-below 26 both selects mode 4 and clears the independent charge/fault state. This
-corrects the earlier description of event `0x44` itself as abnormal. It is a
-healthy result for that consumer, but it is not sufficient to complete the
-separate mode-4 startup lifecycle.
-
-Event `0x43` does not close the missing link. The only recovered direct poster
-is `0x2a6880`, selected by command-handler arm 3 at `0x23587e`; the audited
-calibration and selector-4 functions do not call it. The earlier low-selector-4
-fixture reached event `0x44`, confirming that the healthy charge-state result and
-the mode-4 completion event are distinct contracts.
-
-### Bounded result
-
-Coverage is complete for the proposed boundary: all 11 direct callers of the
-selector-1 reader, all five direct callers of the selector-4 decision, the sole
-classifier caller, and the sole recovered event-`0x43` poster were classified.
-No ROM table or two-input recognition predicate exists in that surface. There is
-therefore no unique evidence-backed `(selector 1, selector 4)` ordinary-pack
-fixture to run. Choosing values on that premise would be the prohibited input
-sweep under a different name. The separate lifecycle audit below later justified
-one fixture from two independently decoded scalar thresholds; it does not revive
-the disproven pair-recognition premise.
-
-## Service-controlled mode 4
-
-The wider lifecycle audit subsequently supplied one unique, non-swept fixture:
-selector 4 `0x14` is below both independently decoded healthy thresholds, and
-selector 1 `0x180` scales to 1840 at the ROM-default unity calibration, below the
-state-3 boundary 1900. Selector 0 and all unrelated channels remained at the
-coherent frontier profile; selector 5 remained zero for no charger.
-
-The bounded fixture selected init mode 4 at about `0.201 s` and did not power
-off, proving the guard was skipped. It did not
-initialize the monitor or reach state 3: no `0x110436` transition or terminal-report caller
-occurred, task 1 remained in mode `0x000d`, and its checklist stopped at `0x0b`
-rather than the coherent frontier's `0x0f`. SIM initialization consequently did
-not begin. This is not an ADC-range failure; mode 4 remains waiting on its distinct
-event-`0x43` completion while the independently healthy selector-4 consumer posts
-event `0x44`.
-
-The fixture therefore falsifies the remaining constant-input escape hatch. A
-backward census then closes the apparent event-`0x43` boundary: `0x2a6880` is
-called only by payload selector 3 of incoming class-`0x40` service command `0x8e`.
-Task 2 dispatches that command to `0x235848`; the handler's sole MCU construction
-is a one-byte `0x8e` acknowledgement at `0x2358a0`, after the service action has
-already run. The ordinary firmware therefore does not initiate this transition.
-
-Command `0x8e` belongs to the external service/test peer contract, is absent from
-the coherent contact manifests, and must not be added to the normal boot peer to
-advance startup. Mode 4 is consequently a service-controlled battery lifecycle,
-not an evidenced ordinary boot branch. The battery/event-`0x43` route is closed.
+Coverage includes every direct caller of the selector-1 reader and selector-4
+decision, the sole classifier caller, and the sole event-`0x43` poster. No
+two-input recognition predicate exists in this surface; external interpretations
+of it as a `(BSI, BTEMP)` interpolation table must not be imported as premises.
 
 ## Cold-boot safety contract
 

@@ -16,7 +16,6 @@ public:
 	void select_w(int selected);
 	void set_adc_source(unsigned channel, uint16_t value);
 	void set_charger_input(bool connected, uint16_t vchar);
-	void latch_irq_sources(uint8_t sources);
 	void set_ready(bool ready) { m_ready = ready; }
 	void set_wddisx_grounded(bool grounded) { m_wddisx_grounded = grounded; }
 	bool watchdog_tick();
@@ -31,6 +30,7 @@ private:
 	TIMER_CALLBACK_MEMBER(rtc_alarm_latch_complete);
 	void update_irq();
 	void advance_rtc();
+	void latch_irq_sources(uint8_t sources);
 
 	devcb_write_line m_irq_cb;
 	devcb_write_line m_power_cb;

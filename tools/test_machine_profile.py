@@ -74,7 +74,7 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("RESET_CHARGER", ccont_body)
         self.assertIn("m_power_cb(1)", ccont_body)
 
-        power_body = self.driver.split("void noki3310_state::ccont_power_w", 1)[1]
+        power_body = self.driver.split("void noki3310_state::reset_digital_baseband", 1)[1]
         power_body = power_body.split("void noki3310_state::sim_irq_w", 1)[0]
         for device in (
             "m_maincpu", "m_mad2", "m_gensio", "m_mbus", "m_dspif",
@@ -84,6 +84,10 @@ class MachineProfileTest(unittest.TestCase):
             self.assertIn(f"{device}->reset()", power_body)
         self.assertIn("machine_reset()", power_body)
         self.assertIn("m_power_on = 0", power_body)
+
+        callback = self.driver.split("void noki3310_state::ccont_power_w", 1)[1]
+        callback = callback.split("void noki3310_state::reset_digital_baseband", 1)[0]
+        self.assertIn("reset_digital_baseband()", callback)
 
 
 if __name__ == "__main__":

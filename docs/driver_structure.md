@@ -7,14 +7,15 @@ deleted incrementally as observed contracts become components.
 ## Entry points vs. quarantine
 
 The memory-map-registered handlers are thin. Diagnostic execution observations
-are isolated in `driver/nokia_3310_trace.inc`; the RAM read path also owns two
-explicitly documented research shortcuts:
+are isolated in `driver/nokia_3310_trace.inc`; no memory read path overrides a
+firmware result:
 
 | hardware entry point | quarantined research helper |
 |---|---|
 | `flash_r` (≈6 lines)  | `nokia_3310_trace.inc::flash_firmware_traces` (observation only; cannot override instructions) |
 | `ram_w`   (≈10 lines) | `nokia_3310_trace.inc::ram_w_firmware_traces` (write-side research observations) |
 | `ram_r`   (≈2 lines)  | none; display provisioning now arrives through EEPROM/NV |
+| `mad2_io_r/w` | functional register routing and board-output helpers, followed by observation-only MAD2 trace helpers |
 
 The PCD8544 LCD and MAME `I2C_24C128` model the display and external
 EEPROM. Headless LCD capture and scripted keypad input belong to the Lua
@@ -36,7 +37,9 @@ pending/masks, and ARM IRQ/FIQ routing. Attached devices signal it through
 callbacks. `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, RX/TX holding
 state, byte callbacks and FIQ2/FIQ3 outputs without supplying a peer. The phone
 state retains board wiring, physical-input latches and less-established
-peripheral windows. `nokia_gensio_device` owns its sparse serial/status/SELECT
+peripheral windows. Its MAD2 memory-map handlers delegate register ownership,
+board outputs and diagnostics to separate helpers so traces do not obscure the
+functional dispatch. `nokia_gensio_device` owns its sparse serial/status/SELECT
 registers and connects CCONT and the PCD8544 through callbacks. Product differences use
 explicit configurations rather than driver-name parsing.
 

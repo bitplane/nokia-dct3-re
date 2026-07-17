@@ -516,7 +516,7 @@ verify-charger-lifecycle:
 		--summary $(RUN_DIR)_charger_connected/boot_summary.txt
 	$(PYTHON) tools/charger_lifecycle_check.py connected \
 		$(RUN_DIR)_charger_connected/boot_summary.txt
-	-@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_acting_dead SECONDS=22 \
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_acting_dead SECONDS=22 \
 		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_INITIAL=1 NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=4000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_acting_dead/error.log
 	$(PYTHON) tools/charger_lifecycle_check.py acting-dead \

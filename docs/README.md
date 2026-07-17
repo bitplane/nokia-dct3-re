@@ -55,7 +55,7 @@ corresponding subsystem:
 - `sim_emulator_scope.md`
 - `firmware_code_maps.md`
 - `message_topology_census.md`
-- `battery_classifier_analysis.md` (active investigation)
+- `battery_classifier_analysis.md` (mapped battery ADC/classifier contract)
 
 Treat concise subsystem documents, normalized evidence, and current source code
 as authoritative. Absolute addresses apply to the 3210 v6.00 firmware unless
