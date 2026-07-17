@@ -30,6 +30,15 @@ class CcontWatchdogTest(unittest.TestCase):
         self.assertNotIn("NOKI3210_DISABLE_CCONT_WATCHDOG", phone)
         self.assertIn("PRODUCT_3210 = { 0x01, true, true, false }", phone)
 
+    def test_expiry_resets_the_complete_digital_baseband_domain(self):
+        phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        timer = phone.split(
+            "TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)", 1
+        )[1].split("// MAD2 watchdog", 1)[0]
+        self.assertIn("reset_digital_baseband();", timer)
+        self.assertNotIn("m_maincpu->reset();", timer)
+        self.assertNotIn("m_mad2->reset();", timer)
+
     def test_rtc_is_internal_and_deterministic(self):
         self.assertNotIn("current_datetime", self.source)
         self.assertIn("m_regs[RTC_HOUR] = 12", self.source)

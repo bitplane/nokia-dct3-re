@@ -227,7 +227,7 @@ object's leading status and delivers it through the ordinary task mailbox.
 | --- | --- | --- |
 | `0x70..0x7f` | `0x29bc00` | preserve class and post to task 2 |
 | `0x80` | `0x284ac4` | structured multi-command decoder |
-| `0x83` | `0x284734` | structured state/report decoder |
+| `0x83` | `0x284734` | controller-gated scalar report; state 3 posts `0x139f` to task 10 |
 | `0x84` | `0x284e26` | post `0x1394` to task 10 |
 | `0x85` | `0x283fe6` | post broker object to task 8 |
 | `0x86` | `0x284316` | structured controller decoder |
@@ -242,6 +242,48 @@ object's leading status and delivers it through the ordinary task mailbox.
 | `0x8f` | `0x284e50` | post `0x13b7` to task 11 |
 | `0x99` | `0x28464c` | structured measurement/report decoder |
 | other | `0x2b3730` | generic invalid/diagnostic path, then free |
+
+Type `0x83` is not a search/camp completion. Controller states 1 and 2 discard
+the packet; state 3 rewrites it to `0x139f` and posts it to task 10; other
+states take the diagnostic path. Task 10's `0x139f` handler copies signed
+payload byte `+6` to scalar state `0x10dc99` and returns. It emits no lower
+result, registration event, or follow-on transaction.
+
+The four remaining direct task-10 status types are closed through their first
+semantic consumer:
+
+- type `0x87` clears controller flag bit 1 and becomes `0x138f`. Task 10 stores
+  state byte `0x0d` at `0x10dbdd` and, when both outstanding work pointers at
+  `0x10d938` and `0x10d928` are null, calls finalizer `0x219e30`. Its payload
+  is not inspected on this path;
+- type `0x8a` is discarded only in controller state 1. Otherwise it clears the
+  same flag and becomes `0x1390`. Task 10 increments count word `0x10dc90`;
+  after it exceeds the firmware-configured limit at `0x110156`, a controller
+  bit gate can enter the same finalizer. Setter `0x29da02` owns that limit and
+  getter `0x29dbbe` reads it under lock;
+- type `0x84` is discarded in controller state 1 and otherwise becomes
+  `0x1394`. Task 10 copies its eight-byte body into the working object and
+  passes it to general controller-event decoder `0x217cac`; this is a
+  structured event input, not a payload-free completion;
+- type `0x89` is rejected when its controller context is already marked one.
+  Otherwise it runs state handler `0x216830`, may replay a firmware-owned
+  type-`0x86` descriptor in later state 7, posts `0x1393`, and establishes
+  context fields `+7 = 3` and `+5 = 1`. Task 10 copies the body, records
+  controller state, and enters fan-out `0x21bb5c` outside global states 1 and
+  2. That fan-out publishes controller/status work but does not directly call
+  `0x219e30`.
+
+This corrects the earlier claim that no fixed-status DSP handler can produce
+the task-17 completion. Status `0x1391` remains the explicit lower-result
+completion, but it is not the only entrance to finalizer `0x219e30`: direct
+DSP type `0x87` can enter it immediately under empty-work gates, and repeated
+type `0x8a` reports can enter it after the configured count limit. When
+controller flag `[0x10dbdb] == 1`, `0x219e30` constructs `0x0434`, transfers
+the queued object and scalar state into it, and posts it through `0x251c3e`.
+Otherwise it publishes a separate `0x1100` status to task 15 before resetting
+the same controller/timer state. These paths identify the missing peer
+contract family; they do not establish which RF condition should cause a
+faithful peer to send `0x87` or `0x8a`, so neither packet is synthesized.
 
 ### Type `0x86` controller protocol
 
@@ -301,10 +343,11 @@ session. Thus the first legal peer acknowledgement is known, but it must only
 be produced in response to an organic session start. It is not a registration
 or idle-boot stimulus.
 
-No simple fixed-status handler produces the required `0x1391`. Thus the organic
-`0x1391 -> 0x0434` completion must be derived by one of the structured decoders
-or by a later controller transition, rather than encoded as a bare first-level
-RX type. Ledger `dsp_type80_primitive70_reply` covers only the fabricated
+No simple fixed-status handler produces `0x1391` itself. That status must be
+derived by a structured decoder or later controller transition. It is no
+longer correct, however, to infer that every route to `0x0434` requires
+`0x1391`: types `0x87` and `0x8a` reach the common finalizer through statuses
+`0x138f` and `0x1390`. Ledger `dsp_type80_primitive70_reply` covers only the fabricated
 primitive-`0x70` payload used in that run; it does **not** cover the type-`0x80`
 family, whose handler `0x284ac4` contains a broad nested command decoder.
 
@@ -436,17 +479,19 @@ around `0x297fc4` and RAM `0x1116f8`/`0x111724`; a Ghidra function name is not
 evidence that task 13 is the display-window subsystem.
 
 Task 17's initializer enters its long-lived event loop at
-`0x223964 -> 0x2271c6`; code at `0x2222fc` and its `0x138f` callbacks is reached
-only after that loop returns. It is therefore downstream of the awaited
-`0x0434`, not its missing predecessor. DSP packet type `0x89` can produce
-`0x138f` only while task 4's initialization flag `[0x112501]` is zero; once
-that flag is one, the packet is rejected.
+`0x223964 -> 0x2271c6`; code at `0x2222fc` and its callbacks is reached only
+after that loop returns. It is therefore downstream of the awaited `0x0434`,
+not its missing predecessor. This task-17 callback family must not be confused
+with task 10's distinct `0x138f` status, which is produced by DSP RX type
+`0x87` and can enter `0x219e30` as described above.
 
-The relevant task-10 completion is status `0x1391`. The dispatcher jump table
-maps it to `0x21b9b4 -> 0x21b198`; when the firmware-owned work state is ready
-this reaches `0x219e30`, the producer of `0x0434`. Status `0x1392` is the
-adjacent table entry and instead maps to the radio-state/configuration path at
-`0x21b790`. Callback `0x2b60f6` unregisters lower-radio key `0x4c00` with
+The explicit lower-result completion is status `0x1391`. The dispatcher jump
+table maps it to `0x21b9b4 -> 0x21b198`; when the firmware-owned work state is
+ready this reaches `0x219e30`, the producer of `0x0434`. Status `0x1392` is
+the adjacent table entry and instead maps to the radio-state/configuration path
+at `0x21b790`. Direct statuses `0x138f` and `0x1390` provide the separately
+gated DSP-report entrances documented above. Callback `0x2b60f6` unregisters
+lower-radio key `0x4c00` with
 `0x2b257e` and posts that non-completing `0x1392` update through `0x2af6ea`.
 
 The large lower-radio result dispatcher `0x245a84` maps result `0x0fc1` through
@@ -561,13 +606,15 @@ confirm GSM network-byte-order framing. The content is produced by these DSP pri
 arriving and being rendered, not by assigning one registration byte. In the measured coherent
 boot no such primitive arrives; dispatch `0x23d62c` runs zero times.
 
-**Byte-lane caution (swap16):** the network-registration data lives in the struct
-at **`0x10d124`** (pool literal `d1280010` → `0x0010d128`) / **`0x10d37e`** — a
-network/registration struct (field `+2` a status halfword, message chunks
-memcpy'd to `+0x34`), accessed from `0x26f1b8`/`0x208110`/`0x26f608`. Byte-lane
-misreads of the same literals as `[0x1028d1]`/`[0x107ed3]` are wrong; auxiliary
-addresses must be decoded with the corrected swap16 byte lanes. The state byte
-alone is insufficient to produce content.
+**Ownership correction and byte-lane caution:** the large structure at
+`0x10d124..0x10d37f` is not proved network-registration state. A coherent
+write-watch attributes its active initialization and updates to running-task
+IDs `0x14` and `0x15`, decimal tasks 20 and 21: the SIM application router and
+SIM driver. The apparent lower-radio attribution came from nearby consumers
+and is retired. Pool literal `d1280010` still decodes to `0x0010d128`; readings
+such as `[0x1028d1]` are invalid swap16 byte-lane interpretations. Camping must
+be located from an evidenced DSP parser/output, not inferred from this SIM-owned
+storage.
 
 ### `0x2b2exx` data-block routers
 

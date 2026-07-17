@@ -273,6 +273,12 @@ cause, sample selector-5 VCHAR above `0x64`, and settle organically in
 acting-dead mode `0x0005`. Resetting only the ARM and MAD2 core left attached
 peripherals in stale protocol states and was rejected.
 
+CCONT watchdog expiry uses the same digital-baseband reset domain. It resets
+the CPU, MAD2 peripherals, GENSIO, MBUS, DSPIF/peer, SIMI/card protocol state
+and LCD controller while retaining CCONT, flash and EEPROM. The separate MAD2
+watchdog remains an ASIC-local reset contract whose physical extent is not yet
+established.
+
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
 phone has the watchdog enabled, so the 3210 product profile leaves WDDISX

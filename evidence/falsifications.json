@@ -11,8 +11,14 @@
     {
       "id": "lower_result_0fbf_completes_task17", "status": "disproven",
       "hypothesis": "Lower result 0x0fbf selects 0x245c76 -> 0x2525a8 -> task-10 0x1392 and completes task 17",
-      "conclusion": "The result table maps 0x0fbf to context handler 0x253610, 0x0fc1 to completion status 0x1391, and 0x0fc2 to radio-state status 0x1392; only the 0x1391 task-10 route can reach 0x0434",
+      "conclusion": "The result table maps 0x0fbf to context handler 0x253610, 0x0fc1 to explicit lower-result completion status 0x1391, and 0x0fc2 to radio-state status 0x1392. A later complete fixed-status decode found separate DSP type-0x87/0x8a entrances to the same 0x219e30 finalizer; that correction does not make result 0x0fbf a completion",
       "evidence": ["docs/message_topology_census.md", "docs/sim_registration.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "fixed_dsp_statuses_cannot_complete_task17", "status": "disproven",
+      "hypothesis": "No direct fixed-status DSP RX handler can reach task-17 completion 0x0434; only lower-result status 0x1391 can call finalizer 0x219e30",
+      "conclusion": "The corrected task-10 jump table maps direct RX type 0x87 through status 0x138f to 0x21ba22, which calls 0x219e30 when two outstanding-work pointers are null. Type 0x8a maps through 0x1390 to 0x21ba08 and can call the same finalizer after exceeding the firmware-configured count at 0x110156. Their legitimate RF trigger semantics remain unresolved, so neither packet is injected",
+      "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md"]
     },
     {
       "id": "direct_05e8_completion", "status": "disproven",
@@ -300,6 +306,24 @@
       "id": "dsp_type86_bootstraps_framed_session", "status": "disproven",
       "hypothesis": "A valid DSP RX type-0x86 controller exchange advances the phase required for later type-0x8e class-0x47 traffic",
       "conclusion": "Complete decode of 0x284316 and all three call sites shows a separate controller/transfer protocol with subtypes 0x70, 0x80, 0xb0 and 0xb1. Its controller state is established by RX type 0x89; its outputs are task-3 transactions, task-13/14/15 completions and an independent task-8 measurement publication. The closed implementation contains no access to framed-session phase 0x11fedb or its state machine, so type 0x86 cannot directly bootstrap type-0x8e acceptance",
+      "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md"]
+    },
+    {
+      "id": "ram_10d124_is_network_registration_context", "status": "disproven",
+      "hypothesis": "The structure at 0x10d124..0x10d37f is the network-registration context whose state should be advanced by a camping DSP report",
+      "conclusion": "A coherent range write-watch attributes the active initialization and later updates to running-task IDs 0x14 and 0x15 (decimal tasks 20 and 21), the SIM application router and SIM driver. The structure is SIM-owned; nearby lower-radio consumers do not establish ownership, so it must not be used as a fake-cell state target",
+      "evidence": ["docs/dsp_interface.md", "docs/rtos_tasks.md"]
+    },
+    {
+      "id": "organic_dial_starts_callback0a_framed_session", "status": "disproven",
+      "hypothesis": "An organic dial attempt starts callback 0x0a's type-0x8e framed call/session protocol",
+      "conclusion": "An organic 123 + Navi attempt instead posts 0x0fa3 from task 5 to task 14. The task-14 call controller accepts it locally, emits 0x09d2 to task 15, and task 15 stores the dial object and produces internal result 0x0a02. The later DSP-facing traffic is a shared-control/L1 configuration batch (commands 0x08, 0x09, 0x25 and 0x2f), not a packet-ring call request or callback-0x0a framed session. The call remains pending registration",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_service_transport_contract.md"]
+    },
+    {
+      "id": "dsp_type83_is_search_camp_completion", "status": "disproven",
+      "hypothesis": "DSP RX type 0x83 is the unsolicited search/camp result that establishes ordinary registration",
+      "conclusion": "The complete direct handler at 0x284734 discards controller states 1 and 2, takes a diagnostic path for other inactive states, and in state 3 rewrites the packet to status 0x139f for task 10. Task 10's 0x139f case only copies signed payload byte +6 to scalar 0x10dc99 and returns; it produces no lower result, registration event, or follow-on transaction",
       "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md"]
     },
     {

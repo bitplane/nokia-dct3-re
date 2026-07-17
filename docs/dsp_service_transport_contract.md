@@ -113,6 +113,21 @@ global DSP-service cadence. It expires and rearms through task 4 at roughly
 34 ms intervals without delivering a task-10 status. It is not the missing
 semantic acknowledgement.
 
+### Organic dial control update
+
+An organic `123` dial attempt does not create a call-signalling packet on the
+MCU-to-DSP ring. Task 5 publishes `0x0fa3`; task 14 accepts it locally and
+publishes `0x09d2`; task 15 stores the dial object, produces internal result
+`0x0a02`, and registers an asynchronous activity slot. The resulting task-5 and
+task-9 L1 configuration flush updates shared-control commands `0x08`, `0x09`,
+`0x25`, and `0x2f`. These are DSP configuration/control publications through
+`0x290cf4`, not the framed task-22 session and not proof of call signalling.
+
+This distinction is runtime-reviewed: the shared-control peer completes the
+batch but the call remains pending, with no post-dial packet-ring request. The
+first network peer behavior is still an unsolicited search/camp ingress; the
+organic dial path becomes its downstream acceptance test.
+
 ## Unreached lower-radio lifecycle
 
 The downstream chain is mapped independently of its ingress:

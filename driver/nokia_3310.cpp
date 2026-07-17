@@ -880,9 +880,10 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 	{
 		if (nokia_env_u32("NOKI3210_TRACE_CCONT_WATCHDOG", 0) != 0)
 			logerror("ccont_watchdog_expired: t=%.6f\n", machine().time().as_double());
-		m_maincpu->reset();
-		m_mad2->reset();
-		machine_reset();
+		// CCONT supervises the switched digital-baseband domain, so expiry has
+		// the same reset extent as a CCONT-controlled rail restart. CCONT itself,
+		// flash and EEPROM remain outside this domain and retain their state.
+		reset_digital_baseband();
 	}
 
 	// MAD2 watchdog

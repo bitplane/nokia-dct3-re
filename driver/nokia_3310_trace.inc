@@ -533,6 +533,16 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		};
 		const u16 status = ram_msg ? fw_word(msg) :
 				(flash_msg ? m_maincpu->space(AS_PROGRAM).read_word(msg) : 0xffff);
+		if (readable_msg && (status == 0x0fa3 || status == 0x09d2))
+			logerror("call_boundary_post: t%u -> t%u status=%04x msg=%08x caller=%08x bytes="
+					"%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x t=%.6f\n",
+					from, to, status, msg,
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					message_byte(msg + 0), message_byte(msg + 1), message_byte(msg + 2), message_byte(msg + 3),
+					message_byte(msg + 4), message_byte(msg + 5), message_byte(msg + 6), message_byte(msg + 7),
+					message_byte(msg + 8), message_byte(msg + 9), message_byte(msg + 10), message_byte(msg + 11),
+					message_byte(msg + 12), message_byte(msg + 13), message_byte(msg + 14), message_byte(msg + 15),
+					machine().time().as_double());
 		if (to == 19 && readable_msg)
 		{
 			static unsigned task19_posts = 0;
@@ -581,6 +591,14 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		if ((total % 2000) == 0)
 			logerror("msgrate: %u posts by t=%.4f (protocol still active)\n", total, machine().time().as_double());
 	}
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00245a84)
+		logerror("call_result_dispatch: status=%04x caller=%08x task=%02x r1=%08x r2=%08x r3=%08x t=%.6f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+				debug_ram_byte(0x00100022),
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R1)),
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R2)),
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R3)), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00221d74)
 		logerror("sim_owner_event: task17 build status=%04x caller=%08x state=%02x/%02x/%02x/%02x t=%.4f\n",
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,

@@ -383,10 +383,15 @@ The DSP-boundary transactions adjacent to registration are authoritative in
 - Timer `0x23` (`0x2697aa`) is a live roughly-34 ms service-cadence timer, not the missing
   semantic completion; `0x219e30` stays dormant (**R**).
 
-The relevant task-10 completion transition is `0x1391 -> ... -> 0x0434` through jump table
-`0x21b4a0`; adjacent `0x1392` is a non-completing radio-state update, and the `0x138f` family
-plus DSP type `0x89` cannot produce the awaited `0x0434`. Lower results `0x0fc1`/`0x0fc2`
-select those two statuses (produced from task-14 object opcodes `0x36`/`0x37`), while result
+The explicit lower-result completion transition is `0x1391 -> ... -> 0x0434` through jump
+table `0x21b4a0`; adjacent `0x1392` is a non-completing radio-state update. A later full
+decode corrects the former fixed-status exclusion: DSP type `0x87` becomes task-10 status
+`0x138f` and can call finalizer `0x219e30` immediately when its two outstanding-work pointers
+are null; type `0x8a` becomes `0x1390` and can call the same finalizer after a configured
+report-count limit. Type `0x89` instead posts `0x1393` and advances controller bookkeeping.
+The RF conditions that legitimately produce `0x87`/`0x8a` remain unknown, so this is a
+mapped peer-contract family rather than permission to synthesize either packet. Lower results `0x0fc1`/`0x0fc2`
+select `0x1391`/`0x1392` (produced from task-14 object opcodes `0x36`/`0x37`), while result
 `0x0fbf` (ROM literal at `0x24788e`, loaded beside the neighboring `0x0fca` literal on the
 event-`0x102f` branch) dispatches to context handler `0x253610`, not either task-10
 publisher; two jump-table misreadings of this extent are ledgered as `lower_result_0fc3` and
