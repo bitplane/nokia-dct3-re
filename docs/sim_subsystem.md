@@ -75,7 +75,7 @@ and only then does its caller consume the card response. Raising RX alone leaves
 stranded behind the missing TX event. IIR `0x20` is not TX completion: it posts static code `0x06`.
 
 Card responses must also be asynchronous. Raising FIQ from inside the final TXD write lets the
-handler observe the previous firmware descriptor. TXD writes now enter a 16-byte UART FIFO rather
+handler observe the previous firmware descriptor. TXD writes enter a 16-byte UART FIFO rather
 than the APDU parser directly. Firmware opens the FIFO through `0x3e=0x04`, fills it, and flushes
 with `0x3e=0x00`; only the flush transfers the bytes to T=0 and schedules TX-empty. This permits a
 command body larger than one FIFO to advance through multiple TX-empty interrupts. The device
@@ -86,12 +86,11 @@ become visible. The card may construct a complete T=0 response synchronously,
 so the controller retains a private serialization queue, but `0x39` exposes
 only the single character currently transferred to its receive holding register.
 
-Activation and T=0 traffic use the default ten-bit 9,600-bit/s character time.
-Although the synthetic ATR advertises TA1 `0x05`, both ROMs answer with
-`ff 00 ff`; that PPS exchange retains default parameters rather than selecting
-the former fixed 65 us model. A bounded v6.00 trace observes consecutive ATR
-and PPS receive-register reads approximately 1.065 ms apart, with RX count one
-for each character.
+Activation and T=0 traffic use the default ten-bit 9,600-bit/s character time,
+approximately 1.042 ms per character. Although the synthetic ATR advertises TA1
+`0x05`, both ROMs answer PPS with `ff 00 ff`, retaining the default parameters.
+A bounded v6.00 trace observes consecutive ATR and PPS receive-register reads
+approximately 1.065 ms apart, with RX count one for each character.
 
 ## Stateful card device
 
@@ -133,8 +132,8 @@ The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. I
 includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`, LOCI `6F7E`, and Phase
 `6FAE`; other known files are erased (`0xff`). `EF_PHASE` reports Phase 2 (`0x02`). Returning `0x00`
 prevents the validated preliminary lifecycle from composing. MF/DF STATUS data uses the GSM 11.11
-directory layout, including a `0x15` GSM-specific-data length and CHV status fields; the earlier
-shifted layout caused the firmware to repeat the preliminary pass.
+directory layout, including a `0x15` GSM-specific-data length and CHV status fields; a shifted
+layout causes the preliminary pass to repeat.
 
 The base `EF_SST` also allocates and activates service 2. `EF_ADN (6F3A)` is
 a synthetic 50-by-32-byte linear-fixed EF under `DF_TELECOM`; its count is card
@@ -145,7 +144,7 @@ NVRAM; `PRESERVE_NVRAM=1` and `run-interactive` retain it.
 
 ## Current organic result
 
-In an unforced coherent run the device now completes:
+An unforced coherent run completes:
 
 ```text
 ATR -> PPS -> preliminary SELECT/STATUS/READ pass
@@ -155,8 +154,8 @@ ATR -> PPS -> preliminary SELECT/STATUS/READ pass
 ```
 
 Observed reads include ICCID, ECC, Phase, LP, SST, IMSI and ACC. SIM-enable byte `[0x111c79]`
-changes to 1 organically at about 1.309 s. This is the first coherent run to pass the preliminary
-card-acceptance transition without firmware-state forcing.
+changes to 1 organically at about 1.309 s; the preliminary card-acceptance transition passes
+without firmware-state forcing.
 
 With service 2 advertised, firmware later selects `DF_TELECOM/EF_ADN` and
 scans all 50 records through absolute `A0 B2`. Adding a contact produces
@@ -164,31 +163,33 @@ scans all 50 records through absolute `A0 B2`. Adding a contact produces
 record 1, receives `9000`, displays `Saved`, and renders `ADA` from the same
 card after restart.
 
-`6F14` is the optional CPHS Operator Name String, a transparent default-alphabet field of up to
-the 24 bytes accepted by parser `0x201876`. The card does not advertise CPHS and need not provide
-it. The previous device nevertheless accepted every unknown SELECT, advertised a zero-byte EF,
-and caused initialization to restart. SELECT now returns GSM 11.11 `94 04` (file ID not found)
-without changing the current selection for unsupported files. Firmware handles that organic
-optional-file result and continues through the rest of its initialization sequence.
+`6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
+provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
+causes initialization to restart. Unsupported SELECT returns GSM 11.11 `94 04` (file ID not
+found) without changing the current selection; firmware handles that organic optional-file
+result and continues its initialization sequence. The CPHS/`94 04` card contract is
+authoritative in `sim_emulator_scope.md`.
 
 At about 1.427 s task 20 reaches its card-presence monitor at `0x2028a4` with SIM enable 1,
 no-SIM 0, and ready byte `0x10dcaf` equal to 1. The card tracks current DF separately from the
 selected EF, so STATUS reports `7F40`; four consecutive checks take the monitor's steady exit at
 `0x20290a`, not its changed-directory path at `0x2028f4`. The monitor issues `A0 F2` and explicitly
-rearms timer `0xea` with delay `0x181`, producing a roughly 42 ms cadence. This perpetual traffic
+rearms timer `0xea` at `0x2028fc` with delay `0x181`, producing a roughly 42 ms cadence. This perpetual traffic
 is a normal firmware-owned presence check, not a repeated initialization pass. Task 1 subsequently
 enters mode `0x0004` at about 1.435 s.
 
-The later extended registration pass still requires a GSM/radio session which constructs callback
-7 and drives:
+The later extended registration pass belongs to a network-registration session — a later
+lifecycle, distinct from the completed offline initialization; see `sim_registration.md`. That
+session would construct callback 7 organically and drive:
 
 ```text
 callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
   -> task-17 0x1583 -> registration/session commit -> 0x1196/0x1199
 ```
 
-Callback 7 currently receives only the global `0x05e2` sweep, not constructor
-`0x05dc`. The mapped task-21 `0x120c -> A0/12 -> D0 -> 0x177x` route is GSM
+In the coherent offline run callback 7 receives only the global `0x05e2` sweep, not
+constructor `0x05dc`; offline SIM initialization completes without it, and the session that
+would construct it must not be forced. The mapped task-21 `0x120c -> A0/12 -> D0 -> 0x177x` route is GSM
 11.14 SIM Toolkit: TERMINAL PROFILE arms latch `0x10dcb7`, `91xx` advertises a
 proactive command, and `A0/12` FETCH retrieves it. The current EF_PHASE=2 card
 correctly leaves this path dormant, and firmware's profile-download function is
@@ -208,7 +209,7 @@ they are intentionally not repeated in this concise hardware/card contract.
 ## Deferred CHV transaction: reply code 2
 
 This is a mapped later card contract, not an outstanding ordinary-SIM-init
-gate. The non-CPHS initialization pass now raises SIM enable without traversing
+gate. The non-CPHS initialization pass raises SIM enable without traversing
 this path. Retain it for the first organic PIN/CHV lifecycle that requests it.
 
 The downstream card contract is already mapped. Organic `0x1196` enters `0x207234`, which calls

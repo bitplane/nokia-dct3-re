@@ -85,8 +85,8 @@ MCU lower-service request
 The external peer must be request-driven and preserve address, route, sequence,
 and ownership metadata. Delivering only `{class=0x40, command=0x64, result=5}`
 can reach the healthy branch in isolation but cannot establish a coherent
-session; that historical bridge and its direct busy-state completion have been
-deleted.
+session and must not be sent; result 5 requests application-task suspension,
+not ordinary startup (ledger `external_service_result5_ordinary_startup`).
 
 ## Extended-task resume
 
@@ -101,9 +101,13 @@ without the corresponding channel-map and transport completion is insufficient.
 
 The ordering run records the `0x622a` shared-control completion at `1.285269 s`,
 the first group-two checklist write at `1.286232 s`, and the final task-18 write
-at `1.297865 s`. The first battery classification has already changed state
-`0 -> 1` at `0.364121 s`. Thus the ordering difference is owned by the whole
-service-gated resume group, not by a slow task-18 initializer.
+at `1.297865 s`. The checklist calls follow the supervisor's static resume
+order: `0x0a`, `0x0b`, `0x0c`, `0x0d`, `0x10`, `0x0f`, `0x0e`, `0x15`, `0x14`,
+`0x11`, then `0x12`; task 18's straight-line initializer at `0x285c14` posts the
+final code at `0x285c5e`, and task 1 evaluates `0x2a6942` at `1.298045 s`. The
+first battery classification has already changed state `0 -> 1` at `0.364121 s`.
+Thus the ordering difference is owned by the whole service-gated resume group,
+not by a slow task-18 initializer.
 
 ## Key addresses and state
 

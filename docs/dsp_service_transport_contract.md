@@ -18,7 +18,7 @@ events do not imply a shared transport.
 
 ## Implementation audit
 
-The implementation now has three explicit owners:
+The implementation has three explicit owners:
 
 1. `nokia_dspif_device` owns shared RAM, DSPIF, ring indices, packet framing and
    FIQ0/IRQ4-facing completion;
@@ -33,7 +33,7 @@ contains no shared-RAM offsets, ring arithmetic or interrupt ownership. The
 external-session delay remain calibrated prototype behavior rather than
 protocol constants.
 
-Bootstrap no longer overlays MCU reads. The MCU first verifies ordinary shared
+All MCU reads are answered from DSPIF-owned backing RAM. The MCU first verifies ordinary shared
 RAM, then performs 64 alternating zero-write/peer-acknowledgement exchanges at
 `0x0fe` and `0x100`. The peer publishes ready words `0x000..0x004 = 1` when the
 exchange completes. Both 3210 ROMs reproduce this state transition. Command 4
@@ -41,13 +41,12 @@ similarly causes the peer to clear busy word `0x0e0` in backing RAM. Publication
 latency remains HLE policy because no DSP timing oracle is available.
 
 DSPIF command 4 is the hardware doorbell for several DSP-owned activities, but
-it is not the only observed work boundary. Service-transport ring delivery and
-shared-control completion now have independent device timers. After that split,
-a doorbell-only run still left service-session status `0x0089`, task 1 in mode `0x000d`,
-and SIM disabled: not every service-transport ring producer commit is paired with command
-4. The validated ring-producer and service-pending transitions remain the
-behavioral scheduling edges; DSPIF is retained and observed but is not yet a
-complete arbitration model.
+it is not the sole scheduling edge: not every service-transport ring producer
+commit is paired with command 4, so the ring-producer and service-pending
+transitions are distinct, required triggers (ledger
+`single_timer_dspif_doorbell_replaces_shared_triggers`). Service-transport ring
+delivery and shared-control completion use independent device timers. DSPIF is
+retained and observed but is not yet a complete arbitration model.
 
 ## Packet-ring ownership
 
@@ -84,7 +83,7 @@ The task-15 leg is firmware-selected, not an emulation divergence: the organic
 message is `09 ec 00 ...`, and task 15 copies byte `+2` into its protocol mode.
 Mode zero selects `0x07d6`; the nearby fast path requires mode `0x10`.
 
-The DSP-owned consumer must drain earlier type-`0x51` and type-`0x70` traffic for
+The DSP-owned consumer must drain preceding type-`0x51` and type-`0x70` traffic for
 this packet to become visible. Consumption is not completion: advancing `0x0a6`
 must not synthesize a firmware result, queued generic-service object, or inbound
 packet.
@@ -165,7 +164,7 @@ absence proof.
 
 ## Next acceptance point
 
-`make verify-dsp-transport` now covers wraparound, full-ring rejection and
+`make verify-dsp-transport` covers wraparound, full-ring rejection and
 partial-packet retention as transport-only conformance fixtures, plus the organic complete-packet lifecycle,
 consumer advancement, RX publication followed by FIQ0, shared-service
 completion through IRQ4, the established type-`0x70` reply, external-session
@@ -173,24 +172,24 @@ correlation, v5.01 doorbell/service mechanics and active-profile save/load.
 Layering tests prevent protocol vocabulary from leaking back into the transport.
 Malformed-packet fault reporting and physical timing remain unexercised gaps.
 
-The paired packet census observes the same semantic sequence in both ROMs:
-34 MCU-to-peer packets and 11 peer-to-MCU packets. Request-derived behavior is
-limited to discovery echo/completion, external transport acknowledgements and
-the type-`0x70/0x74` `0d00` completion. External registration and the channel
-map remain peer-initiated canned frames. All observed MCU-to-peer packets now
-have classified MCU-side semantics. Twenty-four are one-way publications or
-transport acknowledgements and receive no peer packet response. This includes one segmented
-type-`0x51` DSP memory image and the five non-`0d00` type-`0x70` one-way
-publications. See `dsp_packet_semantics.md` for the complete vocabulary rather
-than inferring request/reply behavior from packet type alone.
+The paired packet census observes the same semantic sequence in both ROMs;
+the complete vocabulary, per-type counts, and per-packet dispositions are
+single-homed in the generated `dsp_packet_semantics.md`. Request-derived
+behavior is limited to discovery echo/completion, external transport
+acknowledgements and the type-`0x70/0x74` `0d00` completion. External
+registration and the channel map remain peer-initiated canned frames. All
+observed MCU-to-peer packets have classified MCU-side semantics; most are
+one-way publications or transport acknowledgements and receive no peer packet
+response, including the segmented type-`0x51` DSP memory image and the
+non-`0d00` type-`0x70` publications. Do not infer request/reply behavior from
+packet type alone.
 
 The shared-service timer is one-shot: a nonzero MCU publication at `0x0e4`
-schedules one counter clear and one IRQ4 completion. The transition census
-found that the former periodic implementation generated roughly 4,955
-zero-to-zero "completions" per ROM in 20 seconds. Removing those idle IRQs
-preserves both ROM transport gates and the interactive menu oracle. The retained
-`MODEL_DSP_SERVICE_TICK_MS` name controls peer packet polling for compatibility;
-it no longer creates periodic service completions.
+schedules one counter clear and one IRQ4 completion. Periodic zero-to-zero
+"completions" are idle IRQs whose absence preserves both ROM transport gates
+and the interactive menu oracle. The retained `MODEL_DSP_SERVICE_TICK_MS` name
+is compatibility residue: it controls peer packet polling only and does not
+create periodic service completions.
 
 A future lower-radio investigation succeeds only when a peer-owned state change
 or inbound packet correlates with a firmware consumer through the real hardware

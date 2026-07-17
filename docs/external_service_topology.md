@@ -34,11 +34,11 @@ on byte `[8]`.
 This is the strongest evidenced boundary: **the external service/test peer behind
 task 7's lower service transport**. Task 7 is the on-device transport adapter.
 After service discovery, firmware-created frames carry destination `0x02` and
-source `0x00` (the phone), which is phone-to-service-peer traffic. The inverse
-interpretation in the first trace pass came from labelling the two address bytes
-backwards.
+source `0x00` (the phone), which is phone-to-service-peer traffic.
+**Framing caution:** `[0]` is the destination and `[1]` the source; the reverse
+reading is disproved.
 
-The current DSP-ring model sharpens the ordering.  The startup D0 exchange is
+The startup D0 exchange is
 serialized by task 8/task 3 as DSP packet type `0x05`; a type-`0x8e` reply reaches
 task 8 through FIQ0 and task 7 accepts the state-`4` D0 data frame organically.
 That exchange is finite when the model answers only the state-`1` discovery
@@ -55,7 +55,7 @@ through a firmware write is neither necessary nor correct.
 
 ## Recovered coherent startup session
 
-The forcing-free contact path now composes in one boot:
+The forcing-free contact path composes in one boot:
 
 1. Task 8 emits the state-1 D0 discovery frame as DSP TX type `0x05`. The peer
    returns its compact acknowledgement and state-4 data frame as RX type `0x8e`.
@@ -82,9 +82,9 @@ only one queued frame completes per wire interval.
 In the five-second acceptance run this leaves service-session status `0x49`, advances
 startup `0x000d -> 0x0004`, activates SIM control
 `0x32 -> 0x33 -> 0xb3 -> 0xe3`, and begins the normal SIM SELECT/READ/STATUS
-conversation. Later SIM-card corrections now raise SIM enable organically and
-complete the non-CPHS SIM initialization pass before entering the timed
-card-presence monitor; the modeled service session completes its startup contract.
+conversation. SIM enable rises organically and the non-CPHS SIM initialization
+pass completes before entering the timed card-presence monitor; the modeled
+service session completes its startup contract.
 
 ## Extended-task readiness contract
 
@@ -99,31 +99,26 @@ group contains the checklist writers and is gated at `0x2a9182`: firmware calls
 at `0x29bb06` for `0x11fed1` bit 2 to clear. Firmware seeded that bit during
 service startup at `0x2347d0`. The DSP HLE completes the organic shared-control
 transaction; firmware clears its own state, resumes the tasks, completes the
-checklist, posts event `0x15`, and advances startup. This replaces the historical
-direct-drain experiment that first isolated the chain.
+checklist, posts event `0x15`, and advances startup.
 
-A timestamped coherent run closes the ordering contract. The DSP shared-control
-completion occurs at `t=1.285269`; firmware begins the second task
-group immediately, and its checklist calls follow the supervisor's static
-resume order: `0x0a`, `0x0b`, `0x0c`, `0x0d`, `0x10`, `0x0f`, `0x0e`, `0x15`,
-`0x14`, `0x11`, then `0x12`. Task 18's straight-line initializer at `0x285c14`
-posts the final code at `0x285c5e`, and task 1 evaluates `0x2a6942` at
-`t=1.298045`. There is no independently late checklist owner or ADC completion:
-the complete application group is held behind the service-empty transaction.
+A timestamped coherent run closes the ordering contract: there is no
+independently late checklist owner or ADC completion, and the complete
+application group is held behind the service-empty transaction. The measured
+timeline and the supervisor's static resume order are recorded in
+`service_bootstrap.md`.
 
-The current external-service peer deliberately waits 36 service ticks before beginning
-the external session. That calibrated delay contributes to this ordering and
-remains hardware-fidelity debt, but is not adjusted merely to select a different
-firmware branch. The alternate mode-`0x000d` tail has the same report-code-7
-listener. Both branches nevertheless enter their shared interactive
-initialization before recording mode 4 or 7, so this ordering is fidelity debt
-rather than an application-start blocker.
+The external-service peer's delay before beginning the external session is
+calibrated prototype behavior (single home: `dsp_service_transport_contract.md`)
+and is not adjusted merely to select a different firmware branch. The alternate
+mode-`0x000d` tail has the same report-code-7 listener. Both branches
+nevertheless enter their shared interactive initialization before recording
+mode 4 or 7, so this ordering is fidelity debt rather than an
+application-start blocker.
 
-Command `0x64`, result `5`, is not an ordinary healthy-startup response. Its
+Command `0x64`, result `5`, is not an ordinary healthy-startup response: its
 firmware handler enters lifecycle state 5, delays five scheduler ticks and calls
-the bulk suspend routine `0x2795e6` for tasks 10--17. The earlier peer model
-sent it speculatively; at the correct Timer-0 rate that suspended task 17 before
-the later `0x1587` post. The supported peer no longer invents that transition.
+the bulk suspend routine `0x2795e6` for tasks 10--17. The supported peer does
+not send it (ledger `external_service_result5_ordinary_startup`).
 
 ## Command inventory
 

@@ -265,6 +265,42 @@
       "hypothesis": "Repeated status 0x05a7 after a second physical softkey is a post-security UI transaction retry stalled on a missing completion",
       "conclusion": "Correct concrete execution shows 0x05a7 reaches dispatcher target 0x28c480 and calls 0x2b3222, a three-slot timer manager. Target 0x28c43c belongs exclusively to status 0x05f3; the former 0x28c43a attribution was mid-instruction. Callback 0x47 settles normally after accepted 0x0578 -> 0x05e6 and leaves the active sweep. A negative-control run with only 12345 plus its single submission reproduces the later post-acceptance event wave. Overlapping 0x00c8 is independently published once per second by task 1 at 0x2a2838 and expands to context-maintenance outputs, not a class-1 window selection. No timer completion or callback result is justified for injection.",
       "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md"]
+    },
+    {
+      "id": "timer0_mhz_calibration_required", "status": "disproven",
+      "hypothesis": "3210 boot requires the fast MHz-range Timer-0 calibration; the recovered 33,055 Hz CTSI rate cannot complete startup",
+      "conclusion": "Both supported 3210 ROMs boot to the interactive menu with both MAD2 timers at the 33,055 Hz CTSI default. The fast calibration starved task 2's watchdog service, expiring CCONT at exactly 49 seconds, and its apparent necessity came from the invented external-service result-5 transition suspending application tasks when scheduler delays ran at their real rate (see external_service_result5_ordinary_startup)",
+      "evidence": ["docs/mad2_fidelity.md", "docs/normalization_status.md"]
+    },
+    {
+      "id": "external_service_result5_ordinary_startup", "status": "disproven",
+      "hypothesis": "External-service command 0x64 result 5 is part of ordinary healthy startup and should be transmitted by the peer",
+      "conclusion": "Result 5 suspends tasks 10..17; the speculative peer transmission suspended task 17 before the later 0x1587 post once timers ran at the real CTSI rate. With that lifecycle removed, both 3210 revisions settle at service-session status 0x49 and reach the interactive menu",
+      "evidence": ["docs/external_service_topology.md", "docs/mad2_fidelity.md", "docs/cross_rom_confidence.md"]
+    },
+    {
+      "id": "dsp_shared_e0_completion_exposure_delay", "status": "disproven",
+      "hypothesis": "Shared-control word 0xe0 must expose value 1 until the periodic service tick so firmware can observe completion in progress",
+      "conclusion": "A trial exposing 0xe0=1 until the then-5 ms service tick regressed the deep boot. Completion visibility is not a tunable delay; no delay may be calibrated merely to reproduce an oracle",
+      "evidence": ["docs/dsp_service_transport_contract.md"]
+    },
+    {
+      "id": "status_13fe_0795_frontier_join", "status": "disproven",
+      "hypothesis": "Status 0x13fe advances to 0x0795 as the ordinary frontier transition of one controller lifecycle",
+      "conclusion": "A standards-valid exhausted-account fixture (ACM == ACMmax == 1) makes 0x27f150 construct its activity slot and take 0x27f23e, which publishes status 0x019a, not 0x0795. The two literal 0x0795 producers require display state 7 or dual-selector unavailability with controller state 2; the join crossed two distinct controller lifecycles",
+      "evidence": ["docs/resource_providers.md"]
+    },
+    {
+      "id": "sim_imsi_never_read_during_init", "status": "disproven",
+      "hypothesis": "3210 firmware does not select or read EF_IMSI during SIM initialization",
+      "conclusion": "The absence was an artifact of a malformed MF/DF GSM-specific SELECT response layout, which also held firmware in a repeating STATUS presence loop. With correct directory metadata (including the 0x15 GSM-data length), firmware organically selects and reads EF_IMSI and leaves the preliminary cycle. Directory metadata must be modeled correctly rather than suppressing the STATUS poll",
+      "evidence": ["docs/sim_subsystem.md", "docs/sim_emulator_scope.md"]
+    },
+    {
+      "id": "genio_bit6_backlight", "status": "disproven",
+      "hypothesis": "MAD2 GenIO signal-register bit 6 (0x20020) drives the 3210 LCD/keypad backlight",
+      "conclusion": "The NSE-8/9 service manual routes both illumination outputs behind COBBA_GJP into the N400 UI-Switch. Paired v5.01/v6.00 traces covering a physical key press plus a 35-second timeout show no change on bit 6 or any candidate PUP/UIF output latch, and a changed-write census of the complete MCU-visible DSP shared window finds no key- or timeout-specific light command. Boot-time 0x20020 bit-3 traffic is the proven EEPROM clock. The MAD2-to-COBBA light command remains unmapped; no backlight state is synthesized",
+      "evidence": ["docs/hardware_atlas.md", "docs/normalization_status.md"]
     }
   ]
 }

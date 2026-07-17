@@ -143,8 +143,8 @@ organic transaction rather than the sole evidence.
 ## Diagnostics
 
 `NOKI3210_TRACE_TASKS=1` provides generic mailbox-edge context for future
-application work. The former MMI-specific handoff trace was retired when
-`make verify-mmi-menu` closed the keypad-to-menu lifecycle.
+application work; `make verify-mmi-menu` protects the keypad-to-menu
+lifecycle.
 
 `NOKI3210_TRACE_DISPLAY_PROFILE=1` records the descriptor-load, profile-update,
 active-profile copy and setup-message boundaries. `NOKI3210_TRACE_DISPLAY_IO=1`

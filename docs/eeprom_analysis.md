@@ -66,7 +66,7 @@ used by the EEPROM device.
 
 ## Observed use
 
-Earlier tracing established that EEPROM reads begin around 6 ms into boot and
+EEPROM reads begin around 6 ms into boot and
 cover more than a thousand byte accesses. Important observed ranges include:
 
 | Range | Purpose |
@@ -95,9 +95,9 @@ active-profile byte 7 (`0x11fc87`). Setup-message initializer `0x2b1e80` tests
 that byte against `4`. The generated EEPROM supplies the source byte; the
 driver does not intercept the later RAM read.
 
-All four collected 3210 EEPROM images have the applicable three-record range
-erased, so no complete factory record is available. The generated profile now
-leaves every unknown byte erased and supplies only record-0 byte 5 as value `4`,
+Four 3210 EEPROM images are collected. All four have the applicable
+three-record range erased, so no complete factory record is available. The
+generated profile leaves every unknown byte erased and supplies only record-0 byte 5 as value `4`,
 the field whose ownership and consumer are statically recovered. Firmware loads
 that byte through I2C/NV, copies it to active slot 7 and selects the 3210 LCD
 setup without a RAM-read override. The later profile-update handler `0x29ae68`
@@ -111,8 +111,9 @@ product provisioning rather than a hardware register default. Until an
 authentic configured record is available, supplying only the recovered value
 `4` and leaving the other 35 bytes erased is the smallest evidenced fixture.
 
-Both collected 3210 images have erased bytes across the descriptor-2/3/4 range,
-so this ROM substitutes its validated defaults. The source-7 gain denominator is
+Two of the four collected images are verified to have erased bytes across the
+descriptor-2/3/4 range, so this ROM substitutes its validated defaults; the
+other two images are unverified for this range. The source-7 gain denominator is
 descriptor-2 bytes `0x024a..0x024b`; firmware uses gain `563.0 / denominator`
 and falls back to denominator `0x0233` (unity gain). See
 `battery_classifier_analysis.md` for the complete ranges and boot-safety result.
@@ -153,9 +154,9 @@ by this ROM and must not be treated as a validated 3210 firmware contract.
 The contact/config check uses checksum routine `0x234588` and comparison site
 `0x234810`; its computed and stored values are both `0x1c25`. A mismatch clears
 the service-present bit used by startup. EEPROM
-validity is one real service-session startup prerequisite, but not the only one. The
-native serial path now demonstrates this check organically; it is not satisfied
-by a firmware hook or RAM override.
+validity is one real service-session startup prerequisite, but not the only
+one. The check is demonstrated organically over the native serial path, with
+no firmware hook or RAM override.
 
 ## Synthetic self-test profile
 

@@ -29,12 +29,11 @@ firmware to issue an absolute 32-byte `UPDATE RECORD` for `EF_ADN`, validates
 that only record 1 changed, then restarts with the same SIM NVRAM and matches
 the stable pixels of the firmware-rendered `ADA` search result. It does not
 inject an APDU or conflate card storage with the handset EEPROM.
-The task running at the final emulation tick is deliberately excluded. Moving
-DSP bootstrap-ready state from read overlays to the observed 64-exchange peer
-handshake shifted boot by about 140 ms without changing durable state or the
-stable menu frame; the fixed cutoff consequently sampled scheduler idle
-`0xff` instead of task 1. Startup mode, service/SIM state, resets and hardware
-activity remain protected.
+The task running at the final emulation tick is deliberately excluded:
+final-tick sampling is timing-sensitive, and a harmless schedule shift can
+sample scheduler idle `0xff` instead of task 1 without any change in durable
+state or the stable menu frame. Startup mode, service/SIM state, resets and
+hardware activity remain protected.
 `make verify-3210-v501` runs the same-product v5.01 control with a BIOS-specific
 EEPROM profile and checks `oracles/noki3210-v501-smoke.struct`.
 `make verify-mad2-interrupts` runs three non-oracle controller conformance
@@ -47,6 +46,11 @@ read, organic watchdog service and SIM peripheral-clock gate lifecycle, and asse
 neither boot accesses the timer-1 register window. Its 12-second window reflects
 physical Timer-0 pacing. This is a negative register-coverage contract, not
 validation of the independently running timer-1 overflow source.
+`make verify-charger-wake` powers the running phone off through its physical
+power key, connects the charger while CCONT retains power, and requires cause
+bit `0x04`, a complete digital-domain restart, a post-reset VCHAR sample and
+acting-dead mode `0x0005`. The checker consumes only device traces and the
+structural summary; it does not write firmware state.
 `make verify-mbus` checks the identical v6.00/v5.01 receive-mode
 initialization, asserts that ordinary boot transmits no bytes, and uses one
 external byte to verify RX-ready, firmware consumption and FIQ2 acknowledgement.
@@ -70,10 +74,9 @@ single-run target.
 
 The default runner reseeds an isolated per-run NVRAM directory from the
 generated EEPROM profile. This prevents an old shared `mame/nvram` file from
-silently changing product data. Introducing that deterministic fixture added
-four stable EEPROM transactions and corresponding FIQ/CCONT accounting while
-preserving the exact LCD hash; the structural oracle records the profile-backed
-baseline rather than the former stale-NVRAM run.
+silently changing product data. The structural oracle records the
+profile-backed baseline, including its four stable EEPROM transactions and
+corresponding FIQ/CCONT accounting.
 
 MAME names the alternate v5.01 BIOS NVRAM system `noki3210_1`; the Makefile
 seeds that directory explicitly rather than the default `noki3210` directory.
@@ -110,8 +113,8 @@ externally terminated research run.
 ## Default profile
 
 The historical CONTACT SERVICE frame with SHA-256 prefix `d8a9a7a58e587be8`
-is not an acceptance oracle: corrected watchdog and peer startup behavior makes
-the missing-hardware profile stop before that presentation state. Its semantic subset requires
+is not an acceptance oracle; the missing-hardware profile stops before that
+presentation state. Its semantic subset requires
 GENSIO controls, startup modes, running task, mode/flags, service-session status, and
 SIM gates. LCD, IRQ, CCONT, and EEPROM counts remain in the generated summary
 for diagnosis without making timing-dependent totals part of acceptance.
@@ -130,20 +133,19 @@ completion, and the request-correlated external session. Its v5.01 leg checks
 only the common doorbell/service-completion mechanics. An active coherent run
 also crosses a save/load boundary.
 
-Non-oracle research evidence includes a Security-code frame with SHA-256 prefix
-`6471d1a5803619c2`. It is not part of `make verify-frontier` because the current
-hardware-boundary profile does not reproduce the additional display transfer.
+Fixture frames and their oracle status:
 
-A separately generated provisioned EEPROM profile matched the synthetic phone
-identity and removed that prompt. It painted the idle `Menu` frame with SHA-256
-prefix `dbf2704cb945d56b`, while the structural state remains in mode `0x0004`.
-The corrected IRQ0 keypad source reaches the real matrix scanner and publishes
-decoded keys while that mode remains selected. A physical left-softkey fixture
-then opens the firmware-owned `Phone book` menu; a one-shot mirror capture has
-SHA-256 `9b2ac7477b5be11aa6b4f178f781ff2799754b0b5ff6ce8f66221564d0f914d1`.
-The menu fixture is acceptance evidence but is not yet part of the canonical
-structural oracle. The separate unprovisioned `12345` fixture completes the
-security editor through `0x0578` and its accepted `0x05e6` callback branch.
+| Fixture | Frame hash (SHA-256) | Oracle status |
+|---|---|---|
+| Unprovisioned Security-code prompt | prefix `6471d1a5803619c2` | Research evidence only; outside `make verify-frontier` because the hardware-boundary profile does not reproduce the additional display transfer |
+| Provisioned idle `Menu` | prefix `dbf2704cb945d56b` | Research evidence; structural state remains mode `0x0004` |
+| Provisioned `Phone book` menu after left softkey | raw one-shot mirror `9b2ac7477b5be11aa6b4f178f781ff2799754b0b5ff6ce8f66221564d0f914d1` | Masked stable pixels (animated 20x12 icon region excluded) are protected by `make verify-mmi-menu`; the raw hash is not part of the canonical structural oracle |
+
+The provisioned EEPROM profile matches the synthetic phone identity and
+suppresses the security prompt. The IRQ0 keypad source reaches the real matrix
+scanner and publishes decoded keys while mode `0x0004` remains selected. The
+separate unprovisioned `12345` fixture completes the security editor through
+`0x0578` and its accepted `0x05e6` callback branch.
 
 ## Nokia 3210 v5.01 control
 
@@ -160,7 +162,7 @@ The useful invariants are the task-1 and SIM results. The run organically observ
 flags `0x0f`. At its relocated state block it also clears
 no-SIM and sets SIM ENABLE organically. This independently reproduces the v6.00
 task-1 terminal mode and validates the shared SIM device contract.
-Service-session status remains `0x00c9`, but presentation and interaction now
+Service-session status remains `0x00c9`, but presentation and interaction
 match v6.00 under the provisioned fixture. The status difference remains a
 transport/lifecycle observation, not evidence of a blocked UI.
 

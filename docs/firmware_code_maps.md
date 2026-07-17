@@ -1,8 +1,8 @@
 # Firmware code → meaning maps
 
-Reference tables curated from trace-helper `*_desc()` functions before those were
-stripped from the driver. These map runtime *values* (not addresses, so they're
-not in the Ghidra symbol DB) to meanings. Re-add a trace using these if needed.
+Reference tables mapping runtime *values* to meanings (not addresses, so they
+are not in the Ghidra symbol DB). Curated from the driver's one-time
+trace-helper `*_desc()` functions; a new trace can reuse these tables.
 
 ## Class-`0x40` service-command codes (`response` byte)
 
@@ -46,8 +46,6 @@ dispatcher. These states feed task-1 reports but are not owned by RTOS task 1.
 
 ## The 23-task system table (`0x2d7090`, stride `0xc`)
 
-The former table here accumulated stale subsystem guesses, including incorrect
-LCD/display assignments for tasks 3 and 4 and an incorrect battery assignment
-for task 21. The authoritative, evidence-qualified registry is now
-`rtos_tasks.md`. This file remains a value/code map rather than a second task-name
+The authoritative, evidence-qualified task registry is `rtos_tasks.md`. This
+file remains a value/code map and must not be treated as a second task-name
 authority.

@@ -70,18 +70,15 @@ ATR -> PPS
 All of this travels through device registers, FIQ6, task 21, and the firmware's
 normal T=0 implementation. No message responder or SIM-state write is needed.
 
-## STATUS polling conclusion
+## STATUS polling caution
 
-The repeated `A0 F2 00 00 16` after `EF_PHASE (6FAE)` was a real
-firmware-scheduled presence poll. The response follows the normal
-code-`0x0b` data path at `0x27ee94`; the epilogue at `0x27ef0a` explicitly
-handles INS `0xf2`, runs `0x27ea20`, and waits for the next message at
-`0x27efb0`. The run does not reset the card or report no-SIM.
-
-However, it was not a terminal steady state: correcting the surrounding
-MF/DF GSM-specific response layout let firmware leave that preliminary cycle.
-Do not suppress a STATUS command ad hoc; model its response and the directory
-metadata correctly.
+Repeated `A0 F2 00 00 16` is firmware-scheduled: the response follows the
+normal code-`0x0b` data path at `0x27ee94`, and the epilogue at `0x27ef0a`
+explicitly handles INS `0xf2`, runs `0x27ea20`, and waits for the next message
+at `0x27efb0`. Do not suppress a STATUS command ad hoc; model
+its response and the directory metadata correctly. A malformed MF/DF layout
+holds firmware in a preliminary polling cycle that never requests EF_IMSI
+(ledger `sim_imsi_never_read_during_init` in `evidence/falsifications.json`).
 
 ## Persistent ADN contract
 
@@ -117,9 +114,13 @@ architectural work is to stabilize controller/card timing and errors and move
 the remaining subscriber constants into reusable profiles.
 
 The organically requested initialization pass is complete for a non-CPHS
-synthetic card. Unsupported optional files return `94 04` and leave the current
-selection unchanged. `6F14` is CPHS Operator Name String and is intentionally
-absent; it should only gain content in a card profile that advertises CPHS.
+synthetic card. Unsupported optional files return `94 04` (file ID not found)
+and leave the current selection unchanged; firmware accepts that result and
+continues its file pass. `6F14` is CPHS Operator Name String, a transparent
+default-alphabet field of up to the 24 bytes accepted by parser `0x201876`; it
+is intentionally absent and should only gain content in a card profile that
+advertises CPHS. This file is the authoritative home for the CPHS/`94 04` card
+contract.
 
 `NOKI3210_SIM_CPHS_AOC=1` is a card-provisioning scenario, not a boot bypass.
 It advertises CPHS phase 2 through `EF_INFO (6F16)`, allocates and activates
@@ -130,16 +131,16 @@ selector-0 contract at `0x287250`; it does not populate firmware task state or
 manufacture an active call.
 
 After initialization, task 20 deliberately polls the selected directory with
-STATUS. Function `0x2028a4` rearms timer `0xea` with delay `0x181`; this is the
-card-presence monitor, not a remaining filesystem blocker. The device tracks
-current DF independently of the selected EF; observed `7F40` polls take the
-firmware's steady path rather than falsely reporting a directory change.
+STATUS; this is the firmware card-presence monitor, not a remaining filesystem
+blocker. Its contract is authoritative in `sim_subsystem.md`.
 
 ## Current boundary outside the SIM
 
-The next registration transaction depends on a GSM/radio session. Firmware must
-construct callback 7 with lifecycle `0x05dc`; its own
-code then attaches a radio context and emits:
+The next registration transaction belongs to a network-registration session — a
+later lifecycle, distinct from completed offline SIM initialization; see
+`sim_registration.md`. That session would construct callback 7 with lifecycle
+`0x05dc` organically; firmware's own code then attaches a radio context and
+emits:
 
 ```text
 callback 7 -> 0x5518 -> task 17 0x1583
@@ -147,11 +148,12 @@ callback 7 -> 0x5518 -> task 17 0x1583
   -> parser reply code 2 -> SIM read ENABLE
 ```
 
-Callback 7 receives only the global `0x05e2` sweep in the current run. The SIM
-card does not own its lifecycle or object, so neither belongs in
-`nokia_sim_card_device`. The next peer work must begin from an observed
-firmware request or hardware-visible transition at the GSM/resource/DSP
-boundary.
+In the coherent offline run callback 7 receives only the global `0x05e2` sweep;
+offline initialization completes without it, and the session must not be
+forced. The SIM card does not own callback 7's lifecycle or object, so neither
+belongs in `nokia_sim_card_device`. The next peer work must begin from an
+observed firmware request or hardware-visible transition at the
+GSM/resource/DSP boundary.
 
 ## Acceptance rules
 

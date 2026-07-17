@@ -19,6 +19,7 @@ Documentation is organized by authority rather than investigation date.
 | `research_cleanup.md` | Repeatable cleanup protocol for hypotheses, naming residue, diagnostics, and evidence retention. |
 | `rtos_tasks.md` | Authoritative ROM-specific task identities, neutral aliases, and naming cautions. |
 | `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
+| `tooling.md` | Analysis, census and acceptance tooling reference. |
 
 ## Validated startup and UI boundaries
 
@@ -32,6 +33,7 @@ Documentation is organized by authority rather than investigation date.
 | `service_bootstrap.md` | Service-session startup prerequisites and acceptance contract. |
 | `service_firmware_map.md` | Concise lower-service and service-session firmware address map. |
 | `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |
+| `eeprom_analysis.md` | EEPROM usage map, checksum contracts and the generated provisioning fixture. |
 
 ## Mapped downstream work
 
@@ -52,6 +54,8 @@ corresponding subsystem:
 - `sim_registration.md`
 - `sim_emulator_scope.md`
 - `firmware_code_maps.md`
+- `message_topology_census.md`
+- `battery_classifier_analysis.md` (active investigation)
 
 Treat concise subsystem documents, normalized evidence, and current source code
 as authoritative. Absolute addresses apply to the 3210 v6.00 firmware unless

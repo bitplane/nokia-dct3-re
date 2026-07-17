@@ -87,8 +87,7 @@ likewise sees only `0x05e2`, and neither `0x0389` nor `0x157e` appears.
 The callback contract is broader than the originally mapped display chain.
 Inputs `0x05e1`, `0x05e7`, and `0x05dc` schedule task-local timer class `0x52`;
 the task-5 recode table returns that timer as `0x06c5`, which reports code
-`0x07`. Inputs `0x05eb` and `0x06c5` report immediately. The earlier
-`0x06dc` reading was an arithmetic error in the subtract cascade. Callback
+`0x07`. Inputs `0x05eb` and `0x06c5` report immediately. Callback
 flags `0x01a00000` deliberately choose status `0x032d`, rather than automatic
 `0x05dc`, during framework selection, so callback activation alone does not
 start the timer.
@@ -97,11 +96,9 @@ There is no separate object or peer acknowledgement hidden behind that timer.
 The three start statuses directly construct the local class-`0x52` timeout.
 A physical wrong-code control supplies an organic `0x05e1`, but the dispatcher
 routes it back to callback `0x47`, not callback `0x5d`; status values are scoped
-to the selected callback. A corrected bound now exposes 30 selector-`0x5d`
-records in the 950-record transition table, so the former claim that `0x09d0`
-was its only non-initialization selection is retired. Runtime evidence still
-classifies this display route as later service/test behavior rather than the
-ordinary-startup frontier.
+to the selected callback. The 950-record transition table contains 30
+selector-`0x5d` records. Runtime evidence classifies this display route as
+later service/test behavior rather than the ordinary-startup frontier.
 
 The transaction engine around `0x264504` and `0x264c98` owns statuses
 `0x0280`-`0x0283`. Class-`0x40` service commands `0x81` and `0x82`, plus independent
@@ -111,7 +108,7 @@ boot source. A coherent trace of controller transform `0x253e20` also produces
 none of `0x0280`-`0x0282`. This route is therefore mapped but excluded as the
 ordinary display entrance.
 
-The static producer inventory is now closed at the reporter boundary. Reporter
+The static producer inventory is closed at the reporter boundary. Reporter
 `0x2af190` has four of four callers classified. The two power callers are
 excluded from ordinary boot; `0x27b3b6` is the callback-`0x5d` route; and
 `0x255c3c` is the independent controller route. Five of five direct global
@@ -143,25 +140,23 @@ headed by `0x05e1`. The census finds no literal load, recovered constant
 construction, or direct packed-event call for either invoking form. The table
 entry therefore proves a valid later transition, not an ordinary producer.
 
-The producer census corrects an API-profile blind spot: task-5 render post
-`0x2af6ea` accepts a packed event in `r0`, just like generic constructor
-`0x2af798`. Treating it as an unpacked ID hid `0x4bcc -> 0x0bcc` at callsites
-`0x2afd20`/`0x2afdc8` and `0x53f8 -> 0x13f8` at `0x2a45d4`. A filtered
-forcing-free frontier trace observes neither event, so these repairs close two
-false absence claims without promoting either later conditional lifecycle to
-the ordinary startup frontier.
+Caution: task-5 render post `0x2af6ea` takes a packed event in `r0`, like
+generic constructor `0x2af798`; producer-absence claims require packed-aware
+decoding of its callsites (`0x2afd20`/`0x2afdc8` post `0x0bcc`, `0x2a45d4`
+posts `0x13f8`). A filtered forcing-free frontier trace observes neither
+event.
 
-The only owner selected in the coherent run is callback `0x47`. A corrected
-execution of its subtract cascade shows that the shared branch at `0x28f4e4`
-accepts `0x0578` and `0x1440`, not `0x0778` and `0x1441`. The adjacent
-`0x143f -> 0x28f6a4 -> 0x1440` path is therefore numerically relevant after
-all, although `0x1440` is not observed in the coherent boot.
+The only owner selected in the coherent run is callback `0x47`. The shared
+branch at `0x28f4e4` accepts `0x0578` and `0x1440`
+(`callback47_0778_1441_completion_inputs` in `evidence/falsifications.json`).
+The adjacent `0x143f -> 0x28f6a4 -> 0x1440` path is numerically relevant,
+although `0x1440` is not observed in the coherent boot.
 
 The observed input `0x05dc` instead enters `0x28f588` and starts the generic
 text/UI transaction manager through `0x24b174 -> 0x24af70`. That constructor
 stores `0x0578` as its completion status at `[0x110590 + 0x16]`, publishes
 `0x057c` when the editor is presented, and waits for the UI transaction to
-finish. A deterministic physical `12345` plus softkey sequence now completes it
+finish. A deterministic physical `12345` plus softkey sequence completes it
 through `0x0578`. Verifier `0x2ae704` returns one only when the transformed input
 matches the four stored bytes, selecting callback result `0x05e6`; mismatch
 instead posts `0x05e1`. This classifies the branch as a completed interactive UI
@@ -175,24 +170,21 @@ transient registration only for service `0x0a`, never service `0x05`, and
 executes no resident registration through `0x263d30`. The callback-`0x21` path
 at `0x2298d2` consumes event
 `0x0c20`, but its only recovered direct producer (`0x27616e`) sits in a
-service-command/session block and is not presently an ordinary-hardware
-candidate.
+service-command/session block and is not an ordinary-hardware candidate.
 
-A provisioned runtime trace tightens this exclusion. Ordinary boot installs
-fourteen service-`0x0a` descriptors at about 0.864 s, but never calls transient
-handler `0x263154`, resident API `0x263d30`, pending predicate `0x26265c`, or
-any of the three `0x05eb` publication tails (`0x2632be`, `0x263bd4`,
-`0x263e64`). The only later registration-family observations are two unrelated
-`0x08ac` inputs. These completion tails are valid framework contracts, but are
-not active in the current lifecycle.
-
-The post-`0x622a` audit reproduces that result with the application-release
-boundary timestamped. After the group begins at about 1.286 s, none of the six
-registration entry/predicate/tail sites executes during the eight-second run.
-Callback `0x5d` receives only its earlier initialization sweep `0x05e2` at
-1.255 s. The later organic `0x05e1` at 3.964 s belongs specifically to callback
-`0x2f`'s private initialization lifecycle, as previously falsified; it is not a
-global completion lost before callback `0x5d`.
+Provisioned runtime tracing confirms the exclusion. Ordinary boot installs
+fourteen service-`0x0a` descriptors at about 0.864 s, but no registration
+entry, predicate, or tail site executes during the eight-second run, before or
+after the application-release boundary (`0x622a`): transient handler
+`0x263154`, resident API `0x263d30`, pending predicate `0x26265c`, and the
+three `0x05eb` publication tails (`0x2632be`, `0x263bd4`, `0x263e64`) all stay
+dormant, and the only registration-family observations are two unrelated
+`0x08ac` inputs. Callback `0x5d` receives only its initialization sweep
+`0x05e2`. The organic `0x05e1` at 3.964 s belongs to callback `0x2f`'s private
+initialization lifecycle (`callback2f_05e1_is_global_code7_completion` in
+`evidence/falsifications.json`); it is not a global completion lost before
+callback `0x5d`. These completion tails are valid framework contracts that are
+not active in this lifecycle.
 
 The canonical profile produces `0x08ac` twice and enters `0x27f150` twice.
 Availability helper `0x287250(0)` has two card-provisioning success paths:
@@ -216,8 +208,8 @@ only when an ACM maximum is active. GSM 11.11's zero value means the maximum
 is not valid and correctly leaves the guard clear. A diagnostic but
 standards-valid exhausted account (`ACM == ACMmax == 1`) makes `0x27f150`
 construct its activity slot and take `0x27f23e` without firmware mutation.
-That call publishes status `0x019a`, not `0x0795`. The former
-`0x13fe -> 0x0795` frontier was a false join between controller lifecycles.
+That call publishes status `0x019a`, not `0x0795`
+(`status_13fe_0795_frontier_join` in `evidence/falsifications.json`).
 
 There are exactly two literal `0x0795` producers. The display producer at
 `0x28c2be` requires service/display state 7 and is excluded from mode 4. The
@@ -230,7 +222,7 @@ Status `0x013a` is a callback-`0x24` input in framework mode 11; callback
 input `0x03ab` establishes the same mode. The coherent boot remains in mode 0, making
 this a later conditional route rather than the ordinary startup entrance.
 
-The adjacent start-side status is now closed as well. Display dispatcher
+The adjacent start-side status is also closed. Display dispatcher
 `0x28bddc` selects `0x28c22c` on `0x0794`; that branch calls the code-6/resource
 `0x6a00` wrapper. The status census finds no direct `0x0794` producer. Its sole
 predecessor is catalogue input `0x32b4`/`0x72b4` (index `0x12b4`), and no
