@@ -51,6 +51,30 @@ The next peer behavior is implementable only after the request/response object
 ownership is pinned down. The falsified type-`0x80` primitive-`0x70` reply is not
 that response and must not be restored.
 
+### Current transport boundary
+
+The coherent boot organically transmits the type-`0x1a` ARFCN bitmap at about
+4.8 seconds, but emits no subsequent search/camp request on the recovered
+MCU-to-DSP packet stream. Task 14 receives no message. Cell search is therefore
+currently modeled as autonomous DSP/L1 work after configuration; a peer must
+not wait for an MCU request that the firmware does not send.
+
+The first fake-cell behavior must be an unsolicited DSP-to-MCU report delivered
+through MDIRCV/FIQ0. Static classification narrows the receive surface:
+
+- type `0x99` (`0x28464c`) is a five-sample measurement accumulator which
+  publishes class `0x04`, command `0x4a` to task 8, not a camp transition;
+- type `0x86` (`0x284316`) is a controller/transfer state machine for subtypes
+  `0x70`, `0x80`, `0xb0`, and `0xb1`, and remains a possible prerequisite for
+  accepting later framed traffic;
+- type `0x8e` reaches task 7 and the task-22 class dispatcher, but the observed
+  zero session phase rejects a standalone class-`0x47` candidate.
+
+The next bounded question is which valid type-`0x86` exchange, if any, advances
+the firmware-owned session phase so that type-`0x8e` traffic is accepted. If no
+such path exists, record the quantified absence and begin at the type-`0x8e`
+session constructor rather than guessing a registration-success payload.
+
 ## Acceptance
 
 Network work becomes composable when one coherent run:

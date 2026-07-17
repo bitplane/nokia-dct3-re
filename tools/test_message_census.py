@@ -99,7 +99,7 @@ class ContactServiceTests(unittest.TestCase):
 			"constructor_role": "ack", "producer_class": "unresolved",
 			"confidence": "high", "evidence": "fixture"
 		}]}
-		calls = [{"callsite": 0x2100, "api": "contact_message_alloc",
+		calls = [{"callsite": 0x2100, "api": "service_message_alloc",
 			"arguments": {"command": 0x70, "payload_length": 1}}]
 		runtime = [{"kind": "contact_receive", "fields": {"command": 0x70},
 			"file": "deep.log", "count": 3}]

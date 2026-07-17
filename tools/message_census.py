@@ -424,7 +424,7 @@ def subsystem_runtime_available(manifests, subsystem):
 
 
 def external_service_inventory(profile, calls, runtime):
-	constructors = [call for call in calls if call["api"] == "contact_message_alloc"]
+	constructors = [call for call in calls if call["api"] == "service_message_alloc"]
 	commands = []
 	for definition in profile.get("external_service_commands", []):
 		record = dict(definition)
@@ -767,7 +767,7 @@ def render_report(result):
 			f"`{int(status):#06x}`={count}" for status, count in result["runtime_status_inventory"].items()) + "."]
 	contact = result["external_service"]
 	lines += ["", "## Contact-service command family", "",
-		f"The ROM scan recovered {contact['constructor_callsites_scanned']} calls to `contact_message_alloc_234634`. "
+		f"The ROM scan recovered {contact['constructor_callsites_scanned']} calls to `service_message_alloc_234634`. "
 		"The five target commands each have exactly one constructor; constructor existence is not treated as proof of an initiating producer.", ""]
 	for command in contact["commands"]:
 		constructors = ", ".join(f"`{item['callsite']:#08x}`/len `{item['arguments'].get('payload_length')}`" for item in command["constructors"]) or "none"

@@ -293,6 +293,35 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 				fw_byte(0x00100022), machine().time().as_double());
 	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
+			(addr == 0x002a58cc || addr == 0x0023d62c || addr == 0x0023c55c))
+	{
+		const u32 argument = addr == 0x002a58cc ?
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R4) :
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 message = addr == 0x0023c55c ? argument - 9 : argument;
+		if (message >= NOKIA_RAM_BASE && message + 17 < NOKIA_RAM_END)
+		{
+			logerror("dsp_boundary: framed-rx pc=%08x msg=%08x data=", addr, message);
+			for (unsigned index = 0; index < 18; index++)
+				logerror("%02x", fw_byte(message + index));
+			logerror(" task=%02x t=%.6f\n", fw_byte(FW_SCHED_RUNNING_TASK_ID),
+					machine().time().as_double());
+		}
+	}
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
+			(addr == 0x00284316 || addr == 0x0028464c))
+	{
+		const u32 message = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		if (message >= NOKIA_RAM_BASE && message + 31 < NOKIA_RAM_END)
+		{
+			logerror("dsp_boundary: lower-rx pc=%08x msg=%08x data=", addr, message);
+			for (unsigned index = 0; index < 32; index++)
+				logerror("%02x", fw_byte(message + index));
+			logerror(" controller=%02x task=%02x t=%.6f\n", fw_byte(0x0010d0e2),
+					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+		}
+	}
+	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
 			(addr == 0x002a2074 || addr == 0x0028d710 || addr == 0x0028d7fe || addr == 0x0028d886))
 	{
 		static unsigned l1_config_count = 0;

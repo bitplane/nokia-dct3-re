@@ -79,6 +79,41 @@ Task **22** (`dsp_if_task_2b6548`) is the DSP-interface RTOS task. Its loop: `re
   `0x2b66b0` (0xc-byte records) maps DSP primitives `0x10–0x29` ↔ upper-layer message ids
   `0x035c–0x037b`.
 
+### Class-0x47 call-control candidate
+
+Task-22 class `0x47` is a strong call-control candidate, but the name remains
+provisional until an organic or external-peer scenario reaches it. Handler
+`0x23c55c` accepts exactly primitives `1`, `3`, and `7`. Primitive `3` parses a
+variable-length address-like object and forwards it through `0x2b2ee0`; primitives
+`1` and `7` use the adjacent helpers `0x2b2ef8` and `0x2b2eee`. Those helpers publish
+resource ids `0x8c99`, `0x8d59`, and `0x8e19` respectively. The complete handler body
+has one signature match in the v5.01 image at `0x23bff0`, so this contract is stable
+across the two supported 3210 ROMs.
+
+Translator `0x282d64` is called by task 7's non-class-`0x40` framed-session loop
+at `0x237c4e`; it does not run inside either task 22 or the physical DSP packet-ring
+decoder. For class `0x47`, its primitive-`2` branch constructs and posts a normalized
+class-`0x47`, primitive-`3` message to task 22. This establishes the firmware-side
+envelope as DSP RX type `0x8e` -> task 7 -> translator -> task 22, but does not
+establish primitive `2` as an over-the-air indication.
+
+The existing `enqueue_rx_packet` interface models the separate MDIRCV ring consumed
+by task 4. Arbitrary class-`0x47` data must not be put on that ring: its outer decoder
+only accepts the mapped packet families `0x70..0x7f`, `0x80`, `0x83..0x8f`, and
+`0x99`. An incoming-call fixture is admissible only after the task-22 L1 mailbox
+publication mechanism is recovered, or after a captured peer transaction establishes
+an evidenced translation from one of those outer packet families.
+
+An RX type-`0x8e` experiment reached task 7 and sharpened the remaining gate. A
+parser-safe class-`0x47`, primitive-`3` frame arrived while session phase byte
+`0x11fedb` was zero, so the loop recorded its peer header fields without calling
+`0x282d64` and returned type-`0x05` control frame
+`1e 02 00 7f 00 02 47 80 70`. Advertising `0x47` in the external-service
+command-`0x70` bitmap did not alter the result. The phase byte is read throughout
+`0x2824e4`/`0x282d64` and is incremented indirectly at `0x282734`; it is a framed
+protocol state, not a resource-availability bit. The experimental fixture was
+removed rather than bypassing that state machine.
+
 **Send side (MCU→DSP uplink):** write a command halfword to the **DSPIF register
 `0x30000`**, then poke the doorbell interrupt at `0x20008` (pattern seen at `0x291038`:
 `strh #4→[0x30000]; strb #2→[0x20008]`). The DSPIF has **287 write sites, almost all in the
@@ -433,11 +468,14 @@ The primitive dispatch of `0x23cde0` (`[msg+9]` = primitive; `r5` = `msg+9`) is
 decoded. **The key finding: most primitives forward straight into the `0x2a2xxx`
 idle-element render library — the DSP L1 layer *is* the idle content producer.**
 Each `0x2a2xxx` target opens with a call to status classifier `0x28fa4c`, which
-reads camped/service state `[0x11fce1]`, and then render-posts to task 5. The
-full producer chain is:
+calls firmware-owned UI/network-state classifier `0x28f0f2`, and then
+render-posts to task 5. Earlier notes described this as a direct read of a
+"camped byte" at `0x11fce1`; the complete decode disproves that simplification.
+`0x28f0f2` derives one of seven presentation states from a multi-field firmware
+context and an auxiliary status query. The full producer chain is:
 
 ```
-DSP L1 status primitive → 0x23cde0 → 0x2a2xxx render fn → 0x28fa4c (camped-state gate)
+DSP L1 status primitive → 0x23cde0 → 0x2a2xxx render fn → 0x28fa4c/0x28f0f2
     → render-post 0x2af6ea → task 5 → idle content (signal bars / indicators / operator)
 ```
 
@@ -462,7 +500,7 @@ So the primitives split into **display-update** (`0x10–0x1c`, `0x25` → `0x2a
 **L1 data-block** (`0x30/0x33/0x36` → `0x2b2exx`, carrying big-endian length-prefixed blobs
 up to 300 bytes — measurement/frame data). Big-endian multi-byte fields (`b[n]<<8|b[n+1]`)
 confirm GSM network-byte-order framing. The content is produced by these DSP primitives
-arriving and being rendered, not by the camped-state byte alone. In the measured coherent
+arriving and being rendered, not by assigning one registration byte. In the measured coherent
 boot no such primitive arrives; dispatch `0x23d62c` runs zero times.
 
 **Byte-lane caution (swap16):** the network-registration data lives in the struct
