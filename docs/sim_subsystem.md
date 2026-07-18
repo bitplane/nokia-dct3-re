@@ -129,7 +129,8 @@ card ownership are separate; remaining fidelity debt is ATR start/turnaround tim
 unmodeled errors/removal, and card protocol mixed with subscriber provisioning.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
-includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`, LOCI `6F7E`, and Phase
+includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`,
+PLMN selector `6F30`, LOCI `6F7E`, and Phase
 `6FAE`; other known files are erased (`0xff`). `EF_PHASE` reports Phase 2 (`0x02`). Returning `0x00`
 prevents the validated preliminary lifecycle from composing. MF/DF STATUS data uses the GSM 11.11
 directory layout, including a `0x15` GSM-specific-data length and CHV status fields; a shifted

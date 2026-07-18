@@ -385,6 +385,7 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x6f78, 0x7f20, 2, 0, file_structure::transparent, false },
 		{ 0x6f7e, 0x7f20, 11, 0, file_structure::transparent, false },
 		{ 0x6f20, 0x7f20, 9, 0, file_structure::transparent, false },
+		{ 0x6f30, 0x7f20, 24, 0, file_structure::transparent, false },
 		{ 0x6f7b, 0x7f20, 12, 0, file_structure::transparent, false },
 		{ 0x6fae, 0x7f20, 1, 0, file_structure::transparent, false },
 		{ 0x6f31, 0x7f20, 1, 0, file_structure::transparent, false },
@@ -440,13 +441,18 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// The base card advertises no optional SIM services.  The opt-in CPHS AoC
 	// profile also advertises GSM 11.11 service 5, keeping EF_CSP and EF_SST
 	// consistent and causing the ME to read ACM, ACMmax and PUCT normally.
-	static constexpr u8 service_table[15] = { 0x0c }; // Service 2: ADN allocated and activated.
+	static constexpr u8 service_table[15] = {
+		0x0c, // Service 2: ADN allocated and activated.
+		0x30  // Service 7: PLMN selector allocated and activated.
+	};
 	// GSM 11.11 defines zero as "ACMmax not valid": this profile enables AoC
 	// without imposing a subscriber call-charge limit.
 	static constexpr u8 acm_max[] = { 0x00, 0x00, 0x00 };
 	static constexpr u8 acm[] = { 0x00, 0x00, 0x00 };
 	static constexpr u8 puct[] = { 'G', 'B', 'P', 0x00, 0x00 };
 	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98, 0x10 };
+	// Preferred network 234-15, matching the synthetic IMSI and radio cell.
+	static constexpr u8 plmn_selector[] = { 0x32, 0xf4, 0x51 };
 	// CPHS phase 2 with only the Customer Service Profile allocated and
 	// activated.  The CSP contains its mandatory nine group entries and makes
 	// only Advice of Charge (group 03, bit 6) customer-accessible.
@@ -463,6 +469,7 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 		return m_cphs_aoc && offset == 1 ? 0x03 : service_table[offset];
 	if (fid == 0x6fb7 && offset < std::size(ecc)) return ecc[offset];
 	if (fid == 0x6f07 && offset < std::size(imsi)) return imsi[offset];
+	if (fid == 0x6f30 && offset < std::size(plmn_selector)) return plmn_selector[offset];
 	if (m_cphs_aoc && fid == 0x6f16 && offset < std::size(cphs_info)) return cphs_info[offset];
 	if (m_cphs_aoc && fid == 0x6f15 && offset < std::size(cphs_aoc)) return cphs_aoc[offset];
 	if (m_cphs_aoc && fid == 0x6f37 && offset < std::size(acm_max)) return acm_max[offset];

@@ -49,15 +49,15 @@ to one of the recovered `0x05e8` publishers plus entry `0x28`'s downstream
 readiness state; reviewed runtime does not execute that transition.
 
 An opt-in boundary diagnostic now proves the direct completion route
-end-to-end without touching MCU state. Two type-`0x87` reports, delivered after
+end-to-end without touching MCU state. Two type-`0x87` `NO_BCCH_LEFT` reports, delivered after
 the organic type-`0x1a` publication through MDIRCV/FIQ0, make task 10 enter
 `0x219e30` and post `0x0434` to task 17. A single report is queued but does not
 wake the task-10 consumer in this scheduler state; the reason a real peer
-supplies the additional wake remains unresolved. Repeating type `0x8a` instead
+supplies the additional wake remains unresolved. This is a search-exhaustion
+path, not successful registration. Repeating type `0x8a` `NO_PSW_FOUND` instead
 increments its counter toward limit `0x01f2` while the controller gate remains
-clear. These runs identify `0x87` as the short terminal completion family and
-`0x8a` as a counted report family, but do not establish their RF names or make
-either suitable for default emulation.
+clear. These runs identify the short and counted failure-finalization paths,
+but do not make either suitable for default emulation.
 
 The same run corrects the former downstream assumption. Task 17 consumes
 `0x0434` at the dispatcher comparison `0x225240`, enters handler `0x225b6c`,
@@ -70,8 +70,36 @@ dispatcher arms.
 The retained instrument is disabled by default. Setting
 `NOKI3210_DIAG_RADIO_SCENARIO=1` schedules the two type-`0x87` reports after
 each organic type-`0x1a` packet; value `2` schedules 64 type-`0x8a` reports.
+Value `3` supplies the initial type-`0x87` completion once, then responds to
+the newly exposed organic type-`0x03` `DEACTIVATE` request with `0x89`, `0x84`,
+and two `0x87` reports to test controller-result ownership. That guessed
+sequence does not settle the controller.
+Value `4` is a disproven type-`0x88` timing-offset body probe. Type `0x88` is
+`NEIGHBOUR_TIMING_OFFSET`, not a PLMN or system-information carrier.
+Value `5` tests the successful-search vocabulary: type `0x89`
+`CHANNEL_CHANGED_CNF`, two type-`0x80` `RECEIVED_BLOCK` packets containing a
+GSM 04.08 System Information Type 3 block, then type `0x87` `NO_BCCH_LEFT`. The SI3
+describes PLMN 234-15, LAC 1 and cell id 1. This is still an isolated protocol
+fixture, not the default peer.
 It is a transport/consumer isolation scenario, not a fake-cell model or a
 supported machine profile, and may be removed once the real sequence is known.
+
+Value `10` is the current ordered search probe. Two evidenced
+`NO_BCCH_LEFT` cycles expose a third `SEARCH_LIST` (`00 83 ...`); only then does
+the peer returns an `ALL_RSSI_RESULTS` list containing ARFCN 1 at -60 dBm and
+terminates it with `NO_PSW_LEFT`. The firmware parses the record (the decoded
+cutoff is -108 dBm) and organically emits type `0x03` `DEACTIVATE`, but task 11
+is in measurement mode 3. That mode deliberately bypasses candidate sorter
+`0x212394`; the result is stored and the same `SEARCH_LIST` is retried about
+six seconds later. An earlier guessed `CHANNEL_CHANGED_CNF`/SI3 tail was
+removed because it answered the fire-and-forget `DEACTIVATE` with an unrelated
+packet. The frontier is the firmware-local transition to acquisition mode 2,
+not SI3 encoding or MDIRCV transport.
+
+The synthetic SIM now advertises and serves `EF_PLMNsel` with preferred PLMN
+234-15, consistent with its IMSI and the diagnostic cell. Firmware reads the
+file organically, but this provisioning correction does not select acquisition
+mode by itself.
 
 ## Emulation direction
 
@@ -84,6 +112,17 @@ The next peer behavior is implementable only after the request/response object
 ownership is pinned down. The falsified type-`0x80` primitive-`0x70` reply is not
 that response and must not be restored.
 
+The current acquisition entrance is task-11 status `0x13a3`, whose handler
+`0x214a64` selects scan mode 2. Constructor `0x218770` is firmware-local. The
+ordinary candidate route reaches it from task-10 status `0x03f1` at `0x218930`,
+subject to the network-selection predicate; a second route requires controller
+argument 3. Every literal `0x07d6` producer in this ROM supplies the same zero
+mode and the coherent task-15/task-16 chain consequently produces controller
+argument 1, so that transaction cannot be tuned into argument 3. The message
+census contains no literal `0x03f1` producer. Its data-driven predecessor is
+the next bounded RE target; injecting `0x03f1` or `0x13a3` would bypass the
+contract under investigation.
+
 ### Current transport boundary
 
 The coherent boot organically transmits the type-`0x1a` ARFCN bitmap at about
@@ -92,7 +131,7 @@ MCU-to-DSP packet stream. Task 14 receives no message. Cell search is therefore
 currently modeled as autonomous DSP/L1 work after configuration; a peer must
 not wait for an MCU request that the firmware does not send.
 
-The first fake-cell behavior must be an unsolicited DSP-to-MCU report delivered
+The first fake-cell behavior must be a DSP-to-MCU report delivered
 through MDIRCV/FIQ0. Static classification narrows the receive surface:
 
 - type `0x99` (`0x28464c`) is a five-sample measurement accumulator which
@@ -106,15 +145,22 @@ through MDIRCV/FIQ0. Static classification narrows the receive surface:
   type-`0x8e` framed-session phase, so it is not that session's bootstrap;
 - type `0x8e` reaches task 7 and the task-22 class dispatcher, but the observed
   zero session phase rejects a standalone class-`0x47` candidate.
-- type `0x87` (`0x284ebc`) is payload-independent at task 10 and can enter
+- type `0x87` (`0x284ebc`, `NO_BCCH_LEFT`) is payload-independent at task 10 and can enter
   finalizer `0x219e30` when two outstanding-work pointers are empty;
-- type `0x8a` (`0x284e88`) is the counted variant and can enter the same
+- type `0x8a` (`0x284e88`, `NO_PSW_FOUND`) is the counted variant and can enter the same
   finalizer after exceeding a firmware-owned limit. The RF conditions that
   produce either report remain unresolved, so they define the next peer
   contract to identify rather than packets to inject;
 - type `0x84` feeds a structured eight-byte controller event to `0x217cac`,
   while type `0x89` advances controller state through `0x1393`/`0x21bb5c` and
   does not directly call the finalizer.
+
+The bounded type-`0x84` body census is closed. Task 10 rewrites the message
+status to `0x1394` and passes that wrapper to `0x217cac`; the DSP body begins at
+offset `+4` and therefore cannot select the decoder's top-level event arm.
+Moreover, the handler discards type `0x84` while controller state byte
+`0x10dbd7` is 1. The first type `0x87` temporarily changes that state to 2 and
+the completing report restores it to 1, establishing the active report window.
 
 The type-`0x86` bootstrap hypothesis is closed by quantified absence. The
 type-`0x8e` session is instead started by firmware callback `0x0a`: event

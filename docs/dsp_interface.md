@@ -249,6 +249,15 @@ states take the diagnostic path. Task 10's `0x139f` handler copies signed
 payload byte `+6` to scalar state `0x10dc99` and returns. It emits no lower
 result, registration event, or follow-on transaction.
 
+The recovered Nokia trace-name table supplies protocol-family vocabulary that
+has been checked against these ROM handlers: outbound `0x1a` is `SEARCH_LIST`;
+inbound `0x80` is `RECEIVED_BLOCK`, `0x83` is `RSSI_RESULTS`, `0x84` is
+`RA_INFO`, `0x87` is `NO_BCCH_LEFT`, `0x88` is
+`NEIGHBOUR_TIMING_OFFSET`, `0x89` is `CHANNEL_CHANGED_CNF`, `0x8a` is
+`NO_PSW_FOUND`, `0x8b` is `ALL_RSSI_RESULTS`, and `0x8f` is
+`NO_PSW_LEFT`. These names classify packets; they do not establish that an
+isolated packet is valid in every firmware controller state.
+
 The four remaining direct task-10 status types are closed through their first
 semantic consumer:
 

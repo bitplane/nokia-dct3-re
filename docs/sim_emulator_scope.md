@@ -103,7 +103,8 @@ establishes a concrete requirement. Later work includes:
 
 - completing UPDATE BINARY, SEEK, cyclic/INCREASE, invalidation and CHV
   semantics;
-- supplying coherent IMSI, SST, LOCI, Kc, FPLMN, AD, SPN and optional EFs;
+- supplying coherent LOCI, Kc, FPLMN, AD, SPN and optional EFs beyond the
+  current matched IMSI/SST/PLMN-selector profile;
 - testing card removal, reset, timeout, parity/error, and proactive-SIM status;
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.

@@ -49,6 +49,7 @@ private:
 	bool m_service_control_completion_sent = false;
 	unsigned m_radio_reports_sent = 0;
 	unsigned m_radio_reports_pending = 0;
+	unsigned m_radio_sequence_stage = 0;
 	unsigned m_bootstrap_exchange_count = 0;
 };
 

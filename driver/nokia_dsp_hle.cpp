@@ -25,6 +25,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_service_control_completion_sent));
 	save_item(NAME(m_radio_reports_sent));
 	save_item(NAME(m_radio_reports_pending));
+	save_item(NAME(m_radio_sequence_stage));
 	save_item(NAME(m_bootstrap_exchange_count));
 }
 
@@ -36,6 +37,7 @@ void nokia_dsp_hle_device::device_reset()
 	m_service_control_completion_sent = false;
 	m_radio_reports_sent = 0;
 	m_radio_reports_pending = 0;
+	m_radio_sequence_stage = 0;
 	m_bootstrap_exchange_count = 0;
 	publish_bootstrap_state();
 }
@@ -152,12 +154,36 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 					m_transport->notify_rx();
 				}
 			}
-			// Diagnostic radio-contract scenarios. Both are tied to the firmware's
-			// organic channel-bitmap publication, use the real MDIRCV/FIQ0 path and
-			// remain disabled by default. They distinguish the terminal type-0x87
-			// report from the counted type-0x8a report without touching MCU state.
-			if (m_radio_scenario != 0 && packet.type == 0x1a && m_radio_reports_pending == 0)
-				m_radio_reports_pending = m_radio_scenario == 1 ? 2 : 64;
+			// Diagnostic radio-contract scenarios. They are tied to the firmware's
+			// organic SEARCH_LIST publication, use the real MDIRCV/FIQ0 path and
+			// remain disabled by default. They test peer packet ordering without
+			// touching MCU state.
+			if (m_radio_scenario != 0 && packet.type == 0x1a && m_radio_reports_pending == 0 &&
+					(m_radio_scenario < 3 || m_radio_sequence_stage == 0))
+			{
+				m_radio_reports_pending = m_radio_scenario == 2 ? 64 :
+						m_radio_scenario == 7 ? 1 :
+						m_radio_scenario == 8 ? 2 :
+						m_radio_scenario == 6 ? 5 :
+						m_radio_scenario == 5 ? 4 : m_radio_scenario == 4 ? 3 : 2;
+				if (m_radio_scenario >= 3)
+					m_radio_sequence_stage = 1;
+			}
+			// Scenario 3 tests a now-disproven guessed sequence following the
+			// organically exposed empty DEACTIVATE request.
+			if ((m_radio_scenario == 3 || m_radio_scenario == 9 || m_radio_scenario == 10) &&
+					packet.type == 0x03 &&
+					m_radio_sequence_stage == 1 && m_radio_reports_pending == 0)
+			{
+				m_radio_sequence_stage = 2;
+				m_radio_reports_pending = m_radio_scenario >= 9 ? 2 : 4;
+			}
+			if (m_radio_scenario == 10 && packet.type == 0x1a &&
+					m_radio_sequence_stage == 2 && m_radio_reports_pending == 0)
+			{
+				m_radio_sequence_stage = 3;
+				m_radio_reports_pending = 2;
+			}
 			if (m_trace_enabled)
 			{
 				std::string payload_hex;
@@ -171,9 +197,86 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 		}
 		if (m_radio_reports_pending != 0)
 		{
-			const u8 payload[8] = { 0 };
-			const u8 report_type = m_radio_scenario == 1 ? 0x87 : 0x8a;
-			if (m_transport->enqueue_rx_packet(report_type, payload, std::size(payload)))
+			u8 payload[166] = { 0 };
+			u8 report_type = m_radio_scenario == 2 ? 0x8a : 0x87;
+			// Scenario 4 is a disproven timing-offset-body probe retained only for
+			// comparison with the current ordered scenario.
+			if (m_radio_scenario == 4 && m_radio_sequence_stage == 1 &&
+					m_radio_reports_pending == 2)
+			{
+				report_type = 0x88;
+				// Historical guessed body; it does not carry PLMN/system information.
+				const u8 cell[] = { 1, 0x32, 0xf4, 0x51, 0, 1, 0, 1, 0, 1 };
+				std::copy(std::begin(cell), std::end(cell), std::begin(payload));
+			}
+			if (m_radio_scenario == 5 && m_radio_sequence_stage == 1)
+			{
+				report_type = m_radio_reports_pending == 4 ? 0x89 :
+						m_radio_reports_pending >= 2 ? 0x80 : 0x87;
+				if (report_type == 0x80)
+				{
+					payload[0] = 0x40; // BCCH received block
+					static constexpr u8 si3[] = {
+						0x49, 0x06, 0x1b, 0x00, 0x01, 0x32, 0xf4, 0x51,
+						0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+						0x00, 0x00, 0x00, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b
+					};
+					std::copy(std::begin(si3), std::end(si3), std::begin(payload) + 10);
+				}
+			}
+			if (m_radio_scenario == 6 && m_radio_sequence_stage == 1)
+			{
+				report_type = m_radio_reports_pending == 5 ? 0x89 :
+						m_radio_reports_pending == 4 ? 0x88 :
+						m_radio_reports_pending >= 2 ? 0x80 : 0x87;
+				if (report_type == 0x88)
+					payload[0] = 1; // one candidate's neighbour timing-offset result
+				if (report_type == 0x80)
+				{
+					payload[0] = 0x40; // BCCH received block
+					static constexpr u8 si3[] = {
+						0x49, 0x06, 0x1b, 0x00, 0x01, 0x32, 0xf4, 0x51,
+						0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+						0x00, 0x00, 0x00, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b
+					};
+					std::copy(std::begin(si3), std::end(si3), std::begin(payload) + 10);
+				}
+			}
+			if ((m_radio_scenario == 7 || m_radio_scenario == 8) &&
+					m_radio_sequence_stage == 1)
+			{
+				report_type = m_radio_scenario == 8 && m_radio_reports_pending == 1 ? 0x8f : 0x8b;
+				// Forty {ARFCN, flags, RSSI} result records. Keep all but the
+				// first absent so firmware, rather than the peer, selects ARFCN 1.
+				for (unsigned result = 0; report_type == 0x8b && result < 40; ++result)
+				{
+					payload[2 + result * 4] = result == 0 ? 0x00 : 0xff;
+					payload[3 + result * 4] = result == 0 ? 0x01 : 0xff;
+					payload[5 + result * 4] = result == 0 ? 0xc4 : 0x81;
+				}
+			}
+			if (m_radio_scenario == 10 && m_radio_sequence_stage == 3)
+			{
+				report_type = m_radio_reports_pending == 2 ? 0x8b : 0x8f;
+				if (report_type == 0x8b)
+					payload[1] = 0x10; // non-empty result set; firmware sorts the records
+				for (unsigned result = 0; report_type == 0x8b && result < 40; ++result)
+				{
+					payload[2 + result * 4] = result == 0 ? 0x00 : 0xff;
+					payload[3 + result * 4] = result == 0 ? 0x01 : 0xff;
+					payload[5 + result * 4] = result == 0 ? 0xc4 : 0x81;
+				}
+			}
+			if (m_radio_scenario >= 3 && m_radio_scenario != 9 &&
+					m_radio_scenario != 10 && m_radio_sequence_stage == 2)
+			{
+				report_type = m_radio_reports_pending == 4 ? 0x89 :
+						m_radio_reports_pending == 3 ? 0x84 : 0x87;
+			}
+			const unsigned payload_length = report_type == 0x8b ? 166 :
+					report_type == 0x80 ? 34 :
+					report_type == 0x88 ? 10 : 8;
+			if (m_transport->enqueue_rx_packet(report_type, payload, payload_length))
 			{
 				++m_radio_reports_sent;
 				--m_radio_reports_pending;
