@@ -9,11 +9,12 @@ focused `NOKI3210_TRACE_DSP_BOUNDARY` for live observation at this boundary.
 self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
 download target for coefficient/program blobs, and (d) bidirectional lower-service
 message rings. The aggregate device carries organic D0 discovery,
-type-`0x70` DSP completion and the separate external-service session through
-FIQ 0, proving that the transport composes in the normal scheduler. It does not
-prove that the external class-`0x40` peer is DSP-owned. The lower-radio
-command/reply vocabulary remains incomplete, but it is not the immediate
-boot frontier: ordinary SIM initialization runs after service startup.
+type-`0x70` DSP completion, the separate external-service session, and an
+opt-in deterministic radio peer through FIQ 0. The radio peer follows recovered
+SEARCH_LIST, measurement, channel-change and BCCH contracts through serving-cell
+selection; it stops before Location Updating. This proves that the transport
+composes in the normal scheduler, but not that the external class-`0x40` peer is
+DSP-owned.
 
 ## The two hardware windows
 
@@ -119,15 +120,13 @@ removed rather than bypassing that state machine.
 `strh #4→[0x30000]; strb #2→[0x20008]`). The DSPIF has **287 write sites, almost all in the
 L1 driver `0x2b7xxx–0x2c9xxx`** — the per-command send stubs.
 
-**Runtime status.** The task-22 downlink protocol remains dormant: on the measured boot the
-dispatch `0x23d62c` is reached **0 times**: task 22's handler is entered only ~twice
-(t≈0.37, 3.76) for the low-level echo/handshake and stays `recv`-blocked — no DSP→MCU L1
-message ever arrives. However, the separate `0x290cf4` shared-control service path runs
-and issues command-4 doorbells. The mailbox plumbing (task 22,
-IRQ4 lower-service, dispatch, routing table) is fully present and mapped, but **no
-GSM-L1 traffic flows** because nothing runs the L1 stack: there is no DSP executing the air
-interface to emit measurement/sync/registration primitives, and the MCU-side L1 senders sit
-behind the same coherent-boot/network-attach phase we never reach.
+**Runtime status.** Without the opt-in radio peer, task 22's class/primitive
+downlink remains dormant in the measured boot. The separate shared-ring path is
+active: MCU search and channel requests are consumed from the TX ring, and the
+radio peer returns ROM-evidenced `0x80`/`0x84`/`0x89`/`0x8b`/`0x8c`/`0x8f`
+families through MDIRCV/FIQ0. Firmware selects ARFCN 1 and accepts SI1--SI4.
+These packet-ring families do not establish the task-22 publication mechanism
+needed for arbitrary class-`0x47` call-control messages.
 
 Task 22's housekeeping use keeps it alive. Whether the `0x30`/`0x32`
 completion returns through task 22 or only through shared control
@@ -249,6 +248,17 @@ states take the diagnostic path. Task 10's `0x139f` handler copies signed
 payload byte `+6` to scalar state `0x10dc99` and returns. It emits no lower
 result, registration event, or follow-on transaction.
 
+The task-11 consumers distinguish packet completion from search-lifecycle
+ownership. Status `0x13b8` from type `0x8b` selects handler `0x215bcc`, while
+`0x13b7` from type `0x8f` selects `0x215c28`. Neither initializes task 11.
+Task 11 explicitly selects lifecycle byte `3` during reset and retains it
+through the initial power scan.  The implemented radio peer reaches a usable
+ARFCN, accepted `NO_PSW_LEFT` and channel change, then firmware constructs
+status `0x13a5` with action byte `1` for task 11.  That action, not a literal
+write of lifecycle byte `1`, starts the selected-cell acquisition operation.
+Candidate-list helper `0x2126e4` is separate from this active path. Neither
+`0x043f` nor a task-11 RAM byte is synthesized by the peer.
+
 The recovered Nokia trace-name table supplies protocol-family vocabulary that
 has been checked against these ROM handlers: outbound `0x1a` is `SEARCH_LIST`;
 inbound `0x80` is `RECEIVED_BLOCK`, `0x83` is `RSSI_RESULTS`, `0x84` is
@@ -274,13 +284,13 @@ semantic consumer:
   `0x1394`. Task 10 copies its eight-byte body into the working object and
   passes it to general controller-event decoder `0x217cac`; this is a
   structured event input, not a payload-free completion;
-- type `0x89` is rejected when its controller context is already marked one.
-  Otherwise it runs state handler `0x216830`, may replay a firmware-owned
-  type-`0x86` descriptor in later state 7, posts `0x1393`, and establishes
-  context fields `+7 = 3` and `+5 = 1`. Task 10 copies the body, records
-  controller state, and enters fan-out `0x21bb5c` outside global states 1 and
-  2. That fan-out publishes controller/status work but does not directly call
-  `0x219e30`.
+- type `0x89` is rejected when its acceptance byte at `0x10dbd7` is one.
+  Otherwise it runs state handler `0x216830` and posts `0x1393`. The state
+  handler dispatches on the separate radio-controller state at `0x10dc93` and
+  does not inspect the packet body on the state-1 path. Task 10 reaches fan-out
+  `0x21bb5c` through a separate event arm, not directly from the type-`0x89`
+  receive handler. That fan-out publishes controller/status work but does not
+  directly call `0x219e30`.
 
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result
@@ -308,9 +318,11 @@ type-`0x8e` framed session:
 - `0x70` owns the queued channel context and its task-14/task-15 completion
   notifications; `0x80`, `0xb0`, and `0xb1` select task-3 transaction
   descriptors according to the active controller/configuration state;
-- type `0x89` handler `0x284f74`, not type `0x86`, establishes controller state
-  3 after posting status `0x1393` to task 10. The type-`0x86` callback paths can
-  subsequently operate when that controller reaches state 7;
+- type `0x89` handler `0x284f74`, not type `0x86`, posts status `0x1393` to
+  task 10. It does not itself establish controller state 3. The independently
+  owned controller state starts at 1 after the outbound `SEARCH_LIST` builder;
+  the type-`0x86` callback paths can subsequently operate when firmware moves
+  that controller to state 7;
 - every accepted direct packet eventually runs `0x2841e4`, the independent
   ten-sample measurement publication to task 8, and then frees the broker
   object.
@@ -387,7 +399,9 @@ packet vocabulary, per-type counts, and per-packet dispositions are single-homed
 in the generated `dsp_packet_semantics.md`; do not infer request/reply behavior
 from packet type alone. Consumption alone produces none of `0x0588`, `0x05ea`,
 or `0x07dd`. Every observed outbound packet has classified MCU-side semantics,
-including the fire-and-forget type-`0x1a` ARFCN bitmap publication.
+including type-`0x1a` SEARCH_LIST. That command retains no direct transaction
+token; its results arrive asynchronously through the recovered radio-report
+families.
 
 Types `0x0d` (indexed 64-byte block uploads) and `0x3c` (selector-keyed
 lookup-table uploads) are one-way DSP configuration publications named for their
@@ -448,16 +462,16 @@ driver's opt-in DSP service defaults use the empirically stable 4 ms cadence;
 the eventual DSP peer should own TX consumption independently of the service-IRQ
 timer so correctness does not depend on this scheduling phase.
 
-Type `0x1a` is a fire-and-forget GSM ARFCN channel-set publication with no
-request/reply contract. The builder decode (`0x219f0c`), its sole caller
+Type `0x1a` is SEARCH_LIST, carrying a GSM ARFCN channel-set bitmap. It has no
+direct request/reply token: the builder decode (`0x219f0c`), its sole caller
 `0x21ba54`, the density-guard rejection with flag `0x81`, the disproved
 type-`0x80` state-byte correlation, and the timer-`0x23` cadence are
 single-homed in `dsp_service_transport_contract.md` (ledger
 `dsp_type1a_direct_registration_request`). Adjacent to the publication,
 `0x2697aa(0x23, 0x0a0a)` arms the global DSP-service timer; its live
-expiry/rearm through task 4 delivers no task-10 status and does not run
-`0x219e30`, proving the timer wheel is live while leaving the semantic
-completion unresolved.
+expiry/rearm through task 4 delivers no task-10 status. The radio peer instead
+returns asynchronous measurement and search-completion reports through the
+MDIRCV ring.
 
 RX-ring transport probing pins the return notification: advancing RX producer
 `0x1c8` and asserting **FIQ 0** wakes task 4 with receive sentinel `4`, which
@@ -528,6 +542,14 @@ through translator `0x208ee0` after an object-bearing `0x07dd` has passed parser
 state-machine branches (`0x20be0c`/`0x20f324`). Neither branch executes in the
 coherent run. Consequently a DSP peer must not inject task-14 `0x09d8`; the open
 hardware boundary precedes the generic-service object delivered to task 15.
+
+Parser `0x209978` is specifically a GSM Mobility Management parser: object byte
+`+4` must carry protocol discriminator 5, and message types `0x02`, `0x04`,
+`0x21`, `0x22`, and `0x29` map to Location Updating Accept/Reject and CM Service
+Accept/Reject/Abort results. This contract is necessarily downstream of first
+cell acquisition and signalling-channel establishment. It must not be used to
+bootstrap those prerequisites by injecting `0x07dd` or one of its translated
+statuses.
 
 For the completion variant, task-14 object opcode `0x36` reaches decoder branch
 `0x2674da`, parses through `0x266ffc`, and emits controller event `0x1033`.

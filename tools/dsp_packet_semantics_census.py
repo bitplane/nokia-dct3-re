@@ -54,7 +54,7 @@ def classify(direction: str, packet_type: int, data: bytes) -> tuple[str, str]:
 		if packet_type == 0x51:
 			return "segmented_dsp_memory_upload", "one-way command-0x22 DSP memory image"
 		if packet_type == 0x1A:
-			return "arfcn_bitmap_publication", "one-way GSM channel-set publication"
+			return "search_list", "asynchronous GSM channel search command"
 		if packet_type == 0x0D and len(data) == 66:
 			return "indexed_64_byte_block_upload", "one-way DSP configuration publication"
 		if packet_type == 0x3C and len(data) == 156:

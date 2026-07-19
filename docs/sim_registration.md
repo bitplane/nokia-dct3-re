@@ -366,9 +366,10 @@ The DSP-boundary transactions adjacent to registration are authoritative in
   bookkeeping and keeps awaiting completion `0x0434` or
   `0x0a22` (with later `0x1583`/`0x1584` phase events); task 10 can produce `0x0434` from
   finalizer `0x219e30`, but no direct task-3 completion edge into it is proved.
-- Outbound type `0x1a` is a fire-and-forget GSM ARFCN bitmap publication from builder
-  `0x219f0c` (sole caller: task-10 state dispatcher `0x21ba54`), which retains no transaction
-  token, reply object, or completion callback. Task 3 serializes it through `0x290840` into
+- Outbound type `0x1a` is SEARCH_LIST with a GSM ARFCN bitmap from builder
+  `0x219f0c` (sole caller: task-10 state dispatcher `0x21ba54`). It retains no direct
+  transaction token, reply object, or completion callback; search results return
+  asynchronously through the radio-report families. Task 3 serializes it through `0x290840` into
   the MCU-owned DSP TX ring, and it appears organically once the DSP service
   cadence runs at 4 ms (the external-service peer profile default in `driver/nokia_3310.cpp`)
   (**R**). Ledger `dsp_type1a_direct_registration_request` also covers the numeric

@@ -95,12 +95,13 @@ subtracting 383, and encodes the resulting 503-position domain in a reversed
 coherent boot's mode-2 source is rejected by the density check, producing flag
 `0x81` and a zero bitmap: an organic no-usable-channel-set state.
 
-No response contract exists for this publication. Builder `0x219f0c` is
-called only from task-10 state dispatcher `0x21ba54`; after posting the packet it
-retains no transaction identifier, reply object, or task-3 completion callback.
-It arms the global DSP-service timer, clears the activity counter, and returns.
-Task 17 has already received the immediate `0x043c` acknowledgement. The packet
-is therefore a fire-and-forget channel-set publication.
+Builder `0x219f0c` is called only from task-10 state dispatcher `0x21ba54`; after
+posting the packet it retains no transaction identifier, reply object, or task-3
+completion callback. It arms the global DSP-service timer, clears the activity
+counter, and returns after task 17 has received immediate acknowledgement
+`0x043c`. The packet is nevertheless the SEARCH_LIST command: its radio results
+arrive asynchronously as ALL_RSSI_RESULTS and related completion families rather
+than as a directly correlated reply.
 
 The type-`0x80` inner-command-`0x60` decoder does test a byte against `0x1a`,
 but the byte is radio-controller state at `0x10dbd2`. It is `0x00` when the

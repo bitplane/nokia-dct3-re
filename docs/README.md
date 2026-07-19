@@ -39,7 +39,7 @@ Documentation is organized by authority rather than investigation date.
 
 | Document | Purpose |
 | --- | --- |
-| `network_scouting.md` | Later GSM registration and operator-content lifecycle. |
+| `network_scouting.md` | Validated serving-cell camp contract and the later Location Updating boundary. |
 | `dsp_interface.md` | Detailed MCU/DSP transport and later lower-radio maps. |
 | `dsp_shared_memory_inventory.md` | Generated two-ROM inventory of reachable firmware reads from DSP shared RAM. |
 | `dsp_shared_memory_transitions.md` | Generated two-ROM transaction census for DSP-owned shared-RAM scalar state. |

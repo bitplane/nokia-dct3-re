@@ -1,216 +1,144 @@
 # Network and registration boundary
 
-This document records the later lower-radio contract needed for network
-registration, operator identity, and signal content. Offline MMI settlement is
-validated; this map applies when extending the interactive phone into networked
-features.
+This document defines the currently implemented lower-radio boundary.  The
+checkpoint is serving-cell selection and BCCH system-information acceptance;
+Location Updating, operator presentation and calls remain downstream work.
 
-## Current division of responsibility
+## Ownership
 
-- **SIM identity and files:** the stateful SIM device supplies the card through
-  MAD2 SIMI registers and FIQ 6. The preliminary ATR/PPS/mandatory-EF lifecycle
-  is functional.
-- **RSSI input:** CCONT ADC channel 1 carries a raw RF-strength scenario value.
-  It does not make the phone camp or cause signal bars to render by itself.
-- **Camping, registration and operator identity:** these are owned by the
-  MCU/DSP lower-radio protocol. MCU task 3 serializes work into the DSP shared
-  ring; DSP-to-MCU delivery uses FIQ 0 and the lower task dispatchers.
-- **Idle presentation:** task-5/MMI child events render operator, signal and
-  status content after the corresponding live subsystems publish it.
+- The SIM device supplies identity and preferred-PLMN files through SIMI/FIQ6.
+- MCU tasks 10--12 own search policy, candidate selection and SI parsing.
+- The DSP/radio peer owns measurements, channel-change completion and received
+  L1 blocks.  It returns them through the DSPIF MDIRCV ring and FIQ0.
+- No peer path writes firmware RAM, posts an RTOS message directly, selects an
+  MMI callback or renders content.
 
-## Mapped later radio lifecycle
+`NOKI3210_MODEL_RADIO_PEER=1` enables the smallest recovered radio peer.  It is
+off by default because it describes one deterministic laboratory cell rather
+than a generally configurable network.
 
-Ordinary SIM acceptance already completes. The current firmware does not yet
-receive the owned object which would complete this downstream chain:
+## Verified serving-cell checkpoint
+
+`make verify-radio-camp` proves this ordered firmware-owned progression:
 
 ```text
-service-5 status 0x05e8
-  -> 0x05ea -> task-15 0x07dd
-  -> successful parse -> task-14 0x09d8
-  -> opcode 0x2a / lower result 0x0fbf
-  -> lower context handler 0x253610
-
-separate unresolved completion:
-  lower result 0x0fc1 -> task-10 0x1391 -> task-17 0x0434
-  -> task-17 phase-dependent acknowledgement/restart work
-
-separate task-17 registration request:
-  task-17 0x09d6 -> task-5 0x13e2 -> task-14 0x1776 session request
-
-direct DSP completion family:
-  RX 0x87 -> task-10 0x138f -> empty-work gate -> common finalizer
-  RX 0x8a -> task-10 0x1390 -> count/bit gates -> common finalizer
-  common finalizer 0x219e30 -> task-17 0x0434 when controller flag permits
+MCU SEARCH_LIST (0x1a)
+  -> empty search completions while firmware narrows its bitmap
+  -> ALL_RSSI_RESULTS (0x8b), ARFCN 1 becomes usable
+  -> firmware publishes candidate object 0x0447, usable=1
+  -> narrowed SEARCH_LIST
+  -> ALL_RSSI_RESULTS + SCH RECEIVED_BLOCK (0x80, channel 0x40)
+  -> MCU CHANNEL_CONFIGURE (0x02)
+  -> NO_PSW_LEFT (0x8f), then CHANNEL_CHANGED_CNF (0x89)
+  -> firmware accepts the channel change in controller state 2
+  -> RA_INFO (0x84) -> MCU IDLE_RA (0x0c) -> completion 0x8c
+  -> firmware constructs task-11 status 0x13a5, action=1
+  -> paced BCCH SI1, SI2, SI3 and SI4 RECEIVED_BLOCK packets
+  -> firmware SI bitmap 0x01 -> 0x07 -> 0x0f
 ```
 
-The static portions are normalized in `tools/profiles/noki3210_v600.json` and
-checked by `message_census.py`. The unobserved predecessor is the organic path
-to one of the recovered `0x05e8` publishers plus entry `0x28`'s downstream
-readiness state; reviewed runtime does not execute that transition.
+The final action is observed at dispatcher `0x213c04` as a real RAM object:
+status `0x13a5`, action byte `1`, argument byte `1`, controller state `3`.
+It is not a synthesized task message.  The SI3 parser validates the cell
+identity and the task-12 accumulator reaches `0x0f` after SI4.  This is the
+project's stopping definition of a selected serving cell; it deliberately does
+not claim Location Updating or a registered operator.
 
-An opt-in boundary diagnostic now proves the direct completion route
-end-to-end without touching MCU state. Two type-`0x87` `NO_BCCH_LEFT` reports, delivered after
-the organic type-`0x1a` publication through MDIRCV/FIQ0, make task 10 enter
-`0x219e30` and post `0x0434` to task 17. A single report is queued but does not
-wake the task-10 consumer in this scheduler state; the reason a real peer
-supplies the additional wake remains unresolved. This is a search-exhaustion
-path, not successful registration. Repeating type `0x8a` `NO_PSW_FOUND` instead
-increments its counter toward limit `0x01f2` while the controller gate remains
-clear. These runs identify the short and counted failure-finalization paths,
-but do not make either suitable for default emulation.
+Task-11 byte `0x10c84c` remains `3` during this process; that is the reset-time
+ordinary search lifecycle. Selected-cell acquisition is represented by the
+firmware-owned action-1 object above, not by writing literal lifecycle state 1.
 
-The same run corrects the former downstream assumption. Task 17 consumes
-`0x0434` at the dispatcher comparison `0x225240`, enters handler `0x225b6c`,
-performs local acknowledgement/restart work, and continues at `0x226348`.
-It does not publish `0x13e2` or construct `0x1776` in the active startup phase.
-The `0x225b8c -> 0x2b3f60` publisher is selected by adjacent dispatcher input
-`0x09d6`, not by `0x0434` or `0x0a22`. The former static chain joined separate
-dispatcher arms.
+## ALL_RSSI_RESULTS contract
 
-The retained instrument is disabled by default. Setting
-`NOKI3210_DIAG_RADIO_SCENARIO=1` schedules the two type-`0x87` reports after
-each organic type-`0x1a` packet; value `2` schedules 64 type-`0x8a` reports.
-Value `3` supplies the initial type-`0x87` completion once, then responds to
-the newly exposed organic type-`0x03` `DEACTIVATE` request with `0x89`, `0x84`,
-and two `0x87` reports to test controller-result ownership. That guessed
-sequence does not settle the controller.
-Value `4` is a disproven type-`0x88` timing-offset body probe. Type `0x88` is
-`NEIGHBOUR_TIMING_OFFSET`, not a PLMN or system-information carrier.
-Value `5` tests the successful-search vocabulary: type `0x89`
-`CHANNEL_CHANGED_CNF`, two type-`0x80` `RECEIVED_BLOCK` packets containing a
-GSM 04.08 System Information Type 3 block, then type `0x87` `NO_BCCH_LEFT`. The SI3
-describes PLMN 234-15, LAC 1 and cell id 1. This is still an isolated protocol
-fixture, not the default peer.
-It is a transport/consumer isolation scenario, not a fake-cell model or a
-supported machine profile, and may be removed once the real sequence is known.
+The type-`0x8b` body is 166 bytes:
 
-Value `10` is the current ordered search probe. Two evidenced
-`NO_BCCH_LEFT` cycles expose a third `SEARCH_LIST` (`00 83 ...`); only then does
-the peer returns an `ALL_RSSI_RESULTS` list containing ARFCN 1 at -60 dBm and
-terminates it with `NO_PSW_LEFT`. The firmware parses the record (the decoded
-cutoff is -108 dBm) and organically emits type `0x03` `DEACTIVATE`, but task 11
-is in measurement mode 3. That mode deliberately bypasses candidate sorter
-`0x212394`; the result is stored and the same `SEARCH_LIST` is retried about
-six seconds later. An earlier guessed `CHANNEL_CHANGED_CNF`/SI3 tail was
-removed because it answered the fire-and-forget `DEACTIVATE` with an unrelated
-packet. The frontier is the firmware-local transition to acquisition mode 2,
-not SI3 encoding or MDIRCV transport.
+| Offset | Size | Meaning in the recovered path |
+| --- | ---: | --- |
+| `+0` | 2 | list header; the active peer uses `00 10` |
+| `+2 + n*4` | 2 | big-endian ARFCN for record `n` |
+| `+4 + n*4` | 1 | peer/result flags, initially zero for the real candidate |
+| `+5 + n*4` | 1 | signed RSSI in dBm |
 
-The synthetic SIM now advertises and serves `EF_PLMNsel` with preferred PLMN
-234-15, consistent with its IMSI and the diagnostic cell. Firmware reads the
-file organically, but this provisioning correction does not select acquisition
-mode by itself.
+Forty records are consumed.  Absent entries use ARFCN `0xffff` and RSSI
+`-127`; the deterministic cell occupies record zero with ARFCN `1`.  Two
+baseline reports use `-109 dBm` (`0x93`), below the decoded `-108 dBm` cutoff;
+later reports use `-60 dBm` (`0xc4`).  Firmware reconciles the returned record
+with its requested ARFCN table and derives flags `0x0e`.
 
-## Emulation direction
+Predicate `0x212048` tests the derived flags with mask `0x0b`.  The accepted
+record therefore satisfies `(flags & 0x0b) != 0` and publishes status `0x0447`
+with usable byte `1`, ARFCN `1`, RSSI identity `0`.  The peer does not supply
+the final `0x0e` flags or the usable bit; both are firmware-derived.
 
-A message-boundary DSP/lower-radio peer remains feasible and is the appropriate
-MAME architecture. It should answer organically observed requests at the shared
-ring or lower transport boundary. It must not inject “registered” state, task
-messages, callback selectors, or render events.
+Rejected result shapes are now bounded:
 
-The next peer behavior is implementable only after the request/response object
-ownership is pinned down. The falsified type-`0x80` primitive-`0x70` reply is not
-that response and must not be restored.
+- a channel already above the cutoff on the baseline pass receives an
+  exclusion classification and does not become the same usable candidate;
+- a table containing only `0xffff`/`-127` records remains empty;
+- one isolated improved result does not compose because the search policy
+  requires its preceding baseline rounds;
+- tuning a task-11 ceiling byte, lifecycle byte or candidate RAM object is not
+  part of the peer contract.
 
-The current acquisition entrance is task-11 status `0x13a3`, whose handler
-`0x214a64` selects scan mode 2. Constructor `0x218770` is firmware-local. The
-ordinary candidate route reaches it from task-10 status `0x03f1` at `0x218930`,
-subject to the network-selection predicate; a second route requires controller
-argument 3. Every literal `0x07d6` producer in this ROM supplies the same zero
-mode and the coherent task-15/task-16 chain consequently produces controller
-argument 1, so that transaction cannot be tuned into argument 3. The message
-census contains no literal `0x03f1` producer. Its data-driven predecessor is
-the next bounded RE target; injecting `0x03f1` or `0x13a3` would bypass the
-contract under investigation.
+## Channel and BCCH packets
 
-### Current transport boundary
+The accepted DSP-to-MCU vocabulary is recovered from the ROM handlers:
 
-The coherent boot organically transmits the type-`0x1a` ARFCN bitmap at about
-4.8 seconds, but emits no subsequent search/camp request on the recovered
-MCU-to-DSP packet stream. Task 14 receives no message. Cell search is therefore
-currently modeled as autonomous DSP/L1 work after configuration; a peer must
-not wait for an MCU request that the firmware does not send.
+| Type | Name | First MCU consumer |
+| --- | --- | --- |
+| `0x80` | `RECEIVED_BLOCK` | `0x283f1c` / task 12 for BCCH |
+| `0x84` | `RA_INFO` | `0x284e26` -> task 10 `0x1394` |
+| `0x87` | `NO_BCCH_LEFT` | `0x284ebc` -> task 10 `0x138f` |
+| `0x89` | `CHANNEL_CHANGED_CNF` | `0x284f74` -> task 10 `0x1393` |
+| `0x8b` | `ALL_RSSI_RESULTS` | `0x284fd8` -> task 11 `0x13b8` |
+| `0x8c` | `IDLE_RA` completion | `0x284f48` |
+| `0x8f` | `NO_PSW_LEFT` | `0x284e50` -> task 11 `0x13b7` |
 
-The first fake-cell behavior must be a DSP-to-MCU report delivered
-through MDIRCV/FIQ0. Static classification narrows the receive surface:
+`RECEIVED_BLOCK` contains channel, BSIC, error, 24-bit frame number, ARFCN,
+shift and a 24-byte GSM L2 block.  Channel `0x40` is used for SCH and channel
+`0x50` for BCCH.  Once `CHANNEL_CONFIGURE` has recorded BSIC `0x12`, each BCCH
+block is accepted with that identity.  SI blocks are paced rather than queued
+on one interrupt edge.
 
-- type `0x99` (`0x28464c`) is a five-sample measurement accumulator which
-  publishes class `0x04`, command `0x4a` to task 8, not a camp transition;
-- type `0x83` (`0x284734`) is a controller-gated scalar report. In controller
-  state 3 it publishes `0x139f`; task 10 only copies signed payload byte `+6`
-  to `0x10dc99`, with no registration or lower-result output;
-- type `0x86` (`0x284316`) is a separate controller/transfer state machine for
-  subtypes `0x70`, `0x80`, `0xb0`, and `0xb1`. Its controller state is
-  established by type `0x89`; exhaustive decode found no access to the
-  type-`0x8e` framed-session phase, so it is not that session's bootstrap;
-- type `0x8e` reaches task 7 and the task-22 class dispatcher, but the observed
-  zero session phase rejects a standalone class-`0x47` candidate.
-- type `0x87` (`0x284ebc`, `NO_BCCH_LEFT`) is payload-independent at task 10 and can enter
-  finalizer `0x219e30` when two outstanding-work pointers are empty;
-- type `0x8a` (`0x284e88`, `NO_PSW_FOUND`) is the counted variant and can enter the same
-  finalizer after exceeding a firmware-owned limit. The RF conditions that
-  produce either report remain unresolved, so they define the next peer
-  contract to identify rather than packets to inject;
-- type `0x84` feeds a structured eight-byte controller event to `0x217cac`,
-  while type `0x89` advances controller state through `0x1393`/`0x21bb5c` and
-  does not directly call the finalizer.
+The laboratory cell is PLMN 234-15, LAC 1, cell ID 1.  Its minimum broadcast
+set is SI1 (`0x19`), SI2 (`0x1a`), SI3 (`0x1b`) and SI4 (`0x1c`).  SI3 and SI4
+carry the matching PLMN/LAC identity.  These are standards-shaped inputs to the
+ROM parser, not operator/UI events.
 
-The bounded type-`0x84` body census is closed. Task 10 rewrites the message
-status to `0x1394` and passes that wrapper to `0x217cac`; the DSP body begins at
-offset `+4` and therefore cannot select the decoder's top-level event arm.
-Moreover, the handler discards type `0x84` while controller state byte
-`0x10dbd7` is 1. The first type `0x87` temporarily changes that state to 2 and
-the completing report restores it to 1, establishing the active report window.
+## Closed alternatives
 
-The type-`0x86` bootstrap hypothesis is closed by quantified absence. The
-type-`0x8e` session is instead started by firmware callback `0x0a`: event
-`0x06a9` reaches `0x2831a8`, whose successful validation path calls
-`0x28316c`. That routine initializes the session context, posts task-`0x1a`
-event `0x0202`, sets phase `0x11fedb` to 1, and queues the first outbound
-descriptor. There is no direct caller from the DSP receive machinery.
+The following alternatives are disproven:
 
-The first phase transition is also bounded. Inbound class `0x42`, command
-`0x64`, payload byte `+0x0b == 0x45` is accepted only while phase is 1; it
-advances phase to 2 and invokes outbound constructor `0x2824e4`. Other payload
-values terminate or reset the session. This is a call/session protocol
-contract, not evidence that ordinary offline boot should synthesize it.
+- type `0x88` is `NEIGHBOUR_TIMING_OFFSET`; a guessed PLMN-shaped body did not
+  feed system information;
+- guessed `CHANNEL_CHANGED_CNF` packets sent outside controller state 2 are
+  discarded, so packet identity alone is insufficient;
+- type `0x83` only updates scalar RSSI state through task-10 status `0x139f`;
+  it is not a camp completion;
+- type `0x86` is a separate controller/transfer protocol and does not start the
+  type-`0x8e` framed session;
+- `NO_BCCH_LEFT` and counted `NO_PSW_FOUND` exercise failure finalizers; they do
+  not select a serving cell;
+- unsolicited SI3 before the channel/RA lifecycle parses in isolation but does
+  not compose into acquisition;
+- service-5 `0x05e8`, task-15 `0x07dd`, task-14 resource-`0x35` requests and MM
+  Location Updating results are downstream registration work.  Using them to
+  bootstrap the first cell is circular.
 
-The callback-`0x0a` contract is not the ordinary dial entrance. An organic
-`123` + Navi dial attempt follows this path instead:
+The task-14 request catalog remains mechanically mapped: `0x26605c` encodes 22
+ROM-described resource-`0x35` requests from 42 state-machine call sites.  It is
+an outbound request producer, not the missing inbound camp completion.
 
-```text
-task 5 constructs 0x0fa3 -> task 14
-  -> task-14 call controller accepts the session and emits 0x09d2
-  -> task 15 stores the dial object and returns internal result 0x0a02
-  -> task-15 state 6 registers an asynchronous activity and waits
-```
+## Next boundary
 
-The `0x0fa3 -> 0x09d2` conversion is firmware-local and completes in about
-0.3 ms. It does not contact a peer. Roughly 0.1 seconds later the firmware
-organically updates the DSP shared-control/L1 configuration using commands
-`0x08:0x060b`, `0x09:0x08af`, `0x09:0x09a0`, `0x25:0x0041`, followed by commit
-`0x2f`. The current peer completes those writes, but no new MCU-to-DSP
-packet-ring request or callback-`0x0a` framed session follows and the call
-remains pending. Dialing is therefore a downstream acceptance probe, not the
-missing registration producer.
+The next network milestone begins after this checkpoint:
 
-The next useful experiment remains a peer-owned search/camp report delivered
-through an evidenced DSP-to-MCU decoder. It must establish registration before
-the parked call can be expected to progress.
+1. identify the firmware-owned trigger for Location Updating;
+2. decode the MM request envelope at the existing service/task-15 boundary;
+3. return a standards-valid Location Updating Accept through its evidenced
+   transport;
+4. let firmware publish registered PLMN/operator and signal content;
+5. keep the serving-cell verifier and both 3210 boot oracles green.
 
-## Acceptance
-
-Network work becomes composable when one coherent run:
-
-1. supplies the missing owned object through an evidenced peer transport;
-2. reaches `0x0434` through an evidenced peer condition: either organic lower
-   result `0x0fc1 -> 0x1391` or the now-mapped direct `0x87`/`0x8a` completion
-   family, without conflating the separate `0x0fbf` context and
-   `0x0fc2 -> 0x1392` radio-state paths;
-3. supplies task-17 input `0x09d6` through its organic owner, publishes
-   `0x13e2`, then constructs task-14 `0x1776` without intervention;
-4. continues through SIM registration and emits operator/signal child content;
-5. preserves both 3210 oracles and the 3330 smoke baseline.
-
-Until then, operator-idle is a downstream target, not an independent display
-shortcut.
+No part of that later work may relabel a raw `RECEIVED_BLOCK` as `0x07dd`, post
+`0x05e8`, or write registration state directly.

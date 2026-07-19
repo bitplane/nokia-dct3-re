@@ -405,8 +405,8 @@
       "length": 68,
       "data": "0081980000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
       "time": 4.779469,
-      "semantic": "arfcn_bitmap_publication",
-      "disposition": "one-way GSM channel-set publication",
+      "semantic": "search_list",
+      "disposition": "asynchronous GSM channel search command",
       "notified": false
     },
     {
@@ -900,8 +900,8 @@
       "length": 68,
       "data": "0081980000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
       "time": 4.783739,
-      "semantic": "arfcn_bitmap_publication",
-      "disposition": "one-way GSM channel-set publication",
+      "semantic": "search_list",
+      "disposition": "asynchronous GSM channel search command",
       "notified": false
     },
     {

@@ -19,5 +19,5 @@ for off in range(0, len(data)-2, 2):
         break
 for t in targets:
     print(f"\n=== callers/branchers to {t:#08x} ({len(found[t])}) ===")
-    for a,m in found[t][:40]:
+    for a,m in found[t]:
         print(f"  {a:08x}: {m} {t:#x}")

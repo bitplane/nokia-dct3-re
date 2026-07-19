@@ -268,6 +268,15 @@ Intersecting these constructors with callbacks that contain direct `0x05e8` publ
 
 Callback-table entry `0x28` (`0x2618e9`) accepts numeric status `0x05e8` and returns `0x05ea`. Reviewed control flow shows that branch does not consume an object argument from dispatcher scratch `0x110f1c`; the earlier object-bearing interpretation was incorrect.
 
+The later owned object is preserved by the service framework rather than
+carried by `0x05e8`. Bridge `0x28d29c` recognizes status `0x05ea` in an existing
+service-message envelope and passes that same envelope, whose nested object is
+at `+8`, to `0x28d194` for task-15 status `0x07dd`. This proves the pointer is
+present at the task-16 queue boundary, not whether it was inherited from
+callback-owner state or attached during result publication. The unresolved
+boundary is the producer plus that envelope-population contract, not an
+argument-bearing form of event `0x05e8`.
+
 The census recovers argumentless in-ROM generators of global event `0x05e8` (`0xbd << 3`). That is the expected ABI: the packed event becomes the callback input even with zero argument words. These are genuine candidate publishers, not incomplete object constructors.
 
 The mapped task-21 `0x120c` -> `A0/12` -> D0 -> `0x177x` path is GSM 11.14 SIM Toolkit, not the ordinary registration predecessor. The current EF_PHASE=2 card correctly leaves it dormant; posting downstream events remains an invalid substitute.

@@ -46,6 +46,9 @@
     `make test-tools`.
   - `validate_evidence.py` — validates `evidence/*.json` and runtime-manifest
     structure. `make evidence-check` runs it directly.
+  - `radio_camp_trace_check.py` — validates the ordered firmware-owned path from
+    a usable RSSI candidate through channel change and SI1--SI4 acceptance.
+    `make verify-radio-camp` runs the deterministic radio peer and this checker.
 - `ghidra/scripts/*.java` — headless Ghidra scripts (run via `analyzeHeadless`).
   `ExportGensioAccesses.java` separates resolved direct/literal MAD2 accesses
   from scalar-only candidates and reports coverage totals for another ROM.

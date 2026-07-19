@@ -69,7 +69,7 @@
     {
       "id": "task17_registration_completion", "owner": "task17_registration_control", "status": "unresolved",
       "predicate": "Task 17 receives organic input 0x09d6 and publishes 0x13e2 to the task-5 context dispatcher",
-      "current": "The task-10 jump table maps explicit lower-result status 0x1391 to 0x21b9b4, which can reach the 0x0434 producer. Task-14 object opcode 0x36 produces controller event 0x1033; the controller maps that event to lower-radio result 0x0fc1, which selects wrapper 0x2525be and organically publishes 0x1391. Result 0x0fc2 publishes adjacent status 0x1392 and dispatches to the separate radio-state path; result 0x0fbf selects context handler 0x253610. A corrected full fixed-status decode adds two direct DSP-report entrances to finalizer 0x219e30: type 0x87 -> status 0x138f completes when two outstanding-work pointers are null, while type 0x8a -> status 0x1390 completes after a firmware-configured report-count limit. An opt-in diagnostic tied to the organic type-0x1a publication sends two type-0x87 reports through MDIRCV/FIQ0; task 10 then enters 0x219e30 and publishes 0x0434 without MCU-state intervention. Task 17 consumes it at 0x225240, runs handler 0x225b6c and continues at 0x226348, but produces no 0x13e2 or 0x1776 in the active startup phase. Repeated type 0x8a reports increment count 0x10dc90 toward limit 0x01f2 while the controller bit remains clear. The RF meanings and legitimate packet sequence remain unresolved, so the diagnostic is not default peer behavior. A provisioned coherent trace proves task 17 accepts startup object 0x1587 and emits local outputs 0x0a35, 0x0a25, and 0x09ec. The 0x09ec carries mode byte 0 and task 15 deliberately routes it through 0x07d6, task 16, and task 10; task 17 then receives immediate status 0x043c. The resulting type-0x1a DSP packet is a fire-and-forget GSM ARFCN bitmap publication and retains no direct reply correlation.",
+      "current": "A provisioned coherent trace proves task 17 accepts startup object 0x1587 and emits local outputs 0x0a35, 0x0a25, and 0x09ec. The mode-zero 0x09ec route passes through task 15, task 16 and task 10; task 17 receives immediate acknowledgement 0x043c. Task 10 then publishes type-0x1a SEARCH_LIST. The serving-cell model now proves its asynchronous path through usable RSSI selection, channel change and SI1-SI4 acceptance, but none of those reports publishes task-17 registration completion 0x09d6/0x13e2. Location Updating is the next unresolved owner boundary.",
       "evidence": ["docs/sim_registration.md", "docs/dsp_interface.md", "docs/mmi_settlement.md"]
     },
     {
@@ -107,6 +107,12 @@
       "predicate": "The same 3210 hardware and peer model boots NSE-8 v5.01 to an interactive firmware menu without version-specific execution behavior",
       "current": "With a BIOS-specific generated EEPROM, provisioned identity, and the shared coherent device profile, v5.01 reaches modes 0x0001/0x000d/0x0004, flags 0x0f, clears no-SIM, and sets SIM ENABLE. A physical left-softkey press opens Phone book and reproduces the v6.00 stable-pixel oracle exactly. Service-session status remains 0x00c9 rather than v6.00's 0x0049, proving that difference is not an offline UI blocker. The run uses the common machine devices and differs only in selected BIOS, EEPROM input, diagnostic oracle addresses, and firmware-owned layout.",
       "evidence": ["docs/cross_rom_confidence.md", "docs/structural_regression.md", "docs/normalization_status.md"]
+    },
+    {
+      "id": "radio_serving_cell_camp", "owner": "dsp_radio_peer", "status": "modeled",
+      "predicate": "A ROM-derived usable RSSI candidate advances through accepted channel change, task-11 acquisition action 1 and SI1-SI4 parsing without firmware-state injection",
+      "current": "The opt-in radio peer answers organic SEARCH_LIST requests with two -109 dBm baselines followed by -60 dBm for ARFCN 1. Firmware derives flags 0x0e, publishes usable candidate 0x0447, accepts NO_PSW_LEFT and CHANNEL_CHANGED_CNF in controller state 2, constructs task-11 0x13a5 action 1 after IDLE_RA, and accumulates BCCH SI1-SI4 to bitmap 0x0f for PLMN 234-15/LAC 1/cell 1. Location Updating and operator UI are explicitly outside this checkpoint.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
     }
   ]
 }

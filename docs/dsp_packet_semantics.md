@@ -21,7 +21,7 @@ Types `0x0d` and `0x3c` are named for their recovered wire structure only: the R
 | TX | `0x05` | external_transport_ack | consumed; no response | 2 | 2 | 9 | `1e02007f0002400200`, `1e02007f0002400364` |
 | TX | `0x05` | service_empty_report | one-way packet; completion uses DSP shared control | 1 | 1 | 16 | `1e020000000a01016206008d010001c3` |
 | TX | `0x0d` | indexed_64_byte_block_upload | one-way DSP configuration publication | 4 | 4 | 66 | `0000bab6a4d59afba123bab6a3d59afb`, `00013c43552b64075fde3c43552b6306`, `0002b5bcd5a5fc9b25a2b5bcd6a5fc9c` |
-| TX | `0x1a` | arfcn_bitmap_publication | one-way GSM channel-set publication | 1 | 1 | 68 | `00819800000000000000000000000000` |
+| TX | `0x1a` | search_list | asynchronous GSM channel search command | 1 | 1 | 68 | `00819800000000000000000000000000` |
 | TX | `0x3c` | selector_lookup_table_upload | one-way DSP configuration publication | 2 | 2 | 156 | `0800ffffffffffffffffffffffffffff`, `1800ffffffffffffffffffffffffffff` |
 | TX | `0x51` | segmented_dsp_memory_upload | one-way command-0x22 DSP memory image | 7 | 7 | 16, 28, 80 | `2206545e7e3e611949a8ec1416c2599a`, `222d0000000000007fffffffe610dc10`, `2254001a074e00524f3b200020002000` |
 | TX | `0x70` | bootstrap_platform_word | one-way DSP bootstrap publication | 1 | 1 | 6 | `13042386fef6`, `1304debb0f52` |

@@ -17,6 +17,10 @@ same frame.
 explicitly disables the 3210 peer devices and is a negative failure baseline.
 `make verify-frontier` checks the machine-default request-driven
 external-service/SIM composition against `oracles/noki3210-frontier.struct`.
+`make verify-radio-camp` adds the opt-in deterministic radio peer and requires
+an organically usable ARFCN, accepted channel change, task-11 acquisition
+action, matching SI3 identity, and complete SI1--SI4 bitmap. It stops before
+Location Updating and does not alter either boot oracle.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon

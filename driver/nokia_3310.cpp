@@ -1522,7 +1522,7 @@ void noki3310_state::noki3210(machine_config &config)
 			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
 	m_dsp_hle->set_peer_poll_ms(
 			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
-	m_dsp_hle->set_radio_scenario(nokia_env_u32("NOKI3210_DIAG_RADIO_SCENARIO", 0));
+	m_dsp_hle->set_radio_peer_enabled(nokia_env_u32("NOKI3210_MODEL_RADIO_PEER", 0) != 0);
 	const bool dsp_trace = nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0;
 	m_dspif->set_trace_enabled(dsp_trace);
 	m_dsp_hle->set_trace_enabled(dsp_trace);

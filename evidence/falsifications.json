@@ -101,7 +101,7 @@
     {
       "id": "dsp_type1a_direct_registration_request", "status": "disproven",
       "hypothesis": "The organic outbound DSP type-0x1a packet is a request whose direct inbound reply supplies task-17 registration completion",
-      "conclusion": "The sole caller of builder 0x219f0c is task-10 state dispatcher 0x21ba54; after posting the packet the builder retains no transaction token, reply object, or task-3 callback, arms only the global DSP cadence timer, clears the activity counter, and returns after task 17 has already received 0x043c. Full builder decode identifies the payload as a 503-position GSM 900/DCS 1800 ARFCN bitmap; the coherent offline source is rejected by its density guard and publishes a zero channel set with flag 0x81. The apparent type-0x80 correlation at 0x284c74 instead tests radio-controller state 0x10dbd2, observed as 0x00 at the send, against later state 0x1a and can publish 0x1395 rather than 0x1391. Type 0x1a is a fire-and-forget channel-set publication, not the missing direct registration request",
+      "conclusion": "The sole caller of builder 0x219f0c is task-10 state dispatcher 0x21ba54; after posting the packet the builder retains no transaction token, reply object, or task-3 callback and returns after task 17 has already received 0x043c. Full builder decode identifies the payload as a 503-position GSM 900/DCS 1800 ARFCN bitmap. The apparent type-0x80 correlation at 0x284c74 tests radio-controller state and can publish 0x1395 rather than registration completion 0x1391. Type 0x1a is SEARCH_LIST and produces asynchronous radio reports, but it is not a directly correlated request for task-17 registration completion.",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/sim_registration.md"]
     },
     {
@@ -337,6 +337,36 @@
       "hypothesis": "MAD2 GenIO signal-register bit 6 (0x20020) drives the 3210 LCD/keypad backlight",
       "conclusion": "The NSE-8/9 service manual routes both illumination outputs behind COBBA_GJP into the N400 UI-Switch. Paired v5.01/v6.00 traces covering a physical key press plus a 35-second timeout show no change on bit 6 or any candidate PUP/UIF output latch, and a changed-write census of the complete MCU-visible DSP shared window finds no key- or timeout-specific light command. Boot-time 0x20020 bit-3 traffic is the proven EEPROM clock. The MAD2-to-COBBA light command remains unmapped; no backlight state is synthesized",
       "evidence": ["docs/hardware_atlas.md", "docs/normalization_status.md"]
+    },
+    {
+      "id": "task16_26605c_is_registration_completion_builder", "status": "disproven",
+      "hypothesis": "The 42 callers of 0x26605c are task-16 configuration-completion paths whose execution supplies the missing 0x0834 predecessor and activates task 11",
+      "conclusion": "Runtime entry tracing identifies dispatcher 0x2461fc as decimal task 14 (ID 0x0e), not task 16. Static audit of every call and the complete catalog at 0x2e124c shows 0x26605c encodes and transmits one of 22 resource-0x35 requests, then dispatches local result 0x09d5. The 42 physical sites are repeated outbound actions in an 18-state, eight-context task-14 controller; they are not inbound completion statuses. The coherent run performs only the eight zero-status initialization calls and never enters the request builder. Initial active state 14 selects request 0x102f after decoded status 0x1048, which originates in task-14 object decoder 0x267258 on the 0x09d8/0x09de path. The missing boundary therefore precedes the task-15/task-14 object transaction rather than a task-16 completion.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md", "docs/rtos_tasks.md"]
+    },
+    {
+      "id": "task11_state3_requires_043f_initializer", "status": "disproven",
+      "hypothesis": "Task 11 remains in lifecycle state 3 because firmware status 0x043f never invokes initializer 0x2147a8 before the first serving-cell search",
+      "conclusion": "The task-11 reset path at 0x2159c4 explicitly writes lifecycle byte 3 to 0x10c84c, and that value remains valid through the initial power scan. A coherent radio-peer run derives candidate flags 0x0e, publishes 0x0447 with usable byte 1 and ARFCN 1, accepts NO_PSW_LEFT and CHANNEL_CHANGED_CNF, and then firmware constructs task-11 status 0x13a5 with action byte 1. Selected-cell acquisition uses this action object rather than literal lifecycle state 1. Candidate-list helper 0x2126e4 is a separate path; neither 0x043f nor task-11 RAM is synthesized by the peer.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "task17_157e_is_unique_candidate_configuration_predecessor", "status": "disproven",
+      "hypothesis": "Task-17 input 0x157e is the unique organic predecessor of the 0x0a30 configuration object required before candidate-list publication",
+      "conclusion": "An exhaustive constructor census finds six task-17 call sites that build 0x0a30 with ceiling byte 0x46. Input 0x157e selects only 0x223aae. Its sole recovered direct producer is additionally gated by a selected network-list record matching 62 f2 70, while the other occurrences are callback/catalogue machinery. The independently traced 0x0fa3 and 0x1581 paths are call-session lifecycle. Automatic selection must be recovered from the complete task-17 lifecycle rather than forced through 0x157e",
+      "evidence": ["docs/network_scouting.md", "docs/message_topology_census.md"]
+    },
+    {
+      "id": "radio_type88_carries_serving_identity", "status": "disproven",
+      "hypothesis": "DSP RX type 0x88 can carry PLMN or SI3-shaped serving-cell identity and bootstrap camping",
+      "conclusion": "The ROM handler and recovered protocol vocabulary identify type 0x88 as NEIGHBOUR_TIMING_OFFSET. A standards-shaped PLMN/SI3 body delivered through MDIRCV/FIQ0 does not enter the BCCH system-information parser or commit a serving cell. Serving identity is accepted only from type-0x80 RECEIVED_BLOCK after the channel-change and RA lifecycle.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "radio_channel_change_packet_is_state_independent", "status": "disproven",
+      "hypothesis": "CHANNEL_CHANGED_CNF type 0x89 can be sent at any point after a candidate appears",
+      "conclusion": "Handler 0x284f74 accepts type 0x89 only while controller acceptance byte 0x10dbd7 is 2. Earlier packets are discarded in state 1 and packets after the window closes cannot drive the same transition. The retained peer sends NO_PSW_LEFT before CHANNEL_CHANGED_CNF and the coherent trace observes task-10 0x1393 plus firmware-owned task-11 action 1.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
     }
   ]
 }

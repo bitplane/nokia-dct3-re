@@ -47,3 +47,7 @@ __pycache__/
 
 # runtime artifact (stray mame log in repo root)
 *.log
+
+# ad-hoc message-topology census outputs (canonical conclusions live in docs/)
+run_*_events.json
+run_*_events.txt

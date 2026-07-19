@@ -77,7 +77,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-radio-camp verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -218,7 +218,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -390,6 +390,12 @@ verify-dsp-transport:
 		RUN_ENV='$(FRONTIER_ENV) NOKI3210_STATE_ROUNDTRIP_AT=0.4'
 	@grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_dsp_state/boot_summary.txt
 	@echo "OK — DSPIF transport, split peer composition and active-profile save state reproduced"
+
+verify-radio-camp:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=15 \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_MODEL_RADIO_PEER=1 NOKI3210_TRACE_DSP_BOUNDARY=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_camp_trace_check.py $(RUN_DIR)/error.log
 
 dsp-census:
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v600 SECONDS=20 \

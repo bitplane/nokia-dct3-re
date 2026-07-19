@@ -14,7 +14,7 @@ public:
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_delay_ms(unsigned delay) { m_service_delay_ms = delay; }
 	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
-	void set_radio_scenario(unsigned scenario) { m_radio_scenario = scenario; }
+	void set_radio_peer_enabled(bool enabled) { m_radio_peer_enabled = enabled; }
 	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
 
 	void tx_commit_w(int state);
@@ -34,6 +34,8 @@ private:
 	void drain_responses();
 	void schedule_response();
 	void publish_bootstrap_state();
+	void observe_radio_request(const nokia_dspif_device::packet &packet);
+	void emit_radio_report();
 
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_external_service_peer_device> m_external_peer;
@@ -45,11 +47,14 @@ private:
 	bool m_trace_enabled = false;
 	unsigned m_service_delay_ms = 5;
 	unsigned m_peer_poll_ms = 5;
-	unsigned m_radio_scenario = 0;
+	bool m_radio_peer_enabled = false;
 	bool m_service_control_completion_sent = false;
 	unsigned m_radio_reports_sent = 0;
 	unsigned m_radio_reports_pending = 0;
 	unsigned m_radio_sequence_stage = 0;
+	unsigned m_radio_search_round = 0;
+	unsigned m_radio_wait_ticks = 0;
+	bool m_radio_report_deferred = false;
 	unsigned m_bootstrap_exchange_count = 0;
 };
 

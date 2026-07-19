@@ -12,30 +12,6 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 {
 	const offs_t address = 0x100000 + (offset << 1);
 	const u32 pc = m_maincpu->pc();
-	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			address >= 0x0010ffb4 && address < 0x0010ffd4)
-		logerror("radio_identity_write: pc=%08x address=%08x data=%04x mask=%04x old=%04x task=%02x t=%.6f\n",
-				pc & ~u32(1), u32(address), data, mem_mask, m_ram[offset],
-				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			address <= 0x0010dbd7 && address + 1 >= 0x0010dbd7)
-		logerror("radio_controller_state_write: pc=%08x address=%08x data=%04x mask=%04x "
-				"old=%04x task=%02x t=%.6f\n", pc & ~u32(1), u32(address), data,
-				mem_mask, m_ram[offset], fw_byte(FW_SCHED_RUNNING_TASK_ID),
-				machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			address <= 0x0010d960 && address + 1 >= 0x0010d960)
-		logerror("radio_selection_state_write: pc=%08x address=%08x data=%04x mask=%04x "
-				"old=%04x task=%02x t=%.6f\n", pc & ~u32(1), u32(address), data,
-				mem_mask, m_ram[offset], fw_byte(FW_SCHED_RUNNING_TASK_ID),
-				machine().time().as_double());
-	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			((address <= 0x0010c83a && address + 1 >= 0x0010c83a) ||
-			 (address <= 0x0010c84c && address + 1 >= 0x0010c84c)))
-		logerror("radio_si_mode_write: pc=%08x address=%08x data=%04x mask=%04x "
-				"old=%04x task=%02x t=%.6f\n", pc & ~u32(1), u32(address), data,
-				mem_mask, m_ram[offset], fw_byte(FW_SCHED_RUNNING_TASK_ID),
-				machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0 && address == FW_SERVICE_SESSION_STATUS)
 		logerror("csstatus_write: pc=%08x data=%04x mask=%04x old=%04x task=%02x "
 				"svc_ready=%02x dsp=%04x/%04x/%04x t=%.6f\n",
@@ -53,128 +29,76 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_byte(0x00100022),
 				machine().time().as_double());
 }
-
 // ============================================================================
 // Firmware-research traces for flash fetches. This is diagnostic observation,
 // not hardware behaviour, and never changes the fetched instruction.
 // ============================================================================
 void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 {
-	if (pc == addr && addr == 0x00218930 &&
-			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-		logerror("radio_scan_start_gate: selection=%02x controller=%02x task=%02x t=%.6f\n",
-				fw_byte(0x0010d960), fw_byte(0x0010dbd7),
+	if (pc == addr && addr == 0x002b4628 &&
+			nokia_env_u32("NOKI3210_TRACE_DISPLAY", 0) != 0)
+		logerror("keypad_decoded: code=%02x task=%02x t=%.6f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (pc == addr && addr == 0x00218942 &&
+	// Serving-cell acceptance checkpoints retained by verify-radio-camp.
+	if (pc == addr && addr == 0x00284f74 &&
 			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-		logerror("radio_scan_start_gate: helper_result=%08x selection=%02x task=%02x t=%.6f\n",
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), fw_byte(0x0010d960),
+		logerror("radio_channel_change_state: pc=%08x accept=%02x controller=%02x flags=%08x "
+				"r0=%08x caller=%08x task=%02x t=%.6f\\n", addr,
+				fw_byte(0x0010dbd7), fw_byte(0x0010dc93), fw_dword(0x0010dca0),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (pc == addr && addr == 0x00215bcc &&
+	if (pc == addr && addr == 0x00284e50 &&
 			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
 	{
-		const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
-		const u32 object = fw_dword(sp + 0x14);
-		logerror("radio_all_rssi_handler: object=%08x bytes=", object);
-		for (unsigned index = 0; index < 12; ++index)
-			logerror("%02x", fw_byte(object + index));
-		logerror(" mode=%02x task=%02x t=%.6f\n",
-				fw_byte(m_maincpu->state_int(arm7_cpu_device::ARM7_R4) + 0x19),
+		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		logerror("radio_no_psw_left_decode: object=%08x accept=%02x lifecycle=%02x "
+				"phase=%02x task=%02x t=%.6f\\n", object, fw_byte(0x0010dbd7),
+				fw_byte(0x0010c84c), fw_byte(0x0010dbdd),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	}
-	if (pc == addr && addr == 0x00212394 &&
+	if (pc == addr && addr == 0x00213c04 &&
 			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
 	{
-		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
-		logerror("radio_candidate_sort: object=%08x header=%02x/%02x first=%04x/%02x/%d "
-				"task=%02x t=%.6f\n", object, fw_byte(object + 4), fw_byte(object + 5),
-				fw_word(object + 6), fw_byte(object + 8), s8(fw_byte(object + 9)),
+		// The dispatcher retains its received object in r8; r0 is scratch here.
+		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R8);
+		logerror("radio_acquisition_transition: pc=%08x object=%08x status=%04x action=%02x "
+				"arg=%02x sequence=%02x lifecycle=%02x controller=%02x task=%02x t=%.6f\\n",
+				addr, object, fw_word(object), fw_byte(object + 2), fw_byte(object + 3),
+				fw_byte(0x00111e29), fw_byte(0x0010c84c), fw_byte(0x0010dbd7),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	}
-	if (pc == addr && addr == 0x00211f60 &&
-			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-	{
-		const u32 results = fw_dword(0x0010c2c0);
-		const u32 requested = fw_dword(0x0010c2b8);
-		logerror("radio_candidate_reconcile: results=%08x requested=%08x entries=", results, requested);
-		for (unsigned index = 0; index < 8; ++index)
-		{
-			const u32 result = results + index * 8;
-			const u32 request = requested + index * 8;
-			logerror("%s%04x/%d:%04x/%d/%02x", index == 0 ? "" : ",",
-					fw_word(result), s8(fw_byte(result + 2)), fw_word(request),
-					s8(fw_byte(request + 2)), fw_byte(request + 4));
-		}
-		logerror(" task=%02x t=%.6f\n", fw_byte(FW_SCHED_RUNNING_TASK_ID),
-				machine().time().as_double());
 	}
 	if (pc == addr && addr == 0x0028d404 &&
 			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
-		logerror("radio_candidate_result: object=%08x status=%04x accepted=%02x "
-				"arfcn=%04x task=%02x t=%.6f\n", object,
+		logerror("radio_candidate_table: object=%08x status=%04x usable=%02x "
+				"arfcn=%04x rssi_id=%02x acquisition_mode=%02x task=%02x t=%.6f\\n", object,
 				object >= NOKIA_RAM_BASE && object + 5 < NOKIA_RAM_END ? fw_word(object) : 0xffff,
 				object >= NOKIA_RAM_BASE && object + 5 < NOKIA_RAM_END ? fw_byte(object + 2) : 0xff,
 				object >= NOKIA_RAM_BASE && object + 5 < NOKIA_RAM_END ? fw_word(object + 4) : 0xffff,
+				fw_byte(0x0010c84b), fw_byte(0x0010c83a),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	}
-	if (pc == addr && addr == 0x0028d2e4 &&
+	if (pc == addr && addr == 0x00273aac &&
 			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
 	{
-		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
-		logerror("radio_phase_update: object=%08x status=%04x value=%02x old=%02x "
-				"task=%02x t=%.6f\n", object,
-				object >= NOKIA_RAM_BASE && object + 2 < NOKIA_RAM_END ? fw_word(object) : 0xffff,
-				object >= NOKIA_RAM_BASE && object + 2 < NOKIA_RAM_END ? fw_byte(object + 2) : 0xff,
-				fw_byte(0x0010fafd), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+		const u32 block = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		logerror("radio_bcch_parse: channel=%02x block=%08x data=",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff, block);
+		for (unsigned index = 0; block >= NOKIA_RAM_BASE && block + index < NOKIA_RAM_END && index < 24; ++index)
+			logerror("%02x", fw_byte(block + index));
+		logerror(" task=%02x t=%.6f\\n", fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
 	}
-	if (pc == addr && addr == 0x00215eb6 &&
+	if (pc == addr && addr == 0x00273e58 &&
 			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-		logerror("radio_si_block: task11_mode14=%02x mode02=%02x mode03=%02x "
-				"controller=%02x t=%.6f\n", fw_byte(0x0010c84c),
-				fw_byte(0x0010c83a), fw_byte(0x0010c83b), fw_byte(0x0010dbd7),
-				machine().time().as_double());
-	if (pc == addr && addr == 0x00217cac &&
-			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
-	{
-		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
-		if (object >= NOKIA_RAM_BASE && object + 7 < NOKIA_RAM_END)
-		{
-			logerror("dsp_boundary: controller-event object=%08x data=", object);
-			for (unsigned index = 0; index < 8; ++index)
-				logerror("%02x", fw_byte(object + index));
-			logerror(" task=%02x t=%.6f\n", fw_byte(FW_SCHED_RUNNING_TASK_ID),
-					machine().time().as_double());
-		}
-	}
-	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			(addr == 0x00284d6c || addr == 0x00284df8 || addr == 0x00284d98))
-		logerror("dsp_boundary: received-block-route pc=%08x flags=%08x controller=%02x "
-				"r0=%08x r1=%08x r2=%08x task=%02x t=%.6f\n", addr,
-				fw_dword(0x0010dc84), fw_byte(0x0010dbd7),
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R1),
-				m_maincpu->state_int(arm7_cpu_device::ARM7_R2),
+		logerror("radio_si3_path: pc=%08x result=%08x state=%02x active=%02x flags=%02x/%02x "
+				"task=%02x t=%.6f\\n", addr,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), fw_byte(0x0010dbd7),
+				fw_byte(0x0010edb4), fw_byte(0x0010edb6), fw_byte(0x0010edc1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			(addr == 0x00209380 || addr == 0x00209288 || addr == 0x00209296))
-		logerror("radio_identity_compare: pc=%08x old=%02x%02x%02x%02x%02x/%02x%02x new=%02x%02x%02x%02x%02x/%02x%02x diff=%02x task=%02x t=%.6f\n",
-				pc, fw_byte(0x0010ffb4), fw_byte(0x0010ffb5), fw_byte(0x0010ffb6),
-				fw_byte(0x0010ffb7), fw_byte(0x0010ffb8), fw_byte(0x0010ffbc),
-				fw_byte(0x0010ffbd), fw_byte(0x0010ffc8), fw_byte(0x0010ffc9),
-				fw_byte(0x0010ffca), fw_byte(0x0010ffcb), fw_byte(0x0010ffcc),
-				fw_byte(0x0010ffd0), fw_byte(0x0010ffd1), fw_byte(0x0010fe4f),
-				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 &&
-			(addr == 0x0021ba08 || addr == 0x0021ba22 || addr == 0x0021ba36 || addr == 0x00219e30))
-	{
-		logerror("radio_finalize: pc=%08x work20=%08x work30=%08x count=%04x limit=%04x flags=%02x ctrl=%02x t=%.6f\n",
-				pc, fw_dword(0x0010d938), fw_dword(0x0010d948), fw_word(0x0010dc90),
-				fw_word(0x00110156), fw_byte(0x0010dca3), fw_byte(0x0010dbdb),
-				machine().time().as_double());
-	}
 	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_CCONT_ADC", 0) != 0 &&
 			addr == 0x002b08c6)
 	{
@@ -744,6 +668,11 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
 				fw_byte(0x0010fca8), fw_byte(0x0010fca9), fw_byte(0x0010fcaa), fw_byte(0x0010fcba),
 				machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00223e60)
+		logerror("task17_receive: status=%04x state=%02x/%02x/%02x/%02x t=%.6f\n",
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
+				fw_byte(0x0010fcab), fw_byte(0x0010fcb1), fw_byte(0x0010fcb2), fw_byte(0x0010fcb5),
+				machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00225c9c)
 		logerror("sim_owner_phase_rx: status=%04x latch=%02x phase=%02x/%02x t=%.4f\n",
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
@@ -936,6 +865,16 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 			for (unsigned i = 0; i < n && used + 4 < cap; i++)
 				used += std::snprintf(out + used, cap - used, "%02x%s", fw_byte(p + i), i + 1 == n ? "" : " ");
 		};
+		if (addr == 0x002438e8 && (reg(0) == 0x21 || reg(2) == 0x1a))
+		{
+			static unsigned radio_resource_calls = 0;
+			if (radio_resource_calls++ < 64)
+				logerror("gsm_service: radio-resource channel=%02x slot=%02x resource=%04x arg=%08x "
+						"caller=%08x task=%02x t=%.4f\n",
+						reg(0) & 0xff, reg(1) & 0xff, reg(2) & 0xffff, reg(3),
+						reg(14) & ~u32(1), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+						machine().time().as_double());
+		}
 		if (addr == 0x002438e8 && reg(2) > 0xff)
 			logerror("gsm_service: callback-resource id=%04x channel=%02x slot=%02x arg=%08x t=%.4f\n",
 					reg(2) & 0xffff, reg(0) & 0xff, reg(1) & 0xff, reg(3),

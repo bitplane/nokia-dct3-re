@@ -19,7 +19,7 @@ class DspPacketSemanticsCensusTest(unittest.TestCase):
 				classify("tx", 0x70, bytes.fromhex("140c" + "ff" * 12)))
 		self.assertEqual(("segmented_dsp_memory_upload", "one-way command-0x22 DSP memory image"),
 				classify("tx", 0x51, bytes.fromhex("2206" + "00" * 78)))
-		self.assertEqual(("arfcn_bitmap_publication", "one-way GSM channel-set publication"),
+		self.assertEqual(("search_list", "asynchronous GSM channel search command"),
 				classify("tx", 0x1A, bytes(68)))
 		self.assertEqual(("indexed_64_byte_block_upload", "one-way DSP configuration publication"),
 				classify("tx", 0x0D, bytes(66)))
