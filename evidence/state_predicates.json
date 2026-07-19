@@ -111,7 +111,7 @@
     {
       "id": "radio_serving_cell_camp", "owner": "dsp_radio_peer", "status": "modeled",
       "predicate": "A ROM-derived usable RSSI candidate advances through accepted channel change, task-11 acquisition action 1 and SI1-SI4 parsing without firmware-state injection",
-      "current": "The opt-in radio peer answers organic SEARCH_LIST requests with two -109 dBm baselines followed by -60 dBm for ARFCN 1. Firmware derives flags 0x0e, publishes usable candidate 0x0447, accepts NO_PSW_LEFT and CHANNEL_CHANGED_CNF in controller state 2, constructs task-11 0x13a5 action 1 after IDLE_RA, and accumulates BCCH SI1-SI4 to bitmap 0x0f for PLMN 234-15/LAC 1/cell 1. Location Updating and operator UI are explicitly outside this checkpoint.",
+      "current": "The opt-in radio peer answers organic SEARCH_LIST requests with two -109 dBm baselines followed by -60 dBm for ARFCN 1. Firmware derives flags 0x0e, publishes usable candidate 0x0447, accepts NO_PSW_LEFT and CHANNEL_CHANGED_CNF in controller state 2, constructs task-11 0x13a5 action 1 after IDLE_RA, and accumulates BCCH SI1-SI4 to bitmap 0x0f for home PLMN 001-01/LAC 1/cell 1. Queued and rejected follow-up scans now receive finite NO_BCCH_LEFT completion; Location Updating and operator UI remain outside this checkpoint.",
       "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
     }
   ]

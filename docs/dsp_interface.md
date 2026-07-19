@@ -512,7 +512,7 @@ The explicit lower-result completion is status `0x1391`. The dispatcher jump
 table maps it to `0x21b9b4 -> 0x21b198`; when the firmware-owned work state is
 ready this reaches `0x219e30`, the producer of `0x0434`. Status `0x1392` is
 the adjacent table entry and instead maps to the radio-state/configuration path
-at `0x21b790`. Direct statuses `0x138f` and `0x1390` provide the separately
+at `0x21c36a`. Direct statuses `0x138f` and `0x1390` provide the separately
 gated DSP-report entrances documented above. Callback `0x2b60f6` unregisters
 lower-radio key `0x4c00` with
 `0x2b257e` and posts that non-completing `0x1392` update through `0x2af6ea`.

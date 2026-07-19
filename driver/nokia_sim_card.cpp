@@ -378,7 +378,7 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true },
 		{ 0x6f05, 0x7f20, 4, 0, file_structure::transparent, false },
 		{ 0x6fb7, 0x7f20, 15, 0, file_structure::transparent, false },
-		{ 0x6fad, 0x7f20, 3, 0, file_structure::transparent, false },
+		{ 0x6fad, 0x7f20, 4, 0, file_structure::transparent, false },
 		{ 0x6f07, 0x7f20, 9, 0, file_structure::transparent, false },
 		{ 0x6f38, 0x7f20, 15, 0, file_structure::transparent, false },
 		{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, false },
@@ -450,9 +450,17 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	static constexpr u8 acm_max[] = { 0x00, 0x00, 0x00 };
 	static constexpr u8 acm[] = { 0x00, 0x00, 0x00 };
 	static constexpr u8 puct[] = { 'G', 'B', 'P', 0x00, 0x00 };
+	// GSM 11.11 EF_AD: normal operation, with no additional administrative
+	// information in this phase-2 profile.  Erased 0xff bytes select no valid
+	// operation mode and make the subscriber profile internally inconsistent.
+	static constexpr u8 administrative_data[] = { 0x00, 0xff, 0xff, 0x02 };
+	// This established fixture decodes to IMSI 001-01...; changing it to the
+	// laboratory PLMN currently enters a separate, unresolved SIM transaction.
 	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98, 0x10 };
-	// Preferred network 234-15, matching the synthetic IMSI and radio cell.
-	static constexpr u8 plmn_selector[] = { 0x32, 0xf4, 0x51 };
+	// Prefer the subscriber's home PLMN 001-01, also advertised by the
+	// laboratory serving cell.  Keeping EF_PLMNsel on a different PLMN makes
+	// the firmware legitimately leave the serving cell and resume selection.
+	static constexpr u8 plmn_selector[] = { 0x00, 0xf1, 0x10 };
 	// CPHS phase 2 with only the Customer Service Profile allocated and
 	// activated.  The CSP contains its mandatory nine group entries and makes
 	// only Advice of Charge (group 03, bit 6) customer-accessible.
@@ -468,6 +476,7 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	if (fid == 0x6f38 && offset < std::size(service_table))
 		return m_cphs_aoc && offset == 1 ? 0x03 : service_table[offset];
 	if (fid == 0x6fb7 && offset < std::size(ecc)) return ecc[offset];
+	if (fid == 0x6fad && offset < std::size(administrative_data)) return administrative_data[offset];
 	if (fid == 0x6f07 && offset < std::size(imsi)) return imsi[offset];
 	if (fid == 0x6f30 && offset < std::size(plmn_selector)) return plmn_selector[offset];
 	if (m_cphs_aoc && fid == 0x6f16 && offset < std::size(cphs_info)) return cphs_info[offset];
@@ -475,7 +484,10 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	if (m_cphs_aoc && fid == 0x6f37 && offset < std::size(acm_max)) return acm_max[offset];
 	if (m_cphs_aoc && fid == 0x6f39 && offset < std::size(acm)) return acm[offset];
 	if (m_cphs_aoc && fid == 0x6f41 && offset < std::size(puct)) return puct[offset];
-	if (fid == 0x6f7e) return offset == 10 ? 0x01 : (offset < 4 ? 0xff : 0x00);
+	// EF_LOCI for a subscriber that has never registered: no TMSI, LAI or
+	// TMSI-time value is available, and update status 1 requests an initial
+	// Location Updating procedure.  A zero-filled LAI contradicts that status.
+	if (fid == 0x6f7e) return offset == 10 ? 0x01 : 0xff;
 	if (fid == 0x6fae) return 0x02;
 	return 0xff;
 }

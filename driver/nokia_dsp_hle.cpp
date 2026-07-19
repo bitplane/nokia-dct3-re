@@ -29,6 +29,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_radio_search_round));
 	save_item(NAME(m_radio_wait_ticks));
 	save_item(NAME(m_radio_report_deferred));
+	save_item(NAME(m_radio_search_requested));
 	save_item(NAME(m_bootstrap_exchange_count));
 }
 
@@ -44,6 +45,7 @@ void nokia_dsp_hle_device::device_reset()
 	m_radio_search_round = 0;
 	m_radio_wait_ticks = 0;
 	m_radio_report_deferred = false;
+	m_radio_search_requested = false;
 	m_bootstrap_exchange_count = 0;
 	publish_bootstrap_state();
 }
@@ -179,11 +181,36 @@ void nokia_dsp_hle_device::observe_radio_request(const nokia_dspif_device::packe
 		m_radio_reports_pending = 2;
 		m_radio_report_deferred = true;
 	}
+	else if (packet.type == 0x1a && m_radio_sequence_stage == 4 && m_radio_reports_pending == 0)
+	{
+		// If the MCU rejects the measured candidate it requests the next search
+		// batch instead of issuing CHANNEL_CONFIGURE.  Close that finite scan
+		// with the recovered empty-list terminal so MM can select its fallback.
+		m_radio_sequence_stage = 9;
+		m_radio_reports_pending = 2;
+		m_radio_report_deferred = true;
+	}
 	else if (packet.type == 0x0c && m_radio_sequence_stage == 7)
 	{
 		// RA_INFO makes the MCU issue IDLE_RA; type 0x8c is its recovered
 		// completion family.  Only after it is accepted do BCCH blocks begin.
 		m_radio_sequence_stage = 8;
+		m_radio_reports_pending = 1;
+		m_radio_report_deferred = true;
+	}
+	else if (packet.type == 0x1a && m_radio_sequence_stage == 7)
+	{
+		// Mobility Management can request another search while the current
+		// serving cell's BCCH batch is still being delivered.  Preserve that
+		// request and begin it once the batch has drained.
+		m_radio_search_requested = true;
+		if (m_trace_enabled)
+			logerror("dsp_hle: queued repeated SEARCH_LIST during BCCH t=%.6f\n",
+					machine().time().as_double());
+	}
+	else if (packet.type == 0x1a && m_radio_sequence_stage == 9 && m_radio_reports_pending == 0)
+	{
+		m_radio_sequence_stage = 3;
 		m_radio_reports_pending = 1;
 		m_radio_report_deferred = true;
 	}
@@ -213,6 +240,9 @@ void nokia_dsp_hle_device::emit_radio_report()
 		break;
 	case 8:
 		report_type = 0x8c; // IDLE_RA completion
+		break;
+	case 9:
+		report_type = m_radio_reports_pending == 2 ? 0x8b : 0x87; // result, then search complete
 		break;
 	default:
 		break;
@@ -252,12 +282,12 @@ void nokia_dsp_hle_device::emit_radio_report()
 			0, 0, 0, 0, 0, 0, 0, 0xff, 0, 0, 0, 0
 		};
 		static constexpr u8 si3[] = {
-			0x49, 0x06, 0x1b, 0x00, 0x01, 0x32, 0xf4, 0x51,
+			0x49, 0x06, 0x1b, 0x00, 0x01, 0x00, 0xf1, 0x10,
 			0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0x2b, 0x2b, 0x2b, 0x2b, 0x2b
 		};
 		static constexpr u8 si4[] = {
-			0x31, 0x06, 0x1c, 0x32, 0xf4, 0x51, 0x00, 0x01,
+			0x31, 0x06, 0x1c, 0x00, 0xf1, 0x10, 0x00, 0x01,
 			0, 0, 0, 0, 0, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b,
 			0x2b, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b
 		};
@@ -301,6 +331,16 @@ void nokia_dsp_hle_device::emit_radio_report()
 		// Space SI blocks at a 51-frame-multiframe cadence rather than filling
 		// the MDIRCV ring in a single firmware receive turn.
 		m_radio_wait_ticks = 59;
+	}
+	else if (m_radio_sequence_stage == 7 && report_type == 0x80 && m_radio_search_requested)
+	{
+		m_radio_search_requested = false;
+		m_radio_sequence_stage = 9;
+		m_radio_reports_pending = 2;
+		m_radio_report_deferred = true;
+		if (m_trace_enabled)
+			logerror("dsp_hle: starting queued repeated SEARCH_LIST t=%.6f\n",
+					machine().time().as_double());
 	}
 	m_transport->notify_rx();
 	if (m_trace_enabled)

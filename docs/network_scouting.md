@@ -100,7 +100,8 @@ shift and a 24-byte GSM L2 block.  Channel `0x40` is used for SCH and channel
 block is accepted with that identity.  SI blocks are paced rather than queued
 on one interrupt edge.
 
-The laboratory cell is PLMN 234-15, LAC 1, cell ID 1.  Its minimum broadcast
+The laboratory cell is PLMN 001-01, LAC 1, cell ID 1, matching the synthetic
+subscriber's home PLMN.  Its minimum broadcast
 set is SI1 (`0x19`), SI2 (`0x1a`), SI3 (`0x1b`) and SI4 (`0x1c`).  SI3 and SI4
 carry the matching PLMN/LAC identity.  These are standards-shaped inputs to the
 ROM parser, not operator/UI events.
@@ -128,6 +129,31 @@ The following alternatives are disproven:
 The task-14 request catalog remains mechanically mapped: `0x26605c` encodes 22
 ROM-described resource-`0x35` requests from 42 state-machine call sites.  It is
 an outbound request producer, not the missing inbound camp completion.
+
+## Post-camp registration boundary
+
+The first post-camp PLMN scan is now closed rather than left waiting for a
+`CHANNEL_CONFIGURE` that the firmware deliberately declines to send. A queued
+search is preserved while BCCH drains; the peer then returns
+`ALL_RSSI_RESULTS` followed by `NO_BCCH_LEFT`. A later rejected candidate is
+likewise terminated by that recovered finite-search sequence. This keeps the
+radio transaction live without fabricating an MM result.
+
+Making SI3/SI4 advertise the SIM's home PLMN changes the intermediate candidate
+from unusable to usable and produces a second organic channel configuration,
+but it does not start Location Updating. Standards-valid normal-operation
+`EF_AD`, matching `EF_PLMNsel`, and erased `EF_LOCI` with update-status 1 also
+leave the post-camp route unchanged. These are retained as a coherent SIM
+profile, not as claimed registration fixes.
+
+The corrected task-10 status `0x1392` handler is `0x21c36a`, not `0x21b790`.
+Runtime state writes show controller `0 -> 1 -> 2 -> 3`; SI reports arrive in
+state 2. Finalizer `0x219e30` publishes task-17 `0x0434` for selector 1 and
+task-15 `0x042f` for selector 2. The latter becomes task-17 `0x0a22`; neither
+path presently constructs an MM object or reaches task-15 `0x07dd`.
+
+The remaining boundary is therefore above finite L1 search/camp and below the
+task-15 MM parser. It is not evidence for injecting `0x07dd`.
 
 ## Next boundary
 

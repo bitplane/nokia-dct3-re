@@ -28,6 +28,14 @@ void noki3310_state::ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_
 		logerror("sim_contract: notify-latch write pc=%08x data=%04x mask=%04x old=%04x task=%02x t=%.6f\n",
 				pc & ~u32(1), data, mem_mask, m_ram[offset], fw_byte(0x00100022),
 				machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 && address == 0x0010dbd6)
+		logerror("radio_controller_state_write: pc=%08x data=%04x mask=%04x old=%04x "
+				"task=%02x t=%.6f\n", pc & ~u32(1), data, mem_mask, m_ram[offset],
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0 && address == 0x0010dbda)
+		logerror("radio_completion_selector_write: pc=%08x data=%04x mask=%04x old=%04x "
+				"task=%02x t=%.6f\n", pc & ~u32(1), data, mem_mask, m_ram[offset],
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 }
 // ============================================================================
 // Firmware-research traces for flash fetches. This is diagnostic observation,
@@ -98,6 +106,24 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				"task=%02x t=%.6f\\n", addr,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0), fw_byte(0x0010dbd7),
 				fw_byte(0x0010edb4), fw_byte(0x0010edb6), fw_byte(0x0010edc1),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	if (pc == addr && addr == 0x0021c36a &&
+			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+	{
+		const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
+		const u32 object = fw_dword(sp + 0x1c);
+		logerror("radio_si_update_dispatch: object=%08x status=%04x action=%02x arg=%02x "
+				"controller=%02x accept=%02x flags=%02x/%02x task=%02x t=%.6f\n",
+				object, fw_word(object), fw_byte(object + 2), fw_byte(object + 3),
+				fw_byte(0x0010dbd7), fw_byte(0x0010dc93), fw_byte(0x0010edb6),
+				fw_byte(0x0010edc1), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x00219e30 &&
+			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("radio_idle_completion: selector=%02x controller=%02x flags=%02x/%02x "
+				"task=%02x t=%.6f\n", fw_byte(0x0010dbdb), fw_byte(0x0010dbd7),
+				fw_byte(0x0010edb6), fw_byte(0x0010edc1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	if (pc == addr && nokia_env_u32("NOKI3210_TRACE_CCONT_ADC", 0) != 0 &&
 			addr == 0x002b08c6)
@@ -673,6 +699,23 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,
 				fw_byte(0x0010fcab), fw_byte(0x0010fcb1), fw_byte(0x0010fcb2), fw_byte(0x0010fcb5),
 				machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr &&
+			(addr == 0x00225662 || addr == 0x0022635e || addr == 0x00226372 ||
+			 addr == 0x002263c2 || addr == 0x002263c6))
+		logerror("task17_registration_predicate: pc=%08x result=%08x context=%02x/%02x/%02x/%02x "
+				"identity=%02x%02x selected=%02x%02x task=%02x t=%.6f\n", addr,
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)),
+				fw_byte(0x0010fca8 + 0x11), fw_byte(0x0010fca8 + 0x12),
+				fw_byte(0x0010fca8 + 0x18), fw_byte(0x0010fca8 + 0x1b),
+				fw_byte(0x0010fd00), fw_byte(0x0010fd01),
+				fw_byte(0x0010fcf8), fw_byte(0x0010fcf9),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x002248b6)
+		logerror("task17_registration_restart: state=%02x/%02x/%02x/%02x caller=%08x task=%02x t=%.6f\n",
+				fw_byte(0x0010fca8 + 0x11), fw_byte(0x0010fca8 + 0x12),
+				fw_byte(0x0010fca8 + 0x18), fw_byte(0x0010fca8 + 0x1b),
+				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0 && pc == addr && addr == 0x00225c9c)
 		logerror("sim_owner_phase_rx: status=%04x latch=%02x phase=%02x/%02x t=%.4f\n",
 				u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R0)) & 0xffff,

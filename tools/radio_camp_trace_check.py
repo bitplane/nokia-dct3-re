@@ -21,7 +21,7 @@ CHECKPOINTS = (
     (
         "SI3 identity",
         re.compile(
-            r"radio_bcch_parse: channel=50 .*data=.*49.*06.*1b.*00.*01.*32.*f4.*51.*00.*01"
+            r"radio_bcch_parse: channel=50 .*data=.*49.*06.*1b.*00.*01.*00.*f1.*10.*00.*01"
         ),
     ),
     (

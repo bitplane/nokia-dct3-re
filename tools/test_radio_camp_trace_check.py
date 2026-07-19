@@ -8,7 +8,7 @@ radio_candidate_table: object=00101800 status=0447 usable=01 arfcn=0001 rssi_id=
 radio_no_psw_left_decode: object=00101800 accept=03 lifecycle=03 phase=0c task=04
 radio_channel_change_state: pc=00284f74 accept=03 controller=02 flags=00010011
 radio_acquisition_transition: pc=00213c04 object=00101830 status=13a5 action=01 arg=01 sequence=04 lifecycle=03 controller=03 task=0b
-radio_bcch_parse: channel=50 block=0010229a data=49 06 1b 00 01 32 f4 51 00 01 00 00
+radio_bcch_parse: channel=50 block=0010229a data=49 06 1b 00 01 00 f1 10 00 01 00 00
 radio_si3_path: pc=00273e58 result=0010edb4 state=02 active=00 flags=0f/0f task=0c
 """
 

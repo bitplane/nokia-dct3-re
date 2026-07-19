@@ -55,6 +55,7 @@ private:
 	unsigned m_radio_search_round = 0;
 	unsigned m_radio_wait_ticks = 0;
 	bool m_radio_report_deferred = false;
+	bool m_radio_search_requested = false;
 	unsigned m_bootstrap_exchange_count = 0;
 };
 
