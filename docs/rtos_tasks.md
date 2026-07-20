@@ -35,14 +35,14 @@ entry stored in that table; it is not necessarily the main receive dispatcher.
 | 7 | `0x2a5890` | external-service transport adapter | Carries framed service traffic between task 2 and the lower external transport. Its broader ownership is not closed. | Partial |
 | 8 | `0x283ce8` | lower-service/DSP packet handler | Participates in the D0 discovery exchange and handles DSP RX packet families `0x85`/`0x8d`. Do not generalize this alias across products. | Partial |
 | 9 | `0x28e164` | unknown task 9 | Initialization entry and state near `0x1123ac`/`0x1123b0` are known; semantic ownership is not. | Unknown |
-| 10 | `0x21bf60` | controller-status coordinator | Handles mapped statuses including `0x1391`, `0x1392`, and `0x03e9`, constructs lower-layer work, and reports readiness. “Radio” alone is too broad. | Partial |
-| 11 | `0x2159c4` | unknown task 11 | Posts readiness report `0x0b` and receives some DSP-broker families; that does not identify the subsystem. | Partial |
-| 12 | `0x273ea0` | unknown task 12 | Posts readiness report `0x0c`; no defensible subsystem name is established. | Partial |
-| 13 | `0x23ebd0` | segmented-object consumer | Handles a mapped segmented transaction and posts task-16 status `0x05eb`; subsystem ownership remains unresolved. | Partial |
-| 14 | `0x248318` | object/session decoder | Decodes task-15 translated objects and session requests. It is not proved to be a raw DSP or radio task. | Partial |
-| 15 | `0x20a8a8` | object parser/translator | Parses service objects and translates successful results into task-14 statuses. | Partial |
-| 16 | `0x24f5a0` | completion/status relay | Relays mapped completion/status traffic between tasks 13, 10, and 17. Broader ownership is unresolved. | Partial |
-| 17 | `0x22391c` | registration/control coordinator | Participates in the mapped registration transaction and task-10 completion chain; “radio init” describes only that observed path. | Partial |
+| 10 | `0x21bf60` | L1 control task | Handles mapped statuses including `0x1391`, `0x1392`, and `0x03e9`, constructs lower-layer work, and reports readiness. The recovered ROM trace-module family calls this layer `L1 CONTR`. | Partial |
+| 11 | `0x2159c4` | L1 measurement task | Owns RSSI/candidate reconciliation and timing/measurement status families and posts readiness report `0x0b`. The recovered trace-module family calls this layer `L1 MEAS`. | Partial |
+| 12 | `0x273ea0` | L1 system-parameter task | Parses BCCH system-information blocks and posts readiness report `0x0c`. The recovered trace-module family calls this layer `L1 SYSPA`. | Partial |
+| 13 | `0x23ebd0` | L2 task | Handles the mapped segmented transaction and posts RR status `0x05eb`. The recovered trace-module family calls this layer `L2 TASK`; its complete protocol surface is not closed. | Partial |
+| 14 | `0x248318` | call-control task | Decodes MM-translated objects and session requests. The recovered trace-module family calls this layer `CC TASK`; not every handler has been assigned a call-control primitive. | Partial |
+| 15 | `0x20a8a8` | mobility-management task | Parses registration/service objects and translates successful results into call-control statuses. The recovered trace-module family calls this layer `MM TASK`. | Partial |
+| 16 | `0x24f5a0` | radio-resource task | Relays mapped completion/status traffic between L2, L1 control, mobility management, and registration management. The recovered trace-module family calls this layer `RR TASK`. | Partial |
+| 17 | `0x22391c` | registration-management task | Owns automatic/manual network-selection state and the mapped L1/RR/MM transaction chain. The recovered trace-module family calls this layer `RM TASK`. | Partial |
 | 18 | `0x285c14` | lower-service readiness task | Posts readiness report `0x12` in the resumed application-task group. Broader ownership is unresolved. | Partial |
 | 19 | `0x21de4c` | battery/power state machine | Consumes battery-classification and pack-characterisation events and owns mapped shutdown-level reporting. | Proved |
 | 20 | `0x208134` | SIM application/session router | Owns the mapped SIM registration, card-presence monitoring, and proactive-command routing paths above task 21. | Proved |

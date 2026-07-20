@@ -1,170 +1,190 @@
 # Network and registration boundary
 
-This document defines the currently implemented lower-radio boundary.  The
-checkpoint is serving-cell selection and BCCH system-information acceptance;
-Location Updating, operator presentation and calls remain downstream work.
+This document defines the retained lower-radio model and its verified stopping
+point. The current checkpoint is serving-cell selection and BCCH system-
+information acceptance. It does not claim Location Updating, registered
+operator presentation, calls, or packet data.
 
 ## Ownership
 
-- The SIM device supplies identity and preferred-PLMN files through SIMI/FIQ6.
-- MCU tasks 10--12 own search policy, candidate selection and SI parsing.
-- The DSP/radio peer owns measurements, channel-change completion and received
-  L1 blocks.  It returns them through the DSPIF MDIRCV ring and FIQ0.
-- No peer path writes firmware RAM, posts an RTOS message directly, selects an
-  MMI callback or renders content.
+- The SIM card supplies subscriber identity and preferred-PLMN files through
+  SIMI/FIQ6.
+- MCU tasks 10--12 own search policy, candidate selection, channel lifecycle,
+  and system-information parsing.
+- `nokia_gsm_network_device` owns standards-shaped cell data: ARFCN, signal
+  level, BSIC, PLMN/LAC/cell identity, and SI1--SI4.
+- `nokia_dsp_hle_device` translates between that cell and the recovered Nokia
+  DSP/L1 packet protocol. Packets cross DSPIF shared rings and FIQ0.
+- No peer writes firmware RAM, posts an RTOS message, selects an MMI callback,
+  or renders content.
 
-`NOKI3210_MODEL_RADIO_PEER=1` enables the smallest recovered radio peer.  It is
-off by default because it describes one deterministic laboratory cell rather
-than a generally configurable network.
+`NOKI3210_MODEL_RADIO_PEER=1` enables one deterministic laboratory cell. It is
+opt-in because it is a test network, not a complete configurable GSM system.
 
-## Verified serving-cell checkpoint
+## Verified checkpoint
 
-`make verify-radio-camp` proves this ordered firmware-owned progression:
+`make verify-radio-camp` proves this ordered, firmware-owned sequence:
 
 ```text
 MCU SEARCH_LIST (0x1a)
-  -> empty search completions while firmware narrows its bitmap
-  -> ALL_RSSI_RESULTS (0x8b), ARFCN 1 becomes usable
-  -> firmware publishes candidate object 0x0447, usable=1
-  -> narrowed SEARCH_LIST
-  -> ALL_RSSI_RESULTS + SCH RECEIVED_BLOCK (0x80, channel 0x40)
+  -> baseline ALL_RSSI_RESULTS (0x8b)
+  -> ARFCN 1 rises above the recovered suitability threshold
+  -> firmware publishes candidate 0x0447 (usable=1)
+  -> narrowed SEARCH_LIST and SCH RECEIVED_BLOCK (0x80, channel 0x40)
   -> MCU CHANNEL_CONFIGURE (0x02)
   -> NO_PSW_LEFT (0x8f), then CHANNEL_CHANGED_CNF (0x89)
-  -> firmware accepts the channel change in controller state 2
+  -> firmware accepts the channel in controller state 2
   -> RA_INFO (0x84) -> MCU IDLE_RA (0x0c) -> completion 0x8c
-  -> firmware constructs task-11 status 0x13a5, action=1
-  -> paced BCCH SI1, SI2, SI3 and SI4 RECEIVED_BLOCK packets
+  -> firmware constructs task-11 0x13a5, action=1
+  -> paced BCCH SI1, SI2, SI3, SI4 RECEIVED_BLOCK packets
   -> firmware SI bitmap 0x01 -> 0x07 -> 0x0f
 ```
 
-The final action is observed at dispatcher `0x213c04` as a real RAM object:
-status `0x13a5`, action byte `1`, argument byte `1`, controller state `3`.
-It is not a synthesized task message.  The SI3 parser validates the cell
-identity and the task-12 accumulator reaches `0x0f` after SI4.  This is the
-project's stopping definition of a selected serving cell; it deliberately does
-not claim Location Updating or a registered operator.
+The final action is observed at dispatcher `0x213c04` as a firmware RAM object,
+not as a peer-created task message. SI3 validates cell identity and task 12
+reaches the complete bitmap after SI4. These are the acceptance criteria for a
+selected serving cell.
 
-Task-11 byte `0x10c84c` remains `3` during this process; that is the reset-time
-ordinary search lifecycle. Selected-cell acquisition is represented by the
-firmware-owned action-1 object above, not by writing literal lifecycle state 1.
+The laboratory cell is GSM 900 ARFCN 1, BSIC `0x12`, reserved test PLMN
+001-01, LAC 1, and cell ID 1. It matches the synthetic subscriber's home PLMN.
 
-## ALL_RSSI_RESULTS contract
+## Packet contracts
 
-The type-`0x8b` body is 166 bytes:
+### ALL_RSSI_RESULTS
 
-| Offset | Size | Meaning in the recovered path |
-| --- | ---: | --- |
-| `+0` | 2 | list header; the active peer uses `00 10` |
-| `+2 + n*4` | 2 | big-endian ARFCN for record `n` |
-| `+4 + n*4` | 1 | peer/result flags, initially zero for the real candidate |
-| `+5 + n*4` | 1 | signed RSSI in dBm |
+Type `0x8b` carries a 166-byte body: a two-byte list header followed by forty
+four-byte records. Each record is big-endian ARFCN, flags, and signed RSSI.
+Absent records use ARFCN `0xffff` and RSSI -127 dBm. The retained sequence
+reports ARFCN 1 first at -109 dBm and later at -60 dBm. Firmware reconciles the
+record with its request table, derives flags `0x0e`, applies the -108 dBm
+threshold, and constructs the usable `0x0447` candidate itself.
 
-Forty records are consumed.  Absent entries use ARFCN `0xffff` and RSSI
-`-127`; the deterministic cell occupies record zero with ARFCN `1`.  Two
-baseline reports use `-109 dBm` (`0x93`), below the decoded `-108 dBm` cutoff;
-later reports use `-60 dBm` (`0xc4`).  Firmware reconciles the returned record
-with its requested ARFCN table and derives flags `0x0e`.
+### RECEIVED_BLOCK
 
-Predicate `0x212048` tests the derived flags with mask `0x0b`.  The accepted
-record therefore satisfies `(flags & 0x0b) != 0` and publishes status `0x0447`
-with usable byte `1`, ARFCN `1`, RSSI identity `0`.  The peer does not supply
-the final `0x0e` flags or the usable bit; both are firmware-derived.
+Type `0x80` carries channel, BSIC, error state, 24-bit frame number, ARFCN,
+shift, and a 24-byte GSM L2 block. Channel `0x40` carries SCH and `0x50` carries
+BCCH. The ARFCN field is populated as 1, matching the measured and configured
+carrier. SI blocks are paced at a 51-frame multiframe cadence rather than
+queued behind one interrupt edge.
 
-Rejected result shapes are now bounded:
+The retained broadcast set is SI1 (`0x19`), SI2 (`0x1a`), SI3 (`0x1b`), and
+SI4 (`0x1c`). SI3/SI4 contain the matching PLMN and location identity. Content
+belongs to the GSM network device; Nokia transport headers remain in DSP HLE.
 
-- a channel already above the cutoff on the baseline pass receives an
-  exclusion classification and does not become the same usable candidate;
-- a table containing only `0xffff`/`-127` records remains empty;
-- one isolated improved result does not compose because the search policy
-  requires its preceding baseline rounds;
-- tuning a task-11 ceiling byte, lifecycle byte or candidate RAM object is not
-  part of the peer contract.
+### Accepted DSP receive vocabulary
 
-## Channel and BCCH packets
-
-The accepted DSP-to-MCU vocabulary is recovered from the ROM handlers:
-
-| Type | Name | First MCU consumer |
+| Type | Recovered role | First MCU consumer |
 | --- | --- | --- |
-| `0x80` | `RECEIVED_BLOCK` | `0x283f1c` / task 12 for BCCH |
-| `0x84` | `RA_INFO` | `0x284e26` -> task 10 `0x1394` |
-| `0x87` | `NO_BCCH_LEFT` | `0x284ebc` -> task 10 `0x138f` |
-| `0x89` | `CHANNEL_CHANGED_CNF` | `0x284f74` -> task 10 `0x1393` |
-| `0x8b` | `ALL_RSSI_RESULTS` | `0x284fd8` -> task 11 `0x13b8` |
-| `0x8c` | `IDLE_RA` completion | `0x284f48` |
-| `0x8f` | `NO_PSW_LEFT` | `0x284e50` -> task 11 `0x13b7` |
+| `0x80` | RECEIVED_BLOCK | `0x283f1c` / task 12 for BCCH |
+| `0x84` | RA_INFO | `0x284e26` -> task 10 `0x1394` |
+| `0x87` | NO_BCCH_LEFT | `0x284ebc` -> task 10 `0x138f` |
+| `0x89` | CHANNEL_CHANGED_CNF | `0x284f74` -> task 10 `0x1393` |
+| `0x8b` | ALL_RSSI_RESULTS | `0x284fd8` -> task 11 `0x13b8` |
+| `0x8c` | IDLE_RA completion | `0x284f48` |
+| `0x8f` | NO_PSW_LEFT | `0x284e50` -> task 11 `0x13b7` |
 
-`RECEIVED_BLOCK` contains channel, BSIC, error, 24-bit frame number, ARFCN,
-shift and a 24-byte GSM L2 block.  Channel `0x40` is used for SCH and channel
-`0x50` for BCCH.  Once `CHANNEL_CONFIGURE` has recorded BSIC `0x12`, each BCCH
-block is accepted with that identity.  SI blocks are paced rather than queued
-on one interrupt edge.
+The first SCH is an acknowledge-and-configure step. In controller state 2 it
+becomes status `0x138e` and causes the outbound CHANNEL_CONFIGURE. A second SCH
+belongs to another synchronization lifecycle and is not retained.
 
-The laboratory cell is PLMN 001-01, LAC 1, cell ID 1, matching the synthetic
-subscriber's home PLMN.  Its minimum broadcast
-set is SI1 (`0x19`), SI2 (`0x1a`), SI3 (`0x1b`) and SI4 (`0x1c`).  SI3 and SI4
-carry the matching PLMN/LAC identity.  These are standards-shaped inputs to the
-ROM parser, not operator/UI events.
+## Post-camp state
 
-## Closed alternatives
+RR-to-MM activation is organic. RR maps usable candidate `0x0447` to MM input
+`0x0839`; MM consumes it in state 6, publishes `0x0a32`, receives RM `0x0a34`,
+and RR follows with `0x0838`.
 
-The following alternatives are disproven:
+The serving-cell completion then follows this path:
 
-- type `0x88` is `NEIGHBOUR_TIMING_OFFSET`; a guessed PLMN-shaped body did not
-  feed system information;
-- guessed `CHANNEL_CHANGED_CNF` packets sent outside controller state 2 are
-  discarded, so packet identity alone is insufficient;
-- type `0x83` only updates scalar RSSI state through task-10 status `0x139f`;
-  it is not a camp completion;
-- type `0x86` is a separate controller/transfer protocol and does not start the
-  type-`0x8e` framed session;
-- `NO_BCCH_LEFT` and counted `NO_PSW_FOUND` exercise failure finalizers; they do
-  not select a serving cell;
-- unsolicited SI3 before the channel/RA lifecycle parses in isolation but does
-  not compose into acquisition;
-- service-5 `0x05e8`, task-15 `0x07dd`, task-14 resource-`0x35` requests and MM
-  Location Updating results are downstream registration work.  Using them to
-  bootstrap the first cell is circular.
+```text
+task 10 -> task 11 0x13a5/action 1
+task 11 -> task 10 0x1391/result 0
+task 10 -> task 15 0x042f
+task 15 -> task 17 0x0a22
+task 17 -> PLMN admissibility check
+```
 
-The task-14 request catalog remains mechanically mapped: `0x26605c` encodes 22
-ROM-described resource-`0x35` requests from 42 state-machine call sites.  It is
-an outbound request producer, not the missing inbound camp completion.
+At the task-11 completion, both recovered measurement lists are empty and the
+completion mode is zero. The modes-2/4 fallback copy is therefore deliberately
+skipped. Task 17 then compares selected PLMN `0x10fd00..02` with current PLMN
+`0x10fcf8..fa`; selected PLMN is zero while current PLMN is 001-01. It starts
+the normal `0x09ec` selection transaction.
 
-## Post-camp registration boundary
+That transaction is finite. Task 17 publishes the `0x09ef / 14 ff` phase
+handoff, task 15 runs the search, and returns `0x09f0 / 16 0f`. Context
+continuation 2 is terminal. Later background SEARCH_LIST modes `0x40` and
+`0x50` are closed by the applicable empty-search terminal.
 
-The first post-camp PLMN scan is now closed rather than left waiting for a
-`CHANNEL_CONFIGURE` that the firmware deliberately declines to send. A queued
-search is preserved while BCCH drains; the peer then returns
-`ALL_RSSI_RESULTS` followed by `NO_BCCH_LEFT`. A later rejected candidate is
-likewise terminated by that recovered finite-search sequence. This keeps the
-radio transaction live without fabricating an MM result.
+The home PLMN publisher `0x21adac` builds task-17 status `0x0433` from the SIM
+IMSI. Its two callers are later task-10 acceptance lifecycles and neither runs
+during initial camp. Selected-PLMN helper `0x2229e8` cannot copy that home tuple
+at reset because the tuple has not yet been published.
 
-Making SI3/SI4 advertise the SIM's home PLMN changes the intermediate candidate
-from unusable to usable and produces a second organic channel configuration,
-but it does not start Location Updating. Standards-valid normal-operation
-`EF_AD`, matching `EF_PLMNsel`, and erased `EF_LOCI` with update-status 1 also
-leave the post-camp route unchanged. These are retained as a coherent SIM
-profile, not as claimed registration fixes.
+## Closed contract classes
 
-The corrected task-10 status `0x1392` handler is `0x21c36a`, not `0x21b790`.
-Runtime state writes show controller `0 -> 1 -> 2 -> 3`; SI reports arrive in
-state 2. Finalizer `0x219e30` publishes task-17 `0x0434` for selector 1 and
-task-15 `0x042f` for selector 2. The latter becomes task-17 `0x0a22`; neither
-path presently constructs an MM object or reaches task-15 `0x07dd`.
+The following conclusions are retained in the falsification ledger and must
+not be reintroduced as peer behavior:
 
-The remaining boundary is therefore above finite L1 search/camp and below the
-task-15 MM parser. It is not evidence for injecting `0x07dd`.
+- raw RSSI records, a distinct neighbor in SI2, or repeated SI blocks do not
+  populate the firmware-owned PLMN result list without its measurement mode;
+- cached EF_LOCI and a complete EF_PLMNsel are persistence/preference inputs,
+  not commands to select the currently visible cell;
+- type `0x88` is NEIGHBOUR_TIMING_OFFSET and does not carry serving identity or
+  activate the initial PLMN lifecycle;
+- types `0x83`, `0x86`, and `0x99` have separately decoded scalar/controller
+  roles and do not provide an undocumented PLMN result;
+- a second SCH or an unsolicited CHANNEL_CHANGED_CNF is lifecycle-invalid;
+- complete SI produces task-11 `0x13b2`, not `0x13b3`, and its conditional
+  task-10 post is `0x1396`, not `0x1397`;
+- task-10 `0x1397`, task-11 `0x13b3`, and controller fan-out state 11 have no
+  organic entrance in the coherent camp and must not be synthesized;
+- RR/LAPDm `0x05e9`, task-10 `0x03f1`, and DSP TX type `0x07` belong to later
+  measurement or established-channel lifecycles;
+- task-17 `0x09d6` is a post-registration current-identity-change notification,
+  not a network primitive.
 
-## Next boundary
+The direct task-10 post surface is exhaustively classified: twenty call sites
+account for the observed search, result, DSP receive, SI accumulator, and
+bridge families. None constructs a statically identifiable `0x1397`. This is a
+quantified absence over direct posts, not proof that no data-driven or external
+predecessor exists.
 
-The next network milestone begins after this checkpoint:
+## Location Updating boundary
 
-1. identify the firmware-owned trigger for Location Updating;
-2. decode the MM request envelope at the existing service/task-15 boundary;
-3. return a standards-valid Location Updating Accept through its evidenced
-   transport;
-4. let firmware publish registered PLMN/operator and signal content;
-5. keep the serving-cell verifier and both 3210 boot oracles green.
+The next standards-known receive parser is `0x209978`. It accepts GSM protocol
+discriminator 5 and classifies Mobility Management messages:
 
-No part of that later work may relabel a raw `RECEIVED_BLOCK` as `0x07dd`, post
-`0x05e8`, or write registration state directly.
+- `0x02`: Location Updating Accept
+- `0x04`: Location Updating Reject
+- `0x21`: CM Service Accept
+- `0x22`: CM Service Reject
+- `0x29`: CM Service Abort
+
+This parser is downstream of signalling-channel establishment. The coherent
+run does not construct its `0x07dd` input, so an MM response would currently be
+unsolicited.
+
+Current-identity helper `0x209380` is also downstream. Seven MM result
+lifecycles call it after filling `0x10ffc8`; a changed identity becomes task-17
+`0x09d6`. No current identity is committed in the serving-cell checkpoint.
+
+The unresolved question is therefore singular:
+
+> Which organic RM/MM transition selects the visible home PLMN, establishes
+> the signalling channel, and emits the Location Updating Request envelope?
+
+Only after that request is observed should `nokia_gsm_network_device` answer
+with a standards-valid Location Updating Accept. The peer must not post
+`0x07dd`, relabel a raw RECEIVED_BLOCK as an MM object, or write registration
+state directly.
+
+## Acceptance and next work
+
+The radio checkpoint remains stable when:
+
+1. `make verify-radio-camp` passes through the six ordered semantic predicates;
+2. the default and coherent 3210 boot oracles remain unchanged;
+3. `make evidence-check` and `make test-tools` pass;
+4. no diagnostic packet scenario or direct firmware-state force is retained.
+
+The next investigation starts backward from the Location Updating Request
+consumer/transport and the selected-PLMN commit, not from guessed DSP packets.

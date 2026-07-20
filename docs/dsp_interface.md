@@ -242,6 +242,13 @@ object's leading status and delivers it through the ordinary task mailbox.
 | `0x99` | `0x28464c` | structured measurement/report decoder |
 | other | `0x2b3730` | generic invalid/diagnostic path, then free |
 
+Type `0x99` is a scalar measurement sampler rather than a PLMN-result
+transport. It converts and averages the incoming sample according to the
+controller state, constructs a six-byte type-2/command-`0x4a` object and posts
+it to task 3. It does not post to task 10 or 11, set the task-11 measurement
+mode, or populate a network identity. This closes the last first-level RX
+family as a direct source of the missing PLMN-selection transition.
+
 Type `0x83` is not a search/camp completion. Controller states 1 and 2 discard
 the packet; state 3 rewrites it to `0x139f` and posts it to task 10; other
 states take the diagnostic path. Task 10's `0x139f` handler copies signed
@@ -287,10 +294,12 @@ semantic consumer:
 - type `0x89` is rejected when its acceptance byte at `0x10dbd7` is one.
   Otherwise it runs state handler `0x216830` and posts `0x1393`. The state
   handler dispatches on the separate radio-controller state at `0x10dc93` and
-  does not inspect the packet body on the state-1 path. Task 10 reaches fan-out
-  `0x21bb5c` through a separate event arm, not directly from the type-`0x89`
-  receive handler. That fan-out publishes controller/status work but does not
-  directly call `0x219e30`.
+  does not inspect the packet body on the state-1 path. Task 10 consumes
+  `0x1393` at `0x21c340` and conditionally reaches fan-out `0x21bb5c`.
+  Helper `0x21b468` is a separate replay/event path, not the normal `0x1393`
+  consumer; joining the two paths previously made the channel confirmation
+  appear to publish task-17 home-PLMN status `0x0433` directly. It does not.
+  The fan-out also does not directly call `0x219e30`.
 
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result
@@ -591,9 +600,17 @@ input `0x09d6` (and at `0x223a28` after the phase loop returns). It publishes pa
 `0x255124 -> 0x28a4a8 -> 0x238a24` then constructs `0x1776` for decimal task 14
 (ID `0x0e`). A boundary diagnostic now reaches `0x0434` through direct type-`0x87`
 completion. Task 17 consumes it at `0x225240`, runs `0x225b6c`, and continues at
-`0x226348` without reaching `0x2b3f60`. The missing predecessor of `0x13e2` is therefore
-the organic producer of task-17 input `0x09d6`, not the arrival of `0x0434`. The
-`0x0fbf` context path
+`0x226348` without reaching `0x2b3f60`.
+
+The predecessor of `0x09d6` is now recovered and is firmware-owned. Task-15 helper
+`0x209380` compares the current identity at `0x10ffc8` with the stored identity at
+`0x10ffb4`; on a changed identity it calls translator `0x208ee0` with input `0x09d6`.
+That translator copies the 12-byte current identity into a new object and adapter
+`0x251c92` posts it to task 17 with the same status. The helper is called from seven
+MM result lifecycles but does not execute in the coherent camp because no current
+identity has yet been committed. Therefore `0x09d6` is a downstream
+serving-identity-change notification, not a DSP or network primitive to synthesize.
+The `0x0fbf` context path
 and `0x0fc2 -> 0x1392` radio-state path are separate and do not reach `0x0434`;
 only after the `0x0fc1` contract is pinned should the proven bidirectional
 contract move into a DSP peer device.

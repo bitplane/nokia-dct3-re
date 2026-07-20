@@ -13,6 +13,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dspif.cpp driver/nokia_dspif.h \
 	driver/nokia_external_service.cpp driver/nokia_external_service.h \
 	driver/nokia_gensio.cpp driver/nokia_gensio.h \
+	driver/nokia_gsm_network.cpp driver/nokia_gsm_network.h \
 	driver/nokia_mad2.cpp driver/nokia_mad2.h \
 	driver/nokia_mbus.cpp driver/nokia_mbus.h \
 	driver/nokia_simi.cpp driver/nokia_simi.h \

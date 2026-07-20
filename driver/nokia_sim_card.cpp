@@ -16,6 +16,7 @@ nokia_sim_card_device::nokia_sim_card_device(
 void nokia_sim_card_device::device_start()
 {
 	save_item(NAME(m_cphs_aoc));
+	save_item(NAME(m_cached_location));
 	save_item(NAME(m_atr));
 	save_item(NAME(m_atr_len));
 	save_item(NAME(m_tx));
@@ -438,6 +439,9 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	static constexpr u8 ecc[] = { 0x11, 0xf2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	static constexpr u8 language_preference[] = { 0x01, 0xff, 0xff, 0xff };
+	// GSM 11.11 EF_ACC: allocate one ordinary subscriber class (class 0).
+	// Erased bytes would allocate every class and set reserved byte-1 bit 3.
+	static constexpr u8 access_control_class[] = { 0x00, 0x01 };
 	// The base card advertises no optional SIM services.  The opt-in CPHS AoC
 	// profile also advertises GSM 11.11 service 5, keeping EF_CSP and EF_SST
 	// consistent and causing the ME to read ACM, ACMmax and PUCT normally.
@@ -454,6 +458,11 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// information in this phase-2 profile.  Erased 0xff bytes select no valid
 	// operation mode and make the subscriber profile internally inconsistent.
 	static constexpr u8 administrative_data[] = { 0x00, 0xff, 0xff, 0x02 };
+	// No ciphering key is available, expressed with the GSM 11.11 reserved
+	// key-sequence value rather than an erased (and invalid) sequence byte.
+	static constexpr u8 ciphering_key[] = {
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x07
+	};
 	// This established fixture decodes to IMSI 001-01...; changing it to the
 	// laboratory PLMN currently enters a separate, unresolved SIM transaction.
 	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98, 0x10 };
@@ -478,16 +487,29 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	if (fid == 0x6fb7 && offset < std::size(ecc)) return ecc[offset];
 	if (fid == 0x6fad && offset < std::size(administrative_data)) return administrative_data[offset];
 	if (fid == 0x6f07 && offset < std::size(imsi)) return imsi[offset];
+	if (fid == 0x6f20 && offset < std::size(ciphering_key)) return ciphering_key[offset];
 	if (fid == 0x6f30 && offset < std::size(plmn_selector)) return plmn_selector[offset];
+	if (fid == 0x6f78 && offset < std::size(access_control_class)) return access_control_class[offset];
 	if (m_cphs_aoc && fid == 0x6f16 && offset < std::size(cphs_info)) return cphs_info[offset];
 	if (m_cphs_aoc && fid == 0x6f15 && offset < std::size(cphs_aoc)) return cphs_aoc[offset];
 	if (m_cphs_aoc && fid == 0x6f37 && offset < std::size(acm_max)) return acm_max[offset];
 	if (m_cphs_aoc && fid == 0x6f39 && offset < std::size(acm)) return acm[offset];
 	if (m_cphs_aoc && fid == 0x6f41 && offset < std::size(puct)) return puct[offset];
-	// EF_LOCI for a subscriber that has never registered: no TMSI, LAI or
-	// TMSI-time value is available, and update status 1 requests an initial
-	// Location Updating procedure.  A zero-filled LAI contradicts that status.
-	if (fid == 0x6f7e) return offset == 10 ? 0x01 : 0xff;
+	if (fid == 0x6f7e)
+	{
+		// A cached profile represents a SIM previously registered on the synthetic
+		// 001-01/LAC-1 network.  The TMSI remains invalid, so firmware still owns
+		// identity establishment and any subsequent EF_LOCI update.
+		static constexpr u8 cached_loci[11] =
+				{ 0xff, 0xff, 0xff, 0xff, 0x00, 0xf1, 0x10, 0x00, 0x01, 0x00, 0x00 };
+		if (m_cached_location)
+			return cached_loci[offset];
+		// Never registered: no TMSI, LAI or TMSI-time value, and update status 1.
+		return offset == 10 ? 0x01 : 0xff;
+	}
+	// GSM 11.11 EF_HPLMN is measured in six-minute units.  Five is an ordinary
+	// finite search period; erased 0xff is reserved and not a neutral profile.
+	if (fid == 0x6f31) return 0x05;
 	if (fid == 0x6fae) return 0x02;
 	return 0xff;
 }

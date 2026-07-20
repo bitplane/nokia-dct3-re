@@ -4,6 +4,7 @@
 #include "emu.h"
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
+#include "nokia_gsm_network.h"
 
 class nokia_dsp_hle_device : public device_t
 {
@@ -39,6 +40,7 @@ private:
 
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_external_service_peer_device> m_external_peer;
+	required_device<nokia_gsm_network_device> m_gsm_network;
 	emu_timer *m_service_timer = nullptr;
 	emu_timer *m_packet_timer = nullptr;
 	emu_timer *m_response_timer = nullptr;
@@ -54,6 +56,7 @@ private:
 	unsigned m_radio_sequence_stage = 0;
 	unsigned m_radio_search_round = 0;
 	unsigned m_radio_wait_ticks = 0;
+	u8 m_radio_search_mode = 0;
 	bool m_radio_report_deferred = false;
 	bool m_radio_search_requested = false;
 	unsigned m_bootstrap_exchange_count = 0;

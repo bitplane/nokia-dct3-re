@@ -59,7 +59,9 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn("{ 0x6fad, 0x7f20, 4, 0", self.card)
         self.assertIn("administrative_data[] = { 0x00, 0xff, 0xff, 0x02 }", self.card)
         self.assertIn("plmn_selector[] = { 0x00, 0xf1, 0x10 }", self.card)
-        self.assertIn("if (fid == 0x6f7e) return offset == 10 ? 0x01 : 0xff", self.card)
+        self.assertIn("cached_loci[11]", self.card)
+        self.assertIn("if (m_cached_location)", self.card)
+        self.assertIn("return offset == 10 ? 0x01 : 0xff", self.card)
 
 
 if __name__ == "__main__":

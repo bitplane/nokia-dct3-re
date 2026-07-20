@@ -30,6 +30,7 @@
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
 #include "nokia_gensio.h"
+#include "nokia_gsm_network.h"
 #include "nokia_mad2.h"
 #include "nokia_mbus.h"
 #include "nokia_sim_card.h"
@@ -239,6 +240,7 @@ public:
 		m_dspif(*this, "dspif"),
 		m_dsp_hle(*this, "dsp_hle"),
 		m_external_service_peer(*this, "external_service_peer"),
+		m_gsm_network(*this, "gsm_network"),
 		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
 		m_pcd8544(*this, "pcd8544"),
@@ -337,6 +339,7 @@ private:
 	required_device<nokia_dspif_device> m_dspif;
 	required_device<nokia_dsp_hle_device> m_dsp_hle;
 	required_device<nokia_external_service_peer_device> m_external_service_peer;
+	required_device<nokia_gsm_network_device> m_gsm_network;
 	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<pcd8544_device> m_pcd8544;
@@ -641,6 +644,7 @@ void noki3310_state::machine_reset()
 			m_product.ccont_wddisx_grounded) != 0);
 	m_simi->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", m_product.boot_devices) != 0);
 	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKI3210_SIM_CPHS_AOC", 0) != 0);
+	m_sim_card->set_cached_location(nokia_env_u32("NOKI3210_SIM_CACHED_LOCATION", 0) != 0);
 	{
 		u8 atr[40] = { 0x3b, 0x10, 0x05 };
 		unsigned length = 3;
@@ -1467,6 +1471,7 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_DSPIF(config, m_dspif);
 	NOKIA_DSP_HLE(config, m_dsp_hle);
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
+	NOKIA_GSM_NETWORK(config, m_gsm_network);
 	const bool external_service_model = nokia_env_u32("NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 0) != 0;
 	const unsigned dsp_default_ms = external_service_model ? 4 : 5;
 	const bool dsp_trace = nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0;

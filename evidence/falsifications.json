@@ -357,9 +357,33 @@
       "evidence": ["docs/network_scouting.md", "docs/message_topology_census.md"]
     },
     {
+      "id": "finite_serving_result_populates_task17_network_list", "status": "disproven",
+      "hypothesis": "A post-camp PLMN scan containing one serving-cell ALL_RSSI_RESULTS report followed by the finite terminal populates task 17's network-result list and starts Location Updating",
+      "conclusion": "The standards-shaped serving result traverses MDIRCV/FIQ0 before the terminal, but the task-17 list root at 0x10fce4 remains null. The subsequent 0x0434 takes the same mode-zero path and task 15 returns the same 0x09f0 result bytes 16 0f. A serving carrier alone is insufficient; repeating or retiming RSSI reports is not a substitute for the firmware-owned MM/PLMN result contract.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "finite_neighbor_result_populates_task17_network_list", "status": "disproven",
+      "hypothesis": "A finite post-camp SEARCH_LIST containing a distinct neighbour ARFCN followed by NO_BCCH_LEFT is sufficient to populate task 17's PLMN-result list",
+      "conclusion": "A diagnostic peer returned ARFCN 2 through ALL_RSSI_RESULTS and then the recovered NO_BCCH_LEFT terminal. Firmware consumed both reports, continued through another channel-acquisition/SCH/BCCH cycle, and repeated the search, but 0x10fce4 remained null and task 15 again returned 0x09f0 bytes 16 0f through 30 seconds. A second carrier alone is insufficient; the missing contract is above raw RSSI enumeration and must be recovered from the MM/PLMN result owner rather than tuned through additional scan results.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "si2_neighbor_plus_background_rssi_promotes_candidate", "status": "disproven",
+      "hypothesis": "Advertising ARFCN 2 in serving-cell SI2 and returning it in complete mode-0x40/0x50 RSSI batches is sufficient to make firmware request SCH and channel configuration for the neighbor",
+      "conclusion": "The peer encoded ARFCN 2 in SI2's GSM bitmap-0 field, kept it below the cutoff in the initial measurement history, then returned it at -60 dBm followed by the applicable finite terminal in both observed background modes. Firmware parsed SI2 and consumed every report through MDIRCV/FIQ0, but emitted no candidate object, SCH request or CHANNEL_CONFIGURE. The experiment was removed. Neighbor eligibility depends on an additional firmware-owned SI2/measurement-mode table contract, not merely standards-valid broadcast membership plus RSSI.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
       "id": "radio_type88_carries_serving_identity", "status": "disproven",
       "hypothesis": "DSP RX type 0x88 can carry PLMN or SI3-shaped serving-cell identity and bootstrap camping",
       "conclusion": "The ROM handler and recovered protocol vocabulary identify type 0x88 as NEIGHBOUR_TIMING_OFFSET. A standards-shaped PLMN/SI3 body delivered through MDIRCV/FIQ0 does not enter the BCCH system-information parser or commit a serving cell. Serving identity is accepted only from type-0x80 RECEIVED_BLOCK after the channel-change and RA lifecycle.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "radio_type88_activates_serving_plmn_result", "status": "disproven",
+      "hypothesis": "A ROM-shaped NEIGHBOUR_TIMING_OFFSET report in the accepted serving-cell acquisition window enables the complete-SI aggregate and automatic PLMN result",
+      "conclusion": "The peer delivered type 0x88 after the usable RSSI result while the L1-control acceptance window was active. Firmware transported it through FIQ0 and constructed task-11 status 0x13ac, but the L1-measurement consumer was not in the phase that accepts the timing object. No mode-1 transition or complete-SI aggregate publication followed. The packet was removed from the retained peer; timing-offset traffic belongs to a separate measurement lifecycle and must not be used to force serving-cell selection.",
       "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
     },
     {
@@ -367,6 +391,96 @@
       "hypothesis": "CHANNEL_CHANGED_CNF type 0x89 can be sent at any point after a candidate appears",
       "conclusion": "Handler 0x284f74 accepts type 0x89 only while controller acceptance byte 0x10dbd7 is 2. Earlier packets are discarded in state 1 and packets after the window closes cannot drive the same transition. The retained peer sends NO_PSW_LEFT before CHANNEL_CHANGED_CNF and the coherent trace observes task-10 0x1393 plus firmware-owned task-11 action 1.",
       "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
+    },
+    {
+      "id": "repeat_si3_after_complete_bitmap_starts_location_update", "status": "disproven",
+      "hypothesis": "The finite peer misses a serving-cell suitability transition because SI3 arrives before SI4 completes the required SI bitmap and is not repeated afterwards",
+      "conclusion": "A coherent peer run repeated the same standards-shaped SI3 after firmware had accepted SI1-SI4 and recorded bitmap 0x0f. The repeated block was parsed with the complete bitmap but produced no new task-10 or MM event; task 17 completed the same valid 0x09f0 operation pair and entered continuation 2. Continuous BCCH is a fidelity requirement, but one-shot SI ordering is not the missing Location Updating trigger.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
+    },
+    {
+      "id": "channel_change_directly_publishes_home_plmn", "status": "disproven",
+      "hypothesis": "The normal type-0x89 CHANNEL_CHANGED_CNF path directly enters helper 0x21b468 and publishes task-17 home-PLMN status 0x0433",
+      "conclusion": "Exact task-10 dispatch decode and runtime tracing show status 0x1393 is consumed at 0x21c340 and conditionally enters fan-out 0x21bb5c. Helper 0x21b468 is a separate replay/event path. The sole 0x0433 wrapper caller 0x21adac constructs the PLMN from the cached SIM IMSI, but neither of its conditional call sites executes in the coherent camp. A joined control-flow path had been attributed to the ordinary channel confirmation.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "second_sch_before_bcch_completes_serving_identity", "status": "disproven",
+      "hypothesis": "A second serving-cell SCH after the initial channel change is required to construct the semantic SCH object and complete serving-cell identity before BCCH",
+      "conclusion": "The initial SCH in controller state 2 intentionally becomes acknowledge-only status 0x138e and triggers firmware's CHANNEL_CONFIGURE. A second SCH caused a second configuration request with zero identity fields; answering it made the retained SI3 identity fail the radio-camp gate. The speculative SCH and confirmation were removed. The semantic 0x139e path belongs to a different synchronization lifecycle.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
+    },
+    {
+      "id": "missing_ef_plmnsel_causes_empty_registration_result_list", "status": "disproven",
+      "hypothesis": "Task 17's null PLMN-result list is caused by the synthetic SIM omitting or failing EF_PLMNsel",
+      "conclusion": "The synthetic card exposes a 24-byte EF_PLMNsel containing home PLMN 001-01 followed by erased entries. A coherent trace observes firmware select 6f30, obtain its length and read all 24 bytes before the candidate route, while the task-17 list root at 0x10fce4 remains null before and after camping. Static decode proves helper 0x222868 only tests firmware-maintained identities against that existing list; it does not import EF_PLMNsel. Sole node allocator 0x222ee4 belongs to the separately gated selector-one lifecycle. The missing population belongs to a later RM/MM result lifecycle, not the SIM filesystem or APDU transport.",
+      "evidence": ["docs/network_scouting.md", "docs/sim_subsystem.md"]
+    },
+    {
+      "id": "task17_continuation2_waits_for_registration_successor", "status": "disproven",
+      "hypothesis": "Task 17 stalls after the selector-zero completion because continuation state 2 awaits another event which should start Location Updating",
+      "conclusion": "The sole successful 0x09f0 completion arm writes value 2 to task-17 context byte 0x10fcc5 and returns. Exhaustive decode of every access through the task-17 context base finds no branch testing value 2 to launch a successor. Continuation 2 is a terminal result marker; automatic registration must enter from another firmware-owned lifecycle.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "task10_state3_home_plmn_is_initial_registration_entrance", "status": "disproven",
+      "hypothesis": "Initial CHANNEL_CHANGED_CNF should reach task-10 controller state 3 and publish task-17 home-PLMN status 0x0433",
+      "conclusion": "The initial SEARCH_LIST and acquisition lifecycle correctly accepts CHANNEL_CHANGED_CNF in controller state 2. The state-3 fan-out arm at 0x21be84 belongs to a later channel-change context after serving SI settles. No second CHANNEL_CONFIGURE request precedes the post-SI background-search terminal, so replaying another confirmation would be unsolicited. The retained peer instead lacks a complete identity-bearing candidate lifecycle for the organic mode-0x40/0x50 background search.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "radio_fanout_state11_is_hidden_camp_transition", "status": "disproven",
+      "hypothesis": "Controller fan-out state 11 is selected transiently by an indirect write during the coherent serving-cell lifecycle and supplies the missing SI-aggregate enable",
+      "conclusion": "A complete write-watch of 0x10dc93 through coherent camp observes only states 0, 1 and 2. Reset supplies 0, SEARCH_LIST builder 0x21a16a supplies 1, and mode-0x50 request builder 0x21717a supplies 2. Static direct-writer coverage also finds alternate states 3, 5, 6, 7, 8, 10, 12 and 14, but no state 11. The state-11 arm is a dormant alternate lifecycle, not a hidden transition in ordinary camp.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
+    },
+    {
+      "id": "status13b3_catalogue_descriptor_is_producer", "status": "disproven",
+      "hypothesis": "The central status descriptor for 0x13b3 is a data-driven producer of the task-11 status which enables measurement mode",
+      "conclusion": "The descriptor's five transition records at indices 0x318 through 0x31c are downstream callback reactions. They match selector 0xb7 states and emit events 0x059f, 0x0376, 0x059d or 0x059e. They neither construct nor post task-11 status 0x13b3; the matching status value is a namespace collision, not an organic producer edge.",
+      "evidence": ["docs/network_scouting.md", "tools/message_census.py"]
+    },
+    {
+      "id": "cached_ef_loci_selects_current_plmn", "status": "disproven",
+      "hypothesis": "A standards-valid cached EF_LOCI for the synthetic 001-01/LAC-1 cell causes firmware to commit that PLMN and begin Location Updating after camp",
+      "conclusion": "Firmware reads the complete cached record, including matching LAI and update status zero, but selected tuple 0x10fd00 and the task-17 result list remain empty. EF_LOCI is subscriber persistence; it does not replace the L1 PLMN-measurement and RM selection lifecycle.",
+      "evidence": ["docs/network_scouting.md", "docs/sim_subsystem.md"]
+    },
+    {
+      "id": "background_si_blocks_arm_plmn_measurement", "status": "disproven",
+      "hypothesis": "Returning validated SI1-SI4 blocks during the organic mode-0x40 background SEARCH_LIST is sufficient to produce a PLMN result",
+      "conclusion": "Task 12 parses all four blocks and retains SI bitmap 0x0f, but task-11 measurement mode remains zero and no PLMN list record, SCH request or selected tuple appears. System-information content is necessary but is owned by a prior L1 measurement-context transition.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "dsp_type99_is_plmn_result_transport", "status": "disproven",
+      "hypothesis": "The last unclassified accepted DSP RX family, type 0x99, carries the missing PLMN-measurement result",
+      "conclusion": "Handler 0x28464c converts and averages a scalar sample, builds a six-byte type-2/command-0x4a object and posts it to task 3. It does not address task 10 or 11, change measurement mode or carry network identity.",
+      "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md"]
+    },
+    {
+      "id": "rr_03f1_is_missing_ordinary_plmn_scan_entrance", "status": "disproven",
+      "hypothesis": "One of RR's seven 0x03f1 publishers is dormant only because the emulated network omits the ordinary automatic PLMN-scan trigger",
+      "conclusion": "The 31-entry RR table is a coroutine continuation table. All seven 0x03f1 sites classify as Frequency Redefinition, LAPDm release/completion, or later channel retry paths; decoder 0x2594b8 constructs input 0x0807 from GSM RR Layer-3 type 0x14, and the apparent 0x2504d0 initial chooser is locally constrained to publish 0x03e9. The coherent boot already uses 0x03e9 to construct DSP SEARCH_LIST and complete serving-cell acquisition. Forcing 0x03f1 would enter a later channel-maintenance lifecycle, not repair initial registration.",
+      "evidence": ["docs/network_scouting.md", "tools/message_census.py"]
+    },
+    {
+      "id": "complete_si_aggregate_produces_1397_or_13b3", "status": "disproven",
+      "hypothesis": "Task 12's runtime-built complete-SI aggregate is the otherwise-unidentified producer of task-10 0x1397 or task-11 0x13b3",
+      "conclusion": "The bitmap-0x0f arm at 0x274000 posts fixed object 0x2e2e14, status 0x13b2, to task 11. Task 11 maps 0x13b2 to 0x215c8e and disables measurement mode; adjacent 0x13b3 selects a different reconciliation arm. Task 12's conditional task-10 post at 0x273fde uses fixed status 0x1396. Neither unresolved status is synthesized by complete SI.",
+      "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "idle_ra_completion_before_si_causes_empty_selection", "status": "disproven",
+      "hypothesis": "The radio peer completes IDLE_RA too early, so task 11 consumes the serving carrier before SI1-SI4 can promote it",
+      "conclusion": "A bounded peer experiment delayed the organic type-0x8c IDLE_RA completion until all four serving SI blocks had been accepted. Task 10 then constructed 0x13a5 after SI1-SI4, but task 11 still rebuilt one tag-0x3c carrier, selected index 0xff and returned result zero. The original request-driven ordering was restored; carrier promotion requires another firmware-owned lifecycle.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
+    },
+    {
+      "id": "received_block_zero_arfcn_causes_empty_selection", "status": "disproven",
+      "hypothesis": "The radio peer's omitted ARFCN in RECEIVED_BLOCK prevents the post-SI task-11 completion from selecting the serving network",
+      "conclusion": "The recovered RECEIVED_BLOCK object layout places ARFCN at DSP payload bytes +6..+7. Supplying the evidenced serving ARFCN 1 corrects task-12 SI ownership and keeps active channel 0x10dbce at 1, but task 11 still completes in mode zero with empty measurement sources and task 17 fails selected-PLMN admissibility because 0x10fd00..0x10fd02 is unset. The packet defect was fixed; it was not the RM/MM transition.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
     }
   ]
 }

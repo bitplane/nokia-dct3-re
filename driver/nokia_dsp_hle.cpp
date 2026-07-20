@@ -8,7 +8,8 @@ nokia_dsp_hle_device::nokia_dsp_hle_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
 	m_transport(*this, "^dspif"),
-	m_external_peer(*this, "^external_service_peer")
+	m_external_peer(*this, "^external_service_peer"),
+	m_gsm_network(*this, "^gsm_network")
 {
 }
 
@@ -28,6 +29,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_radio_sequence_stage));
 	save_item(NAME(m_radio_search_round));
 	save_item(NAME(m_radio_wait_ticks));
+	save_item(NAME(m_radio_search_mode));
 	save_item(NAME(m_radio_report_deferred));
 	save_item(NAME(m_radio_search_requested));
 	save_item(NAME(m_bootstrap_exchange_count));
@@ -44,6 +46,7 @@ void nokia_dsp_hle_device::device_reset()
 	m_radio_sequence_stage = 0;
 	m_radio_search_round = 0;
 	m_radio_wait_ticks = 0;
+	m_radio_search_mode = 0;
 	m_radio_report_deferred = false;
 	m_radio_search_requested = false;
 	m_bootstrap_exchange_count = 0;
@@ -145,6 +148,9 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::response_tick)
 
 void nokia_dsp_hle_device::observe_radio_request(const nokia_dspif_device::packet &packet)
 {
+	if (packet.type == 0x1a && packet.length != 0)
+		m_radio_search_mode = packet.payload[0];
+
 	if (packet.type == 0x1a && m_radio_sequence_stage == 0 && m_radio_reports_pending == 0)
 	{
 		// Initial SEARCH_LIST attempts end empty.  The firmware responds by
@@ -192,21 +198,36 @@ void nokia_dsp_hle_device::observe_radio_request(const nokia_dspif_device::packe
 	}
 	else if (packet.type == 0x0c && m_radio_sequence_stage == 7)
 	{
-		// RA_INFO makes the MCU issue IDLE_RA; type 0x8c is its recovered
-		// completion family.  Only after it is accepted do BCCH blocks begin.
+		// RA_INFO makes the MCU issue IDLE_RA.  Type 0x8c is its recovered
+		// completion; withholding it leaves the transaction pending until the
+		// firmware times out and restarts cell acquisition.
 		m_radio_sequence_stage = 8;
 		m_radio_reports_pending = 1;
 		m_radio_report_deferred = true;
 	}
 	else if (packet.type == 0x1a && m_radio_sequence_stage == 7)
 	{
-		// Mobility Management can request another search while the current
-		// serving cell's BCCH batch is still being delivered.  Preserve that
-		// request and begin it once the batch has drained.
-		m_radio_search_requested = true;
-		if (m_trace_enabled)
-			logerror("dsp_hle: queued repeated SEARCH_LIST during BCCH t=%.6f\n",
-					machine().time().as_double());
+		// Preserve a search that overlaps the serving-cell BCCH batch.  Once the
+		// batch is already drained, start the finite background measurement now;
+		// otherwise there is no later SI report that could release the request.
+		if (m_radio_reports_pending != 0)
+		{
+			m_radio_search_requested = true;
+			if (m_trace_enabled)
+				logerror("dsp_hle: queued repeated SEARCH_LIST during BCCH t=%.6f\n",
+						machine().time().as_double());
+		}
+		else
+		{
+			m_radio_sequence_stage = 10;
+			m_radio_reports_pending = 1;
+			m_radio_report_deferred = true;
+		}
+	}
+	else if (packet.type == 0x1a && m_radio_sequence_stage == 10 && m_radio_reports_pending == 0)
+	{
+		m_radio_reports_pending = 1;
+		m_radio_report_deferred = true;
 	}
 	else if (packet.type == 0x1a && m_radio_sequence_stage == 9 && m_radio_reports_pending == 0)
 	{
@@ -244,6 +265,11 @@ void nokia_dsp_hle_device::emit_radio_report()
 	case 9:
 		report_type = m_radio_reports_pending == 2 ? 0x8b : 0x87; // result, then search complete
 		break;
+	case 10:
+		// Camped background searches are maintenance requests.  Close them without
+		// manufacturing a new automatic-selection candidate.
+		report_type = m_radio_search_mode == 0x50 ? 0x8f : 0x87;
+		break;
 	default:
 		break;
 	}
@@ -254,12 +280,14 @@ void nokia_dsp_hle_device::emit_radio_report()
 		// four-byte records: big-endian ARFCN, flags and signed RSSI.  Only ARFCN
 		// 1 exists.  Two -109 dBm baselines followed by -60 dBm let the ROM set
 		// candidate flags 0x0e and satisfy its own 0x212048 predicate.
+		payload[0] = 0x00;
 		payload[1] = 0x10;
 		for (unsigned result = 0; result < 40; ++result)
 		{
-			payload[2 + result * 4] = result == 0 ? 0x00 : 0xff;
-			payload[3 + result * 4] = result == 0 ? 0x01 : 0xff;
-			payload[5 + result * 4] = result == 0 ?
+			const bool serving_result = result == 0;
+			payload[2 + result * 4] = serving_result ? 0x00 : 0xff;
+			payload[3 + result * 4] = serving_result ? 0x01 : 0xff;
+			payload[5 + result * 4] = serving_result ?
 					(m_radio_search_round < 2 ? 0x93 : 0xc4) : 0x81;
 		}
 	}
@@ -272,34 +300,21 @@ void nokia_dsp_hle_device::emit_radio_report()
 		payload[0] = m_radio_sequence_stage >= 5 ? 0x50 : 0x40;
 		if (m_radio_sequence_stage >= 5)
 			payload[1] = 0x12;
-
-		static constexpr u8 si1[] = {
-			0x55, 0x06, 0x19, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2b
-		};
-		static constexpr u8 si2[] = {
-			0x59, 0x06, 0x1a, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0xff, 0, 0, 0, 0
-		};
-		static constexpr u8 si3[] = {
-			0x49, 0x06, 0x1b, 0x00, 0x01, 0x00, 0xf1, 0x10,
-			0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0x2b, 0x2b, 0x2b, 0x2b, 0x2b
-		};
-		static constexpr u8 si4[] = {
-			0x31, 0x06, 0x1c, 0x00, 0xf1, 0x10, 0x00, 0x01,
-			0, 0, 0, 0, 0, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b,
-			0x2b, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b
-		};
+		payload[6] = 0x00;
+		payload[7] = 0x01; // ARFCN 1, matching the selected RSSI candidate.
 
 		if (m_radio_sequence_stage != 7 || m_radio_reports_pending == 2)
-			std::copy(std::begin(si3), std::end(si3), std::begin(payload) + 10);
+			std::copy(m_gsm_network->system_information(2).begin(),
+					m_gsm_network->system_information(2).end(), std::begin(payload) + 10);
 		else if (m_radio_reports_pending == 4)
-			std::copy(std::begin(si1), std::end(si1), std::begin(payload) + 10);
+			std::copy(m_gsm_network->system_information(0).begin(),
+					m_gsm_network->system_information(0).end(), std::begin(payload) + 10);
 		else if (m_radio_reports_pending == 3)
-			std::copy(std::begin(si2), std::end(si2), std::begin(payload) + 10);
+			std::copy(m_gsm_network->system_information(1).begin(),
+					m_gsm_network->system_information(1).end(), std::begin(payload) + 10);
 		else
-			std::copy(std::begin(si4), std::end(si4), std::begin(payload) + 10);
+			std::copy(m_gsm_network->system_information(3).begin(),
+					m_gsm_network->system_information(3).end(), std::begin(payload) + 10);
 	}
 
 	const unsigned payload_length = report_type == 0x8b ? 166 : report_type == 0x80 ? 34 : 8;
@@ -321,11 +336,6 @@ void nokia_dsp_hle_device::emit_radio_report()
 		m_radio_reports_pending = 4;
 		m_radio_wait_ticks = 59;
 	}
-	else if (m_radio_sequence_stage == 8 && report_type == 0x8c)
-	{
-		m_radio_sequence_stage = 7;
-		m_radio_reports_pending = 4;
-	}
 	else if (m_radio_sequence_stage == 7 && report_type == 0x80 && m_radio_reports_pending != 0)
 	{
 		// Space SI blocks at a 51-frame-multiframe cadence rather than filling
@@ -335,12 +345,22 @@ void nokia_dsp_hle_device::emit_radio_report()
 	else if (m_radio_sequence_stage == 7 && report_type == 0x80 && m_radio_search_requested)
 	{
 		m_radio_search_requested = false;
-		m_radio_sequence_stage = 9;
-		m_radio_reports_pending = 2;
+		m_radio_sequence_stage = 10;
+		m_radio_reports_pending = 1;
 		m_radio_report_deferred = true;
 		if (m_trace_enabled)
-			logerror("dsp_hle: starting queued repeated SEARCH_LIST t=%.6f\n",
+			logerror("dsp_hle: answering camped background SEARCH_LIST t=%.6f\n",
 					machine().time().as_double());
+	}
+	else if (m_radio_sequence_stage == 10 && (report_type == 0x87 || report_type == 0x8f))
+	{
+		m_radio_sequence_stage = 7;
+	}
+	else if (m_radio_sequence_stage == 8 && report_type == 0x8c)
+	{
+		m_radio_sequence_stage = 7;
+		m_radio_reports_pending = 4;
+		m_radio_wait_ticks = 59;
 	}
 	m_transport->notify_rx();
 	if (m_trace_enabled)

@@ -30,7 +30,14 @@ public class FindRefs extends GhidraScript {
 
 	@Override
 	protected void run() throws Exception {
-		for (long raw : ADDRS) {
+		String[] args = getScriptArgs();
+		long[] addresses = ADDRS;
+		if (args.length > 0) {
+			addresses = new long[args.length];
+			for (int i = 0; i < args.length; i++)
+				addresses[i] = Long.decode(args[i]);
+		}
+		for (long raw : addresses) {
 			Address to = toAddr(raw);
 			Function target = getFunctionContaining(to);
 			printf("REF_TARGET addr=%s fn=%s\n", to, target == null ? "<none>" : target.getName());

@@ -67,10 +67,16 @@
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
-      "id": "task17_registration_completion", "owner": "task17_registration_control", "status": "unresolved",
-      "predicate": "Task 17 receives organic input 0x09d6 and publishes 0x13e2 to the task-5 context dispatcher",
-      "current": "A provisioned coherent trace proves task 17 accepts startup object 0x1587 and emits local outputs 0x0a35, 0x0a25, and 0x09ec. The mode-zero 0x09ec route passes through task 15, task 16 and task 10; task 17 receives immediate acknowledgement 0x043c. Task 10 then publishes type-0x1a SEARCH_LIST. The serving-cell model now proves its asynchronous path through usable RSSI selection, channel change and SI1-SI4 acceptance, but none of those reports publishes task-17 registration completion 0x09d6/0x13e2. Location Updating is the next unresolved owner boundary.",
-      "evidence": ["docs/sim_registration.md", "docs/dsp_interface.md", "docs/mmi_settlement.md"]
+      "id": "location_update_request_entrance", "owner": "radio_rm_mm", "status": "unresolved",
+      "predicate": "The firmware selects the visible home PLMN, establishes a signalling channel, and emits an organic GSM Location Updating Request at the recovered network boundary",
+      "current": "The radio peer reaches usable ARFCN-1 selection, channel acceptance, RR-to-MM activation, and complete SI1-SI4 parsing. Current PLMN is 001-01 but selected PLMN remains zero, so task 17 performs a finite 0x09ec/0x09ef/0x09f0 selection exchange and stops at terminal continuation 2. Complete EF_PLMNsel and cached EF_LOCI do not populate the firmware-owned result list. Task-10 0x1397, task-11 0x13b3, fan-out state 11, and unsolicited channel confirmations are closed non-entrances and must not be synthesized. Task-15 helper 0x209380 proves 0x09d6 is downstream of an MM result and current-identity commit. Parser 0x209978 defines the eventual Location Updating Accept/Reject boundary, but no 0x07dd request envelope reaches it yet.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md", "docs/sim_registration.md"]
+    },
+    {
+      "id": "plmn_measurement_rr_entrance", "owner": "radio_l1_rr", "status": "satisfied",
+      "predicate": "RR's seven firmware-owned 0x03f1 producers are classified far enough to decide whether they start ordinary automatic PLMN selection",
+      "current": "The downstream chain is closed: task-10 0x03f1 reaches task-11 0x13a3 and constructs DSP TX type 0x07 MEAS_PLMN_RSSI. RR's 31-entry table at 0x2505c4 is a stackless-task continuation table, not a protocol-state table. The seven 0x03f1 sites belong to Frequency Redefinition, LAPDm completion/release, and later channel retry lifecycles. In particular, 0x0807 is decoded from standards-defined GSM RR Layer-3 message type 0x14, and both local paths to the 0x2504d0 chooser initialize its selector to a value that selects 0x03e9. Ordinary boot already follows 0x07d6 -> 0x03e9 -> DSP SEARCH_LIST. No 0x03f1 entrance, LAPDm result, or continuation should be synthesized for initial registration.",
+      "evidence": ["docs/network_scouting.md", "docs/rtos_tasks.md"]
     },
     {
       "id": "frontier_data_event_producer_census", "owner": "tooling", "status": "satisfied",

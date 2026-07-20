@@ -10,6 +10,7 @@ public:
 	auto response_cb() { return m_response_cb.bind(); }
 
 	void set_cphs_aoc(bool enabled) { m_cphs_aoc = enabled; }
+	void set_cached_location(bool enabled) { m_cached_location = enabled; }
 	void set_atr(const u8 *data, unsigned length);
 	void activate();
 	void rx_w(u8 data);
@@ -51,6 +52,7 @@ private:
 
 	devcb_write8 m_response_cb;
 	bool m_cphs_aoc = false;
+	bool m_cached_location = false;
 	u8 m_atr[40] = { 0x3b, 0x10, 0x05 };
 	u8 m_atr_len = 3;
 	u8 m_tx[260] = { 0 };

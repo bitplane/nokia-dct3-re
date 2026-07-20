@@ -427,6 +427,12 @@ task-17 completion branch -> 0x2b3f60(packed 0x53e2, firmware pointer)
   -> post to decimal task 14 (ID 0x0e) at 0x2389fe
 ```
 
+Task 15 organically constructs that `0x09d6` input after a serving-identity change.
+Helper `0x209380` compares current identity `0x10ffc8` with stored identity `0x10ffb4`,
+then translator `0x208ee0` copies the current 12-byte record and adapter `0x251c92`
+posts it to task 17. The coherent camp has not yet committed a current identity, so
+this downstream notification remains dormant; it is not an external message to inject.
+
 `0x13e2` is a real three-byte entry in the ROM message catalogue at `0x2cb810`; its packed
 one-argument producer literal `0x53e2` is at `0x2b3f64`. An opt-in DSP-boundary diagnostic now
 delivers type `0x87` through MDIRCV/FIQ0 and makes task 10 publish `0x0434` organically. In the
@@ -473,6 +479,16 @@ translator output: input `0x0a0c` reaches `0x209116`, where task-15 mode `0x1f` 
 literal, or statically recovered call argument supplies `0x0a0c` to `0x208ee0`; a dynamic
 caller remains possible, but `0x09de` establishes neither an independent peer ingress nor an
 ordinary-bootstrap producer (**S**).
+
+The adjacent task-5 event `0x152f` is part of the same later-session family, not a missing
+bootstrap event. Dispatcher case `0x152f` is the sole caller of `0x27a00c`; object mode 2 is
+sufficient for that routine to allocate a task-15 state-1 slot, while a pre-existing state-6
+slot is required only for its optional `0x0fa1` notification. The direct `0x152f` producer at
+`0x24e514` requires nonzero context bytes `0x10e898/0x10e89a`. Those bytes are derived by
+scanning the four lower-layer records at `0x10ea20`, with subtype 7 selecting this active
+context. In an eight-second coherent run all eight task-15 state slots and both context bytes
+remain zero after initialization (**S/R**). Injecting `0x152f` would therefore skip the absent
+lower-session context rather than create an ordinary registration session.
 
 ## Frontier: quantified non-SAT constructor absence
 
