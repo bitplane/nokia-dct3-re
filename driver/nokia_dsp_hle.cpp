@@ -179,12 +179,17 @@ void nokia_dsp_hle_device::observe_radio_request(const nokia_dspif_device::packe
 		else
 			m_radio_reports_pending = 1;
 	}
-	else if (packet.type == 0x02 && m_radio_sequence_stage == 4 && m_radio_reports_pending == 0)
+	else if (packet.type == 0x02 &&
+			(m_radio_sequence_stage == 4 || m_radio_sequence_stage == 10) &&
+			m_radio_reports_pending == 0)
 	{
-		// SCH reception makes the ROM issue CHANNEL_CONFIGURE.  Complete that
-		// transaction while its channel-change acceptance window is open.
-		m_radio_sequence_stage = 5;
-		m_radio_reports_pending = 2;
+		// SCH reception makes the ROM issue CHANNEL_CONFIGURE during both initial
+		// acquisition and the later mode-0x40 selection pass. Complete the same
+		// recovered channel-change transaction while its acceptance window is open.
+		const bool selected_plmn_search =
+				m_radio_sequence_stage == 10 && m_radio_search_mode == 0x50;
+		m_radio_sequence_stage = selected_plmn_search ? 12 : 5;
+		m_radio_reports_pending = selected_plmn_search ? 1 : 2;
 		m_radio_report_deferred = true;
 	}
 	else if (packet.type == 0x1a && m_radio_sequence_stage == 4 && m_radio_reports_pending == 0)
@@ -205,28 +210,42 @@ void nokia_dsp_hle_device::observe_radio_request(const nokia_dspif_device::packe
 		m_radio_reports_pending = 1;
 		m_radio_report_deferred = true;
 	}
+	else if (packet.type == 0x02 && m_radio_sequence_stage == 7 &&
+			packet.length >= 9 && packet.payload[8] == 0x60)
+	{
+		// After serving-cell selection the ROM configures logical channel 0x12,
+		// encoded as DSP receive channel 0x60. Unlike acquisition this is a
+		// single requested channel-change transaction: acknowledge it directly.
+		m_radio_sequence_stage = 11;
+		m_radio_reports_pending = 1;
+		m_radio_report_deferred = true;
+	}
+	else if (packet.type == 0x03 && m_radio_sequence_stage == 7)
+	{
+		// A completed PLMN search tears down its temporary radio channel before
+		// RR can establish signalling.  Type 0x83 is the paired DSP completion.
+		m_radio_sequence_stage = 15;
+		m_radio_reports_pending = 1;
+		m_radio_report_deferred = true;
+	}
 	else if (packet.type == 0x1a && m_radio_sequence_stage == 7)
 	{
-		// Preserve a search that overlaps the serving-cell BCCH batch.  Once the
-		// batch is already drained, start the finite background measurement now;
-		// otherwise there is no later SI report that could release the request.
+		// Preserve a search that overlaps the serving-cell BCCH batch. Once the
+		// batch is drained, start the finite background measurement immediately.
 		if (m_radio_reports_pending != 0)
 		{
 			m_radio_search_requested = true;
-			if (m_trace_enabled)
-				logerror("dsp_hle: queued repeated SEARCH_LIST during BCCH t=%.6f\n",
-						machine().time().as_double());
 		}
 		else
 		{
 			m_radio_sequence_stage = 10;
-			m_radio_reports_pending = 1;
+			m_radio_reports_pending = 2;
 			m_radio_report_deferred = true;
 		}
 	}
 	else if (packet.type == 0x1a && m_radio_sequence_stage == 10 && m_radio_reports_pending == 0)
 	{
-		m_radio_reports_pending = 1;
+		m_radio_reports_pending = 2;
 		m_radio_report_deferred = true;
 	}
 	else if (packet.type == 0x1a && m_radio_sequence_stage == 9 && m_radio_reports_pending == 0)
@@ -266,9 +285,28 @@ void nokia_dsp_hle_device::emit_radio_report()
 		report_type = m_radio_reports_pending == 2 ? 0x8b : 0x87; // result, then search complete
 		break;
 	case 10:
-		// Camped background searches are maintenance requests.  Close them without
-		// manufacturing a new automatic-selection candidate.
-		report_type = m_radio_search_mode == 0x50 ? 0x8f : 0x87;
+		// Mode 0x40 performs the initial selected-cell measurement.  Mode 0x50 is
+		// requested after task 17 accepts the home PLMN.  Both searches see the
+		// same physical serving cell, so expose its synchronization block after
+		// RSSI and let the firmware decide whether to configure it.
+		report_type = m_radio_reports_pending == 2 ? 0x8b :
+				((m_radio_search_mode == 0x40 || m_radio_search_mode == 0x50) ?
+				0x80 : 0x87);
+		break;
+	case 11:
+		report_type = 0x89; // CHANNEL_CHANGED_CNF for post-selection channel 0x60
+		break;
+	case 12:
+		report_type = 0x89; // CHANNEL_CHANGED_CNF for selected-PLMN search
+		break;
+	case 13:
+		report_type = m_radio_reports_pending == 1 ? 0x87 : 0x80;
+		break;
+	case 14:
+		report_type = 0x84; // RA_INFO for selected-PLMN search
+		break;
+	case 15:
+		report_type = 0x83; // DEACTIVATE completion
 		break;
 	default:
 		break;
@@ -277,7 +315,7 @@ void nokia_dsp_hle_device::emit_radio_report()
 	if (report_type == 0x8b)
 	{
 		// ALL_RSSI_RESULTS begins with a two-byte list header followed by forty
-		// four-byte records: big-endian ARFCN, flags and signed RSSI.  Only ARFCN
+		// four-byte records: big-endian ARFCN, flags and signed RSSI. Only ARFCN
 		// 1 exists.  Two -109 dBm baselines followed by -60 dBm let the ROM set
 		// candidate flags 0x0e and satisfy its own 0x212048 predicate.
 		payload[0] = 0x00;
@@ -297,13 +335,24 @@ void nokia_dsp_hle_device::emit_radio_report()
 		// RECEIVED_BLOCK carries channel, BSIC, error, frame number, ARFCN,
 		// shift and then a 24-byte GSM L2 block.  Channel 0x40 is SCH; 0x50 is
 		// BCCH after the firmware's CHANNEL_CONFIGURE request.
-		payload[0] = m_radio_sequence_stage >= 5 ? 0x50 : 0x40;
-		if (m_radio_sequence_stage >= 5)
-			payload[1] = 0x12;
+		payload[0] = (m_radio_sequence_stage < 5 || m_radio_sequence_stage == 10) ? 0x40 : 0x50;
+		payload[1] = 0x12; // BSIC of the laboratory cell, for SCH and BCCH.
 		payload[6] = 0x00;
 		payload[7] = 0x01; // ARFCN 1, matching the selected RSSI candidate.
 
-		if (m_radio_sequence_stage != 7 || m_radio_reports_pending == 2)
+		if (m_radio_sequence_stage == 13 && m_radio_reports_pending == 5)
+			std::copy(m_gsm_network->system_information(0).begin(),
+					m_gsm_network->system_information(0).end(), std::begin(payload) + 10);
+		else if (m_radio_sequence_stage == 13 && m_radio_reports_pending == 4)
+			std::copy(m_gsm_network->system_information(1).begin(),
+					m_gsm_network->system_information(1).end(), std::begin(payload) + 10);
+		else if (m_radio_sequence_stage == 13 && m_radio_reports_pending == 3)
+			std::copy(m_gsm_network->system_information(2).begin(),
+					m_gsm_network->system_information(2).end(), std::begin(payload) + 10);
+		else if (m_radio_sequence_stage == 13)
+			std::copy(m_gsm_network->system_information(3).begin(),
+					m_gsm_network->system_information(3).end(), std::begin(payload) + 10);
+		else if (m_radio_sequence_stage != 7 || m_radio_reports_pending == 2)
 			std::copy(m_gsm_network->system_information(2).begin(),
 					m_gsm_network->system_information(2).end(), std::begin(payload) + 10);
 		else if (m_radio_reports_pending == 4)
@@ -346,17 +395,58 @@ void nokia_dsp_hle_device::emit_radio_report()
 	{
 		m_radio_search_requested = false;
 		m_radio_sequence_stage = 10;
-		m_radio_reports_pending = 1;
+		m_radio_reports_pending = 2;
 		m_radio_report_deferred = true;
 		if (m_trace_enabled)
 			logerror("dsp_hle: answering camped background SEARCH_LIST t=%.6f\n",
 					machine().time().as_double());
 	}
+	else if (m_radio_sequence_stage == 7 && report_type == 0x80)
+	{
+		// A camped GSM cell broadcasts System Information continuously.
+		m_radio_reports_pending = 4;
+		m_radio_wait_ticks = 59;
+	}
 	else if (m_radio_sequence_stage == 10 && (report_type == 0x87 || report_type == 0x8f))
 	{
 		m_radio_sequence_stage = 7;
+		m_radio_reports_pending = 4;
+		m_radio_wait_ticks = 59;
 	}
 	else if (m_radio_sequence_stage == 8 && report_type == 0x8c)
+	{
+		m_radio_sequence_stage = 7;
+		m_radio_reports_pending = 4;
+		m_radio_wait_ticks = 59;
+	}
+	else if (m_radio_sequence_stage == 11 && report_type == 0x89)
+	{
+		m_radio_sequence_stage = 7;
+		m_radio_reports_pending = 4;
+		m_radio_wait_ticks = 59;
+	}
+	else if (m_radio_sequence_stage == 12 && report_type == 0x89)
+	{
+		m_radio_sequence_stage = 14;
+		m_radio_wait_ticks = 100;
+	}
+	else if (m_radio_sequence_stage == 14 && report_type == 0x84)
+	{
+		m_radio_sequence_stage = 13;
+		m_radio_reports_pending = 5;
+		m_radio_wait_ticks = 59;
+	}
+	else if (m_radio_sequence_stage == 13 && report_type == 0x80)
+	{
+		m_radio_wait_ticks = 59;
+	}
+	else if (m_radio_sequence_stage == 13 && report_type == 0x87)
+	{
+		m_radio_sequence_stage = 7;
+		m_radio_reports_pending = 4;
+		m_radio_wait_ticks = 59;
+	}
+	else if (m_radio_sequence_stage == 15 && report_type == 0x83)
 	{
 		m_radio_sequence_stage = 7;
 		m_radio_reports_pending = 4;
@@ -408,7 +498,11 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 		if (m_radio_peer_enabled && m_radio_sequence_stage == 7 &&
 				m_radio_reports_pending != 0 && m_radio_wait_ticks != 0)
 			--m_radio_wait_ticks;
-		if (m_radio_peer_enabled && m_radio_sequence_stage == 6 &&
+		if (m_radio_peer_enabled && m_radio_sequence_stage == 13 &&
+				m_radio_reports_pending != 0 && m_radio_wait_ticks != 0)
+			--m_radio_wait_ticks;
+		if (m_radio_peer_enabled &&
+				(m_radio_sequence_stage == 6 || m_radio_sequence_stage == 14) &&
 				m_radio_reports_pending == 0 && m_radio_wait_ticks != 0 &&
 				--m_radio_wait_ticks == 0)
 			m_radio_reports_pending = 1;
@@ -416,7 +510,8 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 			m_radio_report_deferred = false;
 		else if (m_radio_reports_pending != 0 &&
 				!(m_radio_sequence_stage == 4 && m_radio_wait_ticks != 0) &&
-				!(m_radio_sequence_stage == 7 && m_radio_wait_ticks != 0))
+				!(m_radio_sequence_stage == 7 && m_radio_wait_ticks != 0) &&
+				!(m_radio_sequence_stage == 13 && m_radio_wait_ticks != 0))
 			emit_radio_report();
 		if (m_external_service_enabled)
 		{

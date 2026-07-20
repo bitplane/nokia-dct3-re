@@ -1,8 +1,8 @@
 # Network and registration boundary
 
 This document defines the retained lower-radio model and its verified stopping
-point. The current checkpoint is serving-cell selection and BCCH system-
-information acceptance. It does not claim Location Updating, registered
+point. The current checkpoint is home-PLMN discovery and finite selected-PLMN
+search. It does not claim Location Updating, registered
 operator presentation, calls, or packet data.
 
 ## Ownership
@@ -103,21 +103,20 @@ task 15 -> task 17 0x0a22
 task 17 -> PLMN admissibility check
 ```
 
-At the task-11 completion, both recovered measurement lists are empty and the
-completion mode is zero. The modes-2/4 fallback copy is therefore deliberately
-skipped. Task 17 then compares selected PLMN `0x10fd00..02` with current PLMN
-`0x10fcf8..fa`; selected PLMN is zero while current PLMN is 001-01. It starts
-the normal `0x09ec` selection transaction.
+Action 1 first reclassifies the measured record. A subsequent mode-`0x40`
+SEARCH_LIST exposes the same synchronized serving cell. The ROM then emits
+MSI (`0x46`), configures logical channel `0x12` as DSP channel `0x60`, and
+accepts the request-driven CHANNEL_CHANGED_CNF. Task 10 organically publishes
+task-17 status `0x0433` with PLMN 001-01 and LAC 1. Task 17 stores the resulting
+home/source tuple as `00 f1 10`; no peer writes either tuple.
 
-That transaction is finite. Task 17 publishes the `0x09ef / 14 ff` phase
-handoff, task 15 runs the search, and returns `0x09f0 / 16 0f`. Context
-continuation 2 is terminal. Later background SEARCH_LIST modes `0x40` and
-`0x50` are closed by the applicable empty-search terminal.
-
-The home PLMN publisher `0x21adac` builds task-17 status `0x0433` from the SIM
-IMSI. Its two callers are later task-10 acceptance lifecycles and neither runs
-during initial camp. Selected-PLMN helper `0x2229e8` cannot copy that home tuple
-at reset because the tuple has not yet been published.
+The ensuing mode-`0x50` selected-PLMN search is also finite: RSSI, SCH,
+CHANNEL_CONFIGURE, CHANNEL_CHANGED_CNF, RA_INFO, one SI1--SI4 batch, then
+NO_BCCH_LEFT. The registration manager reaches its terminal predicate with
+selection `00 f1 10`, but MM returns `0x09f0 / 16 0f` after RR status `0x03ea`.
+The desired tuple at `0x10fd00..02` remains zero. Firmware then emits
+DEACTIVATE (`0x03`); its paired `0x83` completion is transport-valid but is
+discarded in controller state 2 and does not start L2 signalling.
 
 ## Closed contract classes
 
@@ -133,6 +132,8 @@ not be reintroduced as peer behavior:
 - types `0x83`, `0x86`, and `0x99` have separately decoded scalar/controller
   roles and do not provide an undocumented PLMN result;
 - a second SCH or an unsolicited CHANNEL_CHANGED_CNF is lifecycle-invalid;
+  the retained additional confirmations answer distinct mode-`0x40`,
+  mode-`0x50`, and channel-`0x60` requests;
 - complete SI produces task-11 `0x13b2`, not `0x13b3`, and its conditional
   task-10 post is `0x1396`, not `0x1397`;
 - task-10 `0x1397`, task-11 `0x13b3`, and controller fan-out state 11 have no
@@ -165,12 +166,14 @@ unsolicited.
 
 Current-identity helper `0x209380` is also downstream. Seven MM result
 lifecycles call it after filling `0x10ffc8`; a changed identity becomes task-17
-`0x09d6`. No current identity is committed in the serving-cell checkpoint.
+`0x09d6`. The observed pre-registration `0x09d6` carries the visible 001-01
+identity, but no Location Updating transaction follows it.
 
 The unresolved question is therefore singular:
 
-> Which organic RM/MM transition selects the visible home PLMN, establishes
-> the signalling channel, and emits the Location Updating Request envelope?
+> Why does the finite home-PLMN search terminate through RR result `0x03ea`
+> and MM result `0x09f0 / 16 0f` instead of committing the desired PLMN and
+> establishing the Location Updating signalling channel?
 
 Only after that request is observed should `nokia_gsm_network_device` answer
 with a standards-valid Location Updating Accept. The peer must not post

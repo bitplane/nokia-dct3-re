@@ -481,6 +481,12 @@
       "hypothesis": "The radio peer's omitted ARFCN in RECEIVED_BLOCK prevents the post-SI task-11 completion from selecting the serving network",
       "conclusion": "The recovered RECEIVED_BLOCK object layout places ARFCN at DSP payload bytes +6..+7. Supplying the evidenced serving ARFCN 1 corrects task-12 SI ownership and keeps active channel 0x10dbce at 1, but task 11 still completes in mode zero with empty measurement sources and task 17 fails selected-PLMN admissibility because 0x10fd00..0x10fd02 is unset. The packet defect was fixed; it was not the RM/MM transition.",
       "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "mode50_search_is_empty_power_scan", "status": "disproven",
+      "hypothesis": "The mode-0x50 SEARCH_LIST issued after home-PLMN publication is an empty maintenance scan that should terminate without exposing the serving cell",
+      "conclusion": "Mode 0x50 follows organic task-17 home-PLMN status 0x0433 and source-tuple commit. Supplying the same evidenced serving cell makes firmware request a distinct CHANNEL_CONFIGURE, consume CHANNEL_CHANGED_CNF and RA_INFO, parse a finite SI1-SI4 batch, and reach the selection terminal with tuple 00f110. The search is a selected-PLMN lifecycle, although its final RR/MM result still rejects the selection and leaves the desired tuple unset.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
     }
   ]
 }
