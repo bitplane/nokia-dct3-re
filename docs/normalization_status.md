@@ -97,6 +97,14 @@ registration-state forcing controls.
 
 ## Instrumentation debt
 
+The radio peer's numbered stage machine currently mirrors the recovered
+SEARCH_LIST, channel-change, RA_INFO and BCCH transaction order. Its behavior
+is gate-covered, but the numeric stages and pending-count sub-branches are no
+longer reviewer-friendly. After the registration contract stabilizes, replace
+them with named phases and preferably table-driven report sequences; doing so
+before the remaining policy boundary is understood would merely freeze the
+current provisional protocol model into a cleaner-looking guess.
+
 The retained trace switches are scoped as follows:
 
 | Trace | Purpose |

@@ -289,8 +289,11 @@ semantic consumer:
   getter `0x29dbbe` reads it under lock;
 - type `0x84` is discarded in controller state 1 and otherwise becomes
   `0x1394`. Task 10 copies its eight-byte body into the working object and
-  passes it to general controller-event decoder `0x217cac`; this is a
-  structured event input, not a payload-free completion;
+  passes it to general controller-event decoder `0x217cac`. The `0x1394` arm
+  reads object byte `+4` as a flag/mask and bytes `+5..+7` as a big-endian
+  24-bit timing value, then derives an eight-byte `0x0400` object for task 16.
+  It is a structured radio-access timing input, not a payload-free completion
+  or a PLMN-identity transport;
 - type `0x89` is rejected when its acceptance byte at `0x10dbd7` is one.
   Otherwise it runs state handler `0x216830` and posts `0x1393`. The state
   handler dispatches on the separate radio-controller state at `0x10dc93` and

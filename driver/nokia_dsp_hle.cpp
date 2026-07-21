@@ -222,11 +222,13 @@ void nokia_dsp_hle_device::observe_radio_request(const nokia_dspif_device::packe
 	}
 	else if (packet.type == 0x03 && m_radio_sequence_stage == 7)
 	{
-		// A completed PLMN search tears down its temporary radio channel before
-		// RR can establish signalling.  Type 0x83 is the paired DSP completion.
-		m_radio_sequence_stage = 15;
-		m_radio_reports_pending = 1;
-		m_radio_report_deferred = true;
+		// DEACTIVATE is fire-and-forget at this boundary, but it cancels receiver
+		// work already queued by the MCU.  In particular, do not launch an
+		// overlapping SEARCH_LIST after the deactivate has retired that request.
+		m_radio_reports_pending = 0;
+		m_radio_wait_ticks = 0;
+		m_radio_report_deferred = false;
+		m_radio_search_requested = false;
 	}
 	else if (packet.type == 0x1a && m_radio_sequence_stage == 7)
 	{
@@ -304,9 +306,6 @@ void nokia_dsp_hle_device::emit_radio_report()
 		break;
 	case 14:
 		report_type = 0x84; // RA_INFO for selected-PLMN search
-		break;
-	case 15:
-		report_type = 0x83; // DEACTIVATE completion
 		break;
 	default:
 		break;
@@ -441,12 +440,6 @@ void nokia_dsp_hle_device::emit_radio_report()
 		m_radio_wait_ticks = 59;
 	}
 	else if (m_radio_sequence_stage == 13 && report_type == 0x87)
-	{
-		m_radio_sequence_stage = 7;
-		m_radio_reports_pending = 4;
-		m_radio_wait_ticks = 59;
-	}
-	else if (m_radio_sequence_stage == 15 && report_type == 0x83)
 	{
 		m_radio_sequence_stage = 7;
 		m_radio_reports_pending = 4;

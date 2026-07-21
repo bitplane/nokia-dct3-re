@@ -11,8 +11,11 @@ namespace {
 // Minimum broadcast set for a GSM 900 cell on ARFCN 1. The identity is the
 // reserved test PLMN 001-01, LAC 1, cell 1; 0x2b is the GSM padding octet.
 constexpr std::array<std::array<u8, 24>, 4> SYSTEM_INFORMATION = {{
-	{{ 0x55, 0x06, 0x19, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2b, 0 }},
+	// SI1 Cell Channel Description uses GSM bitmap-0 format. ARFCN 1 is
+	// bit 0 of the final octet in that 16-octet field.
+	{{ 0x55, 0x06, 0x19,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01,
+		0, 0, 0, 0x2b, 0 }},
 	{{ 0x59, 0x06, 0x1a, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0xff, 0, 0, 0, 0 }},
 	{{ 0x49, 0x06, 0x1b, 0x00, 0x01, 0x00, 0xf1, 0x10,

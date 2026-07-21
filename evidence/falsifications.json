@@ -487,6 +487,60 @@
       "hypothesis": "The mode-0x50 SEARCH_LIST issued after home-PLMN publication is an empty maintenance scan that should terminate without exposing the serving cell",
       "conclusion": "Mode 0x50 follows organic task-17 home-PLMN status 0x0433 and source-tuple commit. Supplying the same evidenced serving cell makes firmware request a distinct CHANNEL_CONFIGURE, consume CHANNEL_CHANGED_CNF and RA_INFO, parse a finite SI1-SI4 batch, and reach the selection terminal with tuple 00f110. The search is a selected-PLMN lifecycle, although its final RR/MM result still rejects the selection and leaves the desired tuple unset.",
       "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
+    },
+    {
+      "id": "mode50_terminal_or_ra_info_commits_desired_plmn", "status": "disproven",
+      "hypothesis": "The mode-0x50 terminal result or its preceding RA_INFO packet should directly populate task 17's desired-PLMN tuple",
+      "conclusion": "RR result 0x03ea follows task-16 LAPDm SAPI-0/SAPI-3 setup and immediate acknowledgement. Task 15 then constructs internal status 0x09ff and adapts it to 0x09f0 with operation 0x16; constructor 0x208ee0 does not initialize the following byte, whose changing value is allocator residue rather than a reason or GSM cause. The complete direct call surface of selected-PLMN commit helper 0x2229e8 contains eleven callers and only arguments 2 or 3, while the operation-0x16 handler never calls it. Separately, the 0x1394 arm of decoder 0x217cac consumes RA_INFO as a flag byte plus a 24-bit timing value and constructs task-16 object 0x0400; it has no candidate- or desired-tuple writer. Neither path may be patched into a PLMN commit.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "selected_bcch_hold_completes_plmn_selection", "status": "disproven",
+      "hypothesis": "The selected-cell search fails only because the radio peer sends NO_BCCH_LEFT immediately after one SI1-SI4 batch, and remaining camped on BCCH lets firmware complete selection",
+      "conclusion": "A coherent peer experiment retained the selected serving BCCH after SI1-SI4 and continued ordinary broadcasts without injecting a completion. The task-15/task-17 transaction remained pending through 30 seconds, the desired tuple stayed zero and no Location Updating entrance appeared. NO_BCCH_LEFT is required to terminate this finite search; withholding it is not a registration completion.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "channel_change_latency_arms_source_acceptance", "status": "disproven",
+      "hypothesis": "The DSP peer acknowledges channel 0x60 too quickly, causing home-PLMN status 0x0433 to arrive before task 17 arms its source-update window",
+      "conclusion": "Delaying the requested CHANNEL_CHANGED_CNF from one peer poll to roughly four GSM TDMA frames shifted both the organic 0x0433/source update and the later window arm by the same interval. Their order and the final operation-0x16 result were unchanged. The first source publication is intentionally before the window; the live lifecycle requires a later task-10 identity publication rather than different latency for the first one.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "dsp_type83_scalar_completes_identity_publication", "status": "disproven",
+      "hypothesis": "A missing DSP type-0x83 scalar during controller state 3 makes the later data-driven task-10 identity lifecycle return zero and suppress a second home-PLMN publication",
+      "conclusion": "ROM table 0x2e2e1c..0x2e2e33 is a family of status-0x1392 SI3 change descriptors with operations 0x19..0x1e. Descriptor 0x2e2e20 applies operation 0x1a through helper 0x21a220. A quarantined type-0x83 diagnostic set scalar 0x10dc99 to an accepted value through the recovered firmware path. The descriptor then initialized four controller slots and cleared its initialization bit but emitted no 0x0433, desired-tuple commit, or Location Updating request through 60 seconds. The diagnostic was removed; type 0x83 is controller/SI bookkeeping here, not the missing registration completion.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "background_measurement_needs_no_terminal", "status": "disproven",
+      "hypothesis": "A camped mode-0 SEARCH_LIST is a one-result background measurement whose NO_BCCH_LEFT terminal incorrectly clears the serving-cell suitability history",
+      "conclusion": "A bounded peer experiment returned one strong ALL_RSSI_RESULTS response and resumed BCCH without NO_BCCH_LEFT. The task-17 search transaction then remained pending and no later selection result, PLMN commit, or Location Updating entrance occurred. This lifecycle requires its finite terminal; the unresolved defect is why the completed later measurement constructs 0x0447 with usable=0 despite the synchronized ARFCN-1 cell.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "postcamp_measurement_replays_plmn_admissibility", "status": "disproven",
+      "hypothesis": "Repeated strong post-camp mode-0 measurements should rebuild a usable serving candidate and revisit task-17 admissibility after the source tuple is populated",
+      "conclusion": "The successful pre-camp cycle enters reconciler 0x211f60 with ARFCN 1 at -60 dBm and retained history. Received-SI parsing at 0x210c02 subsequently derives mode byte 0x10c851 from SI bit 1. With that byte set, 0x211f60 intentionally returns before reconciliation, so later empty preliminary 0x0447 objects are firmware lifecycle behavior rather than evidence of a malformed RSSI result. The desired commit must be found in the initial task-17 continuation, not manufactured through repeated post-camp measurements.",
+      "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "task17_argument2_commit_is_ordinary_registration", "status": "disproven",
+      "hypothesis": "The task-17 policy predecessor should set 0x10fcb9 to one so either argument-2 selected-PLMN commit caller can advance ordinary automatic registration",
+      "conclusion": "Status 0x158b is the sole direct writer of policy byte 0x10fcb9. Its constructor 0x27951c is called only by phone-lock initialization at 0x28a338 and publishes bit 4 derived from encrypted EEPROM lock/identity records 0x0704..0x0707. An unlocked profile correctly publishes zero. The two argument-2 commit gates are network-lock policy paths and cannot be used as evidence that ordinary registration requires the desired tuple.",
+      "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "dsp_type83_acknowledges_deactivate", "status": "disproven",
+      "hypothesis": "Outbound DSP type 0x03 DEACTIVATE requires a paired inbound type 0x83 completion before registration can continue",
+      "conclusion": "Type 0x83 has an independently decoded scalar/controller contract and the synthetic response is discarded in controller state 2. Removing it preserves the complete radio-camp checkpoint and subsequent selection cadence. A longer coherent run corrects the earlier short-window observation: cancelling queued BCCH/search work at DEACTIVATE leaves firmware quiet for about 10.6 seconds, after which it organically issues a new SEARCH_LIST. The missing registration transition is not a type-0x83 acknowledgement, and a queued search must not be carried across DEACTIVATE.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "task17_argument3_commit_is_ordinary_registration", "status": "disproven",
+      "hypothesis": "Ordinary unlocked automatic registration must copy the populated source PLMN into the desired tuple through an argument-3 call to helper 0x2229e8",
+      "conclusion": "The helper has eight argument-3 callers. Address 0x223988 zero-initializes task-17 state; all seven remaining calls are downstream of object-bearing internal status 0x09ee transaction responses, including helper 0x225e6a reached by the explicit comparison at 0x2246f2. None consumes the coherent automatic-selection result 0x09f0 operation 0x16, and no 0x09ee transaction executes in that lifecycle. The zero desired tuple belongs to separate manual or policy transactions and is not a missing network response.",
+      "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
     }
   ]
 }

@@ -12,6 +12,8 @@ public class FindScalarUses extends GhidraScript {
 	@Override
 	protected void run() throws Exception {
 		long wanted = Long.decode(getScriptArgs().length > 0 ? getScriptArgs()[0] : "0x0578");
+		long lower = getScriptArgs().length > 1 ? Long.decode(getScriptArgs()[1]) : Long.MIN_VALUE;
+		long upper = getScriptArgs().length > 2 ? Long.decode(getScriptArgs()[2]) : Long.MAX_VALUE;
 		if (wanted > 0xffff) {
 			for (MemoryBlock block : currentProgram.getMemory().getBlocks()) {
 				if (!block.isInitialized())
@@ -29,6 +31,9 @@ public class FindScalarUses extends GhidraScript {
 			}
 		}
 		for (Instruction instruction : currentProgram.getListing().getInstructions(true)) {
+			long instructionAddress = instruction.getAddress().getOffset();
+			if (instructionAddress < lower || instructionAddress >= upper)
+				continue;
 			boolean match = false;
 			for (int operand = 0; operand < instruction.getNumOperands(); operand++) {
 				for (Object object : instruction.getOpObjects(operand)) {
