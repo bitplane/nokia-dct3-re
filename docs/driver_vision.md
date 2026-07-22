@@ -60,9 +60,9 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 
 1. Improve the extracted CCONT and GENSIO devices only from observed transactions.
 2. Extend the extracted MAD2 core only from observed reset, clock and peripheral
-   contracts; Timer-1 overflow is modeled, while its destination registers,
-   ARM sleep behavior and reset effects remain provisional. Clock-gate bit 5 is
-   mapped to the SIM lifecycle; the other gate bits remain unidentified.
+   contracts. Timer-1 destination/FIQ5, MCU reset extent and the SIMI clock gate
+   are modeled from paired-ROM evidence and focused tests. Exact divider
+   provenance, ARM sleep and the other clock-gate bits remain unidentified.
 3. Extend deterministic physical-key fixtures into menu and application
    traversal, adding device behavior only when firmware reaches an evidenced
    hardware boundary.

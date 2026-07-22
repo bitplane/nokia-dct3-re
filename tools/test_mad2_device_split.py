@@ -37,19 +37,28 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn("m_regs[0x20]", self.header)
         self.assertIn("offset & 0x1f", self.header)
 
-    def test_timer1_is_free_running_and_interrupts_on_wrap(self):
+    def test_timer1_is_15_bit_and_interrupts_at_destination(self):
         callback = self.device.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)", 1)[1]
         callback = callback.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::fiq8_tick)", 1)[0]
-        self.assertIn("m_timer1_counter++;", callback)
-        self.assertIn("if (m_timer1_counter == 0)", callback)
+        self.assertIn("(m_timer1_counter + 1) & 0x7fff", callback)
+        self.assertIn("m_timer1_counter == m_timer1_destination", callback)
         self.assertIn("assert_fiq(5);", callback)
-        self.assertNotIn("m_timer1_counter = 0;", callback)
-        self.assertIn("m_mad2->set_timer1_hz(33'055);", self.phone)
+        self.assertIn("NOKI3210_TIMER1_HZ\", 1'057", self.phone)
 
-    def test_timer1_destination_is_a_latch_not_synthetic_time(self):
-        self.assertIn("case 0x06: return m_regs[offset];", self.device)
-        self.assertIn("case 0x07: return m_regs[offset];", self.device)
+    def test_timer1_destination_is_hardware_state_not_synthetic_time(self):
+        self.assertIn("case 0x06: return m_timer1_destination >> 8;", self.device)
+        self.assertIn("case 0x07: return m_timer1_destination;", self.device)
+        self.assertIn("m_timer1_destination = 0x7fff", self.header)
         self.assertNotIn("m_timer1_counter + 0x40", self.device)
+
+    def test_reset_control_requests_the_board_reset_domain(self):
+        self.assertIn("auto reset_cb()", self.header)
+        self.assertIn("if (BIT(data, 2) && !BIT(old, 2))", self.device)
+        self.assertIn("m_reset_cb(1);", self.device)
+        self.assertIn("m_mad2->reset_cb().set", self.phone)
+        watchdog = self.phone.split("// MAD2 watchdog", 1)[1].split("// Hardware RAM", 1)[0]
+        self.assertIn("reset_digital_baseband();", watchdog)
+        self.assertIn("set_reset_cause(0x02)", watchdog)
 
 
 if __name__ == "__main__":

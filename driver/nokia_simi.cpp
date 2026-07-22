@@ -27,6 +27,7 @@ void nokia_simi_device::device_start()
 {
 	m_rx_timer = timer_alloc(FUNC(nokia_simi_device::rx_ready), this);
 	save_item(NAME(m_enabled));
+	save_item(NAME(m_clock_enabled));
 	save_item(NAME(m_control));
 	save_item(NAME(m_rx_fifo));
 	save_item(NAME(m_rx_head));
@@ -44,6 +45,7 @@ void nokia_simi_device::device_start()
 void nokia_simi_device::device_reset()
 {
 	m_rx_timer->adjust(attotime::never);
+	m_clock_enabled = false;
 	m_control = 0;
 	m_rx_head = m_rx_tail = m_rx_count = 0;
 	m_rx_ready = false;
@@ -54,14 +56,31 @@ void nokia_simi_device::device_reset()
 	m_tx_fifo_control = 0;
 }
 
+void nokia_simi_device::set_clock_enabled(bool enabled)
+{
+	if (m_clock_enabled == enabled)
+		return;
+	m_clock_enabled = enabled;
+	if (!enabled)
+	{
+		// Clock gating freezes the controller and suppresses delivery. Register,
+		// FIFO and card protocol state survive for the next gated transaction.
+		m_rx_timer->adjust(attotime::never);
+	}
+	else if (m_tx_ready_pending || (!m_rx_ready && m_rx_count != 0))
+	{
+		m_rx_timer->adjust(SIMI_CHARACTER_TIME);
+	}
+}
+
 u8 nokia_simi_device::control_r() const
 {
-	return m_control | ((m_enabled && BIT(m_control, 7)) ? 0x40 : 0x00);
+	return m_control | ((m_enabled && m_clock_enabled && BIT(m_control, 7)) ? 0x40 : 0x00);
 }
 
 void nokia_simi_device::control_w(u8 data)
 {
-	const bool activate = m_enabled && BIT(data, 7) && !BIT(m_control, 7);
+	const bool activate = m_enabled && m_clock_enabled && BIT(data, 7) && !BIT(m_control, 7);
 	m_control = data;
 	if (!activate)
 		return;
@@ -113,6 +132,8 @@ void nokia_simi_device::schedule_card_bytes(
 
 TIMER_CALLBACK_MEMBER(nokia_simi_device::rx_ready)
 {
+	if (!m_enabled || !m_clock_enabled)
+		return;
 	if (m_tx_ready_pending)
 	{
 		m_tx_ready_pending = false;
@@ -168,7 +189,7 @@ void nokia_simi_device::rx_fifo_control_w(u8 data)
 
 void nokia_simi_device::txd_w(u8 data)
 {
-	if (!m_enabled || !BIT(m_control, 7))
+	if (!m_enabled || !m_clock_enabled || !BIT(m_control, 7))
 		return;
 	if (m_uart_tx_count < std::size(m_uart_tx_fifo))
 		m_uart_tx_fifo[m_uart_tx_count++] = data;
@@ -178,7 +199,7 @@ void nokia_simi_device::tx_fifo_control_w(u8 data)
 {
 	const u8 old = m_tx_fifo_control;
 	m_tx_fifo_control = data;
-	if (!m_enabled || !BIT(m_control, 7) || data != 0 || old == 0)
+	if (!m_enabled || !m_clock_enabled || !BIT(m_control, 7) || data != 0 || old == 0)
 		return;
 
 	const u16 rx_count_before = m_rx_count;

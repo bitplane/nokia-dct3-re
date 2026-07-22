@@ -51,11 +51,14 @@ fixtures: overlapping physical keypad/charger sources, an IRQ held pending
 behind its masks, and register-enabled extended FIQ8 routing. The fixtures use
 only input ports and mapped MAD2 registers; their bounded trace checker does
 not treat timing-sensitive interrupt totals as structural-oracle fields.
-`make verify-mad2-clocks` checks both 3210 ROMs against the observed reset-cause
-read, organic watchdog service and SIM peripheral-clock gate lifecycle, and asserts that
-neither boot accesses the timer-1 register window. Its 12-second window reflects
-physical Timer-0 pacing. This is a negative register-coverage contract, not
-validation of the independently running timer-1 overflow source.
+`make verify-mad2-clocks` checks both 3210 ROMs against reset-cause reads and
+the SIM peripheral-clock lifecycle, while recording that MAD2-watchdog service
+is conditional rather than part of ordinary boot. Ordinary boot
+does not execute the Timer-1 readers. `make verify-mad2-timer1` accelerates only
+the hardware timebase and proves destination/FIQ5/acknowledgement; paired static
+decode proves the same Timer-1 algorithm in both ROMs. `make verify-mad2-reset`
+uses mapped controller MMIO to prove both the software-reset and watchdog-expiry
+paths, their shared digital-baseband domain, and their distinct retained causes.
 `make verify-charger-wake` powers the running phone off through its physical
 power key, connects the charger while CCONT retains power, and requires cause
 bit `0x04`, a complete digital-domain restart, a post-reset VCHAR sample and

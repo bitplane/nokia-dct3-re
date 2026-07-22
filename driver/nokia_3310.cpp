@@ -78,8 +78,8 @@ enum mad2_reg : uint8_t
 	MAD2_WATCHDOG = 0x03,
 	MAD2_TIMER1_COUNTER_MSB = 0x04,
 	MAD2_TIMER1_COUNTER_LSB = 0x05,
-	MAD2_TIMER1_COMPARE_MSB = 0x06,
-	MAD2_TIMER1_COMPARE_LSB = 0x07,
+	MAD2_TIMER1_DESTINATION_MSB = 0x06,
+	MAD2_TIMER1_DESTINATION_LSB = 0x07,
 	MAD2_FIQ_STATUS = 0x08,
 	MAD2_IRQ_STATUS = 0x09,
 	MAD2_FIQ_MASK = 0x0a,
@@ -306,6 +306,8 @@ private:
 	void mad2_fiq_w(int state);
 	void mad2_irq_w(int state);
 	void mad2_irq_ack_w(u16 mask);
+	void mad2_reset_w(int state);
+	TIMER_CALLBACK_MEMBER(deferred_mad2_reset);
 	void ccont_irq_w(int state);
 	void ccont_power_w(int state);
 	void reset_digital_baseband();
@@ -389,8 +391,8 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0x03:  return "[CTSI] ASIC watchdog write register (w)";
 	case 0x04:  return "[CTSI] Timer 1 counter (MSB) (r)";
 	case 0x05:  return "[CTSI] Timer 1 counter (LSB) (r)";
-	case 0x06:  return "[CTSI] Timer 1 destination (LSB) (r)";
-	case 0x07:  return "[CTSI] Timer 1 destination (MSB) (r)";
+	case 0x06:  return "[CTSI] Timer 1 destination (MSB) (r)";
+	case 0x07:  return "[CTSI] Timer 1 destination (LSB) (r)";
 	case 0x08:  return "[CTSI] FIQ lines active (rw)";
 	case 0x09:  return "[CTSI] IRQ lines active (rw)";
 	case 0x0A:  return "[CTSI] FIQ lines mask (rw)";
@@ -684,6 +686,21 @@ void noki3310_state::mad2_irq_w(int state)
 	m_maincpu->set_input_line(0, state ? ASSERT_LINE : CLEAR_LINE);
 }
 
+void noki3310_state::mad2_reset_w(int state)
+{
+	if (state)
+		machine().scheduler().synchronize(
+				timer_expired_delegate(FUNC(noki3310_state::deferred_mad2_reset), this));
+}
+
+TIMER_CALLBACK_MEMBER(noki3310_state::deferred_mad2_reset)
+{
+	reset_digital_baseband();
+	// Bit 2 records the MCU-initiated reset that brought the new boot up;
+	// device_reset supplies the persistent power-reset bit 0.
+	m_mad2->set_reset_cause(0x04);
+}
+
 void noki3310_state::mad2_irq_ack_w(u16 mask)
 {
 	if (mask & (u16(1) << KEYPAD_IRQ_LINE_NUM))
@@ -907,9 +924,9 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 	// MAD2 watchdog
 	if (m_mad2->watchdog_tick())
 	{
-		m_maincpu->reset();
-		m_mad2->reset();
-		machine_reset();
+		// The ASIC watchdog resets the same digital baseband that an explicit
+		// MCU reset-control request does; only the retained cause differs.
+		reset_digital_baseband();
 		m_mad2->set_reset_cause(0x02);
 	}
 }
@@ -1086,7 +1103,7 @@ void noki3310_state::trace_mad2_read(offs_t offset, uint8_t data)
 				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_CLOCKS", 0) != 0 &&
 			(offset == MAD2_MCU_RESET_CTRL || offset == MAD2_WATCHDOG ||
-			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_COMPARE_LSB) ||
+			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_DESTINATION_LSB) ||
 			 offset == 0x0d) && m_mad2_clock_trace_count++ < 4096)
 		logerror("mad2_clock: event=R off=%02x data=%02x counter=%04x pc=%08x t=%.9f\n",
 				u32(offset), data, m_mad2->timer1_counter(), m_maincpu->pc(), machine().time().as_double());
@@ -1144,6 +1161,9 @@ void noki3310_state::mad2_register_w(offs_t offset, uint8_t data)
 	else
 		m_mad2_regs[offset] = data;
 
+	if (offset == 0x0d)
+		m_simi->set_clock_enabled(BIT(data, 5));
+
 	if (offset == MAD2_SIM_TXD && m_simi->enabled())
 		m_simi->txd_w(data);
 	else if (offset == MAD2_SIM_IIR && m_simi->enabled())
@@ -1193,7 +1213,7 @@ void noki3310_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old_d
 				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
 	if (nokia_env_u32("NOKI3210_TRACE_MAD2_CLOCKS", 0) != 0 &&
 			(offset == MAD2_MCU_RESET_CTRL || offset == MAD2_WATCHDOG ||
-			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_COMPARE_LSB) ||
+			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_DESTINATION_LSB) ||
 			 offset == 0x0d) && m_mad2_clock_trace_count++ < 4096)
 		logerror("mad2_clock: event=W off=%02x data=%02x old=%02x counter=%04x pc=%08x t=%.9f\n",
 				u32(offset), data, old_data, m_mad2->timer1_counter(), m_maincpu->pc(), machine().time().as_double());
@@ -1464,6 +1484,7 @@ void noki3310_state::noki3310(machine_config &config)
 	m_mad2->fiq_cb().set(FUNC(noki3310_state::mad2_fiq_w));
 	m_mad2->irq_cb().set(FUNC(noki3310_state::mad2_irq_w));
 	m_mad2->irq_ack_cb().set(FUNC(noki3310_state::mad2_irq_ack_w));
+	m_mad2->reset_cb().set(FUNC(noki3310_state::mad2_reset_w));
 	NOKIA_MBUS(config, m_mbus);
 	m_mbus->set_trace(nokia_env_u32("NOKI3210_TRACE_MBUS", 0) != 0);
 	m_mbus->tx_cb().set(FUNC(noki3310_state::mbus_tx_w));
@@ -1525,10 +1546,11 @@ void noki3310_state::noki3210(machine_config &config)
 	// Both supported 3210 firmware revisions use this validated composition.
 	// Other DCT3 products retain the conservative base-device defaults until
 	// their corresponding hardware and peer contracts have been exercised.
-	// Both MAD2 timers use the 33,055 Hz CTSI source recovered for this product.
-	// Timer 1 raises FIQ5 on 16-bit overflow; Timer 0 applies its programmed divider.
+	// The paired ROMs prove that Timer 1 ticks eight times faster than Timer 0's
+	// divided counter. Keep the measured inputs configurable until the exact CTSI
+	// oscillator/divider tree is recovered; do not conflate both timer inputs.
 	m_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 33'055));
-	m_mad2->set_timer1_hz(33'055);
+	m_mad2->set_timer1_hz(nokia_env_u32("NOKI3210_TIMER1_HZ", 1'057));
 	m_mad2->set_timer0_catchup(false);
 
 	const bool external_service_model =

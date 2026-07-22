@@ -10,6 +10,7 @@ public:
 	auto fiq_cb() { return m_fiq_cb.bind(); }
 	auto irq_cb() { return m_irq_cb.bind(); }
 	auto irq_ack_cb() { return m_irq_ack_cb.bind(); }
+	auto reset_cb() { return m_reset_cb.bind(); }
 
 	void set_timer0_hz(u32 value) { m_timer0_hz = value; }
 	void set_timer1_hz(u32 value) { m_timer1_hz = value; }
@@ -32,6 +33,7 @@ public:
 	u16 irq_status() const { return m_irq_status; }
 	u16 timer0_counter() const { return m_timer0_counter; }
 	u16 timer1_counter() const { return m_timer1_counter; }
+	u16 timer1_destination() const { return m_timer1_destination; }
 	u8 reg(offs_t offset) const { return m_regs[offset & 0x1f]; }
 
 protected:
@@ -51,6 +53,7 @@ private:
 	devcb_write_line m_fiq_cb;
 	devcb_write_line m_irq_cb;
 	devcb_write16 m_irq_ack_cb;
+	devcb_write_line m_reset_cb;
 	emu_timer *m_timer0 = nullptr;
 	emu_timer *m_timer1 = nullptr;
 	emu_timer *m_fiq8 = nullptr;
@@ -59,12 +62,15 @@ private:
 	u16 m_irq_status = 0;
 	u16 m_timer0_counter = 0;
 	u16 m_timer1_counter = 0;
+	u16 m_timer1_destination = 0x7fff;
 	u8 m_timer0_divider = 0xff;
 	bool m_timer0_compare_latched = false;
 	bool m_fiq_line_state = false;
 	bool m_irq_line_state = false;
 	u32 m_timer0_hz = 33055;
-	u32 m_timer1_hz = 33055;
+	// Calibrated against Timer 0's divided output. The ROM proves an 8:1
+	// relationship; the exact CTSI divider tree remains to be recovered.
+	u32 m_timer1_hz = 1057;
 	u32 m_fiq8_hz = 1000;
 	bool m_timer0_catchup = false;
 	bool m_timer_trace = false;

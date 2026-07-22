@@ -73,6 +73,18 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn("ccont_write(0x0c, 12)", fixture)
         self.assertIn("ccont_write(0x0f, 0x50)", fixture)
 
+    def test_mad2_reset_fixture_uses_only_the_mapped_controller_register(self):
+        fixture = self.harness.split("if mad2_reset_fixture_at >= 0 then", 1)[1]
+        fixture = fixture.split("if state_roundtrip_at >= 0 then", 1)[0]
+        self.assertIn("space:write_u8(0x20001", fixture)
+        self.assertNotIn("debug_ram", fixture)
+
+    def test_mad2_watchdog_fixture_uses_only_the_mapped_controller_register(self):
+        fixture = self.harness.split("if mad2_watchdog_fixture_at >= 0 then", 1)[1]
+        fixture = fixture.split("if state_roundtrip_at >= 0 then", 1)[0]
+        self.assertIn("space:write_u8(0x20003, 0x01)", fixture)
+        self.assertNotIn("debug_ram", fixture)
+
     def test_interactive_target_uses_standard_mame_input(self):
         makefile = (ROOT / "Makefile").read_text()
         target = makefile.split("run-interactive:", 1)[1].split("\n\n", 1)[0]

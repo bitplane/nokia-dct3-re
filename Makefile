@@ -79,7 +79,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -87,6 +87,7 @@ help:
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
 	@echo "make census         build the 3210 v6.00 message-topology JSON/report"
 	@echo "make controller-census exhaustively verify the 3210 controller dispatcher"
+	@echo "make mad2-static-census extract paired-ROM direct MAD2 MMIO accesses"
 	@echo "make dsp-census     refresh the paired-ROM DSP shared-memory and packet reports"
 	@echo "make census-docs    refresh the committed report; refuses missing scoped runtime"
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
@@ -114,6 +115,8 @@ help:
 	@echo "make verify-mad2    check timer-0/FIQ and save-state restoration contracts"
 	@echo "make verify-mad2-interrupts check simultaneous, masked-pending and extended-FIQ routing"
 	@echo "make verify-mad2-clocks check reset/clock/watchdog boot contracts in both 3210 ROMs"
+	@echo "make verify-mad2-timer1 check Timer-1 destination/FIQ5 at accelerated controller time"
+	@echo "make verify-mad2-reset check software/watchdog reset domains and retained causes"
 	@echo "make verify-mbus    check two-ROM MBUS init and external RX/FIQ2 contracts"
 	@echo "make run-frontier   run the current external-service/SIM research profile"
 	@echo "make verify-frontier reproduce the current coherent frontier predicates"
@@ -223,7 +226,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -481,7 +484,28 @@ verify-mad2-clocks:
 		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v501/error.log
-	@echo "OK — MAD2 reset, SIM clock-gate and watchdog boot contracts reproduced across both 3210 ROMs"
+	@echo "OK — MAD2 reset-cause, SIM clock-gate and conditional-watchdog contracts reproduced across both 3210 ROMs"
+
+verify-mad2-timer1:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=2 \
+		RUN_ENV='NOKI3210_TRACE_MAD2_TIMERS=1 NOKI3210_TIMER1_HZ=1000000'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/mad2_timer1_trace_check.py $(RUN_DIR)/error.log
+	@echo "OK — MAD2 Timer-1 reached 0x7fff, asserted FIQ5 and was acknowledged"
+
+verify-mad2-reset:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_software SECONDS=4 \
+		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1 NOKI3210_MAD2_RESET_FIXTURE_AT=2.0'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_software/error.log
+	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_software/error.log \
+		--require-software-reset --allow-no-watchdog
+	@grep -Eq '^soft_resets=[1-9][0-9]*$$' $(RUN_DIR)_software/boot_summary.txt
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_watchdog SECONDS=3 \
+		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1 NOKI3210_MAD2_WATCHDOG_FIXTURE_AT=0.2'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_watchdog/error.log
+	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_watchdog/error.log \
+		--require-watchdog-reset --allow-no-watchdog --allow-incomplete-clock-lifecycle
+	@echo "OK — MAD2 reset request and watchdog restart the digital baseband with distinct causes"
 
 verify-mbus:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v600 SECONDS=1 \
@@ -667,3 +691,8 @@ verify-structure:
 
 clean:
 	rm -rf $(RUN_DIR) run run_* $(MAME_DIR)/obj progress_latest_frame.*
+
+mad2-static-census:
+	@mkdir -p run_census
+	$(VENV)/bin/python tools/mad2_static_census.py --check \
+		--json run_census/mad2_static_access.json --markdown docs/mad2_static_access.md

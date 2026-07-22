@@ -90,8 +90,8 @@ profile; — = not established.
 | `0x00` | ASIC version (r, → `0x40`) | ✓ |
 | `0x01/0x02` | MCU / **DSP** reset control | ✓ |
 | `0x03` | ASIC watchdog write | ✓ |
-| `0x04/0x05` | timer-1 free-running counter MSB/LSB | (timer1) |
-| `0x06/0x07` | timer-1 destination MSB/LSB | stored latch; no boot access in either 3210 ROM, compare behavior unmodeled |
+| `0x04/0x05` | timer-1 15-bit current counter MSB/LSB | paired-ROM decode + focused FIQ5 test |
+| `0x06/0x07` | timer-1 fixed destination MSB/LSB | `0x7fff`; paired-ROM stable-read/race contract |
 | `0x08/0x09` | FIQ / **IRQ lines active** | ✓ |
 | `0x0a/0x0b` | FIQ / IRQ mask | ✓ |
 | `0x0c` | interrupt control | ✓ |
@@ -99,12 +99,12 @@ profile; — = not established.
 | `0x0e` | **interrupt trigger** (r; read-only — why `assert_irq(4)` can't be SW-triggered) | ✓ |
 | `0x0f–0x13` | programmable timer (divider/counter/compare) | ✓ |
 
-Timer 0's divider/counter/compare behavior is modeled with the 33,055 Hz CTSI
-input. At that rate task 2 services both watchdogs organically. The former
-13 MHz calibration only appeared necessary because an invented external-service
-result suspended the application tasks when scheduler delays ran at their real
-rate. Timer 1 is a separate free-running 33,055 Hz counter with FIQ5 on 16-bit
-wrap; its register-window destination semantics remain provisional.
+Timer 0's divider/counter/compare behavior is modeled with the retained
+33,055 Hz CTSI calibration. At divider `0xf9`, paired-ROM timeout code equates
+its post-divider interval with Timer-1 intervals divided by eight. Timer 1 is a
+separate 15-bit 1,057 Hz calibrated counter with fixed destination `0x7fff` and
+FIQ5 at destination. Service documentation establishes only the nominal 32 kHz
+source, so the absolute internal divider tree remains open.
 
 ### PUP — MBUS, vibrator, buzzer, GenIO
 | off | reg | status / touch |

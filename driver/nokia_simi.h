@@ -13,6 +13,8 @@ public:
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
 	bool enabled() const { return m_enabled; }
+	void set_clock_enabled(bool enabled);
+	bool clock_enabled() const { return m_clock_enabled; }
 
 	u8 control_r() const;
 	void control_w(u8 data);
@@ -39,6 +41,7 @@ private:
 	devcb_write_line m_irq_cb;
 	emu_timer *m_rx_timer = nullptr;
 	bool m_enabled = false;
+	bool m_clock_enabled = false;
 	u8 m_control = 0;
 	// Card-response serialization queue, not firmware-visible FIFO capacity.
 	u8 m_rx_fifo[320] = { 0 };

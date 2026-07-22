@@ -8,6 +8,7 @@ Documentation is organized by authority rather than investigation date.
 | --- | --- |
 | `hardware_atlas.md` | High-level firmware-to-hardware boundary. |
 | `mad2_fidelity.md` | Authoritative MAD2 implementation and uncertainty ledger. |
+| `mad2_static_access.md` | Generated paired-ROM census of direct MAD2 MMIO accesses. |
 | `driver_structure.md` | Code ownership and quarantine rules. |
 | `driver_vision.md` | Current modularization path and configuration taxonomy. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |

@@ -39,12 +39,47 @@ class Mad2ClockTraceCheckTest(unittest.TestCase):
             "mad2_clock: event=W off=01 data=05 old=01 counter=0021 pc=002b4e12 t=0.5\n", "")))
         self.assertEqual([], errors)
 
+    def test_mad2_watchdog_service_is_conditional(self):
+        without_watchdog = "\n".join(
+            line for line in VALID.splitlines() if "off=03" not in line)
+        errors, counts = check(parse(without_watchdog))
+        self.assertEqual([], errors)
+        self.assertEqual(0, counts["watchdog_writes"])
+
+    def test_rejects_unknown_watchdog_service_value(self):
+        errors, _ = check(parse(VALID.replace("off=03 data=31", "off=03 data=30")))
+        self.assertIn("MAD2 watchdog service used a value other than 0x31", errors)
+
     def test_rejects_unknown_reset_write(self):
         errors, _ = check(parse(VALID.replace("data=05 old=01", "data=04 old=01")))
         self.assertIn(
             "reset-control write differed from the observed 0x01 -> 0x05 lifecycle transition",
             errors,
         )
+
+    def test_requires_post_request_reset_cause(self):
+        reset = VALID + "mad2_clock: event=R off=01 data=05 counter=0000 pc=0023060c t=0.7\n"
+        errors, counts = check(parse(reset), require_software_reset=True)
+        self.assertEqual([], errors)
+        self.assertTrue(counts["software_reset_completed"])
+
+    def test_rejects_request_without_completed_reset(self):
+        errors, _ = check(parse(VALID), require_software_reset=True)
+        self.assertIn("MCU reset request was not followed by reset-cause value 0x05", errors)
+
+    def test_requires_watchdog_reset_cause(self):
+        watchdog = VALID.replace("off=03 data=31 old=ff", "off=03 data=01 old=ff")
+        watchdog += "mad2_clock: event=R off=01 data=03 counter=0000 pc=0023060c t=1.0\n"
+        errors, counts = check(
+            parse(watchdog), require_watchdog_reset=True, require_watchdog=False)
+        self.assertEqual([], errors)
+        self.assertTrue(counts["watchdog_reset_completed"])
+
+    def test_rejects_watchdog_without_completed_reset(self):
+        watchdog = VALID.replace("off=03 data=31 old=ff", "off=03 data=01 old=ff")
+        errors, _ = check(
+            parse(watchdog), require_watchdog_reset=True, require_watchdog=False)
+        self.assertIn("MAD2 watchdog expiry was not followed by reset-cause value 0x03", errors)
 
 
 if __name__ == "__main__":

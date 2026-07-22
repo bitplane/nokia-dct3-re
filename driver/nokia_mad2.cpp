@@ -17,7 +17,8 @@ nokia_mad2_device::nokia_mad2_device(
 	device_t(mconfig, NOKIA_MAD2, tag, owner, clock),
 	m_fiq_cb(*this),
 	m_irq_cb(*this),
-	m_irq_ack_cb(*this)
+	m_irq_ack_cb(*this),
+	m_reset_cb(*this)
 {
 }
 
@@ -31,6 +32,7 @@ void nokia_mad2_device::device_start()
 	save_item(NAME(m_irq_status));
 	save_item(NAME(m_timer0_counter));
 	save_item(NAME(m_timer1_counter));
+	save_item(NAME(m_timer1_destination));
 	save_item(NAME(m_timer0_divider));
 	save_item(NAME(m_timer0_compare_latched));
 	save_item(NAME(m_fiq_line_state));
@@ -49,6 +51,7 @@ void nokia_mad2_device::device_reset()
 	m_irq_status = 0;
 	m_timer0_counter = 0;
 	m_timer1_counter = 0;
+	m_timer1_destination = 0x7fff;
 	m_timer0_divider = 0xff;
 	m_timer0_compare_latched = false;
 	m_fiq_line_state = false;
@@ -68,13 +71,14 @@ u8 nokia_mad2_device::read(offs_t offset)
 	switch (offset)
 	{
 	case 0x00: return 0x40;
-	// Timer 1 runs independently of register access. Offsets 0x06/0x07 form
-	// the stored destination latch; no observed firmware path programs it, so
-	// do not synthesize elapsed time or compare behavior here.
+	// Timer 1 is a 15-bit free-running sleep counter. The paired ROMs read its
+	// fixed destination at 0x06 and guard the destination-current subtraction
+	// with FIQ5, so the destination is hardware state rather than a writable
+	// firmware latch.
 	case 0x04: return m_timer1_counter >> 8;
 	case 0x05: return m_timer1_counter;
-	case 0x06: return m_regs[offset];
-	case 0x07: return m_regs[offset];
+	case 0x06: return m_timer1_destination >> 8;
+	case 0x07: return m_timer1_destination;
 	case 0x08: return m_fiq_status;
 	case 0x09: return m_irq_status;
 	case 0x0c: return (m_regs[offset] & ~0x20) | ((m_irq_status >> 3) & 0x20);
@@ -96,9 +100,17 @@ u8 nokia_mad2_device::read(offs_t offset)
 void nokia_mad2_device::write(offs_t offset, u8 data)
 {
 	offset &= 0x1f;
+	const u8 old = m_regs[offset];
 	m_regs[offset] = data;
 	switch (offset)
 	{
+	case 0x01:
+		// Both 3210 ROMs set bit 2 and then spin without a software exit.
+		// MAD2 therefore owns the reset request; the board callback applies the
+		// digital-baseband reset domain after the current MMIO transaction.
+		if (BIT(data, 2) && !BIT(old, 2))
+			m_reset_cb(1);
+		break;
 	case 0x08: ack_fiq(data); break;
 	case 0x09: ack_irq(data); break;
 	case 0x0a: update_fiq_line(); break;
@@ -256,11 +268,18 @@ TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer0_tick)
 
 TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)
 {
-	// Timer 1 is free-running; its overflow is the FIQ5 source. Firmware does
-	// not need to touch the counter window for the overflow interrupt to run.
-	m_timer1_counter++;
-	if (m_timer1_counter == 0)
+	// MADos treats the timebase as 15-bit. Nokia's paired ROMs use FIQ5 as the
+	// race indication for destination-current calculations and acknowledge it
+	// through CTSI status bit 0x20.
+	m_timer1_counter = (m_timer1_counter + 1) & 0x7fff;
+	if (m_timer1_counter == m_timer1_destination)
+	{
 		assert_fiq(5);
+		if (m_timer_trace && m_timer_trace_count++ < 4096)
+			logerror("mad2_timer1: event=destination counter=%04x destination=%04x pending=%03x t=%.9f\n",
+					m_timer1_counter, m_timer1_destination, m_fiq_status,
+					machine().time().as_double());
+	}
 }
 
 TIMER_CALLBACK_MEMBER(nokia_mad2_device::fiq8_tick)

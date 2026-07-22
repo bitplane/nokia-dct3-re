@@ -37,6 +37,8 @@ local fiq8_fixture_at
 local buzzer_fixture_at
 local vibrator_fixture_at
 local rtc_fixture_at
+local mad2_reset_fixture_at
+local mad2_watchdog_fixture_at
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
@@ -66,6 +68,8 @@ fiq8_fixture_at = env_number("NOKI3210_MAD2_FIQ8_FIXTURE_AT", -1)
 buzzer_fixture_at = env_number("NOKI3210_BUZZER_FIXTURE_AT", -1)
 vibrator_fixture_at = env_number("NOKI3210_VIBRATOR_FIXTURE_AT", -1)
 rtc_fixture_at = env_number("NOKI3210_CCONT_RTC_FIXTURE_AT", -1)
+mad2_reset_fixture_at = env_number("NOKI3210_MAD2_RESET_FIXTURE_AT", -1)
+mad2_watchdog_fixture_at = env_number("NOKI3210_MAD2_WATCHDOG_FIXTURE_AT", -1)
 local state_roundtrip_at = env_number("NOKI3210_STATE_ROUNDTRIP_AT", -1)
 
 local function emulation_seconds()
@@ -525,6 +529,26 @@ if rtc_fixture_at >= 0 then
 		space:write_u8(0x2002d, old_control)
 	end)
 	assert(coroutine.resume(rtc_timer))
+end
+
+if mad2_reset_fixture_at >= 0 then
+	local reset_timer = coroutine.create(function()
+		emu.wait(mad2_reset_fixture_at)
+		-- Exercise the mapped MAD2 reset controller only. The device callback,
+		-- not this harness, determines reset extent and the resulting cause.
+		space:write_u8(0x20001, space:read_u8(0x20001) | 0x04)
+	end)
+	assert(coroutine.resume(reset_timer))
+end
+
+if mad2_watchdog_fixture_at >= 0 then
+	local watchdog_timer = coroutine.create(function()
+		emu.wait(mad2_watchdog_fixture_at)
+		-- Load a one-tick ASIC-watchdog interval through mapped MMIO. Device
+		-- timing and reset-domain behavior remain entirely driver-owned.
+		space:write_u8(0x20003, 0x01)
+	end)
+	assert(coroutine.resume(watchdog_timer))
 end
 
 if state_roundtrip_at >= 0 then

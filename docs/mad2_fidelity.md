@@ -17,10 +17,11 @@ Confidence labels:
 The extracted `nokia_mad2_device` owns the CTSI core at offsets `0x00..0x16`:
 reset/clock/watchdog latches, timer state, interrupt pending/masks and CPU-line
 routing. Keypad, GenIO and other board peripherals remain outside that core;
-GENSIO, MBUS and SIMI are separate devices. Timer-1 destination reads, FIQ8
-timing, reset/clock effects, audio outputs and several SELECT/UIF banks remain
-calibrated counters or backing latches. Address-map coverage therefore must not
-be read as peripheral completeness.
+GENSIO, MBUS and SIMI are separate devices. Timer-1 destination behavior,
+MCU-reset extent and the SIMI clock gate are modeled; their absolute clock
+source, FIQ8 timing, other clock-gate bits and several SELECT/UIF banks remain
+calibrated or mapped-only. Address-map coverage therefore must not be read as
+peripheral completeness.
 
 ## Address-space boundary
 
@@ -40,15 +41,15 @@ be read as peripheral completeness.
 | Offsets | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
 | `00` ASIC version | constant `0x40` | Inferred | Compare MAD2 revisions across phone service manuals/ROM checks. |
-| `01` MCU reset | extracted reset-cause latch; optional phone-level soft-reset policy | Partial | Establish reset domains and remove PC-oriented reset options. |
+| `01` MCU reset | bit 2 requests a deferred digital-baseband reset; power bit 0 and retained cause bits are readable | Cross-ROM partial | Both ROMs contain three bit-2 reset sites. A mapped-MMIO fixture proves the reset extent and post-reset value `0x05`; exact rail timing remains unknown. |
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
-| `04..07` timer 1 | 33,055 Hz free-running counter; FIQ5 on 16-bit wrap; stored destination latch | Partial | Overflow timing composes with the menu oracle. Neither ROM accesses the destination latch during boot; establish its compare and reset-enable behavior before adding side effects. |
+| `04..07` timer 1 | 15-bit current counter and fixed `0x7fff` destination; FIQ5 at destination | Cross-ROM partial | Both ROMs use identical stable-read and FIQ5 race handling, and convert remaining Timer-1 ticks by rounded division by 8 before comparing them with Timer 0. Absolute input/divider provenance remains calibrated. |
 | `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ2, masked-pending retention and acknowledgement have focused regressions. The overlap fixture briefly gates CPU delivery through MAD2 MMIO so two physical input callbacks compose deterministically. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
-| `0d` peripheral clock gates | extracted stored latch | Cross-ROM mapped | Both ROMs set bit 5 for SIM activation and clear it after SIM initialization. Other bit ownership and electrical clock effects remain unknown. |
+| `0d` peripheral clock gates | stored latch; bit 5 freezes/resumes SIMI timing and activation without clearing controller state | Cross-ROM partial | Both ROMs perform the same SIM clock lifecycle and the side effect preserves the full frontier. Other bits have paired RMW sites but no proven attached clocks. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
-| `0f..13` timer 0 | live divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated input clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. Recover the physical input/divider relationship without regressing the boot lifecycle. |
+| `0f..13` timer 0 | live source divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated input clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. The register divides source ticks by `data+1`; paired timeout arithmetic proves the resulting Timer-0 interval is compared with `round(Timer1_remaining/8)`. Which documented MAD2 clock feeds the divider remains unproven. |
 
 ## PUP, GPIO and serial blocks
 
@@ -107,20 +108,24 @@ CPU routing and attached interrupt sources. Other unresolved windows remain in
 the phone until their own contracts meet the same standard. GENSIO now meets
 the gate through separate callbacks, two-ROM traces and focused regression.
 
-`make verify-mad2-clocks` adds a two-ROM boot contract for the remaining core
-latches. v6.00 and v5.01 read reset cause `0x01`, organically service watchdog
-offset `0x03` with `0x31`, and complete the peripheral clock-gate lifecycle
-`0x00 -> 0x0c -> 0x2c -> 0x0c`. Static decode establishes that bit 5 is set by
-SIM activation and cleared after SIM initialization; it is not an ARM sleep
-selector.
-Neither accesses timer-1 offsets `0x04..0x07`; that is a negative
-register-access assertion, not evidence that the free-running Timer-1 overflow
-source is inactive. Timer-1 registers do not establish the separate ARM sleep
-mechanism. The former required reset write `0x01 -> 0x05` belonged to
-the unsupported external-service result-5 lifecycle; it is now accepted if
-observed but is not required during ordinary startup. The sequence does not
-establish reset side effects, the remaining clock-gate bits, ARM sleep behavior
-or the destination-latch semantics.
+`make verify-mad2-clocks` provides the paired-ROM boot contract. v6.00 and
+v5.01 read reset cause `0x01` and complete the peripheral clock-gate lifecycle
+`0x00 -> 0x0c -> 0x2c -> 0x0c`. Bit 5 is the SIMI clock gate, not an ARM sleep
+selector; the gated controller freezes delivery while retaining protocol and
+FIFO state. Ordinary boot does not execute the Timer-1 readers, so their
+contract is established by paired static decode and the focused accelerated
+controller test rather than the boot trace. It also performs no MAD2-watchdog
+write in the bounded run; recovered `0x31` service sites are conditional, not a
+periodic startup requirement.
+
+`make verify-mad2-timer1` proves destination `0x7fff`, FIQ5/status `0x020` and
+firmware acknowledgement. `make verify-mad2-reset` runs two mapped-MMIO
+fixtures. Reset-control bit 2 causes a complete digital-baseband restart and
+retains reset cause `0x05`; MAD2-watchdog expiry resets the same domain and
+retains cause `0x03`. Flash, EEPROM and CCONT remain outside that domain.
+CCONT watchdog expiry uses the same reset extent with its own retained cause.
+Exact rail sequencing, ARM sleep and clock-gate bits other than SIMI remain
+unresolved.
 
 The CCONT power-domain gate establishes one reset boundary separately from the
 reset-control register. Watchdog-register data `0x00` holds the digital
@@ -160,10 +165,15 @@ This validates the live divider, coherent 16-bit counter read, compare and
 write-one-clear contract. The previous unused `0x04` timer constant and matching
 pending guard were wrong; runtime assertion/status/acknowledgement all establish
 `0x10`.
-The NSE-8/9 system-module clocking scheme establishes a 13 MHz ARM system
-clock at MAD2PR1; both MAD2 timer models use the recovered 33,055 Hz CTSI input.
-With divider `0xf9`, exact compare/ack cycles continue and task 2 organically
-services both watchdogs at roughly four-second intervals. The former 13 MHz
+The NSE-8/9 system-module documentation establishes a 13 MHz ARM clock and a
+nominal 32 kHz sleep-clock input to MAD2PR1. It does not document the internal
+timer divider tree. The paired ROMs prove the functional relation instead:
+Timer 0 uses programmed divider `0xf9` (`250` source ticks per counter tick),
+while timeout code compares its remaining interval with
+`round(Timer1_remaining / 8)`. The current `33,055 Hz` Timer-0 source and
+`1,057 Hz` Timer-1 rate preserve that observed relation within calibration
+error and keep the boot lifecycle coherent; they remain configurable until a
+primary source establishes the exact oscillator/dividers. The former 13 MHz
 Timer-0 setting starved task 2 and expired CCONT at exactly 49 seconds.
 
 The initial 33,055 Hz experiment exposed task 17 suspended when `0x1587`
@@ -174,9 +184,10 @@ that unsupported lifecycle request leaves task 17 in receive-wait state `4`;
 `0x1587` wakes it, SIM initialization completes, and watchdog service continues.
 No scheduler wake or firmware state is synthesized. `NOKI3210_TIMER0_HZ`
 remains available only for bounded clock comparisons.
-Timer 1 runs independently at 33,055 Hz, wraps at 16 bits and raises FIQ5.
-Catch-up remains disabled, and this
-does not establish other MAD2 revisions' clocks.
+Timer 1 runs independently at the retained `1,057 Hz` calibration, reaches
+fixed destination `0x7fff`, raises FIQ5 and wraps in the 15-bit domain.
+Catch-up remains disabled, and none of this establishes other MAD2 revisions'
+clocks.
 
 The same target performs a scheduled save/load round trip. Main RAM, MAD2
 registers, IRQ/FIQ pending state, timer counters/divider/compare latch, keypad

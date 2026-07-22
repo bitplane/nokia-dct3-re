@@ -275,9 +275,9 @@ peripherals in stale protocol states and was rejected.
 
 CCONT watchdog expiry uses the same digital-baseband reset domain. It resets
 the CPU, MAD2 peripherals, GENSIO, MBUS, DSPIF/peer, SIMI/card protocol state
-and LCD controller while retaining CCONT, flash and EEPROM. The separate MAD2
-watchdog remains an ASIC-local reset contract whose physical extent is not yet
-established.
+and LCD controller while retaining CCONT, flash and EEPROM. MAD2 watchdog
+expiry and reset-control bit 2 now use the same evidenced digital-baseband
+extent while publishing their own retained reset causes.
 
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
@@ -289,13 +289,14 @@ The firmware service helper at `0x2b4dc0` accepts a mask: bit 0 reloads the
 MAD2 watchdog and bit 1 writes `0x31` through logical CCONT descriptor 6,
 which GENSIO maps to physical register 5. A focused v6.00 run observes three
 CCONT-only calls from the startup/NV state machine at 12--13 ms and one
-combined MAD2/CCONT call from task 2 at 0.834 s. It observes no later call
-before expiry at the retained Timer-0 calibration. The earlier claimed Thumb
+CCONT-only call from task 2 at 0.834 s. Paired 12-second clock runs observe no
+MAD2-watchdog write; that service branch is conditional. The earlier claimed Thumb
 pointer at `0x2dfc80` was an unaligned halfword match, not a function-table
 entry. All nine direct calls are classified: six belong to one-shot boot/NV
-callback `0x296428`; the steady-state combined call is task 2 at `0x237b2e`.
+callback `0x296428`; the steady-state CCONT call is task 2 at `0x237b2e`.
 
-Both MAD2 timers now use 33,055 Hz. Task 2 performs combined MAD2/CCONT reloads
+Timer 0 retains its 33,055 Hz source calibration; Timer 1 uses 1,057 Hz, with
+their post-divider 8:1 relation established by paired ROM code. Task 2 performs CCONT reloads
 at approximately 3.965-second intervals. With WDDISX released, v6.00 remains
 coherent through a 75-second run and v5.01 through 65 seconds; neither expires
 or resets. The earlier task-17 failure at this rate was not scheduler or
