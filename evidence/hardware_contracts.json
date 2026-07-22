@@ -149,7 +149,7 @@
     },
     {
       "id": "display_profile_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
-      "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; record-0 byte 5 becomes active slot 7 at 0x11fc87. An erased-profile control loads 0xff with no firmware fallback and leaves the panel blank, so the generated EEPROM supplies only the recovered value 4 through normal NV loading and leaves unknown bytes erased",
+      "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; equivalent ROM reset constructors at 0x29a802 and 0x296d6e explicitly author the same bytes 0..8 before committing variants 0..2. The generated EEPROM supplies those fields through normal NV loading, leaves constructor-unassigned bytes erased, and record-0 byte 5 becomes active slot 7 at 0x11fc87; a fully erased control leaves the panel blank",
       "evidence": ["docs/eeprom_analysis.md", "docs/mmi_layer.md", "docs/normalization_status.md"]
     },
     {

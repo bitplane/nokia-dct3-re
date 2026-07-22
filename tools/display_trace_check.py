@@ -12,6 +12,11 @@ DESCRIPTORS = {
     "v600": (0x2DAD78, 0x18A8),
     "v501": (0x2CF510, 0x18A0),
 }
+PROFILE_DEFAULTS = bytes.fromhex(
+    "000901340104010100ffffff"
+    "010801340104ff0100ffffff"
+    "000901340104010100ffffff"
+)
 
 PROFILE_RE = re.compile(
     r"display_profile: pc=([0-9a-fA-F]{8}) "
@@ -47,7 +52,12 @@ def check_descriptor(rom: bytes, eeprom: bytes, firmware: str):
     if len(records) != length * 3:
         errors.append("EEPROM is too short for three display-profile records")
     erased = bool(records) and all(value == 0xFF for value in records)
-    return errors, {"offset": offset, "length": length, "erased": erased}
+    defaults = records == PROFILE_DEFAULTS
+    if not defaults:
+        errors.append("EEPROM does not contain the ROM-authored display-profile fields")
+    return errors, {
+        "offset": offset, "length": length, "erased": erased, "defaults": defaults
+    }
 
 
 def parse_profile(text: str):
@@ -63,10 +73,9 @@ def check_v600_profile(text: str):
     for pc in (0x29A996, 0x29A768, 0x2B1E80):
         if pc not in profiles:
             errors.append(f"missing display-profile boundary 0x{pc:08x}")
-    expected = bytearray([0xFF]) * 12
-    expected[5] = 4
+    expected = PROFILE_DEFAULTS[:12]
     if 0x29A768 in profiles and profiles[0x29A768][0] != expected:
-        errors.append("NV descriptor 0x0749 did not yield the synthetic display field")
+        errors.append("NV descriptor 0x0749 did not yield ROM-authored profile zero")
     if 0x2B1E80 in profiles and profiles[0x2B1E80][1][7] != 4:
         errors.append("firmware did not copy display-profile byte 5 to active slot 7")
     if 0x29AE68 in profiles:
@@ -132,7 +141,7 @@ def main(argv=None):
     print(
         f"display NV: firmware={args.firmware} descriptor=0x0749 "
         f"offset=0x{descriptor['offset']:04x} length={descriptor['length']} "
-        f"erased={int(descriptor['erased'])}"
+        f"erased={int(descriptor['erased'])} defaults={int(descriptor['defaults'])}"
     )
     print(
         f"display profile: boundaries={profile['boundaries']} "

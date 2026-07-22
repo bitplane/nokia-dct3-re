@@ -55,9 +55,9 @@ explicit configurations rather than driver-name parsing.
   conclusion is normalized; replace each RAM-read shortcut with its real
   hardware or nonvolatile-data owner.
 - All firmware-result forces, registration-message injections and firmware RAM
-  read overrides are removed. The synthetic EEPROM provisions only the
-  recovered descriptor-`0x0749` display-selection field; firmware loads and
-  copies it through its ordinary NV path. See `evidence_regime.md`.
+  read overrides are removed. The synthetic EEPROM provisions the fields from
+  the paired-ROM descriptor-`0x0749` reset constructor; firmware loads and
+  copies them through its ordinary NV path. See `evidence_regime.md`.
 - The direct firmware allocation trampoline,
   service-status RAM completion, and synthetic startup-report feed are removed.
   The current external-service peer consumes organic DSP-ring requests and returns

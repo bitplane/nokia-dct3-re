@@ -55,8 +55,8 @@ remappable inputs and persistent NVRAM; it does not drive scripted keys.
 The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
 executable protocol hypotheses, not finished hardware emulation, but do not
 call firmware handlers or write registration state. Firmware-PC conditions are
-confined to diagnostic traces and the documented erased-NV display-profile
-RAM-read shortcut.
+confined to diagnostic traces; product provisioning enters through EEPROM and
+other ordinary device boundaries.
 
 ## Maturity
 

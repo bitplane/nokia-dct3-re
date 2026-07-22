@@ -95,25 +95,37 @@ active-profile byte 7 (`0x11fc87`). Setup-message initializer `0x2b1e80` tests
 that byte against `4`. The generated EEPROM supplies the source byte; the
 driver does not intercept the later RAM read.
 
-Four 3210 EEPROM images are collected. All four have the applicable
-three-record range erased, so no complete factory record is available. The
-generated profile leaves every unknown byte erased and supplies only record-0 byte 5 as value `4`,
-the field whose ownership and consumer are statically recovered. Firmware loads
-that byte through I2C/NV, copies it to active slot 7 and selects the 3210 LCD
-setup without a RAM-read override. The later profile-update handler `0x29ae68`
-does not execute during coherent boot. `make verify-display` checks this path.
+Two 3210 EEPROM images are collected. Both have the applicable three-record
+range erased, so neither is an authentic configured profile. The ROM
+does, however, contain a product reset constructor: v6.00 `0x29a802` and the
+signature-aligned v5.01 `0x296d6e` explicitly author the same fields before
+committing variants 2, 1 and 0 through the ordinary NV writer. The records are:
+
+| Variant | ROM-authored bytes 0..8 | Unassigned bytes |
+| --- | --- | --- |
+| 0 | `00 09 01 34 01 04 01 01 00` | 9..11 |
+| 1 | `01 08 01 34 01 04 ?? 01 00` | 6, 9..11 |
+| 2 | `00 09 01 34 01 04 01 01 00` | 9..11 |
+
+The generator provisions those explicit assignments and leaves the unassigned
+bytes erased. This is ROM-authored reset data, not a claim about the contents
+of a factory-programmed EEPROM. Firmware loads the records through I2C/NV,
+copies record-0 byte 5 to active slot 7 and selects the 3210 LCD setup without
+a RAM-read override. The later profile-update handler `0x29ae68` does not
+execute during coherent boot. `make verify-display` checks the descriptor,
+all three generated records and the active-profile copy.
 
 An otherwise identical negative-control run with all three records left erased
 loaded `0xff` into active slot 7 and did not enter the update handler or any
 firmware fallback. The later setup emitted commands that the PCD8544 rejected
 and the final panel remained blank. Descriptor `0x0749` is therefore required
-product provisioning rather than a hardware register default. Until an
-authentic configured record is available, supplying only the recovered value
-`4` and leaving the other 35 bytes erased is the smallest evidenced fixture.
+product provisioning rather than a hardware register default. The generated
+ROM-default fields are the strongest available provisioning fixture; bytes the
+constructor does not assign remain unknown pending an authentic configured
+record.
 
-Two of the four collected images are verified to have erased bytes across the
-descriptor-2/3/4 range, so this ROM substitutes its validated defaults; the
-other two images are unverified for this range. The source-7 gain denominator is
+Both collected images have erased bytes across the descriptor-2/3/4 range, so
+this ROM substitutes its validated defaults. The source-7 gain denominator is
 descriptor-2 bytes `0x024a..0x024b`; firmware uses gain `563.0 / denominator`
 and falls back to denominator `0x0233` (unity gain). See
 `battery_classifier_analysis.md` for the complete ranges and boot-safety result.

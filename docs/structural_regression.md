@@ -69,9 +69,10 @@ initialization, asserts that ordinary boot transmits no bytes, and uses one
 external byte to verify RX-ready, firmware consumption and FIQ2 acknowledgement.
 The arbitrary byte's later parser outcome is not an acceptance predicate.
 `make verify-display` checks the version-specific descriptor-`0x0749` EEPROM
-locations, the current erased-data boundary, GENSIO LCD selection, command
-prefix and a complete 504-byte RAM transfer in both 3210 ROMs. It records the
-remaining product-provisioning shortcut rather than treating it as LCD state.
+locations, all fields explicitly authored by the equivalent v6.00/v5.01 reset
+constructors, GENSIO LCD selection, command prefix and a complete 504-byte RAM
+transfer in both 3210 ROMs. Constructor-unassigned bytes remain visibly erased
+rather than being promoted to inferred product data.
 The final startup-event field is deliberately excluded from both subsets: the
 dispatcher continues receiving events after reaching the same accepted mode,
 flags, contact state, SIM state, and exact frame.

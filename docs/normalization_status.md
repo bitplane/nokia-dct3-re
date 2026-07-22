@@ -67,7 +67,7 @@ be investigated only when an organic application path reaches its boundary.
 | DSP/network/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the cross-ROM bootstrap and service transport; `nokia_radio_peer_device` owns Nokia L1 packet correlation; `nokia_gsm_network_device` owns standards-shaped laboratory-cell, RR and MM data; `nokia_external_service_peer_device` owns the request-driven service/test session. Firmware-programmed COBBA oscillator words `0x0ae/0x0b0/0x0b6` drive separate HLE audio voices. | Recover physical bootstrap timing and the DSP-internal PLMN-measurement lifecycle; extend the GSM peer only from an evidenced Nokia L1 entrance; replace square-wave tone HLE with codec-backed behavior when evidenced. |
 | MAD2 | `nokia_mad2_device` owns CTSI offsets `0x00..0x16`, timer-0/FIQ4, 15-bit timer-1/destination/FIQ5, reset request/cause, pending/masks, IRQ/FIQ aggregation, one-shot ARM clock-stop/routed wake and save-state restoration. SIMI clock bit 5 has a controller side effect; SIMI, MBUS and GENSIO are separate devices. | Establish extended IRQ ownership, exact physical timer dividers and transition latency, remaining clock-gate consumers and rail timing. |
 | MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, 9,600-baud character timing and FIQ2/FIQ3 callbacks; ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing. | Recover FIQ3 phase/source and collision/error behavior; attach a counterparty only for organic frames. |
-| Display/input | Native PCD8544, a cross-ROM LCD transport check, and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures. The generated EEPROM supplies the one recovered descriptor-`0x0749` field through normal NV loading; an erased-profile control proves firmware has no usable fallback. | Obtain a complete authentic `0x0749` profile to replace the minimal synthetic field; recover reset timing and mask/debounce edge cases separately. |
+| Display/input | Native PCD8544, a cross-ROM LCD transport check, and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures. The generated EEPROM supplies the fields explicitly authored by equivalent v6.00/v5.01 descriptor-`0x0749` reset constructors through normal NV loading; an erased-profile control leaves the panel blank. | Obtain an authentic configured `0x0749` profile to resolve constructor-unassigned bytes; recover reset timing and mask/debounce edge cases separately. |
 | Buzzer | MAD2 PUP bit 5 gates a MAME beeper; a mapped-MMIO conformance fixture validates the two-byte `13 MHz / divider` clock, enable edge and disable edge. The organic user-alarm lifecycle programs CCONT, consumes its IRQ and drives changing divider/volume values through this output. | Recover the physical volume/acoustic transfer. Ringing-tone preview and DSP/COBBA audio remain separate paths. Vibrator and backlight remain separate gaps. |
 | Vibrator/backlight | PUP bit 4 drives a named MAME `vibration` output while `0x1b` stores its independent control byte; a mapped-MMIO fixture validates the gate. Enabling `Vibrating alert` through the firmware UI and ringing an organic RTC alarm leaves both registers inactive, constraining that setting to another alert lifecycle rather than proving an output defect. The 3210 service manual establishes that COBBA drives separate LCD/key-light signals into the UI-Switch. Paired-ROM MAD2 traces and a complete changed-write census of MCU-visible DSP shared RAM find no key/timeout-specific output command. | Exercise vibra organically from an incoming-call lifecycle and decode `0x1b`. Recover the lower DSP/COBBA light-control surface before exposing backlight outputs. |
 
@@ -75,9 +75,10 @@ The headless LCD mirror and delayed-key fixture are acceptance tooling in
 `mame_noki3210_input_exerciser.lua`. They do not add device state or firmware
 shortcuts to the phone driver.
 
-The synthetic EEPROM provisions the single recovered display-profile field at
-ROM-described descriptor `0x0749`; firmware loads and copies it organically.
-Unknown bytes remain erased because no complete factory record is available.
+The synthetic EEPROM provisions the three display profiles' ROM-authored reset
+fields at descriptor `0x0749`; firmware loads and copies them organically.
+Constructor-unassigned bytes remain erased because no configured factory record
+is available.
 
 ## Runtime-control ledger
 

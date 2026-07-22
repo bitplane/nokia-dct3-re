@@ -50,8 +50,19 @@ class ChecksumTests(unittest.TestCase):
         descriptor = 0x100
         location = 0x18A8
         image = make_eeprom_profile.build_profile(bytes(flash))
-        self.assertEqual(image[location:location + 12],
-                         bytes.fromhex("ffffffffff04ffffffffffff"))
+        self.assertEqual(image[location:location + 36], bytes.fromhex(
+            "000901340104010100ffffff"
+            "010801340104ff0100ffffff"
+            "000901340104010100ffffff"))
+
+    def test_display_profile_location_can_move_between_roms(self):
+        flash = bytearray(self.firmware_fixture())
+        location = 0x18A0
+        flash[0x104:0x108] = ((location << 16) | 12).to_bytes(4, "big")
+        image = make_eeprom_profile.build_profile(bytes(flash))
+        self.assertEqual(image[location:location + 9],
+                         bytes.fromhex("000901340104010100"))
+        self.assertEqual(image[location + 36:location + 45], bytes([0xff]) * 9)
 
 
 if __name__ == "__main__":

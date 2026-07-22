@@ -26,16 +26,36 @@ class DisplayTraceCheckTests(unittest.TestCase):
         )
         self.assertTrue(any("without select" in error for error in errors))
 
-    def test_v600_profile_uses_synthetic_nv_field(self):
+    def test_v600_profile_uses_rom_authored_defaults(self):
+        record = "000901340104010100ffffff"
         text = "\n".join((
             "display_profile: pc=0029a996 source0=" + "00" * 12 + " active=" + "00" * 10,
-            "display_profile: pc=0029a768 source0=ffffffffff04ffffffffffff active=" + "00" * 10,
-            "display_profile: pc=002b1e80 source0=ffffffffff04ffffffffffff"
+            "display_profile: pc=0029a768 source0=" + record + " active=" + "00" * 10,
+            "display_profile: pc=002b1e80 source0=" + record +
                 " active=" + "ff" * 7 + "0400ff",
         ))
         errors, counts = display_trace_check.check_v600_profile(text)
         self.assertEqual(errors, [])
         self.assertEqual(counts["update_seen"], 0)
+
+    def test_descriptor_requires_all_rom_authored_fields(self):
+        rom = bytearray(0x100000)
+        descriptor = 0x2DAD78 - display_trace_check.FLASH_BASE
+        for offset, value in ((descriptor, 0x0749),
+                              (descriptor + 4, (0x18A8 << 16) | 12)):
+            encoded = ((value & 0xffff) << 16) | (value >> 16)
+            rom[offset:offset + 4] = encoded.to_bytes(4, "little")
+        eeprom = bytearray([0xff]) * 0x4000
+        eeprom[0x18A8:0x18A8 + 36] = display_trace_check.PROFILE_DEFAULTS
+        errors, result = display_trace_check.check_descriptor(
+            bytes(rom), bytes(eeprom), "v600")
+        self.assertEqual(errors, [])
+        self.assertTrue(result["defaults"])
+
+        eeprom[0x18A8 + 12] ^= 1
+        errors, _ = display_trace_check.check_descriptor(
+            bytes(rom), bytes(eeprom), "v600")
+        self.assertTrue(any("ROM-authored" in error for error in errors))
 
 
 if __name__ == "__main__":

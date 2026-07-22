@@ -18,8 +18,15 @@ SECURITY_XOR = bytes((0x00, 0xFF, 0xFF, 0xFF))
 SECURITY_CALLBACK_STATE = 0x11
 DISPLAY_PROFILE_KEY = 0x0749
 DISPLAY_PROFILE_LENGTH = 12
-DISPLAY_PROFILE_SLOT7_OFFSET = 5
-DISPLAY_PROFILE_SLOT7_VALUE = 4
+# v6.00 0x29a802 and its v5.01 equivalent 0x296d6e construct these
+# three reset profiles before committing descriptor 0x0749 variants 0..2.
+# None marks bytes the constructor does not write; retain their erased state
+# rather than presenting zero-filled scratch RAM as authored NV data.
+DISPLAY_PROFILE_DEFAULTS = (
+    (0x00, 0x09, 0x01, 0x34, 0x01, 0x04, 0x01, 0x01, 0x00, None, None, None),
+    (0x01, 0x08, 0x01, 0x34, 0x01, 0x04, None, 0x01, 0x00, None, None, None),
+    (0x00, 0x09, 0x01, 0x34, 0x01, 0x04, 0x01, 0x01, 0x00, None, None, None),
+)
 
 
 def sum16(data: bytes) -> int:
@@ -143,14 +150,18 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None) -> byte
     for address, value in patches.items():
         image[address] = value
 
-    # Descriptor 0x0749 owns three display-profile records. No complete factory
-    # record is available, so retain erased bytes and provision only the one
-    # recovered field: record-0 byte 5 is copied to active slot 7 and value 4
-    # selects the 3210 LCD setup. Firmware consumes it through normal I2C/NV
-    # loading; no firmware RAM or LCD-device state is overridden.
+    # Descriptor 0x0749 owns three display-profile records. Both supported ROMs
+    # contain equivalent reset constructors for the fields below. Provision
+    # those ROM-authored defaults, while retaining erased bytes where the
+    # constructor itself makes no assignment. Firmware consumes the records
+    # through normal I2C/NV loading; no firmware RAM or LCD state is overridden.
     display_profile = find_nv_descriptor(
         flash, DISPLAY_PROFILE_KEY, DISPLAY_PROFILE_LENGTH)
-    image[display_profile + DISPLAY_PROFILE_SLOT7_OFFSET] = DISPLAY_PROFILE_SLOT7_VALUE
+    for variant, record in enumerate(DISPLAY_PROFILE_DEFAULTS):
+        record_offset = display_profile + variant * DISPLAY_PROFILE_LENGTH
+        for field, value in enumerate(record):
+            if value is not None:
+                image[record_offset + field] = value
 
     if provisioned_identity is not None:
         provision_security_identity(image, provisioned_identity)
