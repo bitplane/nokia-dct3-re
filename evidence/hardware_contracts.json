@@ -104,7 +104,7 @@
     },
     {
       "id": "dsp_bootstrap_status_hle", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
-      "boundary": "The DSP HLE publishes state into DSPIF-owned shared RAM rather than overriding reads: both 3210 ROMs complete 64 alternating 0x0fe/0x100 acknowledgements before the peer publishes ready words 0x000..0x004, and command 4 clears busy word 0x0e0; no DSP core executes and physical response timing remains unknown",
+      "boundary": "The DSP HLE publishes state into DSPIF-owned shared RAM rather than overriding reads: both 3210 ROMs complete 64 alternating 0x0fe/0x100 acknowledgements and 3310 v6.39 completes 58 before the product-configured peer publishes ready words 0x000..0x004; command 4 clears busy word 0x0e0, no DSP core executes, and physical response timing remains unknown",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/dsp_shared_memory_inventory.md", "evidence/runtime/dsp_shared_reads.json"]
     },
     {
@@ -151,6 +151,21 @@
       "id": "display_profile_source", "subsystem": "display", "status": "prototype", "confidence": "moderate",
       "boundary": "NV descriptor 0x0749 owns three 12-byte display profiles at EEPROM 0x18a8 in v6.00 and 0x18a0 in v5.01; equivalent ROM reset constructors at 0x29a802 and 0x296d6e explicitly author the same bytes 0..8 before committing variants 0..2. The generated EEPROM supplies those fields through normal NV loading, leaves constructor-unassigned bytes erased, and record-0 byte 5 becomes active slot 7 at 0x11fc87; a fully erased control leaves the panel blank",
       "evidence": ["docs/eeprom_analysis.md", "docs/mmi_layer.md", "docs/normalization_status.md"]
+    },
+    {
+      "id": "dsp_bootstrap_product_counts", "subsystem": "dsp", "status": "mapped", "confidence": "strong",
+      "boundary": "The paired 3210 ROMs complete 64 shared-word 0x00fe/0x0100 bootstrap exchanges and 3310 v6.39 completes 58 before the DSP HLE publishes words 0x0000..0x0004 ready. Product configuration owns that calibration; the 3310 clears its wait at 0x2bc96a without a firmware hook",
+      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dsp_hle.cpp"]
+    },
+    {
+      "id": "noki3310_product_profile_idle", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
+      "boundary": "3310 v6.39 reaches its deterministic idle frame with the shared DSP service, external-service and SIM devices plus standard CCONT channels 2/3/4 set to the evidenced normal-pack VBATT/BSI/BTEMP tuple 0x220/0x026/0x200. Its product-configured five-row keypad uses the shared direction AND NOT signal scan rule; physical Navi, Down and C cycles open the Phone book menu, enter and navigate its submenu, then return to the exact idle oracle. The same boot organically exchanges DSP self-test request 0x70/0x0d and completion 0x74/0x0d/0x00; no firmware hook or guessed reply is used",
+      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_3310.cpp", "Makefile"]
+    },
+    {
+      "id": "noki3330_product_profile_interactive", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
+      "boundary": "3330 v4.50 PPM E completes 64 DSP bootstrap exchanges and reaches deterministic idle with the shared request-driven DSP, external-service and SIM peers, standard CCONT channels 2/3/4 at 0x220/0x026/0x200, and the five-row keypad contract. Physical switches complete the virgin PMM's 12345 security, time and date editors, navigate Phone book to Messages, and return to the exact idle oracle; no firmware or RAM state is forced",
+      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_3310.cpp", "Makefile"]
     },
     {
       "id": "ccont_charger_power_wake", "subsystem": "ccont", "status": "partial", "confidence": "strong",

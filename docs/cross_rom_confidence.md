@@ -39,13 +39,52 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
 
 - 3210 v6.00: the default profile reproduces the exact fault-screen oracle
   (`d8a9a7a58e587be8`) with the native 24C128 and extracted CCONT devices.
-- 3330 v4.50 PPM E: `make smoke-3330e RUN_DIR=run_3330e_smoke SECONDS=3`
-  completed three emulated seconds at 207% average speed. Firmware performed
-  one soft reset and issued a blank LCD transfer (`f102/z504`); no phone-specific
-  hook or service model was enabled.
-- Confidence gained already: the build and machine definitions are
-  multi-source/multi-ROM capable; the first two extracted hardware components
-  contain no 3210 firmware addresses.
+- 3330 v4.50 PPM E now has an explicit product profile. It completes 64 DSP
+  bootstrap exchanges, uses the request-driven DSP/external-service/SIM peers,
+  the standard-channel `0x220/0x026/0x200` VBATT/BSI/BTEMP tuple and the shared
+  five-row keypad contract. Peers alone leave the LCD blank; adding the analog
+  tuple advances organically through CONTACT SERVICE to the security editor.
+- The acquired virgin PMM stores phone code `12345` and requires first-boot time
+  and date entry. Physical keypad input submits the code, `12:00`, and
+  `01.01.2002`; firmware accepts each editor and reaches deterministic idle.
+  `make verify-3330-frontier` protects that complete lifecycle.
+- `make verify-3330-navigation` enters Phone book, moves to Messages, and uses C
+  to return to the exact idle oracle. No firmware hook, task message, RAM state,
+  guessed reply or application-specific path participates.
+
+## Nokia 3410 NHM-2 v5.46
+
+The acquired Wintesla MCU, PPM E and virgin PMM streams normalize to a
+`0x370000` firmware image and `0x090000` PMM region. The board uses an ST
+M28W320ECT-compatible 32-Mbit top-boot NOR part (manufacturer `0x20`, device
+`0x88ba`). Its parameter region has eight 8-KiB blocks at the top of the array;
+ordinary blocks are 64 KiB. The tracked MAME flash patch adds that device and
+enforces NOR programming (`stored &= written`), which is load-bearing during
+the firmware's first-boot PMM compaction. Assignment-style programming allowed
+illegal zero-to-one transitions and corrupted a valid seven-entry record.
+
+With that physical flash contract, the v5.46 firmware compacts the supplied PMM
+without a hook or data repair and performs no soft reset. The unattended phone
+then blanks the LCD through its ordinary idle lifecycle. The former frontier
+gate accidentally treated that all-white 96-by-65 capture as an idle oracle
+because its blank-frame filter only recognized the 84-by-48 products.
+`make verify-3410-frontier` now uses one physical End-key cycle to wake the
+firmware-owned idle UI and protects that actual frame by exact LCD hash from a
+fresh NVRAM directory. The product uses the shared PCD8544-family serial
+protocol through MAME's native device, extended with default-preserving
+configurable geometry: 102-by-72 controller RAM and a 96-by-65 visible
+viewport.
+
+The five-row keypad is also ROM-derived. The scanner indexes the active
+25-entry map at `0x4c5130` as `row * 5 + column`; physical Menu maps to logical
+key `0x19` and Names maps to `0x1a`. IRQ0, deferred scanning, debounce and ROM
+mapping all execute organically. Menu content remains firmware-owned: physical
+Menu emits the press object consumed by task 5 and draws `Messages`.
+`make verify-3410-menu` protects that exact screen, while
+`make verify-3410-navigation` independently opens it and uses physical End to
+return to the exact idle frame. Send and End are separate cells in this map and
+are exposed as ordinary MAME inputs; no firmware hook, RAM forcing, injected
+message or guessed peer reply participates.
 
 ### Conditional power lifecycle control
 
@@ -143,15 +182,63 @@ involved.
   reaches its exact Security-code frame without executing its structurally
   equivalent report-7 wrapper. The 5110 uses a serial-keypad lifecycle, so it
   is a protocol-family negative control rather than a 3210 input-path oracle.
-- A Nokia 3310 v6.39 run reaches an interactive idle-like frame without
-  executing its equivalent report-7 wrapper.
+- A Nokia 3310 v6.39 run in the independent message-level emulator reaches an
+  interactive idle-like frame without executing its equivalent report-7
+  wrapper. That is an external behavioral control, not the local MAME result.
 
 Report 7 is therefore not a generic DCT3 DSP/MMI-ready event. Any 3210 model
 that produces it must be derived from the 3210's own observed boundary.
 
+## Nokia 3310 NHM-5 v6.39 MAME spike
+
+The local `3310f639e.fls`/`3310 v2 pmm.bin` pair is declared as BIOS `639` with
+its own hashes and BIOS-specific PMM selection. `make smoke-3310-639
+RUN_DIR=run_3310_spike SECONDS=8` runs it on the existing device composition;
+the spike adds no 3310 firmware hooks or compatibility responses.
+
+The initial bounded run exposed a product assumption: the 3310 performs 58
+alternating DSP bootstrap exchanges through shared words `0x00fe` and `0x0100`,
+writes `0xffff` to shared word `0x0002`, and waits at firmware PC `0x002bc96a`.
+The HLE previously published ready words `0x0000..0x0004` only after the 64
+exchanges recovered from both 3210 ROMs.
+
+The count is explicit product configuration: 3210 uses 64 and this 3310 uses
+58. `make verify-dsp-bootstrap-3310` proves that both request words receive 58
+writes before the single ready publication. The shared DSP service,
+external-service and SIM devices are also enabled by the 3310 product profile.
+ROM 6 organically performs the same `{0x70,0x0d}` request and
+`{0x74,0x0d,0x00}` FIQ0 completion as the existing peer contract.
+
+The additional product contract is CCONT ADC routing and pack input. The 3310
+uses standard channels 2/3/4 for VBATT/BSI/BTEMP and reaches idle with the
+evidenced normal-pack tuple `0x220/0x026/0x200`; the conservative generic
+values caused the firmware's legitimate `CONTACT SERVICE` result. With those
+inputs, the unchanged SIM model completes the ROM-6 filesystem walk and the
+firmware draws the idle screen. `make verify-3310-frontier` protects that
+forcing-free, no-override endpoint by exact frame hash.
+
+The count remains an evidenced calibration, not a recovered protocol constant.
+A future real-DSP or protocol-derived completion condition should replace both
+counts if that boundary becomes observable.
+
 ## Acceptance criteria
 
-The next confidence increment is a 3330-specific structural summary: first
-executed PC, interrupt activity, last stable startup phase and MAD2/CCONT
-requests. A useful failure is an organic firmware-visible hardware request; a
-firmware-PC hook added only for the 3330 is a portability failure.
+Organic keypad interaction is now acceptance-gated. The NHM-5 firmware uses
+the shared active-low signal/direction electrical rule but a product-specific
+five-row matrix. During a Menu press v6.39 reads `0xf7` on row 4 and stores raw
+index `0x17`, whose ROM keymap entry is logical key `0x19` (Menu). The first
+tap follows the firmware's wake/debounce lifecycle; a second separated tap
+opens the `Phone book` menu without a firmware hook. `make verify-3310-menu`
+protects the resulting frame.
+
+The same physical input path supports a deterministic representative workflow.
+A third Navi cycle enters the Phone book submenu, Down moves the selection from
+`Search` to `Add name`, and two C-key cycles unwind through the parent menu to
+the exact idle-frame oracle. `make verify-3310-navigation` protects the selected
+submenu and returned-idle endpoints independently. No 3310-specific electrical
+or shared-device correction was required: Navi, Down and C all use the same
+active-low direction/signal scan contract with the product's five-row wiring.
+The 3330's generic 3210-address structural summary fields remain intentionally
+unused; its product acceptance is instead exact idle/navigation LCD endpoints
+plus physical-key input and the device-boundary profile above. A firmware-PC
+hook added only for this sibling ROM remains a portability failure.

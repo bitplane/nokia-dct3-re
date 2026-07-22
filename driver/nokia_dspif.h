@@ -27,6 +27,14 @@ public:
 	auto service_irq_cb() { return m_service_irq_cb.bind(); }
 
 	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
+	void set_bootstrap_ping_pong(bool enabled) { m_bootstrap_ping_pong = enabled; }
+	void set_code_block_request(bool enabled) { m_code_block_request = enabled; }
+	void set_parked_boot_status(bool enabled, u16 response)
+	{
+		m_parked_boot_status = enabled;
+		m_boot_status_response = response;
+	}
+	bool bootstrap_ping_pong() const { return m_bootstrap_ping_pong; }
 
 	u16 shared_r(offs_t offset);
 	void shared_w(offs_t offset, u16 data, u16 mem_mask = ~0);
@@ -68,6 +76,10 @@ private:
 	u16 m_ram[0x800] = { 0 };
 	u8 m_dspif[4] = { 0 };
 	bool m_trace_enabled = false;
+	bool m_bootstrap_ping_pong = false;
+	bool m_code_block_request = false;
+	bool m_parked_boot_status = false;
+	u16 m_boot_status_response = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_DSPIF, nokia_dspif_device)

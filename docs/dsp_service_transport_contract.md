@@ -34,9 +34,10 @@ external-session delay remain calibrated prototype behavior rather than
 protocol constants.
 
 All MCU reads are answered from DSPIF-owned backing RAM. The MCU first verifies ordinary shared
-RAM, then performs 64 alternating zero-write/peer-acknowledgement exchanges at
-`0x0fe` and `0x100`. The peer publishes ready words `0x000..0x004 = 1` when the
-exchange completes. Both 3210 ROMs reproduce this state transition. Command 4
+RAM, then performs alternating zero-write/peer-acknowledgement exchanges at
+`0x0fe` and `0x100`. Both 3210 ROMs use 64 exchanges; 3310 v6.39 uses 58. The
+product-configured peer publishes ready words `0x000..0x004 = 1` when the
+exchange completes. Command 4
 similarly causes the peer to clear busy word `0x0e0` in backing RAM. Publication
 latency remains HLE policy because no DSP timing oracle is available.
 

@@ -31,6 +31,8 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertIn("peer_shared_w", self.transport)
         self.assertIn("publish_bootstrap_state", self.hle)
         self.assertNotIn("bootstrap_r", self.hle + self.phone)
+        self.assertIn("m_bootstrap_exchange_limit", self.hle)
+        self.assertNotIn("m_bootstrap_exchange_count == 64", self.hle)
 
     def test_external_peer_uses_acknowledged_startup_phases(self):
         self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)

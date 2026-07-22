@@ -1,6 +1,6 @@
 import unittest
 
-from tools.dsp_transport_trace_check import check
+from tools.dsp_transport_trace_check import check, check_bootstrap_completion
 
 
 FULL = """
@@ -12,6 +12,7 @@ dspif_transport: peer RAM W off=0fe data=0001
 dspif_transport: peer RAM W off=100 data=0001
 dspif_transport: RAM W off=0fe data=0000
 dspif_transport: RAM W off=100 data=0000
+dsp_hle: bootstrap ready exchanges=64
 dspif_transport: doorbell command=0004 pending=0000
 dspif_transport: RAM W off=0e4 data=0002
 dspif_transport: IRQ4 service-complete
@@ -28,7 +29,30 @@ class DspTransportTraceCheckTest(unittest.TestCase):
         self.assertEqual(check(FULL, True)["tx_packets"], 1)
 
     def test_bootstrap_contract(self):
-        self.assertEqual(check(FULL, False)["doorbells"], 1)
+        result = check(FULL, False, expected_bootstrap_exchanges=64)
+        self.assertEqual(result["bootstrap_exchanges"], 64)
+
+    def test_wrong_bootstrap_count_fails(self):
+        with self.assertRaisesRegex(ValueError, "expected 58"):
+            check(FULL, False, expected_bootstrap_exchanges=58)
+
+    def test_completion_only_counts_both_exchange_words(self):
+        requests = "".join(
+            "dspif_transport: RAM W off=0fe data=0000\n"
+            "dspif_transport: RAM W off=100 data=0000\n"
+            for _ in range(58)
+        )
+        text = requests + "dsp_hle: bootstrap ready exchanges=58\n"
+        self.assertEqual(
+            check_bootstrap_completion(text, 58), {"bootstrap_exchanges": 58})
+
+    def test_completion_only_rejects_an_incomplete_pair(self):
+        text = (
+            "dspif_transport: RAM W off=0fe data=0000\n"
+            "dsp_hle: bootstrap ready exchanges=1\n"
+        )
+        with self.assertRaisesRegex(ValueError, "word 100"):
+            check_bootstrap_completion(text, 1)
 
     def test_missing_consume_fails(self):
         with self.assertRaisesRegex(ValueError, "consumer advance"):

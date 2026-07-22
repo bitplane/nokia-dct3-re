@@ -8,6 +8,7 @@ MAME_DIR    ?= mame
 PYTHON ?= python3
 VENV   := .venv
 DRIVER := driver/nokia_3310.cpp
+MAME_PATCHES := patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
 	driver/nokia_dspif.cpp driver/nokia_dspif.h \
@@ -54,6 +55,21 @@ ORACLE_RADIO_OPERATOR_CROP_SHA ?= 59dd0d4f80f705c98be148c7f60f3171d2b66d7a434fba
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 ORACLE_V501_STRUCT ?= oracles/noki3210-v501-smoke.struct
+ORACLE_3310_IDLE_SHA ?= 45cc33c77474936613e4add081d437bafd2f8686e27e3b985ad69283168852f9
+ORACLE_3310_MENU_SHA ?= e0890d021f0e11de1978f9ecbcfa0321191ac3741da1379f82337c715079851a
+ORACLE_3310_PHONEBOOK_NAV_SHA ?= 06ea6abd47a1c603fc60382a2ba7e78d7a1247de2a13079374b48fd6796e793e
+ORACLE_3330_IDLE_SHA ?= f40de8661baf671706ad626bb89a7e2aece9c391597318248ffd592c7cfd867d
+ORACLE_3330_MESSAGES_SHA ?= 61d28951699e81a78dbafa8b094cc2690b53f41ec2f61bbb5599e0bb61d569a0
+ORACLE_3410_IDLE_SHA ?= 14c1f25e86f21ea7b52909b37fb624fcc9940668f9df19831a1f64b16913fd87
+ORACLE_3410_MESSAGES_SHA ?= a44445d8880ee46944e4692d3823ae25dd902882f1f38c51f64dcc27412a279e
+
+# The acquired virgin NHM-6 PMM legitimately requests its stored 12345 phone
+# code, then a time and date. These are physical keypad transactions through
+# firmware editors; keeping the sequence named makes the lengthy first-boot
+# precondition reviewable in every 3330 gate.
+NOKI3330_FIRST_BOOT_KEYS := 1,2,3,4,5,enter,wait8000,1,2,0,0,enter,wait1200,0,1,0,1,2,0,0,2,wait600,enter
+NOKI3330_FIRST_BOOT_INPUT := NOKI3210_POST_READY_KEY_DELAY_MS=12000 \
+	NOKI3210_POST_READY_KEY_DURATION_MS=220 NOKI3210_POST_READY_KEY_GAP_MS=280
 
 # The validated 3210 device composition and calibrated boot values are product
 # defaults in the machine configuration. Keep this alias while named research
@@ -80,7 +96,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-bootstrap-3310 verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -96,8 +112,10 @@ help:
 	@echo "make run-manifest-* reproduce named default/deep-gsm/contact/3330 evidence runs"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
+	@echo "make normalize-3410 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make run            run the selected phone/profile into RUN_DIR=$(RUN_DIR)"
 	@echo "make run-interactive open the provisioned 3210 in a persistent MAME window"
+	@echo "make smoke-3310-639 bounded local 3310 v6.39 portability spike"
 	@echo "make verify         check the explicit missing-hardware semantic profile"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
 	@echo "make verify-ccont-watchdog check enabled watchdog service beyond 49 seconds"
@@ -109,6 +127,15 @@ help:
 	@echo "make verify-gensio  check two-ROM endpoint and SELECT-register contracts"
 	@echo "make verify-display check display-profile provenance and LCD serial transport"
 	@echo "make verify-dsp-transport check DSPIF rings, completion and peer layering"
+	@echo "make verify-dsp-bootstrap-3310 check the local v6.39 58-exchange bootstrap"
+	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
+	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
+	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
+	@echo "make verify-3330-frontier complete virgin-PMM setup and reach v4.50 idle"
+	@echo "make verify-3330-navigation navigate v4.50 to Messages and return to idle"
+	@echo "make verify-3410-frontier compact the virgin PMM and wake the v5.46 idle UI"
+	@echo "make verify-3410-menu open the v5.46 Messages menu through the physical keypad"
+	@echo "make verify-3410-navigation open Messages and return to the exact idle UI"
 	@echo "make verify-dsp-tone check the organic ROM-4 COBBA tone command"
 	@echo "make verify-radio-camp check organic serving-cell selection and SI1-SI4"
 	@echo "make verify-radio-registration check Location Updating, release and steady camp"
@@ -149,6 +176,10 @@ download-mame:
 
 # Overlay the local driver and component sources onto the upstream tree (MAME is not vendored).
 overlay: download-mame
+	@for patch in $(MAME_PATCHES); do \
+		if git -C $(MAME_DIR) apply --reverse --check "../$$patch" >/dev/null 2>&1; then :; \
+		else git -C $(MAME_DIR) apply "../$$patch"; fi; \
+	done
 	install -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_3310.cpp
 	@for src in $(DRIVER_COMPONENTS); do install -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
 
@@ -168,6 +199,17 @@ normalize-3330:
 		--expect-eeprom-sha1 68481effb39d90a1639e8f261009c66e97d3e668
 	cp roms/noki3210/boot_rom roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3330/
 
+normalize-3410:
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--mcu roms/3410-nhm2-v546/NHM2NX05.460 \
+		--ppm roms/3410-nhm2-v546/NHM2NX05.46E \
+		--pmm "roms/3410-nhm2-v546/3410 virgin eeprom.pmm" \
+		--flash-output roms/noki3410/3410f546e.fls \
+		--eeprom-output "roms/noki3410/3410 virgin eeprom 005f0000.fls" \
+		--expect-flash-sha1 e650b8a289b434f2c8260c68e44e70e84e41b4cc \
+		--expect-eeprom-sha1 c1cb3a37efc11ea57b96969d2b01ca0f3b0f6bbe
+	cp roms/noki3210/boot_rom roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3410/
+
 roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	@for src in roms/noki*/; do \
 		[ -d "$$src" ] || continue; \
@@ -177,7 +219,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
@@ -261,6 +303,10 @@ prepare-run-nvram: build
 			cp "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)" \
 				"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 		fi; \
+	elif [ "$(PHONE)" = "noki3410" ] && [ "$(PRESERVE_NVRAM)" != "1" ]; then \
+		rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/flash" \
+			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card" \
+			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 	fi
 
 run: prepare-run-nvram
@@ -294,8 +340,14 @@ smoke: build
 	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
 
+smoke-3310-639:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
+
 smoke-3330e: normalize-3330
 	@$(MAKE) --no-print-directory smoke PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
+
+smoke-3410e: normalize-3410
+	@$(MAKE) --no-print-directory smoke PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
 
 smoke-3210-v501:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 \
@@ -313,7 +365,8 @@ audit-roms: build
 # so the progress preview never silently remains stale.
 frame:
 	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
-		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+		! -name '*_z504_*' ! -name '*_ff504_*' ! -name '*_z918_*' ! -name '*_ff918_*' \
+		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	fallback=0; \
 	if [ -z "$$f" ]; then \
 		f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
@@ -390,16 +443,123 @@ verify-dsp-transport:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp SECONDS=4 \
 		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp/error.log
-	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp/error.log
+	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp/error.log \
+		--expected-bootstrap-exchanges 64
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_v501 SECONDS=2 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
 		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_v501/error.log
-	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_v501/error.log --bootstrap-only
+	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_v501/error.log --bootstrap-only \
+		--expected-bootstrap-exchanges 64
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_state SECONDS=2 \
 		RUN_ENV='$(FRONTIER_ENV) NOKI3210_STATE_ROUNDTRIP_AT=0.4'
 	@grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_dsp_state/boot_summary.txt
 	@echo "OK — DSPIF transport, split peer composition and active-profile save state reproduced"
+
+verify-dsp-bootstrap-3310:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)/error.log \
+		--completion-only --expected-bootstrap-exchanges 58
+	@echo "OK — 3310 v6.39 completed its product-calibrated DSP bootstrap"
+
+verify-3310-frontier:
+	@$(MAKE) --no-print-directory smoke-3310-639 RUN_DIR=$(RUN_DIR) SECONDS=15
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3310 LCD frame produced in $(RUN_DIR)"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_IDLE_SHA)
+	@echo "OK — 3310 v6.39 product profile reached its idle frame"
+
+verify-3310-menu:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR) SECONDS=11 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,enter NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_KEY_GAP_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3310 menu frame produced in $(RUN_DIR)"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_MENU_SHA)
+	@echo "OK — 3310 v6.39 physical keypad opened the Phone book menu"
+
+verify-3310-navigation:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_forward SECONDS=13 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_KEY_GAP_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_forward -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3310 navigation frame produced in $(RUN_DIR)_forward"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_PHONEBOOK_NAV_SHA)
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_return SECONDS=14 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down,wait700,c,wait700,c NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_KEY_GAP_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3310 return frame produced in $(RUN_DIR)_return"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_IDLE_SHA)
+	@echo "OK — 3310 v6.39 navigated the Phone book and returned to idle through physical keys"
+
+verify-3330-frontier: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKI3210_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKI3210_POST_READY_CAPTURE_DELAY_MS=7000'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3330 idle frame produced in $(RUN_DIR)"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_IDLE_SHA)
+	@echo "OK — 3330 v4.50 completed virgin-PMM setup and reached idle"
+
+verify-3330-navigation: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_forward SECONDS=49 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKI3210_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait900,down NOKI3210_POST_READY_CAPTURE_DELAY_MS=2500'
+	@frame=$$(find $(RUN_DIR)_forward -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3330 navigation frame produced in $(RUN_DIR)_forward"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_MESSAGES_SHA)
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_return SECONDS=51 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKI3210_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait900,down,wait900,c NOKI3210_POST_READY_CAPTURE_DELAY_MS=3000'
+	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3330 return frame produced in $(RUN_DIR)_return"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_IDLE_SHA)
+	@echo "OK — 3330 v4.50 navigated to Messages and returned to idle through physical keys"
+
+verify-3410-frontier: normalize-3410
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR) \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram SECONDS=22 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=end NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3410 idle frame produced in $(RUN_DIR)"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_IDLE_SHA)
+	@grep -Fqx 'soft_resets=0' $(RUN_DIR)/boot_summary.txt
+	@echo "OK — 3410 v5.46 compacted its virgin PMM and exposed the idle UI"
+
+verify-3410-menu: normalize-3410
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR) \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram SECONDS=22 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3410 menu frame produced in $(RUN_DIR)"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_MESSAGES_SHA)
+	@grep -Fqx 'soft_resets=0' $(RUN_DIR)/boot_summary.txt
+	@echo "OK — 3410 v5.46 physical Menu key opened Messages"
+
+verify-3410-navigation: normalize-3410
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_menu \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_menu)/nvram SECONDS=22 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_menu -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3410 menu frame produced in $(RUN_DIR)_menu"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_MESSAGES_SHA)
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_return \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_return)/nvram SECONDS=24 \
+		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,end NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no informative 3410 return frame produced in $(RUN_DIR)_return"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_IDLE_SHA)
+	@grep -Fqx 'soft_resets=0' $(RUN_DIR)_menu/boot_summary.txt
+	@grep -Fqx 'soft_resets=0' $(RUN_DIR)_return/boot_summary.txt
+	@echo "OK — 3410 v5.46 opened Messages and returned to idle through physical keys"
 
 verify-radio-camp:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=20 \

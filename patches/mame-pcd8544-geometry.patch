@@ -1,0 +1,123 @@
+diff --git a/src/devices/video/pcd8544.cpp b/src/devices/video/pcd8544.cpp
+index 04f177e873d..1da1e0d3035 100644
+--- a/src/devices/video/pcd8544.cpp
++++ b/src/devices/video/pcd8544.cpp
+@@ -32,10 +32,23 @@ DEFINE_DEVICE_TYPE(PCD8544, pcd8544_device, "pcd8544_device", "Philips PCD8544 L
+ 
+ pcd8544_device::pcd8544_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+ 	device_t(mconfig, PCD8544, tag, owner, clock),
+-	m_screen_update_cb(*this)
++	m_screen_update_cb(*this),
++	m_controller_width(84),
++	m_controller_banks(6),
++	m_visible_width(84),
++	m_visible_height(48)
+ {
+ }
+ 
++void pcd8544_device::set_geometry(uint8_t controller_width, uint8_t controller_height,
++		uint8_t visible_width, uint8_t visible_height)
++{
++	m_controller_width = std::min<uint8_t>(controller_width, MAX_WIDTH);
++	m_controller_banks = std::min<uint8_t>((controller_height + 7) / 8, MAX_BANKS);
++	m_visible_width = std::min(visible_width, m_controller_width);
++	m_visible_height = std::min<uint8_t>(visible_height, m_controller_banks * 8);
++}
++
+ //-------------------------------------------------
+ //  device_start - device-specific startup
+ //-------------------------------------------------
+@@ -121,12 +134,12 @@ void pcd8544_device::exec_command(uint8_t cmd)
+ 	{
+ 		if(cmd & 0x80)
+ 		{
+-			m_addr_x = (cmd & 0x7f) % 84;
++			m_addr_x = (cmd & 0x7f) % m_controller_width;
+ 			LOG("PCD8544: set X-address %d\n", cmd & 0x7f);
+ 		}
+ 		else if(cmd & 0x40)
+ 		{
+-			m_addr_y = (cmd & 0x07) % 6;
++			m_addr_y = (cmd & 0x0f) % m_controller_banks;
+ 			LOG("PCD8544: set Y-address %d\n", cmd & 0x07);
+ 		}
+ 		else if(cmd & 0x20)
+@@ -152,25 +165,25 @@ void pcd8544_device::exec_command(uint8_t cmd)
+ 
+ void pcd8544_device::write_data(uint8_t data)
+ {
+-	m_vram[m_addr_y * 84 + m_addr_x] = data;
++	m_vram[m_addr_y * m_controller_width + m_addr_x] = data;
+ 
+ 	if (m_mode & 0x02)
+ 	{
+ 		m_addr_y++;
+ 
+-		if (m_addr_y > 5)
++		if (m_addr_y >= m_controller_banks)
+ 		{
+ 			m_addr_y = 0;
+-			m_addr_x = (m_addr_x + 1) % 84;
++			m_addr_x = (m_addr_x + 1) % m_controller_width;
+ 		}
+ 	}
+ 	else
+ 	{
+ 		m_addr_x++;
+-		if (m_addr_x > 83)
++		if (m_addr_x >= m_controller_width)
+ 		{
+ 			m_addr_x = 0;
+-			m_addr_y = (m_addr_y + 1) % 6;
++			m_addr_y = (m_addr_y + 1) % m_controller_banks;
+ 		}
+ 	}
+ }
+@@ -221,6 +234,10 @@ uint32_t pcd8544_device::screen_update(screen_device &screen, bitmap_ind16 &bitm
+ 			case 3:     // inverse video mode
+ 				if (!m_screen_update_cb.isnull())
+ 					m_screen_update_cb(screen, bitmap, cliprect, m_vram, m_control & 1);
++				else
++					for (unsigned y = 0; y < m_visible_height; y++)
++						for (unsigned x = 0; x < m_visible_width; x++)
++							bitmap.pix(y, x) = BIT(m_vram[(y / 8) * m_controller_width + x], y & 7) ^ (m_control & 1);
+ 				break;
+ 		}
+ 	}
+diff --git a/src/devices/video/pcd8544.h b/src/devices/video/pcd8544.h
+index 91882b8b5c2..190cade67ae 100644
+--- a/src/devices/video/pcd8544.h
++++ b/src/devices/video/pcd8544.h
+@@ -29,6 +29,8 @@ public:
+ 	// construction/destruction
+ 	pcd8544_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
+ 	template <typename... T> void set_screen_update_cb(T &&... args) { m_screen_update_cb.set(std::forward<T>(args)...); }
++	void set_geometry(uint8_t controller_width, uint8_t controller_height,
++			uint8_t visible_width, uint8_t visible_height);
+ 
+ 	// device interface
+ 	void sdin_w(int state);
+@@ -45,7 +47,14 @@ protected:
+ 	void write_data(uint8_t data);
+ 
+ private:
++	static constexpr unsigned MAX_WIDTH = 102;
++	static constexpr unsigned MAX_BANKS = 9;
++
+ 	screen_update_delegate m_screen_update_cb;  // screen update callback
++	uint8_t m_controller_width;
++	uint8_t m_controller_banks;
++	uint8_t m_visible_width;
++	uint8_t m_visible_height;
+ 	int     m_sdin;
+ 	int     m_sclk;
+ 	int     m_dc;
+@@ -58,7 +67,7 @@ private:
+ 	uint8_t   m_indata;
+ 	uint8_t   m_addr_y;
+ 	uint8_t   m_addr_x;
+-	uint8_t   m_vram[6*84];       // 4032 bit video ram
++	uint8_t   m_vram[MAX_BANKS * MAX_WIDTH];
+ };
+ 
+ // device type definition

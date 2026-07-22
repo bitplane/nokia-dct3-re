@@ -14,7 +14,7 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_3210_owns_validated_boot_defaults(self):
         self.assertIn(
-            "constexpr nokia_product_config PRODUCT_3210 = { 0x01, true, true, false };",
+            "{ 0x01, true, true, true, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3210 };",
             self.driver,
         )
         profile = self.driver.split("void noki3310_state::noki3210(machine_config &config)", 1)[1]
@@ -25,14 +25,62 @@ class MachineProfileTest(unittest.TestCase):
         )
         self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
         self.assertNotIn('"NOKI3210_TIMER0_CATCHUP"', profile)
-        self.assertIn('"NOKI3210_MODEL_DSP_SERVICE", 1', profile)
-        self.assertIn('"NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 1', profile)
+        apply = self.driver.split("void noki3310_state::apply_product_config", 1)[1]
+        apply = apply.split("void noki3310_state::machine_start", 1)[0]
+        self.assertIn('"NOKI3210_MODEL_DSP_SERVICE", product.dsp_service', apply)
+        self.assertIn('"NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", product.external_service', apply)
+
+    def test_dsp_bootstrap_count_is_product_configuration(self):
+        self.assertIn(
+            "{ 0x04, true, true, true, true, false, 58, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };",
+            self.driver,
+        )
+
+    def test_3330_owns_observed_peer_adc_keypad_and_bootstrap_defaults(self):
+        self.assertIn(
+            "{ 0x04, true, true, true, true, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };",
+            self.driver,
+        )
+        profile = self.driver.split("void noki3310_state::noki3330(machine_config &config)", 1)[1]
+        profile = profile.split("void noki3310_state::noki3210", 1)[0]
+        self.assertIn("apply_product_config(PRODUCT_3330);", profile)
+        self.assertIn(
+            "m_dsp_hle->set_bootstrap_exchange_limit(product.dsp_bootstrap_exchanges);",
+            self.driver,
+        )
 
     def test_other_products_keep_conservative_defaults(self):
         self.assertIn(
-            "constexpr nokia_product_config PRODUCT_DEFAULT = { 0x04, false, false, false };",
+            "{ 0x04, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };",
             self.driver,
         )
+
+    def test_3310_owns_evidenced_pack_and_peer_defaults(self):
+        self.assertIn(
+            "{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 };",
+            self.driver,
+        )
+        self.assertIn(
+            'nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", m_product.sim_device)',
+            self.driver,
+        )
+
+    def test_3410_owns_dsp_reset_release_wiring(self):
+        self.assertIn(
+            "{ 0x02, true, true, true, true, false, 64, true, true, true, 0, 50, true, 0x53, 0x04, 102, 72, 96, 65, ADC_3310 };",
+            self.driver,
+        )
+        profile = self.driver.split("void noki3310_state::noki3410(machine_config &config)", 1)[1]
+        profile = profile.split("void noki3310_state::noki7110", 1)[0]
+        self.assertIn("apply_product_config(PRODUCT_3410);", profile)
+
+    def test_3410_owns_intel_b3_block_lock_protocol(self):
+        self.assertIn("bool flash_b3_block_lock;", self.driver)
+        self.assertIn("if (m_product.flash_b3_block_lock)", self.driver)
+        for confirm in ("0x01", "0xd0", "0x2f"):
+            self.assertIn(f"(data & 0xff) == {confirm}", self.driver)
+        self.assertIn("m_flash_b3_erase_suspended", self.driver)
+        self.assertIn("return 0x00c0 & mem_mask; // ready + erase suspended", self.driver)
 
     def test_contact_service_oracle_is_explicit_negative_profile(self):
         target = self.makefile.split("CONTACT_SERVICE_ENV :=", 1)[1].split("\n\n", 1)[0]
@@ -79,7 +127,7 @@ class MachineProfileTest(unittest.TestCase):
         for device in (
             "m_maincpu", "m_mad2", "m_gensio", "m_mbus", "m_dspif",
             "m_dsp_hle", "m_external_service_peer", "m_simi", "m_sim_card",
-            "m_pcd8544",
+            "m_lcd",
         ):
             self.assertIn(f"{device}->reset()", power_body)
         self.assertIn("machine_reset()", power_body)

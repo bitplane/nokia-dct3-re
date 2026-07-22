@@ -75,6 +75,19 @@ u8 nokia_mad2_device::read(offs_t offset)
 	switch (offset)
 	{
 	case 0x00: return 0x40;
+	case 0x02:
+		// DSP reset/run is not a plain latch on products that expose the DSP
+		// clock/ready state here. Firmware supplies the product-specific release
+		// line; MAD2 reports the running status only after that line is asserted.
+		// When reset is reasserted, ready bit 4 must read low even if a prior
+		// read-modify-write copied it into the software-visible latch.
+		if (m_dsp_reset_running_status)
+		{
+			if (m_regs[offset] & m_dsp_release_mask)
+				return m_dsp_reset_running_status;
+			return m_regs[offset] & ~0x10;
+		}
+		return m_regs[offset];
 	// Timer 1 is a 15-bit free-running sleep counter. The paired ROMs read its
 	// fixed destination at 0x06 and guard the destination-current subtraction
 	// with FIQ5, so the destination is hardware state rather than a writable

@@ -17,6 +17,8 @@ public:
 	void set_timer1_hz(u32 value) { m_timer1_hz = value; }
 	void set_fiq8_hz(u32 value) { m_fiq8_hz = value; }
 	void set_timer0_catchup(bool value) { m_timer0_catchup = value; }
+	void set_dsp_reset_running_status(u8 value) { m_dsp_reset_running_status = value; }
+	void set_dsp_release_mask(u8 value) { m_dsp_release_mask = value; }
 	void set_timer_trace(bool value) { m_timer_trace = value; }
 	void set_interrupt_trace(bool value) { m_interrupt_trace = value; }
 	void set_clock_trace(bool value) { m_clock_trace = value; }
@@ -81,6 +83,8 @@ private:
 	u32 m_timer1_hz = 1057;
 	u32 m_fiq8_hz = 1000;
 	bool m_timer0_catchup = false;
+	u8 m_dsp_reset_running_status = 0;
+	u8 m_dsp_release_mask = 0;
 	bool m_timer_trace = false;
 	bool m_interrupt_trace = false;
 	bool m_clock_trace = false;

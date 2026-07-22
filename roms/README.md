@@ -76,3 +76,25 @@ Only an exact MAME audit match establishes the canonical 3330 baseline. Differen
 service images remain useful RE inputs, but their results must be labelled with their own hashes.
 The local PPM E result is declared separately as BIOS `450e` with SHA-1
 `7e88caa4963c57ebbd4d919023e38103ff8b528a`; run it with `make smoke-3330e`.
+
+### Nokia 3410 NHM-2 v5.46
+
+Place `NHM2NX05.460`, `NHM2NX05.46E`, and `3410 virgin eeprom.pmm` in
+`roms/3410-nhm2-v546/`. `make normalize-3410` reconstructs the MCU+PPM and PMM
+regions, verifies their pinned hashes, and prepares the `noki3410` ROM set.
+The v5.46 set is the default 3410 BIOS; the older local v5.06 MCU/PPM image is
+retained as a separate, unprovisioned comparison BIOS.
+
+### Nokia 3310 NHM-5 v6.39 local spike
+
+The bounded 3310 portability spike uses a local, already-combined 2 MiB flash
+and its 192 KiB PMM tail as BIOS `639`:
+
+| file | size | SHA-256 |
+|---|---:|---|
+| `3310f639e.fls` | `0x200000` | `975ec791205f026d647254ee772d7fa32691fa50c72a68eecdaff7c8a5921442` |
+| `3310 v2 pmm.bin` | `0x30000` | `dcb2212579f2a2a7059ed85ef81174d337003566ce2f83f284f20bc70aef8bf4` |
+
+This pair is a labelled portability input rather than the canonical 3310 MAME
+set. Its PMM is BIOS-specific and must not be combined with the older declared
+3310 images.

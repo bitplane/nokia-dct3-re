@@ -77,6 +77,25 @@ structural oracles enforce that observation.
 | `0xa00000–0xa03fff` | EEPROM parallel alias | `eeprom_r/w` | **unproven** read-only view of the input region; normal access uses serial I2C |
 | `0xa04000–0xffffff` | unmapped / reserved | — | — |
 
+### Flash devices
+
+The 3210 board carries a 2 MiB Intel F160B3TA. The recovered 3410 contract
+instead requires an ST M28W320ECT-compatible 4 MiB top-boot NOR (manufacturer
+`0x20`, device `0x88ba`): ordinary 64 KiB blocks followed by eight 8 KiB
+parameter blocks at the top. Programming is physically one-way
+(`stored &= written`) until erase; assignment-style writes allowed impossible
+zero-to-one transitions and corrupted the virgin PMM during compaction.
+
+The tracked MAME flash patch contains the reusable chip geometry, identifiers
+and generic NOR-programming correction. The Nokia driver still adapts one
+limitation of the generic core: the 3410 firmware suspends an erase, accesses a
+different partition, and polls a fixed status address while the core exposes a
+single global command state. This adapter is board integration debt, not a
+firmware-result override; a generic partition/read-while-write flash model
+would replace it upstream. Its one-second erase interval is an explicit,
+unmeasured approximation. The firmware polls the ready bit, so no accepted
+behavior currently depends on the exact duration.
+
 ## MAD2 I/O peripheral registers (`0x20000`, byte offsets)
 
 Blocks: **CTSI** (clock/timer/IRQ/reset), **PUP** (MBUS / vibrator / buzzer / GenIO), **KBGPIO**

@@ -28,7 +28,7 @@ DOORBELL = re.compile(
 
 def transition_role(offset: int, time: float) -> tuple[str, str]:
 	if offset <= 0x004:
-		return "bootstrap_ready", "64 bootstrap exchanges complete"
+		return "bootstrap_ready", "configured bootstrap exchange sequence complete"
 	if offset in (0x0FE, 0x100):
 		return "bootstrap_ack", "MCU zero-write request"
 	if offset == 0x0E0:

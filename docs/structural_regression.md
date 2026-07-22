@@ -86,6 +86,41 @@ when investigating those counters specifically. Use the repeatability target
 before banking a new frontier; ordinary RE iterations should use the faster
 single-run target.
 
+`make verify-3310-frontier` boots the local 3310 v6.39 BIOS with its product
+profile and requires the deterministic idle-screen frame. The profile supplies
+only device-boundary behavior: the shared DSP/external-service/SIM models, the
+58-exchange DSP calibration and the standard-channel 3310 battery-pack tuple.
+No firmware address or state is changed by the gate.
+
+`make verify-3310-menu` extends that run with two separated physical Menu
+switch cycles. The first is consumed by the ROM's wake/debounce lifecycle; the
+second is decoded through IRQ0 and the five-row matrix and must draw the
+deterministic `Phone book` menu. The gate changes only MAME input fields.
+
+`make verify-3310-navigation` continues through the same physical matrix into
+the Phone book submenu, moves the highlight once, and checks that the resulting
+frame is deterministic. A separate run repeats that prefix and uses two
+physical C-key cycles to return to the exact `verify-3310-frontier` idle frame.
+The two endpoints prevent a broken key path from passing merely because a
+later screen happens to look plausible.
+
+`make verify-3330-frontier` starts from the canonical virgin PMM and drives its
+real first-boot editors through physical five-row keypad switches: stored phone
+code `12345`, time `12:00`, and date `01.01.2002`. The final frame must be the
+deterministic v4.50 idle screen. `make verify-3330-navigation` repeats that
+provisioning prefix in isolated NVRAM, enters Phone book, moves to Messages,
+and independently proves that C returns to the same idle oracle.
+
+`make verify-3410-frontier` starts from the canonical virgin NHM-2 PMM, lets
+firmware compact the M28W320ECT parameter blocks, and uses one physical End-key
+cycle to wake the idle UI after its normal blank-display timeout. The gate
+rejects all-white 96-by-65 captures and requires the exact visible idle frame
+plus zero soft resets. `make verify-3410-menu` instead presses the physical
+Menu key and requires the exact `Messages` screen. `make
+verify-3410-navigation` proves both endpoints in isolated runs: Menu must open
+`Messages`, then End must return to the same idle hash. These fixtures operate
+only MAME matrix fields; they do not write firmware state or post messages.
+
 The default runner reseeds an isolated per-run NVRAM directory from the
 generated EEPROM profile. This prevents an old shared `mame/nvram` file from
 silently changing product data. The structural oracle records the

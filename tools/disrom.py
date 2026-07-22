@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Thumb-1 (ARMv4T / ARM7TDMI) disassembler for the swap16 flash image.
+# ARMv4T disassembler for the swap16 flash image. Thumb-1 is the default;
+# set NOKI_MODE=arm for copied ARM-mode helpers and veneers.
 #
 # Capstone's CS_MODE_THUMB also decodes 32-bit Thumb-2 instructions, but the
 # ARM7TDMI supports only Thumb-1: the ONLY valid 4-byte instruction is the
@@ -22,7 +23,8 @@ def resolve_lit(ins):
             pcbase=(ins.address+4)&~3
             lit=pcbase+int(m.group(1),16)
             if 0 <= lit-FLASH <= len(data)-4:
-                word=int.from_bytes(data[lit-FLASH:lit-FLASH+4],'little')
+                raw=int.from_bytes(data[lit-FLASH:lit-FLASH+4],'little')
+                word=((raw & 0xffff) << 16) | (raw >> 16)
                 return f"   ; [{lit:08x}] = {word:08x}"
     return ""
 
@@ -30,8 +32,17 @@ def emit(ins):
     print(f"{ins.address:08x}  {ins.bytes.hex():<10} {ins.mnemonic:7} {ins.op_str}{resolve_lit(ins)}")
 
 def dis(va, n):
-    md=capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+    arm_mode = os.environ.get("NOKI_MODE", "thumb").lower() == "arm"
+    md=capstone.Cs(
+        capstone.CS_ARCH_ARM,
+        capstone.CS_MODE_ARM if arm_mode else capstone.CS_MODE_THUMB,
+    )
     md.detail=False
+
+    if arm_mode:
+        for ins in md.disasm(data[va-FLASH:va-FLASH+n], va):
+            emit(ins)
+        return
     addr=va
     end=va+n
     while addr < end:

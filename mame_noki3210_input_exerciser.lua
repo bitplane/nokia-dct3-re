@@ -3,9 +3,18 @@ local cpu = machine.devices[":maincpu"]
 local space = cpu.spaces["program"]
 local output_dir = os.getenv("NOKI3210_SNAPSHOT_DIR") or ".."
 local boot_summary_path = os.getenv("NOKI3210_BOOT_SUMMARY")
+local ram_dump_path = os.getenv("NOKI3210_RAM_DUMP")
+local ram_dump_base = tonumber(os.getenv("NOKI3210_RAM_DUMP_BASE") or "0") or 0
+local ram_dump_size = tonumber(os.getenv("NOKI3210_RAM_DUMP_SIZE") or "65536") or 65536
+local ram_dumped = false
 local quiet = os.getenv("NOKI3210_LUA_QUIET") == "1"
 local bios = machine.options.entries.bios:value()
 local v501 = bios == "501"
+local is_3410 = machine.system.name == "noki3410"
+local lcd_controller_width = is_3410 and 102 or 84
+local lcd_controller_banks = is_3410 and 9 or 6
+local lcd_visible_width = is_3410 and 96 or 84
+local lcd_visible_height = is_3410 and 65 or 48
 
 local function info(message)
 	if not quiet then emu.print_info(message) end
@@ -47,13 +56,14 @@ local structural = {
 	eeprom_signal_writes = 0, irq_seen = 0, fiq_seen = 0, soft_resets = 0,
 	final_irq_status = 0,
 	final_fiq_status = 0, state_roundtrip = "not-run",
+	final_pc = 0,
 	final_current_task = 0, final_startup_mode = 0, final_startup_event = 0,
 	final_startup_flags = 0, final_contact_status = 0,
 	final_no_sim = 0, final_sim_enable = 0,
 	upper_ram_reads = 0, upper_ram_writes = 0, upper_ram_highest = 0,
 }
 
-for i = 0, (84 * 6) - 1 do lcd_vram[i] = 0 end
+for i = 0, (lcd_controller_width * lcd_controller_banks) - 1 do lcd_vram[i] = 0 end
 
 local function env_number(name, fallback)
 	local value = tonumber(os.getenv(name) or "")
@@ -79,22 +89,68 @@ local function emulation_seconds()
 	return machine.time:as_double()
 end
 
+local function write_ram_dump()
+	if not ram_dump_path or ram_dumped then return end
+	local dump = io.open(ram_dump_path, "wb")
+	if not dump then return end
+	local bytes = {}
+	for address = ram_dump_base, ram_dump_base + ram_dump_size - 1 do
+		bytes[#bytes + 1] = string.char(space:read_u8(address))
+		if #bytes == 4096 then
+			dump:write(table.concat(bytes))
+			bytes = {}
+		end
+	end
+	if #bytes > 0 then dump:write(table.concat(bytes)) end
+	dump:close()
+	ram_dumped = true
+end
+
 local function field_by_mask(tag, mask)
 	local port = machine.ioport.ports[":" .. tag] or machine.ioport.ports[tag]
 	return port and port:field(mask) or nil
 end
 
-local key_fields = {
-	enter = field_by_mask("COL.1", 0x02), up = field_by_mask("COL.3", 0x02),
-	down = field_by_mask("COL.1", 0x04), ["0"] = field_by_mask("COL.2", 0x04),
-	["1"] = field_by_mask("COL.1", 0x08), ["2"] = field_by_mask("COL.1", 0x10),
-	["3"] = field_by_mask("COL.2", 0x08), ["4"] = field_by_mask("COL.3", 0x08),
-	["5"] = field_by_mask("COL.2", 0x10), ["6"] = field_by_mask("COL.4", 0x04),
-	["7"] = field_by_mask("COL.4", 0x08), ["8"] = field_by_mask("COL.3", 0x10),
-	["9"] = field_by_mask("COL.4", 0x10), del = field_by_mask("COL.2", 0x02),
-	c = field_by_mask("COL.2", 0x02), minus = field_by_mask("COL.3", 0x04),
-	star = field_by_mask("COL.4", 0x02), power = field_by_mask("PWR", 0x01),
-}
+local is_five_row_product = machine.system.name == "noki3310" or machine.system.name == "noki3330" or is_3410
+local key_fields
+if is_3410 then
+	key_fields = {
+		enter = field_by_mask("COL.4", 0x01), up = field_by_mask("COL.3", 0x10),
+		down = field_by_mask("COL.3", 0x01), ["0"] = field_by_mask("COL.2", 0x01),
+		["1"] = field_by_mask("COL.2", 0x02), ["2"] = field_by_mask("COL.3", 0x02),
+		["3"] = field_by_mask("COL.1", 0x10), ["4"] = field_by_mask("COL.4", 0x04),
+		["5"] = field_by_mask("COL.3", 0x04), ["6"] = field_by_mask("COL.2", 0x04),
+		["7"] = field_by_mask("COL.4", 0x08), ["8"] = field_by_mask("COL.3", 0x08),
+		["9"] = field_by_mask("COL.2", 0x08), del = field_by_mask("COL.1", 0x01),
+		c = field_by_mask("COL.1", 0x01), minus = field_by_mask("COL.2", 0x10),
+		star = field_by_mask("COL.4", 0x10), send = field_by_mask("COL.4", 0x02),
+		["end"] = field_by_mask("COL.1", 0x02), power = field_by_mask("PWR", 0x01),
+	}
+elseif is_five_row_product then
+	key_fields = {
+		enter = field_by_mask("COL.3", 0x10), up = field_by_mask("COL.1", 0x01),
+		down = field_by_mask("COL.1", 0x02), ["0"] = field_by_mask("COL.2", 0x01),
+		["1"] = field_by_mask("COL.2", 0x02), ["2"] = field_by_mask("COL.3", 0x02),
+		["3"] = field_by_mask("COL.1", 0x10), ["4"] = field_by_mask("COL.4", 0x04),
+		["5"] = field_by_mask("COL.3", 0x04), ["6"] = field_by_mask("COL.2", 0x04),
+		["7"] = field_by_mask("COL.4", 0x08), ["8"] = field_by_mask("COL.3", 0x08),
+		["9"] = field_by_mask("COL.2", 0x08), del = field_by_mask("COL.4", 0x01),
+		c = field_by_mask("COL.4", 0x01), minus = field_by_mask("COL.2", 0x10),
+		star = field_by_mask("COL.4", 0x10), power = field_by_mask("PWR", 0x01),
+	}
+else
+	key_fields = {
+		enter = field_by_mask("COL.1", 0x02), up = field_by_mask("COL.3", 0x02),
+		down = field_by_mask("COL.1", 0x04), ["0"] = field_by_mask("COL.2", 0x04),
+		["1"] = field_by_mask("COL.1", 0x08), ["2"] = field_by_mask("COL.1", 0x10),
+		["3"] = field_by_mask("COL.2", 0x08), ["4"] = field_by_mask("COL.3", 0x08),
+		["5"] = field_by_mask("COL.2", 0x10), ["6"] = field_by_mask("COL.4", 0x04),
+		["7"] = field_by_mask("COL.4", 0x08), ["8"] = field_by_mask("COL.3", 0x10),
+		["9"] = field_by_mask("COL.4", 0x10), del = field_by_mask("COL.2", 0x02),
+		c = field_by_mask("COL.2", 0x02), minus = field_by_mask("COL.3", 0x04),
+		star = field_by_mask("COL.4", 0x02), power = field_by_mask("PWR", 0x01),
+	}
+end
 key_fields.navi = key_fields.enter
 key_fields.select = key_fields.enter
 key_fields.left = key_fields.enter
@@ -173,7 +229,7 @@ local function queue_lcd_dump()
 	lcd_full_dumps = lcd_full_dumps + 1
 	local zero, ff, other = 0, 0, 0
 	local snapshot = {}
-	for i = 0, (84 * 6) - 1 do
+	for i = 0, (lcd_controller_width * lcd_controller_banks) - 1 do
 		local value = lcd_vram[i]
 		snapshot[i] = value
 		if value == 0 then zero = zero + 1 elseif value == 0xff then ff = ff + 1 else other = other + 1 end
@@ -193,22 +249,22 @@ taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "noki3210_oracle_mmi
 		lcd_data_writes = lcd_data_writes + 1
 		if value ~= 0 then nonzero_lcd_data_writes = nonzero_lcd_data_writes + 1 end
 		local old_x, old_y = lcd_x, lcd_y
-		lcd_vram[(lcd_y * 84) + lcd_x] = value
+		lcd_vram[(lcd_y * lcd_controller_width) + lcd_x] = value
 		if (lcd_mode & 0x02) ~= 0 then
 			lcd_y = lcd_y + 1
-			if lcd_y > 5 then lcd_y = 0; lcd_x = (lcd_x + 1) % 84 end
+			if lcd_y >= lcd_controller_banks then lcd_y = 0; lcd_x = (lcd_x + 1) % lcd_controller_width end
 		else
 			lcd_x = lcd_x + 1
-			if lcd_x > 83 then lcd_x = 0; lcd_y = (lcd_y + 1) % 6 end
+			if lcd_x >= lcd_controller_width then lcd_x = 0; lcd_y = (lcd_y + 1) % lcd_controller_banks end
 		end
-		if old_x == 83 and old_y == 5 and lcd_x == 0 and lcd_y == 0 then queue_lcd_dump() end
+		if old_x == lcd_controller_width - 1 and old_y == lcd_controller_banks - 1 and lcd_x == 0 and lcd_y == 0 then queue_lcd_dump() end
 	elseif reg == 0x6e then
 		lcd_dirty = true
 		lcd_cmd_writes = lcd_cmd_writes + 1
 		if (lcd_mode & 0x01) ~= 0 then
 			if (value & 0xf8) == 0x20 then lcd_mode = value & 0x07 end
-		elseif (value & 0x80) ~= 0 then lcd_x = (value & 0x7f) % 84
-		elseif (value & 0xf8) == 0x40 then lcd_y = value & 0x07
+		elseif (value & 0x80) ~= 0 then lcd_x = (value & 0x7f) % lcd_controller_width
+		elseif (value & 0xf0) == 0x40 then lcd_y = (value & 0x0f) % lcd_controller_banks
 		elseif (value & 0xf8) == 0x20 then lcd_mode = value & 0x07
 		elseif (value & 0xf8) == 0x08 then lcd_control = ((value & 0x04) >> 1) | (value & 0x01) end
 	end
@@ -240,11 +296,11 @@ local function write_lcd_dump()
 		output_dir, pending.seq, frames, pending.zero, pending.ff, pending.other)
 	local f = io.open(filename, "wb")
 	if not f then return end
-	f:write("P5\n84 48\n255\n")
-	for y = 0, 47 do
+	f:write(string.format("P5\n%d %d\n255\n", lcd_visible_width, lcd_visible_height))
+	for y = 0, lcd_visible_height - 1 do
 		local row, bit = y >> 3, y & 7
-		for x = 0, 83 do
-			local on = (pending.vram[(row * 84) + x] >> bit) & 1
+		for x = 0, lcd_visible_width - 1 do
+			local on = (pending.vram[(row * lcd_controller_width) + x] >> bit) & 1
 			if (pending.control & 1) ~= 0 then on = 1 - on end
 			f:write(string.char(on ~= 0 and 0 or 255))
 		end
@@ -279,6 +335,7 @@ local function write_boot_summary()
 		string.format("eeprom_starts=%d", structural.eeprom_starts),
 		string.format("eeprom_signal_writes=%d", structural.eeprom_signal_writes),
 		string.format("startup_modes=%s", hex_set(structural.startup_modes, 4)),
+		string.format("final_pc=%08X", structural.final_pc),
 		string.format("final_current_task=%02X", structural.final_current_task),
 		string.format("final_startup_mode=%04X", structural.final_startup_mode),
 		string.format("final_startup_event=%04X", structural.final_startup_event),
@@ -333,6 +390,7 @@ local function update_post_ready_key()
 end
 
 local function sample_structural_state()
+	structural.final_pc = cpu.state["PC"].value
 	structural.irq_seen = structural.irq_seen | space:read_u8(0x20009)
 	structural.final_irq_status = space:read_u8(0x20009)
 	structural.fiq_seen = structural.fiq_seen | space:read_u8(0x20008)
@@ -366,11 +424,19 @@ end)
 if #post_keys > 0 then
 	local input_timer = coroutine.create(function()
 		if post_sequence_driven then
-			repeat
-				emu.wait(0.01)
-				sample_structural_state()
-			until (structural.final_startup_flags & 0x0f) == 0x0f
-			startup_ready_time = emulation_seconds()
+			if is_five_row_product then
+				-- The structural addresses above belong to the 3210 ROMs.  A
+				-- product-spanning input fixture uses an explicit boot-relative
+				-- delay for five-row products rather than treating unrelated RAM
+				-- as ready.
+				startup_ready_time = emulation_seconds()
+			else
+				repeat
+					emu.wait(0.01)
+					sample_structural_state()
+				until (structural.final_startup_flags & 0x0f) == 0x0f
+				startup_ready_time = emulation_seconds()
+			end
 			emu.wait(post_delay)
 			for _, name in ipairs(post_keys) do
 				local wait_ms = string.match(name, "^wait(%d+)$")
@@ -622,6 +688,7 @@ end
 
 -- Keep the semantic oracle current independently of display activity.
 emu.register_periodic(function()
+	if ram_dump_path and emulation_seconds() >= 5 then write_ram_dump() end
 	if lcd_dirty then
 		pending_lcd = {}
 		queue_lcd_dump()
@@ -634,6 +701,7 @@ end)
 
 emu.add_machine_stop_notifier(function()
 	for name in pairs(active_fields) do release(name) end
+	write_ram_dump()
 	-- Always publish the terminal mirror. Some firmware states update only
 	-- part of the LCD, so no later 504-byte wrap exists for make frame to use.
 	pending_lcd = {}

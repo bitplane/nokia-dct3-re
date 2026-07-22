@@ -20,9 +20,10 @@ void nokia_dsp_hle_device::device_start()
 	m_response_timer = timer_alloc(FUNC(nokia_dsp_hle_device::response_tick), this);
 	save_item(NAME(m_service_enabled));
 	save_item(NAME(m_external_service_enabled));
-	save_item(NAME(m_service_delay_ms));
+	save_item(NAME(m_service_delay_us));
 	save_item(NAME(m_peer_poll_ms));
 	save_item(NAME(m_service_control_completion_sent));
+	save_item(NAME(m_bootstrap_exchange_limit));
 	save_item(NAME(m_bootstrap_exchange_count));
 }
 
@@ -41,8 +42,11 @@ void nokia_dsp_hle_device::publish_bootstrap_state()
 	// Transition timing is not recovered. Publish the minimum reset-visible DSP
 	// state synchronously, through DSPIF-owned shared RAM, before the MCU starts.
 	m_transport->peer_shared_w(0x0e0 / 2, 0);
-	m_transport->peer_shared_w(0x0fe / 2, 1);
-	m_transport->peer_shared_w(0x100 / 2, 1);
+	if (!m_transport->bootstrap_ping_pong())
+	{
+		m_transport->peer_shared_w(0x0fe / 2, 1);
+		m_transport->peer_shared_w(0x100 / 2, 1);
+	}
 }
 
 void nokia_dsp_hle_device::tx_commit_w(int state)
@@ -54,7 +58,7 @@ void nokia_dsp_hle_device::tx_commit_w(int state)
 void nokia_dsp_hle_device::service_pending_w(int state)
 {
 	if (state && m_service_enabled)
-		m_service_timer->adjust(attotime::from_msec(m_service_delay_ms));
+		m_service_timer->adjust(attotime::from_usec(m_service_delay_us));
 }
 
 void nokia_dsp_hle_device::doorbell_w(int state)
@@ -77,10 +81,13 @@ void nokia_dsp_hle_device::bootstrap_100_w(int state)
 	if (state)
 	{
 		m_transport->peer_shared_w(0x100 / 2, 1);
-		if (++m_bootstrap_exchange_count == 64)
+		if (++m_bootstrap_exchange_count == m_bootstrap_exchange_limit)
 		{
 			for (offs_t offset = 0; offset <= (0x004 / 2); offset++)
 				m_transport->peer_shared_w(offset, 1);
+			if (m_trace_enabled)
+				logerror("dsp_hle: bootstrap ready exchanges=%u t=%.6f\n",
+						m_bootstrap_exchange_count, machine().time().as_double());
 		}
 	}
 }

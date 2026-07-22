@@ -1,0 +1,118 @@
+diff --git a/src/devices/machine/intelfsh.cpp b/src/devices/machine/intelfsh.cpp
+index 5b41774ad3c..55882910f9f 100644
+--- a/src/devices/machine/intelfsh.cpp
++++ b/src/devices/machine/intelfsh.cpp
+@@ -111,6 +111,7 @@ DEFINE_DEVICE_TYPE(MACRONIX_29L001MC,        macronix_29l001mc_device,        "m
+ DEFINE_DEVICE_TYPE(MACRONIX_29LV160TMC,      macronix_29lv160tmc_device,      "macronix_29lv160tmc",      "Macronix 29LV160TMC Flash")
+ DEFINE_DEVICE_TYPE(ST_M29W640GB,             st_m29w640gb_device,             "st_m29w640gb",             "ST M29W640GB Flash")
+ DEFINE_DEVICE_TYPE(ST_M29W640FT,             st_m29w640ft_device,             "st_m29w640ft",             "ST M29W640FT Flash")
++DEFINE_DEVICE_TYPE(ST_M28W320ECT,            st_m28w320ect_device,            "st_m28w320ect",            "ST M28W320ECT Flash")
+ DEFINE_DEVICE_TYPE(TMS_29F040,               tms_29f040_device,               "tms_29f040",               "Texas Instruments 29F040 Flash")
+ 
+ DEFINE_DEVICE_TYPE(PANASONIC_MN63F805MNP,    panasonic_mn63f805mnp_device,    "panasonic_mn63f805mnp",    "Panasonic MN63F805MNP Flash")
+@@ -270,6 +271,9 @@ st_m29w640gb_device::st_m29w640gb_device(const machine_config &mconfig, const ch
+ st_m29w640ft_device::st_m29w640ft_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+ 	: intelfsh16_device(mconfig, ST_M29W640FT, tag, owner, clock, 0x800000, MFG_ST, 0x22ed) { m_bot_boot_sector = true; m_device_id2 = 0x2210; m_device_id3 = 0x2200; }
+ 
++st_m28w320ect_device::st_m28w320ect_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
++	: intelfsh16_device(mconfig, ST_M28W320ECT, tag, owner, clock, 0x400000, MFG_ST, 0x88ba) { m_top_boot_sector = true; }
++
+ panasonic_mn63f805mnp_device::panasonic_mn63f805mnp_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+ 	: intelfsh8_device(mconfig, PANASONIC_MN63F805MNP, tag, owner, clock, 0x10000, MFG_PANASONIC, 0x1b) { m_sector_is_4k = true; }
+ 
+@@ -304,7 +308,7 @@ sharp_lh28f160s3_device::sharp_lh28f160s3_device(const machine_config &mconfig,
+ 	: intelfsh16_device(mconfig, SHARP_LH28F160S3, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
+ 
+ intel_te28f320_device::intel_te28f320_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+-	: intelfsh16_device(mconfig, INTEL_TE28F320, tag, owner, clock, 0x400000, MFG_INTEL, 0x8896) { }
++	: intelfsh16_device(mconfig, INTEL_TE28F320, tag, owner, clock, 0x400000, MFG_INTEL, 0x8896) { m_top_boot_sector = true; }
+ 
+ spansion_s29gl064s_device::spansion_s29gl064s_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+ 	: intelfsh16_device(mconfig, SPANSION_S29GL064S, tag, owner, clock, 0x800000, MFG_SPANSION, 0x227e)
+@@ -504,7 +508,16 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+ 		}
+ 		else if (m_maker_id == MFG_ST)
+ 		{
+-			switch (address & 0xff)
++			if (m_device_id == 0x88ba)
++			{
++				switch (address & 0xff)
++				{
++				case 0x00: data = m_maker_id; break;
++				case 0x01: data = m_device_id; break;
++				case 0x02: data = 0; break;
++				}
++			}
++			else switch (address & 0xff)
+ 			{
+ 				case 0x00: data = m_maker_id; break;
+ 				case 0x02: data = m_device_id; break;
+@@ -1062,11 +1075,22 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 		switch( m_bits )
+ 		{
+ 		case 8:
+-			m_data[address] = data;
++			if (m_maker_id == MFG_ST && m_device_id == 0x88ba)
++				m_data[address] &= data;
++			else
++				m_data[address] = data;
+ 			break;
+ 		case 16:
+-			m_data[address*2] = data >> 8;
+-			m_data[address*2+1] = data;
++			if (m_maker_id == MFG_ST && m_device_id == 0x88ba)
++			{
++				m_data[address*2] &= data >> 8;
++				m_data[address*2+1] &= data;
++			}
++			else
++			{
++				m_data[address*2] = data >> 8;
++				m_data[address*2+1] = data;
++			}
+ 			break;
+ 		default:
+ 			logerror( "FM_WRITEPART1 not supported when m_bits == %d\n", m_bits );
+@@ -1186,6 +1210,17 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 
+ 				m_timer->adjust( attotime::from_msec( duration ) );
+ 			}
++			else if ((m_maker_id == MFG_INTEL && m_device_id == 0x8896) ||
++					(m_maker_id == MFG_ST && m_device_id == 0x88ba))
++			{
++				// These top-boot 32-Mbit parts have eight 8 KiB parameter blocks at
++				// the top of the array; the remaining blocks are 64 KiB.
++				uint32_t const byte_address = address * 2;
++				uint32_t const size = byte_address >= (m_size - 0x10000) ? 0x2000 : 0x10000;
++				uint32_t const base = byte_address & ~(size - 1);
++				memset(&m_data[base], 0xff, size);
++				m_timer->adjust(attotime::from_seconds(1));
++			}
+ 			else
+ 			{
+ 				// clear the 64k block containing the current address to all 0xffs
+diff --git a/src/devices/machine/intelfsh.h b/src/devices/machine/intelfsh.h
+index 5274f6b3d3c..40564bd125b 100644
+--- a/src/devices/machine/intelfsh.h
++++ b/src/devices/machine/intelfsh.h
+@@ -236,6 +236,12 @@ public:
+ 	st_m29w640ft_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
+ };
+ 
++class st_m28w320ect_device : public intelfsh16_device
++{
++public:
++	st_m28w320ect_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
++};
++
+ class panasonic_mn63f805mnp_device : public intelfsh8_device
+ {
+ public:
+@@ -440,6 +446,7 @@ DECLARE_DEVICE_TYPE(MACRONIX_29L001MC,       macronix_29l001mc_device)
+ DECLARE_DEVICE_TYPE(MACRONIX_29LV160TMC,     macronix_29lv160tmc_device)
+ DECLARE_DEVICE_TYPE(ST_M29W640GB,            st_m29w640gb_device)
+ DECLARE_DEVICE_TYPE(ST_M29W640FT,            st_m29w640ft_device)
++DECLARE_DEVICE_TYPE(ST_M28W320ECT,           st_m28w320ect_device)
+ DECLARE_DEVICE_TYPE(TMS_29F040,              tms_29f040_device)
+ 
+ DECLARE_DEVICE_TYPE(PANASONIC_MN63F805MNP,   panasonic_mn63f805mnp_device)

@@ -46,7 +46,7 @@ triggers (single home: `dsp_service_transport_contract.md`; ledger
 | offset | what | evidence |
 |---|---|---|
 | `[0x00–0x24]` | **self-test / RAM echo region** | written with a walking pattern at `0x295f48`, read back + compared at `0x295fc0`/`0x295fd6`. A RAM test of the shared window; passes trivially against a real backing store. |
-| `[0x00–0x04]` | bootstrap-ready words → `0x01` | the peer publishes all three after the observed 64-exchange download handshake; firmware reads ordinary shared RAM. |
+| `[0x00–0x04]` | bootstrap-ready words → `0x01` | the peer publishes all three after the product-configured download handshake: 64 exchanges on both 3210 ROMs and 58 on 3310 v6.39. Firmware reads ordinary shared RAM. |
 | `[0xe0]` → `0x00`, `[0xfe]`/`[0x100]` → `0x01` | **DSP ready/busy flags** | MCU zero-writes to `0xfe`/`0x100` request peer acknowledgements. DSPIF command 4 clears peer-owned busy word `0xe0`; `0xe4` is the lower-service pending counter. |
 | `[0xf6–0x102]` | **config words** (`0x0100 0x0300 0x0001 0x0000 0x0001 0x0001 0x0200`) | 7 individual writes at `0x290a44–0x290a64`. |
 | `[0x200–0x600]` | **coefficient/parameter table** (512 halfwords) | strided copy at `0x290a94`: reads one halfword per 0x20-byte record from flash `0x200040`, packs into `[0x200+]`. |
@@ -150,9 +150,9 @@ shared transmit ring. The first captured pair is:
 The paired transition census narrows active peer-owned scalar publication to
 nine offsets: bootstrap words `0x000/0x002/0x004/0x0fe/0x100`, TX consumer
 `0x0a6`, shared busy/pending words `0x0e0/0x0e4`, and RX producer `0x1c8`.
-Both ROMs use the same set and structurally matching consumers. Bootstrap word
-`0x004` is published after the 64-exchange sequence but is not subsequently
-read in either measured lifecycle.
+Both ROMs use the same set and structurally matching consumers. In the paired
+3210 traces, bootstrap word `0x004` is published after the 64-exchange sequence
+but is not subsequently read in either measured lifecycle.
 
 The service submodel clears the pending count and raises IRQ4. The separate
 request-driven external-service submodel consumes complete TX packets and returns

@@ -13,7 +13,8 @@ that the driver is ready for upstream submission.
   status `0x49`, no-SIM clear, and SIM enable set.
 - `run-manifest-service` records the class-`0x40` service command directions.
 - `run-manifest-deep-gsm` records the coherent generic-service/SIM frontier.
-- `smoke-3330e` is the first cross-ROM portability probe.
+- `verify-3330-frontier` and `verify-3330-navigation` protect the v4.50
+  virgin-PMM setup, idle and physical-key menu lifecycle.
 
 ## Current application baseline
 
@@ -49,8 +50,9 @@ be investigated only when an organic application path reaches its boundary.
   edges, positive fixtures, and negative fixtures for known decode traps.
 - Class-`0x40` service, SIM, DSP-ring, and task-mailbox conclusions have named
   runtime manifests.
-- The 3330 remains a smoke input rather than a second supported semantic
-  topology.
+- The 3330 is a validated third interactive product profile. Its acceptance is
+  UI/device-boundary based; the 3210-specific structural RAM summary is not
+  treated as cross-product evidence.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
   and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu
@@ -90,7 +92,7 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 | Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | The 3210 defaults Timer 0 to 33,055 Hz and Timer 1 to 1,057 Hz. Paired ROMs prove the post-divider 8:1 conversion but not the exact physical divider tree. `MODEL_DSP_SERVICE_DELAY_MS` controls the one-shot shared-service completion delay; the legacy `TICK_MS` name controls peer packet polling only. |
 | Hardware scenarios | `CCONT_READY`, `CCONT_WDDISX_GROUNDED` | Reset-time CCONT readiness and the documented physical watchdog-disable pin. The 3210 profile defaults to ready with WDDISX released. |
 | Device-boundary prototypes | `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE`, `MODEL_RADIO_PEER` | The first three are enabled by the 3210 product profile; overrides remain for negative tests. `MODEL_RADIO_PEER` is an opt-in deterministic network whose search, camp, Location Updating, release and operator-presentation contract is verified through DSPIF/FIQ0 and organic firmware behavior. |
-| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_DSP_SHARED_READS`, `TRACE_DSP_SHARED_TRANSITIONS`, `TRACE_GENSIO`, `TRACE_GENSIO_LIMIT`, `TRACE_CCONT_WATCHDOG`, `TRACE_CCONT_ADC`, `TRACE_CCONT_RTC`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER`, `TRACE_PUP_OUTPUTS` | Log-only and bounded or scoped to a named investigation. `TRACE_GENSIO_LIMIT` changes only the default 20,000-line diagnostic ceiling. |
+| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_DSP_SHARED_READS`, `TRACE_DSP_SHARED_TRANSITIONS`, `TRACE_GENSIO`, `TRACE_GENSIO_LIMIT`, `TRACE_CCONT_WATCHDOG`, `TRACE_CCONT_ADC`, `TRACE_CCONT_RTC`, `TRACE_KEYPAD`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER`, `TRACE_PUP_OUTPUTS` | Log-only and bounded or scoped to a named investigation. `TRACE_GENSIO_LIMIT` changes only the default 20,000-line diagnostic ceiling. |
 | Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `POST_READY_CAPTURE_DELAY_MS`, `CCONT_CHARGER_INITIAL`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `CCONT_RTC_FIXTURE_AT`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `MAD2_SLEEP_FIXTURE_AT`, `MAD2_SLEEP_FIXTURE_SOURCE`, `MAD2_RESET_FIXTURE_AT`, `MAD2_WATCHDOG_FIXTURE_AT`, `BUZZER_FIXTURE_AT`, `VIBRATOR_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
@@ -123,6 +125,7 @@ The retained trace switches are scoped as follows:
 | `TRACE_CCONT_WATCHDOG` | combined firmware service-helper calls and logical-descriptor writes to physical CCONT watchdog register 5 |
 | `TRACE_CCONT_ADC` | physical input IRQ latches and firmware-selected CCONT ADC channels/raw values |
 | `TRACE_CCONT_RTC` | CCONT RTC traffic, IRQ policy, and filtered user-alarm `0x46bc` publication/routing |
+| `TRACE_KEYPAD` | physical switch edges plus MAD2 row, direction, interrupt-mask and column-read activity |
 | `TRACE_MAD2_LEDGER` | first-access MAD2 register census |
 | `TRACE_MAD2_TIMERS` | timer-0 divider/counter/compare and FIQ assertion/acknowledgement lifecycle |
 | `TRACE_MAD2_INTERRUPTS` | MAD2 source, pending, mask, acknowledgement and CPU-line routing transitions |
