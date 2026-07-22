@@ -184,7 +184,11 @@ def markdown(reports):
 		"reads; and ten read-modify-write sites for the peripheral clock register. The",
 		"paired Timer-1 routines use FIQ5 as their destination race signal and compare",
 		"`round((destination - current) / 8)` with Timer 0's remaining post-divider",
-		"interval. The detailed tables below are reproducibility data, not additional",
+		"interval. The ten clock-register RMW sites are also instruction-equivalent:",
+		"boot sets bits 2--3; SIM lifecycle code sets/clears bits 5--6; and the only",
+		"task-0 power-clock helper writes `(old | 0x02) & 0xfe`. Its bit 1 is a",
+		"one-shot clock-stop request, not retained state; bit 0 is always cleared.",
+		"The detailed tables below are reproducibility data, not additional",
 		"semantic claims.", ""]
 	for report in reports:
 		coverage = report["coverage"]
@@ -239,6 +243,16 @@ def main():
 					raise SystemExit(
 						f"{report['label']} MAD2 shape changed at {key}: "
 						f"{summary.get(key)} != {count}")
+			expected_clock_sites = {
+				"v6.00": {0x2a0088, 0x2a00ce, 0x2a0102, 0x2a0120, 0x2a0154,
+					0x2a0612, 0x2a06c6, 0x2b4e82, 0x2b4e8e, 0x2b643e},
+				"v5.01": {0x29d5c8, 0x29d60e, 0x29d642, 0x29d660, 0x29d694,
+					0x29db52, 0x29dc06, 0x2b2236, 0x2b2242, 0x2b381a},
+			}
+			clock_sites = {item["pc"] for item in report["accesses"]
+				if item["offset"] == 0x0d and item["kind"] == "read"}
+			if clock_sites != expected_clock_sites[report["label"]]:
+				raise SystemExit(f"{report['label']} clock-control RMW sites changed")
 	payload = {"schema": 1, "mad2_base": MAD2_BASE, "window_size": MAD2_SIZE, "roms": reports}
 	if args.json:
 		args.json.write_text(json.dumps(payload, indent=2) + "\n")

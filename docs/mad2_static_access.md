@@ -10,7 +10,11 @@ and three reset-control writes; four Timer-1 current reads and eight destination
 reads; and ten read-modify-write sites for the peripheral clock register. The
 paired Timer-1 routines use FIQ5 as their destination race signal and compare
 `round((destination - current) / 8)` with Timer 0's remaining post-divider
-interval. The detailed tables below are reproducibility data, not additional
+interval. The ten clock-register RMW sites are also instruction-equivalent:
+boot sets bits 2--3; SIM lifecycle code sets/clears bits 5--6; and the only
+task-0 power-clock helper writes `(old | 0x02) & 0xfe`. Its bit 1 is a
+one-shot clock-stop request, not retained state; bit 0 is always cleared.
+The detailed tables below are reproducibility data, not additional
 semantic claims.
 
 ## v6.00

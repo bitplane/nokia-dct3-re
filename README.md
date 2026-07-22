@@ -71,7 +71,7 @@ The labels below have precise meanings:
 | Subsystem | State | Evidence / next step |
 |---|---|---|
 | ARM7, flash, RAM mapping | Partial hardware | 3210 executes reliably; product layouts need cross-ROM validation. |
-| MAD2 timers and IRQ/FIQ | Partial hardware | Boot-critical paths work; several timings remain calibrated assumptions. |
+| MAD2 timers, sleep and IRQ/FIQ | Partial hardware | Boot-critical paths work; paired ROMs and focused tests cover ARM clock-stop, timer/key wake and save-state restoration, while exact divider and transition timing remain open. |
 | PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames; MAD2 IRQ0 reaches the matrix scanner and decoded input resources. |
 | 24C128 EEPROM | Partial hardware | MAME's native I2C device is wired through GenIO and passes the oracle; provisioning and the parallel alias need validation. |
 | CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; physical ADC latency, RTC encoding, watchdog clock and board-level analog signals remain open. |
@@ -103,7 +103,7 @@ supported, and it passes the reference and portability checks.
 
 1. Improve the extracted EEPROM, CCONT and GENSIO devices from observed transactions.
 2. Use the Nokia 3330 (NHM-6) as the first cross-ROM confidence target once its service files are normalized reproducibly.
-3. Recover MAD2 physical clocks/reset domains and identify GENSIO SELECT peers from hardware evidence.
+3. Recover MAD2's exact sleep-clock divider/transition timing and identify GENSIO SELECT peers from hardware evidence.
 4. Stabilize the extracted SIMI/card seam, then separate synthetic card provisioning into reusable profiles.
 5. Separate DSP transport/HLE from the external-service peer, then add further DCT3 products as evidence.
 

@@ -11,6 +11,7 @@ public:
 	auto irq_cb() { return m_irq_cb.bind(); }
 	auto irq_ack_cb() { return m_irq_ack_cb.bind(); }
 	auto reset_cb() { return m_reset_cb.bind(); }
+	auto sleep_cb() { return m_sleep_cb.bind(); }
 
 	void set_timer0_hz(u32 value) { m_timer0_hz = value; }
 	void set_timer1_hz(u32 value) { m_timer1_hz = value; }
@@ -18,6 +19,7 @@ public:
 	void set_timer0_catchup(bool value) { m_timer0_catchup = value; }
 	void set_timer_trace(bool value) { m_timer_trace = value; }
 	void set_interrupt_trace(bool value) { m_interrupt_trace = value; }
+	void set_clock_trace(bool value) { m_clock_trace = value; }
 
 	u8 read(offs_t offset);
 	void write(offs_t offset, u8 data);
@@ -34,6 +36,7 @@ public:
 	u16 timer0_counter() const { return m_timer0_counter; }
 	u16 timer1_counter() const { return m_timer1_counter; }
 	u16 timer1_destination() const { return m_timer1_destination; }
+	bool sleeping() const { return m_sleeping; }
 	u8 reg(offs_t offset) const { return m_regs[offset & 0x1f]; }
 
 protected:
@@ -49,11 +52,15 @@ private:
 	void update_irq_line();
 	void update_timer0_compare();
 	bool timer0_compare_due() const;
+	void enter_sleep();
+	void leave_sleep(const char *domain);
+	void restore_outputs();
 
 	devcb_write_line m_fiq_cb;
 	devcb_write_line m_irq_cb;
 	devcb_write16 m_irq_ack_cb;
 	devcb_write_line m_reset_cb;
+	devcb_write_line m_sleep_cb;
 	emu_timer *m_timer0 = nullptr;
 	emu_timer *m_timer1 = nullptr;
 	emu_timer *m_fiq8 = nullptr;
@@ -67,6 +74,7 @@ private:
 	bool m_timer0_compare_latched = false;
 	bool m_fiq_line_state = false;
 	bool m_irq_line_state = false;
+	bool m_sleeping = false;
 	u32 m_timer0_hz = 33055;
 	// Calibrated against Timer 0's divided output. The ROM proves an 8:1
 	// relationship; the exact CTSI divider tree remains to be recovered.
@@ -75,8 +83,10 @@ private:
 	bool m_timer0_catchup = false;
 	bool m_timer_trace = false;
 	bool m_interrupt_trace = false;
+	bool m_clock_trace = false;
 	u32 m_timer_trace_count = 0;
 	u32 m_interrupt_trace_count = 0;
+	u32 m_clock_trace_count = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_MAD2, nokia_mad2_device)

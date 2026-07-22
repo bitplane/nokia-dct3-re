@@ -12,7 +12,7 @@ not compatibility mechanisms.
 | PCD8544 display | MAME device | Add other display controllers per product configuration. |
 | External EEPROM | MAME `I2C_24C128` on mapped MAD2 GenIO pins plus generated provisioning input | Validate write/timing behavior, legitimate provisioning, ROM-aware fallback extraction, and parallel-window semantics. |
 | CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression; deterministic binary RTC and enabled documented watchdog/WDDISX boundary | Establish physical GENSIO/ADC latency, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |
-| MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller, CPU routing and the established digital-baseband reset domain; board/peripheral windows remain phone-owned or extracted separately | Recover sleep entry/resume, physical clock selection and exact rail sequencing; move further windows only after their individual contracts pass the same gate. |
+| MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller, CPU routing, one-shot ARM clock-stop/routed-wake behavior and the established digital-baseband reset domain; board/peripheral windows remain phone-owned or extracted separately | Recover the exact sleep-clock divider tree, transition latency, FIQ8 source and rail sequencing; move further windows only after their individual contracts pass the same gate. |
 | MBUS | Extracted `nokia_mbus_device` with 9,600-baud RX/TX byte attachment and FIQ2/FIQ3 callbacks; no default peer | Recover FIQ3 phase/source and attach a peer only when firmware organically transmits a supported frame. |
 | DSP/DSPIF | `nokia_dspif_device` owns shared RAM, packet rings and interrupt-facing completion; `nokia_dsp_hle_device` owns cross-ROM bootstrap and service timing. Two HLE audio voices expose firmware-programmed COBBA oscillator words while no DSP codec backend exists. | Recover physical response timing, codec waveform/amplitude behavior and wider DSP vocabulary only from organic traffic. |
 | SIM | Separate `nokia_simi_device` controller using the default rate retained by firmware PPS `ff 00 ff`, and a callback-connected `nokia_sim_card_device` with declared files and persistent mutable records | Generalize timing beyond the fixed ATR/PPS profile; recover ATR-start/turnaround and error/removal behavior, then extract reusable provisioning profiles and broaden GSM 11.11 conformance. |
@@ -61,8 +61,9 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 1. Improve the extracted CCONT and GENSIO devices only from observed transactions.
 2. Extend the extracted MAD2 core only from observed reset, clock and peripheral
    contracts. Timer-1 destination/FIQ5, MCU reset extent and the SIMI clock gate
-   are modeled from paired-ROM evidence and focused tests. Exact divider
-   provenance, ARM sleep and the other clock-gate bits remain unidentified.
+   are modeled from paired-ROM evidence and focused tests. ARM clock-stop and
+   routed wake are now modeled; exact divider provenance, transition latency
+   and the other clock-gate consumers remain unidentified.
 3. Extend deterministic physical-key fixtures into menu and application
    traversal, adding device behavior only when firmware reaches an evidenced
    hardware boundary.

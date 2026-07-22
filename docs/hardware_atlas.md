@@ -95,7 +95,7 @@ profile; — = not established.
 | `0x08/0x09` | FIQ / **IRQ lines active** | ✓ |
 | `0x0a/0x0b` | FIQ / IRQ mask | ✓ |
 | `0x0c` | interrupt control | ✓ |
-| `0x0d` | peripheral clock gates; bit 5 gates the SIM clock | ✓ |
+| `0x0d` | clock control; bit 1 pulses ARM clock-stop, bit 5 gates the SIM clock | ✓ |
 | `0x0e` | **interrupt trigger** (r; read-only — why `assert_irq(4)` can't be SW-triggered) | ✓ |
 | `0x0f–0x13` | programmable timer (divider/counter/compare) | ✓ |
 
@@ -105,6 +105,14 @@ its post-divider interval with Timer-1 intervals divided by eight. Timer 1 is a
 separate 15-bit 1,057 Hz calibrated counter with fixed destination `0x7fff` and
 FIQ5 at destination. Service documentation establishes only the nominal 32 kHz
 source, so the absolute internal divider tree remains open.
+
+Paired-ROM task-0 and shutdown code pulse `0x0d.bit1` to stop the ARM clock;
+the bit self-clears rather than selecting a retained clock domain. Timer 0 and
+Timer 1 continue in the sleep-clock domain. MAD2 resumes the ARM when an
+unmasked pending source reaches either CPU interrupt line. Focused tests cover
+Timer-1/FIQ5 and physical-key/IRQ0 wake plus save/load while suspended. The
+current normalized boot does not reach task 0's idle request, so physical sleep
+duty cycle and oscillator transition latency remain unmeasured.
 
 ### PUP — MBUS, vibrator, buzzer, GenIO
 | off | reg | status / touch |

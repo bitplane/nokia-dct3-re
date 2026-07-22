@@ -39,6 +39,7 @@ local vibrator_fixture_at
 local rtc_fixture_at
 local mad2_reset_fixture_at
 local mad2_watchdog_fixture_at
+local mad2_sleep_fixture_at
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
@@ -70,6 +71,8 @@ vibrator_fixture_at = env_number("NOKI3210_VIBRATOR_FIXTURE_AT", -1)
 rtc_fixture_at = env_number("NOKI3210_CCONT_RTC_FIXTURE_AT", -1)
 mad2_reset_fixture_at = env_number("NOKI3210_MAD2_RESET_FIXTURE_AT", -1)
 mad2_watchdog_fixture_at = env_number("NOKI3210_MAD2_WATCHDOG_FIXTURE_AT", -1)
+mad2_sleep_fixture_at = env_number("NOKI3210_MAD2_SLEEP_FIXTURE_AT", -1)
+local mad2_sleep_fixture_source = os.getenv("NOKI3210_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
 local state_roundtrip_at = env_number("NOKI3210_STATE_ROUNDTRIP_AT", -1)
 
 local function emulation_seconds()
@@ -549,6 +552,40 @@ if mad2_watchdog_fixture_at >= 0 then
 		space:write_u8(0x20003, 0x01)
 	end)
 	assert(coroutine.resume(watchdog_timer))
+end
+
+if mad2_sleep_fixture_at >= 0 then
+	local sleep_timer = coroutine.create(function()
+		emu.wait(mad2_sleep_fixture_at)
+		local old_fiq_mask = space:read_u8(0x2000a)
+		local old_irq_mask = space:read_u8(0x2000b)
+		local old_ctrl = space:read_u8(0x2000c) & 0xdf
+		local old_clock = space:read_u8(0x2000d)
+		if mad2_sleep_fixture_source == "timer1" then
+			-- Timer 1/FIQ5 is the internal sleep-counter wake source. The target
+			-- accelerates its input clock; the device still owns counter expiry.
+			space:write_u8(0x2000a, old_fiq_mask & 0xdf)
+			space:write_u8(0x2000c, old_ctrl | 0x01)
+		else
+			-- A physical key edge is one documented external wake source.
+			space:write_u8(0x2000b, old_irq_mask & 0xfe)
+			space:write_u8(0x2000c, old_ctrl | 0x04)
+		end
+		space:write_u8(0x2000d, old_clock | 0x02)
+		if mad2_sleep_fixture_source == "keypad" then
+			emu.wait(0.05)
+			press("up")
+			emu.wait(0.02)
+			release("up")
+		else
+			emu.wait(0.05)
+		end
+		space:write_u8(0x2000a, old_fiq_mask)
+		space:write_u8(0x2000b, old_irq_mask)
+		space:write_u8(0x2000c, old_ctrl)
+		space:write_u8(0x2000d, old_clock)
+	end)
+	assert(coroutine.resume(sleep_timer))
 end
 
 if state_roundtrip_at >= 0 then

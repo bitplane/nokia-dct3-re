@@ -67,6 +67,12 @@
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
+      "id": "mad2_sleep_clock_contract", "owner": "mad2_ctsi", "status": "satisfied",
+      "predicate": "Paired 3210 ROMs issue the same MAD2 ARM clock-stop command, sleep-domain timers continue while the ARM is halted, and only a routed IRQ/FIQ resumes execution",
+      "current": "The complete 0x2000d census finds ten instruction-equivalent RMW sites in each ROM. Boot sets bits 2-3, SIM lifecycle code manages bits 5-6, and the task-0/shutdown helper pulses bit 1 while always clearing bit 0. The device treats bit 1 as an auto-clearing command, suspends the ARM when no routed interrupt is already active, keeps Timer 0 and Timer 1 running, and resumes on MAD2's routed IRQ/FIQ outputs. Focused v6.00/v5.01 Timer-1 tests reach destination 0x7fff and FIQ5, advance Timer 0 during suspension, and reproduce the same wake after save/load; a physical Up-key test wakes through IRQ0. The exact sleep-clock divider tree, transition latency, FIQ8 source and consumers of the other clock-gate bits remain unresolved.",
+      "evidence": ["docs/mad2_fidelity.md", "docs/mad2_static_access.md", "tools/mad2_sleep_trace_check.py"]
+    },
+    {
       "id": "location_update_request_entrance", "owner": "radio_rm_mm", "status": "satisfied",
       "predicate": "The firmware selects the visible home PLMN, establishes a signalling channel, and emits an organic GSM Location Updating Request at the recovered network boundary",
       "current": "The coherent radio peer now drives only recovered DSP/L1 packet boundaries. Firmware selects ARFCN 1, transmits random access, accepts Immediate Assignment, configures the assigned SDCCH, emits LAPDm SABM with a GSM MM Location Updating Request, parses the peer's standards-shaped Location Updating Accept as result 0x48, updates EF_LOCI through SIM T=0, consumes RR Channel Release, deconfigures channel 0x60 and returns to serving BCCH. The bounded run emits one Location Updating Request and no retry.",

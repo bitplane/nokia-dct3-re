@@ -233,6 +233,7 @@ private:
 	void trace_interrupt_register(char operation, offs_t offset, uint8_t data);
 	void mad2_fiq_w(int state);
 	void mad2_irq_w(int state);
+	void mad2_sleep_w(int state);
 	void mad2_irq_ack_w(u16 mask);
 	void mad2_reset_w(int state);
 	TIMER_CALLBACK_MEMBER(deferred_mad2_reset);
@@ -667,6 +668,14 @@ void noki3310_state::mad2_fiq_w(int state)
 void noki3310_state::mad2_irq_w(int state)
 {
 	m_maincpu->set_input_line(0, state ? ASSERT_LINE : CLEAR_LINE);
+}
+
+void noki3310_state::mad2_sleep_w(int state)
+{
+	if (state)
+		m_maincpu->suspend(SUSPEND_REASON_HALT, true);
+	else
+		m_maincpu->resume(SUSPEND_REASON_HALT);
 }
 
 void noki3310_state::mad2_reset_w(int state)
@@ -1464,10 +1473,12 @@ void noki3310_state::noki3310(machine_config &config)
 	m_mad2->set_timer0_catchup(nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 0) != 0);
 	m_mad2->set_timer_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0);
 	m_mad2->set_interrupt_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0);
+	m_mad2->set_clock_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_CLOCKS", 0) != 0);
 	m_mad2->fiq_cb().set(FUNC(noki3310_state::mad2_fiq_w));
 	m_mad2->irq_cb().set(FUNC(noki3310_state::mad2_irq_w));
 	m_mad2->irq_ack_cb().set(FUNC(noki3310_state::mad2_irq_ack_w));
 	m_mad2->reset_cb().set(FUNC(noki3310_state::mad2_reset_w));
+	m_mad2->sleep_cb().set(FUNC(noki3310_state::mad2_sleep_w));
 	NOKIA_MBUS(config, m_mbus);
 	m_mbus->set_trace(nokia_env_u32("NOKI3210_TRACE_MBUS", 0) != 0);
 	m_mbus->tx_cb().set(FUNC(noki3310_state::mbus_tx_w));

@@ -25,7 +25,7 @@ entry stored in that table; it is not necessarily the main receive dispatcher.
 
 | Task | Init | Project alias | What is actually established | Confidence |
 | ---: | ---: | --- | --- | --- |
-| 0 | `0x2a92d2` | task activation supervisor | Participates in task creation/resume ordering. Complete receive ownership is not mapped. | Partial |
+| 0 | `0x2a92d2` | task activation/idle supervisor | Participates in task creation/resume ordering; its idle loop checks subsystem predicates and issues the MAD2 ARM clock-stop request. Complete receive ownership is not mapped. | Partial |
 | 1 | `0x270170` | startup and power-lifecycle coordinator | Owns the startup mode word, readiness reports, power-key shutdown transition, and shared interactive-initialization tail. | Proved |
 | 2 | `0x237bb4` | class-`0x40` service-command dispatcher | Receives framed class-`0x40` commands and applies channel-map, status, indexed-NV, and related service operations. | Proved |
 | 3 | `0x2b18a0` | resource/work serializer | Queues and serializes mapped MCU-to-DSP work and is also reached by resource/display initialization. The complete dispatcher is not classified, so neither “DSP task” nor “display server” is an adequate whole-task name. | Partial |

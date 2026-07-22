@@ -51,6 +51,13 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn("m_timer1_destination = 0x7fff", self.header)
         self.assertNotIn("m_timer1_counter + 0x40", self.device)
 
+    def test_clock_stop_is_saved_and_wakes_only_through_routed_interrupts(self):
+        self.assertIn("save_item(NAME(m_sleeping))", self.device)
+        self.assertIn("m_regs[offset] = data & ~0x02", self.device)
+        self.assertIn('leave_sleep("FIQ")', self.device)
+        self.assertIn('leave_sleep("IRQ")', self.device)
+        self.assertIn("m_sleep_cb(m_sleeping ? 1 : 0)", self.device)
+
     def test_reset_control_requests_the_board_reset_domain(self):
         self.assertIn("auto reset_cb()", self.header)
         self.assertIn("if (BIT(data, 2) && !BIT(old, 2))", self.device)

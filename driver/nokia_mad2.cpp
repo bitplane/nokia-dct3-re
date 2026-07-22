@@ -18,7 +18,8 @@ nokia_mad2_device::nokia_mad2_device(
 	m_fiq_cb(*this),
 	m_irq_cb(*this),
 	m_irq_ack_cb(*this),
-	m_reset_cb(*this)
+	m_reset_cb(*this),
+	m_sleep_cb(*this)
 {
 }
 
@@ -37,8 +38,8 @@ void nokia_mad2_device::device_start()
 	save_item(NAME(m_timer0_compare_latched));
 	save_item(NAME(m_fiq_line_state));
 	save_item(NAME(m_irq_line_state));
-	machine().save().register_postload(save_prepost_delegate(FUNC(nokia_mad2_device::update_fiq_line), this));
-	machine().save().register_postload(save_prepost_delegate(FUNC(nokia_mad2_device::update_irq_line), this));
+	save_item(NAME(m_sleeping));
+	machine().save().register_postload(save_prepost_delegate(FUNC(nokia_mad2_device::restore_outputs), this));
 }
 
 void nokia_mad2_device::device_reset()
@@ -56,10 +57,13 @@ void nokia_mad2_device::device_reset()
 	m_timer0_compare_latched = false;
 	m_fiq_line_state = false;
 	m_irq_line_state = false;
+	m_sleeping = false;
 	m_timer_trace_count = 0;
 	m_interrupt_trace_count = 0;
+	m_clock_trace_count = 0;
 	m_fiq_cb(0);
 	m_irq_cb(0);
+	m_sleep_cb(0);
 	m_timer0->adjust(attotime::from_hz(m_timer0_hz), 0, attotime::from_hz(m_timer0_hz));
 	m_timer1->adjust(attotime::from_hz(m_timer1_hz), 0, attotime::from_hz(m_timer1_hz));
 	m_fiq8->adjust(attotime::from_hz(m_fiq8_hz), 0, attotime::from_hz(m_fiq8_hz));
@@ -119,6 +123,16 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 		ack_irq((data << 3) & LINE_EXTENDED);
 		update_fiq_line();
 		update_irq_line();
+		break;
+	case 0x0d:
+		// Both 3210 ROMs use bit 1 as a one-shot clock-stop request. It is
+		// written from task 0 only after the scheduler's idle predicates and
+		// sleep-timer update; the shutdown path issues the same request after
+		// masking every interrupt. It is therefore a command, not retained
+		// clock-selection state. Other bits remain ordinary peripheral gates.
+		m_regs[offset] = data & ~0x02;
+		if (BIT(data, 1))
+			enter_sleep();
 		break;
 	case 0x0f: m_timer0_divider = data; break;
 	case 0x12: m_timer0_compare_latched = false; break;
@@ -212,6 +226,8 @@ void nokia_mad2_device::update_fiq_line()
 		logerror("mad2_interrupt: event=route domain=FIQ active=%u pending=%03x mask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
 				active, m_fiq_status, m_regs[0x0a], m_regs[0x0c], m_regs[0x16], machine().time().as_double());
 	m_fiq_line_state = active;
+	if (active)
+		leave_sleep("FIQ");
 	m_fiq_cb(active);
 }
 
@@ -228,7 +244,47 @@ void nokia_mad2_device::update_irq_line()
 		logerror("mad2_interrupt: event=route domain=IRQ active=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
 				active, m_irq_status, m_regs[0x0b], m_regs[0x0c], machine().time().as_double());
 	m_irq_line_state = active;
+	if (active)
+		leave_sleep("IRQ");
 	m_irq_cb(active);
+}
+
+void nokia_mad2_device::enter_sleep()
+{
+	// A request made with an already-routed interrupt pending cannot stop the
+	// MCU clock: the wake condition is already true.
+	if (m_sleeping || m_fiq_line_state || m_irq_line_state)
+	{
+		if (m_clock_trace && m_clock_trace_count++ < 4096)
+			logerror("mad2_sleep: event=request_blocked fiq=%03x irq=%03x t=%.9f\n",
+					m_fiq_status, m_irq_status, machine().time().as_double());
+		return;
+	}
+	m_sleeping = true;
+	if (m_clock_trace && m_clock_trace_count++ < 4096)
+		logerror("mad2_sleep: event=request clocks=%02x timer0=%04x timer1=%04x t=%.9f\n",
+				m_regs[0x0d], m_timer0_counter, m_timer1_counter,
+				machine().time().as_double());
+	m_sleep_cb(1);
+}
+
+void nokia_mad2_device::leave_sleep(const char *domain)
+{
+	if (!m_sleeping)
+		return;
+	m_sleeping = false;
+	if (m_clock_trace && m_clock_trace_count++ < 4096)
+		logerror("mad2_sleep: event=wake domain=%s fiq=%03x irq=%03x timer0=%04x timer1=%04x t=%.9f\n",
+				domain, m_fiq_status, m_irq_status, m_timer0_counter,
+				m_timer1_counter, machine().time().as_double());
+	m_sleep_cb(0);
+}
+
+void nokia_mad2_device::restore_outputs()
+{
+	update_fiq_line();
+	update_irq_line();
+	m_sleep_cb(m_sleeping ? 1 : 0);
 }
 
 bool nokia_mad2_device::timer0_compare_due() const
