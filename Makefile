@@ -16,6 +16,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_gsm_network.cpp driver/nokia_gsm_network.h \
 	driver/nokia_mad2.cpp driver/nokia_mad2.h \
 	driver/nokia_mbus.cpp driver/nokia_mbus.h \
+	driver/nokia_radio_peer.cpp driver/nokia_radio_peer.h \
 	driver/nokia_simi.cpp driver/nokia_simi.h \
 	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
 	driver/nokia_3310_trace.inc

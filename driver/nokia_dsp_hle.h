@@ -4,7 +4,7 @@
 #include "emu.h"
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
-#include "nokia_gsm_network.h"
+#include "nokia_radio_peer.h"
 
 class nokia_dsp_hle_device : public device_t
 {
@@ -15,7 +15,6 @@ public:
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_delay_ms(unsigned delay) { m_service_delay_ms = delay; }
 	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
-	void set_radio_peer_enabled(bool enabled) { m_radio_peer_enabled = enabled; }
 	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
 
 	void tx_commit_w(int state);
@@ -29,47 +28,15 @@ protected:
 	virtual void device_reset() override;
 
 private:
-	enum radio_phase : u8
-	{
-		inactive,
-		initial_search,
-		post_deactivate_search,
-		candidate_measurement,
-		candidate_sync,
-		candidate_channel_change,
-		candidate_ra_info,
-		serving_bcch,
-		serving_idle_ra,
-		candidate_retry,
-		selected_search,
-		serving_channel_change,
-		selected_channel_change,
-		selected_bcch,
-		selected_ra_info,
-		selected_bcch_channel_change,
-		random_access,
-		assigned_channel_change,
-		lapdm_establish,
-		contention_resolution,
-		location_update_accept,
-		rr_channel_release,
-		release_deconfigure,
-		release_channel_change
-	};
-
 	TIMER_CALLBACK_MEMBER(service_tick);
 	TIMER_CALLBACK_MEMBER(packet_tick);
 	TIMER_CALLBACK_MEMBER(response_tick);
 	void drain_responses();
 	void schedule_response();
 	void publish_bootstrap_state();
-	static const char *radio_phase_name(u8 phase);
-	void observe_radio_request(const nokia_dspif_device::packet &packet);
-	void emit_radio_report();
-
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_external_service_peer_device> m_external_peer;
-	required_device<nokia_gsm_network_device> m_gsm_network;
+	required_device<nokia_radio_peer_device> m_radio_peer;
 	emu_timer *m_service_timer = nullptr;
 	emu_timer *m_packet_timer = nullptr;
 	emu_timer *m_response_timer = nullptr;
@@ -78,22 +45,7 @@ private:
 	bool m_trace_enabled = false;
 	unsigned m_service_delay_ms = 5;
 	unsigned m_peer_poll_ms = 5;
-	bool m_radio_peer_enabled = false;
 	bool m_service_control_completion_sent = false;
-	unsigned m_radio_reports_sent = 0;
-	unsigned m_radio_reports_remaining = 0;
-	u8 m_radio_phase = radio_phase::inactive;
-	unsigned m_radio_search_round = 0;
-	unsigned m_radio_wait_ticks = 0;
-	u8 m_radio_search_mode = 0;
-	u8 m_radio_access_ra = 0;
-	u32 m_radio_access_frame = 0;
-	std::array<u8, 20> m_radio_contention_l3{};
-	unsigned m_radio_contention_length = 0;
-	bool m_radio_search_has_arfcn1 = false;
-	bool m_radio_report_deferred = false;
-	bool m_radio_search_requested = false;
-	unsigned m_radio_selected_reports_remaining = 0;
 	unsigned m_bootstrap_exchange_count = 0;
 };
 

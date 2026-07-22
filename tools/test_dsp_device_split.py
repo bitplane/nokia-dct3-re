@@ -12,6 +12,7 @@ class DspDeviceSplitTest(unittest.TestCase):
         cls.hle = (ROOT / "driver/nokia_dsp_hle.cpp").read_text() + (ROOT / "driver/nokia_dsp_hle.h").read_text()
         cls.external = (ROOT / "driver/nokia_external_service.cpp").read_text() + (ROOT / "driver/nokia_external_service.h").read_text()
         cls.network = (ROOT / "driver/nokia_gsm_network.cpp").read_text() + (ROOT / "driver/nokia_gsm_network.h").read_text()
+        cls.radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text() + (ROOT / "driver/nokia_radio_peer.h").read_text()
         cls.phone = (ROOT / "driver/nokia_3310.cpp").read_text()
 
     def test_transport_has_no_service_protocol(self):
@@ -42,6 +43,7 @@ class DspDeviceSplitTest(unittest.TestCase):
             "required_device<nokia_dsp_hle_device> m_dsp_hle",
             "required_device<nokia_external_service_peer_device> m_external_service_peer",
             "required_device<nokia_gsm_network_device> m_gsm_network",
+            "required_device<nokia_radio_peer_device> m_radio_peer",
         ):
             self.assertIn(token, self.phone)
 
@@ -49,7 +51,17 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertIn("SYSTEM_INFORMATION", self.network)
         self.assertIn("0x00, 0xf1, 0x10", self.network)
         self.assertNotIn("0x49, 0x06, 0x1b", self.hle)
-        self.assertIn("m_gsm_network->system_information", self.hle)
+        self.assertIn("m_gsm_network->system_information", self.radio)
+
+    def test_radio_transaction_state_is_outside_bootstrap_hle(self):
+        for token in ("phase::", "candidate_sync", "location_update_accept", "system_information"):
+            self.assertNotIn(token, self.hle)
+        for token in ("receive_packet", "next_report_type", "advance_after_report", "m_reports_remaining"):
+            self.assertIn(token, self.radio)
+
+    def test_network_has_no_nokia_transport_ownership(self):
+        for token in ("dspif", "enqueue_rx_packet", "CHANNEL_CHANGED_CNF", "m_reports_remaining"):
+            self.assertNotIn(token, self.network)
 
 
 if __name__ == "__main__":

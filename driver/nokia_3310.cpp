@@ -33,6 +33,7 @@
 #include "nokia_gsm_network.h"
 #include "nokia_mad2.h"
 #include "nokia_mbus.h"
+#include "nokia_radio_peer.h"
 #include "nokia_sim_card.h"
 #include "nokia_simi.h"
 
@@ -167,6 +168,7 @@ public:
 		m_dsp_hle(*this, "dsp_hle"),
 		m_external_service_peer(*this, "external_service_peer"),
 		m_gsm_network(*this, "gsm_network"),
+		m_radio_peer(*this, "radio_peer"),
 		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
 		m_pcd8544(*this, "pcd8544"),
@@ -268,6 +270,7 @@ private:
 	required_device<nokia_dsp_hle_device> m_dsp_hle;
 	required_device<nokia_external_service_peer_device> m_external_service_peer;
 	required_device<nokia_gsm_network_device> m_gsm_network;
+	required_device<nokia_radio_peer_device> m_radio_peer;
 	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
 	required_device<pcd8544_device> m_pcd8544;
@@ -1489,6 +1492,7 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_DSP_HLE(config, m_dsp_hle);
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
+	NOKIA_RADIO_PEER(config, m_radio_peer);
 	const bool external_service_model = nokia_env_u32("NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", 0) != 0;
 	const unsigned dsp_default_ms = external_service_model ? 4 : 5;
 	const bool dsp_trace = nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0;
@@ -1505,6 +1509,7 @@ void noki3310_state::noki3310(machine_config &config)
 	m_dsp_hle->set_service_delay_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
 	m_dsp_hle->set_peer_poll_ms(nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
 	m_dsp_hle->set_trace_enabled(dsp_trace);
+	m_radio_peer->set_trace_enabled(dsp_trace);
 	m_external_service_peer->set_enabled(external_service_model);
 	m_external_service_peer->set_trace_enabled(dsp_trace);
 	NOKIA_SIMI(config, m_simi);
@@ -1546,10 +1551,11 @@ void noki3310_state::noki3210(machine_config &config)
 			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms));
 	m_dsp_hle->set_peer_poll_ms(
 			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
-	m_dsp_hle->set_radio_peer_enabled(nokia_env_u32("NOKI3210_MODEL_RADIO_PEER", 0) != 0);
+	m_radio_peer->set_enabled(nokia_env_u32("NOKI3210_MODEL_RADIO_PEER", 0) != 0);
 	const bool dsp_trace = nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0;
 	m_dspif->set_trace_enabled(dsp_trace);
 	m_dsp_hle->set_trace_enabled(dsp_trace);
+	m_radio_peer->set_trace_enabled(dsp_trace);
 	m_external_service_peer->set_enabled(external_service_model);
 	m_external_service_peer->set_trace_enabled(dsp_trace);
 }

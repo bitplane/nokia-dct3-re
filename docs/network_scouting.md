@@ -15,8 +15,10 @@ outside this checkpoint.
 - `nokia_gsm_network_device` owns standards-shaped GSM cell and MM data: ARFCN,
   signal level, BSIC, PLMN/LAC/cell identity, SI1--SI4, Immediate Assignment,
   Location Updating Accept and RR Channel Release.
-- `nokia_dsp_hle_device` translates between that network and the recovered Nokia
-  DSP/L1 packet protocol. Packets cross the DSPIF shared rings and FIQ0.
+- `nokia_radio_peer_device` translates between that network and the recovered
+  Nokia DSP/L1 packet protocol. Packets cross the DSPIF shared rings and FIQ0.
+- `nokia_dsp_hle_device` owns only DSP bootstrap and service-transport timing;
+  it forwards radio packets without owning radio phases or GSM payloads.
 - No peer writes firmware RAM, posts an RTOS message, selects an MMI callback or
   renders content.
 
@@ -114,7 +116,7 @@ firmware to issue its own deconfiguration request before the peer confirms it.
   confirmations are forbidden.
 - Serving BCCH resumes only after RR release and deconfiguration complete.
 
-These rules are modeled as a transaction state machine in `nokia_dsp_hle`.
+These rules are modeled as a transaction state machine in `nokia_radio_peer`.
 The state numbers are implementation details; packet type, request correlation
 and observable firmware transitions are the contract.
 

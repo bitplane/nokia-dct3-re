@@ -77,11 +77,11 @@ The labels below have precise meanings:
 | CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; physical ADC latency, RTC encoding, watchdog clock and board-level analog signals remain open. |
 | GENSIO serial/SELECT | Partial hardware | Extracted endpoint/status/LCD/CCONT transport passes two 3210 ROMs; physical timing and SELECT-attached peers remain open. |
 | SIMI controller and SIM card | Partial hardware | Separate devices compose through byte/reset callbacks; organic SIMI/FIQ6 and T=0 initialization work, and the GSM 11.11 linear-record path persistently stores firmware-written ADN contacts. Timing, errors, security and broader file coverage remain incomplete. |
-| DSP mailbox/service corner | Prototype | Boot handshake works; GSM L1 and audio DSP remain unemulated. |
-| Startup/external-service peers | Prototype | Request-driven behavior composes through the DSPIF, DSP HLE and external-service devices; the wider peer contract remains incomplete. |
+| DSP mailbox/service corner | Prototype | Bootstrap, service timing, packet rings and two firmware-programmed tone voices work through HLE; a DSP core and codec remain unemulated. |
+| Startup/service/radio peers | Prototype | Separate service, Nokia L1 and standards-shaped GSM devices compose through DSPIF; one laboratory cell supports camp, Location Updating, release and operator presentation. Wider peer contracts remain incomplete. |
 | Interactive startup | Mapped | Provisioned boot reaches the idle screen and opens `Phone book` through a protected physical-keypad oracle. Mode 4 is compatible with the UI; cross-ROM presentation parity remains open. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
-| Audio, RF, network | Unmapped/partial | Defer until offline application boot is stable. |
+| Audio, RF, network | Partial HLE | Laboratory GSM registration and basic tone outputs work; calls, SMS, mobility, RF and codec behavior remain open. |
 
 A component is considered boxed off only when firmware reaches it through its ordinary interface,
 it performs no firmware-state writes, timing is expressed as device behavior, save state is

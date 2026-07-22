@@ -25,9 +25,11 @@ registers, ADC results, RTC, interrupt state and watchdog. Task 7 remains the
 firmware adapter to the external service/test peer; the request-driven
 DSP behavior is split at its evidenced boundaries: `nokia_dspif_device` owns
 shared RAM, DSPIF, packet rings and FIQ0/IRQ4 signaling;
-`nokia_dsp_hle_device` owns the boot-subset DSP behavior; and
+`nokia_dsp_hle_device` owns bootstrap and service timing;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
-session. The phone state only wires their callbacks to MAD2.
+session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation; and
+`nokia_gsm_network_device` owns standards-shaped cell, RR and MM data. The
+phone state only composes those devices and wires DSPIF callbacks to MAD2.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
 connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0,
 declared file metadata, persistent mutable card records and
