@@ -1,4 +1,5 @@
 // license:BSD-3-Clause
+// copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
 #include "nokia_dsp_hle.h"
 
@@ -18,6 +19,7 @@ void nokia_dsp_hle_device::device_start()
 	m_service_timer = timer_alloc(FUNC(nokia_dsp_hle_device::service_tick), this);
 	m_packet_timer = timer_alloc(FUNC(nokia_dsp_hle_device::packet_tick), this);
 	m_response_timer = timer_alloc(FUNC(nokia_dsp_hle_device::response_tick), this);
+	m_keepalive_timer = timer_alloc(FUNC(nokia_dsp_hle_device::keepalive_tick), this);
 	save_item(NAME(m_service_enabled));
 	save_item(NAME(m_external_service_enabled));
 	save_item(NAME(m_service_delay_us));
@@ -25,6 +27,10 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_service_control_completion_sent));
 	save_item(NAME(m_bootstrap_exchange_limit));
 	save_item(NAME(m_bootstrap_exchange_count));
+	save_item(NAME(m_bootstrap_ping_pong));
+	save_item(NAME(m_code_block_request));
+	save_item(NAME(m_parked_boot_status));
+	save_item(NAME(m_boot_status_response));
 }
 
 void nokia_dsp_hle_device::device_reset()
@@ -32,6 +38,8 @@ void nokia_dsp_hle_device::device_reset()
 	m_service_timer->adjust(attotime::never);
 	m_packet_timer->adjust(attotime::never);
 	m_response_timer->adjust(attotime::never);
+	m_keepalive_timer->adjust(m_service_enabled ? attotime::from_seconds(1) : attotime::never,
+			0, attotime::from_seconds(1));
 	m_service_control_completion_sent = false;
 	m_bootstrap_exchange_count = 0;
 	publish_bootstrap_state();
@@ -42,7 +50,7 @@ void nokia_dsp_hle_device::publish_bootstrap_state()
 	// Transition timing is not recovered. Publish the minimum reset-visible DSP
 	// state synchronously, through DSPIF-owned shared RAM, before the MCU starts.
 	m_transport->peer_shared_w(0x0e0 / 2, 0);
-	if (!m_transport->bootstrap_ping_pong())
+	if (!m_bootstrap_ping_pong)
 	{
 		m_transport->peer_shared_w(0x0fe / 2, 1);
 		m_transport->peer_shared_w(0x100 / 2, 1);
@@ -70,15 +78,50 @@ void nokia_dsp_hle_device::doorbell_w(int state)
 				m_transport->service_pending(), machine().time().as_double());
 }
 
-void nokia_dsp_hle_device::bootstrap_fe_w(int state)
+void nokia_dsp_hle_device::shared_002_write_w(int state)
 {
-	if (state)
+	if (state && m_parked_boot_status && m_transport->shared_word(0x002 / 2) == 0xffff)
+		m_transport->peer_shared_w(0x002 / 2, m_boot_status_response);
+}
+
+void nokia_dsp_hle_device::shared_0fe_read_w(int state)
+{
+	if (state && m_bootstrap_ping_pong && m_transport->shared_word(0x0fe / 2) != 0)
+		m_transport->peer_shared_w(0x0fe / 2, 0);
+}
+
+void nokia_dsp_hle_device::shared_0fe_write_w(int state)
+{
+	if (!state)
+		return;
+	const u16 token = m_transport->shared_word(0x0fe / 2);
+	if (m_bootstrap_ping_pong)
+	{
+		m_transport->peer_shared_w(0x0fe / 2, 0);
+		m_transport->peer_shared_w(0x100 / 2, token != 0 ? token : 1);
+	}
+	else if (token == 0)
 		m_transport->peer_shared_w(0x0fe / 2, 1);
 }
 
-void nokia_dsp_hle_device::bootstrap_100_w(int state)
+void nokia_dsp_hle_device::shared_100_read_w(int state)
 {
-	if (state)
+	if (state && m_bootstrap_ping_pong && m_transport->shared_word(0x100 / 2) != 0 &&
+			m_transport->shared_word(0x1ca / 2) == 0)
+		m_transport->peer_shared_w(0x100 / 2, 0);
+}
+
+void nokia_dsp_hle_device::shared_100_write_w(int state)
+{
+	if (!state)
+		return;
+	const u16 token = m_transport->shared_word(0x100 / 2);
+	if (m_bootstrap_ping_pong && m_transport->shared_word(0x1ca / 2) == 0)
+	{
+		m_transport->peer_shared_w(0x100 / 2, 0);
+		m_transport->peer_shared_w(0x0fe / 2, token != 0 ? token : 1);
+	}
+	else if (token == 0)
 	{
 		m_transport->peer_shared_w(0x100 / 2, 1);
 		if (++m_bootstrap_exchange_count == m_bootstrap_exchange_limit)
@@ -94,7 +137,20 @@ void nokia_dsp_hle_device::bootstrap_100_w(int state)
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
 {
+	if (m_code_block_request)
+		m_transport->peer_shared_w(0x0e2 / 2, 1);
 	m_transport->complete_service();
+}
+
+TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::keepalive_tick)
+{
+	// A running DSP continues to publish an idle group-0x03 indication. The MCU
+	// treats any non-fault MDI packet as DSP activity and otherwise enters its
+	// reason-0x68 terminal watchdog path after roughly 32 seconds. This packet
+	// has no payload or higher-level completion semantics; it only traverses the
+	// ordinary MDIRCV ring and FIQ0 boundary.
+	if (m_transport->enqueue_rx_packet(0x03, nullptr, 0))
+		m_transport->notify_rx();
 }
 
 void nokia_dsp_hle_device::drain_responses()

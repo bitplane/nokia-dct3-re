@@ -12,8 +12,8 @@ firmware result:
 
 | hardware entry point | quarantined research helper |
 |---|---|
-| `flash_r/w` | physical flash access plus the documented 3410 B3 partition/status adapter; no firmware-PC diagnostics |
-| `ram_w`   (≈10 lines) | `nokia_3310_trace.inc::ram_w_firmware_traces` (write-side research observations) |
+| `flash_r/w` | physical flash access plus the documented 3410 B3 partition/status adapter; selected read-only contract probes run after the physical read |
+| `ram_w`   (≈3 lines) | none; only the backing-store write |
 | `ram_r`   (≈2 lines)  | none; display provisioning now arrives through EEPROM/NV |
 | `mad2_io_r/w` | functional register routing and board-output helpers, followed by observation-only MAD2 trace helpers |
 
@@ -25,7 +25,9 @@ registers, ADC results, RTC, interrupt state and watchdog. Task 7 remains the
 firmware adapter to the external service/test peer; the request-driven
 DSP behavior is split at its evidenced boundaries: `nokia_dspif_device` owns
 shared RAM, DSPIF, packet rings and FIQ0/IRQ4 signaling;
-`nokia_dsp_hle_device` owns bootstrap and service timing;
+`nokia_dsp_hle_device` owns all bootstrap mailbox policy, peer-published shared
+state and service timing; DSPIF carries no DSP-behavior configuration, making
+the HLE a replaceable backend seam;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
 session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation; and
 `nokia_gsm_network_device` owns standards-shaped cell, RR and MM data. The
@@ -45,18 +47,25 @@ functional dispatch. `nokia_gensio_device` owns its sparse serial/status/SELECT
 registers and connects CCONT and the PCD8544 through callbacks. A separate
 MAME patch extends the otherwise-unused native PCD8544 implementation with
 default-preserving configurable controller/viewport geometry and internal
-rendering; the Nokia-local duplicate has been removed. Product differences
-use explicit configurations rather than driver-name parsing.
+rendering. Its standard six-bank configuration retains the native three-bit Y
+command mask; only controllers configured above eight banks decode bit 3. The
+Nokia-local duplicate has been removed. Product differences use explicit
+typed configurations rather than driver-name parsing or process-environment
+selection. Environment controls retained in the driver are restricted to
+read-only diagnostics and named negative/conformance fixtures.
 
 ## Rules
 
 - New *hardware* behaviour goes in a device model or the owning MAD2 register block.
-- New diagnostic traces may go in the `*_firmware_*` helpers when no component
-  boundary exists yet. Their firmware-address-specific implementation belongs
-  in `nokia_3310_trace.inc`. Do not add result forcing or task-message injection.
+- New firmware-address diagnostics require a named focused consumer and belong
+  in `nokia_3310_trace.inc` only while that regression cannot observe a device
+  boundary. Do not add result forcing or task-message injection.
 - The research helpers should **shrink over time**. Delete a trace after its
   conclusion is normalized; replace each RAM-read shortcut with its real
   hardware or nonvolatile-data owner.
+- Driver and component files use MAME attribution headers. Device headers use
+  include guards, rely on the including translation unit for `emu.h`, and must
+  not introduce a second umbrella include.
 - All firmware-result forces, registration-message injections and firmware RAM
   read overrides are removed. The synthetic EEPROM provisions the fields from
   the paired-ROM descriptor-`0x0749` reset constructor; firmware loads and

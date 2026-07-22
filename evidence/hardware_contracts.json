@@ -104,7 +104,7 @@
     },
     {
       "id": "dsp_bootstrap_status_hle", "subsystem": "dsp", "status": "prototype", "confidence": "moderate",
-      "boundary": "The DSP HLE publishes state into DSPIF-owned shared RAM rather than overriding reads: both 3210 ROMs complete 64 alternating 0x0fe/0x100 acknowledgements and 3310 v6.39 completes 58 before the product-configured peer publishes ready words 0x000..0x004; command 4 clears busy word 0x0e0, no DSP core executes, and physical response timing remains unknown",
+      "boundary": "The DSP HLE publishes state into DSPIF-owned shared RAM rather than overriding reads: both 3210 ROMs complete 64 alternating 0x0fe/0x100 acknowledgements and 3310 v6.39 completes 58 before the product-configured peer publishes ready words 0x000..0x004; NHM-2 ping-pong, parked-loader word 0x002 and service code-block behavior are backend-owned, while DSPIF retains only RAM, rings, doorbells and address-level access notifications; command 4 clears busy word 0x0e0, no DSP core executes, and physical response timing remains unknown",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/dsp_shared_memory_inventory.md", "evidence/runtime/dsp_shared_reads.json"]
     },
     {

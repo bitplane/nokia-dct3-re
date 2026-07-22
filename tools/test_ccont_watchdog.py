@@ -31,7 +31,7 @@ class CcontWatchdogTest(unittest.TestCase):
         product = phone.split(
             "constexpr nokia_product_config PRODUCT_3210 =", 1
         )[1].split(";", 1)[0]
-        self.assertIn("{ 0x01, true, true, true, false, false,", product)
+        self.assertIn("{ 0x01, true, true, true, true, false, false,", product)
 
     def test_expiry_resets_the_complete_digital_baseband_domain(self):
         phone = (ROOT / "driver/nokia_3310.cpp").read_text()

@@ -27,8 +27,14 @@ The implementation has three explicit owners:
 3. `nokia_external_service_peer_device` owns discovery, class-`0x40` session
    correlation, channel map and healthy-state sequencing.
 
-The transport contains no service commands or session state. The external peer
-contains no shared-RAM offsets, ring arithmetic or interrupt ownership. The
+The transport contains no service commands, session state, bootstrap policy or
+DSP-product configuration. It stores shared RAM and DSPIF registers, frames
+packets, maintains ring indices, and reports address-level mailbox accesses to
+the selected DSP backend. The HLE alone interprets the `0x002`, `0x0fe` and
+`0x100` bootstrap dialogue, publishes the 3410 parked-loader response, and
+publishes the code-block request before asking DSPIF to complete service IRQ4.
+This callback boundary is the attachment seam for a future real DSP backend.
+The external peer contains no shared-RAM offsets, ring arithmetic or interrupt ownership. The
 100 us producer wakeup, 5 ms peer packet poll, synchronous bootstrap replies and 36-tick
 external-session delay remain calibrated prototype behavior rather than
 protocol constants.
@@ -204,9 +210,8 @@ packet type alone.
 The shared-service timer is one-shot: a nonzero MCU publication at `0x0e4`
 schedules one counter clear and one IRQ4 completion. Periodic zero-to-zero
 "completions" are idle IRQs whose absence preserves both ROM transport gates
-and the interactive menu oracle. The retained `MODEL_DSP_SERVICE_TICK_MS` name
-is compatibility residue: it controls peer packet polling only and does not
-create periodic service completions.
+and the interactive menu oracle. Completion delay and peer packet polling are
+typed product configuration rather than runtime environment overrides.
 
 A future lower-radio investigation succeeds only when a peer-owned state change
 or inbound packet correlates with a firmware consumer through the real hardware

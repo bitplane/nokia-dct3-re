@@ -11,8 +11,9 @@ that the driver is ready for upstream submission.
 - `make verify-frontier` protects the request-driven external-service peer plus ordinary
   SIMI/FIQ6 card path. It ends in task-1 mode `0x0004`, flags `0x0f`, service-session
   status `0x49`, no-SIM clear, and SIM enable set.
-- `run-manifest-service` records the class-`0x40` service command directions.
-- `run-manifest-deep-gsm` records the coherent generic-service/SIM frontier.
+- Reviewed runtime manifests retain the class-`0x40` service and coherent
+  generic-service/SIM observations that established those contracts. Their
+  broad firmware-PC trace generators have been retired.
 - `verify-3330-frontier` and `verify-3330-navigation` protect the v4.50
   virgin-PMM setup, idle and physical-key menu lifecycle.
 
@@ -84,21 +85,32 @@ is available.
 
 ## Runtime-control ledger
 
-Every live `NOKIA_DCT3_*` control belongs to one of these classes:
+Normal machine composition no longer depends on `NOKIA_DCT3_*` controls.
+Product ADC tuples, clocks, SIMI, DSP/service peers and the validated 3210
+laboratory-network peer are typed `nokia_product_config` data. The remaining
+controls belong exclusively to diagnostics or explicitly named negative and
+conformance fixtures:
 
 | Class | Controls | Status |
 | --- | --- | --- |
-| Hardware scenarios | `ADC_PROFILE`, `ADC0..7`, `CHARGER_ADC`, `SIM_ATR_HEX`, `SIM_CPHS_AOC`, `SIM_CACHED_LOCATION` | Deterministic analog/card inputs, not inferred physical defaults. Charger attachment is a typed CCONT input; `CHARGER_ADC` remains its raw selector-5 VCHAR level for threshold fixtures. Raw `ADC0..7` controls remain laboratory provisioning, not a battery simulation. `SIM_CACHED_LOCATION` supplies persistent EF_LOCI state for registration scenarios. |
-| Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | The 3210 defaults Timer 0 to 33,055 Hz and Timer 1 to 1,057 Hz. Paired ROMs prove the post-divider 8:1 conversion but not the exact physical divider tree. `MODEL_DSP_SERVICE_DELAY_MS` controls the one-shot shared-service completion delay; the legacy `TICK_MS` name controls peer packet polling only. |
-| Hardware scenarios | `CCONT_READY`, `CCONT_WDDISX_GROUNDED` | Reset-time CCONT readiness and the documented physical watchdog-disable pin. The 3210 profile defaults to ready with WDDISX released. |
-| Device-boundary prototypes | `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE`, `MODEL_RADIO_PEER` | The first three are enabled by the 3210 product profile; overrides remain for negative tests. `MODEL_RADIO_PEER` is an opt-in deterministic network whose search, camp, Location Updating, release and operator-presentation contract is verified through DSPIF/FIQ0 and organic firmware behavior. |
-| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_DSP_SHARED_READS`, `TRACE_DSP_SHARED_TRANSITIONS`, `TRACE_GENSIO`, `TRACE_GENSIO_LIMIT`, `TRACE_CCONT_WATCHDOG`, `TRACE_CCONT_ADC`, `TRACE_CCONT_RTC`, `TRACE_KEYPAD`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER`, `TRACE_PUP_OUTPUTS` | Log-only and bounded or scoped to a named investigation. `TRACE_GENSIO_LIMIT` changes only the default 20,000-line diagnostic ceiling. |
+| Card/analog fixtures | `CHARGER_ADC`, `SIM_ATR_HEX`, `SIM_CPHS_AOC`, `SIM_CACHED_LOCATION` | Focused external-input fixtures. Ordinary ADC values and card attachment come from the product profile. `SIM_CACHED_LOCATION` supplies persistent EF_LOCI state for registration scenarios. |
+| Timing fixtures | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP` | Conformance-only clock overrides. Normal products use fixed 33,055 Hz Timer 0, 1,057 Hz Timer 1 and 1 kHz FIQ8 configuration. |
+| Negative composition fixtures | `CCONT_READY`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE`, `MODEL_RADIO_PEER` | May only disable a product-owned component or readiness input for a named negative gate. They cannot enable a component absent from that product profile. |
+| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_SIM_RX`, `TRACE_DSP_BOUNDARY`, `TRACE_DSP_SHARED_READS`, `TRACE_DSP_SHARED_TRANSITIONS`, `TRACE_GENSIO`, `TRACE_GENSIO_LIMIT`, `TRACE_CCONT_WATCHDOG`, `TRACE_CCONT_ADC`, `TRACE_CCONT_RTC`, `TRACE_KEYPAD`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER`, `TRACE_PUP_OUTPUTS` | Log-only and bounded or scoped to a named regression. `TRACE_GENSIO_LIMIT` changes only the default 20,000-line diagnostic ceiling. |
 | Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `POST_READY_CAPTURE_DELAY_MS`, `CCONT_CHARGER_INITIAL`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `CCONT_RTC_FIXTURE_AT`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `MAD2_SLEEP_FIXTURE_AT`, `MAD2_SLEEP_FIXTURE_SOURCE`, `MAD2_RESET_FIXTURE_AT`, `MAD2_WATCHDOG_FIXTURE_AT`, `BUZZER_FIXTURE_AT`, `VIBRATOR_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
 registration-state forcing controls.
 
 ## Instrumentation debt
+
+All driver/component sources now carry MAME license and holder headers; device
+headers use conventional include guards and do not include the `emu.h` umbrella.
+The save-state audit distinguishes emulated state from configuration and
+diagnostics: registers, FIFOs, protocol phases, mutable card data and controller
+line state are registered, while immutable product settings and log counters
+are deliberately not serialized. `make verify-mad2` retains the executable
+mid-boot save/load check.
 
 The extracted `nokia_radio_peer_device` uses named phases for the recovered SEARCH_LIST,
 channel-change, RA_INFO, BCCH, random-access, LAPDm, Location Updating and
@@ -111,13 +123,10 @@ The retained trace switches are scoped as follows:
 
 | Trace | Purpose |
 | --- | --- |
-| `TRACE_DISPLAY` | active MMI context, resource/render entry points, and LCD/DSP transfer boundaries |
+| `TRACE_DISPLAY` | selected-operator resource presentation used by the registration gate |
 | `TRACE_DISPLAY_PROFILE` | descriptor-`0x0749` load/update/copy and setup-message boundaries |
 | `TRACE_DISPLAY_IO` | GENSIO LCD endpoint selection and command/data transfers |
-| `TRACE_TASKS` | generic task liveness and mailbox edges |
-| `TRACE_SERVICE_COMMAND` | class-`0x40` service command direction and state |
 | `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
-| `TRACE_GSM_SERVICE` | manifest-backed generic-service registrations/callbacks |
 | `TRACE_DSP_BOUNDARY` | shared-ring requests and request-derived peer responses |
 | `TRACE_DSP_SHARED_READS` | first read and value transitions for each firmware PC/DSP-shared-memory offset pair |
 | `TRACE_DSP_SHARED_TRANSITIONS` | every firmware observation of the small peer-owned scalar set, for request/completion correlation |
@@ -133,9 +142,13 @@ The retained trace switches are scoped as follows:
 | `TRACE_MBUS` | MBUS register, byte, status and FIQ-facing controller lifecycle |
 | `TRACE_PUP_OUTPUTS` | changed PUP control, vibrator, buzzer and GenIO output values during organic application use |
 
-Firmware-address-specific implementations of retained traces live in
-`driver/nokia_3310_trace.inc`; ordinary MAD2 register taps remain beside their
-hardware handlers.
+The small firmware-address-specific set retained by focused radio, display,
+alarm, and watchdog gates lives in `driver/nokia_3310_trace.inc`. A compliance
+test keeps this quarantine below 200 lines and rejects state-changing APIs.
+Hardware
+boundary traces remain beside their owning handlers. Closed task, service,
+SIM-registration, and generic-display probes have been removed rather than
+preserved as an investigation journal.
 
 ## Topology gaps
 

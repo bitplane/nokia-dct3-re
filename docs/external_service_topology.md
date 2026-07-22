@@ -156,8 +156,9 @@ the receive path and are required to prevent the firmware response from routing
 back into task 2. The supported peer therefore responds only to an observed,
 fully framed request; unsolicited mailbox-level construction is invalid.
 
-`TRACE_SERVICE_COMMAND` is observational only and is capped so later runs retain this
-ownership and routing evidence without large logs.
+The ownership and routing result is retained here and in the reviewed evidence
+profile; the firmware-PC command-stream probe used to derive it has been
+removed.
 
 ## Separate `0x74` namespaces
 

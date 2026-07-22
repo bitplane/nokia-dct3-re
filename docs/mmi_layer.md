@@ -144,9 +144,8 @@ organic transaction rather than the sole evidence.
 
 ## Diagnostics
 
-`NOKIA_DCT3_TRACE_TASKS=1` provides generic mailbox-edge context for future
-application work; `make verify-mmi-menu` protects the keypad-to-menu
-lifecycle.
+`make verify-mmi-menu` protects the keypad-to-menu lifecycle without retaining
+generic firmware task/message probes.
 
 `NOKIA_DCT3_TRACE_DISPLAY_PROFILE=1` records the descriptor-load, profile-update,
 active-profile copy and setup-message boundaries. `NOKIA_DCT3_TRACE_DISPLAY_IO=1`

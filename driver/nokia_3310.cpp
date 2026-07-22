@@ -1,5 +1,5 @@
 // license:BSD-3-Clause
-// copyright-holders:Sandro Ronco
+// copyright-holders:Sandro Ronco, Gaz
 /*
     Driver for Nokia phones based on the Texas Instruments MAD2 family
     (ARM7TDMI + DSP). The Nokia 3210 uses MAD2PR1; later products use other
@@ -60,6 +60,7 @@ struct nokia_product_config
 	bool sim_device;
 	bool dsp_service;
 	bool external_service;
+	bool radio_peer;
 	bool keypad_five_rows;
 	bool ccont_wddisx_grounded;
 	unsigned dsp_bootstrap_exchanges;
@@ -89,28 +90,28 @@ constexpr std::array<u16, 8> ADC_3310 =
 		{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 };
 
 constexpr nokia_product_config PRODUCT_3210 =
-		{ 0x01, true, true, true, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3210 };
+		{ 0x01, true, true, true, true, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3210 };
 constexpr nokia_product_config PRODUCT_3310 =
-		{ 0x04, true, true, true, true, false, 58, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };
+		{ 0x04, true, true, true, false, true, false, 58, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };
 // NHM-6 v4.50 completes 64 DSP bootstrap exchanges and shares the five-row
 // keypad and standard VBATT/BSI/BTEMP channel routing with the 3310 family.
 // Enabling the three request-driven peers plus this ADC tuple advances the
 // virgin PMM from CONTACT SERVICE to its organic security-code editor.
 constexpr nokia_product_config PRODUCT_3330 =
-		{ 0x04, true, true, true, true, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };
+		{ 0x04, true, true, true, false, true, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };
 // NHM-2 releases the DSP through reset-control bit 2 and then polls MAD2's
 // clock/ready status bit. The 0x53 readback is the observed running state; its
 // readiness semantics live in MAD2, while the board wiring remains here.
 constexpr nokia_product_config PRODUCT_3410 =
-		{ 0x02, true, true, true, true, false, 64, true, true, true, 0, 50, true, 0x53, 0x04, 102, 72, 96, 65, ADC_3310 };
+		{ 0x02, true, true, true, false, true, false, 64, true, true, true, 0, 50, true, 0x53, 0x04, 102, 72, 96, 65, ADC_3310 };
 // Preserve the previous 64-exchange behavior for unvalidated products. This is
 // an explicit compatibility calibration, not a recovered cross-DCT3 constant.
 constexpr nokia_product_config PRODUCT_DEFAULT =
-		{ 0x04, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };
+		{ 0x04, false, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };
 constexpr nokia_product_config PRODUCT_5X10 =
-		{ 0x10, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };
+		{ 0x10, false, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };
 constexpr nokia_product_config PRODUCT_8XXX =
-		{ 0x10, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };
+		{ 0x10, false, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };
 
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
@@ -171,7 +172,6 @@ constexpr offs_t FW_SCHED_RUNNING_TASK_ID = 0x100022;
 // startup service-ready byte (0x110c2c) is set =1 by
 // the setter 0x291068 iff the DSP-shared pending counter (DSP RAM byte 0xe4) == 0; the
 // setter only runs when MAD2 IRQ line 4 (the DSP service-completion interrupt) fires.
-constexpr offs_t FW_STARTUP_SERVICE_READY = 0x110c2c;
 constexpr offs_t FW_STARTUP_EVENT = 0x1123ee;
 constexpr offs_t FW_STARTUP_MODE = 0x1123f0;
 constexpr offs_t FW_POST74_EVENT_GATE = 0x112368;
@@ -179,7 +179,6 @@ constexpr offs_t FW_POST74_EVENT_GATE_READY = FW_POST74_EVENT_GATE + 4;
 constexpr offs_t FW_POST74_EVENT_GATE_FLAGS = FW_POST74_EVENT_GATE + 6;
 
 // Service-session state reached during the startup watchdog path.
-constexpr offs_t FW_SERVICE_SESSION_STATUS = 0x11fed0;
 constexpr offs_t FW_SERVICE_SESSION_RESULT = 0x11fed4;
 constexpr offs_t FW_SERVICE_SESSION_COUNTER = 0x11fed6;
 constexpr offs_t FW_SERVICE_SESSION_SUBSTATE = 0x11feda;
@@ -264,7 +263,6 @@ private:
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	void ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
-	void ram_w_firmware_traces(offs_t offset, uint16_t data, uint16_t mem_mask);
 	uint16_t eeprom_r(offs_t offset, uint16_t mem_mask = ~0);
 	void eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t dsp_ram_r(offs_t offset);
@@ -378,7 +376,6 @@ private:
 		bool dsp_shared_reads = false;
 		bool dsp_shared_transitions = false;
 		bool gensio = false;
-		bool gsm_service = false;
 		bool keypad = false;
 		bool mad2_clocks = false;
 		bool mad2_interrupts = false;
@@ -386,17 +383,13 @@ private:
 		bool mad2_timers = false;
 		bool mbus = false;
 		bool pup_outputs = false;
-		bool service_command = false;
 		bool sim_rx = false;
-		bool tasks = false;
 		unsigned gensio_limit = 20'000;
 
 		bool firmware() const
 		{
-			return ccont_adc || ccont_rtc || ccont_watchdog || display || display_profile ||
-				dsp_boundary || gsm_service || keypad || service_command || sim_rx || tasks;
+			return ccont_rtc || ccont_watchdog || display || display_profile || dsp_boundary;
 		}
-		bool ram() const { return service_command || sim_rx; }
 	} m_trace;
 };
 
@@ -490,69 +483,10 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	}
 }
 
-static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
-{
-	char name[] = "NOKIA_DCT3_ADC0";
-	name[12] = '0' + (id & 0x07);
-
-	if (const char *value = std::getenv(name))
-	{
-		char *end = nullptr;
-		const unsigned long parsed = std::strtoul(value, &end, 0);
-		if (end != value)
-			return parsed & 0x03ff;
-	}
-
-	const char *profile = std::getenv("NOKIA_DCT3_ADC_PROFILE");
-	if (profile)
-	{
-		const bool charged = profile && !std::strcmp(profile, "charged");
-		if (!profile || !std::strcmp(profile, "sane") || charged)
-		{
-			// Stable raw-selector fixtures. Electrical signal names and units are
-			// deliberately not assigned until a 3210 board-level source confirms them.
-			switch(id & 0x07)
-			{
-				case 0: return 0x000;
-				case 1: return 0x200;
-				case 2: return 0x2d0;
-				case 3: return 0x280;
-				case 4: return 0x200;
-				case 5: return charged ? 0x200 : 0x000;
-				case 6: return 0x200;
-				case 7: return charged ? 0x120 : 0x000;
-			}
-		}
-	}
-
-	return fallback;
-}
-
 // ============================================================================
-// NOKIA_DCT3_* environment knobs — the driver reads every runtime option from the
-// environment (pass overrides through `make run RUN_ENV='...'`). Three kinds:
-//
-//   1. HARDWARE/PRODUCT CONFIG — selects a scenario, not firmware behaviour:
-//      power/ADC (ADC_PROFILE, CCONT_READY, CCONT_WDDISX_GROUNDED), clocks
-//      (TIMER0_HZ/TIMER1_HZ/TIMER0_CATCHUP,
-//      FIQ8_HZ), and the SIM UART/card fixture. The 3210's documented timer-0
-//      clock is fixed in its product configuration; remaining environment
-//      values are research overrides for unfinished profiles or scenarios.
-//
-//   2. DEVICE-BOUNDARY MODELS — behavior behind an ordinary hardware interface.
-//      The 3210 enables the validated composition by default; MODEL_* can still
-//      disable individual peers for negative tests. MODEL_SIM_DEVICE owns
-//      SIMI/FIQ6. MODEL_DSP_SERVICE enables the DSP
-//      HLE; MODEL_EXTERNAL_SERVICE_PEER enables the separate service peer
-//      behind the DSP transport. Their wider contracts remain incomplete.
-//   3. DIAGNOSTIC TAPS (TRACE_*) — opt-in, log-only, no state change. A curated few:
-//      TRACE_SERVICE_COMMAND (class-0x40 service command stream),
-//      TRACE_TASKS (app-task liveness + inter-task message edges).
-//      TRACE_SIM_RX covers the register/FIQ/APDU path and SIM reply milestones;
-//      TRACE_DSP_BOUNDARY and TRACE_GSM_SERVICE cover the current peer boundary;
-//      TRACE_MAD2_TIMERS records the timer-0/FIQ register lifecycle.
-//      TRACE_MAD2_INTERRUPTS records pending/mask/ack and CPU-line routing.
-//      Research-force policy: docs/evidence_regime.md.
+// NOKIA_DCT3_* environment controls below are test-harness or diagnostic inputs.
+// Normal machine composition, clocks, ADC tuples and peer enablement are fixed
+// by nokia_product_config and never selected from the process environment.
 //
 // Firmware-address traces are quarantined in nokia_3310_trace.inc. Add no
 // forced firmware results or messages. See docs/driver_structure.md.
@@ -593,7 +527,6 @@ void noki3310_state::machine_start()
 	m_trace.dsp_shared_reads = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_SHARED_READS", 0) != 0;
 	m_trace.dsp_shared_transitions = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_SHARED_TRANSITIONS", 0) != 0;
 	m_trace.gensio = nokia_env_u32("NOKIA_DCT3_TRACE_GENSIO", 0) != 0;
-	m_trace.gsm_service = nokia_env_u32("NOKIA_DCT3_TRACE_GSM_SERVICE", 0) != 0;
 	m_trace.keypad = nokia_env_u32("NOKIA_DCT3_TRACE_KEYPAD", 0) != 0;
 	m_trace.mad2_clocks = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_CLOCKS", 0) != 0;
 	m_trace.mad2_interrupts = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_INTERRUPTS", 0) != 0;
@@ -601,10 +534,19 @@ void noki3310_state::machine_start()
 	m_trace.mad2_timers = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_TIMERS", 0) != 0;
 	m_trace.mbus = nokia_env_u32("NOKIA_DCT3_TRACE_MBUS", 0) != 0;
 	m_trace.pup_outputs = nokia_env_u32("NOKIA_DCT3_TRACE_PUP_OUTPUTS", 0) != 0;
-	m_trace.service_command = nokia_env_u32("NOKIA_DCT3_TRACE_SERVICE_COMMAND", 0) != 0;
 	m_trace.sim_rx = nokia_env_u32("NOKIA_DCT3_TRACE_SIM_RX", 0) != 0;
-	m_trace.tasks = nokia_env_u32("NOKIA_DCT3_TRACE_TASKS", 0) != 0;
 	m_trace.gensio_limit = nokia_env_u32("NOKIA_DCT3_TRACE_GENSIO_LIMIT", 20'000);
+	m_mad2->set_timer_trace(m_trace.mad2_timers);
+	m_mad2->set_interrupt_trace(m_trace.mad2_interrupts);
+	m_mad2->set_clock_trace(m_trace.mad2_clocks);
+	m_mbus->set_trace(m_trace.mbus);
+	m_ccont->set_adc_trace(m_trace.ccont_adc);
+	m_ccont->set_rtc_trace(m_trace.ccont_rtc);
+	m_dspif->set_trace_enabled(m_trace.dsp_boundary);
+	m_dsp_hle->set_trace_enabled(m_trace.dsp_boundary);
+	m_radio_peer->set_trace_enabled(m_trace.dsp_boundary);
+	m_external_service_peer->set_trace_enabled(m_trace.dsp_boundary);
+	m_sim_card->set_trace(m_trace.sim_rx);
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
@@ -640,9 +582,9 @@ void noki3310_state::apply_product_config(nokia_product_config const &product)
 {
 	m_product = product;
 	m_dsp_hle->set_bootstrap_exchange_limit(product.dsp_bootstrap_exchanges);
-	m_dspif->set_bootstrap_ping_pong(product.dsp_bootstrap_ping_pong);
-	m_dspif->set_code_block_request(product.dsp_code_block_request);
-	m_dspif->set_parked_boot_status(product.dsp_parked_boot_status,
+	m_dsp_hle->set_bootstrap_ping_pong(product.dsp_bootstrap_ping_pong);
+	m_dsp_hle->set_code_block_request(product.dsp_code_block_request);
+	m_dsp_hle->set_parked_boot_status(product.dsp_parked_boot_status,
 			product.dsp_boot_status_response);
 	m_mad2->set_dsp_reset_running_status(product.dsp_reset_running_status);
 	m_mad2->set_dsp_release_mask(product.dsp_release_mask);
@@ -651,21 +593,16 @@ void noki3310_state::apply_product_config(nokia_product_config const &product)
 	screen_device *const screen = subdevice<screen_device>("screen");
 	screen->set_size(product.lcd_visible_width, product.lcd_visible_height);
 	screen->set_visarea(0, product.lcd_visible_width - 1, 0, product.lcd_visible_height - 1);
-	const bool external_service =
-			nokia_env_u32("NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", product.external_service) != 0;
-	m_dsp_hle->set_service_enabled(
-			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE", product.dsp_service) != 0);
-	m_dsp_hle->set_external_service_enabled(external_service);
-	const unsigned dsp_default_ms = external_service ? 4 : 5;
+	const bool external_service = product.external_service;
+	m_dsp_hle->set_service_enabled(product.dsp_service);
+	m_dsp_hle->set_external_service_enabled(product.external_service);
+	const unsigned dsp_default_ms = product.external_service ? 4 : 5;
 	unsigned service_delay_us = product.dsp_service_delay_us != 0 ?
 			product.dsp_service_delay_us : dsp_default_ms * 1'000;
-	if (std::getenv("NOKIA_DCT3_MODEL_DSP_SERVICE_DELAY_MS"))
-		service_delay_us = nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms) * 1'000;
-	m_dsp_hle->set_service_delay_us(
-			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE_DELAY_US", service_delay_us));
-	m_dsp_hle->set_peer_poll_ms(
-			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
+	m_dsp_hle->set_service_delay_us(service_delay_us);
+	m_dsp_hle->set_peer_poll_ms(dsp_default_ms);
 	m_external_service_peer->set_enabled(external_service);
+	m_radio_peer->set_enabled(product.radio_peer);
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -721,17 +658,30 @@ void noki3310_state::machine_reset()
 	m_flash_b3_status_override = false;
 	m_flash_b3_erase_remaining_us = 0;
 	m_timer_flash_b3_erase->adjust(attotime::never);
+	// These overrides are retained strictly for negative/conformance fixtures.
+	// Normal runs use the typed product configuration installed above.
+	m_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33'055));
+	m_mad2->set_timer1_hz(nokia_env_u32("NOKIA_DCT3_TIMER1_HZ", 1'057));
+	m_mad2->set_fiq8_hz(nokia_env_u32("NOKIA_DCT3_FIQ8_HZ", 1'000));
+	m_mad2->set_timer0_catchup(nokia_env_u32("NOKIA_DCT3_TIMER0_CATCHUP", 0) != 0);
 	if (nokia_env_u32("NOKIA_DCT3_DSPIF_CONFORMANCE", 0) != 0)
 		logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
-	// Load deterministic raw selector inputs. The firmware-observable selector
-	// contract is known; physical 3210 net names and analog units are not.
-	{
-		for (unsigned id = 0; id < 8; id++)
-			m_ccont->set_adc_source(id, nokia_adc_override(id, m_product.adc_defaults[id]));
-	}
-	m_ccont->set_wddisx_grounded(nokia_env_u32("NOKIA_DCT3_CCONT_WDDISX_GROUNDED",
-			m_product.ccont_wddisx_grounded) != 0);
-	m_simi->set_enabled(nokia_env_u32("NOKIA_DCT3_MODEL_SIM_DEVICE", m_product.sim_device) != 0);
+	// Load the deterministic product-level selector tuple. Electrical signal
+	// names and units remain deliberately unassigned where board evidence is absent.
+	for (unsigned id = 0; id < 8; id++)
+		m_ccont->set_adc_source(id, m_product.adc_defaults[id]);
+	m_ccont->set_wddisx_grounded(m_product.ccont_wddisx_grounded);
+	m_ccont->set_ready(nokia_env_u32("NOKIA_DCT3_CCONT_READY", 1) != 0);
+	m_simi->set_enabled(m_product.sim_device &&
+			nokia_env_u32("NOKIA_DCT3_MODEL_SIM_DEVICE", 1) != 0);
+	m_dsp_hle->set_service_enabled(m_product.dsp_service &&
+			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE", 1) != 0);
+	m_dsp_hle->set_external_service_enabled(m_product.external_service &&
+			nokia_env_u32("NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", 1) != 0);
+	m_external_service_peer->set_enabled(m_product.external_service &&
+			nokia_env_u32("NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", 1) != 0);
+	m_radio_peer->set_enabled(m_product.radio_peer &&
+			nokia_env_u32("NOKIA_DCT3_MODEL_RADIO_PEER", 1) != 0);
 	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKIA_DCT3_SIM_CPHS_AOC", 0) != 0);
 	m_sim_card->set_cached_location(nokia_env_u32("NOKIA_DCT3_SIM_CACHED_LOCATION", 0) != 0);
 	{
@@ -1029,11 +979,9 @@ uint16_t noki3310_state::ram_r(offs_t offset, uint16_t mem_mask)
 	return m_ram[offset] & mem_mask;
 }
 
-// Hardware RAM write entry point (registered in the address map). Research
-// traces observe the old value before the real backing-store write.
+// Hardware RAM write entry point registered in the address map.
 void noki3310_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	ram_w_firmware_traces(offset, data, mem_mask);
 	COMBINE_DATA(&m_ram[offset]);
 }
 
@@ -1761,29 +1709,23 @@ void noki3310_state::noki3310(machine_config &config)
 	INTEL_TE28F160(config, "flash");
 	I2C_24C128(config, m_eeprom);
 	NOKIA_MAD2(config, m_mad2);
-	m_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33055));
-	m_mad2->set_timer1_hz(nokia_env_u32("NOKIA_DCT3_TIMER1_HZ", 1057));
-	m_mad2->set_fiq8_hz(nokia_env_u32("NOKIA_DCT3_FIQ8_HZ", 1000));
-	m_mad2->set_timer0_catchup(nokia_env_u32("NOKIA_DCT3_TIMER0_CATCHUP", 0) != 0);
-	m_mad2->set_timer_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_TIMERS", 0) != 0);
-	m_mad2->set_interrupt_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_INTERRUPTS", 0) != 0);
-	m_mad2->set_clock_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_CLOCKS", 0) != 0);
+	m_mad2->set_timer0_hz(33'055);
+	m_mad2->set_timer1_hz(1'057);
+	m_mad2->set_fiq8_hz(1'000);
+	m_mad2->set_timer0_catchup(false);
 	m_mad2->fiq_cb().set(FUNC(noki3310_state::mad2_fiq_w));
 	m_mad2->irq_cb().set(FUNC(noki3310_state::mad2_irq_w));
 	m_mad2->irq_ack_cb().set(FUNC(noki3310_state::mad2_irq_ack_w));
 	m_mad2->reset_cb().set(FUNC(noki3310_state::mad2_reset_w));
 	m_mad2->sleep_cb().set(FUNC(noki3310_state::mad2_sleep_w));
 	NOKIA_MBUS(config, m_mbus);
-	m_mbus->set_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MBUS", 0) != 0);
 	m_mbus->tx_cb().set(FUNC(noki3310_state::mbus_tx_w));
 	m_mbus->fiq2_cb().set(FUNC(noki3310_state::mbus_fiq2_w));
 	m_mbus->fiq3_cb().set(FUNC(noki3310_state::mbus_fiq3_w));
 	NOKIA_CCONT(config, m_ccont);
-	m_ccont->set_adc_trace(nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_ADC", 0) != 0);
-	m_ccont->set_rtc_trace(nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_RTC", 0) != 0);
 	// The low status bit is persistent CCONT reset state, not an IRQ source.
 	// Clearing it provides the explicit missing/unready-CCONT fault fixture.
-	m_ccont->set_ready(nokia_env_u32("NOKIA_DCT3_CCONT_READY", 1) != 0);
+	m_ccont->set_ready(true);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
 	NOKIA_GENSIO(config, m_gensio);
@@ -1798,21 +1740,18 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
 	NOKIA_RADIO_PEER(config, m_radio_peer);
-	const bool dsp_trace = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_BOUNDARY", 0) != 0;
-	m_dspif->set_trace_enabled(dsp_trace);
 	m_dspif->tx_commit_cb().set(FUNC(noki3310_state::dsp_tx_commit_w));
 	m_dspif->service_pending_cb().set(FUNC(noki3310_state::dsp_service_pending_w));
 	m_dspif->doorbell_cb().set(FUNC(noki3310_state::dsp_doorbell_w));
-	m_dspif->bootstrap_fe_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::bootstrap_fe_w));
-	m_dspif->bootstrap_100_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::bootstrap_100_w));
+	m_dspif->shared_002_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_002_write_w));
+	m_dspif->shared_0fe_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_read_w));
+	m_dspif->shared_0fe_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_write_w));
+	m_dspif->shared_100_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_read_w));
+	m_dspif->shared_100_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_write_w));
 	m_dspif->fiq0_cb().set(FUNC(noki3310_state::dsp_fiq0_w));
 	m_dspif->service_irq_cb().set(FUNC(noki3310_state::dsp_service_irq_w));
-	m_dsp_hle->set_trace_enabled(dsp_trace);
-	m_radio_peer->set_trace_enabled(dsp_trace);
-	m_external_service_peer->set_trace_enabled(dsp_trace);
 	NOKIA_SIMI(config, m_simi);
 	NOKIA_SIM_CARD(config, m_sim_card);
-	m_sim_card->set_trace(nokia_env_u32("NOKIA_DCT3_TRACE_SIM_RX", 0) != 0);
 	m_simi->irq_cb().set(FUNC(noki3310_state::sim_irq_w));
 	m_sim_card->response_cb().set(m_simi, FUNC(nokia_simi_device::card_rx_w));
 	apply_product_config(PRODUCT_3310);
@@ -1835,13 +1774,11 @@ void noki3310_state::noki3210(machine_config &config)
 	// The 3310 has its own validated profile; other DCT3 products retain the
 	// conservative base-device defaults until their contracts are exercised.
 	// The paired ROMs prove that Timer 1 ticks eight times faster than Timer 0's
-	// divided counter. Keep the measured inputs configurable until the exact CTSI
+	// divided counter. Keep the measured inputs distinct until the exact CTSI
 	// oscillator/divider tree is recovered; do not conflate both timer inputs.
-	m_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33'055));
-	m_mad2->set_timer1_hz(nokia_env_u32("NOKIA_DCT3_TIMER1_HZ", 1'057));
+	m_mad2->set_timer0_hz(33'055);
+	m_mad2->set_timer1_hz(1'057);
 	m_mad2->set_timer0_catchup(false);
-
-	m_radio_peer->set_enabled(nokia_env_u32("NOKIA_DCT3_MODEL_RADIO_PEER", 0) != 0);
 }
 
 void noki3310_state::noki5210(machine_config &config)

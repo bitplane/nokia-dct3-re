@@ -22,8 +22,9 @@ outside this checkpoint.
 - No peer writes firmware RAM, posts an RTOS message, selects an MMI callback or
   renders content.
 
-`NOKIA_DCT3_MODEL_RADIO_PEER=1` enables one deterministic laboratory cell. It is
-opt-in because it is a test network, not a complete configurable GSM system.
+The validated 3210 product configuration enables one deterministic laboratory
+cell. It remains explicitly an HLE test network, not a complete configurable
+GSM system; a named negative fixture can disable it.
 
 ## Verified sequence
 

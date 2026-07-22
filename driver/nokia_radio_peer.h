@@ -1,7 +1,8 @@
 // license:BSD-3-Clause
-#pragma once
+// copyright-holders:Sandro Ronco, Gaz
 
-#include "emu.h"
+#ifndef MAME_NOKIA_NOKIA_RADIO_PEER_H
+#define MAME_NOKIA_NOKIA_RADIO_PEER_H
 #include "nokia_dspif.h"
 #include "nokia_gsm_network.h"
 
@@ -79,3 +80,5 @@ private:
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device)
+
+#endif // MAME_NOKIA_NOKIA_RADIO_PEER_H

@@ -1,7 +1,8 @@
 // license:BSD-3-Clause
-#pragma once
+// copyright-holders:Sandro Ronco, Gaz
 
-#include "emu.h"
+#ifndef MAME_NOKIA_NOKIA_DSPIF_H
+#define MAME_NOKIA_NOKIA_DSPIF_H
 
 #include <array>
 
@@ -21,23 +22,19 @@ public:
 	auto tx_commit_cb() { return m_tx_commit_cb.bind(); }
 	auto service_pending_cb() { return m_service_pending_cb.bind(); }
 	auto doorbell_cb() { return m_doorbell_cb.bind(); }
-	auto bootstrap_fe_cb() { return m_bootstrap_fe_cb.bind(); }
-	auto bootstrap_100_cb() { return m_bootstrap_100_cb.bind(); }
+	auto shared_002_write_cb() { return m_shared_002_write_cb.bind(); }
+	auto shared_0fe_read_cb() { return m_shared_0fe_read_cb.bind(); }
+	auto shared_0fe_write_cb() { return m_shared_0fe_write_cb.bind(); }
+	auto shared_100_read_cb() { return m_shared_100_read_cb.bind(); }
+	auto shared_100_write_cb() { return m_shared_100_write_cb.bind(); }
 	auto fiq0_cb() { return m_fiq0_cb.bind(); }
 	auto service_irq_cb() { return m_service_irq_cb.bind(); }
 
 	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
-	void set_bootstrap_ping_pong(bool enabled) { m_bootstrap_ping_pong = enabled; }
-	void set_code_block_request(bool enabled) { m_code_block_request = enabled; }
-	void set_parked_boot_status(bool enabled, u16 response)
-	{
-		m_parked_boot_status = enabled;
-		m_boot_status_response = response;
-	}
-	bool bootstrap_ping_pong() const { return m_bootstrap_ping_pong; }
 
 	u16 shared_r(offs_t offset);
 	void shared_w(offs_t offset, u16 data, u16 mem_mask = ~0);
+	u16 shared_word(offs_t offset) const { return m_ram[offset & 0x7ff]; }
 	void peer_shared_w(offs_t offset, u16 data);
 	u8 dspif_r(offs_t offset) const;
 	void dspif_w(offs_t offset, u8 data);
@@ -69,17 +66,18 @@ private:
 	devcb_write_line m_tx_commit_cb;
 	devcb_write_line m_service_pending_cb;
 	devcb_write_line m_doorbell_cb;
-	devcb_write_line m_bootstrap_fe_cb;
-	devcb_write_line m_bootstrap_100_cb;
+	devcb_write_line m_shared_002_write_cb;
+	devcb_write_line m_shared_0fe_read_cb;
+	devcb_write_line m_shared_0fe_write_cb;
+	devcb_write_line m_shared_100_read_cb;
+	devcb_write_line m_shared_100_write_cb;
 	devcb_write_line m_fiq0_cb;
 	devcb_write_line m_service_irq_cb;
 	u16 m_ram[0x800] = { 0 };
 	u8 m_dspif[4] = { 0 };
 	bool m_trace_enabled = false;
-	bool m_bootstrap_ping_pong = false;
-	bool m_code_block_request = false;
-	bool m_parked_boot_status = false;
-	u16 m_boot_status_response = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_DSPIF, nokia_dspif_device)
+
+#endif // MAME_NOKIA_NOKIA_DSPIF_H

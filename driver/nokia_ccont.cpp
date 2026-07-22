@@ -1,4 +1,5 @@
 // license:BSD-3-Clause
+// copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
 #include "nokia_ccont.h"
 
@@ -133,14 +134,16 @@ void nokia_ccont_device::update_irq()
 void nokia_ccont_device::advance_rtc()
 {
 	latch_irq_sources(IRQ_RTC_SECOND);
-	if (m_rtc_trace)
-		logerror("ccont_rtc: event=second time=%02u:%02u:%02u day=%u status=%02x mask=%02x t=%.9f\n",
-			m_regs[RTC_HOUR], m_regs[RTC_MINUTE], m_regs[RTC_SECOND], m_regs[RTC_DAY],
-			m_regs[IRQ_STATUS], m_regs[IRQ_MASK], machine().time().as_double());
 	if (++m_regs[RTC_SECOND] >= 60)
 		m_regs[RTC_SECOND] = 0;
 	if (m_regs[RTC_SECOND] != 0)
+	{
+		if (m_rtc_trace)
+			logerror("ccont_rtc: event=second time=%02u:%02u:%02u day=%u status=%02x mask=%02x t=%.9f\n",
+				m_regs[RTC_HOUR], m_regs[RTC_MINUTE], m_regs[RTC_SECOND], m_regs[RTC_DAY],
+				m_regs[IRQ_STATUS], m_regs[IRQ_MASK], machine().time().as_double());
 		return;
+	}
 	latch_irq_sources(IRQ_RTC_MINUTE);
 	if (++m_regs[RTC_MINUTE] >= 60)
 	{
@@ -165,6 +168,10 @@ void nokia_ccont_device::advance_rtc()
 		m_rtc_alarm_armed = false;
 		m_regs[RTC_ALARM_HOUR] &= 0x7f;
 	}
+	if (m_rtc_trace)
+		logerror("ccont_rtc: event=second time=%02u:%02u:%02u day=%u status=%02x mask=%02x t=%.9f\n",
+			m_regs[RTC_HOUR], m_regs[RTC_MINUTE], m_regs[RTC_SECOND], m_regs[RTC_DAY],
+			m_regs[IRQ_STATUS], m_regs[IRQ_MASK], machine().time().as_double());
 }
 
 TIMER_CALLBACK_MEMBER(nokia_ccont_device::rtc_tick)

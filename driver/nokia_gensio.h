@@ -1,10 +1,7 @@
 // license:BSD-3-Clause
+// copyright-holders:Sandro Ronco, Gaz
 #ifndef MAME_NOKIA_NOKIA_GENSIO_H
 #define MAME_NOKIA_NOKIA_GENSIO_H
-
-#pragma once
-
-#include "emu.h"
 
 class nokia_gensio_device : public device_t
 {
@@ -42,4 +39,4 @@ private:
 
 DECLARE_DEVICE_TYPE(NOKIA_GENSIO, nokia_gensio_device)
 
-#endif
+#endif // MAME_NOKIA_NOKIA_GENSIO_H

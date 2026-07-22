@@ -40,7 +40,7 @@ The device boundary is classified by evidence level:
 | CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status belongs to the separate serial controller, not CCONT. |
 | Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
 | Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. Charger-originated restart exposes cause bit 2, while an operational charger edge uses source bit 3 and MAD2 IRQ2. Firmware reads and clears both forms through register `0x0e`. |
-| ADC selector values | Working fixture | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. `ADC_PROFILE` is test provisioning, not a battery model. |
+| ADC selector values | Product configuration | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. Each supported product supplies one reviewed deterministic tuple; this is not a battery simulation. |
 | RTC counters and alarm (`0x07..0x0c`) | Tested partial hardware | Deterministic binary counters produce second/minute sources; ROM arithmetic establishes binary encoding. Physical `0x07..0x0a` are second/minute/hour/day. A controller fixture proves the comparator and IRQ route; an organic keypad workflow programs a user alarm, receives the CCONT IRQ, and starts the ringtone. Month/calendar persistence remains outside the recovered interface. |
 | Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input and is released in the 3210 profile; both ROMs survive beyond the maximum window through organic reloads. |
 | Other register storage | Compatibility behavior | Registers without mapped semantics retain written bytes so firmware-visible transactions compose. Storage must not be interpreted as a proved hardware contract. |
@@ -282,8 +282,8 @@ extent while publishing their own retained reset causes.
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
 phone has the watchdog enabled, so the 3210 product profile leaves WDDISX
-released. `NOKIA_DCT3_CCONT_WDDISX_GROUNDED=1` remains a physical-input scenario
-for negative comparisons, not the boot default.
+released. The board input is typed product configuration rather than a runtime
+environment choice.
 
 The firmware service helper at `0x2b4dc0` accepts a mask: bit 0 reloads the
 MAD2 watchdog and bit 1 writes `0x31` through logical CCONT descriptor 6,
@@ -296,10 +296,11 @@ entry. All nine direct calls are classified: six belong to one-shot boot/NV
 callback `0x296428`; the steady-state CCONT call is task 2 at `0x237b2e`.
 
 Timer 0 retains its 33,055 Hz source calibration; Timer 1 uses 1,057 Hz, with
-their post-divider 8:1 relation established by paired ROM code. Task 2 performs CCONT reloads
-at approximately 3.965-second intervals. With WDDISX released, v6.00 remains
-coherent through a 75-second run and v5.01 through 65 seconds; neither expires
-or resets. The earlier task-17 failure at this rate was not scheduler or
+their post-divider 8:1 relation established by paired ROM code. In the current
+v6.00 lifecycle task 2 performs one combined MAD2/CCONT reload at approximately
+31 seconds, loading `0x31` into both counters. Periodic non-fault MDI activity
+separately prevents the firmware's reason-`0x68` DSP-liveness terminal path;
+that path was previously misclassified as watchdog-counter expiry. The earlier task-17 failure was not scheduler or
 CCONT behavior: the external-service prototype sent an unsupported command
 `0x64`, result `5`, whose firmware handler deliberately suspends application
 tasks after five scheduler ticks. Without that lifecycle request, task 17
@@ -335,9 +336,11 @@ deassertion. GENSIO endpoint/status
 state and CCONT register, command and IRQ state are save-state registered
 together; post-load reconstructs the IRQ output.
 
-`make verify-ccont-watchdog RUN_DIR=<dir>` runs for 55 seconds with WDDISX
-released and requires at least ten combined task-2 reloads, no gap over five
-seconds, no watchdog expiry, and no soft reset.
+`make verify-ccont-watchdog RUN_DIR=<dir>` runs a provisioned steady-state boot
+for 55 seconds with WDDISX released and requires the task-2 combined reload,
+no terminal watchdog reason, no watchdog expiry, and no soft reset. The
+provisioned identity excludes the independent security-editor timeout/reset
+lifecycle from this hardware gate.
 
 `make verify-charger-lifecycle RUN_DIR=<dir>` separately proves charger-present
 startup, selector-5/IRQ2 service and the physical mode-`0x0009` -> `0x000c` ->

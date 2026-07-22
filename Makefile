@@ -96,7 +96,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-bootstrap-3310 verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-bootstrap-3310 verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -270,24 +270,11 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
 	cp $(MAME_DIR)/error.log run_manifest_default/error.log
-
-run-manifest-deep-gsm:
-	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_deep_gsm SECONDS=8 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_TASKS=1 NOKIA_DCT3_TRACE_SIM_RX=1 NOKIA_DCT3_TRACE_GSM_SERVICE=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
-	cp $(MAME_DIR)/error.log run_manifest_deep_gsm/error.log
-
-run-manifest-service:
-	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_service_default SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_SERVICE_COMMAND=1'
-	cp $(MAME_DIR)/error.log run_manifest_service_default/error.log
-	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_service_deep SECONDS=6 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_SERVICE_COMMAND=1'
-	cp $(MAME_DIR)/error.log run_manifest_service_deep/error.log
 
 run-manifest-3330:
 	@$(MAKE) --no-print-directory smoke-3330e RUN_DIR=run_manifest_3330 SECONDS=3
@@ -401,6 +388,7 @@ verify-ccont:
 
 verify-ccont-watchdog:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=55 \
+		PROVISIONED_IMEI_PREFIX=49015420323751 \
 		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_WATCHDOG=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/ccont_watchdog_trace_check.py \
@@ -563,13 +551,13 @@ verify-3410-navigation: normalize-3410
 
 verify-radio-camp:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=20 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_MODEL_RADIO_PEER=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_camp_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-registration:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=25 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_MODEL_RADIO_PEER=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log
 
@@ -582,7 +570,7 @@ verify-radio-operator:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=105 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_MODEL_RADIO_PEER=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'; \
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log; \
 	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \

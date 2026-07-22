@@ -1,6 +1,8 @@
-#pragma once
+// license:BSD-3-Clause
+// copyright-holders:Sandro Ronco, Gaz
 
-#include "emu.h"
+#ifndef MAME_NOKIA_NOKIA_MBUS_H
+#define MAME_NOKIA_NOKIA_MBUS_H
 
 class nokia_mbus_device : public device_t
 {
@@ -51,3 +53,5 @@ private:
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_MBUS, nokia_mbus_device)
+
+#endif // MAME_NOKIA_NOKIA_MBUS_H

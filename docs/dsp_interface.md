@@ -56,6 +56,14 @@ So the MCU **stages DSP tables/program from flash into shared RAM** at boot — 
 data *is* in the image. On a real phone the DSP would execute or consume it;
 the current HLE peer stores the blobs but does not interpret them.
 
+DSPIF has no product-specific bootstrap switches and never fabricates a value
+on an MCU read. It exposes backing RAM plus address-level access notifications;
+the selected DSP backend owns acknowledgement consumption and publication. For
+the current HLE this includes NHM-2's alternating `0x0fe`/`0x100` tokens, its
+parked-loader response at `0x002`, and the service code-block publication. A
+future DSP core therefore replaces the HLE at this seam without changing ring,
+doorbell or interrupt transport.
+
 ## L1-to-DSP mailbox protocol
 
 Task **22** (`dsp_if_task_2b6548`) is the DSP-interface RTOS task. Its loop: `recv`
@@ -481,8 +489,12 @@ event. The retained peer supplies neither task status `0x13e2` nor display
 primitive `0x25`. Those remain separately decoded protocol families, not
 shortcuts for registered-state presentation.
 
-The older type-`0x80`/primitive-`0x70`, direct `0x0434`, heartbeat, identity and
-guessed packet diagnostics are disproven and removed. Full DSP-core emulation
+The older type-`0x80`/primitive-`0x70`, direct `0x0434`, identity and guessed
+packet diagnostics are disproven and removed. A header-only type-`0x03` packet
+remains as the DSP idle/liveness indication: experiments disproved it as a
+registration or UI completion, but proved that the firmware consumes it as
+MDI activity. Without periodic DSP activity the firmware enters its independent
+reason-`0x68` DSP-watchdog reset path after roughly 32 seconds. Full DSP-core emulation
 would still require a synthetic air interface and is not needed for the current
 registered/camped boundary.
 

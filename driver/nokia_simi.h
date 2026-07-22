@@ -1,6 +1,8 @@
-#pragma once
+// license:BSD-3-Clause
+// copyright-holders:Sandro Ronco, Gaz
 
-#include "emu.h"
+#ifndef MAME_NOKIA_NOKIA_SIMI_H
+#define MAME_NOKIA_NOKIA_SIMI_H
 
 class nokia_sim_card_device;
 
@@ -58,3 +60,5 @@ private:
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_SIMI, nokia_simi_device)
+
+#endif // MAME_NOKIA_NOKIA_SIMI_H

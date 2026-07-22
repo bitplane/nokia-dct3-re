@@ -14,31 +14,34 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_3210_owns_validated_boot_defaults(self):
         self.assertIn(
-            "{ 0x01, true, true, true, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3210 };",
+            "{ 0x01, true, true, true, true, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3210 };",
             self.driver,
         )
         profile = self.driver.split("void noki3310_state::noki3210(machine_config &config)", 1)[1]
         profile = profile.split("void noki3310_state::noki5210", 1)[0]
         self.assertIn(
-            'm_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33\'055));',
+            "m_mad2->set_timer0_hz(33'055);",
             profile,
         )
         self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
         self.assertNotIn('"NOKIA_DCT3_TIMER0_CATCHUP"', profile)
         apply = self.driver.split("void noki3310_state::apply_product_config", 1)[1]
-        apply = apply.split("void noki3310_state::machine_start", 1)[0]
-        self.assertIn('"NOKIA_DCT3_MODEL_DSP_SERVICE", product.dsp_service', apply)
-        self.assertIn('"NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", product.external_service', apply)
+        apply = apply.split("uint16_t noki3310_state::fw_word", 1)[0]
+        self.assertIn("set_service_enabled(product.dsp_service)", apply)
+        self.assertIn("set_external_service_enabled(product.external_service)", apply)
+        self.assertIn("set_enabled(product.radio_peer)", apply)
+        self.assertNotIn("nokia_env_u32", apply)
+        self.assertNotIn("std::getenv", apply)
 
     def test_dsp_bootstrap_count_is_product_configuration(self):
         self.assertIn(
-            "{ 0x04, true, true, true, true, false, 58, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };",
+            "{ 0x04, true, true, true, false, true, false, 58, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };",
             self.driver,
         )
 
     def test_3330_owns_observed_peer_adc_keypad_and_bootstrap_defaults(self):
         self.assertIn(
-            "{ 0x04, true, true, true, true, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };",
+            "{ 0x04, true, true, true, false, true, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };",
             self.driver,
         )
         profile = self.driver.split("void noki3310_state::noki3330(machine_config &config)", 1)[1]
@@ -51,7 +54,7 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_other_products_keep_conservative_defaults(self):
         self.assertIn(
-            "{ 0x04, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };",
+            "{ 0x04, false, false, false, false, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_DEFAULT };",
             self.driver,
         )
 
@@ -60,14 +63,11 @@ class MachineProfileTest(unittest.TestCase):
             "{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 };",
             self.driver,
         )
-        self.assertIn(
-            'nokia_env_u32("NOKIA_DCT3_MODEL_SIM_DEVICE", m_product.sim_device)',
-            self.driver,
-        )
+        self.assertIn("m_simi->set_enabled(m_product.sim_device &&", self.driver)
 
     def test_3410_owns_dsp_reset_release_wiring(self):
         self.assertIn(
-            "{ 0x02, true, true, true, true, false, 64, true, true, true, 0, 50, true, 0x53, 0x04, 102, 72, 96, 65, ADC_3310 };",
+            "{ 0x02, true, true, true, false, true, false, 64, true, true, true, 0, 50, true, 0x53, 0x04, 102, 72, 96, 65, ADC_3310 };",
             self.driver,
         )
         profile = self.driver.split("void noki3310_state::noki3410(machine_config &config)", 1)[1]

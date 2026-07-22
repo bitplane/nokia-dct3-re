@@ -1,3 +1,6 @@
+// license:BSD-3-Clause
+// copyright-holders:Sandro Ronco, Gaz
+
 #include "emu.h"
 #include "nokia_simi.h"
 

@@ -1,7 +1,8 @@
 // license:BSD-3-Clause
-#pragma once
+// copyright-holders:Sandro Ronco, Gaz
 
-#include "emu.h"
+#ifndef MAME_NOKIA_NOKIA_EXTERNAL_SERVICE_H
+#define MAME_NOKIA_NOKIA_EXTERNAL_SERVICE_H
 
 #include <array>
 
@@ -59,3 +60,5 @@ private:
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_EXTERNAL_SERVICE_PEER, nokia_external_service_peer_device)
+
+#endif // MAME_NOKIA_NOKIA_EXTERNAL_SERVICE_H

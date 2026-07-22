@@ -86,8 +86,9 @@ parameter blocks at the top. Programming is physically one-way
 (`stored &= written`) until erase; assignment-style writes allowed impossible
 zero-to-one transitions and corrupted the virgin PMM during compaction.
 
-The tracked MAME flash patch contains the reusable chip geometry, identifiers
-and generic NOR-programming correction. The Nokia driver still adapts one
+The tracked MAME flash patch contains reusable ID-address and block-geometry
+attributes plus the generic one-way NOR-programming correction; operational
+code does not branch on Nokia part-number literals. The Nokia driver still adapts one
 limitation of the generic core: the 3410 firmware suspends an erase, accesses a
 different partition, and polls a fixed status address while the core exposes a
 single global command state. This adapter is board integration debt, not a
@@ -223,7 +224,7 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 signal names remain incomplete.
 Firmware boot reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7
 maps through ROM table `0x2e2d74` to selector 1. The complete logical-source table is identical in
-3210 v5.01. Values come from `nokia_adc_override` (env `NOKIA_DCT3_ADC0..7`, profiles); electrical
+3210 v5.01. Values come from the product's typed ADC tuple; electrical
 scaling and PCB net names remain open.
 
 A physical charger edge establishes selector 5 more narrowly: CCONT source bit 3 wakes the

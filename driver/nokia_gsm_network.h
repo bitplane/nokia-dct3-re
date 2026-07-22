@@ -1,7 +1,8 @@
 // license:BSD-3-Clause
-#pragma once
+// copyright-holders:Sandro Ronco, Gaz
 
-#include "emu.h"
+#ifndef MAME_NOKIA_NOKIA_GSM_NETWORK_H
+#define MAME_NOKIA_NOKIA_GSM_NETWORK_H
 
 #include <array>
 
@@ -22,3 +23,5 @@ protected:
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device)
+
+#endif // MAME_NOKIA_NOKIA_GSM_NETWORK_H

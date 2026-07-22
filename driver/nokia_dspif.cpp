@@ -1,4 +1,5 @@
 // license:BSD-3-Clause
+// copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
 #include "nokia_dspif.h"
 
@@ -27,8 +28,11 @@ nokia_dspif_device::nokia_dspif_device(
 	m_tx_commit_cb(*this),
 	m_service_pending_cb(*this),
 	m_doorbell_cb(*this),
-	m_bootstrap_fe_cb(*this),
-	m_bootstrap_100_cb(*this),
+	m_shared_002_write_cb(*this),
+	m_shared_0fe_read_cb(*this),
+	m_shared_0fe_write_cb(*this),
+	m_shared_100_read_cb(*this),
+	m_shared_100_write_cb(*this),
 	m_fiq0_cb(*this),
 	m_service_irq_cb(*this)
 {
@@ -38,10 +42,6 @@ void nokia_dspif_device::device_start()
 {
 	save_item(NAME(m_ram));
 	save_item(NAME(m_dspif));
-	save_item(NAME(m_bootstrap_ping_pong));
-	save_item(NAME(m_code_block_request));
-	save_item(NAME(m_parked_boot_status));
-	save_item(NAME(m_boot_status_response));
 }
 
 void nokia_dspif_device::device_reset()
@@ -54,16 +54,17 @@ u16 nokia_dspif_device::shared_r(offs_t offset)
 {
 	offset &= 0x7ff;
 	const unsigned byte_offset = offset << 1;
-	const u16 value = m_parked_boot_status && offset == (0x002 / 2) && m_ram[offset] == 0xffff ?
-			m_boot_status_response : m_ram[offset];
-	// NHM-2's loader alternates tokens through these DSP bootstrap mailboxes.
-	// A read consumes the peer acknowledgement. Once the RX ring head is
-	// initialised, 0x10100 is packet RAM and resumes ordinary backing-store
-	// semantics.
-	if (m_bootstrap_ping_pong && value != 0 &&
-			(offset == (0x0fe / 2) ||
-			 (offset == (0x100 / 2) && m_ram[RX_CONSUMER] == 0)))
-		m_ram[offset] = 0;
+	const u16 value = m_ram[offset];
+	if (offset == (0x0fe / 2))
+	{
+		m_shared_0fe_read_cb(1);
+		m_shared_0fe_read_cb(0);
+	}
+	if (offset == (0x100 / 2))
+	{
+		m_shared_100_read_cb(1);
+		m_shared_100_read_cb(0);
+	}
 	if (m_trace_enabled && (byte_offset <= 0x004 || byte_offset == 0x0e0 ||
 			byte_offset == 0x0fe || byte_offset == 0x100 ||
 			byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
@@ -76,20 +77,6 @@ u16 nokia_dspif_device::shared_r(offs_t offset)
 void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 {
 	offset &= 0x7ff;
-	if (m_bootstrap_ping_pong &&
-			(offset == (0x0fe / 2) ||
-			 (offset == (0x100 / 2) && m_ram[RX_CONSUMER] == 0)))
-	{
-		u16 token = 0;
-		COMBINE_DATA(&token);
-		m_ram[offset] = 0;
-		m_ram[offset == (0x0fe / 2) ? (0x100 / 2) : (0x0fe / 2)] = token != 0 ? token : 1;
-		if (m_trace_enabled)
-			logerror("dspif_transport: bootstrap token off=%03x data=%04x ack=%03x t=%.6f\n",
-					offset << 1, token,
-					(offset == (0x0fe / 2) ? 0x100 : 0x0fe), machine().time().as_double());
-		return;
-	}
 	COMBINE_DATA(&m_ram[offset]);
 	if (m_trace_enabled && ((offset << 1) <= 0x004 || (offset << 1) == 0x0e0 ||
 			(offset << 1) == 0x0e2 || (offset << 1) == 0x0e4 ||
@@ -110,15 +97,20 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 		m_service_pending_cb(1);
 		m_service_pending_cb(0);
 	}
-	if (offset == (0x0fe / 2) && m_ram[offset] == 0)
+	if (offset == (0x002 / 2))
 	{
-		m_bootstrap_fe_cb(1);
-		m_bootstrap_fe_cb(0);
+		m_shared_002_write_cb(1);
+		m_shared_002_write_cb(0);
 	}
-	if (offset == (0x100 / 2) && m_ram[offset] == 0)
+	if (offset == (0x0fe / 2))
 	{
-		m_bootstrap_100_cb(1);
-		m_bootstrap_100_cb(0);
+		m_shared_0fe_write_cb(1);
+		m_shared_0fe_write_cb(0);
+	}
+	if (offset == (0x100 / 2))
+	{
+		m_shared_100_write_cb(1);
+		m_shared_100_write_cb(0);
 	}
 }
 
@@ -232,8 +224,6 @@ u16 nokia_dspif_device::service_pending() const
 void nokia_dspif_device::complete_service()
 {
 	peer_shared_w(SVC_PENDING, 0);
-	if (m_code_block_request)
-		peer_shared_w(0x0e2 / 2, 1);
 	if (m_trace_enabled)
 		logerror("dspif_transport: IRQ4 service-complete request=%04x t=%.6f\n",
 				m_ram[0x0e2 / 2], machine().time().as_double());

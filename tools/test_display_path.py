@@ -36,6 +36,10 @@ class DisplayPathTest(unittest.TestCase):
         self.assertIn('m_visible_height(48)', self.lcd_patch)
         self.assertIn('102, 72, 96, 65, ADC_3310', self.phone)
 
+    def test_default_y_command_mask_is_unchanged(self):
+        self.assertIn('m_controller_banks > 8 ? 0x0f : 0x07', self.lcd_patch)
+        self.assertNotIn('m_addr_y = (cmd & 0x0f) % m_controller_banks', self.lcd_patch)
+
 
 if __name__ == "__main__":
     unittest.main()
