@@ -1,0 +1,11 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+index 1b4c1fd66c7..653f50f65e2 100644
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -36167,5 +36167,5 @@ mm2m35d
+ 
+-@source:nokia/nokia_3310.cpp
++@source:nokia/nokia_dct3.cpp
+ noki3210
+ noki3310
+ noki3330

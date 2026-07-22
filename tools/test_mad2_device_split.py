@@ -10,7 +10,7 @@ class Mad2DeviceSplitTest(unittest.TestCase):
     def setUpClass(cls):
         cls.device = (ROOT / "driver/nokia_mad2.cpp").read_text()
         cls.header = (ROOT / "driver/nokia_mad2.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
     def test_device_owns_ctsi_state(self):
         source = self.device + self.header

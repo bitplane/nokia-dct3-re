@@ -8,7 +8,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class MachineProfileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.driver = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
         cls.b3_flash = (ROOT / "driver/nokia_b3_flash.cpp").read_text()
         cls.ccont = (ROOT / "driver/nokia_ccont.cpp").read_text()
         cls.makefile = (ROOT / "Makefile").read_text()
@@ -18,16 +18,16 @@ class MachineProfileTest(unittest.TestCase):
             "{ 0x01, true, true, true, true, false, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3210 };",
             self.driver,
         )
-        profile = self.driver.split("void noki3310_state::noki3210(machine_config &config)", 1)[1]
-        profile = profile.split("void noki3310_state::noki5210", 1)[0]
+        profile = self.driver.split("void nokia_dct3_state::noki3210(machine_config &config)", 1)[1]
+        profile = profile.split("void nokia_dct3_state::noki5210", 1)[0]
         self.assertIn(
             "m_mad2->set_timer0_hz(33'055);",
             profile,
         )
         self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
         self.assertNotIn('"NOKIA_DCT3_TIMER0_CATCHUP"', profile)
-        apply = self.driver.split("void noki3310_state::apply_product_config", 1)[1]
-        apply = apply.split("uint16_t noki3310_state::fw_word", 1)[0]
+        apply = self.driver.split("void nokia_dct3_state::apply_product_config", 1)[1]
+        apply = apply.split("uint16_t nokia_dct3_state::fw_word", 1)[0]
         self.assertIn("set_service_enabled(product.dsp_service)", apply)
         self.assertIn("set_external_service_enabled(product.external_service)", apply)
         self.assertIn("set_enabled(product.radio_peer)", apply)
@@ -45,8 +45,8 @@ class MachineProfileTest(unittest.TestCase):
             "{ 0x04, true, true, true, false, true, false, 64, false, false, false, 0, 0, false, 0x00, 0x00, 84, 48, 84, 48, ADC_3310 };",
             self.driver,
         )
-        profile = self.driver.split("void noki3310_state::noki3330(machine_config &config)", 1)[1]
-        profile = profile.split("void noki3310_state::noki3210", 1)[0]
+        profile = self.driver.split("void nokia_dct3_state::noki3330(machine_config &config)", 1)[1]
+        profile = profile.split("void nokia_dct3_state::noki3210", 1)[0]
         self.assertIn("apply_product_config(PRODUCT_3330);", profile)
         self.assertIn(
             "m_dsp_hle->set_bootstrap_exchange_limit(product.dsp_bootstrap_exchanges);",
@@ -71,8 +71,8 @@ class MachineProfileTest(unittest.TestCase):
             "{ 0x02, true, true, true, false, true, false, 64, true, true, true, 0, 50, true, 0x53, 0x04, 102, 72, 96, 65, ADC_3310 };",
             self.driver,
         )
-        profile = self.driver.split("void noki3310_state::noki3410(machine_config &config)", 1)[1]
-        profile = profile.split("void noki3310_state::noki7110", 1)[0]
+        profile = self.driver.split("void nokia_dct3_state::noki3410(machine_config &config)", 1)[1]
+        profile = profile.split("void nokia_dct3_state::noki7110", 1)[0]
         self.assertIn("apply_product_config(PRODUCT_3410);", profile)
 
     def test_3410_owns_intel_b3_block_lock_protocol(self):
@@ -101,7 +101,7 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("LOGMASKED(LOG_BUZZER", self.driver)
 
     def test_charger_input_updates_vchar_and_latches_both_edges(self):
-        body = self.driver.split("INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )", 1)[1]
+        body = self.driver.split("INPUT_CHANGED_MEMBER( nokia_dct3_state::charger_irq )", 1)[1]
         body = body.split("static INPUT_PORTS_START", 1)[0]
         self.assertIn("set_charger_input(newval != 0", body)
         self.assertIn("set_charger_input(newval != 0);", body)
@@ -122,8 +122,8 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("RESET_CHARGER", ccont_body)
         self.assertIn("m_power_cb(1)", ccont_body)
 
-        power_body = self.driver.split("void noki3310_state::reset_digital_baseband", 1)[1]
-        power_body = power_body.split("void noki3310_state::sim_irq_w", 1)[0]
+        power_body = self.driver.split("void nokia_dct3_state::reset_digital_baseband", 1)[1]
+        power_body = power_body.split("void nokia_dct3_state::sim_irq_w", 1)[0]
         for device in (
             "m_maincpu", "m_mad2", "m_gensio", "m_mbus", "m_dspif",
             "m_dsp_hle", "m_external_service_peer", "m_simi", "m_sim_card",
@@ -133,8 +133,8 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("machine_reset()", power_body)
         self.assertIn("m_power_on = 0", power_body)
 
-        callback = self.driver.split("void noki3310_state::ccont_power_w", 1)[1]
-        callback = callback.split("void noki3310_state::reset_digital_baseband", 1)[0]
+        callback = self.driver.split("void nokia_dct3_state::ccont_power_w", 1)[1]
+        callback = callback.split("void nokia_dct3_state::reset_digital_baseband", 1)[0]
         self.assertIn("reset_digital_baseband()", callback)
 
 

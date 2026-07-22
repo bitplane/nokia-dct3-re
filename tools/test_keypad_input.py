@@ -8,7 +8,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class KeypadInputTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.driver = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
         cls.harness = (ROOT / "mame_nokia_dct3_input_exerciser.lua").read_text()
 
     def test_handset_controls_have_mame_names(self):
@@ -50,7 +50,7 @@ class KeypadInputTest(unittest.TestCase):
 
     def test_input_remains_physical_matrix_driven(self):
         self.assertIn("field:set_value(1)", self.harness)
-        self.assertIn("PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::key_irq), 0)", self.driver)
+        self.assertIn("PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)", self.driver)
         self.assertNotIn("debug_ram", self.harness)
 
     def test_matrix_drive_contract_uses_direction_and_active_low_signal(self):

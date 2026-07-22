@@ -13,7 +13,7 @@ class DspDeviceSplitTest(unittest.TestCase):
         cls.external = (ROOT / "driver/nokia_external_service.cpp").read_text() + (ROOT / "driver/nokia_external_service.h").read_text()
         cls.network = (ROOT / "driver/nokia_gsm_network.cpp").read_text() + (ROOT / "driver/nokia_gsm_network.h").read_text()
         cls.radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text() + (ROOT / "driver/nokia_radio_peer.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
     def test_transport_has_no_service_protocol(self):
         for token in ("DISCOVERY_NODE", "registration_sent", "channel_map", "0x64, 0x01"):

@@ -12,7 +12,7 @@ class SimDeviceSplitTest(unittest.TestCase):
         cls.card_header = (ROOT / "driver/nokia_sim_card.h").read_text()
         cls.simi = (ROOT / "driver/nokia_simi.cpp").read_text()
         cls.simi_header = (ROOT / "driver/nokia_simi.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
     def test_card_has_no_mad2_controller_state(self):
         for token in (

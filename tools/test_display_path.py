@@ -8,7 +8,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class DisplayPathTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         cls.gensio = (ROOT / "driver/nokia_gensio.cpp").read_text()
         cls.lcd_patch = (ROOT / "patches/mame-pcd8544-geometry.patch").read_text()
 

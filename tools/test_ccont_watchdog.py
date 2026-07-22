@@ -25,7 +25,7 @@ class CcontWatchdogTest(unittest.TestCase):
 
     def test_wddisx_is_a_device_input(self):
         self.assertIn("m_wddisx_grounded || m_watchdog == 0", self.source)
-        phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         self.assertIn("set_wddisx_grounded", phone)
         self.assertNotIn("NOKIA_DCT3_DISABLE_CCONT_WATCHDOG", phone)
         product = phone.split(
@@ -34,9 +34,9 @@ class CcontWatchdogTest(unittest.TestCase):
         self.assertIn("{ 0x01, true, true, true, true, false, false,", product)
 
     def test_expiry_resets_the_complete_digital_baseband_domain(self):
-        phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         timer = phone.split(
-            "TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)", 1
+            "TIMER_CALLBACK_MEMBER(nokia_dct3_state::timer_watchdog)", 1
         )[1].split("// MAD2 watchdog", 1)[0]
         self.assertIn("reset_digital_baseband();", timer)
         self.assertNotIn("m_maincpu->reset();", timer)

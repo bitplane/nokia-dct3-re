@@ -160,12 +160,12 @@
     {
       "id": "noki3310_product_profile_idle", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
       "boundary": "3310 v6.39 reaches its deterministic idle frame with the shared DSP service, external-service and SIM devices plus standard CCONT channels 2/3/4 set to the evidenced normal-pack VBATT/BSI/BTEMP tuple 0x220/0x026/0x200. Its product-configured five-row keypad uses the shared direction AND NOT signal scan rule; physical Navi, Down and C cycles open the Phone book menu, enter and navigate its submenu, then return to the exact idle oracle. The same boot organically exchanges DSP self-test request 0x70/0x0d and completion 0x74/0x0d/0x00; no firmware hook or guessed reply is used",
-      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_3310.cpp", "Makefile"]
+      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]
     },
     {
       "id": "noki3330_product_profile_interactive", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
       "boundary": "3330 v4.50 PPM E completes 64 DSP bootstrap exchanges and reaches deterministic idle with the shared request-driven DSP, external-service and SIM peers, standard CCONT channels 2/3/4 at 0x220/0x026/0x200, and the five-row keypad contract. Physical switches complete the virgin PMM's 12345 security, time and date editors, navigate Phone book to Messages, and return to the exact idle oracle; no firmware or RAM state is forced",
-      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_3310.cpp", "Makefile"]
+      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]
     },
     {
       "id": "ccont_charger_power_wake", "subsystem": "ccont", "status": "partial", "confidence": "strong",

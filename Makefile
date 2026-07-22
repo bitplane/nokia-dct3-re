@@ -7,8 +7,9 @@ MAME_DIR    ?= mame
 
 PYTHON ?= python3
 VENV   := .venv
-DRIVER := driver/nokia_3310.cpp
-MAME_PATCHES := patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch
+DRIVER := driver/nokia_dct3.cpp
+MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
+	patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_b3_flash.cpp driver/nokia_b3_flash.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
@@ -21,7 +22,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_radio_peer.cpp driver/nokia_radio_peer.h \
 	driver/nokia_simi.cpp driver/nokia_simi.h \
 	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
-	driver/nokia_3310_trace.inc
+	driver/nokia_dct3_trace.inc
 PHONE ?= noki3210
 BIOS ?=
 
@@ -180,7 +181,7 @@ overlay: download-mame
 		if git -C $(MAME_DIR) apply --reverse --check "../$$patch" >/dev/null 2>&1; then :; \
 		else git -C $(MAME_DIR) apply "../$$patch"; fi; \
 	done
-	install -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_3310.cpp
+	install -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp
 	@for src in $(DRIVER_COMPONENTS); do install -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
 
 eeprom-profile:
@@ -219,7 +220,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_3310.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

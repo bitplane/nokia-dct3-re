@@ -7,7 +7,7 @@ deleted incrementally as observed contracts become components.
 ## Entry points vs. quarantine
 
 The memory-map-registered handlers are thin. Diagnostic execution observations
-are isolated in `driver/nokia_3310_trace.inc`; no memory read path overrides a
+are isolated in `driver/nokia_dct3_trace.inc`; no memory read path overrides a
 firmware result:
 
 | hardware entry point | quarantined research helper |
@@ -65,7 +65,7 @@ fixtures.
 
 - New *hardware* behaviour goes in a device model or the owning MAD2 register block.
 - New firmware-address diagnostics require a named focused consumer and belong
-  in `nokia_3310_trace.inc` only while that regression cannot observe a device
+  in `nokia_dct3_trace.inc` only while that regression cannot observe a device
   boundary. Do not add result forcing or task-message injection.
 - The research helpers should **shrink over time**. Delete a trace after its
   conclusion is normalized; replace each RAM-read shortcut with its real

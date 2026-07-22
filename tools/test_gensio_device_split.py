@@ -10,7 +10,7 @@ class GensioDeviceSplitTest(unittest.TestCase):
     def setUpClass(cls):
         cls.device = (ROOT / "driver/nokia_gensio.cpp").read_text()
         cls.header = (ROOT / "driver/nokia_gensio.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
     def test_device_owns_transport_state(self):
         source = self.device + self.header

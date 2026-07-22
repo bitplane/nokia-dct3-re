@@ -145,7 +145,7 @@ The retained MAME log categories are scoped as follows:
 | `TRACE_PUP_OUTPUTS` | changed PUP control, vibrator, buzzer and GenIO output values during organic application use |
 
 The small firmware-address-specific set retained by focused radio, display,
-alarm, and watchdog gates lives in `driver/nokia_3310_trace.inc`. A compliance
+alarm, and watchdog gates lives in `driver/nokia_dct3_trace.inc`. A compliance
 test keeps this quarantine below 200 lines and rejects state-changing APIs.
 Hardware
 boundary traces remain beside their owning handlers. Closed task, service,
