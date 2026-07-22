@@ -12,6 +12,10 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	const std::array<u8, 24> &system_information(unsigned index) const;
+	std::array<u8, 24> immediate_assignment(u8 random_access, u32 frame_number) const;
+	std::array<u8, 17> location_update_accept(const std::array<u8, 8> &mobile_identity) const;
+	std::array<u8, 3> channel_release() const;
+	s8 serving_rssi(unsigned sample) const;
 
 protected:
 	virtual void device_start() override;

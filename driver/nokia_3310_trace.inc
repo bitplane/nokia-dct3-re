@@ -684,6 +684,28 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 				fw_byte(0x0010fe48), fw_byte(0x0010fe49), fw_byte(0x0010fe4a),
 				fw_byte(0x0010fe4f), fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
+	if (pc == addr && (addr == 0x0020a026 || addr == 0x0020a02c) &&
+			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+	{
+		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
+		const u32 payload = object >= NOKIA_RAM_BASE && object + 0x0c < NOKIA_RAM_END ?
+				fw_dword(object + 8) : 0;
+		logerror("radio_mm_parse: phase=%s object=%08x payload=%08x result=%08x "
+				"mm=%02x/%02x/%02x/%02x task=%02x t=%.6f\n",
+				addr == 0x0020a026 ? "entry" : "return", object, payload,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+				fw_byte(0x0010fe48), fw_byte(0x0010fe49), fw_byte(0x0010fe4a),
+				fw_byte(0x0010fe4f), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				machine().time().as_double());
+	}
+	if (pc == addr && (addr == 0x0020be0c || addr == 0x0020f324) &&
+			nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+		logerror("radio_mm_accept_completion: site=%08x mm=%02x/%02x/%02x/%02x "
+				"context=%02x/%02x/%02x/%02x task=%02x t=%.6f\n", addr,
+				fw_byte(0x0010fe48), fw_byte(0x0010fe49), fw_byte(0x0010fe4a),
+				fw_byte(0x0010fe4f), fw_byte(0x0010fea4), fw_byte(0x0010fea5),
+				fw_byte(0x0010fea6), fw_byte(0x0010fea7),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	if (pc == addr &&
 			(addr == 0x0020aebc || addr == 0x0020b712 || addr == 0x0020c76e ||
 			 addr == 0x0020cd3c || addr == 0x0020d370 || addr == 0x0020d734 ||
@@ -962,8 +984,17 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 						r0 & 0xffff, r0 & 0x1fff, r1, lr, fw_byte(FW_SCHED_RUNNING_TASK_ID),
 						fw_word(FW_STARTUP_MODE), machine().time().as_double());
 			else if (addr == 0x002b257e)
+			{
 				logerror("display_frontier: resource-get id=%04x request=%08x caller=%08x task=%02x t=%.6f\n",
 						r0 & 0xffff, r1, lr, fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+				if ((r0 & 0xffff) == 0x5031 && r1 >= NOKIA_RAM_BASE && r1 + 31 < NOKIA_RAM_END)
+				{
+					logerror("display_frontier: operator-resource data=");
+					for (unsigned index = 0; index < 32; ++index)
+						logerror("%02x", fw_byte(r1 + index));
+					logerror("\n");
+				}
+			}
 			else if (addr == 0x0029800c)
 				logerror("display_frontier: window-recv msg=%08x bytes=%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x "
 						"caller=%08x t=%.6f\n", r0, fw_byte(r0), fw_byte(r0 + 1),

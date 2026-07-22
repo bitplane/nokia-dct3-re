@@ -52,17 +52,33 @@ def stable_digest(width: int, height: int, pixels: bytes, mask: tuple[int, int, 
     return hashlib.sha256(stable).hexdigest()
 
 
+def crop_digest(width: int, height: int, pixels: bytes, crop: tuple[int, int, int, int]) -> str:
+    x, y, crop_width, crop_height = crop
+    if crop_width <= 0 or crop_height <= 0:
+        raise ValueError("crop must have positive dimensions")
+    if x < 0 or y < 0 or x + crop_width > width or y + crop_height > height:
+        raise ValueError("crop lies outside the frame")
+    selected = bytearray()
+    for row in range(y, y + crop_height):
+        selected.extend(pixels[row * width + x:row * width + x + crop_width])
+    return hashlib.sha256(selected).hexdigest()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("frame", type=Path)
     parser.add_argument("--mask", default="0,0,0,0", help="ignored x,y,width,height rectangle")
+    parser.add_argument("--crop", help="hash only this x,y,width,height rectangle")
     parser.add_argument("--sha256", required=True)
     args = parser.parse_args()
     mask = tuple(int(value, 0) for value in args.mask.split(","))
     if len(mask) != 4:
         parser.error("--mask requires x,y,width,height")
     width, height, pixels = read_pgm(args.frame)
-    digest = stable_digest(width, height, pixels, mask)
+    crop = tuple(int(value, 0) for value in args.crop.split(",")) if args.crop else None
+    if crop is not None and len(crop) != 4:
+        parser.error("--crop requires x,y,width,height")
+    digest = crop_digest(width, height, pixels, crop) if crop else stable_digest(width, height, pixels, mask)
     print(f"frame       : {args.frame}")
     print(f"stable sha256: {digest}")
     print(f"oracle       : {args.sha256}")

@@ -1,0 +1,59 @@
+import unittest
+
+from tools.radio_registration_trace_check import verify
+
+
+GOOD = """
+dsp_hle: TX packet type=0c payload=8 words=5 radio_phase=random_access data=0000096b00000000
+dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=contention_resolution data=0080013f4905087000f000fffe
+dspif_transport: RX enqueue type=80 payload=34 producer=09c data=8012000049b50001000001734905087000f000fffe330809101010325476982b2b2b
+radio_mm_parse: phase=return object=001017d0 payload=00101b10 result=00000048 mm=00/00/00/00
+display_frontier: operator-resource data=00 f1 10 01 00
+sim_device: update-binary fid=6f7e offset=4 length=5
+sim_device: update-binary fid=6f7e offset=10 length=1
+dsp_hle: TX packet type=02 payload=20 words=11 radio_phase=release_channel_change data=041202000000001a600000010000000f00000000
+dsp_hle: radio peer RX type=89 sequence=53
+dspif_transport: RX enqueue type=80 payload=34 producer=0ba data=5012000000010001000049061b00
+dspif_transport: RX enqueue type=80 payload=34 producer=0cc data=5012000000020001000059061a00
+dspif_transport: RX enqueue type=80 payload=34 producer=0de data=5012000000030001000031061c00
+dspif_transport: RX enqueue type=80 payload=34 producer=0f0 data=5012000000040001000019061d00
+"""
+
+
+class RegistrationTraceCheckTest(unittest.TestCase):
+    def test_complete_registration(self):
+        verify(GOOD)
+
+    def test_rejects_retry(self):
+        with self.assertRaisesRegex(ValueError, "expected one Location Updating Request"):
+            verify(GOOD + "\n" + GOOD.splitlines()[2])
+
+    def test_rejects_missing_steady_camp(self):
+        with self.assertRaisesRegex(ValueError, "serving BCCH"):
+            verify("\n".join(GOOD.splitlines()[:-3]))
+
+    def test_rejects_operator_resource_before_acceptance(self):
+        lines = GOOD.splitlines()
+        operator = next(line for line in lines if "operator-resource" in line)
+        without = [line for line in lines if "operator-resource" not in line]
+        without.insert(1, operator)
+        with self.assertRaisesRegex(ValueError, "operator presentation"):
+            verify("\n".join(without))
+
+    def test_rejects_unrelated_type80_as_ua(self):
+        bad = GOOD.replace(
+            "8012000049b50001000001734905087000f000fffe330809101010325476982b2b2b",
+            "5012000049b50001000049061b00f110",
+        )
+        with self.assertRaisesRegex(ValueError, "contention-resolution UA"):
+            verify(bad)
+
+    def test_rejects_missing_loci_update(self):
+        without = "\n".join(
+            line for line in GOOD.splitlines() if "update-binary fid=6f7e" not in line)
+        with self.assertRaisesRegex(ValueError, "EF_LOCI"):
+            verify(without)
+
+
+if __name__ == "__main__":
+    unittest.main()

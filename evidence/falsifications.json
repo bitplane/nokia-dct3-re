@@ -155,7 +155,7 @@
     {
       "id": "accepted_security_editor_result_requests_idle_display", "status": "disproven",
       "hypothesis": "Callback 0x47's accepted-code result 0x05e6 reaches a missing display/DSP completion boundary that should select the idle window",
-      "conclusion": "The generic callback dispatcher handles 0x05e6 explicitly at 0x2ac54c by advancing its callback cursor. Task 6 later receives class-2 and class-3 editor-lifecycle messages, but no class-1 idle-window selection follows: control byte 0x1116fd never arms the 0x2a255c idle helper, resource 0x4c22 and event 0x0547 are absent, and no DSP TX is constructed. The accepted editor transaction closes within firmware and is not blocked on display hardware.",
+      "conclusion": "Later verifier tracing corrected the premise: entered 12345 transforms to the exact stored four bytes and verifier 0x2ae704 returns one, after which callback 0x47 publishes 0x05e1, not 0x05e6. Incorrect input can reuse 0x05e1 in another callback-local state, confirming that these scalar statuses are not global accept/reject results. Task 6 later receives class-2 and class-3 editor-lifecycle messages, but no class-1 idle-window selection follows: control byte 0x1116fd never arms the 0x2a255c idle helper, resource 0x4c22 and event 0x0547 are absent, and no DSP TX is constructed. The accepted editor transaction closes within firmware and is not blocked on display hardware.",
       "evidence": ["docs/mmi_settlement.md"]
     },
     {
@@ -269,7 +269,7 @@
     {
       "id": "status05a7_is_stalled_post_security_ui_transaction", "status": "disproven",
       "hypothesis": "Repeated status 0x05a7 after a second physical softkey is a post-security UI transaction retry stalled on a missing completion",
-      "conclusion": "Correct concrete execution shows 0x05a7 reaches dispatcher target 0x28c480 and calls 0x2b3222, a three-slot timer manager. Target 0x28c43c belongs exclusively to status 0x05f3; the former 0x28c43a attribution was mid-instruction. Callback 0x47 settles normally after accepted 0x0578 -> 0x05e6 and leaves the active sweep. A negative-control run with only 12345 plus its single submission reproduces the later post-acceptance event wave. Overlapping 0x00c8 is independently published once per second by task 1 at 0x2a2838 and expands to context-maintenance outputs, not a class-1 window selection. No timer completion or callback result is justified for injection.",
+      "conclusion": "Correct concrete execution shows 0x05a7 reaches dispatcher target 0x28c480 and calls 0x2b3222, a three-slot timer manager. Target 0x28c43c belongs exclusively to status 0x05f3; the former 0x28c43a attribution was mid-instruction. Callback 0x47 settles normally after accepted 0x0578; later verifier tracing observes callback-local 0x05e1 rather than the previously inferred 0x05e6. A negative-control run with only 12345 plus its single submission reproduces the later post-acceptance event wave. Overlapping 0x00c8 is independently published once per second by task 1 at 0x2a2838 and expands to context-maintenance outputs, not a class-1 window selection. No timer completion or callback result is justified for injection.",
       "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md"]
     },
     {
@@ -477,6 +477,30 @@
       "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
     },
     {
+      "id": "no_psw_before_channel_confirmation_causes_empty_selection", "status": "disproven",
+      "hypothesis": "The peer's NO_PSW_LEFT report closes the search list before CHANNEL_CHANGED_CNF, causing task 11 to lose the selected carrier and return 0x1391/result zero",
+      "conclusion": "A bounded peer experiment answered CHANNEL_CONFIGURE with CHANNEL_CHANGED_CNF alone. Firmware produced the same 0x13a5/action 1, rebuilt the same ARFCN-0 class-0x3c record, returned 0x1391/result zero, and suppressed the later Location Updating entrance. The NO_PSW_LEFT then CHANNEL_CHANGED_CNF sequence was restored.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "type0f_consumption_orders_location_update_after_selection", "status": "disproven",
+      "hypothesis": "Consuming the MCU type-0x0f packet before task 17 clears its selection latch causes the later RR completion to miss the ordinary Location Updating entrance",
+      "conclusion": "A bounded peer experiment deferred the one post-selection type-0x0f packet until after the latch clear. Task 16 still published 0x07e0 at the original time, task 15 followed the same active-selection path, and no Location Updating Request was emitted. The original immediate packet consumption was restored.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "selection_latch_clear_requires_task15_retry", "status": "disproven",
+      "hypothesis": "After task 17 clears the selection latch, a missing task-15 timer or policy callback should replay RR establishment and enter Location Updating",
+      "conclusion": "The operation-0x28 result makes task 17 send 0x09ec payload 00 00 05 00. Task 15 intentionally maps state 5 to a cleared latch and the handler performs only policy-state writes. Firmware then continues automatic PLMN selection through a mode-0x50 pass, operation-0x16 result, DEACTIVATE, and a later mode-0 measurement. The missing boundary is the task-17 policy transition that exits this selection cycle, not an omitted task-15 retry after the latch write.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
+      "id": "cached_location_identity_avoids_active_selection_result", "status": "disproven",
+      "hypothesis": "Task 15 chooses 0x0a3f only because the synthetic SIM's stored EF_LOCI PLMN differs from the newly camped home PLMN",
+      "conclusion": "A coherent card-side fixture provisioned cached location 001-01. At the 0x07e0 decision, stored and current firmware tuples both encoded 00 f1 10, but the selection latch remained active and task 15 followed the same 0x0a3f -> operation-0x28 path. The branch is selection-lifecycle policy, not a stale-location mismatch.",
+      "evidence": ["docs/network_scouting.md"]
+    },
+    {
       "id": "received_block_zero_arfcn_causes_empty_selection", "status": "disproven",
       "hypothesis": "The radio peer's omitted ARFCN in RECEIVED_BLOCK prevents the post-SI task-11 completion from selecting the serving network",
       "conclusion": "The recovered RECEIVED_BLOCK object layout places ARFCN at DSP payload bytes +6..+7. Supplying the evidenced serving ARFCN 1 corrects task-12 SI ownership and keeps active channel 0x10dbce at 1, but task 11 still completes in mode zero with empty measurement sources and task 17 fails selected-PLMN admissibility because 0x10fd00..0x10fd02 is unset. The packet defect was fixed; it was not the RM/MM transition.",
@@ -521,7 +545,7 @@
     {
       "id": "postcamp_measurement_replays_plmn_admissibility", "status": "disproven",
       "hypothesis": "Repeated strong post-camp mode-0 measurements should rebuild a usable serving candidate and revisit task-17 admissibility after the source tuple is populated",
-      "conclusion": "The successful pre-camp cycle enters reconciler 0x211f60 with ARFCN 1 at -60 dBm and retained history. Received-SI parsing at 0x210c02 subsequently derives mode byte 0x10c851 from SI bit 1. With that byte set, 0x211f60 intentionally returns before reconciliation, so later empty preliminary 0x0447 objects are firmware lifecycle behavior rather than evidence of a malformed RSSI result. The desired commit must be found in the initial task-17 continuation, not manufactured through repeated post-camp measurements.",
+      "conclusion": "The successful pre-camp cycle enters reconciler 0x211f60 with ARFCN 1 at -60 dBm and retained history. A coherent RAM write watch corrects the earlier parser attribution: 0x10c851 is task 11's acquisition phase, written by initialization 0x215a44, completion path 0x215f94, reset path 0x215f7e, and lifecycle initializer 0x213828; SI parser 0x210c02 does not write that global byte. Phase 1 intentionally suppresses 0x211f60 after camp, so later empty preliminary 0x0447 objects are firmware lifecycle behavior rather than evidence of a malformed RSSI result. The desired commit must be found in the initial task-17 continuation, not manufactured through repeated post-camp measurements.",
       "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
     },
     {
@@ -540,6 +564,18 @@
       "id": "task17_argument3_commit_is_ordinary_registration", "status": "disproven",
       "hypothesis": "Ordinary unlocked automatic registration must copy the populated source PLMN into the desired tuple through an argument-3 call to helper 0x2229e8",
       "conclusion": "The helper has eight argument-3 callers. Address 0x223988 zero-initializes task-17 state; all seven remaining calls are downstream of object-bearing internal status 0x09ee transaction responses, including helper 0x225e6a reached by the explicit comparison at 0x2246f2. None consumes the coherent automatic-selection result 0x09f0 operation 0x16, and no 0x09ee transaction executes in that lifecycle. The zero desired tuple belongs to separate manual or policy transactions and is not a missing network response.",
+      "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "task17_09ef_is_failed_selected_search", "status": "disproven",
+      "hypothesis": "The mode-0x50 terminal must avoid status 0x09ef because it denotes a failed selected-PLMN search",
+      "conclusion": "The observed 0x09ef comes from the substate-0x14 completion arm at 0x22545c. Task 15 responds with 0x07d7; task 16 coherently closes LAPDm SAPI 0 and SAPI 3, resets the controller, and returns 0x07e7. Task 15 then constructs 0x09ff, whose adapter emits operation 0x16. Full decode and runtime branch evidence correct the earlier terminal-marker claim: policy 0x222174 sees request 0x14, returns one, and caller 0x2226e8 leaves task 17 in continuation 3 to retry. The 0x09ef exchange is normal transport cleanup, but its policy outcome is retry rather than accepted terminal completion.",
+      "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "task17_selected_terminal_needs_result_one", "status": "disproven",
+      "hypothesis": "The selected mode-0x50 search must reach one of task 17's result-one writers instead of zero-result writer 0x226b8a before ordinary registration can begin",
+      "conclusion": "Task-15 consumer 0x209efc stores the 0x09ec payload byte in selection state 0x10fe49 and sets its associated active-selection boolean only when the byte equals one. Coherent task-17 result watches show the one writers during intermediate active-selection lifecycles and zero writer 0x226b8a at completed finite-search terminals. Zero is the correct completed-selection result. The remaining registration boundary is the firmware-owned RR continuation after the subsequent coherent cleanup, not an alternate search outcome or result-byte value.",
       "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
     }
   ]

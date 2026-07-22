@@ -39,7 +39,7 @@
     {
       "id": "task1_mode4_code7", "owner": "power_shutdown", "status": "satisfied",
       "predicate": "Organic report code 0x07 after mode 0x0004 belongs to a physical power/shutdown lifecycle rather than ordinary UI startup",
-      "current": "A post-frontier physical power-key press traverses MAD2 IRQ0, decodes key 0x0d, reaches controller status 0x0795, posts report 0x07, and moves task 1 from mode 0x0004 to mode 0x000c. Mode 0x000c then consumes report 0x74, tears services down, calls power-control tail 0x2b4e16, and waits. This closes code 7 as an organic shutdown/power result and excludes it as the boot-to-desktop blocker. Successful security-code completion remains independent and returns 0x05e6. Synthetic cold-boot key releases at four bounded hold times did not publish global 0x0367, so no calibrated timing model was retained.",
+      "current": "A post-frontier physical power-key press traverses MAD2 IRQ0, decodes key 0x0d, reaches controller status 0x0795, posts report 0x07, and moves task 1 from mode 0x0004 to mode 0x000c. Mode 0x000c then consumes report 0x74, tears services down, calls power-control tail 0x2b4e16, and waits. This closes code 7 as an organic shutdown/power result and excludes it as the boot-to-desktop blocker. Successful security-code completion remains independent; verifier 0x2ae704 returns one before callback-local status 0x05e1. Synthetic cold-boot key releases at four bounded hold times did not publish global 0x0367, so no calibrated timing model was retained.",
       "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/mmi_settlement.md"]
     },
     {
@@ -67,10 +67,10 @@
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {
-      "id": "location_update_request_entrance", "owner": "radio_rm_mm", "status": "unresolved",
+      "id": "location_update_request_entrance", "owner": "radio_rm_mm", "status": "satisfied",
       "predicate": "The firmware selects the visible home PLMN, establishes a signalling channel, and emits an organic GSM Location Updating Request at the recovered network boundary",
-      "current": "The firmware reaches the Location Updating preparation path organically. Task 16 constructs status 0x07e0 at 0x250b5a; task 15 consumes it at 0x20e858 and reaches the exact MM Location Updating Request encoder 0x208b98/selector 0x4a. The first entrance is suppressed at 0x20e9b4 because task-17 status 0x09ec payload byte +2 has selected an active-search latch at 0x10fe7b. All other gate inputs are valid. Task 15 returns selection result 0x09f0 operation 0x28; task 17 commits source PLMN 00f110 and clears the latch with 0x09ec mode zero. Task 17 later reaches an equal source/candidate terminal and sends one-way DSP DEACTIVATE. The peer now cancels queued search and receiver work at that boundary instead of leaking a stale SEARCH_LIST across it. No second 0x07e0 follows yet, so no organic Location Updating Request reaches the network parser. The remaining finite producer candidate is 0x251552, downstream of later RR results in the 0x03fc/0x0404 family; 0x2515f0 belongs to an already-started 0x07d1 transaction and cannot initiate registration.",
-      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md", "docs/sim_registration.md"]
+      "current": "The coherent radio peer now drives only recovered DSP/L1 packet boundaries. Firmware selects ARFCN 1, transmits random access, accepts Immediate Assignment, configures the assigned SDCCH, emits LAPDm SABM with a GSM MM Location Updating Request, parses the peer's standards-shaped Location Updating Accept as result 0x48, updates EF_LOCI through SIM T=0, consumes RR Channel Release, deconfigures channel 0x60 and returns to serving BCCH. The bounded run emits one Location Updating Request and no retry.",
+      "evidence": ["docs/network_scouting.md", "tools/radio_registration_trace_check.py"]
     },
     {
       "id": "plmn_measurement_rr_entrance", "owner": "radio_l1_rr", "status": "satisfied",
@@ -99,7 +99,7 @@
     {
       "id": "post_security_ui_window_selection", "owner": "startup_ui", "status": "satisfied",
       "predicate": "Post-security transaction traffic is separated from periodic descriptor/timer traffic without injecting a task-6 window selection",
-      "current": "Accepted 0x0578 makes callback 0x47 return 0x05e6 and leave the active callback sweep. A negative-control run containing only 12345 and its single submission reproduces the later 0x0384, 0x05de/0x05e0, 0x0598, and 0x0578 wave, proving it is the ordinary post-acceptance tail rather than a second-key transaction. Overlapping 0x00c8 is published approximately once per second by task 1 at 0x2a2838 with an incrementing argument. Its descriptor selects context-maintenance outputs 0x1b59, direct 0x01f5, and 0x1b5b; none constructs a class-1 window message. Repeating 0x05a7 is the independent three-slot timer manager at 0x2b3222. The second-softkey/descriptor question is closed and no keypad, timer, callback, context state, or hardware acknowledgement should be synthesized.",
+      "current": "Accepted 0x0578 makes verifier 0x2ae704 return one after the entered 12345 transforms to the exact stored four-byte value; callback 0x47 then publishes 0x05e1. Incorrect input can reuse 0x05e1 in a different callback-local state, so the number is not a global accept/reject code. A negative-control run containing only 12345 and its single submission reproduces the later 0x0384, 0x05de/0x05e0, 0x0598, and 0x0578 wave, proving it is the ordinary post-acceptance tail rather than a second-key transaction. Overlapping 0x00c8 is published approximately once per second by task 1 at 0x2a2838 with an incrementing argument. Its descriptor selects context-maintenance outputs 0x1b59, direct 0x01f5, and 0x1b5b; none constructs a class-1 window message. Repeating 0x05a7 is the independent three-slot timer manager at 0x2b3222. The second-softkey/descriptor question is closed and no keypad, timer, callback, context state, or hardware acknowledgement should be synthesized.",
       "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md", "docs/resource_providers.md"]
     },
     {
@@ -117,8 +117,14 @@
     {
       "id": "radio_serving_cell_camp", "owner": "dsp_radio_peer", "status": "modeled",
       "predicate": "A ROM-derived usable RSSI candidate advances through accepted channel change, task-11 acquisition action 1 and SI1-SI4 parsing without firmware-state injection",
-      "current": "The opt-in radio peer answers organic SEARCH_LIST requests with two -109 dBm baselines followed by -60 dBm for ARFCN 1. Firmware derives flags 0x0e, publishes usable candidate 0x0447, accepts channel change, constructs task-11 0x13a5 action 1 after IDLE_RA, and accumulates BCCH SI1-SI4 to bitmap 0x0f for home PLMN 001-01/LAC 1/cell 1. The subsequent mode-0x40 pass and channel-0x60 confirmation organically publish task-17 home-PLMN status 0x0433 and source tuple 00f110. The following mode-0x50 selected-PLMN search is finite through RSSI, SCH, channel change, RA, SI1-SI4 and NO_BCCH_LEFT. SI parsing sets mode byte 0x10c851 and intentionally retires the pre-camp measurement reconciler, so later empty preliminary 0x0447 objects are firmware lifecycle behavior. Task 17 reaches an equal source/candidate terminal and sends DEACTIVATE; the peer cancels pending receiver/search work at that one-way boundary.",
+      "current": "The opt-in radio peer answers organic SEARCH_LIST requests with two -109 dBm baselines followed by -60 dBm for ARFCN 1. Firmware derives flags 0x0e, publishes usable candidate 0x0447, accepts channel change, constructs task-11 0x13a5 action 1 after IDLE_RA, and accumulates BCCH SI1-SI4 to bitmap 0x0f for home PLMN 001-01/LAC 1/cell 1. The subsequent mode-0x40 pass and channel-0x60 confirmation organically publish task-17 home-PLMN status 0x0433 and source tuple 00f110. Selected-cell validation ends after its final valid SI/RSSI pair; NO_BCCH_LEFT is retained only for searches with no usable cell, avoiding a contradictory stale terminal in the next transaction. Coherent write-watch evidence corrects the earlier SI-bit attribution: 0x10c851 is task 11's acquisition phase, initialized to 1, advanced through 2/3 by completion path 0x215f94, and restored to 1 by 0x215f7e/0x213828.",
       "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
+    },
+    {
+      "id": "registered_operator_presentation", "owner": "radio_mmi", "status": "satisfied",
+      "predicate": "After organic Location Updating, the unobscured idle screen presents the registered laboratory-network identity through firmware-owned resources",
+      "current": "A provisioned coherent run completes one Location Updating exchange, accepts result 0x48, updates EF_LOCI, releases channel 0x60, returns to serving BCCH, publishes task-11 resource 0x5031 with live PLMN 00f110, posts event 0x1399, and renders numeric operator 01. Firmware also selects and reads standards-valid EF_SPN service 17, but the v6.00 idle resource retains its PLMN-table result; the radio peer supplies no display string or firmware state. The trace and stable operator glyph crop are protected together by make verify-radio-operator.",
+      "evidence": ["docs/network_scouting.md", "docs/structural_regression.md", "tools/radio_registration_trace_check.py", "tools/check_lcd_frame.py"]
     }
   ]
 }

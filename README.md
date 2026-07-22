@@ -129,7 +129,7 @@ Start with:
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
 - [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for service-session startup.
 - [`docs/mmi_settlement.md`](docs/mmi_settlement.md) for the validated idle/menu lifecycle and excluded conditional paths.
-- [`docs/sim_registration.md`](docs/sim_registration.md) for the SIM and generic-service findings.
+- [`docs/sim_registration.md`](docs/sim_registration.md) for SIM initialization and adjacent session firmware maps.
 - [`docs/tooling.md`](docs/tooling.md) for the analysis tools.
 
 ## Firmware Policy

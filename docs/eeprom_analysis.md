@@ -182,8 +182,10 @@ and derived record `32 d8 fa 97 00 00 03 17`.
 The unprovisioned security editor independently validates the code encoding.
 After a physical `12345` plus softkey sequence, verifier `0x2ae704` confirms a
 five-character input, transforms it through `0x2ae4e8`, compares four bytes
-against RAM `0x112460`, and returns one. Callback `0x47` consequently returns
-the accepted-code status `0x05e6`; mismatch would instead publish `0x05e1`.
+against RAM `0x112460`, and returns one. The accepted run's callback publication
+is `0x05e1`; incorrect input may use the same scalar in a different
+callback-local state, so acceptance is established by the comparison result
+rather than a global status-code interpretation.
 
 The same fixture is reproducible through
 `make eeprom-profile PROVISIONED_IMEI_PREFIX=49015420323751`. Omitting the

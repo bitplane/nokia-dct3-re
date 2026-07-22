@@ -332,21 +332,30 @@ type-`0x8e` framed session:
   descriptors according to the active controller/configuration state;
 - type `0x89` handler `0x284f74`, not type `0x86`, posts status `0x1393` to
   task 10. It does not itself establish controller state 3. The independently
-  owned controller state starts at 1 after the outbound `SEARCH_LIST` builder;
-  the type-`0x86` callback paths can subsequently operate when firmware moves
-  that controller to state 7;
+  owned controller state starts at 1 after the outbound `SEARCH_LIST` builder.
+  For assigned channel `0x80`, helper `0x2167c0` deliberately enters state 6;
+  state 7 is the alternate branch for other channel identities;
+- Nokia's recovered MDI vocabulary identifies type `0x86` as `BLOCK_REQUEST`.
+  In state 6, the decoder's accepted subtype `0x80` releases a firmware-queued
+  dedicated-channel block. The internal state-7 replay descriptors at
+  `0x2e1128` and `0x2e1130` instead carry subtypes `0xb0` and `0xb1`;
 - every accepted direct packet eventually runs `0x2841e4`, the independent
   ten-sample measurement publication to task 8, and then frees the broker
   object.
 
 The entire type-`0x86` implementation and its two internal callers use the
-controller context rooted near `0x10d0db` and queued channel objects near
+controller context rooted at `0x10dbd0` and queued channel objects near
 `0x11281f`/`0x11381f`. They contain no load from, store to, or call into the
 framed-session phase byte `0x11fedb` or its state machine at `0x2824e4`.
 Consequently a valid type-`0x86` exchange cannot directly bootstrap acceptance
 of type-`0x8e` class-`0x47` traffic. Any indirect relationship would have to be
 a new, independently evidenced task-level contract; none is present in this
 closed decoder.
+
+The controller root was previously recorded as `0x10d0db`. That address was a
+byte-lane transcription error: the swap16 literal `dbd00010` resolves to the
+aligned firmware address `0x10dbd0`, as confirmed by the live state writes at
+`0x10dbd6`.
 
 ### Framed call/session startup
 
@@ -444,179 +453,38 @@ words. Successive v6 packets address `0x2206, 0x222d, ... 0x22f0`, uploading
 per-packet reply token. The physical purpose of this version-specific DSP memory
 image remains unknown, so it is not labelled as audio, radio, or coefficients.
 
-### Organic radio-init queue lifecycle
+### Organic radio and registration transport
 
-The radio-initialization chain reaches this ring without an isolated producer probe.
-Task 17 sends `0x09ec`; task 15 case 6 sends `0x07d6`; task 16 sends `0x03e9` to
-task 10. Task 10 immediately acknowledges task 17 with `0x043c`, then constructs
-a 72-byte task-3 object headed `{00 02 44 1a 00 81 98 ...}`. Finalizer
-`0x219e30` is an organic producer of `0x0434`, but no direct task-3 completion
-edge into it is proved.
+Task 3 serializes firmware-owned L1 requests into the DSP TX ring. The HLE peer
+consumes those packets and returns request-correlated reports through the DSP RX
+ring; advancing its producer pointer and asserting FIQ0 wakes task 4, which
+dispatches the packets naturally. No task message, callback or firmware RAM
+state is injected.
 
-The `0x07d6` leg is intentional for this transaction. The organic task-17
-message is `09 ec 00 ...`; task 15 copies byte `+2` to protocol mode
-`0x10fe49`, then selects `0x07d6` for mode zero. Its adjacent direct `0x09ec`
-path requires mode `0x10` and does not describe this boot transaction.
+The complete search, cell selection, random-access, LAPDm, Mobility Management,
+release and steady-camp sequence is single-homed in `network_scouting.md`.
+This document retains only the DSPIF transport contract. In particular,
+SEARCH_LIST type `0x1a` is asynchronous, type `0x80` is a received-block
+envelope rather than a generic completion, and lower task statuses such as
+`0x0434`, `0x1391` and `0x13e2` must remain firmware-owned.
+## Network-emulation boundary
 
-Task 3 does not immediately serialize that object. Its FIFO first releases the
-type-`0x51` segmented DSP memory upload and five type-`0x70` control packets.
-Packet consumption remains polling-based prototype behavior. The retained 4 ms
-cadence drains the preceding queue so the organic publication reaches the
-DSP boundary as a 35-word packet:
+The message-boundary peer now implements the organic ROM-4 search, channel,
+random-access and signalling transactions through accepted Location Updating,
+RR release and steady camp. `nokia_gsm_network_device` owns GSM data while
+`nokia_dsp_hle_device` owns Nokia packet translation and request correlation;
+the complete contract and gates are in `network_scouting.md`.
 
-```text
-task-3 object: length 0x44, type 0x1a
-wire payload 68: 0081 9800 0000 ...
-```
+Operator presentation is not a peer string. After MM acceptance, task 11 passes
+the firmware-owned PLMN record to resource `0x5031` and posts its own render
+event. The retained peer supplies neither task status `0x13e2` nor display
+primitive `0x25`. Those remain separately decoded protocol families, not
+shortcuts for registered-state presentation.
 
-No firmware message, callback, or RAM state is injected to produce it. The
-driver's opt-in DSP service defaults use the empirically stable 4 ms cadence;
-the eventual DSP peer should own TX consumption independently of the service-IRQ
-timer so correctness does not depend on this scheduling phase.
-
-Type `0x1a` is SEARCH_LIST, carrying a GSM ARFCN channel-set bitmap. It has no
-direct request/reply token: the builder decode (`0x219f0c`), its sole caller
-`0x21ba54`, the density-guard rejection with flag `0x81`, the disproved
-type-`0x80` state-byte correlation, and the timer-`0x23` cadence are
-single-homed in `dsp_service_transport_contract.md` (ledger
-`dsp_type1a_direct_registration_request`). Adjacent to the publication,
-`0x2697aa(0x23, 0x0a0a)` arms the global DSP-service timer; its live
-expiry/rearm through task 4 delivers no task-10 status. The radio peer instead
-returns asynchronous measurement and search-completion reports through the
-MDIRCV ring.
-
-RX-ring transport probing pins the return notification: advancing RX producer
-`0x1c8` and asserting **FIQ 0** wakes task 4 with receive sentinel `4`, which
-calls `0x290904` and dispatches the packet naturally. IRQ lines and the other
-FIQ lines do not. The candidate type-`0x80`, primitive-`0x70` registration
-reply is disproved (ledger `dsp_type80_primitive70_reply`).
-
-The same boundary establishes the DSP-liveness contract independently of any
-semantic reply. A header-only ring entry `0x0003` is an outer RX type-`0x03`
-packet. Task 4 increments activity counter `0x112502` at `0x2b3fca` for every
-non-sentinel packet before type dispatch; type `0x03` then reaches the generic
-discard/diagnostic path and is freed. The counter is cleared at `0x21596e`,
-`0x21a1ec`, and `0x2a0f9a`, matching a repeatedly rearmed liveness check.
-Periodic liveness traffic is real DSP behavior, but it is not the missing
-registration-semantic response (ledger
-`dsp_type03_heartbeat_registration_predecessor`).
-
-The wider type-`0x80`/type-`0x83` `0x040b` route is classified separately.
-Task 13's receive loop at `0x23e62c` and command handler `0x23e7ac` parse a
-segmented transfer at `0x23e324`/`0x23e378`. A valid completed transfer emits
-`0x05eb` to task 16 through `0x23e1a4`. Task-16
-callback `0x3c` takes a dedicated `0x05eb` branch at `0x25df18`, publishes
-`0x057a`, and returns `0x05e6`. That branch bypasses the callback's argumentless
-`0x05e8` fallback at `0x25df08`. Therefore a legitimate `0x040b` transfer is not
-the missing ordinary-registration `0x05dc` predecessor. The transfer's owning
-subsystem is not yet established. In particular, the UI window stack is task 6
-around `0x297fc4` and RAM `0x1116f8`/`0x111724`; a Ghidra function name is not
-evidence that task 13 is the display-window subsystem.
-
-Task 17's initializer enters its long-lived event loop at
-`0x223964 -> 0x2271c6`; code at `0x2222fc` and its callbacks is reached only
-after that loop returns. It is therefore downstream of the awaited `0x0434`,
-not its missing predecessor. This task-17 callback family must not be confused
-with task 10's distinct `0x138f` status, which is produced by DSP RX type
-`0x87` and can enter `0x219e30` as described above.
-
-The explicit lower-result completion is status `0x1391`. The dispatcher jump
-table maps it to `0x21b9b4 -> 0x21b198`; when the firmware-owned work state is
-ready this reaches `0x219e30`, the producer of `0x0434`. Status `0x1392` is
-the adjacent table entry and instead maps to the radio-state/configuration path
-at `0x21c36a`. Direct statuses `0x138f` and `0x1390` provide the separately
-gated DSP-report entrances documented above. Callback `0x2b60f6` unregisters
-lower-radio key `0x4c00` with
-`0x2b257e` and posts that non-completing `0x1392` update through `0x2af6ea`.
-
-The large lower-radio result dispatcher `0x245a84` maps result `0x0fc1` through
-`0x245c8c -> 0x2525be -> 0x2b610a` to completion status `0x1391`. Result
-`0x0fc2` maps through `0x245c76 -> 0x2525a8 -> 0x2b60f6` to the separate
-radio-state status `0x1392`. Both cases copy firmware-owned result fields into
-callback objects before invoking their wrappers; neither is a bare status
-notification.
-
-The controller's event-`0x102f` branch loads result `0x0fbf` at
-`0x24788e` and enters the dispatcher call at `0x246ad6` with that value intact.
-Its table case is `0x245cb2 -> 0x253610`, a context handler. Jump-table
-indexing corrections are ledgered as `lower_result_0fc3` and
-`lower_result_0fbf_completes_task17`. Event
-`0x102f` is returned by object decoder `0x267258` for opcode byte `0x2a`; that
-decoder is reached from task 14 for statuses `0x09d8`/`0x09de`. Both statuses are
-task-15 translator outputs rather than raw peer messages. `0x09de` is selected by
-translator input `0x0a0c` and task-15 mode `0x1f`; no static caller supplying
-`0x0a0c` has been recovered. Neither status currently establishes an independent
-peer transport into the decoder.
-
-The producer side is pinned one layer further back. Task 15 constructs `0x09d8`
-through translator `0x208ee0` after an object-bearing `0x07dd` has passed parser
-`0x209978`, returned internal success `0x09f3`, and selected one of the two `0x0a08`
-state-machine branches (`0x20be0c`/`0x20f324`). Neither branch executes in the
-coherent run. Consequently a DSP peer must not inject task-14 `0x09d8`; the open
-hardware boundary precedes the generic-service object delivered to task 15.
-
-Parser `0x209978` is specifically a GSM Mobility Management parser: object byte
-`+4` must carry protocol discriminator 5, and message types `0x02`, `0x04`,
-`0x21`, `0x22`, and `0x29` map to Location Updating Accept/Reject and CM Service
-Accept/Reject/Abort results. This contract is necessarily downstream of first
-cell acquisition and signalling-channel establishment. It must not be used to
-bootstrap those prerequisites by injecting `0x07dd` or one of its translated
-statuses.
-
-For the completion variant, task-14 object opcode `0x36` reaches decoder branch
-`0x2674da`, parses through `0x266ffc`, and emits controller event `0x1033`.
-The controller branch at `0x2476fa` maps it to lower result `0x0fc1`, completing
-the already-mapped `0x1391 -> 0x0434` route. Adjacent opcode `0x37` emits event
-`0x1034` and result `0x0fc2`, which is the non-completing `0x1392` radio update.
-
-The wider **bidirectional L1 protocol** — MCU sends "search/sync/measure/attach", DSP returns
-cell/RSSI/registration — lives largely in the `0x2b7xxx–0x2c9xxx` driver and is not
-observed carrying task-22 messages. The narrower shared-control path at `0x290cf4` is live,
-so DSP work is not wholly static: its `0x30`/`0x32` request and IRQ-4 completion
-contract can be traced in the current coherent profile.
-
-## Later network-emulation dependencies
-
-- **To reach where we are:** the current echo, ready flags, queue drain, and IRQ model are
-  sufficient, but they are not a completed DSP contract.
-- **The lower-radio session start is a bounded downstream lifecycle.** Organic initialization
-  creates task 14 and its eight controller slots, but no task-14 input starts a resource-`0x35`
-  operation. The concurrent type-`0x1a` ARFCN bitmap is not evidence of such an operation;
-  the falsified type-`0x80`/`0x70` reply (ledger `dsp_type80_primitive70_reply`) must not
-  be restored.
-- **For the network (operator name + signal):** extend the message-boundary DSP peer (answer the L1
-  commands with "camped on a fake cell, operator X, RSSI y") is feasible *in principle* and
-  is the right MAME approach, but the L1 protocol is static-only until coherent
-  execution reaches it and an organic application path requires it. Signal RSSI is separately
-  injectable (CCONT ADC ch1, `network_scouting.md`).
-- **Full DSP-core emulation** (a TI Lead core running the downloaded blobs) is a much larger
-  project and would still need a faked air interface; not warranted given the above ordering.
-
-The ARFCN publication is not the resource-`0x35` transaction. In the measured
-boot task 14 receives no message and neither `0x282238` (resource-`0x35`
-transmit) nor `0x267258` (object receive) runs.
-
-Task-5 status `0x13e2` is downstream, not an absent radio transition. Its natural
-producer is `0x2b3f60`, called by task 17 at `0x225b8c` from the dispatcher arm for
-input `0x09d6` (and at `0x223a28` after the phase loop returns). It publishes packed
-`0x53e2` with one firmware-owned pointer; the consumer path
-`0x255124 -> 0x28a4a8 -> 0x238a24` then constructs `0x1776` for decimal task 14
-(ID `0x0e`). A boundary diagnostic now reaches `0x0434` through direct type-`0x87`
-completion. Task 17 consumes it at `0x225240`, runs `0x225b6c`, and continues at
-`0x226348` without reaching `0x2b3f60`.
-
-The predecessor of `0x09d6` is now recovered and is firmware-owned. Task-15 helper
-`0x209380` compares the current identity at `0x10ffc8` with the stored identity at
-`0x10ffb4`; on a changed identity it calls translator `0x208ee0` with input `0x09d6`.
-That translator copies the 12-byte current identity into a new object and adapter
-`0x251c92` posts it to task 17 with the same status. The helper is called from seven
-MM result lifecycles but does not execute in the coherent camp because no current
-identity has yet been committed. Therefore `0x09d6` is a downstream
-serving-identity-change notification, not a DSP or network primitive to synthesize.
-The `0x0fbf` context path
-and `0x0fc2 -> 0x1392` radio-state path are separate and do not reach `0x0434`;
-only after the `0x0fc1` contract is pinned should the proven bidirectional
-contract move into a DSP peer device.
+The older type-`0x80`/primitive-`0x70`, direct `0x0434`, heartbeat, identity and
+guessed packet diagnostics are disproven and removed. Full DSP-core emulation
+would still require a synthetic air interface and is not needed for the current
+registered/camped boundary.
 
 ## Per-primitive payload semantics
 

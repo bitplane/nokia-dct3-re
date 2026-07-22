@@ -31,6 +31,9 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_record_pointer));
 	save_item(NAME(m_receiving_body));
 	save_item(NAME(m_adn));
+	save_item(NAME(m_loci));
+	save_item(NAME(m_kc));
+	save_item(NAME(m_bcch));
 }
 
 void nokia_sim_card_device::device_reset()
@@ -47,12 +50,30 @@ void nokia_sim_card_device::device_reset()
 void nokia_sim_card_device::nvram_default()
 {
 	std::fill(std::begin(m_adn), std::end(m_adn), 0xff);
+	std::fill(std::begin(m_kc), std::end(m_kc), 0xff);
+	m_kc[8] = 0x07; // no valid ciphering key sequence
+	std::fill(std::begin(m_loci), std::end(m_loci), 0xff);
+	m_loci[10] = 0x01; // location not updated
+	std::fill(std::begin(m_bcch), std::end(m_bcch), 0xff);
+	if (m_cached_location)
+	{
+		const u8 loci[] = { 0xff, 0xff, 0xff, 0xff, 0x00, 0xf1, 0x10, 0x00, 0x01, 0x00, 0x01 };
+		std::copy(std::begin(loci), std::end(loci), std::begin(m_loci));
+		std::fill(std::begin(m_bcch), std::end(m_bcch), 0x00);
+		m_bcch[15] = 0x01;
+	}
 }
 
 bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 {
 	auto const [err, actual] = util::read(file, m_adn, sizeof(m_adn));
 	if (err || actual != sizeof(m_adn))
+		return false;
+	auto const [loci_err, loci_actual] = util::read(file, m_loci, sizeof(m_loci));
+	auto const [kc_err, kc_actual] = util::read(file, m_kc, sizeof(m_kc));
+	auto const [bcch_err, bcch_actual] = util::read(file, m_bcch, sizeof(m_bcch));
+	if (loci_err || loci_actual != sizeof(m_loci) || kc_err || kc_actual != sizeof(m_kc) ||
+			bcch_err || bcch_actual != sizeof(m_bcch))
 		return false;
 	u8 trailing;
 	auto const [trailing_err, trailing_actual] = util::read(file, &trailing, 1);
@@ -62,7 +83,13 @@ bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 bool nokia_sim_card_device::nvram_write(util::write_stream &file)
 {
 	auto const [err, actual] = util::write(file, m_adn, sizeof(m_adn));
-	return !err && actual == sizeof(m_adn);
+	if (err || actual != sizeof(m_adn))
+		return false;
+	auto const [loci_err, loci_actual] = util::write(file, m_loci, sizeof(m_loci));
+	auto const [kc_err, kc_actual] = util::write(file, m_kc, sizeof(m_kc));
+	auto const [bcch_err, bcch_actual] = util::write(file, m_bcch, sizeof(m_bcch));
+	return !loci_err && loci_actual == sizeof(m_loci) && !kc_err && kc_actual == sizeof(m_kc) &&
+			!bcch_err && bcch_actual == sizeof(m_bcch);
 }
 
 void nokia_sim_card_device::set_atr(const u8 *data, unsigned length)
@@ -123,7 +150,7 @@ void nokia_sim_card_device::finish_header()
 		logerror("sim_device: header cla=%02x ins=%02x p1=%02x p2=%02x p3=%02x selected=%04x t=%.8f\n",
 				m_tx[0], m_ins, m_p1, m_p2, m_p3, m_selected_file,
 				machine().time().as_double());
-	if (m_ins == 0xa4 || m_ins == 0x24 || m_ins == 0xdc)
+	if (m_ins == 0xa4 || m_ins == 0x24 || m_ins == 0xd6 || m_ins == 0xdc)
 	{
 		const u8 procedure = m_ins;
 		m_tx_len = 0;
@@ -171,6 +198,13 @@ void nokia_sim_card_device::finish_body()
 	if (m_ins == 0xdc)
 	{
 		update_record();
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		return;
+	}
+	if (m_ins == 0xd6)
+	{
+		update_binary();
 		m_tx_len = m_tx_expected = 0;
 		m_receiving_body = false;
 		return;
@@ -315,6 +349,38 @@ void nokia_sim_card_device::queue_read_record(unsigned requested)
 	emit_response(response, n);
 }
 
+void nokia_sim_card_device::update_binary()
+{
+	const file_descriptor *file = find_file(m_selected_file);
+	if (!file || file->structure != file_structure::transparent)
+	{
+		queue_status(0x94, 0x08);
+		return;
+	}
+	if (!access_allowed(*file))
+	{
+		queue_status(0x98, 0x04);
+		return;
+	}
+	const unsigned start = (unsigned(m_p1 & 0x7f) << 8) | m_p2;
+	if (start + m_tx_len > file->size)
+	{
+		queue_status(0x94, 0x02);
+		return;
+	}
+	u8 *const data = mutable_file_data(file->fid);
+	if (!data)
+	{
+		queue_status(0x98, 0x04);
+		return;
+	}
+	std::copy_n(m_tx, m_tx_len, data + start);
+	if (std::getenv("NOKI3210_TRACE_SIM_RX") != nullptr)
+		logerror("sim_device: update-binary fid=%04x offset=%u length=%u t=%.8f\n",
+				file->fid, start, m_tx_len, machine().time().as_double());
+	queue_status(0x90, 0x00);
+}
+
 void nokia_sim_card_device::update_record()
 {
 	const file_descriptor *file = find_file(m_selected_file);
@@ -382,10 +448,10 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x6fad, 0x7f20, 4, 0, file_structure::transparent, false },
 		{ 0x6f07, 0x7f20, 9, 0, file_structure::transparent, false },
 		{ 0x6f38, 0x7f20, 15, 0, file_structure::transparent, false },
-		{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, false },
+		{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, true },
 		{ 0x6f78, 0x7f20, 2, 0, file_structure::transparent, false },
-		{ 0x6f7e, 0x7f20, 11, 0, file_structure::transparent, false },
-		{ 0x6f20, 0x7f20, 9, 0, file_structure::transparent, false },
+		{ 0x6f7e, 0x7f20, 11, 0, file_structure::transparent, true },
+		{ 0x6f20, 0x7f20, 9, 0, file_structure::transparent, true },
 		{ 0x6f30, 0x7f20, 24, 0, file_structure::transparent, false },
 		{ 0x6f7b, 0x7f20, 12, 0, file_structure::transparent, false },
 		{ 0x6fae, 0x7f20, 1, 0, file_structure::transparent, false },
@@ -458,18 +524,20 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// information in this phase-2 profile.  Erased 0xff bytes select no valid
 	// operation mode and make the subscriber profile internally inconsistent.
 	static constexpr u8 administrative_data[] = { 0x00, 0xff, 0xff, 0x02 };
-	// No ciphering key is available, expressed with the GSM 11.11 reserved
-	// key-sequence value rather than an erased (and invalid) sequence byte.
-	static constexpr u8 ciphering_key[] = {
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x07
-	};
-	// This established fixture decodes to IMSI 001-01...; changing it to the
-	// laboratory PLMN currently enters a separate, unresolved SIM transaction.
-	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98, 0x10 };
+	// IMSI 001010123456789 belongs to the reserved laboratory PLMN advertised
+	// by the serving cell. The remaining digits are deterministic test data.
+	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98 };
 	// Prefer the subscriber's home PLMN 001-01, also advertised by the
 	// laboratory serving cell.  Keeping EF_PLMNsel on a different PLMN makes
 	// the firmware legitimately leave the serving cell and resume selection.
 	static constexpr u8 plmn_selector[] = { 0x00, 0xf1, 0x10 };
+	// GSM 11.11 EF_SPN: display the service-provider name on the registered
+	// home PLMN. Byte zero is the display-condition octet; the remaining
+	// sixteen bytes are the name padded with erased bytes.
+	static constexpr u8 service_provider_name[] = {
+		0x00, 'D', 'C', 'T', '3', ' ', 'L', 'A', 'B',
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+	};
 	// CPHS phase 2 with only the Customer Service Profile allocated and
 	// activated.  The CSP contains its mandatory nine group entries and makes
 	// only Advice of Charge (group 03, bit 6) customer-accessible.
@@ -483,12 +551,20 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	if (fid == 0x6f3a && offset < sizeof(m_adn)) return m_adn[offset];
 	if (fid == 0x6f05 && offset < std::size(language_preference)) return language_preference[offset];
 	if (fid == 0x6f38 && offset < std::size(service_table))
-		return m_cphs_aoc && offset == 1 ? 0x03 : service_table[offset];
+	{
+		if (m_cphs_aoc && offset == 1)
+			return 0x03;
+		// Service 17 (SPN) occupies bits 0-1 of byte five.
+		if (offset == 4)
+			return 0x03;
+		return service_table[offset];
+	}
 	if (fid == 0x6fb7 && offset < std::size(ecc)) return ecc[offset];
 	if (fid == 0x6fad && offset < std::size(administrative_data)) return administrative_data[offset];
 	if (fid == 0x6f07 && offset < std::size(imsi)) return imsi[offset];
-	if (fid == 0x6f20 && offset < std::size(ciphering_key)) return ciphering_key[offset];
+	if (fid == 0x6f20 && offset < std::size(m_kc)) return m_kc[offset];
 	if (fid == 0x6f30 && offset < std::size(plmn_selector)) return plmn_selector[offset];
+	if (fid == 0x6f46 && offset < std::size(service_provider_name)) return service_provider_name[offset];
 	if (fid == 0x6f78 && offset < std::size(access_control_class)) return access_control_class[offset];
 	if (m_cphs_aoc && fid == 0x6f16 && offset < std::size(cphs_info)) return cphs_info[offset];
 	if (m_cphs_aoc && fid == 0x6f15 && offset < std::size(cphs_aoc)) return cphs_aoc[offset];
@@ -496,17 +572,9 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	if (m_cphs_aoc && fid == 0x6f39 && offset < std::size(acm)) return acm[offset];
 	if (m_cphs_aoc && fid == 0x6f41 && offset < std::size(puct)) return puct[offset];
 	if (fid == 0x6f7e)
-	{
-		// A cached profile represents a SIM previously registered on the synthetic
-		// 001-01/LAC-1 network.  The TMSI remains invalid, so firmware still owns
-		// identity establishment and any subsequent EF_LOCI update.
-		static constexpr u8 cached_loci[11] =
-				{ 0xff, 0xff, 0xff, 0xff, 0x00, 0xf1, 0x10, 0x00, 0x01, 0x00, 0x00 };
-		if (m_cached_location)
-			return cached_loci[offset];
-		// Never registered: no TMSI, LAI or TMSI-time value, and update status 1.
-		return offset == 10 ? 0x01 : 0xff;
-	}
+		return m_loci[offset];
+	if (fid == 0x6f74)
+		return m_bcch[offset];
 	// GSM 11.11 EF_HPLMN is measured in six-minute units.  Five is an ordinary
 	// finite search period; erased 0xff is reserved and not a neutral profile.
 	if (fid == 0x6f31) return 0x05;
@@ -516,12 +584,19 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 
 u8 *nokia_sim_card_device::mutable_file_data(u16 fid)
 {
-	return fid == 0x6f3a ? m_adn : nullptr;
+	switch (fid)
+	{
+	case 0x6f3a: return m_adn;
+	case 0x6f7e: return m_loci;
+	case 0x6f20: return m_kc;
+	case 0x6f74: return m_bcch;
+	default: return nullptr;
+	}
 }
 
 const u8 *nokia_sim_card_device::mutable_file_data(u16 fid) const
 {
-	return fid == 0x6f3a ? m_adn : nullptr;
+	return const_cast<nokia_sim_card_device *>(this)->mutable_file_data(fid);
 }
 
 bool nokia_sim_card_device::access_allowed(const file_descriptor &file) const

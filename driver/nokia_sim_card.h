@@ -41,6 +41,7 @@ private:
 	void queue_fcp(u16 fid, unsigned requested);
 	void queue_read_binary(unsigned requested);
 	void queue_read_record(unsigned requested);
+	void update_binary();
 	void update_record();
 	static const file_descriptor *find_file(u16 fid);
 	static bool is_directory(u16 fid);
@@ -67,6 +68,9 @@ private:
 	u16 m_record_pointer = 0;
 	bool m_receiving_body = false;
 	u8 m_adn[50 * 32] = { 0 };
+	u8 m_loci[11] = { 0 };
+	u8 m_kc[9] = { 0 };
+	u8 m_bcch[16] = { 0 };
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_SIM_CARD, nokia_sim_card_device)

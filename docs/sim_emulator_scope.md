@@ -103,8 +103,8 @@ establishes a concrete requirement. Later work includes:
 
 - completing UPDATE BINARY, SEEK, cyclic/INCREASE, invalidation and CHV
   semantics;
-- supplying coherent LOCI, Kc, FPLMN, AD, SPN and optional EFs beyond the
-  current matched IMSI/SST/PLMN-selector profile;
+- supplying coherent FPLMN and optional EFs beyond the current matched
+  IMSI/SST/PLMN-selector/SPN profile;
 - testing card removal, reset, timeout, parity/error, and proactive-SIM status;
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
@@ -137,24 +137,12 @@ blocker. Its contract is authoritative in `sim_subsystem.md`.
 
 ## Current boundary outside the SIM
 
-The next registration transaction belongs to a network-registration session — a
-later lifecycle, distinct from completed offline SIM initialization; see
-`sim_registration.md`. That session would construct callback 7 with lifecycle
-`0x05dc` organically; firmware's own code then attaches a radio context and
-emits:
-
-```text
-callback 7 -> 0x5518 -> task 17 0x1583
-  -> registration/session commit -> task 20 0x1196
-  -> parser reply code 2 -> SIM read ENABLE
-```
-
-In the coherent offline run callback 7 receives only the global `0x05e2` sweep;
-offline initialization completes without it, and the session must not be
-forced. The SIM card does not own callback 7's lifecycle or object, so neither
-belongs in `nokia_sim_card_device`. The next peer work must begin from an
-observed firmware request or hardware-visible transition at the
-GSM/resource/DSP boundary.
+Ordinary network registration crosses the GSM/DSP boundary and is verified
+separately in `network_scouting.md`. The SIM participates only through its
+standards-shaped files and the firmware-issued `EF_LOCI` updates after Location
+Updating Accept. Callback 7 and the `0x1196` commit family are separate
+lower-session machinery; the card does not own their lifecycle or objects, so
+neither belongs in `nokia_sim_card_device`.
 
 ## Acceptance rules
 
@@ -169,6 +157,6 @@ A SIM increment is accepted only when:
 Primary references:
 
 - `sim_subsystem.md` - concise hardware and transaction contract;
-- `sim_registration.md` - firmware ownership and registration chain;
+- `sim_registration.md` - firmware ownership of initialization and adjacent session paths;
 - `dsp_interface.md` - known DSP transports and their exclusions;
 - `driver_structure.md` - component boundaries and extraction status.

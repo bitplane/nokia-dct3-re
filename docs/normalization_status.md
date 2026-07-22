@@ -88,7 +88,7 @@ Every live `NOKI3210_*` control belongs to one of these classes:
 | Hardware scenarios | `ADC_PROFILE`, `ADC0..7`, `CHARGER_ADC`, `SIM_ATR_HEX`, `SIM_CPHS_AOC` | Deterministic analog/card inputs, not inferred physical defaults. Charger attachment is a typed CCONT input; `CHARGER_ADC` remains its raw selector-5 VCHAR level for threshold fixtures. Raw `ADC0..7` controls remain laboratory provisioning, not a battery simulation. |
 | Timing calibration | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP`, `MODEL_DSP_SERVICE_DELAY_MS`, `MODEL_DSP_SERVICE_TICK_MS` | The 3210 now defaults both MAD2 timers to the recovered 33,055 Hz CTSI rate. `MODEL_DSP_SERVICE_DELAY_MS` controls the one-shot shared-service completion delay; the legacy `TICK_MS` name controls peer packet polling only. The remaining knobs stay visible calibration debt. |
 | Hardware scenarios | `CCONT_READY`, `CCONT_WDDISX_GROUNDED` | Reset-time CCONT readiness and the documented physical watchdog-disable pin. The 3210 profile defaults to ready with WDDISX released. |
-| Device-boundary prototypes | `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE`, `MODEL_RADIO_PEER` | The first three are enabled by the 3210 product profile; overrides remain for negative tests. `MODEL_RADIO_PEER` is an opt-in deterministic serving-cell model whose SEARCH_LIST, RSSI, channel-change and BCCH contract is verified through MDIRCV/FIQ0. It stops before Location Updating. |
+| Device-boundary prototypes | `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE`, `MODEL_RADIO_PEER` | The first three are enabled by the 3210 product profile; overrides remain for negative tests. `MODEL_RADIO_PEER` is an opt-in deterministic network whose search, camp, Location Updating, release and operator-presentation contract is verified through DSPIF/FIQ0 and organic firmware behavior. |
 | Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_TASKS`, `TRACE_SERVICE_COMMAND`, `TRACE_SIM_RX`, `TRACE_GSM_SERVICE`, `TRACE_DSP_BOUNDARY`, `TRACE_DSP_SHARED_READS`, `TRACE_DSP_SHARED_TRANSITIONS`, `TRACE_GENSIO`, `TRACE_GENSIO_LIMIT`, `TRACE_CCONT_WATCHDOG`, `TRACE_CCONT_ADC`, `TRACE_CCONT_RTC`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER`, `TRACE_PUP_OUTPUTS` | Log-only and bounded or scoped to a named investigation. `TRACE_GENSIO_LIMIT` changes only the default 20,000-line diagnostic ceiling. |
 | Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `POST_READY_CAPTURE_DELAY_MS`, `CCONT_CHARGER_INITIAL`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `CCONT_RTC_FIXTURE_AT`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `BUZZER_FIXTURE_AT`, `VIBRATOR_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
 
@@ -97,13 +97,12 @@ registration-state forcing controls.
 
 ## Instrumentation debt
 
-The radio peer's numbered stage machine currently mirrors the recovered
-SEARCH_LIST, channel-change, RA_INFO and BCCH transaction order. Its behavior
-is gate-covered, but the numeric stages and pending-count sub-branches are no
-longer reviewer-friendly. After the registration contract stabilizes, replace
-them with named phases and preferably table-driven report sequences; doing so
-before the remaining policy boundary is understood would merely freeze the
-current provisional protocol model into a cleaner-looking guess.
+The radio peer uses named phases for the recovered SEARCH_LIST,
+channel-change, RA_INFO, BCCH, random-access, LAPDm, Location Updating and
+release transactions. Its report counts remain explicit because the firmware
+requests and consumes those reports incrementally. A future table-driven
+representation is worthwhile only where it preserves request correlation and
+makes the protocol easier to review.
 
 The retained trace switches are scoped as follows:
 
@@ -141,9 +140,9 @@ hardware handlers.
 - Dynamic generic-service descriptors are mapped far enough to exclude the
   excluded registration paths, but the wider steady-state service
   topology remains incomplete.
-- The DSP/external-service peer contract is proved only for the requests exercised by
-  the current boot; outbound semantics are complete at the MCU boundary, while
-  wider inbound radio/L1 behavior remains unmapped.
+- The DSP/external-service peer contract is proved only for requests exercised by
+  boot and the deterministic registration checkpoint. Authentication, paging,
+  calls, SMS, mobility and broader inbound radio/L1 behavior remain unmapped.
 - The exact internal cold-boot UI selector remains unnamed, but its behavior is
   no longer a topology gap: provisioned boot reaches an interactive idle screen
   and opens the menu organically. Accepted-security, periodic-timer, conditional

@@ -34,9 +34,11 @@ A coherent trace drives the left softkey 250 ms after readiness and decodes
 keycode `0x19`. A scheduler-backed sequence can also drive `12345` plus the
 left softkey after the editor publishes `0x057c`.
 All physical press/release edges enter IRQ0, the digit path reaches the editor,
-and submission completes the transaction through `0x0578`. The callback returns
-`0x05e6`, the statically proved accepted-code result. The entered `12345`
-therefore matches the firmware-derived value stored at RAM `0x112460`; keypad
+and submission completes the transaction through `0x0578`. Verifier `0x2ae704`
+returns one after transforming the entered bytes to the exact four bytes stored
+at RAM `0x112460`; the callback then publishes `0x05e1`. That status is reused
+by callback-local lifecycles and is not a global rejection result. The entered
+`12345` therefore matches the firmware-derived value; keypad
 delivery and the synthetic EEPROM security-code encoding are both validated.
 
 A bounded 50 ms Up tap proves the physical lifecycle: IRQ0 fires on press and

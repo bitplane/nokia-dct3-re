@@ -19,8 +19,14 @@ explicitly disables the 3210 peer devices and is a negative failure baseline.
 external-service/SIM composition against `oracles/noki3210-frontier.struct`.
 `make verify-radio-camp` adds the opt-in deterministic radio peer and requires
 an organically usable ARFCN, accepted channel change, task-11 acquisition
-action, matching SI3 identity, and complete SI1--SI4 bitmap. It stops before
-Location Updating and does not alter either boot oracle.
+action, matching SI3 identity, and complete SI1--SI4 bitmap.
+`make verify-radio-registration` continues through one accepted Location
+Updating exchange. It requires the exact contention-resolution UA payload, the
+firmware's `UPDATE BINARY` of `EF_LOCI`, RR release, channel deconfiguration and
+at least four channel-`0x50` BCCH blocks after release. This distinguishes a
+completed registration from unrelated type-`0x80` traffic or a retry loop.
+`make verify-radio-operator` adds the unobscured firmware-rendered test-PLMN
+label. None alters either boot oracle.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon
@@ -144,12 +150,15 @@ Fixture frames and their oracle status:
 | Unprovisioned Security-code prompt | prefix `6471d1a5803619c2` | Research evidence only; outside `make verify-frontier` because the hardware-boundary profile does not reproduce the additional display transfer |
 | Provisioned idle `Menu` | prefix `dbf2704cb945d56b` | Research evidence; structural state remains mode `0x0004` |
 | Provisioned `Phone book` menu after left softkey | raw one-shot mirror `9b2ac7477b5be11aa6b4f178f781ff2799754b0b5ff6ce8f66221564d0f914d1` | Masked stable pixels (animated 20x12 icon region excluded) are protected by `make verify-mmi-menu`; the raw hash is not part of the canonical structural oracle |
+| Registered test operator `01` | crop SHA-256 `59dd0d4f80f705c98be148c7f60f3171d2b66d7a434fba51feef7a0134ada9a8` | `make verify-radio-operator` couples the full registration trace to a 12x7 glyph crop, excluding unrelated animated indicators |
 
 The provisioned EEPROM profile matches the synthetic phone identity and
 suppresses the security prompt. The IRQ0 keypad source reaches the real matrix
 scanner and publishes decoded keys while mode `0x0004` remains selected. The
 separate unprovisioned `12345` fixture completes the security editor through
-`0x0578` and its accepted `0x05e6` callback branch.
+`0x0578`. The verifier returns one and the observed callback publication is
+`0x05e1`; that status is callback-scoped and is not, by itself, an accept/reject
+code.
 
 ## Nokia 3210 v5.01 control
 

@@ -38,12 +38,13 @@ message, callback result, or rendered pixels.
 The unprovisioned profile legitimately presents the phone security editor.
 Physical `12345` plus left softkey completes through status `0x0578`; verifier
 `0x2ae704` transforms the five characters through `0x2ae4e8`, compares four
-bytes with RAM `0x112460`, and returns one. Callback `0x47` consequently returns
-accepted result `0x05e6`; an empty or incorrect submission returns `0x05e1` and
-re-presents the editor.
+bytes with RAM `0x112460`, and returns one. Callback `0x47` consequently
+publishes `0x05e1` in the observed accepted transaction. Incorrect input can
+also publish `0x05e1` while re-presenting the editor, so the scalar status is
+callback-local and acceptance is proved by the verifier result and subsequent
+context state, not by assigning a global meaning to that number.
 
-The generic task-5 dispatcher handles `0x05e6` explicitly at `0x2ac54c` by
-advancing its callback cursor. Later class-2/class-3 window notifications are
+Later class-2/class-3 window notifications are
 ordinary editor lifecycle. They are not display acknowledgements and do not
 select the provisioned idle screen. Security editing is therefore an optional
 phone-lock transaction, not a startup prerequisite.

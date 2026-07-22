@@ -1,7 +1,7 @@
 # SIM subsystem
 
 This is the concise hardware and firmware contract for the Nokia 3210 v6.00 SIM path. The
-address-heavy registration investigation remains in `sim_registration.md`; this document records
+address-heavy session map remains in `sim_registration.md`; this document records
 only conclusions that are implemented or directly observed.
 
 ## Hardware boundary
@@ -130,13 +130,15 @@ unmodeled errors/removal, and card protocol mixed with subscriber provisioning.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
 includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`,
-PLMN selector `6F30`, LOCI `6F7E`, and Phase
+PLMN selector `6F30`, SPN `6F46`, LOCI `6F7E`, and Phase
 `6FAE`; other known files are erased (`0xff`). `EF_PHASE` reports Phase 2 (`0x02`). Returning `0x00`
 prevents the validated preliminary lifecycle from composing. MF/DF STATUS data uses the GSM 11.11
 directory layout, including a `0x15` GSM-specific-data length and CHV status fields; a shifted
 layout causes the preliminary pass to repeat.
 
-The base `EF_SST` also allocates and activates service 2. `EF_ADN (6F3A)` is
+The base `EF_SST` allocates and activates services 2 and 17. `EF_SPN` contains
+a standards-shaped laboratory provider name; v6.00 reads it organically but
+uses its PLMN resource for the idle operator label. `EF_ADN (6F3A)` is
 a synthetic 50-by-32-byte linear-fixed EF under `DF_TELECOM`; its count is card
 profile policy, not handset hardware. The EF response reports structure and
 record length, and the card stores firmware-produced alpha/BCD records without
@@ -149,12 +151,12 @@ An unforced coherent run completes:
 
 ```text
 ATR -> PPS -> preliminary SELECT/STATUS/READ pass
-  -> LP -> AD -> SST -> LOCI -> IMSI -> ACC -> 2FE6
+  -> LP -> AD -> SST -> SPN -> LOCI -> IMSI -> ACC -> 2FE6
   -> optional CPHS ONS 6F14 absent -> remaining GSM/vendor EFs
   -> optional 6F99 absent -> timed directory-presence monitor
 ```
 
-Observed reads include ICCID, ECC, Phase, LP, SST, IMSI and ACC. SIM-enable byte `[0x111c79]`
+Observed reads include ICCID, ECC, Phase, LP, SST, SPN, IMSI and ACC. SIM-enable byte `[0x111c79]`
 changes to 1 organically at about 1.309 s; the preliminary card-acceptance transition passes
 without firmware-state forcing.
 
@@ -179,31 +181,26 @@ rearms timer `0xea` at `0x2028fc` with delay `0x181`, producing a roughly 42 ms 
 is a normal firmware-owned presence check, not a repeated initialization pass. Task 1 subsequently
 enters mode `0x0004` at about 1.435 s.
 
-The later extended registration pass belongs to a network-registration session — a later
-lifecycle, distinct from the completed offline initialization; see `sim_registration.md`. That
-session would construct callback 7 organically and drive:
+Ordinary GSM Location Updating is now independently verified. After MM acceptance,
+firmware selects `EF_LOCI` and persists location/status fields with two `UPDATE
+BINARY` commands through SIMI/FIQ6. It does not require callback 7 or the
+`0x1196/0x1199` lower-session commit family. Those remain mapped later-session
+contracts in `sim_registration.md` and must not be forced.
 
-```text
-callback 7 0x05dc -> 0x0aa0 -> context attachment -> packed 0x5518
-  -> task-17 0x1583 -> registration/session commit -> 0x1196/0x1199
-```
-
-In the coherent offline run callback 7 receives only the global `0x05e2` sweep, not
-constructor `0x05dc`; offline SIM initialization completes without it, and the session that
-would construct it must not be forced. The mapped task-21 `0x120c -> A0/12 -> D0 -> 0x177x` route is GSM
+The mapped task-21 `0x120c -> A0/12 -> D0 -> 0x177x` route is GSM
 11.14 SIM Toolkit: TERMINAL PROFILE arms latch `0x10dcb7`, `91xx` advertises a
 proactive command, and `A0/12` FETCH retrieves it. The current EF_PHASE=2 card
 correctly leaves this path dormant, and firmware's profile-download function is
 part of a later session lifecycle even with a phase-3 isolation card.
-This route is therefore excluded as the ordinary registration predecessor.
+This route is therefore separate from ordinary registration.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract
 by selecting callbacks, posting task results, replaying commit keys, or setting registration state.
 
-Later registration, MMI callbacks, report 7, and the unattended UI handoff are
-outside the SIM boundary. Report 7 is a shutdown/power-lifecycle report, not a
-SIM-ready event. The mapped registration descriptor and callback chains remain
+MMI callbacks, report 7, and the unattended UI lifecycle are outside the SIM
+boundary. Report 7 is a shutdown/power-lifecycle report, not a SIM-ready event.
+The mapped session descriptor and callback chains remain
 in `sim_registration.md`, `mmi_settlement.md`, and normalized evidence;
 they are intentionally not repeated in this concise hardware/card contract.
 

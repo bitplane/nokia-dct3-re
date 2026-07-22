@@ -59,9 +59,15 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn("{ 0x6fad, 0x7f20, 4, 0", self.card)
         self.assertIn("administrative_data[] = { 0x00, 0xff, 0xff, 0x02 }", self.card)
         self.assertIn("plmn_selector[] = { 0x00, 0xf1, 0x10 }", self.card)
-        self.assertIn("cached_loci[11]", self.card)
+        self.assertIn("{ 0x6f20, 0x7f20, 9, 0, file_structure::transparent, true }", self.card)
+        self.assertIn("{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, true }", self.card)
+        self.assertIn("{ 0x6f7e, 0x7f20, 11, 0, file_structure::transparent, true }", self.card)
+        self.assertIn("void nokia_sim_card_device::update_binary()", self.card)
+        self.assertIn("save_item(NAME(m_loci))", self.card)
+        self.assertIn("save_item(NAME(m_kc))", self.card)
+        self.assertIn("save_item(NAME(m_bcch))", self.card)
+        self.assertIn("m_loci[10] = 0x01", self.card)
         self.assertIn("if (m_cached_location)", self.card)
-        self.assertIn("return offset == 10 ? 0x01 : 0xff", self.card)
 
 
 if __name__ == "__main__":

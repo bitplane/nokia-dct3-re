@@ -49,6 +49,7 @@ FRAME_PNG ?= progress_latest_frame.png
 # Regression oracle: sha256 prefix of the promoted LCD frame from `make run`.
 # A blank/un-provisioned 3210 deterministically reaches CONTACT SERVICE here.
 ORACLE_MMI_MENU_STABLE_SHA ?= 305c12459700027431ef9c04132bcceb7e2157ef87debf2cdf1ae438b8bd8d3f
+ORACLE_RADIO_OPERATOR_CROP_SHA ?= 59dd0d4f80f705c98be148c7f60f3171d2b66d7a434fba51feef7a0134ada9a8
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 ORACLE_V501_STRUCT ?= oracles/noki3210-v501-smoke.struct
@@ -78,7 +79,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-radio-camp verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 roms build swap16 census frontier-event-census controller-census mad2-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3330e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-deep-gsm run-manifest-service run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -107,6 +108,9 @@ help:
 	@echo "make verify-display check display-profile provenance and LCD serial transport"
 	@echo "make verify-dsp-transport check DSPIF rings, completion and peer layering"
 	@echo "make verify-dsp-tone check the organic ROM-4 COBBA tone command"
+	@echo "make verify-radio-camp check organic serving-cell selection and SI1-SI4"
+	@echo "make verify-radio-registration check Location Updating, release and steady camp"
+	@echo "make verify-radio-operator check registration plus firmware-rendered operator"
 	@echo "make verify-mad2    check timer-0/FIQ and save-state restoration contracts"
 	@echo "make verify-mad2-interrupts check simultaneous, masked-pending and extended-FIQ routing"
 	@echo "make verify-mad2-clocks check reset/clock/watchdog boot contracts in both 3210 ROMs"
@@ -219,7 +223,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_display_path.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -393,10 +397,35 @@ verify-dsp-transport:
 	@echo "OK — DSPIF transport, split peer composition and active-profile save state reproduced"
 
 verify-radio-camp:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=15 \
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=20 \
 		RUN_ENV='$(FRONTIER_ENV) NOKI3210_MODEL_RADIO_PEER=1 NOKI3210_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_camp_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-registration:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=25 \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_MODEL_RADIO_PEER=1 NOKI3210_TRACE_DSP_BOUNDARY=1 NOKI3210_TRACE_DISPLAY=1 NOKI3210_TRACE_SIM_RX=1'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-operator:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=105 \
+		PROVISIONED_IMEI_PREFIX=49015420323751 \
+		RUN_ENV='$(FRONTIER_ENV) NOKI3210_MODEL_RADIO_PEER=1 NOKI3210_TRACE_DSP_BOUNDARY=1 NOKI3210_TRACE_DISPLAY=1 NOKI3210_TRACE_SIM_RX=1'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log; \
+	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no registered operator frame produced in $(RUN_DIR)"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --crop 6,0,12,7 \
+		--sha256 $(ORACLE_RADIO_OPERATOR_CROP_SHA)
+	@echo "OK — registered test-PLMN operator presentation reproduced"
 
 dsp-census:
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v600 SECONDS=20 \

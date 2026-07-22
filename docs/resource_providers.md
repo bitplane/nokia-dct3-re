@@ -158,8 +158,10 @@ stores `0x0578` as its completion status at `[0x110590 + 0x16]`, publishes
 `0x057c` when the editor is presented, and waits for the UI transaction to
 finish. A deterministic physical `12345` plus softkey sequence completes it
 through `0x0578`. Verifier `0x2ae704` returns one only when the transformed input
-matches the four stored bytes, selecting callback result `0x05e6`; mismatch
-instead posts `0x05e1`. This classifies the branch as a completed interactive UI
+matches the four stored bytes. The coherent accepted run observes `0x05e1`
+after that result; incorrect input can reuse the scalar in a different
+callback-local state, so it is not a global accept/reject code. This classifies
+the branch as a completed interactive UI
 lifecycle, not an absent radio/DSP reply or an unconditional ordinary-boot
 hardware prerequisite.
 

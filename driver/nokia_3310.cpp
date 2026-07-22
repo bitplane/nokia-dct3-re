@@ -763,6 +763,20 @@ void noki3310_state::dsp_service_irq_w(int state)
 
 void noki3310_state::dsp_tx_commit_w(int state)
 {
+	if (state && nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0)
+	{
+		nokia_dspif_device::packet packet;
+		if (m_dspif->peek_tx_packet(packet) && packet.type == 0x0f)
+			logerror("radio_type0f_commit: pc=%08x lr=%08x data0=%02x "
+					"task16=%02x/%02x/%02x/%02x/%02x/%02x task=%02x t=%.6f\n",
+					u32(m_maincpu->pc()),
+					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
+					packet.length != 0 ? packet.payload[0] : 0xff,
+					fw_byte(0x0010faec), fw_byte(0x0010faef),
+					fw_byte(0x0010faf4), fw_byte(0x0010faff),
+					fw_byte(0x0010fb08), fw_byte(0x0010fb14),
+					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
 	m_dsp_hle->tx_commit_w(state);
 }
 
