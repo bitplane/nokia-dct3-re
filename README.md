@@ -153,8 +153,10 @@ make swap16
 ```
 
 `make verify` boots the explicit missing-hardware profile and checks its semantic predicates.
-Peer models and diagnostic traces are opt-in through `NOKI3210_*` environment
+Peer models and diagnostic traces are opt-in through `NOKIA_DCT3_*` environment
 variables. They must not be enabled when establishing a new ROM's hardware baseline.
+The former `NOKI3210_*` research prefix is not retained as a compatibility alias;
+all shared runtime controls use the product-neutral namespace.
 
 ## Engineering Rules
 

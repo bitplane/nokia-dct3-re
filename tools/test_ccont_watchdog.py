@@ -27,7 +27,7 @@ class CcontWatchdogTest(unittest.TestCase):
         self.assertIn("m_wddisx_grounded || m_watchdog == 0", self.source)
         phone = (ROOT / "driver/nokia_3310.cpp").read_text()
         self.assertIn("set_wddisx_grounded", phone)
-        self.assertNotIn("NOKI3210_DISABLE_CCONT_WATCHDOG", phone)
+        self.assertNotIn("NOKIA_DCT3_DISABLE_CCONT_WATCHDOG", phone)
         product = phone.split(
             "constexpr nokia_product_config PRODUCT_3210 =", 1
         )[1].split(";", 1)[0]

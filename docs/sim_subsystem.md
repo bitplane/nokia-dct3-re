@@ -95,7 +95,7 @@ approximately 1.065 ms apart, with RX count one for each character.
 ## Stateful card device
 
 The 3210 machine profile enables the SIMI/card composition. Setting
-`NOKI3210_MODEL_SIM_DEVICE=0` disables it for negative tests. The card
+`NOKIA_DCT3_MODEL_SIM_DEVICE=0` disables it for negative tests. The card
 implements:
 
 - activation reset, ATR and PPS echo;

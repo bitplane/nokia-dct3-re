@@ -9,7 +9,7 @@ class KeypadInputTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.driver = (ROOT / "driver/nokia_3310.cpp").read_text()
-        cls.harness = (ROOT / "mame_noki3210_input_exerciser.lua").read_text()
+        cls.harness = (ROOT / "mame_nokia_dct3_input_exerciser.lua").read_text()
 
     def test_handset_controls_have_mame_names(self):
         expected = {
@@ -137,7 +137,7 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn("upper_ram_writes", self.harness)
 
     def test_buzzer_fixture_uses_only_mapped_mad2_registers(self):
-        self.assertIn("NOKI3210_BUZZER_FIXTURE_AT", self.harness)
+        self.assertIn("NOKIA_DCT3_BUZZER_FIXTURE_AT", self.harness)
         for address in ("0x20015", "0x2001c", "0x2001d", "0x2001e"):
             self.assertIn(f"space:write_u8({address}", self.harness)
 

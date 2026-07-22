@@ -123,7 +123,7 @@ is intentionally absent and should only gain content in a card profile that
 advertises CPHS. This file is the authoritative home for the CPHS/`94 04` card
 contract.
 
-`NOKI3210_SIM_CPHS_AOC=1` is a card-provisioning scenario, not a boot bypass.
+`NOKIA_DCT3_SIM_CPHS_AOC=1` is a card-provisioning scenario, not a boot bypass.
 It advertises CPHS phase 2 through `EF_INFO (6F16)`, allocates and activates
 the Customer Service Profile, and serves a minimum valid 18-byte `EF_CSP
 (6F15)` with only group-03 mask `0x20` enabled. Firmware requests both files

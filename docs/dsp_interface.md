@@ -3,7 +3,7 @@
 A map of how the ARM7 MCU talks to the on-chip **DSP** (which runs the GSM Layer-1
 baseband + audio codec) in the Nokia 3210 firmware. It combines static
 disassembly with the reviewed shared-ring and service-boundary traces. Use the
-focused `NOKI3210_TRACE_DSP_BOUNDARY` for live observation at this boundary.
+focused `NOKIA_DCT3_TRACE_DSP_BOUNDARY` for live observation at this boundary.
 
 **TL;DR for emulation:** at boot the MCU treats the DSP interface as (a) a RAM
 self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
@@ -130,7 +130,7 @@ needed for arbitrary class-`0x47` call-control messages.
 
 Task 22's housekeeping use keeps it alive. Whether the `0x30`/`0x32`
 completion returns through task 22 or only through shared control
-state is unresolved. Use `NOKI3210_TRACE_DSP_BOUNDARY` for this boundary.
+state is unresolved. Use `NOKIA_DCT3_TRACE_DSP_BOUNDARY` for this boundary.
 
 ## What the reachable boot currently proves
 

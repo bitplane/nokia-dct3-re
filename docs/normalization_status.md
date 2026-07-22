@@ -74,7 +74,7 @@ be investigated only when an organic application path reaches its boundary.
 | Vibrator/backlight | PUP bit 4 drives a named MAME `vibration` output while `0x1b` stores its independent control byte; a mapped-MMIO fixture validates the gate. Enabling `Vibrating alert` through the firmware UI and ringing an organic RTC alarm leaves both registers inactive, constraining that setting to another alert lifecycle rather than proving an output defect. The 3210 service manual establishes that COBBA drives separate LCD/key-light signals into the UI-Switch. Paired-ROM MAD2 traces and a complete changed-write census of MCU-visible DSP shared RAM find no key/timeout-specific output command. | Exercise vibra organically from an incoming-call lifecycle and decode `0x1b`. Recover the lower DSP/COBBA light-control surface before exposing backlight outputs. |
 
 The headless LCD mirror and delayed-key fixture are acceptance tooling in
-`mame_noki3210_input_exerciser.lua`. They do not add device state or firmware
+`mame_nokia_dct3_input_exerciser.lua`. They do not add device state or firmware
 shortcuts to the phone driver.
 
 The synthetic EEPROM provisions the three display profiles' ROM-authored reset
@@ -84,7 +84,7 @@ is available.
 
 ## Runtime-control ledger
 
-Every live `NOKI3210_*` control belongs to one of these classes:
+Every live `NOKIA_DCT3_*` control belongs to one of these classes:
 
 | Class | Controls | Status |
 | --- | --- | --- |

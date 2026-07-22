@@ -43,7 +43,7 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn("(m_timer1_counter + 1) & 0x7fff", callback)
         self.assertIn("m_timer1_counter == m_timer1_destination", callback)
         self.assertIn("assert_fiq(5);", callback)
-        self.assertIn("NOKI3210_TIMER1_HZ\", 1'057", self.phone)
+        self.assertIn("NOKIA_DCT3_TIMER1_HZ\", 1'057", self.phone)
 
     def test_timer1_destination_is_hardware_state_not_synthetic_time(self):
         self.assertIn("case 0x06: return m_timer1_destination >> 8;", self.device)

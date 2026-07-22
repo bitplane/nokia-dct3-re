@@ -20,15 +20,15 @@ class MachineProfileTest(unittest.TestCase):
         profile = self.driver.split("void noki3310_state::noki3210(machine_config &config)", 1)[1]
         profile = profile.split("void noki3310_state::noki5210", 1)[0]
         self.assertIn(
-            'm_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 33\'055));',
+            'm_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33\'055));',
             profile,
         )
         self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
-        self.assertNotIn('"NOKI3210_TIMER0_CATCHUP"', profile)
+        self.assertNotIn('"NOKIA_DCT3_TIMER0_CATCHUP"', profile)
         apply = self.driver.split("void noki3310_state::apply_product_config", 1)[1]
         apply = apply.split("void noki3310_state::machine_start", 1)[0]
-        self.assertIn('"NOKI3210_MODEL_DSP_SERVICE", product.dsp_service', apply)
-        self.assertIn('"NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", product.external_service', apply)
+        self.assertIn('"NOKIA_DCT3_MODEL_DSP_SERVICE", product.dsp_service', apply)
+        self.assertIn('"NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", product.external_service', apply)
 
     def test_dsp_bootstrap_count_is_product_configuration(self):
         self.assertIn(
@@ -61,7 +61,7 @@ class MachineProfileTest(unittest.TestCase):
             self.driver,
         )
         self.assertIn(
-            'nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", m_product.sim_device)',
+            'nokia_env_u32("NOKIA_DCT3_MODEL_SIM_DEVICE", m_product.sim_device)',
             self.driver,
         )
 
@@ -89,8 +89,8 @@ class MachineProfileTest(unittest.TestCase):
             "MODEL_EXTERNAL_SERVICE_PEER",
             "MODEL_SIM_DEVICE",
         ):
-            self.assertIn(f"NOKI3210_{model}=0", target)
-        self.assertIn("NOKI3210_CCONT_READY=0", target)
+            self.assertIn(f"NOKIA_DCT3_{model}=0", target)
+        self.assertIn("NOKIA_DCT3_CCONT_READY=0", target)
         self.assertIn("verify: RUN_ENV=$(CONTACT_SERVICE_ENV)", self.makefile)
 
     def test_3210_buzzer_uses_mad2_pup_and_divider(self):
@@ -98,13 +98,13 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("BIT(m_mad2->reg(0x15), 5)", self.driver)
         self.assertIn("(u16(m_mad2_regs[0x1c]) << 8) | m_mad2_regs[0x1d]", self.driver)
         self.assertIn("m_buzzer->set_clock(13'000'000 / divider)", self.driver)
-        self.assertIn('NOKI3210_TRACE_BUZZER', self.driver)
+        self.assertIn('NOKIA_DCT3_TRACE_BUZZER', self.driver)
 
     def test_charger_input_updates_vchar_and_latches_both_edges(self):
         body = self.driver.split("INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )", 1)[1]
         body = body.split("static INPUT_PORTS_START", 1)[0]
         self.assertIn("set_charger_input(newval != 0", body)
-        self.assertIn('NOKI3210_CHARGER_ADC', body)
+        self.assertIn('NOKIA_DCT3_CHARGER_ADC', body)
         self.assertNotIn("latch_irq_sources", body)
         self.assertNotIn("if (newval)", body)
 

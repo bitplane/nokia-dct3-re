@@ -68,29 +68,29 @@ ORACLE_3410_MESSAGES_SHA ?= a44445d8880ee46944e4692d3823ae25dd902882f1f38c51f64d
 # firmware editors; keeping the sequence named makes the lengthy first-boot
 # precondition reviewable in every 3330 gate.
 NOKI3330_FIRST_BOOT_KEYS := 1,2,3,4,5,enter,wait8000,1,2,0,0,enter,wait1200,0,1,0,1,2,0,0,2,wait600,enter
-NOKI3330_FIRST_BOOT_INPUT := NOKI3210_POST_READY_KEY_DELAY_MS=12000 \
-	NOKI3210_POST_READY_KEY_DURATION_MS=220 NOKI3210_POST_READY_KEY_GAP_MS=280
+NOKI3330_FIRST_BOOT_INPUT := NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+	NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280
 
 # The validated 3210 device composition and calibrated boot values are product
 # defaults in the machine configuration. Keep this alias while named research
 # targets are normalized; it intentionally contributes no state-changing knobs.
 FRONTIER_ENV :=
 
-BOOT_ENV := NOKI3210_LUA_QUIET=1
+BOOT_ENV := NOKIA_DCT3_LUA_QUIET=1
 
 # Explicit missing-hardware profile retained for the CONTACT SERVICE oracle.
 # CCONT readiness is a reset-time device input; the peer devices are disabled
 # at their ordinary boundaries. No firmware state is changed.
 CONTACT_SERVICE_ENV := \
-	NOKI3210_CCONT_READY=0 \
-	NOKI3210_MODEL_DSP_SERVICE=0 \
-	NOKI3210_MODEL_EXTERNAL_SERVICE_PEER=0 \
-	NOKI3210_MODEL_SIM_DEVICE=0
+	NOKIA_DCT3_CCONT_READY=0 \
+	NOKIA_DCT3_MODEL_DSP_SERVICE=0 \
+	NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER=0 \
+	NOKIA_DCT3_MODEL_SIM_DEVICE=0
 
 MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-keyboardprovider none -mouseprovider none -lightgunprovider none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
-	-autoboot_script ../mame_noki3210_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
+	-autoboot_script ../mame_nokia_dct3_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
 INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 	-keepaspect -skip_gameinfo $(if $(BIOS),-bios $(BIOS))
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
@@ -163,7 +163,7 @@ help:
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
 	@echo "make clean          remove build/run state (keeps the MAME clone)"
-	@echo "Override runtime knobs with RUN_ENV, e.g.  make run RUN_ENV='NOKI3210_TRACE_DISPLAY=1'"
+	@echo "Override runtime knobs with RUN_ENV, e.g.  make run RUN_ENV='NOKIA_DCT3_TRACE_DISPLAY=1'"
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -248,7 +248,7 @@ controller-census:
 	$(VENV)/bin/python tools/controller_dispatch_census.py --check
 
 mad2-census:
-	@test -n "$(MAD2_LOG)" || { echo "Set MAD2_LOG to a MAME error log captured with NOKI3210_TRACE_MAD2_LEDGER=1"; exit 1; }
+	@test -n "$(MAD2_LOG)" || { echo "Set MAD2_LOG to a MAME error log captured with NOKIA_DCT3_TRACE_MAD2_LEDGER=1"; exit 1; }
 	@mkdir -p run_census
 	$(VENV)/bin/python tools/mad2_access_census.py --check "$(MAD2_LOG)" \
 		--json run_census/mad2_accesses.json --report run_census/mad2_accesses.md
@@ -278,15 +278,15 @@ run-manifest-default:
 
 run-manifest-deep-gsm:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_deep_gsm SECONDS=8 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_TASKS=1 NOKI3210_TRACE_SIM_RX=1 NOKI3210_TRACE_GSM_SERVICE=1 NOKI3210_TRACE_DSP_BOUNDARY=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_TASKS=1 NOKIA_DCT3_TRACE_SIM_RX=1 NOKIA_DCT3_TRACE_GSM_SERVICE=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log run_manifest_deep_gsm/error.log
 
 run-manifest-service:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_service_default SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_SERVICE_COMMAND=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_SERVICE_COMMAND=1'
 	cp $(MAME_DIR)/error.log run_manifest_service_default/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=run_manifest_service_deep SECONDS=6 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_SERVICE_COMMAND=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_SERVICE_COMMAND=1'
 	cp $(MAME_DIR)/error.log run_manifest_service_deep/error.log
 
 run-manifest-3330:
@@ -311,10 +311,10 @@ prepare-run-nvram: build
 
 run: prepare-run-nvram
 	@mkdir -p $(RUN_DIR)
-	@find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' -delete
+	@find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -delete
 	@truncate -s 0 $(MAME_DIR)/error.log
-	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
-		NOKI3210_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		./mame $(MAME_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
@@ -337,7 +337,7 @@ run-interactive:
 
 smoke: build
 	@mkdir -p $(RUN_DIR)
-	cd $(MAME_DIR) && env $(BOOT_ENV) NOKI3210_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+	cd $(MAME_DIR) && env $(BOOT_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
 
 smoke-3310-639:
@@ -364,12 +364,12 @@ audit-roms: build
 # Promote the latest informative LCD frame, falling back to the latest capture
 # so the progress preview never silently remains stale.
 frame:
-	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' ! -name '*_z918_*' ! -name '*_ff918_*' \
 		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	fallback=0; \
 	if [ -z "$$f" ]; then \
-		f=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+		f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 		fallback=1; \
 	fi; \
 	if [ -z "$$f" ]; then echo "frame: no LCD frame in $(RUN_DIR) yet"; else \
@@ -390,18 +390,18 @@ verify: run
 	@echo "OK — missing-hardware semantic predicates reproduced"
 
 verify-ccont:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKI3210_TRACE_GENSIO=1'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)/error.log --adc-profile sane
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_irq SECONDS=4 \
-		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_PULSE_AT=2.0'
+		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_irq/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log \
 		--require-charger-irq --summary $(RUN_DIR)_irq/boot_summary.txt
 
 verify-ccont-watchdog:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=55 \
-		RUN_ENV='NOKI3210_TRACE_CCONT_WATCHDOG=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_WATCHDOG=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/ccont_watchdog_trace_check.py \
 		$(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
@@ -409,12 +409,12 @@ verify-ccont-watchdog:
 
 verify-gensio:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v600 SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_GENSIO=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v600/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v600/error.log \
 		--require-select-contract --require-ccont-boot-status
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v501 SECONDS=1 BIOS=501 \
-		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKI3210_TRACE_GENSIO=1'
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v501/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v501/error.log \
 		--require-select-contract --require-ccont-boot-status
@@ -422,14 +422,14 @@ verify-gensio:
 
 verify-display:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_display_v600 SECONDS=3 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_DISPLAY_PROFILE=1 NOKI3210_TRACE_DISPLAY_IO=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DISPLAY_PROFILE=1 NOKIA_DCT3_TRACE_DISPLAY_IO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v600/error.log
 	$(PYTHON) tools/display_trace_check.py $(RUN_DIR)_display_v600/error.log --firmware v600 \
 		--rom roms/3210f600a_swap16.bin --eeprom "roms/noki3210/3210 v600 eeprom.bin" \
 		--require-profile-boundary
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_display_v501 SECONDS=1 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKI3210_TRACE_DISPLAY_IO=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_DISPLAY_IO=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v501/error.log
 	$(PYTHON) tools/display_trace_check.py $(RUN_DIR)_display_v501/error.log --firmware v501 \
 		--rom roms/nokia_3210_nse-8_v05_01_full_hu_swap16.bin \
@@ -437,28 +437,28 @@ verify-display:
 
 verify-dsp-transport:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_conformance SECONDS=1 \
-		RUN_ENV='NOKI3210_DSPIF_CONFORMANCE=1'
+		RUN_ENV='NOKIA_DCT3_DSPIF_CONFORMANCE=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_conformance/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_conformance/error.log --conformance
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp SECONDS=4 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_DSP_BOUNDARY=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp/error.log \
 		--expected-bootstrap-exchanges 64
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_v501 SECONDS=2 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_TRACE_DSP_BOUNDARY=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_v501/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_v501/error.log --bootstrap-only \
 		--expected-bootstrap-exchanges 64
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_state SECONDS=2 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_STATE_ROUNDTRIP_AT=0.4'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.4'
 	@grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_dsp_state/boot_summary.txt
 	@echo "OK — DSPIF transport, split peer composition and active-profile save state reproduced"
 
 verify-dsp-bootstrap-3310:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
-		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1'
+		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)/error.log \
 		--completion-only --expected-bootstrap-exchanges 58
@@ -466,7 +466,7 @@ verify-dsp-bootstrap-3310:
 
 verify-3310-frontier:
 	@$(MAKE) --no-print-directory smoke-3310-639 RUN_DIR=$(RUN_DIR) SECONDS=15
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3310 LCD frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_IDLE_SHA)
@@ -474,8 +474,8 @@ verify-3310-frontier:
 
 verify-3310-menu:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR) SECONDS=11 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,enter NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_KEY_GAP_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3310 menu frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_MENU_SHA)
@@ -483,14 +483,14 @@ verify-3310-menu:
 
 verify-3310-navigation:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_forward SECONDS=13 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_KEY_GAP_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
-	@frame=$$(find $(RUN_DIR)_forward -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_forward -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3310 navigation frame produced in $(RUN_DIR)_forward"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_PHONEBOOK_NAV_SHA)
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_return SECONDS=14 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down,wait700,c,wait700,c NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_KEY_GAP_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
-	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down,wait700,c,wait700,c NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3310 return frame produced in $(RUN_DIR)_return"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_IDLE_SHA)
@@ -498,8 +498,8 @@ verify-3310-navigation:
 
 verify-3330-frontier: normalize-3330
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=44 \
-		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKI3210_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKI3210_POST_READY_CAPTURE_DELAY_MS=7000'
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3330 idle frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_IDLE_SHA)
@@ -507,14 +507,14 @@ verify-3330-frontier: normalize-3330
 
 verify-3330-navigation: normalize-3330
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_forward SECONDS=49 \
-		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKI3210_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait900,down NOKI3210_POST_READY_CAPTURE_DELAY_MS=2500'
-	@frame=$$(find $(RUN_DIR)_forward -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait900,down NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'
+	@frame=$$(find $(RUN_DIR)_forward -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3330 navigation frame produced in $(RUN_DIR)_forward"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_MESSAGES_SHA)
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_return SECONDS=51 \
-		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKI3210_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait900,down,wait900,c NOKI3210_POST_READY_CAPTURE_DELAY_MS=3000'
-	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait900,down,wait900,c NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'
+	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3330 return frame produced in $(RUN_DIR)_return"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_IDLE_SHA)
@@ -523,8 +523,8 @@ verify-3330-navigation: normalize-3330
 verify-3410-frontier: normalize-3410
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR) \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram SECONDS=22 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=end NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3410 idle frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_IDLE_SHA)
@@ -534,8 +534,8 @@ verify-3410-frontier: normalize-3410
 verify-3410-menu: normalize-3410
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR) \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram SECONDS=22 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
-	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3410 menu frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_MESSAGES_SHA)
@@ -545,15 +545,15 @@ verify-3410-menu: normalize-3410
 verify-3410-navigation: normalize-3410
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_menu \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_menu)/nvram SECONDS=22 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
-	@frame=$$(find $(RUN_DIR)_menu -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_menu -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3410 menu frame produced in $(RUN_DIR)_menu"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_MESSAGES_SHA)
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_return \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_return)/nvram SECONDS=24 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=enter,wait1000,end NOKI3210_POST_READY_KEY_DELAY_MS=16000 NOKI3210_POST_READY_KEY_DURATION_MS=200 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1200'
-	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3410 return frame produced in $(RUN_DIR)_return"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_IDLE_SHA)
@@ -563,13 +563,13 @@ verify-3410-navigation: normalize-3410
 
 verify-radio-camp:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=20 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_MODEL_RADIO_PEER=1 NOKI3210_TRACE_DSP_BOUNDARY=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_MODEL_RADIO_PEER=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_camp_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-registration:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=25 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_MODEL_RADIO_PEER=1 NOKI3210_TRACE_DSP_BOUNDARY=1 NOKI3210_TRACE_DISPLAY=1 NOKI3210_TRACE_SIM_RX=1'
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_MODEL_RADIO_PEER=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log
 
@@ -582,10 +582,10 @@ verify-radio-operator:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=105 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_MODEL_RADIO_PEER=1 NOKI3210_TRACE_DSP_BOUNDARY=1 NOKI3210_TRACE_DISPLAY=1 NOKI3210_TRACE_SIM_RX=1'; \
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_MODEL_RADIO_PEER=1 NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log; \
-	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no registered operator frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --crop 6,0,12,7 \
@@ -594,11 +594,11 @@ verify-radio-operator:
 
 dsp-census:
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v600 SECONDS=20 \
-		RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1 NOKI3210_TRACE_DSP_SHARED_READS=1 NOKI3210_TRACE_DSP_SHARED_TRANSITIONS=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DSP_SHARED_READS=1 NOKIA_DCT3_TRACE_DSP_SHARED_TRANSITIONS=1'
 	cp $(MAME_DIR)/error.log run_dsp_census_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v501 SECONDS=20 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1 NOKI3210_TRACE_DSP_SHARED_READS=1 NOKI3210_TRACE_DSP_SHARED_TRANSITIONS=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DSP_SHARED_READS=1 NOKIA_DCT3_TRACE_DSP_SHARED_TRANSITIONS=1'
 	cp $(MAME_DIR)/error.log run_dsp_census_v501/error.log
 	$(VENV)/bin/python tools/dsp_shared_read_census.py \
 		v600=run_dsp_census_v600/error.log v501=run_dsp_census_v501/error.log \
@@ -611,77 +611,77 @@ dsp-census:
 		--json evidence/runtime/dsp_packets.json --report docs/dsp_packet_semantics.md --check
 
 verify-mad2:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKI3210_TRACE_MAD2_TIMERS=1'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKIA_DCT3_TRACE_MAD2_TIMERS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/mad2_timer_trace_check.py $(RUN_DIR)/error.log \
 		--summary $(RUN_DIR)/boot_summary.txt --expected-line 4
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_state SECONDS=1 \
-		RUN_ENV='NOKI3210_STATE_ROUNDTRIP_AT=0.4'
+		RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.4'
 	@grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_state/boot_summary.txt
 	@echo "OK — MAD2 state round trip restored RAM, timer and controller state"
 
 verify-mad2-interrupts:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_overlap SECONDS=4 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_IRQ_OVERLAP_AT=2.0'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_INTERRUPTS=1 NOKIA_DCT3_MAD2_IRQ_OVERLAP_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_overlap/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py overlap $(RUN_DIR)_overlap/error.log \
 		--summary $(RUN_DIR)_overlap/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mask SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_IRQ_MASK_FIXTURE_AT=0.2'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_INTERRUPTS=1 NOKIA_DCT3_MAD2_IRQ_MASK_FIXTURE_AT=0.2'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mask/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py mask $(RUN_DIR)_mask/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_fiq8 SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_INTERRUPTS=1 NOKI3210_MAD2_FIQ8_FIXTURE_AT=0.2'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_INTERRUPTS=1 NOKIA_DCT3_MAD2_FIQ8_FIXTURE_AT=0.2'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_fiq8/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py fiq8 $(RUN_DIR)_fiq8/error.log
 	@echo "OK — MAD2 simultaneous, masked-pending and extended-FIQ routing contracts reproduced"
 
 verify-mad2-clocks:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v600 SECONDS=12 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v501 SECONDS=12 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v501/error.log
 	@echo "OK — MAD2 reset-cause, SIM clock-gate and conditional-watchdog contracts reproduced across both 3210 ROMs"
 
 verify-mad2-sleep:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v600 SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1 NOKI3210_TIMER1_HZ=1000000 NOKI3210_MAD2_SLEEP_FIXTURE_AT=0.01 NOKI3210_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKI3210_STATE_ROUNDTRIP_AT=0.015'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_TIMER1_HZ=1000000 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v600/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_v600/error.log \
 		--source timer1 --summary $(RUN_DIR)_sleep_v600/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v501 SECONDS=1 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1 NOKI3210_TIMER1_HZ=1000000 NOKI3210_MAD2_SLEEP_FIXTURE_AT=0.01 NOKI3210_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKI3210_STATE_ROUNDTRIP_AT=0.015'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_TIMER1_HZ=1000000 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v501/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_v501/error.log \
 		--source timer1 --summary $(RUN_DIR)_sleep_v501/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_keypad SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1 NOKI3210_MAD2_SLEEP_FIXTURE_AT=0.2 NOKI3210_MAD2_SLEEP_FIXTURE_SOURCE=keypad'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_keypad/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_keypad/error.log --source keypad
 	@echo "OK — MAD2 clock stop, sleep-counter wake, external-key wake and sleep-state restore reproduced"
 
 verify-mad2-timer1:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=2 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_TIMERS=1 NOKI3210_TIMER1_HZ=1000000'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_TIMERS=1 NOKIA_DCT3_TIMER1_HZ=1000000'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/mad2_timer1_trace_check.py $(RUN_DIR)/error.log
 	@echo "OK — MAD2 Timer-1 reached 0x7fff, asserted FIQ5 and was acknowledged"
 
 verify-mad2-reset:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_software SECONDS=4 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1 NOKI3210_MAD2_RESET_FIXTURE_AT=2.0'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_MAD2_RESET_FIXTURE_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_software/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_software/error.log \
 		--require-software-reset --allow-no-watchdog
 	@grep -Eq '^soft_resets=[1-9][0-9]*$$' $(RUN_DIR)_software/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_watchdog SECONDS=3 \
-		RUN_ENV='NOKI3210_TRACE_MAD2_CLOCKS=1 NOKI3210_MAD2_WATCHDOG_FIXTURE_AT=0.2'
+		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT=0.2'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_watchdog/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_watchdog/error.log \
 		--require-watchdog-reset --allow-no-watchdog --allow-incomplete-clock-lifecycle
@@ -689,67 +689,67 @@ verify-mad2-reset:
 
 verify-mbus:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v600 SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_MBUS=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_MBUS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v600/error.log
 	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v501 SECONDS=1 BIOS=501 \
-		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKI3210_TRACE_MBUS=1'
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKIA_DCT3_TRACE_MBUS=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v501/error.log
 	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v501/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_rx SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_MBUS=1 NOKI3210_MBUS_RX_FIXTURE=0xa5 NOKI3210_MBUS_RX_FIXTURE_AT_MS=300'
+		RUN_ENV='NOKIA_DCT3_TRACE_MBUS=1 NOKIA_DCT3_MBUS_RX_FIXTURE=0xa5 NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS=300'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_rx/error.log
 	$(PYTHON) tools/mbus_trace_check.py rx $(RUN_DIR)_mbus_rx/error.log
 	@echo "OK — MBUS initialization, idle TX and external RX/FIQ2 contracts reproduced"
 
 verify-buzzer:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_buzzer SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_BUZZER=1 NOKI3210_BUZZER_FIXTURE_AT=0.3'
+		RUN_ENV='NOKIA_DCT3_TRACE_BUZZER=1 NOKIA_DCT3_BUZZER_FIXTURE_AT=0.3'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_buzzer/error.log
 	$(PYTHON) tools/buzzer_trace_check.py $(RUN_DIR)_buzzer/error.log
 
 verify-vibrator:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_vibrator SECONDS=1 \
-		RUN_ENV='NOKI3210_TRACE_PUP_OUTPUTS=1 NOKI3210_VIBRATOR_FIXTURE_AT=0.3'
+		RUN_ENV='NOKIA_DCT3_TRACE_PUP_OUTPUTS=1 NOKIA_DCT3_VIBRATOR_FIXTURE_AT=0.3'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_vibrator/error.log
 	$(PYTHON) tools/vibrator_trace_check.py $(RUN_DIR)_vibrator/error.log
 
 verify-dsp-tone:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v600 SECONDS=3 \
-		RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v600/error.log
 	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v501 SECONDS=3 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKI3210_TRACE_DSP_BOUNDARY=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v501/error.log
 	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v501/error.log
 
 verify-ccont-rtc:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_rtc SECONDS=19 \
-		RUN_ENV='NOKI3210_TRACE_CCONT_RTC=1 NOKI3210_CCONT_RTC_FIXTURE_AT=15'
+		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_RTC=1 NOKIA_DCT3_CCONT_RTC_FIXTURE_AT=15'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_rtc/error.log
 	$(PYTHON) tools/ccont_rtc_trace_check.py $(RUN_DIR)_rtc/error.log
 
 verify-alarm:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_alarm SECONDS=135 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='NOKI3210_TRACE_CCONT_RTC=1 NOKI3210_TRACE_BUZZER=1 NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=70 NOKI3210_POST_READY_KEY_GAP_MS=180 NOKI3210_POST_READY_KEYS=enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,1,wait400,2,wait400,0,wait400,1,wait400,enter,wait700,enter,wait700,0,wait400,1,wait400,0,wait400,1,wait400,1,wait400,9,wait400,9,wait400,9,wait400,enter,wait900,c,wait900,enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,2,wait400,0,wait400,2,wait400,enter'
+		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_RTC=1 NOKIA_DCT3_TRACE_BUZZER=1 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=180 NOKIA_DCT3_POST_READY_KEYS=enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,1,wait400,2,wait400,0,wait400,1,wait400,enter,wait700,enter,wait700,0,wait400,1,wait400,0,wait400,1,wait400,1,wait400,9,wait400,9,wait400,9,wait400,enter,wait900,c,wait900,enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,2,wait400,0,wait400,2,wait400,enter'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_alarm/error.log
 	$(PYTHON) tools/alarm_trace_check.py $(RUN_DIR)_alarm/error.log
 
 verify-power-lifecycle:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_short SECONDS=18 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=250 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
 	$(PYTHON) tools/power_lifecycle_check.py short $(RUN_DIR)_power_short/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_long SECONDS=20 \
-		RUN_ENV='NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=2000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
 	$(PYTHON) tools/power_lifecycle_check.py long $(RUN_DIR)_power_long/boot_summary.txt
 	@echo "OK — physical power-key short/long firmware lifecycles reproduced"
 
 verify-charger-lifecycle:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_connected SECONDS=18 \
-		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_INITIAL=1'
+		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1 NOKIA_DCT3_CCONT_CHARGER_INITIAL=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_connected/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_charger_connected/error.log \
 		--require-charger-irq --charger-present-only \
@@ -757,7 +757,7 @@ verify-charger-lifecycle:
 	$(PYTHON) tools/charger_lifecycle_check.py connected \
 		$(RUN_DIR)_charger_connected/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_acting_dead SECONDS=22 \
-		RUN_ENV='NOKI3210_TRACE_GENSIO=1 NOKI3210_CCONT_CHARGER_INITIAL=1 NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=4000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=1500'
+		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1 NOKIA_DCT3_CCONT_CHARGER_INITIAL=1 NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_acting_dead/error.log
 	$(PYTHON) tools/charger_lifecycle_check.py acting-dead \
 		$(RUN_DIR)_acting_dead/boot_summary.txt
@@ -765,7 +765,7 @@ verify-charger-lifecycle:
 
 verify-charger-wake:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_wake SECONDS=35 \
-		RUN_ENV='NOKI3210_TRACE_CCONT_ADC=1 NOKI3210_POST_READY_KEYS=power NOKI3210_POST_READY_KEY_DELAY_MS=6000 NOKI3210_POST_READY_KEY_DURATION_MS=4000 NOKI3210_CCONT_CHARGER_PULSE_AT=13 NOKI3210_CCONT_CHARGER_PULSE_DURATION=30'
+		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_ADC=1 NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=13 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_wake/error.log
 	$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)_charger_wake/error.log \
 		$(RUN_DIR)_charger_wake/boot_summary.txt
@@ -785,9 +785,9 @@ verify-mmi-menu:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR) SECONDS=20 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=3000'; \
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_POST_READY_KEYS=enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'; \
 	$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_FRONTIER_STRUCT); \
-	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative LCD frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --mask 23,23,20,12 \
@@ -805,9 +805,9 @@ verify-mmi-menu-501:
 	$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=20 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKI3210_POST_READY_KEYS=enter NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_CAPTURE_DELAY_MS=3000'; \
+		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_POST_READY_KEYS=enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'; \
 	$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_V501_STRUCT); \
-	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative LCD frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --mask 23,23,20,12 \
@@ -825,15 +825,15 @@ verify-sim-phonebook:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR="$$save_dir" SECONDS=32 \
 		PRESERVE_NVRAM=0 PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='NOKI3210_TRACE_SIM_RX=1 NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEY_DURATION_MS=70 NOKI3210_POST_READY_KEY_GAP_MS=180 NOKI3210_POST_READY_KEYS=enter,wait700,enter,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKI3210_POST_READY_CAPTURE_DELAY_MS=2500'; \
+		RUN_ENV='NOKIA_DCT3_TRACE_SIM_RX=1 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=180 NOKIA_DCT3_POST_READY_KEYS=enter,wait700,enter,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
 	cp "$(MAME_DIR)/error.log" "$$save_dir/error.log"; \
 	$(PYTHON) tools/sim_phonebook_check.py "$$save_dir/error.log" \
 		"$$save_dir/nvram/$(NVRAM_SYSTEM)/sim_card"; \
 	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR="$$reload_dir" SECONDS=24 \
 		PRESERVE_NVRAM=1 PROVISIONED_IMEI_PREFIX=49015420323751 \
 		RUN_NVRAM_DIR="$(abspath $(RUN_DIR)_phonebook_save/nvram)" \
-		RUN_ENV='NOKI3210_POST_READY_KEY_DELAY_MS=12000 NOKI3210_POST_READY_KEYS=enter,wait700,enter,wait700,enter,wait700,enter NOKI3210_POST_READY_CAPTURE_DELAY_MS=2500'; \
-	frame=$$(find "$$reload_dir" -maxdepth 1 -name 'noki3210_lcdmirror_*.pgm' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEYS=enter,wait700,enter,wait700,enter,wait700,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
+	frame=$$(find "$$reload_dir" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no reloaded phonebook frame produced"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --mask 23,23,20,12 \

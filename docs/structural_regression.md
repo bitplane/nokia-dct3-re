@@ -10,8 +10,8 @@ The structural oracle
 guards stable mid-boot behavior that can regress while still converging on the
 same frame.
 
-`mame_noki3210_input_exerciser.lua` writes a deterministic summary to
-`NOKI3210_BOOT_SUMMARY`. `make run` places it at
+`mame_nokia_dct3_input_exerciser.lua` writes a deterministic summary to
+`NOKIA_DCT3_BOOT_SUMMARY`. `make run` places it at
 `RUN_DIR/boot_summary.txt`; `make verify` checks the semantic predicates in
 `oracles/noki3210-default.struct` without requiring an LCD frame. That target
 explicitly disables the 3210 peer devices and is a negative failure baseline.

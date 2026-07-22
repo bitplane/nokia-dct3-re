@@ -223,7 +223,7 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 signal names remain incomplete.
 Firmware boot reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7
 maps through ROM table `0x2e2d74` to selector 1. The complete logical-source table is identical in
-3210 v5.01. Values come from `nokia_adc_override` (env `NOKI3210_ADC0..7`, profiles); electrical
+3210 v5.01. Values come from `nokia_adc_override` (env `NOKIA_DCT3_ADC0..7`, profiles); electrical
 scaling and PCB net names remain open.
 
 A physical charger edge establishes selector 5 more narrowly: CCONT source bit 3 wakes the
@@ -286,5 +286,5 @@ the first portability probe. See `mmi_settlement.md` and `mmi_layer.md`.
 
 ## Diagnostic
 
-Use `NOKI3210_TRACE_MAD2_LEDGER=1` for a bounded first-read/first-write trace of
+Use `NOKIA_DCT3_TRACE_MAD2_LEDGER=1` for a bounded first-read/first-write trace of
 MAD2 I/O. See `mad2_fidelity.md` for the authoritative implementation ledger.

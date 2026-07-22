@@ -282,7 +282,7 @@ extent while publishing their own retained reset causes.
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
 phone has the watchdog enabled, so the 3210 product profile leaves WDDISX
-released. `NOKI3210_CCONT_WDDISX_GROUNDED=1` remains a physical-input scenario
+released. `NOKIA_DCT3_CCONT_WDDISX_GROUNDED=1` remains a physical-input scenario
 for negative comparisons, not the boot default.
 
 The firmware service helper at `0x2b4dc0` accepts a mask: bit 0 reloads the

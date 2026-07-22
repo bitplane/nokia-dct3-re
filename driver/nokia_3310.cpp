@@ -492,7 +492,7 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 
 static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 {
-	char name[] = "NOKI3210_ADC0";
+	char name[] = "NOKIA_DCT3_ADC0";
 	name[12] = '0' + (id & 0x07);
 
 	if (const char *value = std::getenv(name))
@@ -503,7 +503,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 			return parsed & 0x03ff;
 	}
 
-	const char *profile = std::getenv("NOKI3210_ADC_PROFILE");
+	const char *profile = std::getenv("NOKIA_DCT3_ADC_PROFILE");
 	if (profile)
 	{
 		const bool charged = profile && !std::strcmp(profile, "charged");
@@ -529,7 +529,7 @@ static uint16_t nokia_adc_override(unsigned id, uint16_t fallback)
 }
 
 // ============================================================================
-// NOKI3210_* environment knobs — the driver reads every runtime option from the
+// NOKIA_DCT3_* environment knobs — the driver reads every runtime option from the
 // environment (pass overrides through `make run RUN_ENV='...'`). Three kinds:
 //
 //   1. HARDWARE/PRODUCT CONFIG — selects a scenario, not firmware behaviour:
@@ -582,29 +582,29 @@ static unsigned nokia_env_u32(const char *name, unsigned fallback)
 
 void noki3310_state::machine_start()
 {
-	m_trace.buzzer = nokia_env_u32("NOKI3210_TRACE_BUZZER", 0) != 0;
-	m_trace.ccont_adc = nokia_env_u32("NOKI3210_TRACE_CCONT_ADC", 0) != 0;
-	m_trace.ccont_rtc = nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0;
-	m_trace.ccont_watchdog = nokia_env_u32("NOKI3210_TRACE_CCONT_WATCHDOG", 0) != 0;
-	m_trace.display = nokia_env_u32("NOKI3210_TRACE_DISPLAY", 0) != 0;
-	m_trace.display_io = nokia_env_u32("NOKI3210_TRACE_DISPLAY_IO", 0) != 0;
-	m_trace.display_profile = nokia_env_u32("NOKI3210_TRACE_DISPLAY_PROFILE", 0) != 0;
-	m_trace.dsp_boundary = nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0;
-	m_trace.dsp_shared_reads = nokia_env_u32("NOKI3210_TRACE_DSP_SHARED_READS", 0) != 0;
-	m_trace.dsp_shared_transitions = nokia_env_u32("NOKI3210_TRACE_DSP_SHARED_TRANSITIONS", 0) != 0;
-	m_trace.gensio = nokia_env_u32("NOKI3210_TRACE_GENSIO", 0) != 0;
-	m_trace.gsm_service = nokia_env_u32("NOKI3210_TRACE_GSM_SERVICE", 0) != 0;
-	m_trace.keypad = nokia_env_u32("NOKI3210_TRACE_KEYPAD", 0) != 0;
-	m_trace.mad2_clocks = nokia_env_u32("NOKI3210_TRACE_MAD2_CLOCKS", 0) != 0;
-	m_trace.mad2_interrupts = nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0;
-	m_trace.mad2_ledger = nokia_env_u32("NOKI3210_TRACE_MAD2_LEDGER", 0) != 0;
-	m_trace.mad2_timers = nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0;
-	m_trace.mbus = nokia_env_u32("NOKI3210_TRACE_MBUS", 0) != 0;
-	m_trace.pup_outputs = nokia_env_u32("NOKI3210_TRACE_PUP_OUTPUTS", 0) != 0;
-	m_trace.service_command = nokia_env_u32("NOKI3210_TRACE_SERVICE_COMMAND", 0) != 0;
-	m_trace.sim_rx = nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0;
-	m_trace.tasks = nokia_env_u32("NOKI3210_TRACE_TASKS", 0) != 0;
-	m_trace.gensio_limit = nokia_env_u32("NOKI3210_TRACE_GENSIO_LIMIT", 20'000);
+	m_trace.buzzer = nokia_env_u32("NOKIA_DCT3_TRACE_BUZZER", 0) != 0;
+	m_trace.ccont_adc = nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_ADC", 0) != 0;
+	m_trace.ccont_rtc = nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_RTC", 0) != 0;
+	m_trace.ccont_watchdog = nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_WATCHDOG", 0) != 0;
+	m_trace.display = nokia_env_u32("NOKIA_DCT3_TRACE_DISPLAY", 0) != 0;
+	m_trace.display_io = nokia_env_u32("NOKIA_DCT3_TRACE_DISPLAY_IO", 0) != 0;
+	m_trace.display_profile = nokia_env_u32("NOKIA_DCT3_TRACE_DISPLAY_PROFILE", 0) != 0;
+	m_trace.dsp_boundary = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_BOUNDARY", 0) != 0;
+	m_trace.dsp_shared_reads = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_SHARED_READS", 0) != 0;
+	m_trace.dsp_shared_transitions = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_SHARED_TRANSITIONS", 0) != 0;
+	m_trace.gensio = nokia_env_u32("NOKIA_DCT3_TRACE_GENSIO", 0) != 0;
+	m_trace.gsm_service = nokia_env_u32("NOKIA_DCT3_TRACE_GSM_SERVICE", 0) != 0;
+	m_trace.keypad = nokia_env_u32("NOKIA_DCT3_TRACE_KEYPAD", 0) != 0;
+	m_trace.mad2_clocks = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_CLOCKS", 0) != 0;
+	m_trace.mad2_interrupts = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_INTERRUPTS", 0) != 0;
+	m_trace.mad2_ledger = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_LEDGER", 0) != 0;
+	m_trace.mad2_timers = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_TIMERS", 0) != 0;
+	m_trace.mbus = nokia_env_u32("NOKIA_DCT3_TRACE_MBUS", 0) != 0;
+	m_trace.pup_outputs = nokia_env_u32("NOKIA_DCT3_TRACE_PUP_OUTPUTS", 0) != 0;
+	m_trace.service_command = nokia_env_u32("NOKIA_DCT3_TRACE_SERVICE_COMMAND", 0) != 0;
+	m_trace.sim_rx = nokia_env_u32("NOKIA_DCT3_TRACE_SIM_RX", 0) != 0;
+	m_trace.tasks = nokia_env_u32("NOKIA_DCT3_TRACE_TASKS", 0) != 0;
+	m_trace.gensio_limit = nokia_env_u32("NOKIA_DCT3_TRACE_GENSIO_LIMIT", 20'000);
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
@@ -652,19 +652,19 @@ void noki3310_state::apply_product_config(nokia_product_config const &product)
 	screen->set_size(product.lcd_visible_width, product.lcd_visible_height);
 	screen->set_visarea(0, product.lcd_visible_width - 1, 0, product.lcd_visible_height - 1);
 	const bool external_service =
-			nokia_env_u32("NOKI3210_MODEL_EXTERNAL_SERVICE_PEER", product.external_service) != 0;
+			nokia_env_u32("NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", product.external_service) != 0;
 	m_dsp_hle->set_service_enabled(
-			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE", product.dsp_service) != 0);
+			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE", product.dsp_service) != 0);
 	m_dsp_hle->set_external_service_enabled(external_service);
 	const unsigned dsp_default_ms = external_service ? 4 : 5;
 	unsigned service_delay_us = product.dsp_service_delay_us != 0 ?
 			product.dsp_service_delay_us : dsp_default_ms * 1'000;
-	if (std::getenv("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS"))
-		service_delay_us = nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms) * 1'000;
+	if (std::getenv("NOKIA_DCT3_MODEL_DSP_SERVICE_DELAY_MS"))
+		service_delay_us = nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE_DELAY_MS", dsp_default_ms) * 1'000;
 	m_dsp_hle->set_service_delay_us(
-			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_DELAY_US", service_delay_us));
+			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE_DELAY_US", service_delay_us));
 	m_dsp_hle->set_peer_poll_ms(
-			nokia_env_u32("NOKI3210_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
+			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE_TICK_MS", dsp_default_ms));
 	m_external_service_peer->set_enabled(external_service);
 }
 
@@ -721,7 +721,7 @@ void noki3310_state::machine_reset()
 	m_flash_b3_status_override = false;
 	m_flash_b3_erase_remaining_us = 0;
 	m_timer_flash_b3_erase->adjust(attotime::never);
-	if (nokia_env_u32("NOKI3210_DSPIF_CONFORMANCE", 0) != 0)
+	if (nokia_env_u32("NOKIA_DCT3_DSPIF_CONFORMANCE", 0) != 0)
 		logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
 	// Load deterministic raw selector inputs. The firmware-observable selector
 	// contract is known; physical 3210 net names and analog units are not.
@@ -729,15 +729,15 @@ void noki3310_state::machine_reset()
 		for (unsigned id = 0; id < 8; id++)
 			m_ccont->set_adc_source(id, nokia_adc_override(id, m_product.adc_defaults[id]));
 	}
-	m_ccont->set_wddisx_grounded(nokia_env_u32("NOKI3210_CCONT_WDDISX_GROUNDED",
+	m_ccont->set_wddisx_grounded(nokia_env_u32("NOKIA_DCT3_CCONT_WDDISX_GROUNDED",
 			m_product.ccont_wddisx_grounded) != 0);
-	m_simi->set_enabled(nokia_env_u32("NOKI3210_MODEL_SIM_DEVICE", m_product.sim_device) != 0);
-	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKI3210_SIM_CPHS_AOC", 0) != 0);
-	m_sim_card->set_cached_location(nokia_env_u32("NOKI3210_SIM_CACHED_LOCATION", 0) != 0);
+	m_simi->set_enabled(nokia_env_u32("NOKIA_DCT3_MODEL_SIM_DEVICE", m_product.sim_device) != 0);
+	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKIA_DCT3_SIM_CPHS_AOC", 0) != 0);
+	m_sim_card->set_cached_location(nokia_env_u32("NOKIA_DCT3_SIM_CACHED_LOCATION", 0) != 0);
 	{
 		u8 atr[40] = { 0x3b, 0x10, 0x05 };
 		unsigned length = 3;
-		if (const char *hex = std::getenv("NOKI3210_SIM_ATR_HEX"))
+		if (const char *hex = std::getenv("NOKIA_DCT3_SIM_ATR_HEX"))
 		{
 			length = 0;
 			for (const char *p = hex; p[0] && p[1] && length < std::size(atr); p += 2)
@@ -752,10 +752,10 @@ void noki3310_state::machine_reset()
 	m_keypad_irq_latched = false;
 	m_ccont_irq_state = false;
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
-	if (std::getenv("NOKI3210_MBUS_RX_FIXTURE"))
+	if (std::getenv("NOKIA_DCT3_MBUS_RX_FIXTURE"))
 		m_timer_mbus_rx_fixture->adjust(attotime::from_msec(
-				nokia_env_u32("NOKI3210_MBUS_RX_FIXTURE_AT_MS", 300)),
-				nokia_env_u32("NOKI3210_MBUS_RX_FIXTURE", 0xff) & 0xff);
+				nokia_env_u32("NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS", 300)),
+				nokia_env_u32("NOKIA_DCT3_MBUS_RX_FIXTURE", 0xff) & 0xff);
 	else
 		m_timer_mbus_rx_fixture->adjust(attotime::never);
 
@@ -1602,7 +1602,7 @@ INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )
 {
 	m_ccont->set_charger_input(newval != 0,
-			nokia_env_u32("NOKI3210_CHARGER_ADC", 0x3ff));
+			nokia_env_u32("NOKIA_DCT3_CHARGER_ADC", 0x3ff));
 }
 
 static INPUT_PORTS_START( noki3210 )
@@ -1761,29 +1761,29 @@ void noki3310_state::noki3310(machine_config &config)
 	INTEL_TE28F160(config, "flash");
 	I2C_24C128(config, m_eeprom);
 	NOKIA_MAD2(config, m_mad2);
-	m_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 33055));
-	m_mad2->set_timer1_hz(nokia_env_u32("NOKI3210_TIMER1_HZ", 1057));
-	m_mad2->set_fiq8_hz(nokia_env_u32("NOKI3210_FIQ8_HZ", 1000));
-	m_mad2->set_timer0_catchup(nokia_env_u32("NOKI3210_TIMER0_CATCHUP", 0) != 0);
-	m_mad2->set_timer_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_TIMERS", 0) != 0);
-	m_mad2->set_interrupt_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_INTERRUPTS", 0) != 0);
-	m_mad2->set_clock_trace(nokia_env_u32("NOKI3210_TRACE_MAD2_CLOCKS", 0) != 0);
+	m_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33055));
+	m_mad2->set_timer1_hz(nokia_env_u32("NOKIA_DCT3_TIMER1_HZ", 1057));
+	m_mad2->set_fiq8_hz(nokia_env_u32("NOKIA_DCT3_FIQ8_HZ", 1000));
+	m_mad2->set_timer0_catchup(nokia_env_u32("NOKIA_DCT3_TIMER0_CATCHUP", 0) != 0);
+	m_mad2->set_timer_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_TIMERS", 0) != 0);
+	m_mad2->set_interrupt_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_INTERRUPTS", 0) != 0);
+	m_mad2->set_clock_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_CLOCKS", 0) != 0);
 	m_mad2->fiq_cb().set(FUNC(noki3310_state::mad2_fiq_w));
 	m_mad2->irq_cb().set(FUNC(noki3310_state::mad2_irq_w));
 	m_mad2->irq_ack_cb().set(FUNC(noki3310_state::mad2_irq_ack_w));
 	m_mad2->reset_cb().set(FUNC(noki3310_state::mad2_reset_w));
 	m_mad2->sleep_cb().set(FUNC(noki3310_state::mad2_sleep_w));
 	NOKIA_MBUS(config, m_mbus);
-	m_mbus->set_trace(nokia_env_u32("NOKI3210_TRACE_MBUS", 0) != 0);
+	m_mbus->set_trace(nokia_env_u32("NOKIA_DCT3_TRACE_MBUS", 0) != 0);
 	m_mbus->tx_cb().set(FUNC(noki3310_state::mbus_tx_w));
 	m_mbus->fiq2_cb().set(FUNC(noki3310_state::mbus_fiq2_w));
 	m_mbus->fiq3_cb().set(FUNC(noki3310_state::mbus_fiq3_w));
 	NOKIA_CCONT(config, m_ccont);
-	m_ccont->set_adc_trace(nokia_env_u32("NOKI3210_TRACE_CCONT_ADC", 0) != 0);
-	m_ccont->set_rtc_trace(nokia_env_u32("NOKI3210_TRACE_CCONT_RTC", 0) != 0);
+	m_ccont->set_adc_trace(nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_ADC", 0) != 0);
+	m_ccont->set_rtc_trace(nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_RTC", 0) != 0);
 	// The low status bit is persistent CCONT reset state, not an IRQ source.
 	// Clearing it provides the explicit missing/unready-CCONT fault fixture.
-	m_ccont->set_ready(nokia_env_u32("NOKI3210_CCONT_READY", 1) != 0);
+	m_ccont->set_ready(nokia_env_u32("NOKIA_DCT3_CCONT_READY", 1) != 0);
 	m_ccont->irq_cb().set(FUNC(noki3310_state::ccont_irq_w));
 	m_ccont->power_cb().set(FUNC(noki3310_state::ccont_power_w));
 	NOKIA_GENSIO(config, m_gensio);
@@ -1798,7 +1798,7 @@ void noki3310_state::noki3310(machine_config &config)
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
 	NOKIA_RADIO_PEER(config, m_radio_peer);
-	const bool dsp_trace = nokia_env_u32("NOKI3210_TRACE_DSP_BOUNDARY", 0) != 0;
+	const bool dsp_trace = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_BOUNDARY", 0) != 0;
 	m_dspif->set_trace_enabled(dsp_trace);
 	m_dspif->tx_commit_cb().set(FUNC(noki3310_state::dsp_tx_commit_w));
 	m_dspif->service_pending_cb().set(FUNC(noki3310_state::dsp_service_pending_w));
@@ -1812,7 +1812,7 @@ void noki3310_state::noki3310(machine_config &config)
 	m_external_service_peer->set_trace_enabled(dsp_trace);
 	NOKIA_SIMI(config, m_simi);
 	NOKIA_SIM_CARD(config, m_sim_card);
-	m_sim_card->set_trace(nokia_env_u32("NOKI3210_TRACE_SIM_RX", 0) != 0);
+	m_sim_card->set_trace(nokia_env_u32("NOKIA_DCT3_TRACE_SIM_RX", 0) != 0);
 	m_simi->irq_cb().set(FUNC(noki3310_state::sim_irq_w));
 	m_sim_card->response_cb().set(m_simi, FUNC(nokia_simi_device::card_rx_w));
 	apply_product_config(PRODUCT_3310);
@@ -1837,11 +1837,11 @@ void noki3310_state::noki3210(machine_config &config)
 	// The paired ROMs prove that Timer 1 ticks eight times faster than Timer 0's
 	// divided counter. Keep the measured inputs configurable until the exact CTSI
 	// oscillator/divider tree is recovered; do not conflate both timer inputs.
-	m_mad2->set_timer0_hz(nokia_env_u32("NOKI3210_TIMER0_HZ", 33'055));
-	m_mad2->set_timer1_hz(nokia_env_u32("NOKI3210_TIMER1_HZ", 1'057));
+	m_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33'055));
+	m_mad2->set_timer1_hz(nokia_env_u32("NOKIA_DCT3_TIMER1_HZ", 1'057));
 	m_mad2->set_timer0_catchup(false);
 
-	m_radio_peer->set_enabled(nokia_env_u32("NOKI3210_MODEL_RADIO_PEER", 0) != 0);
+	m_radio_peer->set_enabled(nokia_env_u32("NOKIA_DCT3_MODEL_RADIO_PEER", 0) != 0);
 }
 
 void noki3310_state::noki5210(machine_config &config)

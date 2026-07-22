@@ -1,13 +1,13 @@
 local machine = manager.machine
 local cpu = machine.devices[":maincpu"]
 local space = cpu.spaces["program"]
-local output_dir = os.getenv("NOKI3210_SNAPSHOT_DIR") or ".."
-local boot_summary_path = os.getenv("NOKI3210_BOOT_SUMMARY")
-local ram_dump_path = os.getenv("NOKI3210_RAM_DUMP")
-local ram_dump_base = tonumber(os.getenv("NOKI3210_RAM_DUMP_BASE") or "0") or 0
-local ram_dump_size = tonumber(os.getenv("NOKI3210_RAM_DUMP_SIZE") or "65536") or 65536
+local output_dir = os.getenv("NOKIA_DCT3_SNAPSHOT_DIR") or ".."
+local boot_summary_path = os.getenv("NOKIA_DCT3_BOOT_SUMMARY")
+local ram_dump_path = os.getenv("NOKIA_DCT3_RAM_DUMP")
+local ram_dump_base = tonumber(os.getenv("NOKIA_DCT3_RAM_DUMP_BASE") or "0") or 0
+local ram_dump_size = tonumber(os.getenv("NOKIA_DCT3_RAM_DUMP_SIZE") or "65536") or 65536
 local ram_dumped = false
-local quiet = os.getenv("NOKI3210_LUA_QUIET") == "1"
+local quiet = os.getenv("NOKIA_DCT3_LUA_QUIET") == "1"
 local bios = machine.options.entries.bios:value()
 local v501 = bios == "501"
 local is_3410 = machine.system.name == "noki3410"
@@ -35,8 +35,8 @@ local lcd_dirty = false
 local active_fields = {}
 -- Address-space taps must outlive the script chunk; otherwise their Lua
 -- callbacks can be collected while the CPU still holds the native tap.
-noki3210_oracle_taps = {}
-local taps = noki3210_oracle_taps
+nokia_dct3_oracle_taps = {}
+local taps = nokia_dct3_oracle_taps
 local startup_ready_time = nil
 local post_key_active = nil
 local charger_pulse_at
@@ -70,20 +70,20 @@ local function env_number(name, fallback)
 	return value or fallback
 end
 
-charger_pulse_at = env_number("NOKI3210_CCONT_CHARGER_PULSE_AT", -1)
-local charger_pulse_duration = env_number("NOKI3210_CCONT_CHARGER_PULSE_DURATION", 0.05)
-local charger_initial = env_number("NOKI3210_CCONT_CHARGER_INITIAL", 0) ~= 0
-irq_overlap_at = env_number("NOKI3210_MAD2_IRQ_OVERLAP_AT", -1)
-irq_mask_fixture_at = env_number("NOKI3210_MAD2_IRQ_MASK_FIXTURE_AT", -1)
-fiq8_fixture_at = env_number("NOKI3210_MAD2_FIQ8_FIXTURE_AT", -1)
-buzzer_fixture_at = env_number("NOKI3210_BUZZER_FIXTURE_AT", -1)
-vibrator_fixture_at = env_number("NOKI3210_VIBRATOR_FIXTURE_AT", -1)
-rtc_fixture_at = env_number("NOKI3210_CCONT_RTC_FIXTURE_AT", -1)
-mad2_reset_fixture_at = env_number("NOKI3210_MAD2_RESET_FIXTURE_AT", -1)
-mad2_watchdog_fixture_at = env_number("NOKI3210_MAD2_WATCHDOG_FIXTURE_AT", -1)
-mad2_sleep_fixture_at = env_number("NOKI3210_MAD2_SLEEP_FIXTURE_AT", -1)
-local mad2_sleep_fixture_source = os.getenv("NOKI3210_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
-local state_roundtrip_at = env_number("NOKI3210_STATE_ROUNDTRIP_AT", -1)
+charger_pulse_at = env_number("NOKIA_DCT3_CCONT_CHARGER_PULSE_AT", -1)
+local charger_pulse_duration = env_number("NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION", 0.05)
+local charger_initial = env_number("NOKIA_DCT3_CCONT_CHARGER_INITIAL", 0) ~= 0
+irq_overlap_at = env_number("NOKIA_DCT3_MAD2_IRQ_OVERLAP_AT", -1)
+irq_mask_fixture_at = env_number("NOKIA_DCT3_MAD2_IRQ_MASK_FIXTURE_AT", -1)
+fiq8_fixture_at = env_number("NOKIA_DCT3_MAD2_FIQ8_FIXTURE_AT", -1)
+buzzer_fixture_at = env_number("NOKIA_DCT3_BUZZER_FIXTURE_AT", -1)
+vibrator_fixture_at = env_number("NOKIA_DCT3_VIBRATOR_FIXTURE_AT", -1)
+rtc_fixture_at = env_number("NOKIA_DCT3_CCONT_RTC_FIXTURE_AT", -1)
+mad2_reset_fixture_at = env_number("NOKIA_DCT3_MAD2_RESET_FIXTURE_AT", -1)
+mad2_watchdog_fixture_at = env_number("NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT", -1)
+mad2_sleep_fixture_at = env_number("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT", -1)
+local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
+local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
 
 local function emulation_seconds()
 	return machine.time:as_double()
@@ -240,7 +240,7 @@ local function queue_lcd_dump()
 	}
 end
 
-taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "noki3210_oracle_mmio", function(offset, data, mask)
+taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "nokia_dct3_oracle_mmio", function(offset, data, mask)
 	local address, value = bus_byte(offset, data, mask)
 	record_mmio(address, value)
 	local reg = address & 0xff
@@ -271,7 +271,7 @@ taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "noki3210_oracle_mmi
 	return data
 end)
 
-taps[#taps + 1] = space:install_read_tap(0x2006c, 0x2006f, "noki3210_oracle_ccont_read", function(offset, data, mask)
+taps[#taps + 1] = space:install_read_tap(0x2006c, 0x2006f, "nokia_dct3_oracle_ccont_read", function(offset, data, mask)
 	local address = bus_byte(offset, data, mask)
 	if (address & 0xff) == 0x6c then structural.ccont_reads = structural.ccont_reads + 1 end
 	return data
@@ -280,11 +280,11 @@ end)
 -- The 3210 carries a 128 KiB KM68U1000 SRAM. Keep the wider provisional map
 -- observable until its address-line mirroring is modeled, so ordinary boot
 -- cannot silently depend on storage that does not exist on the board.
-taps[#taps + 1] = space:install_read_tap(0x120000, 0x17ffff, "noki3210_upper_ram_read", function(offset, data, mask)
+taps[#taps + 1] = space:install_read_tap(0x120000, 0x17ffff, "nokia_dct3_upper_ram_read", function(offset, data, mask)
 	structural.upper_ram_reads = structural.upper_ram_reads + 1
 	if offset > structural.upper_ram_highest then structural.upper_ram_highest = offset end
 end)
-taps[#taps + 1] = space:install_write_tap(0x120000, 0x17ffff, "noki3210_upper_ram_write", function(offset, data, mask)
+taps[#taps + 1] = space:install_write_tap(0x120000, 0x17ffff, "nokia_dct3_upper_ram_write", function(offset, data, mask)
 	structural.upper_ram_writes = structural.upper_ram_writes + 1
 	if offset > structural.upper_ram_highest then structural.upper_ram_highest = offset end
 end)
@@ -292,7 +292,7 @@ end)
 local function write_lcd_dump()
 	while #pending_lcd > 0 do
 	local pending = table.remove(pending_lcd, 1)
-	local filename = string.format("%s/noki3210_lcdmirror_%04d_f%03d_z%03d_ff%03d_o%03d.pgm",
+	local filename = string.format("%s/nokia_dct3_lcdmirror_%04d_f%03d_z%03d_ff%03d_o%03d.pgm",
 		output_dir, pending.seq, frames, pending.zero, pending.ff, pending.other)
 	local f = io.open(filename, "wb")
 	if not f then return end
@@ -352,16 +352,16 @@ local function write_boot_summary()
 	if f then f:write(table.concat(summary, "\n"), "\n"); f:close(); os.rename(temporary, boot_summary_path) end
 end
 
-local post_key = os.getenv("NOKI3210_POST_READY_KEY")
+local post_key = os.getenv("NOKIA_DCT3_POST_READY_KEY")
 local post_keys = {}
-for name in string.gmatch(os.getenv("NOKI3210_POST_READY_KEYS") or post_key or "", "[^,%s]+") do
+for name in string.gmatch(os.getenv("NOKIA_DCT3_POST_READY_KEYS") or post_key or "", "[^,%s]+") do
 	post_keys[#post_keys + 1] = name
 end
-local post_delay = env_number("NOKI3210_POST_READY_KEY_DELAY_MS", 250) / 1000
-local post_duration = env_number("NOKI3210_POST_READY_KEY_DURATION_MS", 50) / 1000
-local post_gap = env_number("NOKI3210_POST_READY_KEY_GAP_MS", 100) / 1000
-local post_period = env_number("NOKI3210_POST_READY_KEY_PERIOD_MS", 0) / 1000
-local post_capture_delay = env_number("NOKI3210_POST_READY_CAPTURE_DELAY_MS", -1) / 1000
+local post_delay = env_number("NOKIA_DCT3_POST_READY_KEY_DELAY_MS", 250) / 1000
+local post_duration = env_number("NOKIA_DCT3_POST_READY_KEY_DURATION_MS", 50) / 1000
+local post_gap = env_number("NOKIA_DCT3_POST_READY_KEY_GAP_MS", 100) / 1000
+local post_period = env_number("NOKIA_DCT3_POST_READY_KEY_PERIOD_MS", 0) / 1000
+local post_capture_delay = env_number("NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS", -1) / 1000
 local post_sequence_driven = #post_keys > 0 and post_period == 0
 
 local function update_post_ready_key()
@@ -665,9 +665,9 @@ if state_roundtrip_at >= 0 then
 			irq_ctrl = space:read_u8(0x2000c),
 			gensio = space:read_u8(0x2006d),
 		}
-		machine:save("noki3210_mad2_contract")
+		machine:save("nokia_dct3_mad2_contract")
 		emu.wait(0.05)
-		machine:load("noki3210_mad2_contract")
+		machine:load("nokia_dct3_mad2_contract")
 		emu.wait(0.01)
 		local counter = space:read_u16(0x20010)
 		local counter_delta = (counter - snapshot.counter) & 0xffff
@@ -710,5 +710,5 @@ emu.add_machine_stop_notifier(function()
 	write_boot_summary()
 end)
 
-info("noki3210 oracle/input harness installed")
+info("Nokia DCT3 oracle/input harness installed")
 if cpu.debug then cpu.debug:go() end

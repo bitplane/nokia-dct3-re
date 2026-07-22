@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize the bounded NOKI3210_TRACE_MAD2_LEDGER register trace."""
+"""Summarize the bounded NOKIA_DCT3_TRACE_MAD2_LEDGER register trace."""
 
 import argparse
 import json
