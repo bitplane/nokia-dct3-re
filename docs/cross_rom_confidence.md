@@ -2,9 +2,10 @@
 
 ## Purpose
 
-The first cross-ROM test is a portability check, not a new boot target. A
-second firmware should exercise the same MAD2, EEPROM, CCONT, timer and display
-boundaries without adding firmware-address special cases.
+Cross-ROM tests distinguish shared hardware contracts from product-specific
+flash, storage, display, keypad, and lifecycle behavior. A new firmware begins
+as a portability probe and becomes a supported profile only after a
+forcing-free device/UI acceptance gate exists.
 
 ## Nokia 3330 NHM-6 v4.50
 
@@ -95,7 +96,7 @@ its healthy startup uses reports `0x14`-`0x17`, and its dormant report-7 branch
 is measurement-gated inside the battery/charger dispatcher. This is portability
 evidence for a conditional power lifecycle, not a shared boot-readiness event.
 Exact 3210 ownership and consumer semantics remain authoritative in
-`mmi_settlement.md`. No firmware-PC hook was added for either sibling ROM.
+`mmi_layer.md`. No firmware-PC hook was added for either sibling ROM.
 
 ## Nokia 3210 NSE-8 v5.01
 
@@ -152,9 +153,9 @@ physical rail timing or a battery charging model.
 The ROM is packaged as MAME BIOS `501` with a BIOS-specific generated EEPROM
 profile. `make verify-3210-v501` provides the forcing-free structural runtime
 comparison. It observes startup modes `0x0001 -> 0x000d -> 0x0004` and
-readiness flags `0x0f`: the same task-1 terminal mode as v6.00. The service
-lifecycle retains one visible difference: v5.01 finishes with service-session
-status `0x00c9` rather than v6.00's `0x0049`. This is not a boot blocker. With
+readiness flags `0x0f`: the same task-1 terminal mode as v6.00. Both revisions
+now settle at service-session status `0x0049`; the earlier v5.01 `0x00c9`
+result came from the removed speculative result-5 service response. With
 provisioned identity and the same physical left-softkey fixture,
 `make verify-mmi-menu-501` opens the same `Phone book` menu and reproduces the
 same stable-pixel oracle as v6.00. The SIM block is relocated by `-0x1d0`:

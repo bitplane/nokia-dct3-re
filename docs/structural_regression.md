@@ -213,10 +213,9 @@ The useful invariants are the task-1 and SIM results. The run organically observ
 `0x0001`, `0x000d`, and `0x0004`, then remains in mode `0x0004` with readiness
 flags `0x0f`. At its relocated state block it also clears
 no-SIM and sets SIM ENABLE organically. This independently reproduces the v6.00
-task-1 terminal mode and validates the shared SIM device contract.
-Service-session status remains `0x00c9`, but presentation and interaction
-match v6.00 under the provisioned fixture. The status difference remains a
-transport/lifecycle observation, not evidence of a blocked UI.
+task-1 terminal mode and validates the shared SIM device contract. Both
+revisions now settle at service-session status `0x0049`; the earlier v5.01
+`0x00c9` result depended on the removed speculative result-5 service response.
 
 `tools/find_literal_loads.py` scans Thumb-1 PC-relative literal loads while
 normalizing the swapped image's 32-bit halfword order. It is intended for static

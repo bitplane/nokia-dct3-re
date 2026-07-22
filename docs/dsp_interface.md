@@ -11,10 +11,11 @@ download target for coefficient/program blobs, and (d) bidirectional lower-servi
 message rings. The aggregate device carries organic D0 discovery,
 type-`0x70` DSP completion, the separate external-service session, and an
 opt-in deterministic radio peer through FIQ 0. The radio peer follows recovered
-SEARCH_LIST, measurement, channel-change and BCCH contracts through serving-cell
-selection; it stops before Location Updating. This proves that the transport
-composes in the normal scheduler, but not that the external class-`0x40` peer is
-DSP-owned.
+SEARCH_LIST, measurement, channel-change, BCCH, random-access, LAPDm, Location
+Updating, RR release, and operator-presentation contracts for one deterministic
+laboratory cell. This proves that the transport composes in the normal
+scheduler, but not that the external class-`0x40` peer is DSP-owned or that
+unimplemented mobility, paging, authentication, calls, or SMS are implied.
 
 ## The two hardware windows
 
@@ -170,9 +171,8 @@ to `0x05ea`, task-15 `0x07dd`, or the SIM registration result, so treating the D
 as that request would be speculation.
 
 Counter drain and IRQ 4 are jointly minimal: either signal alone leaves
-`service_ready=0` (single home: `service_bootstrap.md`). `MODEL_DSP_SERVICE`
-therefore models one coherent hardware transaction, not two independent
-conveniences.
+`service_ready=0` (single home: `service_bootstrap.md`). The DSP HLE therefore
+models one coherent peer transaction, not two independent conveniences.
 
 ### COBBA tone control
 

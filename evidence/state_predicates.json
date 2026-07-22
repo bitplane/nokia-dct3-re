@@ -40,13 +40,13 @@
       "id": "task1_mode4_code7", "owner": "power_shutdown", "status": "satisfied",
       "predicate": "Organic report code 0x07 after mode 0x0004 belongs to a physical power/shutdown lifecycle rather than ordinary UI startup",
       "current": "A post-frontier physical power-key press traverses MAD2 IRQ0, decodes key 0x0d, reaches controller status 0x0795, posts report 0x07, and moves task 1 from mode 0x0004 to mode 0x000c. Mode 0x000c then consumes report 0x74, tears services down, calls power-control tail 0x2b4e16, and waits. This closes code 7 as an organic shutdown/power result and excludes it as the boot-to-desktop blocker. Successful security-code completion remains independent; verifier 0x2ae704 returns one before callback-local status 0x05e1. Synthetic cold-boot key releases at four bounded hold times did not publish global 0x0367, so no calibrated timing model was retained.",
-      "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/resource_providers.md", "docs/sim_subsystem.md", "docs/sim_registration.md", "docs/mmi_layer.md"]
     },
     {
       "id": "controller_selector0_availability", "owner": "sim_provisioning", "status": "satisfied",
       "predicate": "0x287250 selector 0 returns true only for its decoded CPHS CSP or EF_SST provisioning alternatives",
       "current": "Primary helper 0x26f5a4 requires EEPROM product-feature query 0x1a to return zero (record 0x150, mirrored 0x1124e9.bit0 clear), the EF_CSP parsed-valid flag, and group-03 mask 0x20. Fallback 0x26eef4 requires the EF_SST parsed-valid flag and both mapped bits sourced from EF_SST byte 2 bits 1 and 2. An opt-in standards-valid CPHS phase-2/AoC card is read through the ordinary SIM device path and makes the selector return one without firmware state changes. The separate post-selector guard is 0x11fd04 and belongs to the conditional AoC limit lifecycle; it is not part of selector availability itself.",
-      "evidence": ["docs/resource_providers.md", "docs/mmi_settlement.md", "docs/sim_registration.md"]
+      "evidence": ["docs/resource_providers.md", "docs/mmi_layer.md", "docs/sim_registration.md"]
     },
     {
       "id": "generic_service_05e8_activation", "owner": "generic_service", "status": "unresolved",
@@ -94,30 +94,30 @@
       "id": "ui_start_global_0367", "owner": "startup_ui", "status": "satisfied",
       "predicate": "Firmware can publish global status 0x0367 from the physical-key navigation path without an emulated peer injecting it",
       "current": "Callback 0x01 at 0x29ea80 maps global 0x0367 to controller status 0x03e9. Exhaustive controller execution proves 0x03e9 alone reaches 0x255ebc, which calls 0x256f68 and publishes global 0x05e7 with argument one. Callback 0x10 at 0x292878 consumes that pair and performs the full application/UI initialization sequence. Runtime falsifies the missing-producer inference: a physical Up-key cycle queues 0x40c8, then function 0x2a1a80 reads 0x0367 from the active UI-context record and publishes it through 0x2af798. A bounded callback audit also falsifies the missing-registration inference: fixed callback 0x01 has zero records in the complete 950-record transition table, is initialized and visited organically by the callback-plane sweep, and is no longer active when Up produces 0x0367. Descriptor selector 0x75 is a separate namespace with eleven records; its state-zero transition emits 0x051d, and 0x057c also appears. The 0x0367 -> 0x03e9 chain is therefore a conditional navigation action during callback 0x01's lifecycle, not the ordinary startup entrance. A 50 ms tap produces press and release IRQ0 entries but exactly one key decode. Runtime identifies extended nested transition record 0x411 as the repeated caller of polling predicate 0x2a1a80; the earlier 0x2a1b18 iterator attribution was an address-boundary error. The predicate publishes the active context status, returns zero against required result one, and remains intentionally unsatisfied. The separate organic task-16 message 0x03e9 is delivered to task 10 and is a distinct namespace occurrence.",
-      "evidence": ["docs/mmi_settlement.md", "docs/message_topology_census.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/message_topology_census.md"]
     },
     {
       "id": "task6_idle_class1_selection", "owner": "startup_ui", "status": "satisfied",
       "predicate": "The firmware owner and input contract for task-6 class-1 selector constructor 0x2b1e44 are enumerated without injecting a message or callback state",
       "current": "The selector contract is closed: 0x2b1e44 sends class 1 with byte +6 equal to one; task 6 consumes that byte at 0x2982b4, stores one to 0x1116fd at 0x298346, and on the next loop calls 0x2a255c for resource 0x4c22 and event 0x0547. Standard class-2 constructor 0x2b1f24 always sends byte +6 equal to zero. The selector has three ROM callers: two in conditional contact/service handler 0x236f6c and task-5 leaf 0x28c248. Exhaustive execution of all 65,536 dispatcher inputs proves 0x28c248 belongs only to status 0x0732. Physical power-key runs before and after accepted security-code input organically post 0x0732 after report code 7 and enter mode 0x000c. Task 1 starts shutdown/service teardown before task 5 performs another outer receive, so 0x0732 remains queued and 0x0547 is not expected in that ordering. The path is conditional shutdown behavior rather than unattended idle boot or a missing queue boundary.",
-      "evidence": ["docs/mmi_settlement.md", "docs/resource_providers.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/resource_providers.md"]
     },
     {
       "id": "post_security_ui_window_selection", "owner": "startup_ui", "status": "satisfied",
       "predicate": "Post-security transaction traffic is separated from periodic descriptor/timer traffic without injecting a task-6 window selection",
       "current": "Accepted 0x0578 makes verifier 0x2ae704 return one after the entered 12345 transforms to the exact stored four-byte value; callback 0x47 then publishes 0x05e1. Incorrect input can reuse 0x05e1 in a different callback-local state, so the number is not a global accept/reject code. A negative-control run containing only 12345 and its single submission reproduces the later 0x0384, 0x05de/0x05e0, 0x0598, and 0x0578 wave, proving it is the ordinary post-acceptance tail rather than a second-key transaction. Overlapping 0x00c8 is published approximately once per second by task 1 at 0x2a2838 with an incrementing argument. Its descriptor selects context-maintenance outputs 0x1b59, direct 0x01f5, and 0x1b5b; none constructs a class-1 window message. Repeating 0x05a7 is the independent three-slot timer manager at 0x2b3222. The second-softkey/descriptor question is closed and no keypad, timer, callback, context state, or hardware acknowledgement should be synthesized.",
-      "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md", "docs/resource_providers.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/resource_providers.md"]
     },
     {
       "id": "mmi_idle_menu_interaction", "owner": "startup_ui", "status": "satisfied",
       "predicate": "A provisioned coherent boot accepts a physical left-softkey press and opens a firmware-owned menu without injected firmware state",
       "current": "After serializing EEPROM generation and NVRAM seeding, the provisioned identity profile removes the security editor. Firmware decodes left softkey 0x19, posts packed press/release inputs 0x40c8/0x40c9, produces 0x0598 then 0x0578, selects callback 0x02, and settles the pipeline at 0x00dc. A one-shot LCD mirror after the transaction shows the Phone book menu and Select softkey. Task 1 remains in mode 0x0004, proving that mode is compatible with ordinary interactive UI and is not a blocked pre-desktop state. No task-6 idle selector, callback state, message, rendered pixels, or hardware result is injected.",
-      "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md", "docs/structural_regression.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/structural_regression.md"]
     },
     {
       "id": "v501_mmi_menu_interaction", "owner": "cross_rom_ui", "status": "satisfied",
       "predicate": "The same 3210 hardware and peer model boots NSE-8 v5.01 to an interactive firmware menu without version-specific execution behavior",
-      "current": "With a BIOS-specific generated EEPROM, provisioned identity, and the shared coherent device profile, v5.01 reaches modes 0x0001/0x000d/0x0004, flags 0x0f, clears no-SIM, and sets SIM ENABLE. A physical left-softkey press opens Phone book and reproduces the v6.00 stable-pixel oracle exactly. Service-session status remains 0x00c9 rather than v6.00's 0x0049, proving that difference is not an offline UI blocker. The run uses the common machine devices and differs only in selected BIOS, EEPROM input, diagnostic oracle addresses, and firmware-owned layout.",
+      "current": "With a BIOS-specific generated EEPROM, provisioned identity, and the shared coherent device profile, v5.01 reaches modes 0x0001/0x000d/0x0004, flags 0x0f, clears no-SIM, and sets SIM ENABLE. A physical left-softkey press opens Phone book and reproduces the v6.00 stable-pixel oracle exactly. Both 3210 revisions now settle at service-session status 0x0049; the earlier v5.01 0x00c9 result depended on the removed speculative result-5 service response. The run uses the common machine devices and differs only in selected BIOS, EEPROM input, diagnostic oracle addresses, and firmware-owned layout.",
       "evidence": ["docs/cross_rom_confidence.md", "docs/structural_regression.md", "docs/normalization_status.md"]
     },
     {

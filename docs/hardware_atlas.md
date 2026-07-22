@@ -282,10 +282,11 @@ file traffic, clears no-SIM, sets SIM enable, scans the keypad, reaches the idle
 screen, and opens `Phone book` through physical input. The optional security
 transaction also completes through normal firmware paths. Conditional power,
 reinitialization, and service/test display routes are classified separately.
-The next boundary is application coverage and whichever hardware contract each
-application exercises organically. The default fault-screen, coherent frontier,
-and interactive menu remain separate acceptance baselines; the Nokia 3330 is
-the first portability probe. See `mmi_settlement.md` and `mmi_layer.md`.
+Further application coverage is useful only when it exercises an unresolved
+hardware contract. The negative baseline, coherent 3210 profile, interactive
+menu, radio registration, and cross-product UI gates remain separate acceptance
+profiles. The 3310, 3330, and 3410 now provide product-level portability
+evidence. See `mmi_layer.md` and `cross_rom_confidence.md`.
 
 ## Diagnostic
 

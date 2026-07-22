@@ -2,6 +2,21 @@
 
 Documentation is organized by authority rather than investigation date.
 
+When documents overlap, use this precedence:
+
+1. reviewed `evidence/*.json` and named runtime manifests state accepted or
+   falsified conclusions;
+2. concise subsystem contracts state current ownership, behavior, and remaining
+   uncertainty;
+3. generated/static censuses state mechanically recovered coverage and facts;
+4. deep reverse-engineering maps retain address-level detail but do not override
+   a newer subsystem contract or evidence entry; and
+5. Git history retains chronology and discarded implementations.
+
+The source implements the current model, but a calibrated implementation is not
+automatically a hardware fact. The relevant subsystem contract must label that
+distinction.
+
 ## Start here
 
 | Document | Purpose |
@@ -14,8 +29,8 @@ Documentation is organized by authority rather than investigation date.
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
 | `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |
-| `cross_rom_confidence.md` | 3210/3330 portability evidence and ROM-input status. |
-| `structural_regression.md` | Default mid-boot oracle and current deep-profile result. |
+| `cross_rom_confidence.md` | Cross-product and cross-ROM boot, idle, and input evidence. |
+| `structural_regression.md` | Acceptance profiles, semantic predicates, and frame oracles. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
 | `research_cleanup.md` | Repeatable cleanup protocol for hypotheses, naming residue, diagnostics, and evidence retention. |
 | `rtos_tasks.md` | Authoritative ROM-specific task identities, neutral aliases, and naming cautions. |
@@ -27,8 +42,7 @@ Documentation is organized by authority rather than investigation date.
 | Document | Purpose |
 | --- | --- |
 | `sim_subsystem.md` | Concise SIM ownership and interface summary. |
-| `mmi_settlement.md` | Validated idle/menu settlement plus security-editor and conditional power lifecycles. |
-| `mmi_layer.md` | Keypad IRQ, mailbox, matrix-scan and decoded-key acceptance path. |
+| `mmi_layer.md` | Keypad, security editor, interactive idle/menu, and power/shutdown lifecycle. |
 | `resource_providers.md` | Resource-provider ownership and excluded conditional startup paths. |
 | `external_service_topology.md` | Class-`0x40` service-command producers, acknowledgements, and external-service boundary. |
 | `service_bootstrap.md` | Service-session startup prerequisites and acceptance contract. |
@@ -36,7 +50,7 @@ Documentation is organized by authority rather than investigation date.
 | `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |
 | `eeprom_analysis.md` | EEPROM usage map, checksum contracts and the generated provisioning fixture. |
 
-## Mapped downstream work
+## Active protocol and HLE boundaries
 
 | Document | Purpose |
 | --- | --- |
@@ -47,7 +61,7 @@ Documentation is organized by authority rather than investigation date.
 | `dsp_packet_semantics.md` | Generated two-ROM inventory of DSP packet vocabulary and current HLE disposition. |
 | `dsp_service_transport_contract.md` | DSP/generic-service ownership and acceptance contract. |
 
-## Deep reverse-engineering references
+## Address-level reverse-engineering references
 
 The following are detailed firmware maps that remain useful when working in the
 corresponding subsystem:
@@ -58,9 +72,9 @@ corresponding subsystem:
 - `message_topology_census.md`
 - `battery_classifier_analysis.md` (mapped battery ADC/classifier contract)
 
-Treat concise subsystem documents, normalized evidence, and current source code
-as authoritative. Absolute addresses apply to the 3210 v6.00 firmware unless
-explicitly stated otherwise.
+Absolute addresses apply to the 3210 v6.00 firmware unless explicitly stated
+otherwise. These maps are retained because their coverage and exact addresses
+make future work cheaper; their older interpretations are not authoritative.
 
 Normalized reviewed evidence lives in `evidence/*.json`; named runtime inputs
 live in `tools/run_manifests/*.json`. Run `make evidence-check` before banking a

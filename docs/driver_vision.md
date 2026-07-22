@@ -8,8 +8,8 @@ not compatibility mechanisms.
 
 | Subsystem | Current shape | Next architectural step |
 | --- | --- | --- |
-| ARM7, flash and RAM | MAME CPU/flash devices plus phone-owned maps | Validate decode and reset path with another ROM. |
-| PCD8544 display | MAME device | Add other display controllers per product configuration. |
+| ARM7, flash and RAM | MAME CPU/flash devices plus product-owned maps; reset and flash behavior are exercised across four products | Validate further address-decode and retention behavior when another product diverges. |
+| PCD8544-family display | MAME device with product geometry and viewport configuration | Add a separate controller only when a recovered command set falls outside this family. |
 | External EEPROM | MAME `I2C_24C128` on mapped MAD2 GenIO pins plus generated provisioning input | Validate write/timing behavior, legitimate provisioning, ROM-aware fallback extraction, and parallel-window semantics. |
 | CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression; deterministic binary RTC and enabled documented watchdog/WDDISX boundary | Establish physical GENSIO/ADC latency, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |
 | MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller, CPU routing, one-shot ARM clock-stop/routed-wake behavior and the established digital-baseband reset domain; board/peripheral windows remain phone-owned or extracted separately | Recover the exact sleep-clock divider tree, transition latency, FIQ8 source and rail sequencing; move further windows only after their individual contracts pass the same gate. |
@@ -32,21 +32,23 @@ See `mad2_fidelity.md` for register-level implementation status and
 | Missing-hardware negative baseline (`make verify`) | Preserve a known failure comparison | Semantic startup predicates; no required LCD frame. |
 | New-ROM baseline | Detect product-specific assumptions | No firmware-address hooks; record first divergence even when no frame renders. |
 
-Only the Nokia 3210 product profile enables the validated composition. Other
-DCT3 products retain conservative device defaults until their hardware and peer
-contracts have independent evidence.
+The Nokia 3210 v6.00/v5.01, 3310 v6.39, 3330 v4.50, and 3410 v5.46 profiles
+have forcing-free acceptance gates. Their shared composition is evidence for
+reuse, not proof that every DCT3 product has identical peripherals or peer
+contracts. Unvalidated products retain conservative defaults until their first
+divergence is classified.
 
 ## Configuration taxonomy
 
-Environment controls must fit one of five classes:
+Runtime controls fit one of five classes:
 
 | Class | Examples | Policy |
 | --- | --- | --- |
-| Machine/scenario configuration | display profile, clock rates, battery state, EEPROM image | Keep, but prefer typed machine configuration or input data over individual register values. |
+| Product configuration | display geometry, clock rates, ADC tuple, flash capabilities, peer composition | Typed `nokia_product_config` or device setters; no production environment lookup. |
 | Device-boundary model | CCONT, request-driven SIM card behavior, DSP ring ownership | Keep only while it reacts to organic traffic through the real interface. |
-| Diagnostic trace/probe | `TRACE_*`, bounded MAD2 ledger | Opt-in, no state changes, and small enough to remove when no longer useful. |
+| Diagnostic trace/probe | MAME log masks, bounded MAD2 ledger | Read-only, no state changes, and small enough to remove when no longer useful. |
 | Provisional firmware bridge | none retained in the supported profiles | Do not reintroduce firmware calls, result substitution, or message injection. |
-| Shortcut/force | RAM-result override, forced event or task message | Add no new supported behavior in this class. Existing named shortcuts remain quarantined debt; a new diagnostic force must be bounded to one concrete question and then deleted. |
+| External fixture | Lua key, charger, RTC, MBUS, capture, or MMIO-conformance action | Test orchestration only; never production device configuration or firmware-state mutation. |
 
 The number of variables alone is not a sufficient debt metric. A display
 variant and a firmware-state poke are not equivalent. The useful measures are:
@@ -56,25 +58,20 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 - device behaviors lacking a documented hardware cause; and
 - subsystem contracts tested against only one ROM.
 
-## Modularization order
+## Remaining architecture work
 
-1. Improve the extracted CCONT and GENSIO devices only from observed transactions.
-2. Extend the extracted MAD2 core only from observed reset, clock and peripheral
-   contracts. Timer-1 destination/FIQ5, MCU reset extent and the SIMI clock gate
-   are modeled from paired-ROM evidence and focused tests. ARM clock-stop and
-   routed wake are now modeled; exact divider provenance, transition latency
-   and the other clock-gate consumers remain unidentified.
-3. Extend deterministic physical-key fixtures into menu and application
-   traversal, adding device behavior only when firmware reaches an evidenced
-   hardware boundary.
-4. Extend focused DSPIF transport tests to wrap/full/fault cases and replace
-   calibrated HLE scheduling only when peer timing is recovered.
-5. Use the 3330 as the first portability probe before treating MAD2 behavior as
-   common DCT3 hardware.
-
-The CTSI core met the extraction gate without moving unresolved peripheral
-windows. Each additional MAD2 block still needs reset semantics, callbacks,
-focused tests and freedom from firmware-address conditions first.
+1. Keep `nokia_dspif_device` transport-only and preserve the single swappable
+   DSP-backend seam. Move no radio, service, bootstrap, or audio semantics down
+   into the transport.
+2. Move the 3410 B3 adapter's partitioned read-while-write and erase-suspend
+   behavior into MAME's generic flash core when that core can express it.
+3. Recover MAD2's remaining divider, transition, extended-interrupt, and rail
+   contracts before extracting additional uncertain register windows.
+4. Replace calibrated HLE timing only with measured hardware behavior or
+   cross-ROM protocol evidence; declared calibration is preferable to invented
+   precision.
+5. Extend product coverage through typed profiles and device data, never
+   firmware-PC compatibility branches.
 
 ## Engineering rules
 

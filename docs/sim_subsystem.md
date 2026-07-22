@@ -202,7 +202,7 @@ by selecting callbacks, posting task results, replaying commit keys, or setting 
 MMI callbacks, report 7, and the unattended UI lifecycle are outside the SIM
 boundary. Report 7 is a shutdown/power-lifecycle report, not a SIM-ready event.
 The mapped session descriptor and callback chains remain
-in `sim_registration.md`, `mmi_settlement.md`, and normalized evidence;
+in `sim_registration.md`, `mmi_layer.md`, and normalized evidence;
 they are intentionally not repeated in this concise hardware/card contract.
 
 ## Deferred CHV transaction: reply code 2

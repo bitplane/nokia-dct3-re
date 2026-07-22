@@ -48,25 +48,25 @@
       "id": "dsp_type03_heartbeat_registration_predecessor", "status": "disproven",
       "hypothesis": "Periodic header-only DSP RX type-0x03 liveness traffic activates the missing ordinary-registration publisher",
       "conclusion": "Two independent empty-ring-gated DSP RAM/FIQ0 runs were consumed by task 4. The first incremented firmware activity counter 0x112502 but emitted none of 0x05e8, 0x05ea, 0x07dd, 0x09d8, or 0x0434. The later 182-heartbeat experiment also emitted none of callback-0x1a status 0x1400, initializer status 0x08ac, controller status 0x0795, or report code 7. A newer coherent profile reaches 0x08ac through a different controller owner. The packet is therefore disproven as a semantic completion, not as liveness: a silent HLE later proved to enter the firmware's reason-0x68 DSP-watchdog reset path, while this consumed packet increments the watchdog's MDI activity counter.",
-      "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/dsp_interface.md", "docs/sim_registration.md", "docs/mmi_layer.md"]
     },
     {
       "id": "dsp_type70_0a09_task13_reply", "status": "disproven",
       "hypothesis": "The organic outbound DSP type-0x70 payload 0a 09 expects a type-0x74 echo which completes task 13 and reports startup code 7",
       "conclusion": "An empty-ring-gated type-0x74 payload 0a 09 was delivered through the real DSP RX/FIQ0 path and produced no task-13 message, 0x05eb, code 7, or mode advance. The later owner census closes the premise statically: handler 0x234954 posts 0a09 only after it has consumed the correlated type-0x74/0d00 completion, making 0a09 a one-way post-completion publication rather than another request.",
-      "evidence": ["docs/dsp_interface.md", "docs/dsp_packet_semantics.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/dsp_interface.md", "docs/dsp_packet_semantics.md", "docs/mmi_layer.md"]
     },
     {
       "id": "callback45_is_ordinary_code7_blocker", "status": "disproven",
       "hypothesis": "An ordinary DSP-downstream completion advances callback-state slot 0x45 and selects 0x09d0 as the missing report-code-7 predecessor",
       "conclusion": "Runtime observes only zero writes. Static coverage comprises 46 selector-0x45 catalogue rows (all state 0x3f/preserve), all 46 generic initialization/reconciliation records (no selector 0x45), 47 exact-address literal references (one direct store, the global-0x05e2 reset at 0x299ba0), and 57 array-base literal references (broad indexed writers only clear the slot). No identified writer reaches a DSP prerequisite. The 0x09d0 path remains mapped but has no evidenced ordinary owner.",
-      "evidence": ["docs/mmi_settlement.md", "docs/sim_registration.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/sim_registration.md"]
     },
     {
       "id": "battery_callers_are_ordinary_code7_owner", "status": "disproven",
       "hypothesis": "A normal 3210 ADC value or calibration activates one of the two power-owned report-code-7 callers during ordinary boot",
       "conclusion": "The 0x21e40c caller is battery event 0x25 under the firmware string 'Check voltage level for shutdown'. Predicate 0x27cd82 returns one above the shutdown threshold and skips the reporter; only the at-or-below result reaches it. Selector 1 value 0x1b0 powers off before task 1, while 0x1c0 reaches mode 0x0004 with battery band 2 and no code 7. The 0x21f8de caller is power state 0x0c, labelled 'CHARGING COMPLETED', and reports after event 0x42. The coherent no-charger run instead follows 0x1a -> 0x1c -> 0x05 -> 0x04 and receives event 0x42 in state 0x04 without transitioning. These are shutdown/charging outcomes, not the missing ordinary-ready producer",
-      "evidence": ["docs/battery_classifier_analysis.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/mmi_layer.md"]
     },
     {
       "id": "task19_state6_is_missing_pack_characterization", "status": "disproven",
@@ -78,25 +78,25 @@
       "id": "task5_1400_ordinary_code7_route", "status": "disproven",
       "hypothesis": "Callback-table index 0x1a receives an ordinary-boot callback return 0x1400 and initiates the 0x08ac to 0x0795 code-7 chain",
       "conclusion": "0x1400 is decoded from an argumentless task-5 mailbox message at 0x2af57c, not returned by a callback. All 188 direct task-5 event-helper calls have recovered constant events and none emits 0x1400; the remaining unresolved-destination sender routes through a service table that does not target task 5. The chain is a mapped dormant or service-specific contract, not the strongest ordinary-boot route",
-      "evidence": ["docs/sim_registration.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/sim_registration.md", "docs/mmi_layer.md"]
     },
     {
       "id": "display_028x_ordinary_code7_route", "status": "disproven",
       "hypothesis": "Display statuses 0x0280, 0x0281, or 0x0282 head the ordinary-boot lifecycle that supplies global 0x05eb and report code 7",
       "conclusion": "The 0x028x states are owned by the transaction engine around 0x264504/0x264c98 and reached from class-`0x40` service commands 0x81/0x82 and local/test ASCII command frontends. No catalogue or literal producer establishes an ordinary source, and coherent controller-transform tracing produces none of them. The route is valid but service/test-specific.",
-      "evidence": ["docs/resource_providers.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/resource_providers.md", "docs/mmi_layer.md"]
     },
     {
       "id": "display_06ca_0795_mode4_route", "status": "disproven",
       "hypothesis": "Display status 0x06ca supplies ordinary report code 7 through 0x0795 while task 1 is parked in mode 0x0004",
       "conclusion": "The 0x06ca case at 0x28c268 reaches the 0x0795 generator only when getter 0x2af066 returns startup/display state 7. The coherently observed mode-0x0004 route establishes state 3 through setter 0x2af058; state 7 belongs a separate mode-2 branch after input code 0x10. Coherent runtime observes state 3 and no 0x06ca/0x0795 publication.",
-      "evidence": ["docs/mmi_settlement.md"]
+      "evidence": ["docs/mmi_layer.md"]
     },
     {
       "id": "controller_08ac_ordinary_code7_route", "status": "disproven",
       "hypothesis": "The organically reached 0x08ac -> 0x27f150 controller route is the unconditional ordinary-boot owner of 0x0795 and task-1 report code 7",
       "conclusion": "The corrected guard is 0x11fd04, but coherent service-5 initialization proves initializer 0x27f9e8 owns it from EF_ACMmax. A standards-valid exhausted account reaches 0x27f23e organically and the function publishes 0x019a, not 0x0795. The true non-display 0x0795 producer at 0x28796a is reached after 0x08b0. The variable-length catalogue proves two inputs: packed 0x213a/0x613a expands to 0x089a,0x08b0 and packed 0x213b/0x613b emits 0x08b0 directly. Status 0x013a is consumed by callback 0x24 in framework mode 11; callback 0x013b is registered only after input 0x03ab establishes the same later mode, while coherent startup remains in mode 0. The other literal producer requires display state 7. Thus 0x08ac -> 0x27f150 is not the ordinary code-7 route.",
-      "evidence": ["docs/resource_providers.md", "docs/mmi_settlement.md", "docs/sim_registration.md"]
+      "evidence": ["docs/resource_providers.md", "docs/mmi_layer.md", "docs/sim_registration.md"]
     },
     {
       "id": "dsp_type1a_direct_registration_request", "status": "disproven",
@@ -126,61 +126,61 @@
       "id": "task13_05eb_is_code7_owner", "status": "disproven",
       "hypothesis": "A valid DSP type-0x80 segmented completion correlated with the organic type-0x70 0a09 transaction supplies callback 0x5d status 0x05eb and report code 7",
       "conclusion": "The packet traverses FIQ0, normalizes to 0x040b, returns parser result 0x061a, and publishes 0x05eb directly to task 16 through 0x23e1a4. It does not enter the global callback sweep, call the code-7 reporter, or advance task 1 beyond mode 0x0004",
-      "evidence": ["docs/dsp_interface.md", "docs/mmi_settlement.md", "docs/sim_registration.md"]
+      "evidence": ["docs/dsp_interface.md", "docs/mmi_layer.md", "docs/sim_registration.md"]
     },
     {
       "id": "callback47_0778_1441_completion_inputs", "status": "disproven",
       "hypothesis": "Callback 0x47's shared 0x05e1 branch is selected by absent dynamic statuses 0x0778 and 0x1441",
       "conclusion": "Correct subtract-cascade execution yields 0x0578 and 0x1440. The observed 0x05dc branch starts the generic text/UI manager through 0x24b174 -> 0x24af70, stores 0x0578 as its completion, and publishes 0x057c when presented. The coherent run reaches 0x05dc/0x057c but no interactive completion. This is not an absent DSP/network reply or the unconditional code-7 owner.",
-      "evidence": ["docs/resource_providers.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/resource_providers.md", "docs/mmi_layer.md"]
     },
     {
       "id": "security_identity_completion_owns_code7", "status": "disproven",
       "hypothesis": "A valid phone identity/security profile completes callback 0x47 through 0x0578 -> 0x05e1 -> 0x06c5 and supplies startup report code 7",
       "conclusion": "The default combined EEPROM checksums were already valid. A firmware-derived fixture supplies a synthetic IMEI, default phone code 12345, and matching derived record at 0x06c8. The 0x2ae61a comparison succeeds at 0x0317, callback 0x47 is not selected, and the Security-code prompt becomes the idle Menu frame. A later physical left-softkey fixture proves that frame is interactive and opens Phone book while task 1 remains in mode 0x0004. No 0x05e1, 0x06c5, code 7, or mode exit is required. Security provisioning controls the prompt but does not own code 7.",
-      "evidence": ["docs/eeprom_analysis.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/eeprom_analysis.md", "docs/mmi_layer.md"]
     },
     {
       "id": "rom4_dsp_74_1300_reaches_code7", "status": "disproven",
       "hypothesis": "Inbound ROM-4 DSP group/class 0x74 payload 0x13 00 is the missing code-7 completion",
       "conclusion": "In this ROM first-level class 0x74 reaches 0x234954. Its recognized contact/self-test completion payload is 0x0d 00 and clears the contact busy flag at 0x2349dc. Payload 0x13 00 falls through the generic path and has no static route to 0x05e1, 0x05eb, 0x06c5, or any code-7 reporter. Group labels from another decoder layer cannot be replayed as this class byte.",
-      "evidence": ["docs/dsp_interface.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/dsp_interface.md", "docs/mmi_layer.md"]
     },
     {
       "id": "callback2f_05e1_is_global_code7_completion", "status": "disproven",
       "hypothesis": "The organic post-SIM 0x05e1 is a global completion that reaches callback 0x5d and supplies report code 7",
       "conclusion": "In both unprovisioned and provisioned coherent runs, the observed startup 0x05e1 is delivered specifically to selected callback 0x2f, whose initialization lifecycle expects 0x05e0/0x05e1. A new negative control enters wrong phone code 11111 through the physical keypad: verifier mismatch makes callback 0x47 publish 0x05e1, but the dispatcher selects callback 0x47 again and never callback 0x5d. Callback 0x5d receives only its early 0x05e2 initialization. The later repeating 0x0d16 is independently decoded as task-5 timer class 0x3d, rearmed by the resource-0x62 periodic poll, and is not a completion. Status values are callback-scoped, not global broadcasts.",
-      "evidence": ["docs/mmi_settlement.md", "docs/resource_providers.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/resource_providers.md"]
     },
     {
       "id": "accepted_security_editor_result_requests_idle_display", "status": "disproven",
       "hypothesis": "Callback 0x47's accepted-code result 0x05e6 reaches a missing display/DSP completion boundary that should select the idle window",
       "conclusion": "Later verifier tracing corrected the premise: entered 12345 transforms to the exact stored four bytes and verifier 0x2ae704 returns one, after which callback 0x47 publishes 0x05e1, not 0x05e6. Incorrect input can reuse 0x05e1 in another callback-local state, confirming that these scalar statuses are not global accept/reject results. Task 6 later receives class-2 and class-3 editor-lifecycle messages, but no class-1 idle-window selection follows: control byte 0x1116fd never arms the 0x2a255c idle helper, resource 0x4c22 and event 0x0547 are absent, and no DSP TX is constructed. The accepted editor transaction closes within firmware and is not blocked on display hardware.",
-      "evidence": ["docs/mmi_settlement.md"]
+      "evidence": ["docs/mmi_layer.md"]
     },
     {
       "id": "forced_code7_proves_downstream_mmi_completion", "status": "disproven",
       "hypothesis": "Supplying report code 7 in isolation creates a coherent MMI/display lifecycle whose later completion identifies the faithful missing boundary",
       "conclusion": "The isolated report enters the conditional mode-4 continuation: firmware posts 0x0732 to task 5, initializes task 6, and task 6 posts 0x0547. It does not compose. The forced path runs while task 5 retains its existing backlog; the 0x0547 object remains queued while internal timer traffic wins the receive path. Later consumer-side decode proved that ordinary interactive initialization already falls through without code 7, and physical power input identifies code 7 as a shutdown continuation. Neither the report nor its downstream statuses should be injected.",
-      "evidence": ["docs/mmi_layer.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/mmi_layer.md"]
     },
     {
       "id": "ordinary_handoff_bypasses_code7_via_alternate_0732", "status": "disproven",
       "hypothesis": "A healthy 3210 starts task 6 or posts 0x0732 through an ordinary entrance independent of task 1's code-7 branches",
       "conclusion": "The exhaustive effective-literal inventory contains four 0x0732 sites. Three populate event fields or registration structures. The sole direct publisher is 0x2a26d4, whose only callers are 0x270f7a and 0x271292 immediately after the two explicit task-1 code-7 receives. Task 6's idle-window helper is reachable only from its own receive loop after startup. No independent ordinary entrance is present in this statically enumerable surface.",
-      "evidence": ["docs/mmi_settlement.md", "docs/message_topology_census.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/message_topology_census.md"]
     },
     {
       "id": "pwronx_repetition_supplies_code7", "status": "disproven",
       "hypothesis": "A missing or insufficiently held PWRONX interrupt prevents the ordinary power-on completion from publishing report code 7",
       "conclusion": "MAD2 IRQ line 0 is enabled and acknowledged through 0x2b3084. Its handler calls 0x2b4662, which posts event 0x41 to task 1 for the early power-key scan. Holding the emulated key raises 51 interrupts in a bounded run, but callback 0x5d still receives only 0x05e2, code 7 remains absent, and task 1 stays in mode 0x0004. Task 19's separate numeric event-0x41 branch is labelled CHARGER CONNECTION and has no producer edge from this IRQ.",
-      "evidence": ["docs/mmi_settlement.md"]
+      "evidence": ["docs/mmi_layer.md"]
     },
     {
       "id": "contact_selftest_verdict_is_missing_code7_boundary", "status": "disproven",
       "hypothesis": "The contact/DSP self-test verdict remains incomplete and suppresses the ordinary code-7 publication",
       "conclusion": "Firmware organically constructs contact flags 0xc8. The modeled request-derived RX class-0x74 payload 0d00 reaches 0x2349c8 and clears pending bit 2, after which task 5 consumes ready bit 7 at 0x29bc8c and leaves steady flags 0x49. The self-test completion and ready-bit lifecycle therefore complete normally; the associated immediate event 0x1a is a kernel completion, not a task-1 report.",
-      "evidence": ["docs/external_service_topology.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/external_service_topology.md", "docs/mmi_layer.md"]
     },
     {
       "id": "forced_registration_messages", "status": "disproven",
@@ -210,13 +210,13 @@
       "id": "rom4_report7_is_generic_dsp_startup_completion", "status": "disproven",
       "hypothesis": "Report code 7 is a generic ROM-4 DSP/startup completion and a healthy sibling boot can supply a replayable peer contract",
       "conclusion": "NSE-1 v5.30 contains the exact report-7 wrapper at 0x28f142 and exactly four callers at 0x22cb7e, 0x22dc62, 0x246eaa, and 0x26af8a. A forcing-free 60-million-instruction sibling boot reaches its byte-exact interactive Security-code frame without executing the wrapper. The 5110 uses a serial-keypad scan lifecycle and its wrapper only posts code 7; the 3210 wrapper additionally publishes resource 0x6a01 readiness. This disproves a generic ROM-4/DSP completion and agrees with the later 3210 result that code 7 belongs to conditional power/shutdown continuation rather than ordinary boot.",
-      "evidence": ["docs/mmi_settlement.md"]
+      "evidence": ["docs/mmi_layer.md"]
     },
     {
       "id": "constant_calibrated_battery_produces_safe_band3", "status": "disproven",
       "hypothesis": "A faithful 3210 ADC routing and factory calibration fixture can hold one constant source-7 value that survives cold boot, produces classifier state 3, and advances 0x2a6942",
       "conclusion": "Both cold-boot safety 0x27d5fc and the later classifier consume source 7, which runtime maps to physical CCONT channel 1, through the same gain, zero offset, and 1500/313 scaling. Cold boot powers off below 0x0834, while state 3 requires a value below 0x076c. These ranges are disjoint by 200 scaled units for every common affine calibration. At unity gain the predicted minimum safe raw value is 0x1b7 and the maximum state-3 value is 0x18c; coherent runs confirm 0x1b6 powers off before task 1 and 0x1b7 reaches mode 0x000d. EEPROM descriptors 2/3/4 map to 0x0248..0x025b; both collected 3210 images are erased there and validly select ROM defaults. No safe constant-input fixture reached state 3 or a legitimate code-7 caller.",
-      "evidence": ["docs/battery_classifier_analysis.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/mmi_layer.md"]
     },
     {
       "id": "selector1_selector4_pair_recognition_table", "status": "disproven",
@@ -228,13 +228,13 @@
       "id": "mode0d_proper_advance_requires_classifier_state3", "status": "disproven",
       "hypothesis": "The proper mode-0d advance requires monitor state 3, making the safe mode-1 guard and later gate statically disjoint",
       "conclusion": "Exhaustive decode of 0x2a6942 proves state 0 returns 2, states 1/2 return 0, state 3 returns 1 or 3 according to flag bit 5, and every other byte returns 2. The mode-0d caller at 0x270edc accepts every nonzero result. Writer coverage shows 0x27ddfa initializes 0x110436 to state 0 and the sole later writer 0x27dcfa stores classifier states 1/2/3; no initialized writer produces state 4. Coherent runtime reaches the gate after state 1 has been published, but the accepted pre-classification state 0 removes the claimed static contradiction and points to readiness-versus-monitor ordering instead of an impossible ADC value.",
-      "evidence": ["docs/battery_classifier_analysis.md", "docs/mmi_settlement.md"]
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/mmi_layer.md"]
     },
     {
       "id": "mode0d_state0_ordering_unlocks_code7_handoff", "status": "disproven",
       "hypothesis": "Completing the application-readiness checklist before the first battery classification selects the accepted mode-0d branch and removes the code-7 boot wall",
       "conclusion": "The full checklist is delayed as one firmware task group behind completion of the modeled service-empty 0x622a transaction. The serialized type-0x05 report is one-way; completion uses the separate DSPIF shared-control path, not an RX packet acknowledgement. Task 18 is merely the last task in the fixed resume order and posts code 0x12 immediately from its initializer. Shortening the peer's calibrated delay could change which tail 0x2a6942 selects, but both tails compare a mailbox report before falling through to equivalent interactive initialization. Timing changes the recorded continuation, not whether the UI starts; no timing constant was changed.",
-      "evidence": ["docs/external_service_topology.md", "docs/mmi_settlement.md", "docs/service_bootstrap.md"]
+      "evidence": ["docs/external_service_topology.md", "docs/mmi_layer.md", "docs/service_bootstrap.md"]
     },
     {
       "id": "single_timer_dspif_doorbell_replaces_shared_triggers", "status": "disproven",
@@ -246,31 +246,31 @@
       "id": "status0794_0795_pair_is_ordinary_code7_owner", "status": "unsupported",
       "hypothesis": "The adjacent status-0x0794/code-6 and status-0x0795/code-7 routes form the missing ordinary bootstrap lifecycle",
       "conclusion": "The pair is structurally real but has no evidenced ordinary initiator. Status 0x0794 selects 0x28c22c and code 6, but its sole predecessor is packed catalogue input 0x32b4/0x72b4, neither of which has an in-ROM producer. Both effective 0x0795 producers are later conditional routes. The non-display route requires framework mode 11 established by 0x03ab; 0x03ab has one consumer and no in-ROM producer. Correcting keypad ownership later proved that security-editor input is independent of this pair, so the pair remains excluded as the ordinary keypad/bootstrap owner.",
-      "evidence": ["docs/mmi_settlement.md", "docs/resource_providers.md", "docs/message_topology_census.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/resource_providers.md", "docs/message_topology_census.md"]
     },
     {
       "id": "callback01_registration_is_ordinary_ui_handoff", "status": "disproven",
       "hypothesis": "A missing registration or lifecycle transition should select callback 0x01 when the organic physical-key path publishes status 0x0367, completing the ordinary UI-start chain",
       "conclusion": "Callback 0x01 is a fixed callback-table entry with zero records in the complete 950-record transition table. The callback engine initializes it and sweeps it organically during startup; by the post-frontier Up event the active callback has advanced elsewhere. Descriptor selector 0x75 is a separate namespace with eleven records and maps state-zero 0x0367 to 0x051d. Thus 0x0367 -> callback 0x01 -> 0x03e9 is a conditional navigation action during callback 0x01's lifecycle, not a missing hardware boundary or the ordinary startup entrance.",
-      "evidence": ["docs/mmi_settlement.md", "docs/message_topology_census.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/message_topology_census.md"]
     },
     {
       "id": "callback10_05e7_is_ordinary_cold_boot_entrance", "status": "disproven",
       "hypothesis": "An ordinary startup lifecycle should select callback 0x10 and publish 0x05e7, causing the full application/UI initialization sequence",
       "conclusion": "Callback 0x10 is a fixed callback-plane entry with zero transition records. The sole recovered global 0x05e7 publisher is 0x256f68, and its complete ROM caller set consists of controller status 0x03e9's conditional navigation route and the already-classified local/service-test statuses 0x0280/0x0281/0x0282. In an unattended coherent run callback 0x10 receives only initialization status 0x05e2; neither 0x256f68 nor the 0x05e7 branch executes. The path is conditional UI reinitialization, not the cold-boot entrance.",
-      "evidence": ["docs/mmi_settlement.md", "docs/resource_providers.md"]
+      "evidence": ["docs/mmi_layer.md", "docs/resource_providers.md"]
     },
     {
       "id": "task6_0732_selector_is_ordinary_idle_boot", "status": "disproven",
       "hypothesis": "Task-5 leaf 0x28c248 and class-1 constructor 0x2b1e44 are the missing ordinary cold-boot entrance to task 6's idle window",
       "conclusion": "Concrete execution of all 65,536 inputs to dispatcher 0x28bddc finds exactly one status reaching 0x28c248: 0x0732. Firmware produces 0x0732 organically after a physical power key posts report code 7 and enters mode 0x000c, proving this is conditional power/shutdown UI lifecycle rather than unattended startup. A 20-second trace and a post-security-code run both show task 1 starting shutdown/service teardown before task 5 performs another outer receive; 0x0732 consequently remains queued and no downstream class-1 message, resource 0x4c22, or event 0x0547 executes. This is shutdown ordering, not a missing task-5 queue or hardware acknowledgement.",
-      "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md"]
+      "evidence": ["docs/mmi_layer.md"]
     },
     {
       "id": "status05a7_is_stalled_post_security_ui_transaction", "status": "disproven",
       "hypothesis": "Repeated status 0x05a7 after a second physical softkey is a post-security UI transaction retry stalled on a missing completion",
       "conclusion": "Correct concrete execution shows 0x05a7 reaches dispatcher target 0x28c480 and calls 0x2b3222, a three-slot timer manager. Target 0x28c43c belongs exclusively to status 0x05f3; the former 0x28c43a attribution was mid-instruction. Callback 0x47 settles normally after accepted 0x0578; later verifier tracing observes callback-local 0x05e1 rather than the previously inferred 0x05e6. A negative-control run with only 12345 plus its single submission reproduces the later post-acceptance event wave. Overlapping 0x00c8 is independently published once per second by task 1 at 0x2a2838 and expands to context-maintenance outputs, not a class-1 window selection. No timer completion or callback result is justified for injection.",
-      "evidence": ["docs/mmi_settlement.md", "docs/mmi_layer.md"]
+      "evidence": ["docs/mmi_layer.md"]
     },
     {
       "id": "timer0_mhz_calibration_required", "status": "disproven",

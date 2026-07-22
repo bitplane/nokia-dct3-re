@@ -111,7 +111,7 @@ initialization sequencer; its contract (function `0x2028a4`, timer `0xea`) is au
 Task 1 enters mode `0x0004` after this conversation and remains interactive. Report code
 `0x07`, callback `0x5d`, controller status `0x0795`, and the Advice-of-Charge lifecycle are not
 SIM-registration prerequisites; their ownership and power/UI semantics are authoritative in
-`mmi_settlement.md` and intentionally not duplicated here.
+`mmi_layer.md` and intentionally not duplicated here.
 
 ## Task-20 reply contract
 

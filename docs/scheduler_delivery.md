@@ -102,5 +102,5 @@ must use a real branch target, an MMIO/RAM watch, or static control-flow proof.
 | `0x236bac` | command-`0x65` startup-status handler |
 
 Current task-1/report-7 and keypad behavior is documented in
-`mmi_settlement.md`; current contact ownership is documented in
+`mmi_layer.md`; current contact ownership is documented in
 `external_service_topology.md`.

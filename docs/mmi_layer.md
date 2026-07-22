@@ -1,8 +1,9 @@
 # MMI and keypad lifecycle
 
-This document summarizes the firmware-owned MMI input path at the current
-coherent Nokia 3210 v6.00 frontier. `mmi_settlement.md` owns the startup
-report investigation; this file owns the keypad hardware-to-firmware contract.
+This document owns the validated Nokia 3210 v6.00 keypad, security-editor,
+interactive-idle, and conditional power/shutdown contracts. Rejected startup
+and handoff hypotheses live in `evidence/falsifications.json`, not as alternate
+recipes here.
 
 ## Contract audit
 
@@ -45,8 +46,62 @@ A bounded 50 ms Up tap proves the physical lifecycle: IRQ0 fires on press and
 release, the matrix scanner polls while held, and `0x2b4628` decodes one key.
 Later `0x0367` polling, the accepted editor transaction and periodic `0x00c8`
 and `0x05a7` traffic are firmware-owned MMI lifecycle behavior, not repeated
-matrix scans or missing hardware acknowledgements. Their transition-level
-evidence belongs in `mmi_settlement.md`.
+matrix scans or missing hardware acknowledgements.
+
+## Startup and power lifecycle
+
+Task 1 owns the startup state rooted at `0x1123ee`, dispatched by master
+routine `0x270c8e`:
+
+| field | address | accepted value/role |
+| --- | --- | --- |
+| pending event | `0x1123ee` | current scalar mailbox input |
+| mode | `0x1123f0` | `0x0004` with interactive UI |
+| readiness flags | `0x112399` | `0x0f` after mode `0x000d` |
+| substate | `0x11239c` | diagnostic context |
+
+The coherent interactive state is mode `0x0004` with readiness flags `0x0f`. Both exits from mode
+`0x000d` compare the current report with code `0x07`; a different report records
+mode `0x0004` or `0x0007`, then both paths execute equivalent interactive
+initialization tails. Mode `0x0004` is therefore an interactive state carrying
+a later power/shutdown continuation, not a blocked pre-desktop state.
+
+Report `0x07` is conditional power/shutdown lifecycle, not boot completion.
+Its v6.00 callers cover low-voltage shutdown (`0x21e40c`), charging completion
+(`0x21f8de`), callback `0x5d` terminal completion (`0x27b3b6`), and controller
+status `0x0795` (`0x255c3c`). A physical two-second power-key hold exercises the
+last route, changes task 1 to mode `0x000c`, reaches terminal event `0x0074`,
+clears SIM enable, and blanks the LCD through firmware-owned teardown. A short
+press leaves the phone interactive. `make verify-power-lifecycle` protects
+both outcomes.
+
+Callback `0x5d` is the paired report-6/7 status dispatcher. Input `0x0348`
+posts report 6; inputs `0x05e1`, `0x05e7`, and `0x05dc` start timer class
+`0x52`; terminal `0x05eb` or recoded completion `0x06c5` posts report 7. The
+complete transition table has 950 records, 30 of which select callback `0x5d`.
+Code 7 must not be injected or treated as cold-boot readiness.
+
+## Conditional UI paths
+
+Several mapped paths were initially plausible ordinary-startup entrances.
+Runtime and complete table/caller censuses reclassify them as conditional
+firmware lifecycles rather than the cold-boot route. No class-1 message,
+`0x0547`, callback selection, context state, timer result, hardware event, or
+peer response should be synthesized from them:
+
+- Callback `0x01` at `0x29ea80` can map global status `0x0367` to controller
+  status `0x03e9`, but callback `0x01` is no longer selected when a physical
+  navigation key produces `0x0367` indirectly from the active UI context.
+- Controller `0x03e9` reaches `0x256f68`, which publishes global `0x05e7`
+  (argument 1); callback `0x10` at `0x292878` consumes that pair for
+  application/UI reinitialization, not ordinary cold boot.
+- Task-6 constructor `0x2b1e44` sends class 1 with selector byte one, then arms
+  `0x1116fd`, requests resource `0x4c22`, and posts `0x0547`. Exhaustive
+  execution of task-5 dispatcher `0x28bddc` finds only status `0x0732`
+  selecting that constructor, and `0x0732` belongs to power/shutdown ordering.
+- Periodic `0x00c8` traffic is task-1 context maintenance; repeating `0x05a7`
+  is the independent three-slot timer manager at `0x2b3222`. Neither is a
+  retried idle-screen transaction.
 
 ## Hardware path
 

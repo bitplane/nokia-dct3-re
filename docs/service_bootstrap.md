@@ -37,7 +37,7 @@ of an incomplete startup contract, not the root hardware boundary.
 
 | Prerequisite | Firmware observation | Current owner |
 | --- | --- | --- |
-| DSP lower-service completion | pending counter `0x100e4` drains and MAD2 IRQ 4 invokes `0x2af3ca`; `0x291068` sets `0x110c2c = 1` | `MODEL_DSP_SERVICE` prototype |
+| DSP lower-service completion | pending counter `0x100e4` drains and MAD2 IRQ 4 invokes `0x2af3ca`; `0x291068` sets `0x110c2c = 1` | `nokia_dsp_hle_device` |
 | CCONT readiness | live serial read of CCONT register `0x0e`, bit 0 | persistent reset status owned by `nokia_ccont_device` |
 | EEPROM configuration | checksum over `0x120..0x243` matches stored value at `0x244` | generated EEPROM profile through native `I2C_24C128` |
 | EEPROM tune/security block | checksum over the security/tune region matches the stored word at `0x11c` | generated EEPROM profile |

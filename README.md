@@ -39,8 +39,7 @@ unprovisioned Security-code editor also accepts a physical `12345` sequence.
 
 Report code 7 is a later power/shutdown report. Mapped callback, descriptor,
 timer, and task-6 selector paths are conditional firmware lifecycles rather
-than missing hardware acknowledgements. Detailed contracts live in
-[`docs/mmi_settlement.md`](docs/mmi_settlement.md) and
+than missing hardware acknowledgements. The detailed contract lives in
 [`docs/mmi_layer.md`](docs/mmi_layer.md).
 
 `make verify-frontier RUN_DIR=run_frontier` is the authoritative 3210 hardware
@@ -52,11 +51,11 @@ adds provisioned identity and protects the interactive menu transaction.
 For direct use, `make run-interactive` opens a normal MAME window with standard
 remappable inputs and persistent NVRAM; it does not drive scripted keys.
 
-The surviving `MODEL_*` paths react at device or DSP-ring boundaries. They are
-executable protocol hypotheses, not finished hardware emulation, but do not
-call firmware handlers or write registration state. Firmware-PC conditions are
-confined to diagnostic traces; product provisioning enters through EEPROM and
-other ordinary device boundaries.
+The DSP, radio, GSM-network, and external-service HLE devices react at explicit
+transport boundaries. They are executable protocol models, not finished silicon
+emulation, but do not call firmware handlers or write registration state.
+Firmware-PC conditions are confined to diagnostic traces; product provisioning
+enters through EEPROM and other ordinary device boundaries.
 
 ## Maturity
 
@@ -101,11 +100,16 @@ supported, and it passes the reference and portability checks.
 
 ### Platform work
 
-1. Improve the extracted EEPROM, CCONT and GENSIO devices from observed transactions.
-2. Use the Nokia 3330 (NHM-6) as the first cross-ROM confidence target once its service files are normalized reproducibly.
-3. Recover MAD2's exact sleep-clock divider/transition timing and identify GENSIO SELECT peers from hardware evidence.
-4. Stabilize the extracted SIMI/card seam, then separate synthetic card provisioning into reusable profiles.
-5. Separate DSP transport/HLE from the external-service peer, then add further DCT3 products as evidence.
+1. Recover MAD2's remaining clock-divider, transition-latency, extended-interrupt,
+   and rail-sequencing contracts.
+2. Replace calibrated CCONT ADC/serial timing and board-level analog values only
+   when an exercised firmware consumer or hardware measurement supplies units.
+3. Extend SIMI/card timing, error, removal, CHV, and file behavior from organic
+   firmware requests or focused protocol conformance tests.
+4. Keep DSPIF as a transport-only attachment point while expanding the HLE only
+   from evidenced traffic; a future C54x backend replaces that HLE at the same seam.
+5. Use the validated 3210, 3310, 3330, and 3410 profiles to distinguish shared
+   DCT3 behavior from product-specific display, flash, storage, and peer contracts.
 
 New phone support is initially a portability probe. A ROM that fails early is still valuable when
 it identifies a 3210-specific assumption.
@@ -128,7 +132,7 @@ Start with:
 - [`docs/driver_structure.md`](docs/driver_structure.md) for implementation rules.
 - [`docs/driver_vision.md`](docs/driver_vision.md) for the component retirement path.
 - [`docs/service_bootstrap.md`](docs/service_bootstrap.md) for service-session startup.
-- [`docs/mmi_settlement.md`](docs/mmi_settlement.md) for the validated idle/menu lifecycle and excluded conditional paths.
+- [`docs/mmi_layer.md`](docs/mmi_layer.md) for the validated keypad, idle/menu, security-editor, and power lifecycle.
 - [`docs/sim_registration.md`](docs/sim_registration.md) for SIM initialization and adjacent session firmware maps.
 - [`docs/tooling.md`](docs/tooling.md) for the analysis tools.
 
@@ -153,10 +157,11 @@ make swap16
 ```
 
 `make verify` boots the explicit missing-hardware profile and checks its semantic predicates.
-Peer models and diagnostic traces are opt-in through `NOKIA_DCT3_*` environment
-variables. They must not be enabled when establishing a new ROM's hardware baseline.
-The former `NOKI3210_*` research prefix is not retained as a compatibility alias;
-all shared runtime controls use the product-neutral namespace.
+Normal product composition is typed machine configuration. Named `HWCFG` and
+`DIAGCFG` fixtures select negative-composition and controller-conformance tests;
+passive diagnostics use MAME logging. `NOKIA_DCT3_*` variables are confined to
+the external Lua harness for scripted input, capture, and test output. The former
+`NOKI3210_*` prefix is not retained as a compatibility alias.
 
 ## Engineering Rules
 
