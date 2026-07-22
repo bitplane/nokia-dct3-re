@@ -146,7 +146,7 @@ void nokia_sim_card_device::finish_header()
 	m_p1 = m_tx[2];
 	m_p2 = m_tx[3];
 	m_p3 = m_tx[4];
-	if (std::getenv("NOKI3210_TRACE_SIM_RX") != nullptr)
+	if (m_trace)
 		logerror("sim_device: header cla=%02x ins=%02x p1=%02x p2=%02x p3=%02x selected=%04x t=%.8f\n",
 				m_tx[0], m_ins, m_p1, m_p2, m_p3, m_selected_file,
 				machine().time().as_double());
@@ -185,7 +185,7 @@ void nokia_sim_card_device::finish_body()
 			m_selected_df = requested_file;
 		m_record_pointer = 0;
 	}
-	if (std::getenv("NOKI3210_TRACE_SIM_RX") != nullptr)
+	if (m_trace)
 	{
 		if (m_ins == 0xa4)
 			logerror("sim_device: body ins=%02x length=%u requested=%04x selected=%04x result=%s t=%.8f\n",
@@ -375,7 +375,7 @@ void nokia_sim_card_device::update_binary()
 		return;
 	}
 	std::copy_n(m_tx, m_tx_len, data + start);
-	if (std::getenv("NOKI3210_TRACE_SIM_RX") != nullptr)
+	if (m_trace)
 		logerror("sim_device: update-binary fid=%04x offset=%u length=%u t=%.8f\n",
 				file->fid, start, m_tx_len, machine().time().as_double());
 	queue_status(0x90, 0x00);
@@ -426,7 +426,7 @@ void nokia_sim_card_device::update_record()
 	}
 	std::copy_n(m_tx, file->record_length, data + (record - 1) * file->record_length);
 	m_record_pointer = record;
-	if (std::getenv("NOKI3210_TRACE_SIM_RX") != nullptr)
+	if (m_trace)
 		logerror("sim_device: update fid=%04x record=%u length=%u t=%.8f\n",
 				file->fid, record, file->record_length, machine().time().as_double());
 	queue_status(0x90, 0x00);

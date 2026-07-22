@@ -43,7 +43,7 @@ peripheral completeness.
 | `00` ASIC version | constant `0x40` | Inferred | Compare MAD2 revisions across phone service manuals/ROM checks. |
 | `01` MCU reset | bit 2 requests a deferred digital-baseband reset; power bit 0 and retained cause bits are readable | Cross-ROM partial | Both ROMs contain three bit-2 reset sites. A mapped-MMIO fixture proves the reset extent and post-reset value `0x05`; exact rail timing remains unknown. |
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
-| `03` watchdog | decrement/reset loop | Inferred | Determine tick source, reload semantics and reset domain. |
+| `03` watchdog | nonzero writes reload an eight-bit seconds counter; expiry resets the digital baseband and retains cause `0x03` | Focus-tested partial | The mapped-MMIO fixture proves reload, expiry and reset extent. Determine the physical tick source and exact rail timing. |
 | `04..07` timer 1 | 15-bit current counter and fixed `0x7fff` destination; FIQ5 at destination | Cross-ROM partial | Both ROMs use identical stable-read and FIQ5 race handling, and convert remaining Timer-1 ticks by rounded division by 8 before comparing them with Timer 0. Absolute input/divider provenance remains calibrated. |
 | `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ2, masked-pending retention and acknowledgement have focused regressions. The overlap fixture briefly gates CPU delivery through MAD2 MMIO so two physical input callbacks compose deterministically. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
@@ -134,8 +134,8 @@ SIMI and LCD domains together while CCONT and nonvolatile storage persist.
 Both 3210 ROMs restart through MAD2 reset value `0x01`, consume CCONT charger
 cause `0x04` and reach acting-dead mode. Exact rail sequencing remains unknown.
 
-Until the second ROM is normalized, `NOKI3210_TRACE_MAD2_LEDGER=1` provides the
-curated 3210 evidence pass: at most one read and one write record per MAD2 byte
+`NOKI3210_TRACE_MAD2_LEDGER=1` provides a curated register-access pass: at most
+one read and one write record per MAD2 byte
 offset per reset, including value, previous value for writes, PC, time and the
 register description. It intentionally excludes RAM and firmware hooks.
 
@@ -162,9 +162,9 @@ divider is at most `0xea`, program a compare two counter ticks ahead, wait for
 FIQ line 4/status bit `0x10`, and acknowledge it through status offset `0x08`.
 `make verify-mad2` checks that complete lifecycle from a targeted organic trace.
 This validates the live divider, coherent 16-bit counter read, compare and
-write-one-clear contract. The previous unused `0x04` timer constant and matching
-pending guard were wrong; runtime assertion/status/acknowledgement all establish
-`0x10`.
+write-one-clear contract. Runtime assertion, status and acknowledgement all
+establish FIQ bit `0x10`; the earlier `0x04` assignment is retained only as a
+falsification in the evidence ledger.
 The NSE-8/9 system-module documentation establishes a 13 MHz ARM clock and a
 nominal 32 kHz sleep-clock input to MAD2PR1. It does not document the internal
 timer divider tree. The paired ROMs prove the functional relation instead:
@@ -173,21 +173,20 @@ while timeout code compares its remaining interval with
 `round(Timer1_remaining / 8)`. The current `33,055 Hz` Timer-0 source and
 `1,057 Hz` Timer-1 rate preserve that observed relation within calibration
 error and keep the boot lifecycle coherent; they remain configurable until a
-primary source establishes the exact oscillator/dividers. The former 13 MHz
-Timer-0 setting starved task 2 and expired CCONT at exactly 49 seconds.
-
-The initial 33,055 Hz experiment exposed task 17 suspended when `0x1587`
-arrived. Scheduler-state comparison established that the ordinary post API was
-correct: the external-service prototype had sent command `0x64`, result `5`,
-which runs a five-tick delay and deliberately suspends tasks 10--17. Removing
-that unsupported lifecycle request leaves task 17 in receive-wait state `4`;
-`0x1587` wakes it, SIM initialization completes, and watchdog service continues.
-No scheduler wake or firmware state is synthesized. `NOKI3210_TIMER0_HZ`
-remains available only for bounded clock comparisons.
+primary source establishes the exact oscillator/dividers. Using the 13 MHz ARM
+clock directly as Timer 0's input is disproven: it starves task 2 and expires
+CCONT at 49 seconds. No scheduler wake or firmware state is synthesized;
+`NOKI3210_TIMER0_HZ` remains available only for bounded clock comparisons.
 Timer 1 runs independently at the retained `1,057 Hz` calibration, reaches
 fixed destination `0x7fff`, raises FIQ5 and wraps in the 15-bit domain.
 Catch-up remains disabled, and none of this establishes other MAD2 revisions'
 clocks.
+
+The next clock question is deliberately narrower: recover the cross-ROM sleep
+entry and resume sequence, identify which clock-control bits select the 13 MHz
+and 32.768 kHz domains, establish which domain feeds each counter, and enumerate
+the interrupt sources that can wake MAD2. Do not infer those effects from the
+current calibrated rates.
 
 The same target performs a scheduled save/load round trip. Main RAM, MAD2
 registers, IRQ/FIQ pending state, timer counters/divider/compare latch, keypad

@@ -18,6 +18,8 @@ public:
 	void set_charger_input(bool connected, uint16_t vchar);
 	void set_ready(bool ready) { m_ready = ready; }
 	void set_wddisx_grounded(bool grounded) { m_wddisx_grounded = grounded; }
+	void set_adc_trace(bool enabled) { m_adc_trace = enabled; }
+	void set_rtc_trace(bool enabled) { m_rtc_trace = enabled; }
 	bool watchdog_tick();
 
 protected:
@@ -44,6 +46,8 @@ private:
 	bool m_charger_connected = false;
 	bool m_wddisx_grounded = false;
 	bool m_rtc_alarm_armed = false;
+	bool m_adc_trace = false;
+	bool m_rtc_trace = false;
 	emu_timer *m_rtc_timer = nullptr;
 	emu_timer *m_rtc_alarm_latch_timer = nullptr;
 };

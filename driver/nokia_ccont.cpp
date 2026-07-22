@@ -100,7 +100,7 @@ void nokia_ccont_device::set_charger_input(bool connected, uint16_t vchar)
 		// power-on cause consumed by the 3210 startup classifier.
 		m_powered = true;
 		m_regs[IRQ_STATUS] = (m_ready ? RESET_READY : 0) | RESET_CHARGER;
-		if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+		if (m_adc_trace)
 			logerror("ccont_power: event=wake cause=%02x t=%.9f\n",
 				RESET_CHARGER, machine().time().as_double());
 		m_power_cb(1);
@@ -118,7 +118,7 @@ void nokia_ccont_device::select_w(int selected)
 void nokia_ccont_device::latch_irq_sources(uint8_t sources)
 {
 	m_regs[IRQ_STATUS] |= sources & IRQ_SOURCE_MASK;
-	if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+	if (m_adc_trace)
 		logerror("ccont_input: irq_latch=%02x status=%02x mask=%02x t=%.9f\n",
 			sources & IRQ_SOURCE_MASK, m_regs[IRQ_STATUS], m_regs[IRQ_MASK],
 			machine().time().as_double());
@@ -133,7 +133,7 @@ void nokia_ccont_device::update_irq()
 void nokia_ccont_device::advance_rtc()
 {
 	latch_irq_sources(IRQ_RTC_SECOND);
-	if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+	if (m_rtc_trace)
 		logerror("ccont_rtc: event=second time=%02u:%02u:%02u day=%u status=%02x mask=%02x t=%.9f\n",
 			m_regs[RTC_HOUR], m_regs[RTC_MINUTE], m_regs[RTC_SECOND], m_regs[RTC_DAY],
 			m_regs[IRQ_STATUS], m_regs[IRQ_MASK], machine().time().as_double());
@@ -195,7 +195,7 @@ void nokia_ccont_device::serial_w(uint8_t data)
 			m_regs[address] = data;
 			m_regs[ADC_LSB] = value & 0xff;
 			m_regs[ADC_MSB] = (value >> 8) & 0x03;
-			if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+			if (m_adc_trace)
 				logerror("ccont_input: adc_select=%u raw=%03x ctrl=%02x t=%.9f\n",
 					channel, value, data, machine().time().as_double());
 			break;
@@ -204,7 +204,7 @@ void nokia_ccont_device::serial_w(uint8_t data)
 			if (data == 0x00)
 			{
 				m_powered = false;
-				if (std::getenv("NOKI3210_TRACE_CCONT_ADC"))
+				if (m_adc_trace)
 					logerror("ccont_power: event=off t=%.9f\n", machine().time().as_double());
 				m_power_cb(0);
 			}
@@ -222,13 +222,13 @@ void nokia_ccont_device::serial_w(uint8_t data)
 		case RTC_HOUR:
 		case RTC_DAY:
 			m_regs[address] = data;
-			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+			if (m_rtc_trace)
 				logerror("ccont_rtc: event=counter_write reg=%02x data=%02x t=%.9f\n",
 					address, data, machine().time().as_double());
 			break;
 		case RTC_ALARM_MINUTE:
 			m_regs[address] = data & 0x3f;
-			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+			if (m_rtc_trace)
 				logerror("ccont_rtc: event=alarm_write reg=%02x data=%02x armed=%u t=%.9f\n",
 					address, data, m_rtc_alarm_armed, machine().time().as_double());
 			break;
@@ -246,14 +246,14 @@ void nokia_ccont_device::serial_w(uint8_t data)
 				m_regs[address] &= 0x1f;
 				m_rtc_alarm_armed = true;
 			}
-			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+			if (m_rtc_trace)
 				logerror("ccont_rtc: event=alarm_write reg=%02x data=%02x armed=%u t=%.9f\n",
 					address, data, m_rtc_alarm_armed, machine().time().as_double());
 			break;
 		case IRQ_STATUS:
 			// Ready bit 0 is persistent device status. Bits 1/2 are clearable
 			// power-key/charger reset causes; upper bits are IRQ-source latches.
-			if (std::getenv("NOKI3210_TRACE_CCONT_RTC"))
+			if (m_rtc_trace)
 				logerror("ccont_rtc: event=status_ack data=%02x old=%02x t=%.9f\n",
 					data, m_regs[address], machine().time().as_double());
 			m_regs[address] = (m_regs[address] & RESET_READY) |
@@ -282,11 +282,11 @@ uint8_t nokia_ccont_device::serial_r()
 		case RTC_SECOND: data |= 0x80; break;
 		}
 	}
-	if (std::getenv("NOKI3210_TRACE_CCONT_RTC") &&
+	if (m_rtc_trace &&
 			((address >= RTC_SECOND && address <= RTC_ALARM_HOUR) || address == IRQ_STATUS))
 		logerror("ccont_rtc: event=read reg=%02x data=%02x t=%.9f\n",
 			address, data, machine().time().as_double());
-	if (std::getenv("NOKI3210_TRACE_CCONT_ADC") && address == IRQ_STATUS)
+	if (m_adc_trace && address == IRQ_STATUS)
 		logerror("ccont_power: event=cause_read data=%02x t=%.9f\n",
 			data, machine().time().as_double());
 	// Reading the selected register completes the serial transaction.  A later
