@@ -9,6 +9,7 @@ class MachineProfileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.driver = (ROOT / "driver/nokia_3310.cpp").read_text()
+        cls.b3_flash = (ROOT / "driver/nokia_b3_flash.cpp").read_text()
         cls.ccont = (ROOT / "driver/nokia_ccont.cpp").read_text()
         cls.makefile = (ROOT / "Makefile").read_text()
 
@@ -76,11 +77,12 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_3410_owns_intel_b3_block_lock_protocol(self):
         self.assertIn("bool flash_b3_block_lock;", self.driver)
-        self.assertIn("if (m_product.flash_b3_block_lock)", self.driver)
+        self.assertIn("m_b3_flash->set_enabled(product.flash_b3_block_lock);", self.driver)
         for confirm in ("0x01", "0xd0", "0x2f"):
-            self.assertIn(f"(data & 0xff) == {confirm}", self.driver)
-        self.assertIn("m_flash_b3_erase_suspended", self.driver)
-        self.assertIn("return 0x00c0 & mem_mask; // ready + erase suspended", self.driver)
+            self.assertIn(f"command == {confirm}", self.b3_flash)
+        self.assertIn("m_erase_suspended", self.b3_flash)
+        self.assertIn("return 0x00c0 & mem_mask; // ready + erase suspended", self.b3_flash)
+        self.assertNotIn("m_flash_b3_erase_suspended", self.driver)
 
     def test_contact_service_oracle_is_explicit_negative_profile(self):
         target = self.makefile.split("CONTACT_SERVICE_ENV :=", 1)[1].split("\n\n", 1)[0]

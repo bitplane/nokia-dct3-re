@@ -27,6 +27,7 @@
 #include "video/pcd8544.h"
 
 #include "nokia_ccont.h"
+#include "nokia_b3_flash.h"
 #include "nokia_dsp_hle.h"
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
@@ -117,7 +118,6 @@ constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
 constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
 constexpr offs_t NOKIA_3410_FLASH_STATUS_CSR = 0x003fff00;
-constexpr offs_t NOKIA_FLASH_END = 0x00a00000;
 constexpr uint32_t NOKIA_FLASH_ENTRY = 0x200040;
 
 enum mad2_reg : uint8_t
@@ -158,8 +158,6 @@ enum mad2_reg : uint8_t
 	MAD2_SIM_TX_FILL = 0x3f
 };
 
-constexpr uint16_t MAD2_FIQ_TIMER0_COMPARE = uint16_t(1) << 4;
-
 // CCONT serial command/status bits + fixed wiring (hardware constants, not configurable).
 // PWRONX is latched as CCONT status bit 1 on a cold power-key boot. It is a
 // reset cause sampled by firmware, not one of the upper interrupt sources.
@@ -168,34 +166,6 @@ constexpr uint8_t CCONT_IRQ_LINE_NUM = 2;         // MAD2 IRQ line the CCONT ass
 
 // Firmware RAM locations used only by observation-only research diagnostics.
 constexpr offs_t FW_SCHED_RUNNING_TASK_ID = 0x100022;
-// Service-ready / DSP-handshake chain; see docs/service_bootstrap.md. The
-// startup service-ready byte (0x110c2c) is set =1 by
-// the setter 0x291068 iff the DSP-shared pending counter (DSP RAM byte 0xe4) == 0; the
-// setter only runs when MAD2 IRQ line 4 (the DSP service-completion interrupt) fires.
-constexpr offs_t FW_STARTUP_EVENT = 0x1123ee;
-constexpr offs_t FW_STARTUP_MODE = 0x1123f0;
-constexpr offs_t FW_POST74_EVENT_GATE = 0x112368;
-constexpr offs_t FW_POST74_EVENT_GATE_READY = FW_POST74_EVENT_GATE + 4;
-constexpr offs_t FW_POST74_EVENT_GATE_FLAGS = FW_POST74_EVENT_GATE + 6;
-
-// Service-session state reached during the startup watchdog path.
-constexpr offs_t FW_SERVICE_SESSION_RESULT = 0x11fed4;
-constexpr offs_t FW_SERVICE_SESSION_COUNTER = 0x11fed6;
-constexpr offs_t FW_SERVICE_SESSION_SUBSTATE = 0x11feda;
-constexpr offs_t FW_SERVICE_SESSION_ACK = 0x11fedb;
-
-// Service-channel/lower-service state used by the current startup transport model.
-constexpr offs_t FW_SERVICE_CHANNEL_ENABLE_FLAGS = 0x11fee4;
-
-// Service-session remote read (see docs/service_bootstrap.md). The firmware
-// reads its command from PM logical address 0x5f00 via an async MBUS/PM
-// request message. The request's dest node ([msg+1]) is sourced from the channel-enable flag
-// FW_SERVICE_CHANNEL_ENABLE_FLAGS (0x11fee4) — which is 0 on a blank phone, so the read is
-// dropped (no request sent). The response, when one arrives, is dispatched by command at
-// 0x236dc6; command 0x05 completes the service transaction. Request frame format:
-//   00 [node] 00 00 00 0a 00 01 [addr_hi] [addr_lo] [seq][seq] [ctr] [count] [data..]
-constexpr uint16_t PM_LOGICAL_SERVICE_COMMAND = 0x5f00;
-constexpr uint8_t  SERVICE_RESPONSE_CMD_HEALTHY = 0x05;
 
 class noki3310_state : public driver_device
 {
@@ -203,7 +173,7 @@ public:
 	noki3310_state(const machine_config &mconfig, device_type type, const char *tag) :
 		driver_device(mconfig, type, tag),
 		m_maincpu(*this, "maincpu"),
-		m_flash(*this, "flash"),
+		m_b3_flash(*this, "b3_flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
 		m_gensio(*this, "gensio"),
@@ -259,7 +229,6 @@ private:
 
 	TIMER_CALLBACK_MEMBER(timer_watchdog);
 	TIMER_CALLBACK_MEMBER(timer_mbus_rx_fixture);
-	TIMER_CALLBACK_MEMBER(timer_flash_b3_erase);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	void ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
@@ -306,7 +275,7 @@ private:
 	uint16_t debug_ram_word(offs_t address) const { return fw_word(address); }
 	uint8_t debug_ram_byte(offs_t address) const { return fw_byte(address); }
 	required_device<cpu_device> m_maincpu;
-	required_device<intelfsh16_device> m_flash;
+	required_device<nokia_b3_flash_device> m_b3_flash;
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
 	required_device<nokia_gensio_device> m_gensio;
@@ -335,17 +304,9 @@ private:
 	bool          m_keypad_irq_latched;
 	bool          m_ccont_irq_state;
 	bool          m_baseband_powered = true;
-	bool          m_flash_b3_lock_command = false;
-	bool          m_flash_b3_program_data = false;
-	bool          m_flash_b3_erase_confirm = false;
-	bool          m_flash_b3_erase_active = false;
-	bool          m_flash_b3_erase_suspended = false;
-	bool          m_flash_b3_status_override = false;
-	u64           m_flash_b3_erase_remaining_us = 0;
 
 	emu_timer * m_timer_watchdog;
 	emu_timer * m_timer_mbus_rx_fixture;
-	emu_timer * m_timer_flash_b3_erase;
 
 	uint8_t       m_mad2_regs[0x100];
 	bool          m_mad2_trace_read[0x100] = {false};
@@ -551,20 +512,12 @@ void noki3310_state::machine_start()
 
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
 	m_timer_mbus_rx_fixture = timer_alloc(FUNC(noki3310_state::timer_mbus_rx_fixture), this);
-	m_timer_flash_b3_erase = timer_alloc(FUNC(noki3310_state::timer_flash_b3_erase), this);
 	save_pointer(NAME(m_ram), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 	save_item(NAME(m_power_on));
 	save_item(NAME(m_keypad_columns));
 	save_item(NAME(m_keypad_irq_latched));
 	save_item(NAME(m_ccont_irq_state));
 	save_item(NAME(m_baseband_powered));
-	save_item(NAME(m_flash_b3_lock_command));
-	save_item(NAME(m_flash_b3_program_data));
-	save_item(NAME(m_flash_b3_erase_confirm));
-	save_item(NAME(m_flash_b3_erase_active));
-	save_item(NAME(m_flash_b3_erase_suspended));
-	save_item(NAME(m_flash_b3_status_override));
-	save_item(NAME(m_flash_b3_erase_remaining_us));
 	save_item(NAME(m_mad2_regs));
 	save_item(NAME(m_mcuif_regs));
 	machine().save().register_postload(save_prepost_delegate(FUNC(noki3310_state::post_load), this));
@@ -603,6 +556,7 @@ void noki3310_state::apply_product_config(nokia_product_config const &product)
 	m_dsp_hle->set_peer_poll_ms(dsp_default_ms);
 	m_external_service_peer->set_enabled(external_service);
 	m_radio_peer->set_enabled(product.radio_peer);
+	m_b3_flash->set_enabled(product.flash_b3_block_lock);
 }
 
 uint16_t noki3310_state::fw_word(offs_t address) const
@@ -650,14 +604,6 @@ void noki3310_state::machine_reset()
 	m_mad2_interrupt_trace_count = 0;
 	m_mad2_clock_trace_count = 0;
 	m_mbus_trace_count = 0;
-	m_flash_b3_lock_command = false;
-	m_flash_b3_program_data = false;
-	m_flash_b3_erase_confirm = false;
-	m_flash_b3_erase_active = false;
-	m_flash_b3_erase_suspended = false;
-	m_flash_b3_status_override = false;
-	m_flash_b3_erase_remaining_us = 0;
-	m_timer_flash_b3_erase->adjust(attotime::never);
 	// These overrides are retained strictly for negative/conformance fixtures.
 	// Normal runs use the typed product configuration installed above.
 	m_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33'055));
@@ -966,13 +912,6 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 	}
 }
 
-TIMER_CALLBACK_MEMBER(noki3310_state::timer_flash_b3_erase)
-{
-	m_flash_b3_erase_active = false;
-	m_flash_b3_erase_suspended = false;
-	m_flash_b3_erase_remaining_us = 0;
-}
-
 // Hardware RAM read entry point (registered in the address map).
 uint16_t noki3310_state::ram_r(offs_t offset, uint16_t mem_mask)
 {
@@ -1042,106 +981,12 @@ uint16_t noki3310_state::flash_r(offs_t offset, uint16_t mem_mask)
 	const u32 pc = m_maincpu->pc();
 	const u32 addr = 0x00200000 + (offset << 1);
 	flash_firmware_traces(pc, addr);
-	// The 3410's B3 driver sends commands and polls status through a fixed
-	// CSR while reading record data from other read-while-write partitions.
-	// The generic flash core exposes one global command mode, so bypass that
-	// mode for ordinary array reads while the externally timed erase is active.
-	u16 value;
-	if (m_product.flash_b3_block_lock && m_flash_b3_status_override &&
-			(addr & ~u32(1)) != NOKIA_3410_FLASH_STATUS_CSR)
-	{
-		const u8 *const array = m_flash->base();
-		value = (u16(array[offset * 2]) << 8) | array[offset * 2 + 1];
-	}
-	else
-	{
-		value = m_flash->read(offset);
-	}
-	if (m_product.flash_b3_block_lock && m_flash_b3_status_override &&
-			(addr & ~u32(1)) == NOKIA_3410_FLASH_STATUS_CSR)
-	{
-		// The 3410 interleaves writes to another partition while a B3 erase is
-		// suspended.  The generic flash core has a single global command state,
-		// so preserve the independently observable erase status here.
-		if (m_flash_b3_erase_suspended)
-			return 0x00c0 & mem_mask; // ready + erase suspended
-		return (m_flash_b3_erase_active ? 0x0000 : 0x0080) & mem_mask;
-	}
-	return value & mem_mask;
+	return m_b3_flash->read(offset, mem_mask);
 }
 
 void noki3310_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	if (m_product.flash_b3_block_lock)
-	{
-		if (m_flash_b3_program_data)
-		{
-			// The word following 40 is array data, even when its low byte is also
-			// a command opcode (the observed 3410 PMM stream contains xx60).
-			m_flash_b3_program_data = false;
-		}
-		else if (m_flash_b3_lock_command)
-		{
-			m_flash_b3_lock_command = false;
-			// Intel B3 uses 60/01, 60/d0 and 60/2f for block lock,
-			// unlock and lock-down.  The current firmware unlocks every block
-			// before programming and relocks it afterwards; expose ready status
-			// while the flash core remains responsible for the data operation.
-			if ((data & 0xff) == 0x01 || (data & 0xff) == 0xd0 || (data & 0xff) == 0x2f)
-			{
-				m_flash->write(offset, 0x70);
-				return;
-			}
-		}
-		else if ((data & 0xff) == 0x60)
-		{
-			m_flash_b3_lock_command = true;
-			return;
-		}
-		else if (m_flash_b3_erase_active && m_flash_b3_erase_suspended &&
-				(data & 0xff) == 0xd0)
-		{
-			m_flash_b3_erase_suspended = false;
-			m_flash_b3_status_override = true;
-			m_timer_flash_b3_erase->adjust(attotime::from_usec(
-					std::max<u64>(1, m_flash_b3_erase_remaining_us)));
-			return;
-		}
-		else if (m_flash_b3_erase_active && (data & 0xff) == 0xb0)
-		{
-			m_flash_b3_erase_remaining_us = std::max<u64>(1,
-					m_timer_flash_b3_erase->remaining().as_ticks(1'000'000));
-			m_timer_flash_b3_erase->adjust(attotime::never);
-			m_flash_b3_erase_suspended = true;
-			m_flash_b3_status_override = true;
-			return;
-		}
-		else if ((data & 0xff) == 0x20)
-		{
-			m_flash_b3_erase_confirm = true;
-		}
-		else if ((data & 0xff) == 0x40)
-		{
-			m_flash_b3_program_data = true;
-		}
-		else if (m_flash_b3_erase_confirm)
-		{
-			m_flash_b3_erase_confirm = false;
-			if ((data & 0xff) == 0xd0)
-			{
-				m_flash_b3_erase_active = true;
-				m_flash_b3_erase_suspended = false;
-				m_flash_b3_status_override = true;
-				// Approximate only: the firmware polls ready status, but no physical
-				// M28W320ECT erase-duration measurement is available yet.
-				m_flash_b3_erase_remaining_us = 1'000'000;
-				m_timer_flash_b3_erase->adjust(attotime::from_seconds(1));
-			}
-		}
-		if ((data & 0xff) == 0xff || (data & 0xff) == 0xf0)
-			m_flash_b3_status_override = false;
-	}
-	m_flash->write(offset, data);
+	m_b3_flash->write(offset, data, mem_mask);
 }
 
 uint32_t noki3310_state::rom2_mirror_r(offs_t offset, uint32_t mem_mask)
@@ -1707,6 +1552,8 @@ void noki3310_state::noki3310(machine_config &config)
 	BEEP(config, m_dsp_tone2).add_route(ALL_OUTPUTS, "mono", 0.12);
 
 	INTEL_TE28F160(config, "flash");
+	NOKIA_B3_FLASH(config, m_b3_flash, 0);
+	m_b3_flash->set_status_csr((NOKIA_3410_FLASH_STATUS_CSR - NOKIA_FLASH1_BASE) >> 1);
 	I2C_24C128(config, m_eeprom);
 	NOKIA_MAD2(config, m_mad2);
 	m_mad2->set_timer0_hz(33'055);

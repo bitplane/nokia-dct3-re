@@ -12,7 +12,7 @@ firmware result:
 
 | hardware entry point | quarantined research helper |
 |---|---|
-| `flash_r/w` | physical flash access plus the documented 3410 B3 partition/status adapter; selected read-only contract probes run after the physical read |
+| `flash_r/w` | thin routing through `nokia_b3_flash_device`; selected read-only contract probes run before the physical read |
 | `ram_w`   (≈3 lines) | none; only the backing-store write |
 | `ram_r`   (≈2 lines)  | none; display provisioning now arrives through EEPROM/NV |
 | `mad2_io_r/w` | functional register routing and board-output helpers, followed by observation-only MAD2 trace helpers |
@@ -43,7 +43,12 @@ state, byte callbacks and FIQ2/FIQ3 outputs without supplying a peer. The phone
 state retains board wiring, physical-input latches and less-established
 peripheral windows. Its MAD2 memory-map handlers delegate register ownership,
 board outputs and diagnostics to separate helpers so traces do not obscure the
-functional dispatch. `nokia_gensio_device` owns its sparse serial/status/SELECT
+functional dispatch. `nokia_b3_flash_device` is a transitional wrapper over
+MAME's generic Intel-compatible flash core; it owns the 3410's independently
+observable B3 lock, erase-suspend, partition-status timer and save-state until
+those generic read-while-write semantics move into `intelfsh`. The phone state
+only maps accesses and selects the product capability. `nokia_gensio_device`
+owns its sparse serial/status/SELECT
 registers and connects CCONT and the PCD8544 through callbacks. A separate
 MAME patch extends the otherwise-unused native PCD8544 implementation with
 default-preserving configurable controller/viewport geometry and internal

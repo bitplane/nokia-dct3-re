@@ -88,12 +88,14 @@ zero-to-one transitions and corrupted the virgin PMM during compaction.
 
 The tracked MAME flash patch contains reusable ID-address and block-geometry
 attributes plus the generic one-way NOR-programming correction; operational
-code does not branch on Nokia part-number literals. The Nokia driver still adapts one
-limitation of the generic core: the 3410 firmware suspends an erase, accesses a
-different partition, and polls a fixed status address while the core exposes a
-single global command state. This adapter is board integration debt, not a
-firmware-result override; a generic partition/read-while-write flash model
-would replace it upstream. Its one-second erase interval is an explicit,
+code does not branch on Nokia part-number literals. The extracted
+`nokia_b3_flash_device` adapts one limitation of the generic core: the 3410
+firmware suspends an erase, accesses a different partition, and polls a fixed
+status address while the core exposes a single global command state. The
+adapter owns that timer and its save-state fields; the phone driver only maps
+accesses and selects the product capability. This remains transitional device
+debt, not a firmware-result override, and a generic partition/read-while-write
+flash model would replace it upstream. Its one-second erase interval is an explicit,
 unmeasured approximation. The firmware polls the ready bit, so no accepted
 behavior currently depends on the exact duration.
 
