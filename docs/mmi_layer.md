@@ -147,9 +147,9 @@ organic transaction rather than the sole evidence.
 `make verify-mmi-menu` protects the keypad-to-menu lifecycle without retaining
 generic firmware task/message probes.
 
-`NOKIA_DCT3_TRACE_DISPLAY_PROFILE=1` records the descriptor-load, profile-update,
-active-profile copy and setup-message boundaries. `NOKIA_DCT3_TRACE_DISPLAY_IO=1`
-records only endpoint selection and LCD command/data bytes. `make verify-display`
+The MAME display categories enabled by `RUN_VERBOSE=1` record the descriptor-load,
+profile-update, active-profile copy and setup-message boundaries plus endpoint
+selection and LCD command/data bytes. `make verify-display`
 checks both ROMs' NV descriptor layouts and serial transfers; its v6.00 leg also
 locks down the ROM-authored reset profile, its firmware-owned copy and the
 absent profile-update handler. The

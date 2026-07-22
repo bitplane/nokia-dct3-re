@@ -2,7 +2,12 @@
 // copyright-holders:Sandro Ronco, Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_mad2.h"
+
+#define LOG_MAD2 (1U << 0)
+#define VERBOSE (LOG_MAD2)
+#include "logmacro.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_MAD2, nokia_mad2_device, "nokia_mad2", "Nokia MAD2 CTSI controller")
 
@@ -28,6 +33,9 @@ nokia_mad2_device::nokia_mad2_device(
 
 void nokia_mad2_device::device_start()
 {
+	m_timer_trace = machine().options().verbose();
+	m_interrupt_trace = machine().options().verbose();
+	m_clock_trace = machine().options().verbose();
 	m_timer0 = timer_alloc(FUNC(nokia_mad2_device::timer0_tick), this);
 	m_timer1 = timer_alloc(FUNC(nokia_mad2_device::timer1_tick), this);
 	m_fiq8 = timer_alloc(FUNC(nokia_mad2_device::fiq8_tick), this);
@@ -108,7 +116,7 @@ u8 nokia_mad2_device::read(offs_t offset)
 	{
 		const u8 data = (m_regs[offset] & ~0x02) | ((m_fiq_status >> 7) & 0x02);
 		if (m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-			logerror("mad2_interrupt: event=reg_R off=16 data=%02x fiq=%03x irq=%03x fiqmask=%02x irqmask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
+			LOGMASKED(LOG_MAD2, "mad2_interrupt: event=reg_R off=16 data=%02x fiq=%03x irq=%03x fiqmask=%02x irqmask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
 					data, m_fiq_status, m_irq_status, m_regs[0x0a], m_regs[0x0b],
 					m_regs[0x0c], m_regs[0x16], machine().time().as_double());
 		return data;
@@ -169,7 +177,7 @@ void nokia_mad2_device::assert_fiq(unsigned line)
 	const u16 before = m_fiq_status;
 	m_fiq_status |= line < 8 ? u16(1) << line : LINE_EXTENDED;
 	if (m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=assert domain=FIQ line=%u pending_before=%03x pending_after=%03x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=assert domain=FIQ line=%u pending_before=%03x pending_after=%03x t=%.9f\n",
 				line, before, m_fiq_status, machine().time().as_double());
 	update_fiq_line();
 }
@@ -179,7 +187,7 @@ void nokia_mad2_device::assert_irq(unsigned line)
 	const u16 before = m_irq_status;
 	m_irq_status |= line < 8 ? u16(1) << line : LINE_EXTENDED;
 	if (m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=assert domain=IRQ line=%u pending_before=%03x pending_after=%03x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=assert domain=IRQ line=%u pending_before=%03x pending_after=%03x t=%.9f\n",
 				line, before, m_irq_status, machine().time().as_double());
 	update_irq_line();
 }
@@ -193,7 +201,7 @@ void nokia_mad2_device::set_irq_line(unsigned line, bool state)
 	else
 		m_irq_status &= ~mask;
 	if (before != m_irq_status && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=levels domain=IRQ line=%u active=%u pending_before=%03x pending_after=%03x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=levels domain=IRQ line=%u active=%u pending_before=%03x pending_after=%03x t=%.9f\n",
 				line, state, before, m_irq_status, machine().time().as_double());
 	update_irq_line();
 }
@@ -204,10 +212,10 @@ void nokia_mad2_device::ack_fiq(u16 mask)
 	m_fiq_status &= ~mask;
 	update_fiq_line();
 	if (m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=ack domain=FIQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=ack domain=FIQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
 				mask, before, m_fiq_status, machine().time().as_double());
 	if (m_timer_trace && m_timer_trace_count++ < 4096)
-		logerror("mad2_timer: event=ack mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_timer: event=ack mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
 				mask, before, m_fiq_status, machine().time().as_double());
 }
 
@@ -219,7 +227,7 @@ void nokia_mad2_device::ack_irq(u16 mask)
 		m_irq_ack_cb(mask);
 	update_irq_line();
 	if (mask && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=ack domain=IRQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=ack domain=IRQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
 				mask, before, m_irq_status, machine().time().as_double());
 }
 
@@ -239,7 +247,7 @@ void nokia_mad2_device::update_fiq_line()
 			active = true;
 	}
 	if (active != m_fiq_line_state && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=route domain=FIQ active=%u pending=%03x mask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=route domain=FIQ active=%u pending=%03x mask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
 				active, m_fiq_status, m_regs[0x0a], m_regs[0x0c], m_regs[0x16], machine().time().as_double());
 	m_fiq_line_state = active;
 	if (active)
@@ -257,7 +265,7 @@ void nokia_mad2_device::update_irq_line()
 			active = true;
 	}
 	if (active != m_irq_line_state && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=route domain=IRQ active=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=route domain=IRQ active=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
 				active, m_irq_status, m_regs[0x0b], m_regs[0x0c], machine().time().as_double());
 	m_irq_line_state = active;
 	if (active)
@@ -272,13 +280,13 @@ void nokia_mad2_device::enter_sleep()
 	if (m_sleeping || m_fiq_line_state || m_irq_line_state)
 	{
 		if (m_clock_trace && m_clock_trace_count++ < 4096)
-			logerror("mad2_sleep: event=request_blocked fiq=%03x irq=%03x t=%.9f\n",
+			LOGMASKED(LOG_MAD2, "mad2_sleep: event=request_blocked fiq=%03x irq=%03x t=%.9f\n",
 					m_fiq_status, m_irq_status, machine().time().as_double());
 		return;
 	}
 	m_sleeping = true;
 	if (m_clock_trace && m_clock_trace_count++ < 4096)
-		logerror("mad2_sleep: event=request clocks=%02x timer0=%04x timer1=%04x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_sleep: event=request clocks=%02x timer0=%04x timer1=%04x t=%.9f\n",
 				m_regs[0x0d], m_timer0_counter, m_timer1_counter,
 				machine().time().as_double());
 	m_sleep_cb(1);
@@ -290,7 +298,7 @@ void nokia_mad2_device::leave_sleep(const char *domain)
 		return;
 	m_sleeping = false;
 	if (m_clock_trace && m_clock_trace_count++ < 4096)
-		logerror("mad2_sleep: event=wake domain=%s fiq=%03x irq=%03x timer0=%04x timer1=%04x t=%.9f\n",
+		LOGMASKED(LOG_MAD2, "mad2_sleep: event=wake domain=%s fiq=%03x irq=%03x timer0=%04x timer1=%04x t=%.9f\n",
 				domain, m_fiq_status, m_irq_status, m_timer0_counter,
 				m_timer1_counter, machine().time().as_double());
 	m_sleep_cb(0);
@@ -320,7 +328,7 @@ void nokia_mad2_device::update_timer0_compare()
 	{
 		assert_fiq(4);
 		if (m_timer_trace && m_timer_trace_count++ < 4096)
-			logerror("mad2_timer: event=assert counter=%04x compare=%04x divider=%02x pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
+			LOGMASKED(LOG_MAD2, "mad2_timer: event=assert counter=%04x compare=%04x divider=%02x pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
 					m_timer0_counter, (u16(m_regs[0x12]) << 8) | m_regs[0x13],
 					m_timer0_divider, m_fiq_status, m_regs[0x0a], m_regs[0x0c], machine().time().as_double());
 	}
@@ -348,7 +356,7 @@ TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)
 	{
 		assert_fiq(5);
 		if (m_timer_trace && m_timer_trace_count++ < 4096)
-			logerror("mad2_timer1: event=destination counter=%04x destination=%04x pending=%03x t=%.9f\n",
+			LOGMASKED(LOG_MAD2, "mad2_timer1: event=destination counter=%04x destination=%04x pending=%03x t=%.9f\n",
 					m_timer1_counter, m_timer1_destination, m_fiq_status,
 					machine().time().as_double());
 	}

@@ -13,7 +13,6 @@ public:
 	auto fiq2_cb() { return m_fiq2_cb.bind(); }
 	auto fiq3_cb() { return m_fiq3_cb.bind(); }
 
-	void set_trace(bool enabled) { m_trace = enabled; }
 
 	u8 read(offs_t offset);
 	void write(offs_t offset, u8 data);

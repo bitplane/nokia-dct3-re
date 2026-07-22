@@ -1,7 +1,12 @@
 // license:BSD-3-Clause
 // copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_dsp_hle.h"
+
+#define LOG_DSP_HLE (1U << 0)
+#define VERBOSE (LOG_DSP_HLE)
+#include "logmacro.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_DSP_HLE, nokia_dsp_hle_device, "nokia_dsp_hle", "Nokia DCT3 DSP HLE")
 
@@ -16,6 +21,7 @@ nokia_dsp_hle_device::nokia_dsp_hle_device(
 
 void nokia_dsp_hle_device::device_start()
 {
+	m_trace_enabled = machine().options().verbose();
 	m_service_timer = timer_alloc(FUNC(nokia_dsp_hle_device::service_tick), this);
 	m_packet_timer = timer_alloc(FUNC(nokia_dsp_hle_device::packet_tick), this);
 	m_response_timer = timer_alloc(FUNC(nokia_dsp_hle_device::response_tick), this);
@@ -74,7 +80,7 @@ void nokia_dsp_hle_device::doorbell_w(int state)
 	if (state && m_transport->dspif_r(0) == 0 && m_transport->dspif_r(1) == 4)
 		m_transport->peer_shared_w(0x0e0 / 2, 0);
 	if (state && m_trace_enabled)
-		logerror("dsp_hle: doorbell pending=%04x t=%.6f\n",
+		LOGMASKED(LOG_DSP_HLE, "dsp_hle: doorbell pending=%04x t=%.6f\n",
 				m_transport->service_pending(), machine().time().as_double());
 }
 
@@ -129,7 +135,7 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 			for (offs_t offset = 0; offset <= (0x004 / 2); offset++)
 				m_transport->peer_shared_w(offset, 1);
 			if (m_trace_enabled)
-				logerror("dsp_hle: bootstrap ready exchanges=%u t=%.6f\n",
+				LOGMASKED(LOG_DSP_HLE, "dsp_hle: bootstrap ready exchanges=%u t=%.6f\n",
 						m_bootstrap_exchange_count, machine().time().as_double());
 		}
 	}
@@ -163,7 +169,7 @@ void nokia_dsp_hle_device::drain_responses()
 			m_transport->enqueue_rx_packet(response.type, response.payload.data(), response.length))
 	{
 		if (m_trace_enabled)
-			logerror("dsp_hle: peer RX type=%02x length=%u t=%.6f\n",
+			LOGMASKED(LOG_DSP_HLE, "dsp_hle: peer RX type=%02x length=%u t=%.6f\n",
 					response.type, response.length, machine().time().as_double());
 		m_external_peer->consume_response();
 		if (response.notify)
@@ -177,7 +183,7 @@ void nokia_dsp_hle_device::schedule_response()
 	if (m_response_timer->remaining().is_never() && m_external_peer->peek_response(response))
 	{
 		if (m_trace_enabled)
-			logerror("dsp_hle: peer RX scheduled length=%u delay=%.6f t=%.6f\n",
+			LOGMASKED(LOG_DSP_HLE, "dsp_hle: peer RX scheduled length=%u delay=%.6f t=%.6f\n",
 					response.length, attotime::from_ticks(response.length * 10, 9'600).as_double(),
 					machine().time().as_double());
 		m_response_timer->adjust(attotime::from_ticks(response.length * 10, 9'600));
@@ -219,7 +225,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 				std::string payload_hex;
 				for (unsigned index = 0; index < packet.length; ++index)
 					payload_hex += util::string_format("%02x", packet.payload[index]);
-				logerror("dsp_hle: TX packet type=%02x payload=%u words=%u radio_phase=%s data=%s t=%.6f\n",
+				LOGMASKED(LOG_DSP_HLE, "dsp_hle: TX packet type=%02x payload=%u words=%u radio_phase=%s data=%s t=%.6f\n",
 						packet.type, packet.length, packet.words, m_radio_peer->phase_name(), payload_hex,
 						machine().time().as_double());
 			}

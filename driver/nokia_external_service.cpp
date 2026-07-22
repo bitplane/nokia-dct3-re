@@ -1,7 +1,12 @@
 // license:BSD-3-Clause
 // copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_external_service.h"
+
+#define LOG_EXTERNAL_SERVICE (1U << 0)
+#define VERBOSE (LOG_EXTERNAL_SERVICE)
+#include "logmacro.h"
 
 #include <algorithm>
 
@@ -16,6 +21,7 @@ nokia_external_service_peer_device::nokia_external_service_peer_device(
 
 void nokia_external_service_peer_device::device_start()
 {
+	m_trace_enabled = machine().options().verbose();
 	save_item(NAME(m_enabled));
 	save_item(NAME(m_discovery_complete));
 	save_item(NAME(m_service_control_complete));
@@ -70,7 +76,7 @@ bool nokia_external_service_peer_device::queue_service_frame(u8 command, u8 resu
 	if (!queue_response(frame, std::size(frame)))
 		return false;
 	if (m_trace_enabled)
-		logerror("external_service: response command=%02x result=%02x sequence=%02x t=%.6f\n",
+		LOGMASKED(LOG_EXTERNAL_SERVICE, "external_service: response command=%02x result=%02x sequence=%02x t=%.6f\n",
 				command, result, sequence, machine().time().as_double());
 	return true;
 }

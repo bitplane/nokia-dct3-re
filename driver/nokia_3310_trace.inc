@@ -15,7 +15,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 
 	// Serving-cell acceptance checkpoints retained by verify-radio-camp.
 	if (pc == addr && addr == 0x00284f74 && m_trace.dsp_boundary)
-		logerror("radio_channel_change_state: pc=%08x accept=%02x controller=%02x flags=%08x "
+		LOGMASKED(LOG_DSP_BOUNDARY, "radio_channel_change_state: pc=%08x accept=%02x controller=%02x flags=%08x "
 				"r0=%08x caller=%08x task=%02x t=%.6f\\n", addr,
 				fw_byte(0x0010dbd7), fw_byte(0x0010dc93), fw_dword(0x0010dca0),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
@@ -24,7 +24,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 	if (pc == addr && addr == 0x00284e50 && m_trace.dsp_boundary)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
-		logerror("radio_no_psw_left_decode: object=%08x accept=%02x lifecycle=%02x "
+		LOGMASKED(LOG_DSP_BOUNDARY, "radio_no_psw_left_decode: object=%08x accept=%02x lifecycle=%02x "
 				"phase=%02x task=%02x t=%.6f\\n", object, fw_byte(0x0010dbd7),
 				fw_byte(0x0010c84c), fw_byte(0x0010dbdd),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
@@ -32,7 +32,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 	if (pc == addr && addr == 0x00213c04 && m_trace.dsp_boundary)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R8);
-		logerror("radio_acquisition_transition: pc=%08x object=%08x status=%04x action=%02x "
+		LOGMASKED(LOG_DSP_BOUNDARY, "radio_acquisition_transition: pc=%08x object=%08x status=%04x action=%02x "
 				"arg=%02x sequence=%02x lifecycle=%02x controller=%02x task=%02x t=%.6f\\n",
 				addr, object, fw_word(object), fw_byte(object + 2), fw_byte(object + 3),
 				fw_byte(0x00111e29), fw_byte(0x0010c84c), fw_byte(0x0010dbd7),
@@ -42,7 +42,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
 		const bool readable = object >= NOKIA_RAM_BASE && object + 5 < NOKIA_RAM_END;
-		logerror("radio_candidate_table: object=%08x status=%04x usable=%02x "
+		LOGMASKED(LOG_DSP_BOUNDARY, "radio_candidate_table: object=%08x status=%04x usable=%02x "
 				"arfcn=%04x rssi_id=%02x acquisition_mode=%02x task=%02x t=%.6f\\n", object,
 				readable ? fw_word(object) : 0xffff, readable ? fw_byte(object + 2) : 0xff,
 				readable ? fw_word(object + 4) : 0xffff, fw_byte(0x0010c84b),
@@ -52,15 +52,15 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 	if (pc == addr && addr == 0x00273aac && m_trace.dsp_boundary)
 	{
 		const u32 block = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
-		logerror("radio_bcch_parse: channel=%02x block=%08x data=",
+		LOGMASKED(LOG_DSP_BOUNDARY, "radio_bcch_parse: channel=%02x block=%08x data=",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xff, block);
 		for (unsigned index = 0; block >= NOKIA_RAM_BASE && block + index < NOKIA_RAM_END && index < 24; ++index)
-			logerror("%02x", fw_byte(block + index));
-		logerror(" task=%02x t=%.6f\\n", fw_byte(FW_SCHED_RUNNING_TASK_ID),
+			LOGMASKED(LOG_DSP_BOUNDARY, "%02x", fw_byte(block + index));
+		LOGMASKED(LOG_DSP_BOUNDARY, " task=%02x t=%.6f\\n", fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
 	}
 	if (pc == addr && addr == 0x00273e58 && m_trace.dsp_boundary)
-		logerror("radio_si3_path: pc=%08x result=%08x update1=%08x update2=%08x state=%02x active=%02x flags=%02x/%02x "
+		LOGMASKED(LOG_DSP_BOUNDARY, "radio_si3_path: pc=%08x result=%08x update1=%08x update2=%08x state=%02x active=%02x flags=%02x/%02x "
 				"task=%02x t=%.6f\\n", addr,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R6),
@@ -72,7 +72,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
 		const u32 payload = object >= NOKIA_RAM_BASE && object + 0x0c < NOKIA_RAM_END ?
 				fw_dword(object + 8) : 0;
-		logerror("radio_mm_parse: phase=%s object=%08x payload=%08x result=%08x "
+		LOGMASKED(LOG_DSP_BOUNDARY, "radio_mm_parse: phase=%s object=%08x payload=%08x result=%08x "
 				"mm=%02x/%02x/%02x/%02x task=%02x t=%.6f\n",
 				addr == 0x0020a026 ? "entry" : "return", object, payload,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
@@ -83,14 +83,14 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 
 	// The alarm regression needs the firmware's final packed-event mapping.
 	if (pc == addr && addr == 0x002af64a && m_trace.ccont_rtc && fw_word(0x00110f1a) == 0x06bc)
-		logerror("rtc_alarm_route: map-output=%04x base=%08x offset=%08x deadline=%08x task=%02x t=%.9f\n",
+		LOGMASKED(LOG_CCONT_RTC, "rtc_alarm_route: map-output=%04x base=%08x offset=%08x deadline=%08x task=%02x t=%.9f\n",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
 				fw_dword(0x001121d8), fw_dword(0x001121e0), fw_dword(0x001121e4),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 
 	// The watchdog gate checks the firmware helper's combined MAD2/CCONT service.
 	if (pc == addr && addr == 0x002b4dda && m_trace.ccont_watchdog)
-		logerror("watchdog_terminal: reason=%02x caller=%08x task=%02x t=%.6f\n",
+		LOGMASKED(LOG_CCONT_WATCHDOG, "watchdog_terminal: reason=%02x caller=%08x task=%02x t=%.6f\n",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
@@ -98,7 +98,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 	{
 		const u32 mask = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
 		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
-		logerror("ccont_watchdog_service: mask=%02x caller=%08x task=%02x t=%.6f\n",
+		LOGMASKED(LOG_CCONT_WATCHDOG, "ccont_watchdog_service: mask=%02x caller=%08x task=%02x t=%.6f\n",
 				mask & 0xff, lr, fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
 	}
@@ -108,7 +108,7 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 			(addr == 0x0029a996 || addr == 0x0029ae68 || addr == 0x0029a768 ||
 			 addr == 0x002b1e80 || addr == 0x002af2ac))
 	{
-		logerror("display_profile: pc=%08x "
+		LOGMASKED(LOG_DISPLAY_PROFILE, "display_profile: pc=%08x "
 				"source0=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x "
 				"active=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x task=%02x t=%.6f\n",
 				addr,
@@ -130,10 +130,10 @@ void noki3310_state::flash_firmware_traces(u32 pc, u32 addr)
 		const u32 request = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);
 		if (id == 0x5031 && request >= NOKIA_RAM_BASE && request + 31 < NOKIA_RAM_END)
 		{
-			logerror("display_frontier: operator-resource data=");
+			LOGMASKED(LOG_DISPLAY, "display_frontier: operator-resource data=");
 			for (unsigned index = 0; index < 32; ++index)
-				logerror("%02x", fw_byte(request + index));
-			logerror("\n");
+				LOGMASKED(LOG_DISPLAY, "%02x", fw_byte(request + index));
+			LOGMASKED(LOG_DISPLAY, "\n");
 		}
 	}
 }

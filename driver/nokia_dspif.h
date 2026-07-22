@@ -30,7 +30,6 @@ public:
 	auto fiq0_cb() { return m_fiq0_cb.bind(); }
 	auto service_irq_cb() { return m_service_irq_cb.bind(); }
 
-	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
 
 	u16 shared_r(offs_t offset);
 	void shared_w(offs_t offset, u16 data, u16 mem_mask = ~0);

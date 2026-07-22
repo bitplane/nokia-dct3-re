@@ -1,7 +1,12 @@
 // license:BSD-3-Clause
 // copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_dspif.h"
+
+#define LOG_DSPIF (1U << 0)
+#define VERBOSE (LOG_DSPIF)
+#include "logmacro.h"
 
 #include <algorithm>
 #include <iomanip>
@@ -40,6 +45,7 @@ nokia_dspif_device::nokia_dspif_device(
 
 void nokia_dspif_device::device_start()
 {
+	m_trace_enabled = machine().options().verbose();
 	save_item(NAME(m_ram));
 	save_item(NAME(m_dspif));
 }
@@ -69,7 +75,7 @@ u16 nokia_dspif_device::shared_r(offs_t offset)
 			byte_offset == 0x0fe || byte_offset == 0x100 ||
 			byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
 			byte_offset == 0x1c8 || byte_offset == 0x1ca || byte_offset == 0x0e4))
-		logerror("dspif_transport: RAM R off=%03x data=%04x t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: RAM R off=%03x data=%04x t=%.6f\n",
 				byte_offset, value, machine().time().as_double());
 	return value;
 }
@@ -85,7 +91,7 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 			(offset << 1) == 0x0b6 ||
 			offset == TX_PRODUCER || offset == TX_CONSUMER ||
 			offset == RX_PRODUCER || offset == RX_CONSUMER || offset == SVC_PENDING))
-		logerror("dspif_transport: RAM W off=%03x data=%04x t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: RAM W off=%03x data=%04x t=%.6f\n",
 				offset << 1, m_ram[offset], machine().time().as_double());
 	if (offset == TX_PRODUCER)
 	{
@@ -120,7 +126,7 @@ void nokia_dspif_device::peer_shared_w(offs_t offset, u16 data)
 	const u16 old_data = m_ram[offset];
 	m_ram[offset] = data;
 	if (m_trace_enabled)
-		logerror("dspif_transport: peer RAM W off=%03x old=%04x data=%04x t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: peer RAM W off=%03x old=%04x data=%04x t=%.6f\n",
 				offset << 1, old_data, data, machine().time().as_double());
 }
 
@@ -136,7 +142,7 @@ void nokia_dspif_device::dspif_w(offs_t offset, u8 data)
 	if (offset != 1)
 		return;
 	if (m_trace_enabled)
-		logerror("dspif_transport: doorbell command=%04x pending=%04x t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: doorbell command=%04x pending=%04x t=%.6f\n",
 				(u16(m_dspif[0]) << 8) | m_dspif[1], m_ram[SVC_PENDING],
 				machine().time().as_double());
 	m_doorbell_cb(1);
@@ -171,7 +177,7 @@ void nokia_dspif_device::consume_tx_packet(const packet &value)
 {
 	peer_shared_w(TX_CONSUMER, (m_ram[TX_CONSUMER] + value.words) % TX_WORDS);
 	if (m_trace_enabled)
-		logerror("dspif_transport: TX consume type=%02x payload=%u words=%u consumer=%02x data=%s t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: TX consume type=%02x payload=%u words=%u consumer=%02x data=%s t=%.6f\n",
 				value.type, value.length, value.words, m_ram[TX_CONSUMER],
 				packet_hex(value.payload.data(), value.length).c_str(),
 				machine().time().as_double());
@@ -201,7 +207,7 @@ bool nokia_dspif_device::enqueue_rx_packet(u8 type, const u8 *payload, unsigned 
 		put((u16(payload[i]) << 8) | (i + 1 < payload_length ? payload[i + 1] : 0));
 	peer_shared_w(RX_PRODUCER, producer);
 	if (m_trace_enabled)
-		logerror("dspif_transport: RX enqueue type=%02x payload=%u producer=%03x data=%s t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: RX enqueue type=%02x payload=%u producer=%03x data=%s t=%.6f\n",
 				type, payload_length, producer, packet_hex(payload, payload_length).c_str(),
 				machine().time().as_double());
 	return true;
@@ -210,7 +216,7 @@ bool nokia_dspif_device::enqueue_rx_packet(u8 type, const u8 *payload, unsigned 
 void nokia_dspif_device::notify_rx()
 {
 	if (m_trace_enabled)
-		logerror("dspif_transport: FIQ0 notify producer=%03x consumer=%03x t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: FIQ0 notify producer=%03x consumer=%03x t=%.6f\n",
 				m_ram[RX_PRODUCER], m_ram[RX_CONSUMER], machine().time().as_double());
 	m_fiq0_cb(1);
 	m_fiq0_cb(0);
@@ -225,7 +231,7 @@ void nokia_dspif_device::complete_service()
 {
 	peer_shared_w(SVC_PENDING, 0);
 	if (m_trace_enabled)
-		logerror("dspif_transport: IRQ4 service-complete request=%04x t=%.6f\n",
+		LOGMASKED(LOG_DSPIF, "dspif_transport: IRQ4 service-complete request=%04x t=%.6f\n",
 				m_ram[0x0e2 / 2], machine().time().as_double());
 	m_service_irq_cb(1);
 	m_service_irq_cb(0);

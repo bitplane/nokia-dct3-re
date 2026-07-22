@@ -21,9 +21,6 @@ public:
 	void set_timer0_catchup(bool value) { m_timer0_catchup = value; }
 	void set_dsp_reset_running_status(u8 value) { m_dsp_reset_running_status = value; }
 	void set_dsp_release_mask(u8 value) { m_dsp_release_mask = value; }
-	void set_timer_trace(bool value) { m_timer_trace = value; }
-	void set_interrupt_trace(bool value) { m_interrupt_trace = value; }
-	void set_clock_trace(bool value) { m_clock_trace = value; }
 
 	u8 read(offs_t offset);
 	void write(offs_t offset, u8 data);

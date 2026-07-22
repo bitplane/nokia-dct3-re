@@ -21,7 +21,6 @@ public:
 			const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
-	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
 	void receive_frame(const u8 *payload, unsigned length);
 	void set_service_control_complete();
 	void tick();

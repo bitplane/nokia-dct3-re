@@ -25,7 +25,6 @@ public:
 		m_parked_boot_status = enabled;
 		m_boot_status_response = response;
 	}
-	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
 
 	void tx_commit_w(int state);
 	void service_pending_w(int state);

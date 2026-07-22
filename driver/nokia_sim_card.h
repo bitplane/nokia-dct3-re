@@ -13,7 +13,6 @@ public:
 
 	void set_cphs_aoc(bool enabled) { m_cphs_aoc = enabled; }
 	void set_cached_location(bool enabled) { m_cached_location = enabled; }
-	void set_trace(bool enabled) { m_trace = enabled; }
 	void set_atr(const u8 *data, unsigned length);
 	void activate();
 	void rx_w(u8 data);

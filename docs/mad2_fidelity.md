@@ -153,7 +153,7 @@ SIMI and LCD domains together while CCONT and nonvolatile storage persist.
 Both 3210 ROMs restart through MAD2 reset value `0x01`, consume CCONT charger
 cause `0x04` and reach acting-dead mode. Exact rail sequencing remains unknown.
 
-`NOKIA_DCT3_TRACE_MAD2_LEDGER=1` provides a curated register-access pass: at most
+The MAD2-ledger MAME category (`RUN_VERBOSE=1`) provides a curated register-access pass: at most
 one read and one write record per MAD2 byte
 offset per reset, including value, previous value for writes, PC, time and the
 register description. It intentionally excludes RAM and firmware hooks.
@@ -193,11 +193,12 @@ Timer 0 uses programmed divider `0xf9` (`250` source ticks per counter tick),
 while timeout code compares its remaining interval with
 `round(Timer1_remaining / 8)`. The current `33,055 Hz` Timer-0 source and
 `1,057 Hz` Timer-1 rate preserve that observed relation within calibration
-error and keep the boot lifecycle coherent; they remain configurable until a
-primary source establishes the exact oscillator/dividers. Using the 13 MHz ARM
+error and keep the boot lifecycle coherent. A primary source is still needed
+to establish the exact oscillator/dividers. Using the 13 MHz ARM
 clock directly as Timer 0's input is disproven: it starves task 2 and expires
 CCONT at 49 seconds. No scheduler wake or firmware state is synthesized;
-`NOKIA_DCT3_TIMER0_HZ` remains available only for bounded clock comparisons.
+The former process-environment clock overrides have been removed; conformance
+fixtures now exercise the configured product clocks through mapped registers.
 Timer 1 runs independently at the retained `1,057 Hz` calibration, reaches
 fixed destination `0x7fff`, raises FIQ5 and wraps in the 15-bit domain.
 Both timers remain active while the ARM clock is stopped, consistent with the
@@ -219,7 +220,7 @@ registers, IRQ/FIQ pending state, timer counters/divider/compare latch, keypad
 and CCONT aggregation, power-on state and GENSIO state are registered. Post-load
 reconstructs the CPU interrupt lines without manufacturing a new source.
 
-`NOKIA_DCT3_TRACE_MAD2_INTERRUPTS=1` records source assertions and level
+The MAD2-interrupt MAME category (`RUN_VERBOSE=1`) records source assertions and level
 recomputation, pending masks, write-one-clear acknowledgements, relevant
 register accesses and only actual CPU-line transitions. It is capped at 4,096
 records per reset. The paired conformance target runs three scenarios through
@@ -238,7 +239,7 @@ triggers therefore remain.
 
 ## GENSIO focused trace
 
-`NOKIA_DCT3_TRACE_GENSIO=1` logs value-level CCONT/LCD and SELECT-bank accesses
+The GENSIO MAME category (`RUN_VERBOSE=1`) logs value-level CCONT/LCD and SELECT-bank accesses
 and is capped at 20,000 records per reset. Firmware disassembly and runtime
 tracing establish:
 

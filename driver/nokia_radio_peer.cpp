@@ -1,7 +1,12 @@
 // license:BSD-3-Clause
 // copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_radio_peer.h"
+
+#define LOG_RADIO (1U << 0)
+#define VERBOSE (LOG_RADIO)
+#include "logmacro.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device,
 		"nokia_radio_peer", "Nokia DCT3 radio peer HLE")
@@ -16,6 +21,7 @@ nokia_radio_peer_device::nokia_radio_peer_device(
 
 void nokia_radio_peer_device::device_start()
 {
+	m_trace_enabled = machine().options().verbose();
 	save_item(NAME(m_enabled));
 	save_item(NAME(m_reports_sent));
 	save_item(NAME(m_reports_remaining));
@@ -435,7 +441,7 @@ void nokia_radio_peer_device::emit_report()
 	advance_after_report(report_type);
 	m_transport->notify_rx();
 	if (m_trace_enabled)
-		logerror("dsp_hle: radio peer RX type=%02x sequence=%u t=%.6f\n",
+		LOGMASKED(LOG_RADIO, "dsp_hle: radio peer RX type=%02x sequence=%u t=%.6f\n",
 				report_type, m_reports_sent, machine().time().as_double());
 }
 

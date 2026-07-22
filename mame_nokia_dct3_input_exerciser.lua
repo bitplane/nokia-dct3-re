@@ -84,6 +84,8 @@ mad2_watchdog_fixture_at = env_number("NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT", -1)
 mad2_sleep_fixture_at = env_number("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT", -1)
 local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
 local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
+local mbus_rx_fixture = tonumber(os.getenv("NOKIA_DCT3_MBUS_RX_FIXTURE") or "")
+local mbus_rx_fixture_at = env_number("NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS", 300) / 1000
 
 local function emulation_seconds()
 	return machine.time:as_double()
@@ -161,6 +163,7 @@ key_fields.right = key_fields.c
 key_fields.soft2 = key_fields.c
 key_fields.hash = key_fields.minus
 local charger_field = field_by_mask("CHARGER", 0x01)
+local mbus_rx_field = field_by_mask("MBUS_RX", 0xff)
 if charger_initial and charger_field then charger_field:set_value(1) end
 
 local function press(name)
@@ -476,6 +479,14 @@ if charger_pulse_at >= 0 and charger_field then
 	assert(coroutine.resume(charger_timer))
 end
 
+if mbus_rx_fixture and mbus_rx_field then
+	local mbus_rx_timer = coroutine.create(function()
+		emu.wait(mbus_rx_fixture_at)
+		mbus_rx_field:set_value(mbus_rx_fixture & 0xff)
+	end)
+	assert(coroutine.resume(mbus_rx_timer))
+end
+
 -- Focused MAD2 conformance fixtures use physical inputs or the mapped MAD2
 -- registers only. They never write firmware RAM or construct RTOS messages.
 if irq_overlap_at >= 0 and charger_field and key_fields.up then
@@ -628,8 +639,9 @@ if mad2_sleep_fixture_at >= 0 then
 		local old_ctrl = space:read_u8(0x2000c) & 0xdf
 		local old_clock = space:read_u8(0x2000d)
 		if mad2_sleep_fixture_source == "timer1" then
-			-- Timer 1/FIQ5 is the internal sleep-counter wake source. The target
-			-- accelerates its input clock; the device still owns counter expiry.
+			-- Timer 1/FIQ5 is the internal sleep-counter wake source. Its 0x7fff
+			-- destination is hardware-owned and read-only, so this fixture waits
+			-- for the real product-rate counter rather than changing either one.
 			space:write_u8(0x2000a, old_fiq_mask & 0xdf)
 			space:write_u8(0x2000c, old_ctrl | 0x01)
 		else

@@ -32,6 +32,8 @@ SWAP ?= roms/3210f600a_swap16.bin
 RUN_DIR ?= run
 SECONDS ?= 20
 RUN_ENV ?=
+RUN_VERBOSE ?= 0
+RUN_EXTRA_ARGS ?=
 RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
 NVRAM_SYSTEM := $(if $(and $(filter noki3210,$(PHONE)),$(filter 501,$(BIOS))),noki3210_1,$(PHONE))
 PRESERVE_NVRAM ?= 0
@@ -82,16 +84,13 @@ BOOT_ENV := NOKIA_DCT3_LUA_QUIET=1
 # Explicit missing-hardware profile retained for the CONTACT SERVICE oracle.
 # CCONT readiness is a reset-time device input; the peer devices are disabled
 # at their ordinary boundaries. No firmware state is changed.
-CONTACT_SERVICE_ENV := \
-	NOKIA_DCT3_CCONT_READY=0 \
-	NOKIA_DCT3_MODEL_DSP_SERVICE=0 \
-	NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER=0 \
-	NOKIA_DCT3_MODEL_SIM_DEVICE=0
+CONTACT_SERVICE_ARGS := -cfg_directory ../fixtures/contact_service
 
 MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-keyboardprovider none -mouseprovider none -lightgunprovider none \
 	-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
-	-autoboot_script ../mame_nokia_dct3_input_exerciser.lua $(if $(BIOS),-bios $(BIOS))
+	-autoboot_script ../mame_nokia_dct3_input_exerciser.lua $(if $(BIOS),-bios $(BIOS)) \
+	$(if $(filter 1,$(RUN_VERBOSE)),-verbose)
 INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 	-keepaspect -skip_gameinfo $(if $(BIOS),-bios $(BIOS))
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
@@ -164,7 +163,7 @@ help:
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
 	@echo "make clean          remove build/run state (keeps the MAME clone)"
-	@echo "Override runtime knobs with RUN_ENV, e.g.  make run RUN_ENV='NOKIA_DCT3_TRACE_DISPLAY=1'"
+	@echo "Enable passive MAME log categories with RUN_VERBOSE=1; harness fixtures use RUN_ENV"
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -249,7 +248,7 @@ controller-census:
 	$(VENV)/bin/python tools/controller_dispatch_census.py --check
 
 mad2-census:
-	@test -n "$(MAD2_LOG)" || { echo "Set MAD2_LOG to a MAME error log captured with NOKIA_DCT3_TRACE_MAD2_LEDGER=1"; exit 1; }
+	@test -n "$(MAD2_LOG)" || { echo "Set MAD2_LOG to a MAME error log captured with RUN_VERBOSE=1"; exit 1; }
 	@mkdir -p run_census
 	$(VENV)/bin/python tools/mad2_access_census.py --check "$(MAD2_LOG)" \
 		--json run_census/mad2_accesses.json --report run_census/mad2_accesses.md
@@ -303,7 +302,7 @@ run: prepare-run-nvram
 	@truncate -s 0 $(MAME_DIR)/error.log
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
-		./mame $(MAME_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
+		./mame $(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
 run-frontier:
@@ -372,17 +371,17 @@ watch:
 	@while :; do clear; chafa --size=84x48 $(FRAME_PNG) 2>/dev/null || echo "no $(FRAME_PNG) yet"; sleep 0.5; done
 
 verify: PHONE=noki3210
-verify: RUN_ENV=$(CONTACT_SERVICE_ENV)
+verify: RUN_EXTRA_ARGS=$(CONTACT_SERVICE_ARGS)
 verify: run
 	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR)
 	@echo "OK — missing-hardware semantic predicates reproduced"
 
 verify-ccont:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)/error.log --adc-profile sane
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_irq SECONDS=4 \
-		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=2.0'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_irq/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log \
 		--require-charger-irq --summary $(RUN_DIR)_irq/boot_summary.txt
@@ -390,7 +389,7 @@ verify-ccont:
 verify-ccont-watchdog:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=55 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_WATCHDOG=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/ccont_watchdog_trace_check.py \
 		$(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
@@ -398,12 +397,12 @@ verify-ccont-watchdog:
 
 verify-gensio:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v600 SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v600/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v600/error.log \
 		--require-select-contract --require-ccont-boot-status
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v501 SECONDS=1 BIOS=501 \
-		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1'
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v501/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v501/error.log \
 		--require-select-contract --require-ccont-boot-status
@@ -411,14 +410,14 @@ verify-gensio:
 
 verify-display:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_display_v600 SECONDS=3 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DISPLAY_PROFILE=1 NOKIA_DCT3_TRACE_DISPLAY_IO=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v600/error.log
 	$(PYTHON) tools/display_trace_check.py $(RUN_DIR)_display_v600/error.log --firmware v600 \
 		--rom roms/3210f600a_swap16.bin --eeprom "roms/noki3210/3210 v600 eeprom.bin" \
 		--require-profile-boundary
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_display_v501 SECONDS=1 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKIA_DCT3_TRACE_DISPLAY_IO=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v501/error.log
 	$(PYTHON) tools/display_trace_check.py $(RUN_DIR)_display_v501/error.log --firmware v501 \
 		--rom roms/nokia_3210_nse-8_v05_01_full_hu_swap16.bin \
@@ -426,17 +425,17 @@ verify-display:
 
 verify-dsp-transport:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_conformance SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_DSPIF_CONFORMANCE=1'
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/dspif_conformance'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_conformance/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_conformance/error.log --conformance
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp SECONDS=4 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp/error.log \
 		--expected-bootstrap-exchanges 64
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_v501 SECONDS=2 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_v501/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_v501/error.log --bootstrap-only \
 		--expected-bootstrap-exchanges 64
@@ -447,7 +446,7 @@ verify-dsp-transport:
 
 verify-dsp-bootstrap-3310:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
-		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
+		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)/error.log \
 		--completion-only --expected-bootstrap-exchanges 58
@@ -552,13 +551,13 @@ verify-3410-navigation: normalize-3410
 
 verify-radio-camp:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=20 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_camp_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-registration:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=25 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log
 
@@ -571,7 +570,7 @@ verify-radio-operator:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=105 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DISPLAY=1 NOKIA_DCT3_TRACE_SIM_RX=1'; \
+		RUN_VERBOSE=1; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log; \
 	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
@@ -583,11 +582,11 @@ verify-radio-operator:
 
 dsp-census:
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v600 SECONDS=20 \
-		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DSP_SHARED_READS=1 NOKIA_DCT3_TRACE_DSP_SHARED_TRANSITIONS=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log run_dsp_census_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v501 SECONDS=20 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1 NOKIA_DCT3_TRACE_DSP_SHARED_READS=1 NOKIA_DCT3_TRACE_DSP_SHARED_TRANSITIONS=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log run_dsp_census_v501/error.log
 	$(VENV)/bin/python tools/dsp_shared_read_census.py \
 		v600=run_dsp_census_v600/error.log v501=run_dsp_census_v501/error.log \
@@ -600,7 +599,7 @@ dsp-census:
 		--json evidence/runtime/dsp_packets.json --report docs/dsp_packet_semantics.md --check
 
 verify-mad2:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_ENV='NOKIA_DCT3_TRACE_MAD2_TIMERS=1'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/mad2_timer_trace_check.py $(RUN_DIR)/error.log \
 		--summary $(RUN_DIR)/boot_summary.txt --expected-line 4
@@ -611,66 +610,65 @@ verify-mad2:
 
 verify-mad2-interrupts:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_overlap SECONDS=4 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_INTERRUPTS=1 NOKIA_DCT3_MAD2_IRQ_OVERLAP_AT=2.0'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_IRQ_OVERLAP_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_overlap/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py overlap $(RUN_DIR)_overlap/error.log \
 		--summary $(RUN_DIR)_overlap/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mask SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_INTERRUPTS=1 NOKIA_DCT3_MAD2_IRQ_MASK_FIXTURE_AT=0.2'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_IRQ_MASK_FIXTURE_AT=0.2'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mask/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py mask $(RUN_DIR)_mask/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_fiq8 SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_INTERRUPTS=1 NOKIA_DCT3_MAD2_FIQ8_FIXTURE_AT=0.2'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_FIQ8_FIXTURE_AT=0.2'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_fiq8/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py fiq8 $(RUN_DIR)_fiq8/error.log
 	@echo "OK — MAD2 simultaneous, masked-pending and extended-FIQ routing contracts reproduced"
 
 verify-mad2-clocks:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v600 SECONDS=12 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v501 SECONDS=12 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v501/error.log
 	@echo "OK — MAD2 reset-cause, SIM clock-gate and conditional-watchdog contracts reproduced across both 3210 ROMs"
 
 verify-mad2-sleep:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v600 SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_TIMER1_HZ=1000000 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v600 SECONDS=35 \
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v600/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_v600/error.log \
 		--source timer1 --summary $(RUN_DIR)_sleep_v600/boot_summary.txt
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v501 SECONDS=1 BIOS=501 \
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v501 SECONDS=35 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_TIMER1_HZ=1000000 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v501/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_v501/error.log \
 		--source timer1 --summary $(RUN_DIR)_sleep_v501/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_keypad SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_keypad/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_keypad/error.log --source keypad
 	@echo "OK — MAD2 clock stop, sleep-counter wake, external-key wake and sleep-state restore reproduced"
 
 verify-mad2-timer1:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=2 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_TIMERS=1 NOKIA_DCT3_TIMER1_HZ=1000000'
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/mad2_timer1_trace_check.py $(RUN_DIR)/error.log
 	@echo "OK — MAD2 Timer-1 reached 0x7fff, asserted FIQ5 and was acknowledged"
 
 verify-mad2-reset:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_software SECONDS=4 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_MAD2_RESET_FIXTURE_AT=2.0'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_RESET_FIXTURE_AT=2.0'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_software/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_software/error.log \
 		--require-software-reset --allow-no-watchdog
 	@grep -Eq '^soft_resets=[1-9][0-9]*$$' $(RUN_DIR)_software/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_watchdog SECONDS=3 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MAD2_CLOCKS=1 NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT=0.2'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT=0.2'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_watchdog/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_watchdog/error.log \
 		--require-watchdog-reset --allow-no-watchdog --allow-incomplete-clock-lifecycle
@@ -678,52 +676,52 @@ verify-mad2-reset:
 
 verify-mbus:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v600 SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MBUS=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v600/error.log
 	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v501 SECONDS=1 BIOS=501 \
-		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_ENV='NOKIA_DCT3_TRACE_MBUS=1'
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v501/error.log
 	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v501/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_rx SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_MBUS=1 NOKIA_DCT3_MBUS_RX_FIXTURE=0xa5 NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS=300'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MBUS_RX_FIXTURE=0xa5 NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS=300'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_rx/error.log
 	$(PYTHON) tools/mbus_trace_check.py rx $(RUN_DIR)_mbus_rx/error.log
 	@echo "OK — MBUS initialization, idle TX and external RX/FIQ2 contracts reproduced"
 
 verify-buzzer:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_buzzer SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_BUZZER=1 NOKIA_DCT3_BUZZER_FIXTURE_AT=0.3'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_BUZZER_FIXTURE_AT=0.3'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_buzzer/error.log
 	$(PYTHON) tools/buzzer_trace_check.py $(RUN_DIR)_buzzer/error.log
 
 verify-vibrator:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_vibrator SECONDS=1 \
-		RUN_ENV='NOKIA_DCT3_TRACE_PUP_OUTPUTS=1 NOKIA_DCT3_VIBRATOR_FIXTURE_AT=0.3'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_VIBRATOR_FIXTURE_AT=0.3'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_vibrator/error.log
 	$(PYTHON) tools/vibrator_trace_check.py $(RUN_DIR)_vibrator/error.log
 
 verify-dsp-tone:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v600 SECONDS=3 \
-		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v600/error.log
 	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v501 SECONDS=3 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
-		RUN_ENV='NOKIA_DCT3_TRACE_DSP_BOUNDARY=1'
+		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v501/error.log
 	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v501/error.log
 
 verify-ccont-rtc:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_rtc SECONDS=19 \
-		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_RTC=1 NOKIA_DCT3_CCONT_RTC_FIXTURE_AT=15'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_RTC_FIXTURE_AT=15'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_rtc/error.log
 	$(PYTHON) tools/ccont_rtc_trace_check.py $(RUN_DIR)_rtc/error.log
 
 verify-alarm:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_alarm SECONDS=135 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_RTC=1 NOKIA_DCT3_TRACE_BUZZER=1 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=180 NOKIA_DCT3_POST_READY_KEYS=enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,1,wait400,2,wait400,0,wait400,1,wait400,enter,wait700,enter,wait700,0,wait400,1,wait400,0,wait400,1,wait400,1,wait400,9,wait400,9,wait400,9,wait400,enter,wait900,c,wait900,enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,2,wait400,0,wait400,2,wait400,enter'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=180 NOKIA_DCT3_POST_READY_KEYS=enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,1,wait400,2,wait400,0,wait400,1,wait400,enter,wait700,enter,wait700,0,wait400,1,wait400,0,wait400,1,wait400,1,wait400,9,wait400,9,wait400,9,wait400,enter,wait900,c,wait900,enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,2,wait400,0,wait400,2,wait400,enter'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_alarm/error.log
 	$(PYTHON) tools/alarm_trace_check.py $(RUN_DIR)_alarm/error.log
 
@@ -738,7 +736,7 @@ verify-power-lifecycle:
 
 verify-charger-lifecycle:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_connected SECONDS=18 \
-		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1 NOKIA_DCT3_CCONT_CHARGER_INITIAL=1'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_CHARGER_INITIAL=1'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_connected/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_charger_connected/error.log \
 		--require-charger-irq --charger-present-only \
@@ -746,7 +744,7 @@ verify-charger-lifecycle:
 	$(PYTHON) tools/charger_lifecycle_check.py connected \
 		$(RUN_DIR)_charger_connected/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_acting_dead SECONDS=22 \
-		RUN_ENV='NOKIA_DCT3_TRACE_GENSIO=1 NOKIA_DCT3_CCONT_CHARGER_INITIAL=1 NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_CHARGER_INITIAL=1 NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_acting_dead/error.log
 	$(PYTHON) tools/charger_lifecycle_check.py acting-dead \
 		$(RUN_DIR)_acting_dead/boot_summary.txt
@@ -754,7 +752,7 @@ verify-charger-lifecycle:
 
 verify-charger-wake:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_wake SECONDS=35 \
-		RUN_ENV='NOKIA_DCT3_TRACE_CCONT_ADC=1 NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=13 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=13 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_wake/error.log
 	$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)_charger_wake/error.log \
 		$(RUN_DIR)_charger_wake/boot_summary.txt
@@ -814,7 +812,7 @@ verify-sim-phonebook:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR="$$save_dir" SECONDS=32 \
 		PRESERVE_NVRAM=0 PROVISIONED_IMEI_PREFIX=49015420323751 \
-		RUN_ENV='NOKIA_DCT3_TRACE_SIM_RX=1 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=180 NOKIA_DCT3_POST_READY_KEYS=enter,wait700,enter,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=180 NOKIA_DCT3_POST_READY_KEYS=enter,wait700,enter,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
 	cp "$(MAME_DIR)/error.log" "$$save_dir/error.log"; \
 	$(PYTHON) tools/sim_phonebook_check.py "$$save_dir/error.log" \
 		"$$save_dir/nvram/$(NVRAM_SYSTEM)/sim_card"; \

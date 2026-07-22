@@ -289,5 +289,5 @@ the first portability probe. See `mmi_settlement.md` and `mmi_layer.md`.
 
 ## Diagnostic
 
-Use `NOKIA_DCT3_TRACE_MAD2_LEDGER=1` for a bounded first-read/first-write trace of
+Use `RUN_VERBOSE=1` for a bounded first-read/first-write trace of
 MAD2 I/O. See `mad2_fidelity.md` for the authoritative implementation ledger.

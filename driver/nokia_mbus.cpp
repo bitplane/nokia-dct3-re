@@ -2,7 +2,12 @@
 // copyright-holders:Sandro Ronco, Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_mbus.h"
+
+#define LOG_MBUS (1U << 0)
+#define VERBOSE (LOG_MBUS)
+#include "logmacro.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_MBUS, nokia_mbus_device, "nokia_mbus", "Nokia MAD2 MBUS controller")
 
@@ -26,6 +31,7 @@ nokia_mbus_device::nokia_mbus_device(
 
 void nokia_mbus_device::device_start()
 {
+	m_trace = machine().options().verbose();
 	m_byte_timer = timer_alloc(FUNC(nokia_mbus_device::byte_complete), this);
 	m_fiq3_timer = timer_alloc(FUNC(nokia_mbus_device::fiq3_event), this);
 	save_item(NAME(m_control));
@@ -165,7 +171,7 @@ TIMER_CALLBACK_MEMBER(nokia_mbus_device::fiq3_event)
 void nokia_mbus_device::trace_event(const char *event, u8 data)
 {
 	if (m_trace && m_trace_count++ < 8192)
-		logerror("mbus_device: event=%s data=%02x ctrl=%02x status=%02x rx=%u tx=%u t=%.9f\n",
+		LOGMASKED(LOG_MBUS, "mbus_device: event=%s data=%02x ctrl=%02x status=%02x rx=%u tx=%u t=%.9f\n",
 				event, data, m_control, status(), m_rx_ready, m_tx_pending,
 				machine().time().as_double());
 }

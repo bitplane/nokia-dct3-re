@@ -54,10 +54,12 @@ MAME patch extends the otherwise-unused native PCD8544 implementation with
 default-preserving configurable controller/viewport geometry and internal
 rendering. Its standard six-bank configuration retains the native three-bit Y
 command mask; only controllers configured above eight banks decode bit 3. The
-Nokia-local duplicate has been removed. Product differences use explicit
-typed configurations rather than driver-name parsing or process-environment
-selection. Environment controls retained in the driver are restricted to
-read-only diagnostics and named negative/conformance fixtures.
+Nokia-local duplicate has been removed. Product differences use explicit typed
+configurations rather than driver-name parsing or process-environment selection.
+The production driver and devices do not read environment variables: passive
+diagnostics use MAME logging, while negative composition and conformance
+selection use standard MAME configuration ports populated by named external
+fixtures.
 
 ## Rules
 

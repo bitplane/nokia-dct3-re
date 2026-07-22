@@ -12,11 +12,7 @@ mad2_clock: event=W off=0d data=0c old=0c counter=0002 pc=1 t=0.3
 
 class Mad2SleepTraceCheckTest(unittest.TestCase):
 	def test_timer1_sleep_wake_and_state_roundtrip(self):
-		restored = TIMER.replace(
-			"mad2_clock: event=W off=0d data=0c old=0c counter=0002 pc=1 t=0.3\n",
-			"mad2_sleep: event=wake domain=FIQ fiq=020 irq=000 timer0=0002 timer1=7fff t=0.2\n"
-			"mad2_clock: event=W off=0d data=0c old=0c counter=0002 pc=1 t=0.3\n")
-		self.assertEqual(check(restored, "timer1", "state_roundtrip=pass\n"), [])
+		self.assertEqual(check(TIMER, "timer1", "state_roundtrip=pass\n"), [])
 
 	def test_rejects_wrong_timer_wake_bit(self):
 		errors = check(TIMER.replace("fiq=020", "fiq=010"), "timer1")

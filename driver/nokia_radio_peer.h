@@ -13,7 +13,6 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
-	void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
 	bool enabled() const { return m_enabled; }
 	void receive_packet(const nokia_dspif_device::packet &packet);
 	void tick();

@@ -88,17 +88,18 @@ is available.
 
 Normal machine composition no longer depends on `NOKIA_DCT3_*` controls.
 Product ADC tuples, clocks, SIMI, DSP/service peers and the validated 3210
-laboratory-network peer are typed `nokia_product_config` data. The remaining
-controls belong exclusively to diagnostics or explicitly named negative and
-conformance fixtures:
+laboratory-network peer are typed `nokia_product_config` data. Negative
+composition is selected through standard MAME configuration ports, passive
+diagnostics use MAME logging, and scripted physical-input/MMIO fixtures remain
+outside the production driver in Lua:
 
 | Class | Controls | Status |
 | --- | --- | --- |
-| Card/analog fixtures | `CHARGER_ADC`, `SIM_ATR_HEX`, `SIM_CPHS_AOC`, `SIM_CACHED_LOCATION` | Focused external-input fixtures. Ordinary ADC values and card attachment come from the product profile. `SIM_CACHED_LOCATION` supplies persistent EF_LOCI state for registration scenarios. |
-| Timing fixtures | `TIMER0_HZ`, `TIMER1_HZ`, `FIQ8_HZ`, `TIMER0_CATCHUP` | Conformance-only clock overrides. Normal products use fixed 33,055 Hz Timer 0, 1,057 Hz Timer 1 and 1 kHz FIQ8 configuration. |
-| Negative composition fixtures | `CCONT_READY`, `MODEL_DSP_SERVICE`, `MODEL_EXTERNAL_SERVICE_PEER`, `MODEL_SIM_DEVICE`, `MODEL_RADIO_PEER` | May only disable a product-owned component or readiness input for a named negative gate. They cannot enable a component absent from that product profile. |
-| Read-only diagnostics | `TRACE_DISPLAY`, `TRACE_DISPLAY_PROFILE`, `TRACE_DISPLAY_IO`, `TRACE_SIM_RX`, `TRACE_DSP_BOUNDARY`, `TRACE_DSP_SHARED_READS`, `TRACE_DSP_SHARED_TRANSITIONS`, `TRACE_GENSIO`, `TRACE_GENSIO_LIMIT`, `TRACE_CCONT_WATCHDOG`, `TRACE_CCONT_ADC`, `TRACE_CCONT_RTC`, `TRACE_KEYPAD`, `TRACE_MAD2_LEDGER`, `TRACE_MAD2_TIMERS`, `TRACE_MAD2_INTERRUPTS`, `TRACE_MAD2_CLOCKS`, `TRACE_MBUS`, `TRACE_BUZZER`, `TRACE_PUP_OUTPUTS` | Log-only and bounded or scoped to a named regression. `TRACE_GENSIO_LIMIT` changes only the default 20,000-line diagnostic ceiling. |
-| Harness/output controls | `SNAPSHOT_DIR`, `BOOT_SUMMARY`, `LUA_QUIET`, `POST_READY_KEY`, `POST_READY_KEYS`, `POST_READY_KEY_DELAY_MS`, `POST_READY_KEY_DURATION_MS`, `POST_READY_KEY_GAP_MS`, `POST_READY_KEY_PERIOD_MS`, `POST_READY_CAPTURE_DELAY_MS`, `CCONT_CHARGER_INITIAL`, `CCONT_CHARGER_PULSE_AT`, `CCONT_CHARGER_PULSE_DURATION`, `CCONT_RTC_FIXTURE_AT`, `MAD2_IRQ_OVERLAP_AT`, `MAD2_IRQ_MASK_FIXTURE_AT`, `MAD2_FIQ8_FIXTURE_AT`, `MAD2_SLEEP_FIXTURE_AT`, `MAD2_SLEEP_FIXTURE_SOURCE`, `MAD2_RESET_FIXTURE_AT`, `MAD2_WATCHDOG_FIXTURE_AT`, `BUZZER_FIXTURE_AT`, `VIBRATOR_FIXTURE_AT`, `DSPIF_CONFORMANCE`, `MBUS_RX_FIXTURE`, `MBUS_RX_FIXTURE_AT_MS`, `STATE_ROUNDTRIP_AT` | Frame capture, summaries, save-state checks, and deterministic physical-input/MMIO conformance fixtures outside the emulated hardware contract. |
+| Product hardware | Typed `nokia_product_config` fields and device setters | ADC inputs, timer clocks, SIM profile, display geometry, flash capabilities and peer composition are fixed by the selected machine configuration. |
+| Negative composition | `HWCFG` MAME configuration port, with named files under `fixtures/` | A gate may disable a product-owned CCONT, SIM, DSP-service, external-service or radio component. It cannot enable hardware absent from the product profile. |
+| Controller conformance | `DIAGCFG` MAME configuration port, selected by a named fixture | Requests an internal device invariant check without changing firmware state or normal machine composition. |
+| Passive diagnostics | Standard MAME logging categories, enabled by `RUN_VERBOSE=1` in the local harness | Read-only and bounded observations. No device or driver parses a diagnostic environment variable. |
+| Harness/output controls | Lua-only `NOKIA_DCT3_*` controls for snapshots, summaries, scripted keys, charger/RTC events, MAD2 MMIO fixtures, MBUS input and save-state checks | External test orchestration. These variables are parsed only by `mame_nokia_dct3_input_exerciser.lua` and are not production configuration. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
 registration-state forcing controls.
@@ -120,7 +121,7 @@ requests and consumes those reports incrementally. A future table-driven
 representation is worthwhile only where it preserves request correlation and
 makes the protocol easier to review.
 
-The retained trace switches are scoped as follows:
+The retained MAME log categories are scoped as follows:
 
 | Trace | Purpose |
 | --- | --- |

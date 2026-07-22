@@ -2,7 +2,12 @@
 // copyright-holders:Sandro Ronco, Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_sim_card.h"
+
+#define LOG_SIM (1U << 0)
+#define VERBOSE (LOG_SIM)
+#include "logmacro.h"
 
 #include <algorithm>
 
@@ -18,6 +23,7 @@ nokia_sim_card_device::nokia_sim_card_device(
 
 void nokia_sim_card_device::device_start()
 {
+	m_trace = machine().options().verbose();
 	save_item(NAME(m_cphs_aoc));
 	save_item(NAME(m_cached_location));
 	save_item(NAME(m_atr));
@@ -150,7 +156,7 @@ void nokia_sim_card_device::finish_header()
 	m_p2 = m_tx[3];
 	m_p3 = m_tx[4];
 	if (m_trace)
-		logerror("sim_device: header cla=%02x ins=%02x p1=%02x p2=%02x p3=%02x selected=%04x t=%.8f\n",
+		LOGMASKED(LOG_SIM, "sim_device: header cla=%02x ins=%02x p1=%02x p2=%02x p3=%02x selected=%04x t=%.8f\n",
 				m_tx[0], m_ins, m_p1, m_p2, m_p3, m_selected_file,
 				machine().time().as_double());
 	if (m_ins == 0xa4 || m_ins == 0x24 || m_ins == 0xd6 || m_ins == 0xdc)
@@ -191,11 +197,11 @@ void nokia_sim_card_device::finish_body()
 	if (m_trace)
 	{
 		if (m_ins == 0xa4)
-			logerror("sim_device: body ins=%02x length=%u requested=%04x selected=%04x result=%s t=%.8f\n",
+			LOGMASKED(LOG_SIM, "sim_device: body ins=%02x length=%u requested=%04x selected=%04x result=%s t=%.8f\n",
 					m_ins, m_tx_len, requested_file, m_selected_file, select_ok ? "ok" : "not-found",
 					machine().time().as_double());
 		else
-			logerror("sim_device: body ins=%02x length=%u selected=%04x t=%.8f\n",
+			LOGMASKED(LOG_SIM, "sim_device: body ins=%02x length=%u selected=%04x t=%.8f\n",
 					m_ins, m_tx_len, m_selected_file, machine().time().as_double());
 	}
 	if (m_ins == 0xdc)
@@ -379,7 +385,7 @@ void nokia_sim_card_device::update_binary()
 	}
 	std::copy_n(m_tx, m_tx_len, data + start);
 	if (m_trace)
-		logerror("sim_device: update-binary fid=%04x offset=%u length=%u t=%.8f\n",
+		LOGMASKED(LOG_SIM, "sim_device: update-binary fid=%04x offset=%u length=%u t=%.8f\n",
 				file->fid, start, m_tx_len, machine().time().as_double());
 	queue_status(0x90, 0x00);
 }
@@ -430,7 +436,7 @@ void nokia_sim_card_device::update_record()
 	std::copy_n(m_tx, file->record_length, data + (record - 1) * file->record_length);
 	m_record_pointer = record;
 	if (m_trace)
-		logerror("sim_device: update fid=%04x record=%u length=%u t=%.8f\n",
+		LOGMASKED(LOG_SIM, "sim_device: update fid=%04x record=%u length=%u t=%.8f\n",
 				file->fid, record, file->record_length, machine().time().as_double());
 	queue_status(0x90, 0x00);
 }

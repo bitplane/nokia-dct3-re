@@ -320,8 +320,8 @@ IRQ contract.
    it does not wait for a CCONT interrupt. A synthetic conversion-complete IRQ
    is therefore excluded unless separate hardware evidence establishes one.
 3. Recover the physical timing of the MAD2 power-key edge separately.
-4. Replace raw environment ADC overrides with typed battery, charger and RF
-   scenario inputs while retaining deterministic tests.
+4. Replace the current typed raw ADC tuple with battery, charger and RF models
+   once their physical units and relationships are known.
 5. Validate remaining register semantics against a working-phone trace or
    independent chip documentation; the v5.01 same-product control is complete.
 

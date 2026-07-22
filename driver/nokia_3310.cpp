@@ -14,9 +14,9 @@
 // if anybody has solid information to aid in the emulation of this (or other phones) please contribute.
 
 #include "emu.h"
+#include "emuopts.h"
 
 #include <array>
-#include <optional>
 #include <unordered_map>
 
 #include "cpu/arm7/arm7.h"
@@ -42,18 +42,36 @@
 #include "emupal.h"
 #include "screen.h"
 
-#include <cstdlib>
 #include <cstring>
-#include <string>
 
-#define LOG_MAD2_REGISTER_ACCESS    (1U << 1)
+#define LOG_MAD2_REGISTER_ACCESS    (1U << 0)
+#define LOG_BUZZER                  (1U << 1)
+#define LOG_CCONT_ADC               (1U << 2)
+#define LOG_CCONT_RTC               (1U << 3)
+#define LOG_CCONT_WATCHDOG          (1U << 4)
+#define LOG_DISPLAY                 (1U << 5)
+#define LOG_DISPLAY_IO              (1U << 6)
+#define LOG_DISPLAY_PROFILE         (1U << 7)
+#define LOG_DSP_BOUNDARY            (1U << 8)
+#define LOG_DSP_SHARED              (1U << 9)
+#define LOG_GENSIO                  (1U << 10)
+#define LOG_KEYPAD                  (1U << 11)
+#define LOG_MAD2_CLOCKS             (1U << 12)
+#define LOG_MAD2_INTERRUPTS         (1U << 13)
+#define LOG_MAD2_LEDGER             (1U << 14)
+#define LOG_MAD2_TIMERS             (1U << 15)
+#define LOG_MBUS                    (1U << 16)
+#define LOG_PUP_OUTPUTS             (1U << 17)
+#define LOG_SIM_RX                  (1U << 18)
 
-#define VERBOSE (0)
+#define VERBOSE (LOG_MAD2_REGISTER_ACCESS | LOG_BUZZER | LOG_CCONT_ADC | \
+		LOG_CCONT_RTC | LOG_CCONT_WATCHDOG | LOG_DISPLAY | LOG_DISPLAY_IO | \
+		LOG_DISPLAY_PROFILE | LOG_DSP_BOUNDARY | LOG_DSP_SHARED | LOG_GENSIO | \
+		LOG_KEYPAD | LOG_MAD2_CLOCKS | LOG_MAD2_INTERRUPTS | LOG_MAD2_LEDGER | \
+		LOG_MAD2_TIMERS | LOG_MBUS | LOG_PUP_OUTPUTS | LOG_SIM_RX)
 #include "logmacro.h"
 
 namespace {
-
-static unsigned nokia_env_u32(const char *name, unsigned fallback);
 
 struct nokia_product_config
 {
@@ -164,6 +182,15 @@ enum mad2_reg : uint8_t
 constexpr uint8_t KEYPAD_IRQ_LINE_NUM = 0;        // MAD2 keypad/UIF interrupt
 constexpr uint8_t CCONT_IRQ_LINE_NUM = 2;         // MAD2 IRQ line the CCONT asserts
 
+enum hardware_config : u8
+{
+	HWCFG_CCONT_READY = 0x01,
+	HWCFG_SIM_DEVICE = 0x02,
+	HWCFG_DSP_SERVICE = 0x04,
+	HWCFG_EXTERNAL_SERVICE = 0x08,
+	HWCFG_RADIO_PEER = 0x10
+};
+
 // Firmware RAM locations used only by observation-only research diagnostics.
 constexpr offs_t FW_SCHED_RUNNING_TASK_ID = 0x100022;
 
@@ -192,7 +219,9 @@ public:
 		m_dsp_tone2(*this, "dsp_tone2"),
 		m_vibration(*this, "vibration"),
 		m_keypad(*this, "COL.%u", 0),
-		m_pwr(*this, "PWR")
+		m_pwr(*this, "PWR"),
+		m_hw_config(*this, "HWCFG"),
+		m_diag_config(*this, "DIAGCFG")
 	{ }
 
 	void noki3330(machine_config &config);
@@ -206,6 +235,7 @@ public:
 
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
 	DECLARE_INPUT_CHANGED_MEMBER(charger_irq);
+	DECLARE_INPUT_CHANGED_MEMBER(mbus_rx_byte);
 
 private:
 	virtual void machine_start() override ATTR_COLD;
@@ -228,7 +258,6 @@ private:
 	void mad2_mcuif_w(offs_t offset, uint8_t data);
 
 	TIMER_CALLBACK_MEMBER(timer_watchdog);
-	TIMER_CALLBACK_MEMBER(timer_mbus_rx_fixture);
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	void ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
@@ -295,6 +324,8 @@ private:
 	output_finder<> m_vibration;
 	required_ioport_array<5> m_keypad;
 	required_ioport m_pwr;
+	optional_ioport m_hw_config;
+	optional_ioport m_diag_config;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
 
@@ -306,7 +337,6 @@ private:
 	bool          m_baseband_powered = true;
 
 	emu_timer * m_timer_watchdog;
-	emu_timer * m_timer_mbus_rx_fixture;
 
 	uint8_t       m_mad2_regs[0x100];
 	bool          m_mad2_trace_read[0x100] = {false};
@@ -445,73 +475,36 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 }
 
 // ============================================================================
-// NOKIA_DCT3_* environment controls below are test-harness or diagnostic inputs.
-// Normal machine composition, clocks, ADC tuples and peer enablement are fixed
-// by nokia_product_config and never selected from the process environment.
-//
 // Firmware-address traces are quarantined in nokia_3310_trace.inc. Add no
 // forced firmware results or messages. See docs/driver_structure.md.
 // ============================================================================
-static unsigned nokia_env_u32(const char *name, unsigned fallback)
-{
-	// Environment options are immutable for a run. Device configuration and
-	// machine_start resolve them once; this cache also keeps reset-time scenario
-	// reads cheap without putting process lookups back into emulation callbacks.
-	static std::unordered_map<const char *, std::optional<unsigned>> cache;
-	auto it = cache.find(name);
-	if (it == cache.end())
-	{
-		std::optional<unsigned> resolved;
-		if (const char *value = std::getenv(name))
-		{
-			char *end = nullptr;
-			const unsigned long parsed = std::strtoul(value, &end, 0);
-			if (end != value)
-				resolved = unsigned(parsed);
-		}
-		it = cache.emplace(name, resolved).first;
-	}
-
-	return it->second.value_or(fallback);
-}
-
 void noki3310_state::machine_start()
 {
-	m_trace.buzzer = nokia_env_u32("NOKIA_DCT3_TRACE_BUZZER", 0) != 0;
-	m_trace.ccont_adc = nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_ADC", 0) != 0;
-	m_trace.ccont_rtc = nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_RTC", 0) != 0;
-	m_trace.ccont_watchdog = nokia_env_u32("NOKIA_DCT3_TRACE_CCONT_WATCHDOG", 0) != 0;
-	m_trace.display = nokia_env_u32("NOKIA_DCT3_TRACE_DISPLAY", 0) != 0;
-	m_trace.display_io = nokia_env_u32("NOKIA_DCT3_TRACE_DISPLAY_IO", 0) != 0;
-	m_trace.display_profile = nokia_env_u32("NOKIA_DCT3_TRACE_DISPLAY_PROFILE", 0) != 0;
-	m_trace.dsp_boundary = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_BOUNDARY", 0) != 0;
-	m_trace.dsp_shared_reads = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_SHARED_READS", 0) != 0;
-	m_trace.dsp_shared_transitions = nokia_env_u32("NOKIA_DCT3_TRACE_DSP_SHARED_TRANSITIONS", 0) != 0;
-	m_trace.gensio = nokia_env_u32("NOKIA_DCT3_TRACE_GENSIO", 0) != 0;
-	m_trace.keypad = nokia_env_u32("NOKIA_DCT3_TRACE_KEYPAD", 0) != 0;
-	m_trace.mad2_clocks = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_CLOCKS", 0) != 0;
-	m_trace.mad2_interrupts = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_INTERRUPTS", 0) != 0;
-	m_trace.mad2_ledger = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_LEDGER", 0) != 0;
-	m_trace.mad2_timers = nokia_env_u32("NOKIA_DCT3_TRACE_MAD2_TIMERS", 0) != 0;
-	m_trace.mbus = nokia_env_u32("NOKIA_DCT3_TRACE_MBUS", 0) != 0;
-	m_trace.pup_outputs = nokia_env_u32("NOKIA_DCT3_TRACE_PUP_OUTPUTS", 0) != 0;
-	m_trace.sim_rx = nokia_env_u32("NOKIA_DCT3_TRACE_SIM_RX", 0) != 0;
-	m_trace.gensio_limit = nokia_env_u32("NOKIA_DCT3_TRACE_GENSIO_LIMIT", 20'000);
-	m_mad2->set_timer_trace(m_trace.mad2_timers);
-	m_mad2->set_interrupt_trace(m_trace.mad2_interrupts);
-	m_mad2->set_clock_trace(m_trace.mad2_clocks);
-	m_mbus->set_trace(m_trace.mbus);
-	m_ccont->set_adc_trace(m_trace.ccont_adc);
-	m_ccont->set_rtc_trace(m_trace.ccont_rtc);
-	m_dspif->set_trace_enabled(m_trace.dsp_boundary);
-	m_dsp_hle->set_trace_enabled(m_trace.dsp_boundary);
-	m_radio_peer->set_trace_enabled(m_trace.dsp_boundary);
-	m_external_service_peer->set_trace_enabled(m_trace.dsp_boundary);
-	m_sim_card->set_trace(m_trace.sim_rx);
+	// Passive research logging uses MAME's standard -verbose switch.  Product
+	// composition and hardware timing are configured by machine_config.
+	const bool trace = machine().options().verbose();
+	m_trace.buzzer = trace;
+	m_trace.ccont_adc = trace;
+	m_trace.ccont_rtc = trace;
+	m_trace.ccont_watchdog = trace;
+	m_trace.display = trace;
+	m_trace.display_io = trace;
+	m_trace.display_profile = trace;
+	m_trace.dsp_boundary = trace;
+	m_trace.dsp_shared_reads = trace;
+	m_trace.dsp_shared_transitions = trace;
+	m_trace.gensio = trace;
+	m_trace.keypad = trace;
+	m_trace.mad2_clocks = trace;
+	m_trace.mad2_interrupts = trace;
+	m_trace.mad2_ledger = trace;
+	m_trace.mad2_timers = trace;
+	m_trace.mbus = trace;
+	m_trace.pup_outputs = trace;
+	m_trace.sim_rx = trace;
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 
 	m_timer_watchdog = timer_alloc(FUNC(noki3310_state::timer_watchdog), this);
-	m_timer_mbus_rx_fixture = timer_alloc(FUNC(noki3310_state::timer_mbus_rx_fixture), this);
 	save_pointer(NAME(m_ram), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 	save_item(NAME(m_power_on));
 	save_item(NAME(m_keypad_columns));
@@ -604,43 +597,24 @@ void noki3310_state::machine_reset()
 	m_mad2_interrupt_trace_count = 0;
 	m_mad2_clock_trace_count = 0;
 	m_mbus_trace_count = 0;
-	// These overrides are retained strictly for negative/conformance fixtures.
-	// Normal runs use the typed product configuration installed above.
-	m_mad2->set_timer0_hz(nokia_env_u32("NOKIA_DCT3_TIMER0_HZ", 33'055));
-	m_mad2->set_timer1_hz(nokia_env_u32("NOKIA_DCT3_TIMER1_HZ", 1'057));
-	m_mad2->set_fiq8_hz(nokia_env_u32("NOKIA_DCT3_FIQ8_HZ", 1'000));
-	m_mad2->set_timer0_catchup(nokia_env_u32("NOKIA_DCT3_TIMER0_CATCHUP", 0) != 0);
-	if (nokia_env_u32("NOKIA_DCT3_DSPIF_CONFORMANCE", 0) != 0)
-		logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
+	const u8 hardware = m_hw_config.read_safe(0x1f);
+	if (BIT(m_diag_config.read_safe(0x00), 0))
+		machine().logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
 	// Load the deterministic product-level selector tuple. Electrical signal
 	// names and units remain deliberately unassigned where board evidence is absent.
 	for (unsigned id = 0; id < 8; id++)
 		m_ccont->set_adc_source(id, m_product.adc_defaults[id]);
 	m_ccont->set_wddisx_grounded(m_product.ccont_wddisx_grounded);
-	m_ccont->set_ready(nokia_env_u32("NOKIA_DCT3_CCONT_READY", 1) != 0);
-	m_simi->set_enabled(m_product.sim_device &&
-			nokia_env_u32("NOKIA_DCT3_MODEL_SIM_DEVICE", 1) != 0);
-	m_dsp_hle->set_service_enabled(m_product.dsp_service &&
-			nokia_env_u32("NOKIA_DCT3_MODEL_DSP_SERVICE", 1) != 0);
-	m_dsp_hle->set_external_service_enabled(m_product.external_service &&
-			nokia_env_u32("NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", 1) != 0);
-	m_external_service_peer->set_enabled(m_product.external_service &&
-			nokia_env_u32("NOKIA_DCT3_MODEL_EXTERNAL_SERVICE_PEER", 1) != 0);
-	m_radio_peer->set_enabled(m_product.radio_peer &&
-			nokia_env_u32("NOKIA_DCT3_MODEL_RADIO_PEER", 1) != 0);
-	m_sim_card->set_cphs_aoc(nokia_env_u32("NOKIA_DCT3_SIM_CPHS_AOC", 0) != 0);
-	m_sim_card->set_cached_location(nokia_env_u32("NOKIA_DCT3_SIM_CACHED_LOCATION", 0) != 0);
-	{
-		u8 atr[40] = { 0x3b, 0x10, 0x05 };
-		unsigned length = 3;
-		if (const char *hex = std::getenv("NOKIA_DCT3_SIM_ATR_HEX"))
-		{
-			length = 0;
-			for (const char *p = hex; p[0] && p[1] && length < std::size(atr); p += 2)
-				atr[length++] = u8(std::strtoul(std::string(p, 2).c_str(), nullptr, 16));
-		}
-		m_sim_card->set_atr(atr, length);
-	}
+	m_ccont->set_ready(BIT(hardware, 0));
+	m_simi->set_enabled(m_product.sim_device && BIT(hardware, 1));
+	m_dsp_hle->set_service_enabled(m_product.dsp_service && BIT(hardware, 2));
+	m_dsp_hle->set_external_service_enabled(m_product.external_service && BIT(hardware, 3));
+	m_external_service_peer->set_enabled(m_product.external_service && BIT(hardware, 3));
+	m_radio_peer->set_enabled(m_product.radio_peer && BIT(hardware, 4));
+	m_sim_card->set_cphs_aoc(false);
+	m_sim_card->set_cached_location(false);
+	const u8 atr[] = { 0x3b, 0x10, 0x05 };
+	m_sim_card->set_atr(atr, std::size(atr));
 	m_eeprom->write_scl(1);
 	m_eeprom->write_sda(1);
 
@@ -648,12 +622,6 @@ void noki3310_state::machine_reset()
 	m_keypad_irq_latched = false;
 	m_ccont_irq_state = false;
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
-	if (std::getenv("NOKIA_DCT3_MBUS_RX_FIXTURE"))
-		m_timer_mbus_rx_fixture->adjust(attotime::from_msec(
-				nokia_env_u32("NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS", 300)),
-				nokia_env_u32("NOKIA_DCT3_MBUS_RX_FIXTURE", 0xff) & 0xff);
-	else
-		m_timer_mbus_rx_fixture->adjust(attotime::never);
 
 	// Simulate the product-specific keypad column used by the power-on input.
 	m_power_on = ~m_product.power_on_column_mask;
@@ -709,7 +677,7 @@ void noki3310_state::ccont_irq_w(int state)
 	if (state && !m_ccont_irq_state)
 		m_mad2->assert_irq(CCONT_IRQ_LINE_NUM);
 	if (m_trace.ccont_rtc && state != m_ccont_irq_state)
-		logerror("ccont_route: state=%u irq_line=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
+		LOGMASKED(LOG_CCONT_RTC, "ccont_route: state=%u irq_line=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
 			state, CCONT_IRQ_LINE_NUM, m_mad2->irq_status(), m_mad2->reg(MAD2_IRQ_MASK),
 			m_mad2->reg(MAD2_IRQ_CTRL), machine().time().as_double());
 	m_ccont_irq_state = bool(state);
@@ -775,7 +743,7 @@ void noki3310_state::dsp_tx_commit_w(int state)
 	{
 		nokia_dspif_device::packet packet;
 		if (m_dspif->peek_tx_packet(packet) && packet.type == 0x0f)
-			logerror("radio_type0f_commit: pc=%08x lr=%08x data0=%02x "
+				LOGMASKED(LOG_DSP_BOUNDARY, "radio_type0f_commit: pc=%08x lr=%08x data0=%02x "
 					"task16=%02x/%02x/%02x/%02x/%02x/%02x task=%02x t=%.6f\n",
 					u32(m_maincpu->pc()),
 					u32(m_maincpu->state_int(arm7_cpu_device::ARM7_R14)) & ~u32(1),
@@ -835,7 +803,7 @@ void noki3310_state::update_keypad_ccont_irqs()
 	if (before != after &&
 			m_trace.mad2_interrupts &&
 			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=levels domain=IRQ keypad=%u ccont=%u pending_before=%03x pending_after=%03x t=%.9f\n",
+			LOGMASKED(LOG_MAD2_INTERRUPTS, "mad2_interrupt: event=levels domain=IRQ keypad=%u ccont=%u pending_before=%03x pending_after=%03x t=%.9f\n",
 				m_keypad_irq_latched, m_ccont_irq_state, before, after,
 				machine().time().as_double());
 }
@@ -867,22 +835,15 @@ void noki3310_state::mbus_fiq3_w(int state)
 void noki3310_state::mbus_tx_w(u8 data)
 {
 	if (m_trace.mbus && m_mbus_trace_count++ < 8192)
-		logerror("mbus: event=TX data=%02x pc=%08x t=%.9f\n", data,
+		LOGMASKED(LOG_MBUS, "mbus: event=TX data=%02x pc=%08x t=%.9f\n", data,
 				m_maincpu->pc(), machine().time().as_double());
-}
-
-TIMER_CALLBACK_MEMBER(noki3310_state::timer_mbus_rx_fixture)
-{
-	const bool accepted = m_mbus->receive_byte(u8(param));
-	logerror("mbus_fixture: data=%02x accepted=%u t=%.9f\n", u8(param), accepted,
-			machine().time().as_double());
 }
 
 void noki3310_state::trace_interrupt_register(char operation, offs_t offset, uint8_t data)
 {
 	if (m_trace.mad2_interrupts &&
 			m_mad2_interrupt_trace_count++ < 4096)
-		logerror("mad2_interrupt: event=reg_%c off=%02x data=%02x fiq=%03x irq=%03x fiqmask=%02x irqmask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
+		LOGMASKED(LOG_MAD2_INTERRUPTS, "mad2_interrupt: event=reg_%c off=%02x data=%02x fiq=%03x irq=%03x fiqmask=%02x irqmask=%02x ctrl=%02x extctrl=%02x t=%.9f\n",
 				operation, u32(offset), data, m_mad2->fiq_status(), m_mad2->irq_status(),
 				m_mad2->reg(MAD2_FIQ_MASK), m_mad2->reg(MAD2_IRQ_MASK),
 				m_mad2->reg(MAD2_IRQ_CTRL), m_mad2->reg(MAD2_FIQ8_CTRL),
@@ -895,7 +856,7 @@ TIMER_CALLBACK_MEMBER(noki3310_state::timer_watchdog)
 	if (m_ccont->watchdog_tick())
 	{
 		if (m_trace.ccont_watchdog)
-			logerror("ccont_watchdog_expired: t=%.6f\n", machine().time().as_double());
+				LOGMASKED(LOG_CCONT_WATCHDOG, "ccont_watchdog_expired: t=%.6f\n", machine().time().as_double());
 		// CCONT supervises the switched digital-baseband domain, so expiry has
 		// the same reset extent as a CCONT-controlled rail restart. CCONT itself,
 		// flash and EEPROM remain outside this domain and retain their state.
@@ -951,7 +912,7 @@ uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 			(byte_offset <= 0x004 || byte_offset == 0x0a6 || byte_offset == 0x0e0 ||
 			 byte_offset == 0x0e4 || byte_offset == 0x0fe || byte_offset == 0x100 ||
 			 byte_offset == 0x1c8))
-		logerror("dsp_shared_observe: off=%03x data=%04x pc=%08x t=%.6f\n",
+		LOGMASKED(LOG_DSP_SHARED, "dsp_shared_observe: off=%03x data=%04x pc=%08x t=%.6f\n",
 				byte_offset, data, pc, machine().time().as_double());
 	if (m_trace.dsp_shared_reads)
 	{
@@ -959,7 +920,7 @@ uint16_t noki3310_state::dsp_ram_r(offs_t offset)
 		if (inserted || trace_item->second != data)
 		{
 			trace_item->second = data;
-			logerror("dsp_shared_read: off=%03x data=%04x pc=%08x t=%.6f\n",
+				LOGMASKED(LOG_DSP_SHARED, "dsp_shared_read: off=%03x data=%04x pc=%08x t=%.6f\n",
 					byte_offset, data, pc, machine().time().as_double());
 		}
 	}
@@ -1012,7 +973,8 @@ uint8_t noki3310_state::mad2_io_r(offs_t offset)
 {
 	const uint8_t data = mad2_register_r(offset);
 	trace_mad2_read(offset, data);
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
+	if (machine().options().verbose())
+		LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
 	return data;
 }
 
@@ -1027,7 +989,7 @@ uint8_t noki3310_state::mad2_register_r(offs_t offset)
 		case 0x2a:
 			data = keypad_columns_r(true);
 			if (m_trace.keypad)
-				logerror("keypad: event=cols_r data=%02x rows=%02x dir=%02x irqc=%02x pc=%08x t=%.9f\n",
+					LOGMASKED(LOG_KEYPAD, "keypad: event=cols_r data=%02x rows=%02x dir=%02x irqc=%02x pc=%08x t=%.9f\n",
 						data, m_mad2_regs[MAD2_KEYBOARD_ROWS], m_mad2_regs[0xa8],
 						m_mad2_regs[0x6b], m_maincpu->pc(), machine().time().as_double());
 			break;
@@ -1070,29 +1032,29 @@ void noki3310_state::trace_mad2_read(offs_t offset, uint8_t data)
 	{
 		static unsigned sim_fifo_read_count = 0;
 		if (sim_fifo_read_count++ < 64)
-			logerror("sim_fifo_read: off=%02x data=%02x remaining=%u pc=%08x t=%.8f\n",
+				LOGMASKED(LOG_SIM_RX, "sim_fifo_read: off=%02x data=%02x remaining=%u pc=%08x t=%.8f\n",
 					offset, data, m_simi->rx_count_r(), m_maincpu->pc(), machine().time().as_double());
 	}
 	if (m_trace.gensio &&
 			nokia_gensio_device::owns(offset) &&
 			m_gensio_trace_count++ < m_trace.gensio_limit)
-		logerror("gensio: R off=%02x data=%02x pc=%08x t=%.9f\n", offset, data,
+		LOGMASKED(LOG_GENSIO, "gensio: R off=%02x data=%02x pc=%08x t=%.9f\n", offset, data,
 				m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.mad2_timers &&
 			((offset >= 0x08 && offset <= 0x13) || offset == 0x0a) &&
 			m_mad2_timer_trace_count++ < 4096)
-		logerror("mad2_timer: event=R off=%02x data=%02x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_MAD2_TIMERS, "mad2_timer: event=R off=%02x data=%02x pc=%08x t=%.9f\n",
 				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.mad2_clocks &&
 			(offset == MAD2_MCU_RESET_CTRL || offset == MAD2_WATCHDOG ||
 			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_DESTINATION_LSB) ||
 			 offset == 0x0d) && m_mad2_clock_trace_count++ < 4096)
-		logerror("mad2_clock: event=R off=%02x data=%02x counter=%04x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_MAD2_CLOCKS, "mad2_clock: event=R off=%02x data=%02x counter=%04x pc=%08x t=%.9f\n",
 				u32(offset), data, m_mad2->timer1_counter(), m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.mbus &&
 			(offset == MAD2_MBUS_CTRL || offset == MAD2_MBUS_STATUS || offset == 0x1a ||
 			 offset == MAD2_FIQ_STATUS || offset == MAD2_FIQ_MASK) && m_mbus_trace_count++ < 8192)
-		logerror("mbus: event=R off=%02x data=%02x ctrl=%02x status=%02x fiq=%03x mask=%02x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_MBUS, "mbus: event=R off=%02x data=%02x ctrl=%02x status=%02x fiq=%03x mask=%02x pc=%08x t=%.9f\n",
 				u32(offset), data, m_mbus->control(), m_mbus->status(),
 				m_mad2->fiq_status(), m_mad2->reg(MAD2_FIQ_MASK), m_maincpu->pc(), machine().time().as_double());
 	if (offset == MAD2_FIQ_STATUS || offset == MAD2_IRQ_STATUS ||
@@ -1103,7 +1065,7 @@ void noki3310_state::trace_mad2_read(offs_t offset, uint8_t data)
 	if (m_trace.mad2_ledger && !m_mad2_trace_read[offset])
 	{
 		m_mad2_trace_read[offset] = true;
-		logerror("mad2_ledger: R off=%02x data=%02x pc=%08x t=%.6f %s\n", offset, data,
+			LOGMASKED(LOG_MAD2_LEDGER, "mad2_ledger: R off=%02x data=%02x pc=%08x t=%.6f %s\n", offset, data,
 				m_maincpu->pc(), machine().time().as_double(), nokia_mad2_reg_desc(offset));
 	}
 }
@@ -1114,7 +1076,8 @@ void noki3310_state::mad2_io_w(offs_t offset, uint8_t data)
 	mad2_register_w(offset, data);
 	mad2_board_outputs_w(offset);
 	trace_mad2_write(offset, data, old_data);
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
+	if (machine().options().verbose())
+		LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x %s\n", offset, data, nokia_mad2_reg_desc(offset));
 }
 
 uint8_t noki3310_state::mad2_register_peek(offs_t offset)
@@ -1162,7 +1125,7 @@ void noki3310_state::mad2_board_outputs_w(offs_t offset)
 {
 	if (m_trace.keypad &&
 			(offset == MAD2_KEYBOARD_ROWS || offset == 0x6b || offset == 0xa8))
-		logerror("keypad: event=reg_w off=%02x data=%02x rows=%02x dir=%02x irqc=%02x cols=%02x matrix3=%02x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_KEYPAD, "keypad: event=reg_w off=%02x data=%02x rows=%02x dir=%02x irqc=%02x cols=%02x matrix3=%02x pc=%08x t=%.9f\n",
 				u32(offset), m_mad2_regs[offset], m_mad2_regs[MAD2_KEYBOARD_ROWS],
 				m_mad2_regs[0xa8], m_mad2_regs[0x6b], keypad_columns_r(false),
 				m_keypad[3]->read(),
@@ -1191,55 +1154,55 @@ void noki3310_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old_d
 		(offset >= 0x1b && offset <= 0x1e && old_data != data) ||
 		(offset == 0x20 && ((old_data ^ data) & 0x40) != 0);
 	if (m_trace.pup_outputs && pup_output_change)
-		logerror("pup_output: off=%02x data=%02x old=%02x buzzer=%u vibra=%u backlight6=%u pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_PUP_OUTPUTS, "pup_output: off=%02x data=%02x old=%02x buzzer=%u vibra=%u backlight6=%u pc=%08x t=%.9f\n",
 			u32(offset), data, old_data, BIT(m_mad2->reg(0x15), 5),
 			BIT(m_mad2->reg(0x15), 4), BIT(m_mad2_regs[0x20], 6),
 			m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.mad2_timers &&
 			(offset >= 0x08 && offset <= 0x13) &&
 			m_mad2_timer_trace_count++ < 4096)
-		logerror("mad2_timer: event=W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_MAD2_TIMERS, "mad2_timer: event=W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n",
 				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.mad2_clocks &&
 			(offset == MAD2_MCU_RESET_CTRL || offset == MAD2_WATCHDOG ||
 			 (offset >= MAD2_TIMER1_COUNTER_MSB && offset <= MAD2_TIMER1_DESTINATION_LSB) ||
 			 offset == 0x0d) && m_mad2_clock_trace_count++ < 4096)
-		logerror("mad2_clock: event=W off=%02x data=%02x old=%02x counter=%04x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_MAD2_CLOCKS, "mad2_clock: event=W off=%02x data=%02x old=%02x counter=%04x pc=%08x t=%.9f\n",
 				u32(offset), data, old_data, m_mad2->timer1_counter(), m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.mbus &&
 			(offset == MAD2_MBUS_CTRL || offset == MAD2_MBUS_STATUS || offset == 0x1a ||
 			 offset == MAD2_FIQ_STATUS || offset == MAD2_FIQ_MASK) && m_mbus_trace_count++ < 8192)
-		logerror("mbus: event=W off=%02x data=%02x old=%02x ctrl=%02x status=%02x fiq=%03x mask=%02x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_MBUS, "mbus: event=W off=%02x data=%02x old=%02x ctrl=%02x status=%02x fiq=%03x mask=%02x pc=%08x t=%.9f\n",
 				u32(offset), data, old_data, m_mbus->control(), m_mbus->status(),
 				m_mad2->fiq_status(), m_mad2->reg(MAD2_FIQ_MASK), m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.sim_rx && offset == 0x36)
 	{
 		static unsigned sim_txd_count = 0;
 		if (sim_txd_count++ < 128)
-			logerror("sim_txd: data=%02x pc=%08x t=%.8f\n", data, m_maincpu->pc(),
+				LOGMASKED(LOG_SIM_RX, "sim_txd: data=%02x pc=%08x t=%.8f\n", data, m_maincpu->pc(),
 					machine().time().as_double());
 	}
 	if (m_trace.sim_rx && offset == 0x39)
 	{
 		static unsigned sim_control_count = 0;
 		if (sim_control_count++ < 128)
-			logerror("sim_control_w: data=%02x old=%02x live=%02x pc=%08x t=%.8f\n", data,
+				LOGMASKED(LOG_SIM_RX, "sim_control_w: data=%02x old=%02x live=%02x pc=%08x t=%.8f\n", data,
 					old_data, m_simi->control_r(), m_maincpu->pc(), machine().time().as_double());
 	}
 	if (m_trace.gensio &&
 			gensio_register &&
 			m_gensio_trace_count++ < m_trace.gensio_limit)
-		logerror("gensio: W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset, data,
+		LOGMASKED(LOG_GENSIO, "gensio: W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset, data,
 				old_data, m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.display_io &&
 			(offset == 0x2d || offset == 0x2e || offset == 0x6e) &&
 			m_display_io_trace_count++ < 4096)
-		logerror("display_io: off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset,
+		LOGMASKED(LOG_DISPLAY_IO, "display_io: off=%02x data=%02x old=%02x pc=%08x t=%.9f\n", offset,
 				data, old_data, m_maincpu->pc(), machine().time().as_double());
 	if (m_trace.mad2_ledger && !m_mad2_trace_write[offset])
 	{
 		m_mad2_trace_write[offset] = true;
-		logerror("mad2_ledger: W off=%02x data=%02x old=%02x pc=%08x t=%.6f %s\n", offset,
+			LOGMASKED(LOG_MAD2_LEDGER, "mad2_ledger: W off=%02x data=%02x old=%02x pc=%08x t=%.6f %s\n", offset,
 				data, old_data, m_maincpu->pc(), machine().time().as_double(), nokia_mad2_reg_desc(offset));
 	}
 
@@ -1249,7 +1212,7 @@ void noki3310_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old_d
 		trace_interrupt_register('W', offset, data);
 	if (m_trace.ccont_rtc &&
 			offset == MAD2_IRQ_STATUS && BIT(data, CCONT_IRQ_LINE_NUM))
-		logerror("ccont_route: event=mad_ack data=%02x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_CCONT_RTC, "ccont_route: event=mad_ack data=%02x pc=%08x t=%.9f\n",
 			data, m_maincpu->pc(), machine().time().as_double());
 }
 
@@ -1261,7 +1224,7 @@ void noki3310_state::update_buzzer()
 	const bool enabled = BIT(m_mad2->reg(0x15), 5) && divider != 0;
 	m_buzzer->set_state(enabled);
 	if (m_trace.buzzer)
-		logerror("buzzer: enabled=%u divider=%u frequency=%u volume=%u t=%.6f\n",
+		LOGMASKED(LOG_BUZZER, "buzzer: enabled=%u divider=%u frequency=%u volume=%u t=%.6f\n",
 				enabled, divider, divider ? 13'000'000 / divider : 0,
 				m_mad2_regs[0x1e], machine().time().as_double());
 }
@@ -1273,7 +1236,7 @@ void noki3310_state::update_vibrator()
 	const bool enabled = BIT(m_mad2->reg(0x15), 4);
 	m_vibration = enabled;
 	if (m_trace.pup_outputs)
-		logerror("vibrator: enabled=%u control=%02x t=%.6f\n",
+		LOGMASKED(LOG_PUP_OUTPUTS, "vibrator: enabled=%u control=%02x t=%.6f\n",
 			enabled, m_mad2_regs[0x1b], machine().time().as_double());
 }
 
@@ -1294,7 +1257,7 @@ void noki3310_state::update_dsp_tones()
 	m_dsp_tone1->set_state(amplitude != 0 && frequency1 != 0);
 	m_dsp_tone2->set_state(amplitude != 0 && frequency2 != 0);
 	if (m_trace.dsp_boundary)
-		logerror("dsp_tone: oscillator=%04x/%04x frequency=%u/%u amplitude=%04x active=%u/%u t=%.6f\n",
+		LOGMASKED(LOG_DSP_BOUNDARY, "dsp_tone: oscillator=%04x/%04x frequency=%u/%u amplitude=%04x active=%u/%u t=%.6f\n",
 				oscillator1, oscillator2, frequency1, frequency2, amplitude,
 				amplitude != 0 && frequency1 != 0, amplitude != 0 && frequency2 != 0,
 				machine().time().as_double());
@@ -1307,10 +1270,11 @@ uint8_t noki3310_state::mad2_dspif_r(offs_t offset)
 	if (m_trace.mad2_ledger && !m_dspif_trace_read[offset])
 	{
 		m_dspif_trace_read[offset] = true;
-		logerror("mad2_ledger: R bus=DSPIF off=%02x data=%02x pc=%08x t=%.6f DSP API control\n",
+			LOGMASKED(LOG_MAD2_LEDGER, "mad2_ledger: R bus=DSPIF off=%02x data=%02x pc=%08x t=%.6f DSP API control\n",
 				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
 	}
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
+	if (machine().options().verbose())
+		LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x DSPIF\n", offset);
 	return data;
 }
 
@@ -1321,15 +1285,16 @@ void noki3310_state::mad2_dspif_w(offs_t offset, uint8_t data)
 	if (m_trace.mad2_ledger && !m_dspif_trace_write[offset])
 	{
 		m_dspif_trace_write[offset] = true;
-		logerror("mad2_ledger: W bus=DSPIF off=%02x data=%02x old=%02x pc=%08x t=%.6f DSP API control\n",
+			LOGMASKED(LOG_MAD2_LEDGER, "mad2_ledger: W bus=DSPIF off=%02x data=%02x old=%02x pc=%08x t=%.6f DSP API control\n",
 				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
 	}
 	if (m_trace.dsp_boundary)
-		logerror("dsp_boundary: DSPIF W off=%x data=%02x pc=%08x task=%02x t=%.6f\n",
+		LOGMASKED(LOG_DSP_BOUNDARY, "dsp_boundary: DSPIF W off=%x data=%02x pc=%08x task=%02x t=%.6f\n",
 				u32(offset), data, m_maincpu->pc() & ~u32(1), fw_byte(0x00100022),
 				machine().time().as_double());
 	m_dspif->dspif_w(offset, data);
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
+	if (machine().options().verbose())
+		LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x DSPIF\n", offset, data);
 }
 
 uint8_t noki3310_state::mad2_mcuif_r(offs_t offset)
@@ -1339,10 +1304,11 @@ uint8_t noki3310_state::mad2_mcuif_r(offs_t offset)
 	if (m_trace.mad2_ledger && !m_mcuif_trace_read[offset])
 	{
 		m_mcuif_trace_read[offset] = true;
-		logerror("mad2_ledger: R bus=MCUIF off=%02x data=%02x pc=%08x t=%.6f memory-window control\n",
+			LOGMASKED(LOG_MAD2_LEDGER, "mad2_ledger: R bus=MCUIF off=%02x data=%02x pc=%08x t=%.6f memory-window control\n",
 				u32(offset), data, m_maincpu->pc(), machine().time().as_double());
 	}
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x MCUIF\n", offset);
+	if (machine().options().verbose())
+		LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 R %02x MCUIF\n", offset);
 	return data;
 }
 
@@ -1354,10 +1320,11 @@ void noki3310_state::mad2_mcuif_w(offs_t offset, uint8_t data)
 	if (m_trace.mad2_ledger && !m_mcuif_trace_write[offset])
 	{
 		m_mcuif_trace_write[offset] = true;
-		logerror("mad2_ledger: W bus=MCUIF off=%02x data=%02x old=%02x pc=%08x t=%.6f memory-window control\n",
+			LOGMASKED(LOG_MAD2_LEDGER, "mad2_ledger: W bus=MCUIF off=%02x data=%02x old=%02x pc=%08x t=%.6f memory-window control\n",
 				u32(offset), data, old_data, m_maincpu->pc(), machine().time().as_double());
 	}
-	LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x MCUIF\n", offset, data);
+	if (machine().options().verbose())
+		LOGMASKED(LOG_MAD2_REGISTER_ACCESS, "MAD2 W %02x = %02x MCUIF\n", offset, data);
 }
 
 void noki3310_state::noki3310_map(address_map &map)
@@ -1379,7 +1346,7 @@ void noki3310_state::noki3310_map(address_map &map)
 INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 {
 	if (m_trace.keypad)
-		logerror("keypad: event=edge old=%u new=%u param=%u rows=%02x dir=%02x irqc=%02x cols=%02x matrix=%02x/%02x/%02x/%02x/%02x pc=%08x t=%.9f\n",
+		LOGMASKED(LOG_KEYPAD, "keypad: event=edge old=%u new=%u param=%u rows=%02x dir=%02x irqc=%02x cols=%02x matrix=%02x/%02x/%02x/%02x/%02x pc=%08x t=%.9f\n",
 				oldval, newval, param, m_mad2_regs[MAD2_KEYBOARD_ROWS],
 				m_mad2_regs[0xa8], m_mad2_regs[0x6b], keypad_columns_r(false),
 				m_keypad[0]->read(), m_keypad[1]->read(), m_keypad[2]->read(),
@@ -1394,8 +1361,19 @@ INPUT_CHANGED_MEMBER( noki3310_state::key_irq )
 
 INPUT_CHANGED_MEMBER( noki3310_state::charger_irq )
 {
-	m_ccont->set_charger_input(newval != 0,
-			nokia_env_u32("NOKIA_DCT3_CHARGER_ADC", 0x3ff));
+	m_ccont->set_charger_input(newval != 0);
+}
+
+INPUT_CHANGED_MEMBER( noki3310_state::mbus_rx_byte )
+{
+	// Configuration loading initializes adjusters before the machine runs. Only
+	// a live field change represents a byte arriving at the external MBUS pin.
+	if (newval != oldval && machine().phase() == machine_phase::RUNNING)
+	{
+		const bool accepted = m_mbus->receive_byte(u8(newval));
+		LOGMASKED(LOG_MBUS, "mbus_fixture: data=%02x accepted=%u t=%.9f\n",
+				u8(newval), accepted, machine().time().as_double());
+	}
 }
 
 static INPUT_PORTS_START( noki3210 )
@@ -1441,6 +1419,36 @@ static INPUT_PORTS_START( noki3210 )
 
 	PORT_START("CHARGER")
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::charger_irq), 0)
+
+	PORT_START("MBUS_RX")
+	PORT_BIT(0xff, 0xff, IPT_POSITIONAL) PORT_NAME("MBUS receive byte")
+		PORT_POSITIONS(0xff) PORT_SENSITIVITY(100) PORT_KEYDELTA(1)
+		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(noki3310_state::mbus_rx_byte), 0)
+
+	// Standard MAME configuration inputs keep negative-composition tests out of
+	// process-global environment state. Normal machine profiles enable every
+	// component they own; external test cfg files may remove one explicitly.
+	PORT_START("HWCFG")
+	PORT_CONFNAME(HWCFG_CCONT_READY, HWCFG_CCONT_READY, "CCONT readiness")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_CCONT_READY, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_SIM_DEVICE, HWCFG_SIM_DEVICE, "SIM interface")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_SIM_DEVICE, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_DSP_SERVICE, HWCFG_DSP_SERVICE, "DSP service HLE")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_DSP_SERVICE, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_EXTERNAL_SERVICE, HWCFG_EXTERNAL_SERVICE, "External service HLE")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_EXTERNAL_SERVICE, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_RADIO_PEER, HWCFG_RADIO_PEER, "Radio peer HLE")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_RADIO_PEER, DEF_STR(On))
+
+	PORT_START("DIAGCFG")
+	PORT_CONFNAME(0x01, 0x00, "Run DSPIF conformance check")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x01, DEF_STR(On))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3310 )

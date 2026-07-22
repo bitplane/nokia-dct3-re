@@ -34,6 +34,13 @@ class MameSourceComplianceTest(unittest.TestCase):
         self.assertNotIn("set_state_int", text)
         self.assertNotIn("enqueue_rx_packet", text)
 
+    def test_production_sources_do_not_read_process_environment(self):
+        for source in list(DRIVER.glob("*.cpp")) + list(DRIVER.glob("*.h")):
+            with self.subTest(source=source.name):
+                text = source.read_text()
+                self.assertNotIn("getenv", text)
+                self.assertNotIn("NOKIA_DCT3_", text)
+
 
 if __name__ == "__main__":
     unittest.main()
