@@ -1,0 +1,859 @@
+{
+  "schema_version": 1,
+  "method": "organic two-second boot with verbose GENSIO transaction decoding",
+  "coverage": {
+    "roms": 5,
+    "complete_transactions": 933,
+    "observed_registers": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "unobserved_registers": [
+      8,
+      9
+    ]
+  },
+  "roms": [
+    {
+      "label": "3210-v6.00",
+      "source": "organic verbose boot log (generated, not retained)",
+      "gensio_accesses": 8439,
+      "transactions": 206,
+      "adc_selectors": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "registers": [
+        {
+          "direction": "W",
+          "register": 0,
+          "count": 62,
+          "values": [
+            0,
+            8,
+            24,
+            40,
+            56,
+            72,
+            88,
+            104,
+            120
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 1,
+          "count": 2,
+          "values": [
+            0,
+            64
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 2,
+          "count": 59,
+          "values": [
+            0,
+            128,
+            192,
+            208
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 3,
+          "count": 60,
+          "values": [
+            176,
+            178
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 3,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 4,
+          "count": 3,
+          "values": [
+            32
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 5,
+          "count": 4,
+          "values": [
+            32,
+            49
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 6,
+          "count": 2,
+          "values": [
+            84,
+            86
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 7,
+          "count": 1,
+          "values": [
+            128
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 7,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 10,
+          "count": 1,
+          "values": [
+            1
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 11,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 12,
+          "count": 2,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 13,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 14,
+          "count": 3,
+          "values": [
+            3,
+            19
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 15,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 15,
+          "count": 2,
+          "values": [
+            240
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3210-v5.01",
+      "source": "organic verbose boot log (generated, not retained)",
+      "gensio_accesses": 7334,
+      "transactions": 191,
+      "adc_selectors": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "registers": [
+        {
+          "direction": "W",
+          "register": 0,
+          "count": 57,
+          "values": [
+            0,
+            8,
+            24,
+            40,
+            56,
+            72,
+            88,
+            104,
+            120
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 1,
+          "count": 2,
+          "values": [
+            0,
+            64
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 2,
+          "count": 54,
+          "values": [
+            0,
+            128,
+            192,
+            208
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 3,
+          "count": 55,
+          "values": [
+            176,
+            178
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 3,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 4,
+          "count": 3,
+          "values": [
+            32
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 5,
+          "count": 4,
+          "values": [
+            32,
+            49
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 6,
+          "count": 2,
+          "values": [
+            84,
+            86
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 7,
+          "count": 1,
+          "values": [
+            128
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 7,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 10,
+          "count": 1,
+          "values": [
+            1
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 11,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 12,
+          "count": 2,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 13,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 14,
+          "count": 3,
+          "values": [
+            3,
+            19
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 15,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 15,
+          "count": 2,
+          "values": [
+            240
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3310-v6.39",
+      "source": "organic verbose boot log (generated, not retained)",
+      "gensio_accesses": 5746,
+      "transactions": 315,
+      "adc_selectors": [
+        0,
+        2,
+        3,
+        4,
+        5,
+        7
+      ],
+      "registers": [
+        {
+          "direction": "W",
+          "register": 0,
+          "count": 99,
+          "values": [
+            0,
+            40,
+            56,
+            88,
+            128,
+            136,
+            168,
+            184,
+            200,
+            216,
+            248
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 1,
+          "count": 2,
+          "values": [
+            0,
+            112
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 2,
+          "count": 96,
+          "values": [
+            0,
+            32,
+            38
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 3,
+          "count": 97,
+          "values": [
+            176,
+            178
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 3,
+          "count": 1,
+          "values": [
+            11
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 4,
+          "count": 2,
+          "values": [
+            0,
+            32
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 5,
+          "count": 4,
+          "values": [
+            32,
+            49
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 6,
+          "count": 2,
+          "values": [
+            84,
+            86
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 7,
+          "count": 1,
+          "values": [
+            128
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 7,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 10,
+          "count": 1,
+          "values": [
+            1
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 11,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 12,
+          "count": 2,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 13,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 14,
+          "count": 1,
+          "values": [
+            3
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 15,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 15,
+          "count": 3,
+          "values": [
+            240
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3330-v4.50",
+      "source": "organic verbose boot log (generated, not retained)",
+      "gensio_accesses": 2633,
+      "transactions": 111,
+      "adc_selectors": [
+        0,
+        2,
+        3,
+        4,
+        5
+      ],
+      "registers": [
+        {
+          "direction": "W",
+          "register": 0,
+          "count": 31,
+          "values": [
+            0,
+            40,
+            56,
+            88,
+            128,
+            168,
+            184,
+            200
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 1,
+          "count": 2,
+          "values": [
+            0,
+            112
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 2,
+          "count": 29,
+          "values": [
+            0,
+            32,
+            38
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 3,
+          "count": 30,
+          "values": [
+            176,
+            178
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 3,
+          "count": 1,
+          "values": [
+            11
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 4,
+          "count": 1,
+          "values": [
+            32
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 5,
+          "count": 4,
+          "values": [
+            32,
+            49
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 6,
+          "count": 2,
+          "values": [
+            84,
+            86
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 7,
+          "count": 1,
+          "values": [
+            129
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 7,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 10,
+          "count": 1,
+          "values": [
+            1
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 11,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 12,
+          "count": 2,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 13,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 14,
+          "count": 1,
+          "values": [
+            19
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 15,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 15,
+          "count": 2,
+          "values": [
+            240
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3410-v5.46",
+      "source": "organic verbose boot log (generated, not retained)",
+      "gensio_accesses": 5864,
+      "transactions": 110,
+      "adc_selectors": [
+        0,
+        2,
+        3,
+        4,
+        5
+      ],
+      "registers": [
+        {
+          "direction": "W",
+          "register": 0,
+          "count": 31,
+          "values": [
+            0,
+            40,
+            56,
+            88,
+            128,
+            168,
+            184,
+            200
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 1,
+          "count": 2,
+          "values": [
+            0,
+            112
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 2,
+          "count": 29,
+          "values": [
+            0,
+            32,
+            38
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 3,
+          "count": 30,
+          "values": [
+            176,
+            178
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 3,
+          "count": 1,
+          "values": [
+            11
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 4,
+          "count": 1,
+          "values": [
+            32
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 5,
+          "count": 4,
+          "values": [
+            32,
+            49
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 6,
+          "count": 2,
+          "values": [
+            84,
+            86
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 7,
+          "count": 1,
+          "values": [
+            129
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 7,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 10,
+          "count": 1,
+          "values": [
+            1
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 11,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 12,
+          "count": 2,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 13,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "R",
+          "register": 15,
+          "count": 1,
+          "values": [
+            0
+          ]
+        },
+        {
+          "direction": "W",
+          "register": 15,
+          "count": 2,
+          "values": [
+            240
+          ]
+        }
+      ]
+    }
+  ]
+}

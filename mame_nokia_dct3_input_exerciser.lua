@@ -49,6 +49,7 @@ local rtc_fixture_at
 local mad2_reset_fixture_at
 local mad2_watchdog_fixture_at
 local ccont_watchdog_fixture_at
+local ccont_mask_fixture_at
 local mad2_sleep_fixture_at
 
 local structural = {
@@ -83,6 +84,7 @@ rtc_fixture_at = env_number("NOKIA_DCT3_CCONT_RTC_FIXTURE_AT", -1)
 mad2_reset_fixture_at = env_number("NOKIA_DCT3_MAD2_RESET_FIXTURE_AT", -1)
 mad2_watchdog_fixture_at = env_number("NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT", -1)
 ccont_watchdog_fixture_at = env_number("NOKIA_DCT3_CCONT_WATCHDOG_FIXTURE_AT", -1)
+ccont_mask_fixture_at = env_number("NOKIA_DCT3_CCONT_MASK_FIXTURE_AT", -1)
 mad2_sleep_fixture_at = env_number("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT", -1)
 local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
 local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
@@ -646,6 +648,40 @@ if ccont_watchdog_fixture_at >= 0 then
 	end)
 	assert(coroutine.resume(watchdog_timer))
 end
+
+if ccont_mask_fixture_at >= 0 then
+	local mask_timer = coroutine.create(function()
+		emu.wait(ccont_mask_fixture_at)
+		local old_control = space:read_u8(0x2002d)
+		local function ccont_write(reg, value)
+			space:write_u8(0x2002d, old_control | 0x04)
+			space:write_u8(0x2002c, reg << 3)
+			space:write_u8(0x2002c, value)
+		end
+		local function ccont_read(reg)
+			space:write_u8(0x2002d, old_control | 0x04)
+			space:write_u8(0x2002c, (reg << 3) | 0x04)
+			space:read_u8(0x2006d)
+			return space:read_u8(0x2006c)
+		end
+		-- Hold every source masked, then create a minute+alarm transition. Reading
+		-- status proves the source remained pending without acknowledging it.
+		ccont_write(0x0f, 0xf8)
+		ccont_write(0x07, 58)
+		ccont_write(0x08, 0)
+		ccont_write(0x09, 12)
+		ccont_write(0x0b, 1)
+		ccont_write(0x0c, 12)
+		emu.wait(2.2)
+		ccont_read(0x0e)
+		-- Unmask only alarm bit 7. The device must assert its existing pending
+		-- source now; firmware remains responsible for reading and acknowledging it.
+		ccont_write(0x0f, 0x78)
+		space:write_u8(0x2002d, old_control)
+	end)
+	assert(coroutine.resume(mask_timer))
+end
+
 
 if mad2_sleep_fixture_at >= 0 then
 	local sleep_timer = coroutine.create(function()

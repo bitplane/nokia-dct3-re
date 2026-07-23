@@ -231,13 +231,13 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | reg | role | notes |
 |---|---|---|
 | `0x0` | control | |
-| `0x1` | PWM (charger) — **write-only** | (the idx6 service-channel check reads a *cached* value here; see service_bootstrap.md) |
+| `0x1` | unidentified control | compatibility storage; product families use different boot values, with no recovered side effect |
 | `0x2/0x3` | ADC read LSB / MSB | |
 | `0x5` | watchdog (WDReg) | nonzero data reloads an eight-bit seconds counter; `0x00` powers down; firmware helper `0x2b4dc0` services it organically in both supported 3210 ROMs with WDDISX released |
-| `0x6` | RTC enable | |
+| `0x6` | unidentified control | all five ROMs write `0x54,0x56`; retained without an asserted side effect |
 | `0x7–0xa` | RTC second/minute/hour/day read surface | deterministic binary counters and second/minute IRQs; firmware keeps calendar epoch state in software |
 | `0xb–0xc` | RTC alarm minute/hour | partial one-shot comparator; hour bit 7 is a self-clearing disable/update strobe |
-| `0xd` | clock gates | stored latch; effects unknown |
+| `0xd` | unidentified control | stored latch; effects unknown |
 | `0xe` | **interrupt/reset status** | reset `0x03`: persistent bit 0 ready, clearable bit 1 PWRONX cause; upper bits `0xf8` are write-one-to-clear IRQ sources |
 | `0xf` | interrupt mask | |
 

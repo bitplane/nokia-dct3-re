@@ -277,7 +277,12 @@ void nokia_ccont_device::serial_w(uint8_t data)
 		default:
 			m_regs[address] = data;
 			if (address == IRQ_MASK)
+			{
+				if (m_rtc_trace)
+					LOGMASKED(LOG_CCONT, "ccont_rtc: event=mask_write data=%02x status=%02x t=%.9f\n",
+						data, m_regs[IRQ_STATUS], machine().time().as_double());
 				update_irq();
+			}
 			break;
 		}
 	}

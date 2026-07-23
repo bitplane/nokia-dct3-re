@@ -1,0 +1,729 @@
+{
+  "schema_version": 1,
+  "method": "unique byte-lane-correct descriptor signature and literal-reference census",
+  "coverage": {
+    "roms_requested": 5,
+    "roms_decoded": 5,
+    "descriptor_entries_per_rom": 18,
+    "total_descriptor_entries": 90
+  },
+  "cross_rom_descriptor_identity": true,
+  "special_direct_paths": {
+    "register_0": "ADC request helper, outside descriptor table",
+    "register_5": "watchdog/power helper, outside descriptor table",
+    "register_1": "outside descriptor table; direct boot writes observed",
+    "register_6": "outside descriptor table; direct boot writes observed"
+  },
+  "roms": [
+    {
+      "label": "3210-v6.00",
+      "rom": "roms/noki3210/3210f600a.fls",
+      "image_bytes": 2097152,
+      "descriptor_table": "0x002e2da8",
+      "literal_references": [
+        "0x002afc94",
+        "0x002b5384"
+      ],
+      "descriptors": [
+        {
+          "logical": 0,
+          "command": "0xff",
+          "register": null,
+          "default": "0x00"
+        },
+        {
+          "logical": 1,
+          "command": "0xff",
+          "register": null,
+          "default": "0x08"
+        },
+        {
+          "logical": 2,
+          "command": "0x10",
+          "register": 2,
+          "default": null
+        },
+        {
+          "logical": 3,
+          "command": "0x20",
+          "register": 4,
+          "default": "0x18"
+        },
+        {
+          "logical": 4,
+          "command": "0x18",
+          "register": 3,
+          "default": null
+        },
+        {
+          "logical": 5,
+          "command": "0xff",
+          "register": null,
+          "default": "0x20"
+        },
+        {
+          "logical": 6,
+          "command": "0xff",
+          "register": null,
+          "default": "0x28"
+        },
+        {
+          "logical": 7,
+          "command": "0xff",
+          "register": null,
+          "default": "0x30"
+        },
+        {
+          "logical": 8,
+          "command": "0xff",
+          "register": null,
+          "default": "0x38"
+        },
+        {
+          "logical": 9,
+          "command": "0x38",
+          "register": 7,
+          "default": null
+        },
+        {
+          "logical": 10,
+          "command": "0x40",
+          "register": 8,
+          "default": null
+        },
+        {
+          "logical": 11,
+          "command": "0x48",
+          "register": 9,
+          "default": null
+        },
+        {
+          "logical": 12,
+          "command": "0x50",
+          "register": 10,
+          "default": "0x50"
+        },
+        {
+          "logical": 13,
+          "command": "0x58",
+          "register": 11,
+          "default": "0x58"
+        },
+        {
+          "logical": 14,
+          "command": "0x60",
+          "register": 12,
+          "default": "0x60"
+        },
+        {
+          "logical": 15,
+          "command": "0x68",
+          "register": 13,
+          "default": "0x68"
+        },
+        {
+          "logical": 16,
+          "command": "0x70",
+          "register": 14,
+          "default": "0x70"
+        },
+        {
+          "logical": 17,
+          "command": "0x78",
+          "register": 15,
+          "default": "0x78"
+        }
+      ],
+      "mapped_registers": [
+        2,
+        3,
+        4,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "unmapped_logical_descriptors": [
+        0,
+        1,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "label": "3210-v5.01",
+      "rom": "roms/noki3210/3210f501.fls",
+      "image_bytes": 2097152,
+      "descriptor_table": "0x002d777c",
+      "literal_references": [
+        "0x002ad0c0",
+        "0x002b2738"
+      ],
+      "descriptors": [
+        {
+          "logical": 0,
+          "command": "0xff",
+          "register": null,
+          "default": "0x00"
+        },
+        {
+          "logical": 1,
+          "command": "0xff",
+          "register": null,
+          "default": "0x08"
+        },
+        {
+          "logical": 2,
+          "command": "0x10",
+          "register": 2,
+          "default": null
+        },
+        {
+          "logical": 3,
+          "command": "0x20",
+          "register": 4,
+          "default": "0x18"
+        },
+        {
+          "logical": 4,
+          "command": "0x18",
+          "register": 3,
+          "default": null
+        },
+        {
+          "logical": 5,
+          "command": "0xff",
+          "register": null,
+          "default": "0x20"
+        },
+        {
+          "logical": 6,
+          "command": "0xff",
+          "register": null,
+          "default": "0x28"
+        },
+        {
+          "logical": 7,
+          "command": "0xff",
+          "register": null,
+          "default": "0x30"
+        },
+        {
+          "logical": 8,
+          "command": "0xff",
+          "register": null,
+          "default": "0x38"
+        },
+        {
+          "logical": 9,
+          "command": "0x38",
+          "register": 7,
+          "default": null
+        },
+        {
+          "logical": 10,
+          "command": "0x40",
+          "register": 8,
+          "default": null
+        },
+        {
+          "logical": 11,
+          "command": "0x48",
+          "register": 9,
+          "default": null
+        },
+        {
+          "logical": 12,
+          "command": "0x50",
+          "register": 10,
+          "default": "0x50"
+        },
+        {
+          "logical": 13,
+          "command": "0x58",
+          "register": 11,
+          "default": "0x58"
+        },
+        {
+          "logical": 14,
+          "command": "0x60",
+          "register": 12,
+          "default": "0x60"
+        },
+        {
+          "logical": 15,
+          "command": "0x68",
+          "register": 13,
+          "default": "0x68"
+        },
+        {
+          "logical": 16,
+          "command": "0x70",
+          "register": 14,
+          "default": "0x70"
+        },
+        {
+          "logical": 17,
+          "command": "0x78",
+          "register": 15,
+          "default": "0x78"
+        }
+      ],
+      "mapped_registers": [
+        2,
+        3,
+        4,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "unmapped_logical_descriptors": [
+        0,
+        1,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "label": "3310-v6.39",
+      "rom": "roms/noki3310/3310f639e.fls",
+      "image_bytes": 2097152,
+      "descriptor_table": "0x003305c0",
+      "literal_references": [
+        "0x002ea948",
+        "0x002f043c"
+      ],
+      "descriptors": [
+        {
+          "logical": 0,
+          "command": "0xff",
+          "register": null,
+          "default": "0x00"
+        },
+        {
+          "logical": 1,
+          "command": "0xff",
+          "register": null,
+          "default": "0x08"
+        },
+        {
+          "logical": 2,
+          "command": "0x10",
+          "register": 2,
+          "default": null
+        },
+        {
+          "logical": 3,
+          "command": "0x20",
+          "register": 4,
+          "default": "0x18"
+        },
+        {
+          "logical": 4,
+          "command": "0x18",
+          "register": 3,
+          "default": null
+        },
+        {
+          "logical": 5,
+          "command": "0xff",
+          "register": null,
+          "default": "0x20"
+        },
+        {
+          "logical": 6,
+          "command": "0xff",
+          "register": null,
+          "default": "0x28"
+        },
+        {
+          "logical": 7,
+          "command": "0xff",
+          "register": null,
+          "default": "0x30"
+        },
+        {
+          "logical": 8,
+          "command": "0xff",
+          "register": null,
+          "default": "0x38"
+        },
+        {
+          "logical": 9,
+          "command": "0x38",
+          "register": 7,
+          "default": null
+        },
+        {
+          "logical": 10,
+          "command": "0x40",
+          "register": 8,
+          "default": null
+        },
+        {
+          "logical": 11,
+          "command": "0x48",
+          "register": 9,
+          "default": null
+        },
+        {
+          "logical": 12,
+          "command": "0x50",
+          "register": 10,
+          "default": "0x50"
+        },
+        {
+          "logical": 13,
+          "command": "0x58",
+          "register": 11,
+          "default": "0x58"
+        },
+        {
+          "logical": 14,
+          "command": "0x60",
+          "register": 12,
+          "default": "0x60"
+        },
+        {
+          "logical": 15,
+          "command": "0x68",
+          "register": 13,
+          "default": "0x68"
+        },
+        {
+          "logical": 16,
+          "command": "0x70",
+          "register": 14,
+          "default": "0x70"
+        },
+        {
+          "logical": 17,
+          "command": "0x78",
+          "register": 15,
+          "default": "0x78"
+        }
+      ],
+      "mapped_registers": [
+        2,
+        3,
+        4,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "unmapped_logical_descriptors": [
+        0,
+        1,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "label": "3330-v4.50",
+      "rom": "roms/noki3330/3330f450e.fls",
+      "image_bytes": 3473408,
+      "descriptor_table": "0x0043e3f0",
+      "literal_references": [
+        "0x0038f9f0",
+        "0x003a1d60"
+      ],
+      "descriptors": [
+        {
+          "logical": 0,
+          "command": "0xff",
+          "register": null,
+          "default": "0x00"
+        },
+        {
+          "logical": 1,
+          "command": "0xff",
+          "register": null,
+          "default": "0x08"
+        },
+        {
+          "logical": 2,
+          "command": "0x10",
+          "register": 2,
+          "default": null
+        },
+        {
+          "logical": 3,
+          "command": "0x20",
+          "register": 4,
+          "default": "0x18"
+        },
+        {
+          "logical": 4,
+          "command": "0x18",
+          "register": 3,
+          "default": null
+        },
+        {
+          "logical": 5,
+          "command": "0xff",
+          "register": null,
+          "default": "0x20"
+        },
+        {
+          "logical": 6,
+          "command": "0xff",
+          "register": null,
+          "default": "0x28"
+        },
+        {
+          "logical": 7,
+          "command": "0xff",
+          "register": null,
+          "default": "0x30"
+        },
+        {
+          "logical": 8,
+          "command": "0xff",
+          "register": null,
+          "default": "0x38"
+        },
+        {
+          "logical": 9,
+          "command": "0x38",
+          "register": 7,
+          "default": null
+        },
+        {
+          "logical": 10,
+          "command": "0x40",
+          "register": 8,
+          "default": null
+        },
+        {
+          "logical": 11,
+          "command": "0x48",
+          "register": 9,
+          "default": null
+        },
+        {
+          "logical": 12,
+          "command": "0x50",
+          "register": 10,
+          "default": "0x50"
+        },
+        {
+          "logical": 13,
+          "command": "0x58",
+          "register": 11,
+          "default": "0x58"
+        },
+        {
+          "logical": 14,
+          "command": "0x60",
+          "register": 12,
+          "default": "0x60"
+        },
+        {
+          "logical": 15,
+          "command": "0x68",
+          "register": 13,
+          "default": "0x68"
+        },
+        {
+          "logical": 16,
+          "command": "0x70",
+          "register": 14,
+          "default": "0x70"
+        },
+        {
+          "logical": 17,
+          "command": "0x78",
+          "register": 15,
+          "default": "0x78"
+        }
+      ],
+      "mapped_registers": [
+        2,
+        3,
+        4,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "unmapped_logical_descriptors": [
+        0,
+        1,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "label": "3410-v5.46",
+      "rom": "roms/noki3410/3410f546e.fls",
+      "image_bytes": 3604480,
+      "descriptor_table": "0x004c53a0",
+      "literal_references": [
+        "0x003de410",
+        "0x003f4b38"
+      ],
+      "descriptors": [
+        {
+          "logical": 0,
+          "command": "0xff",
+          "register": null,
+          "default": "0x00"
+        },
+        {
+          "logical": 1,
+          "command": "0xff",
+          "register": null,
+          "default": "0x08"
+        },
+        {
+          "logical": 2,
+          "command": "0x10",
+          "register": 2,
+          "default": null
+        },
+        {
+          "logical": 3,
+          "command": "0x20",
+          "register": 4,
+          "default": "0x18"
+        },
+        {
+          "logical": 4,
+          "command": "0x18",
+          "register": 3,
+          "default": null
+        },
+        {
+          "logical": 5,
+          "command": "0xff",
+          "register": null,
+          "default": "0x20"
+        },
+        {
+          "logical": 6,
+          "command": "0xff",
+          "register": null,
+          "default": "0x28"
+        },
+        {
+          "logical": 7,
+          "command": "0xff",
+          "register": null,
+          "default": "0x30"
+        },
+        {
+          "logical": 8,
+          "command": "0xff",
+          "register": null,
+          "default": "0x38"
+        },
+        {
+          "logical": 9,
+          "command": "0x38",
+          "register": 7,
+          "default": null
+        },
+        {
+          "logical": 10,
+          "command": "0x40",
+          "register": 8,
+          "default": null
+        },
+        {
+          "logical": 11,
+          "command": "0x48",
+          "register": 9,
+          "default": null
+        },
+        {
+          "logical": 12,
+          "command": "0x50",
+          "register": 10,
+          "default": "0x50"
+        },
+        {
+          "logical": 13,
+          "command": "0x58",
+          "register": 11,
+          "default": "0x58"
+        },
+        {
+          "logical": 14,
+          "command": "0x60",
+          "register": 12,
+          "default": "0x60"
+        },
+        {
+          "logical": 15,
+          "command": "0x68",
+          "register": 13,
+          "default": "0x68"
+        },
+        {
+          "logical": 16,
+          "command": "0x70",
+          "register": 14,
+          "default": "0x70"
+        },
+        {
+          "logical": 17,
+          "command": "0x78",
+          "register": 15,
+          "default": "0x78"
+        }
+      ],
+      "mapped_registers": [
+        2,
+        3,
+        4,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "unmapped_logical_descriptors": [
+        0,
+        1,
+        5,
+        6,
+        7,
+        8
+      ]
+    }
+  ]
+}

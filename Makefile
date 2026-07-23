@@ -99,7 +99,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-bootstrap-3310 verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-bootstrap-3310 verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -121,8 +121,11 @@ help:
 	@echo "make smoke-3310-639 bounded local 3310 v6.39 portability spike"
 	@echo "make verify         check the explicit missing-hardware semantic profile"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
+	@echo "make ccont-static-census check the five-ROM CCONT descriptor surface"
+	@echo "make ccont-runtime-census regenerate five-ROM organic register coverage"
 	@echo "make verify-ccont-watchdog check enabled watchdog service beyond 49 seconds"
 	@echo "make verify-ccont-rtc check CCONT alarm programming and MAD2 IRQ2 delivery"
+	@echo "make verify-ccont-mask check masked-pending delivery on CCONT IRQ2"
 	@echo "make verify-alarm    set and ring a user alarm through organic keypad input"
 	@echo "make verify-power-lifecycle check short-press UI and long-press shutdown behavior"
 	@echo "make verify-charger-lifecycle check charger-present startup and power-key policy"
@@ -273,7 +276,26 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
+
+ccont-static-census:
+	$(VENV)/bin/python tools/ccont_static_census.py --check --json docs/data/ccont_static_census.json
+
+ccont-runtime-census:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_3210v6 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v6/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR)_3210v5 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v5/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_3310 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3310/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_3330 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3330/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_3410 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3410/error.log
+	$(VENV)/bin/python tools/ccont_runtime_census.py --check --json docs/data/ccont_runtime_census.json \
+		--log 3210-v6.00 $(RUN_DIR)_3210v6/error.log --log 3210-v5.01 $(RUN_DIR)_3210v5/error.log \
+		--log 3310-v6.39 $(RUN_DIR)_3310/error.log --log 3330-v4.50 $(RUN_DIR)_3330/error.log \
+		--log 3410-v5.46 $(RUN_DIR)_3410/error.log
 
 run-manifest-default:
 	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
@@ -728,6 +750,12 @@ verify-ccont-rtc:
 		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_RTC_FIXTURE_AT=15'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_rtc/error.log
 	$(PYTHON) tools/ccont_rtc_trace_check.py $(RUN_DIR)_rtc/error.log
+
+verify-ccont-mask:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_ccont_mask SECONDS=6 \
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_MASK_FIXTURE_AT=2'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_ccont_mask/error.log
+	$(PYTHON) tools/ccont_mask_pending_check.py $(RUN_DIR)_ccont_mask/error.log
 
 verify-alarm:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_alarm SECONDS=135 \

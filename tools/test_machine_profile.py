@@ -74,7 +74,7 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_service": "true",
                 "external_service": "true",
                 "keypad_five_rows": "true",
-                "ccont_board": "ADC_3310",
+                "ccont_board": "ADC_STANDARD",
             },
         )
         profile = self.driver.split("void nokia_dct3_state::noki3330(machine_config &config)", 1)[1]
@@ -127,7 +127,7 @@ class MachineProfileTest(unittest.TestCase):
     def test_3210_board_profile_routes_both_voltage_inputs(self):
         profile = self.driver.split(
             "constexpr nokia_ccont_board_profile ADC_3210", 1
-        )[1].split("constexpr nokia_ccont_board_profile ADC_3310", 1)[0]
+        )[1].split("constexpr nokia_ccont_board_profile ADC_STANDARD", 1)[0]
         self.assertIn("{ 0x2c0, 0x2c0, 0x2d0, 0x280, 0x200, 0x000, 0x200, 0x000 }", profile)
         self.assertIn("{ 0, 1 }, 2, 3, 4, 5", profile)
         census = json.loads((ROOT / "docs/data/ccont_adc_channels.json").read_text())

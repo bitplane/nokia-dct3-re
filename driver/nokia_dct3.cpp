@@ -94,7 +94,7 @@ constexpr nokia_ccont_board_profile ADC_3210 = {
 // Standard 3310 routing: channel 2 is VBATT, 3 is the BMC-3 pack's BSI
 // resistor and 4 is battery temperature. This tuple clears the firmware's
 // ordinary pack/self-test path; it is product input, not a state fixture.
-constexpr nokia_ccont_board_profile ADC_3310 = {
+constexpr nokia_ccont_board_profile ADC_STANDARD = {
 	{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 },
 	{ 2, 0 }, 1, 3, 4, 5
 };
@@ -149,14 +149,14 @@ constexpr nokia_product_config make_3310_config()
 	result.dsp_bootstrap_exchanges = 58;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
-	result.ccont_board = ADC_3310;
+	result.ccont_board = ADC_STANDARD;
 	return result;
 }
 
 // NHM-6 v4.50 completes 64 DSP bootstrap exchanges and shares the five-row
-// keypad and standard VBATT/BSI/BTEMP channel routing with the 3310 family.
-// Enabling the three request-driven peers plus this ADC tuple advances the
-// virgin PMM from CONTACT SERVICE to its organic security-code editor.
+// keypad. The 3310 analog tuple is retained as a calibrated compatibility
+// profile: it advances the virgin PMM organically, but does not prove NHM-6
+// PCB signal identity.
 constexpr nokia_product_config make_3330_config()
 {
 	nokia_product_config result;
@@ -166,7 +166,7 @@ constexpr nokia_product_config make_3330_config()
 	result.keypad_five_rows = true;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
-	result.ccont_board = ADC_3310;
+	result.ccont_board = ADC_STANDARD;
 	return result;
 }
 

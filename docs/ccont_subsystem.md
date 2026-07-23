@@ -43,7 +43,7 @@ The device boundary is classified by evidence level:
 | ADC selector values | Product configuration | Firmware-visible routing identifies 3210 channels 0/1 as VBATT, 3 as BSI, 4 as BTEMP and 5 as VCHAR. Each product supplies named board wiring plus reviewed raw defaults; this is not a battery simulation. |
 | RTC counters and alarm (`0x07..0x0c`) | Tested partial hardware | Deterministic binary counters produce second/minute sources; ROM arithmetic establishes binary encoding. Physical `0x07..0x0a` are second/minute/hour/day. A controller fixture proves the comparator and IRQ route; an organic keypad workflow programs a user alarm, receives the CCONT IRQ, and starts the ringtone. Month/calendar persistence remains outside the recovered interface. |
 | Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input and is released in the 3210 profile; both ROMs survive beyond the maximum window through organic reloads. |
-| Other register storage | Compatibility behavior | Registers without mapped semantics retain written bytes so firmware-visible transactions compose. Storage must not be interpreted as a proved hardware contract. |
+| Other register storage | Compatibility behavior | Registers `0x1`, `0x4`, `0x6` and `0xd` retain organic firmware writes so later reads compose. Five-ROM traces establish traffic but no modeled side effect; storage is not a proved hardware contract. |
 
 No direct firmware state is changed by the CCONT device. The main fidelity risk
 is therefore not a forcing shim; it is that provisional timing, encoding, and
@@ -83,23 +83,23 @@ not prove that physical GENSIO or CCONT has zero latency.
 | Register | Role | Current fidelity |
 | --- | --- | --- |
 | `0x0` | ADC control/channel request | Inferred; conversion currently completes immediately. |
-| `0x1` | PWM/charger control | Inferred register storage. |
+| `0x1` | unidentified control | Compatibility storage. Both 3210 ROMs write `0x40,0x00`; 3310/3330/3410 write `0x70,0x00`. No downstream effect is established. |
 | `0x2` | ADC result LSB | Proven role. |
 | `0x3` | ADC result MSB/status | Proven role; upper returned bits are inferred. |
-| `0x4` | charger control/status | Unknown storage. |
+| `0x4` | unidentified control | Compatibility storage. All five boot traces write `0x20`; 3310 also writes `0x00`. |
 | `0x5` | watchdog and power control | Proven role; reload command semantics inferred from firmware. |
-| `0x6` | RTC enable/control | Inferred storage. |
+| `0x6` | unidentified control | Compatibility storage. Every supported ROM writes the same `0x54,0x56` sequence, but no device-side effect is established. |
 | `0x7..0xa` | RTC second/minute/hour/day read surface | The reader at `0x2b068c` weights these fields by 1, 60, 3,600 and 86,400 respectively. Firmware polls the seconds field and separately writes zero to the day/epoch field during its software-date lifecycle. |
 | `0xb..0xc` | RTC alarm minute/hour | Partial one-shot comparison; hour bit 7 is a self-clearing disable/update strobe. An ordinary hour write arms the comparator. |
-| `0xd` | clock gates | Stored latch; effects not recovered. |
+| `0xd` | unidentified control | Compatibility storage; organically read as zero during boot. Effects are not recovered. |
 | `0xe` | interrupt/reset status | Cold power-key reset exposes ready bit 0 and PWRONX cause bit 1 (`0x03`); bit 0 persists while bit 1 and upper interrupt sources are write-one-to-clear. |
 | `0xf` | interrupt mask | Strongly inferred from firmware ISR behavior. |
 
 Writing PWRONX or upper interrupt-status bits clears them. The IRQ output is active when
 `status & ~mask & 0xf8` is nonzero; the low reset/presence bits do not assert
 it. MAD2 owns the resulting CPU interrupt assertion. The default-inactive
-`CHARGER` input latches established source bit 3 on connection; disconnection
-has no assigned status effect pending hardware evidence.
+`CHARGER` input latches established source bit 3 on both connection and
+removal. Both edges use the same firmware debounce path.
 
 The ROM IRQ dispatcher at `0x2b08c6` independently handles status bit 4 as the
 second source, bit 5 as the minute source, and bit 7 as the alarm source. The
@@ -152,6 +152,23 @@ commands, power helpers and the IRQ acknowledge loop. The ROM shadow/default
 tables at v6.00 `0x2e2da8` and v5.01 `0x2d777c` are byte-identical. These are
 same-product controls for the register grammar, not independent chip
 documentation; command meanings that firmware never observes remain inferred.
+
+All five supported firmware controls contain one byte-lane-correct, 18-entry
+descriptor table and two literal references to it. All 90 decoded entries are
+identical: logical descriptors expose physical registers `0x2`, `0x3`, `0x4`
+and `0x7..0xf`; six logical slots are absent. ADC register `0x0`, watchdog
+register `0x5`, and boot writes to `0x1`/`0x6` use direct special paths outside
+that table. `docs/data/ccont_static_census.json` records every entry and table
+address. This establishes addressability, not semantics.
+
+Independent two-second organic traces of the same five ROMs decode 933 complete
+CCONT transactions with no phase errors. They observe registers `0x0..0x7`
+except no read of `0x1`, plus `0xa..0xf`; registers `0x8` and `0x9` are covered
+by the longer RTC/alarm workflows rather than short boot. Counts and value sets
+are in `docs/data/ccont_runtime_census.json`. Both 3210 ROMs request all eight
+ADC selectors; 3310 requests 0/2/3/4/5/7, while 3330 and 3410 request
+0/2/3/4/5 in this window. The latter two retain the 3310 raw tuple as an
+explicit boot calibration, not a claim that their PCB nets are identical.
 
 ## ADC selectors
 
@@ -325,17 +342,31 @@ Service-channel provisioning does not control CCONT startup-event delivery.
 Any further CCONT change requires a separately evidenced register, timing, or
 IRQ contract.
 
-## Fidelity backlog
+## Completion matrix
 
-1. Establish whether real GENSIO exposes a measurable busy interval and map
-   the remaining endpoint-control bits.
-2. Measure ADC request-to-result latency from hardware or chip documentation;
-   paired firmware establishes polling semantics but no physical duration.
-3. Recover the physical timing of the MAD2 power-key edge separately.
-4. Replace the current typed raw ADC tuple with battery, charger and RF models
-   once their physical units and relationships are known.
-5. Validate remaining register semantics against a working-phone trace or
-   independent chip documentation; the v5.01 same-product control is complete.
+| Goal surface | Current result | Remaining evidence |
+| --- | --- | --- |
+| Serial grammar | Validated across five ROMs; 90/90 descriptor entries decoded and identical | Physical GENSIO busy duration |
+| Register surface | All 16 addresses classified as descriptor-backed, direct-special, or compatibility-only | Side effects of `0x1`, `0x4`, `0x6`, `0xd` |
+| ADC | All eight channels exercised; NSE-8 VBATT/BSI/BTEMP/VCHAR routes classified | Electrical units and channels 2/6/7 |
+| Interrupts | Bits 3/4/5/7 mapped; status bits 0/1/2 separated from IRQ latches | Physical owner and stimulus for bit 6 |
+| Reset/retention | Cold, software, MAD2/CCONT watchdog, rail-off and charger wake distinguished | Physical rail transition delays |
+| Watchdog | One-second eight-bit reload, WDDISX, expiry and zero-data power-off covered | Oscillator tolerance |
+| RTC/alarm | Binary counters, strobes, second/minute/alarm sources and organic alarm covered | Calendar persistence and oscillator drift |
+| Charger/power | Both edges, VCHAR debounce and acting-dead restart covered | CHAPS current regulation and battery dynamics |
+| Save state | Register, ADC, watchdog, power, command phase and IRQ state registered; outputs reconstructed | Lua saves synchronize after the request, so exact mid-byte capture is not independently gated |
+
+## Hardware-measurement backlog
+
+1. Measure GENSIO select-to-ready and ADC request-to-result latency; firmware
+   proves polling but no nonzero lower bound.
+2. Capture registers `0x1`, `0x4`, `0x6` and `0xd` while changing charger,
+   sleep and RTC states, and stimulate interrupt bit 6 if possible.
+3. Correlate ADC channels 2, 6 and 7 with board nets and measure raw-to-unit
+   transfer functions for VBATT, BSI, BTEMP and VCHAR.
+4. Measure baseband rail transition delay and watchdog oscillator tolerance.
+   Model CHAPS current and battery evolution only after both a firmware
+   consumer and physical relationship are established.
 
 The structural summary records CCONT commands and read counts, but those totals
 remain diagnostic. `make verify-ccont RUN_DIR=<dir>` is the focused
@@ -347,6 +378,16 @@ read, write-one-clear acknowledgement, cleared follow-up read, and final IRQ
 deassertion. GENSIO endpoint/status
 state and CCONT register, command and IRQ state are save-state registered
 together; post-load reconstructs the IRQ output.
+
+`make ccont-static-census` checks the common five-ROM descriptor vocabulary.
+`make ccont-runtime-census RUN_DIR=<dir>` regenerates the five short organic
+boots and requires the established 14-register boot surface. These censuses
+separate firmware coverage from device-side semantic claims.
+
+`make verify-ccont-mask RUN_DIR=<dir>` masks every CCONT source through mapped
+register `0xf`, creates a minute/alarm transition, reads the pending alarm from
+register `0xe` without acknowledging it, then unmasks only bit 7. It requires
+no IRQ before unmask and an immediate routed MAD2 IRQ2 afterward.
 
 `make verify-ccont-watchdog RUN_DIR=<dir>` runs a provisioned steady-state boot
 for 55 seconds with WDDISX released and requires the task-2 combined reload,
@@ -368,8 +409,7 @@ reset, MAD2 watchdog expiry and CCONT watchdog expiry. The CCONT case requires
 the complete baseband clock initializer to restart and the pre-expiry CCONT
 status byte to survive unchanged.
 
-The focused gate does not yet validate every register reset value, mask changes
-while a source is pending, alarm reprogramming, the `0x06bc` consumer,
+The focused gates do not yet validate every register reset value, alarm reprogramming, the `0x06bc` consumer,
 register-`0x0a` write semantics, or full save-state resumption.
 RTC determinism and source assignments have source-level
 regressions; the byte-exact default frame and coherent frontier protect their

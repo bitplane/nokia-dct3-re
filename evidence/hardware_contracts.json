@@ -164,7 +164,7 @@
     },
     {
       "id": "noki3330_product_profile_interactive", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
-      "boundary": "3330 v4.50 PPM E completes 64 DSP bootstrap exchanges and reaches deterministic idle with the shared request-driven DSP, external-service and SIM peers, standard CCONT channels 2/3/4 at 0x220/0x026/0x200, and the five-row keypad contract. Physical switches complete the virgin PMM's 12345 security, time and date editors, navigate Phone book to Messages, and return to the exact idle oracle; no firmware or RAM state is forced",
+      "boundary": "3330 v4.50 PPM E completes 64 DSP bootstrap exchanges and reaches deterministic idle with the shared request-driven DSP, external-service and SIM peers, a calibrated 3310-derived CCONT raw tuple, and the five-row keypad contract. Physical switches complete the virgin PMM's 12345 security, time and date editors, navigate Phone book to Messages, and return to the exact idle oracle; no firmware or RAM state is forced. Successful boot does not establish NHM-6 PCB signal identity",
       "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]
     },
     {
@@ -181,6 +181,16 @@
       "id": "ccont_watchdog_retained_status", "subsystem": "ccont", "status": "partial", "confidence": "strong",
       "boundary": "A mapped GENSIO fixture loads CCONT watchdog register 5 with one second. Expiry resets the complete digital-baseband domain, restarts MAD2 clock initialization and preserves the exact pre-expiry CCONT status byte, including pending RTC sources and existing low reset flags. It does not use watchdog-data-zero rail-off and does not synthesize a new CCONT reset-cause bit",
       "evidence": ["docs/ccont_subsystem.md", "tools/ccont_watchdog_expiry_check.py"]
+    },
+    {
+      "id": "ccont_five_rom_register_surface", "subsystem": "ccont", "status": "mapped", "confidence": "strong",
+      "boundary": "Five supported ROM controls contain byte-identical 18-entry CCONT descriptor tables: 90/90 entries map the same physical register vocabulary and each table has exactly two literal references. Separate organic two-second boots decode 933 phase-correct transactions and exercise 14 of 16 registers; longer RTC/alarm gates cover the remaining time fields. Registers 1, 4, 6 and 13 remain compatibility storage because traffic alone does not establish physical effects",
+      "evidence": ["docs/ccont_subsystem.md", "docs/data/ccont_static_census.json", "docs/data/ccont_runtime_census.json"]
+    },
+    {
+      "id": "ccont_masked_pending_delivery", "subsystem": "ccont", "status": "validated", "confidence": "strong",
+      "boundary": "A mapped controller fixture masks every upper CCONT source, creates simultaneous minute and alarm latches, and reads alarm bit 7 pending without an IRQ assertion. Clearing only mask bit 7 asserts the existing source through MAD2 IRQ2, after which firmware owns acknowledgement. The fixture changes controller registers only and does not write firmware state",
+      "evidence": ["docs/ccont_subsystem.md", "tools/ccont_mask_pending_check.py"]
     }
   ]
 }
