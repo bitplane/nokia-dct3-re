@@ -29,9 +29,10 @@ class CcontWatchdogTest(unittest.TestCase):
         self.assertIn("set_wddisx_grounded", phone)
         self.assertNotIn("NOKIA_DCT3_DISABLE_CCONT_WATCHDOG", phone)
         product = phone.split(
-            "constexpr nokia_product_config PRODUCT_3210 =", 1
-        )[1].split(";", 1)[0]
-        self.assertIn("{ 0x01, true, true, true, true, false, false,", product)
+            "constexpr nokia_product_config make_3210_config()", 1
+        )[1].split("constexpr nokia_product_config make_3310_config()", 1)[0]
+        self.assertIn("result.power_on_column_mask = 0x01;", product)
+        self.assertNotIn("result.ccont_wddisx_grounded = true;", product)
 
     def test_expiry_resets_the_complete_digital_baseband_domain(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()

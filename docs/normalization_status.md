@@ -69,10 +69,10 @@ be investigated only when an organic application path reaches its boundary.
 | EEPROM | Native MAME `I2C_24C128` on mapped GenIO pins plus a v6.00-oriented generated provisioning fixture; the parallel window is unproved. | Decode remaining fields, validate writes/timing and another product's storage placement, and make fallback-record extraction ROM-aware. |
 | Flash | Native Intel/ST flash parts plus an extracted transitional `nokia_b3_flash_device` owning the 3410's lock-command, partition-status, erase-suspend timer and save-state contract. | Move the adapter semantics into MAME's generic `intelfsh` core once partitioned read-while-write and independently observable erase status are supported. |
 | DSP/network/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the cross-ROM bootstrap and service transport; `nokia_radio_peer_device` owns Nokia L1 packet correlation; `nokia_gsm_network_device` owns standards-shaped laboratory-cell, RR and MM data; `nokia_external_service_peer_device` owns the request-driven service/test session. Firmware-programmed COBBA oscillator words `0x0ae/0x0b0/0x0b6` drive separate HLE audio voices. | Recover physical bootstrap timing and the DSP-internal PLMN-measurement lifecycle; extend the GSM peer only from an evidenced Nokia L1 entrance; replace square-wave tone HLE with codec-backed behavior when evidenced. |
-| MAD2 | `nokia_mad2_device` owns CTSI offsets `0x00..0x16`, timer-0/FIQ4, 15-bit timer-1/destination/FIQ5, reset request/cause, pending/masks, IRQ/FIQ aggregation, one-shot ARM clock-stop/routed wake and save-state restoration. SIMI clock bit 5 has a controller side effect; SIMI, MBUS and GENSIO are separate devices. | Establish extended IRQ ownership, exact physical timer dividers and transition latency, remaining clock-gate consumers and rail timing. |
+| MAD2 | `nokia_mad2_device` owns the CTSI registers within `0x00..0x16`, timer-0/FIQ4, 15-bit timer-1/destination/FIQ5, reset request/cause, pending/masks, IRQ/FIQ aggregation, one-shot ARM clock-stop/routed wake and save-state restoration. PUP `0x15`, KBGPIO, SIMI, MBUS and GENSIO are separate devices. | Establish extended IRQ ownership, exact physical timer dividers and transition latency, remaining clock-gate consumers and rail timing. |
 | MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, 9,600-baud character timing and FIQ2/FIQ3 callbacks; ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing. | Recover FIQ3 phase/source and collision/error behavior; attach a counterparty only for organic frames. |
-| Display/input | Native PCD8544, a cross-ROM LCD transport check, and a cross-ROM-derived MAD2 IRQ0 matrix contract; the Lua mirror and key timing are acceptance fixtures. The generated EEPROM supplies the fields explicitly authored by equivalent v6.00/v5.01 descriptor-`0x0749` reset constructors through normal NV loading; an erased-profile control leaves the panel blank. | Obtain an authentic configured `0x0749` profile to resolve constructor-unassigned bytes; recover reset timing and mask/debounce edge cases separately. |
-| Buzzer | MAD2 PUP bit 5 gates a MAME beeper; a mapped-MMIO conformance fixture validates the two-byte `13 MHz / divider` clock, enable edge and disable edge. The organic user-alarm lifecycle programs CCONT, consumes its IRQ and drives changing divider/volume values through this output. | Recover the physical volume/acoustic transfer. Ringing-tone preview and DSP/COBBA audio remain separate paths. Vibrator and backlight remain separate gaps. |
+| Display/input | Native PCD8544, a cross-ROM LCD transport check, and extracted `nokia_kbgpio_device` matrix/IRQ0 behavior; the Lua mirror, handset key layout and timing remain acceptance/board fixtures. The generated EEPROM supplies fields authored by equivalent v6.00/v5.01 descriptor-`0x0749` reset constructors through normal NV loading. | Obtain an authentic configured `0x0749` profile; recover keypad mask/debounce and display reset timing separately. |
+| Buzzer | Extracted `nokia_pup_device` bit 5 gates a MAME beeper and derives its clock from the two-byte `13 MHz / divider`; mapped-MMIO and organic user-alarm lifecycles validate the boundary. | Recover the physical volume/acoustic transfer. Ringing-tone preview and DSP/COBBA audio remain separate paths. Vibrator and backlight remain separate gaps. |
 | Vibrator/backlight | PUP bit 4 drives a named MAME `vibration` output while `0x1b` stores its independent control byte; a mapped-MMIO fixture validates the gate. Enabling `Vibrating alert` through the firmware UI and ringing an organic RTC alarm leaves both registers inactive, constraining that setting to another alert lifecycle rather than proving an output defect. The 3210 service manual establishes that COBBA drives separate LCD/key-light signals into the UI-Switch. Paired-ROM MAD2 traces and a complete changed-write census of MCU-visible DSP shared RAM find no key/timeout-specific output command. | Exercise vibra organically from an incoming-call lifecycle and decode `0x1b`. Recover the lower DSP/COBBA light-control surface before exposing backlight outputs. |
 
 The headless LCD mirror and delayed-key fixture are acceptance tooling in
@@ -98,7 +98,7 @@ outside the production driver in Lua:
 | Product hardware | Typed `nokia_product_config` fields and device setters | ADC inputs, timer clocks, SIM profile, display geometry, flash capabilities and peer composition are fixed by the selected machine configuration. |
 | Negative composition | `HWCFG` MAME configuration port, with named files under `fixtures/` | A gate may disable a product-owned CCONT, SIM, DSP-service, external-service or radio component. It cannot enable hardware absent from the product profile. |
 | Controller conformance | `DIAGCFG` MAME configuration port, selected by a named fixture | Requests an internal device invariant check without changing firmware state or normal machine composition. |
-| Passive diagnostics | Standard MAME logging categories, enabled by `RUN_VERBOSE=1` in the local harness | Read-only and bounded observations. No device or driver parses a diagnostic environment variable. |
+| Passive diagnostics | Standard MAME logging categories, enabled together by `RUN_VERBOSE=1` in the local harness | Read-only and bounded observations. No device or driver parses a diagnostic environment variable. |
 | Harness/output controls | Lua-only `NOKIA_DCT3_*` controls for snapshots, summaries, scripted keys, charger/RTC events, MAD2 MMIO fixtures, MBUS input and save-state checks | External test orchestration. These variables are parsed only by `mame_nokia_dct3_input_exerciser.lua` and are not production configuration. |
 
 There are no retained firmware-result, callback-key, task-message, or direct
@@ -121,14 +121,16 @@ requests and consumes those reports incrementally. A future table-driven
 representation is worthwhile only where it preserves request correlation and
 makes the protocol easier to review.
 
-The retained MAME log categories are scoped as follows:
+The retained MAME log categories are scoped as follows. The production driver
+uses one verbose-mode gate; categories keep each output stream named and make a
+future per-mask migration mechanical rather than maintaining parallel boolean
+configuration:
 
 | Trace | Purpose |
 | --- | --- |
 | `TRACE_DISPLAY` | selected-operator resource presentation used by the registration gate |
 | `TRACE_DISPLAY_PROFILE` | descriptor-`0x0749` load/update/copy and setup-message boundaries |
 | `TRACE_DISPLAY_IO` | GENSIO LCD endpoint selection and command/data transfers |
-| `TRACE_SIM_RX` | SIMI/FIQ/APDU lifecycle |
 | `TRACE_DSP_BOUNDARY` | shared-ring requests and request-derived peer responses |
 | `TRACE_DSP_SHARED_READS` | first read and value transitions for each firmware PC/DSP-shared-memory offset pair |
 | `TRACE_DSP_SHARED_TRANSITIONS` | every firmware observation of the small peer-owned scalar set, for request/completion correlation |
@@ -136,13 +138,12 @@ The retained MAME log categories are scoped as follows:
 | `TRACE_CCONT_WATCHDOG` | combined firmware service-helper calls and logical-descriptor writes to physical CCONT watchdog register 5 |
 | `TRACE_CCONT_ADC` | physical input IRQ latches and firmware-selected CCONT ADC channels/raw values |
 | `TRACE_CCONT_RTC` | CCONT RTC traffic, IRQ policy, and filtered user-alarm `0x46bc` publication/routing |
-| `TRACE_KEYPAD` | physical switch edges plus MAD2 row, direction, interrupt-mask and column-read activity |
 | `TRACE_MAD2_LEDGER` | first-access MAD2 register census |
 | `TRACE_MAD2_TIMERS` | timer-0 divider/counter/compare and FIQ assertion/acknowledgement lifecycle |
 | `TRACE_MAD2_INTERRUPTS` | MAD2 source, pending, mask, acknowledgement and CPU-line routing transitions |
 | `TRACE_MAD2_CLOCKS` | reset-cause, watchdog, peripheral clock-gate and timer-1 boot accesses |
 | `TRACE_MBUS` | MBUS register, byte, status and FIQ-facing controller lifecycle |
-| `TRACE_PUP_OUTPUTS` | changed PUP control, vibrator, buzzer and GenIO output values during organic application use |
+| `TRACE_BUZZER` / `TRACE_VIBRATOR` | changed organic output state used by focused peripheral gates |
 
 The small firmware-address-specific set retained by focused radio, display,
 alarm, and watchdog gates lives in `driver/nokia_dct3_trace.inc`. A compliance

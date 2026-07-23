@@ -8,20 +8,43 @@
 // observe firmware execution, but must not alter fetched instructions,
 // synthesize messages, or force firmware-owned state.
 
+namespace {
+constexpr offs_t FW_SCHED_RUNNING_TASK_ID = 0x100022;
+}
+
+uint16_t nokia_dct3_state::fw_word(offs_t address) const
+{
+	if (address < NOKIA_RAM_BASE || address >= NOKIA_RAM_END)
+		return 0xffff;
+
+	return m_ram[(address - NOKIA_RAM_BASE) >> 1];
+}
+
+uint8_t nokia_dct3_state::fw_byte(offs_t address) const
+{
+	const uint16_t word = fw_word(address);
+	return BIT(address, 0) ? uint8_t(word & 0x00ff) : uint8_t(word >> 8);
+}
+
+uint32_t nokia_dct3_state::fw_dword(offs_t address) const
+{
+	return (uint32_t(fw_word(address)) << 16) | uint32_t(fw_word(address + 2));
+}
+
 void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 {
-	if (!m_trace.firmware())
+	if (!m_trace_enabled)
 		return;
 
 	// Serving-cell acceptance checkpoints retained by verify-radio-camp.
-	if (pc == addr && addr == 0x00284f74 && m_trace.dsp_boundary)
+	if (pc == addr && addr == 0x00284f74 && m_trace_enabled)
 		LOGMASKED(LOG_DSP_BOUNDARY, "radio_channel_change_state: pc=%08x accept=%02x controller=%02x flags=%08x "
 				"r0=%08x caller=%08x task=%02x t=%.6f\\n", addr,
 				fw_byte(0x0010dbd7), fw_byte(0x0010dc93), fw_dword(0x0010dca0),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (pc == addr && addr == 0x00284e50 && m_trace.dsp_boundary)
+	if (pc == addr && addr == 0x00284e50 && m_trace_enabled)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
 		LOGMASKED(LOG_DSP_BOUNDARY, "radio_no_psw_left_decode: object=%08x accept=%02x lifecycle=%02x "
@@ -29,7 +52,7 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 				fw_byte(0x0010c84c), fw_byte(0x0010dbdd),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	}
-	if (pc == addr && addr == 0x00213c04 && m_trace.dsp_boundary)
+	if (pc == addr && addr == 0x00213c04 && m_trace_enabled)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R8);
 		LOGMASKED(LOG_DSP_BOUNDARY, "radio_acquisition_transition: pc=%08x object=%08x status=%04x action=%02x "
@@ -38,7 +61,7 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 				fw_byte(0x00111e29), fw_byte(0x0010c84c), fw_byte(0x0010dbd7),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	}
-	if (pc == addr && addr == 0x0028d404 && m_trace.dsp_boundary)
+	if (pc == addr && addr == 0x0028d404 && m_trace_enabled)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
 		const bool readable = object >= NOKIA_RAM_BASE && object + 5 < NOKIA_RAM_END;
@@ -49,7 +72,7 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 				fw_byte(0x0010c83a), fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
 	}
-	if (pc == addr && addr == 0x00273aac && m_trace.dsp_boundary)
+	if (pc == addr && addr == 0x00273aac && m_trace_enabled)
 	{
 		const u32 block = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
 		LOGMASKED(LOG_DSP_BOUNDARY, "radio_bcch_parse: channel=%02x block=%08x data=",
@@ -59,7 +82,7 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 		LOGMASKED(LOG_DSP_BOUNDARY, " task=%02x t=%.6f\\n", fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
 	}
-	if (pc == addr && addr == 0x00273e58 && m_trace.dsp_boundary)
+	if (pc == addr && addr == 0x00273e58 && m_trace_enabled)
 		LOGMASKED(LOG_DSP_BOUNDARY, "radio_si3_path: pc=%08x result=%08x update1=%08x update2=%08x state=%02x active=%02x flags=%02x/%02x "
 				"task=%02x t=%.6f\\n", addr,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
@@ -67,7 +90,7 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R5), fw_byte(0x0010dbd7),
 				fw_byte(0x0010edb4), fw_byte(0x0010edb6), fw_byte(0x0010edc1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (pc == addr && (addr == 0x0020a026 || addr == 0x0020a02c) && m_trace.dsp_boundary)
+	if (pc == addr && (addr == 0x0020a026 || addr == 0x0020a02c) && m_trace_enabled)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
 		const u32 payload = object >= NOKIA_RAM_BASE && object + 0x0c < NOKIA_RAM_END ?
@@ -82,19 +105,19 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 	}
 
 	// The alarm regression needs the firmware's final packed-event mapping.
-	if (pc == addr && addr == 0x002af64a && m_trace.ccont_rtc && fw_word(0x00110f1a) == 0x06bc)
+	if (pc == addr && addr == 0x002af64a && m_trace_enabled && fw_word(0x00110f1a) == 0x06bc)
 		LOGMASKED(LOG_CCONT_RTC, "rtc_alarm_route: map-output=%04x base=%08x offset=%08x deadline=%08x task=%02x t=%.9f\n",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff,
 				fw_dword(0x001121d8), fw_dword(0x001121e0), fw_dword(0x001121e4),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 
 	// The watchdog gate checks the firmware helper's combined MAD2/CCONT service.
-	if (pc == addr && addr == 0x002b4dda && m_trace.ccont_watchdog)
+	if (pc == addr && addr == 0x002b4dda && m_trace_enabled)
 		LOGMASKED(LOG_CCONT_WATCHDOG, "watchdog_terminal: reason=%02x caller=%08x task=%02x t=%.6f\n",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
-	if (pc == addr && addr == 0x002b4dc0 && m_trace.ccont_watchdog)
+	if (pc == addr && addr == 0x002b4dc0 && m_trace_enabled)
 	{
 		const u32 mask = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
 		const u32 lr = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
@@ -104,7 +127,7 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 	}
 
 	// NV descriptor 0x0749 supplies three 12-byte display-profile records.
-	if (pc == addr && m_trace.display_profile &&
+	if (pc == addr && m_trace_enabled &&
 			(addr == 0x0029a996 || addr == 0x0029ae68 || addr == 0x0029a768 ||
 			 addr == 0x002b1e80 || addr == 0x002af2ac))
 	{
@@ -124,7 +147,7 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 	}
 
 	// Registration presents the selected operator through resource 0x5031.
-	if (pc == addr && addr == 0x002b257e && m_trace.display)
+	if (pc == addr && addr == 0x002b257e && m_trace_enabled)
 	{
 		const u32 id = m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xffff;
 		const u32 request = m_maincpu->state_int(arm7_cpu_device::ARM7_R1);

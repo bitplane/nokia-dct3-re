@@ -35,14 +35,18 @@ phone state only composes those devices and wires DSPIF callbacks to MAD2.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
 connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0,
 declared file metadata, persistent mutable card records and
-the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI core at
-offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrupt
+the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI registers
+within offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrupt
 pending/masks, and ARM IRQ/FIQ routing. Attached devices signal it through
-callbacks. `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, RX/TX holding
+callbacks. `nokia_kbgpio_device` owns the sparse keyboard register families,
+matrix scan, cold-boot latch and IRQ edge state; product input ports and MAD2
+IRQ0 routing remain callbacks. `nokia_pup_device` owns output control, buzzer,
+vibrator and GenIO latches and drives the external EEPROM/audio/output devices
+through callbacks. `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, RX/TX holding
 state, byte callbacks and FIQ2/FIQ3 outputs without supplying a peer. The phone
-state retains board wiring, physical-input latches and less-established
+state retains board wiring and less-established
 peripheral windows. Its MAD2 memory-map handlers delegate register ownership,
-board outputs and diagnostics to separate helpers so traces do not obscure the
+interrupt routing and diagnostics to separate helpers so traces do not obscure the
 functional dispatch. `nokia_b3_flash_device` is a transitional wrapper over
 MAME's generic Intel-compatible flash core; it owns the 3410's independently
 observable B3 lock, erase-suspend, partition-status timer and save-state until
@@ -56,10 +60,19 @@ rendering. Its standard six-bank configuration retains the native three-bit Y
 command mask; only controllers configured above eight banks decode bit 3. The
 Nokia-local duplicate has been removed. Product differences use explicit typed
 configurations rather than driver-name parsing or process-environment selection.
+The neutral base compositions select only flash width and shared devices; every
+machine entry then applies exactly one named product profile. Unvalidated 32-Mbit
+products therefore retain conservative defaults instead of inheriting the
+3330's SIM, DSP-service and external-service composition accidentally.
 The production driver and devices do not read environment variables: passive
 diagnostics use MAME logging, while negative composition and conformance
 selection use standard MAME configuration ports populated by named external
 fixtures.
+
+Digital-baseband reset explicitly resets the stateful radio-correlation peer
+alongside MAD2, DSPIF, DSP HLE, service peer, SIMI and the LCD. The GSM network
+device contains immutable laboratory-cell data; it has no transaction state to
+reset. CCONT, flash and EEPROM remain on their documented surviving domains.
 
 ## Rules
 

@@ -34,6 +34,21 @@ class MameSourceComplianceTest(unittest.TestCase):
         self.assertNotIn("set_state_int", text)
         self.assertNotIn("enqueue_rx_packet", text)
 
+    def test_firmware_address_observations_stay_in_trace_quarantine(self):
+        driver = (DRIVER / "nokia_dct3.cpp").read_text()
+        for token in ("fw_byte(0x", "fw_word(0x", "fw_dword(0x", "FW_SCHED_RUNNING_TASK_ID"):
+            with self.subTest(token=token):
+                self.assertNotIn(token, driver)
+
+    def test_retired_broad_trace_families_do_not_return(self):
+        sources = "\n".join(path.read_text() for path in DRIVER.glob("nokia_dct3*"))
+        for token in (
+            "radio_type0f_commit", "sim_fifo_read", "sim_txd:",
+            "sim_control_w", "pup_output:", "LOG_PUP_OUTPUTS",
+        ):
+            with self.subTest(token=token):
+                self.assertNotIn(token, sources)
+
     def test_production_sources_do_not_read_process_environment(self):
         for source in list(DRIVER.glob("*.cpp")) + list(DRIVER.glob("*.h")):
             with self.subTest(source=source.name):

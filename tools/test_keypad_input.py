@@ -9,6 +9,7 @@ class KeypadInputTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.kbgpio = (ROOT / "driver/nokia_kbgpio.cpp").read_text()
         cls.harness = (ROOT / "mame_nokia_dct3_input_exerciser.lua").read_text()
 
     def test_handset_controls_have_mame_names(self):
@@ -54,7 +55,10 @@ class KeypadInputTest(unittest.TestCase):
         self.assertNotIn("debug_ram", self.harness)
 
     def test_matrix_drive_contract_uses_direction_and_active_low_signal(self):
-        self.assertIn("m_mad2_regs[0xa8] & ~m_mad2_regs[0x28]", self.driver)
+        self.assertIn(
+            "m_regs[ROW_DIRECTION] & ~m_regs[ROW_SIGNAL]",
+            self.kbgpio,
+        )
 
     def test_3310_fixture_uses_boot_relative_timing(self):
         self.assertIn('machine.system.name == "noki3310"', self.harness)

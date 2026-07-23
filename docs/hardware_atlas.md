@@ -137,6 +137,10 @@ current normalized boot does not reach task 0's idle request, so physical sleep
 duty cycle and oscillator transition latency remain unmeasured.
 
 ### PUP — MBUS, vibrator, buzzer, GenIO
+`nokia_pup_device` owns control `0x15`, vibrator/buzzer `0x1b..0x1e` and the
+sparse GenIO `0x20/0x22/0x24` family. External EEPROM pins, beeper and vibra
+output remain callback-connected board components; `0x22` is retained only as
+a latch.
 | off | reg | status / touch |
 |---|---|---|
 | `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable, bit 4 optional vibra-pack enable; periodic FIQ8 remains provisional ✓ |
@@ -146,12 +150,14 @@ duty cycle and oscillator transition latency remain unmeasured.
 | `0x1e` | buzzer volume | stored; acoustic response unmodeled |
 | `0x20/0x22/0x24` | McuGenIO signal / ? / direction | partial: native EEPROM pins plus unknown stored bits ✓; paired-ROM physical-key traces do not corroborate the sibling emulator's proposed 3210 backlight bit 6 |
 
-### KBGPIO — keyboard (partial hardware ✓)
+### KBGPIO — keyboard (extracted partial hardware ✓)
 ROW `0x28` signal / `0xa8` direction, COL `0x2a` active-low input / `0x6b`
 interrupt mask. Firmware drives a 4-row by 5-column matrix; physical key edges
 latch MAD2 IRQ0, whose handler starts the firmware scan/decode sequence. CCONT
 uses the separate MAD2 IRQ2 source. Registers `0x29/0x68/0x69/0xa9` and
 `0x2b/0x6a/0xaa/0xab` remain backing storage with no established keypad role.
+`nokia_kbgpio_device` owns the complete sparse families, scan state, IRQ latch
+and cold-boot power sample; handset ports and MAD2 routing remain board wiring.
 
 ### GENSIO — multiplexed serial (CCONT, LCD, + SELECT-muxed)
 | off | reg | status |
