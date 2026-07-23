@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "product": "Nokia 3210 NSE-8",
+  "firmware_controls": ["v6.00", "v5.01"],
+  "route_table": {
+    "v6.00_address": "0x2e2d74",
+    "v5.01_address": "0x2d7770",
+    "source_to_channel": [0, 4, 5, 6, 7, 3, 2, 1]
+  },
+  "channels": [
+    {"channel": 0, "signal": "vbatt", "confidence": "strong", "consumer": "early five-sample battery reader 0x2a84b0 and task-18 accepted window 0x2be..0x314"},
+    {"channel": 1, "signal": "vbatt", "confidence": "strong", "consumer": "source-7 monitor, voltage calibration and 2100-unit shutdown floor; scalar reader 0x2a68c4 has 11 classified callers"},
+    {"channel": 2, "signal": "unresolved", "confidence": "unknown", "consumer": "logical source 6 route only"},
+    {"channel": 3, "signal": "bsi", "confidence": "moderate", "consumer": "independent battery-size input reader at 0x2a90b4"},
+    {"channel": 4, "signal": "btemp", "confidence": "moderate", "consumer": "five classified init-mode callers plus independent charge-fault reader 0x2a90ac"},
+    {"channel": 5, "signal": "vchar", "confidence": "strong", "consumer": "six-sample charger debounce at 0x2b084c with raw threshold 0x64"},
+    {"channel": 6, "signal": "unresolved", "confidence": "unknown", "consumer": "logical source 3 route only"},
+    {"channel": 7, "signal": "unresolved", "confidence": "unknown", "consumer": "one early initialization sample; no organic charger-edge reread"}
+  ],
+  "timing": {
+    "firmware_contract": "write control, poll GENSIO status, read result registers",
+    "conversion_irq": false,
+    "required_nonzero_delay": false,
+    "physical_duration": null
+  }
+}

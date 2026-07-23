@@ -21,11 +21,11 @@ source 7
 ```
 
 The swap16-correct source-to-selector table is `0 4 5 6 7 3 2 1` for sources
-0 through 7. Runtime tracing confirms source 7 selects physical channel 1. The
-generic driver labels are not a proved 3210 PCB netlist, so channel 1 is described
-by selector number here rather than named BSI, RSSI, or VBAT. A sibling emulator
-maps it to BSI, but its own 3210 profile labels that mapping and its pack values as
-pending reverse engineering. That is useful corroboration, not independent proof.
+0 through 7. Runtime tracing confirms source 7 selects physical channel 1.
+Channel 1 is a second VBATT input: it uses the same voltage-calibration fields
+as the direct battery path, scales the result by `1500/313`, and applies a
+2100-unit shutdown floor. Channel 3 is consumed separately by the battery-size
+input reader. This corrects the former BSI hypothesis for channel 1.
 
 The calibration/scaling performed by `0x27cc74` is:
 
@@ -39,8 +39,9 @@ to zero. A second logical sample can enter through source 8, but the cold-boot
 safety average and the classifier's primary voltage sample both use source 7.
 
 The separate early power-on check at `0x2a84b0` directly reads physical channel
-0. Its accepted input window does not establish channel 0's physical signal name,
-and it must not be conflated with the source-7 path.
+0 and task 18 accepts raw `0x02be..0x0314`; this is the other 3210 VBATT path.
+The product profile therefore routes one stable battery input to channels 0 and
+1 while retaining independent BSI, BTEMP and VCHAR inputs on channels 3, 4 and 5.
 
 ## Calibration records
 
@@ -178,6 +179,12 @@ and 6 run cold-boot guard `0x27d5fc`; modes 0 and 4 skip it. An independent
 selector-4 consumer at `0x2a90ac` treats values below 26 as its non-fault path,
 clears state `0x112448`, and posts task-19 event `0x44`. This supports a
 temperature-like interpretation but does not prove the PCB net name.
+
+The independent selector-3 read at `0x2a90b4`, together with the standard
+DCT3 channel assignment, identifies it as BSI with moderate confidence.
+Selector 4 is correspondingly retained as BTEMP with moderate confidence.
+Selectors 2, 6 and 7 remain unnamed because their recovered consumers do not
+establish a board-level electrical quantity.
 
 Mode 4 has a distinct, external completion contract. Its event `0x43` has one
 recovered poster, `0x2a6880`, selected only by payload 3 of incoming class-`0x40`

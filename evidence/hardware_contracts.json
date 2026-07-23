@@ -171,6 +171,16 @@
       "id": "ccont_charger_power_wake", "subsystem": "ccont", "status": "partial", "confidence": "strong",
       "boundary": "CCONT watchdog data 0x00 removes the MAD2 digital baseband domain while CCONT and nonvolatile storage persist. A later physical charger edge exposes reset-cause bit 2, resets the CPU and attached MAD2 peripheral domain, and both 3210 v6.00 and v5.01 organically read the cause and VCHAR before settling in acting-dead mode 0x0005. Physical rail timing and battery/current dynamics remain unmodeled",
       "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md", "tools/charger_wake_check.py"]
+    },
+    {
+      "id": "nse8_ccont_adc_board_wiring", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "The paired 3210 firmware routes early battery sampling to CCONT channel 0 and source-7 monitoring to channel 1. Both paths consume voltage thresholds, channel 1 uses the voltage-calibration fields and 1500/313 scaling, and its 2100-unit floor is an undervoltage shutdown predicate. Channel 3 is the independent BSI input, channel 4 is BTEMP and channel 5 is VCHAR; channels 2, 6 and 7 remain electrically unnamed. Product configuration owns this board wiring while CCONT remains an eight-channel converter",
+      "evidence": ["docs/battery_classifier_analysis.md", "docs/ccont_subsystem.md", "docs/data/ccont_adc_channels.json"]
+    },
+    {
+      "id": "ccont_watchdog_retained_status", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "A mapped GENSIO fixture loads CCONT watchdog register 5 with one second. Expiry resets the complete digital-baseband domain, restarts MAD2 clock initialization and preserves the exact pre-expiry CCONT status byte, including pending RTC sources and existing low reset flags. It does not use watchdog-data-zero rail-off and does not synthesize a new CCONT reset-cause bit",
+      "evidence": ["docs/ccont_subsystem.md", "tools/ccont_watchdog_expiry_check.py"]
     }
   ]
 }

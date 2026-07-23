@@ -48,6 +48,7 @@ local vibrator_fixture_at
 local rtc_fixture_at
 local mad2_reset_fixture_at
 local mad2_watchdog_fixture_at
+local ccont_watchdog_fixture_at
 local mad2_sleep_fixture_at
 
 local structural = {
@@ -81,6 +82,7 @@ vibrator_fixture_at = env_number("NOKIA_DCT3_VIBRATOR_FIXTURE_AT", -1)
 rtc_fixture_at = env_number("NOKIA_DCT3_CCONT_RTC_FIXTURE_AT", -1)
 mad2_reset_fixture_at = env_number("NOKIA_DCT3_MAD2_RESET_FIXTURE_AT", -1)
 mad2_watchdog_fixture_at = env_number("NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT", -1)
+ccont_watchdog_fixture_at = env_number("NOKIA_DCT3_CCONT_WATCHDOG_FIXTURE_AT", -1)
 mad2_sleep_fixture_at = env_number("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT", -1)
 local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
 local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
@@ -627,6 +629,20 @@ if mad2_watchdog_fixture_at >= 0 then
 		-- Load a one-tick ASIC-watchdog interval through mapped MMIO. Device
 		-- timing and reset-domain behavior remain entirely driver-owned.
 		space:write_u8(0x20003, 0x01)
+	end)
+	assert(coroutine.resume(watchdog_timer))
+end
+
+if ccont_watchdog_fixture_at >= 0 then
+	local watchdog_timer = coroutine.create(function()
+		emu.wait(ccont_watchdog_fixture_at)
+		local old_control = space:read_u8(0x2002d)
+		-- Load CCONT register 5 through the mapped GENSIO transaction. The
+		-- device owns countdown timing, reset extent and retained status.
+		space:write_u8(0x2002d, old_control | 0x04)
+		space:write_u8(0x2002c, 0x05 << 3)
+		space:write_u8(0x2002c, 0x01)
+		space:write_u8(0x2002d, old_control)
 	end)
 	assert(coroutine.resume(watchdog_timer))
 end

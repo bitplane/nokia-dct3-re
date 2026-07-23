@@ -14,7 +14,7 @@ public:
 	uint8_t serial_r();
 	void select_w(int selected);
 	void set_adc_source(unsigned channel, uint16_t value);
-	void set_charger_input(bool connected, uint16_t vchar = 0x03ff);
+	void set_charger_input(unsigned channel, bool connected, uint16_t vchar = 0x03ff);
 	void set_ready(bool ready) { m_ready = ready; }
 	void set_wddisx_grounded(bool grounded) { m_wddisx_grounded = grounded; }
 	bool watchdog_tick();

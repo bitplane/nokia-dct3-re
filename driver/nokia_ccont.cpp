@@ -95,7 +95,7 @@ void nokia_ccont_device::set_adc_source(unsigned channel, uint16_t value)
 		m_adc_source[channel] = value & 0x3ff;
 }
 
-void nokia_ccont_device::set_charger_input(bool connected, uint16_t vchar)
+void nokia_ccont_device::set_charger_input(unsigned channel, bool connected, uint16_t vchar)
 {
 	// The firmware determines the new charger state by debouncing VCHAR on ADC
 	// selector 5 after either edge of CCONT interrupt source 3.
@@ -113,7 +113,7 @@ void nokia_ccont_device::set_charger_input(bool connected, uint16_t vchar)
 				RESET_CHARGER, machine().time().as_double());
 		m_power_cb(1);
 	}
-	set_adc_source(5, connected ? vchar : 0);
+	set_adc_source(channel, connected ? vchar : 0);
 	latch_irq_sources(0x08);
 }
 

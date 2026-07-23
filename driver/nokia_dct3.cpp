@@ -68,15 +68,36 @@
 
 namespace {
 
-constexpr std::array<u16, 8> ADC_DEFAULT =
-		{ 0x000, 0x3ff, 0x3ff, 0x280, 0x200, 0x000, 0x200, 0x000 };
-constexpr std::array<u16, 8> ADC_3210 =
-		{ 0x000, 0x200, 0x2d0, 0x280, 0x200, 0x000, 0x200, 0x000 };
+struct nokia_ccont_board_profile
+{
+	std::array<u16, 8> channel_defaults;
+	std::array<u8, 2> vbatt_channels;
+	u8 vbatt_channel_count;
+	u8 bsi_channel;
+	u8 btemp_channel;
+	u8 vchar_channel;
+	u16 vchar_connected_raw = 0x03ff;
+};
+
+constexpr nokia_ccont_board_profile ADC_DEFAULT = {
+	{ 0x000, 0x3ff, 0x3ff, 0x280, 0x200, 0x000, 0x200, 0x000 },
+	{ 2, 0 }, 1, 3, 4, 5
+};
+
+// NSE-8 routes the early battery input to channel 0 and the monitored battery
+// quantity to channel 1. Both paths consume voltage calibration and voltage
+// thresholds; BSI remains the independent channel-3 input.
+constexpr nokia_ccont_board_profile ADC_3210 = {
+	{ 0x2c0, 0x2c0, 0x2d0, 0x280, 0x200, 0x000, 0x200, 0x000 },
+	{ 0, 1 }, 2, 3, 4, 5
+};
 // Standard 3310 routing: channel 2 is VBATT, 3 is the BMC-3 pack's BSI
 // resistor and 4 is battery temperature. This tuple clears the firmware's
 // ordinary pack/self-test path; it is product input, not a state fixture.
-constexpr std::array<u16, 8> ADC_3310 =
-		{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 };
+constexpr nokia_ccont_board_profile ADC_3310 = {
+	{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 },
+	{ 2, 0 }, 1, 3, 4, 5
+};
 
 struct nokia_product_config
 {
@@ -101,7 +122,7 @@ struct nokia_product_config
 	u8 lcd_controller_height = 48;
 	u8 lcd_visible_width = 84;
 	u8 lcd_visible_height = 48;
-	std::array<u16, 8> adc_defaults = ADC_DEFAULT;
+	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
 
 constexpr nokia_product_config make_3210_config()
@@ -114,7 +135,7 @@ constexpr nokia_product_config make_3210_config()
 	result.radio_peer = true;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
-	result.adc_defaults = ADC_3210;
+	result.ccont_board = ADC_3210;
 	return result;
 }
 
@@ -128,7 +149,7 @@ constexpr nokia_product_config make_3310_config()
 	result.dsp_bootstrap_exchanges = 58;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
-	result.adc_defaults = ADC_3310;
+	result.ccont_board = ADC_3310;
 	return result;
 }
 
@@ -145,7 +166,7 @@ constexpr nokia_product_config make_3330_config()
 	result.keypad_five_rows = true;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
-	result.adc_defaults = ADC_3310;
+	result.ccont_board = ADC_3310;
 	return result;
 }
 
@@ -583,7 +604,7 @@ void nokia_dct3_state::machine_reset()
 	// Load the deterministic product-level selector tuple. Electrical signal
 	// names and units remain deliberately unassigned where board evidence is absent.
 	for (unsigned id = 0; id < 8; id++)
-		m_ccont->set_adc_source(id, m_product.adc_defaults[id]);
+		m_ccont->set_adc_source(id, m_product.ccont_board.channel_defaults[id]);
 	m_ccont->set_wddisx_grounded(m_product.ccont_wddisx_grounded);
 	m_ccont->set_ready(BIT(hardware, 0));
 	m_simi->set_enabled(m_product.sim_device && BIT(hardware, 1));
@@ -1178,7 +1199,8 @@ INPUT_CHANGED_MEMBER( nokia_dct3_state::key_irq )
 
 INPUT_CHANGED_MEMBER( nokia_dct3_state::charger_irq )
 {
-	m_ccont->set_charger_input(newval != 0);
+	m_ccont->set_charger_input(m_product.ccont_board.vchar_channel, newval != 0,
+		m_product.ccont_board.vchar_connected_raw);
 }
 
 INPUT_CHANGED_MEMBER( nokia_dct3_state::mbus_rx_byte )

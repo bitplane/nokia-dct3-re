@@ -59,8 +59,10 @@ is conditional rather than part of ordinary boot. Ordinary boot
 does not execute the Timer-1 readers. `make verify-mad2-timer1` accelerates only
 the hardware timebase and proves terminal-count/FIQ5/acknowledgement; paired static
 decode proves the same Timer-1 algorithm in both ROMs. `make verify-mad2-reset`
-uses mapped controller MMIO to prove both the software-reset and watchdog-expiry
-paths, their shared digital-baseband domain, and their distinct retained causes.
+uses mapped controller MMIO to prove the software-reset, MAD2-watchdog and
+CCONT-watchdog expiry paths. All reset the shared digital-baseband domain;
+software and MAD2 watchdog publish distinct MAD2 causes, while CCONT watchdog
+preserves the complete pre-expiry CCONT status rather than inventing a cause.
 `make verify-charger-wake` powers the running phone off through its physical
 power key, connects the charger while CCONT retains power, and requires cause
 bit `0x04`, a complete digital-domain restart, a post-reset VCHAR sample and

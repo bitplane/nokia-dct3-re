@@ -64,7 +64,7 @@ class GensioTraceCheckTest(unittest.TestCase):
 
     def test_adc_detects_bad_upper_bits(self):
         transactions = [("W", 0, selector << 4) for selector in range(8)]
-        transactions.extend((("W", 0, 0x20), ("R", 3, 0xB0)))
+        transactions.extend((("W", 0, 0x20), ("R", 2, 0x00), ("R", 3, 0xB0)))
         errors, _ = check_adc(transactions, (0, 0, 0x300, 0, 0, 0, 0, 0))
         self.assertIn(
             "ADC selector 2 register 3 returned 0xb0, expected 0xb3", errors

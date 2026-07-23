@@ -242,10 +242,10 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0xf` | interrupt mask | |
 
 **ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver deliberately exposes raw selectors
-`0..7`; selector 5 is now identified as VCHAR, while the other board-level
+`0..7`; on NSE-8, selectors 0/1 are VBATT, 3 is BSI, 4 is BTEMP and 5 is VCHAR, while the remaining board-level
 signal names remain incomplete.
 Firmware boot reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7
-maps through ROM table `0x2e2d74` to selector 1. The complete logical-source table is identical in
+maps through ROM table `0x2e2d74` to selector 1. Both are voltage paths; selector 1 uses voltage calibration and the 2100-unit shutdown floor. The complete logical-source table is identical in
 3210 v5.01. Values come from the product's typed ADC tuple; electrical
 scaling and PCB net names remain open.
 

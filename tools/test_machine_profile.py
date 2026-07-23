@@ -1,4 +1,5 @@
 import pathlib
+import json
 import unittest
 
 
@@ -36,7 +37,7 @@ class MachineProfileTest(unittest.TestCase):
                 "radio_peer": "true",
                 "dsp_service_delay_us": "4'000",
                 "dsp_peer_poll_ms": "4",
-                "adc_defaults": "ADC_3210",
+                "ccont_board": "ADC_3210",
             },
         )
         profile = self.driver.split("void nokia_dct3_state::noki3210(machine_config &config)", 1)[1]
@@ -73,7 +74,7 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_service": "true",
                 "external_service": "true",
                 "keypad_five_rows": "true",
-                "adc_defaults": "ADC_3310",
+                "ccont_board": "ADC_3310",
             },
         )
         profile = self.driver.split("void nokia_dct3_state::noki3330(machine_config &config)", 1)[1]
@@ -118,10 +119,25 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_3310_owns_evidenced_pack_and_peer_defaults(self):
         self.assertIn(
-            "{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 };",
+            "{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 }",
             self.driver,
         )
         self.assertIn("m_simi->set_enabled(m_product.sim_device &&", self.driver)
+
+    def test_3210_board_profile_routes_both_voltage_inputs(self):
+        profile = self.driver.split(
+            "constexpr nokia_ccont_board_profile ADC_3210", 1
+        )[1].split("constexpr nokia_ccont_board_profile ADC_3310", 1)[0]
+        self.assertIn("{ 0x2c0, 0x2c0, 0x2d0, 0x280, 0x200, 0x000, 0x200, 0x000 }", profile)
+        self.assertIn("{ 0, 1 }, 2, 3, 4, 5", profile)
+        census = json.loads((ROOT / "docs/data/ccont_adc_channels.json").read_text())
+        signals = {item["channel"]: item["signal"] for item in census["channels"]}
+        self.assertEqual("vbatt", signals[0])
+        self.assertEqual("vbatt", signals[1])
+        self.assertEqual("bsi", signals[3])
+        self.assertEqual("btemp", signals[4])
+        self.assertEqual("vchar", signals[5])
+        self.assertFalse(census["timing"]["conversion_irq"])
 
     def test_3410_owns_dsp_reset_release_wiring(self):
         self.assert_profile_fields(
@@ -172,15 +188,15 @@ class MachineProfileTest(unittest.TestCase):
     def test_charger_input_updates_vchar_and_latches_both_edges(self):
         body = self.driver.split("INPUT_CHANGED_MEMBER( nokia_dct3_state::charger_irq )", 1)[1]
         body = body.split("static INPUT_PORTS_START", 1)[0]
-        self.assertIn("set_charger_input(newval != 0", body)
-        self.assertIn("set_charger_input(newval != 0);", body)
+        self.assertIn("set_charger_input(m_product.ccont_board.vchar_channel", body)
+        self.assertIn("m_product.ccont_board.vchar_connected_raw", body)
         self.assertNotIn("latch_irq_sources", body)
         self.assertNotIn("if (newval)", body)
 
         ccont_body = self.ccont.split(
             "void nokia_ccont_device::set_charger_input", 1
         )[1].split("void nokia_ccont_device::select_w", 1)[0]
-        self.assertIn("set_adc_source(5, connected ? vchar : 0)", ccont_body)
+        self.assertIn("set_adc_source(channel, connected ? vchar : 0)", ccont_body)
         self.assertIn("latch_irq_sources(0x08)", ccont_body)
 
     def test_charger_wake_resets_the_digital_baseband_domain(self):

@@ -40,7 +40,7 @@ The device boundary is classified by evidence level:
 | CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status belongs to the separate serial controller, not CCONT. |
 | Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
 | Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. Charger-originated restart exposes cause bit 2, while an operational charger edge uses source bit 3 and MAD2 IRQ2. Firmware reads and clears both forms through register `0x0e`. |
-| ADC selector values | Product configuration | Firmware-visible selector routing is mapped, but raw values, electrical names, units, and physical battery relationships are not. Each supported product supplies one reviewed deterministic tuple; this is not a battery simulation. |
+| ADC selector values | Product configuration | Firmware-visible routing identifies 3210 channels 0/1 as VBATT, 3 as BSI, 4 as BTEMP and 5 as VCHAR. Each product supplies named board wiring plus reviewed raw defaults; this is not a battery simulation. |
 | RTC counters and alarm (`0x07..0x0c`) | Tested partial hardware | Deterministic binary counters produce second/minute sources; ROM arithmetic establishes binary encoding. Physical `0x07..0x0a` are second/minute/hour/day. A controller fixture proves the comparator and IRQ route; an organic keypad workflow programs a user alarm, receives the CCONT IRQ, and starts the ringtone. Month/calendar persistence remains outside the recovered interface. |
 | Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input and is released in the 3210 profile; both ROMs survive beyond the maximum window through organic reloads. |
 | Other register storage | Compatibility behavior | Registers without mapped semantics retain written bytes so firmware-visible transactions compose. Storage must not be interpreted as a proved hardware contract. |
@@ -167,11 +167,11 @@ the two 3210 builds, but it does not name the PCB nets behind the selectors.
 
 | Selector | Board-level interpretation |
 | ---: | --- |
-| 0 | unresolved; consumed by the early battery reader |
-| 1 | unresolved; BSI is a corroborated hypothesis |
+| 0 | VBATT; consumed by the early five-sample reader and task-18 raw acceptance window `0x02be..0x0314` |
+| 1 | VBATT; source-7 monitor and scalar reader use voltage calibration and the 2100-unit shutdown floor |
 | 2 | unresolved |
-| 3 | unresolved; battery-type/BSI is a generic DCT3 hypothesis |
-| 4 | temperature-like charging input; PCB net unresolved |
+| 3 | BSI; independently consumed by the battery-size input reader `0x2a90b4` |
+| 4 | BTEMP; selects battery-init mode and feeds the independent charge-fault reader |
 | 5 | VCHAR/charger voltage. `0x2b084c` takes six samples, separates them at raw `0x64`, averages a stable-side set, and publishes the debounced present state. |
 | 6 | unresolved |
 | 7 | unresolved; observed once during early initialization, but not consumed by the organic connect/remove lifecycle. |
@@ -180,8 +180,15 @@ Static audit proves that selector 1 passes
 through affine calibration at `0x2a68c4`, while selector 4 independently selects
 battery-init mode 4 below raw 39 and mode 1 otherwise at `0x2b4f2c`. Neither
 function implements the hypothesised two-input pack-recognition table. Exact
-electrical naming and scaling remain open. Environment profiles populate raw
-ten-bit values; this is scenario input, not a finished physical battery model.
+electrical naming and scaling remain open. Product configuration supplies raw
+ten-bit defaults; these are board inputs, not a finished physical battery model.
+The machine-readable coverage record is `docs/data/ccont_adc_channels.json`.
+
+Firmware's ADC helper writes the control byte, polls GENSIO status and reads the
+two result registers. It does not wait for a CCONT interrupt. Neither 3210 ROM
+requires a nonzero conversion interval, and no independent source establishes
+a physical duration, so completion remains immediate rather than replacing one
+calibration with another. A conversion-complete IRQ remains explicitly excluded.
 
 ## Interrupt-to-firmware behavior
 
@@ -279,6 +286,13 @@ and LCD controller while retaining CCONT, flash and EEPROM. MAD2 watchdog
 expiry and reset-control bit 2 now use the same evidenced digital-baseband
 extent while publishing their own retained reset causes.
 
+A mapped one-second watchdog fixture closes the CCONT side separately. The last
+status read before expiry and the first after reboot are both `0x13`: existing
+ready/PWRONX state plus the pending RTC-second source survive exactly, while
+MAD2 clock initialization restarts. CCONT watchdog expiry therefore creates no
+new CCONT cause bit. Watchdog data zero remains the distinct commanded rail-off
+path.
+
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational
 phone has the watchdog enabled, so the 3210 product profile leaves WDDISX
@@ -315,10 +329,8 @@ IRQ contract.
 
 1. Establish whether real GENSIO exposes a measurable busy interval and map
    the remaining endpoint-control bits.
-2. Establish ADC request-to-result latency. Firmware routine `0x2b52cc` writes
-   the ADC control byte, polls GENSIO status, and reads the result registers;
-   it does not wait for a CCONT interrupt. A synthetic conversion-complete IRQ
-   is therefore excluded unless separate hardware evidence establishes one.
+2. Measure ADC request-to-result latency from hardware or chip documentation;
+   paired firmware establishes polling semantics but no physical duration.
 3. Recover the physical timing of the MAD2 power-key edge separately.
 4. Replace the current typed raw ADC tuple with battery, charger and RF models
    once their physical units and relationships are known.
@@ -351,9 +363,14 @@ CCONT removes power, a later charger edge raises cause `0x04`, firmware reads
 that cause and VCHAR after a complete digital-domain reset, and the restarted
 phone settles in mode `0x0005`. The same gate passes v6.00 and v5.01.
 
+`make verify-mad2-reset RUN_DIR=<dir>` additionally exercises MCU software
+reset, MAD2 watchdog expiry and CCONT watchdog expiry. The CCONT case requires
+the complete baseband clock initializer to restart and the pre-expiry CCONT
+status byte to survive unchanged.
+
 The focused gate does not yet validate every register reset value, mask changes
 while a source is pending, alarm reprogramming, the `0x06bc` consumer,
-register-`0x0a` write semantics, watchdog expiry, or full save-state resumption.
+register-`0x0a` write semantics, or full save-state resumption.
 RTC determinism and source assignments have source-level
 regressions; the byte-exact default frame and coherent frontier protect their
 integration behavior.

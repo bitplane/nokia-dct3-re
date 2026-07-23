@@ -12,7 +12,7 @@ ACCESS_RE = re.compile(
 )
 
 ADC_PROFILES = {
-    "sane": (0x000, 0x200, 0x2D0, 0x280, 0x200, 0x000, 0x200, 0x000),
+    "sane": (0x2C0, 0x2C0, 0x2D0, 0x280, 0x200, 0x000, 0x200, 0x000),
 }
 
 SELECT_INIT = {
@@ -141,6 +141,7 @@ def check_select_contract(accesses):
 def check_adc(transactions, values):
     errors = []
     selector = None
+    result_lsb_seen = False
     observed = set()
     sample_reads = 0
 
@@ -148,7 +149,13 @@ def check_adc(transactions, values):
         if direction == "W" and address == 0:
             selector = (data >> 4) & 0x07
             observed.add(selector)
+            result_lsb_seen = False
         elif direction == "R" and address in (2, 3) and selector is not None:
+            # Register 3 also exposes the CCONT chip ID and is read by self-test
+            # independently of an ADC result. Only pair it with a conversion
+            # after the corresponding result-LSB read.
+            if address == 3 and not result_lsb_seen:
+                continue
             expected = values[selector]
             if address == 2:
                 wanted = expected & 0xFF
@@ -160,6 +167,7 @@ def check_adc(transactions, values):
                     f"0x{data:02x}, expected 0x{wanted:02x}"
                 )
             sample_reads += 1
+            result_lsb_seen = address == 2
 
     missing = sorted(set(range(len(values))) - observed)
     if missing:
