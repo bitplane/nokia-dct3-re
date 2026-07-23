@@ -638,16 +638,23 @@ if mad2_sleep_fixture_at >= 0 then
 		local old_irq_mask = space:read_u8(0x2000b)
 		local old_ctrl = space:read_u8(0x2000c) & 0xdf
 		local old_clock = space:read_u8(0x2000d)
+		local old_fiq8 = space:read_u8(0x20016) & 0x05
 		if mad2_sleep_fixture_source == "timer1" then
 			-- Timer 1/FIQ5 is the internal sleep-counter wake source. Its 0x7fff
 			-- destination is hardware-owned and read-only, so this fixture waits
 			-- for the real product-rate counter rather than changing either one.
 			space:write_u8(0x2000a, old_fiq_mask & 0xdf)
 			space:write_u8(0x2000c, old_ctrl | 0x01)
-		else
+		elseif mad2_sleep_fixture_source == "keypad" then
 			-- A physical key edge is one documented external wake source.
 			space:write_u8(0x2000b, old_irq_mask & 0xfe)
 			space:write_u8(0x2000c, old_ctrl | 0x04)
+		else
+			-- Firmware leaves FIQ8 eligible across clock-stop. Acknowledge stale
+			-- state, enable its periodic source and expose the extended FIQ route.
+			space:write_u8(0x2000c, old_ctrl & 0xfe)
+			space:write_u8(0x20016, 0x03)
+			space:write_u8(0x2000c, old_ctrl | 0x01)
 		end
 		space:write_u8(0x2000d, old_clock | 0x02)
 		if mad2_sleep_fixture_source == "keypad" then
@@ -660,6 +667,11 @@ if mad2_sleep_fixture_at >= 0 then
 		end
 		space:write_u8(0x2000a, old_fiq_mask)
 		space:write_u8(0x2000b, old_irq_mask)
+		if mad2_sleep_fixture_source == "fiq8" then
+			space:write_u8(0x2000c, old_ctrl & 0xfe)
+			space:write_u8(0x20016, 0x07)
+			space:write_u8(0x20016, old_fiq8)
+		end
 		space:write_u8(0x2000c, old_ctrl)
 		space:write_u8(0x2000d, old_clock)
 	end)

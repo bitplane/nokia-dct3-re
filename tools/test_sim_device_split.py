@@ -12,6 +12,7 @@ class SimDeviceSplitTest(unittest.TestCase):
         cls.card_header = (ROOT / "driver/nokia_sim_card.h").read_text()
         cls.simi = (ROOT / "driver/nokia_simi.cpp").read_text()
         cls.simi_header = (ROOT / "driver/nokia_simi.h").read_text()
+        cls.mad2 = (ROOT / "driver/nokia_mad2.cpp").read_text()
         cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
     def test_card_has_no_mad2_controller_state(self):
@@ -48,12 +49,13 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertNotIn("from_usec(100)", self.simi + self.simi_header)
 
     def test_mad2_clock_gate_freezes_transport_without_erasing_state(self):
-        self.assertIn("void set_clock_enabled(bool enabled)", self.simi_header)
+        self.assertIn("void set_clock_enabled(int state)", self.simi_header)
         gate = self.simi.split("void nokia_simi_device::set_clock_enabled", 1)[1]
         gate = gate.split("u8 nokia_simi_device::control_r", 1)[0]
         self.assertIn("m_rx_timer->adjust(attotime::never)", gate)
         self.assertNotIn("m_rx_head =", gate)
-        self.assertIn("m_simi->set_clock_enabled(BIT(data, 5))", self.phone)
+        self.assertIn("m_mad2->simi_clock_cb().set(m_simi", self.phone)
+        self.assertIn("m_simi_clock_cb(BIT(m_regs[offset], 5))", self.mad2)
 
     def test_card_owns_persistent_linear_fixed_adn(self):
         self.assertIn("public device_nvram_interface", self.card_header)

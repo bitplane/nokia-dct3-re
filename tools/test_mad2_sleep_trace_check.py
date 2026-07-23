@@ -22,6 +22,12 @@ class Mad2SleepTraceCheckTest(unittest.TestCase):
 		keypad = TIMER.replace("domain=FIQ fiq=020 irq=000", "domain=IRQ fiq=000 irq=001")
 		self.assertEqual(check(keypad, "keypad"), [])
 
+	def test_fiq8_requires_extended_pending_bit(self):
+		fiq8 = TIMER.replace("fiq=020", "fiq=100")
+		self.assertEqual(check(fiq8, "fiq8"), [])
+		errors = check(fiq8.replace("fiq=100", "fiq=020"), "fiq8")
+		self.assertIn("FIQ8 wake did not carry extended FIQ/status bit 0x100", errors)
+
 	def test_rejects_stopped_sleep_domain_timer(self):
 		errors = check(TIMER.replace("timer0=0002 timer1=7fff", "timer0=0001 timer1=7fff"), "timer1")
 		self.assertIn("Timer 0 did not advance while the ARM clock was stopped", errors)

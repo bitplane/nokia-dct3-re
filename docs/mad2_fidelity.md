@@ -17,7 +17,7 @@ Confidence labels:
 The extracted `nokia_mad2_device` owns the CTSI core at offsets `0x00..0x16`:
 reset/clock/watchdog latches, timer state, interrupt pending/masks and CPU-line
 routing. Keypad, GenIO and other board peripherals remain outside that core;
-GENSIO, MBUS and SIMI are separate devices. Timer-1 destination behavior,
+GENSIO, MBUS and SIMI are separate devices. Timer-1 terminal-count behavior,
 MCU-reset extent, the SIMI clock gate and the ARM clock-stop/wake contract are
 modeled. The timer divider tree, FIQ8 timing, clock-gate bits without an attached
 consumer and several SELECT/UIF banks remain calibrated or mapped-only.
@@ -44,10 +44,10 @@ Address-map coverage therefore must not be read as peripheral completeness.
 | `01` MCU reset | bit 2 requests a deferred digital-baseband reset; power bit 0 and retained cause bits are readable | Cross-ROM partial | Both ROMs contain three bit-2 reset sites. A mapped-MMIO fixture proves the reset extent and post-reset value `0x05`; exact rail timing remains unknown. |
 | `02` DSP reset | stored only | Placeholder | Observe DSP reset/run handshake. |
 | `03` watchdog | nonzero writes reload an eight-bit seconds counter; expiry resets the digital baseband and retains cause `0x03` | Focus-tested partial | The mapped-MMIO fixture proves reload, expiry and reset extent. Determine the physical tick source and exact rail timing. |
-| `04..07` timer 1 | 15-bit current counter and fixed `0x7fff` destination; FIQ5 at destination; continues while ARM clock is stopped | Cross-ROM partial | Both ROMs use identical stable-read and FIQ5 race handling, and convert remaining Timer-1 ticks by rounded division by 8 before comparing them with Timer 0. Focused sleep tests prove it can wake the halted ARM. Absolute input/divider provenance remains calibrated. |
+| `04..07` timer 1 | current counter wrapping after fixed terminal count `0x7fff`; FIQ5 at the terminal; continues while ARM clock is stopped | Cross-ROM partial | Both ROMs use identical stable-read and FIQ5 race handling, and convert the unsigned terminal-minus-current interval by rounded division by 8 before comparing it with Timer 0. A 16-bit free-running model breaks organic shutdown timing. Absolute input/divider provenance remains calibrated. |
 | `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ2, masked-pending retention and acknowledgement have focused regressions. The overlap fixture briefly gates CPU delivery through MAD2 MMIO so two physical input callbacks compose deterministically. Other source assignments still need independent evidence. |
-| `0c` IRQ control | gates CPU lines; bit mapping inferred | Partial | Cross-check enable/mask polarity and reset value. |
-| `0d` clock control | stored gate bits; bit 1 is an auto-clearing ARM clock-stop request; bit 5 freezes/resumes SIMI timing and activation without clearing controller state | Cross-ROM partial | Both ROMs have instruction-equivalent RMW sites: boot sets bits 2--3, SIM code manages bits 5--6, and the task-0/shutdown helper writes `(old | 0x02) & 0xfe`. A routed interrupt resumes the ARM. Bit 0 is always cleared; attached consumers for bits 2--4 and 6 remain partly unknown. |
+| `0c` IRQ control | gates CPU lines; bit 5 projects the ninth IRQ pending state and write-only bit 6 acknowledges it | Cross-ROM partial | Both 3210 dispatchers implement the same bit-5/read and `0x40`/write contract. The ninth IRQ source and owner remain unidentified. |
+| `0d` clock control | stored gates; bit 1 is an auto-clearing ARM clock-stop request; bit 5 drives the extracted SIMI clock input | Cross-ROM partial | Both ROMs have instruction-equivalent RMW sites: boot sets bits 2--3 once, SIMI code exclusively manages bits 5--6, and the task-0/shutdown helper writes `(old | 0x02) & 0xfe`. Bit 6 is SIMI-owned but its hardware effect is not established; bit 4 has no recovered writer. |
 | `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
 | `0f..13` timer 0 | live source divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated input clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. The register divides source ticks by `data+1`; paired timeout arithmetic proves the resulting Timer-0 interval is compared with `round(Timer1_remaining/8)`. Which documented MAD2 clock feeds the divider remains unproven. |
 
@@ -55,7 +55,7 @@ Address-map coverage therefore must not be read as peripheral completeness.
 
 | Block | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
-| FIQ8 `16` | periodic timer when enabled; extended pending/status/mask routing | Partial routing, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery and acknowledgement. Identify the source clock and physical timer semantics. |
+| FIQ8 `16` | periodic timer when enabled; extended pending/status/mask routing; routed wake from ARM clock-stop | Partial routing/wake, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery, acknowledgement and wake. Identify the source clock and observe an organic countdown overlapping idle sleep. |
 | MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, physical character rate | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover FIQ3 phase/source, collision and error behavior. |
 | Buzzer `15/1c/1d/1e` | extracted PUP bit-5 enable and 13 MHz divider drive a MAME beeper; `make verify-buzzer` validates mapped MMIO and `make verify-alarm` validates the organic keypad-to-CCONT-to-ringtone path | Partial hardware | Recover volume/acoustic transfer; keypad tones are DSP/COBBA-owned and the MZT-03C acoustic response is not modeled. |
 | Vibrator `15/1b` | extracted PUP bit-4 enable drives the named MAME `vibration` output; `0x1b` remains the independent frequency/mode latch | Partial hardware | Exercise the optional vibra battery pack from an organic incoming-call lifecycle and recover `0x1b` semantics. |
@@ -86,9 +86,27 @@ second runtime oracle or hardware documentation.
 FIQ8 uses the ninth internal pending bit (`0x100`). Register `0x16.bit1`
 projects that pending state, bit 2 masks its CPU delivery, and writing bit 1
 acknowledges it. `make verify-mad2-interrupts` exercises this routing while the
-periodic source is explicitly enabled through the mapped register. The source
-clock remains calibrated and the extended IRQ projection at `0x0c.bit5` has no
-legitimate modeled producer, so extended IRQ remains an unvalidated decode.
+periodic source is explicitly enabled through the mapped register. Firmware
+helper `0x2a1388` loads a 16-bit software countdown and enables the source;
+the FIQ dispatcher decrements it and calls expiry helper `0x2a13e0` at zero.
+The three callers supply either `0xffff` or application-owned countdown data,
+so they establish programmable-tick semantics but no seconds conversion. The
+clock-stop helper does not mask or disable FIQ8. A phase-separated mapped-MMIO
+fixture enters sleep with FIQ8 enabled and unmasked, then observes extended
+pending bit `0x100` wake the ARM on the next tick. This validates the current
+routed-wake behavior, but ordinary boot does not organically overlap an active
+countdown with task-0 sleep, so it does not establish whether the physical
+source oscillator continues in every low-power state. The source clock remains
+calibrated.
+
+The separate ninth IRQ uses the same internal bit but a different register
+contract. Both v6.00 (`0x2af3f8..0x2af400`) and v5.01
+(`0x2ac824..0x2ac82c`) read `0x0c.bit5` as pending and write `0x40` to
+acknowledge it. The old model incorrectly treated bit 6 as a local mask and
+mapped acknowledgement to bit 5; the cross-ROM dispatcher decode corrects
+both errors. No recovered component asserts IRQ line 8, and no ordinary or
+focused run observes it, so this establishes register semantics but not the
+physical source, ownership, or delivery timing.
 
 ## Extraction gate
 
@@ -111,8 +129,14 @@ the gate through separate callbacks, two-ROM traces and focused regression.
 `make verify-mad2-clocks` provides the paired-ROM boot contract. v6.00 and
 v5.01 read reset cause `0x01` and complete the peripheral clock-gate lifecycle
 `0x00 -> 0x0c -> 0x2c -> 0x0c`. Bit 5 is the SIMI clock gate, not an ARM sleep
-selector; the gated controller freezes delivery while retaining protocol and
-FIFO state. Ordinary boot does not execute the Timer-1 readers, so their
+selector; MAD2 now exposes it as a device callback, and the gated controller
+freezes delivery while retaining protocol and FIFO state. The callback is
+replayed after save-state restore so the attached clock line cannot diverge
+from the retained MAD2 latch. Bits 2--3 are enabled together by the common
+peripheral initializer and are never cleared by either ROM. Bit 6 occurs only
+inside a SIMI variant-control helper; this establishes ownership but not an
+effect worth synthesizing. Bit 4 has no writer in the complete direct census.
+Ordinary boot does not execute the Timer-1 readers, so their
 contract is established by paired static decode and the focused accelerated
 controller test rather than the boot trace. It also performs no MAD2-watchdog
 write in the bounded run; recovered `0x31` service sites are conditional, not a
@@ -130,12 +154,12 @@ model.
 `make verify-mad2-sleep` validates this contract on both ROMs with an MMIO
 controller fixture: Timer 1 continues while the ARM is suspended, reaches
 destination `0x7fff`, raises FIQ5 and wakes the CPU. Each run saves and reloads
-while asleep and reproduces the same wake. A separate v6.00 case uses a
-physical Up-key edge and proves external IRQ0 wake. These fixtures manipulate
-only mapped controller registers and physical inputs; they do not write
-firmware RAM or messages. The current normalized boot does not naturally
-execute task 0's stop request, so this gate proves controller semantics rather
-than claiming an observed idle duty cycle.
+while asleep and reproduces the same wake. Separate v6.00 cases prove external
+IRQ0 wake from a physical Up-key edge and extended-FIQ wake from an enabled
+FIQ8 tick. These fixtures manipulate only mapped controller registers and
+physical inputs; they do not write firmware RAM or messages. The current
+normalized boot does not naturally execute task 0's stop request, so this gate
+proves controller semantics rather than claiming an observed idle duty cycle.
 
 `make verify-mad2-timer1` proves destination `0x7fff`, FIQ5/status `0x020` and
 firmware acknowledgement. `make verify-mad2-reset` runs two mapped-MMIO
@@ -143,15 +167,19 @@ fixtures. Reset-control bit 2 causes a complete digital-baseband restart and
 retains reset cause `0x05`; MAD2-watchdog expiry resets the same domain and
 retains cause `0x03`. Flash, EEPROM and CCONT remain outside that domain.
 CCONT watchdog expiry uses the same reset extent with its own retained cause.
-Exact rail sequencing and clock-gate bits without identified consumers remain
-unresolved.
+Exact rail sequencing, oscillator start latency, the SIMI bit-6 effect and the
+peripherals fed by the boot-only bit-2/bit-3 pair remain unresolved.
 
 The CCONT power-domain gate establishes one reset boundary separately from the
 reset-control register. Watchdog-register data `0x00` holds the digital
 baseband off; a later charger edge resets the CPU, MAD2, GENSIO, MBUS, DSPIF,
 SIMI and LCD domains together while CCONT and nonvolatile storage persist.
 Both 3210 ROMs restart through MAD2 reset value `0x01`, consume CCONT charger
-cause `0x04` and reach acting-dead mode. Exact rail sequencing remains unknown.
+cause `0x04` and reach acting-dead mode. With the scripted four-second power
+hold, v6.00 removes the rail at about 14.03 emulated seconds; the charger-wake
+fixture therefore applies its external edge at 16 seconds. That is a bounded
+firmware-lifecycle observation, not a claimed physical rail-settling time.
+Exact electrical sequencing remains unknown.
 
 The MAD2-ledger MAME category (`RUN_VERBOSE=1`) provides a curated register-access pass: at most
 one read and one write record per MAD2 byte
@@ -185,7 +213,7 @@ write-one-clear contract. Runtime assertion, status and acknowledgement all
 establish FIQ bit `0x10`; the earlier `0x04` assignment is retained only as a
 falsification in the evidence ledger.
 The NSE-8/9 system-module documentation establishes a 13 MHz ARM clock and a
-nominal 32 kHz sleep-clock input to MAD2PR1, and states that MCU/DSP clocks stop
+32.768 kHz sleep-clock input to MAD2PR1, and states that MCU/DSP clocks stop
 in sleep while the sleep clock remains active. It does not document the
 internal timer divider tree. The paired ROMs prove the functional relation
 instead:
@@ -193,14 +221,18 @@ Timer 0 uses programmed divider `0xf9` (`250` source ticks per counter tick),
 while timeout code compares its remaining interval with
 `round(Timer1_remaining / 8)`. The current `33,055 Hz` Timer-0 source and
 `1,057 Hz` Timer-1 rate preserve that observed relation within calibration
-error and keep the boot lifecycle coherent. A primary source is still needed
-to establish the exact oscillator/dividers. Using the 13 MHz ARM
-clock directly as Timer 0's input is disproven: it starves task 2 and expires
-CCONT at 49 seconds. No scheduler wake or firmware state is synthesized;
+error and keep the boot lifecycle coherent. Applying 32.768 kHz directly to
+Timer 1 and the ratio-derived 1.024 MHz to Timer 0 passes the isolated timer and
+sleep gates but drives coherent firmware into repeated terminal reset reason
+`0x6c` at about four seconds. This disproves the direct-input assignment, not
+the external crystal: at least one undocumented internal divider remains.
+Using the 13 MHz ARM clock directly as Timer 0's input is independently
+disproven because it starves task 2 and expires CCONT at 49 seconds. No
+scheduler wake or firmware state is synthesized;
 The former process-environment clock overrides have been removed; conformance
 fixtures now exercise the configured product clocks through mapped registers.
 Timer 1 runs independently at the retained `1,057 Hz` calibration, reaches
-fixed destination `0x7fff`, raises FIQ5 and wraps in the 15-bit domain.
+terminal count `0x7fff`, raises FIQ5 and wraps to zero on the next tick.
 Both timers remain active while the ARM clock is stopped, consistent with the
 sleep-clock domain; this establishes domain ownership but not the exact divider
 ratios. Catch-up remains disabled, and none of this establishes other MAD2

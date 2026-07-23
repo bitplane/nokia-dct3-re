@@ -66,7 +66,7 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
    into the transport.
 2. Move the 3410 B3 adapter's partitioned read-while-write and erase-suspend
    behavior into MAME's generic flash core when that core can express it.
-3. Recover MAD2's remaining divider, transition, extended-interrupt, and rail
+3. Recover MAD2's remaining divider, transition, ninth-IRQ ownership, and rail
    contracts before extracting additional uncertain register windows.
 4. Replace calibrated HLE timing only with measured hardware behavior or
    cross-ROM protocol evidence; declared calibration is preferable to invented

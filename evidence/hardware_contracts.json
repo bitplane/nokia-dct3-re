@@ -54,12 +54,12 @@
     },
     {
       "id": "mad2_reset_clock_boot_sequence", "subsystem": "system_controller", "status": "mapped", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share reset-cause reads, organic watchdog reloads of 0x31, and the peripheral clock-gate lifecycle 0x00-to-0x0c-to-0x2c-to-0x0c; static decode maps bit 5 to SIM activation and shutdown, while other bits and ARM sleep remain unknown, and neither ROM accesses timer-1 registers during boot",
+      "boundary": "3210 v6.00 and v5.01 share reset-cause reads, organic watchdog reloads of 0x31, and the peripheral clock-gate lifecycle 0x00-to-0x0c-to-0x2c-to-0x0c; the complete paired-ROM census assigns bit 1 to ARM clock-stop, bits 5-6 exclusively to SIMI routines and bits 2-3 to a boot-only common enable, while bit 4 has no writer; bit 5 drives the extracted SIMI clock callback, but bit 6, the bit-2/bit-3 consumers and physical transition timing remain unresolved",
       "evidence": ["docs/mad2_fidelity.md", "tools/mad2_clock_trace_check.py"]
     },
     {
       "id": "mad2_interrupt_aggregation", "subsystem": "interrupts", "status": "partial", "confidence": "strong",
-      "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component sources onto ARM lines; focused fixtures validate simultaneous keypad IRQ0/CCONT IRQ2 without destructive acknowledgement, pending retention across masks, immediate delivery on unmask/global enable, and FIQ8 ninth-bit projection/mask/ack routing; extended IRQ ownership and several line assignments remain unvalidated",
+      "boundary": "MAD2 retains IRQ/FIQ pending and mask state and aggregates modeled component sources onto ARM lines; focused fixtures validate simultaneous keypad IRQ0/CCONT IRQ2 without destructive acknowledgement, pending retention across masks, immediate delivery on unmask/global enable, and FIQ8 ninth-bit projection/mask/ack routing; both 3210 ROMs independently establish that the separate ninth IRQ is read at 0x0c.bit5 and acknowledged by writing bit 6, but its physical owner and several other line assignments remain unvalidated",
       "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
     },
     {

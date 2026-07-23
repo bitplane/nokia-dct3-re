@@ -48,14 +48,16 @@ hardware activity remain protected.
 EEPROM profile and checks `oracles/noki3210-v501-smoke.struct`.
 `make verify-mad2-interrupts` runs three non-oracle controller conformance
 fixtures: overlapping physical keypad/charger sources, an IRQ held pending
-behind its masks, and register-enabled extended FIQ8 routing. The fixtures use
+behind its masks, and register-enabled extended FIQ8 routing. The separate
+`make verify-mad2-sleep` gate covers Timer-1, keypad and FIQ8 wake from MAD2
+clock-stop. The fixtures use
 only input ports and mapped MAD2 registers; their bounded trace checker does
 not treat timing-sensitive interrupt totals as structural-oracle fields.
 `make verify-mad2-clocks` checks both 3210 ROMs against reset-cause reads and
 the SIM peripheral-clock lifecycle, while recording that MAD2-watchdog service
 is conditional rather than part of ordinary boot. Ordinary boot
 does not execute the Timer-1 readers. `make verify-mad2-timer1` accelerates only
-the hardware timebase and proves destination/FIQ5/acknowledgement; paired static
+the hardware timebase and proves terminal-count/FIQ5/acknowledgement; paired static
 decode proves the same Timer-1 algorithm in both ROMs. `make verify-mad2-reset`
 uses mapped controller MMIO to prove both the software-reset and watchdog-expiry
 paths, their shared digital-baseband domain, and their distinct retained causes.

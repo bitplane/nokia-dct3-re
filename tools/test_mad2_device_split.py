@@ -37,10 +37,10 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn("m_regs[0x20]", self.header)
         self.assertIn("offset & 0x1f", self.header)
 
-    def test_timer1_is_15_bit_and_interrupts_at_destination(self):
+    def test_timer1_wraps_at_terminal_count_and_interrupts_at_destination(self):
         callback = self.device.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)", 1)[1]
         callback = callback.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::fiq8_tick)", 1)[0]
-        self.assertIn("(m_timer1_counter + 1) & 0x7fff", callback)
+        self.assertIn("m_timer1_counter = (m_timer1_counter + 1) & m_timer1_destination;", callback)
         self.assertIn("m_timer1_counter == m_timer1_destination", callback)
         self.assertIn("assert_fiq(5);", callback)
         self.assertIn("m_mad2->set_timer1_hz(1'057);", self.phone)
@@ -57,6 +57,20 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn('leave_sleep("FIQ")', self.device)
         self.assertIn('leave_sleep("IRQ")', self.device)
         self.assertIn("m_sleep_cb(m_sleeping ? 1 : 0)", self.device)
+
+    def test_mad2_owns_the_proven_simi_clock_output(self):
+        self.assertIn("auto simi_clock_cb()", self.header)
+        self.assertIn("m_simi_clock_cb(BIT(m_regs[offset], 5))", self.device)
+        self.assertIn("m_simi_clock_cb(BIT(m_regs[0x0d], 5))", self.device)
+        self.assertIn("m_mad2->simi_clock_cb().set(m_simi", self.phone)
+
+    def test_extended_irq_uses_cross_rom_status_and_ack_bits(self):
+        self.assertIn("constexpr u8 EXT_IRQ_STATUS = 0x20;", self.device)
+        self.assertIn("constexpr u8 EXT_IRQ_ACK = 0x40;", self.device)
+        self.assertIn("(m_irq_status & LINE_EXTENDED) ? EXT_IRQ_STATUS : 0", self.device)
+        self.assertIn("if (data == EXT_IRQ_ACK)", self.device)
+        self.assertIn("ack_irq(LINE_EXTENDED);", self.device)
+        self.assertNotIn("EXT_IRQ_MASK", self.device)
 
     def test_reset_control_requests_the_board_reset_domain(self):
         self.assertIn("auto reset_cb()", self.header)

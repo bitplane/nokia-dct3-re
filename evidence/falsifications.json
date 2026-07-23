@@ -573,10 +573,22 @@
       "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
     },
     {
+      "id": "mad2_timer1_direct_sleep_clock", "status": "disproven",
+      "hypothesis": "MAD2 Timer 1 consumes the board 32.768 kHz sleep clock directly, implying a 1.024 MHz Timer-0 source from the paired-ROM divide-by-eight relation and the modeled divide-by-250 stage",
+      "conclusion": "The rates preserve the decoded counter-domain ratio and pass the isolated Timer-1 and sleep/wake gates, but a coherent 3210 v6.00 boot reaches terminal reset reason 0x6c at about four seconds and repeats. The service documentation establishes the external 32.768 kHz clock but not the internal CTSI divider tree. Timer 0 and/or Timer 1 therefore receives an additional undocumented division; the retained 33,055 Hz and 1,057 Hz rates remain explicit calibrations.",
+      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
+    },
+    {
       "id": "task17_selected_terminal_needs_result_one", "status": "disproven",
       "hypothesis": "The selected mode-0x50 search must reach one of task 17's result-one writers instead of zero-result writer 0x226b8a before ordinary registration can begin",
       "conclusion": "Task-15 consumer 0x209efc stores the 0x09ec payload byte in selection state 0x10fe49 and sets its associated active-selection boolean only when the byte equals one. Coherent task-17 result watches show the one writers during intermediate active-selection lifecycles and zero writer 0x226b8a at completed finite-search terminals. Zero is the correct completed-selection result. The remaining registration boundary is the firmware-owned RR continuation after the subsequent coherent cleanup, not an alternate search outcome or result-byte value.",
       "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
+    },
+    {
+      "id": "mad2_timer1_free_runs_past_destination", "status": "disproven",
+      "hypothesis": "MAD2 Timer 1 is a free-running 16-bit counter and 0x7fff is only a compare destination",
+      "conclusion": "The isolated destination/FIQ5 and sleep gates cannot distinguish a terminal counter from a free-running one. In the 35-second coherent power fixture, allowing current to pass 0x7fff produces no CCONT power-off or charger-originated restart because firmware computes unsigned destination-current intervals. Wrapping to zero after terminal 0x7fff restores rail removal at about 14.03 seconds and the subsequent organic wake sequence. The register pair is therefore modeled as current plus terminal count, not current plus a non-wrapping compare point.",
+      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md", "tools/charger_wake_check.py"]
     }
   ]
 }

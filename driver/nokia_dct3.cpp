@@ -1020,9 +1020,6 @@ void nokia_dct3_state::mad2_register_w(offs_t offset, uint8_t data)
 	else
 		m_mad2_regs[offset] = data;
 
-	if (offset == MAD2_CLOCK_CTRL)
-		m_simi->set_clock_enabled(BIT(data, 5));
-
 	if (offset == MAD2_SIM_TXD && m_simi->enabled())
 		m_simi->txd_w(data);
 	else if (offset == MAD2_SIM_IIR && m_simi->enabled())
@@ -1393,6 +1390,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_mad2->irq_ack_cb().set(FUNC(nokia_dct3_state::mad2_irq_ack_w));
 	m_mad2->reset_cb().set(FUNC(nokia_dct3_state::mad2_reset_w));
 	m_mad2->sleep_cb().set(FUNC(nokia_dct3_state::mad2_sleep_w));
+	m_mad2->simi_clock_cb().set(m_simi, FUNC(nokia_simi_device::set_clock_enabled));
 	NOKIA_KBGPIO(config, m_kbgpio);
 	m_kbgpio->matrix_cb(0).set_ioport("COL.0");
 	m_kbgpio->matrix_cb(1).set_ioport("COL.1");

@@ -11,9 +11,12 @@ reads; and ten read-modify-write sites for the peripheral clock register. The
 paired Timer-1 routines use FIQ5 as their destination race signal and compare
 `round((destination - current) / 8)` with Timer 0's remaining post-divider
 interval. The ten clock-register RMW sites are also instruction-equivalent:
-boot sets bits 2--3; SIM lifecycle code sets/clears bits 5--6; and the only
+boot sets bits 2--3 once and never clears them; SIMI code exclusively owns
+bit 5 and the variant-specific bit-6 pair; and the only
 task-0 power-clock helper writes `(old | 0x02) & 0xfe`. Its bit 1 is a
 one-shot clock-stop request, not retained state; bit 0 is always cleared.
+Bit 5 is attached to the extracted SIMI clock input. Bit 6 remains a SIMI-owned
+auxiliary control without an established device-side effect.
 The detailed tables below are reproducibility data, not additional
 semantic claims.
 

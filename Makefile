@@ -655,7 +655,11 @@ verify-mad2-sleep:
 		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_keypad/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_keypad/error.log --source keypad
-	@echo "OK — MAD2 clock stop, sleep-counter wake, external-key wake and sleep-state restore reproduced"
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_fiq8 SECONDS=1 \
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2005 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=fiq8'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_fiq8/error.log
+	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_fiq8/error.log --source fiq8
+	@echo "OK — MAD2 clock stop, Timer-1/FIQ8/keypad wake and sleep-state restore reproduced"
 
 verify-mad2-timer1:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1
@@ -755,7 +759,7 @@ verify-charger-lifecycle:
 
 verify-charger-wake:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_wake SECONDS=35 \
-		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=13 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
+		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=16 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_wake/error.log
 	$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)_charger_wake/error.log \
 		$(RUN_DIR)_charger_wake/boot_summary.txt

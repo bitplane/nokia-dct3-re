@@ -59,8 +59,9 @@ void nokia_simi_device::device_reset()
 	m_tx_fifo_control = 0;
 }
 
-void nokia_simi_device::set_clock_enabled(bool enabled)
+void nokia_simi_device::set_clock_enabled(int state)
 {
+	const bool enabled = bool(state);
 	if (m_clock_enabled == enabled)
 		return;
 	m_clock_enabled = enabled;

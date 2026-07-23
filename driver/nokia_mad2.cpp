@@ -15,7 +15,8 @@ namespace {
 constexpr u16 LINE_EXTENDED = 0x100;
 constexpr u8 FIQ_ENABLE = 0x01;
 constexpr u8 IRQ_ENABLE = 0x04;
-constexpr u8 EXT_IRQ_MASK = 0x40;
+constexpr u8 EXT_IRQ_STATUS = 0x20;
+constexpr u8 EXT_IRQ_ACK = 0x40;
 constexpr u8 FIQ8_MASK = 0x04;
 constexpr u16 TIMER0_FIQ = u16(1) << 4;
 }
@@ -27,7 +28,8 @@ nokia_mad2_device::nokia_mad2_device(
 	m_irq_cb(*this),
 	m_irq_ack_cb(*this),
 	m_reset_cb(*this),
-	m_sleep_cb(*this)
+	m_sleep_cb(*this),
+	m_simi_clock_cb(*this)
 {
 }
 
@@ -75,6 +77,7 @@ void nokia_mad2_device::device_reset()
 	m_fiq_cb(0);
 	m_irq_cb(0);
 	m_sleep_cb(0);
+	m_simi_clock_cb(0);
 	m_timer0->adjust(attotime::from_hz(m_timer0_hz), 0, attotime::from_hz(m_timer0_hz));
 	m_timer1->adjust(attotime::from_hz(m_timer1_hz), 0, attotime::from_hz(m_timer1_hz));
 	m_fiq8->adjust(attotime::from_hz(m_fiq8_hz), 0, attotime::from_hz(m_fiq8_hz));
@@ -99,17 +102,16 @@ u8 nokia_mad2_device::read(offs_t offset)
 			return m_regs[offset] & ~0x10;
 		}
 		return m_regs[offset];
-	// Timer 1 is a 15-bit free-running sleep counter. The paired ROMs read its
-	// fixed destination at 0x06 and guard the destination-current subtraction
-	// with FIQ5, so the destination is hardware state rather than a writable
-	// firmware latch.
+	// Timer 1 counts through its fixed terminal destination and then wraps. The
+	// paired ROMs guard destination-current arithmetic with FIQ5, so the
+	// destination is hardware state rather than a writable firmware latch.
 	case 0x04: return m_timer1_counter >> 8;
 	case 0x05: return m_timer1_counter;
 	case 0x06: return m_timer1_destination >> 8;
 	case 0x07: return m_timer1_destination;
 	case 0x08: return m_fiq_status;
 	case 0x09: return m_irq_status;
-	case 0x0c: return (m_regs[offset] & ~0x20) | ((m_irq_status >> 3) & 0x20);
+	case 0x0c: return (m_regs[offset] & ~EXT_IRQ_STATUS) | ((m_irq_status & LINE_EXTENDED) ? EXT_IRQ_STATUS : 0);
 	case 0x10: return m_timer0_counter >> 8;
 	case 0x11: return m_timer0_counter;
 	case 0x16:
@@ -129,7 +131,8 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 {
 	offset &= 0x1f;
 	const u8 old = m_regs[offset];
-	m_regs[offset] = data;
+	if (offset != 0x0c)
+		m_regs[offset] = data;
 	switch (offset)
 	{
 	case 0x01:
@@ -144,7 +147,14 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 	case 0x0a: update_fiq_line(); break;
 	case 0x0b: update_irq_line(); break;
 	case 0x0c:
-		ack_irq((data << 3) & LINE_EXTENDED);
+		// Both 3210 IRQ dispatchers read bit 5 as the ninth pending IRQ and
+		// write 0x40 as its acknowledgement command.  The dispatcher writes
+		// only that command byte, so it must not replace the retained global
+		// IRQ/FIQ enable bits in the control latch.
+		if (data == EXT_IRQ_ACK)
+			ack_irq(LINE_EXTENDED);
+		else
+			m_regs[offset] = data & ~(EXT_IRQ_STATUS | EXT_IRQ_ACK);
 		update_fiq_line();
 		update_irq_line();
 		break;
@@ -155,6 +165,7 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 		// masking every interrupt. It is therefore a command, not retained
 		// clock-selection state. Other bits remain ordinary peripheral gates.
 		m_regs[offset] = data & ~0x02;
+		m_simi_clock_cb(BIT(m_regs[offset], 5));
 		if (BIT(data, 1))
 			enter_sleep();
 		break;
@@ -261,7 +272,7 @@ void nokia_mad2_device::update_irq_line()
 	if (m_regs[0x0c] & IRQ_ENABLE)
 	{
 		active = (m_irq_status & ~m_regs[0x0b] & 0xff) != 0;
-		if ((m_irq_status & LINE_EXTENDED) && !(m_regs[0x0c] & EXT_IRQ_MASK))
+		if (m_irq_status & LINE_EXTENDED)
 			active = true;
 	}
 	if (active != m_irq_line_state && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
@@ -309,6 +320,7 @@ void nokia_mad2_device::restore_outputs()
 	update_fiq_line();
 	update_irq_line();
 	m_sleep_cb(m_sleeping ? 1 : 0);
+	m_simi_clock_cb(BIT(m_regs[0x0d], 5));
 }
 
 bool nokia_mad2_device::timer0_compare_due() const
@@ -348,10 +360,11 @@ TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer0_tick)
 
 TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)
 {
-	// MADos treats the timebase as 15-bit. Nokia's paired ROMs use FIQ5 as the
-	// race indication for destination-current calculations and acknowledge it
-	// through CTSI status bit 0x20.
-	m_timer1_counter = (m_timer1_counter + 1) & 0x7fff;
+	// Nokia's paired ROMs use FIQ5 as the race indication for terminal-count
+	// destination-current calculations and acknowledge it through CTSI status
+	// bit 0x20. Keeping current within 0x0000..destination is load-bearing for
+	// the shutdown timers that consume the unsigned remaining interval.
+	m_timer1_counter = (m_timer1_counter + 1) & m_timer1_destination;
 	if (m_timer1_counter == m_timer1_destination)
 	{
 		assert_fiq(5);

@@ -112,21 +112,23 @@ profile; — = not established.
 | `0x00` | ASIC version (r, → `0x40`) | ✓ |
 | `0x01/0x02` | MCU / **DSP** reset control | ✓ |
 | `0x03` | ASIC watchdog write | ✓ |
-| `0x04/0x05` | timer-1 15-bit current counter MSB/LSB | paired-ROM decode + focused FIQ5 test |
-| `0x06/0x07` | timer-1 fixed destination MSB/LSB | `0x7fff`; paired-ROM stable-read/race contract |
+| `0x04/0x05` | timer-1 current counter MSB/LSB | wraps after terminal `0x7fff`; paired-ROM decode + organic shutdown regression |
+| `0x06/0x07` | timer-1 fixed terminal count MSB/LSB | `0x7fff`; paired-ROM stable-read/race contract |
 | `0x08/0x09` | FIQ / **IRQ lines active** | ✓ |
 | `0x0a/0x0b` | FIQ / IRQ mask | ✓ |
-| `0x0c` | interrupt control | ✓ |
-| `0x0d` | clock control; bit 1 pulses ARM clock-stop, bit 5 gates the SIM clock | ✓ |
+| `0x0c` | interrupt control; bit 5 ninth-IRQ status, write bit 6 ninth-IRQ acknowledge | paired-ROM decode; source unknown |
+| `0x0d` | clock control; bit 1 pulses ARM clock-stop, bits 5--6 are SIMI-owned, with bit 5 wired to its clock input | paired-ROM decode; bit-6 effect unknown |
 | `0x0e` | **interrupt trigger** (r; read-only — why `assert_irq(4)` can't be SW-triggered) | ✓ |
 | `0x0f–0x13` | programmable timer (divider/counter/compare) | ✓ |
 
 Timer 0's divider/counter/compare behavior is modeled with the retained
 33,055 Hz CTSI calibration. At divider `0xf9`, paired-ROM timeout code equates
 its post-divider interval with Timer-1 intervals divided by eight. Timer 1 is a
-separate 15-bit 1,057 Hz calibrated counter with fixed destination `0x7fff` and
-FIQ5 at destination. Service documentation establishes only the nominal 32 kHz
-source, so the absolute internal divider tree remains open.
+separate 1,057 Hz calibrated counter with terminal count `0x7fff`, FIQ5 at the
+terminal and wrap to zero on the following tick. Service documentation establishes the external
+32.768 kHz source but not the internal divider tree. Applying that rate directly
+to Timer 1 and the ratio-derived 1.024 MHz to Timer 0 drives coherent firmware
+to reset reason `0x6c`, so the absolute internal dividers remain open.
 
 Paired-ROM task-0 and shutdown code pulse `0x0d.bit1` to stop the ARM clock;
 the bit self-clears rather than selecting a retained clock domain. Timer 0 and
@@ -136,6 +138,18 @@ Timer-1/FIQ5 and physical-key/IRQ0 wake plus save/load while suspended. The
 current normalized boot does not reach task 0's idle request, so physical sleep
 duty cycle and oscillator transition latency remain unmeasured.
 
+The complete paired-ROM write census also bounds the retained gate bits. A
+common initializer sets bits 2--3 once, SIMI routines exclusively manipulate
+bits 5--6, and no site writes bit 4. Only bit 5 has an evidenced attached
+effect, so MAD2 drives the SIMI device through a clock callback. The auxiliary
+bit-6 effect and the peripherals clocked by bits 2--3 remain open rather than
+being inferred from their positions.
+
+Both 3210 IRQ dispatchers read `0x0c.bit5` as the ninth IRQ pending indication
+and acknowledge it by writing `0x40`. No recovered component or normalized run
+asserts that source, so the register grammar is cross-ROM evidence while the
+physical owner remains deliberately unassigned.
+
 ### PUP — MBUS, vibrator, buzzer, GenIO
 `nokia_pup_device` owns control `0x15`, vibrator/buzzer `0x1b..0x1e` and the
 sparse GenIO `0x20/0x22/0x24` family. External EEPROM pins, beeper and vibra
@@ -143,7 +157,7 @@ output remain callback-connected board components; `0x22` is retained only as
 a latch.
 | off | reg | status / touch |
 |---|---|---|
-| `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable, bit 4 optional vibra-pack enable; periodic FIQ8 remains provisional ✓ |
+| `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable, bit 4 optional vibra-pack enable; periodic FIQ8 routing and clock-stop wake are tested, source rate remains provisional ✓ |
 | `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | extracted controller with byte attachment, FIQ2 RX/TX lifecycle and 9,600-baud character timing; no bus peer ✓ |
 | `0x1b` | vibrator frequency/mode | stored independently of the `0x15.bit4` enable; MAME `vibration` output and mapped-MMIO gate test ✓ |
 | `0x1c/0x1d` | buzzer divider high/low | MZT-03C square-wave frequency = 13 MHz / divider |
@@ -252,7 +266,10 @@ controller route through mode `0x000c` into acting-dead mode `0x0005`.
 Post-power-off charger insertion now restores the complete MAD2 digital domain.
 CCONT retains power and exposes reset-cause bit 2; both 3210 ROMs restart,
 sample the connected VCHAR input and settle in acting-dead mode `0x0005`.
-Battery-voltage/current evolution and physical rail timing remain unmodeled.
+The scripted v6.00 lifecycle removes the rail at about 14.03 seconds and the
+focused gate supplies its charger edge at 16 seconds. This bounds fixture
+ordering only; battery-voltage/current evolution and physical rail timing
+remain unmodeled.
 
 ## The DSP interface
 

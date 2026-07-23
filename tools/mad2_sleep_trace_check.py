@@ -23,7 +23,7 @@ def check(log_text, source, summary_text=None):
 	wakes = list(WAKE.finditer(log_text))
 	if len(requests) != 1:
 		errors.append(f"expected one clock-stop request, observed {len(requests)}")
-	expected_domain = "FIQ" if source == "timer1" else "IRQ"
+	expected_domain = "IRQ" if source == "keypad" else "FIQ"
 	matching = [wake for wake in wakes if wake.group("domain") == expected_domain]
 	if not matching:
 		errors.append(f"no {expected_domain} wake followed the clock-stop request")
@@ -34,7 +34,9 @@ def check(log_text, source, summary_text=None):
 			errors.append("Timer-1 wake did not carry FIQ5/status bit 0x020")
 		if int(matching[0].group("timer1"), 16) == int(requests[0].group("timer1"), 16):
 			errors.append("Timer-1 did not advance to the programmed wake destination")
-	if matching and requests:
+	if matching and source == "fiq8" and not (int(matching[0].group("fiq"), 16) & 0x100):
+		errors.append("FIQ8 wake did not carry extended FIQ/status bit 0x100")
+	if matching and requests and source != "fiq8":
 		request_timer0 = int(requests[0].group("timer0"), 16)
 		wake_timer0 = int(matching[0].group("timer0"), 16)
 		if request_timer0 == wake_timer0:
@@ -60,7 +62,7 @@ def check(log_text, source, summary_text=None):
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("log", type=Path)
-	parser.add_argument("--source", choices=("timer1", "keypad"), required=True)
+	parser.add_argument("--source", choices=("timer1", "keypad", "fiq8"), required=True)
 	parser.add_argument("--summary", type=Path)
 	args = parser.parse_args()
 	errors = check(args.log.read_text(errors="replace"), args.source,

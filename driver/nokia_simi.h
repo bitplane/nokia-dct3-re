@@ -15,7 +15,7 @@ public:
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
 	bool enabled() const { return m_enabled; }
-	void set_clock_enabled(bool enabled);
+	void set_clock_enabled(int state);
 	bool clock_enabled() const { return m_clock_enabled; }
 
 	u8 control_r() const;
