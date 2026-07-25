@@ -70,24 +70,55 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn(
             "stream_alloc(microphone_inputs, audio_outputs, pcm_rate)", cobba
         )
-        self.assertIn("stream.get(m_selected_microphone, index)", cobba)
-        self.assertIn('MICROPHONE(config, "microphone", 1)', phone)
-        self.assertIn("nokia_cobba_device::mic2", phone)
-        self.assertIn("nokia_cobba_device::ear", phone)
-        self.assertIn("set_hle_internal_voice_route(", phone)
-        self.assertIn("must never write these pins", phone)
+        self.assertIn("stream.get(m_hle_microphone, index)", cobba)
+        base = phone[
+            phone.index("void nokia_dct3_state::dct3_base"):
+            phone.index("void nokia_dct3_state::noki3310")
+        ]
+        nse8 = phone[
+            phone.index("void nokia_dct3_state::noki3210"):
+            phone.index("void nokia_dct3_state::noki5210")
+        ]
+        self.assertNotIn('MICROPHONE(config, "microphone", 1)', base)
+        self.assertNotIn("m_cobba->add_route", base)
+        self.assertIn('MICROPHONE(config, "microphone", 1)', nse8)
+        self.assertIn("nokia_cobba_device::mic2", nse8)
+        self.assertIn("nokia_cobba_device::ear", nse8)
+        self.assertIn("set_hle_voice_profile(", phone)
+        self.assertIn("must never mutate this fallback", phone)
         self.assertNotIn("block.fill(0)", cobba)
 
     def test_nse8_analogue_gains_are_product_configuration(self):
         cobba = (ROOT / "driver/nokia_cobba.cpp").read_text()
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
-        self.assertIn("m_microphone_gain_db / 20.0F", cobba)
-        self.assertIn("m_earpiece_gain_db / 20.0F", cobba)
-        self.assertIn("cobba_internal_microphone_gain_db = 18.0F", phone)
-        self.assertIn("cobba_internal_earpiece_gain_db = -10.0F", phone)
-        self.assertIn("cobba_pcm_sample_bits = 13", phone)
-        self.assertIn("set_internal_voice_gains(", phone)
-        self.assertIn("set_pcm_sample_bits(product.cobba_pcm_sample_bits)", phone)
+        self.assertIn("m_hle_microphone_gain_db / 20.0F", cobba)
+        self.assertIn("m_hle_output_gain_db / 20.0F", cobba)
+        self.assertIn("cobba_hle_voice.microphone_gain_db = 18.0F", phone)
+        self.assertIn("cobba_hle_voice.output_gain_db = -10.0F", phone)
+        self.assertIn("cobba_pcm.sample_bits = 13", phone)
+        self.assertIn("set_hle_voice_profile(", phone)
+        self.assertIn("set_pcm_sample_bits(product.cobba_pcm.sample_bits)", phone)
+
+    def test_audio_profiles_are_grouped_and_configuration_only(self):
+        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        pcm = (ROOT / "driver/nokia_mad2_pcm.h").read_text()
+        cobba = (ROOT / "driver/nokia_cobba.h").read_text()
+        runtime = "".join(
+            (ROOT / path).read_text()
+            for path in (
+                "driver/nokia_dsp_hle.cpp",
+                "driver/nokia_radio_peer.cpp",
+                "driver/nokia_gsm_session.cpp",
+            )
+        )
+        self.assertIn("struct bus_profile", pcm)
+        self.assertIn("struct hle_voice_profile", cobba)
+        self.assertIn("bus_profile cobba_pcm", phone)
+        self.assertIn("hle_voice_profile cobba_hle_voice", phone)
+        self.assertNotIn("cobba_pcm_data_clock", phone)
+        self.assertNotIn("cobba_hle_voice_microphone", phone)
+        self.assertEqual(phone.count("set_hle_voice_profile("), 1)
+        self.assertNotIn("set_hle_voice_profile", runtime)
 
     def test_cobba_control_transport_is_separate_and_opaque(self):
         header = (ROOT / "driver/nokia_cobba.h").read_text()

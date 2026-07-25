@@ -732,15 +732,17 @@ The edge convention is corroborated by Nokia's
 COBBA owns the 8 kHz converter stream and bounded queues on both sides. Its
 sound interface exposes the documented three differential microphone pins
 MIC1/MIC2/MIC3 and the separate EAR and HF outputs. NSE-8 board composition
-wires the machine's generic physical microphone specifically to MIC2 and the
-speaker specifically to EAR; other products do not inherit those connections.
+wires MAME's host-facing physical microphone endpoint specifically to MIC2
+and its receiver speaker specifically to EAR; other products do not inherit
+those connections.
 Only COBBA converts those samples into uplink PCM. With no host capture source
 the pin naturally yields silence; no DSP or call fixture injects samples.
 NSE-8 product configuration supplies the HLE internal-call MIC2/EAR path and
 applies the service manual's nominal +18 dB/-10 dB transfer. The API is named
-`set_hle_internal_voice_route` to make its status explicit: it describes the
-product's internal handset path while the real DSP backend is absent, not a
-decoded power-on register value or firmware-selected mux transaction. The
+`set_hle_voice_profile` to make its status explicit: it describes the
+product's internal handset path and nominal gains while the real DSP backend
+is absent, not a decoded power-on register value or firmware-selected mux
+transaction. The
 still unknown DSP control-register encoding is not synthesized, and MCU call
 state never writes this route. Accessory-driven runtime changes remain pending
 recovery of COBBA's control bits.

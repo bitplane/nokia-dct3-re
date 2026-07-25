@@ -14,24 +14,30 @@ class nokia_mad2_pcm_device : public device_t
 {
 public:
 	using pcm_block = nokia_cobba_device::pcm_block;
+	enum class clock_edge : u8 { rising, falling };
+	struct bus_profile
+	{
+		u32 data_clock = 0;
+		u32 frame_clock = 0;
+		u8 sample_bits = 0;
+		u8 sync_clocks = 0;
+		u8 word_clocks = 0;
+		bool msb_first = true;
+		clock_edge data_edge = clock_edge::falling;
+	};
 
 	nokia_mad2_pcm_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
-	void set_clock_rates(u32 data_clock, u32 frame_clock)
+	void set_bus_profile(bus_profile const &profile)
 	{
-		m_data_clock = data_clock;
-		m_frame_clock = frame_clock;
-	}
-	void set_sample_bits(u8 bits) { m_sample_bits = bits; }
-	enum class clock_edge : u8 { rising, falling };
-	void set_frame_format(u8 sync_clocks, u8 word_clocks,
-			bool msb_first, clock_edge data_edge)
-	{
-		m_sync_clocks = sync_clocks;
-		m_word_clocks = word_clocks;
-		m_msb_first = msb_first;
-		m_data_edge = u8(data_edge);
+		m_data_clock = profile.data_clock;
+		m_frame_clock = profile.frame_clock;
+		m_sample_bits = profile.sample_bits;
+		m_sync_clocks = profile.sync_clocks;
+		m_word_clocks = profile.word_clocks;
+		m_msb_first = profile.msb_first;
+		m_data_edge = u8(profile.data_edge);
 	}
 	bool transfer_frame_block(
 			const pcm_block &dsp_to_cobba, pcm_block &cobba_to_dsp);

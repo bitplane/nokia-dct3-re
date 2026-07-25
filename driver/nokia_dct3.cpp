@@ -123,18 +123,8 @@ struct nokia_product_config
 	u8 dsp_speech_control_command = 0xff;
 	u16 dsp_speech_control_mask = 0;
 	u16 dsp_speech_control_enabled = 0;
-	u32 cobba_pcm_data_clock = 0;
-	u32 cobba_pcm_frame_clock = 0;
-	u8 cobba_pcm_sample_bits = 0;
-	u8 cobba_pcm_sync_clocks = 0;
-	u8 cobba_pcm_word_clocks = 0;
-	bool cobba_pcm_msb_first = true;
-	nokia_mad2_pcm_device::clock_edge cobba_pcm_data_edge =
-			nokia_mad2_pcm_device::clock_edge::falling;
-	u8 cobba_hle_voice_microphone = nokia_cobba_device::disconnected;
-	u8 cobba_hle_voice_output = nokia_cobba_device::disconnected;
-	float cobba_internal_microphone_gain_db = 0.0F;
-	float cobba_internal_earpiece_gain_db = 0.0F;
+	nokia_mad2_pcm_device::bus_profile cobba_pcm;
+	nokia_cobba_device::hle_voice_profile cobba_hle_voice;
 	bool flash_b3_block_lock = false;
 	u8 dsp_reset_running_status = 0;
 	u8 dsp_release_mask = 0;
@@ -160,27 +150,27 @@ constexpr nokia_product_config make_3210_config()
 	result.dsp_speech_control_command = 0x08;
 	result.dsp_speech_control_mask = 0x0201;
 	result.dsp_speech_control_enabled = 0x0201;
-	result.cobba_pcm_data_clock = 520'000;
-	result.cobba_pcm_frame_clock = 8'000;
+	result.cobba_pcm.data_clock = 520'000;
+	result.cobba_pcm.frame_clock = 8'000;
 	// DCT3 MAD2/COBBA-GJ PCM timing diagrams show a 16-bit serial word
 	// containing a sign-extended 13-bit linear converter sample.
-	result.cobba_pcm_sample_bits = 13;
+	result.cobba_pcm.sample_bits = 13;
 	// Best-evidenced Nokia/COBBA-family format: a one-clock active-high frame
 	// pulse followed by a 16-bit, MSB-first word transferred on falling
 	// PCMDClk edges. At NSE-8's 520/8 kHz rates, the remaining 48 of 65 clocks
 	// are inactive. Keep this product-configured pending a direct NSE-8 trace.
-	result.cobba_pcm_sync_clocks = 1;
-	result.cobba_pcm_word_clocks = 16;
-	result.cobba_pcm_msb_first = true;
-	result.cobba_pcm_data_edge = nokia_mad2_pcm_device::clock_edge::falling;
-	// NSE-8 board wiring: the internal microphone terminates at MIC2 and the
-	// internal receiver at the differential EAR output.
-	result.cobba_hle_voice_microphone = nokia_cobba_device::mic2;
-	result.cobba_hle_voice_output = nokia_cobba_device::ear;
+	result.cobba_pcm.sync_clocks = 1;
+	result.cobba_pcm.word_clocks = 16;
+	result.cobba_pcm.msb_first = true;
+	result.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
+	// HLE fallback corresponding to NSE-8's internal MIC2/EAR board path.
+	// Physical sound routes are installed only by noki3210(machine_config).
+	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	result.cobba_hle_voice.output = nokia_cobba_device::ear;
 	// NSE-8/9 system-module Tables 33/34: the internal voice path uses
 	// COBBA MIC2 at +18 dB and EAR at -10 dB.
-	result.cobba_internal_microphone_gain_db = 18.0F;
-	result.cobba_internal_earpiece_gain_db = -10.0F;
+	result.cobba_hle_voice.microphone_gain_db = 18.0F;
+	result.cobba_hle_voice.output_gain_db = -10.0F;
 	result.ccont_board = ADC_3210;
 	return result;
 }
@@ -631,25 +621,12 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 			product.dsp_speech_control_command,
 			product.dsp_speech_control_mask,
 			product.dsp_speech_control_enabled);
-	m_mad2_pcm->set_clock_rates(
-			product.cobba_pcm_data_clock,
-			product.cobba_pcm_frame_clock);
-	m_mad2_pcm->set_sample_bits(product.cobba_pcm_sample_bits);
-	m_mad2_pcm->set_frame_format(
-			product.cobba_pcm_sync_clocks,
-			product.cobba_pcm_word_clocks,
-			product.cobba_pcm_msb_first,
-			product.cobba_pcm_data_edge);
-	m_cobba->set_pcm_sample_bits(product.cobba_pcm_sample_bits);
+	m_mad2_pcm->set_bus_profile(product.cobba_pcm);
+	m_cobba->set_pcm_sample_bits(product.cobba_pcm.sample_bits);
 	// This explicitly configures the HLE's internal-handset path. A future
 	// real DSP backend must instead select paths through COBBA's serial
-	// control transport; MCU speech state must never write these pins.
-	m_cobba->set_hle_internal_voice_route(
-			product.cobba_hle_voice_microphone,
-			product.cobba_hle_voice_output);
-	m_cobba->set_internal_voice_gains(
-			product.cobba_internal_microphone_gain_db,
-			product.cobba_internal_earpiece_gain_db);
+	// control transport; MCU speech state must never mutate this fallback.
+	m_cobba->set_hle_voice_profile(product.cobba_hle_voice);
 	m_external_service_peer->set_enabled(product.external_service);
 	m_radio_peer->set_enabled(product.radio_peer);
 	m_b3_flash->set_enabled(product.flash_b3_block_lock);
@@ -1524,10 +1501,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	BEEP(config, m_buzzer).add_route(ALL_OUTPUTS, "mono", 0.25);
 	BEEP(config, m_dsp_tone1).add_route(ALL_OUTPUTS, "mono", 0.12);
 	BEEP(config, m_dsp_tone2).add_route(ALL_OUTPUTS, "mono", 0.12);
-	NOKIA_COBBA(config, m_cobba).add_route(
-			nokia_cobba_device::ear, "mono", 0.50);
-	MICROPHONE(config, "microphone", 1).front_center()
-			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
+	NOKIA_COBBA(config, m_cobba);
 
 	INTEL_TE28F160(config, "flash");
 	NOKIA_B3_FLASH(config, m_b3_flash, 0);
@@ -1622,6 +1596,12 @@ void nokia_dct3_state::noki3330(machine_config &config)
 void nokia_dct3_state::noki3210(machine_config &config)
 {
 	dct3_base(config);
+	// NSE-8 board topology: the internal microphone is physically wired to
+	// COBBA MIC2 and the receiver to its differential EAR output. Keep these
+	// MAME sound routes out of the generic DCT3 base configuration.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 0.50);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(PRODUCT_3210);
 
 	// Both supported 3210 firmware revisions use this validated composition.

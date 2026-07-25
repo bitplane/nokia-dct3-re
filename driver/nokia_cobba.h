@@ -19,23 +19,28 @@ public:
 	enum microphone_input : u8 { mic1 = 0, mic2 = 1, mic3 = 2 };
 	enum audio_output : u8 { ear = 0, hf = 1 };
 	using pcm_block = std::array<s16, pcm_block_samples>;
+	struct hle_voice_profile
+	{
+		u8 microphone = disconnected;
+		u8 output = disconnected;
+		float microphone_gain_db = 0.0F;
+		float output_gain_db = 0.0F;
+	};
 
 	nokia_cobba_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
-	void set_internal_voice_gains(float microphone_db, float earpiece_db)
-	{
-		m_microphone_gain_db = microphone_db;
-		m_earpiece_gain_db = earpiece_db;
-	}
 	void set_pcm_sample_bits(u8 bits) { m_pcm_sample_bits = bits; }
-	// Temporary HLE route used only until a DSP backend drives the opaque
-	// COBBA control transport. This is product topology, not decoded register
+	// Temporary HLE selection used only until a DSP backend drives the opaque
+	// COBBA control transport. Physical board connections are machine-config
+	// sound routes; this profile is neither topology nor decoded register
 	// semantics, and must not be changed from MCU call state.
-	void set_hle_internal_voice_route(u8 microphone, u8 output)
+	void set_hle_voice_profile(hle_voice_profile const &profile)
 	{
-		m_selected_microphone = microphone;
-		m_selected_output = output;
+		m_hle_microphone = profile.microphone;
+		m_hle_output = profile.output;
+		m_hle_microphone_gain_db = profile.microphone_gain_db;
+		m_hle_output_gain_db = profile.output_gain_db;
 	}
 	// DSP serial-control plane. The register payload is 12 bits; meanings are
 	// deliberately opaque until recovered independently for the product.
@@ -75,13 +80,13 @@ private:
 	u64 m_earpiece_overruns = 0;
 	u64 m_microphone_overruns = 0;
 	u64 m_microphone_underruns = 0;
-	float m_microphone_gain_db = 0.0F;
-	float m_earpiece_gain_db = 0.0F;
-	float m_microphone_gain = 1.0F;
-	float m_earpiece_gain = 1.0F;
+	float m_hle_microphone_gain_db = 0.0F;
+	float m_hle_output_gain_db = 0.0F;
+	float m_hle_microphone_gain = 1.0F;
+	float m_hle_output_gain = 1.0F;
 	u8 m_pcm_sample_bits = 0;
-	u8 m_selected_microphone = disconnected;
-	u8 m_selected_output = disconnected;
+	u8 m_hle_microphone = disconnected;
+	u8 m_hle_output = disconnected;
 	std::array<u16, 16> m_control_registers{};
 	u16 m_control_data_latch = 0;
 	u8 m_control_address = 0;

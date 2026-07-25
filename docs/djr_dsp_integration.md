@@ -71,8 +71,8 @@ prove DSP-owned data-memory contents, but neither exposes the DSP-local port
 writes that program COBBA. Recovering the analogue-mux encoding requires a
 non-placeholder, legally obtained NSE-8 DSP image executed through a compatible
 backend, or a physical COBBA-control-bus trace. Until then the product's
-MIC2/EAR internal path is explicitly named as an HLE route and must not be
-presented as decoded register behavior.
+MIC2/EAR internal path is explicitly contained in an `hle_voice_profile` and
+must not be presented as decoded register behavior.
 
 ## Reusable research workflow
 

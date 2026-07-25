@@ -364,6 +364,13 @@ serial representation, MAD2 and DSP encoding to non-zero output from the
 network peer's independent GSM-FR decoder. The test source never appears in
 the Nokia machine configuration or handset data path.
 
+The generic DCT3 machine now instantiates COBBA without assuming handset
+analogue wiring. Only the NSE-8 `noki3210` composition connects MAME's physical
+microphone to MIC2 and EAR to the receiver speaker. The serial bus parameters
+are grouped in a `bus_profile`, while the temporary analogue selection and
+nominal gains are grouped in a separate `hle_voice_profile`; products with no
+recovered contract inherit inert profiles and no host microphone route.
+
 The wider firmware contains roughly 287 DSPIF references and 444 shared-RAM
 base references, concentrated in the GSM-L1/audio layer at
 `0x2b6xxx–0x2c8xxx`. The coherent boot now exercises more than the original
