@@ -81,6 +81,12 @@ checks; each restored branch then reaches a physical End and clean teardown.
 The v6.00 half uses the decoded control-lifecycle oracle while the v5.01 half
 uses the shared-wire oracle, so the gate preserves the known product contract
 difference rather than forcing both ROMs through one interpretation.
+The same target runs `radio_facch_interruption_trace_check.py`. It requires
+good uplink and downlink FACCH only after the firmware speech-route request
+and before speech teardown, a subsequent concealment increment at each
+independent codec boundary, and then more than 100 recovered handset/network
+speech frames. Thus the organic control blocks are proven to steal traffic
+and cross the BFI seams rather than merely appearing somewhere in the trace.
 `make verify-radio-pcm-missing` runs the same paired-ROM lifecycle with the
 MAD2/COBBA PCM component disabled. It correlates the firmware's command-`0x08`
 wire value with the DSP-facing payload, requires the unsupported-link fault,

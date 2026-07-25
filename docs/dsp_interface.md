@@ -892,6 +892,16 @@ still consumes the already recovered Nokia block transaction directly; the
 parallel burst path models its Layer-1 consequence without making call-control
 timing depend on the HLE air-link decoder.
 
+The paired-ROM `make verify-radio-call-state-roundtrip` gate now checks that
+consequence explicitly. After each firmware enables its speech route,
+organically produced control traffic decodes as four uplink/four downlink
+FACCH blocks on v6.00 and four/three on v5.01. The next handset and network
+codec boundaries increase their independent concealment histories, proving
+that the stolen intervals became BFIs. Both sides then resume good speech for
+more than 100 frames before the firmware-controlled teardown. This is a
+causal interruption-and-recovery check, not merely a search for a FACCH log
+line.
+
 The air boundary also accepts explicit, generic hard-error profiles. They
 operate only on the 114 TCH data bits after diagonal interleaving and before
 normal-burst packing, so they cannot alter firmware, codec payloads, training,
