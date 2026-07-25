@@ -37,9 +37,10 @@ makes no traffic-channel, speech or ringing-UI claim.
 `make verify-radio-incoming-sms` uses another event fixture and requires one
 SAPI-3 SABM/UA exchange, both exact segments of the ordinary `hello`
 SMS-DELIVER, the handset's SAPI-3 acknowledgement, an organic 176-byte
-`EF_SMS` update, and the exact unread record in card NVRAM. The locked v6.00
-run does not expose the CP/RP closing tail, so that verifier makes no RR
-teardown or visible-notification claim.
+`EF_SMS` update, and the exact unread record in card NVRAM. Neither the default
+v6.00 run nor a separate physical security-code-unlock control exposes the
+CP/RP closing tail, so that verifier makes no RR teardown or
+visible-notification claim.
 `make verify-radio-incoming-smart-message` replaces the text TPDU with one
 complete 251-byte Nokia RTPL ringtone queued as two concatenated parts. It
 requires all nine exact stop-and-wait SAPI-3 segments of part 1, including

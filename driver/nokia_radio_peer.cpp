@@ -419,13 +419,22 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 						information[0] & 0x0f, information[1] & 0x3f,
 						m_lapdm_link->layer3_length(),
 						machine().time().as_double());
-			const auto action = m_gsm_session->receive_layer3(
+			m_gsm_session->receive_layer3(
 					m_lapdm_link->layer3_sapi(),
 					information.data(), m_lapdm_link->layer3_length());
 			// A queued L3 response is itself an I frame and piggybacks N(R) for
-			// this uplink. Otherwise send a standalone LAPDm RR.
-			m_phase = action !=
-					nokia_gsm_session_device::downlink_kind::none ?
+			// this uplink. Link establishment is a SABM and cannot piggyback
+			// N(R); terminal session results likewise carry no message. Both
+			// therefore require a standalone LAPDm RR first.
+			const auto pending_kind =
+					m_gsm_session->pending_downlink_kind();
+			const bool queued_information =
+					pending_kind !=
+							nokia_gsm_session_device::downlink_kind::none &&
+					pending_kind !=
+							nokia_gsm_session_device::downlink_kind::
+									sapi3_establishment;
+			m_phase = queued_information ?
 					phase::service_downlink :
 					phase::service_uplink_acknowledgement;
 			m_reports_remaining = 1;

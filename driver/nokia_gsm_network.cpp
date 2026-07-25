@@ -187,8 +187,8 @@ std::array<u8, 36> nokia_gsm_network_device::incoming_sms_cp_data() const
 
 unsigned nokia_gsm_network_device::incoming_smart_message_part_count() const
 {
-	constexpr unsigned payload_length = 251;
-	return (payload_length + smart_message_multipart_part_capacity - 1) /
+	return (smart_message_ringtone_payload_length +
+			smart_message_multipart_part_capacity - 1) /
 			smart_message_multipart_part_capacity;
 }
 
@@ -220,6 +220,7 @@ nokia_gsm_network_device::incoming_smart_message_cp_data(
 	};
 	static constexpr unsigned PAYLOAD_LENGTH =
 			RINGTONE_COMMAND.size() * 2 + 1;
+	static_assert(PAYLOAD_LENGTH == smart_message_ringtone_payload_length);
 	const unsigned part_count = incoming_smart_message_part_count();
 	layer3_message result;
 	if (part_index >= part_count || part_count > smart_message_maximum_parts)

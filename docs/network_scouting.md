@@ -104,7 +104,7 @@ The v6.00 firmware then organically sends MM STATUS, Call Confirmed, Alerting
 and Disconnect. The network acknowledges each uplink I-frame, answers
 Disconnect with Release, then closes RR after the handset's organic Release
 Complete and returns to PCH fill. This is a bounded signalling result: the
-generated first-boot profile still presents its security-code editor, and no
+default erased-identity profile presents its security-code editor, and no
 traffic channel, speech codec, ringing UI oracle or answered-call state is
 claimed.
 
@@ -114,9 +114,11 @@ once, and delivers a standards-shaped SMS-DELIVER for `hello` in two I frames.
 The firmware acknowledges SAPI 3, selects `EF_SMS`, writes a complete 176-byte
 record through SIMI/FIQ6, and card NVRAM contains the exact unread record.
 That independently proves transport acceptance, firmware SMS parsing and
-persistent delivery. In this locked first-boot v6.00 run the handset does not
-emit the expected CP-ACK/RP-ACK tail after storage, so the fixture does not
-claim CP/RP closure, RR teardown or a user-visible message notification.
+persistent delivery. Neither the default run nor a separate physical
+security-code-unlock run emits the expected CP-ACK/RP-ACK tail after storage,
+so the fixture does not claim CP/RP closure, RR teardown or a user-visible
+message notification. The unlock control rules out the security editor as the
+cause of the missing tail.
 
 `make verify-radio-incoming-smart-message` substitutes a Nokia ringtone TPDU
 above that same transport. The codec builds a complete 251-byte RTPL tone as

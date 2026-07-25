@@ -13,6 +13,7 @@ public:
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
 	static constexpr unsigned smart_message_maximum_parts = 3;
+	static constexpr unsigned smart_message_ringtone_payload_length = 251;
 
 	struct layer3_message
 	{

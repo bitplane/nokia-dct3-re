@@ -31,11 +31,12 @@ the HLE a replaceable backend seam;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
 session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation; and
 `nokia_lapdm_link_device` owns decoded LAPDm establishment state, contention
-identity, sequence numbers and pending downlink acknowledgements;
+identity, sequence numbers, stop-and-wait downlink segmentation and pending
+downlink acknowledgements;
 `nokia_gsm_session_device` owns the per-handset Layer-3 request and
 acknowledgement-gated registration, paging, bounded call and SMS transactions; and
 `nokia_gsm_network_device` owns
-immutable standards-shaped cell, RR and MM data. The
+immutable standards-shaped cell, RR, MM, call-control and SMS data. The
 phone state only composes those devices and wires DSPIF callbacks to MAD2.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
 connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0,
