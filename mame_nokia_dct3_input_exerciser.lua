@@ -90,6 +90,8 @@ local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURC
 local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
 local state_roundtrip_end_delay = env_number(
 		"NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS", -1) / 1000
+local state_roundtrip_replay = env_number(
+		"NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS", 0) / 1000
 local mbus_rx_fixture = tonumber(os.getenv("NOKIA_DCT3_MBUS_RX_FIXTURE") or "")
 local mbus_rx_fixture_at = env_number("NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS", 300) / 1000
 
@@ -757,9 +759,25 @@ if state_roundtrip_at >= 0 then
 			gensio = space:read_u8(0x2006d),
 		}
 		machine:save("nokia_dct3_mad2_contract")
-		emu.wait(0.05)
+		if state_roundtrip_replay > 0 then
+			emu.wait(0.01)
+			machine:logerror(string.format(
+				"state_replay: phase=reference event=begin t=%.6f\n",
+				emulation_seconds()))
+			emu.wait(state_roundtrip_replay)
+			machine:logerror(string.format(
+				"state_replay: phase=reference event=end t=%.6f\n",
+				emulation_seconds()))
+		else
+			emu.wait(0.05)
+		end
 		machine:load("nokia_dct3_mad2_contract")
 		emu.wait(0.01)
+		if state_roundtrip_replay > 0 then
+			machine:logerror(string.format(
+				"state_replay: phase=restored event=begin t=%.6f\n",
+				emulation_seconds()))
+		end
 		local counter = space:read_u16(0x20010)
 		local counter_delta = (counter - snapshot.counter) & 0xffff
 		local passed =
@@ -775,6 +793,12 @@ if state_roundtrip_at >= 0 then
 				.. "requested_at=%.6f t=%.6f\n",
 			structural.state_roundtrip, counter_delta, snapshot.mode,
 			state_roundtrip_at, emulation_seconds()))
+		if state_roundtrip_replay > 0 then
+			emu.wait(state_roundtrip_replay)
+			machine:logerror(string.format(
+				"state_replay: phase=restored event=end t=%.6f\n",
+				emulation_seconds()))
+		end
 		-- Optional acceptance orchestration: issue an ordinary physical End
 		-- only after the restored machine has run for the requested interval.
 		-- A pre-existing Lua wait is deliberately unsuitable because Lua

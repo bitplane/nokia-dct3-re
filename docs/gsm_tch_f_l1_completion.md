@@ -20,7 +20,7 @@ are emulated.
 | Organic non-silent downlink | Network-side 1 kHz PCM is GSM-FR encoded and crosses timed Layer 1 to COBBA EAR | v6.00 and v5.01: 145 non-silent blocks each |
 | Organic non-silent physical uplink | External host audio enters only MAME's microphone, COBBA MIC2, PCM, DSP codec and timed Layer 1 | `make verify-radio-physical-uplink`; audited runs: v6.00 850/850, peak 2264; v5.01 1200/1200, peak 2032 |
 | Organic teardown | Firmware drives CC and DSP control back to idle after media/FACCH | v6.00 and v5.01 lifecycle gates |
-| Layer separation and generic configuration | Codec, Layer 1, radio peer, DSP PCM and COBBA remain separate devices/components; impairment is a network profile | 325 repository tests and `test_speech_media_boundaries.py` |
+| Layer separation and generic configuration | Codec, Layer 1, radio peer, DSP PCM and COBBA remain separate devices/components; impairment is a network profile | 327 repository tests and `test_speech_media_boundaries.py` |
 
 Meaningful SACCH measurement reports and downlink SACCH system information are
 not fabricated. Their Nokia DSP-side ownership remains an evidence question,

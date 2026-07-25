@@ -2,10 +2,24 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from tools.radio_speech_media_trace_check import check
+from tools.radio_speech_media_trace_check import canonical_timeline, check
 
 
 class RadioSpeechMediaTraceCheckTests(unittest.TestCase):
+    def test_canonical_timeline_discards_only_reference_branch(self):
+        text = "\n".join([
+            "before",
+            "state_replay: phase=reference event=begin t=1.0",
+            "reference speech",
+            "state_replay: phase=reference event=end t=2.0",
+            "state_replay: phase=restored event=begin t=1.0",
+            "restored speech",
+        ])
+        result = canonical_timeline(text)
+        self.assertIn("before", result)
+        self.assertNotIn("reference speech", result)
+        self.assertIn("restored speech", result)
+
     def test_accepts_bidirectional_twenty_ms_media(self):
         with TemporaryDirectory() as directory:
             log = Path(directory) / "error.log"

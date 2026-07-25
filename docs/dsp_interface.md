@@ -758,8 +758,13 @@ counted and the organic media verifier treats either condition as an error.
 MAME saves those two codec histories alongside the DSP HLE, rather than
 serializing libgsm pointers or allocator padding. Combined with the complete
 Layer-1 endpoint state, `make verify-radio-call-state-roundtrip` saves and
-loads during an organically answered call, then requires continuing
-bidirectional speech and normal physical-End teardown.
+loads during an organically answered call. It first advances a 2.1-second
+reference branch, restores the snapshot, and advances the same emulated
+interval again. The gate requires the ordered DSP and independent network
+speech checkpoints to match exactly, then evaluates continuing bidirectional
+media and normal physical-End teardown only on the canonical restored
+timeline. The current run replays four checkpoints exactly before reaching
+322/317 codec frames and clean teardown.
 See the
 [NSE-3 system-module description](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6110/03SYS%20%5B73%5D.pdf).
 The edge convention is corroborated by Nokia's

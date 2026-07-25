@@ -31,8 +31,25 @@ FACCH_RE = re.compile(
 )
 
 
+def canonical_timeline(text: str) -> str:
+    """Discard the speculative branch of an intentional save-state replay."""
+    begin = text.find("state_replay: phase=reference event=begin")
+    end_marker = "state_replay: phase=reference event=end"
+    end = text.find(end_marker)
+    if begin < 0 and end < 0:
+        return text
+    if begin < 0 or end < begin:
+        raise ValueError("incomplete save-state reference interval")
+    end_of_line = text.find("\n", end)
+    if end_of_line < 0:
+        end_of_line = len(text)
+    else:
+        end_of_line += 1
+    return text[:begin] + text[end_of_line:]
+
+
 def check(path: Path) -> str:
-    text = path.read_text(errors="replace")
+    text = canonical_timeline(path.read_text(errors="replace"))
     if "speech blocked by unsupported PCM link" in text:
         raise ValueError("product PCM link was not supported")
     if "speech PCM transfer rejected" in text:
