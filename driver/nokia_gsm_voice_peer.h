@@ -19,7 +19,10 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	void set_lab_test_source(bool enabled) { m_lab_test_source = enabled; }
-	bool exchange(const speech_frame &uplink, speech_frame &downlink);
+	void start_call();
+	// Null uplink denotes BFI/FACCH substitution at the network receiver.
+	// Downlink generation remains independent and still produces one frame.
+	bool exchange(const speech_frame *uplink, speech_frame &downlink);
 	u64 exchanges() const { return m_exchanges; }
 	u16 last_uplink_peak() const { return m_last_uplink_peak; }
 	u16 last_downlink_peak() const { return m_last_downlink_peak; }
@@ -30,13 +33,21 @@ protected:
 
 private:
 	static u16 block_peak(const nokia_gsm_fr_codec::pcm_block &block);
+	void prepare_codec_save();
+	void restore_codec_state();
 
 	nokia_gsm_fr_codec m_uplink_decoder;
 	nokia_gsm_fr_codec m_downlink_encoder;
+	nokia_gsm_fr_receiver m_uplink_receiver;
+	nokia_gsm_fr_codec::state m_uplink_decoder_state{};
+	nokia_gsm_fr_codec::state m_downlink_encoder_state{};
+	nokia_gsm_fr_receiver::state m_uplink_receiver_state{};
 	bool m_lab_test_source = false;
 	bool m_trace_enabled = false;
 	u8 m_test_phase = 0;
 	u64 m_exchanges = 0;
+	u64 m_concealed_uplink_frames = 0;
+	u64 m_muted_uplink_frames = 0;
 	u16 m_last_uplink_peak = 0;
 	u16 m_last_downlink_peak = 0;
 };

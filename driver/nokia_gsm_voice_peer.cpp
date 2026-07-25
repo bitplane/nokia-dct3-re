@@ -25,18 +25,75 @@ void nokia_gsm_voice_peer_device::device_start()
 	save_item(NAME(m_lab_test_source));
 	save_item(NAME(m_test_phase));
 	save_item(NAME(m_exchanges));
+	save_item(NAME(m_concealed_uplink_frames));
+	save_item(NAME(m_muted_uplink_frames));
 	save_item(NAME(m_last_uplink_peak));
 	save_item(NAME(m_last_downlink_peak));
+	auto save_codec_state =
+			[this](nokia_gsm_fr_codec::state &state, int index)
+	{
+		save_item(STRUCT_MEMBER(state.channels, dp0), index);
+		save_item(STRUCT_MEMBER(state.channels, e), index);
+		save_item(STRUCT_MEMBER(state.channels, z1), index);
+		save_item(STRUCT_MEMBER(state.channels, l_z2), index);
+		save_item(STRUCT_MEMBER(state.channels, mp), index);
+		save_item(STRUCT_MEMBER(state.channels, u), index);
+		save_item(STRUCT_MEMBER(state.channels, larpp), index);
+		save_item(STRUCT_MEMBER(state.channels, j), index);
+		save_item(STRUCT_MEMBER(state.channels, ltp_cut), index);
+		save_item(STRUCT_MEMBER(state.channels, nrp), index);
+		save_item(STRUCT_MEMBER(state.channels, v), index);
+		save_item(STRUCT_MEMBER(state.channels, msr), index);
+		save_item(STRUCT_MEMBER(state.channels, verbose), index);
+		save_item(STRUCT_MEMBER(state.channels, fast), index);
+		save_item(STRUCT_MEMBER(state.channels, wav_fmt), index);
+		save_item(STRUCT_MEMBER(state.channels, frame_index), index);
+		save_item(STRUCT_MEMBER(state.channels, frame_chain), index);
+	};
+	save_codec_state(m_uplink_decoder_state, 0);
+	save_codec_state(m_downlink_encoder_state, 1);
+	save_item(NAME(m_uplink_receiver_state.last_good));
+	save_item(NAME(m_uplink_receiver_state.have_good));
+	save_item(NAME(m_uplink_receiver_state.lost_frames));
+	machine().save().register_presave(
+			save_prepost_delegate(
+				FUNC(nokia_gsm_voice_peer_device::prepare_codec_save), this));
+	machine().save().register_postload(
+			save_prepost_delegate(
+				FUNC(nokia_gsm_voice_peer_device::restore_codec_state), this));
 }
 
 void nokia_gsm_voice_peer_device::device_reset()
 {
+	start_call();
+}
+
+void nokia_gsm_voice_peer_device::start_call()
+{
 	m_uplink_decoder.reset();
 	m_downlink_encoder.reset();
+	m_uplink_receiver.reset();
 	m_test_phase = 0;
 	m_exchanges = 0;
+	m_concealed_uplink_frames = 0;
+	m_muted_uplink_frames = 0;
 	m_last_uplink_peak = 0;
 	m_last_downlink_peak = 0;
+}
+
+void nokia_gsm_voice_peer_device::prepare_codec_save()
+{
+	m_uplink_decoder_state = m_uplink_decoder.snapshot();
+	m_downlink_encoder_state = m_downlink_encoder.snapshot();
+	m_uplink_receiver_state = m_uplink_receiver.snapshot();
+}
+
+void nokia_gsm_voice_peer_device::restore_codec_state()
+{
+	if (!m_uplink_decoder.restore(m_uplink_decoder_state) ||
+			!m_downlink_encoder.restore(m_downlink_encoder_state) ||
+			!m_uplink_receiver.restore(m_uplink_receiver_state))
+		fatalerror("GSM voice peer: invalid codec state in save image");
 }
 
 u16 nokia_gsm_voice_peer_device::block_peak(
@@ -50,14 +107,27 @@ u16 nokia_gsm_voice_peer_device::block_peak(
 }
 
 bool nokia_gsm_voice_peer_device::exchange(
-		const speech_frame &uplink, speech_frame &downlink)
+		const speech_frame *uplink, speech_frame &downlink)
 {
 	nokia_gsm_fr_codec::speech_frame encoded_uplink{};
-	std::copy(uplink.begin(), uplink.end(), encoded_uplink.begin());
+	const nokia_gsm_fr_codec::speech_frame *decoder_frame = nullptr;
+	if (uplink)
+	{
+		std::copy(uplink->begin(), uplink->end(), encoded_uplink.begin());
+		decoder_frame = &encoded_uplink;
+	}
 	nokia_gsm_fr_codec::pcm_block remote_receiver{};
-	if (!m_uplink_decoder.decode(encoded_uplink, remote_receiver))
+	if (!m_uplink_receiver.decode(
+			m_uplink_decoder, decoder_frame, remote_receiver))
 		return false;
 	m_last_uplink_peak = block_peak(remote_receiver);
+	if (!uplink)
+	{
+		++m_concealed_uplink_frames;
+		if (m_uplink_receiver.lost_frames() >=
+				nokia_gsm_fr_receiver::mute_after_lost_frames)
+			++m_muted_uplink_frames;
+	}
 
 	nokia_gsm_fr_codec::pcm_block remote_microphone{};
 	if (m_lab_test_source)
@@ -84,9 +154,12 @@ bool nokia_gsm_voice_peer_device::exchange(
 			(m_exchanges <= 3 || (m_exchanges % 50) == 0))
 		LOGMASKED(LOG_VOICE_PEER,
 				"gsm_voice_peer: exchange=%llu uplink_peak=%u "
-				"downlink_peak=%u source=%s t=%.6f\n",
+				"downlink_peak=%u source=%s uplink_good=%u "
+				"concealed=%llu muted=%llu t=%.6f\n",
 				m_exchanges, m_last_uplink_peak, m_last_downlink_peak,
 				m_lab_test_source ? "lab-1khz" : "silence",
+				uplink != nullptr, m_concealed_uplink_frames,
+				m_muted_uplink_frames,
 				machine().time().as_double());
 	return true;
 }

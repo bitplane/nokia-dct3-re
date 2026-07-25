@@ -64,6 +64,10 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_downlink_facch_blocks));
 	save_item(NAME(m_uplink_bad_speech_blocks));
 	save_item(NAME(m_downlink_bad_speech_blocks));
+	save_item(NAME(m_uplink_tch_burst_error_period));
+	save_item(NAME(m_uplink_tch_burst_error_span));
+	save_item(NAME(m_uplink_tch_bursts));
+	save_item(NAME(m_uplink_tch_bursts_impaired));
 	save_item(NAME(m_downlink_tch_burst_error_period));
 	save_item(NAME(m_downlink_tch_burst_error_span));
 	save_item(NAME(m_downlink_tch_bursts));
@@ -165,6 +169,8 @@ void nokia_radio_peer_device::device_reset()
 	m_downlink_facch_blocks = 0;
 	m_uplink_bad_speech_blocks = 0;
 	m_downlink_bad_speech_blocks = 0;
+	m_uplink_tch_bursts = 0;
+	m_uplink_tch_bursts_impaired = 0;
 	m_downlink_tch_bursts = 0;
 	m_downlink_tch_bursts_impaired = 0;
 	reset_l1_pipeline();
@@ -325,6 +331,7 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	if (!m_l1_traffic_active)
 	{
 		reset_l1_pipeline();
+		m_voice_peer->start_call();
 		m_l1_traffic_active = true;
 	}
 
@@ -368,8 +375,25 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	}
 
 	const auto training = gsm::tch_f::training_sequence(2);
-	auto uplink_air = gsm::tch_f::pack_normal_burst(
-			m_uplink_transmitter.next_burst(), training);
+	auto uplink_payload = m_uplink_transmitter.next_burst();
+	++m_uplink_tch_bursts;
+	if (m_uplink_tch_burst_error_period &&
+			((m_uplink_tch_bursts - 1) %
+				m_uplink_tch_burst_error_period) <
+					m_uplink_tch_burst_error_span &&
+			!uplink_payload.hl && !uplink_payload.hu)
+	{
+		gsm::tch_f::invert_data_bits(uplink_payload);
+		++m_uplink_tch_bursts_impaired;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: direction=uplink impairment=invert-data "
+					"burst=%llu count=%llu fn=%u t=%.6f\n",
+					m_uplink_tch_bursts, m_uplink_tch_bursts_impaired,
+					frame_number, machine().time().as_double());
+	}
+	auto uplink_air =
+			gsm::tch_f::pack_normal_burst(uplink_payload, training);
 	const auto network_block = m_network_receiver.receive(
 			gsm::tch_f::unpack_normal_burst(uplink_air));
 	if (network_block &&
@@ -384,26 +408,44 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 					frame_number, machine().time().as_double());
 	}
 	else if (network_block && !network_block->speech.good)
-		++m_uplink_bad_speech_blocks;
-	if (network_block &&
-			network_block->kind == gsm::tch_f::traffic_block_kind::speech &&
-			network_block->speech.good)
 	{
-		++m_uplink_speech_received;
+		++m_uplink_bad_speech_blocks;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: direction=uplink kind=speech good=0 "
+					"count=%llu fn=%u t=%.6f\n",
+					m_uplink_bad_speech_blocks, frame_number,
+					machine().time().as_double());
+	}
+	if (network_block)
+	{
 		speech_frame network_uplink{};
-		std::copy(
-				network_block->speech.frame.begin(),
-				network_block->speech.frame.end(), network_uplink.begin());
+		const speech_frame *network_uplink_frame = nullptr;
+		if (network_block->kind == gsm::tch_f::traffic_block_kind::speech &&
+				network_block->speech.good)
+		{
+			++m_uplink_speech_received;
+			std::copy(
+					network_block->speech.frame.begin(),
+					network_block->speech.frame.end(), network_uplink.begin());
+			network_uplink_frame = &network_uplink;
+		}
 		speech_frame network_downlink{};
 		bool have_downlink = false;
 		if (m_lab_voice_source)
 		{
 			nokia_gsm_voice_peer_device::speech_frame peer_uplink{};
+			const nokia_gsm_voice_peer_device::speech_frame *peer_uplink_frame =
+					nullptr;
 			nokia_gsm_voice_peer_device::speech_frame peer_downlink{};
-			std::copy(
-					network_uplink.begin(), network_uplink.end(),
-					peer_uplink.begin());
-			if (m_voice_peer->exchange(peer_uplink, peer_downlink))
+			if (network_uplink_frame)
+			{
+				std::copy(
+						network_uplink.begin(), network_uplink.end(),
+						peer_uplink.begin());
+				peer_uplink_frame = &peer_uplink;
+			}
+			if (m_voice_peer->exchange(peer_uplink_frame, peer_downlink))
 			{
 				std::copy(
 						peer_downlink.begin(), peer_downlink.end(),
@@ -411,7 +453,7 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 				have_downlink = true;
 			}
 		}
-		else if (m_speech_loopback)
+		else if (m_speech_loopback && network_uplink_frame)
 		{
 			network_downlink = network_uplink;
 			have_downlink = true;

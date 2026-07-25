@@ -15,12 +15,12 @@ are emulated.
 | TDMA timing | Exact 60/13 ms timer and 26-frame timeslot-1 schedule | Schedule tests plus organic calls; 24 traffic, one idle and one SACCH position per multiframe |
 | FACCH substitution | Organic `0xb0` LAPDm blocks enter FIRE/convolutional coding and replace queued speech | Runtime gate requires independently decoded downlink FACCH; clean calls retain teardown with one displaced interval |
 | SACCH coexistence | Four-burst rectangular coding plus stateful empty-safe endpoints over 104 frames | All-timeslot phase/wrap tests and live reserved positions; no invented measurement payload |
-| Bad/erased frames | Decoder reports protected-frame validity; bad and FACCH-stolen intervals cross an explicit BFI boundary into isolated GSM 06.11 substitution and 320 ms muting | `make verify-radio-degraded-speech`: 20 impaired bursts, 10 induced bad blocks, 14 concealed intervals, 143 non-silent blocks and later clean recovery |
-| Independent network decoding | Uplink and downlink each cross separate transmitter/receiver state before the network voice peer or DSP codec | Clean, degraded and physical-uplink runtime gates |
-| Organic non-silent downlink | Network-side 1 kHz PCM is GSM-FR encoded and crosses timed Layer 1 to COBBA EAR | v6.00: 144 non-silent blocks; v5.01: 142 |
+| Bad/erased frames | Both decoders report protected-frame validity; bad and FACCH-stolen intervals cross explicit BFI boundaries into isolated GSM 06.11 substitution and 320 ms muting | `make verify-radio-degraded-speech`: 20 impaired bursts/direction, handset/network concealment of 12/5 intervals, 145 non-silent blocks and clean recovery |
+| Independent network decoding | Uplink and downlink cross separate transmitter/receiver and transcoder state; uplink BFI/FACCH cannot pause remote downlink encoding | Clean, bidirectionally degraded, save/load and physical-uplink runtime gates |
+| Organic non-silent downlink | Network-side 1 kHz PCM is GSM-FR encoded and crosses timed Layer 1 to COBBA EAR | v6.00 and v5.01: 145 non-silent blocks each |
 | Organic non-silent physical uplink | External host audio enters only MAME's microphone, COBBA MIC2, PCM, DSP codec and timed Layer 1 | `make verify-radio-physical-uplink`; audited runs: v6.00 850/850, peak 2264; v5.01 1200/1200, peak 2032 |
 | Organic teardown | Firmware drives CC and DSP control back to idle after media/FACCH | v6.00 and v5.01 lifecycle gates |
-| Layer separation and generic configuration | Codec, Layer 1, radio peer, DSP PCM and COBBA remain separate devices/components; impairment is a network profile | 314 repository tests and `test_speech_media_boundaries.py` |
+| Layer separation and generic configuration | Codec, Layer 1, radio peer, DSP PCM and COBBA remain separate devices/components; impairment is a network profile | 325 repository tests and `test_speech_media_boundaries.py` |
 
 Meaningful SACCH measurement reports and downlink SACCH system information are
 not fabricated. Their Nokia DSP-side ownership remains an evidence question,

@@ -814,6 +814,15 @@ frequency. The source enters only through network GSM-FR encoding and the
 radio downlink queue; it does not alter handset state or inject samples into
 MAD2, COBBA, or the UI.
 
+The transcoder is clocked by every independently decoded uplink traffic
+interval, not only by successful speech payloads. A good frame advances its
+network-side GSM 06.10 decoder normally; an uplink BFI or FACCH-stolen
+interval enters a separate GSM 06.11 receiver substitutor. In either case the
+remote microphone is encoded into the next downlink frame, so damage in one
+radio direction cannot pause the other direction. Predictor and substitution
+state reset at each new traffic-channel activation and all survive emulator
+save/load as fixed-width state.
+
 Between the DSP speech queues and either network endpoint,
 `gsm_tch_f_l1` now owns a handset-independent TS 45.003/TS 46.010
 boundary. It converts the conventional 33-octet codec representation to the
@@ -863,23 +872,24 @@ still consumes the already recovered Nokia block transaction directly; the
 parallel burst path models its Layer-1 consequence without making call-control
 timing depend on the HLE air-link decoder.
 
-The air boundary also accepts an explicit, generic hard-error profile. It
-operates only on the 114 TCH data bits after diagonal interleaving and before
-normal-burst packing, so it cannot alter firmware, codec payloads, training,
-tails or stealing flags. `NETCFG` bit `0x40` selects a laboratory four-burst
-downlink fade every six traffic multiframes. This spacing is intentionally
-specified in radio units rather than call/frame contents. FACCH bursts are
-preserved so the profile tests speech degradation rather than forcing call
-control.
+The air boundary also accepts explicit, generic hard-error profiles. They
+operate only on the 114 TCH data bits after diagonal interleaving and before
+normal-burst packing, so they cannot alter firmware, codec payloads, training,
+tails or stealing flags. `NETCFG` bits `0x40` and `0x80` independently select
+laboratory four-burst downlink and uplink fades every six traffic
+multiframes. This spacing is intentionally specified in radio units rather
+than call/frame contents. FACCH bursts are preserved so the profiles test
+speech degradation rather than forcing call control.
 
 `make verify-radio-degraded-speech` proves the complete consequence: the
-configured fade reaches the air seam, protected speech fails parity after
-Viterbi decoding, the BFI triggers GSM 06.11 substitution rather than decoding
-the damaged payload or abruptly muting the earpiece, and later clean blocks
-reset the loss sequence. The current v6.00 run inverted 20 bursts, rejected
-10 impairment-induced speech blocks, concealed 14 total startup, FACCH and
-bad-frame intervals, still delivered 143 non-silent earpiece blocks and
-completed organic teardown.
+configured fades reach both air seams, protected speech fails parity after
+Viterbi decoding, and each BFI triggers the direction's independent GSM 06.11
+substitutor rather than decoding damaged payload. The network continues
+encoding downlink audio across uplink losses, later clean blocks reset both
+loss sequences, and call control remains organic. The current v6.00 run
+inverted 20 bursts per direction, observed eight impairment-induced downlink
+bad blocks, concealed 12 handset-side and five network-side intervals, still
+delivered 145 non-silent earpiece blocks and completed organic teardown.
 
 The receive-side requirements and 320 ms maximum muting interval are derived
 from [ETSI GSM 06.11 version 3.0.1](https://www.etsi.org/deliver/etsi_gts/06/0611/03.00.01_60/gsmts_0611sv030001p.pdf),
@@ -891,7 +901,7 @@ v5.01, `radio_speech_media_trace_check.py` proves fresh codec state, 20 ms
 cadence, at least 100 continuing encoded-uplink and decoded-downlink frames,
 the peer's fixed source peak, and non-zero samples in the COBBA receiver
 stream. The current paired runs each carried 150 microphone-side frames and
-149 network-to-earpiece frames, with all 149 received COBBA blocks non-silent.
+145 network-to-earpiece frames, with all 145 received COBBA blocks non-silent.
 
 This proves a standards-based codec and initial channel-coded media
 *transport* slice, a non-silent

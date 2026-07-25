@@ -155,8 +155,14 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         cobba = (ROOT / "driver/nokia_cobba.cpp").read_text()
         self.assertIn("nokia_gsm_fr_codec m_uplink_decoder", voice)
         self.assertIn("nokia_gsm_fr_codec m_downlink_encoder", voice)
+        self.assertIn("nokia_gsm_fr_receiver m_uplink_receiver", voice)
+        self.assertIn("m_uplink_decoder.snapshot()", voice)
+        self.assertIn("m_downlink_encoder.snapshot()", voice)
+        self.assertIn("m_uplink_receiver.snapshot()", voice)
+        self.assertIn("const speech_frame *uplink", voice)
         self.assertIn("sine_1khz", voice)
         self.assertIn("m_voice_peer->exchange", radio)
+        self.assertIn("m_voice_peer->start_call()", radio)
         self.assertNotIn("sine_1khz", dsp + cobba)
 
     def test_layer1_has_an_independent_tdma_burst_clock(self):
