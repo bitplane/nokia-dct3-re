@@ -899,8 +899,16 @@ uint16_t nokia_dct3_state::dsp_ram_r(offs_t offset)
 
 void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
+	offset &= 0x7ff;
+	const uint16_t old_data = m_dspif->shared_word(offset);
 	m_dspif->shared_w(offset, data, mem_mask);
-	const unsigned byte_offset = (offset & 0x7ff) << 1;
+	const uint16_t new_data = m_dspif->shared_word(offset);
+	const unsigned byte_offset = offset << 1;
+	if (m_trace_enabled && old_data != new_data)
+		LOGMASKED(LOG_DSP_SHARED,
+				"dsp_shared_write: off=%03x old=%04x data=%04x pc=%08x t=%.6f\n",
+				byte_offset, old_data, new_data, m_maincpu->pc(),
+				machine().time().as_double());
 	if (byte_offset == DSP_TONE_OSCILLATOR_1 || byte_offset == DSP_TONE_OSCILLATOR_2 || byte_offset == DSP_TONE_AMPLITUDE)
 		update_dsp_tones();
 }

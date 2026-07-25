@@ -17,6 +17,7 @@ public:
 		ignored,
 		establish_indication,
 		establish_confirmation,
+		release_indication,
 		downlink_acknowledgement,
 		information_indication
 	};
@@ -25,7 +26,9 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	uplink_result receive_uplink(const u8 *frame, unsigned length);
+	void begin_mobile_establishment(u8 sapi);
 	std::array<u8, frame_length> build_ua();
+	std::array<u8, frame_length> build_release_ua();
 	std::array<u8, frame_length> build_sabm_command(u8 sapi);
 	std::array<u8, frame_length> build_information_frame(
 			u8 sapi, const u8 *information, unsigned length,
@@ -79,6 +82,7 @@ private:
 	std::array<u8, link_count> m_next_uplink_receive_sequence{};
 	std::array<u8, link_count> m_pending_receive_sequence{};
 	std::array<bool, link_count> m_established{};
+	std::array<bool, link_count> m_mobile_establishment_expected{};
 	std::array<bool, link_count> m_awaiting_establishment{};
 	std::array<bool, link_count> m_downlink_segmentation_pending{};
 	std::array<bool, link_count> m_downlink_acknowledgement_pending{};

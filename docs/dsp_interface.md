@@ -188,6 +188,59 @@ navigation reaches the Ringing-tone selector but produces neither this
 shared-word sequence nor a PUP transaction, so the missing ringtone preview
 remains upstream in firmware/resource handling.
 
+### Cipher-control packet
+
+An acknowledgement-gated GSM Cipher Mode Command now exercises the firmware's
+real cipher-control boundary before each incoming laboratory service. The
+retained command is `06 35 00`: its SC bit is zero, so the connection explicitly
+remains unciphered. The v6.00 ROM publishes TX type `0x14`, payload
+`00 f4 ff ff ff ff ff ff ff ff 00 00`, requires no DSP-ring response, and then
+organically sends RR Cipher Mode Complete (`06 32`). Calls, ordinary SMS and the
+first multipart Smart Message part all continue through their existing
+checkpoints.
+
+Two quarantined probes delimit the stronger interpretation. Command
+`06 35 01` (start A5/1) changed the type-`0x14` prefix to `02 00` and still
+produced Cipher Mode Complete without a DSP reply. Replacing the SIM's eight
+`EF_Kc` bytes with `01 23 45 67 89 ab cd ef` changed the packet to
+`02 00 cd ef 89 ab 45 67 01 23 00 00`, confirming that the middle eight bytes
+carry Kc in the firmware/DSP word order. Both probes were removed: the radio
+peer still exchanges clear decoded blocks, so retaining SC=1 would falsely
+claim A5 bitstream processing. Type `0x14` is therefore a recovered one-way
+cipher-control publication, not evidence of a working cipher backend.
+
+### Answered-call boundary
+
+The named answered-call fixture supplies the erased identity's matching
+security verifier, enters `12345` through the physical keypad, observes the
+organic MAD2 PUP ringtone gate and presses physical Answer. The v6.00 ROM emits
+CC Connect, accepts Connect Acknowledge and remains on the assigned TCH/F.
+After that acknowledgement, the retained MCU-to-DSP trace contains one LAPDm
+RR and periodic empty type-`0x1b` blocks
+`00 f0 01 03 01 2b...2b 00`. The only other packet is type `0x05`, class
+`0x00`, command `0x5f`, already classified independently as the periodic
+external-service poll and present at the same absolute time in unanswered and
+idle controls. No new packet family or payload carries speech or codec
+configuration.
+
+A complete changed-write trace of the shared window does expose a lower
+boundary outside the packet ring. Immediately after organic CC Connect, task 5
+calls shared-control helper `0x290cf4` with command `0x08`, value `0x060b` and
+commit flag 1; the helper publishes encoded word `0x860b` at shared offset
+`0x0a8` and rings DSPIF command 4. This occurs before Connect Acknowledge and
+does not occur in a matched unlocked-but-unanswered control. It is the first
+proved answer-only DSP control entrance, but the `0x060b` bit meanings and the
+DSP-to-COBBA PCM consequence are not yet decoded.
+
+About 22 ms later, task 9 emits a separate bounded command group: commands
+`0x09`, `0x26`, `0x21`, `0x25`, `0x29`, and `0x2f` program oscillator word
+`0x0e10` (900 Hz), amplitude `0x0041`, and a route bit, then clear the
+oscillator after 120.8 ms. The same helper/caller family produces keypad tones,
+and no further shared-control command follows during the retained call. This
+is an answer acknowledgement/UI tone, not speech framing. The answered
+signalling and lower control boundary are now proved; a speech backend still
+requires decoding command `0x08` or observing the DSP/PCM side of that command.
+
 ### Reachable shared-control commands
 
 The stateful-SIM path calls `0x290cf4` with command `0x30`, then command `0x32`.

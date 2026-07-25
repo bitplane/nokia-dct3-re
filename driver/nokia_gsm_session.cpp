@@ -91,12 +91,11 @@ nokia_gsm_session_device::contention_resolution_delivered()
 	{
 		if (m_incoming_service != u8(incoming_service::none))
 		{
-			// This laboratory connection remains unciphered. Supply the network
-			// time on the newly established MM connection before entering call
-			// control, matching the ordering expected by this firmware.
-			const auto information = m_network->mm_information();
-			m_state = u8(state::awaiting_mm_information_acknowledgement);
-			return queue_downlink(downlink_kind::mm_information,
+			// Exercise the firmware's real DSP cipher-control publication while
+			// keeping this laboratory connection explicitly unciphered.
+			const auto information = m_network->cipher_mode_command();
+			m_state = u8(state::awaiting_cipher_mode_command_acknowledgement);
+			return queue_downlink(downlink_kind::cipher_mode_command,
 					information.data(), information.size());
 		}
 		const auto release = m_network->channel_release();
@@ -140,6 +139,26 @@ nokia_gsm_session_device::downlink_acknowledged()
 		clear_pending_downlink();
 		m_state = u8(state::incoming_call_active);
 		return downlink_kind::none;
+	}
+
+	if (m_state == u8(state::awaiting_traffic_assignment) &&
+			m_pending_downlink.kind == u8(downlink_kind::traffic_assignment))
+	{
+		// The mobile may acknowledge this I frame before locally releasing the
+		// old SDCCH. Assignment completion itself belongs to the new link.
+		clear_pending_downlink();
+		return downlink_kind::none;
+	}
+
+	if (m_state == u8(state::awaiting_cipher_mode_command_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::cipher_mode_command))
+	{
+		// Supply deterministic network time before entering call control or
+		// SAPI-3 SMS, matching the ordering expected by this firmware.
+		const auto information = m_network->mm_information();
+		m_state = u8(state::awaiting_mm_information_acknowledgement);
+		return queue_downlink(downlink_kind::mm_information,
+				information.data(), information.size());
 	}
 
 	if (m_state == u8(state::awaiting_mm_information_acknowledgement) &&
@@ -265,10 +284,21 @@ nokia_gsm_session_device::receive_layer3(
 	const u8 message_type = information[1] & 0x3f;
 	if (sapi == 0 &&
 			(m_state == u8(state::incoming_call_active) ||
+			m_state == u8(state::awaiting_traffic_assignment) ||
+			m_state == u8(state::awaiting_assignment_complete) ||
 			m_state == u8(state::awaiting_incoming_call_setup_acknowledgement)) &&
 			protocol_discriminator == 0x03)
 	{
-		if (message_type == 0x08 || message_type == 0x01)
+		if (message_type == 0x08)
+		{
+			if (m_state != u8(state::incoming_call_active))
+				return downlink_kind::none;
+			const auto assignment = m_network->traffic_assignment();
+			m_state = u8(state::awaiting_traffic_assignment);
+			return queue_downlink(downlink_kind::traffic_assignment,
+					assignment.data(), assignment.size());
+		}
+		if (message_type == 0x01)
 			return downlink_kind::none;
 		if (message_type == 0x07)
 		{
@@ -285,6 +315,14 @@ nokia_gsm_session_device::receive_layer3(
 			return queue_downlink(downlink_kind::call_release,
 					release.data(), release.size());
 		}
+	}
+
+	if (sapi == 0 &&
+			m_state == u8(state::awaiting_assignment_complete) &&
+			protocol_discriminator == 0x06 && message_type == 0x29)
+	{
+		m_state = u8(state::incoming_call_active);
+		return downlink_kind::none;
 	}
 
 	if (m_state == u8(state::awaiting_release_complete) &&
@@ -319,6 +357,15 @@ nokia_gsm_session_device::receive_layer3(
 	}
 
 	return downlink_kind::none;
+}
+
+bool nokia_gsm_session_device::begin_traffic_assignment()
+{
+	if (m_state != u8(state::awaiting_traffic_assignment))
+		return false;
+	clear_pending_downlink();
+	m_state = u8(state::awaiting_assignment_complete);
+	return true;
 }
 
 nokia_gsm_session_device::downlink_kind

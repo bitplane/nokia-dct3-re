@@ -136,19 +136,22 @@ class DspDeviceSplitTest(unittest.TestCase):
 
     def test_incoming_call_ownership_is_split_at_decoded_blocks(self):
         for token in (
-            "mm_information", "incoming_call_setup",
-            "connect_acknowledge", "call_release",
+            "cipher_mode_command", "mm_information", "incoming_call_setup",
+            "traffic_assignment", "connect_acknowledge", "call_release",
         ):
             self.assertIn(token, self.network)
         for token in (
+            "awaiting_cipher_mode_command_acknowledgement",
             "awaiting_mm_information_acknowledgement",
             "awaiting_incoming_call_setup_acknowledgement",
-            "incoming_call_active", "receive_layer3",
+            "incoming_call_active", "awaiting_assignment_complete",
+            "receive_layer3",
         ):
             self.assertIn(token, self.session)
         for token in (
             "phase::service_downlink", "phase::service_uplink_request",
-            "build_receive_ready", "information_indication",
+            "phase::traffic_channel_change", "build_receive_ready",
+            "information_indication",
         ):
             self.assertIn(token, self.radio)
         self.assertNotIn("enqueue_rx_packet", self.network + self.session)

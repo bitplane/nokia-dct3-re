@@ -27,8 +27,10 @@ public:
 		none,
 		location_update_accept,
 		channel_release,
+		cipher_mode_command,
 		mm_information,
 		incoming_call_setup,
+		traffic_assignment,
 		sapi3_establishment,
 		incoming_sms_cp_data,
 		sms_cp_ack,
@@ -54,6 +56,7 @@ public:
 	downlink_kind downlink_acknowledged();
 	downlink_kind receive_layer3(
 			u8 sapi, const u8 *information, unsigned length);
+	bool begin_traffic_assignment();
 
 	const downlink_message &pending_downlink() const { return m_pending_downlink; }
 	downlink_kind pending_downlink_kind() const
@@ -70,6 +73,10 @@ public:
 		return m_registered_mobile_identity_length;
 	}
 	bool idle() const { return m_state == u8(state::idle); }
+	bool awaiting_traffic_assignment() const
+	{
+		return m_state == u8(state::awaiting_traffic_assignment);
+	}
 
 protected:
 	virtual void device_start() override;
@@ -84,9 +91,12 @@ private:
 		awaiting_paging_contention_resolution,
 		awaiting_location_update_accept_acknowledgement,
 		awaiting_channel_release_acknowledgement,
+		awaiting_cipher_mode_command_acknowledgement,
 		awaiting_mm_information_acknowledgement,
 		awaiting_incoming_call_setup_acknowledgement,
 		incoming_call_active,
+		awaiting_traffic_assignment,
+		awaiting_assignment_complete,
 		awaiting_connect_acknowledgement,
 		awaiting_call_release_acknowledgement,
 		awaiting_release_complete,

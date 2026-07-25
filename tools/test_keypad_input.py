@@ -39,6 +39,11 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn('string.match(name, "^wait(%d+)$")', self.harness)
         self.assertIn("emu.wait(tonumber(wait_ms) / 1000)", self.harness)
 
+    def test_sequence_can_wait_for_organic_buzzer_before_physical_answer(self):
+        self.assertIn('name == "waitbuzzer"', self.harness)
+        self.assertIn("space:read_u8(0x20015) & 0x20", self.harness)
+        self.assertIn('machine:logerror("input-wait: buzzer timeout', self.harness)
+
     def test_shutdown_publishes_the_terminal_lcd_mirror(self):
         stop = self.harness.split("emu.add_machine_stop_notifier", 1)[1]
         self.assertIn("queue_lcd_dump()", stop)

@@ -87,6 +87,7 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 	if (m_trace_enabled && ((offset << 1) <= 0x004 || (offset << 1) == 0x0e0 ||
 			(offset << 1) == 0x0e2 || (offset << 1) == 0x0e4 ||
 			(offset << 1) == 0x0fe || (offset << 1) == 0x100 ||
+			(offset << 1) == 0x0a8 || (offset << 1) == 0x0dc ||
 			(offset << 1) == 0x0ae || (offset << 1) == 0x0b0 ||
 			(offset << 1) == 0x0b6 ||
 			offset == TX_PRODUCER || offset == TX_CONSUMER ||

@@ -15,9 +15,17 @@ CHECKPOINTS = (
         r"TX packet type=1b .*data=0080013f410627")),
     ("contention-resolution UA", re.compile(
         r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]*0173410627")),
+    ("no-cipher Cipher Mode Command", re.compile(
+        r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
+        r"03000d063500")),
+    ("DSP cipher-control publication", re.compile(
+        r"TX packet type=14 payload=12 .*"
+        r"data=00f4ffffffffffffffff0000")),
     ("MM Information", re.compile(
         r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
-        r"03002905324762704221000000")),
+        r"03[0-9a-f]{2}2905324762704221000000")),
+    ("Cipher Mode Complete", re.compile(
+        r"GSM service uplink sapi=0 pd=06 message=32 length=2")),
     ("SAPI 3 SABM", re.compile(
         r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
         r"0f3f01")),
@@ -88,8 +96,8 @@ def main() -> int:
     except ValueError as error:
         raise SystemExit(str(error)) from None
     print(
-        'OK - page, SAPI 3 segmented SMS-DELIVER and persistent unread "hello" '
-        "record completed organically")
+        'OK - page, SC=0 DSP cipher control/complete, SAPI 3 segmented '
+        'SMS-DELIVER and persistent unread "hello" record completed organically')
     return 0
 
 

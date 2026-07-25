@@ -12,7 +12,10 @@ dsp_hle: LAPDm Channel Release acknowledged nr=2
 dsp_hle: PCH IMSI page transmitted channel=60 fn=3759
 dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=contention_resolution data=0080013f4106270703331881080910101032547698
 dspif_transport: RX enqueue type=80 payload=34 producer=0a8 data=8012000012c40001000001734106270703331881080910101032547698
-dspif_transport: RX enqueue type=80 payload=34 producer=0ba data=8012000012c500010000030029053247627042210000002b2b2b2b
+dspif_transport: RX enqueue type=80 payload=34 producer=0ba data=8012000012c50001000003000d0635002b2b2b2b
+dsp_hle: TX packet type=14 payload=12 words=7 radio_phase=service_uplink_request data=00f4ffffffffffffffff0000
+dspif_transport: RX enqueue type=80 payload=34 producer=0c0 data=8012000012d500010000030229053247627042210000002b2b2b2b
+dsp_hle: GSM service uplink sapi=0 pd=06 message=32 length=2
 dspif_transport: RX enqueue type=80 payload=34 producer=084 data=801200001a25000100000f3f012b2b
 dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=service_downlink data=00800f73012b2b
 dspif_transport: RX enqueue type=80 payload=34 producer=0b2 data=801200001a2a000100000f005309012101400691214365870900160407815515322b

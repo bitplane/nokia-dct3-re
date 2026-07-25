@@ -104,6 +104,17 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 				machine().time().as_double());
 	}
 
+	// The answered-call codec-boundary gate inventories the firmware's real
+	// shared-control commands before they are folded into DSP RAM words.
+	if (pc == addr && addr == 0x00290cf4 && m_trace_enabled)
+		LOGMASKED(LOG_DSP_BOUNDARY,
+				"dsp_shared_control: command=%02x value=%04x commit=%u caller=%08x task=%02x t=%.6f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+
 	// The alarm regression needs the firmware's final packed-event mapping.
 	if (pc == addr && addr == 0x002af64a && m_trace_enabled && fw_word(0x00110f1a) == 0x06bc)
 		LOGMASKED(LOG_CCONT_RTC, "rtc_alarm_route: map-output=%04x base=%08x offset=%08x deadline=%08x task=%02x t=%.9f\n",

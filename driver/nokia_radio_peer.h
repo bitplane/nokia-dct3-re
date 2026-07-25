@@ -76,6 +76,10 @@ private:
 		service_uplink_request,
 		service_uplink_wait,
 		service_uplink_acknowledgement,
+		traffic_channel_change,
+		traffic_lapdm_establish,
+		traffic_contention_resolution,
+		traffic_release_acknowledgement,
 		count
 	};
 
@@ -112,6 +116,7 @@ private:
 	bool m_incoming_smart_message_after_registration = false;
 	bool m_pch_fill_delivered = false;
 	bool m_page_transmitted = false;
+	bool m_traffic_channel_active = false;
 	unsigned m_downlink_offset = 0;
 };
 

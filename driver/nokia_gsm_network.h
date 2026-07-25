@@ -39,8 +39,10 @@ public:
 	std::array<u8, 24> immediate_assignment(u8 random_access, u32 frame_number) const;
 	std::array<u8, 17> location_update_accept(
 			const u8 *location_update_request, unsigned length) const;
+	std::array<u8, 3> cipher_mode_command() const;
 	std::array<u8, 10> mm_information() const;
 	std::array<u8, 17> incoming_call_setup() const;
+	std::array<u8, 8> traffic_assignment() const;
 	std::array<u8, 36> incoming_sms_cp_data() const;
 	unsigned incoming_smart_message_part_count() const;
 	layer3_message incoming_smart_message_cp_data(unsigned part_index) const;

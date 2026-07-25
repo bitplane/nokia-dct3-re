@@ -21,6 +21,8 @@ class DspPacketSemanticsCensusTest(unittest.TestCase):
 				classify("tx", 0x51, bytes.fromhex("2206" + "00" * 78)))
 		self.assertEqual(("search_list", "asynchronous GSM channel search command"),
 				classify("tx", 0x1A, bytes(68)))
+		self.assertEqual(("cipher_control", "one-way DSP cipher-control publication"),
+				classify("tx", 0x14, bytes.fromhex("00f4" + "ff" * 8 + "0000")))
 		self.assertEqual(("indexed_64_byte_block_upload", "one-way DSP configuration publication"),
 				classify("tx", 0x0D, bytes(66)))
 		self.assertEqual(("selector_lookup_table_upload", "one-way DSP configuration publication"),

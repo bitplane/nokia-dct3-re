@@ -449,6 +449,19 @@ if #post_keys > 0 then
 				local wait_ms = string.match(name, "^wait(%d+)$")
 				if wait_ms then
 					emu.wait(tonumber(wait_ms) / 1000)
+				elseif name == "waitbuzzer" then
+					-- Acceptance orchestration only: observe the mapped MAD2 PUP
+					-- buzzer gate, then deliver the next ordinary physical key.
+					-- This avoids coupling an answer fixture to firmware timing
+					-- without modifying call, UI or device state.
+					local deadline = emulation_seconds() + 20
+					repeat emu.wait(0.005) until
+							(space:read_u8(0x20015) & 0x20) ~= 0 or
+							emulation_seconds() >= deadline
+					if (space:read_u8(0x20015) & 0x20) == 0 then
+						machine:logerror("input-wait: buzzer timeout\n")
+						return
+					end
 				else
 					press(name)
 					emu.wait(post_duration)

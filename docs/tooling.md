@@ -37,6 +37,10 @@
   - `display_trace_check.py` — validates the version-specific NV descriptor
     `0x0749` mapping and the selected PCD8544 command/data stream captured by
     `make verify-display`.
+  - `radio_answered_audio_boundary_trace_check.py` — validates the answer-only
+    DSP shared-control command, its committed shared-RAM publication, and the
+    bounded acknowledgement-tone start/stop sequence captured by
+    `make verify-radio-incoming-call-answered`.
   - `gensio_trace_check.py` — validates CCONT phase/status plus the shared
     v5.01/v6.00 SELECT-latch initialization and read-modify-write contract.
   - `test_message_census.py`, `test_find_thumb_signature.py`,
@@ -72,6 +76,9 @@ functions and export analysis. The naming list is also exported as a
   Firmware editors retain their real completion rules: for example, the first
   clock setup requires four time digits and all eight date digits before `OK`
   completes. Harness waits do not fill untouched fields or bypass validation.
+  The `waitbuzzer` sequence token polls only the mapped MAD2 PUP buzzer gate
+  before delivering the next physical key; it does not inspect or change call
+  or firmware state.
 - `make verify-alarm` uses that organic input path to set the clock/date and a
   12:02 alarm, then requires the firmware to program CCONT, consume its alarm
   IRQ, clear the software deadline, and drive the MAD2 buzzer. It is distinct

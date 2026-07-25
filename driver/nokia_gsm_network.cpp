@@ -148,6 +148,14 @@ std::array<u8, 17> nokia_gsm_network_device::location_update_accept(
 	return message;
 }
 
+std::array<u8, 3> nokia_gsm_network_device::cipher_mode_command() const
+{
+	// GSM 04.08 9.1.9. This exercises the handset's cipher-control boundary
+	// while explicitly selecting SC=0 (no ciphering). Subsequent laboratory
+	// frames therefore remain clear; this is not an A5 implementation.
+	return { 0x06, 0x35, 0x00 };
+}
+
 std::array<u8, 10> nokia_gsm_network_device::mm_information() const
 {
 	// GSM 04.08 9.2.15. Keep this deterministic: 2026-07-24 12:00:00 UTC.
@@ -167,6 +175,15 @@ std::array<u8, 17> nokia_gsm_network_device::incoming_call_setup() const
 		0x34, 0x01,
 		0x5c, 0x05, 0x81, 0x55, 0x15, 0x32, 0xf4
 	};
+}
+
+std::array<u8, 8> nokia_gsm_network_device::traffic_assignment() const
+{
+	// GSM 04.08 9.1.2 and 10.5.2.5. Move the call from its temporary SDCCH
+	// onto TCH/F timeslot 1 on non-hopping ARFCN 1. TSC 2 is the BCC carried
+	// by the laboratory cell's BSIC 0x12; power level 0 is the mandatory
+	// initial Power Command. Channel Mode selects GSM full-rate speech v1.
+	return { 0x06, 0x2e, 0x09, 0x40, 0x01, 0x00, 0x63, 0x01 };
 }
 
 std::array<u8, 36> nokia_gsm_network_device::incoming_sms_cp_data() const

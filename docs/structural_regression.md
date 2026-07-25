@@ -30,12 +30,28 @@ selects a named network-event fixture and requires one IMSI page in the
 subscriber's calculated paging group, organic RACH/Immediate Assignment and
 Paging Response, bounded release, and return to PCH fill.
 `make verify-radio-incoming-call` uses a separate event fixture and continues
-from that entrance through acknowledgement-gated MM Information, one incoming
-SETUP, organic Call Confirmed and Alerting, handset clearing, network Release,
-organic Release Complete, RR teardown and return to PCH fill. It deliberately
-makes no traffic-channel, speech or ringing-UI claim.
-`make verify-radio-incoming-sms` uses another event fixture and requires one
-SAPI-3 SABM/UA exchange, both exact segments of the ordinary `hello`
+from that entrance through an SC=0 Cipher Mode Command, one-way DSP type
+`0x14`, organic Cipher Mode Complete, acknowledgement-gated MM Information,
+one incoming SETUP, organic Call Confirmed and Alerting, handset clearing,
+an RR TCH/F Assignment Command, organic channel configuration and new-link
+SABM/UA, Assignment Complete, network Release, organic Release Complete,
+DISC/UA, physical teardown and return to PCH fill. It deliberately makes no
+A5, answered-call speech or codec claim.
+`make verify-radio-incoming-call-answered` retains the same page and radio
+path but provisions the erased identity's real security-code verifier, enters
+`12345` through physical keys, waits for the organic MAD2 PUP buzzer gate and
+presses physical Answer once. It requires the ringtone enable/disable
+lifecycle, CC Connect, network Connect Acknowledge and a stable answered
+interval. The post-answer census admits only empty type-`0x1b` TCH polls and
+the independently classified type-`0x05` external-service poll; it fails on an
+unclassified DSP packet family. Its lower-boundary checker also requires the
+answer-only committed shared-control command `0x08/0x060b`, the exact 900 Hz
+acknowledgement-tone start/stop group, its 100--150 ms recovered duration, and
+no continuing MCU shared-control traffic. This locates a codec-control
+frontier without claiming decoded speech or PCM.
+`make verify-radio-incoming-sms` uses another event fixture, traverses the same
+SC=0 control boundary, and requires one SAPI-3 SABM/UA exchange, both exact
+segments of the ordinary `hello`
 SMS-DELIVER, the handset's SAPI-3 acknowledgement, an organic 176-byte
 `EF_SMS` update, and the exact unread record in card NVRAM. Neither the default
 v6.00 run nor a separate physical security-code-unlock control exposes the

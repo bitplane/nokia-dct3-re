@@ -286,7 +286,17 @@ phone-state constant shim:
   command path (`0x290cf4`; command 4 at `0x29103c`, followed by doorbell byte 2). Stateful-SIM
   runs reach this path with service commands `0x30` and `0x32`; the peer retains the register,
   and service-transport ring/service completion now use independent timers. Their observed
-  ring-producer and service-pending triggers remain distinct from command 4.
+ring-producer and service-pending triggers remain distinct from command 4.
+
+The deterministic answered-call trace reaches a new use of that same
+shared-control path. Between CC Connect and Connect Acknowledge, task 5 commits
+command `0x08` with value `0x060b`; helper `0x290cf4` writes encoded word
+`0x860b` to `[0x0a8]`, sets `[0x0e0]`, and rings command 4. The matched
+unanswered control produces no non-ring shared writes at this point. A
+separate task-9 sequence programs the known oscillator surface for a 900 Hz,
+120.8 ms acknowledgement tone. Thus `[0x0a8]` is now the proved lower
+call-audio control frontier, while the DSP-internal interpretation and
+MAD2-to-COBBA PCM bus remain unmodeled.
 
 The wider firmware contains roughly 287 DSPIF references and 444 shared-RAM
 base references, concentrated in the GSM-L1/audio layer at

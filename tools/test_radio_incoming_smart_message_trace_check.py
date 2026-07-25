@@ -14,6 +14,11 @@ def good_trace() -> str:
         "dsp_hle: PCH IMSI page transmitted channel=60 fn=3759",
         "dsp_hle: TX packet type=1b data=0080013f410627",
         "dspif_transport: RX enqueue type=80 payload=34 data="
+        "801200001a230001000003000d063500" + "2b" * 17,
+        "dsp_hle: TX packet type=14 payload=12 "
+        "data=00f4ffffffffffffffff0000",
+        "dsp_hle: GSM service uplink sapi=0 pd=06 message=32 length=2",
+        "dspif_transport: RX enqueue type=80 payload=34 data="
         "801200001a25000100000f3f01" + "2b" * 21,
         "dsp_hle: TX packet type=1b data=00800f7301",
     ]

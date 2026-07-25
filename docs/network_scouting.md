@@ -6,7 +6,8 @@ acceptance, SIM persistence, dedicated-channel release, return to serving-cell
 monitoring, PCH fill, one bounded paging/Paging Response lifecycle, one
 bounded mobile-terminated call-control attempt and one persistently delivered
 ordinary mobile-terminated SMS, plus one bounded port-addressed Nokia ringtone
-delivery. Packet data and speech traffic channels are outside this checkpoint.
+delivery. The call now includes TCH/F assignment and FACCH link establishment
+and release; speech frames, codec audio and packet data remain outside it.
 
 ## Ownership
 
@@ -16,7 +17,8 @@ delivery. Packet data and speech traffic channels are outside this checkpoint.
   parsing, RR/LAPDm, Mobility Management and operator-resource publication.
 - `nokia_gsm_network_device` owns immutable standards-shaped GSM cell and MM
   data: ARFCN, signal level, BSIC, PLMN/LAC/cell identity, SI1--SI4, Immediate
-  Assignment, Location Updating Accept and RR Channel Release.
+  Assignment, Location Updating Accept, TCH/F Assignment Command and RR
+  Channel Release.
 - `nokia_gsm_session_device` recognizes the complete Layer-3 Location Updating
   Request and owns the per-handset MM progression from contention-resolution
   delivery through acknowledgement of Location Updating Accept and Channel
@@ -24,10 +26,11 @@ delivery. Packet data and speech traffic channels are outside this checkpoint.
   numbers or Nokia scheduling.
 - After registration it retains the organically supplied IMSI mobile identity.
   Named network-event fixtures may move the idle session through Paging
-  Response into either bounded RR release or an unciphered MM connection,
+  Response into either bounded RR release or an SC=0 cipher-control exchange
+  followed by an unciphered MM connection,
   deterministic MM Information, mobile-terminated call control or SAPI-3 SMS.
 - `nokia_lapdm_link_device` owns the decoded dedicated-link boundary: SABM
-  validation, contention-resolution identity, UA construction and downlink
+  validation, contention-resolution identity, UA/DISC release and downlink
   I-frame sequence state. Its current organic coverage is the registration
   exchange on SAPI 0 plus independent SAPI-3 establishment and two-frame
   downlink segmentation for the SMS fixture. Wider supervisory/reassembly
@@ -99,17 +102,39 @@ The page is emitted exactly once. No call or SMS result is synthesized.
 
 `make verify-radio-incoming-call` selects the call fixture instead. After the
 same organic Paging Response and contention-resolution UA, the network sends
-time-only MM Information and waits for its LAPDm acknowledgement before SETUP.
-The v6.00 firmware then organically sends MM STATUS, Call Confirmed, Alerting
-and Disconnect. The network acknowledges each uplink I-frame, answers
-Disconnect with Release, then closes RR after the handset's organic Release
-Complete and returns to PCH fill. This is a bounded signalling result: the
-default erased-identity profile presents its security-code editor, and no
-traffic channel, speech codec, ringing UI oracle or answered-call state is
-claimed.
+an acknowledgement-gated SC=0 Cipher Mode Command, then time-only MM
+Information, and waits for each LAPDm acknowledgement before SETUP.
+The v6.00 firmware then organically sends MM STATUS, Call Confirmed and
+Alerting. The network assigns TCH/F timeslot 1 on ARFCN 1 with GSM full-rate
+speech mode. The ROM publishes Nokia `CHANNEL_CONFIGURE` for channel `0xc1`,
+accepts its correlated `CHANNEL_CHANGED_CNF`, establishes the new FACCH link
+with an empty SABM/UA exchange and sends RR Assignment Complete. The default
+erased-identity UI then disconnects; Release Complete, LAPDm DISC/UA, physical
+deconfiguration and return to PCH fill are all organic. This proves TCH/F
+control, not answered speech or codec data.
+
+`make verify-radio-incoming-call-answered` uses a separate named fixture with
+the generated erased-identity security verifier. Physical `12345` input lets
+the ROM leave its security editor; the already queued page is then processed
+organically. The input harness observes only the mapped PUP buzzer gate before
+pressing physical Answer. The ROM stops the ringtone, emits CC Connect, accepts
+Connect Acknowledge and remains on TCH/F. During the retained answered
+interval, MCU-to-DSP traffic consists of one LAPDm RR, periodic empty
+type-`0x1b` blocks on selector `0xf0`, and one already-classified type-`0x05`
+external-service poll. No new speech-frame or codec-configuration packet
+family appears in the packet ring. A complete shared-window changed-write trace
+does find the next lower entrance: task 5 commits shared-control command
+`0x08/0x060b` between CC Connect and Connect Acknowledge, producing encoded
+word `0x860b` at offset `0x0a8` and a DSPIF command-4 doorbell. A matched
+unlocked but unanswered run has no corresponding non-ring writes. A later
+task-9 group produces only a 900 Hz, 120.8 ms acknowledgement tone and stops;
+it is separately classified from the answer-only command. Command `0x08` is
+therefore the current call-audio control frontier. Its bit fields and any
+DSP-to-COBBA PCM action remain unknown.
 
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
-the same page and unciphered MM entrance, establishes LAPDm SAPI 3 exactly
+the same page, SC=0 cipher-control and unciphered MM entrance, establishes
+LAPDm SAPI 3 exactly
 once, and delivers a standards-shaped SMS-DELIVER for `hello` in two I frames.
 The firmware acknowledges SAPI 3, selects `EF_SMS`, writes a complete 176-byte
 record through SIMI/FIQ6, and card NVRAM contains the exact unread record.
@@ -164,8 +189,8 @@ activated the synthetic EEPROM's unmodeled network-lock policy and displayed
 | RX `0x8c` | IDLE_RA completion | completes receiver/random-access configuration |
 | RX `0x8f` | NO_PSW_LEFT | closes the initial power-scan work list |
 | MCU `0x0c` | IDLE_RA/random access | form 0 carries the CHANNEL REQUEST octet |
-| MCU `0x1b` | SEND_BLOCK | two-byte DSP channel header followed by LAPDm |
-| MCU `0x02` | CHANNEL_CONFIGURE | establishes or releases the recovered logical channel |
+| MCU `0x1b` | SEND_BLOCK | two-byte DSP channel header followed by LAPDm; TCH/F FACCH uses active selector `0xb0` and empty polling reports `0xf0` |
+| MCU `0x02` | CHANNEL_CONFIGURE | establishes or releases the recovered logical channel; accepted TCH/F configuration exposes channel code `0xc1` |
 
 RSSI results report two -109 dBm baselines followed by ARFCN 1 at -60 dBm.
 Firmware reconciles the request table, applies its -108 dBm threshold and
@@ -180,12 +205,13 @@ it does not post the firmware's internal MM result. The link records the
 Accept's next receive sequence, requests another dedicated uplink block and
 accepts only the handset's matching SAPI-0 RR acknowledgement before the peer
 queues Channel Release. The link then requires the handset's second SAPI-0 RR,
-acknowledging N(R)=2, before physical teardown. A focused extra-uplink probe
-after that acknowledgement returned only the firmware's ordinary `01 03 01`
-UI/fill frame; the firmware independently issued channel deconfiguration and
-did not expose DISC at this boundary. The peer therefore does not invent a
-DISC/UA exchange. RR release causes firmware to issue its own deconfiguration
-request before the peer confirms it.
+acknowledging N(R)=2, before physical teardown. A focused registration
+extra-uplink probe after that acknowledgement returned only the firmware's
+ordinary `01 03 01` UI/fill frame, so the SDCCH registration path still does
+not invent DISC. In contrast, the assigned TCH/F call organically exposes an
+empty new-link SABM, Assignment Complete and a final DISC. The peer returns
+standards-shaped UA frames only for those observed transactions, then confirms
+the ROM's own deconfiguration request.
 
 After registration, channel `0x50` continues to carry BCCH while channel
 `0x60` carries the decoded PCH/AGCH blocks already associated with the
@@ -234,7 +260,7 @@ be reintroduced as peer behavior:
 
 The checkpoint is registered and camped, not a complete cellular network.
 Known extensions are authentication/ciphering, periodic and mobility-driven
-Location Updating, answered-call/TCH control, MO SMS and MT SMS CP/RP closure,
+Location Updating, deterministic answered-call speech/codec data, MO SMS and MT SMS CP/RP closure,
 multipart Smart Messaging and ringtone UI/persistence, handover, measurement reporting,
 loss/reselection, rejected registration and configurable multi-cell topology.
 Each extension must begin with an organic MCU request or a standards-defined

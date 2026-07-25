@@ -597,10 +597,28 @@
       "evidence": ["docs/network_scouting.md", "ghidra/symbols/3210.csv"]
     },
     {
+      "id": "cipher_mode_complete_requires_dsp_reply", "status": "disproven",
+      "hypothesis": "The v6.00 firmware cannot emit RR Cipher Mode Complete until the DSP peer implements a response to the handset's cipher-control request",
+      "conclusion": "An acknowledgement-gated SC=0 Cipher Mode Command after organic Paging Response makes the firmware publish DSP TX type 0x14 with payload 00f4ffffffffffffffff0000 and then organically send RR Cipher Mode Complete without any DSP-ring response. Calls, ordinary SMS and the first multipart Smart Message part all continue. Quarantined SC=1 and patterned-EF_Kc probes change the packet to 0200 plus the eight Kc bytes in DSP word order and likewise complete without a reply. SC=1 was removed because the peer transports clear decoded blocks; the result proves the control-plane boundary, not A5 bitstream processing.",
+      "evidence": ["docs/dsp_interface.md", "docs/grey_salamander_integration.md", "tools/radio_incoming_call_trace_check.py"]
+    },
+    {
       "id": "mad2_timer1_free_runs_past_destination", "status": "disproven",
       "hypothesis": "MAD2 Timer 1 is a free-running 16-bit counter and 0x7fff is only a compare destination",
       "conclusion": "The isolated destination/FIQ5 and sleep gates cannot distinguish a terminal counter from a free-running one. In the 35-second coherent power fixture, allowing current to pass 0x7fff produces no CCONT power-off or charger-originated restart because firmware computes unsigned destination-current intervals. Wrapping to zero after terminal 0x7fff restores rail removal at about 14.03 seconds and the subsequent organic wake sequence. The register pair is therefore modeled as current plus terminal count, not current plus a non-wrapping compare point.",
       "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md", "tools/charger_wake_check.py"]
+    },
+    {
+      "id": "answered_call_exposes_mcu_speech_packets", "status": "disproven",
+      "hypothesis": "Once the v6.00 ROM accepts an incoming TCH/F call, a new MCU-visible DSP packet family immediately carries speech frames or codec configuration",
+      "conclusion": "A deterministic physical-input fixture unlocks the erased-identity UI, waits for organic MAD2 ringing, presses Answer, observes CC Connect and Connect Acknowledge, and retains more than forty post-answer TCH polls. MCU-to-DSP traffic after Connect Ack is one LAPDm RR, periodic empty type-0x1b blocks on selector 0xf0, and one type-0x05 class-0 command-0x5f external-service poll also present at the same absolute time in unanswered and idle controls. No speech-bearing or codec-configuration packet family appears at this boundary; speech must be sought below or outside the currently observed MCU packet ring.",
+      "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md", "tools/radio_answered_call_trace_check.py"]
+    },
+    {
+      "id": "answered_call_has_no_non_ring_dsp_control", "status": "disproven",
+      "hypothesis": "Because an answered call emits no new MCU packet-ring family, it also produces no answer-specific control below that ring",
+      "conclusion": "A complete changed-write trace shows task 5 committing shared-control command 0x08 with value 0x060b between organic CC Connect and Connect Acknowledge, publishing encoded word 0x860b at shared offset 0x0a8 and ringing DSPIF command 4. A matched unlocked-but-unanswered run has no non-ring writes after the corresponding point. A separate task-9 sequence programs a 900 Hz oscillator and stops it after 120.8 ms; its bounded UI-tone behavior is not speech. Command 0x08 is the proved lower call-audio control frontier, but its bit semantics and the DSP-to-COBBA PCM consequence remain unknown.",
+      "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md", "tools/radio_answered_audio_boundary_trace_check.py"]
     }
   ]
 }

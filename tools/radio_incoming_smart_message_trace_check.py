@@ -23,6 +23,13 @@ PREFIX_CHECKPOINTS = (
         r"PCH IMSI page transmitted channel=60 fn=")),
     ("Paging Response", re.compile(
         r"TX packet type=1b .*data=0080013f410627")),
+    ("no-cipher Cipher Mode Command", re.compile(
+        r"RX enqueue type=80 payload=34 .*data=[0-9a-f]{20}03000d063500")),
+    ("DSP cipher-control publication", re.compile(
+        r"TX packet type=14 payload=12 .*"
+        r"data=00f4ffffffffffffffff0000")),
+    ("Cipher Mode Complete", re.compile(
+        r"GSM service uplink sapi=0 pd=06 message=32 length=2")),
     ("SAPI 3 SABM", re.compile(
         r"RX enqueue type=80 payload=34 .*data=[0-9a-f]{20}0f3f01")),
     ("SAPI 3 UA", re.compile(
