@@ -171,6 +171,22 @@ bool nokia_radio_peer_device::take_uplink_speech(speech_frame &frame)
 			m_uplink_speech_count, frame);
 }
 
+bool nokia_radio_peer_device::queue_downlink_sacch(
+		const gsm::tch_f::packed_control_block &block)
+{
+	return speech_channel_active() &&
+			m_downlink_sacch_transmitter.enqueue(
+				gsm::tch_f::unpack_control(block));
+}
+
+bool nokia_radio_peer_device::submit_uplink_sacch(
+		const gsm::tch_f::packed_control_block &block)
+{
+	return speech_channel_active() &&
+			m_uplink_sacch_transmitter.enqueue(
+				gsm::tch_f::unpack_control(block));
+}
+
 void nokia_radio_peer_device::clear_speech_queues()
 {
 	m_downlink_speech_head = 0;
@@ -185,6 +201,10 @@ void nokia_radio_peer_device::reset_l1_pipeline()
 	m_network_receiver.reset();
 	m_downlink_transmitter.reset();
 	m_handset_receiver.reset();
+	m_uplink_sacch_transmitter.reset();
+	m_network_sacch_receiver.reset();
+	m_downlink_sacch_transmitter.reset();
+	m_handset_sacch_receiver.reset();
 }
 
 TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
@@ -208,9 +228,29 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	// The laboratory RR assignment is TCH/F timeslot 1. Its frame 12 is idle
 	// and frame 25 is the SACCH/TF position; neither advances the diagonal TCH
 	// interleaver.
-	if (gsm::tch_f::full_rate_slot(frame_number, 1) !=
-			gsm::tch_f::tdma_slot_kind::traffic)
+	const auto slot = gsm::tch_f::full_rate_slot(frame_number, 1);
+	if (slot == gsm::tch_f::tdma_slot_kind::idle)
 		return;
+	if (slot == gsm::tch_f::tdma_slot_kind::sacch)
+	{
+		const unsigned phase = gsm::tch_f::sacch_burst_index(frame_number, 1);
+		const auto training = gsm::tch_f::training_sequence(2);
+		if (const auto uplink =
+					m_uplink_sacch_transmitter.next_burst(phase))
+		{
+			const auto air = gsm::tch_f::pack_normal_burst(*uplink, training);
+			m_network_sacch_receiver.receive(
+					gsm::tch_f::unpack_normal_burst(air));
+		}
+		if (const auto downlink =
+					m_downlink_sacch_transmitter.next_burst(phase))
+		{
+			const auto air = gsm::tch_f::pack_normal_burst(*downlink, training);
+			m_handset_sacch_receiver.receive(
+					gsm::tch_f::unpack_normal_burst(air));
+		}
+		return;
+	}
 
 	// Keep the DSP's 20 ms codec clock independent. At each four-traffic-burst
 	// block boundary, consume at most the next frame it has made available.

@@ -62,6 +62,10 @@ public:
 	bool take_downlink_speech(speech_frame &frame);
 	bool submit_uplink_speech(const speech_frame &frame);
 	bool take_uplink_speech(speech_frame &frame);
+	bool queue_downlink_sacch(
+			const gsm::tch_f::packed_control_block &block);
+	bool submit_uplink_sacch(
+			const gsm::tch_f::packed_control_block &block);
 
 protected:
 	virtual void device_start() override;
@@ -171,6 +175,10 @@ private:
 	gsm::tch_f::diagonal_receiver m_network_receiver;
 	gsm::tch_f::diagonal_transmitter m_downlink_transmitter;
 	gsm::tch_f::diagonal_receiver m_handset_receiver;
+	gsm::tch_f::sacch_transmitter m_uplink_sacch_transmitter;
+	gsm::tch_f::sacch_receiver m_network_sacch_receiver;
+	gsm::tch_f::sacch_transmitter m_downlink_sacch_transmitter;
+	gsm::tch_f::sacch_receiver m_handset_sacch_receiver;
 	u64 m_uplink_facch_blocks = 0;
 	u64 m_downlink_facch_blocks = 0;
 	u64 m_uplink_bad_speech_blocks = 0;

@@ -850,9 +850,13 @@ decoded downlink to COBBA, and non-silent physical-microphone uplink decoded
 at the network peer. It does not yet prove the constituent meanings of
 command-`0x08` bits 0 and 9, the MAD2 serial-port edge/idle-clock and register
 contract or firmware-selected COBBA analogue routing. SACCH coding,
-rectangular interleaving and timeslot coexistence are present, but meaningful
-measurement-report/system-information payload production and consumption
-remain to be connected to their Layer-3 owners.
+rectangular interleaving and timeslot coexistence are present. Independent
+stateful SACCH transmitters and receivers now wait for the correct
+timeslot-dependent phase in the 104-frame cycle; all eight timeslots are
+covered, including the wrapped phase ordering for timeslots 2--7. An empty
+endpoint transmits nothing rather than manufacturing a measurement report.
+Meaningful measurement-report/system-information payload production and
+consumption remain to be connected to their Layer-3 owners.
 
 ## Unresolved contracts
 - Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the

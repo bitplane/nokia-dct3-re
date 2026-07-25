@@ -140,6 +140,32 @@ private:
 	std::array<burst_payload, 8> m_new{};
 };
 
+// SACCH/TF uses one rectangularly interleaved burst in each 26-frame
+// multiframe. An empty transmitter emits no invented Layer-2 payload.
+class sacch_transmitter
+{
+public:
+	bool enqueue(const control_bits &information);
+	std::optional<burst_payload> next_burst(unsigned scheduled_phase);
+	void reset();
+
+private:
+	bool m_pending = false;
+	unsigned m_phase = 0;
+	std::array<burst_payload, 4> m_bursts{};
+};
+
+class sacch_receiver
+{
+public:
+	std::optional<decoded_control> receive(const burst_payload &burst);
+	void reset();
+
+private:
+	unsigned m_phase = 0;
+	std::array<burst_payload, 4> m_bursts{};
+};
+
 enum class tdma_slot_kind : std::uint8_t
 {
 	traffic,
@@ -149,6 +175,7 @@ enum class tdma_slot_kind : std::uint8_t
 
 // TS 45.002 table 1 / figure 7a. frame_number is an absolute TDMA FN.
 tdma_slot_kind full_rate_slot(std::uint32_t frame_number, unsigned timeslot);
+unsigned sacch_burst_index(std::uint32_t frame_number, unsigned timeslot);
 
 } // namespace gsm::tch_f
 

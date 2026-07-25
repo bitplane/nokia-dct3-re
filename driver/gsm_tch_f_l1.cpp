@@ -611,6 +611,53 @@ void diagonal_receiver::reset()
 	m_new = {};
 }
 
+bool sacch_transmitter::enqueue(const control_bits &information)
+{
+	if (m_pending)
+		return false;
+	m_bursts = interleave_sacch(encode_control(information));
+	m_pending = true;
+	m_phase = 0;
+	return true;
+}
+
+std::optional<burst_payload> sacch_transmitter::next_burst(
+		unsigned scheduled_phase)
+{
+	if (!m_pending || (scheduled_phase & 3) != m_phase)
+		return std::nullopt;
+	const burst_payload result = m_bursts[m_phase++];
+	if (m_phase == 4)
+	{
+		m_phase = 0;
+		m_pending = false;
+	}
+	return result;
+}
+
+void sacch_transmitter::reset()
+{
+	m_pending = false;
+	m_phase = 0;
+	m_bursts = {};
+}
+
+std::optional<decoded_control> sacch_receiver::receive(
+		const burst_payload &burst)
+{
+	m_bursts[m_phase++] = burst;
+	if (m_phase != 4)
+		return std::nullopt;
+	m_phase = 0;
+	return decode_control(deinterleave_sacch(m_bursts));
+}
+
+void sacch_receiver::reset()
+{
+	m_phase = 0;
+	m_bursts = {};
+}
+
 tdma_slot_kind full_rate_slot(std::uint32_t frame_number, unsigned timeslot)
 {
 	const unsigned position = frame_number % 26;
@@ -623,6 +670,15 @@ tdma_slot_kind full_rate_slot(std::uint32_t frame_number, unsigned timeslot)
 	if (position == idle_position)
 		return tdma_slot_kind::idle;
 	return tdma_slot_kind::traffic;
+}
+
+unsigned sacch_burst_index(std::uint32_t frame_number, unsigned timeslot)
+{
+	// TS 45.002 table 1 rotates the four SACCH/TF bursts by one multiframe
+	// for each pair of timeslots: TS0/1 B(12/25,38/51,64/77,90/103),
+	// TS2/3 start at the second entry, and so on.
+	const unsigned multiframe = (frame_number / 26) & 3;
+	return (multiframe + 4 - ((timeslot & 7) / 2)) & 3;
 }
 
 } // namespace gsm::tch_f

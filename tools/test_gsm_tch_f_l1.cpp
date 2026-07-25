@@ -232,6 +232,64 @@ void test_full_rate_schedule()
 	assert(full_rate_slot(25, 1) == tdma_slot_kind::sacch);
 	assert(full_rate_slot(12, 0) == tdma_slot_kind::sacch);
 	assert(full_rate_slot(25, 0) == tdma_slot_kind::idle);
+
+	for (unsigned timeslot = 0; timeslot < 8; ++timeslot)
+	{
+		std::array<bool, 4> phases{};
+		for (unsigned fn = 0; fn < 104; ++fn)
+		{
+			if (full_rate_slot(fn, timeslot) == tdma_slot_kind::sacch)
+				phases[sacch_burst_index(fn, timeslot)] = true;
+		}
+		assert(std::all_of(
+				phases.begin(), phases.end(), [](bool value) { return value; }));
+	}
+	assert(sacch_burst_index(12, 0) == 0);
+	assert(sacch_burst_index(25, 1) == 0);
+	assert(sacch_burst_index(12, 2) == 3);
+	assert(sacch_burst_index(25, 7) == 1);
+}
+
+void test_stateful_sacch_stream()
+{
+	control_bits information{};
+	for (unsigned k = 0; k < information.size(); ++k)
+		information[k] = ((k * 17 + 3) % 31) < 14;
+	sacch_transmitter transmitter;
+	sacch_receiver receiver;
+	assert(!transmitter.next_burst(0));
+	assert(transmitter.enqueue(information));
+	assert(!transmitter.enqueue(information));
+	assert(!transmitter.next_burst(2));
+
+	std::optional<decoded_control> decoded;
+	unsigned traffic_slots = 0;
+	unsigned idle_slots = 0;
+	for (unsigned fn = 0; fn < 104; ++fn)
+	{
+		switch (full_rate_slot(fn, 1))
+		{
+		case tdma_slot_kind::traffic:
+			++traffic_slots;
+			break;
+		case tdma_slot_kind::idle:
+			++idle_slots;
+			break;
+		case tdma_slot_kind::sacch:
+		{
+			const auto burst = transmitter.next_burst(
+					sacch_burst_index(fn, 1));
+			assert(burst);
+			auto result = receiver.receive(*burst);
+			if (result)
+				decoded = result;
+			break;
+		}
+		}
+	}
+	assert(traffic_slots == 96 && idle_slots == 4);
+	assert(decoded && decoded->good && decoded->bits == information);
+	assert(!transmitter.next_burst(0));
 }
 
 } // anonymous namespace
@@ -245,6 +303,7 @@ int main()
 	test_facch_control_coding();
 	test_stateful_diagonal_stream();
 	test_full_rate_schedule();
+	test_stateful_sacch_stream();
 	std::cout << "GSM TCH/FS Layer 1 tests passed\n";
 	return 0;
 }
