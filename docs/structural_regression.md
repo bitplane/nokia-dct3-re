@@ -72,12 +72,15 @@ Answer-to-End flow under the independently relocated v5.01 firmware and checks
 the invariant shared-offset-`0x0a8` wire lifecycle
 `0x8002 -> 0x860b -> 0x840a -> 0x8002`.
 `make verify-radio-call-state-roundtrip` additionally saves during the stable
-speech interval, records 2.1 seconds of DSP/network media evolution, restores
-the save, and records the same emulated interval again. Its verifier compares
-the ordered speech records exactly rather than accepting mere post-load
-activity. The discarded reference branch is removed only for the ordinary
-monotonic lifecycle/media checks; the restored branch then reaches a physical
-End and clean teardown.
+speech interval under both v6.00 and independently relocated v5.01, records
+two seconds of DSP/network media evolution, restores the save, and records the
+same emulated interval again. Its verifier compares the ordered speech
+records exactly rather than accepting mere post-load activity. The discarded
+reference branch is removed only for the ordinary monotonic lifecycle/media
+checks; each restored branch then reaches a physical End and clean teardown.
+The v6.00 half uses the decoded control-lifecycle oracle while the v5.01 half
+uses the shared-wire oracle, so the gate preserves the known product contract
+difference rather than forcing both ROMs through one interpretation.
 `make verify-radio-incoming-sms` uses another event fixture, traverses the same
 SC=0 control boundary, and requires one SAPI-3 SABM/UA exchange, both exact
 segments of the ordinary `hello`
