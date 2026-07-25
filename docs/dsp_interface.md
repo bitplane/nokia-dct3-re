@@ -895,15 +895,18 @@ multiframes. This spacing is intentionally specified in radio units rather
 than call/frame contents. FACCH bursts are preserved so the profiles test
 speech degradation rather than forcing call control.
 
-`make verify-radio-degraded-speech` proves the complete consequence: the
-configured fades reach both air seams, protected speech fails parity after
-Viterbi decoding, and each BFI triggers the direction's independent GSM 06.11
-substitutor rather than decoding damaged payload. The network continues
-encoding downlink audio across uplink losses, later clean blocks reset both
-loss sequences, and call control remains organic. The current v6.00 run
-inverted 20 bursts per direction, observed eight impairment-induced downlink
-bad blocks, concealed 12 handset-side and five network-side intervals, still
-delivered 145 non-silent earpiece blocks and completed organic teardown.
+`make verify-radio-degraded-speech` proves the complete consequence under both
+v6.00 and independently relocated v5.01: the configured fades reach both air
+seams, protected speech fails parity after Viterbi decoding, and each BFI
+triggers the direction's independent GSM 06.11 substitutor rather than
+decoding damaged payload. The network continues encoding downlink audio
+across uplink losses, later clean blocks reset both loss sequences, and call
+control remains organic. Each run inverted 20 bursts per direction, observed
+eight impairment-induced downlink bad blocks, retained 145 non-silent
+earpiece blocks and completed organic teardown. Handset/network concealment
+counts were 12/5 for v6.00 and 11/5 for v5.01; the one-frame difference comes
+from their organically different call timing rather than a product-specific
+error path.
 
 The receive-side requirements and 320 ms maximum muting interval are derived
 from [ETSI GSM 06.11 version 3.0.1](https://www.etsi.org/deliver/etsi_gts/06/0611/03.00.01_60/gsmts_0611sv030001p.pdf),

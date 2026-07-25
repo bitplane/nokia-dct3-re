@@ -81,6 +81,12 @@ checks; each restored branch then reaches a physical End and clean teardown.
 The v6.00 half uses the decoded control-lifecycle oracle while the v5.01 half
 uses the shared-wire oracle, so the gate preserves the known product contract
 difference rather than forcing both ROMs through one interpretation.
+`make verify-radio-degraded-speech` likewise runs both ROMs through the
+bidirectional burst-impairment profile. It requires protected-frame failure,
+explicit handset and network BFIs, independent downlink continuation during
+uplink loss, non-silent concealment, clean-frame recovery and organic
+teardown. The v6.00 half retains its decoded control-lifecycle oracle and the
+v5.01 half its shared-wire oracle.
 `make verify-radio-incoming-sms` uses another event fixture, traverses the same
 SC=0 control boundary, and requires one SAPI-3 SABM/UA exchange, both exact
 segments of the ordinary `hello`
