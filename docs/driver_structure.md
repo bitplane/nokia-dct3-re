@@ -30,11 +30,16 @@ state and service timing; DSPIF carries no DSP-behavior configuration, making
 the HLE a replaceable backend seam;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
 session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation; and
-`nokia_gsm_network_device` owns standards-shaped cell, RR and MM data. The
+`nokia_lapdm_link_device` owns decoded LAPDm establishment state, contention
+identity, sequence numbers and pending downlink acknowledgements;
+`nokia_gsm_session_device` owns the per-handset Layer-3 request and
+acknowledgement-gated registration, paging, bounded call and SMS transactions; and
+`nokia_gsm_network_device` owns
+immutable standards-shaped cell, RR and MM data. The
 phone state only composes those devices and wires DSPIF callbacks to MAD2.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
 connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0,
-declared file metadata, persistent mutable card records and
+declared file metadata, persistent mutable ADN/SMS/SMSP records and
 the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI registers
 within offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrupt
 pending/masks, and ARM IRQ/FIQ routing. Attached devices signal it through
@@ -69,10 +74,11 @@ diagnostics use MAME logging, while negative composition and conformance
 selection use standard MAME configuration ports populated by named external
 fixtures.
 
-Digital-baseband reset explicitly resets the stateful radio-correlation peer
-alongside MAD2, DSPIF, DSP HLE, service peer, SIMI and the LCD. The GSM network
-device contains immutable laboratory-cell data; it has no transaction state to
-reset. CCONT, flash and EEPROM remain on their documented surviving domains.
+Digital-baseband reset explicitly resets the stateful radio-correlation,
+LAPDm-link and GSM-session peers alongside MAD2, DSPIF, DSP HLE, service peer,
+SIMI and the LCD. The GSM network device contains immutable laboratory-cell
+data; it has no transaction state to reset. CCONT, flash and EEPROM remain on
+their documented surviving domains.
 
 ## Rules
 

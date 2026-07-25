@@ -23,8 +23,30 @@ action, matching SI3 identity, and complete SI1--SI4 bitmap.
 `make verify-radio-registration` continues through one accepted Location
 Updating exchange. It requires the exact contention-resolution UA payload, the
 firmware's `UPDATE BINARY` of `EF_LOCI`, RR release, channel deconfiguration and
-at least four channel-`0x50` BCCH blocks after release. This distinguishes a
-completed registration from unrelated type-`0x80` traffic or a retry loop.
+at least four channel-`0x50` BCCH blocks and a channel-`0x60` no-identity PCH
+block after release. This distinguishes a completed registration from
+unrelated type-`0x80` traffic or a retry loop. `make verify-radio-paging`
+selects a named network-event fixture and requires one IMSI page in the
+subscriber's calculated paging group, organic RACH/Immediate Assignment and
+Paging Response, bounded release, and return to PCH fill.
+`make verify-radio-incoming-call` uses a separate event fixture and continues
+from that entrance through acknowledgement-gated MM Information, one incoming
+SETUP, organic Call Confirmed and Alerting, handset clearing, network Release,
+organic Release Complete, RR teardown and return to PCH fill. It deliberately
+makes no traffic-channel, speech or ringing-UI claim.
+`make verify-radio-incoming-sms` uses another event fixture and requires one
+SAPI-3 SABM/UA exchange, both exact segments of the ordinary `hello`
+SMS-DELIVER, the handset's SAPI-3 acknowledgement, an organic 176-byte
+`EF_SMS` update, and the exact unread record in card NVRAM. The locked v6.00
+run does not expose the CP/RP closing tail, so that verifier makes no RR
+teardown or visible-notification claim.
+`make verify-radio-incoming-smart-message` replaces the text TPDU with one
+complete 251-byte Nokia RTPL ringtone queued as two concatenated parts. It
+requires all nine exact stop-and-wait SAPI-3 segments of part 1, including
+TP-UDHI, DCS `f5`, the port-`1581` UDH, reference `7a`, count `2`, index `1`
+and RTPL bytes, while also requiring `EF_SMS` record 1 to stay free. Part 2
+remains queued behind organic CP/RP closure; the gate deliberately does not
+claim ringtone UI, playback, reassembly or persistence.
 `make verify-radio-operator` adds the unobscured firmware-rendered test-PLMN
 label. None alters either boot oracle.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical

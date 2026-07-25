@@ -4,6 +4,7 @@ SHELL := /bin/bash
 MAME_REPO   ?= https://github.com/mamedev/mame.git
 MAME_COMMIT ?= 58fca9a8a20f75ac2010980e1a2ec0465c595583
 MAME_DIR    ?= mame
+JOBS        ?= 4
 
 PYTHON ?= python3
 VENV   := .venv
@@ -17,6 +18,8 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_external_service.cpp driver/nokia_external_service.h \
 	driver/nokia_gensio.cpp driver/nokia_gensio.h \
 	driver/nokia_gsm_network.cpp driver/nokia_gsm_network.h \
+	driver/nokia_gsm_session.cpp driver/nokia_gsm_session.h \
+	driver/nokia_lapdm_link.cpp driver/nokia_lapdm_link.h \
 	driver/nokia_kbgpio.cpp driver/nokia_kbgpio.h \
 	driver/nokia_mad2.cpp driver/nokia_mad2.h \
 	driver/nokia_mbus.cpp driver/nokia_mbus.h \
@@ -41,6 +44,7 @@ RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
 NVRAM_SYSTEM := $(if $(and $(filter noki3210,$(PHONE)),$(filter 501,$(BIOS))),noki3210_1,$(PHONE))
 PRESERVE_NVRAM ?= 0
 PROVISIONED_IMEI_PREFIX ?=
+ERASED_IDENTITY_SECURITY_CODE ?=
 EEPROM_BASENAME ?= $(if $(filter 501,$(BIOS)),3210 v501 eeprom.bin,3210 v600 eeprom.bin)
 CENSUS_LOG ?=
 CENSUS_MANIFESTS ?= tools/run_manifests/external-service.json tools/run_manifests/deep-gsm.json
@@ -88,6 +92,10 @@ BOOT_ENV := NOKIA_DCT3_LUA_QUIET=1
 # CCONT readiness is a reset-time device input; the peer devices are disabled
 # at their ordinary boundaries. No firmware state is changed.
 CONTACT_SERVICE_ARGS := -cfg_directory ../fixtures/contact_service
+RADIO_PAGING_ARGS := -cfg_directory ../fixtures/radio_paging
+RADIO_INCOMING_CALL_ARGS := -cfg_directory ../fixtures/radio_incoming_call
+RADIO_INCOMING_SMS_ARGS := -cfg_directory ../fixtures/radio_incoming_sms
+RADIO_INCOMING_SMART_MESSAGE_ARGS := -cfg_directory ../fixtures/radio_incoming_smart_message
 
 MAME_ARGS := $(PHONE) -rompath roms -log -video none -sound none \
 	-keyboardprovider none -mouseprovider none -lightgunprovider none \
@@ -99,7 +107,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-bootstrap-3310 verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-bootstrap-3310 verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-vibrator verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -145,6 +153,10 @@ help:
 	@echo "make verify-dsp-tone check the organic ROM-4 COBBA tone command"
 	@echo "make verify-radio-camp check organic serving-cell selection and SI1-SI4"
 	@echo "make verify-radio-registration check Location Updating, release and steady camp"
+	@echo "make verify-radio-paging check PCH fill, one IMSI page and organic Paging Response"
+	@echo "make verify-radio-incoming-call check organic MT SETUP, Alerting and bounded clearing"
+	@echo "make verify-radio-incoming-sms check organic segmented MT text delivery and SIM storage"
+	@echo "make verify-radio-incoming-smart-message check part 1 of a queued long Nokia ringtone"
 	@echo "make verify-radio-operator check registration plus firmware-rendered operator"
 	@echo "make verify-mad2    check timer-0/FIQ and save-state restoration contracts"
 	@echo "make verify-mad2-interrupts check simultaneous, masked-pending and extended-FIQ routing"
@@ -163,6 +175,7 @@ help:
 	@echo "make verify-vibrator exercise the MAD2 vibrator gate/control MMIO contract"
 	@echo "make mad2-census MAD2_LOG=... summarize a bounded MAD2 ledger trace"
 	@echo "PRESERVE_NVRAM=1    retain EEPROM writes between runs (default reseeds the fixture)"
+	@echo "JOBS=4              bound MAME build parallelism (override for larger machines)"
 	@echo "make verify-structure  compare semantic boot predicates with $(ORACLE_STRUCT)"
 	@echo "make smoke PHONE=noki3330  bounded non-oracle boot for another local ROM set"
 	@echo "make smoke-3330e     normalize and boot the local v4.50 PPM E service files"
@@ -186,13 +199,14 @@ overlay: download-mame
 		if git -C $(MAME_DIR) apply --reverse --check "../$$patch" >/dev/null 2>&1; then :; \
 		else git -C $(MAME_DIR) apply "../$$patch"; fi; \
 	done
-	install -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp
-	@for src in $(DRIVER_COMPONENTS); do install -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
+	install -C -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp
+	@for src in $(DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
 
 eeprom-profile:
 	@test -f $(ROM) || { echo "Missing $(ROM) — bring your own dump (see roms/README.md)"; exit 1; }
 	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/$(EEPROM_BASENAME)" \
-		$(if $(PROVISIONED_IMEI_PREFIX),--provisioned-imei-prefix $(PROVISIONED_IMEI_PREFIX))
+		$(if $(PROVISIONED_IMEI_PREFIX),--provisioned-imei-prefix $(PROVISIONED_IMEI_PREFIX)) \
+		$(if $(ERASED_IDENTITY_SECURITY_CODE),--erased-identity-security-code $(ERASED_IDENTITY_SECURITY_CODE))
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \
@@ -225,7 +239,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$$(nproc)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 -j$(JOBS)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
@@ -276,7 +290,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
 
 ccont-static-census:
 	$(VENV)/bin/python tools/ccont_static_census.py --check --json docs/data/ccont_static_census.json
@@ -585,6 +599,32 @@ verify-radio-registration:
 		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-paging:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=32 \
+		RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-incoming-call:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=36 \
+		RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_incoming_call_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-incoming-sms:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 \
+		RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log \
+		$(RUN_DIR)/nvram/noki3210/sim_card
+
+verify-radio-incoming-smart-message:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 \
+		RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py \
+		$(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
 
 verify-radio-operator:
 	@set -e; \

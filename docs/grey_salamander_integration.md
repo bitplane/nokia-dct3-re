@@ -1,0 +1,202 @@
+# Grey Salamander knowledge-integration catalogue
+
+This document catalogues reusable protocol knowledge from
+[`jmacato/grey-salamander-magpie-kit`](https://github.com/jmacato/grey-salamander-magpie-kit)
+and defines how it may inform this project without copying its implementation.
+
+The reviewed upstream baseline is tag `v0.1.1`, commit
+`b09ec27ac96f3607442337ed80cde177e8b92ddb` (22 July 2026). The repository was
+still at that commit when rechecked on 24 July 2026.
+
+## Use policy
+
+Grey Salamander is a source of:
+
+- protocol coverage hints;
+- known-working transaction order;
+- useful edge cases and test scenarios;
+- host-boundary and state-ownership ideas; and
+- pointers to relevant GSM specifications.
+
+It is not a source file dependency and its C# is not to be translated line by
+line. New behavior is implemented natively from the cited GSM specifications,
+our recovered Nokia boundary, and firmware observations. A feature enters the
+supported model only when organic DCT3 traffic reaches the relevant boundary
+and the resulting lifecycle passes a named local acceptance gate.
+
+The upstream tests are compatibility clues rather than GSM conformance proof.
+Differences accepted by their tested handset must not override behavior already
+proved by our firmware.
+
+## Architectural result
+
+The useful common boundary is a complete decoded LAPDm block:
+
+```text
+Nokia firmware
+    <-> DSPIF shared rings and Nokia L1 packets
+        <-> nokia_radio_peer_device
+            <-> nokia_lapdm_link_device
+                <-> nokia_gsm_session_device
+                    <-> nokia_gsm_network_device cell/profile data
+                    <-> optional host call/SMS backend
+```
+
+Ownership is:
+
+| Component | Owns | Must not own |
+| --- | --- | --- |
+| `nokia_dspif_device` | shared RAM, packet rings, doorbells and interrupt-facing completion | radio, LAPDm or GSM session policy |
+| `nokia_dsp_hle_device` | DSP bootstrap and service timing | decoded radio protocol |
+| `nokia_radio_peer_device` | Nokia L1 request correlation, channel configuration, frame scheduling and delivery | LAPDm sequence numbers or call/SMS transactions |
+| `nokia_lapdm_link_device` | decoded link establishment, SAPI state, N(S)/N(R), acknowledgements, segmentation and link expiry | Nokia packet types, RF policy or application routing |
+| `nokia_gsm_network_device` | immutable facade-cell identity, broadcast data and network-side message encoding | per-handset transactions, DSPIF transport or firmware state |
+| `nokia_gsm_session_device` | per-handset Layer-3 request and acknowledgement-gated MM transaction state; future RR/CC/SMS state and queued network actions | LAPDm sequence state, RF scheduling or backend policy |
+| future host backend | accept/reject/connect/terminate decisions and external message endpoints | emulated protocol sequencing |
+
+The link and GSM session may grow independently. Call signalling does not imply
+traffic-channel audio, and SMS signalling does not imply an external messaging
+service.
+
+## Capability catalogue
+
+Status terms:
+
+- **landed**: present and organically regression-tested;
+- **next**: the next bounded extension with an existing firmware entrance;
+- **queued**: useful, but depends on an earlier boundary;
+- **reference**: retain the knowledge but do not implement without new evidence;
+- **out of scope**: explicitly not supplied by Grey Salamander or not presently
+  justified here.
+
+| ID | Capability learned from upstream | Local destination | Admission work and evidence gate | Status |
+| --- | --- | --- | --- | --- |
+| GS-00 | Separate decoded LAPDm state from host/DSP scheduling | `nokia_lapdm_link_device` between radio peer and network | Preserve the existing SABM-with-information, echoed UA, Location Updating Accept and Channel Release bytes; retain save-state ownership; pass `make verify-radio-registration` | **landed** |
+| GS-01 | Advance Layer 3 only after the handset acknowledges downlink I-frames | LAPDm uplink I/RR parsing and pending-downlink state | The link records the next N(R), the peer requests an uplink block after Location Updating Accept, and only the organic SAPI-0 RR with N(R)=1 permits Channel Release; the full sequence is required by `make verify-radio-registration` | **landed** |
+| GS-02 | Complete the exposed registration data-link teardown | `nokia_lapdm_link_device` and radio-peer uplink scheduling | After RR Channel Release the peer requests one uplink and requires the organic SAPI-0 RR with N(R)=2 before accepting physical deconfiguration. An extra probe produced only `01 03 01` UI/fill before firmware-driven deconfiguration, so no DISC/UA exchange is invented | **landed** |
+| GS-03 | MM Information can carry network name and NITZ after registration or connection establishment | GSM MM session state plus LAPDm downlink queue | A deterministic time-only MM Information is acknowledgement-gated ahead of incoming SETUP because the v6.00 ROM otherwise acknowledges but ignores SETUP; network-name and idle clock/operator effects remain independent work | **landed for active connection** |
+| GS-04 | Keep an idle PCH alive with no-identity fill and calculate the subscriber paging group | network cell scheduler through `nokia_radio_peer_device` | After registration, channel-`0x60` no-identity Paging Request Type 1 blocks are interleaved with channel-`0x50` BCCH and RSSI reports at the paging group derived from the registered IMSI; the ordinary registration gate requires return to PCH fill | **landed** |
+| GS-05 | Incoming service begins with paging, RACH correlation, Immediate Assignment and Paging Response | radio peer scheduler -> LAPDm -> GSM MM session | A named network-event fixture sends exactly one IMSI page requesting SDCCH; the phone organically emits RACH, accepts an assignment carrying its exact request reference, establishes LAPDm with Paging Response, receives bounded Channel Release, and returns to PCH fill | **landed** |
+| GS-06 | Minimal cipher-mode command/complete exchange can exercise firmware control flow without implementing A5 | GSM RR/MM session | Probes after organic Paging Response found the ROM acknowledges both cipher-setting forms at LAPDm but emits no Cipher Mode Complete without a real cipher boundary. The retained lab call therefore stays explicitly unciphered; do not claim A5 or synthesize completion | **reference pending a real cipher boundary** |
+| GS-07 | Mobile-originated call ordering from CM Service Request through Setup, Connect and Release | GSM call-control session and optional backend request | First recover the post-dial Nokia L1 entrance; publish a request-ID event; keep firmware pending until a backend decision; validate dial, ringing/connected UI and organic clearing separately | **queued** |
+| GS-08 | Mobile-terminated call ordering from paging through Setup, Alerting, Connect and clearing | incoming-service queue and GSM call-control session | The named call fixture now proves page, MM Information, SETUP, organic Call Confirmed/Alerting/Disconnect, network Release, organic Release Complete and RR teardown. The locked first-boot UI clears the call and no TCH/speech is claimed; Connect handling is retained for a later answered-call fixture | **landed, bounded signalling** |
+| GS-09 | Mobile-originated SMS uses CP-DATA/ACK and RP-DATA/ACK/error, with GSM-7 and UCS-2 decoding | GSM SMS session and host request event | Requires GS-01, GS-06 and SIM SMS parameters; recover SAPI-3 establishment organically; test accept/reject and final SAPI-0 RR release | **queued** |
+| GS-10 | Mobile-terminated SMS uses paging, SAPI 3, SMS-DELIVER, timestamps and CP/RP acknowledgements | incoming-service queue and GSM SMS session | The named fixture proves one page, independent SAPI-3 establishment, both segments of an ordinary `hello` SMS-DELIVER, handset SAPI-3 acknowledgement and the firmware's exact persistent unread `EF_SMS` record. The session recognizes the reference-`40` CP/RP acknowledgement tail, but this locked v6.00 run does not organically emit that tail or return to RR idle, so neither is claimed | **landed through persistent ordinary-text delivery; CP/RP close pending** |
+| GS-11 | A usable legacy SMS profile needs EF_SMSP and 176-byte linear-fixed EF_SMS records | `nokia_sim_card_device` and NVRAM schema | `EF_SMSP` and ten 176-byte `EF_SMS` records are declared under `DF_TELECOM`, advertised by `EF_SST`, covered by save state/card NVRAM and exercised by organic select/read/update traffic. Existing 32-byte/50-record ADN geometry is unchanged | **landed** |
+| GS-12 | Port-addressed 8-bit SMS and concatenation carry Nokia Smart Messaging payloads | SMS TPDU/user-data codec above GS-10 | The codec now owns a bounded 251-byte RTPL tone, 128-byte multipart capacity, shared reference `7a`, two-part queue and per-part RP references. The named fixture proves part 1, including port and concatenation IEs, over nine strictly acknowledged SAPI-3 I frames and leaves `EF_SMS` free. Part 2 remains queued behind GS-06/GS-10 CP/RP closure; visible save/play and persistence are not claimed | **codec/queue landed; organic part 1 proved** |
+| GS-13 | One identity/profile should generate IMSI, PLMN, LAI, paging identity, operator data and SIM contents consistently | typed subscriber/cell configuration shared by SIM and GSM devices | Extract current constants without changing the validated 001-01 profile; add consistency checks before exposing alternate profiles | **queued, independent** |
+| GS-14 | Calls and SMS should produce asynchronous request objects and accept later host decisions | future backend-neutral event interface | Use stable request IDs, queue decisions onto the emulation scheduler, save all pending state, and provide a no-backend deterministic policy for tests | **queued before external routing** |
+| GS-15 | Paging and dedicated-channel work require deadlines and ordered queues | radio scheduler and LAPDm timers | Paging groups and the one-page fixture now use emulated frame/scheduler time and save-state fields; add explicit expiry and mid-transaction save/load coverage when an unanswered or queued service is admitted | **queued for expiry coverage** |
+| GS-16 | Mutable Layer-3 session state should be distinct from both the decoded link and immutable facade cell | `nokia_gsm_session_device` | The session recognizes the complete Location Updating Request, owns contention-delivery and both acknowledgement-gated MM transitions, queues typed downlink actions, registers save-state fields, and preserves the network device's pure cell/data role; pass the unchanged organic registration gate | **landed** |
+| GS-17 | Additional LAPDm SAPIs, DISC/UA, fill handling, segmentation, reassembly and expiry | `nokia_lapdm_link_device` | Independent save-state-backed SAPI-0/SAPI-3 establishment, sequence and acknowledgement state plus two-frame downlink segmentation are now exercised by ordinary MT SMS. DISC/UA, uplink reassembly and expiry remain reference work until observed | **partially landed at the SAPI-3/segmentation boundary** |
+
+## Upstream source map
+
+This map makes the provenance of each knowledge item reviewable without making
+the upstream repository a build dependency:
+
+| Upstream area | Knowledge represented here |
+| --- | --- |
+| `GsmCellCodec.cs` and its tests | GS-04/05 paging groups, fill frames, RACH reference preservation and assignment scenarios |
+| `LapdmLink.cs` and its tests | GS-00--02, GS-15 and GS-17 link establishment, acknowledgement, SAPI, segmentation, expiry and release-ordering scenarios |
+| `GsmNetwork.cs` and its tests | GS-03 and GS-05--10 MM, paging-response, call-control and SMS transaction order |
+| `SimCard.cs`, `SimPhonebookCodec.cs` and tests | GS-11/13 SIM file requirements, persistence scenarios and identity consistency |
+| `SmartMessageSms.cs` and tests | GS-12 port-addressed and multipart payload scenarios |
+| `PORTING.md`, `PROTOCOL-COVERAGE.md` and `SPEC-SOURCES.md` | host-boundary assumptions, stated coverage limits and specification routing |
+
+## Implementation sequence
+
+### Phase A: finish the registration link
+
+1. GS-00--02: decoded link extraction and both acknowledgement-gated
+   registration downlinks are landed.
+2. Preserve the exact registration and post-release BCCH gates.
+3. Keep DISC/UA and other GS-17 mechanics as references until observed.
+4. GS-16 is landed: mutable Layer-3 registration state is separate from link
+   sequencing and immutable cell data.
+5. Add MM Information/NITZ only as a separate GS-03 change.
+
+This phase proves that the extracted link is a real bidirectional protocol
+owner rather than only a downlink frame builder.
+
+### Phase B: create a network-originated entrance
+
+1. Idle PCH channel scheduling is landed without changing BCCH acquisition.
+2. No-identity PCH fill and steady camp are part of the registration gate.
+3. A named fixture queues exactly one incoming IMSI page.
+4. The existing correlated Immediate Assignment path preserves its RACH
+   octet and request frame.
+5. The organic Paging Response reaches LAPDm and the Layer-3 session, then a
+   bounded release returns the phone to PCH fill.
+
+This phase supplies the prerequisite entrance for incoming calls and SMS. Nokia
+L1 scheduling remains in
+`nokia_radio_peer_device`; Grey Salamander deliberately starts above the Nokia
+DSP/L1 boundary and cannot supply that mapping.
+
+### Phase C: Layer-3 services
+
+1. Keep the current call entrance explicitly unciphered. A real cipher boundary
+   is required before admitting Cipher Mode Complete as an organic checkpoint.
+2. Add mobile-originated call signalling first if the dormant post-dial Nokia
+   path is recovered before paging.
+3. Mobile-terminated call signalling is landed through organic Alerting and
+   bounded clearing; an answered call and TCH/speech remain separate work.
+4. SIM SMS files and bounded ordinary MT text delivery are landed. MO SMS and
+   the v6.00 CP/RP closing exchange remain separate work.
+5. The bounded long-ringtone codec and queue are landed after the ordinary
+   persisted-delivery oracle. Part 1 is proved with stop-and-wait segmentation;
+   preserve the explicit CP/RP-tail limitation before releasing part 2 or
+   claiming UI/persistence.
+
+Each service gets a small protocol-state fixture and a full-ROM organic
+acceptance test. A UI result alone is not sufficient: traces must also prove
+the expected Nokia packet, LAPDm and Layer-3 boundaries.
+
+## Knowledge to retain without adopting
+
+The following upstream choices are useful comparison points, not local changes:
+
+- Its host supplies SCH/RSSI and already-decoded control blocks; ours must
+  continue reaching those blocks through DSPIF and the recovered Nokia L1
+  protocol.
+- Its 23-byte LAPDm block API differs from the 24-byte field carried by our
+  Nokia `RECEIVED_BLOCK` envelope. The adapter boundary must make that padding
+  explicit rather than changing a validated packet layout.
+- Its Immediate Assignment selects SDCCH/8 subchannel 0 on timeslot 1. Our
+  organically accepted assignment uses timeslot 0; channel description becomes
+  configurable only after another validated profile requires it.
+- Its SIM geometry and broad default service table must not replace our
+  firmware-observed ADN geometry and conservative service advertisement.
+- Its combined Layer-3 implementation is a useful behavioral map, but local
+  per-handset RR/MM/call-control/SMS state belongs in the session device,
+  separate from immutable cell data and organized into reviewable,
+  save-state-aware transitions rather than one monolithic method.
+
+## Explicit non-goals
+
+Grey Salamander does not provide, and this catalogue does not infer:
+
+- Ki/RAND/SRES authentication or a real VLR/HLR;
+- A5 cipher generation;
+- burst coding, interleaving, equalization or RF;
+- traffic-channel allocation, speech coding or transcoding;
+- handover, hopping, GPRS, USSD or supplementary services; or
+- multi-cell/multi-subscriber network simulation.
+
+Those require separate evidence and architecture decisions. Successful
+call-control signalling must not be described as working call audio.
+
+## Per-change checklist
+
+For every catalogue item:
+
+1. name the organic Nokia or standards-defined entrance;
+2. cite the governing GSM section and the upstream scenario that highlighted
+   it;
+3. keep DSPIF, Nokia L1, LAPDm and Layer-3 ownership separate;
+4. add save-state coverage for new mutable state;
+5. add a focused protocol/structure test;
+6. pass the existing lower-layer gates;
+7. add a full-ROM acceptance check for the new lifecycle; and
+8. update this table from **queued** to **landed** only after that check passes.

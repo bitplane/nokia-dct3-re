@@ -33,6 +33,8 @@
 #include "nokia_external_service.h"
 #include "nokia_gensio.h"
 #include "nokia_gsm_network.h"
+#include "nokia_gsm_session.h"
+#include "nokia_lapdm_link.h"
 #include "nokia_kbgpio.h"
 #include "nokia_mad2.h"
 #include "nokia_mbus.h"
@@ -291,6 +293,8 @@ public:
 		m_dsp_hle(*this, "dsp_hle"),
 		m_external_service_peer(*this, "external_service_peer"),
 		m_gsm_network(*this, "gsm_network"),
+		m_gsm_session(*this, "gsm_session"),
+		m_lapdm_link(*this, "lapdm_link"),
 		m_radio_peer(*this, "radio_peer"),
 		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
@@ -300,7 +304,8 @@ public:
 		m_dsp_tone2(*this, "dsp_tone2"),
 		m_vibration(*this, "vibration"),
 		m_hw_config(*this, "HWCFG"),
-		m_diag_config(*this, "DIAGCFG")
+		m_diag_config(*this, "DIAGCFG"),
+		m_network_config(*this, "NETCFG")
 	{ }
 
 	void noki3330(machine_config &config);
@@ -394,6 +399,8 @@ private:
 	required_device<nokia_dsp_hle_device> m_dsp_hle;
 	required_device<nokia_external_service_peer_device> m_external_service_peer;
 	required_device<nokia_gsm_network_device> m_gsm_network;
+	required_device<nokia_gsm_session_device> m_gsm_session;
+	required_device<nokia_lapdm_link_device> m_lapdm_link;
 	required_device<nokia_radio_peer_device> m_radio_peer;
 	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
@@ -404,6 +411,7 @@ private:
 	output_finder<> m_vibration;
 	optional_ioport m_hw_config;
 	optional_ioport m_diag_config;
+	optional_ioport m_network_config;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
 
@@ -612,6 +620,13 @@ void nokia_dct3_state::machine_reset()
 	m_dsp_hle->set_external_service_enabled(m_product.external_service && BIT(hardware, 3));
 	m_external_service_peer->set_enabled(m_product.external_service && BIT(hardware, 3));
 	m_radio_peer->set_enabled(m_product.radio_peer && BIT(hardware, 4));
+	const u8 network = m_network_config.read_safe(0x00);
+	m_radio_peer->set_page_after_registration(
+			BIT(network, 0) || BIT(network, 1) || BIT(network, 2) ||
+			BIT(network, 3));
+	m_radio_peer->set_incoming_call_after_registration(BIT(network, 1));
+	m_radio_peer->set_incoming_sms_after_registration(BIT(network, 2));
+	m_radio_peer->set_incoming_smart_message_after_registration(BIT(network, 3));
 	m_sim_card->set_cphs_aoc(false);
 	m_sim_card->set_cached_location(false);
 	const u8 atr[] = { 0x3b, 0x10, 0x05 };
@@ -731,12 +746,14 @@ void nokia_dct3_state::reset_digital_baseband()
 	m_dspif->reset();
 	m_dsp_hle->reset();
 	m_external_service_peer->reset();
+	m_gsm_session->reset();
+	m_lapdm_link->reset();
 	m_radio_peer->reset();
 	m_simi->reset();
 	m_sim_card->reset();
 	m_lcd->reset();
-	// nokia_gsm_network_device contains immutable cell data and has no runtime
-	// transaction state; the radio peer above owns the reset-sensitive phase.
+	// nokia_gsm_network_device contains immutable cell data; the session, link
+	// and radio peers above own the reset-sensitive protocol phases.
 	machine_reset();
 }
 
@@ -1288,6 +1305,22 @@ static INPUT_PORTS_START( noki3210 )
 	PORT_CONFNAME(0x01, 0x00, "Run DSPIF conformance check")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
+
+	// External network-event fixtures may queue a bounded incoming service.
+	// The default cell remains passive after registration.
+	PORT_START("NETCFG")
+	PORT_CONFNAME(0x01, 0x00, "Queue one incoming page after registration")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x01, DEF_STR(On))
+	PORT_CONFNAME(0x02, 0x00, "Queue one incoming call after registration")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x02, DEF_STR(On))
+	PORT_CONFNAME(0x04, 0x00, "Queue one incoming SMS after registration")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x04, DEF_STR(On))
+	PORT_CONFNAME(0x08, 0x00, "Queue one incoming Smart Messaging ringtone")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x08, DEF_STR(On))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3310 )
@@ -1449,6 +1482,8 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_DSP_HLE(config, m_dsp_hle);
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
+	NOKIA_GSM_SESSION(config, m_gsm_session);
+	NOKIA_LAPDM_LINK(config, m_lapdm_link);
 	NOKIA_RADIO_PEER(config, m_radio_peer);
 	m_dspif->tx_commit_cb().set(FUNC(nokia_dct3_state::dsp_tx_commit_w));
 	m_dspif->service_pending_cb().set(FUNC(nokia_dct3_state::dsp_service_pending_w));

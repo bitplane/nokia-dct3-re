@@ -15,7 +15,9 @@ nokia_radio_peer_device::nokia_radio_peer_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_RADIO_PEER, tag, owner, clock),
 	m_transport(*this, "^dspif"),
-	m_gsm_network(*this, "^gsm_network")
+	m_gsm_network(*this, "^gsm_network"),
+	m_gsm_session(*this, "^gsm_session"),
+	m_lapdm_link(*this, "^lapdm_link")
 {
 }
 
@@ -31,12 +33,14 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_search_mode));
 	save_item(NAME(m_access_ra));
 	save_item(NAME(m_access_frame));
-	save_item(NAME(m_contention_l3));
-	save_item(NAME(m_contention_length));
 	save_item(NAME(m_search_has_arfcn1));
 	save_item(NAME(m_report_deferred));
 	save_item(NAME(m_search_requested));
 	save_item(NAME(m_selected_reports_remaining));
+	save_item(NAME(m_registered));
+	save_item(NAME(m_pch_fill_delivered));
+	save_item(NAME(m_page_transmitted));
+	save_item(NAME(m_downlink_offset));
 }
 
 void nokia_radio_peer_device::device_reset()
@@ -49,12 +53,14 @@ void nokia_radio_peer_device::device_reset()
 	m_search_mode = 0;
 	m_access_ra = 0;
 	m_access_frame = 0;
-	m_contention_l3.fill(0);
-	m_contention_length = 0;
 	m_search_has_arfcn1 = false;
 	m_report_deferred = false;
 	m_search_requested = false;
 	m_selected_reports_remaining = 0;
+	m_registered = false;
+	m_pch_fill_delivered = false;
+	m_page_transmitted = false;
+	m_downlink_offset = 0;
 }
 
 const char *nokia_radio_peer_device::phase_name(u8 value)
@@ -66,8 +72,12 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"selected_search", "serving_channel_change", "selected_channel_change",
 		"selected_bcch", "selected_ra_info", "selected_bcch_channel_change",
 		"random_access", "assigned_channel_change", "lapdm_establish",
-		"contention_resolution", "location_update_accept", "rr_channel_release",
-		"release_deconfigure", "release_channel_change"
+		"contention_resolution", "location_update_accept",
+		"location_update_ack_request", "location_update_acknowledgement",
+		"rr_channel_release", "channel_release_uplink_request",
+		"channel_release_acknowledgement", "release_deconfigure",
+		"release_channel_change", "service_downlink", "service_uplink_request",
+		"service_uplink_wait", "service_uplink_acknowledgement"
 	};
 	const unsigned index = unsigned(value);
 	return index < std::size(NAMES) ? NAMES[index] : "invalid";
@@ -85,7 +95,8 @@ u8 nokia_radio_peer_device::next_report_type() const
 	static constexpr std::array<u8, phase::count> FIXED_REPORT = {
 		0x87, 0x87, 0x87, 0x8b, 0xff, 0xff, 0x84, 0xff,
 		0x8c, 0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89,
-		0xff, 0x89, 0x86, 0x80, 0x80, 0x80, 0x87, 0x89
+		0xff, 0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80,
+		0x86, 0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80
 	};
 
 	const u8 fixed = m_phase < FIXED_REPORT.size() ? FIXED_REPORT[m_phase] : 0x87;
@@ -99,6 +110,8 @@ u8 nokia_radio_peer_device::next_report_type() const
 	case phase::candidate_channel_change:
 		return m_reports_remaining == 2 ? 0x8f : 0x89;
 	case phase::serving_bcch:
+		if (m_registered)
+			return (m_reports_remaining % 3) == 1 ? 0x83 : 0x80;
 		return (m_reports_remaining & 1) == 0 ? 0x80 : 0x83;
 	case phase::candidate_retry:
 		return m_reports_remaining == 2 ? 0x8b : 0x87;
@@ -115,6 +128,32 @@ u8 nokia_radio_peer_device::next_report_type() const
 	default:
 		return 0x87;
 	}
+}
+
+unsigned nokia_radio_peer_device::serving_cycle_reports() const
+{
+	return m_registered ? 12 : 8;
+}
+
+bool nokia_radio_peer_device::serving_pch_report() const
+{
+	return m_phase == phase::serving_bcch && m_registered &&
+			(m_reports_remaining % 3) == 2;
+}
+
+u32 nokia_radio_peer_device::paging_frame_number(u32 minimum_frame_number) const
+{
+	static constexpr u32 FRAME_NUMBER_MODULUS = 26 * 51 * 2048;
+	const auto group = m_gsm_network->subscriber_paging_group(
+			m_gsm_session->registered_mobile_identity().data(),
+			m_gsm_session->registered_mobile_identity_length());
+	u32 multiframe = minimum_frame_number / 51;
+	if ((multiframe & 1) != group.multiframe_phase)
+		++multiframe;
+	u32 frame_number = multiframe * 51 + group.frame_offset;
+	if (frame_number < minimum_frame_number)
+		frame_number += 102;
+	return frame_number % FRAME_NUMBER_MODULUS;
 }
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
@@ -288,21 +327,165 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		m_report_deferred = true;
 	}
 	else if (packet.type == 0x1b && m_phase == phase::lapdm_establish &&
-			packet.length >= 7 && packet.payload[1] == 0x80 &&
-			packet.payload[2] == 0x01 && packet.payload[3] == 0x3f)
+			packet.length >= 5 && packet.payload[1] == 0x80)
 	{
 		// SEND_BLOCK has a two-byte DSP channel header followed by LAPDm. A
 		// SABM with information invokes contention resolution, whose UA echoes
 		// that information field exactly.
-		const unsigned l3_length = packet.payload[4] >> 2;
-		if (l3_length <= m_contention_l3.size() &&
-				packet.length >= 5 + l3_length)
+		if (m_lapdm_link->receive_uplink(packet.payload.data() + 2,
+					packet.length - 2) ==
+				nokia_lapdm_link_device::uplink_result::establish_indication &&
+				m_gsm_session->establish_layer3(
+					m_lapdm_link->layer3_information().data(),
+					m_lapdm_link->layer3_length()))
 		{
-			std::copy_n(packet.payload.begin() + 5, l3_length,
-					m_contention_l3.begin());
-			m_contention_length = l3_length;
 			m_phase = phase::contention_resolution;
 			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
+	}
+	else if (packet.type == 0x1b &&
+			m_phase == phase::location_update_acknowledgement &&
+			packet.length >= 5 && packet.payload[1] == 0x80)
+	{
+		if (m_lapdm_link->receive_uplink(packet.payload.data() + 2,
+					packet.length - 2) ==
+				nokia_lapdm_link_device::uplink_result::downlink_acknowledgement)
+		{
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: LAPDm Location Updating Accept acknowledged nr=%u t=%.6f\n",
+						m_lapdm_link->pending_receive_sequence(),
+						machine().time().as_double());
+			if (m_gsm_session->downlink_acknowledged() ==
+					nokia_gsm_session_device::downlink_kind::channel_release)
+			{
+				m_phase = phase::rr_channel_release;
+				m_reports_remaining = 1;
+				m_report_deferred = true;
+			}
+		}
+	}
+	else if (packet.type == 0x1b &&
+			m_phase == phase::channel_release_acknowledgement &&
+			packet.length >= 5 && packet.payload[1] == 0x80)
+	{
+		const auto result = m_lapdm_link->receive_uplink(
+				packet.payload.data() + 2, packet.length - 2);
+		if (result == nokia_lapdm_link_device::uplink_result::downlink_acknowledgement)
+		{
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: LAPDm Channel Release acknowledged nr=%u t=%.6f\n",
+						m_lapdm_link->pending_receive_sequence(),
+						machine().time().as_double());
+			if (m_gsm_session->downlink_acknowledged() ==
+					nokia_gsm_session_device::downlink_kind::release_complete)
+			{
+				m_registered =
+						m_gsm_session->registered_mobile_identity_length() == 8;
+				m_phase = phase::release_deconfigure;
+				m_reports_remaining = 0;
+			}
+		}
+	}
+	else if (packet.type == 0x1b && m_phase == phase::service_uplink_wait &&
+			packet.length >= 5 && packet.payload[1] == 0x80)
+	{
+		const auto result = m_lapdm_link->receive_uplink(
+				packet.payload.data() + 2, packet.length - 2);
+		auto acknowledge_downlink =
+				[this]() -> nokia_gsm_session_device::downlink_kind
+		{
+			m_downlink_offset = 0;
+			return m_gsm_session->downlink_acknowledged();
+		};
+		if (result == nokia_lapdm_link_device::uplink_result::information_indication)
+		{
+			if (m_lapdm_link->last_downlink_acknowledged())
+			{
+				if (m_lapdm_link->downlink_segmentation_pending(
+						m_lapdm_link->layer3_sapi()))
+					m_downlink_offset +=
+							nokia_lapdm_link_device::maximum_information_length;
+				else
+					acknowledge_downlink();
+			}
+			const auto &information = m_lapdm_link->layer3_information();
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: GSM service uplink sapi=%u pd=%02x message=%02x length=%u t=%.6f\n",
+						m_lapdm_link->layer3_sapi(),
+						information[0] & 0x0f, information[1] & 0x3f,
+						m_lapdm_link->layer3_length(),
+						machine().time().as_double());
+			const auto action = m_gsm_session->receive_layer3(
+					m_lapdm_link->layer3_sapi(),
+					information.data(), m_lapdm_link->layer3_length());
+			// A queued L3 response is itself an I frame and piggybacks N(R) for
+			// this uplink. Otherwise send a standalone LAPDm RR.
+			m_phase = action !=
+					nokia_gsm_session_device::downlink_kind::none ?
+					phase::service_downlink :
+					phase::service_uplink_acknowledgement;
+			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
+		else if (result ==
+				nokia_lapdm_link_device::uplink_result::establish_confirmation)
+		{
+			m_downlink_offset = 0;
+			const auto action = m_gsm_session->downlink_acknowledged();
+			m_phase = action != nokia_gsm_session_device::downlink_kind::none ?
+					phase::service_downlink : phase::service_uplink_request;
+			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
+		else if (result ==
+				nokia_lapdm_link_device::uplink_result::downlink_acknowledgement)
+		{
+			if (m_lapdm_link->downlink_segmentation_pending(
+					m_lapdm_link->layer3_sapi()))
+			{
+				m_downlink_offset +=
+						nokia_lapdm_link_device::maximum_information_length;
+				m_phase = phase::service_downlink;
+				m_reports_remaining = 1;
+				m_report_deferred = true;
+				return;
+			}
+			const auto action = acknowledge_downlink();
+			if (action == nokia_gsm_session_device::downlink_kind::release_complete)
+			{
+				if (m_trace_enabled)
+					LOGMASKED(LOG_RADIO,
+							"dsp_hle: LAPDm service Channel Release acknowledged nr=%u t=%.6f\n",
+							m_lapdm_link->pending_receive_sequence(),
+							machine().time().as_double());
+				m_phase = phase::release_deconfigure;
+				m_reports_remaining = 0;
+				m_page_transmitted = false;
+			}
+			else if (action != nokia_gsm_session_device::downlink_kind::none)
+			{
+				m_phase = phase::service_downlink;
+				m_reports_remaining = 1;
+				m_report_deferred = true;
+			}
+			else
+			{
+				m_phase = phase::service_uplink_request;
+				m_reports_remaining = 1;
+				m_report_deferred = true;
+			}
+		}
+		else
+		{
+			// The firmware can return an idle UI/fill block while a service waits
+			// for user input or an upper-layer response.
+			m_phase = phase::service_uplink_request;
+			m_reports_remaining = 1;
+			m_wait_ticks = 100;
 			m_report_deferred = true;
 		}
 	}
@@ -311,8 +494,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 void nokia_radio_peer_device::emit_report()
 {
 	u8 payload[166] = { 0 };
+	bool transmitted_page = false;
 	const u8 report_type = next_report_type();
-	if (m_phase == phase::lapdm_establish)
+	if (m_phase == phase::lapdm_establish ||
+			m_phase == phase::location_update_ack_request ||
+			m_phase == phase::channel_release_uplink_request ||
+			m_phase == phase::service_uplink_request)
 		payload[0] = 0x80; // BLOCK_REQUEST subtype accepted in controller state 6.
 
 	if (report_type == 0x8b)
@@ -337,17 +524,25 @@ void nokia_radio_peer_device::emit_report()
 
 	if (report_type == 0x80)
 	{
+		const bool pch_report = serving_pch_report();
+		const bool dedicated_downlink =
+				(m_phase >= phase::contention_resolution &&
+					m_phase <= phase::rr_channel_release) ||
+				m_phase == phase::service_downlink ||
+				m_phase == phase::service_uplink_acknowledgement;
 		// RECEIVED_BLOCK carries channel, BSIC, error, frame number, ARFCN,
 		// shift and then a 24-byte GSM L2 block.  Channel 0x40 is SCH; 0x50 is
-		// BCCH after the firmware's CHANNEL_CONFIGURE request.
-		payload[0] = (m_phase >= phase::contention_resolution &&
-				m_phase <= phase::rr_channel_release) ? 0x80 :
+		// BCCH; 0x60 is the shared paging/access-grant common control channel.
+		payload[0] = pch_report ? 0x60 :
+				dedicated_downlink ? 0x80 :
 				m_phase == phase::random_access ? 0x60 :
 				((m_phase < phase::candidate_channel_change ||
 					m_phase == phase::selected_search) ? 0x40 : 0x50);
 		payload[1] = 0x12; // BSIC of the laboratory cell, for SCH and BCCH.
-		const u32 frame_number = m_phase == phase::random_access ? m_access_frame :
+		u32 frame_number = m_phase == phase::random_access ? m_access_frame :
 				(machine().time().as_ticks(13'000) / 60) % 2'715'648;
+		if (pch_report)
+			frame_number = paging_frame_number(frame_number);
 		payload[3] = frame_number >> 16;
 		payload[4] = frame_number >> 8;
 		payload[5] = frame_number;
@@ -356,37 +551,67 @@ void nokia_radio_peer_device::emit_report()
 
 		if (m_phase == phase::contention_resolution)
 		{
-			auto *const block = std::begin(payload) + 10;
-			std::fill_n(block, 24, 0x2b);
-			block[0] = 0x01;
-			block[1] = 0x73; // UA with final bit set
-			block[2] = (m_contention_length << 2) | 1;
-			std::copy_n(m_contention_l3.begin(), m_contention_length,
-					block + 3);
+			const auto frame = m_lapdm_link->build_ua();
+			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
 		}
 		else if (m_phase == phase::location_update_accept)
 		{
-			auto *const block = std::begin(payload) + 10;
-			std::array<u8, 8> mobile_identity{};
-			if (m_contention_length >= 18 && m_contention_l3[9] == 8)
-				std::copy_n(m_contention_l3.begin() + 10, mobile_identity.size(),
-						mobile_identity.begin());
-			const auto accept = m_gsm_network->location_update_accept(mobile_identity);
-			std::fill_n(block, 24, 0x2b);
-			block[0] = 0x03; // network-to-mobile command, SAPI 0
-			block[1] = 0x00; // I frame, N(S)=0, N(R)=0
-			block[2] = (accept.size() << 2) | 1;
-			std::copy(accept.begin(), accept.end(), block + 3);
+			const auto &message = m_gsm_session->pending_downlink();
+			const auto frame = m_lapdm_link->build_information_frame(
+					0, message.data.data(), message.length);
+			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
 		}
 		else if (m_phase == phase::rr_channel_release)
 		{
-			auto *const block = std::begin(payload) + 10;
-			const auto release = m_gsm_network->channel_release();
-			std::fill_n(block, 24, 0x2b);
-			block[0] = 0x03; // network-to-mobile command, SAPI 0
-			block[1] = 0x02; // I frame, N(S)=1, N(R)=0
-			block[2] = (release.size() << 2) | 1;
-			std::copy(release.begin(), release.end(), block + 3);
+			const auto &message = m_gsm_session->pending_downlink();
+			const auto frame = m_lapdm_link->build_information_frame(
+					0, message.data.data(), message.length);
+			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+		}
+		else if (m_phase == phase::service_downlink)
+		{
+			const auto &message = m_gsm_session->pending_downlink();
+			std::array<u8, nokia_lapdm_link_device::frame_length> frame;
+			if (message.kind == u8(
+					nokia_gsm_session_device::downlink_kind::sapi3_establishment))
+				frame = m_lapdm_link->build_sabm_command(message.sapi);
+			else
+			{
+				const unsigned count = std::min<unsigned>(
+						nokia_lapdm_link_device::maximum_information_length,
+						message.length - m_downlink_offset);
+				const bool more_data =
+						m_downlink_offset + count < message.length;
+				frame = m_lapdm_link->build_information_frame(
+						message.sapi, message.data.data() + m_downlink_offset,
+						count, more_data);
+			}
+			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+		}
+		else if (m_phase == phase::service_uplink_acknowledgement)
+		{
+			const auto frame = m_lapdm_link->build_receive_ready(
+					m_lapdm_link->layer3_sapi());
+			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+		}
+		else if (pch_report)
+		{
+			const auto service = m_incoming_smart_message_after_registration ?
+					nokia_gsm_session_device::incoming_service::smart_message :
+					m_incoming_sms_after_registration ?
+					nokia_gsm_session_device::incoming_service::sms :
+					m_incoming_call_after_registration ?
+					nokia_gsm_session_device::incoming_service::call :
+					nokia_gsm_session_device::incoming_service::none;
+			const bool transmit_page =
+					m_page_after_registration && m_pch_fill_delivered &&
+					!m_page_transmitted &&
+					m_gsm_session->queue_incoming_page(service);
+			const auto block = transmit_page ?
+					m_gsm_session->paging_request() :
+					m_gsm_network->paging_fill();
+			std::copy(block.begin(), block.end(), std::begin(payload) + 10);
+			transmitted_page = transmit_page;
 		}
 		else if (payload[0] == 0x60)
 		{
@@ -434,6 +659,28 @@ void nokia_radio_peer_device::emit_report()
 	if (!m_transport->enqueue_rx_packet(report_type, payload, payload_length))
 		return;
 
+	if (report_type == 0x80 && serving_pch_report())
+	{
+		const u32 frame_number =
+				(payload[3] << 16) | (payload[4] << 8) | payload[5];
+		if (transmitted_page)
+		{
+			m_page_transmitted = true;
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: PCH IMSI page transmitted channel=60 fn=%u t=%.6f\n",
+						frame_number, machine().time().as_double());
+		}
+		else if (!m_pch_fill_delivered)
+		{
+			m_pch_fill_delivered = true;
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: PCH no-identity fill channel=60 fn=%u t=%.6f\n",
+						frame_number, machine().time().as_double());
+		}
+	}
+
 	if (report_type == 0x8b && m_phase >= phase::candidate_measurement)
 		++m_search_round;
 	++m_reports_sent;
@@ -455,7 +702,7 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	else if (m_phase == phase::candidate_ra_info && report_type == 0x84)
 	{
 		m_phase = phase::serving_bcch;
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::serving_bcch && report_type == 0x80)
@@ -468,24 +715,24 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 			m_reports_remaining == 0)
 	{
 		// A camped GSM cell broadcasts System Information continuously.
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 	}
 	else if (m_phase == phase::selected_search && (report_type == 0x87 || report_type == 0x8f))
 	{
 		m_phase = phase::serving_bcch;
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::serving_idle_ra && report_type == 0x8c)
 	{
 		m_phase = phase::serving_bcch;
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::serving_channel_change && report_type == 0x89)
 	{
 		m_phase = phase::serving_bcch;
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::selected_channel_change && report_type == 0x89)
@@ -515,14 +762,14 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		if (m_reports_remaining == 0)
 		{
 			m_phase = phase::serving_bcch;
-			m_reports_remaining = 8;
+			m_reports_remaining = serving_cycle_reports();
 			m_wait_ticks = 59;
 		}
 	}
 	else if (m_phase == phase::selected_bcch && report_type == 0x87)
 	{
 		m_phase = phase::serving_bcch;
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::selected_bcch_channel_change && report_type == 0x89)
@@ -532,7 +779,7 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		// completion; replaying the pre-change terminal makes that newer request
 		// lose ownership and restarts selection indefinitely.
 		m_phase = phase::serving_bcch;
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 		m_selected_reports_remaining = 0;
 		m_wait_ticks = 59;
 	}
@@ -554,27 +801,98 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	}
 	else if (m_phase == phase::contention_resolution && report_type == 0x80)
 	{
-		m_phase = phase::location_update_accept;
-		m_reports_remaining = 1;
-		m_report_deferred = true;
+		const auto action = m_gsm_session->contention_resolution_delivered();
+		if (action == nokia_gsm_session_device::downlink_kind::location_update_accept)
+		{
+			m_phase = phase::location_update_accept;
+			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
+		else if (action == nokia_gsm_session_device::downlink_kind::channel_release)
+		{
+			m_phase = phase::rr_channel_release;
+			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
+		else if (action ==
+				nokia_gsm_session_device::downlink_kind::mm_information)
+		{
+			m_phase = phase::service_downlink;
+			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
 	}
 	else if (m_phase == phase::location_update_accept && report_type == 0x80)
 	{
-		m_phase = phase::rr_channel_release;
+		m_phase = phase::location_update_ack_request;
 		m_reports_remaining = 1;
+		m_report_deferred = true;
+	}
+	else if (m_phase == phase::location_update_ack_request && report_type == 0x86)
+	{
+		m_phase = phase::location_update_acknowledgement;
+		m_reports_remaining = 0;
 	}
 	else if (m_phase == phase::rr_channel_release && report_type == 0x80)
 	{
-		// Firmware owns the LAPDm disconnect and physical-channel teardown which
-		// follow the network's RR Channel Release.
-		m_phase = phase::release_deconfigure;
+		m_phase = phase::channel_release_uplink_request;
+		m_reports_remaining = 1;
+		m_report_deferred = true;
+	}
+	else if (m_phase == phase::channel_release_uplink_request && report_type == 0x86)
+	{
+		m_phase = phase::channel_release_acknowledgement;
 		m_reports_remaining = 0;
 	}
 	else if (m_phase == phase::release_channel_change && report_type == 0x89)
 	{
 		m_phase = phase::serving_bcch;
-		m_reports_remaining = 8;
+		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
+	}
+	else if (m_phase == phase::service_downlink && report_type == 0x80)
+	{
+		// LAPDm uses a one-frame transmit window here. Even when M=1, wait for
+		// the handset's N(R) before emitting the next Layer-3 segment.
+		m_phase = phase::service_uplink_request;
+		m_reports_remaining = 1;
+		m_report_deferred = true;
+	}
+	else if (m_phase == phase::service_uplink_request && report_type == 0x86)
+	{
+		m_phase = phase::service_uplink_wait;
+		m_reports_remaining = 0;
+	}
+	else if (m_phase == phase::service_uplink_acknowledgement && report_type == 0x80)
+	{
+		if (m_gsm_session->idle())
+		{
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: LAPDm service Channel Release acknowledged nr=%u t=%.6f\n",
+						m_lapdm_link->pending_receive_sequence(),
+						machine().time().as_double());
+			m_phase = phase::release_deconfigure;
+			m_reports_remaining = 0;
+		}
+		else
+		{
+			// An uplink I frame can cross a network-initiated SAPI 3 SABM.
+			// Acknowledge that I frame without retransmitting the SABM while
+			// its UA is already in flight: a second SABM resets the handset's
+			// SMS link immediately after it has accepted CP-DATA.
+			const bool awaiting_sapi3 =
+					m_gsm_session->pending_downlink_kind() ==
+							nokia_gsm_session_device::downlink_kind::
+									sapi3_establishment &&
+					m_lapdm_link->awaiting_establishment(3);
+			m_phase = m_gsm_session->pending_downlink_kind() !=
+							nokia_gsm_session_device::downlink_kind::none &&
+							!awaiting_sapi3 ?
+					phase::service_downlink : phase::service_uplink_request;
+			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
 	}
 }
 
@@ -590,6 +908,9 @@ void nokia_radio_peer_device::tick()
 		--m_wait_ticks;
 	if (m_phase == phase::selected_bcch && m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
+	if (m_phase == phase::service_uplink_request &&
+			m_reports_remaining != 0 && m_wait_ticks != 0)
+		--m_wait_ticks;
 	if ((m_phase == phase::candidate_ra_info || m_phase == phase::selected_ra_info) &&
 			m_reports_remaining == 0 && m_wait_ticks != 0 && --m_wait_ticks == 0)
 		m_reports_remaining = 1;
@@ -598,7 +919,8 @@ void nokia_radio_peer_device::tick()
 	else if (m_reports_remaining != 0 &&
 			!(m_phase == phase::candidate_sync && m_wait_ticks != 0) &&
 			!(m_phase == phase::serving_bcch && m_wait_ticks != 0) &&
-			!(m_phase == phase::selected_bcch && m_wait_ticks != 0))
+			!(m_phase == phase::selected_bcch && m_wait_ticks != 0) &&
+			!(m_phase == phase::service_uplink_request && m_wait_ticks != 0))
 		emit_report();
 }
 

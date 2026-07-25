@@ -60,7 +60,7 @@ class SimDeviceSplitTest(unittest.TestCase):
     def test_card_owns_persistent_linear_fixed_adn(self):
         self.assertIn("public device_nvram_interface", self.card_header)
         self.assertIn("{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true }", self.card)
-        self.assertIn("Service 2: ADN allocated and activated", self.card)
+        self.assertIn("Services 2 (ADN) and 4 (SMS) allocated", self.card)
         self.assertIn("fcp[8] = 0x01", self.card)
         self.assertIn("void nokia_sim_card_device::update_record()", self.card)
         self.assertIn("save_item(NAME(m_adn))", self.card)
@@ -78,6 +78,21 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn("save_item(NAME(m_bcch))", self.card)
         self.assertIn("m_loci[10] = 0x01", self.card)
         self.assertIn("if (m_cached_location)", self.card)
+
+    def test_sms_files_are_declared_and_persistent(self):
+        self.assertIn(
+            "{ 0x6f3c, 0x7f10, sms_record_count * sms_record_length",
+            self.card)
+        self.assertIn(
+            "{ 0x6f42, 0x7f10, smsp_record_count * smsp_record_length",
+            self.card)
+        self.assertIn("sms_record_length = 176", self.card_header)
+        self.assertIn("Services 2 (ADN) and 4 (SMS)", self.card)
+        self.assertIn("Service 12: SMS parameters", self.card)
+        self.assertIn("save_item(NAME(m_sms))", self.card)
+        self.assertIn("save_item(NAME(m_smsp))", self.card)
+        self.assertIn("case 0x6f3c: return m_sms", self.card)
+        self.assertIn("case 0x6f42: return m_smsp", self.card)
 
 
 if __name__ == "__main__":

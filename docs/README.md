@@ -55,6 +55,7 @@ distinction.
 | Document | Purpose |
 | --- | --- |
 | `network_scouting.md` | Validated camp, Location Updating, channel-release and operator-presentation contract. |
+| `grey_salamander_integration.md` | Knowledge-integration catalogue and dependency order for LAPDm, paging, calls, SMS and SIM extensions. |
 | `dsp_interface.md` | Detailed MCU/DSP transport and later lower-radio maps. |
 | `dsp_shared_memory_inventory.md` | Generated two-ROM inventory of reachable firmware reads from DSP shared RAM. |
 | `dsp_shared_memory_transitions.md` | Generated two-ROM transaction census for DSP-owned shared-RAM scalar state. |

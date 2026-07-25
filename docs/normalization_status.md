@@ -68,7 +68,7 @@ be investigated only when an organic application path reaches its boundary.
 | CCONT/GENSIO | `nokia_ccont_device` owns selected-device registers and outputs, a deterministic binary RTC, recovered periodic IRQ sources, the documented watchdog counter and its WDDISX pin, plus retained power state. Five ROMs share an identical 18-entry descriptor vocabulary and a 933-transaction organic census. NSE-8 board wiring is classified; 3330/3410 explicitly retain the 3310 raw tuple as boot calibration rather than asserted PCB identity. | Measure GENSIO/ADC latency, sibling board wiring, raw electrical units, rail timing, interrupt bit 6 and compatibility-register effects. |
 | EEPROM | Native MAME `I2C_24C128` on mapped GenIO pins plus a v6.00-oriented generated provisioning fixture; the parallel window is unproved. | Decode remaining fields, validate writes/timing and another product's storage placement, and make fallback-record extraction ROM-aware. |
 | Flash | Native Intel/ST flash parts plus an extracted transitional `nokia_b3_flash_device` owning the 3410's lock-command, partition-status, erase-suspend timer and save-state contract. | Move the adapter semantics into MAME's generic `intelfsh` core once partitioned read-while-write and independently observable erase status are supported. |
-| DSP/network/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the cross-ROM bootstrap and service transport; `nokia_radio_peer_device` owns Nokia L1 packet correlation; `nokia_gsm_network_device` owns standards-shaped laboratory-cell, RR and MM data; `nokia_external_service_peer_device` owns the request-driven service/test session. Firmware-programmed COBBA oscillator words `0x0ae/0x0b0/0x0b6` drive separate HLE audio voices. | Recover physical bootstrap timing and the DSP-internal PLMN-measurement lifecycle; extend the GSM peer only from an evidenced Nokia L1 entrance; replace square-wave tone HLE with codec-backed behavior when evidenced. |
+| DSP/network/external-service | `nokia_dspif_device` owns shared RAM/DSPIF, rings and interrupt-facing completion; `nokia_dsp_hle_device` owns the cross-ROM bootstrap and service transport; `nokia_radio_peer_device` owns Nokia L1 packet correlation and BCCH/PCH/dedicated-channel scheduling; `nokia_lapdm_link_device` owns decoded link establishment, contention identity, bidirectional I/RR sequence and pending-downlink acknowledgement state; `nokia_gsm_session_device` owns per-handset Layer-3 registration, paging and bounded incoming-call state; `nokia_gsm_network_device` owns immutable standards-shaped laboratory-cell, RR, MM and call-control data; `nokia_external_service_peer_device` owns the request-driven service/test session. Firmware-programmed COBBA oscillator words `0x0ae/0x0b0/0x0b6` drive separate HLE audio voices. | Recover physical bootstrap timing and the DSP-internal PLMN-measurement lifecycle; add answered-call/TCH and speech behavior separately from the proved MT signalling attempt; add DISC/UA, segmentation and further SAPI/session state only when organic traffic exposes them; replace square-wave tone HLE with codec-backed behavior when evidenced. |
 | MAD2 | `nokia_mad2_device` owns the CTSI registers within `0x00..0x16`, timer-0/FIQ4, timer-1 current/terminal-count/FIQ5, reset request/cause, pending/masks, IRQ/FIQ aggregation, cross-ROM ninth-IRQ status/ack semantics, one-shot ARM clock-stop/routed wake and save-state restoration. PUP `0x15`, KBGPIO, SIMI, MBUS and GENSIO are separate devices. | Establish the ninth IRQ's physical owner, exact physical timer dividers and transition latency, remaining clock-gate consumers and rail timing. |
 | MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, 9,600-baud character timing and FIQ2/FIQ3 callbacks; ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing. | Recover FIQ3 phase/source and collision/error behavior; attach a counterparty only for organic frames. |
 | Display/input | Native PCD8544, a cross-ROM LCD transport check, and extracted `nokia_kbgpio_device` matrix/IRQ0 behavior; the Lua mirror, handset key layout and timing remain acceptance/board fixtures. The generated EEPROM supplies fields authored by equivalent v6.00/v5.01 descriptor-`0x0749` reset constructors through normal NV loading. | Obtain an authentic configured `0x0749` profile; recover keypad mask/debounce and display reset timing separately. |
@@ -98,6 +98,7 @@ outside the production driver in Lua:
 | Product hardware | Typed `nokia_product_config` fields and device setters | ADC inputs, timer clocks, SIM profile, display geometry, flash capabilities and peer composition are fixed by the selected machine configuration. |
 | Negative composition | `HWCFG` MAME configuration port, with named files under `fixtures/` | A gate may disable a product-owned CCONT, SIM, DSP-service, external-service or radio component. It cannot enable hardware absent from the product profile. |
 | Controller conformance | `DIAGCFG` MAME configuration port, selected by a named fixture | Requests an internal device invariant check without changing firmware state or normal machine composition. |
+| Network event | `NETCFG` MAME configuration port, selected by `fixtures/radio_paging` or `fixtures/radio_incoming_call` | Queues exactly one incoming page or one bounded incoming-call attempt after organic registration; the default laboratory cell remains passive and emits only no-identity PCH fill. |
 | Passive diagnostics | Standard MAME logging categories, enabled together by `RUN_VERBOSE=1` in the local harness | Read-only and bounded observations. No device or driver parses a diagnostic environment variable. |
 | Harness/output controls | Lua-only `NOKIA_DCT3_*` controls for snapshots, summaries, scripted keys, charger/RTC events, MAD2 MMIO fixtures, MBUS input and save-state checks | External test orchestration. These variables are parsed only by `mame_nokia_dct3_input_exerciser.lua` and are not production configuration. |
 
@@ -115,9 +116,11 @@ are deliberately not serialized. `make verify-mad2` retains the executable
 mid-boot save/load check.
 
 The extracted `nokia_radio_peer_device` uses named phases for the recovered SEARCH_LIST,
-channel-change, RA_INFO, BCCH, random-access, LAPDm, Location Updating and
-release transactions. Its report counts remain explicit because the firmware
-requests and consumes those reports incrementally. A future table-driven
+channel-change, RA_INFO, BCCH, random-access, Location Updating and release
+transactions. Decoded link establishment and sequence state belong to
+`nokia_lapdm_link_device`; complete Layer-3 request and MM transaction state
+belong to `nokia_gsm_session_device`. Radio-peer report counts remain explicit
+because the firmware requests and consumes those reports incrementally. A future table-driven
 representation is worthwhile only where it preserves request correlation and
 makes the protocol easier to review.
 
@@ -161,8 +164,13 @@ preserved as an investigation journal.
   excluded registration paths, but the wider steady-state service
   topology remains incomplete.
 - The DSP/external-service peer contract is proved only for requests exercised by
-  boot and the deterministic registration checkpoint. Authentication, paging,
-  calls, SMS, mobility and broader inbound radio/L1 behavior remain unmapped.
+  boot, registration, bounded paging, the bounded MT call-control attempt and
+  persistent ordinary MT SMS delivery. Authentication, answered calls/TCH, MO
+  SMS, MT CP/RP closure, completed multipart Smart Messaging/ringtone UI,
+  mobility and broader inbound radio/L1 behavior remain unmapped. A bounded
+  two-part long-ringtone codec and queue are present; part 1 is organically
+  regression-tested through nine stop-and-wait SAPI-3 frames, while part 2
+  correctly remains gated by the missing CP/RP close.
 - The exact internal cold-boot UI selector remains unnamed, but its behavior is
   no longer a topology gap: provisioned boot reaches an interactive idle screen
   and opens the menu organically. Accepted-security, periodic-timer, conditional

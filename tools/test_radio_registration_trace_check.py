@@ -9,10 +9,17 @@ dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=contention_resolution
 dspif_transport: RX enqueue type=80 payload=34 producer=09c data=8012000049b50001000001734905087000f000fffe330809101010325476982b2b2b
 radio_mm_parse: phase=return object=001017d0 payload=00101b10 result=00000048 mm=00/00/00/00
 display_frontier: operator-resource data=00 f1 10 01 00
+dspif_transport: RX enqueue type=86 payload=8 producer=09d data=8000000000000000
+dsp_hle: LAPDm Location Updating Accept acknowledged nr=1
+dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=rr_channel_release data=00800321012b2b
+dspif_transport: RX enqueue type=86 payload=8 producer=0b4 data=8000000000000000
+dsp_hle: LAPDm Channel Release acknowledged nr=2
+dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=release_deconfigure data=00800341012b2b
 sim_device: update-binary fid=6f7e offset=4 length=5
 sim_device: update-binary fid=6f7e offset=10 length=1
 dsp_hle: TX packet type=02 payload=20 words=11 radio_phase=release_channel_change data=041202000000001a600000010000000f00000000
 dsp_hle: radio peer RX type=89 sequence=53
+dspif_transport: RX enqueue type=80 payload=34 producer=0aa data=601200000005000100001506210001f02b2b
 dspif_transport: RX enqueue type=80 payload=34 producer=0ba data=5012000000010001000049061b00
 dspif_transport: RX enqueue type=80 payload=34 producer=0cc data=5012000000020001000059061a00
 dspif_transport: RX enqueue type=80 payload=34 producer=0de data=5012000000030001000031061c00
@@ -53,6 +60,30 @@ class RegistrationTraceCheckTest(unittest.TestCase):
             line for line in GOOD.splitlines() if "update-binary fid=6f7e" not in line)
         with self.assertRaisesRegex(ValueError, "EF_LOCI"):
             verify(without)
+
+    def test_rejects_missing_location_update_acknowledgement(self):
+        without = "\n".join(
+            line for line in GOOD.splitlines()
+            if "LAPDm Location Updating Accept acknowledged" not in line)
+        with self.assertRaisesRegex(ValueError, "LAPDm acknowledgement"):
+            verify(without)
+
+    def test_rejects_wrong_receive_sequence(self):
+        bad = GOOD.replace("data=0080032101", "data=0080030101")
+        with self.assertRaisesRegex(ValueError, "SAPI-0 RR"):
+            verify(bad)
+
+    def test_rejects_missing_channel_release_acknowledgement(self):
+        without = "\n".join(
+            line for line in GOOD.splitlines()
+            if "LAPDm Channel Release acknowledged" not in line)
+        with self.assertRaisesRegex(ValueError, "Channel Release LAPDm acknowledgement"):
+            verify(without)
+
+    def test_rejects_wrong_channel_release_receive_sequence(self):
+        bad = GOOD.replace("data=0080034101", "data=0080032101")
+        with self.assertRaisesRegex(ValueError, r"N\(R\)=2"):
+            verify(bad)
 
 
 if __name__ == "__main__":

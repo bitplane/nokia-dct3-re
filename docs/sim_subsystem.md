@@ -104,7 +104,8 @@ implements:
   RECORD and CHANGE CHV sequencing;
 - current DF, selected EF and record-pointer state;
 - declared GSM 11.11 file metadata and synthetic profile content; and
-- persistent mutable `EF_ADN` contents through MAME device NVRAM.
+- persistent mutable `EF_ADN`, `EF_SMS` and `EF_SMSP` contents through MAME
+  device NVRAM.
 
 It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
 device is disabled, SIMI reads and writes retain the legacy behavior used by the
@@ -121,7 +122,7 @@ The implemented surface is classified by ownership and evidence:
 | IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
 | SELECT/STATUS/GET RESPONSE/READ behavior | Prototype card | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. Invalidation, full CHV state, errors and removal are incomplete. |
-| UPDATE RECORD and ADN persistence | Partial card contract | Firmware organically writes a standard 32-byte ADN record and reads it after a card-NVRAM reload. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
+| UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
 | CHANGE CHV support | Dormant prototype | The procedure/body/status sequence is implemented, but the ordinary boot does not request it and no persistent credential semantics are validated. |
 
@@ -137,7 +138,8 @@ prevents the validated preliminary lifecycle from composing. MF/DF STATUS data u
 directory layout, including a `0x15` GSM-specific-data length and CHV status fields; a shifted
 layout causes the preliminary pass to repeat.
 
-The base `EF_SST` allocates and activates services 2 and 17. `EF_SPN` contains
+The base `EF_SST` allocates and activates services 2, 4, 7, 12 and 17.
+`EF_SPN` contains
 a standards-shaped laboratory provider name; v6.00 reads it organically but
 uses its PLMN resource for the idle operator label. `EF_ADN (6F3A)` is
 a synthetic 50-by-32-byte linear-fixed EF under `DF_TELECOM`; its count is card
@@ -166,6 +168,16 @@ scans all 50 records through absolute `A0 B2`. Adding a contact produces
 `A0 DC 01 04 20`; the validated fixture writes `ADA` and number `123` to
 record 1, receives `9000`, displays `Saved`, and renders `ADA` from the same
 card after restart.
+
+The card also declares ten free 176-byte `EF_SMS (6F3C)` records and two
+44-byte `EF_SMSP (6F42)` records under `DF_TELECOM`. The first SMSP record
+contains the fixture service-centre address. In
+`make verify-radio-incoming-sms`, firmware organically selects these files and
+writes record 1 with status `03` plus the exact SMSC/SMS-DELIVER representation
+of unread text `hello`; the verifier checks the resulting card NVRAM bytes.
+The port-addressed ringtone fixture instead leaves all `EF_SMS` records free,
+which is part of its application-routing oracle rather than a missing SIM
+write.
 
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
@@ -224,6 +236,8 @@ ordinary boot does not organically request `0x1196`.
 - `make run-frontier`: current external-service/SIM research profile.
 - `make verify-sim-phonebook`: organic two-launch ADN update and persistence
   oracle.
+- `make verify-radio-incoming-sms`: organic 176-byte `EF_SMS` update and exact
+  persisted unread SMS record.
 - `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
 - Stateful-model trace: natural ATR/PPS and the ordinary non-CPHS EF pass, with
   SIM enable rising and the timed presence monitor starting without injected

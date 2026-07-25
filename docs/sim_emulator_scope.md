@@ -47,7 +47,8 @@ The card currently supports:
 - STATUS for the current directory;
 - READ BINARY and linear-fixed READ/UPDATE RECORD with a declared GSM
   filesystem;
-- a persistent 50-record `EF_ADN` synthetic profile; and
+- persistent 50-record `EF_ADN`, ten-record `EF_SMS` and two-record `EF_SMSP`
+  synthetic files; and
 - save-state coverage for transport, selection and mutable card contents.
 
 The organic 3210 conversation currently reaches:
@@ -95,6 +96,27 @@ are MAME device NVRAM, separate from the handset's 24C128. The card stores the
 checks the resulting GSM 11.11 record, restarts with the same card NVRAM and
 requires firmware Search to render the saved name.
 
+## Persistent SMS contract
+
+The base profile also allocates and activates GSM 11.11 services 4 and 12.
+`EF_SMS (6F3C)` has ten 176-byte linear-fixed records initialized free, while
+`EF_SMSP (6F42)` has two 44-byte records and supplies the deterministic
+service-centre address in record 1. Both are mutable card NVRAM appended after
+the pre-existing ADN/location fields, with compatibility for older card
+images.
+
+`make verify-radio-incoming-sms` drives those files from the radio boundary:
+after paging and segmented SAPI-3 SMS-DELIVER traffic, firmware issues
+`A0 DC 01 04 B0` and stores an unread `hello` message in record 1. The verifier
+matches the exact persisted status, SMSC, originator, timestamp and GSM-7 user
+data; no APDU or card contents are injected by the test.
+
+The Smart Messaging ringtone fixture deliberately has the opposite card
+result: after part 1 of its concatenated port-`1581` RTPL tone crosses SAPI 3,
+firmware does not issue `UPDATE RECORD` and record 1 remains free. Part 2 is
+queued behind the organic CP/RP close. This application-routing contract is
+owned by the GSM fixture, not by a special SIM file or card-side decoder.
+
 ## Remaining card work
 
 The card filesystem covers boot and one complete mutable linear-record path.
@@ -138,10 +160,10 @@ blocker. Its contract is authoritative in `sim_subsystem.md`.
 
 ## Current boundary outside the SIM
 
-Ordinary network registration crosses the GSM/DSP boundary and is verified
-separately in `network_scouting.md`. The SIM participates only through its
-standards-shaped files and the firmware-issued `EF_LOCI` updates after Location
-Updating Accept. Callback 7 and the `0x1196` commit family are separate
+Ordinary network registration and bounded MT SMS delivery cross the GSM/DSP
+boundary and are verified separately in `network_scouting.md`. The SIM
+participates only through its standards-shaped files and firmware-issued
+`EF_LOCI`/`EF_SMS` updates. Callback 7 and the `0x1196` commit family are separate
 lower-session machinery; the card does not own their lifecycle or objects, so
 neither belongs in `nokia_sim_card_device`.
 

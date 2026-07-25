@@ -12,6 +12,8 @@ class DspDeviceSplitTest(unittest.TestCase):
         cls.hle = (ROOT / "driver/nokia_dsp_hle.cpp").read_text() + (ROOT / "driver/nokia_dsp_hle.h").read_text()
         cls.external = (ROOT / "driver/nokia_external_service.cpp").read_text() + (ROOT / "driver/nokia_external_service.h").read_text()
         cls.network = (ROOT / "driver/nokia_gsm_network.cpp").read_text() + (ROOT / "driver/nokia_gsm_network.h").read_text()
+        cls.session = (ROOT / "driver/nokia_gsm_session.cpp").read_text() + (ROOT / "driver/nokia_gsm_session.h").read_text()
+        cls.lapdm = (ROOT / "driver/nokia_lapdm_link.cpp").read_text() + (ROOT / "driver/nokia_lapdm_link.h").read_text()
         cls.radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text() + (ROOT / "driver/nokia_radio_peer.h").read_text()
         cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
@@ -57,6 +59,8 @@ class DspDeviceSplitTest(unittest.TestCase):
             "required_device<nokia_dsp_hle_device> m_dsp_hle",
             "required_device<nokia_external_service_peer_device> m_external_service_peer",
             "required_device<nokia_gsm_network_device> m_gsm_network",
+            "required_device<nokia_gsm_session_device> m_gsm_session",
+            "required_device<nokia_lapdm_link_device> m_lapdm_link",
             "required_device<nokia_radio_peer_device> m_radio_peer",
         ):
             self.assertIn(token, self.phone)
@@ -73,8 +77,109 @@ class DspDeviceSplitTest(unittest.TestCase):
         for token in ("receive_packet", "next_report_type", "advance_after_report", "m_reports_remaining"):
             self.assertIn(token, self.radio)
 
+    def test_lapdm_owns_link_state_not_nokia_transport(self):
+        for token in (
+            "m_sapi", "m_downlink_send_sequence",
+            "m_next_uplink_receive_sequence",
+            "m_downlink_acknowledgement_pending",
+            "m_pending_receive_sequence", "build_ua",
+            "build_information_frame",
+        ):
+            self.assertIn(token, self.lapdm)
+        for token in ("dspif", "enqueue_rx_packet", "RECEIVED_BLOCK", "m_reports_remaining"):
+            self.assertNotIn(token, self.lapdm)
+        self.assertIn("m_lapdm_link->receive_uplink", self.radio)
+        self.assertIn("m_lapdm_link->build_ua", self.radio)
+        self.assertIn("m_lapdm_link->build_information_frame", self.radio)
+        self.assertIn("phase::location_update_acknowledgement", self.radio)
+        self.assertIn("phase::channel_release_acknowledgement", self.radio)
+        self.assertNotIn("block[1] = 0x73", self.radio)
+
+    def test_gsm_session_owns_layer3_transaction_not_transport(self):
+        for token in (
+            "establish_layer3",
+            "contention_resolution_delivered",
+            "downlink_acknowledged",
+            "awaiting_location_update_accept_acknowledgement",
+            "awaiting_channel_release_acknowledgement",
+            "m_pending_downlink",
+        ):
+            self.assertIn(token, self.session)
+        for token in (
+            "dspif", "enqueue_rx_packet", "RECEIVED_BLOCK",
+            "BLOCK_REQUEST", "m_reports_remaining", "build_ua",
+        ):
+            self.assertNotIn(token, self.session)
+        self.assertIn("m_gsm_session->establish_layer3", self.radio)
+        self.assertIn("m_gsm_session->contention_resolution_delivered", self.radio)
+        self.assertIn("m_gsm_session->downlink_acknowledged", self.radio)
+        self.assertIn("m_gsm_session->pending_downlink", self.radio)
+
+    def test_paging_ownership_is_split_at_decoded_blocks(self):
+        for token in (
+            "paging_fill", "paging_request", "subscriber_paging_group",
+            "CCCH_BLOCK_OFFSETS",
+        ):
+            self.assertIn(token, self.network)
+        for token in (
+            "queue_incoming_page", "awaiting_paging_response",
+            "awaiting_paging_contention_resolution",
+            "m_registered_mobile_identity",
+        ):
+            self.assertIn(token, self.session)
+        for token in (
+            "serving_pch_report", "paging_frame_number",
+            "m_page_after_registration", "m_pch_fill_delivered",
+        ):
+            self.assertIn(token, self.radio)
+        self.assertNotIn("enqueue_rx_packet", self.network + self.session)
+
+    def test_incoming_call_ownership_is_split_at_decoded_blocks(self):
+        for token in (
+            "mm_information", "incoming_call_setup",
+            "connect_acknowledge", "call_release",
+        ):
+            self.assertIn(token, self.network)
+        for token in (
+            "awaiting_mm_information_acknowledgement",
+            "awaiting_incoming_call_setup_acknowledgement",
+            "incoming_call_active", "receive_layer3",
+        ):
+            self.assertIn(token, self.session)
+        for token in (
+            "phase::service_downlink", "phase::service_uplink_request",
+            "build_receive_ready", "information_indication",
+        ):
+            self.assertIn(token, self.radio)
+        self.assertNotIn("enqueue_rx_packet", self.network + self.session)
+
+    def test_incoming_sms_and_smart_message_ownership_is_split(self):
+        for token in (
+            "incoming_sms_cp_data", "incoming_smart_message_cp_data",
+            "smart_message_multipart_part_capacity", "append(0xf5)",
+            "append(0x7a)",
+        ):
+            self.assertIn(token, self.network)
+        for token in (
+            "incoming_service::smart_message",
+            "awaiting_sms_sapi3_establishment",
+            "awaiting_sms_cp_data_acknowledgement",
+        ):
+            self.assertIn(token, self.session)
+        for token in (
+            "m_incoming_smart_message_after_registration",
+            "maximum_information_length",
+        ):
+            self.assertIn(token, self.radio)
+        self.assertNotIn("dspif", self.network + self.session)
+
     def test_network_has_no_nokia_transport_ownership(self):
-        for token in ("dspif", "enqueue_rx_packet", "CHANNEL_CHANGED_CNF", "m_reports_remaining"):
+        for token in (
+            "dspif", "enqueue_rx_packet", "CHANNEL_CHANGED_CNF",
+            "m_reports_remaining", "build_ua", "m_downlink_send_sequence",
+            "awaiting_location_update_accept_acknowledgement",
+            "downlink_acknowledged",
+        ):
             self.assertNotIn(token, self.network)
 
 

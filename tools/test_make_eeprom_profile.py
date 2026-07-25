@@ -45,6 +45,16 @@ class ChecksumTests(unittest.TestCase):
         self.assertEqual(image[0x06C8:0x06D0], bytes.fromhex("32d8fa9700000317"))
         self.assertEqual(make_eeprom_profile.imei_check_digit("49015420323751"), "8")
 
+    def test_erased_identity_can_have_a_physical_security_code(self):
+        image = make_eeprom_profile.build_profile(
+            self.firmware_fixture(),
+            erased_identity_security_code="12345")
+        self.assertEqual(image[0x000C:0x0014], bytes([0xff]) * 8)
+        self.assertEqual(image[0x0110:0x0113], bytes.fromhex("123450"))
+        self.assertEqual(image[0x06C8:0x06D0], bytes.fromhex(
+            "3ad2f490000003c2"))
+        make_eeprom_profile.validate_checksums(image)
+
     def test_display_profile_uses_rom_descriptor(self):
         flash = bytearray(self.firmware_fixture())
         descriptor = 0x100

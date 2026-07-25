@@ -17,6 +17,18 @@ CHECKPOINTS = (
         r"radio_mm_parse: phase=return .*result=00000048 ")),
     ("operator presentation", re.compile(
         r"operator-resource data=.*00.*f1.*10.*01")),
+    ("dedicated uplink request after Location Updating Accept", re.compile(
+        r"RX enqueue type=86 payload=8 .*data=8000000000000000")),
+    ("Location Updating Accept LAPDm acknowledgement", re.compile(
+        r"LAPDm Location Updating Accept acknowledged nr=1")),
+    ("handset SAPI-0 RR N(R)=1", re.compile(
+        r"TX packet type=1b .*data=0080032101")),
+    ("dedicated uplink request after RR Channel Release", re.compile(
+        r"RX enqueue type=86 payload=8 .*data=8000000000000000")),
+    ("RR Channel Release LAPDm acknowledgement", re.compile(
+        r"LAPDm Channel Release acknowledged nr=2")),
+    ("handset SAPI-0 RR N(R)=2", re.compile(
+        r"TX packet type=1b .*data=0080034101")),
     ("EF_LOCI location update", re.compile(
         r"sim_device: update-binary fid=6f7e offset=4 length=5")),
     ("EF_LOCI status update", re.compile(
@@ -28,6 +40,8 @@ POST_ACCEPT_CHECKPOINTS = (
         r"TX packet type=02 .*radio_phase=release_channel_change "
         r"data=041202000000001a600000010000000f00000000")),
     ("idle-channel confirmation", re.compile(r"radio peer RX type=89 .*")),
+    ("no-identity PCH fill", re.compile(
+        r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}1506210001f0")),
 )
 
 def verify(text: str) -> None:

@@ -99,10 +99,20 @@ def provision_security_identity(image: bytearray, first_fourteen: str,
     identity = first_fourteen + imei_check_digit(first_fourteen)
     identity_bcd = bytes((int(first_fourteen[index]) << 4) | int(first_fourteen[index + 1])
                          for index in range(0, 14, 2)) + bytes(1)
+    image[IDENTITY_OFFSET:IDENTITY_OFFSET + 8] = identity_bcd
+    provision_security_state(image, identity, security_code)
+
+
+def provision_security_state(image: bytearray, identity: str,
+                             security_code: str = "12345") -> None:
+    """Encode the code and verifier record for a formatted 15-character identity."""
+    if len(identity) != 15:
+        raise ValueError("formatted identity must contain exactly fifteen characters")
+    if len(security_code) != 5 or not security_code.isdigit():
+        raise ValueError("security code must contain exactly five digits")
     code_bcd = bytes((int(security_code[0:2], 16),
                       int(security_code[2:4], 16),
                       int(security_code[4], 16) << 4))
-    image[IDENTITY_OFFSET:IDENTITY_OFFSET + 8] = identity_bcd
     image[SECURITY_CODE_OFFSET:SECURITY_CODE_OFFSET + 3] = code_bcd
 
     packed_code = bytes((5, code_bcd[0], code_bcd[1], code_bcd[2]))
@@ -113,7 +123,8 @@ def provision_security_identity(image: bytearray, first_fourteen: str,
         encrypted + bytes(2) + identity_sum.to_bytes(2, "big"))
 
 
-def build_profile(flash: bytes, provisioned_identity: str | None = None) -> bytearray:
+def build_profile(flash: bytes, provisioned_identity: str | None = None,
+                  erased_identity_security_code: str | None = None) -> bytearray:
     image = bytearray([0xFF]) * SIZE
 
     # Firmware fallback record for NV descriptor 0x0757, variant zero.
@@ -163,8 +174,16 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None) -> byte
             if value is not None:
                 image[record_offset + field] = value
 
+    if provisioned_identity is not None and erased_identity_security_code is not None:
+        raise ValueError("choose either a provisioned identity or erased-identity security code")
     if provisioned_identity is not None:
         provision_security_identity(image, provisioned_identity)
+    elif erased_identity_security_code is not None:
+        # The unprovisioned ROM formats its erased identity as fifteen question
+        # marks. Supplying the matching verifier state lets a physical 12345
+        # entry leave that editor without inventing an IMEI.
+        provision_security_state(
+            image, "?" * 15, erased_identity_security_code)
 
     # Firmware 0x264c56 reads 0x120 bytes, sums the first 0x11e bytes, and
     # compares the result with the big-endian 32-bit word at 0x011c. The two
@@ -193,9 +212,14 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--provisioned-imei-prefix", metavar="DIGITS",
                         help="provision a synthetic 14-digit IMEI prefix and matching security record")
+    parser.add_argument("--erased-identity-security-code", metavar="DIGITS",
+                        help="provision a code/verifier while leaving the IMEI erased")
     args = parser.parse_args()
 
-    profile = build_profile(args.flash.read_bytes(), args.provisioned_imei_prefix)
+    profile = build_profile(
+        args.flash.read_bytes(),
+        args.provisioned_imei_prefix,
+        args.erased_identity_security_code)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(profile)
     print(f"wrote {args.output} ({len(profile)} bytes)")

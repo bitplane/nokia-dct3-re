@@ -43,6 +43,8 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_loci));
 	save_item(NAME(m_kc));
 	save_item(NAME(m_bcch));
+	save_item(NAME(m_sms));
+	save_item(NAME(m_smsp));
 }
 
 void nokia_sim_card_device::device_reset()
@@ -64,6 +66,7 @@ void nokia_sim_card_device::nvram_default()
 	std::fill(std::begin(m_loci), std::end(m_loci), 0xff);
 	m_loci[10] = 0x01; // location not updated
 	std::fill(std::begin(m_bcch), std::end(m_bcch), 0xff);
+	initialize_sms_files();
 	if (m_cached_location)
 	{
 		const u8 loci[] = { 0xff, 0xff, 0xff, 0xff, 0x00, 0xf1, 0x10, 0x00, 0x01, 0x00, 0x01 };
@@ -84,6 +87,20 @@ bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 	if (loci_err || loci_actual != sizeof(m_loci) || kc_err || kc_actual != sizeof(m_kc) ||
 			bcch_err || bcch_actual != sizeof(m_bcch))
 		return false;
+	auto const [sms_err, sms_actual] = util::read(file, m_sms, sizeof(m_sms));
+	if (!sms_err && sms_actual == 0)
+	{
+		// Preserve compatibility with card NVRAM created before SMS storage was
+		// admitted; initialize only the newly appended files.
+		initialize_sms_files();
+		return true;
+	}
+	if (sms_err || sms_actual != sizeof(m_sms))
+		return false;
+	auto const [smsp_err, smsp_actual] = util::read(
+			file, m_smsp, sizeof(m_smsp));
+	if (smsp_err || smsp_actual != sizeof(m_smsp))
+		return false;
 	u8 trailing;
 	auto const [trailing_err, trailing_actual] = util::read(file, &trailing, 1);
 	return !trailing_err && trailing_actual == 0;
@@ -97,8 +114,30 @@ bool nokia_sim_card_device::nvram_write(util::write_stream &file)
 	auto const [loci_err, loci_actual] = util::write(file, m_loci, sizeof(m_loci));
 	auto const [kc_err, kc_actual] = util::write(file, m_kc, sizeof(m_kc));
 	auto const [bcch_err, bcch_actual] = util::write(file, m_bcch, sizeof(m_bcch));
+	auto const [sms_err, sms_actual] = util::write(file, m_sms, sizeof(m_sms));
+	auto const [smsp_err, smsp_actual] = util::write(
+			file, m_smsp, sizeof(m_smsp));
 	return !loci_err && loci_actual == sizeof(m_loci) && !kc_err && kc_actual == sizeof(m_kc) &&
-			!bcch_err && bcch_actual == sizeof(m_bcch);
+			!bcch_err && bcch_actual == sizeof(m_bcch) &&
+			!sms_err && sms_actual == sizeof(m_sms) &&
+			!smsp_err && smsp_actual == sizeof(m_smsp);
+}
+
+void nokia_sim_card_device::initialize_sms_files()
+{
+	std::fill(std::begin(m_sms), std::end(m_sms), 0xff);
+	for (unsigned record = 0; record < sms_record_count; ++record)
+		m_sms[record * sms_record_length] = 0x00;
+
+	std::fill(std::begin(m_smsp), std::end(m_smsp), 0xff);
+	// GSM 11.11 EF_SMSP: only the service-centre address is present in record
+	// one. Parameter indicators mark destination/PID/DCS/validity absent.
+	m_smsp[16] = 0xfd;
+	const u8 service_centre[] = {
+		0x06, 0x91, 0x21, 0x43, 0x65, 0x87, 0x09
+	};
+	std::copy(std::begin(service_centre), std::end(service_centre),
+			std::begin(m_smsp) + 29);
 }
 
 void nokia_sim_card_device::set_atr(const u8 *data, unsigned length)
@@ -452,6 +491,10 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x2fe2, 0x3f00, 10, 0, file_structure::transparent, false },
 		{ 0x2fe6, 0x3f00, 4, 0, file_structure::transparent, false },
 		{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true },
+		{ 0x6f3c, 0x7f10, sms_record_count * sms_record_length,
+				sms_record_length, file_structure::linear_fixed, true },
+		{ 0x6f42, 0x7f10, smsp_record_count * smsp_record_length,
+				smsp_record_length, file_structure::linear_fixed, true },
 		{ 0x6f05, 0x7f20, 4, 0, file_structure::transparent, false },
 		{ 0x6fb7, 0x7f20, 15, 0, file_structure::transparent, false },
 		{ 0x6fad, 0x7f20, 4, 0, file_structure::transparent, false },
@@ -521,8 +564,9 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// profile also advertises GSM 11.11 service 5, keeping EF_CSP and EF_SST
 	// consistent and causing the ME to read ACM, ACMmax and PUCT normally.
 	static constexpr u8 service_table[15] = {
-		0x0c, // Service 2: ADN allocated and activated.
-		0x30  // Service 7: PLMN selector allocated and activated.
+		0xcc, // Services 2 (ADN) and 4 (SMS) allocated and activated.
+		0x30, // Service 7: PLMN selector allocated and activated.
+		0xc0  // Service 12: SMS parameters allocated and activated.
 	};
 	// GSM 11.11 defines zero as "ACMmax not valid": this profile enables AoC
 	// without imposing a subscriber call-charge limit.
@@ -558,6 +602,8 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	};
 	if (fid == 0x2fe2 && offset < std::size(iccid)) return iccid[offset];
 	if (fid == 0x6f3a && offset < sizeof(m_adn)) return m_adn[offset];
+	if (fid == 0x6f3c && offset < sizeof(m_sms)) return m_sms[offset];
+	if (fid == 0x6f42 && offset < sizeof(m_smsp)) return m_smsp[offset];
 	if (fid == 0x6f05 && offset < std::size(language_preference)) return language_preference[offset];
 	if (fid == 0x6f38 && offset < std::size(service_table))
 	{
@@ -596,6 +642,8 @@ u8 *nokia_sim_card_device::mutable_file_data(u16 fid)
 	switch (fid)
 	{
 	case 0x6f3a: return m_adn;
+	case 0x6f3c: return m_sms;
+	case 0x6f42: return m_smsp;
 	case 0x6f7e: return m_loci;
 	case 0x6f20: return m_kc;
 	case 0x6f74: return m_bcch;

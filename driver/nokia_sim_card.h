@@ -52,6 +52,12 @@ private:
 	u8 *mutable_file_data(u16 fid);
 	const u8 *mutable_file_data(u16 fid) const;
 	bool access_allowed(const file_descriptor &file) const;
+	void initialize_sms_files();
+
+	static constexpr unsigned sms_record_length = 176;
+	static constexpr unsigned sms_record_count = 10;
+	static constexpr unsigned smsp_record_length = 44;
+	static constexpr unsigned smsp_record_count = 2;
 
 	devcb_write8 m_response_cb;
 	bool m_cphs_aoc = false;
@@ -74,6 +80,8 @@ private:
 	u8 m_loci[11] = { 0 };
 	u8 m_kc[9] = { 0 };
 	u8 m_bcch[16] = { 0 };
+	u8 m_sms[sms_record_count * sms_record_length] = { 0 };
+	u8 m_smsp[smsp_record_count * smsp_record_length] = { 0 };
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_SIM_CARD, nokia_sim_card_device)
