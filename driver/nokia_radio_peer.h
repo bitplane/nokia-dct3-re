@@ -59,7 +59,7 @@ public:
 	const char *phase_name() const;
 	bool speech_channel_active() const;
 	bool queue_downlink_speech(const speech_frame &frame);
-	bool take_downlink_speech(speech_frame &frame);
+	bool take_downlink_speech(speech_frame &frame, bool &good);
 	bool submit_uplink_speech(const speech_frame &frame);
 	bool take_uplink_speech(speech_frame &frame);
 	bool queue_downlink_sacch(
@@ -127,6 +127,7 @@ private:
 	bool speech_queue_pop(
 			std::array<speech_frame, speech_queue_depth> &queue,
 			u8 &head, u8 &count, speech_frame &frame);
+	bool queue_downlink_delivery(const speech_frame &frame, bool good);
 	void clear_speech_queues();
 	void reset_l1_pipeline();
 	void prepare_l1_save();
@@ -165,6 +166,7 @@ private:
 	bool m_traffic_channel_active = false;
 	unsigned m_downlink_offset = 0;
 	std::array<speech_frame, speech_queue_depth> m_downlink_speech{};
+	std::array<u8, speech_queue_depth> m_downlink_speech_good{};
 	std::array<speech_frame, speech_queue_depth> m_uplink_speech{};
 	u8 m_downlink_speech_head = 0;
 	u8 m_downlink_speech_count = 0;

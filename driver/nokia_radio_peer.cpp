@@ -49,6 +49,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_traffic_channel_active));
 	save_item(NAME(m_downlink_offset));
 	save_item(NAME(m_downlink_speech));
+	save_item(NAME(m_downlink_speech_good));
 	save_item(NAME(m_uplink_speech));
 	save_item(NAME(m_downlink_speech_head));
 	save_item(NAME(m_downlink_speech_count));
@@ -226,17 +227,32 @@ bool nokia_radio_peer_device::speech_queue_pop(
 
 bool nokia_radio_peer_device::queue_downlink_speech(const speech_frame &frame)
 {
+	return queue_downlink_delivery(frame, true);
+}
+
+bool nokia_radio_peer_device::queue_downlink_delivery(
+		const speech_frame &frame, bool good)
+{
 	if (!speech_channel_active())
 		return false;
+	if (m_downlink_speech_count == speech_queue_depth)
+		return false;
+	m_downlink_speech_good[
+			(m_downlink_speech_head + m_downlink_speech_count) %
+				speech_queue_depth] = good;
 	return speech_queue_push(
 			m_downlink_speech, m_downlink_speech_head,
 			m_downlink_speech_count, frame);
 }
 
-bool nokia_radio_peer_device::take_downlink_speech(speech_frame &frame)
+bool nokia_radio_peer_device::take_downlink_speech(
+		speech_frame &frame, bool &good)
 {
 	if (!speech_channel_active())
 		return false;
+	if (!m_downlink_speech_count)
+		return false;
+	good = m_downlink_speech_good[m_downlink_speech_head] != 0;
 	return speech_queue_pop(
 			m_downlink_speech, m_downlink_speech_head,
 			m_downlink_speech_count, frame);
@@ -443,6 +459,9 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	if (handset_block &&
 			handset_block->kind == gsm::tch_f::traffic_block_kind::facch)
 	{
+		// FACCH/F steals one complete speech block.  Preserve that fact as a
+		// BFI at the codec-clock boundary instead of an ambiguous empty queue.
+		queue_downlink_delivery({}, false);
 		if (handset_block->control.good)
 			++m_downlink_facch_blocks;
 		if (m_trace_enabled)
@@ -453,6 +472,7 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	}
 	else if (handset_block && !handset_block->speech.good)
 	{
+		queue_downlink_delivery({}, false);
 		++m_downlink_bad_speech_blocks;
 		if (m_trace_enabled)
 			LOGMASKED(LOG_RADIO,

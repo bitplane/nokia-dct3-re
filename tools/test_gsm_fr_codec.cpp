@@ -82,6 +82,67 @@ int main()
 	invalid_state.channels[1].nrp = 0;
 	assert(!codec.restore(invalid_state));
 
+	// GSM 06.11 receive-side substitution is independent of Layer 1.  The
+	// first BFI repeats a valid speech frame, subsequent BFIs fade, and the
+	// output reaches silence at 320 ms before recovering on a clean frame.
+	nokia_gsm_fr_codec receive_codec;
+	nokia_gsm_fr_receiver receiver;
+	nokia_gsm_fr_codec::pcm_block concealed{};
+	assert(receiver.decode(receive_codec, nullptr, concealed));
+	assert(std::all_of(concealed.begin(), concealed.end(),
+			[](std::int16_t sample) { return sample == 0; }));
+	assert(receiver.decode(receive_codec, &encoded, concealed));
+	std::uint16_t clean_peak = 0;
+	for (std::int16_t sample : concealed)
+		clean_peak = std::max<std::uint16_t>(
+				clean_peak, std::uint16_t(
+						sample < 0 ? -std::int32_t(sample) : sample));
+	assert(clean_peak != 0);
+	for (unsigned loss = 1;
+			loss <= nokia_gsm_fr_receiver::mute_after_lost_frames; ++loss)
+	{
+		assert(receiver.decode(receive_codec, nullptr, concealed));
+		std::uint16_t peak = 0;
+		for (std::int16_t sample : concealed)
+			peak = std::max<std::uint16_t>(
+					peak, std::uint16_t(
+							sample < 0 ? -std::int32_t(sample) : sample));
+		if (loss == 1)
+			assert(peak != 0);
+		if (loss == nokia_gsm_fr_receiver::mute_after_lost_frames)
+			assert(peak == 0);
+	}
+	assert(receiver.decode(receive_codec, &encoded, concealed));
+	assert(receiver.lost_frames() == 0);
+	assert(std::any_of(concealed.begin(), concealed.end(),
+			[](std::int16_t sample) { return sample != 0; }));
+
+	// Receiver substitution history and the underlying decoder predictor must
+	// branch together across a save/load in the middle of a loss sequence.
+	assert(receiver.decode(receive_codec, nullptr, concealed));
+	assert(receiver.decode(receive_codec, nullptr, concealed));
+	const auto saved_receiver = receiver.snapshot();
+	const auto saved_receive_codec = receive_codec.snapshot();
+	nokia_gsm_fr_codec restored_receive_codec;
+	nokia_gsm_fr_receiver restored_receiver;
+	assert(restored_receive_codec.restore(saved_receive_codec));
+	assert(restored_receiver.restore(saved_receiver));
+	for (unsigned loss = 0; loss < 4; ++loss)
+	{
+		nokia_gsm_fr_codec::pcm_block original_concealed{};
+		nokia_gsm_fr_codec::pcm_block restored_concealed{};
+		assert(receiver.decode(
+				receive_codec, nullptr, original_concealed));
+		assert(restored_receiver.decode(
+				restored_receive_codec, nullptr, restored_concealed));
+		assert(original_concealed == restored_concealed);
+	}
+
+	auto receiver_state = receiver.snapshot();
+	receiver_state.lost_frames =
+			nokia_gsm_fr_receiver::mute_after_lost_frames + 1;
+	assert(!receiver.restore(receiver_state));
+
 	codec.reset();
 	assert(codec.available());
 	return 0;

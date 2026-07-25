@@ -51,6 +51,8 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_pcm_link_fault));
 	save_item(NAME(m_speech_uplink_frames));
 	save_item(NAME(m_speech_downlink_frames));
+	save_item(NAME(m_speech_concealed_frames));
+	save_item(NAME(m_speech_muted_frames));
 	save_item(NAME(m_speech_nonzero_microphone_blocks));
 	save_item(NAME(m_speech_nonzero_earpiece_blocks));
 	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, dp0));
@@ -70,6 +72,9 @@ void nokia_dsp_hle_device::device_start()
 	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, wav_fmt));
 	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, frame_index));
 	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, frame_chain));
+	save_item(NAME(m_speech_receiver_state.last_good));
+	save_item(NAME(m_speech_receiver_state.have_good));
+	save_item(NAME(m_speech_receiver_state.lost_frames));
 	machine().save().register_presave(
 			save_prepost_delegate(
 				FUNC(nokia_dsp_hle_device::prepare_speech_codec_save), this));
@@ -93,10 +98,13 @@ void nokia_dsp_hle_device::device_reset()
 	std::fill(m_data_memory.begin(), m_data_memory.end(), 0);
 	std::fill(m_data_memory_loaded.begin(), m_data_memory_loaded.end(), 0);
 	m_speech_codec.reset();
+	m_speech_receiver.reset();
 	m_speech_active = false;
 	m_pcm_link_fault = false;
 	m_speech_uplink_frames = 0;
 	m_speech_downlink_frames = 0;
+	m_speech_concealed_frames = 0;
+	m_speech_muted_frames = 0;
 	m_speech_nonzero_microphone_blocks = 0;
 	m_speech_nonzero_earpiece_blocks = 0;
 	publish_bootstrap_state();
@@ -105,12 +113,15 @@ void nokia_dsp_hle_device::device_reset()
 void nokia_dsp_hle_device::prepare_speech_codec_save()
 {
 	m_speech_codec_state = m_speech_codec.snapshot();
+	m_speech_receiver_state = m_speech_receiver.snapshot();
 }
 
 void nokia_dsp_hle_device::restore_speech_codec_state()
 {
 	if (!m_speech_codec.restore(m_speech_codec_state))
 		fatalerror("DSP HLE: invalid GSM-FR codec state in save image");
+	if (!m_speech_receiver.restore(m_speech_receiver_state))
+		fatalerror("DSP HLE: invalid GSM-FR receiver state in save image");
 }
 
 void nokia_dsp_hle_device::publish_bootstrap_state()
@@ -276,20 +287,35 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 		// GSM-FR predictor state belongs to one continuous traffic-channel
 		// activation and must not leak from a previous call.
 		m_speech_codec.reset();
+		m_speech_receiver.reset();
 		m_speech_active = true;
 	}
 
 	nokia_mad2_pcm_device::pcm_block earpiece{};
 	nokia_radio_peer_device::speech_frame radio_frame{};
-	if (m_radio_peer->take_downlink_speech(radio_frame))
+	bool radio_frame_good = false;
+	const bool have_radio_delivery =
+			m_radio_peer->take_downlink_speech(radio_frame, radio_frame_good);
+	nokia_gsm_fr_codec::speech_frame downlink{};
+	const nokia_gsm_fr_codec::speech_frame *decoder_frame = nullptr;
+	if (have_radio_delivery && radio_frame_good)
 	{
-		nokia_gsm_fr_codec::speech_frame downlink{};
 		std::copy(radio_frame.begin(), radio_frame.end(), downlink.begin());
-		nokia_gsm_fr_codec::pcm_block decoder_output{};
-		if (m_speech_codec.decode(downlink, decoder_output))
-		{
-			std::copy(decoder_output.begin(), decoder_output.end(), earpiece.begin());
+		decoder_frame = &downlink;
+	}
+	nokia_gsm_fr_codec::pcm_block decoder_output{};
+	if (m_speech_receiver.decode(
+			m_speech_codec, decoder_frame, decoder_output))
+	{
+		std::copy(decoder_output.begin(), decoder_output.end(), earpiece.begin());
+		if (decoder_frame)
 			++m_speech_downlink_frames;
+		else
+		{
+			++m_speech_concealed_frames;
+			if (m_speech_receiver.lost_frames() >=
+					nokia_gsm_fr_receiver::mute_after_lost_frames)
+				++m_speech_muted_frames;
 		}
 	}
 
@@ -332,8 +358,8 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 		LOGMASKED(LOG_DSP_HLE,
 				"dsp_hle: speech tick uplink=%llu downlink=%llu pcm=%llu "
 				"pcm_clock=%u/%u pcm_shape=%u serial_clocks=%llu/%llu "
-				"mic_peak=%u ear_peak=%u "
-				"nonzero=%llu/%llu t=%.6f\n",
+				"mic_peak=%u ear_peak=%u nonzero=%llu/%llu "
+				"concealed=%llu muted=%llu t=%.6f\n",
 				m_speech_uplink_frames, m_speech_downlink_frames,
 				m_mad2_pcm->blocks_transferred(), m_mad2_pcm->data_clock(),
 				m_mad2_pcm->frame_clock(),
@@ -343,6 +369,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 				microphone_peak, earpiece_peak,
 				m_speech_nonzero_microphone_blocks,
 				m_speech_nonzero_earpiece_blocks,
+				m_speech_concealed_frames, m_speech_muted_frames,
 				machine().time().as_double());
 }
 

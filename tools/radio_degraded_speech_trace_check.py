@@ -22,6 +22,10 @@ BAD_RE = re.compile(
 GOOD_MEDIA_RE = re.compile(
     r"dsp_hle: speech tick uplink=(\d+) downlink=(\d+) .*?t=([0-9.]+)"
 )
+CONCEALMENT_RE = re.compile(
+    r"dsp_hle: speech tick .*?ear_peak=(\d+) .*?"
+    r"concealed=(\d+) muted=(\d+) t=([0-9.]+)"
+)
 
 
 def check(path: Path) -> str:
@@ -54,10 +58,19 @@ def check(path: Path) -> str:
     if not media or not any(time > impaired_bad[-1][2] and downlink > 100
                             for _, downlink, time in media):
         raise ValueError("good downlink media did not recover after a bad frame")
+    concealment = [
+        (int(peak), int(concealed), int(muted), float(time))
+        for peak, concealed, muted, time in CONCEALMENT_RE.findall(text)
+    ]
+    if not concealment or concealment[-1][1] == 0:
+        raise ValueError("bad/FACCH-displaced speech never reached BFI concealment")
+    if not any(peak and concealed and time > impaired_bad[0][2]
+               for peak, concealed, _, time in concealment):
+        raise ValueError("receiver did not substitute non-silent speech after BFI")
     return (
         f"{clean_result}; degraded link inverted {impairments[-1][1]} bursts "
         f"and observed {len(impaired_bad)} impairment-induced bad blocks "
-        f"before recovery"
+        f"with {concealment[-1][1]} concealed intervals before recovery"
     )
 
 

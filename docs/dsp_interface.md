@@ -709,6 +709,18 @@ branches after four non-silent frames and proves that restoring the snapshot
 produces bit-identical future encoded frames and sample-identical decoded
 PCM; it also rejects invalid decoder-lag state.
 
+`nokia_gsm_fr_receiver` is a separate ETSI GSM 06.11 receive-side boundary.
+Layer 1 supplies either a valid frame or BFI; a received bad payload is never
+passed to the speech decoder. Before any valid history it emits silence.
+Thereafter it substitutes the previous valid encoded frame at the decoder
+input, leaves the first lost interval at full level, and progressively
+attenuates subsequent output to silence on the sixteenth 20 ms loss (320 ms).
+A valid frame resets the loss sequence. The substitution frame and loss
+position are save-state data alongside, but distinct from, the GSM 06.10
+predictor. The standalone verifier covers loss before first speech, first-loss
+substitution, the 320 ms mute bound, clean recovery, invalid state rejection
+and sample-identical save/load branching in mid-loss.
+
 The DSP HLE clocks this boundary every 20 ms only when both the TCH/F and the
 product-configured command-`0x08` speech field are active. It reads one microphone block
 through `nokia_mad2_pcm_device`, encodes and submits the uplink frame, then
@@ -845,10 +857,11 @@ Organic LAPDm blocks carried on channel selector `0xb0` are also copied into
 the corresponding uplink or downlink FACCH coder. FACCH has priority over the
 next queued speech block, its eight stealing flags identify the replacement
 to the independent receiver, and the displaced speech interval is delivered
-as a media gap rather than delayed or fabricated. Layer 3 still consumes the
-already recovered Nokia block transaction directly; the parallel burst path
-models its Layer-1 consequence without making call-control timing depend on
-the HLE air-link decoder.
+as an explicit BFI rather than delayed or confused with queue starvation.
+The same typed delivery carries protected speech decode failures. Layer 3
+still consumes the already recovered Nokia block transaction directly; the
+parallel burst path models its Layer-1 consequence without making call-control
+timing depend on the HLE air-link decoder.
 
 The air boundary also accepts an explicit, generic hard-error profile. It
 operates only on the 114 TCH data bits after diagonal interleaving and before
@@ -861,10 +874,17 @@ control.
 
 `make verify-radio-degraded-speech` proves the complete consequence: the
 configured fade reaches the air seam, protected speech fails parity after
-Viterbi decoding, the invalid frame is withheld from the speech codec, and
-later clean blocks restore non-silent receiver audio. The current v6.00 run
-inverted 20 bursts, rejected 10 impairment-induced speech blocks, still
-delivered 137 non-silent downlink blocks and completed organic teardown.
+Viterbi decoding, the BFI triggers GSM 06.11 substitution rather than decoding
+the damaged payload or abruptly muting the earpiece, and later clean blocks
+reset the loss sequence. The current v6.00 run inverted 20 bursts, rejected
+10 impairment-induced speech blocks, concealed 14 total startup, FACCH and
+bad-frame intervals, still delivered 143 non-silent earpiece blocks and
+completed organic teardown.
+
+The receive-side requirements and 320 ms maximum muting interval are derived
+from [ETSI GSM 06.11 version 3.0.1](https://www.etsi.org/deliver/etsi_gts/06/0611/03.00.01_60/gsmts_0611sv030001p.pdf),
+“Full rate speech; Substitution and muting of lost frames for full rate speech
+traffic channels”.
 
 The answered-call fixture selects that voice peer. Across both v6.00 and
 v5.01, `radio_speech_media_trace_check.py` proves fresh codec state, 20 ms

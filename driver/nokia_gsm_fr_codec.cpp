@@ -182,3 +182,53 @@ bool nokia_gsm_fr_codec::restore(const state &state)
 	*static_cast<gsm_state *>(m_decoder) = decoder;
 	return true;
 }
+
+bool nokia_gsm_fr_receiver::decode(nokia_gsm_fr_codec &codec,
+		const nokia_gsm_fr_codec::speech_frame *frame,
+		nokia_gsm_fr_codec::pcm_block &pcm)
+{
+	if (frame)
+	{
+		if (!codec.decode(*frame, pcm))
+			return false;
+		m_state.last_good = *frame;
+		m_state.have_good = 1;
+		m_state.lost_frames = 0;
+		return true;
+	}
+
+	// GSM 06.11 requires a lost frame not to reach the speech decoder as the
+	// received payload.  Before the first valid frame there is nothing valid
+	// to extrapolate, so emit silence.  Afterwards repeat the last good frame
+	// at the decoder input and attenuate progressively to silence no later
+	// than 320 ms.  The first loss remains at full level as required.
+	if (m_state.lost_frames < mute_after_lost_frames)
+		++m_state.lost_frames;
+	if (!m_state.have_good)
+	{
+		pcm.fill(0);
+		return true;
+	}
+	if (!codec.decode(m_state.last_good, pcm))
+		return false;
+
+	const unsigned gain =
+			m_state.lost_frames >= mute_after_lost_frames
+				? 0
+				: mute_after_lost_frames - m_state.lost_frames;
+	constexpr unsigned denominator = mute_after_lost_frames - 1;
+	for (std::int16_t &sample : pcm)
+		sample = std::int16_t(
+				(std::int32_t(sample) * std::int32_t(gain)) /
+				std::int32_t(denominator));
+	return true;
+}
+
+bool nokia_gsm_fr_receiver::restore(const state &saved)
+{
+	if (saved.have_good > 1 ||
+			saved.lost_frames > mute_after_lost_frames)
+		return false;
+	m_state = saved;
+	return true;
+}

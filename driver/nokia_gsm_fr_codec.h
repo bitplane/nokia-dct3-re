@@ -67,4 +67,34 @@ private:
 	void *m_decoder = nullptr;
 };
 
+// Generic GSM-FR receive-side bad-frame substitution.  Layer 1 supplies the
+// BFI; this component substitutes a previous valid speech frame at the decoder
+// input and progressively mutes its PCM result.  It owns neither radio timing
+// nor Nokia DSP/COBBA routing.
+class nokia_gsm_fr_receiver
+{
+public:
+	static constexpr unsigned mute_after_lost_frames = 16; // 320 ms at 20 ms
+
+	struct state
+	{
+		nokia_gsm_fr_codec::speech_frame last_good{};
+		std::uint8_t have_good = 0;
+		std::uint8_t lost_frames = 0;
+	};
+
+	// A null frame is a BFI/erasure.  A valid frame resets the muting sequence.
+	bool decode(nokia_gsm_fr_codec &codec,
+			const nokia_gsm_fr_codec::speech_frame *frame,
+			nokia_gsm_fr_codec::pcm_block &pcm);
+	void reset() { m_state = {}; }
+	state snapshot() const { return m_state; }
+	bool restore(const state &saved);
+	unsigned lost_frames() const { return m_state.lost_frames; }
+	bool concealed() const { return m_state.lost_frames != 0; }
+
+private:
+	state m_state{};
+};
+
 #endif // MAME_NOKIA_NOKIA_GSM_FR_CODEC_H
