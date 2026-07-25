@@ -29,6 +29,7 @@ public:
 	nokia_mad2_pcm_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
+	void set_enabled(bool enabled) { m_enabled = enabled; }
 	void set_bus_profile(bus_profile const &profile)
 	{
 		m_data_clock = profile.data_clock;
@@ -39,6 +40,8 @@ public:
 		m_msb_first = profile.msb_first;
 		m_data_edge = u8(profile.data_edge);
 	}
+	bool link_ready() const;
+	bool enabled() const { return m_enabled; }
 	bool transfer_frame_block(
 			const pcm_block &dsp_to_cobba, pcm_block &cobba_to_dsp);
 
@@ -53,6 +56,7 @@ public:
 	u64 frames_transferred() const { return m_frames_transferred; }
 	u64 data_clocks_transferred() const { return m_data_clocks_transferred; }
 	u64 idle_clocks_transferred() const { return m_idle_clocks_transferred; }
+	u64 transfer_failures() const { return m_transfer_failures; }
 
 protected:
 	virtual void device_start() override;
@@ -60,6 +64,7 @@ protected:
 
 private:
 	required_device<nokia_cobba_device> m_cobba;
+	bool m_enabled = true;
 	u32 m_data_clock = 0;
 	u32 m_frame_clock = 0;
 	u8 m_sample_bits = 0;
@@ -71,6 +76,7 @@ private:
 	u64 m_frames_transferred = 0;
 	u64 m_data_clocks_transferred = 0;
 	u64 m_idle_clocks_transferred = 0;
+	u64 m_transfer_failures = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_MAD2_PCM, nokia_mad2_pcm_device)

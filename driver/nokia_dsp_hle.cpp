@@ -48,6 +48,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_data_memory));
 	save_item(NAME(m_data_memory_loaded));
 	save_item(NAME(m_speech_active));
+	save_item(NAME(m_pcm_link_fault));
 	save_item(NAME(m_speech_uplink_frames));
 	save_item(NAME(m_speech_downlink_frames));
 	save_item(NAME(m_speech_nonzero_microphone_blocks));
@@ -93,6 +94,7 @@ void nokia_dsp_hle_device::device_reset()
 	std::fill(m_data_memory_loaded.begin(), m_data_memory_loaded.end(), 0);
 	m_speech_codec.reset();
 	m_speech_active = false;
+	m_pcm_link_fault = false;
 	m_speech_uplink_frames = 0;
 	m_speech_downlink_frames = 0;
 	m_speech_nonzero_microphone_blocks = 0;
@@ -245,8 +247,20 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 			m_speech_control_mask != 0 &&
 			(m_mcu_control_word & m_speech_control_mask) ==
 					m_speech_control_enabled;
-	const bool active =
+	const bool requested =
 			m_radio_peer->speech_channel_active() && dsp_speech_route;
+	const bool pcm_link_ready = m_mad2_pcm->link_ready();
+	const bool active = requested && pcm_link_ready;
+	if (requested && !pcm_link_ready && !m_pcm_link_fault)
+		LOGMASKED(LOG_DSP_HLE,
+				"dsp_hle: speech blocked by unsupported PCM link "
+				"control=%04x enabled=%u clock=%u/%u shape=%u t=%.6f\n",
+				m_mcu_control_word, m_mad2_pcm->enabled(),
+				m_mad2_pcm->data_clock(),
+				m_mad2_pcm->frame_clock(),
+				m_mad2_pcm->data_clocks_per_frame(),
+				machine().time().as_double());
+	m_pcm_link_fault = requested && !pcm_link_ready;
 	if (!active)
 	{
 		if (m_speech_active && m_trace_enabled)
@@ -280,7 +294,14 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 	}
 
 	nokia_mad2_pcm_device::pcm_block microphone{};
-	m_mad2_pcm->transfer_frame_block(earpiece, microphone);
+	if (!m_mad2_pcm->transfer_frame_block(earpiece, microphone))
+	{
+		LOGMASKED(LOG_DSP_HLE,
+				"dsp_hle: speech PCM transfer rejected failures=%llu t=%.6f\n",
+				m_mad2_pcm->transfer_failures(),
+				machine().time().as_double());
+		return;
+	}
 	const auto block_peak = [] (const auto &block)
 	{
 		u16 peak = 0;

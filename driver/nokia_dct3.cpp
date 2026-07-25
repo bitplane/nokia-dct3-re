@@ -306,7 +306,8 @@ enum hardware_config : u8
 	HWCFG_SIM_DEVICE = 0x02,
 	HWCFG_DSP_SERVICE = 0x04,
 	HWCFG_EXTERNAL_SERVICE = 0x08,
-	HWCFG_RADIO_PEER = 0x10
+	HWCFG_RADIO_PEER = 0x10,
+	HWCFG_PCM_LINK = 0x20
 };
 
 class nokia_dct3_state : public driver_device
@@ -656,7 +657,7 @@ void nokia_dct3_state::machine_reset()
 	m_mad2_interrupt_trace_count = 0;
 	m_mad2_clock_trace_count = 0;
 	m_mbus_trace_count = 0;
-	const u8 hardware = m_hw_config.read_safe(0x1f);
+	const u8 hardware = m_hw_config.read_safe(0x3f);
 	if (BIT(m_diag_config.read_safe(0x00), 0))
 		machine().logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
 	// Load the deterministic product-level selector tuple. Electrical signal
@@ -670,6 +671,7 @@ void nokia_dct3_state::machine_reset()
 	m_dsp_hle->set_external_service_enabled(m_product.external_service && BIT(hardware, 3));
 	m_external_service_peer->set_enabled(m_product.external_service && BIT(hardware, 3));
 	m_radio_peer->set_enabled(m_product.radio_peer && BIT(hardware, 4));
+	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
 	m_radio_peer->set_page_after_registration(
 			BIT(network, 0) || BIT(network, 1) || BIT(network, 2) ||
@@ -1367,6 +1369,9 @@ static INPUT_PORTS_START( noki3210 )
 	PORT_CONFNAME(HWCFG_RADIO_PEER, HWCFG_RADIO_PEER, "Radio peer HLE")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(HWCFG_RADIO_PEER, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_PCM_LINK, HWCFG_PCM_LINK, "MAD2/COBBA PCM link")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_PCM_LINK, DEF_STR(On))
 
 	PORT_START("DIAGCFG")
 	PORT_CONFNAME(0x01, 0x00, "Run DSPIF conformance check")

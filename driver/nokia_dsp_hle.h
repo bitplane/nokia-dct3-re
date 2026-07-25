@@ -100,6 +100,7 @@ private:
 	nokia_gsm_fr_codec m_speech_codec;
 	nokia_gsm_fr_codec::state m_speech_codec_state{};
 	bool m_speech_active = false;
+	bool m_pcm_link_fault = false;
 	u64 m_speech_uplink_frames = 0;
 	u64 m_speech_downlink_frames = 0;
 	u64 m_speech_nonzero_microphone_blocks = 0;

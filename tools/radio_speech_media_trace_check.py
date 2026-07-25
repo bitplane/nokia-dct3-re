@@ -33,6 +33,10 @@ FACCH_RE = re.compile(
 
 def check(path: Path) -> str:
     text = path.read_text(errors="replace")
+    if "speech blocked by unsupported PCM link" in text:
+        raise ValueError("product PCM link was not supported")
+    if "speech PCM transfer rejected" in text:
+        raise ValueError("MAD2/COBBA rejected a speech transfer")
     samples = [
         (int(match.group(1)), int(match.group(2)), float(match.group(3)))
         for match in SPEECH_RE.finditer(text)

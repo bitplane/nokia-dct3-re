@@ -729,6 +729,14 @@ reconstructing the converter value. MAD2 converts between that value and the
 left-scaled 16-bit domain consumed by GSM 06.10; COBBA alone converts between
 the serial value and normalized analogue samples.
 
+The command-`0x08` request and physical TCH are necessary but not sufficient
+to start the HLE data plane. The product's PCM profile must also describe the
+supported 8 kHz, integral-clock, one-sync-clock, 16-bit MSB-first
+falling-edge link. Default or unknown product profiles therefore remain inert
+instead of emitting synthetic silent GSM frames. If COBBA rejects a live
+transfer, that 20 ms uplink frame is not encoded or submitted; the failure is
+counted and the organic media verifier treats either condition as an error.
+
 MAME saves those two codec histories alongside the DSP HLE, rather than
 serializing libgsm pointers or allocator padding. Combined with the complete
 Layer-1 endpoint state, `make verify-radio-call-state-roundtrip` saves and

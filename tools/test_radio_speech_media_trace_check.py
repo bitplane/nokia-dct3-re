@@ -38,6 +38,25 @@ class RadioSpeechMediaTraceCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "bidirectional"):
                 check(log)
 
+    def test_rejects_unsupported_product_pcm_link(self):
+        with TemporaryDirectory() as directory:
+            log = Path(directory) / "error.log"
+            log.write_text(
+                "dsp_hle: speech blocked by unsupported PCM link "
+                "control=060b clock=0/0 shape=0 t=10.000000\n"
+            )
+            with self.assertRaisesRegex(ValueError, "not supported"):
+                check(log)
+
+    def test_rejects_pcm_transfer_failure(self):
+        with TemporaryDirectory() as directory:
+            log = Path(directory) / "error.log"
+            log.write_text(
+                "dsp_hle: speech PCM transfer rejected failures=1 t=10.000000\n"
+            )
+            with self.assertRaisesRegex(ValueError, "rejected"):
+                check(log)
+
 
 if __name__ == "__main__":
     unittest.main()

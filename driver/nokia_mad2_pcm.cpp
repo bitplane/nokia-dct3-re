@@ -17,6 +17,7 @@ nokia_mad2_pcm_device::nokia_mad2_pcm_device(
 
 void nokia_mad2_pcm_device::device_start()
 {
+	save_item(NAME(m_enabled));
 	save_item(NAME(m_data_clock));
 	save_item(NAME(m_frame_clock));
 	save_item(NAME(m_sample_bits));
@@ -28,6 +29,7 @@ void nokia_mad2_pcm_device::device_start()
 	save_item(NAME(m_frames_transferred));
 	save_item(NAME(m_data_clocks_transferred));
 	save_item(NAME(m_idle_clocks_transferred));
+	save_item(NAME(m_transfer_failures));
 }
 
 void nokia_mad2_pcm_device::device_reset()
@@ -36,6 +38,23 @@ void nokia_mad2_pcm_device::device_reset()
 	m_frames_transferred = 0;
 	m_data_clocks_transferred = 0;
 	m_idle_clocks_transferred = 0;
+	m_transfer_failures = 0;
+}
+
+bool nokia_mad2_pcm_device::link_ready() const
+{
+	const u32 clocks_per_frame = data_clocks_per_frame();
+	return m_enabled &&
+			m_frame_clock == nokia_cobba_device::pcm_rate &&
+			m_data_clock &&
+			(m_data_clock % m_frame_clock) == 0 &&
+			m_sample_bits >= 2 && m_sample_bits <= 16 &&
+			m_sync_clocks == 1 &&
+			m_word_clocks == 16 &&
+			m_msb_first &&
+			m_data_edge == u8(clock_edge::falling) &&
+			clocks_per_frame >= u32(m_sync_clocks + m_word_clocks) &&
+			nokia_cobba_device::pcm_block_samples == (m_frame_clock / 50);
 }
 
 bool nokia_mad2_pcm_device::transfer_frame_block(
@@ -46,18 +65,12 @@ bool nokia_mad2_pcm_device::transfer_frame_block(
 	// validation derived from product clocks; another MAD2/COBBA pair may
 	// configure a different integral frame shape.
 	const u32 clocks_per_frame = data_clocks_per_frame();
-	if (m_frame_clock != nokia_cobba_device::pcm_rate ||
-			!m_data_clock ||
-			(m_data_clock % m_frame_clock) != 0 ||
-			m_sample_bits < 2 || m_sample_bits > 16 ||
-			m_sync_clocks != 1 ||
-			m_word_clocks != 16 ||
-			!m_msb_first ||
-			m_data_edge != u8(clock_edge::falling) ||
-			clocks_per_frame < u32(m_sync_clocks + m_word_clocks) ||
-			dsp_to_cobba.size() !=
-					(m_frame_clock / 50))
+	if (!link_ready() ||
+			dsp_to_cobba.size() != (m_frame_clock / 50))
+	{
+		++m_transfer_failures;
 		return false;
+	}
 
 	// The MAD2/COBBA serial word is 16 bits wide, but the converter sample is
 	// sign-extended from the product-configured linear resolution. The DSP
@@ -101,6 +114,10 @@ bool nokia_mad2_pcm_device::transfer_frame_block(
 				u64(dsp_to_cobba.size()) * clocks_per_frame;
 		m_idle_clocks_transferred += u64(dsp_to_cobba.size()) *
 				(clocks_per_frame - m_sync_clocks - m_word_clocks);
+	}
+	else
+	{
+		++m_transfer_failures;
 	}
 	return accepted;
 }

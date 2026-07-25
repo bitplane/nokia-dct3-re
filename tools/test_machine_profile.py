@@ -177,6 +177,15 @@ class MachineProfileTest(unittest.TestCase):
             self.assertIn(f'mask="{mask}"', fixture)
             self.assertIn(f'defvalue="{mask}" value="0"', fixture)
 
+    def test_missing_pcm_oracle_removes_only_the_physical_link(self):
+        makefile = (ROOT / "Makefile").read_text()
+        fixture = (ROOT / "fixtures/radio_pcm_missing/noki3210.cfg").read_text()
+        self.assertIn("fixtures/radio_pcm_missing", makefile)
+        self.assertIn('tag=":HWCFG"', fixture)
+        self.assertIn('mask="32" defvalue="32" value="0"', fixture)
+        for mask in ("1", "2", "4", "8", "16"):
+            self.assertNotIn(f'tag=":HWCFG" type="CONFIG" mask="{mask}"', fixture)
+
     def test_3210_buzzer_uses_mad2_pup_and_divider(self):
         self.assertIn("BEEP(config, m_buzzer)", self.driver)
         self.assertIn("BIT(m_regs[CONTROL], 5)", self.pup)
