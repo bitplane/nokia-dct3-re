@@ -18,6 +18,36 @@ public:
 	using pcm_block = std::array<std::int16_t, pcm_samples>;
 	using speech_frame = std::array<std::uint8_t, frame_octets>;
 
+	// Complete algorithmic state of one libgsm 1.0.24 direction, expressed
+	// in fixed-width values rather than opaque allocator bytes. This keeps
+	// emulator save states independent of pointers and structure padding.
+	struct channel_state
+	{
+		std::array<std::int16_t, 280> dp0{};
+		std::array<std::int16_t, 50> e{};
+		std::int16_t z1 = 0;
+		std::int64_t l_z2 = 0;
+		std::int32_t mp = 0;
+		std::array<std::int16_t, 8> u{};
+		std::array<std::int16_t, 16> larpp{};
+		std::int16_t j = 0;
+		std::int16_t ltp_cut = 0;
+		std::int16_t nrp = 40;
+		std::array<std::int16_t, 9> v{};
+		std::int16_t msr = 0;
+		std::int8_t verbose = 0;
+		std::int8_t fast = 0;
+		std::int8_t wav_fmt = 0;
+		std::uint8_t frame_index = 0;
+		std::uint8_t frame_chain = 0;
+	};
+
+	struct state
+	{
+		// Encoder and decoder histories are intentionally independent.
+		std::array<channel_state, 2> channels{};
+	};
+
 	nokia_gsm_fr_codec();
 	~nokia_gsm_fr_codec();
 
@@ -28,6 +58,8 @@ public:
 	bool encode(const pcm_block &pcm, speech_frame &frame);
 	bool decode(const speech_frame &frame, pcm_block &pcm);
 	void reset();
+	state snapshot() const;
+	bool restore(const state &state);
 
 private:
 	void release();

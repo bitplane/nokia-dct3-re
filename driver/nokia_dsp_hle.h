@@ -65,6 +65,8 @@ private:
 	void drain_responses();
 	void schedule_response();
 	void publish_bootstrap_state();
+	void prepare_speech_codec_save();
+	void restore_speech_codec_state();
 	bool consume_memory_upload(const nokia_dspif_device::packet &packet);
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_external_service_peer_device> m_external_peer;
@@ -96,6 +98,7 @@ private:
 	std::array<u16, 0x10000> m_data_memory = { 0 };
 	std::array<u8, 0x10000> m_data_memory_loaded = { 0 };
 	nokia_gsm_fr_codec m_speech_codec;
+	nokia_gsm_fr_codec::state m_speech_codec_state{};
 	bool m_speech_active = false;
 	u64 m_speech_uplink_frames = 0;
 	u64 m_speech_downlink_frames = 0;

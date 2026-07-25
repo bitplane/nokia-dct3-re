@@ -52,6 +52,29 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_speech_downlink_frames));
 	save_item(NAME(m_speech_nonzero_microphone_blocks));
 	save_item(NAME(m_speech_nonzero_earpiece_blocks));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, dp0));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, e));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, z1));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, l_z2));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, mp));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, u));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, larpp));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, j));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, ltp_cut));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, nrp));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, v));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, msr));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, verbose));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, fast));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, wav_fmt));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, frame_index));
+	save_item(STRUCT_MEMBER(m_speech_codec_state.channels, frame_chain));
+	machine().save().register_presave(
+			save_prepost_delegate(
+				FUNC(nokia_dsp_hle_device::prepare_speech_codec_save), this));
+	machine().save().register_postload(
+			save_prepost_delegate(
+				FUNC(nokia_dsp_hle_device::restore_speech_codec_state), this));
 }
 
 void nokia_dsp_hle_device::device_reset()
@@ -75,6 +98,17 @@ void nokia_dsp_hle_device::device_reset()
 	m_speech_nonzero_microphone_blocks = 0;
 	m_speech_nonzero_earpiece_blocks = 0;
 	publish_bootstrap_state();
+}
+
+void nokia_dsp_hle_device::prepare_speech_codec_save()
+{
+	m_speech_codec_state = m_speech_codec.snapshot();
+}
+
+void nokia_dsp_hle_device::restore_speech_codec_state()
+{
+	if (!m_speech_codec.restore(m_speech_codec_state))
+		fatalerror("DSP HLE: invalid GSM-FR codec state in save image");
 }
 
 void nokia_dsp_hle_device::publish_bootstrap_state()

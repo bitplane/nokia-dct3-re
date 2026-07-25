@@ -703,7 +703,11 @@ official GSM 06.10 RPE-LTP implementation and converts exactly one 160-sample
 PCM block to or from one 33-octet frame. It does not own radio scheduling,
 channel coding, PCM routing, or analogue gain. `make verify-gsm-fr-codec`
 checks framing, bidirectional conversion, malformed-frame rejection, and
-reset independently of phone firmware.
+reset independently of phone firmware. Encoder and decoder RPE-LTP histories
+are separately snapshotable as fixed-width algorithm state. The verifier
+branches after four non-silent frames and proves that restoring the snapshot
+produces bit-identical future encoded frames and sample-identical decoded
+PCM; it also rejects invalid decoder-lag state.
 
 The DSP HLE clocks this boundary every 20 ms only when both the TCH/F and the
 product-configured command-`0x08` speech field are active. It reads one microphone block
@@ -724,6 +728,12 @@ validates the configured shape and serializes every sample bit before
 reconstructing the converter value. MAD2 converts between that value and the
 left-scaled 16-bit domain consumed by GSM 06.10; COBBA alone converts between
 the serial value and normalized analogue samples.
+
+MAME saves those two codec histories alongside the DSP HLE, rather than
+serializing libgsm pointers or allocator padding. Combined with the complete
+Layer-1 endpoint state, `make verify-radio-call-state-roundtrip` saves and
+loads during an organically answered call, then requires continuing
+bidirectional speech and normal physical-End teardown.
 See the
 [NSE-3 system-module description](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6110/03SYS%20%5B73%5D.pdf).
 The edge convention is corroborated by Nokia's

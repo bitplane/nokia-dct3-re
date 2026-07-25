@@ -88,6 +88,8 @@ ccont_mask_fixture_at = env_number("NOKIA_DCT3_CCONT_MASK_FIXTURE_AT", -1)
 mad2_sleep_fixture_at = env_number("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT", -1)
 local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
 local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
+local state_roundtrip_end_delay = env_number(
+		"NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS", -1) / 1000
 local mbus_rx_fixture = tonumber(os.getenv("NOKIA_DCT3_MBUS_RX_FIXTURE") or "")
 local mbus_rx_fixture_at = env_number("NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS", 300) / 1000
 
@@ -769,8 +771,20 @@ if state_roundtrip_at >= 0 then
 			counter_delta < 0x1000
 		structural.state_roundtrip = passed and "pass" or "fail"
 		machine:logerror(string.format(
-			"state_roundtrip: result=%s timer_delta=%04x mode=%04x\n",
-			structural.state_roundtrip, counter_delta, snapshot.mode))
+			"state_roundtrip: result=%s timer_delta=%04x mode=%04x "
+				.. "requested_at=%.6f t=%.6f\n",
+			structural.state_roundtrip, counter_delta, snapshot.mode,
+			state_roundtrip_at, emulation_seconds()))
+		-- Optional acceptance orchestration: issue an ordinary physical End
+		-- only after the restored machine has run for the requested interval.
+		-- A pre-existing Lua wait is deliberately unsuitable because Lua
+		-- coroutine timers are outside MAME's machine save image.
+		if state_roundtrip_end_delay >= 0 then
+			emu.wait(state_roundtrip_end_delay)
+			press("enter")
+			emu.wait(post_duration)
+			release("enter")
+		end
 	end)
 	assert(coroutine.resume(state_timer))
 end
