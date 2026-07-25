@@ -813,12 +813,14 @@ verify-radio-degraded-speech:
 			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
 	}; \
 	trap restore_default EXIT; \
-	degraded_env='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	degraded_env='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=28.5 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
 	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v600 SECONDS=45 \
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
 		RUN_ENV="$$degraded_env"; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log; \
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
+		$(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \
 		$(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py \
@@ -830,6 +832,8 @@ verify-radio-degraded-speech:
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
 		RUN_ENV="$$degraded_env"; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log; \
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
+		$(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_call_audio_wire_trace_check.py \
 		$(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py \

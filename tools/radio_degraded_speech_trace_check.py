@@ -6,9 +6,15 @@ import re
 from pathlib import Path
 
 try:
-    from tools.radio_speech_media_trace_check import check as check_clean_media
+    from tools.radio_speech_media_trace_check import (
+        canonical_timeline,
+        check as check_clean_media,
+    )
 except ModuleNotFoundError:
-    from radio_speech_media_trace_check import check as check_clean_media
+    from radio_speech_media_trace_check import (
+        canonical_timeline,
+        check as check_clean_media,
+    )
 
 
 IMPAIRMENT_RE = re.compile(
@@ -35,7 +41,7 @@ PEER_CONCEALMENT_RE = re.compile(
 
 def check(path: Path) -> str:
     clean_result = check_clean_media(path)
-    text = path.read_text(errors="replace")
+    text = canonical_timeline(path.read_text(errors="replace"))
     impairments = [
         (direction, int(burst), int(count), int(frame), float(time))
         for direction, burst, count, frame, time
@@ -79,8 +85,11 @@ def check(path: Path) -> str:
         (int(uplink), int(downlink), float(time))
         for uplink, downlink, time in GOOD_MEDIA_RE.findall(text)
     ]
-    if not media or not any(time > impaired_bad[-1][3] and downlink > 100
-                            for _, downlink, time in media):
+    if not media or not any(
+        right[2] > impaired_bad[0][3] and right[1] > 100
+        and right[1] > left[1]
+        for left, right in zip(media, media[1:])
+    ):
         raise ValueError("good downlink media did not recover after a bad frame")
     concealment = [
         (int(peak), int(concealed), int(muted), float(time))

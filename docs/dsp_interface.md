@@ -907,12 +907,15 @@ seams, protected speech fails parity after Viterbi decoding, and each BFI
 triggers the direction's independent GSM 06.11 substitutor rather than
 decoding damaged payload. The network continues encoding downlink audio
 across uplink losses, later clean blocks reset both loss sequences, and call
-control remains organic. Each run inverted 20 bursts per direction, observed
-eight impairment-induced downlink bad blocks, retained 145 non-silent
-earpiece blocks and completed organic teardown. Handset/network concealment
-counts were 12/5 for v6.00 and 11/5 for v5.01; the one-frame difference comes
-from their organically different call timing rather than a product-specific
-error path.
+control remains organic. The gate now saves during that active degraded
+interval, advances a two-second reference branch, restores, and requires all
+34 ordered impairment, Layer-1, codec and peer records to replay exactly on
+each ROM. On the canonical restored timelines, v6.00 inverted 36 bursts per
+direction, observed 16 impairment-induced downlink bad blocks and retained
+295 non-silent earpiece blocks; v5.01 inverted 76, observed 35 and retained
+595 respectively. Handset/network concealment totals were 20/5 and 35/5.
+Both decoded clean frames after earlier losses and completed organic teardown;
+a final fade may legitimately overlap release.
 
 The receive-side requirements and 320 ms maximum muting interval are derived
 from [ETSI GSM 06.11 version 3.0.1](https://www.etsi.org/deliver/etsi_gts/06/0611/03.00.01_60/gsmts_0611sv030001p.pdf),

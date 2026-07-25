@@ -758,13 +758,20 @@ if state_roundtrip_at >= 0 then
 			irq_ctrl = space:read_u8(0x2000c),
 			gensio = space:read_u8(0x2006d),
 		}
-		machine:save("nokia_dct3_mad2_contract")
 		if state_roundtrip_replay > 0 then
-			emu.wait(0.01)
 			machine:logerror(string.format(
 				"state_replay: phase=reference event=begin t=%.6f\n",
 				emulation_seconds()))
-			emu.wait(state_roundtrip_replay)
+		end
+		machine:save("nokia_dct3_mad2_contract")
+		if state_roundtrip_replay > 0 then
+			-- Saving completes on the next scheduler boundary. Keep that
+			-- settling time inside the marked interval so the reference and
+			-- restored branches cover identical emulated timestamps.
+			emu.wait(0.01)
+			if state_roundtrip_replay > 0.01 then
+				emu.wait(state_roundtrip_replay - 0.01)
+			end
 			machine:logerror(string.format(
 				"state_replay: phase=reference event=end t=%.6f\n",
 				emulation_seconds()))

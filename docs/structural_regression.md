@@ -92,8 +92,11 @@ speech.
 bidirectional burst-impairment profile. It requires protected-frame failure,
 explicit handset and network BFIs, independent downlink continuation during
 uplink loss, non-silent concealment, clean-frame recovery and organic
-teardown. The v6.00 half retains its decoded control-lifecycle oracle and the
-v5.01 half its shared-wire oracle.
+teardown. It also saves during active degradation and requires the two-second
+reference/restored branches to match exactly across ordered impairment,
+Layer-1, codec and peer records. Ordinary monotonic checks discard only the
+speculative reference branch. The v6.00 half retains its decoded
+control-lifecycle oracle and the v5.01 half its shared-wire oracle.
 `make verify-radio-incoming-sms` uses another event fixture, traverses the same
 SC=0 control boundary, and requires one SAPI-3 SABM/UA exchange, both exact
 segments of the ordinary `hello`
