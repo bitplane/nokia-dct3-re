@@ -753,12 +753,15 @@ advertised capture sources but lacked its record-stream implementation, so
 `mame-pulseaudio-input.patch` supplies the generic source-open, buffered-read
 and source-close contract; no Nokia device receives a test-source option.
 With the external source attenuated to retain headroom after NSE-8's +18 dB
-MIC2 gain, the current 13-bit v6.00 and v5.01 runs each produced 150/150
-non-silent COBBA microphone blocks at DSP-domain peak 16072. The separate
-network peer's GSM-FR decoder observed peaks 16280 and 16448 respectively.
+MIC2 gain, the post-TDMA-scheduler v6.00 run produced 850/850 non-silent
+COBBA microphone blocks and the v5.01 run produced 1200/1200. The separate
+network peer's GSM-FR decoder observed peaks 2264 and 2032 respectively.
 `radio_physical_uplink_trace_check.py`
 requires at least 100 non-silent microphone blocks, non-zero decoded uplink
-energy, and rejects clipping.
+energy, and rejects clipping. `make verify-radio-physical-uplink` creates a
+temporary isolated PulseAudio sink, drives its monitor with an attenuated
+host-side 1 kHz stream, selects that monitor only for MAME, and removes it on
+exit.
 
 COBBA's DSP control plane is represented separately from those samples.
 `nokia_cobba_device` exposes an opaque 16-register, 12-bit serial transport
