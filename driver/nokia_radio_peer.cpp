@@ -2,6 +2,7 @@
 // copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
 #include "emuopts.h"
+#include "gsm_tch_f_l1.h"
 #include "nokia_radio_peer.h"
 
 #define LOG_RADIO (1U << 0)
@@ -10,6 +11,44 @@
 
 DEFINE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device,
 		"nokia_radio_peer", "Nokia DCT3 radio peer HLE")
+
+namespace
+{
+
+bool transport_tch_f_speech(
+		const nokia_radio_peer_device::speech_frame &transmitted,
+		nokia_radio_peer_device::speech_frame &received)
+{
+	gsm::tch_f::packed_speech_frame packed{};
+	std::copy(transmitted.begin(), transmitted.end(), packed.begin());
+	const auto contributions =
+			gsm::tch_f::interleave(gsm::tch_f::encode_speech(packed));
+	const std::array<gsm::tch_f::burst_payload, 8> idle_contributions{};
+	std::array<gsm::tch_f::burst_payload, 8> payloads{};
+	for (unsigned phase = 0; phase < 4; ++phase)
+	{
+		payloads[phase] = gsm::tch_f::combine_diagonal(
+				idle_contributions, contributions, phase);
+		payloads[phase + 4] = gsm::tch_f::combine_diagonal(
+				contributions, idle_contributions, phase);
+	}
+
+	// TSC 2 is assigned by nokia_gsm_network for this laboratory cell. Packing
+	// and unpacking here make the 114 encrypted-bit fields the future A5 seam.
+	const auto training = gsm::tch_f::training_sequence(2);
+	for (auto &payload : payloads)
+		payload = gsm::tch_f::unpack_normal_burst(
+				gsm::tch_f::pack_normal_burst(payload, training));
+
+	const auto decoded =
+			gsm::tch_f::decode_speech(gsm::tch_f::deinterleave(payloads));
+	if (!decoded.good)
+		return false;
+	std::copy(decoded.frame.begin(), decoded.frame.end(), received.begin());
+	return true;
+}
+
+} // anonymous namespace
 
 nokia_radio_peer_device::nokia_radio_peer_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
@@ -1091,22 +1130,33 @@ void nokia_radio_peer_device::tick()
 	while (take_uplink_speech(uplink))
 	{
 		++m_uplink_speech_received;
+		speech_frame network_uplink{};
+		if (!transport_tch_f_speech(uplink, network_uplink))
+			continue;
 		if (m_lab_voice_source)
 		{
 			nokia_gsm_voice_peer_device::speech_frame peer_uplink{};
 			nokia_gsm_voice_peer_device::speech_frame peer_downlink{};
-			std::copy(uplink.begin(), uplink.end(), peer_uplink.begin());
+			std::copy(
+					network_uplink.begin(), network_uplink.end(),
+					peer_uplink.begin());
 			if (m_voice_peer->exchange(peer_uplink, peer_downlink))
 			{
+				speech_frame network_downlink{};
 				speech_frame downlink{};
 				std::copy(
 						peer_downlink.begin(), peer_downlink.end(),
-						downlink.begin());
-				queue_downlink_speech(downlink);
+						network_downlink.begin());
+				if (transport_tch_f_speech(network_downlink, downlink))
+					queue_downlink_speech(downlink);
 			}
 		}
 		else if (m_speech_loopback)
-			queue_downlink_speech(uplink);
+		{
+			speech_frame downlink{};
+			if (transport_tch_f_speech(network_uplink, downlink))
+				queue_downlink_speech(downlink);
+		}
 	}
 
 	if (m_phase == phase::candidate_sync && m_reports_remaining != 0 && m_wait_ticks != 0)

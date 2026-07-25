@@ -781,6 +781,35 @@ frequency. The source enters only through network GSM-FR encoding and the
 radio downlink queue; it does not alter handset state or inject samples into
 MAD2, COBBA, or the UI.
 
+Between the DSP speech queues and either network endpoint,
+`gsm_tch_f_l1` now owns a handset-independent TS 45.003/TS 46.010
+boundary. It converts the conventional 33-octet codec representation to the
+260 serial codec bits, applies table-2 subjective-importance ordering, the
+class-1a parity code, the rate-1/2 convolutional code and the unprotected
+class-2 tail to form 456 coded bits. The receive side is a separate hard
+decision Viterbi decoder with parity and tail validation; a bad protected
+frame is not delivered as good speech.
+
+The same component maps each block through the eight-burst diagonal
+interleaver, combines old and new block halves at the four-burst cadence, and
+packs the resulting 114 data bits and `hl`/`hu` flags into the 148-bit GMSK
+normal-burst shape. Training sequence 2 comes from the cell's assigned BCC,
+not from a media fixture. The 114-bit field is the explicit future A5
+cipher/decipher seam; training, tail and stealing bits remain outside it.
+SACCH/FACCH's shared 184-bit FIRE and convolutional coding is implemented
+independently, and FACCH stealing marks the first four `hu` and last four
+`hl` flags as TS 45.003 requires.
+
+`make verify-gsm-tch-f-l1` checks a fixed all-zero channel-code result,
+codec-bit permutation, clean and degraded speech decoding, unprotected
+class-2 corruption, control-channel error correction, diagonal placement,
+normal-burst fields, training bits and stealing flags. The current live link
+crosses those bit and burst representations independently in each direction.
+It still completes a whole eight-burst span within one 20 ms media exchange;
+the next step is to clock those bursts on the 26-multiframe TCH/F schedule so
+SACCH and idle frames consume their actual TDMA positions and FACCH
+substitution can interrupt a live speech stream.
+
 The answered-call fixture selects that voice peer. Across both v6.00 and
 v5.01, `radio_speech_media_trace_check.py` proves fresh codec state, 20 ms
 cadence, at least 100 continuing encoded-uplink and decoded-downlink frames,
@@ -788,12 +817,13 @@ the peer's fixed source peak, and non-zero samples in the COBBA receiver
 stream. The current paired runs each carried 150 microphone-side frames and
 149 network-to-earpiece frames, with all 149 received COBBA blocks non-silent.
 
-This proves a complete standards-based media *transport* slice, a non-silent
+This proves a standards-based codec and initial channel-coded media
+*transport* slice, a non-silent
 decoded downlink to COBBA, and non-silent physical-microphone uplink decoded
 at the network peer. It does not yet prove the constituent meanings of
 command-`0x08` bits 0 and 9, the MAD2 serial-port edge/idle-clock and register
-contract, firmware-selected COBBA analogue routing, or GSM channel
-coding/interleaving/burst timing.
+contract, firmware-selected COBBA analogue routing, or TDMA-paced GSM burst
+timing and live FACCH/SACCH multiplexing.
 
 ## Unresolved contracts
 - Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the
