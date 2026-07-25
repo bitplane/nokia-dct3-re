@@ -151,6 +151,12 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_control_read = BIT(select, 4)", cobba)
         self.assertIn("m_control_registers[0x0d] = 0x000c", cobba)
         self.assertNotIn("control_select_w", dsp)
+        control_write = cobba.split(
+            "void nokia_cobba_device::control_select_w", 1
+        )[1].split("u16 nokia_cobba_device::control_data_r", 1)[0]
+        self.assertNotIn("m_hle_microphone", control_write)
+        self.assertNotIn("m_hle_output", control_write)
+        self.assertNotIn("gain", control_write)
 
     def test_remote_voice_source_stays_at_network_boundary(self):
         voice = (

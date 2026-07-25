@@ -310,9 +310,10 @@ raw frame loopback and network-side GSM-FR voice peer are explicit,
 independent configuration. The latter encodes a service-test 1 kHz PCM source
 outside the handset and supplies it only through the radio downlink queue.
 Paired v6.00/v5.01 answered-call runs carry that signal through handset
-decoding, MAD2 and COBBA: each proves 149 non-silent receiver blocks before
-organic teardown. MAD2 serial-port registers and COBBA analogue routing
-remain unmodelled.
+decoding, MAD2 and COBBA: each proves 145 non-silent receiver blocks before
+organic teardown. The product-configured serial PCM bus is modelled at its
+documented clock/word boundary; MAD2 register programming and COBBA analogue
+routing remain unmodelled.
 
 Nokia's DCT3 system-module documentation identifies the physical audio
 boundary more precisely. MAD2 contains a DSP serial port connected to PCM and

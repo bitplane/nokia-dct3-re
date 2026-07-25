@@ -74,6 +74,19 @@ backend, or a physical COBBA-control-bus trace. Until then the product's
 MIC2/EAR internal path is explicitly contained in an `hle_voice_profile` and
 must not be presented as decoded register behavior.
 
+A renewed evidence audit on 26 July 2026 found no admissible register
+semantics. Public Nokia COBBA-GJP service material, including the
+[NSB-5 system-module manual](https://manualmachine.com/nokia/7190/5055290-service-manual/),
+independently confirms the three microphone inputs, separate EAR/HF outputs,
+internal source selection, gain control, and distinct control and PCM serial
+buses. It does not publish the 16-register `{address,value}` encoding. The
+local NSE-8 DSP regions remain
+uniform `0xff`, the paired MCU uploads remain coefficient/configuration data,
+and no organic MCU-visible transaction reaches `control_select_w`. Therefore
+the opaque register transport remains deliberately disconnected from the HLE
+MIC2/EAR profile. `test_speech_media_boundaries.py` rejects any attempt to
+make an opaque control write alter that route or its gains.
+
 ## Reusable research workflow
 
 Upstream demonstrates a useful licensing and architecture pattern: keep a real

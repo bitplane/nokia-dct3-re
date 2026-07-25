@@ -52,8 +52,8 @@ frontier. The separate speech-media gate selects a network-side voice peer,
 whose independent GSM-FR encoder supplies a 1 kHz service-test signal only
 through the radio downlink queue. It requires 20 ms full-duplex cadence,
 continuing uplink/downlink frame counts, and non-zero COBBA receiver blocks;
-the same gate passes under v6.00 and v5.01 with 150 uplink frames, 149
-downlink frames and 149 non-silent receiver blocks. This is an energy-bearing
+the same gate passes under v6.00 and v5.01 with 150 uplink frames, 145
+downlink frames and 145 non-silent receiver blocks. This is an energy-bearing
 boundary test, not a fixture write into handset PCM or call-control state.
 `radio_physical_uplink_trace_check.py` covers the opposite direction in
 audio-enabled runs. An external host source enters through MAME's microphone
