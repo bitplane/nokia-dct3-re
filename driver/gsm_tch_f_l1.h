@@ -76,6 +76,7 @@ normal_burst pack_normal_burst(
 		const burst_payload &payload, const std::array<bit, 26> &training);
 burst_payload unpack_normal_burst(const normal_burst &burst);
 std::array<bit, 26> training_sequence(unsigned tsc);
+void invert_data_bits(burst_payload &payload);
 
 // Merge the old block's odd half and new block's even half for one of the
 // four burst periods at which a new diagonal-interleaver block begins.

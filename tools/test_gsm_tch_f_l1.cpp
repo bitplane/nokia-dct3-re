@@ -104,6 +104,11 @@ void test_interleaving_and_bursts()
 	}
 	const auto tsc2 = training_sequence(2);
 	assert(tsc2[0] == 0 && tsc2[1] == 1 && tsc2[25] == 0);
+	auto inverted = payloads[0];
+	invert_data_bits(inverted);
+	for (unsigned k = 0; k < inverted.data.size(); ++k)
+		assert(inverted.data[k] != payloads[0].data[k]);
+	assert(inverted.hl == payloads[0].hl && inverted.hu == payloads[0].hu);
 
 	coded_block next_coded{};
 	for (unsigned k = 0; k < next_coded.size(); ++k)

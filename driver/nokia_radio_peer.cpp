@@ -63,6 +63,10 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_downlink_facch_blocks));
 	save_item(NAME(m_uplink_bad_speech_blocks));
 	save_item(NAME(m_downlink_bad_speech_blocks));
+	save_item(NAME(m_downlink_tch_burst_error_period));
+	save_item(NAME(m_downlink_tch_burst_error_span));
+	save_item(NAME(m_downlink_tch_bursts));
+	save_item(NAME(m_downlink_tch_bursts_impaired));
 	// In-flight diagonal state spans only eight traffic bursts. Re-form it
 	// after a state load; the saved codec-frame queues remain authoritative.
 	machine().save().register_postload(
@@ -97,6 +101,8 @@ void nokia_radio_peer_device::device_reset()
 	m_downlink_facch_blocks = 0;
 	m_uplink_bad_speech_blocks = 0;
 	m_downlink_bad_speech_blocks = 0;
+	m_downlink_tch_bursts = 0;
+	m_downlink_tch_bursts_impaired = 0;
 	reset_l1_pipeline();
 }
 
@@ -280,7 +286,31 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	}
 
 	auto downlink_air = gsm::tch_f::pack_normal_burst(
-			m_downlink_transmitter.next_burst(), training);
+			[&]()
+			{
+				auto payload = m_downlink_transmitter.next_burst();
+				++m_downlink_tch_bursts;
+				// A generic deterministic hard-error profile at the future A5
+				// seam. Preserve FACCH so media degradation cannot force call
+				// control success or failure.
+				if (m_downlink_tch_burst_error_period &&
+						((m_downlink_tch_bursts - 1) %
+							m_downlink_tch_burst_error_period) <
+								m_downlink_tch_burst_error_span &&
+						!payload.hl && !payload.hu)
+				{
+					gsm::tch_f::invert_data_bits(payload);
+					++m_downlink_tch_bursts_impaired;
+					if (m_trace_enabled)
+						LOGMASKED(LOG_RADIO,
+								"radio_l1: direction=downlink impairment=invert-data "
+								"burst=%llu count=%llu fn=%u t=%.6f\n",
+								m_downlink_tch_bursts,
+								m_downlink_tch_bursts_impaired,
+								frame_number, machine().time().as_double());
+				}
+				return payload;
+			}(), training);
 	const auto handset_block = m_handset_receiver.receive(
 			gsm::tch_f::unpack_normal_burst(downlink_air));
 	if (handset_block &&
@@ -295,7 +325,14 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 					frame_number, machine().time().as_double());
 	}
 	else if (handset_block && !handset_block->speech.good)
+	{
 		++m_downlink_bad_speech_blocks;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: direction=downlink kind=speech good=0 count=%llu fn=%u t=%.6f\n",
+					m_downlink_bad_speech_blocks, frame_number,
+					machine().time().as_double());
+	}
 	if (handset_block &&
 			handset_block->kind == gsm::tch_f::traffic_block_kind::speech &&
 			handset_block->speech.good)

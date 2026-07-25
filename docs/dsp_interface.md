@@ -821,6 +821,22 @@ already recovered Nokia block transaction directly; the parallel burst path
 models its Layer-1 consequence without making call-control timing depend on
 the HLE air-link decoder.
 
+The air boundary also accepts an explicit, generic hard-error profile. It
+operates only on the 114 TCH data bits after diagonal interleaving and before
+normal-burst packing, so it cannot alter firmware, codec payloads, training,
+tails or stealing flags. `NETCFG` bit `0x40` selects a laboratory four-burst
+downlink fade every six traffic multiframes. This spacing is intentionally
+specified in radio units rather than call/frame contents. FACCH bursts are
+preserved so the profile tests speech degradation rather than forcing call
+control.
+
+`make verify-radio-degraded-speech` proves the complete consequence: the
+configured fade reaches the air seam, protected speech fails parity after
+Viterbi decoding, the invalid frame is withheld from the speech codec, and
+later clean blocks restore non-silent receiver audio. The current v6.00 run
+inverted 20 bursts, rejected 10 impairment-induced speech blocks, still
+delivered 137 non-silent downlink blocks and completed organic teardown.
+
 The answered-call fixture selects that voice peer. Across both v6.00 and
 v5.01, `radio_speech_media_trace_check.py` proves fresh codec state, 20 ms
 cadence, at least 100 continuing encoded-uplink and decoded-downlink frames,

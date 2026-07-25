@@ -41,6 +41,12 @@ public:
 		m_incoming_smart_message_after_registration = enabled;
 	}
 	void set_speech_loopback(bool enabled) { m_speech_loopback = enabled; }
+	void set_downlink_tch_burst_error_profile(
+			unsigned period, unsigned span)
+	{
+		m_downlink_tch_burst_error_period = period;
+		m_downlink_tch_burst_error_span = span;
+	}
 	void set_lab_voice_source(bool enabled)
 	{
 		m_voice_peer->set_lab_test_source(enabled);
@@ -169,6 +175,10 @@ private:
 	u64 m_downlink_facch_blocks = 0;
 	u64 m_uplink_bad_speech_blocks = 0;
 	u64 m_downlink_bad_speech_blocks = 0;
+	unsigned m_downlink_tch_burst_error_period = 0;
+	unsigned m_downlink_tch_burst_error_span = 0;
+	u64 m_downlink_tch_bursts = 0;
+	u64 m_downlink_tch_bursts_impaired = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device)

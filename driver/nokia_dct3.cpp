@@ -679,6 +679,8 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_incoming_smart_message_after_registration(BIT(network, 3));
 	m_radio_peer->set_speech_loopback(BIT(network, 4));
 	m_radio_peer->set_lab_voice_source(BIT(network, 5));
+	m_radio_peer->set_downlink_tch_burst_error_profile(
+			BIT(network, 6) ? 144 : 0, BIT(network, 6) ? 4 : 0);
 	m_sim_card->set_cphs_aoc(false);
 	m_sim_card->set_cached_location(false);
 	const u8 atr[] = { 0x3b, 0x10, 0x05 };
@@ -1392,6 +1394,9 @@ static INPUT_PORTS_START( noki3210 )
 	PORT_CONFNAME(0x20, 0x00, "Laboratory remote 1 kHz voice source")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x20, DEF_STR(On))
+	PORT_CONFNAME(0x40, 0x00, "Four-burst downlink TCH fade per six multiframes")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x40, DEF_STR(On))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3310 )

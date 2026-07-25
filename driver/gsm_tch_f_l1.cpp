@@ -480,6 +480,12 @@ std::array<bit, 26> training_sequence(unsigned tsc)
 	return sequences[tsc & 7];
 }
 
+void invert_data_bits(burst_payload &payload)
+{
+	for (bit &value : payload.data)
+		value ^= 1;
+}
+
 burst_payload combine_diagonal(
 		const std::array<burst_payload, 8> &old_block,
 		const std::array<burst_payload, 8> &new_block, unsigned phase)
