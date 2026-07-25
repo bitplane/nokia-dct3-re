@@ -2,7 +2,6 @@
 // copyright-holders:Sandro Ronco, Gaz
 #include "emu.h"
 #include "emuopts.h"
-#include "gsm_tch_f_l1.h"
 #include "nokia_radio_peer.h"
 
 #define LOG_RADIO (1U << 0)
@@ -11,44 +10,6 @@
 
 DEFINE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device,
 		"nokia_radio_peer", "Nokia DCT3 radio peer HLE")
-
-namespace
-{
-
-bool transport_tch_f_speech(
-		const nokia_radio_peer_device::speech_frame &transmitted,
-		nokia_radio_peer_device::speech_frame &received)
-{
-	gsm::tch_f::packed_speech_frame packed{};
-	std::copy(transmitted.begin(), transmitted.end(), packed.begin());
-	const auto contributions =
-			gsm::tch_f::interleave(gsm::tch_f::encode_speech(packed));
-	const std::array<gsm::tch_f::burst_payload, 8> idle_contributions{};
-	std::array<gsm::tch_f::burst_payload, 8> payloads{};
-	for (unsigned phase = 0; phase < 4; ++phase)
-	{
-		payloads[phase] = gsm::tch_f::combine_diagonal(
-				idle_contributions, contributions, phase);
-		payloads[phase + 4] = gsm::tch_f::combine_diagonal(
-				contributions, idle_contributions, phase);
-	}
-
-	// TSC 2 is assigned by nokia_gsm_network for this laboratory cell. Packing
-	// and unpacking here make the 114 encrypted-bit fields the future A5 seam.
-	const auto training = gsm::tch_f::training_sequence(2);
-	for (auto &payload : payloads)
-		payload = gsm::tch_f::unpack_normal_burst(
-				gsm::tch_f::pack_normal_burst(payload, training));
-
-	const auto decoded =
-			gsm::tch_f::decode_speech(gsm::tch_f::deinterleave(payloads));
-	if (!decoded.good)
-		return false;
-	std::copy(decoded.frame.begin(), decoded.frame.end(), received.begin());
-	return true;
-}
-
-} // anonymous namespace
 
 nokia_radio_peer_device::nokia_radio_peer_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
@@ -64,6 +25,11 @@ nokia_radio_peer_device::nokia_radio_peer_device(
 void nokia_radio_peer_device::device_start()
 {
 	m_trace_enabled = machine().options().verbose();
+	m_burst_timer = timer_alloc(FUNC(nokia_radio_peer_device::burst_tick), this);
+	// One assigned timeslot per GSM TDMA frame: 60/13 ms exactly.
+	m_burst_timer->adjust(
+			attotime::from_ticks(60, 13'000), 0,
+			attotime::from_ticks(60, 13'000));
 	save_item(NAME(m_enabled));
 	save_item(NAME(m_reports_sent));
 	save_item(NAME(m_reports_remaining));
@@ -91,6 +57,17 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_speech_loopback));
 	save_item(NAME(m_lab_voice_source));
 	save_item(NAME(m_uplink_speech_received));
+	save_item(NAME(m_tdma_frame_number));
+	save_item(NAME(m_l1_traffic_active));
+	save_item(NAME(m_uplink_facch_blocks));
+	save_item(NAME(m_downlink_facch_blocks));
+	save_item(NAME(m_uplink_bad_speech_blocks));
+	save_item(NAME(m_downlink_bad_speech_blocks));
+	// In-flight diagonal state spans only eight traffic bursts. Re-form it
+	// after a state load; the saved codec-frame queues remain authoritative.
+	machine().save().register_postload(
+			save_prepost_delegate(
+				FUNC(nokia_radio_peer_device::reset_l1_pipeline), this));
 }
 
 void nokia_radio_peer_device::device_reset()
@@ -114,6 +91,13 @@ void nokia_radio_peer_device::device_reset()
 	m_downlink_offset = 0;
 	clear_speech_queues();
 	m_uplink_speech_received = 0;
+	m_tdma_frame_number = 0;
+	m_l1_traffic_active = false;
+	m_uplink_facch_blocks = 0;
+	m_downlink_facch_blocks = 0;
+	m_uplink_bad_speech_blocks = 0;
+	m_downlink_bad_speech_blocks = 0;
+	reset_l1_pipeline();
 }
 
 bool nokia_radio_peer_device::speech_channel_active() const
@@ -187,6 +171,141 @@ void nokia_radio_peer_device::clear_speech_queues()
 	m_downlink_speech_count = 0;
 	m_uplink_speech_head = 0;
 	m_uplink_speech_count = 0;
+}
+
+void nokia_radio_peer_device::reset_l1_pipeline()
+{
+	m_uplink_transmitter.reset();
+	m_network_receiver.reset();
+	m_downlink_transmitter.reset();
+	m_handset_receiver.reset();
+}
+
+TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
+{
+	const u32 frame_number = m_tdma_frame_number++;
+	if (!speech_channel_active())
+	{
+		if (m_l1_traffic_active)
+		{
+			reset_l1_pipeline();
+			m_l1_traffic_active = false;
+		}
+		return;
+	}
+	if (!m_l1_traffic_active)
+	{
+		reset_l1_pipeline();
+		m_l1_traffic_active = true;
+	}
+
+	// The laboratory RR assignment is TCH/F timeslot 1. Its frame 12 is idle
+	// and frame 25 is the SACCH/TF position; neither advances the diagonal TCH
+	// interleaver.
+	if (gsm::tch_f::full_rate_slot(frame_number, 1) !=
+			gsm::tch_f::tdma_slot_kind::traffic)
+		return;
+
+	// Keep the DSP's 20 ms codec clock independent. At each four-traffic-burst
+	// block boundary, consume at most the next frame it has made available.
+	speech_frame uplink{};
+	if (take_uplink_speech(uplink))
+	{
+		gsm::tch_f::packed_speech_frame packed{};
+		std::copy(uplink.begin(), uplink.end(), packed.begin());
+		m_uplink_transmitter.enqueue(
+				{gsm::tch_f::encode_speech(packed),
+					gsm::tch_f::traffic_block_kind::speech});
+	}
+
+	const auto training = gsm::tch_f::training_sequence(2);
+	auto uplink_air = gsm::tch_f::pack_normal_burst(
+			m_uplink_transmitter.next_burst(), training);
+	const auto network_block = m_network_receiver.receive(
+			gsm::tch_f::unpack_normal_burst(uplink_air));
+	if (network_block &&
+			network_block->kind == gsm::tch_f::traffic_block_kind::facch)
+	{
+		if (network_block->control.good)
+			++m_uplink_facch_blocks;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: direction=uplink kind=facch good=%u count=%llu fn=%u t=%.6f\n",
+					network_block->control.good, m_uplink_facch_blocks,
+					frame_number, machine().time().as_double());
+	}
+	else if (network_block && !network_block->speech.good)
+		++m_uplink_bad_speech_blocks;
+	if (network_block &&
+			network_block->kind == gsm::tch_f::traffic_block_kind::speech &&
+			network_block->speech.good)
+	{
+		++m_uplink_speech_received;
+		speech_frame network_uplink{};
+		std::copy(
+				network_block->speech.frame.begin(),
+				network_block->speech.frame.end(), network_uplink.begin());
+		speech_frame network_downlink{};
+		bool have_downlink = false;
+		if (m_lab_voice_source)
+		{
+			nokia_gsm_voice_peer_device::speech_frame peer_uplink{};
+			nokia_gsm_voice_peer_device::speech_frame peer_downlink{};
+			std::copy(
+					network_uplink.begin(), network_uplink.end(),
+					peer_uplink.begin());
+			if (m_voice_peer->exchange(peer_uplink, peer_downlink))
+			{
+				std::copy(
+						peer_downlink.begin(), peer_downlink.end(),
+						network_downlink.begin());
+				have_downlink = true;
+			}
+		}
+		else if (m_speech_loopback)
+		{
+			network_downlink = network_uplink;
+			have_downlink = true;
+		}
+		if (have_downlink)
+		{
+			gsm::tch_f::packed_speech_frame packed{};
+			std::copy(
+					network_downlink.begin(), network_downlink.end(),
+					packed.begin());
+			m_downlink_transmitter.enqueue(
+					{gsm::tch_f::encode_speech(packed),
+						gsm::tch_f::traffic_block_kind::speech});
+		}
+	}
+
+	auto downlink_air = gsm::tch_f::pack_normal_burst(
+			m_downlink_transmitter.next_burst(), training);
+	const auto handset_block = m_handset_receiver.receive(
+			gsm::tch_f::unpack_normal_burst(downlink_air));
+	if (handset_block &&
+			handset_block->kind == gsm::tch_f::traffic_block_kind::facch)
+	{
+		if (handset_block->control.good)
+			++m_downlink_facch_blocks;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: direction=downlink kind=facch good=%u count=%llu fn=%u t=%.6f\n",
+					handset_block->control.good, m_downlink_facch_blocks,
+					frame_number, machine().time().as_double());
+	}
+	else if (handset_block && !handset_block->speech.good)
+		++m_downlink_bad_speech_blocks;
+	if (handset_block &&
+			handset_block->kind == gsm::tch_f::traffic_block_kind::speech &&
+			handset_block->speech.good)
+	{
+		speech_frame downlink{};
+		std::copy(
+				handset_block->speech.frame.begin(),
+				handset_block->speech.frame.end(), downlink.begin());
+		queue_downlink_speech(downlink);
+	}
 }
 
 const char *nokia_radio_peer_device::phase_name(u8 value)
@@ -560,6 +679,18 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					(packet.payload[1] == 0xb0 ||
 						packet.payload[1] == 0xf0))))
 	{
+		if (m_traffic_channel_active && packet.payload[1] == 0xb0 &&
+				packet.length >=
+					2 + gsm::tch_f::packed_control_block{}.size())
+		{
+			gsm::tch_f::packed_control_block control{};
+			std::copy_n(
+					packet.payload.begin() + 2, control.size(),
+					control.begin());
+			m_uplink_transmitter.substitute_facch(
+					gsm::tch_f::encode_control(
+						gsm::tch_f::unpack_control(control)));
+		}
 		const auto result = m_lapdm_link->receive_uplink(
 				packet.payload.data() + 2, packet.length - 2);
 		auto acknowledge_downlink =
@@ -855,6 +986,15 @@ void nokia_radio_peer_device::emit_report()
 	}
 
 	const unsigned payload_length = report_type == 0x8b ? 166 : report_type == 0x80 ? 34 : 8;
+	if (report_type == 0x80 && payload[0] == 0xb0)
+	{
+		gsm::tch_f::packed_control_block control{};
+		std::copy_n(
+				std::begin(payload) + 10, control.size(), control.begin());
+		m_downlink_transmitter.substitute_facch(
+				gsm::tch_f::encode_control(
+					gsm::tch_f::unpack_control(control)));
+	}
 	if (!m_transport->enqueue_rx_packet(report_type, payload, payload_length))
 		return;
 
@@ -1122,42 +1262,6 @@ void nokia_radio_peer_device::tick()
 {
 	if (!m_enabled)
 		return;
-
-	// The base-station side always consumes transmitted speech.  Optional
-	// loopback is an explicit laboratory-network media endpoint, useful without
-	// conflating a test call source with handset DSP or COBBA implementation.
-	speech_frame uplink{};
-	while (take_uplink_speech(uplink))
-	{
-		++m_uplink_speech_received;
-		speech_frame network_uplink{};
-		if (!transport_tch_f_speech(uplink, network_uplink))
-			continue;
-		if (m_lab_voice_source)
-		{
-			nokia_gsm_voice_peer_device::speech_frame peer_uplink{};
-			nokia_gsm_voice_peer_device::speech_frame peer_downlink{};
-			std::copy(
-					network_uplink.begin(), network_uplink.end(),
-					peer_uplink.begin());
-			if (m_voice_peer->exchange(peer_uplink, peer_downlink))
-			{
-				speech_frame network_downlink{};
-				speech_frame downlink{};
-				std::copy(
-						peer_downlink.begin(), peer_downlink.end(),
-						network_downlink.begin());
-				if (transport_tch_f_speech(network_downlink, downlink))
-					queue_downlink_speech(downlink);
-			}
-		}
-		else if (m_speech_loopback)
-		{
-			speech_frame downlink{};
-			if (transport_tch_f_speech(network_uplink, downlink))
-				queue_downlink_speech(downlink);
-		}
-	}
 
 	if (m_phase == phase::candidate_sync && m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;

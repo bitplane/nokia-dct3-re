@@ -375,6 +375,49 @@ decoded_control decode_control(const coded_block &coded)
 	return result;
 }
 
+control_bits unpack_control(const packed_control_block &packed)
+{
+	control_bits result{};
+	for (unsigned k = 0; k < result.size(); ++k)
+		result[k] = (packed[k / 8] >> (7 - k % 8)) & 1;
+	return result;
+}
+
+packed_control_block pack_control(const control_bits &bits)
+{
+	packed_control_block result{};
+	for (unsigned k = 0; k < bits.size(); ++k)
+		result[k / 8] |= bits[k] << (7 - k % 8);
+	return result;
+}
+
+std::array<burst_payload, 4> interleave_sacch(const coded_block &coded)
+{
+	std::array<burst_payload, 4> result{};
+	for (unsigned k = 0; k < coded.size(); ++k)
+	{
+		const unsigned burst = k % 4;
+		const unsigned j = 2 * ((49 * k) % 57) + ((k % 8) / 4);
+		result[burst].data[j] = coded[k];
+	}
+	for (auto &burst : result)
+		burst.hl = burst.hu = 1;
+	return result;
+}
+
+coded_block deinterleave_sacch(
+		const std::array<burst_payload, 4> &bursts)
+{
+	coded_block result{};
+	for (unsigned k = 0; k < result.size(); ++k)
+	{
+		const unsigned burst = k % 4;
+		const unsigned j = 2 * ((49 * k) % 57) + ((k % 8) / 4);
+		result[k] = bursts[burst].data[j];
+	}
+	return result;
+}
+
 std::array<burst_payload, 8> interleave(const coded_block &coded)
 {
 	std::array<burst_payload, 8> result{};
@@ -466,6 +509,114 @@ bool indicates_facch(const std::array<burst_payload, 8> &bursts)
 			std::all_of(
 				bursts.begin() + 4, bursts.end(),
 				[](const burst_payload &burst) { return burst.hl != 0; });
+}
+
+bool diagonal_transmitter::enqueue(const traffic_block &block)
+{
+	if (m_count == queue_depth)
+		return false;
+	m_queue[(m_head + m_count) % queue_depth] = block;
+	++m_count;
+	return true;
+}
+
+bool diagonal_transmitter::substitute_facch(const coded_block &coded)
+{
+	for (unsigned offset = 0; offset < m_count; ++offset)
+	{
+		traffic_block &queued = m_queue[(m_head + offset) % queue_depth];
+		if (queued.kind == traffic_block_kind::speech)
+		{
+			queued.coded = coded;
+			queued.kind = traffic_block_kind::facch;
+			return true;
+		}
+	}
+	return enqueue({coded, traffic_block_kind::facch});
+}
+
+burst_payload diagonal_transmitter::next_burst()
+{
+	if (m_phase == 0)
+	{
+		m_previous = m_current;
+		m_current = {};
+		if (m_count)
+		{
+			const traffic_block &block = m_queue[m_head];
+			m_current = interleave(block.coded);
+			if (block.kind == traffic_block_kind::facch)
+				mark_facch(m_current);
+			m_head = (m_head + 1) % queue_depth;
+			--m_count;
+		}
+	}
+	const burst_payload result =
+			combine_diagonal(m_previous, m_current, m_phase);
+	m_phase = (m_phase + 1) & 3;
+	return result;
+}
+
+void diagonal_transmitter::reset()
+{
+	m_head = 0;
+	m_count = 0;
+	m_phase = 0;
+	m_previous = {};
+	m_current = {};
+}
+
+std::optional<received_traffic_block> diagonal_receiver::receive(
+		const burst_payload &burst)
+{
+	m_pending[4 + m_phase] = burst;
+	m_new[m_phase] = burst;
+	std::optional<received_traffic_block> result;
+	if (m_phase == 3)
+	{
+		if (m_pending_valid)
+		{
+			received_traffic_block decoded{};
+			if (indicates_facch(m_pending))
+			{
+				decoded.kind = traffic_block_kind::facch;
+				decoded.control = decode_control(deinterleave(m_pending));
+			}
+			else
+			{
+				decoded.kind = traffic_block_kind::speech;
+				decoded.speech = decode_speech(deinterleave(m_pending));
+			}
+			result = decoded;
+		}
+		m_pending = m_new;
+		m_new = {};
+		m_pending_valid = true;
+	}
+	m_phase = (m_phase + 1) & 3;
+	return result;
+}
+
+void diagonal_receiver::reset()
+{
+	m_phase = 0;
+	m_pending_valid = false;
+	m_pending = {};
+	m_new = {};
+}
+
+tdma_slot_kind full_rate_slot(std::uint32_t frame_number, unsigned timeslot)
+{
+	const unsigned position = frame_number % 26;
+	// SACCH/TF is displaced by 13 frames for odd timeslots. Table 1 gives
+	// timeslot 0 at FN mod 104 = 12,38,64,90 and timeslot 1 at 25,51,77,103.
+	const unsigned sacch_position = (timeslot & 1) ? 25 : 12;
+	const unsigned idle_position = (sacch_position + 13) % 26;
+	if (position == sacch_position)
+		return tdma_slot_kind::sacch;
+	if (position == idle_position)
+		return tdma_slot_kind::idle;
+	return tdma_slot_kind::traffic;
 }
 
 } // namespace gsm::tch_f

@@ -17,6 +17,7 @@ class RadioSpeechMediaTraceCheckTests(unittest.TestCase):
                 "dsp_hle: speech tick uplink=3 downlink=2 pcm=3 pcm_clock=520000/8000 pcm_shape=65 serial_clocks=31200/23040 mic_peak=0 ear_peak=4096 nonzero=0/2 t=10.040000",
                 "dsp_hle: speech tick uplink=50 downlink=48 pcm=50 pcm_clock=520000/8000 pcm_shape=65 serial_clocks=520000/384000 mic_peak=0 ear_peak=4096 nonzero=0/48 t=11.000000",
                 "gsm_voice_peer: exchange=102 uplink_peak=16 downlink_peak=4096 source=lab-1khz t=11.999000",
+                "radio_l1: direction=downlink kind=facch good=1 count=1 fn=2170 t=11.999500",
                 "dsp_hle: speech tick uplink=102 downlink=100 pcm=102 pcm_clock=520000/8000 pcm_shape=65 serial_clocks=1060800/783360 mic_peak=0 ear_peak=4096 nonzero=0/100 t=12.000000",
                 "dsp_shared_control: command=08 value=040a commit=1 t=12.010000",
                 "dsp_hle: speech stop control=040a uplink=102 downlink=100 t=12.020000",

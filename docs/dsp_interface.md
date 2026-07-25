@@ -804,11 +804,22 @@ independently, and FACCH stealing marks the first four `hu` and last four
 codec-bit permutation, clean and degraded speech decoding, unprotected
 class-2 corruption, control-channel error correction, diagonal placement,
 normal-burst fields, training bits and stealing flags. The current live link
-crosses those bit and burst representations independently in each direction.
-It still completes a whole eight-burst span within one 20 ms media exchange;
-the next step is to clock those bursts on the 26-multiframe TCH/F schedule so
-SACCH and idle frames consume their actual TDMA positions and FACCH
-substitution can interrupt a live speech stream.
+crosses those bit and burst representations through independent transmitter
+and receiver state in each direction. A separate exact 60/13 ms timer advances
+one assigned timeslot per TDMA frame. For the laboratory assignment on
+timeslot 1, FN modulo 26 positions 0--11 and 13--24 advance TCH/F, position 12
+is idle, and position 25 is reserved for SACCH/TF. Thus 24 traffic bursts per
+120 ms carry exactly six speech blocks while one four-burst SACCH block spans
+104 TDMA frames.
+
+Organic LAPDm blocks carried on channel selector `0xb0` are also copied into
+the corresponding uplink or downlink FACCH coder. FACCH has priority over the
+next queued speech block, its eight stealing flags identify the replacement
+to the independent receiver, and the displaced speech interval is delivered
+as a media gap rather than delayed or fabricated. Layer 3 still consumes the
+already recovered Nokia block transaction directly; the parallel burst path
+models its Layer-1 consequence without making call-control timing depend on
+the HLE air-link decoder.
 
 The answered-call fixture selects that voice peer. Across both v6.00 and
 v5.01, `radio_speech_media_trace_check.py` proves fresh codec state, 20 ms
@@ -822,8 +833,10 @@ This proves a standards-based codec and initial channel-coded media
 decoded downlink to COBBA, and non-silent physical-microphone uplink decoded
 at the network peer. It does not yet prove the constituent meanings of
 command-`0x08` bits 0 and 9, the MAD2 serial-port edge/idle-clock and register
-contract, firmware-selected COBBA analogue routing, or TDMA-paced GSM burst
-timing and live FACCH/SACCH multiplexing.
+contract or firmware-selected COBBA analogue routing. SACCH coding,
+rectangular interleaving and timeslot coexistence are present, but meaningful
+measurement-report/system-information payload production and consumption
+remain to be connected to their Layer-3 owners.
 
 ## Unresolved contracts
 - Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the

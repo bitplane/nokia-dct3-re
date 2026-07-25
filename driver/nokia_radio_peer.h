@@ -3,6 +3,7 @@
 
 #ifndef MAME_NOKIA_NOKIA_RADIO_PEER_H
 #define MAME_NOKIA_NOKIA_RADIO_PEER_H
+#include "gsm_tch_f_l1.h"
 #include "nokia_dspif.h"
 #include "nokia_gsm_network.h"
 #include "nokia_gsm_session.h"
@@ -117,12 +118,15 @@ private:
 			std::array<speech_frame, speech_queue_depth> &queue,
 			u8 &head, u8 &count, speech_frame &frame);
 	void clear_speech_queues();
+	void reset_l1_pipeline();
+	TIMER_CALLBACK_MEMBER(burst_tick);
 
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_gsm_network_device> m_gsm_network;
 	required_device<nokia_gsm_session_device> m_gsm_session;
 	required_device<nokia_gsm_voice_peer_device> m_voice_peer;
 	required_device<nokia_lapdm_link_device> m_lapdm_link;
+	emu_timer *m_burst_timer = nullptr;
 	bool m_enabled = false;
 	bool m_trace_enabled = false;
 	unsigned m_reports_sent = 0;
@@ -155,6 +159,16 @@ private:
 	u8 m_uplink_speech_head = 0;
 	u8 m_uplink_speech_count = 0;
 	u64 m_uplink_speech_received = 0;
+	u32 m_tdma_frame_number = 0;
+	bool m_l1_traffic_active = false;
+	gsm::tch_f::diagonal_transmitter m_uplink_transmitter;
+	gsm::tch_f::diagonal_receiver m_network_receiver;
+	gsm::tch_f::diagonal_transmitter m_downlink_transmitter;
+	gsm::tch_f::diagonal_receiver m_handset_receiver;
+	u64 m_uplink_facch_blocks = 0;
+	u64 m_downlink_facch_blocks = 0;
+	u64 m_uplink_bad_speech_blocks = 0;
+	u64 m_downlink_bad_speech_blocks = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device)

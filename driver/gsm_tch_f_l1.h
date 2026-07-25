@@ -7,12 +7,14 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 
 namespace gsm::tch_f
 {
 
 using bit = std::uint8_t;
 using packed_speech_frame = std::array<std::uint8_t, 33>;
+using packed_control_block = std::array<std::uint8_t, 23>;
 using speech_bits = std::array<bit, 260>;
 using control_bits = std::array<bit, 184>;
 using coded_block = std::array<bit, 456>;
@@ -58,6 +60,11 @@ decoded_speech decode_speech(const coded_block &coded);
 // SACCH and FACCH/F share this 184-bit FIRE-code/convolutional-code block.
 coded_block encode_control(const control_bits &information);
 decoded_control decode_control(const coded_block &coded);
+control_bits unpack_control(const packed_control_block &packed);
+packed_control_block pack_control(const control_bits &bits);
+std::array<burst_payload, 4> interleave_sacch(const coded_block &coded);
+coded_block deinterleave_sacch(
+		const std::array<burst_payload, 4> &bursts);
 
 // TS 45.003 3.1.3. The returned element k belongs in burst B0+k.
 std::array<burst_payload, 8> interleave(const coded_block &coded);
@@ -78,6 +85,69 @@ burst_payload combine_diagonal(
 
 void mark_facch(std::array<burst_payload, 8> &bursts);
 bool indicates_facch(const std::array<burst_payload, 8> &bursts);
+
+enum class traffic_block_kind : std::uint8_t
+{
+	speech,
+	facch
+};
+
+struct traffic_block
+{
+	coded_block coded{};
+	traffic_block_kind kind = traffic_block_kind::speech;
+};
+
+struct received_traffic_block
+{
+	traffic_block_kind kind = traffic_block_kind::speech;
+	decoded_speech speech{};
+	decoded_control control{};
+};
+
+// Stateful, independent transmit and receive halves of the diagonal
+// interleaver. Call once for each TCH/F burst position (not SACCH or idle).
+class diagonal_transmitter
+{
+public:
+	static constexpr unsigned queue_depth = 8;
+
+	bool enqueue(const traffic_block &block);
+	bool substitute_facch(const coded_block &coded);
+	burst_payload next_burst();
+	void reset();
+
+private:
+	std::array<traffic_block, queue_depth> m_queue{};
+	unsigned m_head = 0;
+	unsigned m_count = 0;
+	unsigned m_phase = 0;
+	std::array<burst_payload, 8> m_previous{};
+	std::array<burst_payload, 8> m_current{};
+};
+
+class diagonal_receiver
+{
+public:
+	std::optional<received_traffic_block> receive(const burst_payload &burst);
+	void reset();
+
+private:
+	unsigned m_phase = 0;
+	bool m_pending_valid = false;
+	std::array<burst_payload, 8> m_pending{};
+	std::array<burst_payload, 8> m_new{};
+};
+
+enum class tdma_slot_kind : std::uint8_t
+{
+	traffic,
+	sacch,
+	idle
+};
+
+// TS 45.002 table 1 / figure 7a. frame_number is an absolute TDMA FN.
+tdma_slot_kind full_rate_slot(std::uint32_t frame_number, unsigned timeslot);
 
 } // namespace gsm::tch_f
 

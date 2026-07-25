@@ -25,6 +25,10 @@ VOICE_PEER_RE = re.compile(
     r"gsm_voice_peer: exchange=(\d+) uplink_peak=(\d+) "
     r"downlink_peak=(\d+) source=lab-1khz"
 )
+FACCH_RE = re.compile(
+    r"radio_l1: direction=(uplink|downlink) kind=facch good=(\d) "
+    r"count=(\d+) fn=(\d+)"
+)
 
 
 def check(path: Path) -> str:
@@ -67,6 +71,13 @@ def check(path: Path) -> str:
     ]
     if not voice_peer or voice_peer[-1][0] < 100 or voice_peer[-1][2] != 4096:
         raise ValueError("laboratory remote source did not sustain GSM-FR downlink")
+    facch = [
+        (direction, int(good), int(count), int(frame))
+        for direction, good, count, frame in FACCH_RE.findall(text)
+    ]
+    if not any(direction == "downlink" and good and count
+               for direction, good, count, _ in facch):
+        raise ValueError("organic downlink FACCH did not cross the burst decoder")
     if any(right[0] <= left[0] or right[1] < left[1]
            for left, right in zip(samples, samples[1:])):
         raise ValueError("speech counters are not monotonic")

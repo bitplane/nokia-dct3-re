@@ -146,6 +146,87 @@ void test_facch_control_coding()
 	assert(decoded.good);
 	assert(decoded.bits == information);
 	assert(decoded.corrected_bits == 5);
+	assert(unpack_control(pack_control(information)) == information);
+
+	const auto sacch = interleave_sacch(encode_control(information));
+	for (const auto &burst : sacch)
+		assert(burst.hl == 1 && burst.hu == 1);
+	decoded = decode_control(deinterleave_sacch(sacch));
+	assert(decoded.good);
+	assert(decoded.bits == information);
+}
+
+void test_stateful_diagonal_stream()
+{
+	const auto speech_frame = patterned_frame();
+	control_bits facch{};
+	for (unsigned k = 0; k < facch.size(); ++k)
+		facch[k] = (k % 9) == 2;
+
+	diagonal_transmitter transmitter;
+	diagonal_receiver receiver;
+	assert(transmitter.enqueue(
+			{encode_speech(speech_frame), traffic_block_kind::speech}));
+	assert(transmitter.substitute_facch(encode_control(facch)));
+	assert(transmitter.enqueue(
+			{encode_speech(speech_frame), traffic_block_kind::speech}));
+
+	std::array<received_traffic_block, 4> received{};
+	unsigned count = 0;
+	// Four queued/empty block starts flush the three useful diagonal blocks.
+	for (unsigned burst = 0; burst < 16; ++burst)
+	{
+		const auto decoded = receiver.receive(transmitter.next_burst());
+		if (decoded)
+			received[count++] = *decoded;
+	}
+	assert(count == 3);
+	assert(received[0].kind == traffic_block_kind::facch);
+	assert(received[0].control.good);
+	assert(received[0].control.bits == facch);
+	assert(received[1].kind == traffic_block_kind::speech);
+	assert(received[1].speech.good);
+	assert(received[1].speech.frame == speech_frame);
+	assert(received[2].kind == traffic_block_kind::speech);
+	assert(!received[2].speech.good);
+
+	transmitter.reset();
+	receiver.reset();
+	// No queued traffic produces an erased/bad speech block, not synthetic
+	// codec payload or an accidentally valid FACCH.
+	std::optional<received_traffic_block> erased;
+	for (unsigned burst = 0; burst < 8; ++burst)
+	{
+		auto result = receiver.receive(transmitter.next_burst());
+		if (result)
+			erased = result;
+	}
+	assert(erased);
+	assert(erased->kind == traffic_block_kind::speech);
+	assert(!erased->speech.good);
+}
+
+void test_full_rate_schedule()
+{
+	unsigned traffic = 0;
+	unsigned sacch = 0;
+	unsigned idle = 0;
+	for (unsigned fn = 0; fn < 104; ++fn)
+	{
+		switch (full_rate_slot(fn, 1))
+		{
+		case tdma_slot_kind::traffic: ++traffic; break;
+		case tdma_slot_kind::sacch: ++sacch; break;
+		case tdma_slot_kind::idle: ++idle; break;
+		}
+	}
+	assert(traffic == 96);
+	assert(sacch == 4);
+	assert(idle == 4);
+	assert(full_rate_slot(12, 1) == tdma_slot_kind::idle);
+	assert(full_rate_slot(25, 1) == tdma_slot_kind::sacch);
+	assert(full_rate_slot(12, 0) == tdma_slot_kind::sacch);
+	assert(full_rate_slot(25, 0) == tdma_slot_kind::idle);
 }
 
 } // anonymous namespace
@@ -157,6 +238,8 @@ int main()
 	test_clean_and_degraded_round_trip();
 	test_interleaving_and_bursts();
 	test_facch_control_coding();
+	test_stateful_diagonal_stream();
+	test_full_rate_schedule();
 	std::cout << "GSM TCH/FS Layer 1 tests passed\n";
 	return 0;
 }

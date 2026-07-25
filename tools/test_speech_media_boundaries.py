@@ -151,6 +151,31 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_voice_peer->exchange", radio)
         self.assertNotIn("sine_1khz", dsp + cobba)
 
+    def test_layer1_has_an_independent_tdma_burst_clock(self):
+        l1 = (
+            (ROOT / "driver/gsm_tch_f_l1.cpp").read_text()
+            + (ROOT / "driver/gsm_tch_f_l1.h").read_text()
+        )
+        radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
+        dsp = (ROOT / "driver/nokia_dsp_hle.cpp").read_text()
+        self.assertIn("diagonal_transmitter", l1)
+        self.assertIn("diagonal_receiver", l1)
+        self.assertIn("full_rate_slot", l1)
+        self.assertIn("substitute_facch", l1)
+        self.assertIn("interleave_sacch", l1)
+        self.assertIn("attotime::from_ticks(60, 13'000)", radio)
+        burst = radio[
+            radio.index(
+                "TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)"
+            ):
+            radio.index("const char *nokia_radio_peer_device::phase_name")
+        ]
+        self.assertIn("pack_normal_burst", burst)
+        self.assertIn("m_network_receiver.receive", burst)
+        self.assertIn("m_handset_receiver.receive", burst)
+        self.assertNotIn("from_msec(20)", burst)
+        self.assertIn("attotime::from_msec(20)", dsp)
+
 
 if __name__ == "__main__":
     unittest.main()
