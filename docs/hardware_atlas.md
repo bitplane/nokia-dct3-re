@@ -335,8 +335,10 @@ and reconstructed across that word boundary instead of treating converter
 values and GSM-codec-domain samples as interchangeable. Generic COBBA and MAD2
 defaults remain unconfigured. Paired firmware proves the combined
 command-`0x08` speech-path
-field `0x0201`, but not the individual physical meaning of bits 0 and 9. See
-the
+field `0x0201`, but not the individual physical meaning of bits 0 and 9.
+Paired negative-composition runs also prove that disabling this PCM component
+blocks all handset codec/uplink media without stopping the independent
+network downlink or firmware-controlled teardown. See the
 [NSW-6 system-module description](https://manualmachine.com/nokia/nsw6/4544463-rf-description-and-troubleshooting/)
 and the
 [NSM-3 MAD2 block description](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/8210/03SYS%20%5B54%5D.pdf),

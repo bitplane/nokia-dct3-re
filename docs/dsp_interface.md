@@ -754,6 +754,12 @@ falling-edge link. Default or unknown product profiles therefore remain inert
 instead of emitting synthetic silent GSM frames. If COBBA rejects a live
 transfer, that 20 ms uplink frame is not encoded or submitted; the failure is
 counted and the organic media verifier treats either condition as an error.
+`make verify-radio-pcm-missing` proves this negative contract under both
+v6.00 and independently relocated v5.01. Each firmware organically requests
+its speech route and later completes call teardown, but the disabled PCM
+component permits no DSP codec tick and no good uplink delivery. The
+independent network transmitter continues producing downlink frames; missing
+handset hardware does not incorrectly stop the remote endpoint.
 
 MAME saves those two codec histories alongside the DSP HLE, rather than
 serializing libgsm pointers or allocator padding. Combined with the complete

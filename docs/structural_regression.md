@@ -81,6 +81,13 @@ checks; each restored branch then reaches a physical End and clean teardown.
 The v6.00 half uses the decoded control-lifecycle oracle while the v5.01 half
 uses the shared-wire oracle, so the gate preserves the known product contract
 difference rather than forcing both ROMs through one interpretation.
+`make verify-radio-pcm-missing` runs the same paired-ROM lifecycle with the
+MAD2/COBBA PCM component disabled. It correlates the firmware's command-`0x08`
+wire value with the DSP-facing payload, requires the unsupported-link fault,
+rejects every codec tick and good uplink frame, and still requires independent
+network downlink timing plus organic Release Complete. This is the negative
+composition proof that an unknown product profile cannot manufacture handset
+speech.
 `make verify-radio-degraded-speech` likewise runs both ROMs through the
 bidirectional burst-impairment profile. It requires protected-frame failure,
 explicit handset and network BFIs, independent downlink continuation during
