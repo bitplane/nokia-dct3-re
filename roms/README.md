@@ -44,6 +44,24 @@ security, and user NV data. An all-`0xFF` image represents an erased chip, not a
 factory-provisioned handset. The project normally generates an explicit test
 profile; see `docs/eeprom_analysis.md`.
 
+## DSP region caveat
+
+The currently declared `dsp_prom`, `dsp_drom`, and `dsp_pdrom` files are
+checksum-valid MAME set members, but the local files are uniform `0xFF` fill:
+
+| file | size | SHA-256 | classification |
+|---|---:|---|---|
+| `dsp_prom` | 49,152 | `abd8e2a70d51a53287941838446e6ed141005d401faf597fd7c6de0bbc8c329d` | placeholder fill |
+| `dsp_drom` | 16,384 | `0fbba07a833d4dcfc7024eaf313661a0ba8f80a05c6d29b8801c612e10e60dee` | placeholder fill |
+| `dsp_pdrom` | 4,096 | `f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6` | placeholder fill |
+
+They contain no executable C54x program and cannot support DSP disassembly or
+cycle-accurate execution. MAME ROM-audit success proves only that these files
+match the current declaration. Run `make audit-dsp-roms PHONE=noki3210` to
+classify the actual local regions before using them as evidence. A future real
+DSP dump must be identified by product and hash and must not silently replace
+these placeholders in a test baseline.
+
 ## Portability ROMs
 
 Additional firmware is used only as local validation material. Put each complete MAME set in its

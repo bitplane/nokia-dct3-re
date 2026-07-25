@@ -28,15 +28,18 @@
 
 #include "nokia_ccont.h"
 #include "nokia_b3_flash.h"
+#include "nokia_cobba.h"
 #include "nokia_dsp_hle.h"
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
 #include "nokia_gensio.h"
 #include "nokia_gsm_network.h"
 #include "nokia_gsm_session.h"
+#include "nokia_gsm_voice_peer.h"
 #include "nokia_lapdm_link.h"
 #include "nokia_kbgpio.h"
 #include "nokia_mad2.h"
+#include "nokia_mad2_pcm.h"
 #include "nokia_mbus.h"
 #include "nokia_pup.h"
 #include "nokia_radio_peer.h"
@@ -117,6 +120,21 @@ struct nokia_product_config
 	u16 dsp_boot_status_response = 0;
 	unsigned dsp_service_delay_us = 5'000;
 	unsigned dsp_peer_poll_ms = 5;
+	u8 dsp_speech_control_command = 0xff;
+	u16 dsp_speech_control_mask = 0;
+	u16 dsp_speech_control_enabled = 0;
+	u32 cobba_pcm_data_clock = 0;
+	u32 cobba_pcm_frame_clock = 0;
+	u8 cobba_pcm_sample_bits = 0;
+	u8 cobba_pcm_sync_clocks = 0;
+	u8 cobba_pcm_word_clocks = 0;
+	bool cobba_pcm_msb_first = true;
+	nokia_mad2_pcm_device::clock_edge cobba_pcm_data_edge =
+			nokia_mad2_pcm_device::clock_edge::falling;
+	u8 cobba_hle_voice_microphone = nokia_cobba_device::disconnected;
+	u8 cobba_hle_voice_output = nokia_cobba_device::disconnected;
+	float cobba_internal_microphone_gain_db = 0.0F;
+	float cobba_internal_earpiece_gain_db = 0.0F;
 	bool flash_b3_block_lock = false;
 	u8 dsp_reset_running_status = 0;
 	u8 dsp_release_mask = 0;
@@ -137,6 +155,32 @@ constexpr nokia_product_config make_3210_config()
 	result.radio_peer = true;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
+	// Paired NSE-8 firmware independently constructs/removes this field around
+	// Answer while retaining the separate 0x0408 dedicated-channel field.
+	result.dsp_speech_control_command = 0x08;
+	result.dsp_speech_control_mask = 0x0201;
+	result.dsp_speech_control_enabled = 0x0201;
+	result.cobba_pcm_data_clock = 520'000;
+	result.cobba_pcm_frame_clock = 8'000;
+	// DCT3 MAD2/COBBA-GJ PCM timing diagrams show a 16-bit serial word
+	// containing a sign-extended 13-bit linear converter sample.
+	result.cobba_pcm_sample_bits = 13;
+	// Best-evidenced Nokia/COBBA-family format: a one-clock active-high frame
+	// pulse followed by a 16-bit, MSB-first word transferred on falling
+	// PCMDClk edges. At NSE-8's 520/8 kHz rates, the remaining 48 of 65 clocks
+	// are inactive. Keep this product-configured pending a direct NSE-8 trace.
+	result.cobba_pcm_sync_clocks = 1;
+	result.cobba_pcm_word_clocks = 16;
+	result.cobba_pcm_msb_first = true;
+	result.cobba_pcm_data_edge = nokia_mad2_pcm_device::clock_edge::falling;
+	// NSE-8 board wiring: the internal microphone terminates at MIC2 and the
+	// internal receiver at the differential EAR output.
+	result.cobba_hle_voice_microphone = nokia_cobba_device::mic2;
+	result.cobba_hle_voice_output = nokia_cobba_device::ear;
+	// NSE-8/9 system-module Tables 33/34: the internal voice path uses
+	// COBBA MIC2 at +18 dB and EAR at -10 dB.
+	result.cobba_internal_microphone_gain_db = 18.0F;
+	result.cobba_internal_earpiece_gain_db = -10.0F;
 	result.ccont_board = ADC_3210;
 	return result;
 }
@@ -284,8 +328,10 @@ public:
 		m_b3_flash(*this, "b3_flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
+		m_cobba(*this, "cobba"),
 		m_gensio(*this, "gensio"),
 		m_mad2(*this, "mad2"),
+		m_mad2_pcm(*this, "mad2_pcm"),
 		m_kbgpio(*this, "kbgpio"),
 		m_mbus(*this, "mbus"),
 		m_pup(*this, "pup"),
@@ -386,12 +432,16 @@ private:
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
 	uint32_t fw_dword(offs_t address) const;
+	void trace_dsp_audio_shadow_write(
+			offs_t address, uint16_t old_data, uint16_t data);
 	required_device<cpu_device> m_maincpu;
 	required_device<nokia_b3_flash_device> m_b3_flash;
 	required_device<i2c_24c128_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
+	required_device<nokia_cobba_device> m_cobba;
 	required_device<nokia_gensio_device> m_gensio;
 	required_device<nokia_mad2_device> m_mad2;
+	required_device<nokia_mad2_pcm_device> m_mad2_pcm;
 	required_device<nokia_kbgpio_device> m_kbgpio;
 	required_device<nokia_mbus_device> m_mbus;
 	required_device<nokia_pup_device> m_pup;
@@ -577,6 +627,29 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_dsp_hle->set_external_service_enabled(product.external_service);
 	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
 	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
+	m_dsp_hle->set_speech_control(
+			product.dsp_speech_control_command,
+			product.dsp_speech_control_mask,
+			product.dsp_speech_control_enabled);
+	m_mad2_pcm->set_clock_rates(
+			product.cobba_pcm_data_clock,
+			product.cobba_pcm_frame_clock);
+	m_mad2_pcm->set_sample_bits(product.cobba_pcm_sample_bits);
+	m_mad2_pcm->set_frame_format(
+			product.cobba_pcm_sync_clocks,
+			product.cobba_pcm_word_clocks,
+			product.cobba_pcm_msb_first,
+			product.cobba_pcm_data_edge);
+	m_cobba->set_pcm_sample_bits(product.cobba_pcm_sample_bits);
+	// This explicitly configures the HLE's internal-handset path. A future
+	// real DSP backend must instead select paths through COBBA's serial
+	// control transport; MCU speech state must never write these pins.
+	m_cobba->set_hle_internal_voice_route(
+			product.cobba_hle_voice_microphone,
+			product.cobba_hle_voice_output);
+	m_cobba->set_internal_voice_gains(
+			product.cobba_internal_microphone_gain_db,
+			product.cobba_internal_earpiece_gain_db);
 	m_external_service_peer->set_enabled(product.external_service);
 	m_radio_peer->set_enabled(product.radio_peer);
 	m_b3_flash->set_enabled(product.flash_b3_block_lock);
@@ -627,6 +700,8 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_incoming_call_after_registration(BIT(network, 1));
 	m_radio_peer->set_incoming_sms_after_registration(BIT(network, 2));
 	m_radio_peer->set_incoming_smart_message_after_registration(BIT(network, 3));
+	m_radio_peer->set_speech_loopback(BIT(network, 4));
+	m_radio_peer->set_lab_voice_source(BIT(network, 5));
 	m_sim_card->set_cphs_aoc(false);
 	m_sim_card->set_cached_location(false);
 	const u8 atr[] = { 0x3b, 0x10, 0x05 };
@@ -852,7 +927,11 @@ uint16_t nokia_dct3_state::ram_r(offs_t offset, uint16_t mem_mask)
 // Hardware RAM write entry point registered in the address map.
 void nokia_dct3_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
+	const uint16_t old_data = m_ram[offset];
 	COMBINE_DATA(&m_ram[offset]);
+	const offs_t address = NOKIA_RAM_BASE + (offset << 1);
+	if (m_trace_enabled && old_data != m_ram[offset])
+		trace_dsp_audio_shadow_write(address, old_data, m_ram[offset]);
 }
 
 
@@ -879,7 +958,8 @@ uint16_t nokia_dct3_state::dsp_ram_r(offs_t offset)
 	const uint64_t trace_key = (uint64_t(pc) << 11) | offset;
 	const unsigned byte_offset = offset << 1;
 	if (m_trace_enabled &&
-			(byte_offset <= 0x004 || byte_offset == 0x0a6 || byte_offset == 0x0e0 ||
+			(byte_offset <= 0x004 || byte_offset == 0x0a6 ||
+			 byte_offset == 0x0a8 || byte_offset == 0x0aa || byte_offset == 0x0e0 ||
 			 byte_offset == 0x0e4 || byte_offset == 0x0fe || byte_offset == 0x100 ||
 			 byte_offset == 0x1c8))
 		LOGMASKED(LOG_DSP_SHARED, "dsp_shared_observe: off=%03x data=%04x pc=%08x t=%.6f\n",
@@ -1329,6 +1409,12 @@ static INPUT_PORTS_START( noki3210 )
 	PORT_CONFNAME(0x08, 0x00, "Queue one incoming Smart Messaging ringtone")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x08, DEF_STR(On))
+	PORT_CONFNAME(0x10, 0x00, "Laboratory network speech loopback")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x10, DEF_STR(On))
+	PORT_CONFNAME(0x20, 0x00, "Laboratory remote 1 kHz voice source")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x20, DEF_STR(On))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3310 )
@@ -1438,12 +1524,18 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	BEEP(config, m_buzzer).add_route(ALL_OUTPUTS, "mono", 0.25);
 	BEEP(config, m_dsp_tone1).add_route(ALL_OUTPUTS, "mono", 0.12);
 	BEEP(config, m_dsp_tone2).add_route(ALL_OUTPUTS, "mono", 0.12);
+	NOKIA_COBBA(config, m_cobba).add_route(
+			nokia_cobba_device::ear, "mono", 0.50);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 
 	INTEL_TE28F160(config, "flash");
 	NOKIA_B3_FLASH(config, m_b3_flash, 0);
 	m_b3_flash->set_status_csr((NOKIA_3410_FLASH_STATUS_CSR - NOKIA_FLASH1_BASE) >> 1);
 	I2C_24C128(config, m_eeprom);
 	NOKIA_MAD2(config, m_mad2);
+	NOKIA_MAD2_PCM(config, m_mad2_pcm);
+	NOKIA_GSM_VOICE_PEER(config, "gsm_voice_peer");
 	m_mad2->set_timer0_hz(33'055);
 	m_mad2->set_timer1_hz(1'057);
 	m_mad2->set_fiq8_hz(1'000);

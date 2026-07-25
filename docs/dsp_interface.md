@@ -49,6 +49,7 @@ triggers (single home: `dsp_service_transport_contract.md`; ledger
 | `[0x00–0x24]` | **self-test / RAM echo region** | written with a walking pattern at `0x295f48`, read back + compared at `0x295fc0`/`0x295fd6`. A RAM test of the shared window; passes trivially against a real backing store. |
 | `[0x00–0x04]` | bootstrap-ready words → `0x01` | the peer publishes all three after the product-configured download handshake: 64 exchanges on both 3210 ROMs and 58 on 3310 v6.39. Firmware reads ordinary shared RAM. |
 | `[0xe0]` → `0x00`, `[0xfe]`/`[0x100]` → `0x01` | **DSP ready/busy flags** | MCU zero-writes to `0xfe`/`0x100` request peer acknowledgements. DSPIF command 4 clears peer-owned busy word `0xe0`; `0xe4` is the lower-service pending counter. |
+| `[0xa8]` / `[0xaa]` | **adjacent MCU-written DSP control words** | Both supported 3210 ROMs update `0xa8` through shared-control command `0x08`. In both answered-call lifecycles, command `0x1c` independently writes `0xaa=ffff` during the active interval and restores zero at clearing. A separate 5110 ROM4 analysis calls these request/acknowledgement, but the organic paired-ROM 3210 writes contradict transferring that semantic unchanged. The HLE therefore latches only raw `0xa8`; neither word is treated as PCM. |
 | `[0xf6–0x102]` | **config words** (`0x0100 0x0300 0x0001 0x0000 0x0001 0x0001 0x0200`) | 7 individual writes at `0x290a44–0x290a64`. |
 | `[0x200–0x600]` | **coefficient/parameter table** (512 halfwords) | strided copy at `0x290a94`: reads one halfword per 0x20-byte record from flash `0x200040`, packs into `[0x200+]`. |
 | `[0xe00+]` | **second blob** (~240+ halfwords) | ARM block-copy (`stmia`) at `0x2b5bd0` (reached via `bx pc` ARM-mode switch). |
@@ -229,17 +230,55 @@ calls shared-control helper `0x290cf4` with command `0x08`, value `0x060b` and
 commit flag 1; the helper publishes encoded word `0x860b` at shared offset
 `0x0a8` and rings DSPIF command 4. This occurs before Connect Acknowledge and
 does not occur in a matched unlocked-but-unanswered control. It is the first
-proved answer-only DSP control entrance, but the `0x060b` bit meanings and the
-DSP-to-COBBA PCM consequence are not yet decoded.
+proved answer-only DSP control entrance.
 
 About 22 ms later, task 9 emits a separate bounded command group: commands
 `0x09`, `0x26`, `0x21`, `0x25`, `0x29`, and `0x2f` program oscillator word
 `0x0e10` (900 Hz), amplitude `0x0041`, and a route bit, then clear the
 oscillator after 120.8 ms. The same helper/caller family produces keypad tones,
 and no further shared-control command follows during the retained call. This
-is an answer acknowledgement/UI tone, not speech framing. The answered
-signalling and lower control boundary are now proved; a speech backend still
-requires decoding command `0x08` or observing the DSP/PCM side of that command.
+is an answer acknowledgement/UI tone, not speech framing.
+
+A second physical press of the same context-sensitive Navi key organically
+ends the retained call. The phone emits CC Disconnect, accepts network CC
+Release, emits Release Complete, and requests the proved release channel
+change. The command-`0x08` desired word follows the complete observed
+lifecycle `0x0002 -> 0x060b -> 0x040a -> 0x0002`.
+
+The answer transition is built by firmware stores at `0x28d9a8`
+(`0x0002 -> 0x0203`) and `0x28dd1c` (`0x0203 -> 0x060b`). After release,
+stores at `0x28d97e` and `0x28d986` produce `0x060a` and then `0x040a`;
+`0x28dcf6` later restores `0x0002`. The desired table is at `0x11206c`
+and its applied mirror at `0x112054`.
+
+The compiler tables now separate two fields. The answer-only add table contains
+`0x0201`; its release keep-mask is `0xfdfe`, the exact complement of that
+field. The independent dedicated-channel add table contains `0x0408`.
+Non-speech registration and paging channels repeatedly publish `0x040a`
+(`0x0002 | 0x0408`), while Answer publishes `0x060b`
+(`0x040a | 0x0201`). On clearing, firmware removes `0x0201` before it removes
+the dedicated-channel field. This proves `0x0201` as the speech-path field
+without assigning unsupported meanings to its two constituent bits.
+
+The v5.01 ROM independently relocates the compiler to `0x28eae0`, the shared
+helper to `0x2906a8`, the desired table to `0x111e6c`, and the applied mirror
+to `0x111e54`. Nevertheless, a complete physical Answer-to-End call publishes
+the identical DSP wire words at shared offset `0x0a8`: idle `0x8002`, answered
+`0x860b`, post-release `0x840a`, and restored idle `0x8002`. This proves a
+cross-ROM MCU-to-DSP protocol contract while keeping the relocated firmware
+addresses in trace-only quarantine.
+
+The v5.01 compiler tables independently contain the same `0x0201` add,
+`0xfdfe` keep-mask and `0x0408` channel field. The checksum-independent
+`verify-dsp-speech-control-static` gate checks both ROMs.
+
+Shared offset `0x0a8` is a multiplexed command wire, not persistent command-8
+storage. Bits 15..12 identify commands `0x08`/`0x09`, and bits 11..0 carry the
+value. Thus the answer word `0x860b` is legitimately overwritten about 22 ms
+later by tone-control wires `0x98af` and `0x99a0`. The HLE now decodes command
+`0x08` into independent applied state, mirroring the firmware's per-command
+table, rather than mistaking the last raw wire value for the speech state.
+DSPIF remains only the shared-RAM and doorbell transport.
 
 ### Reachable shared-control commands
 
@@ -512,7 +551,15 @@ words. Successive v6 packets address `0x2206, 0x222d, ... 0x22f0`, uploading
 247 contiguous words; v5.01 analogously uploads 241 words from `0x2286` through
 `0x2370`. The constructor advances through the descriptor and retains no
 per-packet reply token. The physical purpose of this version-specific DSP memory
-image remains unknown, so it is not labelled as audio, radio, or coefficients.
+image remains unknown, so it is not labelled as speech code or coefficients.
+Static placement nevertheless narrows its ownership: `0x28d710` is the same
+firmware audio manager that initializes the desired shared-control table at
+`0x11206c`, and the two extracted images have an 85.2% sequence-match ratio.
+The HLE now applies each big-endian address/data fragment to DSP-owned 16-bit
+data memory rather than merely discarding it. `make verify-dsp-memory-upload`
+proves seven contiguous fragments populate `0x2206–0x22fc` (247 words) on v6.00
+and `0x2286–0x2376` (241 words) on v5.01. No fixed address or length is built
+into the consumer and no reply is fabricated.
 
 ### Organic radio and registration transport
 
@@ -633,6 +680,118 @@ statically without a spec or a live trace; the code never runs on our boot.
 
 The data path terminates in a dormant MMI-VM event rather than a statically decodable
 processor. Further semantic claims require an organic packet or an external protocol source.
+
+## Speech media boundary
+
+Speech is being added as a separate data plane, not as another DSPIF
+control-packet special case:
+
+```
+GSM TCH/F speech frame (33 octets / 20 ms)
+        <-> DSP GSM-FR transcoder
+        <-> 160 signed PCM samples at 8 kHz
+        <-> MAD2/COBBA PCM and analogue endpoints
+```
+
+`nokia_radio_peer_device` exposes bounded uplink and downlink speech-frame
+queues when RR has assigned the physical speech-mode TCH/F. The TCH exists
+while the phone rings and briefly during FACCH release, independently of
+call-control and handset audio routing.
+
+`nokia_gsm_fr_codec` is the DSP-side standardized codec boundary. It wraps the
+official GSM 06.10 RPE-LTP implementation and converts exactly one 160-sample
+PCM block to or from one 33-octet frame. It does not own radio scheduling,
+channel coding, PCM routing, or analogue gain. `make verify-gsm-fr-codec`
+checks framing, bidirectional conversion, malformed-frame rejection, and
+reset independently of phone firmware.
+
+The DSP HLE clocks this boundary every 20 ms only when both the TCH/F and the
+product-configured command-`0x08` speech field are active. It reads one microphone block
+through `nokia_mad2_pcm_device`, encodes and submits the uplink frame, then
+decodes any downlink frame and transfers one earpiece block through the same
+full-duplex boundary. The PCM device owns the product-configured 520 kHz
+`PCMDClk` and 8 kHz `PCMSClk` contract. Their integral ratio gives 65 serial
+data-clock periods per full-duplex frame. NSE-3 MAD2/COBBA-GJ documentation
+establishes a 16-bit word containing sign-extended 13-bit linear PCM (bits
+15--13 repeat the sign and bits 12--0 carry the converter value).
+Same-ASIC Nokia troubleshooting material establishes the one-clock,
+active-high sync pulse at 520/8 kHz; Nokia's separately documented
+sign-extended PCM contract supplies MSB-first falling-edge transfer. NSE-8
+product configuration combines that family evidence, leaving 48 idle clocks,
+but retains every property as configuration pending a direct NSE-8 DSP or
+logic trace. Generic MAD2/COBBA defaults remain inert. The runtime gate
+validates the configured shape and serializes every sample bit before
+reconstructing the converter value. MAD2 converts between that value and the
+left-scaled 16-bit domain consumed by GSM 06.10; COBBA alone converts between
+the serial value and normalized analogue samples.
+See the
+[NSE-3 system-module description](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6110/03SYS%20%5B73%5D.pdf).
+The edge convention is corroborated by Nokia's
+[sign-extended PCM contract](https://fcc.report/FCC-ID/LJPRX-9/393500.pdf).
+
+COBBA owns the 8 kHz converter stream and bounded queues on both sides. Its
+sound interface exposes the documented three differential microphone pins
+MIC1/MIC2/MIC3 and the separate EAR and HF outputs. NSE-8 board composition
+wires the machine's generic physical microphone specifically to MIC2 and the
+speaker specifically to EAR; other products do not inherit those connections.
+Only COBBA converts those samples into uplink PCM. With no host capture source
+the pin naturally yields silence; no DSP or call fixture injects samples.
+NSE-8 product configuration supplies the HLE internal-call MIC2/EAR path and
+applies the service manual's nominal +18 dB/-10 dB transfer. The API is named
+`set_hle_internal_voice_route` to make its status explicit: it describes the
+product's internal handset path while the real DSP backend is absent, not a
+decoded power-on register value or firmware-selected mux transaction. The
+still unknown DSP control-register encoding is not synthesized, and MCU call
+state never writes this route. Accessory-driven runtime changes remain pending
+recovery of COBBA's control bits.
+
+The physical-uplink acceptance run uses MAME's ordinary microphone endpoint
+with an external host-side 1 kHz source. The pinned MAME PulseAudio module
+advertised capture sources but lacked its record-stream implementation, so
+`mame-pulseaudio-input.patch` supplies the generic source-open, buffered-read
+and source-close contract; no Nokia device receives a test-source option.
+With the external source attenuated to retain headroom after NSE-8's +18 dB
+MIC2 gain, the current 13-bit v6.00 and v5.01 runs each produced 150/150
+non-silent COBBA microphone blocks at DSP-domain peak 16072. The separate
+network peer's GSM-FR decoder observed peaks 16280 and 16448 respectively.
+`radio_physical_uplink_trace_check.py`
+requires at least 100 non-silent microphone blocks, non-zero decoded uplink
+energy, and rejects clipping.
+
+COBBA's DSP control plane is represented separately from those samples.
+`nokia_cobba_device` exposes an opaque 16-register, 12-bit serial transport
+matching the reviewed ROM4 port protocol: data is latched first, then a
+low-nibble register select commits a write; select bit 4 requests a read, whose
+data port reports the addressed 12-bit value with the busy flag clear after
+the immediate modelled transaction. Control register `0xD` resets to the
+recovered idle handshake value `0x00c` (accept bits clear, completion bits
+set). Other register meanings are deliberately not
+attached to routes or gains yet. In particular, command `0x08` does not
+synthetically write a COBBA register.
+
+The laboratory network has two separately configured speech endpoints.
+`NETCFG` bit `0x10` selects raw frame loopback, which consumes an uplink frame
+at the network boundary and returns that frame as downlink. Bit `0x20` instead
+selects `nokia_gsm_voice_peer_device`, a network-side transcoder with codec
+state independent of the handset DSP. Its explicit laboratory source is a
+1 kHz signed-PCM signal, matching the service-manual audio-level test
+frequency. The source enters only through network GSM-FR encoding and the
+radio downlink queue; it does not alter handset state or inject samples into
+MAD2, COBBA, or the UI.
+
+The answered-call fixture selects that voice peer. Across both v6.00 and
+v5.01, `radio_speech_media_trace_check.py` proves fresh codec state, 20 ms
+cadence, at least 100 continuing encoded-uplink and decoded-downlink frames,
+the peer's fixed source peak, and non-zero samples in the COBBA receiver
+stream. The current paired runs each carried 150 microphone-side frames and
+149 network-to-earpiece frames, with all 149 received COBBA blocks non-silent.
+
+This proves a complete standards-based media *transport* slice, a non-silent
+decoded downlink to COBBA, and non-silent physical-microphone uplink decoded
+at the network peer. It does not yet prove the constituent meanings of
+command-`0x08` bits 0 and 9, the MAD2 serial-port edge/idle-clock and register
+contract, firmware-selected COBBA analogue routing, or GSM channel
+coding/interleaving/burst timing.
 
 ## Unresolved contracts
 - Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the

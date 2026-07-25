@@ -15,7 +15,9 @@ nokia_dsp_hle_device::nokia_dsp_hle_device(
 	device_t(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
 	m_transport(*this, "^dspif"),
 	m_external_peer(*this, "^external_service_peer"),
-	m_radio_peer(*this, "^radio_peer")
+	m_radio_peer(*this, "^radio_peer"),
+	m_mad2_pcm(*this, "^mad2_pcm"),
+	m_mcu_control_word_cb(*this)
 {
 }
 
@@ -26,6 +28,7 @@ void nokia_dsp_hle_device::device_start()
 	m_packet_timer = timer_alloc(FUNC(nokia_dsp_hle_device::packet_tick), this);
 	m_response_timer = timer_alloc(FUNC(nokia_dsp_hle_device::response_tick), this);
 	m_keepalive_timer = timer_alloc(FUNC(nokia_dsp_hle_device::keepalive_tick), this);
+	m_speech_timer = timer_alloc(FUNC(nokia_dsp_hle_device::speech_tick), this);
 	save_item(NAME(m_service_enabled));
 	save_item(NAME(m_external_service_enabled));
 	save_item(NAME(m_service_delay_us));
@@ -37,6 +40,18 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_code_block_request));
 	save_item(NAME(m_parked_boot_status));
 	save_item(NAME(m_boot_status_response));
+	save_item(NAME(m_mcu_control_word));
+	save_item(NAME(m_mcu_control_wire));
+	save_item(NAME(m_speech_control_command));
+	save_item(NAME(m_speech_control_mask));
+	save_item(NAME(m_speech_control_enabled));
+	save_item(NAME(m_data_memory));
+	save_item(NAME(m_data_memory_loaded));
+	save_item(NAME(m_speech_active));
+	save_item(NAME(m_speech_uplink_frames));
+	save_item(NAME(m_speech_downlink_frames));
+	save_item(NAME(m_speech_nonzero_microphone_blocks));
+	save_item(NAME(m_speech_nonzero_earpiece_blocks));
 }
 
 void nokia_dsp_hle_device::device_reset()
@@ -46,8 +61,19 @@ void nokia_dsp_hle_device::device_reset()
 	m_response_timer->adjust(attotime::never);
 	m_keepalive_timer->adjust(m_service_enabled ? attotime::from_seconds(1) : attotime::never,
 			0, attotime::from_seconds(1));
+	m_speech_timer->adjust(attotime::from_msec(20), 0, attotime::from_msec(20));
 	m_service_control_completion_sent = false;
 	m_bootstrap_exchange_count = 0;
+	m_mcu_control_word = 0;
+	m_mcu_control_wire = 0;
+	std::fill(m_data_memory.begin(), m_data_memory.end(), 0);
+	std::fill(m_data_memory_loaded.begin(), m_data_memory_loaded.end(), 0);
+	m_speech_codec.reset();
+	m_speech_active = false;
+	m_speech_uplink_frames = 0;
+	m_speech_downlink_frames = 0;
+	m_speech_nonzero_microphone_blocks = 0;
+	m_speech_nonzero_earpiece_blocks = 0;
 	publish_bootstrap_state();
 }
 
@@ -78,10 +104,25 @@ void nokia_dsp_hle_device::service_pending_w(int state)
 void nokia_dsp_hle_device::doorbell_w(int state)
 {
 	if (state && m_transport->dspif_r(0) == 0 && m_transport->dspif_r(1) == 4)
+	{
+		m_mcu_control_wire = m_transport->shared_word(0x0a8 / 2);
+		// The wire is multiplexed: bits 15..12 select one of the command
+		// table's first sixteen entries and bits 11..0 carry its value.
+		// Preserve command 0x08's applied state when later command 0x09
+		// transactions reuse the same physical word.
+		if ((m_mcu_control_wire >> 12) == m_speech_control_command)
+		{
+			m_mcu_control_word = m_mcu_control_wire & 0x0fff;
+			m_mcu_control_word_cb(m_mcu_control_word);
+		}
 		m_transport->peer_shared_w(0x0e0 / 2, 0);
+	}
 	if (state && m_trace_enabled)
-		LOGMASKED(LOG_DSP_HLE, "dsp_hle: doorbell pending=%04x t=%.6f\n",
-				m_transport->service_pending(), machine().time().as_double());
+		LOGMASKED(LOG_DSP_HLE,
+				"dsp_hle: doorbell pending=%04x wire=%04x speech_control=%04x t=%.6f\n",
+				m_transport->service_pending(), m_mcu_control_wire,
+				m_mcu_control_word,
+				machine().time().as_double());
 }
 
 void nokia_dsp_hle_device::shared_002_write_w(int state)
@@ -159,6 +200,97 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::keepalive_tick)
 		m_transport->notify_rx();
 }
 
+TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
+{
+	// Command 0x08 is a bit-field, not an enum. Across both NSE-8 ROMs the
+	// non-speech dedicated-channel state is 0x040a; Answer adds field 0x0201,
+	// and release removes that same field before the TCH is deconfigured.
+	// Product configuration carries the recovered field so another MAD2/DSP
+	// variant need not inherit NSE-8 wiring.
+	const bool dsp_speech_route =
+			m_speech_control_mask != 0 &&
+			(m_mcu_control_word & m_speech_control_mask) ==
+					m_speech_control_enabled;
+	const bool active =
+			m_radio_peer->speech_channel_active() && dsp_speech_route;
+	if (!active)
+	{
+		if (m_speech_active && m_trace_enabled)
+			LOGMASKED(LOG_DSP_HLE,
+					"dsp_hle: speech stop control=%04x uplink=%llu downlink=%llu t=%.6f\n",
+					m_mcu_control_word, m_speech_uplink_frames,
+					m_speech_downlink_frames, machine().time().as_double());
+		m_speech_active = false;
+		return;
+	}
+	if (!m_speech_active)
+	{
+		// GSM-FR predictor state belongs to one continuous traffic-channel
+		// activation and must not leak from a previous call.
+		m_speech_codec.reset();
+		m_speech_active = true;
+	}
+
+	nokia_mad2_pcm_device::pcm_block earpiece{};
+	nokia_radio_peer_device::speech_frame radio_frame{};
+	if (m_radio_peer->take_downlink_speech(radio_frame))
+	{
+		nokia_gsm_fr_codec::speech_frame downlink{};
+		std::copy(radio_frame.begin(), radio_frame.end(), downlink.begin());
+		nokia_gsm_fr_codec::pcm_block decoder_output{};
+		if (m_speech_codec.decode(downlink, decoder_output))
+		{
+			std::copy(decoder_output.begin(), decoder_output.end(), earpiece.begin());
+			++m_speech_downlink_frames;
+		}
+	}
+
+	nokia_mad2_pcm_device::pcm_block microphone{};
+	m_mad2_pcm->transfer_frame_block(earpiece, microphone);
+	const auto block_peak = [] (const auto &block)
+	{
+		u16 peak = 0;
+		for (s16 sample : block)
+			peak = std::max<u16>(peak,
+					u16(sample < 0 ? -s32(sample) : s32(sample)));
+		return peak;
+	};
+	const u16 microphone_peak = block_peak(microphone);
+	const u16 earpiece_peak = block_peak(earpiece);
+	if (microphone_peak)
+		++m_speech_nonzero_microphone_blocks;
+	if (earpiece_peak)
+		++m_speech_nonzero_earpiece_blocks;
+	nokia_gsm_fr_codec::pcm_block encoder_input{};
+	std::copy(microphone.begin(), microphone.end(), encoder_input.begin());
+	nokia_gsm_fr_codec::speech_frame uplink{};
+	if (m_speech_codec.encode(encoder_input, uplink))
+	{
+		nokia_radio_peer_device::speech_frame radio_frame{};
+		std::copy(uplink.begin(), uplink.end(), radio_frame.begin());
+		if (m_radio_peer->submit_uplink_speech(radio_frame))
+			++m_speech_uplink_frames;
+	}
+
+	if (m_trace_enabled &&
+			(m_speech_uplink_frames <= 3 || (m_speech_uplink_frames % 50) == 0))
+		LOGMASKED(LOG_DSP_HLE,
+				"dsp_hle: speech tick uplink=%llu downlink=%llu pcm=%llu "
+				"pcm_clock=%u/%u pcm_shape=%u serial_clocks=%llu/%llu "
+				"mic_peak=%u ear_peak=%u "
+				"nonzero=%llu/%llu t=%.6f\n",
+				m_speech_uplink_frames, m_speech_downlink_frames,
+				m_mad2_pcm->blocks_transferred(), m_mad2_pcm->data_clock(),
+				m_mad2_pcm->frame_clock(),
+				m_mad2_pcm->data_clocks_per_frame(),
+				m_mad2_pcm->data_clocks_transferred(),
+				m_mad2_pcm->idle_clocks_transferred(),
+				microphone_peak, earpiece_peak,
+				m_speech_nonzero_microphone_blocks,
+				m_speech_nonzero_earpiece_blocks,
+				machine().time().as_double());
+}
+
 void nokia_dsp_hle_device::drain_responses()
 {
 	nokia_external_service_peer_device::response response;
@@ -197,6 +329,31 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::response_tick)
 	if (m_external_peer->peek_response(response))
 		m_response_timer->adjust(attotime::from_ticks(response.length * 10, 9'600));
 }
+
+bool nokia_dsp_hle_device::consume_memory_upload(const nokia_dspif_device::packet &packet)
+{
+	// Type 0x51 carries a big-endian DSP word address followed by a contiguous
+	// sequence of big-endian data words.  The firmware fragments one logical
+	// image into transport-sized packets; it neither requests nor receives a
+	// per-fragment acknowledgement.
+	if (packet.type != 0x51 || packet.length < 4 || BIT(packet.length, 0))
+		return false;
+
+	u16 address = (u16(packet.payload[0]) << 8) | packet.payload[1];
+	const u16 first = address;
+	for (unsigned index = 2; index < packet.length; index += 2, ++address)
+	{
+		m_data_memory[address] = (u16(packet.payload[index]) << 8) | packet.payload[index + 1];
+		m_data_memory_loaded[address] = 1;
+	}
+	if (m_trace_enabled)
+		LOGMASKED(LOG_DSP_HLE,
+				"dsp_hle: data memory upload first=%04x words=%u last=%04x t=%.6f\n",
+				first, (packet.length - 2) / 2, u16(address - 1),
+				machine().time().as_double());
+	return true;
+}
+
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 {
 	if (m_external_service_enabled || m_radio_peer->enabled())
@@ -204,6 +361,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 		nokia_dspif_device::packet packet;
 		while (m_transport->peek_tx_packet(packet))
 		{
+			consume_memory_upload(packet);
 			if (m_external_service_enabled && packet.type == 0x05 &&
 					packet.length >= 9 && packet.length <= 75)
 				m_external_peer->receive_frame(packet.payload.data(), packet.length);

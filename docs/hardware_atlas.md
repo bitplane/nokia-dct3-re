@@ -298,6 +298,72 @@ separate task-9 sequence programs the known oscillator surface for a 900 Hz,
 call-audio control frontier, while the DSP-internal interpretation and
 MAD2-to-COBBA PCM bus remain unmodeled.
 
+The first media-plane slice is now explicit: the radio peer owns bounded
+33-octet GSM full-rate uplink/downlink queues, enabled by organic RR traffic
+assignment; a separate GSM-FR codec owns only the
+33-octet/160-sample transcoding contract; and the DSP clocks those blocks to a
+separate 8 kHz COBBA converter endpoint every 20 ms. The paired-ROM
+command-`0x08` speech field `0x0201`, independently configured per product,
+gates that PCM clock while the `0x0408` dedicated-channel field remains
+separate. No audio is injected at the UI. The laboratory network's optional
+raw frame loopback and network-side GSM-FR voice peer are explicit,
+independent configuration. The latter encodes a service-test 1 kHz PCM source
+outside the handset and supplies it only through the radio downlink queue.
+Paired v6.00/v5.01 answered-call runs carry that signal through handset
+decoding, MAD2 and COBBA: each proves 149 non-silent receiver blocks before
+organic teardown. MAD2 serial-port registers and COBBA analogue routing
+remain unmodelled.
+
+Nokia's DCT3 system-module documentation identifies the physical audio
+boundary more precisely. MAD2 contains a DSP serial port connected to PCM and
+an MFI interface to COBBA's converters. The four-wire MAD2/COBBA bus carries
+`PCMDClk`, `PCMSClk`, `PCMTX`, and `PCMRX`; NSE-8 COBBA supplies a 520 kHz
+data clock and derives an 8 kHz frame clock. In the uplink direction the DSP
+reads COBBA-produced PCM speech blocks. `nokia_mad2_pcm_device` now owns this
+full-duplex, product-configured clock boundary. The configured clock ratio is
+checked as 65 data-clock periods per frame, and generic reset defaults to no
+clocks rather than silently assuming NSE-8. The closely related NSE-3
+MAD2/COBBA-GJ diagram establishes the 16-bit, sign-extended 13-bit word.
+Same-ASIC Nokia troubleshooting material establishes a one-clock active-high
+frame pulse at 520/8 kHz, while Nokia's documented sign-extended PCM contract
+places the MSB-first word on falling data-clock edges. NSE-8 product
+configuration combines this family evidence, leaving 48 idle clocks after
+the sync and data clocks. This edge choice remains explicitly configurable
+pending a direct NSE-8 DSP or logic trace. Every emulated sample is serialized
+and reconstructed across that word boundary instead of treating converter
+values and GSM-codec-domain samples as interchangeable. Generic COBBA and MAD2
+defaults remain unconfigured. Paired firmware proves the combined
+command-`0x08` speech-path
+field `0x0201`, but not the individual physical meaning of bits 0 and 9. See
+the
+[NSW-6 system-module description](https://manualmachine.com/nokia/nsw6/4544463-rf-description-and-troubleshooting/)
+and the
+[NSM-3 MAD2 block description](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/8210/03SYS%20%5B54%5D.pdf),
+plus the
+[NSE-3 PCM timing diagram](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6110/03SYS%20%5B73%5D.pdf).
+The falling-edge family contract is independently documented in the
+[Nokia 12 integrator manual](https://fcc.report/FCC-ID/LJPRX-9/393500.pdf).
+
+COBBA now exposes separate MIC1/MIC2/MIC3 analogue sound-stream inputs and EAR
+and HF outputs. NSE-8 board composition terminates the emulator's generic
+physical microphone specifically at MIC2 and its speaker at EAR. COBBA samples
+the selected input at the documented 8 kHz converter rate and exposes the
+resulting signed PCM only through MAD2's uplink direction. With no capture
+backend the analogue pin is zero; neither the UI nor a call fixture supplies
+samples. Firmware-selected analogue mux register encoding remains unknown and
+is not synthesized; NSE-8 product configuration currently supplies the
+documented internal-call MIC2/EAR path through an explicitly HLE-only route
+API. It is not described as a power-on mux value, and MCU call state cannot
+change it. The configuration also carries the nominal gains:
++18 dB on COBBA's MIC2 path and -10 dB on its EAR path; generic COBBA defaults
+remain neutral. A `-sound none` headless run correctly leaves the physical
+microphone at zero. Separate audio-enabled v6.00/v5.01 acceptance runs attach
+an external host 1 kHz source through MAME's microphone endpoint. Each carries
+150/150 non-silent, unclipped COBBA blocks through the configured 13-bit
+serial representation, MAD2 and DSP encoding to non-zero output from the
+network peer's independent GSM-FR decoder. The test source never appears in
+the Nokia machine configuration or handset data path.
+
 The wider firmware contains roughly 287 DSPIF references and 444 shared-RAM
 base references, concentrated in the GSM-L1/audio layer at
 `0x2b6xxx–0x2c8xxx`. The coherent boot now exercises more than the original

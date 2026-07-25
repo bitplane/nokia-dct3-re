@@ -41,6 +41,33 @@
     DSP shared-control command, its committed shared-RAM publication, and the
     bounded acknowledgement-tone start/stop sequence captured by
     `make verify-radio-incoming-call-answered`.
+  - `radio_answered_call_lifecycle_trace_check.py` — validates physical
+    Answer-to-End CC teardown, the release channel change, and the complete
+    observed command-`0x08` lifecycle captured by
+    `make verify-radio-incoming-call-lifecycle`.
+  - `radio_call_audio_wire_trace_check.py` — validates the address-independent
+    MCU/DSP shared-control wire lifecycle, including stable answered traffic
+    and organic teardown. The v5.01 gate is
+    `make verify-radio-incoming-call-lifecycle-v501`.
+  - `radio_speech_media_trace_check.py` — validates fresh handset and
+    network-peer codec state, 20 ms full-duplex cadence, sustained frame
+    exchange, the configured network-side 1 kHz source, and non-zero COBBA
+    receiver blocks. It therefore distinguishes an energy-bearing decoded
+    downlink from a silent framing-only pass.
+  - `radio_physical_uplink_trace_check.py` — validates that an external host
+    capture source produced at least 100 non-silent COBBA microphone blocks
+    and non-zero speech at the network peer's independent GSM-FR decoder. It
+    rejects both silence and clipped input. The pinned MAME PulseAudio
+    record-stream support is supplied by `mame-pulseaudio-input.patch`; the
+    Nokia machine itself has no laboratory microphone generator.
+  - `dsp_rom_audit.py` — distinguishes real nonuniform DSP regions from
+    checksum-valid uniform fill placeholders (`make audit-dsp-roms`).
+  - `dsp_upload_extract.py` — reconstructs contiguous type-`0x51`
+    DSP-addressed images or bounded shared-RAM staging snapshots from passive
+    traces, with explicit word byte order.
+  - `dsp_memory_upload_trace_check.py` — proves every firmware type-`0x51`
+    fragment was applied at the same address and that the complete image is
+    contiguous (`make verify-dsp-memory-upload` covers both 3210 ROMs).
   - `gensio_trace_check.py` — validates CCONT phase/status plus the shared
     v5.01/v6.00 SELECT-latch initialization and read-modify-write contract.
   - `test_message_census.py`, `test_find_thumb_signature.py`,

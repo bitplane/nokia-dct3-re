@@ -6,7 +6,7 @@ and defines how it may inform this project without copying its implementation.
 
 The reviewed upstream baseline is tag `v0.1.1`, commit
 `b09ec27ac96f3607442337ed80cde177e8b92ddb` (22 July 2026). The repository was
-still at that commit when rechecked on 24 July 2026.
+still at that commit when rechecked on 25 July 2026.
 
 ## Use policy
 
@@ -57,6 +57,11 @@ Ownership is:
 The link and GSM session may grow independently. Call signalling does not imply
 traffic-channel audio, and SMS signalling does not imply an external messaging
 service.
+
+The upstream `PROTOCOL-COVERAGE.md` explicitly excludes traffic-channel
+allocation, speech channel coding, transcoding, and RF audio. It therefore
+supplies no MCU/DSP/COBBA contract to copy or reinterpret; the local audio work
+must continue from firmware traces and physical MAD2/COBBA documentation.
 
 ## Capability catalogue
 

@@ -17,6 +17,7 @@ nokia_radio_peer_device::nokia_radio_peer_device(
 	m_transport(*this, "^dspif"),
 	m_gsm_network(*this, "^gsm_network"),
 	m_gsm_session(*this, "^gsm_session"),
+	m_voice_peer(*this, "^gsm_voice_peer"),
 	m_lapdm_link(*this, "^lapdm_link")
 {
 }
@@ -42,6 +43,15 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_page_transmitted));
 	save_item(NAME(m_traffic_channel_active));
 	save_item(NAME(m_downlink_offset));
+	save_item(NAME(m_downlink_speech));
+	save_item(NAME(m_uplink_speech));
+	save_item(NAME(m_downlink_speech_head));
+	save_item(NAME(m_downlink_speech_count));
+	save_item(NAME(m_uplink_speech_head));
+	save_item(NAME(m_uplink_speech_count));
+	save_item(NAME(m_speech_loopback));
+	save_item(NAME(m_lab_voice_source));
+	save_item(NAME(m_uplink_speech_received));
 }
 
 void nokia_radio_peer_device::device_reset()
@@ -63,6 +73,81 @@ void nokia_radio_peer_device::device_reset()
 	m_page_transmitted = false;
 	m_traffic_channel_active = false;
 	m_downlink_offset = 0;
+	clear_speech_queues();
+	m_uplink_speech_received = 0;
+}
+
+bool nokia_radio_peer_device::speech_channel_active() const
+{
+	// This is the physical, speech-mode TCH/F assigned by RR. Call-control
+	// state and handset PCM routing are deliberately separate: the TCH exists
+	// while the phone rings and briefly while release signalling uses FACCH.
+	return m_enabled && m_traffic_channel_active;
+}
+
+bool nokia_radio_peer_device::speech_queue_push(
+		std::array<speech_frame, speech_queue_depth> &queue,
+		u8 &head, u8 &count, const speech_frame &frame)
+{
+	if (count == speech_queue_depth)
+		return false;
+	queue[(head + count) % speech_queue_depth] = frame;
+	++count;
+	return true;
+}
+
+bool nokia_radio_peer_device::speech_queue_pop(
+		std::array<speech_frame, speech_queue_depth> &queue,
+		u8 &head, u8 &count, speech_frame &frame)
+{
+	if (!count)
+		return false;
+	frame = queue[head];
+	head = (head + 1) % speech_queue_depth;
+	--count;
+	return true;
+}
+
+bool nokia_radio_peer_device::queue_downlink_speech(const speech_frame &frame)
+{
+	if (!speech_channel_active())
+		return false;
+	return speech_queue_push(
+			m_downlink_speech, m_downlink_speech_head,
+			m_downlink_speech_count, frame);
+}
+
+bool nokia_radio_peer_device::take_downlink_speech(speech_frame &frame)
+{
+	if (!speech_channel_active())
+		return false;
+	return speech_queue_pop(
+			m_downlink_speech, m_downlink_speech_head,
+			m_downlink_speech_count, frame);
+}
+
+bool nokia_radio_peer_device::submit_uplink_speech(const speech_frame &frame)
+{
+	if (!speech_channel_active())
+		return false;
+	return speech_queue_push(
+			m_uplink_speech, m_uplink_speech_head,
+			m_uplink_speech_count, frame);
+}
+
+bool nokia_radio_peer_device::take_uplink_speech(speech_frame &frame)
+{
+	return speech_queue_pop(
+			m_uplink_speech, m_uplink_speech_head,
+			m_uplink_speech_count, frame);
+}
+
+void nokia_radio_peer_device::clear_speech_queues()
+{
+	m_downlink_speech_head = 0;
+	m_downlink_speech_count = 0;
+	m_uplink_speech_head = 0;
+	m_uplink_speech_count = 0;
 }
 
 const char *nokia_radio_peer_device::phase_name(u8 value)
@@ -923,6 +1008,7 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	else if (m_phase == phase::release_channel_change && report_type == 0x89)
 	{
 		m_traffic_channel_active = false;
+		clear_speech_queues();
 		m_phase = phase::serving_bcch;
 		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
@@ -997,6 +1083,31 @@ void nokia_radio_peer_device::tick()
 {
 	if (!m_enabled)
 		return;
+
+	// The base-station side always consumes transmitted speech.  Optional
+	// loopback is an explicit laboratory-network media endpoint, useful without
+	// conflating a test call source with handset DSP or COBBA implementation.
+	speech_frame uplink{};
+	while (take_uplink_speech(uplink))
+	{
+		++m_uplink_speech_received;
+		if (m_lab_voice_source)
+		{
+			nokia_gsm_voice_peer_device::speech_frame peer_uplink{};
+			nokia_gsm_voice_peer_device::speech_frame peer_downlink{};
+			std::copy(uplink.begin(), uplink.end(), peer_uplink.begin());
+			if (m_voice_peer->exchange(peer_uplink, peer_downlink))
+			{
+				speech_frame downlink{};
+				std::copy(
+						peer_downlink.begin(), peer_downlink.end(),
+						downlink.begin());
+				queue_downlink_speech(downlink);
+			}
+		}
+		else if (m_speech_loopback)
+			queue_downlink_speech(uplink);
+	}
 
 	if (m_phase == phase::candidate_sync && m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;

@@ -6,7 +6,11 @@
 
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
+#include "nokia_gsm_fr_codec.h"
+#include "nokia_mad2_pcm.h"
 #include "nokia_radio_peer.h"
+
+#include <array>
 
 class nokia_dsp_hle_device : public device_t
 {
@@ -17,6 +21,12 @@ public:
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_delay_us(unsigned delay) { m_service_delay_us = delay; }
 	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
+	void set_speech_control(u8 command, u16 mask, u16 enabled)
+	{
+		m_speech_control_command = command;
+		m_speech_control_mask = mask;
+		m_speech_control_enabled = enabled;
+	}
 	void set_bootstrap_exchange_limit(unsigned exchanges) { m_bootstrap_exchange_limit = exchanges; }
 	void set_bootstrap_ping_pong(bool enabled) { m_bootstrap_ping_pong = enabled; }
 	void set_code_block_request(bool enabled) { m_code_block_request = enabled; }
@@ -25,6 +35,13 @@ public:
 		m_parked_boot_status = enabled;
 		m_boot_status_response = response;
 	}
+	auto mcu_control_word_cb() { return m_mcu_control_word_cb.bind(); }
+	u16 mcu_control_word() const { return m_mcu_control_word; }
+	u16 mcu_control_wire() const { return m_mcu_control_wire; }
+	u16 data_word(u16 address) const { return m_data_memory[address]; }
+	bool data_word_loaded(u16 address) const { return m_data_memory_loaded[address] != 0; }
+	u64 speech_uplink_frames() const { return m_speech_uplink_frames; }
+	u64 speech_downlink_frames() const { return m_speech_downlink_frames; }
 
 	void tx_commit_w(int state);
 	void service_pending_w(int state);
@@ -44,16 +61,21 @@ private:
 	TIMER_CALLBACK_MEMBER(packet_tick);
 	TIMER_CALLBACK_MEMBER(response_tick);
 	TIMER_CALLBACK_MEMBER(keepalive_tick);
+	TIMER_CALLBACK_MEMBER(speech_tick);
 	void drain_responses();
 	void schedule_response();
 	void publish_bootstrap_state();
+	bool consume_memory_upload(const nokia_dspif_device::packet &packet);
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_external_service_peer_device> m_external_peer;
 	required_device<nokia_radio_peer_device> m_radio_peer;
+	required_device<nokia_mad2_pcm_device> m_mad2_pcm;
+	devcb_write16 m_mcu_control_word_cb;
 	emu_timer *m_service_timer = nullptr;
 	emu_timer *m_packet_timer = nullptr;
 	emu_timer *m_response_timer = nullptr;
 	emu_timer *m_keepalive_timer = nullptr;
+	emu_timer *m_speech_timer = nullptr;
 	bool m_service_enabled = false;
 	bool m_external_service_enabled = false;
 	bool m_trace_enabled = false;
@@ -66,6 +88,19 @@ private:
 	bool m_code_block_request = false;
 	bool m_parked_boot_status = false;
 	u16 m_boot_status_response = 0;
+	u16 m_mcu_control_word = 0;
+	u16 m_mcu_control_wire = 0;
+	u8 m_speech_control_command = 0xff;
+	u16 m_speech_control_mask = 0;
+	u16 m_speech_control_enabled = 0;
+	std::array<u16, 0x10000> m_data_memory = { 0 };
+	std::array<u8, 0x10000> m_data_memory_loaded = { 0 };
+	nokia_gsm_fr_codec m_speech_codec;
+	bool m_speech_active = false;
+	u64 m_speech_uplink_frames = 0;
+	u64 m_speech_downlink_frames = 0;
+	u64 m_speech_nonzero_microphone_blocks = 0;
+	u64 m_speech_nonzero_earpiece_blocks = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_DSP_HLE, nokia_dsp_hle_device)

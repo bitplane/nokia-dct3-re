@@ -1,0 +1,155 @@
+diff --git a/src/osd/modules/sound/pulse_sound.cpp b/src/osd/modules/sound/pulse_sound.cpp
+index 21639b24..280d2228 100644
+--- a/src/osd/modules/sound/pulse_sound.cpp
++++ b/src/osd/modules/sound/pulse_sound.cpp
+@@ -38,9 +38,11 @@ public:
+ 	virtual uint32_t get_generation() override;
+ 	virtual osd::audio_info get_information() override;
+ 	virtual uint32_t stream_sink_open(uint32_t node, std::string name, uint32_t rate) override;
++	virtual uint32_t stream_source_open(uint32_t node, std::string name, uint32_t rate) override;
+ 	virtual void stream_set_volumes(uint32_t id, const std::vector<float> &db) override;
+ 	virtual void stream_close(uint32_t id) override;
+ 	virtual void stream_sink_update(uint32_t, const int16_t *buffer, int samples_this_frame) override;
++	virtual void stream_source_update(uint32_t id, int16_t *buffer, int samples_this_frame) override;
+ 
+ private:
+ 	struct position_info {
+@@ -77,10 +79,11 @@ private:
+ 		node_info *m_target_node;
+ 		uint32_t m_channels;
+ 		pa_stream *m_stream;
++		bool m_source;
+ 		std::vector<float> m_volumes;
+ 		abuffer m_buffer;
+ 
+-		stream_info(sound_pulse *pulse, uint32_t osdid, uint32_t channels, uint32_t rate) : m_pulse(pulse), m_osdid(osdid), m_pulse_id(0), m_channels(channels), m_stream(nullptr), m_volumes(channels), m_buffer(channels, rate) {}
++		stream_info(sound_pulse *pulse, uint32_t osdid, uint32_t channels, uint32_t rate, bool source = false) : m_pulse(pulse), m_osdid(osdid), m_pulse_id(0), m_channels(channels), m_stream(nullptr), m_source(source), m_volumes(channels), m_buffer(channels, rate) {}
+ 	};
+ 
+ 	std::map<uint32_t, node_info> m_nodes;
+@@ -108,6 +111,8 @@ private:
+ 	void stream_notify(stream_info *stream);
+ 	static void i_stream_write_request(pa_stream *, size_t size, void *self);
+ 	void stream_write_request(stream_info *stream, size_t size);
++	static void i_stream_read_request(pa_stream *, size_t, void *self);
++	void stream_read_request(stream_info *stream);
+ 	static void i_source_info(pa_context *, const pa_source_info *i, int eol, void *self);
+ 	void source_info(const pa_source_info *i, int eol);
+ 	static void i_sink_info_new(pa_context *, const pa_sink_info *i, int eol, void *self);
+@@ -203,6 +208,26 @@ void sound_pulse::stream_write_request(stream_info *stream, size_t size)
+ 	}
+ }
+ 
++void sound_pulse::i_stream_read_request(pa_stream *, size_t, void *self)
++{
++	reinterpret_cast<stream_info *>(self)->m_pulse->stream_read_request(
++			reinterpret_cast<stream_info *>(self));
++}
++
++void sound_pulse::stream_read_request(stream_info *stream)
++{
++	const void *data = nullptr;
++	size_t bytes = 0;
++	if (pa_stream_peek(stream->m_stream, &data, &bytes) < 0)
++		return;
++
++	if (data && bytes)
++		stream->m_buffer.push(
++				reinterpret_cast<const int16_t *>(data),
++				bytes / (sizeof(int16_t) * stream->m_channels));
++	pa_stream_drop(stream->m_stream);
++}
++
+ void sound_pulse::i_stream_write_request(pa_stream *, size_t size, void *self)
+ {
+ 	stream_info *si = static_cast<stream_info *>(self);
+@@ -487,6 +512,58 @@ uint32_t sound_pulse::stream_sink_open(uint32_t node, std::string name, uint32_t
+ 	return id;
+ }
+ 
++uint32_t sound_pulse::stream_source_open(uint32_t node, std::string name, uint32_t rate)
++{
++	pa_threaded_mainloop_lock(m_mainloop);
++	auto ni = m_node_osdid_to_id.find(node);
++	if(ni == m_node_osdid_to_id.end()) {
++		pa_threaded_mainloop_unlock(m_mainloop);
++		return 0;
++	}
++	node_info &snode = m_nodes.find(ni->second)->second;
++
++	uint32_t id = m_stream_current_id++;
++	auto &stream = m_streams.emplace(
++			id, stream_info(this, id, snode.m_source_port_count, rate, true)).first->second;
++
++	pa_sample_spec ss;
++#ifdef LSB_FIRST
++	ss.format = PA_SAMPLE_S16LE;
++#else
++	ss.format = PA_SAMPLE_S16BE;
++#endif
++	ss.rate = rate;
++	ss.channels = stream.m_channels;
++	stream.m_stream = pa_stream_new(m_context, name.c_str(), &ss, nullptr);
++	pa_stream_set_state_callback(stream.m_stream, i_stream_notify, &stream);
++	pa_stream_set_read_callback(stream.m_stream, i_stream_read_request, &stream);
++
++	pa_buffer_attr battr;
++	battr.fragsize = uint32_t(-1);
++	battr.maxlength = uint32_t(-1);
++	battr.minreq = uint32_t(-1);
++	battr.prebuf = uint32_t(-1);
++	battr.tlength = uint32_t(-1);
++
++	int err = pa_stream_connect_record(
++			stream.m_stream, snode.m_name.c_str(), &battr,
++			pa_stream_flags_t(PA_STREAM_ADJUST_LATENCY | PA_STREAM_START_UNMUTED));
++	if(err)
++		generic_pa_error("stream connect record", err);
++
++	stream.m_target_node = &snode;
++
++	m_wait_stream = true;
++	while(m_wait_stream)
++		pa_threaded_mainloop_wait(m_mainloop);
++
++	stream.m_pulse_id = pa_stream_get_index(stream.m_stream);
++	m_stream_pulse_id_to_osdid[stream.m_pulse_id] = id;
++
++	pa_threaded_mainloop_unlock(m_mainloop);
++	return id;
++}
++
+ void sound_pulse::stream_sink_update(uint32_t id, const int16_t *buffer, int samples_this_frame)
+ {
+ 	pa_threaded_mainloop_lock(m_mainloop);
+@@ -499,6 +576,18 @@ void sound_pulse::stream_sink_update(uint32_t id, const int16_t *buffer, int sam
+ 	pa_threaded_mainloop_unlock(m_mainloop);
+ }
+ 
++void sound_pulse::stream_source_update(uint32_t id, int16_t *buffer, int samples_this_frame)
++{
++	pa_threaded_mainloop_lock(m_mainloop);
++	auto si = m_streams.find(id);
++	if(si == m_streams.end()) {
++		pa_threaded_mainloop_unlock(m_mainloop);
++		return;
++	}
++	si->second.m_buffer.get(buffer, samples_this_frame);
++	pa_threaded_mainloop_unlock(m_mainloop);
++}
++
+ void sound_pulse::stream_set_volumes(uint32_t id, const std::vector<float> &db)
+ {
+ }
+@@ -513,7 +602,10 @@ void sound_pulse::stream_close(uint32_t id)
+ 	}
+ 	stream_info &stream = si->second;
+ 	pa_stream_set_state_callback(stream.m_stream, nullptr, &stream);
+-	pa_stream_set_write_callback(stream.m_stream, nullptr, &stream);
++	if(stream.m_source)
++		pa_stream_set_read_callback(stream.m_stream, nullptr, &stream);
++	else
++		pa_stream_set_write_callback(stream.m_stream, nullptr, &stream);
+ 	pa_stream_disconnect(stream.m_stream);
+ 	m_streams.erase(si);
+ 	pa_threaded_mainloop_unlock(m_mainloop);

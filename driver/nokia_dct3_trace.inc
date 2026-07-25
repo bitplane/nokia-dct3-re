@@ -20,6 +20,21 @@ uint16_t nokia_dct3_state::fw_word(offs_t address) const
 	return m_ram[(address - NOKIA_RAM_BASE) >> 1];
 }
 
+void nokia_dct3_state::trace_dsp_audio_shadow_write(
+		offs_t address, uint16_t old_data, uint16_t data)
+{
+	// The compiler tables relocate between the two NSE-8 ROMs. Keep these
+	// firmware observations here; the shared DSP wire words are invariant.
+	const bool v600_table = address >= 0x0011206c && address <= 0x00112080;
+	const bool v501_table = address >= 0x00111e6c && address <= 0x00111e80;
+	if (!v600_table && !v501_table)
+		return;
+	LOGMASKED(LOG_DSP_SHARED,
+			"dsp_audio_shadow_write: address=%08x old=%04x data=%04x pc=%08x task=%02x t=%.6f\n",
+			address, old_data, data, m_maincpu->pc(),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+}
+
 uint8_t nokia_dct3_state::fw_byte(offs_t address) const
 {
 	const uint16_t word = fw_word(address);
@@ -106,14 +121,19 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 
 	// The answered-call codec-boundary gate inventories the firmware's real
 	// shared-control commands before they are folded into DSP RAM words.
-	if (pc == addr && addr == 0x00290cf4 && m_trace_enabled)
+	if (pc == addr &&
+			(addr == 0x00290cf4 || addr == 0x002906a8) &&
+			m_trace_enabled)
 		LOGMASKED(LOG_DSP_BOUNDARY,
-				"dsp_shared_control: command=%02x value=%04x commit=%u caller=%08x task=%02x t=%.6f\n",
+				"dsp_shared_control: command=%02x value=%04x commit=%u caller=%08x task=%02x t=%.6f desired=%08x applied=%08x firmware=%s\n",
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R0) & 0xff,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R1) & 0xffff,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R2) & 0xff,
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
-				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double(),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R4),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R5),
+				addr == 0x00290cf4 ? "v600" : "v501");
 
 	// The alarm regression needs the firmware's final packed-event mapping.
 	if (pc == addr && addr == 0x002af64a && m_trace_enabled && fw_word(0x00110f1a) == 0x06bc)

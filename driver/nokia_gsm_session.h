@@ -77,6 +77,10 @@ public:
 	{
 		return m_state == u8(state::awaiting_traffic_assignment);
 	}
+	bool call_connected() const
+	{
+		return m_state == u8(state::incoming_call_active);
+	}
 
 protected:
 	virtual void device_start() override;

@@ -132,6 +132,14 @@ it is separately classified from the answer-only command. Command `0x08` is
 therefore the current call-audio control frontier. Its bit fields and any
 DSP-to-COBBA PCM action remain unknown.
 
+`make verify-radio-incoming-call-lifecycle` presses the context-sensitive Navi
+key again after the stable answered interval. The resulting Disconnect,
+network Release, Release Complete and release channel change are organic.
+Across that sequence the firmware-owned DSP desired word moves from idle
+`0x0002` to answered `0x060b`, post-release `0x040a`, and back to idle
+`0x0002`. This closes the signalling/control teardown lifecycle without
+treating those values as a speech implementation or guessing bit meanings.
+
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes
 LAPDm SAPI 3 exactly

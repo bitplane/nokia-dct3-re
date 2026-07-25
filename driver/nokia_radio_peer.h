@@ -6,11 +6,19 @@
 #include "nokia_dspif.h"
 #include "nokia_gsm_network.h"
 #include "nokia_gsm_session.h"
+#include "nokia_gsm_voice_peer.h"
 #include "nokia_lapdm_link.h"
+
+#include <array>
 
 class nokia_radio_peer_device : public device_t
 {
 public:
+	// GSM 06.10/ETSI TS 46.010 full-rate speech: one 20 ms, 260-bit
+	// parameter frame in the conventional 33-octet serial representation.
+	static constexpr unsigned speech_frame_octets = 33;
+	using speech_frame = std::array<u8, speech_frame_octets>;
+
 	nokia_radio_peer_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
@@ -31,11 +39,22 @@ public:
 	{
 		m_incoming_smart_message_after_registration = enabled;
 	}
+	void set_speech_loopback(bool enabled) { m_speech_loopback = enabled; }
+	void set_lab_voice_source(bool enabled)
+	{
+		m_voice_peer->set_lab_test_source(enabled);
+		m_lab_voice_source = enabled;
+	}
 	bool enabled() const { return m_enabled; }
 	void receive_packet(const nokia_dspif_device::packet &packet);
 	void tick();
 	bool fast_completion_pending() const;
 	const char *phase_name() const;
+	bool speech_channel_active() const;
+	bool queue_downlink_speech(const speech_frame &frame);
+	bool take_downlink_speech(speech_frame &frame);
+	bool submit_uplink_speech(const speech_frame &frame);
+	bool take_uplink_speech(speech_frame &frame);
 
 protected:
 	virtual void device_start() override;
@@ -90,10 +109,19 @@ private:
 	u32 paging_frame_number(u32 minimum_frame_number) const;
 	void emit_report();
 	void advance_after_report(u8 report_type);
+	static constexpr unsigned speech_queue_depth = 8;
+	bool speech_queue_push(
+			std::array<speech_frame, speech_queue_depth> &queue,
+			u8 &head, u8 &count, const speech_frame &frame);
+	bool speech_queue_pop(
+			std::array<speech_frame, speech_queue_depth> &queue,
+			u8 &head, u8 &count, speech_frame &frame);
+	void clear_speech_queues();
 
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_gsm_network_device> m_gsm_network;
 	required_device<nokia_gsm_session_device> m_gsm_session;
+	required_device<nokia_gsm_voice_peer_device> m_voice_peer;
 	required_device<nokia_lapdm_link_device> m_lapdm_link;
 	bool m_enabled = false;
 	bool m_trace_enabled = false;
@@ -114,10 +142,19 @@ private:
 	bool m_incoming_call_after_registration = false;
 	bool m_incoming_sms_after_registration = false;
 	bool m_incoming_smart_message_after_registration = false;
+	bool m_speech_loopback = false;
+	bool m_lab_voice_source = false;
 	bool m_pch_fill_delivered = false;
 	bool m_page_transmitted = false;
 	bool m_traffic_channel_active = false;
 	unsigned m_downlink_offset = 0;
+	std::array<speech_frame, speech_queue_depth> m_downlink_speech{};
+	std::array<speech_frame, speech_queue_depth> m_uplink_speech{};
+	u8 m_downlink_speech_head = 0;
+	u8 m_downlink_speech_count = 0;
+	u8 m_uplink_speech_head = 0;
+	u8 m_uplink_speech_count = 0;
+	u64 m_uplink_speech_received = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device)

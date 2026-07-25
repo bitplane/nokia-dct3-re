@@ -74,6 +74,7 @@ u16 nokia_dspif_device::shared_r(offs_t offset)
 	if (m_trace_enabled && (byte_offset <= 0x004 || byte_offset == 0x0e0 ||
 			byte_offset == 0x0fe || byte_offset == 0x100 ||
 			byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
+			byte_offset == 0x0a8 || byte_offset == 0x0aa ||
 			byte_offset == 0x1c8 || byte_offset == 0x1ca || byte_offset == 0x0e4))
 		LOGMASKED(LOG_DSPIF, "dspif_transport: RAM R off=%03x data=%04x t=%.6f\n",
 				byte_offset, value, machine().time().as_double());
@@ -87,7 +88,8 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 	if (m_trace_enabled && ((offset << 1) <= 0x004 || (offset << 1) == 0x0e0 ||
 			(offset << 1) == 0x0e2 || (offset << 1) == 0x0e4 ||
 			(offset << 1) == 0x0fe || (offset << 1) == 0x100 ||
-			(offset << 1) == 0x0a8 || (offset << 1) == 0x0dc ||
+			(offset << 1) == 0x0a8 || (offset << 1) == 0x0aa ||
+			(offset << 1) == 0x0dc ||
 			(offset << 1) == 0x0ae || (offset << 1) == 0x0b0 ||
 			(offset << 1) == 0x0b6 ||
 			offset == TX_PRODUCER || offset == TX_CONSUMER ||

@@ -48,7 +48,29 @@ unclassified DSP packet family. Its lower-boundary checker also requires the
 answer-only committed shared-control command `0x08/0x060b`, the exact 900 Hz
 acknowledgement-tone start/stop group, its 100--150 ms recovered duration, and
 no continuing MCU shared-control traffic. This locates a codec-control
-frontier without claiming decoded speech or PCM.
+frontier. The separate speech-media gate selects a network-side voice peer,
+whose independent GSM-FR encoder supplies a 1 kHz service-test signal only
+through the radio downlink queue. It requires 20 ms full-duplex cadence,
+continuing uplink/downlink frame counts, and non-zero COBBA receiver blocks;
+the same gate passes under v6.00 and v5.01 with 150 uplink frames, 149
+downlink frames and 149 non-silent receiver blocks. This is an energy-bearing
+boundary test, not a fixture write into handset PCM or call-control state.
+`radio_physical_uplink_trace_check.py` covers the opposite direction in
+audio-enabled runs. An external host source enters through MAME's microphone
+record stream; the gate requires at least 100 non-silent, unclipped COBBA
+microphone blocks and non-zero output from the network peer's independent
+GSM-FR uplink decoder. Paired v6.00/v5.01 runs each pass with 150/150
+non-silent microphone blocks.
+`make verify-radio-incoming-call-lifecycle` presses the context-sensitive Navi
+key again after that stable interval. It requires organic CC
+Disconnect/Release/Release Complete, the release channel change, and the
+ordered command-`0x08` desired-state lifecycle
+`0x0002 -> 0x060b -> 0x040a -> 0x0002`, including its firmware producer sites.
+It deliberately assigns no semantic names to the control bits.
+`make verify-radio-incoming-call-lifecycle-v501` repeats the physical
+Answer-to-End flow under the independently relocated v5.01 firmware and checks
+the invariant shared-offset-`0x0a8` wire lifecycle
+`0x8002 -> 0x860b -> 0x840a -> 0x8002`.
 `make verify-radio-incoming-sms` uses another event fixture, traverses the same
 SC=0 control boundary, and requires one SAPI-3 SABM/UA exchange, both exact
 segments of the ordinary `hello`

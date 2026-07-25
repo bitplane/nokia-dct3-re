@@ -39,6 +39,8 @@ progress_latest_frame.*
 *.pgm
 scratchpad/
 /tmp/
+third_party/libgsm-*/
+third_party/*.tar.gz
 
 # ── Editor / OS noise ──
 __pycache__/

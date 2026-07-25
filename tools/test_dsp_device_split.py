@@ -29,6 +29,33 @@ class DspDeviceSplitTest(unittest.TestCase):
         for token in ("registration_sent", "channel_map_sent", "DISCOVERY_NODE"):
             self.assertNotIn(token, self.hle)
 
+    def test_dsp_hle_decodes_product_configured_control_field(self):
+        self.assertIn("mcu_control_word_cb", self.hle)
+        self.assertIn("shared_word(0x0a8 / 2)", self.hle)
+        self.assertNotIn("mcu_control_word", self.transport)
+        self.assertNotIn("mcu_control_word", self.network + self.session)
+        for token in (
+            "m_mcu_control_wire >> 12",
+            "m_mcu_control_wire & 0x0fff",
+            "m_speech_control_command",
+            "m_speech_control_mask",
+            "m_speech_control_enabled",
+        ):
+            self.assertIn(token, self.hle)
+        # The paired-ROM evidence supports a masked field transition, not an
+        # NSE-8 whole-word state machine embedded in the generic DSP device.
+        self.assertNotIn("m_mcu_control_word == 0x060b", self.hle)
+
+    def test_dsp_hle_owns_dsp_addressed_memory_upload(self):
+        for token in (
+            "consume_memory_upload", "packet.type != 0x51",
+            "m_data_memory[address]", "m_data_memory_loaded[address]",
+            "data_word(u16 address)", "data_word_loaded(u16 address)",
+        ):
+            self.assertIn(token, self.hle)
+        self.assertNotIn("m_data_memory", self.transport)
+        self.assertNotIn("m_data_memory", self.network + self.session)
+
     def test_bootstrap_is_peer_publication_not_read_overlay(self):
         self.assertIn("peer_shared_w", self.transport)
         self.assertIn("publish_bootstrap_state", self.hle)
