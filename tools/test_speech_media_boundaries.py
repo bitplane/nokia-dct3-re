@@ -42,6 +42,13 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         ]
         self.assertIn("submit_uplink_speech", tick)
         self.assertIn("take_downlink_speech", tick)
+        self.assertIn("speech_delivery::none", tick)
+        self.assertIn("speech_delivery::good", tick)
+        self.assertIn(
+            "radio_delivery !=\n"
+            "\t\t\tnokia_radio_peer_device::speech_delivery::none",
+            tick,
+        )
         self.assertIn("transfer_frame_block", tick)
         self.assertIn("m_radio_peer->speech_channel_active()", tick)
         self.assertIn("m_speech_control_mask", tick)

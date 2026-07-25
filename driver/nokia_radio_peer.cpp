@@ -251,17 +251,22 @@ bool nokia_radio_peer_device::queue_downlink_delivery(
 			m_downlink_speech_count, frame);
 }
 
-bool nokia_radio_peer_device::take_downlink_speech(
-		speech_frame &frame, bool &good)
+nokia_radio_peer_device::speech_delivery
+nokia_radio_peer_device::take_downlink_speech(speech_frame &frame)
 {
 	if (!speech_channel_active())
-		return false;
+		return speech_delivery::none;
 	if (!m_downlink_speech_count)
-		return false;
-	good = m_downlink_speech_good[m_downlink_speech_head] != 0;
-	return speech_queue_pop(
+		return speech_delivery::none;
+	const speech_delivery result =
+			m_downlink_speech_good[m_downlink_speech_head]
+				? speech_delivery::good
+				: speech_delivery::bad;
+	if (!speech_queue_pop(
 			m_downlink_speech, m_downlink_speech_head,
-			m_downlink_speech_count, frame);
+			m_downlink_speech_count, frame))
+		return speech_delivery::none;
+	return result;
 }
 
 bool nokia_radio_peer_device::submit_uplink_speech(const speech_frame &frame)

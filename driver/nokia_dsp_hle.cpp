@@ -293,18 +293,20 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 
 	nokia_mad2_pcm_device::pcm_block earpiece{};
 	nokia_radio_peer_device::speech_frame radio_frame{};
-	bool radio_frame_good = false;
-	const bool have_radio_delivery =
-			m_radio_peer->take_downlink_speech(radio_frame, radio_frame_good);
+	const auto radio_delivery =
+			m_radio_peer->take_downlink_speech(radio_frame);
 	nokia_gsm_fr_codec::speech_frame downlink{};
 	const nokia_gsm_fr_codec::speech_frame *decoder_frame = nullptr;
-	if (have_radio_delivery && radio_frame_good)
+	if (radio_delivery ==
+			nokia_radio_peer_device::speech_delivery::good)
 	{
 		std::copy(radio_frame.begin(), radio_frame.end(), downlink.begin());
 		decoder_frame = &downlink;
 	}
 	nokia_gsm_fr_codec::pcm_block decoder_output{};
-	if (m_speech_receiver.decode(
+	if (radio_delivery !=
+			nokia_radio_peer_device::speech_delivery::none &&
+			m_speech_receiver.decode(
 			m_speech_codec, decoder_frame, decoder_output))
 	{
 		std::copy(decoder_output.begin(), decoder_output.end(), earpiece.begin());

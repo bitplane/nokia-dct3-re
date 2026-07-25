@@ -698,6 +698,12 @@ queues when RR has assigned the physical speech-mode TCH/F. The TCH exists
 while the phone rings and briefly during FACCH release, independently of
 call-control and handset audio routing.
 
+The downlink queue boundary is explicitly tri-state. A good decoded block
+carries a frame, a failed protected block or FACCH-stolen interval carries a
+BFI, and an empty queue carries no delivery. Only the explicit BFI advances
+GSM 06.11 substitution state; a temporarily empty producer/consumer boundary
+leaves that history unchanged instead of inventing radio loss.
+
 `nokia_gsm_fr_codec` is the DSP-side standardized codec boundary. It wraps the
 official GSM 06.10 RPE-LTP implementation and converts exactly one 160-sample
 PCM block to or from one 33-octet frame. It does not own radio scheduling,

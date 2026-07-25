@@ -19,6 +19,12 @@ public:
 	// parameter frame in the conventional 33-octet serial representation.
 	static constexpr unsigned speech_frame_octets = 33;
 	using speech_frame = std::array<u8, speech_frame_octets>;
+	enum class speech_delivery : u8
+	{
+		none,
+		good,
+		bad
+	};
 
 	nokia_radio_peer_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
@@ -64,7 +70,7 @@ public:
 	const char *phase_name() const;
 	bool speech_channel_active() const;
 	bool queue_downlink_speech(const speech_frame &frame);
-	bool take_downlink_speech(speech_frame &frame, bool &good);
+	speech_delivery take_downlink_speech(speech_frame &frame);
 	bool submit_uplink_speech(const speech_frame &frame);
 	bool take_uplink_speech(speech_frame &frame);
 	bool queue_downlink_sacch(
