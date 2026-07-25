@@ -175,6 +175,13 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_handset_receiver.receive", burst)
         self.assertNotIn("from_msec(20)", burst)
         self.assertIn("attotime::from_msec(20)", dsp)
+        self.assertIn("prepare_l1_save", radio)
+        self.assertIn("restore_l1_block_kinds", radio)
+        self.assertIn("STRUCT_MEMBER(state.previous, data)", radio)
+        self.assertIn("STRUCT_MEMBER(state.bursts, data)", radio)
+        self.assertNotIn(
+            "FUNC(nokia_radio_peer_device::reset_l1_pipeline), this", radio
+        )
 
 
 if __name__ == "__main__":

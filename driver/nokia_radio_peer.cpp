@@ -67,11 +67,74 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_downlink_tch_burst_error_span));
 	save_item(NAME(m_downlink_tch_bursts));
 	save_item(NAME(m_downlink_tch_bursts_impaired));
-	// In-flight diagonal state spans only eight traffic bursts. Re-form it
-	// after a state load; the saved codec-frame queues remain authoritative.
+
+	auto save_diagonal_transmitter =
+			[this](gsm::tch_f::diagonal_transmitter &endpoint, int index)
+	{
+		auto &state = endpoint.live_state();
+		save_item(STRUCT_MEMBER(state.queue, coded), index);
+		save_item(NAME(state.head), index);
+		save_item(NAME(state.count), index);
+		save_item(NAME(state.phase), index);
+		save_item(STRUCT_MEMBER(state.previous, data), index);
+		save_item(STRUCT_MEMBER(state.previous, hl), index);
+		save_item(STRUCT_MEMBER(state.previous, hu), index);
+		save_item(STRUCT_MEMBER(state.current, data), index);
+		save_item(STRUCT_MEMBER(state.current, hl), index);
+		save_item(STRUCT_MEMBER(state.current, hu), index);
+	};
+	auto save_diagonal_receiver =
+			[this](gsm::tch_f::diagonal_receiver &endpoint, int index)
+	{
+		auto &state = endpoint.live_state();
+		save_item(NAME(state.phase), index);
+		save_item(NAME(state.pending_valid), index);
+		save_item(STRUCT_MEMBER(state.pending, data), index);
+		save_item(STRUCT_MEMBER(state.pending, hl), index);
+		save_item(STRUCT_MEMBER(state.pending, hu), index);
+		save_item(STRUCT_MEMBER(state.incoming, data), index);
+		save_item(STRUCT_MEMBER(state.incoming, hl), index);
+		save_item(STRUCT_MEMBER(state.incoming, hu), index);
+	};
+	auto save_sacch_transmitter =
+			[this](gsm::tch_f::sacch_transmitter &endpoint, int index)
+	{
+		auto &state = endpoint.live_state();
+		save_item(NAME(state.pending), index);
+		save_item(NAME(state.phase), index);
+		save_item(STRUCT_MEMBER(state.bursts, data), index);
+		save_item(STRUCT_MEMBER(state.bursts, hl), index);
+		save_item(STRUCT_MEMBER(state.bursts, hu), index);
+	};
+	auto save_sacch_receiver =
+			[this](gsm::tch_f::sacch_receiver &endpoint, int index)
+	{
+		auto &state = endpoint.live_state();
+		save_item(NAME(state.phase), index);
+		save_item(STRUCT_MEMBER(state.bursts, data), index);
+		save_item(STRUCT_MEMBER(state.bursts, hl), index);
+		save_item(STRUCT_MEMBER(state.bursts, hu), index);
+	};
+
+	// These indexes distinguish identical generic endpoint fields in MAME's
+	// save registry. Preserve every half-block rather than inventing an
+	// erasure, dropping FACCH, or restarting SACCH after a state load.
+	save_diagonal_transmitter(m_uplink_transmitter, 0);
+	save_diagonal_transmitter(m_downlink_transmitter, 1);
+	save_diagonal_receiver(m_network_receiver, 2);
+	save_diagonal_receiver(m_handset_receiver, 3);
+	save_sacch_transmitter(m_uplink_sacch_transmitter, 4);
+	save_sacch_transmitter(m_downlink_sacch_transmitter, 5);
+	save_sacch_receiver(m_network_sacch_receiver, 6);
+	save_sacch_receiver(m_handset_sacch_receiver, 7);
+	save_item(NAME(m_uplink_l1_block_kinds));
+	save_item(NAME(m_downlink_l1_block_kinds));
+	machine().save().register_presave(
+			save_prepost_delegate(
+				FUNC(nokia_radio_peer_device::prepare_l1_save), this));
 	machine().save().register_postload(
 			save_prepost_delegate(
-				FUNC(nokia_radio_peer_device::reset_l1_pipeline), this));
+				FUNC(nokia_radio_peer_device::restore_l1_block_kinds), this));
 }
 
 void nokia_radio_peer_device::device_reset()
@@ -104,6 +167,30 @@ void nokia_radio_peer_device::device_reset()
 	m_downlink_tch_bursts = 0;
 	m_downlink_tch_bursts_impaired = 0;
 	reset_l1_pipeline();
+}
+
+void nokia_radio_peer_device::prepare_l1_save()
+{
+	const auto &uplink = m_uplink_transmitter.live_state();
+	const auto &downlink = m_downlink_transmitter.live_state();
+	for (unsigned k = 0; k < gsm::tch_f::diagonal_transmitter::queue_depth; ++k)
+	{
+		m_uplink_l1_block_kinds[k] = u8(uplink.queue[k].kind);
+		m_downlink_l1_block_kinds[k] = u8(downlink.queue[k].kind);
+	}
+}
+
+void nokia_radio_peer_device::restore_l1_block_kinds()
+{
+	auto &uplink = m_uplink_transmitter.live_state();
+	auto &downlink = m_downlink_transmitter.live_state();
+	for (unsigned k = 0; k < gsm::tch_f::diagonal_transmitter::queue_depth; ++k)
+	{
+		uplink.queue[k].kind =
+				gsm::tch_f::traffic_block_kind(m_uplink_l1_block_kinds[k]);
+		downlink.queue[k].kind =
+				gsm::tch_f::traffic_block_kind(m_downlink_l1_block_kinds[k]);
+	}
 }
 
 bool nokia_radio_peer_device::speech_channel_active() const

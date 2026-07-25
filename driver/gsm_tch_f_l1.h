@@ -106,6 +106,16 @@ struct received_traffic_block
 	decoded_control control{};
 };
 
+struct diagonal_transmitter_state
+{
+	std::array<traffic_block, 8> queue{};
+	unsigned head = 0;
+	unsigned count = 0;
+	unsigned phase = 0;
+	std::array<burst_payload, 8> previous{};
+	std::array<burst_payload, 8> current{};
+};
+
 // Stateful, independent transmit and receive halves of the diagonal
 // interleaver. Call once for each TCH/F burst position (not SACCH or idle).
 class diagonal_transmitter
@@ -117,14 +127,20 @@ public:
 	bool substitute_facch(const coded_block &coded);
 	burst_payload next_burst();
 	void reset();
+	diagonal_transmitter_state snapshot() const { return m_state; }
+	void restore(const diagonal_transmitter_state &state) { m_state = state; }
+	diagonal_transmitter_state &live_state() { return m_state; }
 
 private:
-	std::array<traffic_block, queue_depth> m_queue{};
-	unsigned m_head = 0;
-	unsigned m_count = 0;
-	unsigned m_phase = 0;
-	std::array<burst_payload, 8> m_previous{};
-	std::array<burst_payload, 8> m_current{};
+	diagonal_transmitter_state m_state{};
+};
+
+struct diagonal_receiver_state
+{
+	unsigned phase = 0;
+	bool pending_valid = false;
+	std::array<burst_payload, 8> pending{};
+	std::array<burst_payload, 8> incoming{};
 };
 
 class diagonal_receiver
@@ -132,12 +148,19 @@ class diagonal_receiver
 public:
 	std::optional<received_traffic_block> receive(const burst_payload &burst);
 	void reset();
+	diagonal_receiver_state snapshot() const { return m_state; }
+	void restore(const diagonal_receiver_state &state) { m_state = state; }
+	diagonal_receiver_state &live_state() { return m_state; }
 
 private:
-	unsigned m_phase = 0;
-	bool m_pending_valid = false;
-	std::array<burst_payload, 8> m_pending{};
-	std::array<burst_payload, 8> m_new{};
+	diagonal_receiver_state m_state{};
+};
+
+struct sacch_transmitter_state
+{
+	bool pending = false;
+	unsigned phase = 0;
+	std::array<burst_payload, 4> bursts{};
 };
 
 // SACCH/TF uses one rectangularly interleaved burst in each 26-frame
@@ -148,11 +171,18 @@ public:
 	bool enqueue(const control_bits &information);
 	std::optional<burst_payload> next_burst(unsigned scheduled_phase);
 	void reset();
+	sacch_transmitter_state snapshot() const { return m_state; }
+	void restore(const sacch_transmitter_state &state) { m_state = state; }
+	sacch_transmitter_state &live_state() { return m_state; }
 
 private:
-	bool m_pending = false;
-	unsigned m_phase = 0;
-	std::array<burst_payload, 4> m_bursts{};
+	sacch_transmitter_state m_state{};
+};
+
+struct sacch_receiver_state
+{
+	unsigned phase = 0;
+	std::array<burst_payload, 4> bursts{};
 };
 
 class sacch_receiver
@@ -160,10 +190,12 @@ class sacch_receiver
 public:
 	std::optional<decoded_control> receive(const burst_payload &burst);
 	void reset();
+	sacch_receiver_state snapshot() const { return m_state; }
+	void restore(const sacch_receiver_state &state) { m_state = state; }
+	sacch_receiver_state &live_state() { return m_state; }
 
 private:
-	unsigned m_phase = 0;
-	std::array<burst_payload, 4> m_bursts{};
+	sacch_receiver_state m_state{};
 };
 
 enum class tdma_slot_kind : std::uint8_t

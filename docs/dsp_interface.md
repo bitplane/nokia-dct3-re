@@ -815,6 +815,14 @@ is idle, and position 25 is reserved for SACCH/TF. Thus 24 traffic bursts per
 120 ms carry exactly six speech blocks while one four-burst SACCH block spans
 104 TDMA frames.
 
+Save states preserve the complete generic Layer-1 endpoint state: queued
+speech/FACCH blocks and their kinds, both halves of every diagonal
+interleaver, burst phase, receiver accumulation, stealing flags, and partial
+SACCH blocks. Restoring at a non-block boundary therefore continues with the
+same subsequent air bits and decode results; it does not manufacture an
+erasure, lose a pending FACCH replacement, or restart the 480 ms SACCH
+assembly.
+
 Organic LAPDm blocks carried on channel selector `0xb0` are also copied into
 the corresponding uplink or downlink FACCH coder. FACCH has priority over the
 next queued speech block, its eight stealing flags identify the replacement

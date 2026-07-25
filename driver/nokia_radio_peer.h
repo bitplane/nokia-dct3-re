@@ -129,6 +129,8 @@ private:
 			u8 &head, u8 &count, speech_frame &frame);
 	void clear_speech_queues();
 	void reset_l1_pipeline();
+	void prepare_l1_save();
+	void restore_l1_block_kinds();
 	TIMER_CALLBACK_MEMBER(burst_tick);
 
 	required_device<nokia_dspif_device> m_transport;
@@ -179,6 +181,10 @@ private:
 	gsm::tch_f::sacch_receiver m_network_sacch_receiver;
 	gsm::tch_f::sacch_transmitter m_downlink_sacch_transmitter;
 	gsm::tch_f::sacch_receiver m_handset_sacch_receiver;
+	std::array<u8, gsm::tch_f::diagonal_transmitter::queue_depth>
+			m_uplink_l1_block_kinds{};
+	std::array<u8, gsm::tch_f::diagonal_transmitter::queue_depth>
+			m_downlink_l1_block_kinds{};
 	u64 m_uplink_facch_blocks = 0;
 	u64 m_downlink_facch_blocks = 0;
 	u64 m_uplink_bad_speech_blocks = 0;

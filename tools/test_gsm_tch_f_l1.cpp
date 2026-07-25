@@ -211,6 +211,68 @@ void test_stateful_diagonal_stream()
 	assert(!erased->speech.good);
 }
 
+void test_diagonal_snapshot_continuation()
+{
+	const auto speech_frame = patterned_frame();
+	control_bits facch{};
+	for (unsigned k = 0; k < facch.size(); ++k)
+		facch[k] = ((k * 23 + 5) % 41) < 19;
+
+	diagonal_transmitter original_transmitter;
+	diagonal_receiver original_receiver;
+	assert(original_transmitter.enqueue(
+			{encode_speech(speech_frame), traffic_block_kind::speech}));
+	assert(original_transmitter.substitute_facch(encode_control(facch)));
+	assert(original_transmitter.enqueue(
+			{encode_speech(speech_frame), traffic_block_kind::speech}));
+
+	// Save at a deliberately non-block-aligned point, while old and new
+	// diagonal halves are both live.
+	for (unsigned burst = 0; burst < 5; ++burst)
+		original_receiver.receive(original_transmitter.next_burst());
+
+	diagonal_transmitter restored_transmitter;
+	diagonal_receiver restored_receiver;
+	restored_transmitter.restore(original_transmitter.snapshot());
+	restored_receiver.restore(original_receiver.snapshot());
+
+	unsigned decoded_blocks = 0;
+	for (unsigned burst = 5; burst < 20; ++burst)
+	{
+		const auto original_burst = original_transmitter.next_burst();
+		const auto restored_burst = restored_transmitter.next_burst();
+		assert(original_burst.data == restored_burst.data);
+		assert(original_burst.hl == restored_burst.hl);
+		assert(original_burst.hu == restored_burst.hu);
+
+		const auto original =
+				original_receiver.receive(original_burst);
+		const auto restored =
+				restored_receiver.receive(restored_burst);
+		assert(bool(original) == bool(restored));
+		if (!original)
+			continue;
+
+		++decoded_blocks;
+		assert(original->kind == restored->kind);
+		if (original->kind == traffic_block_kind::facch)
+		{
+			assert(original->control.good == restored->control.good);
+			assert(original->control.bits == restored->control.bits);
+			assert(original->control.corrected_bits ==
+					restored->control.corrected_bits);
+		}
+		else
+		{
+			assert(original->speech.good == restored->speech.good);
+			assert(original->speech.frame == restored->speech.frame);
+			assert(original->speech.corrected_bits ==
+					restored->speech.corrected_bits);
+		}
+	}
+	assert(decoded_blocks >= 3);
+}
+
 void test_full_rate_schedule()
 {
 	unsigned traffic = 0;
@@ -292,6 +354,55 @@ void test_stateful_sacch_stream()
 	assert(!transmitter.next_burst(0));
 }
 
+void test_sacch_snapshot_continuation()
+{
+	control_bits information{};
+	for (unsigned k = 0; k < information.size(); ++k)
+		information[k] = ((k * 13 + 7) % 37) < 18;
+
+	sacch_transmitter original_transmitter;
+	sacch_receiver original_receiver;
+	assert(original_transmitter.enqueue(information));
+	for (unsigned phase = 0; phase < 2; ++phase)
+	{
+		const auto burst = original_transmitter.next_burst(phase);
+		assert(burst);
+		assert(!original_receiver.receive(*burst));
+	}
+
+	sacch_transmitter restored_transmitter;
+	sacch_receiver restored_receiver;
+	restored_transmitter.restore(original_transmitter.snapshot());
+	restored_receiver.restore(original_receiver.snapshot());
+
+	for (unsigned phase = 2; phase < 4; ++phase)
+	{
+		const auto original_burst =
+				original_transmitter.next_burst(phase);
+		const auto restored_burst =
+				restored_transmitter.next_burst(phase);
+		assert(original_burst && restored_burst);
+		assert(original_burst->data == restored_burst->data);
+		assert(original_burst->hl == restored_burst->hl);
+		assert(original_burst->hu == restored_burst->hu);
+
+		const auto original =
+				original_receiver.receive(*original_burst);
+		const auto restored =
+				restored_receiver.receive(*restored_burst);
+		assert(bool(original) == bool(restored));
+		if (phase == 3)
+		{
+			assert(original && restored);
+			assert(original->good == restored->good);
+			assert(original->bits == restored->bits);
+			assert(original->corrected_bits ==
+					restored->corrected_bits);
+			assert(restored->good && restored->bits == information);
+		}
+	}
+}
+
 } // anonymous namespace
 
 int main()
@@ -302,8 +413,10 @@ int main()
 	test_interleaving_and_bursts();
 	test_facch_control_coding();
 	test_stateful_diagonal_stream();
+	test_diagonal_snapshot_continuation();
 	test_full_rate_schedule();
 	test_stateful_sacch_stream();
+	test_sacch_snapshot_continuation();
 	std::cout << "GSM TCH/FS Layer 1 tests passed\n";
 	return 0;
 }

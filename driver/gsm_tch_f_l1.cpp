@@ -519,18 +519,19 @@ bool indicates_facch(const std::array<burst_payload, 8> &bursts)
 
 bool diagonal_transmitter::enqueue(const traffic_block &block)
 {
-	if (m_count == queue_depth)
+	if (m_state.count == queue_depth)
 		return false;
-	m_queue[(m_head + m_count) % queue_depth] = block;
-	++m_count;
+	m_state.queue[(m_state.head + m_state.count) % queue_depth] = block;
+	++m_state.count;
 	return true;
 }
 
 bool diagonal_transmitter::substitute_facch(const coded_block &coded)
 {
-	for (unsigned offset = 0; offset < m_count; ++offset)
+	for (unsigned offset = 0; offset < m_state.count; ++offset)
 	{
-		traffic_block &queued = m_queue[(m_head + offset) % queue_depth];
+		traffic_block &queued =
+				m_state.queue[(m_state.head + offset) % queue_depth];
 		if (queued.kind == traffic_block_kind::speech)
 		{
 			queued.coded = coded;
@@ -543,119 +544,112 @@ bool diagonal_transmitter::substitute_facch(const coded_block &coded)
 
 burst_payload diagonal_transmitter::next_burst()
 {
-	if (m_phase == 0)
+	if (m_state.phase == 0)
 	{
-		m_previous = m_current;
-		m_current = {};
-		if (m_count)
+		m_state.previous = m_state.current;
+		m_state.current = {};
+		if (m_state.count)
 		{
-			const traffic_block &block = m_queue[m_head];
-			m_current = interleave(block.coded);
+			const traffic_block &block = m_state.queue[m_state.head];
+			m_state.current = interleave(block.coded);
 			if (block.kind == traffic_block_kind::facch)
-				mark_facch(m_current);
-			m_head = (m_head + 1) % queue_depth;
-			--m_count;
+				mark_facch(m_state.current);
+			m_state.head = (m_state.head + 1) % queue_depth;
+			--m_state.count;
 		}
 	}
 	const burst_payload result =
-			combine_diagonal(m_previous, m_current, m_phase);
-	m_phase = (m_phase + 1) & 3;
+			combine_diagonal(
+				m_state.previous, m_state.current, m_state.phase);
+	m_state.phase = (m_state.phase + 1) & 3;
 	return result;
 }
 
 void diagonal_transmitter::reset()
 {
-	m_head = 0;
-	m_count = 0;
-	m_phase = 0;
-	m_previous = {};
-	m_current = {};
+	m_state = {};
 }
 
 std::optional<received_traffic_block> diagonal_receiver::receive(
 		const burst_payload &burst)
 {
-	m_pending[4 + m_phase] = burst;
-	m_new[m_phase] = burst;
+	m_state.pending[4 + m_state.phase] = burst;
+	m_state.incoming[m_state.phase] = burst;
 	std::optional<received_traffic_block> result;
-	if (m_phase == 3)
+	if (m_state.phase == 3)
 	{
-		if (m_pending_valid)
+		if (m_state.pending_valid)
 		{
 			received_traffic_block decoded{};
-			if (indicates_facch(m_pending))
+			if (indicates_facch(m_state.pending))
 			{
 				decoded.kind = traffic_block_kind::facch;
-				decoded.control = decode_control(deinterleave(m_pending));
+				decoded.control =
+						decode_control(deinterleave(m_state.pending));
 			}
 			else
 			{
 				decoded.kind = traffic_block_kind::speech;
-				decoded.speech = decode_speech(deinterleave(m_pending));
+				decoded.speech =
+						decode_speech(deinterleave(m_state.pending));
 			}
 			result = decoded;
 		}
-		m_pending = m_new;
-		m_new = {};
-		m_pending_valid = true;
+		m_state.pending = m_state.incoming;
+		m_state.incoming = {};
+		m_state.pending_valid = true;
 	}
-	m_phase = (m_phase + 1) & 3;
+	m_state.phase = (m_state.phase + 1) & 3;
 	return result;
 }
 
 void diagonal_receiver::reset()
 {
-	m_phase = 0;
-	m_pending_valid = false;
-	m_pending = {};
-	m_new = {};
+	m_state = {};
 }
 
 bool sacch_transmitter::enqueue(const control_bits &information)
 {
-	if (m_pending)
+	if (m_state.pending)
 		return false;
-	m_bursts = interleave_sacch(encode_control(information));
-	m_pending = true;
-	m_phase = 0;
+	m_state.bursts = interleave_sacch(encode_control(information));
+	m_state.pending = true;
+	m_state.phase = 0;
 	return true;
 }
 
 std::optional<burst_payload> sacch_transmitter::next_burst(
 		unsigned scheduled_phase)
 {
-	if (!m_pending || (scheduled_phase & 3) != m_phase)
+	if (!m_state.pending || (scheduled_phase & 3) != m_state.phase)
 		return std::nullopt;
-	const burst_payload result = m_bursts[m_phase++];
-	if (m_phase == 4)
+	const burst_payload result = m_state.bursts[m_state.phase++];
+	if (m_state.phase == 4)
 	{
-		m_phase = 0;
-		m_pending = false;
+		m_state.phase = 0;
+		m_state.pending = false;
 	}
 	return result;
 }
 
 void sacch_transmitter::reset()
 {
-	m_pending = false;
-	m_phase = 0;
-	m_bursts = {};
+	m_state = {};
 }
 
 std::optional<decoded_control> sacch_receiver::receive(
 		const burst_payload &burst)
 {
-	m_bursts[m_phase++] = burst;
-	if (m_phase != 4)
+	m_state.bursts[m_state.phase++] = burst;
+	if (m_state.phase != 4)
 		return std::nullopt;
-	m_phase = 0;
-	return decode_control(deinterleave_sacch(m_bursts));
+	m_state.phase = 0;
+	return decode_control(deinterleave_sacch(m_state.bursts));
 }
 
 void sacch_receiver::reset()
 {
-	m_phase = 0;
-	m_bursts = {};
+	m_state = {};
 }
 
 tdma_slot_kind full_rate_slot(std::uint32_t frame_number, unsigned timeslot)
