@@ -360,12 +360,15 @@ API. It is not described as a power-on mux value, and MCU call state cannot
 change it. The configuration also carries the nominal gains:
 +18 dB on COBBA's MIC2 path and -10 dB on its EAR path; generic COBBA defaults
 remain neutral. A `-sound none` headless run correctly leaves the physical
-microphone at zero. Separate audio-enabled v6.00/v5.01 acceptance runs attach
-an external host 1 kHz source through MAME's microphone endpoint. Each carries
-150/150 non-silent, unclipped COBBA blocks through the configured 13-bit
-serial representation, MAD2 and DSP encoding to non-zero output from the
-network peer's independent GSM-FR decoder. The test source never appears in
-the Nokia machine configuration or handset data path.
+microphone at zero. The paired audio-enabled v6.00/v5.01 acceptance gate
+attaches an external host 1 kHz source through MAME's microphone endpoint.
+Each real-time run carries 250/250 non-silent, unclipped COBBA blocks through
+the configured 13-bit serial representation, MAD2 and DSP encoding to
+non-silent output from the network peer's independent GSM-FR decoder, then
+physically Ends the call and observes firmware-driven teardown. Whole-call
+microphone/network peaks were 6872/6992 for v6.00 and 10664/10848 for v5.01.
+The test source never appears in the Nokia machine configuration or handset
+data path.
 
 The generic DCT3 machine now instantiates COBBA without assuming handset
 analogue wiring. Only the NSE-8 `noki3210` composition connects MAME's physical

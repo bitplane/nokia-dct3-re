@@ -23,19 +23,23 @@ def check(path: Path) -> str:
     if not energy or energy[-1][0] < 100:
         raise ValueError("physical microphone path did not sustain 100 DSP frames")
 
-    uplink, _, mic_peak, _, nonzero_mic, _ = energy[-1]
+    uplink, _, _, _, nonzero_mic, _ = energy[-1]
+    mic_peak = max(sample[2] for sample in energy)
     if nonzero_mic < 100 or mic_peak == 0:
         raise ValueError("COBBA microphone stream remained silent")
     if mic_peak >= 32768:
         raise ValueError("COBBA microphone stimulus clipped")
-    if not peer or peer[-1][0] < 100 or peer[-1][1] == 0:
+    if not peer or peer[-1][0] < 100:
+        raise ValueError("network peer did not sustain uplink speech")
+    peer_peak = max(sample[1] for sample in peer)
+    if peer_peak <= 16:
         raise ValueError("network peer did not decode non-silent uplink speech")
-    if peer[-1][1] >= 32768:
+    if peer_peak >= 32768:
         raise ValueError("decoded uplink speech clipped")
 
     return (
         f"OK - {nonzero_mic}/{uplink} COBBA microphone blocks were non-silent; "
-        f"network GSM-FR decoder peak={peer[-1][1]}"
+        f"microphone/network peaks={mic_peak}/{peer_peak}"
     )
 
 

@@ -18,9 +18,9 @@ are emulated.
 | Bad/erased frames | Both decoders report protected-frame validity; bad and FACCH-stolen intervals cross explicit BFI boundaries into isolated GSM 06.11 substitution and 320 ms muting; queue absence remains a distinct no-delivery state | Paired-ROM `make verify-radio-degraded-speech`: exact 34-record replay while degraded; canonical v6.00/v5.01 runs retain 295/595 non-silent blocks, handset/network concealment 20/5 and 35/5, clean recovery and teardown |
 | Independent network decoding | Uplink and downlink cross separate transmitter/receiver and transcoder state; uplink BFI/FACCH cannot pause remote downlink encoding | Clean, bidirectionally degraded, save/load and physical-uplink runtime gates |
 | Organic non-silent downlink | Network-side 1 kHz PCM is GSM-FR encoded and crosses timed Layer 1 to COBBA EAR | v6.00 and v5.01: 145 non-silent blocks each |
-| Organic non-silent physical uplink | External host audio enters only MAME's microphone, COBBA MIC2, PCM, DSP codec and timed Layer 1 | `make verify-radio-physical-uplink`; audited runs: v6.00 850/850, peak 2264; v5.01 1200/1200, peak 2032 |
+| Organic non-silent physical uplink | External host audio enters only MAME's microphone, COBBA MIC2, PCM, DSP codec and timed Layer 1 | Paired real-time `make verify-radio-physical-uplink`: both revisions 250/250 non-silent blocks; whole-call microphone/network peaks v6.00 6872/6992 and v5.01 10664/10848; FACCH recovery and physical End-to-idle included |
 | Organic teardown | Firmware drives CC and DSP control back to idle after media/FACCH | v6.00 and v5.01 lifecycle gates |
-| Layer separation and generic configuration | Codec, Layer 1, radio peer, DSP PCM and COBBA remain separate devices/components; impairment is a network profile | 327 repository tests and `test_speech_media_boundaries.py` |
+| Layer separation and generic configuration | Codec, Layer 1, radio peer, DSP PCM and COBBA remain separate devices/components; impairment is a network profile | Repository tests and `test_speech_media_boundaries.py` |
 
 Meaningful SACCH measurement reports and downlink SACCH system information are
 not fabricated. Their Nokia DSP-side ownership remains an evidence question,

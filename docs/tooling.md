@@ -56,10 +56,14 @@
     downlink from a silent framing-only pass.
   - `radio_physical_uplink_trace_check.py` — validates that an external host
     capture source produced at least 100 non-silent COBBA microphone blocks
-    and non-zero speech at the network peer's independent GSM-FR decoder. It
-    rejects both silence and clipped input. The pinned MAME PulseAudio
-    record-stream support is supplied by `mame-pulseaudio-input.patch`; the
-    Nokia machine itself has no laboratory microphone generator.
+    and speech above the GSM-FR silence floor at the network peer's independent
+    decoder. It evaluates whole-call peak maxima and rejects both silence and
+    clipping at any checkpoint. `make verify-radio-physical-uplink` runs the
+    v6.00 and v5.01 firmware gates in real time, including their appropriate
+    control oracle, speech/FACCH checks and physical End-to-idle teardown. The
+    pinned MAME PulseAudio record-stream support is supplied by
+    `mame-pulseaudio-input.patch`; the Nokia machine itself has no laboratory
+    microphone generator.
   - `dsp_rom_audit.py` — distinguishes real nonuniform DSP regions from
     checksum-valid uniform fill placeholders (`make audit-dsp-roms`).
   - `dsp_upload_extract.py` — reconstructs contiguous type-`0x51`

@@ -8,6 +8,7 @@ run_dir=${RUN_DIR:-run_physical_uplink}
 bios=${BIOS:-}
 rom=${ROM:-roms/3210f600a.fls}
 eeprom_basename=${EEPROM_BASENAME:-3210 v600 eeprom.bin}
+audio_control_checker=${AUDIO_CONTROL_CHECKER:-tools/radio_answered_call_lifecycle_trace_check.py}
 sink_name="nokia_dct3_uplink_$$"
 module_id=
 source_pid=
@@ -41,11 +42,13 @@ ffmpeg -hide_banner -loglevel error -re \
 source_pid=$!
 
 make --no-print-directory run JOBS=4 PHONE=noki3210 BIOS="$bios" ROM="$rom" \
-	RUN_DIR="$run_dir" SECONDS=45 ERASED_IDENTITY_SECURITY_CODE=12345 \
+	RUN_DIR="$run_dir" SECONDS=38 ERASED_IDENTITY_SECURITY_CODE=12345 \
 	RUN_VERBOSE=1 \
-	RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_incoming_call_answered -sound pulse" \
-	RUN_ENV="PULSE_SOURCE=$sink_name.monitor NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280"
+	RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_incoming_call_answered -sound pulse -throttle" \
+	RUN_ENV="PULSE_SOURCE=$sink_name.monitor NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280"
 
 cp mame/error.log "$run_dir/error.log"
+python3 "$audio_control_checker" "$run_dir/error.log"
 python3 tools/radio_physical_uplink_trace_check.py "$run_dir/error.log"
 python3 tools/radio_speech_media_trace_check.py "$run_dir/error.log"
+python3 tools/radio_facch_interruption_trace_check.py "$run_dir/error.log"

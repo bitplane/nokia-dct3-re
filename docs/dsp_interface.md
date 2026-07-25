@@ -803,15 +803,20 @@ advertised capture sources but lacked its record-stream implementation, so
 `mame-pulseaudio-input.patch` supplies the generic source-open, buffered-read
 and source-close contract; no Nokia device receives a test-source option.
 With the external source attenuated to retain headroom after NSE-8's +18 dB
-MIC2 gain, the post-TDMA-scheduler v6.00 run produced 850/850 non-silent
-COBBA microphone blocks and the v5.01 run produced 1200/1200. The separate
-network peer's GSM-FR decoder observed peaks 2264 and 2032 respectively.
-`radio_physical_uplink_trace_check.py`
-requires at least 100 non-silent microphone blocks, non-zero decoded uplink
-energy, and rejects clipping. `make verify-radio-physical-uplink` creates a
-temporary isolated PulseAudio sink, drives its monitor with an attenuated
-host-side 1 kHz stream, selects that monitor only for MAME, and removes it on
-exit.
+MIC2 gain, the paired real-time acceptance run produced 250/250 non-silent
+COBBA microphone blocks on both v6.00 and v5.01. Whole-call microphone/network
+peaks were 6872/6992 and 10664/10848 respectively. The verifier examines the
+maximum over the complete call rather than relying on a possibly silent final
+checkpoint. It requires at least 100 non-silent microphone blocks, decoded
+uplink energy above the GSM-FR silence floor, and rejects clipping at any
+checkpoint. `make verify-radio-physical-uplink` runs both firmware revisions,
+creates a temporary isolated PulseAudio sink, drives its monitor with an
+attenuated host-side 1 kHz stream, selects that monitor only for MAME, and
+removes it on exit. MAME is throttled to real time so its capture demand
+matches the host source instead of manufacturing underrun discontinuities.
+Each run also checks the revision-appropriate firmware control oracle, speech
+media, FACCH interruption and recovery, and an organic physical End back to
+idle.
 
 COBBA's DSP control plane is represented separately from those samples.
 `nokia_cobba_device` exposes an opaque 16-register, 12-bit serial transport

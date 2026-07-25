@@ -58,9 +58,12 @@ boundary test, not a fixture write into handset PCM or call-control state.
 `radio_physical_uplink_trace_check.py` covers the opposite direction in
 audio-enabled runs. An external host source enters through MAME's microphone
 record stream; the gate requires at least 100 non-silent, unclipped COBBA
-microphone blocks and non-zero output from the network peer's independent
-GSM-FR uplink decoder. Paired v6.00/v5.01 runs each pass with 150/150
-non-silent microphone blocks.
+microphone blocks and output above the GSM-FR silence floor from the network
+peer's independent uplink decoder. It checks whole-call maxima so an earlier
+clipped checkpoint cannot be hidden by the final sample. The public target
+runs v6.00 and v5.01 at real-time speed; each passes with 250/250 non-silent
+microphone blocks, its revision-specific control oracle, sustained media,
+FACCH interruption/recovery and organic End-to-idle teardown.
 `make verify-radio-incoming-call-lifecycle` presses the context-sensitive Navi
 key again after that stable interval. It requires organic CC
 Disconnect/Release/Release Complete, the release channel change, and the

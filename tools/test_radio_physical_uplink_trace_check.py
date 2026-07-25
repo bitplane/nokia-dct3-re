@@ -34,6 +34,31 @@ class RadioPhysicalUplinkTraceCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "clipped"):
                 check(self.write_log(directory, 32768, 150, 32768))
 
+    def test_uses_whole_call_peak_not_final_silence_floor(self):
+        with TemporaryDirectory() as directory:
+            log = self.write_log(directory, 1200, 150, 16)
+            text = log.read_text()
+            log.write_text(text.replace(
+                "gsm_voice_peer: exchange=150",
+                "gsm_voice_peer: exchange=100 uplink_peak=2032 "
+                "downlink_peak=4096 source=lab-1khz\n"
+                "gsm_voice_peer: exchange=150",
+            ))
+            self.assertIn("network peaks=1200/2032", check(log))
+
+    def test_rejects_earlier_clipped_microphone_checkpoint(self):
+        with TemporaryDirectory() as directory:
+            log = self.write_log(directory, 1200, 150, 2032)
+            text = log.read_text()
+            log.write_text(text.replace(
+                "dsp_hle: speech tick uplink=150",
+                "dsp_hle: speech tick uplink=100 downlink=95 pcm=100 "
+                "mic_peak=32768 ear_peak=4096 nonzero=100/95\n"
+                "dsp_hle: speech tick uplink=150",
+            ))
+            with self.assertRaisesRegex(ValueError, "clipped"):
+                check(log)
+
 
 if __name__ == "__main__":
     unittest.main()
