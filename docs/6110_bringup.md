@@ -780,6 +780,23 @@ publish status with control argument 2: once when a runtime flag bit is set
 external image establishes these numeric conditions but not the meaning of
 the control argument, flag, counter or event.
 
+The result-source byte is now bounded more precisely. Exact v4.06 code reaches
+SRAM `0x10fde1` both through direct literal roots and as offset `0x69` from
+controller root `0x10fd78`. It is not used as one Boolean verdict:
+
+- two paths test bit 2 and can clear it;
+- internal event `0xd3` tests and clears bit 4 before one status publication;
+- two independent external-service gates test bit 5; and
+- the command-`0x64` result derives from bit 6, which three paths can clear.
+
+An independent v5.48 HLE profile calls this numeric address its DSP
+self-test/verdict cell. The address overlap is useful corroboration, but the
+v4.06 consumers prove a multi-bit controller contract and do not establish
+those bit meanings, their initial value, or portable revision semantics.
+Consequently the driver does not acquire a writable `verdict` hook and must
+not force this byte to pass startup. Any future peer must cause the
+firmware-observed transitions through the recovered DSP/service protocol.
+
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,
 or the complete ordering around discovery and acknowledgements. Those facts

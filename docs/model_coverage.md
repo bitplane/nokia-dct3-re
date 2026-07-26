@@ -32,6 +32,14 @@ Because six task-17 producer sites feed `0x03f1`, neither the external
 a checked protocol boundary without enabling the NSE-3 radio peer or
 promoting coverage.
 
+The comparison also identifies SRAM `0x10fde1` as a possible v5.48 DSP
+verdict location. Exact v4.06 analysis rejects treating it as a portable
+Boolean hook: direct and derived references use bits 2, 4, 5 and 6 in
+different external-service controller paths, and command `0x64` exposes only
+bit 6 as its result. The bit meanings and initial state remain unassigned.
+No firmware state is forced, no DSP peer is enabled and coverage remains
+unpromoted.
+
 ## Promotion rules
 
 The levels are cumulative:

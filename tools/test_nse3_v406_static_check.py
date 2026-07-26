@@ -1109,6 +1109,33 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS[0x23A59E],
         )
 
+    def test_external_service_controller_cell_is_a_revision_local_bitfield(self):
+        self.assertEqual(
+            0x10FDE1,
+            check.EXTERNAL_SERVICE_CONTROLLER_FLAG_CELL,
+        )
+        self.assertEqual(
+            0x10FDE1,
+            check.EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_ROOT
+            + check.EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_OFFSET,
+        )
+        self.assertEqual(
+            ("lsrs", "r0, r0, #7"),
+            check.EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS[0x239D12],
+        )
+        self.assertEqual(
+            ("movs", "r1, #0xef"),
+            check.EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS[0x23A58C],
+        )
+        self.assertEqual(
+            ("lsrs", "r0, r0, #6"),
+            check.EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS[0x28FB08],
+        )
+        self.assertEqual(
+            0x10FD78,
+            check.EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS[0x23A54C],
+        )
+
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
         image[0x40:0x42] = b"\x12\x34"

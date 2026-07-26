@@ -2234,6 +2234,63 @@ EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS = {
     0x23A59E: ("movs", "r0, #2"),
     0x23A5A0: ("bl", "#0x239cfc"),
 }
+EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS = {
+    # The address used by an external v5.48 HLE as a monolithic "DSP
+    # verdict" is a bitfield in this exact v4.06 image.  Its independent
+    # consumers assign distinct control roles to bits 2, 4, 5 and 6.
+    0x237DD4: ("ldr", "r5, [pc, #0x390]"),
+    0x237DD6: ("ldrb", "r0, [r5]"),
+    0x237DD8: ("lsrs", "r0, r0, #3"),
+    0x237DE2: ("movs", "r0, #0xfb"),
+    0x237DE4: ("ldrb", "r1, [r5]"),
+    0x237DE6: ("ands", "r0, r1"),
+    0x237DE8: ("strb", "r0, [r5]"),
+    0x237E0A: ("movs", "r0, #0xbf"),
+    0x237E0C: ("ldrb", "r1, [r5]"),
+    0x237E0E: ("ands", "r0, r1"),
+    0x237E10: ("strb", "r0, [r5]"),
+    0x237E20: ("movs", "r1, #0xbf"),
+    0x237E22: ("ldrb", "r0, [r5]"),
+    0x237E24: ("ands", "r1, r0"),
+    0x237E26: ("strb", "r1, [r5]"),
+    0x239D0E: ("ldr", "r5, [pc, #0x1e0]"),
+    0x239D10: ("ldrb", "r0, [r5]"),
+    0x239D12: ("lsrs", "r0, r0, #7"),
+    # Event 0xd4 tests bit 2 and, on the alternate arm, clears bits 6 and 2.
+    0x23A500: ("ldr", "r0, [pc, #0x30c]"),
+    0x23A502: ("ldrb", "r1, [r0]"),
+    0x23A504: ("lsrs", "r1, r1, #3"),
+    0x23A520: ("movs", "r1, #0xbf"),
+    0x23A526: ("strb", "r1, [r0]"),
+    0x23A528: ("movs", "r1, #0xfb"),
+    0x23A52E: ("strb", "r1, [r0]"),
+    # Event 0xd3 reaches the same byte as offset 0x69 from a distinct
+    # controller root.  It tests and clears bit 4 before status publication.
+    0x23A54C: ("ldr", "r5, [pc, #0x2bc]"),
+    0x23A584: ("ldrb", "r0, [r6, r5]"),
+    0x23A586: ("lsrs", "r0, r0, #5"),
+    0x23A58C: ("movs", "r1, #0xef"),
+    0x23A590: ("strb", "r1, [r6, r5]"),
+    # Two further gates test bit 5 before accepting their respective
+    # external-service command/report paths.
+    0x28FB04: ("ldr", "r0, [pc, #0x388]"),
+    0x28FB06: ("ldrb", "r0, [r0]"),
+    0x28FB08: ("lsrs", "r0, r0, #6"),
+    0x2984AC: ("ldr", "r1, [pc, #0x1e4]"),
+    0x2984AE: ("ldrb", "r1, [r1]"),
+    0x2984B0: ("lsrs", "r1, r1, #6"),
+}
+EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS = {
+    0x237DD4: 0x10FDE1,
+    0x239D0E: 0x10FDE1,
+    0x23A500: 0x10FDE1,
+    0x23A54C: 0x10FD78,
+    0x28FB04: 0x10FDE1,
+    0x2984AC: 0x10FDE1,
+}
+EXTERNAL_SERVICE_CONTROLLER_FLAG_CELL = 0x10FDE1
+EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_ROOT = 0x10FD78
+EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_OFFSET = 0x69
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -3344,12 +3401,14 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_OTHER_CONSTRUCTOR_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_CONTROLLER_STATUS_LITERALS)
     verify_thumb_literals(data, TYPE_0X03_CONTROL_LITERALS)
+    verify_thumb_literals(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -5086,6 +5145,33 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     "internal_event": 0xD3,
                     "internal_event_argument": 2,
                     "argument_semantics": "not_established",
+                },
+                "controller_flag_cell": {
+                    "address": EXTERNAL_SERVICE_CONTROLLER_FLAG_CELL,
+                    "derived_from": {
+                        "root": EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_ROOT,
+                        "offset":
+                            EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_OFFSET,
+                    },
+                    "bit_2": {
+                        "tested_by": [0x237DD8, 0x23A504],
+                        "clear_sites": [0x237DE8, 0x23A52E],
+                    },
+                    "bit_4": {
+                        "tested_by": [0x23A586],
+                        "clear_sites": [0x23A590],
+                    },
+                    "bit_5": {
+                        "tested_by": [0x28FB08, 0x2984B0],
+                        "clear_sites": [],
+                    },
+                    "bit_6": {
+                        "status_result_source": 0x239D12,
+                        "clear_sites": [0x237E10, 0x237E26, 0x23A526],
+                    },
+                    "single_boolean_verdict": False,
+                    "external_v548_address_portable_as_semantics": False,
+                    "bit_semantics_assigned": False,
                 },
             },
             "peer_start_delay": "not_established",
