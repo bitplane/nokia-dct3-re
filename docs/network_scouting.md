@@ -49,8 +49,9 @@ GSM system; a named negative fixture can disable it.
 ## Verified sequence
 
 `make verify-radio-camp` proves serving-cell acquisition. The stronger
-`make verify-radio-registration` proves the following ordered firmware-owned
-sequence:
+`make verify-radio-registration` for NSE-8 and
+`make verify-3310-radio-registration` for NHM-5 prove the following ordered
+firmware-owned sequence:
 
 ```text
 SEARCH_LIST (0x1a)
@@ -193,7 +194,7 @@ activated the synthetic EEPROM's unmodeled network-lock policy and displayed
 | RX `0x83` | serving-channel level | correlated RSSI between paced BCCH blocks |
 | RX `0x84` | RA_INFO | timing input used by the access controller |
 | RX `0x87` | NO_BCCH_LEFT | finite search terminal only when no usable cell remains |
-| RX `0x89` | CHANNEL_CHANGED_CNF | response to an organic channel-configure request |
+| RX `0x89` | CHANNEL_CHANGED_CNF | response to an organic channel-configure request; NHM-5 correlates body bit 0 with its pending context and requires success value one |
 | RX `0x8c` | IDLE_RA completion | completes receiver/random-access configuration |
 | RX `0x8f` | NO_PSW_LEFT | closes the initial power-scan work list |
 | MCU `0x0c` | IDLE_RA/random access | form 0 carries the CHANNEL REQUEST octet |
@@ -223,6 +224,14 @@ TCH/F call organically exposes an
 empty new-link SABM, Assignment Complete and a final DISC. The peer returns
 standards-shaped UA frames only for those observed transactions, then confirms
 the ROM's own deconfiguration request.
+
+NHM-5 v6.39 independently checks the `CHANNEL_CHANGED_CNF` body before arming
+its assigned-channel link. Handler `0x2c4c28` compares payload bit 0 with byte 2
+of the pending channel-change context, which is one for the successful SDCCH
+transition. An NSE-8-compatible all-zero body is therefore not a generic
+success response: NHM-5 discards it and continues returning UI/fill frames.
+The product-typed peer supplies value one, after which the ROM itself exposes
+the same standards-shaped Location Updating lifecycle and updates `EF_LOCI`.
 
 After registration, channel `0x50` continues to carry BCCH while channel
 `0x60` carries the decoded PCH/AGCH blocks already associated with the

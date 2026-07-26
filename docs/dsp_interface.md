@@ -404,6 +404,14 @@ semantic consumer:
   appear to publish task-17 home-PLMN status `0x0433` directly. It does not.
   The fan-out also does not directly call `0x219e30`.
 
+NHM-5 v6.39 has an additional product-specific body contract at handler
+`0x2c4c28`: payload bit 0 is compared with byte 2 of the pending
+channel-change context. Its successful assigned-SDCCH context contains one,
+so an all-zero confirmation is rejected before LAPDm establishment. Returning
+one through the typed NHM-5 protocol profile lets firmware organically publish
+SABM and its Location Updating Request. This is not inferred from NSE-8, whose
+accepted confirmation body remains zero.
+
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result
 completion, but it is not the only entrance to finalizer `0x219e30`: direct

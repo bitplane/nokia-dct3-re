@@ -9,7 +9,7 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Radio lifecycle, paired GSM-FR/FACCH/degraded-media and isolated physical audio gates pass. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
 | Nokia 3210 NSE-8 v5.01 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Independent ROM gates cover the call lifecycle and isolated physical duplex. The same COBBA/DSP limitation applies. |
-| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its typed `0x56` active candidate window, paced acquisition, SCH success on requested ARFCN `0x0058`, organic type-`0x02/20` channel configuration, `NO_PSW_LEFT`, channel-change confirmation, RA information and sustained serving BCCH/RSSI reception. SI1 is generated for that selected carrier rather than retaining the 3210 cell's ARFCN-1 bitmap. The firmware's real dispatcher consumes SI1 through SI4 and reaches its complete `0x0f` SI set. It then organically configures decoded channel `0x60`, initiates Random Access and accepts an Immediate Assignment whose channel description preserves serving ARFCN `0x0058`; its own assigned-SDCCH configuration carries the same carrier. The independently recovered `0x8b` result array and type-`0x55` terminal path remain valid unsuccessful-search contracts; `0x8a` is the failure result `NO_PSW_FOUND`. Registration is still unproved: the next boundary is the assigned-channel uplink, where v6.39 currently returns the ordinary empty LAPDm UI/fill frame instead of exposing a Location Updating Request. |
+| Nokia 3310 NHM-5 v6.39 | Yes | Yes | Yes | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, `verify-3310-navigation`, and `verify-3310-radio-registration`. Its typed `0x56` candidate search selects and camps on ARFCN `0x0058`; SI1--SI4, Random Access and Immediate Assignment remain firmware-owned. The NHM-5 `CHANNEL_CHANGED_CNF` success bit is correlated with the pending assigned-channel context, after which v6.39 organically emits its LAPDm SABM and Location Updating Request. The independent network returns contention UA, Location Updating Accept and RR Channel Release; firmware acknowledges N(R)=1 and N(R)=2, persists `EF_LOCI`, deconfigures SDCCH and resumes steady BCCH/PCH monitoring. The next boundary is paging and call control; no 3210 call or audio assumptions are claimed. |
 | Nokia 3330 NHM-6 v4.50E | Yes | Yes | No | No | No | No | No | `verify-3330-frontier` and `verify-3330-navigation`; later product contracts are not established. |
 | Nokia 3410 NHM-2 v5.46E | Yes | Yes | No | No | No | No | No | `verify-3410-frontier` and navigation/menu gates; later product contracts are not established. |
 | Nokia 6110 NSE-3 family | No | No | No | No | No | No | No | Hardware documentation informs shared DCT3 boundaries, but no local declared 6110 ROM/profile or executable acceptance gate exists. Acquire and identify a lawful firmware image before implementation claims. |
@@ -109,18 +109,21 @@ used by the selected-cell path. Once the firmware has accepted SI1 through
 SI4, it organically configures idle common control, issues Random Access and
 accepts Immediate Assignment. The network now encodes the live serving ARFCN
 in that assignment instead of inheriting NSE-8's ARFCN 1; v6.39 consequently
-publishes an assigned-SDCCH configuration on `0x0058`. The next unproved
-boundary is Layer 2 establishment on that assigned channel. The first
-requested uplink is the firmware's ordinary empty `01 03 01` UI/fill frame,
-not SABM and not a Location Updating Request. The emulator must not replace it
-with a synthetic MM payload or infer registration from Random Access alone.
-Static analysis closes the immediate cause: `0x2c4d78` selects the fill-frame
-constructor at `0x2a7b04` while the firmware's pending SDCCH pointer
-`0x001114b0` is null. The alternative path releases a firmware-built LAPDm
-object populated by `0x2a7cb4`; therefore the missing Location Updating Request
-is an upstream firmware/MM-state boundary, not an unparsed peer frame. The DSP
-continues issuing paced `BLOCK_REQUEST` transactions after an empty uplink, as
-real SDCCH scheduling requires, but repeated organic requests remain empty.
+publishes an assigned-SDCCH configuration on `0x0058`.
+
+The previously empty assigned-channel uplink was traced to a rejected
+confirmation, not a missing MM payload. NHM-5 handler `0x2c4c28` correlates bit
+0 of the `CHANNEL_CHANGED_CNF` body with byte 2 of its pending channel-change
+context. That context requests success value one for the assigned SDCCH; the
+all-zero body accepted by NSE-8 is discarded before NHM-5 can arm LAPDm. The
+typed NHM-5 radio profile now returns that recovered success value. Firmware
+then organically constructs SABM with its Location Updating Request, consumes
+contention UA and Location Updating Accept, acknowledges N(R)=1, consumes RR
+Channel Release, acknowledges N(R)=2, updates `EF_LOCI`, deconfigures channel
+`0x60` and resumes serving BCCH/PCH. `verify-3310-radio-registration` checks
+that complete ordered lifecycle, exactly one request, SIM persistence and
+steady post-release camp. No firmware state, internal message or synthetic
+uplink payload is injected.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at

@@ -1307,6 +1307,16 @@ void nokia_radio_peer_device::emit_report()
 		payload[2] = u8(m_gsm_network->serving_rssi(m_search_round));
 	}
 
+	if (report_type == 0x89 &&
+			m_protocol_profile == protocol_profile::nhm5_candidate_list)
+	{
+		// NHM-5's CHANNEL_CHANGED_CNF consumer correlates payload bit 0 with
+		// the pending RR channel-change context.  A completed change carries
+		// success value one; an all-zero NSE-8-style payload is discarded
+		// before the assigned-channel state can arm LAPDm.
+		payload[0] = 0x01;
+	}
+
 	if (report_type == 0x84 && m_phase == phase::random_access)
 	{
 		// RA_INFO is the DSP's report of the transmitted random-access burst.

@@ -26,10 +26,30 @@ dspif_transport: RX enqueue type=80 payload=34 producer=0de data=501200000003000
 dspif_transport: RX enqueue type=80 payload=34 producer=0f0 data=5012000000040001000019061d00
 """
 
+NHM5_GOOD = GOOD.replace(
+    "radio_mm_parse: phase=return object=001017d0 payload=00101b10 result=00000048 mm=00/00/00/00\n"
+    "display_frontier: operator-resource data=00 f1 10 01 00",
+    "dspif_transport: RX enqueue type=80 payload=34 producer=0c1 "
+    "data=80120000052a00580000030045050200f1100001170809101010325476982b2b2b2b",
+).replace(
+    "data=041202000000001a600000010000000f00000000",
+    "data=041202000000001a600000580000000f00000000",
+)
+
 
 class RegistrationTraceCheckTest(unittest.TestCase):
     def test_complete_registration(self):
         verify(GOOD)
+
+    def test_complete_nhm5_registration(self):
+        verify(NHM5_GOOD, "nhm5")
+
+    def test_nhm5_rejects_nse8_channel_deconfiguration(self):
+        with self.assertRaisesRegex(ValueError, "RR channel deconfiguration"):
+            verify(NHM5_GOOD.replace(
+                "data=041202000000001a600000580000000f00000000",
+                "data=041202000000001a600000010000000f00000000",
+            ), "nhm5")
 
     def test_rejects_retry(self):
         with self.assertRaisesRegex(ValueError, "expected one Location Updating Request"):
