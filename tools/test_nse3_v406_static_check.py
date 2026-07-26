@@ -231,6 +231,18 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(0x10000, len(stream))
         self.assertEqual(b"\x12\x34\x56\x78", stream[:4])
         self.assertEqual(b"\x9a\xbc\xff\xff\xff\xff", stream[-6:])
+        self.assertEqual(
+            [
+                {"address": 0x100F6, "value": 0x0100},
+                {"address": 0x100F8, "value": 0x0300},
+                {"address": 0x100FA, "value": 0x0000},
+                {"address": 0x100FC, "value": 0x8000},
+                {"address": 0x100FE, "value": 0x0001},
+                {"address": 0x10100, "value": 0x0001},
+                {"address": 0x10102, "value": 0x0200},
+            ],
+            check.DSP_BOOTSTRAP_HEADER,
+        )
 
     def test_selector_8_state_boundary_keeps_live_and_shadow_blocks_distinct(self):
         self.assertNotEqual(0x10C020, 0x10C008)

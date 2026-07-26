@@ -965,6 +965,30 @@ DSP_BOOTSTRAP_ANCHORS = {
     0x285906: ("strh", "r0, [r5]"),
     0x285908: ("strh", "r0, [r5, #2]"),
     0x28592A: ("ldr", "r1, [pc, #0x22c]"),
+    # Seven fixed shared header/control halfwords.
+    0x28592C: ("movs", "r0, #0xff"),
+    0x28592E: ("adds", "r0, #1"),
+    0x285930: ("strh", "r0, [r1]"),
+    0x285934: ("movs", "r0, #3"),
+    0x285936: ("lsls", "r0, r0, #8"),
+    0x285938: ("strh", "r0, [r1]"),
+    0x28593C: ("strh", "r4, [r1]"),
+    0x285940: ("movs", "r0, #1"),
+    0x285942: ("lsls", "r0, r0, #0xf"),
+    0x285944: ("strh", "r0, [r1]"),
+    0x285948: ("movs", "r0, #1"),
+    0x28594A: ("strh", "r0, [r1]"),
+    0x28594E: ("strh", "r0, [r1]"),
+    0x285952: ("lsls", "r0, r0, #9"),
+    0x285954: ("strh", "r0, [r1]"),
+    # MAD2 byte 0x20002 bit 0 is asserted before staging.
+    0x285956: ("bl", "#0x29ae76"),
+    0x28595A: ("ldr", "r1, [pc, #0x200]"),
+    0x28595C: ("movs", "r0, #1"),
+    0x28595E: ("ldrb", "r2, [r1]"),
+    0x285960: ("orrs", "r0, r2"),
+    0x285962: ("strb", "r0, [r1]"),
+    0x285964: ("bl", "#0x29ae90"),
     # 512-word staging loop: sequential shared destination, flash stride 0x20.
     0x285970: ("ldr", "r2, [pc, #0x1ec]"),
     0x285972: ("ldr", "r7, [pc, #0x1f0]"),
@@ -1006,16 +1030,34 @@ DSP_BOOTSTRAP_ANCHORS = {
     0x2859DE: ("ldrh", "r0, [r1, #2]"),
     0x2859E0: ("cmp", "r0, #0"),
     0x2859E2: ("beq", "#0x2859de"),
+    # The same MAD2 bit is released after both result captures.
+    0x2859EE: ("bl", "#0x29ae76"),
+    0x2859F2: ("movs", "r0, #0xfe"),
+    0x2859F4: ("ldrb", "r1, [r5, #2]"),
+    0x2859F6: ("ands", "r0, r1"),
+    0x2859F8: ("strb", "r0, [r5, #2]"),
+    0x2859FA: ("bl", "#0x29ae90"),
     0x2859FE: ("pop", "{r4, r5, r6, r7, pc}"),
 }
 DSP_BOOTSTRAP_LITERALS = {
     0x285904: 0x10000,
     0x28592A: 0x100F6,
+    0x28595A: 0x20002,
     0x285970: 0x100FE,
     0x285972: 0x10200,
     0x285976: 0x200040,
     0x2859BC: 0xFFFF,
+    0x2859C6: 0x20000,
 }
+DSP_BOOTSTRAP_HEADER = [
+    {"address": 0x100F6, "value": 0x0100},
+    {"address": 0x100F8, "value": 0x0300},
+    {"address": 0x100FA, "value": 0x0000},
+    {"address": 0x100FC, "value": 0x8000},
+    {"address": 0x100FE, "value": 0x0001},
+    {"address": 0x10100, "value": 0x0001},
+    {"address": 0x10102, "value": 0x0200},
+]
 DSP_BOOTSTRAP_STREAM_SHA1 = "f708ffd71e430f41c47f12e18128cf4deffb5845"
 DSP_BOOTSTRAP_RESULT_ANCHORS = {
     # Capture the two final shared publications in the DSPIF state object.
@@ -2471,6 +2513,7 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             "source_words": 32766,
         },
         "staging": {
+            "shared_header": DSP_BOOTSTRAP_HEADER,
             "shared_start": 0x10200,
             "shared_end_exclusive": 0x10600,
             "words_per_block": 512,
@@ -2488,6 +2531,13 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             "wait_condition": "opposite_cell_nonzero",
             "post_transfer_publication_wait": 0x10002,
             "reply_meaning": "not_established",
+            "mad2_transfer_gate": {
+                "byte_address": 0x20002,
+                "bit": 0,
+                "assert_before_staging": 0x285962,
+                "release_after_result_capture": 0x2859F8,
+                "physical_meaning": "not_established",
+            },
         },
         "result_capture": {
             "direct_callers": direct_callers,

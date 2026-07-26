@@ -502,6 +502,28 @@ accesses, terminators and derived stream fingerprint. This establishes the
 external firmware's transfer schedule without requiring a running emulator or
 guessing through a missing peer.
 
+Immediately before staging, the MCU writes a fixed seven-halfword shared
+header:
+
+| Shared address | Initial halfword |
+| --- | --- |
+| `0x100f6` | `0x0100` |
+| `0x100f8` | `0x0300` |
+| `0x100fa` | `0x0000` |
+| `0x100fc` | `0x8000` |
+| `0x100fe` | `0x0001` |
+| `0x10100` | `0x0001` |
+| `0x10102` | `0x0200` |
+
+The two alternating synchronization cells are therefore initialized as part
+of the same header rather than appearing as uninitialized RAM. Firmware also
+sets bit 0 of MAD2 byte `0x20002` before the first staged block and clears that
+same bit only after both final publications have been captured. The exact gate
+pins both read/modify/write sequences and their bracketing helper calls. The
+physical name of this bit and the meanings of the other header words remain
+unestablished; they are a required wire contract, not inferred register
+semantics.
+
 The post-transfer results are no longer completely unconstrained. After the
 final non-zero wait, the routine copies shared `0x10000` to SRAM `0x10b97a`
 and shared `0x10002` to `0x10b97c`. The service-response handler passes request
