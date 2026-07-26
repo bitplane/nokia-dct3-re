@@ -50,6 +50,26 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "expected 0x100000-byte"):
             check.verify_identity(b"\xff" * 32)
 
+    def test_keypad_boundary_distinguishes_side_keys(self):
+        image = bytearray(b"\xff" * check.FLASH_SIZE)
+        offset = check.KEYMAP_ADDRESS - check.FLASH_BASE
+        special_offset = check.SPECIAL_KEYMAP_ADDRESS - check.FLASH_BASE
+        image[offset : offset + len(check.KEYMAP)] = check.KEYMAP
+        image[special_offset : special_offset + len(check.SPECIAL_KEYMAP)] = (
+            check.SPECIAL_KEYMAP
+        )
+        result = check.verify_keypad_boundary(bytes(image))
+        self.assertEqual(0x11, result["volume_down"]["keycode"])
+        self.assertEqual(0x10, result["volume_up"]["keycode"])
+
+    def test_keypad_boundary_rejects_reversed_volume_key(self):
+        image = bytearray(b"\xff" * check.FLASH_SIZE)
+        offset = check.KEYMAP_ADDRESS - check.FLASH_BASE
+        image[offset : offset + len(check.KEYMAP)] = check.KEYMAP
+        image[offset + 5] = 0x10
+        with self.assertRaisesRegex(ValueError, "normal 5x5 keypad"):
+            check.verify_keypad_boundary(bytes(image))
+
 
 if __name__ == "__main__":
     unittest.main()

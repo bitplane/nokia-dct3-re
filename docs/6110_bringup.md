@@ -71,6 +71,15 @@ table-driven accesses remain outside it, and no offset is assigned a meaning
 without separate evidence. The checker pins these results to the exact
 firmware hash and emits `run_census/nse3_v406_static_boundary.json`.
 
+The v4.06 image also contains a 25-byte five-by-five keycode table at
+`0x2be8bc`, followed by its special-key table at `0x2be8d8`. The numeric,
+softkey, Send/End and navigation positions agree with the UE4 matrix. More
+importantly, the firmware distinguishes side-key code `0x11` at drive row 1
+from code `0x10` at drive row 4; those decode as Volume Down and Volume Up
+respectively. This corrected the initially reversed side-key labels in the
+driver. Power is code `0x0d` in the separate special table. The verifier checks
+the source bytes rather than accepting the input declaration as its own proof.
+
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine
 therefore retains `NO_DUMP` internal ROMs and firmware-derived peers remain

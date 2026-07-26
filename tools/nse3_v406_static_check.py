@@ -28,6 +28,16 @@ SRAM_BASE = 0x100000
 SRAM_SIZE = 0x10000
 EXPECTED_SHA1 = "5025a6ac3b4a13714211fde903f27f92cbb7c9b6"
 VECTOR_SOURCE = 0x200180
+KEYMAP_ADDRESS = 0x2BE8BC
+KEYMAP = bytes.fromhex(
+    "3e 3e 3e 3e 3e "
+    "11 19 01 02 03 "
+    "0e 17 04 05 06 "
+    "0f 18 07 08 09 "
+    "10 1a 0c 0a 0b"
+)
+SPECIAL_KEYMAP_ADDRESS = 0x2BE8D8
+SPECIAL_KEYMAP = bytes.fromhex("3e 3e 3e 3e 0d")
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -125,10 +135,28 @@ def verify_mad2_census(data: bytes) -> dict:
     return actual
 
 
+def verify_keypad_boundary(data: bytes) -> dict:
+    offset = KEYMAP_ADDRESS - FLASH_BASE
+    special_offset = SPECIAL_KEYMAP_ADDRESS - FLASH_BASE
+    if data[offset : offset + len(KEYMAP)] != KEYMAP:
+        raise ValueError(f"normal 5x5 keypad table changed at {KEYMAP_ADDRESS:#x}")
+    if data[special_offset : special_offset + len(SPECIAL_KEYMAP)] != SPECIAL_KEYMAP:
+        raise ValueError(f"special keypad table changed at {SPECIAL_KEYMAP_ADDRESS:#x}")
+    return {
+        "normal_table": KEYMAP_ADDRESS,
+        "indexing": "drive_row_times_5_plus_sense_column",
+        "volume_down": {"drive_row": 1, "sense_column": 0, "keycode": 0x11},
+        "volume_up": {"drive_row": 4, "sense_column": 0, "keycode": 0x10},
+        "special_table": SPECIAL_KEYMAP_ADDRESS,
+        "power_keycode": 0x0D,
+    }
+
+
 def verify(data: bytes) -> dict:
     return {
         "identity": verify_identity(data),
         "reset_boundary": verify_reset_boundary(data),
+        "keypad_boundary": verify_keypad_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {
             "rom3_compatibility": "candidate_not_proven",
