@@ -672,6 +672,13 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x238226: ("movs", "r1, #0xa"),
     0x238228: ("adds", "r1, r1, r4"),
     0x23822A: ("bl", "#0x28ecec"),
+    0x23A03C: ("movs", "r0, #0xc9"),
+    0x23A046: ("subs", "r0, #1"),
+    0x23A048: ("cmp", "r0, #1"),
+    0x23A04A: ("bhi", "#0x23a04e"),
+    0x23A04C: ("b", "#0x23a18a"),
+    0x23A18A: ("adds", "r0, r4, #0"),
+    0x23A18C: ("bl", "#0x238218"),
     0x28ECF4: ("movs", "r0, #0x40"),
     0x28ECF8: ("movs", "r2, #0x1c"),
     0x28ECFA: ("bl", "#0x29cf2a"),
@@ -825,6 +832,20 @@ DSP_PARAMETER_STALE_EVENT_REUSE_OWNER = {
         "write_callsite": 0x28EDCC,
     },
     "payload_event_mutability": "runtime_request_writable",
+}
+DSP_PARAMETER_EEPROM_WRITE_CENSUS = {
+    "calls": 44,
+    "resolved_addresses": 32,
+    "runtime_addresses": 12,
+    "event_byte_range": [0x52, 0x54],
+    "resolved_overlapping_calls": [
+        {
+            "callsite": 0x28EDCC,
+            "address": 0x40,
+            "length": 0x1C,
+        },
+    ],
+    "field_writer_direct_calls": [0x23822A],
 }
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
@@ -2003,6 +2024,72 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             f"{DSP_PARAMETER_ALLOCATOR_CENSUS}, got {allocator_census}"
         )
 
+    eeprom_write_profile = {
+        "apis": [
+            {
+                "address": 0x29CE12,
+                "name": "serial_eeprom_write",
+                "kind": "call",
+                "arguments": {
+                    "address": "r0",
+                    "length": "r2",
+                },
+            }
+        ]
+    }
+    eeprom_write_calls = extract_calls(
+        eeprom_write_profile, instructions, physical, FLASH_BASE
+    )
+    resolved_eeprom_write_calls = [
+        call
+        for call in eeprom_write_calls
+        if call["arguments"]["address"] is not None
+    ]
+    event_range_start = 0x52
+    event_range_end = 0x54
+    resolved_overlapping_eeprom_writes = [
+        {
+            "callsite": call["callsite"],
+            "address": call["arguments"]["address"],
+            "length": call["arguments"]["length"],
+        }
+        for call in resolved_eeprom_write_calls
+        if call["arguments"]["length"] is not None
+        and call["arguments"]["address"] < event_range_end
+        and call["arguments"]["address"] + call["arguments"]["length"]
+        > event_range_start
+    ]
+    eeprom_write_census = {
+        "calls": len(eeprom_write_calls),
+        "resolved_addresses": len(resolved_eeprom_write_calls),
+        "runtime_addresses":
+            len(eeprom_write_calls) - len(resolved_eeprom_write_calls),
+        "event_byte_range": [event_range_start, event_range_end],
+        "resolved_overlapping_calls": resolved_overlapping_eeprom_writes,
+    }
+    eeprom_field_writer_profile = {
+        "apis": [
+            {
+                "address": 0x28ECEC,
+                "name": "eeprom_field_writer",
+                "kind": "call",
+                "arguments": {},
+            }
+        ]
+    }
+    eeprom_field_writer_calls = extract_calls(
+        eeprom_field_writer_profile, instructions, physical, FLASH_BASE
+    )
+    eeprom_write_census["field_writer_direct_calls"] = [
+        call["callsite"] for call in eeprom_field_writer_calls
+    ]
+    if eeprom_write_census != DSP_PARAMETER_EEPROM_WRITE_CENSUS:
+        raise ValueError(
+            "NSE-3 EEPROM write census changed: expected "
+            f"{DSP_PARAMETER_EEPROM_WRITE_CENSUS}, got "
+            f"{eeprom_write_census}"
+        )
+
     object_event_profile = {
         "apis": [
             {
@@ -2144,6 +2231,7 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                 "allocator_census": allocator_census,
                 "stale_event_reuse_owner":
                     DSP_PARAMETER_STALE_EVENT_REUSE_OWNER,
+                "eeprom_write_census": eeprom_write_census,
             },
         },
         "runtime_built_calls_exclude_parameter_events": False,

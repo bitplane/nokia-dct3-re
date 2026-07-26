@@ -431,6 +431,23 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             },
             check.DSP_PARAMETER_STALE_EVENT_REUSE_OWNER,
         )
+        self.assertEqual(
+            {
+                "calls": 44,
+                "resolved_addresses": 32,
+                "runtime_addresses": 12,
+                "event_byte_range": [0x52, 0x54],
+                "resolved_overlapping_calls": [
+                    {
+                        "callsite": 0x28EDCC,
+                        "address": 0x40,
+                        "length": 0x1C,
+                    },
+                ],
+                "field_writer_direct_calls": [0x23822A],
+            },
+            check.DSP_PARAMETER_EEPROM_WRITE_CENSUS,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
         self.assertEqual(
             [0x256E2E],

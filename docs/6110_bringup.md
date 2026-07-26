@@ -408,7 +408,18 @@ decodes four payload bytes into range offsets `0x11..0x14`, which includes
 the possible stale event at offsets `0x12..0x13` (EEPROM `0x52..0x53`), then
 writes the complete 28-byte range back. Selectors 1 through 5 are accepted;
 other values return status 3. The exact verifier pins the request boundary,
-selector branch and paired serial-memory transactions.
+selector branch and paired serial-memory transactions. A whole-image direct
+caller census finds only call `0x23822a`, reached from the central inbound
+dispatcher for message types `0xca/0xcb`; there is no separate direct
+startup invocation of the field helper.
+
+The whole-image direct-call census finds 44 calls to the serial EEPROM writer
+`0x29ce12`. Thirty-two have statically resolved addresses and 12 retain
+runtime-derived addresses. Of the resolved calls, `0x28edcc` is the only one
+whose range overlaps EEPROM `0x52..0x53`. The runtime-address calls include
+generic storage operations, so their presence prevents a stronger static
+claim that selector 4 is the only possible writer or that no earlier
+lifecycle operation touches the bytes.
 
 The NSE-3 EEPROM remains `NO_DUMP`, so neither the initial nor the
 request-updated value is known. Static firmware also cannot establish the
