@@ -156,6 +156,18 @@ subsequent 102-frame paging opportunity makes the parser repeat the same
 successful completion without waking the idle-RR admission path or producing
 RACH, so a missing network retry is also excluded.
 
+The short nine-second trace was not by itself a sufficient latency bound:
+the proven NSE-8 path does not emit its paged RACH until 13.64 seconds after
+the page, with serving-cell revalidation in between. A 32-second NHM-5 run
+now covers that complete comparison window. NHM-5 receives its page at
+7.731663 seconds, performs two correlated channel changes after outbound DSP
+type `0x46`, emits outbound type `0x57/03050000` at 10.120796 seconds, and
+continues receiving BCCH/PCH reports through the end of the run without
+another random-access request. The corresponding NSE-8 trace receives its
+page at 16.980246 seconds and emits the paged RACH at 30.620707 seconds.
+Therefore the missing NHM-5 transition is not an artefact of stopping before
+the established NSE-8 admission latency.
+
 Address-scoped writes to the RR global refine the post-release control flow.
 The `0x256f1a` release branch arms timer `0x9f`, waits for the real release
 events, cancels `0x9f`, sets RR state byte `r4+7` to one at `0x2570b8`, clears
@@ -203,6 +215,13 @@ path, but no static producer or post-release occurrence has yet been proved.
 The next implementation must recover the real producer and lifecycle of that
 handoff. Forcing A2, synthesising `0x08cb`, changing the addressed GSM page,
 or bypassing the parser would cross the current evidence boundary.
+
+The intervening type `0x57` is an outbound MCU-to-DSP publication, not an
+inbound `NO_PSW_FOUND` report, and its four-byte body is retained verbatim in
+the trace. The current peer has no reply contract for that packet. A reply
+must not be invented merely because it is the final outbound packet before
+the stall; its consumer and response semantics remain to be recovered from
+DSP-side evidence.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at

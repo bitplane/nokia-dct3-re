@@ -643,6 +643,12 @@
       "hypothesis": "A valid page for another subscriber, unlike the no-identity PCH filler, supplies the missing idle transition and arms the timer whose 0x08cb expiry admits the addressed NHM-5 page",
       "conclusion": "Static decode identifies 0x08cb as RR timer A2's expiry and 0x255ec0 as its sole arm site. Replacing idle filler with a standards-shaped Paging Request Type 1 carrying a different valid IMSI never arms A2 and never admits the subsequent addressed page. Repeated nonmatching pages instead lead firmware through serving-channel revalidation and its existing type-0x57 terminal. Unrelated subscriber traffic is not the missing foreground wake and must not replace standards-valid no-identity fill.",
       "evidence": ["docs/model_coverage.md"]
+    },
+    {
+      "id": "nhm5_paging_stall_is_short_runtime", "status": "disproven",
+      "hypothesis": "NHM-5 paging appears stalled only because the nine-second fixture ends before the admission latency observed on the proven NSE-8 path",
+      "conclusion": "The NSE-8 comparison receives its page at 16.980246 seconds and does not emit the paged RACH until 30.620707 seconds. A 32-second NHM-5 run covers the same post-page interval: after its page at 7.731663 seconds it performs correlated serving-channel changes and emits outbound DSP type 0x57/03050000 at 10.120796 seconds, but no later random access occurs. Runtime length is excluded; the type-0x57 consumer and the firmware event handoff remain unproved boundaries.",
+      "evidence": ["docs/model_coverage.md"]
     }
   ]
 }
