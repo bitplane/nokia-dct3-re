@@ -116,3 +116,17 @@ and its 192 KiB PMM tail as BIOS `639`:
 This pair is a labelled portability input rather than the canonical 3310 MAME
 set. Its PMM is BIOS-specific and must not be combined with the older declared
 3310 images.
+
+### Nokia 6110 NSE-3 acquisition status
+
+The primary service manual specifies a 1 MiB Intel TE28F800 program flash and
+an independent 8 KiB serial EEPROM. Historical firmware indexes identify
+NSE-3 v5.48 MCU + PPM B as the likely baseline, but the surviving indexed
+download links found in the July 2026 audit are unavailable or terminate at
+obsolete hosts. There is therefore no declared `noki6110` ROM set yet.
+
+Do not pad a later image, reuse a 3210 EEPROM, or declare a 2 MiB flash device.
+When an NSE-3 image is obtained, preserve the original archive outside this
+repository and record member names, sizes and SHA-256 values. ROM3 and ROM4
+variants must be distinguished before runtime results are compared. The
+hardware and staged acceptance requirements are in `docs/6110_bringup.md`.

@@ -366,6 +366,17 @@ plus the
 The falling-edge family contract is independently documented in the
 [Nokia 12 integrator manual](https://fcc.report/FCC-ID/LJPRX-9/393500.pdf).
 
+NSE-3 is now tracked as a future product profile rather than only as
+cross-family PCM evidence. Its Nokia system-module parts list names an Intel
+TE28F800 512K x 16 flash and ROM3 MAD2 variant F711604; the memory description
+specifies 64 KiB SRAM and an 8 KiB serial EEPROM. UE4 separately establishes an
+84 x 48 serial display and a five-row/five-column keypad with dedicated
+softkeys, Send/End and navigation controls. The audio chapter connects the
+internal microphone to MIC2 and the internal receiver to EAR, while its
+1 MHz/8 kHz serial bus independently matches the 13-in-16 word shape. None of
+those facts establishes an NSE-3 DSP bootstrap count, speech-control word,
+radio packet grammar or analogue gain. See `docs/6110_bringup.md`.
+
 COBBA now exposes separate MIC1/MIC2/MIC3 analogue sound-stream inputs and EAR
 and HF outputs. NSE-8 board composition terminates the emulator's generic
 physical microphone specifically at MIC2 and its speaker at EAR. COBBA samples
