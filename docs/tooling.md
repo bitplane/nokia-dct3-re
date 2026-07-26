@@ -37,6 +37,10 @@
   - `display_trace_check.py` — validates the version-specific NV descriptor
     `0x0749` mapping and the selected PCD8544 command/data stream captured by
     `make verify-display`.
+  - `cobba_control_trace_check.py` — validates the exact result of the mapped
+    COBBA control-device conformance fixture: reset handshake, latched 12-bit
+    writes, non-destructive addressed reads and select masking. It deliberately
+    verifies no analogue register semantics.
   - `radio_answered_audio_boundary_trace_check.py` — validates the answer-only
     DSP shared-control command, its committed shared-RAM publication, and the
     bounded acknowledgement-tone start/stop sequence captured by

@@ -660,6 +660,9 @@ void nokia_dct3_state::machine_reset()
 	const u8 hardware = m_hw_config.read_safe(0x3f);
 	if (BIT(m_diag_config.read_safe(0x00), 0))
 		machine().logerror("dspif_fixture: conformance=%02x\n", m_dspif->run_conformance_checks());
+	if (BIT(m_diag_config.read_safe(0x00), 1))
+		machine().logerror("cobba_fixture: control_conformance=%02x\n",
+				m_cobba->run_control_conformance_checks());
 	// Load the deterministic product-level selector tuple. Electrical signal
 	// names and units remain deliberately unassigned where board evidence is absent.
 	for (unsigned id = 0; id < 8; id++)
@@ -1379,6 +1382,9 @@ static INPUT_PORTS_START( noki3210 )
 	PORT_CONFNAME(0x01, 0x00, "Run DSPIF conformance check")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
+	PORT_CONFNAME(0x02, 0x00, "Run COBBA control conformance check")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x02, DEF_STR(On))
 
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.

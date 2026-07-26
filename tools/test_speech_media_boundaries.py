@@ -165,6 +165,12 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("m_hle_microphone", control_write)
         self.assertNotIn("m_hle_output", control_write)
         self.assertNotIn("gain", control_write)
+        conformance = cobba.split(
+            "u8 nokia_cobba_device::run_control_conformance_checks", 1
+        )[1].split("bool nokia_cobba_device::write_earpiece_pcm", 1)[0]
+        self.assertNotIn("m_hle_microphone", conformance)
+        self.assertNotIn("m_hle_output", conformance)
+        self.assertNotIn("gain", conformance)
 
     def test_remote_voice_source_stays_at_network_boundary(self):
         voice = (

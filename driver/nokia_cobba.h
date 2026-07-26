@@ -51,6 +51,7 @@ public:
 	{
 		return m_control_registers[address & 0x0f];
 	}
+	u8 run_control_conformance_checks();
 	bool write_earpiece_pcm(const pcm_block &block);
 	void read_microphone_pcm(pcm_block &block);
 	u64 earpiece_blocks() const { return m_earpiece_blocks; }

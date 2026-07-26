@@ -828,9 +828,13 @@ low-nibble register select commits a write; select bit 4 requests a read, whose
 data port reports the addressed 12-bit value with the busy flag clear after
 the immediate modelled transaction. Control register `0xD` resets to the
 recovered idle handshake value `0x00c` (accept bits clear, completion bits
-set). Other register meanings are deliberately not
-attached to routes or gains yet. In particular, command `0x08` does not
-synthetically write a COBBA register.
+set). `make verify-cobba-control` exercises that device boundary directly. It
+checks reset state, 12-bit data masking and write-select commit, non-destructive
+read-select with a retained data latch, and masking of the select word to its
+read bit and low address nibble. The conformance operation snapshots and
+restores the complete opaque control state. Other register meanings are
+deliberately not attached to routes or gains yet. In particular, command
+`0x08` does not synthetically write a COBBA register.
 
 The laboratory network has two separately configured speech endpoints.
 `NETCFG` bit `0x10` selects raw frame loopback, which consumes an uplink frame

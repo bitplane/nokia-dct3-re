@@ -85,7 +85,10 @@ uniform `0xff`, the paired MCU uploads remain coefficient/configuration data,
 and no organic MCU-visible transaction reaches `control_select_w`. Therefore
 the opaque register transport remains deliberately disconnected from the HLE
 MIC2/EAR profile. `test_speech_media_boundaries.py` rejects any attempt to
-make an opaque control write alter that route or its gains.
+make an opaque control write alter that route or its gains. The independent
+`make verify-cobba-control` mapped-device gate now proves the admitted
+latch/select/read grammar at runtime and restores its complete control state;
+it does not promote any register to a mux or gain control.
 
 ## Reusable research workflow
 

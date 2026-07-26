@@ -85,6 +85,57 @@ u16 nokia_cobba_device::control_data_r() const
 	return m_control_registers[m_control_address] & 0x0fff;
 }
 
+u8 nokia_cobba_device::run_control_conformance_checks()
+{
+	const auto saved_registers = m_control_registers;
+	const u16 saved_latch = m_control_data_latch;
+	const u8 saved_address = m_control_address;
+	const bool saved_read = m_control_read;
+	u8 result = 0;
+
+	// Reset exposes only the recovered ROM4 idle handshake in register D.
+	bool reset_state = m_control_registers[0x0d] == 0x000c;
+	for (u8 address = 0; address != m_control_registers.size(); ++address)
+		if (address != 0x0d && m_control_registers[address] != 0)
+			reset_state = false;
+	if (reset_state)
+		result |= 0x01;
+
+	// A write-select commits the previously latched, 12-bit payload.
+	control_data_w(0xface);
+	control_select_w(0x03);
+	if (m_control_registers[0x03] == 0x0ace &&
+			m_control_address == 0x03 && !m_control_read)
+		result |= 0x02;
+
+	// A read-select changes the addressed readback without committing the
+	// current data latch. A later write-select commits that retained latch.
+	control_data_w(0x0123);
+	control_select_w(0x13);
+	const bool read_non_destructive =
+			control_data_r() == 0x0ace &&
+			m_control_registers[0x03] == 0x0ace && m_control_read;
+	control_select_w(0x04);
+	if (read_non_destructive && m_control_registers[0x04] == 0x0123)
+		result |= 0x04;
+
+	// Only select bit 4 and the low address nibble are part of this protocol.
+	control_data_w(0x1fed);
+	control_select_w(0xa5);
+	const bool masked_write =
+			m_control_registers[0x05] == 0x0fed &&
+			m_control_address == 0x05 && !m_control_read;
+	control_select_w(0xb5);
+	if (masked_write && m_control_read && control_data_r() == 0x0fed)
+		result |= 0x08;
+
+	m_control_registers = saved_registers;
+	m_control_data_latch = saved_latch;
+	m_control_address = saved_address;
+	m_control_read = saved_read;
+	return result;
+}
+
 bool nokia_cobba_device::write_earpiece_pcm(const pcm_block &block)
 {
 	m_stream->update();
