@@ -549,8 +549,27 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x2A345C: ("adds", "r0, r0, r1"),
     0x2A345E: ("lsls", "r0, r0, #4"),
     0x2A3464: ("ldrh", "r5, [r4, #4]"),
+    # Startup clears the whole ordinary SRAM arena, then applies a counted
+    # copy table.  This lets the verifier distinguish zero-initialized runtime
+    # records from fixed data copied out of flash.
+    0x2000F4: ("ldr", "r0, [pc, #0x7c]"),
+    0x2000F6: ("ldr", "r1, [pc, #0x80]"),
+    0x200108: ("cmp", "r1, #0x2f"),
+    0x20011C: ("ldr", "r0, [pc, #0x5c]"),
+    0x200130: ("ldr", "r1, [r0, #4]"),
+    0x200144: ("ldrb", "r4, [r0]"),
+    0x200148: ("strb", "r4, [r1]"),
+    # The remaining call's SRAM-table event is copied from a 28-byte
+    # registration descriptor by this sole table constructor.
+    0x25A4F8: ("ldr", "r6, [pc, #0x370]"),
+    0x25A4FE: ("ldrb", "r1, [r4, #0x19]"),
+    0x25A510: ("ldrh", "r1, [r2, #0x12]"),
+    0x25A512: ("strh", "r1, [r4, #0x12]"),
+    0x25A5B2: ("cmp", "r5, #0x50"),
 }
 DSP_PARAMETER_MODE_EVENT_TABLE_ADDRESS = 0x2B43F0
+DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS = 0x1061A4
+NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
     0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
@@ -1265,6 +1284,108 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "NSE-3 byte-indexed mode event table contains a parameter event"
         )
 
+    # Reconstruct the startup copy image.  The firmware first clears
+    # 0x100020..0x10c507, so addresses absent from this table begin as zero.
+    initial_sram: dict[int, int] = {}
+    copy_cursor = NSE3_COPY_TABLE_ADDRESS
+    copy_records = 0
+    runtime_table_copied = False
+    while True:
+        offset = copy_cursor - FLASH_BASE
+        size = (
+            (int.from_bytes(physical[offset : offset + 4], "little") << 16)
+            | (int.from_bytes(physical[offset : offset + 4], "little") >> 16)
+        ) & 0xFFFFFFFF
+        if size == 0:
+            break
+        destination_raw = int.from_bytes(
+            physical[offset + 4 : offset + 8], "little"
+        )
+        destination = (
+            (destination_raw << 16) | (destination_raw >> 16)
+        ) & 0xFFFFFFFF
+        source = copy_cursor + 8
+        if (
+            destination
+            <= DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS
+            < destination + size
+        ):
+            runtime_table_copied = True
+        for index in range(size):
+            # Byte lanes cross within each flash halfword on this image.
+            source_offset = (source - FLASH_BASE + index) ^ 1
+            initial_sram[destination + index] = physical[source_offset]
+        copy_cursor = source + ((size + 3) & ~3)
+        copy_records += 1
+        if copy_records > 512:
+            raise ValueError("NSE-3 startup copy table did not terminate")
+    if copy_records != 109 or copy_cursor != 0x2A586C:
+        raise ValueError(
+            "NSE-3 startup copy table changed: expected 109 records ending "
+            f"at 0x2a586c, got {copy_records} ending at {copy_cursor:#x}"
+        )
+    if runtime_table_copied:
+        raise ValueError(
+            "NSE-3 runtime event-record table unexpectedly has a flash image"
+        )
+
+    registration_profile = {
+        "apis": [
+            {
+                "address": 0x25A4F0,
+                "name": "runtime_record_register",
+                "kind": "constructor",
+                "arguments": {"descriptor": "r2"},
+            }
+        ]
+    }
+    registrations = extract_calls(
+        registration_profile, instructions, physical, FLASH_BASE
+    )
+    fixed_registration_events = []
+    runtime_registration_calls = []
+    fixed_rom_descriptors = 0
+    fixed_sram_descriptors = 0
+    for call in registrations:
+        descriptor = call["arguments"]["descriptor"]
+        if descriptor is None:
+            runtime_registration_calls.append(call["callsite"])
+            continue
+        if FLASH_BASE <= descriptor < FLASH_BASE + len(physical):
+            event_offset = descriptor - FLASH_BASE + 0x12
+            event = int.from_bytes(
+                physical[event_offset : event_offset + 2], "little"
+            )
+            fixed_rom_descriptors += 1
+        elif SRAM_BASE <= descriptor < SRAM_BASE + SRAM_SIZE:
+            low = initial_sram.get(descriptor + 0x12, 0)
+            high = initial_sram.get(descriptor + 0x13, 0)
+            event = low | (high << 8)
+            fixed_sram_descriptors += 1
+        else:
+            raise ValueError(
+                f"NSE-3 registration descriptor outside flash/SRAM: "
+                f"{descriptor:#x}"
+            )
+        fixed_registration_events.append(event)
+    if (
+        len(registrations) != 116
+        or fixed_rom_descriptors != 81
+        or fixed_sram_descriptors != 5
+        or len(runtime_registration_calls) != 30
+    ):
+        raise ValueError(
+            "NSE-3 runtime-record registration census changed: expected "
+            "116 total, 81 ROM, 5 startup-SRAM and 30 runtime descriptors; "
+            f"got {len(registrations)}, {fixed_rom_descriptors}, "
+            f"{fixed_sram_descriptors}, {len(runtime_registration_calls)}"
+        )
+    if {value & 0x1FFF for value in fixed_registration_events} & target_events:
+        raise ValueError(
+            "NSE-3 fixed runtime-record registration can publish a "
+            "parameter event"
+        )
+
     unresolved = DSP_PARAMETER_UNRESOLVED_EVENT_CALLS
     return {
         "event_apis": {
@@ -1287,9 +1408,22 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "byte_domain_mode_table": [0x2A3472],
         },
         "remaining_unresolved_calls": unresolved,
+        "remaining_runtime_record_population": {
+            "constructor": 0x25A4F0,
+            "table": DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS,
+            "capacity": 80,
+            "direct_calls": len(registrations),
+            "fixed_rom_descriptors": fixed_rom_descriptors,
+            "startup_sram_descriptors": fixed_sram_descriptors,
+            "runtime_descriptors": runtime_registration_calls,
+            "fixed_descriptors_exclude_parameter_events": True,
+            "startup_copy_records": copy_records,
+            "table_zero_initialized": True,
+            "object_record_population": "unresolved",
+        },
         "runtime_built_calls_exclude_parameter_events": False,
         "producer_absence_proven": False,
-        "next_evidence": "bound_25a87e_runtime_record_population_or_organic_trace",
+        "next_evidence": "bound_30_runtime_descriptors_and_object_records_or_trace",
     }
 
 

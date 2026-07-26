@@ -240,6 +240,11 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x2B43F0,
             check.DSP_PARAMETER_MODE_EVENT_TABLE_ADDRESS,
         )
+        self.assertEqual(
+            0x1061A4,
+            check.DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS,
+        )
+        self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
 
     def test_dsp_bootstrap_result_rejects_generic_ready_one(self):
         physical = bytearray(b"\xff" * check.FLASH_SIZE)

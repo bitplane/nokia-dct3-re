@@ -264,10 +264,21 @@ Finally, `0x2a3472` uses a byte selector plus a binary input to address two
 event halfwords finds no member of `0x076f..0x0778`.
 
 Only `0x25a87e` remains unresolved. It selects an event from either a
-runtime-owned object record or the SRAM table rooted at `0x1061a4`; the
-initial contents of SRAM are not evidence for its populated values. The exact
-verifier therefore reduces the dynamic frontier from eight calls to one, but
-still does not claim producer absence or that the paired events are dormant.
+runtime-owned object record or the SRAM table rooted at `0x1061a4`. Startup
+first clears `0x100020..0x10c507`, then applies the 109-entry counted copy
+table at `0x2a5008`; no copy record covers `0x1061a4`, so the event table is
+proven zero-initialized rather than treated as unknowable initial SRAM.
+
+The table's population boundary is also recovered. The sole constructor at
+`0x25a4f0` has capacity 80 and copies event halfword `descriptor[0x12]` into
+the selected 28-byte SRAM record. A whole-image census finds 116 direct calls:
+81 use fixed ROM descriptors, five use descriptors reconstructed from the
+startup SRAM copy image, and 30 construct or select descriptors at runtime.
+None of the 86 fixed descriptors supplies `0x076f..0x0778`. The remaining
+evidence frontier is therefore those 30 runtime descriptors plus the
+alternative runtime-object record population—not the table's initial state.
+The exact verifier still does not claim producer absence or that the paired
+events are dormant.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
