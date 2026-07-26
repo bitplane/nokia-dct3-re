@@ -125,6 +125,9 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn('ROM_REGION16_BE(0x100000, "flash"', rom)
         self.assertIn('ROM_REGION(0x02000, "eeprom"', rom)
         self.assertIn("nse3_rom3_f711604_boot.bin", rom)
+        self.assertIn("6110_nse3_v406_rom3_candidate.fls", rom)
+        self.assertIn("CRC(78f6dce9)", rom)
+        self.assertIn("SHA1(5025a6ac3b4a13714211fde903f27f92cbb7c9b6)", rom)
         self.assertEqual(rom.count("NO_DUMP"), 6)
         self.assertNotIn("MAD2_INTERNAL_ROMS", rom)
 

@@ -117,16 +117,40 @@ This pair is a labelled portability input rather than the canonical 3310 MAME
 set. Its PMM is BIOS-specific and must not be combined with the older declared
 3310 images.
 
-### Nokia 6110 NSE-3 acquisition status
+### Nokia 6110 NSE-3 v4.06
 
 The primary service manual specifies a 1 MiB Intel TE28F800 program flash and
-an independent 8 KiB serial EEPROM. Historical firmware indexes identify
-NSE-3 v5.48 MCU + PPM B as the likely baseline, but the surviving indexed
-download links found in the July 2026 audit are unavailable or terminate at
-obsolete hosts. There is therefore no declared `noki6110` ROM set yet.
+an independent 8 KiB serial EEPROM. Internet Archive item
+`Nokia_DCT3_firmwares` preserves original self-extracting package
+`Nse-3_v4.06.exe`:
+
+| source | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Nse-3_v4.06.exe` | 673,764 | `851c5c3df031055a5023665bb8ead3e3c69fa38fd40a0c04443c1511730f4cbb` |
+| `NSE32514.060` MCU records | 782,176 | `efc34ed1b4420de6f466ab435f24db3b27631dbb5f7f482f4da5ac37abe8dda1` |
+| `NSE32514.06B` PPM B records | 262,432 | `cac545fe9fbf737a93fade3ecddbdeb4eb0b1d0c8df52d6da79a6f13e51463b3` |
+
+The archive's SHA-1 and MD5 agree with its public metadata. The two members are
+Wintesla record streams. MCU covers `0x200000..0x2bebff`; PPM B covers
+`0x2c0000..0x2fffff`. `make normalize-6110` validates every record and gap,
+then writes the ignored 1 MiB image
+`roms/noki6110/6110_nse3_v406_rom3_candidate.fls`:
+
+| Bytes | CRC32 | SHA-1 | SHA-256 |
+| ---: | --- | --- | --- |
+| 1,048,576 | `78f6dce9` | `5025a6ac3b4a13714211fde903f27f92cbb7c9b6` | `aace812405bca224689ae707ea1a6174dbcf413bf62c88a944d96d298880ba60` |
+
+The image identifies `V 4.06`, dated 16-01-98, NSE-3, PPM B. Contemporary
+version tables distinguish `v5.48 ROM3` from `05.48 ROM4`; the unpadded v4.06
+spelling is therefore a ROM3 candidate, not yet proof. The driver declares it
+under that label but cannot promote booting until the matching F711604 internal
+boot/DSP ROMs are acquired or independently dumped.
+
+Historical indexes still identify v5.48 MCU + PPM B as the final baseline.
+Surviving free download links are dead; GSMForum retains v4.06/v5.40/v5.47/
+v5.48 and ROM4 attachments behind paid authentication. Keep seeking an
+accessible, hashable v5.48 source without treating filenames as identity proof.
 
 Do not pad a later image, reuse a 3210 EEPROM, or declare a 2 MiB flash device.
-When an NSE-3 image is obtained, preserve the original archive outside this
-repository and record member names, sizes and SHA-256 values. ROM3 and ROM4
-variants must be distinguished before runtime results are compared. The
-hardware and staged acceptance requirements are in `docs/6110_bringup.md`.
+The hardware and staged acceptance requirements are in
+`docs/6110_bringup.md`.

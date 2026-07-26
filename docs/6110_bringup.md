@@ -36,10 +36,22 @@ as `Int 28F800B3-T`, manufacturer/device ID `0089:8892`:
 Public historical indexes consistently label the final GSM NSE-3 release as
 v5.48 and describe an MCU + PPM B archive of about 1.07 MiB. They are discovery
 leads, not identity evidence. The currently indexed firmware.center NSE-3
-directory is empty, and the surviving links found during the audit terminate at
-obsolete file hosts. No local image exists yet.
+directory is empty, and surviving free links terminate at obsolete hosts.
 
-An accepted baseline must:
+Internet Archive's `Nokia_DCT3_firmwares` collection supplies an earlier,
+original `Nse-3_v4.06.exe` service package. Its independently hashed Wintesla
+members normalize reproducibly to exactly 1 MiB: MCU
+`0x200000..0x2bebff`, an erased gap through `0x2bffff`, and PPM B
+`0x2c0000..0x2fffff`. The normalized image has SHA-1
+`5025a6ac3b4a13714211fde903f27f92cbb7c9b6`; full source/member hashes and the
+reproduction command are recorded in `roms/README.md`.
+
+This is a real firmware-analysis baseline, but not a boot promotion. Its
+unprefixed `V 4.06` version spelling is consistent with contemporary ROM3
+version tables, so the BIOS is explicitly labelled “ROM3 candidate”. The
+matching F711604 internal boot/DSP ROMs and 24C64 contents remain `NO_DUMP`.
+
+Any later v5.48 replacement or comparison baseline must:
 
 1. be identified as Nokia 6110 NSE-3, not the later 6110 Navigator;
 2. retain the original archive and member names outside the repository;
