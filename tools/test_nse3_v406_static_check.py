@@ -491,6 +491,47 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.RADIO_REPORT_HANDLER_ANCHORS[0x215A18],
         )
 
+    def test_type_0x8f_triggers_distinct_candidate_list_request_stage(self):
+        self.assertEqual(
+            0x1090FF, check.RADIO_REPORT_HANDLER_LITERALS[0x2803CC]
+        )
+        self.assertEqual(
+            0x13B7, check.RADIO_REPORT_HANDLER_LITERALS[0x2803DC]
+        )
+        self.assertEqual(0x214788, check.CANDIDATE_LIST_REQUEST_BUILDER)
+        self.assertEqual(
+            [0x216192, 0x217210],
+            check.CANDIDATE_LIST_REQUEST_BUILDER_DIRECT_CALLS,
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x54"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2147A2],
+        )
+        self.assertEqual(
+            ("adds", "r0, #0x18"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2147D8],
+        )
+        self.assertEqual(
+            ("cmp", "r2, #0x28"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2147E4],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x50"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x21480A],
+        )
+        self.assertEqual(
+            ("movs", "r0, #9"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x21480E],
+        )
+        self.assertEqual(
+            ("bl", "#0x25fb4c"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x214814],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x6e"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x217218],
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)

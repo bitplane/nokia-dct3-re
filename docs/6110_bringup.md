@@ -427,6 +427,31 @@ controller gates. Outside that state/mode, a zero first control byte permits
 `CHANNEL_CONFIGURE` packet. The exact image therefore establishes a
 timing/candidate-update shape without assigning a DSP report name.
 
+Type `0x8f` exposes a later and materially different request stage. Handler
+`0x2803c8` reads no report-body field, discards only when controller byte
+`0x1090ff` equals 1, and otherwise posts the unchanged eight-byte object as
+task-12 status `0x13b7`. Its consumer at `0x217208` likewise reads no
+report-body field. Unless task state `0x106b08` equals 3 it calls shared
+builder `0x214788`; the whole image has exactly one other direct caller of
+that builder, at `0x216192`.
+
+Builder `0x214788` does not emit another bitmap. It allocates `0x54` bytes,
+declares length `0x50` and type `0x09`, and scans 24-byte records in
+candidate state `0x106aa4`. Records whose byte +`0x0f` is zero contribute
+their two-byte key at +`0x0a..0x0b`; up to forty pairs are placed from
+request-object byte 4 onward, with every unused pair filled `ff ff`. A
+non-empty selection is submitted to task 3, advances controller byte
+`0x109107` to `0x0f`, and returns 1. Its no-submission path returns zero;
+the type-`0x8f` consumer then arms timer `0x6e` with raw duration 8 and
+numeric control argument zero.
+
+This proves that NSE-3 acquisition uses at least two distinct outbound radio
+representations: the type-`0x1a` populated bitmap and a later type-`0x09`
+candidate-key list. They are separate protocol stages sharing firmware
+candidate state, not alternative product-wide wire profiles. The semantic
+name of type `0x8f`, the exact declared-length/pair-padding interpretation,
+and the DSP conditions that emit the trigger remain unassigned.
+
 There is a narrower relationship to one populated type-`0x1a` request path:
 builder `0x20e9cc` reads the same byte `0x1090ff`, distinguishes values 6
 and 7, and uses that state to populate request-object bytes `0x12..0x13`

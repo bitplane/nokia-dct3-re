@@ -746,6 +746,76 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x215A04: ("strh", "r0, [r4, #8]"),
     0x215A08: ("strb", "r0, [r4, #0xf]"),
     0x215A18: ("adds", "r4, #0x18"),
+    # Type 0x8f is a body-independent controller trigger.  Its task-12 arm
+    # calls the shared type-0x09 candidate-list request builder and falls back
+    # to timer 0x6e when that builder reports no submission.
+    0x2803C8: ("push", "{r4, lr}"),
+    0x2803CC: ("ldr", "r0, [pc, #0x230]"),
+    0x2803CE: ("ldrb", "r0, [r0]"),
+    0x2803D0: ("cmp", "r0, #1"),
+    0x2803D4: ("adds", "r0, r4, #0"),
+    0x2803D6: ("bl", "#0x26069c"),
+    0x2803DC: ("ldr", "r0, [pc, #0x224]"),
+    0x2803DE: ("strh", "r0, [r4]"),
+    0x2803E2: ("movs", "r1, #8"),
+    0x2803E4: ("bl", "#0x276912"),
+    0x2803E8: ("movs", "r0, #0xc"),
+    0x2803EC: ("bl", "#0x25fb4c"),
+    0x217208: ("ldr", "r0, [pc, #0x364]"),
+    0x21720C: ("cmp", "r0, #3"),
+    0x217210: ("bl", "#0x214788"),
+    0x217214: ("cmp", "r0, #0"),
+    0x217218: ("movs", "r0, #0x6e"),
+    0x21721A: ("movs", "r1, #8"),
+    0x21721C: ("bl", "#0x25f146"),
+    0x217220: ("movs", "r0, #0x6e"),
+    0x217222: ("movs", "r1, #0"),
+    0x217224: ("bl", "#0x276648"),
+    0x217228: ("ldrb", "r0, [r6, #0xd]"),
+    0x21722A: ("cmp", "r0, #0xf"),
+    0x217232: ("strb", "r0, [r6, #0xd]"),
+    0x217234: ("movs", "r0, #2"),
+    0x217236: ("bl", "#0x295e1c"),
+    # The shared builder emits a separate type-0x09 request.  It scans 24-byte
+    # candidate records, copies selected two-byte keys into a 40-pair buffer,
+    # and fills all remaining pairs with ff ff.
+    0x214788: ("push", "{r4, r5, r6, r7, lr}"),
+    0x21478A: ("ldr", "r4, [pc, #0x14c]"),
+    0x21478C: ("ldr", "r0, [r4, #0x30]"),
+    0x214796: ("ldrb", "r1, [r1, r4]"),
+    0x214798: ("cmp", "r1, #0xa"),
+    0x2147A2: ("movs", "r0, #0x54"),
+    0x2147A4: ("bl", "#0x260abc"),
+    0x2147B0: ("ldrb", "r7, [r4, #8]"),
+    0x2147B8: ("ldrb", "r3, [r0, #0xf]"),
+    0x2147C2: ("ldrh", "r5, [r0, #0xa]"),
+    0x2147C4: ("lsrs", "r5, r5, #8"),
+    0x2147C6: ("strb", "r5, [r3, #4]"),
+    0x2147C8: ("ldrb", "r5, [r0, #0xb]"),
+    0x2147CA: ("strb", "r5, [r3, #5]"),
+    0x2147D8: ("adds", "r0, #0x18"),
+    0x2147E4: ("cmp", "r2, #0x28"),
+    0x2147E8: ("movs", "r3, #0xff"),
+    0x2147EE: ("strb", "r3, [r0, #4]"),
+    0x2147F0: ("strb", "r3, [r0, #5]"),
+    0x214808: ("strh", "r0, [r1]"),
+    0x21480A: ("movs", "r0, #0x50"),
+    0x21480C: ("strb", "r0, [r1, #2]"),
+    0x21480E: ("movs", "r0, #9"),
+    0x214810: ("strb", "r0, [r1, #3]"),
+    0x214812: ("movs", "r0, #3"),
+    0x214814: ("bl", "#0x25fb4c"),
+    0x214818: ("movs", "r0, #6"),
+    0x21481A: ("bl", "#0x295e1c"),
+    0x21481E: ("ldr", "r0, [pc, #0x2e0]"),
+    0x214820: ("movs", "r1, #0xf"),
+    0x214822: ("strb", "r1, [r0]"),
+    0x214824: ("movs", "r0, #1"),
+    0x214868: ("movs", "r1, #2"),
+    0x21486A: ("strb", "r1, [r0]"),
+    0x21486C: ("ldr", "r0, [pc, #0x2a4]"),
+    0x21486E: ("strb", "r1, [r0]"),
+    0x214876: ("movs", "r0, #0"),
     # The task-side ALL_RSSI_RESULTS case accepts controller state 4 only for
     # the active type-0x1a search, and also accepts states 6 and 7.
     0x21732E: ("movs", "r0, #0x6b"),
@@ -981,7 +1051,15 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x2172DC: 0x106AF6,
     0x21730A: 0x297001,
     0x2159BA: 0x106AA4,
+    0x2803CC: 0x1090FF,
+    0x2803DC: 0x13B7,
+    0x217208: 0x106B08,
+    0x21478A: 0x106AA4,
+    0x21481E: 0x109107,
+    0x21486C: 0x106B08,
 }
+CANDIDATE_LIST_REQUEST_BUILDER = 0x214788
+CANDIDATE_LIST_REQUEST_BUILDER_DIRECT_CALLS = [0x216192, 0x217210]
 TASK_11_EVENT_DECODER = 0x210DA8
 TASK_11_EVENT_DECODER_DIRECT_CALLS = [
     0x211CFC,
@@ -2498,6 +2576,22 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 scalar-measurement timer call census changed: expected "
             f"{expected_scalar_timer_calls}, got {scalar_timer_calls}"
         )
+    candidate_list_builder_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == CANDIDATE_LIST_REQUEST_BUILDER
+    ]
+    if (
+        candidate_list_builder_calls
+        != CANDIDATE_LIST_REQUEST_BUILDER_DIRECT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 candidate-list request-builder call census changed: "
+            f"expected {CANDIDATE_LIST_REQUEST_BUILDER_DIRECT_CALLS}, "
+            f"got {candidate_list_builder_calls}"
+        )
     task_4_entry = effective_u32(
         physical, NSE3_TASK_4_ENTRY_POINTER - FLASH_BASE)
     if task_4_entry != NSE3_TASK_4_ENTRY:
@@ -2955,6 +3049,51 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "direct_bitmap_search_constructor": None,
                 "direct_channel_configure_constructor": None,
                 "acquisition_terminal": False,
+                "semantic_name_assigned": False,
+            },
+            "type_0x8f": {
+                "handler": 0x2803C8,
+                "discard_controller_byte": 0x1090FF,
+                "discard_controller_values": [1],
+                "task": 12,
+                "status": 0x13B7,
+                "task_object_bytes": 8,
+                "report_body_read_by_handler": False,
+                "report_body_read_by_consumer": False,
+                "consumer": 0x217208,
+                "suppressed_task_state": {
+                    "cell": 0x106B08,
+                    "value": 3,
+                },
+                "candidate_list_builder": {
+                    "routine": CANDIDATE_LIST_REQUEST_BUILDER,
+                    "direct_calls": candidate_list_builder_calls,
+                    "request_type": 0x09,
+                    "declared_length": 0x50,
+                    "object_allocation": 0x54,
+                    "destination_task": 3,
+                    "candidate_state": 0x106AA4,
+                    "candidate_record_bytes": 0x18,
+                    "candidate_key_offsets": [0x0A, 0x0B],
+                    "selection_byte_offset": 0x0F,
+                    "selected_value": 0,
+                    "maximum_pairs": 40,
+                    "unused_pair": [0xFF, 0xFF],
+                    "controller_byte_after_submission": {
+                        "cell": 0x109107,
+                        "value": 0x0F,
+                    },
+                    "success_return": 1,
+                    "no_submission_return": 0,
+                },
+                "no_submission_path": {
+                    "timer_code": 0x6E,
+                    "raw_duration": 8,
+                    "control_argument": 0,
+                },
+                "direct_bitmap_search_constructor": None,
+                "direct_channel_configure_constructor": None,
+                "acquisition_stage": "candidate_list_request",
                 "semantic_name_assigned": False,
             },
             "task_11_event_decoder": {
