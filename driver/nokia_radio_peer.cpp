@@ -612,7 +612,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 	switch (m_phase)
 	{
 	case phase::candidate_measurement:
-		if (m_protocol_profile == protocol_profile::nhm5_candidate_list)
+		if (m_acquisition_profile == acquisition_profile::nhm5)
 			return m_reports_remaining == 2 ? 0x80 : 0x8b;
 		return 0x8b;
 	case phase::candidate_sync:
@@ -670,15 +670,19 @@ u32 nokia_radio_peer_device::paging_frame_number(u32 minimum_frame_number) const
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
 {
-	const bool nse8_search =
-			m_protocol_profile == protocol_profile::nse8_bitmap_search &&
+	const bool bitmap_search =
+			m_wire_profile == wire_profile::bitmap_search &&
 			packet.type == 0x1a && packet.length != 0;
-	const bool nhm5_search =
-			m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+	const bool candidate_list_search =
+			m_wire_profile == wire_profile::candidate_list &&
 			packet.type == 0x56 && packet.length == 160;
+	const bool nse8_search =
+			bitmap_search && m_acquisition_profile == acquisition_profile::nse8;
+	const bool nhm5_search =
+			candidate_list_search && m_acquisition_profile == acquisition_profile::nhm5;
 	const bool search = nse8_search || nhm5_search;
 
-	if (nse8_search)
+	if (bitmap_search)
 	{
 		m_search_mode = packet.payload[0];
 		// SEARCH_LIST carries a 512-bit ARFCN set after its four-byte control
@@ -687,7 +691,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		m_search_has_serving_arfcn =
 				packet.length > 65 && BIT(packet.payload[65], 0);
 	}
-	else if (nhm5_search)
+	else if (candidate_list_search)
 	{
 		// NHM-5 constructs eighty big-endian channel entries and uses 0xffff
 		// for unused slots. Its independently recovered 0x8b consumer uses the
@@ -760,7 +764,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		else
 			m_reports_remaining = 1;
 	}
-	else if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+	else if (m_acquisition_profile == acquisition_profile::nhm5 &&
 			packet.type == 0x55 && packet.length == 4 &&
 			m_phase == phase::candidate_measurement &&
 			m_reports_remaining == 0)
@@ -774,7 +778,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 	else if (packet.type == 0x02 &&
 			(((m_phase == phase::candidate_sync || m_phase == phase::selected_search) &&
 				m_reports_remaining == 0) ||
-			(m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+			(m_acquisition_profile == acquisition_profile::nhm5 &&
 				m_phase == phase::candidate_measurement &&
 				m_reports_remaining == 1)))
 	{
@@ -782,7 +786,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// acquisition and the later mode-0x40 selection pass. Complete the same
 		// recovered channel-change transaction while its acceptance window is open.
 		const bool nhm5_active_sync =
-				m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+				m_acquisition_profile == acquisition_profile::nhm5 &&
 				m_phase == phase::candidate_measurement;
 		const bool selected_plmn_search =
 				m_phase == phase::selected_search && m_search_mode == 0x50;
@@ -823,7 +827,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// acquisition BCCH to its idle common-control receiver; subsequent
 		// decoded blocks on that receiver are PCH/AGCH, not more SI payloads.
 		m_idle_common_control_active =
-				m_protocol_profile == protocol_profile::nhm5_candidate_list;
+				m_acquisition_profile == acquisition_profile::nhm5;
 		m_phase = phase::serving_channel_change;
 		m_reports_remaining = 1;
 		m_report_deferred = true;
@@ -854,11 +858,11 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			packet.length >= 16 && packet.payload[8] == 0x60 &&
 			(packet.payload[15] == 0x0f ||
 				(m_traffic_channel_active &&
-					((m_protocol_profile ==
-								protocol_profile::nse8_bitmap_search &&
+					((m_acquisition_profile ==
+								acquisition_profile::nse8 &&
 							packet.payload[15] == 0x08) ||
-						(m_protocol_profile ==
-								protocol_profile::nhm5_candidate_list &&
+						(m_acquisition_profile ==
+								acquisition_profile::nhm5 &&
 							packet.payload[15] == 0x14)))))
 	{
 		// RR Channel Release makes the ROM issue the same CHANNEL_CONFIGURE
@@ -965,7 +969,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
-		else if (m_protocol_profile == protocol_profile::nhm5_candidate_list)
+		else if (m_acquisition_profile == acquisition_profile::nhm5)
 		{
 			// NHM-5 keeps ownership of the assigned SDCCH after an empty UI
 			// block and requests another transmit opportunity.  NSE-8 does not:
@@ -1081,7 +1085,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			const auto pending_kind =
 					m_gsm_session->pending_downlink_kind();
 			m_wait_ticks = 0;
-			if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+			if (m_acquisition_profile == acquisition_profile::nhm5 &&
 					pending_kind ==
 							nokia_gsm_session_device::downlink_kind::
 									incoming_call_setup)
@@ -1143,8 +1147,8 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				m_reports_remaining = 1;
 				m_wait_ticks = 0;
 				m_report_deferred = true;
-				if (m_protocol_profile ==
-							protocol_profile::nhm5_candidate_list &&
+				if (m_acquisition_profile ==
+							acquisition_profile::nhm5 &&
 						action ==
 								nokia_gsm_session_device::downlink_kind::
 										incoming_call_setup)
@@ -1212,14 +1216,14 @@ void nokia_radio_peer_device::emit_report()
 		{
 			const bool serving_result =
 					result == 0 &&
-					(m_protocol_profile != protocol_profile::nhm5_candidate_list ||
+					(m_acquisition_profile != acquisition_profile::nhm5 ||
 						m_search_has_serving_arfcn);
 			payload[2 + result * 4] =
 					serving_result ? u8(m_serving_arfcn >> 8) : 0xff;
 			payload[3 + result * 4] =
 					serving_result ? u8(m_serving_arfcn) : 0xff;
 			payload[5 + result * 4] = serving_result ?
-					(m_protocol_profile == protocol_profile::nhm5_candidate_list ?
+					(m_acquisition_profile == acquisition_profile::nhm5 ?
 						u8(m_gsm_network->serving_rssi(m_search_round)) :
 						(m_search_round < 2 ? u8(0x93) :
 							u8(m_gsm_network->serving_rssi(m_search_round - 2)))) :
@@ -1368,7 +1372,7 @@ void nokia_radio_peer_device::emit_report()
 	}
 
 	if (report_type == 0x89 &&
-			m_protocol_profile == protocol_profile::nhm5_candidate_list)
+			m_acquisition_profile == acquisition_profile::nhm5)
 	{
 		// NHM-5's CHANNEL_CHANGED_CNF consumer correlates payload bit 0 with
 		// ordinary pending channel-change contexts. Assigned SDCCH context
@@ -1701,7 +1705,7 @@ void nokia_radio_peer_device::tick()
 	if (m_phase == phase::service_downlink &&
 			m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
-	if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+	if (m_acquisition_profile == acquisition_profile::nhm5 &&
 			m_phase == phase::lapdm_establish &&
 			m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
@@ -1717,7 +1721,7 @@ void nokia_radio_peer_device::tick()
 			!(m_phase == phase::selected_bcch && m_wait_ticks != 0) &&
 			!(m_phase == phase::service_downlink && m_wait_ticks != 0) &&
 			!(m_phase == phase::service_uplink_request && m_wait_ticks != 0) &&
-			!(m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+			!(m_acquisition_profile == acquisition_profile::nhm5 &&
 				m_phase == phase::lapdm_establish && m_wait_ticks != 0))
 		emit_report();
 }

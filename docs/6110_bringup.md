@@ -196,6 +196,16 @@ NSE-3 confirmation handler does not require the product-specific body-bit
 correlation recovered for NHM-5. It does not, by itself, prove which DSP
 report follows next in every controller state.
 
+The emulator configuration now reflects this evidence directly. Radio
+`wire_profile` selects only packet representation (`bitmap_search` or
+`candidate_list`), while `acquisition_profile` selects the product-specific
+sequencing and timing policy (`nse8` or `nhm5`). The 3210 and 3310 select both
+halves of their proven contracts. The 6110 selects the proven shared
+`bitmap_search` wire format but leaves acquisition policy `none` and keeps the
+peer disabled. This prevents a future caller from treating identical bitmap
+packing as proof of the entire NSE-8 search lifecycle, while avoiding a copied
+NSE-3 packet codec.
+
 The external image also proves the MCU side of a much larger bootstrap
 transfer. Routine `0x2858fc..0x2859ff` samples 32,766 halfwords from its own
 flash, beginning at reset entry `0x200040`, advancing by `0x20` bytes and

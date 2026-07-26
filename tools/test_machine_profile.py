@@ -83,6 +83,8 @@ class MachineProfileTest(unittest.TestCase):
                 "cobba_hle_voice.microphone": "nokia_cobba_device::mic2",
                 "cobba_hle_voice.output": "nokia_cobba_device::ear",
                 "pup_eeprom_scl_bit": "2",
+                "radio_wire":
+                    "nokia_radio_peer_device::wire_profile::bitmap_search",
             },
         )
         self.assertIn(
@@ -95,6 +97,7 @@ class MachineProfileTest(unittest.TestCase):
         )
         for peer in ("dsp_service", "external_service", "radio_peer"):
             self.assertNotIn(f"result.{peer} = true;", body)
+        self.assertNotIn("result.radio_acquisition =", body)
 
         profile = self.driver.split(
             "void nokia_dct3_state::noki6110(machine_config &config)", 1
@@ -108,6 +111,24 @@ class MachineProfileTest(unittest.TestCase):
             "apply_product_config(PRODUCT_6110);",
         ):
             self.assertIn(declaration, profile)
+
+    def test_radio_wire_and_acquisition_policy_are_product_typed_separately(self):
+        self.assertIn(
+            "nokia_radio_peer_device::wire_profile radio_wire",
+            self.driver,
+        )
+        self.assertIn(
+            "nokia_radio_peer_device::acquisition_profile radio_acquisition",
+            self.driver,
+        )
+        self.assertIn(
+            "m_radio_peer->set_wire_profile(product.radio_wire);",
+            self.driver,
+        )
+        self.assertIn(
+            "m_radio_peer->set_acquisition_profile(product.radio_acquisition);",
+            self.driver,
+        )
 
     def test_6110_map_uses_nse3_physical_extents_without_later_rom2_alias(self):
         body = self.function_body(

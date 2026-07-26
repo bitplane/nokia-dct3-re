@@ -113,8 +113,10 @@ struct nokia_product_config
 	bool dsp_service = false;
 	bool external_service = false;
 	bool radio_peer = false;
-	nokia_radio_peer_device::protocol_profile radio_protocol =
-			nokia_radio_peer_device::protocol_profile::none;
+	nokia_radio_peer_device::wire_profile radio_wire =
+			nokia_radio_peer_device::wire_profile::none;
+	nokia_radio_peer_device::acquisition_profile radio_acquisition =
+			nokia_radio_peer_device::acquisition_profile::none;
 	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
 	unsigned dsp_bootstrap_exchanges = 64;
@@ -149,8 +151,9 @@ constexpr nokia_product_config make_3210_config()
 	result.dsp_service = true;
 	result.external_service = true;
 	result.radio_peer = true;
-	result.radio_protocol =
-			nokia_radio_peer_device::protocol_profile::nse8_bitmap_search;
+	result.radio_wire = nokia_radio_peer_device::wire_profile::bitmap_search;
+	result.radio_acquisition =
+			nokia_radio_peer_device::acquisition_profile::nse8;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
 	// Paired NSE-8 firmware independently constructs/removes this field around
@@ -191,8 +194,9 @@ constexpr nokia_product_config make_3310_config()
 	result.dsp_service = true;
 	result.external_service = true;
 	result.radio_peer = true;
-	result.radio_protocol =
-			nokia_radio_peer_device::protocol_profile::nhm5_candidate_list;
+	result.radio_wire = nokia_radio_peer_device::wire_profile::candidate_list;
+	result.radio_acquisition =
+			nokia_radio_peer_device::acquisition_profile::nhm5;
 	result.keypad_five_rows = true;
 	result.dsp_bootstrap_exchanges = 58;
 	result.dsp_service_delay_us = 4'000;
@@ -287,6 +291,10 @@ constexpr nokia_product_config make_6110_config()
 	// B06 and a later path compares it against 0x0b06, so the generic HLE ready
 	// value 1 is demonstrably incompatible. Keep the peer disabled pending the
 	// full DSP-side publication semantics.
+	// Its external firmware independently proves the shared type-0x1a/68
+	// bitmap wire boundary. Record that separately from the still-unproved
+	// NSE-3 acquisition policy; a disabled peer cannot synthesize traffic.
+	result.radio_wire = nokia_radio_peer_device::wire_profile::bitmap_search;
 	result.cobba_pcm.data_clock = 1'000'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	result.cobba_pcm.sample_bits = 13;
@@ -709,7 +717,8 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_cobba->set_hle_voice_profile(product.cobba_hle_voice);
 	m_external_service_peer->set_enabled(product.external_service);
 	m_radio_peer->set_enabled(product.radio_peer);
-	m_radio_peer->set_protocol_profile(product.radio_protocol);
+	m_radio_peer->set_wire_profile(product.radio_wire);
+	m_radio_peer->set_acquisition_profile(product.radio_acquisition);
 	m_b3_flash->set_enabled(product.flash_b3_block_lock);
 }
 

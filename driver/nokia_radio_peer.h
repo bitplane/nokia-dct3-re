@@ -15,11 +15,18 @@
 class nokia_radio_peer_device : public device_t
 {
 public:
-	enum class protocol_profile : u8
+	enum class wire_profile : u8
 	{
 		none,
-		nse8_bitmap_search,
-		nhm5_candidate_list
+		bitmap_search,
+		candidate_list
+	};
+
+	enum class acquisition_profile : u8
+	{
+		none,
+		nse8,
+		nhm5
 	};
 
 	// GSM 06.10/ETSI TS 46.010 full-rate speech: one 20 ms, 260-bit
@@ -37,7 +44,11 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
-	void set_protocol_profile(protocol_profile profile) { m_protocol_profile = profile; }
+	void set_wire_profile(wire_profile profile) { m_wire_profile = profile; }
+	void set_acquisition_profile(acquisition_profile profile)
+	{
+		m_acquisition_profile = profile;
+	}
 	void set_page_after_registration(bool enabled)
 	{
 		m_page_after_registration = enabled;
@@ -161,7 +172,8 @@ private:
 	required_device<nokia_lapdm_link_device> m_lapdm_link;
 	emu_timer *m_burst_timer = nullptr;
 	bool m_enabled = false;
-	protocol_profile m_protocol_profile = protocol_profile::none;
+	wire_profile m_wire_profile = wire_profile::none;
+	acquisition_profile m_acquisition_profile = acquisition_profile::none;
 	bool m_trace_enabled = false;
 	unsigned m_reports_sent = 0;
 	unsigned m_reports_remaining = 0;
