@@ -135,16 +135,27 @@ accesses, terminators and derived stream fingerprint. This establishes the
 external firmware's transfer schedule without requiring a running emulator or
 guessing through a missing peer.
 
+The post-transfer results are no longer completely unconstrained. After the
+final non-zero wait, the routine copies shared `0x10000` to SRAM `0x10b97a`
+and shared `0x10002` to `0x10b97c`. One diagnostic path formats the first
+captured word nibblewise as `B06`; a separate later path compares it against
+exactly `0x0b06` and branches away when it differs. The verifier pins the sole
+direct bootstrap call at `0x2973f0`, both result captures, the formatter and
+the exact comparison. This proves that publishing the generic HLE ready word
+`0x0001` cannot satisfy all NSE-3 firmware paths. No equivalent value
+constraint has yet been recovered for the captured `0x10002` word.
+
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, what non-zero response
-values mean, or what publishes the final word. The matching internal DSP image
-is absent. In particular, “64 transfer blocks” is not interchangeable with the
-existing HLE peer's product-configured completion counter: that counter embeds
-response policy, while this gate establishes only transfer geometry and
-non-zero waits. Consequently the NSE-3 profile still has no DSP peer, no
-guessed ready value and no inherited NSE-8 or NHM-5 service grammar. The
-static JSON records these unknowns so later work cannot silently promote the
-shared layout into a working-handshake claim.
+values mean beyond that exact comparison, or what publishes the final words.
+The matching internal DSP image is absent. In particular, “64 transfer blocks”
+is not interchangeable with the existing HLE peer's product-configured
+completion counter: that counter embeds response policy, while this gate
+establishes transfer geometry, non-zero waits and one captured-word
+constraint. Consequently the NSE-3 profile still has no DSP peer, no guessed
+ready value and no inherited NSE-8 or NHM-5 service grammar. The static JSON
+records these unknowns so later work cannot silently promote the shared layout
+into a working-handshake claim.
 
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine

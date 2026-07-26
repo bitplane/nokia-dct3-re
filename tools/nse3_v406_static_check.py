@@ -18,10 +18,10 @@ import capstone
 
 try:
     from tools.mad2_static_census import analyze_image
-    from tools.message_census import decode_image, literal_value
+    from tools.message_census import decode_image, immediate_target, literal_value
 except ModuleNotFoundError:  # Direct execution from tools/.
     from mad2_static_census import analyze_image
-    from message_census import decode_image, literal_value
+    from message_census import decode_image, immediate_target, literal_value
 
 
 FLASH_BASE = 0x200000
@@ -173,6 +173,40 @@ DSP_BOOTSTRAP_LITERALS = {
     0x2859BC: 0xFFFF,
 }
 DSP_BOOTSTRAP_STREAM_SHA1 = "f708ffd71e430f41c47f12e18128cf4deffb5845"
+DSP_BOOTSTRAP_RESULT_ANCHORS = {
+    # Capture the two final shared publications in the DSPIF state object.
+    0x2859E4: ("ldr", "r0, [pc, #0xa8]"),
+    0x2859E6: ("ldrh", "r2, [r1, #2]"),
+    0x2859E8: ("strh", "r2, [r0, #0xc]"),
+    0x2859EA: ("ldrh", "r1, [r1]"),
+    0x2859EC: ("strh", "r1, [r0, #0xa]"),
+    # The normal initialization sequence has one direct transfer call.
+    0x2973F0: ("bl", "#0x2858fc"),
+    # One diagnostic formatter emits the captured 0x10000 word as Bxx.
+    0x28E976: ("ldr", "r1, [pc, #0x35c]"),
+    0x28E978: ("ldrh", "r0, [r1]"),
+    0x28E97A: ("lsrs", "r0, r0, #8"),
+    0x28E97C: ("lsls", "r0, r0, #0x1c"),
+    0x28E97E: ("lsrs", "r0, r0, #0x1c"),
+    0x28E980: ("adds", "r0, #0x37"),
+    0x28E984: ("ldrh", "r0, [r1]"),
+    0x28E986: ("lsrs", "r0, r0, #4"),
+    0x28E990: ("ldrh", "r0, [r1]"),
+    0x28E992: ("lsls", "r0, r0, #0x1c"),
+    # A later path requires the same captured word to equal 0x0b06.
+    0x298E82: ("ldr", "r0, [pc, #0x48]"),
+    0x298E84: ("ldrh", "r1, [r0]"),
+    0x298E86: ("ldr", "r0, [pc, #0x48]"),
+    0x298E88: ("cmp", "r1, r0"),
+    0x298E8A: ("beq", "#0x298e8e"),
+    0x298E8C: ("b", "#0x298b36"),
+}
+DSP_BOOTSTRAP_RESULT_LITERALS = {
+    0x2859E4: 0x10B970,
+    0x28E976: 0x10B97A,
+    0x298E82: 0x10B97A,
+    0x298E86: 0x0B06,
+}
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -221,10 +255,12 @@ def decode_thumb_anchors(data: bytes, anchors: dict[int, tuple[str, str]]) -> No
 
 def verify_thumb_literals(data: bytes, literals: dict[int, int]) -> None:
     physical = swap16(data)
-    instructions = decode_image(physical, FLASH_BASE)
-    by_address = {insn.address: insn for insn in instructions if insn}
+    decoder = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+    decoder.detail = True
     for pc, expected in literals.items():
-        actual = literal_value(by_address.get(pc), physical, FLASH_BASE)
+        offset = pc - FLASH_BASE
+        decoded = list(decoder.disasm(physical[offset : offset + 4], pc, count=1))
+        actual = literal_value(decoded[0] if decoded else None, physical, FLASH_BASE)
         if actual != expected:
             raise ValueError(
                 f"Thumb literal {pc:#x}: expected {expected:#x}, got "
@@ -388,6 +424,21 @@ def extract_dsp_bootstrap_stream(data: bytes) -> bytes:
 def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, DSP_BOOTSTRAP_ANCHORS)
     verify_thumb_literals(data, DSP_BOOTSTRAP_LITERALS)
+    decode_thumb_anchors(data, DSP_BOOTSTRAP_RESULT_ANCHORS)
+    verify_thumb_literals(data, DSP_BOOTSTRAP_RESULT_LITERALS)
+    physical = swap16(data)
+    direct_callers = [
+        insn.address
+        for insn in decode_image(physical, FLASH_BASE)
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == 0x2858FC
+    ]
+    if direct_callers != [0x2973F0]:
+        raise ValueError(
+            "NSE-3 DSP bootstrap direct callers changed: expected "
+            f"[0x2973f0], got {[hex(address) for address in direct_callers]}"
+        )
     stream = extract_dsp_bootstrap_stream(data)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != DSP_BOOTSTRAP_STREAM_SHA1:
@@ -421,6 +472,22 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             "wait_condition": "opposite_cell_nonzero",
             "post_transfer_publication_wait": 0x10002,
             "reply_meaning": "not_established",
+        },
+        "result_capture": {
+            "direct_callers": direct_callers,
+            "shared_0x10000": {
+                "storage": 0x10B97A,
+                "exact_comparison": 0x0B06,
+                "comparison_pc": 0x298E88,
+                "diagnostic_render": "B06",
+                "render_pc": 0x28E976,
+            },
+            "shared_0x10002": {
+                "storage": 0x10B97C,
+                "value_constraint": "not_established",
+            },
+            "current_hle_ready_0x0001_satisfies_comparison": False,
+            "word_meaning": "not_established",
         },
         "claims": {
             "stream_is_dsp_code": "not_established",

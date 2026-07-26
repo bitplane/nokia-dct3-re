@@ -176,6 +176,20 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(b"\x12\x34\x56\x78", stream[:4])
         self.assertEqual(b"\x9a\xbc\xff\xff\xff\xff", stream[-6:])
 
+    def test_dsp_bootstrap_result_rejects_generic_ready_one(self):
+        physical = bytearray(b"\xff" * check.FLASH_SIZE)
+        pc = 0x298E86
+        physical[pc - check.FLASH_BASE : pc - check.FLASH_BASE + 2] = (
+            bytes.fromhex("1248")
+        )
+        generic_ready = 1
+        raw = ((generic_ready << 16) | (generic_ready >> 16)) & 0xFFFFFFFF
+        struct.pack_into("<I", physical, 0x298ED0 - check.FLASH_BASE, raw)
+        with self.assertRaisesRegex(ValueError, "expected 0xb06"):
+            check.verify_thumb_literals(
+                check.swap16(bytes(physical)), {pc: 0x0B06}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
