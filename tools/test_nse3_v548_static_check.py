@@ -29,6 +29,15 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
         )
         self.assertEqual(0x1C28, rom4["formatter"] - rom3["formatter"])
         self.assertEqual(0x1C2C, rom4["acceptance"] - rom3["acceptance"])
+        self.assertEqual((0x0358, 0x0008), rom3["eeprom_security_records"][0x0701])
+        self.assertEqual((0x0360, 0x002C), rom3["eeprom_security_records"][0x0702])
+        self.assertEqual((0x0380, 0x0008), rom4["eeprom_security_records"][0x0701])
+        self.assertEqual((0x0388, 0x002C), rom4["eeprom_security_records"][0x0702])
+        self.assertEqual(
+            0x28,
+            rom4["eeprom_security_records"][0x0701][0]
+            - rom3["eeprom_security_records"][0x0701][0],
+        )
 
     def test_result_contract_is_not_named_as_physical_cobba(self):
         source = Path(check.__file__).read_text(encoding="utf-8")

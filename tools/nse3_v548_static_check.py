@@ -29,6 +29,11 @@ VARIANTS = {
             0x2838C8, 0x2838E8, 0x283908, 0x28392A, 0x283A5A,
             0x283AF2, 0x297A04, 0x297B4E, 0x297C3C,
         ],
+        "eeprom_security_directory": 0x2B8524,
+        "eeprom_security_records": {
+            0x0701: (0x0358, 0x0008),
+            0x0702: (0x0360, 0x002C),
+        },
         "internal_rom_service": 0x23751A,
         "internal_rom_service_call": 0x237532,
         "internal_rom_service_setter": 0x28CB36,
@@ -51,6 +56,11 @@ VARIANTS = {
             0x2854E4, 0x285504, 0x285524, 0x285546, 0x285676,
             0x28570E, 0x299630, 0x29977A, 0x299868,
         ],
+        "eeprom_security_directory": 0x2B9838,
+        "eeprom_security_records": {
+            0x0701: (0x0380, 0x0008),
+            0x0702: (0x0388, 0x002C),
+        },
         "internal_rom_service": 0x237A5A,
         "internal_rom_service_call": 0x237A72,
         "internal_rom_service_setter": 0x28E75E,
@@ -165,6 +175,27 @@ def verify_variant(path: Path, name: str) -> dict:
     for marker in profile["identity"]:
         if marker not in data:
             raise ValueError(f"{path}: missing embedded identity {marker!r}")
+
+    # The ROM3 and ROM4 images carry different external-EEPROM record
+    # directories.  Each descriptor is {u32 id, u16 offset, u16 length}.
+    # Keep these product-revision offsets distinct; a valid ROM4 template is
+    # not evidence for ROM3's security/configuration layout.
+    directory_offset = profile["eeprom_security_directory"] - FLASH_BASE
+    expected_directory = b"".join(
+        record.to_bytes(4, "big")
+        + offset.to_bytes(2, "big")
+        + length.to_bytes(2, "big")
+        for record, (offset, length)
+        in profile["eeprom_security_records"].items()
+    )
+    actual_directory = data[
+        directory_offset : directory_offset + len(expected_directory)
+    ]
+    if actual_directory != expected_directory:
+        raise ValueError(
+            f"{path}: EEPROM security record directory changed: expected "
+            f"{expected_directory.hex()}, got {actual_directory.hex()}"
+        )
 
     base = profile["loader"]
     # v5.48 initializes four shared bootstrap cells.  The pre-upload exchange
@@ -399,6 +430,15 @@ def verify_variant(path: Path, name: str) -> dict:
         "stream_sha1": stream_sha1,
         "state": profile["state"],
         "state_literal_roots": state_literal_roots,
+        "eeprom_security_directory": profile["eeprom_security_directory"],
+        "eeprom_security_records": {
+            f"{record:#06x}": {
+                "offset": offset,
+                "length": length,
+            }
+            for record, (offset, length)
+            in profile["eeprom_security_records"].items()
+        },
         "final_result_capture": {
             "first_storage": first_result,
             "first_direct_literal_references":

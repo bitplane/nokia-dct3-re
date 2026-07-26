@@ -1445,6 +1445,25 @@ value. This narrows the missing contract to a DSP-owned completion event. It
 still does not justify publishing zero: zero would not satisfy the firmware's
 wait, and the exact non-sentinel hardware verdict remains unknown.
 
+The collaborator's prepared NokiX EEPROM is also ROM4-specific evidence, not
+a generic NSE-3 factory profile. The exact flash record directories encode
+eight-byte descriptors `{u32 id, u16 EEPROM offset, u16 length}`. ROM3's
+directory at `0x2b8524` maps security state record `0x0701` to
+`0x0358`/length 8 and settings record `0x0702` to `0x0360`/length `0x2c`.
+ROM4's directory at `0x2b9838` instead maps them to `0x0380` and `0x0388`
+with the same lengths. The `0x28` relocation is in EEPROM data layout, not
+merely flash code.
+
+Current upstream provisions its shared NSE-3 blob using the ROM4 offsets
+`0x0380` and `0x0388 + 0x1f`. Those offsets are now independently corroborated
+for this repository's exact ROM4 image, but applying them to ROM3 would edit
+different records. No upstream bytes are imported, and the setting-byte index
+inside record `0x0702` remains runtime-sweep evidence rather than a
+flash-derived fact. Local provisioning must therefore be selected by exact
+firmware layout and must begin from a legally obtained matching 24C64 image;
+an erased device cannot be turned into calibrated factory state by copying
+only these security records.
+
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
 retain their three ready words of `1`; NSE-3 v4.06 selects
