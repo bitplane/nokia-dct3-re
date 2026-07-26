@@ -278,6 +278,14 @@ channel-map command `0x70`, applies its map through `0x2398a0`, and returns a
 one-byte `0x70` acknowledgement containing that result. Its alternative path
 disables the map and returns an empty command-`0x71` acknowledgement.
 
+The map consumer independently fixes the reusable data boundary. It rejects a
+frame whose low length byte is at most `0x42`, addresses the map at queue
+object byte 9, and passes exactly `0x40` bytes to store `0x293a40`. It then
+feeds the stored map and two associated runtime bytes into activation call
+`0x29ffc2`, returning success. This proves a shared 64-byte map parser; it does
+not prove that NSE-3's peer advertises the NSE-8 startup bits for service
+channels `0x5f` and `0x62`.
+
 NSE-3 also constructs command `0x64` with a nine-byte body at `0x239cfc`.
 The result field at body offset 1 is dynamically selected as zero or one from
 bit 6 of a runtime flag byte, while the seven fixed product bytes are

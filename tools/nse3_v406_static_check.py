@@ -484,6 +484,22 @@ EXTERNAL_SERVICE_APPLICATION_ANCHORS = {
     0x239900: ("movs", "r1, #0x70"),
     0x239902: ("movs", "r2, #1"),
     0x239904: ("bl", "#0x237a12"),
+    # The map consumer requires a sufficiently large frame, selects object
+    # byte 9 and passes exactly 64 bytes to the shared map store before
+    # activating the resulting runtime tuple.  It does not reveal peer-owned
+    # bitmap contents.
+    0x2398A0: ("push", "{r4, lr}"),
+    0x2398A2: ("ldrb", "r1, [r0, #5]"),
+    0x2398A4: ("cmp", "r1, #0x42"),
+    0x2398AC: ("movs", "r1, #9"),
+    0x2398AE: ("adds", "r4, r1, r0"),
+    0x2398B2: ("movs", "r1, #0x40"),
+    0x2398B4: ("bl", "#0x293a40"),
+    0x2398C8: ("ldrb", "r0, [r2, #5]"),
+    0x2398CA: ("ldrb", "r2, [r2, #6]"),
+    0x2398CC: ("adds", "r3, r4, #0"),
+    0x2398CE: ("bl", "#0x29ffc2"),
+    0x2398D2: ("movs", "r0, #1"),
     0x23990C: ("bl", "#0x2398a0"),
     0x239910: ("strb", "r0, [r5, #9]"),
     0x239914: ("bl", "#0x237a58"),
@@ -1831,8 +1847,15 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "enable_command": 0x70,
                 "enable_handler": 0x2398D6,
                 "enable_acknowledgement_length": 1,
+                "consumer": 0x2398A0,
+                "frame_length_low_byte_must_exceed": 0x42,
+                "bitmap_object_offset": 9,
+                "bitmap_bytes": 64,
+                "bitmap_store": 0x293A40,
+                "activation_call": 0x29FFC2,
                 "disable_command": 0x71,
                 "disable_acknowledgement_length": 0,
+                "nse8_advertised_bits_proven_for_nse3": False,
             },
             "status": {
                 "command": 0x64,

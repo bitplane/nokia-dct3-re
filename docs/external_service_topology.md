@@ -10,6 +10,21 @@ Task 2 is the class-`0x40` service-command dispatcher and task 7 is the
 external-service transport adapter. The fault-screen caption does not name the
 protocol.
 
+## Cross-model boundary
+
+Nokia 6110 NSE-3 v4.06 independently confirms that the transport, class-`0x40`
+frame helper, command `0x64` status shape and command `0x70`/`0x71` map
+enable/disable vocabulary are architectural DCT3 pieces rather than NSE-8
+addresses copied into another product.
+
+Its relocated map consumer at `0x2398a0` requires the low frame-length byte to
+exceed `0x42`, takes the map from object byte 9 and supplies exactly `0x40`
+bytes to store `0x293a40` before activation through `0x29ffc2`. Thus the
+64-byte map parser is shared. The current peer's bitmap values selecting
+channels `0x5f` and `0x62`, its startup delay and its ordering are evidenced
+only for NSE-8/NHM-5. They must remain separately typed and disabled for NSE-3
+until its missing DSP side or a hardware trace establishes them.
+
 The machine-readable evidence is produced by `tools/message_census.py`. The ROM
 scan covers all 98 recovered calls to `service_message_alloc_234634`; all five
 target constructor callsites and payload lengths are checked by `--check`.

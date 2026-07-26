@@ -241,6 +241,18 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x239900],
         )
         self.assertEqual(
+            ("cmp", "r1, #0x42"),
+            check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x2398A4],
+        )
+        self.assertEqual(
+            ("movs", "r1, #0x40"),
+            check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x2398B2],
+        )
+        self.assertEqual(
+            ("bl", "#0x293a40"),
+            check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x2398B4],
+        )
+        self.assertEqual(
             ("movs", "r1, #0x64"),
             check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x239D04],
         )
