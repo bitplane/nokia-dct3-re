@@ -3,6 +3,7 @@
 
 import argparse
 import collections
+import hashlib
 import pathlib
 
 try:
@@ -11,7 +12,58 @@ except ModuleNotFoundError:
 	from dsp_packet_semantics_census import parse
 
 
-def check_nhm5_startup(path: pathlib.Path) -> None:
+NHM5_V639_SHA256 = "975ec791205f026d647254ee772d7fa32691fa50c72a68eecdaff7c8a5921442"
+
+
+def swap16(data: bytes) -> bytes:
+	result = bytearray(data)
+	for offset in range(0, len(result) - 1, 2):
+		result[offset], result[offset + 1] = result[offset + 1], result[offset]
+	return bytes(result)
+
+
+def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
+	rom = path.read_bytes()
+	digest = hashlib.sha256(rom).hexdigest()
+	if digest != NHM5_V639_SHA256:
+		raise SystemExit(f"NHM-5 static check requires v6.39 {NHM5_V639_SHA256}, got {digest}")
+
+	unique = {(packet["type"], packet["data"]): packet for packet in packets
+			if packet["direction"] == "tx"}
+	type20 = next((packet for (packet_type, _), packet in unique.items() if packet_type == 0x20), None)
+	type22 = next((packet for (packet_type, _), packet in unique.items() if packet_type == 0x22), None)
+	if type20 is None or type22 is None:
+		raise SystemExit("NHM-5 static check needs observed type 0x20 and 0x22 packets")
+
+	def require_payload(packet: dict, address: int) -> None:
+		offset = address - 0x200000
+		payload = bytes.fromhex(packet["data"])
+		if rom[offset:offset + len(payload)] != payload:
+			raise SystemExit(
+				f"NHM-5 type 0x{packet['type']:02x} does not match ROM table at 0x{address:08x}"
+			)
+
+	require_payload(type22, 0x00325E28)
+	require_payload(type20, 0x00325EF0)
+
+	image = swap16(rom)
+	constructors = {
+		0x002C2A02: bytes.fromhex("022020802020a0702220e070"),
+		0x002C2A5E: bytes.fromhex("022020804420a0702020e070"),
+		0x002C2AB8: bytes.fromhex("022020802020a0702120e070"),
+	}
+	for address, expected in constructors.items():
+		offset = address - 0x200000
+		if image[offset:offset + len(expected)] != expected:
+			raise SystemExit(f"NHM-5 constructor anchor changed at 0x{address:08x}")
+
+	print(
+		"NHM-5 static boundary: type 22/32 and 20/68 are exact profile-selected ROM "
+		"tables; type 21/32 is a separately constructed two-table composite"
+	)
+
+
+def check_nhm5_startup(path: pathlib.Path, rom: pathlib.Path | None = None) -> None:
 	packets = parse("nhm5", path)
 	tx = [packet for packet in packets if packet["direction"] == "tx"]
 	by_type = collections.defaultdict(list)
@@ -53,15 +105,18 @@ def check_nhm5_startup(path: pathlib.Path) -> None:
 		"NHM-5 radio boundary: "
 		"2x20/68, 2x21/32, 2x22/32, 1x56/160; no NSE-8 type 0x1a"
 	)
+	if rom is not None:
+		check_nhm5_static(rom, packets)
 
 
 def main() -> None:
 	parser = argparse.ArgumentParser()
 	parser.add_argument("log", type=pathlib.Path)
 	parser.add_argument("--profile", choices=("nhm5-startup",), required=True)
+	parser.add_argument("--rom", type=pathlib.Path)
 	args = parser.parse_args()
 	if args.profile == "nhm5-startup":
-		check_nhm5_startup(args.log)
+		check_nhm5_startup(args.log, args.rom)
 
 
 if __name__ == "__main__":

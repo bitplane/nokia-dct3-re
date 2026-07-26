@@ -98,6 +98,9 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 				offset << 1, m_ram[offset], machine().time().as_double());
 	if (offset == TX_PRODUCER)
 	{
+		if (m_trace_enabled)
+			LOGMASKED(LOG_DSPIF, "dspif_transport: TX commit producer=%03x context=%s t=%.6f\n",
+					m_ram[offset], machine().describe_context(), machine().time().as_double());
 		m_tx_commit_cb(1);
 		m_tx_commit_cb(0);
 	}

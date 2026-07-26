@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tools.dsp_radio_profile_trace_check import check_nhm5_startup
+from tools.dsp_radio_profile_trace_check import check_nhm5_startup, swap16
 
 
 def line(packet_type: int, data: str, time: float) -> str:
@@ -48,6 +48,9 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 			)
 			with self.assertRaises(SystemExit):
 				check_nhm5_startup(path)
+
+	def test_swap16(self):
+		self.assertEqual(bytes.fromhex("01000302"), swap16(bytes.fromhex("00010203")))
 
 
 if __name__ == "__main__":
