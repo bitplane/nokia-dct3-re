@@ -304,12 +304,26 @@ input rather than a terminal notification.
 The subsequent call to `0x27fdc4` is also unique in the image. It receives
 the original report, not the compact task-12 copy, and tests fields at
 offsets 6, `0x0e`, `0x0f`, `0x10`, `0x12`, `0x13` and `0x14`. Depending
-on those fields and controller state, it may publish an eight-byte object
-with status 2, bytes 2 and 3 equal to `04 1f`, and helper argument
-`0x1e08` to task 3; preserve a `0x28`-byte status-`0x13c8` object for
-task 13; or preserve a `0x28`-byte status-`0x040b` object for task 14.
-These numeric layouts are recorded without assigning protocol meanings
-to the task-3 object or `0x1e08`.
+on those fields and controller state, it may publish an eight-byte
+status-2 object to task 3; preserve a `0x28`-byte status-`0x13c8` object
+for task 13; or preserve a `0x28`-byte status-`0x040b` object for task 14.
+
+The task-3 form is now separated from its adjacent instrumentation. Its
+object byte 2 is four and task 3's status-2 queue eventually passes exactly
+four bytes starting at object +3 to byte-stream helper `0x285746`. The
+wire-side bytes are therefore `1f 00`, a controller-flags byte with
+statically constructed values `01`, `06` or `07`, and a derived timing byte
+or zero. Object byte 7 is local metadata beyond that declared payload.
+
+Before task submission, `0x2768b4` receives the same object with argument
+`0x1e08`. An exact census finds nine callers with arguments
+`1e00..1e05` and `1e08` (not every value occurs). The helper applies the
+shared `0x1c00` filter, derives a secondary identifier from object byte 3,
+and copies eight bytes into a separately allocated envelope through
+`0x29fe98`. It contains no task-3 submission. Thus `0x1e08` belongs to the
+filtered-copy family and is not a task-3 wire field. The numeric
+type-`0x1f` payload remains unnamed until its DSP-side consumer or an
+independent protocol source supplies its meaning.
 
 Across the complete handler extent, none of these arms directly calls
 `CHANNEL_CONFIGURE`, the type-`0x1a` bitmap builder or the type-`0x09`

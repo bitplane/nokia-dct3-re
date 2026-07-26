@@ -391,6 +391,50 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.RADIO_REPORT_HANDLER_ANCHORS[0x27FECC],
         )
         self.assertEqual(
+            [
+                0x27FAB8, 0x27FB0E, 0x27FB20, 0x27FB4E, 0x27FB84,
+                0x27FBC2, 0x27FBFC, 0x27FC1E, 0x27FEC4,
+            ],
+            check.TYPE_0X80_0X70_TRACE_HELPER_DIRECT_CALLS,
+        )
+        self.assertEqual(
+            [
+                0x1E01, 0x1E01, 0x1E00, 0x1E04, 0x1E03,
+                0x1E04, 0x1E03, 0x1E05, 0x1E08,
+            ],
+            check.TYPE_0X80_0X70_TRACE_HELPER_ARGUMENTS,
+        )
+        self.assertEqual(
+            ("bl", "#0x29fe70"),
+            check.TYPE_0X80_0X70_TRACE_HELPER_ANCHORS[0x2768BE],
+        )
+        self.assertEqual(
+            ("bl", "#0x29fe98"),
+            check.TYPE_0X80_0X70_TRACE_HELPER_ANCHORS[0x27690C],
+        )
+        self.assertEqual(
+            0x1E08,
+            check.TYPE_0X80_0X70_TRACE_HELPER_LITERALS[0x2768D2],
+        )
+        self.assertEqual(0x2B74D4, check.NSE3_TASK_3_ENTRY_POINTER)
+        self.assertEqual(0x298AB9, check.NSE3_TASK_3_ENTRY)
+        self.assertEqual(
+            ("beq", "#0x298bd6"),
+            check.TYPE_0X80_0X70_TASK_3_ANCHORS[0x298B44],
+        )
+        self.assertEqual(
+            ("ldrb", "r0, [r5, #2]"),
+            check.TYPE_0X80_0X70_TASK_3_ANCHORS[0x298C82],
+        )
+        self.assertEqual(
+            ("adds", "r1, r5, #3"),
+            check.TYPE_0X80_0X70_TASK_3_ANCHORS[0x298C84],
+        )
+        self.assertEqual(
+            ("bl", "#0x285746"),
+            check.TYPE_0X80_0X70_TASK_3_ANCHORS[0x298C86],
+        )
+        self.assertEqual(
             0x1E08, check.RADIO_REPORT_HANDLER_LITERALS[0x27FEC0]
         )
         self.assertEqual(

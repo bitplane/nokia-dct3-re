@@ -1255,6 +1255,8 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x27FEBC: ("movs", "r0, #0x1f"),
     0x27FEBE: ("strb", "r0, [r4, #3]"),
     0x27FEC0: ("ldr", "r0, [pc, #0x1c8]"),
+    0x27FEC2: ("adds", "r1, r4, #0"),
+    0x27FEC4: ("bl", "#0x2768b4"),
     0x27FEC8: ("movs", "r0, #3"),
     0x27FECC: ("bl", "#0x25fb4c"),
     0x27FF00: ("ldr", "r0, [pc, #0x18c]"),
@@ -1349,6 +1351,48 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x212658: ("ldrb", "r0, [r0]"),
     0x21265A: ("cmp", "r0, #4"),
 }
+TYPE_0X80_0X70_TRACE_HELPER_ANCHORS = {
+    # This helper filters a 0x1c00 publication class, derives a secondary
+    # identifier from object byte 3, and copies the object into a separately
+    # allocated envelope through 0x29fe98.  It does not submit the original
+    # object to task 3.
+    0x2768B4: ("push", "{r4, r5, r6, r7, lr}"),
+    0x2768B6: ("adds", "r4, r1, #0"),
+    0x2768B8: ("adds", "r7, r0, #0"),
+    0x2768BA: ("movs", "r0, #7"),
+    0x2768BC: ("lsls", "r0, r0, #0xa"),
+    0x2768BE: ("bl", "#0x29fe70"),
+    0x2768C6: ("ldrb", "r0, [r4, #3]"),
+    0x2768CA: ("movs", "r1, #0x19"),
+    0x2768CC: ("bl", "#0x276074"),
+    0x2768D2: ("ldr", "r0, [pc, #0x178]"),
+    0x2768D4: ("cmp", "r7, r0"),
+    0x2768D8: ("cmp", "r6, #0x52"),
+    0x2768DC: ("movs", "r0, #1"),
+    0x2768DE: ("ldr", "r1, [pc, #0x170]"),
+    0x2768E0: ("adds", "r2, r4, #0"),
+    0x2768E2: ("bl", "#0x2767dc"),
+    0x276900: ("ldrb", "r0, [r4, #2]"),
+    0x276902: ("adds", "r0, #4"),
+    0x276908: ("adds", "r1, r5, #0"),
+    0x27690A: ("adds", "r2, r4, #0"),
+    0x27690C: ("bl", "#0x29fe98"),
+}
+TYPE_0X80_0X70_TASK_3_ANCHORS = {
+    # Task 3 status 2 queues the object.  Its common output loop later passes
+    # object byte 2 as the length and object +3 as the byte-stream source.
+    0x298AB8: ("push", "{r4, r5, r6, r7, lr}"),
+    0x298B3E: ("ldrh", "r0, [r6]"),
+    0x298B40: ("subs", "r0, r0, #2"),
+    0x298B44: ("beq", "#0x298bd6"),
+    0x298BD6: ("ldr", "r0, [sp, #0x9c]"),
+    0x298BD8: ("cmp", "r0, #0x19"),
+    0x298BE8: ("str", "r6, [r1, r0]"),
+    0x298C78: ("ldrb", "r1, [r5, #2]"),
+    0x298C82: ("ldrb", "r0, [r5, #2]"),
+    0x298C84: ("adds", "r1, r5, #3"),
+    0x298C86: ("bl", "#0x285746"),
+}
 RADIO_REPORT_HANDLER_LITERALS = {
     0x211C68: 0x1393,
     0x211C72: 0x1389,
@@ -1433,6 +1477,10 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x2124F0: 0x106D3C,
     0x212642: 0x106AA4,
     0x212656: 0x1090FF,
+}
+TYPE_0X80_0X70_TRACE_HELPER_LITERALS = {
+    0x2768D2: 0x1E08,
+    0x2768DE: 0x0803,
 }
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 RA_INFO_CONSUMER = 0x20DB1C
@@ -1658,6 +1706,17 @@ TYPE_0X80_DISCRIMINATOR_ROUTES = {
 TYPE_0X80_STATUS_0X13D0_PRODUCERS = [0x280174]
 TYPE_0X80_0X70_FOLLOWUP = 0x27FDC4
 TYPE_0X80_0X70_FOLLOWUP_DIRECT_CALLS = [0x28019A]
+TYPE_0X80_0X70_TRACE_HELPER = 0x2768B4
+TYPE_0X80_0X70_TRACE_HELPER_DIRECT_CALLS = [
+    0x27FAB8, 0x27FB0E, 0x27FB20, 0x27FB4E, 0x27FB84,
+    0x27FBC2, 0x27FBFC, 0x27FC1E, 0x27FEC4,
+]
+TYPE_0X80_0X70_TRACE_HELPER_ARGUMENTS = [
+    0x1E01, 0x1E01, 0x1E00, 0x1E04, 0x1E03,
+    0x1E04, 0x1E03, 0x1E05, 0x1E08,
+]
+NSE3_TASK_3_ENTRY_POINTER = 0x2B74D4
+NSE3_TASK_3_ENTRY = 0x298AB9
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -2987,12 +3046,15 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, RADIO_PACKET_LITERALS)
     decode_thumb_anchors(data, RADIO_REPORT_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
+    decode_thumb_anchors(data, TYPE_0X80_0X70_TRACE_HELPER_ANCHORS)
+    decode_thumb_anchors(data, TYPE_0X80_0X70_TASK_3_ANCHORS)
     decode_thumb_anchors(data, NSE3_TASK_17_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
+    verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -3157,6 +3219,60 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
         raise ValueError(
             "NSE-3 type-0x80/0x70 follow-up acquired a direct radio "
             f"constructor edge: {type_0x80_0x70_followup_request_calls}"
+        )
+    type_0x80_0x70_trace_helper_call_indices = [
+        index
+        for index, insn in enumerate(instructions)
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TYPE_0X80_0X70_TRACE_HELPER
+    ]
+    type_0x80_0x70_trace_helper_calls = [
+        instructions[index].address
+        for index in type_0x80_0x70_trace_helper_call_indices
+    ]
+    if (
+        type_0x80_0x70_trace_helper_calls
+        != TYPE_0X80_0X70_TRACE_HELPER_DIRECT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 0x2768b4 direct-call census changed: expected "
+            f"{TYPE_0X80_0X70_TRACE_HELPER_DIRECT_CALLS}, got "
+            f"{type_0x80_0x70_trace_helper_calls}"
+        )
+    type_0x80_0x70_trace_helper_arguments = [
+        call_registers(instructions, index, physical, FLASH_BASE)["r0"]
+        for index in type_0x80_0x70_trace_helper_call_indices
+    ]
+    if (
+        type_0x80_0x70_trace_helper_arguments
+        != TYPE_0X80_0X70_TRACE_HELPER_ARGUMENTS
+    ):
+        raise ValueError(
+            "NSE-3 0x2768b4 argument family changed: expected "
+            f"{TYPE_0X80_0X70_TRACE_HELPER_ARGUMENTS}, got "
+            f"{type_0x80_0x70_trace_helper_arguments}"
+        )
+    type_0x80_0x70_trace_helper_task_3_submissions = [
+        insn.address
+        for insn in instructions
+        if insn
+        and TYPE_0X80_0X70_TRACE_HELPER <= insn.address < 0x276912
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == 0x25FB4C
+    ]
+    if type_0x80_0x70_trace_helper_task_3_submissions:
+        raise ValueError(
+            "NSE-3 0x2768b4 unexpectedly submits the original object: "
+            f"{type_0x80_0x70_trace_helper_task_3_submissions}"
+        )
+    task_3_entry = effective_u32(
+        physical, NSE3_TASK_3_ENTRY_POINTER - FLASH_BASE
+    )
+    if task_3_entry != NSE3_TASK_3_ENTRY:
+        raise ValueError(
+            "NSE-3 task-3 entry changed: expected "
+            f"{NSE3_TASK_3_ENTRY:#x}, got {task_3_entry:#x}"
         )
     task_17_entry = effective_u32(
         physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
@@ -3738,7 +3854,39 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                                 "object_bytes": 8,
                                 "object_byte_2": 4,
                                 "object_byte_3": 0x1F,
-                                "publication_helper_argument": 0x1E08,
+                                "wire_payload": {
+                                    "length_from_object_offset": 2,
+                                    "source_offset": 3,
+                                    "bytes": [
+                                        0x1F,
+                                        0,
+                                        "controller_flags_0x01_0x06_or_0x07",
+                                        "derived_timing_or_zero",
+                                    ],
+                                    "object_byte_7_is_not_in_payload": True,
+                                },
+                                "pre_submission_copy_helper": {
+                                    "routine":
+                                        TYPE_0X80_0X70_TRACE_HELPER,
+                                    "argument": 0x1E08,
+                                    "all_direct_calls":
+                                        type_0x80_0x70_trace_helper_calls,
+                                    "all_direct_call_arguments":
+                                        type_0x80_0x70_trace_helper_arguments,
+                                    "family": "0x1e00_through_0x1e08_sparse",
+                                    "object_copy_bytes": 8,
+                                    "task_3_submissions":
+                                        type_0x80_0x70_trace_helper_task_3_submissions,
+                                    "assign_wire_semantics": False,
+                                },
+                                "task_3_consumer": {
+                                    "entry_pointer":
+                                        NSE3_TASK_3_ENTRY_POINTER,
+                                    "entry": task_3_entry,
+                                    "status_2_case": 0x298BD6,
+                                    "queue_capacity": 0x19,
+                                    "byte_stream_helper": 0x285746,
+                                },
                             },
                             {
                                 "destination_task": 13,
