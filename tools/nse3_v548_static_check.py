@@ -38,6 +38,9 @@ VARIANTS = {
         },
         "security_validator": 0x29DF76,
         "identity_sum_helper": 0x294884,
+        "settings_record_load": 0x2A3EF8,
+        "settings_record_reader": 0x29A326,
+        "settings_record_state": 0x10FCD6,
         "security_level_state": 0x10FCF5,
         "security_checksum_state": 0x10C62E,
         "internal_rom_service": 0x23751A,
@@ -71,6 +74,9 @@ VARIANTS = {
         },
         "security_validator": 0x29FBA2,
         "identity_sum_helper": 0x2964DC,
+        "settings_record_load": 0x2A5BEC,
+        "settings_record_reader": 0x29BF52,
+        "settings_record_state": 0x10FCD6,
         "security_level_state": 0x10FCF5,
         "security_checksum_state": 0x10C646,
         "internal_rom_service": 0x237A5A,
@@ -224,6 +230,30 @@ def verify_variant(path: Path, name: str) -> dict:
         verify_instruction(data, validator + delta, *expected)
     verify_literal(data, validator + 0x12, profile["security_level_state"])
     verify_literal(data, validator + 0x1C, profile["security_checksum_state"])
+
+    settings_load = profile["settings_record_load"]
+    settings_load_anchors = {
+        0x00: ("push", "{lr}"),
+        0x02: ("sub", "sp, #4"),
+        0x08: ("movs", "r2, #0"),
+        0x0A: ("bl", f"#{profile['settings_record_reader']:#x}"),
+        0x0E: ("add", "sp, #4"),
+        0x10: ("pop", "{pc}"),
+    }
+    for delta, expected in settings_load_anchors.items():
+        verify_instruction(data, settings_load + delta, *expected)
+    verify_literal(data, settings_load + 0x04, profile["settings_record_state"])
+    verify_literal(data, settings_load + 0x06, 0x0702)
+    security_level_index = (
+        profile["security_level_state"] - profile["settings_record_state"]
+    )
+    if security_level_index != 0x1F:
+        raise ValueError(
+            f"{path}: expected security-level index 0x1f, "
+            f"got {security_level_index:#x}"
+        )
+    settings_record = profile["eeprom_security_records"][0x0702]
+    security_level_eeprom_offset = settings_record[1] + security_level_index
 
     base = profile["loader"]
     # v5.48 initializes four shared bootstrap cells.  The pre-upload exchange
@@ -475,7 +505,11 @@ def verify_variant(path: Path, name: str) -> dict:
             "security_level_state": profile["security_level_state"],
             "stored_checksum_state": profile["security_checksum_state"],
             "relationship": "(identity_sum + security_level) & 0xffff == stored_checksum",
-            "eeprom_setting_byte_index": "not_static",
+            "settings_record": 0x0702,
+            "settings_record_load": settings_load,
+            "settings_record_state": profile["settings_record_state"],
+            "eeprom_setting_byte_index": security_level_index,
+            "eeprom_setting_byte_offset": security_level_eeprom_offset,
         },
         "final_result_capture": {
             "first_storage": first_result,

@@ -43,13 +43,17 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
             - rom3["eeprom_security_records"][0x0701][1],
         )
 
-    def test_security_validator_keeps_setting_index_unclaimed(self):
+    def test_security_validator_recovers_setting_index_from_record_load(self):
         source = Path(check.__file__).read_text(encoding="utf-8")
         self.assertIn(
             '"relationship": "(identity_sum + security_level) & 0xffff == stored_checksum"',
             source,
         )
-        self.assertIn('"eeprom_setting_byte_index": "not_static"', source)
+        self.assertIn("security_level_index != 0x1F", source)
+        self.assertIn(
+            '"eeprom_setting_byte_offset": security_level_eeprom_offset',
+            source,
+        )
 
     def test_result_contract_is_not_named_as_physical_cobba(self):
         source = Path(check.__file__).read_text(encoding="utf-8")

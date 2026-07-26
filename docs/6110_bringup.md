@@ -1466,10 +1466,16 @@ assuming the EEPROM template's contents.
 Current upstream provisions its shared NSE-3 blob using the ROM4 offsets
 `0x0380` and `0x0388 + 0x1f`. Those offsets are now independently corroborated
 for this repository's exact ROM4 image, but applying them to ROM3 would edit
-different records. No upstream bytes are imported, and the setting-byte index
-inside record `0x0702` remains runtime-sweep evidence rather than a
-flash-derived fact. Local provisioning must therefore be selected by exact
-firmware layout and must begin from a legally obtained matching 24C64 image;
+different records. The setting-byte index is now independently static as
+well: the homologous loaders at `0x2a3ef8`/`0x2a5bec` read record `0x0702`
+into SRAM `0x10fcd6`, while both validators consume security-level state
+`0x10fcf5`, exactly offset `+0x1f`. The resulting physical EEPROM byte is
+therefore `0x037f` for ROM3 and `0x03a7` for ROM4. This replaces the
+collaborator's ROM4 sweep with firmware proof and derives the previously
+missing ROM3 location.
+
+No upstream bytes are imported. Local provisioning must still be selected by
+exact firmware layout and begin from a legally obtained matching 24C64 image;
 an erased device cannot be turned into calibrated factory state by copying
 only these security records.
 
