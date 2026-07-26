@@ -214,6 +214,19 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(b"\x12\x34\x56\x78", stream[:4])
         self.assertEqual(b"\x9a\xbc\xff\xff\xff\xff", stream[-6:])
 
+    def test_selector_8_state_boundary_keeps_live_and_shadow_blocks_distinct(self):
+        self.assertNotEqual(0x10C020, 0x10C008)
+        self.assertEqual(
+            [0x2B8608, 0x2B861C],
+            [check.DSP_PARAMETER_08_LITERALS[address]
+             for address in (0x2837BE, 0x283AC4)],
+        )
+        self.assertEqual(
+            [0x2B85F8, 0x2B860C],
+            [check.DSP_PARAMETER_08_LITERALS[address]
+             for address in (0x2837D8, 0x283AE8)],
+        )
+
     def test_dsp_bootstrap_result_rejects_generic_ready_one(self):
         physical = bytearray(b"\xff" * check.FLASH_SIZE)
         pc = 0x298E86

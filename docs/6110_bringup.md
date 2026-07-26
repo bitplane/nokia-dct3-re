@@ -226,11 +226,16 @@ This proves a real command codec and one service-mode caller, not that
 `0x8600` means Answer, speech enable, or any particular audio route.
 
 The ordinary DSP-parameter updater supplies a second, non-service path. It
-compares live and shadow halfwords, then maps changed slots through the exact
-selector sequence `08,09,1b,25,20,21,22,23,24,28,2d`; selector 8 is slot
-zero. This proves that command 8 participates in normal parameter-state
-publication without proving which higher call-control transition changes
-slot zero or what value it writes.
+constructs a live eleven-halfword parameter block at SRAM `0x10c020`, compares
+it with the shadow block at `0x10c008`, then maps changed slots through the
+exact selector sequence `08,09,1b,25,20,21,22,23,24,28,2d`; selector 8 is
+slot zero. Within that controller updater, two branches construct the first
+live halfword as `(previous & selected_mask) | indexed_value`, using separate
+tables at `0x2b8608`/`0x2b85f8` and `0x2b861c`/`0x2b860c`. Successful
+publication copies the live halfword into its shadow. This proves that command
+8 participates in product-specific controller-state publication; it does not
+prove which higher call-control transition selects those table entries or
+what speech meaning, if any, belongs to their bits.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
