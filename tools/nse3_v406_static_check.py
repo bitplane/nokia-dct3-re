@@ -20,6 +20,7 @@ try:
     from tools.mad2_static_census import analyze_image
     from tools.message_census import (
         cpu_byte,
+        call_registers,
         decode_image,
         effective_u32,
         extract_calls,
@@ -30,6 +31,7 @@ except ModuleNotFoundError:  # Direct execution from tools/.
     from mad2_static_census import analyze_image
     from message_census import (
         cpu_byte,
+        call_registers,
         decode_image,
         effective_u32,
         extract_calls,
@@ -652,9 +654,40 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x2163B2: ("ldrsb", "r1, [r0, r4]"),
     0x2163D0: ("movs", "r0, #0x6c"),
     0x2163DA: ("movs", "r0, #0x6c"),
+    0x2163DC: ("ldr", "r1, [pc, #0x354]"),
     0x2163DE: ("bl", "#0x25f146"),
     0x2163F0: ("movs", "r0, #0x6c"),
     0x2163F2: ("bl", "#0x25ef90"),
+    # Timer 0x6c has two additional controller query/cancel paths and one
+    # bulk-controller cancel path.  Its expiry status 0x13a6 shares the outer
+    # task-12 case with 0x13a5/0x13a7, then remains distinct inside 0x2155b8.
+    0x2156AE: ("movs", "r0, #0x6c"),
+    0x2156B0: ("bl", "#0x25f23c"),
+    0x2156BA: ("movs", "r0, #0x6c"),
+    0x2156BC: ("bl", "#0x25ef90"),
+    0x21594A: ("movs", "r0, #0x6c"),
+    0x21594C: ("bl", "#0x25ef90"),
+    0x2170E4: ("subs", "r0, #1"),
+    0x2170E6: ("cmp", "r0, #2"),
+    0x2170EA: ("b", "#0x2172b2"),
+    0x2172B2: ("adds", "r0, r4, #0"),
+    0x2172B4: ("bl", "#0x2155b8"),
+    0x2155B8: ("push", "{r4, r5, r6, r7, lr}"),
+    0x2155C4: ("ldrh", "r0, [r0]"),
+    0x2155C6: ("ldr", "r1, [pc, #0x35c]"),
+    0x2155D0: ("subs", "r1, #1"),
+    0x2155D6: ("b", "#0x2156e4"),
+    0x2156E4: ("movs", "r0, #0x6c"),
+    0x2156E6: ("movs", "r1, #2"),
+    0x2156E8: ("bl", "#0x276648"),
+    0x2156EC: ("ldr", "r1, [pc, #0x3a8]"),
+    0x2156F0: ("ldrsh", "r0, [r1, r0]"),
+    0x2156F2: ("cmp", "r0, #0"),
+    0x2156F8: ("ldr", "r0, [pc, #0x3a0]"),
+    0x2156FC: ("cmp", "r0, #4"),
+    0x215702: ("ldr", "r4, [pc, #0x39c]"),
+    0x215704: ("ldrb", "r0, [r4, #0xb]"),
+    0x215706: ("cmp", "r0, #0"),
     # The task-side ALL_RSSI_RESULTS case accepts controller state 4 only for
     # the active type-0x1a search, and also accepts states 6 and 7.
     0x21732E: ("movs", "r0, #0x6b"),
@@ -879,6 +912,11 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x210E0A: 0x139F,
     0x210E14: 0x10918D,
     0x2173B6: 0x106AF6,
+    0x2163DC: 0x0273,
+    0x2155C6: 0x13A5,
+    0x2156EC: 0x106CEA,
+    0x2156F8: 0x1090FF,
+    0x215702: 0x106AA4,
 }
 TASK_11_EVENT_DECODER = 0x210DA8
 TASK_11_EVENT_DECODER_DIRECT_CALLS = [
@@ -979,6 +1017,23 @@ MEASUREMENT_TIMER_CODE = 0x6B
 MEASUREMENT_TIMER_CONFIGURATION = bytes.fromhex("030c0000002be7b0")
 MEASUREMENT_TIMER_EVENT_OBJECT = 0x2BE7B0
 MEASUREMENT_TIMER_EVENT_PREFIX = bytes.fromhex("13aa0000")
+SCALAR_MEASUREMENT_TIMER_CODE = 0x6C
+SCALAR_MEASUREMENT_TIMER_CONFIGURATION = bytes.fromhex(
+    "010c0000002be7a8"
+)
+SCALAR_MEASUREMENT_TIMER_EVENT_OBJECT = 0x2BE7A8
+SCALAR_MEASUREMENT_TIMER_EVENT_PREFIX = bytes.fromhex("13a60000")
+SCALAR_MEASUREMENT_TIMER_ARM_CALLS = [0x2163DE]
+SCALAR_MEASUREMENT_TIMER_CANCEL_CALLS = [
+    0x2156BC,
+    0x21594C,
+    0x2163F2,
+]
+SCALAR_MEASUREMENT_TIMER_QUERY_CALLS = [
+    0x2156B0,
+    0x2163D2,
+    0x2163E8,
+]
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -2353,6 +2408,32 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 task-11 event jump table changed: expected "
             f"{TASK_11_EVENT_JUMP_TABLE}, got {task_11_event_jump_table}"
         )
+    scalar_timer_calls = {}
+    for target, name in (
+        (0x25F146, "arm"),
+        (0x25EF90, "cancel"),
+        (0x25F23C, "query"),
+    ):
+        scalar_timer_calls[name] = [
+            insn.address
+            for index, insn in enumerate(instructions)
+            if insn
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+            and call_registers(
+                instructions, index, physical, FLASH_BASE
+            ).get("r0") == SCALAR_MEASUREMENT_TIMER_CODE
+        ]
+    expected_scalar_timer_calls = {
+        "arm": SCALAR_MEASUREMENT_TIMER_ARM_CALLS,
+        "cancel": SCALAR_MEASUREMENT_TIMER_CANCEL_CALLS,
+        "query": SCALAR_MEASUREMENT_TIMER_QUERY_CALLS,
+    }
+    if scalar_timer_calls != expected_scalar_timer_calls:
+        raise ValueError(
+            "NSE-3 scalar-measurement timer call census changed: expected "
+            f"{expected_scalar_timer_calls}, got {scalar_timer_calls}"
+        )
     task_4_entry = effective_u32(
         physical, NSE3_TASK_4_ENTRY_POINTER - FLASH_BASE)
     if task_4_entry != NSE3_TASK_4_ENTRY:
@@ -2415,6 +2496,41 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 measurement timer event changed: expected "
             f"{MEASUREMENT_TIMER_EVENT_PREFIX.hex()}, got "
             f"{timer_event_prefix.hex()}"
+        )
+    scalar_timer_configuration_address = (
+        TIMER_CONFIGURATION_TABLE_ADDRESS
+        + SCALAR_MEASUREMENT_TIMER_CODE * TIMER_CONFIGURATION_RECORD_BYTES
+    )
+    scalar_timer_configuration = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            scalar_timer_configuration_address + index,
+        )
+        for index in range(TIMER_CONFIGURATION_RECORD_BYTES)
+    )
+    if (
+        scalar_timer_configuration
+        != SCALAR_MEASUREMENT_TIMER_CONFIGURATION
+    ):
+        raise ValueError(
+            "NSE-3 scalar-measurement timer configuration changed: expected "
+            f"{SCALAR_MEASUREMENT_TIMER_CONFIGURATION.hex()}, got "
+            f"{scalar_timer_configuration.hex()}"
+        )
+    scalar_timer_event_prefix = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            SCALAR_MEASUREMENT_TIMER_EVENT_OBJECT + index,
+        )
+        for index in range(len(SCALAR_MEASUREMENT_TIMER_EVENT_PREFIX))
+    )
+    if scalar_timer_event_prefix != SCALAR_MEASUREMENT_TIMER_EVENT_PREFIX:
+        raise ValueError(
+            "NSE-3 scalar-measurement timer event changed: expected "
+            f"{SCALAR_MEASUREMENT_TIMER_EVENT_PREFIX.hex()}, got "
+            f"{scalar_timer_event_prefix.hex()}"
         )
     search_timer_configuration_address = (
         TIMER_CONFIGURATION_TABLE_ADDRESS
@@ -2691,7 +2807,38 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                             "routine": 0x21630C,
                             "report_byte_offsets": [4, 6, 7, 8, 9],
                             "maximum_history_samples": 5,
-                            "timer_code": 0x6C,
+                            "timer": {
+                                "code": 0x6C,
+                                "configuration_address":
+                                    scalar_timer_configuration_address,
+                                "flags": scalar_timer_configuration[0],
+                                "owner_task":
+                                    scalar_timer_configuration[1],
+                                "expiry_event_object":
+                                    SCALAR_MEASUREMENT_TIMER_EVENT_OBJECT,
+                                "expiry_status": 0x13A6,
+                                "raw_duration": 0x0273,
+                                "duration_unit": "not_established",
+                                "arm_calls":
+                                    scalar_timer_calls["arm"],
+                                "query_calls":
+                                    scalar_timer_calls["query"],
+                                "cancel_calls":
+                                    scalar_timer_calls["cancel"],
+                                "expiry_outer_case": 0x2172B2,
+                                "expiry_decoder": 0x2155B8,
+                                "expiry_branch": 0x2156E4,
+                                "expiry_control_call": {
+                                    "code": 0x6C,
+                                    "argument": 2,
+                                },
+                                "expiry_signed_scalar_cell": 0x106CEA,
+                                "expiry_requires_scalar_negative": True,
+                                "expiry_controller_byte": 0x1090FF,
+                                "expiry_controller_value": 4,
+                                "expiry_gate_object": 0x106AA4,
+                                "expiry_rearms_timer": False,
+                            },
                         },
                         "mode_cell": 0x106AF6,
                         "mode_3_state_6_or_7_helper": 0x216424,

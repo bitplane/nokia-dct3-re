@@ -418,6 +418,41 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.RADIO_REPORT_HANDLER_ANCHORS[0x2163D0],
         )
 
+    def test_scalar_measurement_timer_is_distinct_one_shot_control(self):
+        self.assertEqual(0x6C, check.SCALAR_MEASUREMENT_TIMER_CODE)
+        self.assertEqual(
+            bytes.fromhex("010c0000002be7a8"),
+            check.SCALAR_MEASUREMENT_TIMER_CONFIGURATION,
+        )
+        self.assertEqual(
+            bytes.fromhex("13a60000"),
+            check.SCALAR_MEASUREMENT_TIMER_EVENT_PREFIX,
+        )
+        self.assertEqual(
+            [0x2163DE], check.SCALAR_MEASUREMENT_TIMER_ARM_CALLS
+        )
+        self.assertEqual(
+            [0x2156BC, 0x21594C, 0x2163F2],
+            check.SCALAR_MEASUREMENT_TIMER_CANCEL_CALLS,
+        )
+        self.assertEqual(
+            [0x2156B0, 0x2163D2, 0x2163E8],
+            check.SCALAR_MEASUREMENT_TIMER_QUERY_CALLS,
+        )
+        self.assertEqual(
+            0x0273, check.RADIO_REPORT_HANDLER_LITERALS[0x2163DC]
+        )
+        self.assertEqual(
+            ("b", "#0x2156e4"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2155D6],
+        )
+        self.assertEqual(
+            0x13A5, check.RADIO_REPORT_HANDLER_LITERALS[0x2155C6]
+        )
+        self.assertEqual(
+            0x106CEA, check.RADIO_REPORT_HANDLER_LITERALS[0x2156EC]
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)

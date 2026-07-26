@@ -353,8 +353,25 @@ task-12 status `0x13a0`.
 
 The `0x13a0` consumer at `0x2173b0` passes report bytes 4, 6, 7, 8 and 9
 through `0x21630c`. That routine maintains a five-sample rolling scalar
-state and conditionally arms or cancels timer `0x6c`. The consumer then
-selects product-local helpers `0x216424` or `0x216cb4` from mode
+state and conditionally arms or cancels timer `0x6c`. The timer is now
+independently bounded. Its configuration record at `0x2b7930` is
+`01 0c 0000 002be7a8`: flags 1, owner task 12, and expiry object
+`0x2be7a8` carrying status `0x13a6`. A whole-image direct-call census finds
+one arm at `0x2163de` with raw duration `0x0273`, queries at `0x2156b0`,
+`0x2163d2` and `0x2163e8`, and cancellations at `0x2156bc`,
+`0x21594c` and `0x2163f2`.
+
+Task 12 initially shares case `0x2172b2` for statuses `0x13a5..0x13a7`,
+but decoder `0x2155b8` sends `0x13a6` to its own `0x2156e4` branch. That
+branch issues numeric control `(0x6c, 2)` and continues only when signed
+scalar `0x106cea` is negative, controller byte `0x1090ff` equals 4, and an
+additional gate in object `0x106aa4` is clear. It does not rearm timer
+`0x6c`. This makes `0x6c` a distinct one-shot scalar-control timer, not the
+timer-`0x6b` measurement recurrence or timer-`0x1b` activity machinery.
+Its raw duration unit and semantic name remain unassigned.
+
+The type-`0x83` consumer then selects product-local helpers `0x216424` or
+`0x216cb4` from mode
 `0x106af6` and controller states 6/7. Neither the task-11 nor task-12 arm
 directly constructs a bitmap search or `CHANNEL_CONFIGURE` request. Type
 `0x83` is therefore established as controller-routed scalar measurement
