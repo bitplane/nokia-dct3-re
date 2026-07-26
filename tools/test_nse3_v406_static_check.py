@@ -533,6 +533,13 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             },
             check.DSP_BOOTSTRAP_POST_LITERALS,
         )
+        self.assertEqual(
+            0x286098, check.DSP_EXTERNAL_SOFTWARE_STRING
+        )
+        self.assertEqual(
+            b" 25.3.531 \n17-Dec-97\nNSE-3Nx\n(c) NMP.\x00",
+            check.DSP_EXTERNAL_SOFTWARE_BYTES,
+        )
 
 
 if __name__ == "__main__":

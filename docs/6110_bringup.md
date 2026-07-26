@@ -569,8 +569,9 @@ a DSP completion-status response.
 The surrounding service selectors also preserve the revision namespaces in
 firmware rather than merely in our documentation:
 
-- `0x03` (DSP external software) follows a flash-indirect source rooted at
-  `0x2ab52c`;
+- `0x03` (DSP external software) dereferences the flash pointer at `0x2ab52c`
+  to the NUL-terminated identity at `0x286098`: revision `25.3.531`, date
+  `17-Dec-97`, product line `NSE-3Nx`, and copyright marker `(c) NMP.`;
 - `0x09` (DSP internal software) reads a separately populated runtime buffer
   at `0x10bcf0`;
 - `0x0c` (system ASIC) reads MAD2 register `0x20000`; and
@@ -581,6 +582,15 @@ must therefore never use COBBA `B06` as a DSP software revision, MAD mask
 revision or ROM3/ROM4 flash selector. Conversely, learning one of those other
 identities cannot supply the missing DSP-side rule that publishes the COBBA
 word.
+
+The external-software string is stronger than the previously reported source
+root: the verifier now checks the pointer value and every byte through its NUL
+terminator. It identifies the DSP external-software namespace carried by this
+v4.06 image; it does not by itself prove that the sparsely sampled 64 KiB
+bootstrap stream is executable DSP code or that all of revision `25.3.531`
+resides in that stream. Notably, the identity string address is not one of the
+halfwords selected by the stream's `0x20`-byte sampling stride, so the string
+is metadata rather than a byte-for-byte member of the derived stream.
 
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, how the DSP derives or

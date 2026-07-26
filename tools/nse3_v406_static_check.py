@@ -19,7 +19,9 @@ import capstone
 try:
     from tools.mad2_static_census import analyze_image
     from tools.message_census import (
+        cpu_byte,
         decode_image,
+        effective_u32,
         extract_calls,
         immediate_target,
         literal_value,
@@ -27,7 +29,9 @@ try:
 except ModuleNotFoundError:  # Direct execution from tools/.
     from mad2_static_census import analyze_image
     from message_census import (
+        cpu_byte,
         decode_image,
+        effective_u32,
         extract_calls,
         immediate_target,
         literal_value,
@@ -1177,6 +1181,14 @@ COBBA_ID_SERVICE_LITERALS = {
     0x28EA16: 0x10BCF0,
     0x28EA1E: 0x2AB52C,
 }
+DSP_EXTERNAL_SOFTWARE_POINTER_TABLE = 0x2AB52C
+DSP_EXTERNAL_SOFTWARE_STRING = 0x286098
+DSP_EXTERNAL_SOFTWARE_BYTES = (
+    b" 25.3.531 \n"
+    b"17-Dec-97\n"
+    b"NSE-3Nx\n"
+    b"(c) NMP.\x00"
+)
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -2434,6 +2446,24 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, DSP_BOOTSTRAP_POST_ANCHORS)
     verify_thumb_literals(data, DSP_BOOTSTRAP_POST_LITERALS)
     physical = swap16(data)
+    external_software_pointer = effective_u32(
+        physical, DSP_EXTERNAL_SOFTWARE_POINTER_TABLE - FLASH_BASE)
+    if external_software_pointer != DSP_EXTERNAL_SOFTWARE_STRING:
+        raise ValueError(
+            "NSE-3 DSP external-software pointer changed: expected "
+            f"{DSP_EXTERNAL_SOFTWARE_STRING:#x}, got "
+            f"{external_software_pointer!r}"
+        )
+    external_software_bytes = bytes(
+        cpu_byte(physical, FLASH_BASE, external_software_pointer + index)
+        for index in range(len(DSP_EXTERNAL_SOFTWARE_BYTES))
+    )
+    if external_software_bytes != DSP_EXTERNAL_SOFTWARE_BYTES:
+        raise ValueError(
+            "NSE-3 DSP external-software identity changed: expected "
+            f"{DSP_EXTERNAL_SOFTWARE_BYTES!r}, got "
+            f"{external_software_bytes!r}"
+        )
     instructions = decode_image(physical, FLASH_BASE)
     direct_callers = [
         insn.address
@@ -2572,6 +2602,11 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
                 "0x03_dsp_external_software": {
                     "source": "flash_indirect",
                     "pointer_table": 0x2AB52C,
+                    "string_address": external_software_pointer,
+                    "raw": external_software_bytes.decode("ascii").rstrip("\x00"),
+                    "revision": "25.3.531",
+                    "date": "17-Dec-97",
+                    "product": "NSE-3Nx",
                 },
                 "0x09_dsp_internal_software": {
                     "source": "runtime_ram",
