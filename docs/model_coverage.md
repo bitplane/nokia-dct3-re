@@ -157,24 +157,35 @@ successful completion without waking the idle-RR admission path or producing
 RACH, so a missing network retry is also excluded.
 
 The foreground RR loop at `0x255fbe` does not enter admission merely because
-the parser completion byte is set. It first waits for internal completion
-event `0x08cb`; only that event calls `0x255ff8`, which consumes the saved
-parser result and can enter the organic random-access setup at `0x256014`.
-The event is a firmware mailbox completion rather than a DSP-ring packet.
-After release, task 13 sends task 12 request `0x0a05` with selector byte one;
-task 12 stores that selector at `0x0010e4bd`. A complete trace through the
-first addressed page contains no later task-12 input and no `0x08cb`
-publication. Meanwhile later PCH fill results overwrite the asynchronous
-parser result before the foreground loop's ordinary periodic wake.
+the parser completion byte is set. It first waits for internal event
+`0x08cb`; only that event calls `0x255ff8`, which consumes the saved parser
+result and can enter the organic random-access setup at `0x256014`. Static
+decode corrects the earlier task-12 attribution: ROM objects
+`0x3303a0..0x3303b0` carry `0x08ca`, `0x08cc`, `0x08cd`, `0x08cb` and
+`0x08c9`. The task-13 dispatcher maps `0x08ca..0x08cd` to RR timer IDs
+`0x9f`, `0xa2`, `0xa0` and `0xa1`; therefore `0x08cb` is specifically timer
+A2's expiry event.
 
-The remaining failure is therefore the firmware-owned task-12 completion
-contract that should reconnect the background parser to foreground paging
-admission. Reversing the release ordering so the real `0x89` confirmation is
-accepted before result `0x05e8` does not change the paging outcome, excluding
-the modeled four-millisecond confirmation latency as that transition.
-Consequently the next implementation must recover the real L1/timing
-prerequisite for `0x08cb`; changing GSM paging octets, forcing firmware state,
-synthesising that internal event or bypassing the parser would cross the
+RR initialization cancels timers `0x9f..0xa2`. During registration release it
+later arms only `0x9f`, for 80 ticks at `0x256f50`; its `0x08ca` expiry is
+received before the final channel-change request. The sole A2 arm site is
+`0x255ec0`, for 501 ticks, and the coherent paging trace never reaches it.
+Task 13 still sends task 12 request `0x0a05` with selector one, which task 12
+stores at `0x0010e4bd`, but no evidence makes that request the producer of
+`0x08cb`.
+
+A standards-shaped, nonmatching IMSI page in place of the no-identity filler
+also fails to arm A2 or admit the addressed page. Repeated nonmatching pages
+eventually make firmware revalidate its serving-channel configuration and
+publish its existing type-`0x57` terminal, so treating unrelated subscriber
+traffic as the missing wake would be both ineffective and architecturally
+wrong. Reversing the release ordering so the real `0x89` confirmation is
+accepted before result `0x05e8` likewise does not change paging.
+
+The remaining failure is the firmware-owned foreground transition that should
+reach the A2 timed wait after return to idle. The next implementation must
+recover its real L1/RR prerequisite. Forcing A2, synthesising `0x08cb`,
+changing the addressed GSM page, or bypassing the parser would cross the
 current evidence boundary.
 
 The alternative `0x8b` measurement terminal still has its independently

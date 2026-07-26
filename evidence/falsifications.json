@@ -637,6 +637,12 @@
       "hypothesis": "NHM-5 context 0x0409/01/00 requires CHANNEL_CHANGED_CNF body bit zero to complete RR release",
       "conclusion": "Handler 0x2c4c28 recognizes pending-context word 0x0409 and branches to 0x2c4ca8 before the body-bit comparison used by ordinary contexts. Runtime follows that special branch with the reproduced zero body. Delivering the same real confirmation immediately, before RR result 0x05e8 instead of after it, is also accepted but does not enable later paging. Zero remains the observed release body, not a proved acceptance requirement or the missing idle-transition timing contract.",
       "evidence": ["docs/dsp_interface.md", "docs/model_coverage.md", "docs/network_scouting.md"]
+    },
+    {
+      "id": "nhm5_nonmatching_page_arms_admission_timer", "status": "disproven",
+      "hypothesis": "A valid page for another subscriber, unlike the no-identity PCH filler, supplies the missing idle transition and arms the timer whose 0x08cb expiry admits the addressed NHM-5 page",
+      "conclusion": "Static decode identifies 0x08cb as RR timer A2's expiry and 0x255ec0 as its sole arm site. Replacing idle filler with a standards-shaped Paging Request Type 1 carrying a different valid IMSI never arms A2 and never admits the subsequent addressed page. Repeated nonmatching pages instead lead firmware through serving-channel revalidation and its existing type-0x57 terminal. Unrelated subscriber traffic is not the missing foreground wake and must not replace standards-valid no-identity fill.",
+      "evidence": ["docs/model_coverage.md"]
     }
   ]
 }
