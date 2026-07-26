@@ -57,8 +57,8 @@ def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
 			"10b5a420f2f718fd041c0021a42249f051ff"
 			"a020a070022020805620e070"
 		),
-		# Four-byte type-0x55 constructor reached only after task 10 consumes
-		# the measurement results.
+		# Four-byte type-0x55 power-sweep constructor reached only after task 10
+		# consumes the measurement results.
 		0x002A7BAA: bytes.fromhex(
 			"70b50d1c061c0820f2f72dfe041c002108224af066f8"
 			"0420a070022020805520e070"
@@ -69,7 +69,7 @@ def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
 			"0120824601360435002e2cd500980069c188828889180089"
 			"4018404523dae879a979090240180004070c697a08060016"
 		),
-		# The 0x8a completion consumer reads its big-endian channel at report
+		# The 0x8a NO_PSW_FOUND consumer reads its big-endian channel at report
 		# object offsets 4/5 and resolves it against the populated candidates.
 		0x0028A19C: bytes.fromhex(
 			"30b50d1ca04c41790079000208180004000ca168fef74fff"
@@ -143,8 +143,9 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			if packet["direction"] == "rx" and packet["type"] == 0x8B), None)
 	control = next((packet for packet in packets
 			if packet["direction"] == "tx" and packet["type"] == 0x55), None)
-	ack = next((packet for packet in packets
-			if packet["direction"] == "rx" and packet["type"] == 0x8A), None)
+	unsolicited_result = next((packet for packet in packets
+			if packet["direction"] == "rx" and packet["time"] >= control["time"]
+			and packet["type"] in (0x80, 0x8A)), None) if control is not None else None
 	if results is None or results["length"] != 166:
 		raise SystemExit("NHM-5 search did not receive its 166-byte type 0x8b result array")
 	if not results["data"].startswith("0010005800c4"):
@@ -154,13 +155,16 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 		)
 	if control is None or control["length"] != 4 or control["data"] != "03050000":
 		raise SystemExit("NHM-5 did not organically publish the observed type 0x55 control")
-	if ack is None or ack["length"] != 8 or not ack["data"].startswith("0058"):
-		raise SystemExit("NHM-5 type 0x55 control did not receive its type 0x8a completion")
-	if not search["time"] <= results["time"] < control["time"] <= ack["time"]:
+	if unsolicited_result is not None:
+		raise SystemExit(
+			"NHM-5 power-sweep frontier synthesized an unproved "
+			f"type 0x{unsolicited_result['type']:02x} result"
+		)
+	if not search["time"] <= results["time"] < control["time"]:
 		raise SystemExit("NHM-5 search/control transaction order changed")
 	print(
 		"NHM-5 search frontier: 56/160 candidate 0058 -> 8b/166 measured results -> "
-		"55/4 control -> channel-keyed 8a/8 completion"
+		"55/4 power-sweep request; no invented success or NO_PSW_FOUND result"
 	)
 
 

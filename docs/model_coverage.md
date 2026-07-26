@@ -9,7 +9,7 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Radio lifecycle, paired GSM-FR/FACCH/degraded-media and isolated physical audio gates pass. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
 | Nokia 3210 NSE-8 v5.01 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Independent ROM gates cover the call lifecycle and isolated physical duplex. The same COBBA/DSP limitation applies. |
-| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its typed `0x56` candidate search, independently recovered `0x8b` result layout and acceptance threshold, organic `0x55` follow-up, and channel-keyed `0x8a` completion. The firmware emits no subsequent radio command in the bounded trace; identifying its post-measurement scheduler condition, rather than assuming NSE-8 channel configuration, remains the next boundary. |
+| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its typed `0x56` candidate search, independently recovered `0x8b` result layout and acceptance threshold, and organic `0x55` power-sweep request. Firmware identifies `0x8a` as the failure result `NO_PSW_FOUND`; the peer no longer mislabels it as an acknowledgement or sends an unproved SCH success. Recovering the NHM-5 power-sweep success condition and timing remains the next boundary. |
 | Nokia 3330 NHM-6 v4.50E | Yes | Yes | No | No | No | No | No | `verify-3330-frontier` and `verify-3330-navigation`; later product contracts are not established. |
 | Nokia 3410 NHM-2 v5.46E | Yes | Yes | No | No | No | No | No | `verify-3410-frontier` and navigation/menu gates; later product contracts are not established. |
 | Nokia 6110 NSE-3 family | No | No | No | No | No | No | No | Hardware documentation informs shared DCT3 boundaries, but no local declared 6110 ROM/profile or executable acceptance gate exists. Acquire and identify a lawful firmware image before implementation claims. |
@@ -78,6 +78,9 @@ command profiles: NSE-8 bitmap search and NHM-5 candidate-list search.
 
 After consuming the `0x8b` result for `0x0058`, v6.39 organically constructs
 type `0x55/4` at `0x2a7baa` with payload `03 05 00 00`. Its active task-10
-state explicitly accepts inbound type `0x8a`; completing that transaction
-advances without state forcing or a translated NSE-8 command. The current gate
-stops there because no later serving-channel command has yet been observed.
+state distinguishes a channel-`0x40` `RECEIVED_BLOCK` path from firmware-named
+type `0x8a` `NO_PSW_FOUND`; the latter reads its channel from object offsets
+4/5 and is a failure report, not a command acknowledgement. Bounded probes of
+both unsolicited outcomes converged without an organic follow-on command, so
+the retained peer stops at the power-sweep request. The gate rejects either
+invented result until the RF success condition and timing are recovered.

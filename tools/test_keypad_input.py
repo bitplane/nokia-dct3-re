@@ -54,6 +54,14 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn("if lcd_dirty then", periodic)
         self.assertLess(periodic.index("queue_lcd_dump()"), periodic.index("write_lcd_dump()"))
 
+    def test_ram_probe_time_is_configurable_and_read_only(self):
+        self.assertIn('os.getenv("NOKIA_DCT3_RAM_DUMP_AT") or "5"', self.harness)
+        self.assertIn("emulation_seconds() >= ram_dump_at", self.harness)
+        dump = self.harness.split("local function write_ram_dump()", 1)[1]
+        dump = dump.split("local function field_by_mask", 1)[0]
+        self.assertIn("space:read_u8(address)", dump)
+        self.assertNotIn("space:write_", dump)
+
     def test_input_remains_physical_matrix_driven(self):
         self.assertIn("field:set_value(1)", self.harness)
         self.assertIn("PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)", self.driver)

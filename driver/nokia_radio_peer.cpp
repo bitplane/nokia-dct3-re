@@ -558,7 +558,7 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"service_uplink_wait", "service_uplink_acknowledgement",
 		"traffic_channel_change", "traffic_lapdm_establish",
 		"traffic_contention_resolution", "traffic_release_acknowledgement",
-		"nhm5_control_ack"
+		"nhm5_psw_search"
 	};
 	const unsigned index = unsigned(value);
 	return index < std::size(NAMES) ? NAMES[index] : "invalid";
@@ -578,7 +578,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 		0x8c, 0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89,
 		0xff, 0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80,
 		0x86, 0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80,
-		0x89, 0x86, 0x80, 0x80, 0x8a
+		0x89, 0x86, 0x80, 0x80, 0xff
 	};
 
 	const u8 fixed = m_phase < FIXED_REPORT.size() ? FIXED_REPORT[m_phase] : 0x87;
@@ -731,12 +731,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_phase == phase::candidate_measurement &&
 			m_reports_remaining == 0)
 	{
-		// The state entered after NHM-5 consumes ALL_RSSI_RESULTS explicitly
-		// accepts report 0x8a in its task-10 dispatcher. Type 0x55 is built by
-		// 0x2a7baa as a four-byte control transaction; retain its payload as
-		// firmware-owned selectors and complete only that evidenced boundary.
-		m_phase = phase::nhm5_control_ack;
-		m_reports_remaining = 1;
+		// Type 0x55 starts NHM-5's power-sweep/synchronisation operation. Its
+		// dispatcher distinguishes a channel-0x40 RECEIVED_BLOCK from type 0x8a
+		// NO_PSW_FOUND; neither is an acknowledgement. The RF condition and
+		// timing that select the successful result are not yet recovered, so
+		// stop at the firmware-owned request instead of inventing either result.
+		m_phase = phase::nhm5_psw_search;
 	}
 	else if (packet.type == 0x02 &&
 			(m_phase == phase::candidate_sync || m_phase == phase::selected_search) &&
@@ -1281,18 +1281,6 @@ void nokia_radio_peer_device::emit_report()
 		payload[1] = m_access_frame >> 16;
 		payload[2] = m_access_frame >> 8;
 		payload[3] = m_access_frame;
-	}
-
-	if (report_type == 0x8a &&
-			m_protocol_profile == protocol_profile::nhm5_candidate_list &&
-			m_phase == phase::nhm5_control_ack)
-	{
-		// NHM-5's consumer at 0x28a19c reads a big-endian channel from report
-		// object offsets 4/5 and resolves it against the candidate database
-		// populated by the preceding 0x8b results. Echo the selected requested
-		// channel; zero would deliberately fail that lookup.
-		payload[0] = m_serving_arfcn >> 8;
-		payload[1] = m_serving_arfcn;
 	}
 
 	const unsigned payload_length = report_type == 0x8b ? 166 : report_type == 0x80 ? 34 : 8;

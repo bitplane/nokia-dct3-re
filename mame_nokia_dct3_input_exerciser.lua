@@ -6,6 +6,7 @@ local boot_summary_path = os.getenv("NOKIA_DCT3_BOOT_SUMMARY")
 local ram_dump_path = os.getenv("NOKIA_DCT3_RAM_DUMP")
 local ram_dump_base = tonumber(os.getenv("NOKIA_DCT3_RAM_DUMP_BASE") or "0") or 0
 local ram_dump_size = tonumber(os.getenv("NOKIA_DCT3_RAM_DUMP_SIZE") or "65536") or 65536
+local ram_dump_at = tonumber(os.getenv("NOKIA_DCT3_RAM_DUMP_AT") or "5") or 5
 local ram_dumped = false
 local quiet = os.getenv("NOKIA_DCT3_LUA_QUIET") == "1"
 local bios = machine.options.entries.bios:value()
@@ -822,7 +823,7 @@ end
 
 -- Keep the semantic oracle current independently of display activity.
 emu.register_periodic(function()
-	if ram_dump_path and emulation_seconds() >= 5 then write_ram_dump() end
+	if ram_dump_path and emulation_seconds() >= ram_dump_at then write_ram_dump() end
 	if lcd_dirty then
 		pending_lcd = {}
 		queue_lcd_dump()
