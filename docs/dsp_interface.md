@@ -436,6 +436,17 @@ transaction forms. No bit-field meaning is assigned to either byte. Confirming
 the NHM-5 request with the recovered zero-body `0x89` stops TCH/F burst
 transport and restores the ordinary `0x60` PCH/AGCH plus serving-cell schedule.
 
+NHM-5 also independently crosses the MCU/DSP speech-control boundary. Organic
+Answer publishes encoded shared word `0x860b`, and the DSP-side command
+demultiplexer retains command `0x08` value `0x060b` while subsequent command
+families reuse the physical word. Organic End later publishes `0x840a`, clearing
+the recovered `0x0201` request field. This proves that product's speech-control
+lifecycle, but not NSE-8's MAD2/COBBA clock shape or board-level MIC2/EAR route.
+The NHM-5 product configuration therefore admits only the command field. Its
+PCM profile remains disabled, and
+`radio_3310_speech_control_trace_check.py` rejects any speech tick until an
+independent PCM and analogue-topology basis is added.
+
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result
 completion, but it is not the only entrance to finalizer `0x219e30`: direct

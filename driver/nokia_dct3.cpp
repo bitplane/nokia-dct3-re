@@ -192,6 +192,13 @@ constexpr nokia_product_config make_3310_config()
 	result.dsp_bootstrap_exchanges = 58;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
+	// NHM-5 independently publishes command 0x08 value 0x060b immediately
+	// after organic Answer, then 0x040a during physical-End teardown. Those
+	// values satisfy and clear the same recovered speech-request field, but do
+	// not establish a PCM bus or analogue route for this product.
+	result.dsp_speech_control_command = 0x08;
+	result.dsp_speech_control_mask = 0x0201;
+	result.dsp_speech_control_enabled = 0x0201;
 	result.ccont_board = ADC_STANDARD;
 	return result;
 }
