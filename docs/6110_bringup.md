@@ -1454,6 +1454,15 @@ ROM4's directory at `0x2b9838` instead maps them to `0x0380` and `0x0388`
 with the same lengths. The `0x28` relocation is in EEPROM data layout, not
 merely flash code.
 
+The nested descriptors are relocated by the same amount: ROM3 maps
+`0x070a` to `0x035c`/length 1 and `0x070b` to `0x035e`/length 2, while ROM4
+maps them to `0x0384` and `0x0386`. The homologous validators at `0x29df76`
+and `0x29fba2` independently sum sixteen identity bytes, add the byte in
+shared security-level state `0x10fcf5`, truncate to sixteen bits and compare
+against the stored halfword at revision-local state `0x10c62e`/`0x10c646`.
+This proves the checksum relationship and its per-ROM storage without
+assuming the EEPROM template's contents.
+
 Current upstream provisions its shared NSE-3 blob using the ROM4 offsets
 `0x0380` and `0x0388 + 0x1f`. Those offsets are now independently corroborated
 for this repository's exact ROM4 image, but applying them to ROM3 would edit

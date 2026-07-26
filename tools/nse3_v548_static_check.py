@@ -31,9 +31,15 @@ VARIANTS = {
         ],
         "eeprom_security_directory": 0x2B8524,
         "eeprom_security_records": {
-            0x0701: (0x0358, 0x0008),
-            0x0702: (0x0360, 0x002C),
+            0x0701: (0x2B8524, 0x0358, 0x0008),
+            0x0702: (0x2B852C, 0x0360, 0x002C),
+            0x070A: (0x2B856C, 0x035C, 0x0001),
+            0x070B: (0x2B8574, 0x035E, 0x0002),
         },
+        "security_validator": 0x29DF76,
+        "identity_sum_helper": 0x294884,
+        "security_level_state": 0x10FCF5,
+        "security_checksum_state": 0x10C62E,
         "internal_rom_service": 0x23751A,
         "internal_rom_service_call": 0x237532,
         "internal_rom_service_setter": 0x28CB36,
@@ -58,9 +64,15 @@ VARIANTS = {
         ],
         "eeprom_security_directory": 0x2B9838,
         "eeprom_security_records": {
-            0x0701: (0x0380, 0x0008),
-            0x0702: (0x0388, 0x002C),
+            0x0701: (0x2B9838, 0x0380, 0x0008),
+            0x0702: (0x2B9840, 0x0388, 0x002C),
+            0x070A: (0x2B9880, 0x0384, 0x0001),
+            0x070B: (0x2B9888, 0x0386, 0x0002),
         },
+        "security_validator": 0x29FBA2,
+        "identity_sum_helper": 0x2964DC,
+        "security_level_state": 0x10FCF5,
+        "security_checksum_state": 0x10C646,
         "internal_rom_service": 0x237A5A,
         "internal_rom_service_call": 0x237A72,
         "internal_rom_service_setter": 0x28E75E,
@@ -180,22 +192,38 @@ def verify_variant(path: Path, name: str) -> dict:
     # directories.  Each descriptor is {u32 id, u16 offset, u16 length}.
     # Keep these product-revision offsets distinct; a valid ROM4 template is
     # not evidence for ROM3's security/configuration layout.
-    directory_offset = profile["eeprom_security_directory"] - FLASH_BASE
-    expected_directory = b"".join(
-        record.to_bytes(4, "big")
-        + offset.to_bytes(2, "big")
-        + length.to_bytes(2, "big")
-        for record, (offset, length)
-        in profile["eeprom_security_records"].items()
-    )
-    actual_directory = data[
-        directory_offset : directory_offset + len(expected_directory)
-    ]
-    if actual_directory != expected_directory:
-        raise ValueError(
-            f"{path}: EEPROM security record directory changed: expected "
-            f"{expected_directory.hex()}, got {actual_directory.hex()}"
+    for record, (descriptor, offset, length) in (
+        profile["eeprom_security_records"].items()
+    ):
+        expected_descriptor = (
+            record.to_bytes(4, "big")
+            + offset.to_bytes(2, "big")
+            + length.to_bytes(2, "big")
         )
+        descriptor_offset = descriptor - FLASH_BASE
+        actual_descriptor = data[descriptor_offset : descriptor_offset + 8]
+        if actual_descriptor != expected_descriptor:
+            raise ValueError(
+                f"{path}: EEPROM record {record:#06x} descriptor changed: "
+                f"expected {expected_descriptor.hex()}, "
+                f"got {actual_descriptor.hex()}"
+            )
+
+    validator = profile["security_validator"]
+    security_anchors = {
+        0x00: ("push", "{r4, r5, r6, lr}"),
+        0x0A: ("mov", "r0, sp"),
+        0x0C: ("movs", "r1, #0x10"),
+        0x0E: ("bl", f"#{profile['identity_sum_helper']:#x}"),
+        0x14: ("ldrb", "r1, [r6]"),
+        0x16: ("adds", "r0, r1, r0"),
+        0x1E: ("ldrh", "r1, [r1]"),
+        0x20: ("cmp", "r1, r0"),
+    }
+    for delta, expected in security_anchors.items():
+        verify_instruction(data, validator + delta, *expected)
+    verify_literal(data, validator + 0x12, profile["security_level_state"])
+    verify_literal(data, validator + 0x1C, profile["security_checksum_state"])
 
     base = profile["loader"]
     # v5.48 initializes four shared bootstrap cells.  The pre-upload exchange
@@ -433,11 +461,21 @@ def verify_variant(path: Path, name: str) -> dict:
         "eeprom_security_directory": profile["eeprom_security_directory"],
         "eeprom_security_records": {
             f"{record:#06x}": {
+                "descriptor": descriptor,
                 "offset": offset,
                 "length": length,
             }
-            for record, (offset, length)
+            for record, (descriptor, offset, length)
             in profile["eeprom_security_records"].items()
+        },
+        "security_validator": {
+            "entry": validator,
+            "identity_sum_helper": profile["identity_sum_helper"],
+            "identity_sum_length": 0x10,
+            "security_level_state": profile["security_level_state"],
+            "stored_checksum_state": profile["security_checksum_state"],
+            "relationship": "(identity_sum + security_level) & 0xffff == stored_checksum",
+            "eeprom_setting_byte_index": "not_static",
         },
         "final_result_capture": {
             "first_storage": first_result,

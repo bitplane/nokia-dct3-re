@@ -29,15 +29,27 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
         )
         self.assertEqual(0x1C28, rom4["formatter"] - rom3["formatter"])
         self.assertEqual(0x1C2C, rom4["acceptance"] - rom3["acceptance"])
-        self.assertEqual((0x0358, 0x0008), rom3["eeprom_security_records"][0x0701])
-        self.assertEqual((0x0360, 0x002C), rom3["eeprom_security_records"][0x0702])
-        self.assertEqual((0x0380, 0x0008), rom4["eeprom_security_records"][0x0701])
-        self.assertEqual((0x0388, 0x002C), rom4["eeprom_security_records"][0x0702])
+        self.assertEqual((0x2B8524, 0x0358, 0x0008), rom3["eeprom_security_records"][0x0701])
+        self.assertEqual((0x2B852C, 0x0360, 0x002C), rom3["eeprom_security_records"][0x0702])
+        self.assertEqual((0x2B856C, 0x035C, 0x0001), rom3["eeprom_security_records"][0x070A])
+        self.assertEqual((0x2B8574, 0x035E, 0x0002), rom3["eeprom_security_records"][0x070B])
+        self.assertEqual((0x2B9838, 0x0380, 0x0008), rom4["eeprom_security_records"][0x0701])
+        self.assertEqual((0x2B9840, 0x0388, 0x002C), rom4["eeprom_security_records"][0x0702])
+        self.assertEqual((0x2B9880, 0x0384, 0x0001), rom4["eeprom_security_records"][0x070A])
+        self.assertEqual((0x2B9888, 0x0386, 0x0002), rom4["eeprom_security_records"][0x070B])
         self.assertEqual(
             0x28,
-            rom4["eeprom_security_records"][0x0701][0]
-            - rom3["eeprom_security_records"][0x0701][0],
+            rom4["eeprom_security_records"][0x0701][1]
+            - rom3["eeprom_security_records"][0x0701][1],
         )
+
+    def test_security_validator_keeps_setting_index_unclaimed(self):
+        source = Path(check.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            '"relationship": "(identity_sum + security_level) & 0xffff == stored_checksum"',
+            source,
+        )
+        self.assertIn('"eeprom_setting_byte_index": "not_static"', source)
 
     def test_result_contract_is_not_named_as_physical_cobba(self):
         source = Path(check.__file__).read_text(encoding="utf-8")
