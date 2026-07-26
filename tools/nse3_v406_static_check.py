@@ -588,6 +588,17 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x25A800: ("ldrb", "r3, [r6, #6]"),
     0x25A80E: ("ldrh", "r3, [r0, #0xe]"),
     0x25A83C: ("ldrh", "r1, [r0, #0x12]"),
+    # The object emitter preserves its r0 input in fp; all direct entries
+    # below supply 0xff, which becomes event 0x0389's second argument.
+    0x25A7DE: ("mov", "fp, r0"),
+    0x25ADA2: ("movs", "r0, #0xff"),
+    0x25ADA4: ("bl", "#0x25a7d0"),
+    0x25AE88: ("movs", "r0, #0xff"),
+    0x25AE8A: ("bl", "#0x25a7d0"),
+    0x25B074: ("movs", "r0, #0xff"),
+    0x25B076: ("bl", "#0x25a7d0"),
+    0x25B0B0: ("movs", "r0, #0xff"),
+    0x25B0B2: ("bl", "#0x25a7d0"),
     # Event 0x0389 is the sole dispatcher case that reaches the remaining
     # runtime object constructor.  Its packed arguments are copied into the
     # runtime cell before the case loads cell[0] as the object input.
@@ -610,6 +621,18 @@ DSP_PARAMETER_RUNTIME_OBJECT_EVENT = 0x0389
 DSP_PARAMETER_RUNTIME_OBJECT_EVENT_PRODUCERS = {
     0x231660: [0x0000, 0x0000],
     0x25A8FA: [None, None],
+    0x25B044: [None, 0x0000],
+}
+DSP_PARAMETER_OBJECT_EMITTER_ADDRESS = 0x25A7D0
+DSP_PARAMETER_OBJECT_EMITTER_CALLS = {
+    0x25ADA4: 0x00FF,
+    0x25AE8A: 0x00FF,
+    0x25B076: 0x00FF,
+    0x25B0B2: 0x00FF,
+}
+DSP_PARAMETER_RUNTIME_OBJECT_EVENT_BOUNDED_ARGUMENTS = {
+    0x231660: [0x0000, 0x0000],
+    0x25A8FA: [None, 0x00FF],
     0x25B044: [None, 0x0000],
 }
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
@@ -1630,6 +1653,34 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             f"{object_event_producers}"
         )
 
+    object_emitter_profile = {
+        "apis": [
+            {
+                "address": DSP_PARAMETER_OBJECT_EMITTER_ADDRESS,
+                "name": "runtime_object_emit",
+                "kind": "call",
+                "arguments": {"input": "r0"},
+            }
+        ]
+    }
+    object_emitter_calls = {
+        call["callsite"]: call["arguments"]["input"]
+        for call in extract_calls(
+            object_emitter_profile, instructions, physical, FLASH_BASE
+        )
+    }
+    if object_emitter_calls != DSP_PARAMETER_OBJECT_EMITTER_CALLS:
+        raise ValueError(
+            "NSE-3 runtime object emitter entries changed: expected "
+            f"{DSP_PARAMETER_OBJECT_EMITTER_CALLS}, got "
+            f"{object_emitter_calls}"
+        )
+    emitter_pointer = DSP_PARAMETER_OBJECT_EMITTER_ADDRESS | 1
+    if physical.find(emitter_pointer.to_bytes(4, "little")) != -1:
+        raise ValueError(
+            "NSE-3 runtime object emitter acquired a stored Thumb pointer"
+        )
+
     unresolved = DSP_PARAMETER_UNRESOLVED_EVENT_CALLS
     return {
         "event_apis": {
@@ -1687,6 +1738,10 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                     DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS,
                 "constructor_event": DSP_PARAMETER_RUNTIME_OBJECT_EVENT,
                 "constructor_event_producers": object_event_producers,
+                "constructor_event_bounded_arguments":
+                    DSP_PARAMETER_RUNTIME_OBJECT_EVENT_BOUNDED_ARGUMENTS,
+                "object_emitter_calls": object_emitter_calls,
+                "object_emitter_has_stored_pointer": False,
             },
         },
         "runtime_built_calls_exclude_parameter_events": False,

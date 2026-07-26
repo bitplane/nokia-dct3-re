@@ -265,6 +265,24 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             },
             check.DSP_PARAMETER_RUNTIME_OBJECT_EVENT_PRODUCERS,
         )
+        self.assertEqual(0x25A7D0, check.DSP_PARAMETER_OBJECT_EMITTER_ADDRESS)
+        self.assertEqual(
+            {
+                0x25ADA4: 0x00FF,
+                0x25AE8A: 0x00FF,
+                0x25B076: 0x00FF,
+                0x25B0B2: 0x00FF,
+            },
+            check.DSP_PARAMETER_OBJECT_EMITTER_CALLS,
+        )
+        self.assertEqual(
+            {
+                0x231660: [0x0000, 0x0000],
+                0x25A8FA: [None, 0x00FF],
+                0x25B044: [None, 0x0000],
+            },
+            check.DSP_PARAMETER_RUNTIME_OBJECT_EVENT_BOUNDED_ARGUMENTS,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
         self.assertEqual(
             [0x256E2E],

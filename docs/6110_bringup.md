@@ -312,14 +312,19 @@ cell `0x10b284[0]` and invokes the constructor, while the common packed-event
 argument copier stores the event's arguments into that cell. A whole-image
 call census finds exactly three direct producers of `0x0389`: callsite
 `0x231660` supplies fixed arguments `(0, 0)`, `0x25a8fa` supplies two
-runtime values, and `0x25b044` supplies one runtime value followed by zero.
+initially runtime-derived values, and `0x25b044` supplies one runtime value
+followed by zero. Backward entry analysis further bounds `0x25a8fa`'s second
+argument: its enclosing emitter preserves the entry argument in `fp`, all
+four direct entries supply `0xff`, and the image contains no stored Thumb
+pointer to that entry. Its arguments are therefore `(record[+8], 0xff)`.
 The first producer therefore cannot introduce a non-null object pointer; the
-other two remain data-dependent and are not reinterpreted as fixed catalogue
-addresses. This reduces the alternative-object frontier from an unspecified
-population to two identified dynamic producer inputs. With the internal boot
+other two producers share one genuinely dynamic input shape, record field
+`+8`, and it is not reinterpreted as a fixed catalogue address. This reduces
+the alternative-object frontier from an unspecified population to one
+identified record field reached through two producers. With the internal boot
 ROM still missing, a passive MAME trace cannot reach this firmware boundary
-organically, so those values are not fabricated through a direct-to-flash
-reset bypass. The exact verifier still does not claim producer absence.
+organically, so that value is not fabricated through a direct-to-flash reset
+bypass. The exact verifier still does not claim producer absence.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
