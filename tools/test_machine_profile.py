@@ -13,6 +13,12 @@ class MachineProfileTest(unittest.TestCase):
         cls.b3_flash = (ROOT / "driver/nokia_b3_flash.cpp").read_text()
         cls.ccont = (ROOT / "driver/nokia_ccont.cpp").read_text()
         cls.pup = (ROOT / "driver/nokia_pup.cpp").read_text()
+        cls.external_service = (
+            ROOT / "driver/nokia_external_service.cpp"
+        ).read_text()
+        cls.external_service_header = (
+            ROOT / "driver/nokia_external_service.h"
+        ).read_text()
         cls.makefile = (ROOT / "Makefile").read_text()
 
     def function_body(self, signature, next_signature):
@@ -34,7 +40,7 @@ class MachineProfileTest(unittest.TestCase):
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
                 "dsp_service": "true",
-                "external_service": "true",
+                "external_service_transport": "true",
                 "radio_peer": "true",
                 "dsp_service_delay_us": "4'000",
                 "dsp_peer_poll_ms": "4",
@@ -54,7 +60,10 @@ class MachineProfileTest(unittest.TestCase):
             "void nokia_dct3_state::machine_reset",
         )
         self.assertIn("set_service_enabled(product.dsp_service)", apply)
-        self.assertIn("set_external_service_enabled(product.external_service)", apply)
+        self.assertIn(
+            "set_external_service_enabled(product.external_service_transport)",
+            apply,
+        )
         self.assertIn("set_enabled(product.radio_peer)", apply)
         self.assertIn("set_service_delay_us(product.dsp_service_delay_us)", apply)
         self.assertIn("set_peer_poll_ms(product.dsp_peer_poll_ms)", apply)
@@ -97,7 +106,12 @@ class MachineProfileTest(unittest.TestCase):
             "constexpr nokia_product_config make_conservative_config",
         )
         for peer in ("dsp_service", "external_service", "radio_peer"):
-            self.assertNotIn(f"result.{peer} = true;", body)
+            field = (
+                "external_service_transport"
+                if peer == "external_service"
+                else peer
+            )
+            self.assertNotIn(f"result.{field} = true;", body)
         self.assertNotIn("result.radio_acquisition =", body)
         self.assertNotIn("result.dsp_speech_request_mask =", body)
         self.assertNotIn("result.dsp_speech_request_value =", body)
@@ -181,7 +195,7 @@ class MachineProfileTest(unittest.TestCase):
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
                 "dsp_service": "true",
-                "external_service": "true",
+                "external_service_transport": "true",
                 "keypad_five_rows": "true",
                 "ccont_board": "ADC_STANDARD",
             },
@@ -204,8 +218,50 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("bool simi_controller = false;", self.driver)
         self.assertIn("bool synthetic_sim_card = false;", self.driver)
         self.assertIn("bool dsp_service = false;", self.driver)
-        self.assertIn("bool external_service = false;", self.driver)
+        self.assertIn("bool external_service_transport = false;", self.driver)
         self.assertIn("bool radio_peer = false;", self.driver)
+
+    def test_external_service_application_is_typed_per_supported_product(self):
+        self.assertIn("enum class application_profile", self.external_service_header)
+        self.assertIn(
+            "application_profile m_application_profile = "
+            "application_profile::none;",
+            self.external_service_header,
+        )
+        self.assertIn(
+            "product.external_service_application",
+            self.driver,
+        )
+        profiles = {
+            "make_3210_config": "application_profile::nse8",
+            "make_3310_config": "application_profile::nhm5",
+        }
+        for builder, profile in profiles.items():
+            body = self.function_body(
+                f"constexpr nokia_product_config {builder}()",
+                "constexpr nokia_product_config",
+            )
+            self.assertIn(profile, body)
+
+        for builder in ("make_3330_config", "make_6110_config"):
+            body = self.function_body(
+                f"constexpr nokia_product_config {builder}()",
+                "constexpr nokia_product_config",
+            )
+            self.assertNotIn("external_service_application =", body)
+
+        self.assertEqual(
+            self.external_service.count(
+                "static constexpr profile_contract NSE8"
+            ),
+            1,
+        )
+        self.assertEqual(
+            self.external_service.count(
+                "static constexpr profile_contract NHM5"
+            ),
+            1,
+        )
 
     def test_each_machine_applies_one_explicit_product_profile(self):
         expected = {

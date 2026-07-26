@@ -9,6 +9,13 @@
 class nokia_external_service_peer_device : public device_t
 {
 public:
+	enum class application_profile : u8
+	{
+		none,
+		nse8,
+		nhm5,
+	};
+
 	struct response
 	{
 		u8 type = 0x8e;
@@ -21,6 +28,10 @@ public:
 			const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
+	void set_application_profile(application_profile profile)
+	{
+		m_application_profile = profile;
+	}
 	void receive_frame(const u8 *payload, unsigned length);
 	void set_service_control_complete();
 	void tick();
@@ -32,15 +43,32 @@ protected:
 	virtual void device_reset() override;
 
 private:
+	struct profile_contract
+	{
+		unsigned start_delay_ticks;
+		u8 registration_result;
+		u8 registration_sequence;
+		u8 channel_map_byte_a;
+		u8 channel_map_mask_a;
+		u8 channel_map_byte_b;
+		u8 channel_map_mask_b;
+		u8 channel_map_sequence;
+	};
+
 	static constexpr u8 DISCOVERY_NODE = 0x02;
-	static constexpr unsigned SERVICE_START_DELAY_TICKS = 36;
 	static constexpr unsigned QUEUE_SIZE = 8;
 
 	bool queue_response(const u8 *payload, unsigned length, bool notify = true);
 	bool queue_transport_ack(const u8 *payload, unsigned length);
 	bool queue_service_frame(u8 command, u8 result, u8 sequence);
+	const profile_contract *contract() const;
+	bool application_enabled() const
+	{
+		return m_enabled && m_application_profile != application_profile::none;
+	}
 
 	bool m_enabled = false;
+	application_profile m_application_profile = application_profile::none;
 	bool m_trace_enabled = false;
 	bool m_discovery_complete = false;
 	bool m_service_control_complete = false;

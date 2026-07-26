@@ -111,7 +111,9 @@ struct nokia_product_config
 	bool simi_controller = false;
 	bool synthetic_sim_card = false;
 	bool dsp_service = false;
-	bool external_service = false;
+	bool external_service_transport = false;
+	nokia_external_service_peer_device::application_profile external_service_application =
+			nokia_external_service_peer_device::application_profile::none;
 	bool radio_peer = false;
 	nokia_radio_peer_device::wire_profile radio_wire =
 			nokia_radio_peer_device::wire_profile::none;
@@ -149,7 +151,9 @@ constexpr nokia_product_config make_3210_config()
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
-	result.external_service = true;
+	result.external_service_transport = true;
+	result.external_service_application =
+			nokia_external_service_peer_device::application_profile::nse8;
 	result.radio_peer = true;
 	result.radio_wire = nokia_radio_peer_device::wire_profile::bitmap_search;
 	result.radio_acquisition =
@@ -192,7 +196,9 @@ constexpr nokia_product_config make_3310_config()
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
-	result.external_service = true;
+	result.external_service_transport = true;
+	result.external_service_application =
+			nokia_external_service_peer_device::application_profile::nhm5;
 	result.radio_peer = true;
 	result.radio_wire = nokia_radio_peer_device::wire_profile::candidate_list;
 	result.radio_acquisition =
@@ -233,14 +239,16 @@ constexpr nokia_product_config make_3310_config()
 // NHM-6 v4.50 completes 64 DSP bootstrap exchanges and shares the five-row
 // keypad. The 3310 analog tuple is retained as a calibrated compatibility
 // profile: it advances the virgin PMM organically, but does not prove NHM-6
-// PCB signal identity.
+// PCB signal identity. Its lower external-service transport remains available,
+// but the application profile defaults to none: the independent NHM-6 gates
+// do not establish NHM-5's delay, registration body or channel bitmap.
 constexpr nokia_product_config make_3330_config()
 {
 	nokia_product_config result;
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
-	result.external_service = true;
+	result.external_service_transport = true;
 	result.keypad_five_rows = true;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
@@ -718,7 +726,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	screen->set_size(product.lcd_visible_width, product.lcd_visible_height);
 	screen->set_visarea(0, product.lcd_visible_width - 1, 0, product.lcd_visible_height - 1);
 	m_dsp_hle->set_service_enabled(product.dsp_service);
-	m_dsp_hle->set_external_service_enabled(product.external_service);
+	m_dsp_hle->set_external_service_enabled(product.external_service_transport);
 	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
 	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
 	m_dsp_hle->set_parameter_command(product.dsp_parameter_command);
@@ -731,7 +739,9 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	// real DSP backend must instead select paths through COBBA's serial
 	// control transport; MCU speech state must never mutate this fallback.
 	m_cobba->set_hle_voice_profile(product.cobba_hle_voice);
-	m_external_service_peer->set_enabled(product.external_service);
+	m_external_service_peer->set_application_profile(
+			product.external_service_application);
+	m_external_service_peer->set_enabled(product.external_service_transport);
 	m_radio_peer->set_enabled(product.radio_peer);
 	m_radio_peer->set_wire_profile(product.radio_wire);
 	m_radio_peer->set_acquisition_profile(product.radio_acquisition);
@@ -781,8 +791,10 @@ void nokia_dct3_state::machine_reset()
 	m_simi->set_enabled(m_product.simi_controller && BIT(hardware, 1));
 	m_simi->set_card_present(m_product.synthetic_sim_card && BIT(hardware, 1));
 	m_dsp_hle->set_service_enabled(m_product.dsp_service && BIT(hardware, 2));
-	m_dsp_hle->set_external_service_enabled(m_product.external_service && BIT(hardware, 3));
-	m_external_service_peer->set_enabled(m_product.external_service && BIT(hardware, 3));
+	m_dsp_hle->set_external_service_enabled(
+			m_product.external_service_transport && BIT(hardware, 3));
+	m_external_service_peer->set_enabled(
+			m_product.external_service_transport && BIT(hardware, 3));
 	m_radio_peer->set_enabled(m_product.radio_peer && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);

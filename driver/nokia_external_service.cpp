@@ -19,6 +19,33 @@ nokia_external_service_peer_device::nokia_external_service_peer_device(
 {
 }
 
+const nokia_external_service_peer_device::profile_contract *
+nokia_external_service_peer_device::contract() const
+{
+	// These currently match in value but remain separate evidence: NSE-8 and
+	// NHM-5 have independent organic startup/call gates. A new product must
+	// supply its own contract rather than inheriting either handset.
+	static constexpr profile_contract NSE8 = {
+		36, 0x01, 0x42,
+		0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
+	};
+	static constexpr profile_contract NHM5 = {
+		36, 0x01, 0x42,
+		0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
+	};
+
+	switch (m_application_profile)
+	{
+	case application_profile::nse8:
+		return &NSE8;
+	case application_profile::nhm5:
+		return &NHM5;
+	case application_profile::none:
+		return nullptr;
+	}
+	return nullptr;
+}
+
 void nokia_external_service_peer_device::device_start()
 {
 	m_trace_enabled = machine().options().verbose();
@@ -92,7 +119,7 @@ bool nokia_external_service_peer_device::queue_transport_ack(const u8 *payload, 
 
 void nokia_external_service_peer_device::receive_frame(const u8 *payload, unsigned length)
 {
-	if (!m_enabled || length < 9 || length > 75 || payload[0] != 0x1e)
+	if (!application_enabled() || length < 9 || length > 75 || payload[0] != 0x1e)
 		return;
 
 	const u8 frame_class = payload[3];
@@ -139,21 +166,27 @@ void nokia_external_service_peer_device::set_service_control_complete()
 
 void nokia_external_service_peer_device::tick()
 {
-	if (!m_enabled)
+	const profile_contract *const profile = contract();
+	if (!m_enabled || !profile)
 		return;
 	if (m_discovery_complete && m_service_control_complete && !m_registration_sent)
 	{
-		if (++m_registration_ticks >= SERVICE_START_DELAY_TICKS)
-			m_registration_sent = queue_service_frame(0x64, 0x01, 0x42);
+		if (++m_registration_ticks >= profile->start_delay_ticks)
+			m_registration_sent = queue_service_frame(
+					0x64, profile->registration_result,
+					profile->registration_sequence);
 	}
 	else if (m_registration_acknowledged && !m_channel_map_sent)
 	{
 		u8 frame[75] = { 0 };
 		frame[0] = 0x1e; frame[2] = DISCOVERY_NODE; frame[3] = 0x40;
 		frame[5] = 0x45; frame[7] = 0x01; frame[8] = 0x70;
-		frame[9 + (0x5f >> 3)] = 0x01;
-		frame[9 + (0x62 >> 3)] = 0x20;
-		frame[73] = 0x01; frame[74] = 0x43;
+		frame[9 + profile->channel_map_byte_a] |=
+				profile->channel_map_mask_a;
+		frame[9 + profile->channel_map_byte_b] |=
+				profile->channel_map_mask_b;
+		frame[73] = 0x01;
+		frame[74] = profile->channel_map_sequence;
 		m_channel_map_sent = queue_response(frame, std::size(frame));
 	}
 }
