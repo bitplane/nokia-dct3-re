@@ -19,6 +19,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dspif.cpp driver/nokia_dspif.h \
 	driver/nokia_external_service.cpp driver/nokia_external_service.h \
 	driver/nokia_gensio.cpp driver/nokia_gensio.h \
+	driver/gsm_a3a8.cpp driver/gsm_a3a8.h \
 	driver/gsm_tch_f_l1.cpp driver/gsm_tch_f_l1.h \
 	driver/nokia_gsm_fr_codec.cpp driver/nokia_gsm_fr_codec.h \
 	driver/nokia_gsm_network.cpp driver/nokia_gsm_network.h \
@@ -128,7 +129,7 @@ INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
 .PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3310-radio-registration verify-3310-radio-paging verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
-.PHONY: verify-cobba-control normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static
+.PHONY: verify-cobba-control verify-gsm-a3a8 normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -141,6 +142,7 @@ help:
 	@echo "make census-docs    refresh the committed report; refuses missing scoped runtime"
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
 	@echo "make test-tools     run the static-tool and EEPROM-profile unit tests"
+	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-6110-static verify the identified NSE-3 v4.06 static boundary"
 	@echo "make normalize-6110-v548 extract the evidenced NSE-3 v5.48 ROM3/ROM4 PPM-B images"
 	@echo "make verify-6110-v548-static verify distinct NSE-3 v5.48 ROM3/ROM4 bootstrap boundaries"
@@ -270,6 +272,13 @@ verify-gsm-tch-f-l1:
 		-o scratchpad/test_gsm_tch_f_l1
 	scratchpad/test_gsm_tch_f_l1
 
+verify-gsm-a3a8:
+	mkdir -p scratchpad
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic \
+		driver/gsm_a3a8.cpp tools/test_gsm_a3a8.cpp \
+		-o scratchpad/test_gsm_a3a8
+	scratchpad/test_gsm_a3a8
+
 verify-dsp-speech-control-static:
 	$(VENV)/bin/python tools/dsp_speech_control_static_check.py \
 		--v600 roms/3210f600a_swap16.bin \
@@ -353,7 +362,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms $(LIBGSM_ARCHIVE)
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/nokia_gsm_fr_codec.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 LDFLAGS="-Wl,--whole-archive $(LIBGSM_ARCHIVE) -Wl,--no-whole-archive" -j$(JOBS)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/nokia_gsm_fr_codec.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 LDFLAGS="-Wl,--whole-archive $(LIBGSM_ARCHIVE) -Wl,--no-whole-archive" -j$(JOBS)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

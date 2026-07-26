@@ -847,6 +847,16 @@ void nokia_dct3_state::machine_reset()
 			BIT(network, 7) ? 144 : 0, BIT(network, 7) ? 4 : 0);
 	m_sim_card->set_cphs_aoc(false);
 	m_sim_card->set_cached_location(false);
+	// The removable laboratory subscriber explicitly selects 3GPP TS 55.205
+	// section 5's AES-based example A3/A8 profile.  A3/A8 is operator-owned;
+	// this key is synthetic fixture provisioning, not handset identity.
+	const gsm::a3a8::block lab_ki = {
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
+	};
+	m_sim_card->set_authentication(
+			nokia_sim_card_device::authentication_profile::gsm_aes_example,
+			lab_ki);
 	const u8 atr[] = { 0x3b, 0x10, 0x05 };
 	m_sim_card->set_atr(atr, std::size(atr));
 	m_eeprom->write_scl(1);

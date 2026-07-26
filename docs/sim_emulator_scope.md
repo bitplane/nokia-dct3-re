@@ -135,8 +135,10 @@ Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
 
 - SEEK, invalidation and additional access-condition/error semantics;
-- RUN GSM ALGORITHM once an explicit laboratory A3/A8 and key profile is
-  selected, rather than embedding an assumed authentication shortcut;
+- integrating the now-profiled RUN GSM ALGORITHM response with a matching
+  network-side authentication exchange; the default card deliberately has no
+  A3/A8, while the synthetic subscriber selects the independently tested
+  TS 55.205 section-5 AES example and an explicit laboratory key;
 - supplying coherent FPLMN and optional EFs beyond the current matched
   IMSI/SST/PLMN-selector/SPN profile;
 - testing card removal, reset, timeout, parity/error, and proactive-SIM status;

@@ -290,7 +290,7 @@ void nokia_sim_card_device::finish_header()
 				m_tx[0], m_ins, m_p1, m_p2, m_p3, m_selected_file,
 				machine().time().as_double());
 	if (m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
-			m_ins == 0x28 || m_ins == 0x2c || m_ins == 0xa4 ||
+			m_ins == 0x28 || m_ins == 0x2c || m_ins == 0x88 || m_ins == 0xa4 ||
 			m_ins == 0x32 || m_ins == 0xd6 || m_ins == 0xdc)
 	{
 		const u8 procedure = m_ins;
@@ -359,6 +359,13 @@ void nokia_sim_card_device::finish_body()
 		m_receiving_body = false;
 		return;
 	}
+	if (m_ins == 0x88)
+	{
+		run_gsm_algorithm();
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		return;
+	}
 	if (m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
 			m_ins == 0x28 || m_ins == 0x2c)
 	{
@@ -389,6 +396,30 @@ void nokia_sim_card_device::finish_body()
 	}
 	else
 		queue_status(0x90, 0x00);
+}
+
+void nokia_sim_card_device::run_gsm_algorithm()
+{
+	// GSM 11.11 9.2.11: P1/P2 are zero and the command body is the 16-byte
+	// RAND.  A successful card returns SRES || Kc through GET RESPONSE.
+	if (m_p1 != 0 || m_p2 != 0 || m_tx_len != 16 ||
+			m_authentication_profile == authentication_profile::none)
+	{
+		queue_status(0x6d, 0x00);
+		return;
+	}
+
+	gsm::a3a8::block rand;
+	std::copy_n(m_tx, rand.size(), rand.begin());
+	const gsm::a3a8::result authentication =
+			gsm::a3a8::aes_example(m_ki, rand);
+	std::copy(authentication.sres.begin(), authentication.sres.end(),
+			m_pending_response);
+	std::copy(authentication.kc.begin(), authentication.kc.end(),
+			m_pending_response + authentication.sres.size());
+	m_pending_response_len =
+			authentication.sres.size() + authentication.kc.size();
+	queue_status(0x9f, m_pending_response_len);
 }
 
 bool nokia_sim_card_device::chv_matches(unsigned index, const u8 *value) const

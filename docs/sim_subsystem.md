@@ -102,7 +102,7 @@ implements:
 - activation reset, ATR and PPS echo;
 - T=0 SELECT, STATUS, immediate GET RESPONSE, READ BINARY,
   linear-fixed/cyclic READ/UPDATE RECORD, INCREASE and complete CHV command
-  sequencing;
+  sequencing, plus explicitly profiled RUN GSM ALGORITHM;
 - current DF, selected EF and record-pointer state;
 - declared GSM 11.11 file metadata and synthetic profile content; and
 - persistent mutable `EF_ADN`, `EF_SMS`, `EF_SMSP` and cyclic `EF_ACM`
@@ -125,12 +125,19 @@ The implemented surface is classified by ownership and evidence:
 | SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. Invalidation, broader errors and removal remain incomplete. |
 | UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
 | Cyclic EF_ACM and INCREASE | Standards-derived dormant contract | The descriptor, CHV1 access conditions, checked 24-bit addition, `98 50` overflow result, six-byte delayed response and append-only persistence follow GSM 11.11. NSE-3 constructs the exact `A0 32 00 00 03` APDU, but no product firmware acceptance trace currently exercises it. |
+| RUN GSM ALGORITHM | Standards-derived dormant contract | The card accepts only `A0 88 00 00 10`, consumes the 16-byte RAND and exposes `SRES || Kc` through the immediately following twelve-byte GET RESPONSE. A3/A8 remains explicitly operator-selectable: the card defaults to no algorithm, while the synthetic laboratory subscriber selects TS 55.205 section 5's AES example and a separately provisioned test key. The AES projection has an independent FIPS-derived vector gate; no handset has organically requested authentication. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
 | CHV support | Standards-derived dormant contract | VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK have persistent credentials/counters and reset-scoped verification. Ordinary boot does not exercise the complete lifecycle, so it is not a product-runtime promotion. |
 
 The model does not force firmware state or inject RTOS messages. Controller and
 card ownership are separate; remaining fidelity debt is ATR start/turnaround timing,
 unmodeled errors/removal, and card protocol mixed with subscriber provisioning.
+
+The authentication profile follows
+[3GPP TS 55.205](https://www.etsi.org/deliver/etsi_TS/155200_155299/155205/18.00.00_60/ts_155205v180000p.pdf):
+A3/A8 are operator-selectable, and section 5 defines the explicit AES projection
+used by this laboratory card. It is not labelled as the historical operator
+algorithm of any emulated subscriber.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
 includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`,

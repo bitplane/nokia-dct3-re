@@ -149,6 +149,21 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn("fcp[8] = 0x11", self.card)
         self.assertIn("fcp[9] = 0x10", self.card)
 
+    def test_authentication_is_explicitly_profiled_and_not_nse3_special_cased(self):
+        for token in (
+            "authentication_profile::none",
+            "void nokia_sim_card_device::run_gsm_algorithm()",
+            "m_p1 != 0 || m_p2 != 0 || m_tx_len != 16",
+            "gsm::a3a8::aes_example(m_ki, rand)",
+            "m_pending_response_len =",
+            "queue_status(0x9f, m_pending_response_len)",
+        ):
+            self.assertIn(token, self.card + self.card_header)
+        self.assertIn(
+            "authentication_profile::gsm_aes_example", self.phone
+        )
+        self.assertNotIn("noki6110", self.card + self.card_header)
+
 
 if __name__ == "__main__":
     unittest.main()

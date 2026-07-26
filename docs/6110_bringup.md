@@ -235,14 +235,23 @@ overflow, and the specified six-byte result through the immediately following
 GET RESPONSE. This removes a genuine shared-card gap, but does not prove that
 NSE-3 reaches its constructor or promote 6110 runtime coverage.
 
-The remaining unsupported constructors are RUN GSM ALGORITHM and the four SIM
-Toolkit commands; they continue to return `6d 00`. This is not permission to
-pre-implement an assumed 6110 boot script: an organic trace must establish
-which commands are actually issued, their parameters and status progression.
-Authentication also needs an explicit laboratory A3/A8 and key profile, and
-Toolkit needs a proactive-service profile. Missing commands should be
-implemented generically from the applicable GSM SIM contract rather than
-special-cased for NSE-3.
+RUN GSM ALGORITHM is now implemented generically rather than as an NSE-3 boot
+shortcut. The card accepts the GSM 11.11 `A0 88 00 00 10` shape, consumes
+RAND and makes the twelve-byte `SRES || Kc` result available only through the
+immediately following GET RESPONSE. Because A3/A8 is operator-selectable, the
+card's default profile remains `none`; the synthetic laboratory subscriber
+explicitly selects 3GPP TS 55.205 section 5's AES example and a provisioned
+test key. `verify-gsm-a3a8` checks the resulting SRES/Kc projection against the
+FIPS-197 AES-128 example. No network authentication exchange or organic NSE-3
+command ordering is inferred, so this still does not promote 6110 runtime
+coverage.
+
+The four SIM Toolkit constructors remain unsupported and return `6d 00`.
+This is not permission to pre-implement an assumed 6110 boot script: an
+organic trace must establish which commands are actually issued, their
+parameters and status progression. Toolkit additionally needs a
+proactive-service profile. Missing commands should be implemented generically
+from the applicable GSM SIM contract rather than special-cased for NSE-3.
 
 The same exact-image gate now establishes the firmware side of the generic
 DSPIF transport. The MCU-to-DSP ring occupies shared byte offsets

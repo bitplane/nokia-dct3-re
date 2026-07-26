@@ -4,15 +4,25 @@
 #ifndef MAME_NOKIA_NOKIA_SIM_CARD_H
 #define MAME_NOKIA_NOKIA_SIM_CARD_H
 
+#include "gsm_a3a8.h"
+
 class nokia_sim_card_device : public device_t, public device_nvram_interface
 {
 public:
+	enum class authentication_profile : u8 { none, gsm_aes_example };
+
 	nokia_sim_card_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
 	auto response_cb() { return m_response_cb.bind(); }
 
 	void set_cphs_aoc(bool enabled) { m_cphs_aoc = enabled; }
 	void set_cached_location(bool enabled) { m_cached_location = enabled; }
+	void set_authentication(authentication_profile profile,
+			const gsm::a3a8::block &ki)
+	{
+		m_authentication_profile = profile;
+		m_ki = ki;
+	}
 	void set_atr(const u8 *data, unsigned length);
 	void activate();
 	void rx_w(u8 data);
@@ -47,6 +57,7 @@ private:
 	void update_binary();
 	void update_record();
 	void increase_record();
+	void run_gsm_algorithm();
 	void process_chv();
 	void initialize_chv();
 	bool chv_matches(unsigned index, const u8 *value) const;
@@ -69,6 +80,9 @@ private:
 	devcb_write8 m_response_cb;
 	bool m_cphs_aoc = false;
 	bool m_cached_location = false;
+	authentication_profile m_authentication_profile =
+			authentication_profile::none;
+	gsm::a3a8::block m_ki{};
 	bool m_trace = false;
 	u8 m_atr[40] = { 0x3b, 0x10, 0x05 };
 	u8 m_atr_len = 3;
