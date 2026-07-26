@@ -9,6 +9,7 @@ sim_device: header cla=a0 ins=88 p1=00 p2=00 p3=10 selected=7f20
 sim_device: body ins=88 length=16 selected=7f20
 sim_device: header cla=a0 ins=c0 p1=00 p2=00 p3=0c selected=7f20
 sim_device: pending response ins=c0 length=12 status=9000
+sim_authentication_consumer: pc=00206914 get_status=0066 accepted=01 task=14
 """
 
 
@@ -17,6 +18,7 @@ class AuthenticationBoundaryTraceCheckTest(unittest.TestCase):
         result = verify(GOOD)
         self.assertEqual(1, result["authentication_requests"])
         self.assertEqual(12, result["result_bytes_fetched"])
+        self.assertEqual(1, result["firmware_results_accepted"])
         self.assertEqual(0, result["mm_authentication_responses"])
         self.assertFalse(result["registration_promotion"])
 
@@ -33,6 +35,10 @@ class AuthenticationBoundaryTraceCheckTest(unittest.TestCase):
             verify(GOOD.replace(
                 "sim_device: pending response ins=c0 length=12 status=9000", ""
             ))
+
+    def test_rejects_card_result_not_accepted_by_firmware(self):
+        with self.assertRaisesRegex(ValueError, "firmware-accepted"):
+            verify(GOOD.replace("get_status=0066 accepted=01", "get_status=0066 accepted=00"))
 
 
 if __name__ == "__main__":

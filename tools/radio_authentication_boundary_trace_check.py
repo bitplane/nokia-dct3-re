@@ -39,6 +39,15 @@ def verify(text: str) -> dict:
         raise ValueError("expected one complete RUN GSM ALGORITHM transaction")
     if len(get_responses) != 1 or len(results) != 1:
         raise ValueError("expected one complete twelve-byte GET RESPONSE")
+    consumers = [
+        line for line in text.splitlines()
+        if "sim_authentication_consumer:" in line
+        and "get_status=0066 accepted=01" in line
+    ]
+    if len(consumers) != 1:
+        raise ValueError(
+            f"expected one firmware-accepted authentication result, found {len(consumers)}"
+        )
 
     authentication_responses = [
         line for line in text.splitlines()
@@ -48,6 +57,7 @@ def verify(text: str) -> dict:
         "authentication_requests": 1,
         "run_gsm_algorithm_commands": 1,
         "result_bytes_fetched": 12,
+        "firmware_results_accepted": 1,
         "mm_authentication_responses": len(authentication_responses),
         "registration_promotion": False,
     }
@@ -63,6 +73,7 @@ def main() -> None:
         f"requests={result['authentication_requests']} "
         f"SIM-runs={result['run_gsm_algorithm_commands']} "
         f"fetched={result['result_bytes_fetched']} "
+        f"accepted={result['firmware_results_accepted']} "
         f"MM-responses={result['mm_authentication_responses']} "
         "promotion=no"
     )

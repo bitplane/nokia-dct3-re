@@ -244,8 +244,12 @@ explicitly selects 3GPP TS 55.205 section 5's AES example and a provisioned
 test key. `verify-gsm-a3a8` checks the resulting SRES/Kc projection against the
 FIPS-197 AES-128 example. An opt-in network fixture now takes the already
 working 3210 and 3310 firmware through MM Authentication Request, the organic
-SIM command and its complete GET RESPONSE, but neither handset yet publishes
-MM Authentication Response. That cross-product frontier does not establish
+SIM command and its complete GET RESPONSE. Exact-image and runtime evidence
+now show both products also accept typed result `0x0066`, copy Kc and invoke
+their relocated SRES publication helper; neither handset's result then reaches
+the modeled radio boundary as MM Authentication Response. The remaining
+frontier is therefore the shared radio-task publication path, not SIM
+completion or result layout. That cross-product frontier does not establish
 NSE-3 command ordering and does not promote 6110 runtime coverage.
 
 The four SIM Toolkit constructors remain unsupported and return `6d 00`.

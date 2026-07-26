@@ -51,6 +51,20 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 	if (!m_trace_enabled)
 		return;
 
+	// NSE-8 v6.00 and NHM-5 v6.39 share the same independently typed
+	// authentication completion: RUN GSM ALGORITHM returns 2, GET RESPONSE
+	// returns status 0x0066, and only then is SRES published to the radio task.
+	// Observe the final branch, where speculative flash prefetch can no longer
+	// make an intermediate register value look like a completed transaction.
+	if (pc == addr && (addr == 0x00206914 || addr == 0x0021bcfc))
+		LOGMASKED(LOG_DSP_BOUNDARY,
+				"sim_authentication_consumer: pc=%08x get_status=%04x "
+				"accepted=%02x task=%02x t=%.6f\n",
+				addr,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R4) & 0xffff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R5) & 0xff,
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+
 	// Serving-cell acceptance checkpoints retained by verify-radio-camp.
 	if (pc == addr && addr == 0x00284f74 && m_trace_enabled)
 		LOGMASKED(LOG_DSP_BOUNDARY, "radio_channel_change_state: pc=%08x accept=%02x controller=%02x flags=%08x "
