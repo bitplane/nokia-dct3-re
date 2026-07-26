@@ -279,11 +279,22 @@ one-byte `0x70` acknowledgement containing that result. Its alternative path
 disables the map and returns an empty command-`0x71` acknowledgement.
 
 NSE-3 also constructs command `0x64` with a nine-byte body at `0x239cfc`.
-The result field is dynamic, while the seven fixed product bytes are
+The result field at body offset 1 is dynamically selected as zero or one from
+bit 6 of a runtime flag byte, while the seven fixed product bytes are
 `30 08 01 01 01 1f 20`. NSE-8 uses `45 0d 01 01 01 1b 58` in the
 corresponding frame. The command vocabulary and frame helper can therefore be
 shared, but the status body is genuine typed product configuration rather
 than a portable 3210 fixture.
+
+The caller graph separates that result from the publisher's control argument.
+Class-`0x40` dispatcher `0x239ef4` reads the command at byte 8. Command
+`0x64` passes incoming body byte 0 (object byte 9) to the status publisher,
+while commands `0x70` and `0x71` alone route to the map enable/disable
+handler. A separate dispatcher maps internal event `0xd3` to a path that can
+publish status with control argument 2: once when a runtime flag bit is set
+(clearing that bit), and again when a separate byte counter reaches 15. The
+external image establishes these numeric conditions but not the meaning of
+the control argument, flag, counter or event.
 
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,

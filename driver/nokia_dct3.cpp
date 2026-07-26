@@ -287,7 +287,9 @@ constexpr nokia_product_config make_6110_config()
 	// retain their disabled defaults. The external image establishes generic
 	// 0x1e/0x1c service framing and d0 discovery through DSP reports 8d/8e,
 	// plus the class-40 command 70/71 channel-map acknowledgement grammar and
-	// a product-specific command-64 status body. It does not establish the
+	// a product-specific command-64 status body. Its dispatcher and internal
+	// event-d3 publication conditions are bounded too, without assigning
+	// meanings to their runtime control argument. It does not establish the
 	// DSP-owned startup delay, advertised map contents or exchange ordering,
 	// so those proven receive-side pieces do not justify enabling the peer.
 	// The external image also bounds task 9's 011c..0120 event dispatch and

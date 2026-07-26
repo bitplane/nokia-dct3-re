@@ -494,6 +494,9 @@ EXTERNAL_SERVICE_APPLICATION_ANCHORS = {
     0x239D04: ("movs", "r1, #0x64"),
     0x239D06: ("movs", "r2, #9"),
     0x239D08: ("bl", "#0x237a12"),
+    0x239D10: ("ldrb", "r0, [r5]"),
+    0x239D12: ("lsrs", "r0, r0, #7"),
+    0x239D14: ("bhs", "#0x239d1e"),
     0x239D16: ("movs", "r0, #0"),
     0x239D18: ("strb", "r0, [r4, #0xa]"),
     0x239D1E: ("movs", "r7, #1"),
@@ -571,6 +574,41 @@ EXTERNAL_SERVICE_CONTROLLER_ANCHORS = {
     0x273B22: ("adds", "r0, #1"),
     0x273B24: ("strb", "r0, [r4, #4]"),
     0x273B26: ("bl", "#0x273256"),
+}
+EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS = {
+    # The class-0x40 command dispatcher reads byte 8.  Incoming command 0x64
+    # passes body byte 0 (+9) as the status publisher's control argument.
+    0x239EF4: ("push", "{r4, r5, r6, r7, lr}"),
+    0x239EFE: ("ldrb", "r5, [r4, #8]"),
+    0x239F02: ("cmp", "r2, #0x64"),
+    0x239F06: ("b", "#0x23a38c"),
+    0x23A38C: ("ldrb", "r0, [r4, #9]"),
+    0x23A38E: ("bl", "#0x239cfc"),
+    # Only commands 0x70 and 0x71 reach the shared map enable/disable handler.
+    0x239F80: ("cmp", "r2, #0x71"),
+    0x239F84: ("cmp", "r2, #0x70"),
+    0x239F88: ("b", "#0x23a2ec"),
+    0x23A2EC: ("adds", "r0, r4, #0"),
+    0x23A2EE: ("bl", "#0x2398d6"),
+    # A separate internal event dispatcher maps event 0xd3 to a path that can
+    # invoke the same status publisher with control argument 2.  One call is
+    # guarded by a runtime flag bit and clears it; the other is guarded by a
+    # byte counter reaching 15.  Their higher-level meanings remain unknown.
+    0x23A3C0: ("push", "{r4, r5, r6, r7, lr}"),
+    0x23A3C6: ("movs", "r1, #0xd3"),
+    0x23A3CC: ("bne", "#0x23a3d0"),
+    0x23A3CE: ("b", "#0x23a532"),
+    0x23A584: ("ldrb", "r0, [r6, r5]"),
+    0x23A586: ("lsrs", "r0, r0, #5"),
+    0x23A588: ("blo", "#0x23a598"),
+    0x23A58C: ("movs", "r1, #0xef"),
+    0x23A590: ("strb", "r1, [r6, r5]"),
+    0x23A592: ("movs", "r0, #2"),
+    0x23A594: ("bl", "#0x239cfc"),
+    0x23A598: ("ldrb", "r0, [r4, r5]"),
+    0x23A59A: ("cmp", "r0, #0xf"),
+    0x23A59E: ("movs", "r0, #2"),
+    0x23A5A0: ("bl", "#0x239cfc"),
 }
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
@@ -1673,6 +1711,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     physical = swap16(data)
     task_9_entry = effective_u32(
@@ -1801,10 +1840,18 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "payload_length": 9,
                 "result_offset": 1,
                 "result_values": [0, 1],
+                "result_source_runtime_flag_bit": 6,
                 "fixed_product_bytes": [0x30, 0x08, 0x01, 0x01, 0x01, 0x1F, 0x20],
                 "nse8_fixed_product_bytes":
                     [0x45, 0x0D, 0x01, 0x01, 0x01, 0x1B, 0x58],
                 "product_payload_shared": False,
+                "publisher_control": {
+                    "incoming_command_body_offset": 0,
+                    "incoming_dispatcher": 0x239EF4,
+                    "internal_event": 0xD3,
+                    "internal_event_argument": 2,
+                    "argument_semantics": "not_established",
+                },
             },
             "peer_start_delay": "not_established",
             "channel_bitmap": "not_established",
