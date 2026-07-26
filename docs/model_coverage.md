@@ -156,14 +156,26 @@ subsequent 102-frame paging opportunity makes the parser repeat the same
 successful completion without waking the idle-RR admission path or producing
 RACH, so a missing network retry is also excluded.
 
-The remaining failure is therefore the firmware-owned control transition
-between the background parser loop and paging admission. Reversing the
-release ordering so the real `0x89` confirmation is accepted before result
-`0x05e8` does not change the paging outcome, excluding the modeled
-four-millisecond confirmation latency as that transition. Consequently the
-next implementation must recover that NHM-5 contract; changing GSM paging
-octets, forcing firmware state, synthesising an internal wake-up or bypassing
-the parser would cross the current evidence boundary.
+The foreground RR loop at `0x255fbe` does not enter admission merely because
+the parser completion byte is set. It first waits for internal completion
+event `0x08cb`; only that event calls `0x255ff8`, which consumes the saved
+parser result and can enter the organic random-access setup at `0x256014`.
+The event is a firmware mailbox completion rather than a DSP-ring packet.
+After release, task 13 sends task 12 request `0x0a05` with selector byte one;
+task 12 stores that selector at `0x0010e4bd`. A complete trace through the
+first addressed page contains no later task-12 input and no `0x08cb`
+publication. Meanwhile later PCH fill results overwrite the asynchronous
+parser result before the foreground loop's ordinary periodic wake.
+
+The remaining failure is therefore the firmware-owned task-12 completion
+contract that should reconnect the background parser to foreground paging
+admission. Reversing the release ordering so the real `0x89` confirmation is
+accepted before result `0x05e8` does not change the paging outcome, excluding
+the modeled four-millisecond confirmation latency as that transition.
+Consequently the next implementation must recover the real L1/timing
+prerequisite for `0x08cb`; changing GSM paging octets, forcing firmware state,
+synthesising that internal event or bypassing the parser would cross the
+current evidence boundary.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
