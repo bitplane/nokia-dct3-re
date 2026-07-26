@@ -1206,12 +1206,45 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x20DB80: 0x10917C,
     0x20DBB2: 0x052E,
     0x20DBD4: 0x108EE0,
+    0x24CEB2: 0x10A3B8,
 }
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 RA_INFO_CONSUMER = 0x20DB1C
 RA_INFO_CONSUMER_DIRECT_CALLS = [0x211EB6]
 RA_INFO_FOLLOWUP_HELPER = 0x20D8D6
 RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS = [0x20DC02]
+NSE3_TASK_17_ENTRY_POINTER = 0x2B757C
+NSE3_TASK_17_ENTRY = 0x24CE99
+NSE3_TASK_17_CODE_START = 0x24CE98
+NSE3_TASK_17_CODE_END = 0x24F1C4
+NSE3_TASK_17_STATE_CELL = 0x10A3B8
+NSE3_TASK_17_STATE_JUMP_TABLE_ADDRESS = 0x24EA6C
+NSE3_TASK_17_STATE_JUMP_TABLE = [
+    0x24EAF0, 0x24E618, 0x24D27A, 0x24D1F6, 0x24D206,
+    0x24D610, 0x24DC22, 0x24DEEC, 0x24EE26, 0x24EEC4,
+    0x24EC7E, 0x24E4AA, 0x24E4D4, 0x24E504, 0x24DA14,
+    0x24D70A, 0x24D95C, 0x24D8B0, 0x24E0D0, 0x24E1BA,
+    0x24E136, 0x24E0A6, 0x24E222, 0x24E2E2, 0x24E33A,
+    0x24E41A, 0x24DDDA, 0x24EF5A, 0x24E6CE, 0x24F19E,
+]
+NSE3_TASK_17_DIRECT_RADIO_TARGETS = {
+    "channel_configure": 0x20CFFA,
+    "bitmap_search": 0x20FAEC,
+    "candidate_list": 0x214788,
+    "task_submit": 0x25FB4C,
+}
+NSE3_TASK_17_ANCHORS = {
+    0x24CE98: ("push", "{r4, r5, r6, r7, lr}"),
+    0x24CEBC: ("movs", "r0, #0x11"),
+    0x24CEBE: ("bl", "#0x231f70"),
+    0x24EA3E: ("movs", "r0, #0"),
+    0x24EA42: ("ldrsh", "r0, [r1, r0]"),
+    0x24EA44: ("cmp", "r0, #0x1d"),
+    0x24EA64: ("adr", "r1, #4"),
+    0x24EA66: ("lsls", "r0, r0, #2"),
+    0x24EA68: ("ldr", "r0, [r1, r0]"),
+    0x24EA6A: ("mov", "pc, r0"),
+}
 CANDIDATE_LIST_REQUEST_BUILDER = 0x214788
 CANDIDATE_LIST_REQUEST_BUILDER_DIRECT_CALLS = [0x216192, 0x217210]
 TASK_11_EVENT_DECODER = 0x210DA8
@@ -2672,6 +2705,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, RADIO_PACKET_LITERALS)
     decode_thumb_anchors(data, RADIO_REPORT_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
+    decode_thumb_anchors(data, NSE3_TASK_17_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_ANCHORS)
@@ -2728,6 +2762,46 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 RA_INFO follow-up direct-call census changed: expected "
             f"{RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS}, got "
             f"{ra_info_followup_calls}"
+        )
+    task_17_entry = effective_u32(
+        physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
+    )
+    if task_17_entry != NSE3_TASK_17_ENTRY:
+        raise ValueError(
+            "NSE-3 task-17 entry changed: expected "
+            f"{NSE3_TASK_17_ENTRY:#x}, got {task_17_entry:#x}"
+        )
+    task_17_state_jump_table = [
+        effective_u32(
+            physical,
+            NSE3_TASK_17_STATE_JUMP_TABLE_ADDRESS - FLASH_BASE
+            + state * 4,
+        )
+        for state in range(len(NSE3_TASK_17_STATE_JUMP_TABLE))
+    ]
+    if task_17_state_jump_table != NSE3_TASK_17_STATE_JUMP_TABLE:
+        raise ValueError(
+            "NSE-3 task-17 state jump table changed: expected "
+            f"{NSE3_TASK_17_STATE_JUMP_TABLE}, got "
+            f"{task_17_state_jump_table}"
+        )
+    task_17_direct_radio_calls = {
+        name: [
+            insn.address
+            for insn in instructions
+            if insn
+            and NSE3_TASK_17_CODE_START
+            <= insn.address
+            < NSE3_TASK_17_CODE_END
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+        ]
+        for name, target in NSE3_TASK_17_DIRECT_RADIO_TARGETS.items()
+    }
+    if any(task_17_direct_radio_calls.values()):
+        raise ValueError(
+            "NSE-3 task-17 acquired a direct radio-constructor/submit call: "
+            f"{task_17_direct_radio_calls}"
         )
     task_11_event_jump_table = {
         status: effective_u32(
@@ -3176,6 +3250,26 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     "value_24_source_offsets": [5, 6, 7],
                     "conversion_divisors": [0x052E, 0x33, 0x1A],
                     "destination_task": 0x11,
+                    "destination_boundary": {
+                        "entry_pointer": NSE3_TASK_17_ENTRY_POINTER,
+                        "entry": task_17_entry,
+                        "code_extent": [
+                            NSE3_TASK_17_CODE_START,
+                            NSE3_TASK_17_CODE_END,
+                        ],
+                        "controller_state_cell": NSE3_TASK_17_STATE_CELL,
+                        "controller_states": [
+                            0,
+                            len(NSE3_TASK_17_STATE_JUMP_TABLE) - 1,
+                        ],
+                        "state_jump_table":
+                            NSE3_TASK_17_STATE_JUMP_TABLE_ADDRESS,
+                        "state_routes": task_17_state_jump_table,
+                        "status_0x0400_route":
+                            "controller_state_dependent",
+                        "direct_radio_calls": task_17_direct_radio_calls,
+                        "direct_radio_configuration": False,
+                    },
                 },
                 "conditional_followup": {
                     "controller_object_offset": 0x18,

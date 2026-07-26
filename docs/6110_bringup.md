@@ -338,6 +338,19 @@ byte `0x18` is not 1, the same 24-bit value is passed to the uniquely called
 helper `0x20d8d6` and its result is stored back at byte `0x18`; value 1
 instead enters a timer-`0x71` scheduling path.
 
+The task-17 destination is now bounded independently. Task table entry
+`0x2b757c` contains Thumb entry `0x24ce99`. Its dispatcher reads signed
+controller state at `0x10a3b8`, accepts exactly states `0x00..0x1d`, and
+uses the exact thirty-entry jump table at `0x24ea6c`. Status `0x0400` must
+therefore be interpreted within the active task-17 controller state rather
+than through one global RA_INFO callback. Across the complete task extent
+`0x24ce98..0x24f1c4`, a direct-call census finds no call to
+`CHANNEL_CONFIGURE`, the type-`0x1a` bitmap builder, the type-`0x09`
+candidate-list builder or the task-3 submission API. Transitive effects of
+individual task-17 state paths remain to be recovered, but this fixed
+boundary rules out treating the derived object itself as a direct radio
+request.
+
 Thus the NSE-3 `RA_INFO` boundary carries compact control/timing data into
 the controller; it is not a zero-body completion like the direct type-`0x89`
 handler. The exact path calls neither the type-`0x1a` bitmap builder nor

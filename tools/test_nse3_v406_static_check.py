@@ -367,6 +367,27 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(
             [0x20DC02], check.RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS
         )
+        self.assertEqual(0x2B757C, check.NSE3_TASK_17_ENTRY_POINTER)
+        self.assertEqual(0x24CE99, check.NSE3_TASK_17_ENTRY)
+        self.assertEqual(0x10A3B8, check.NSE3_TASK_17_STATE_CELL)
+        self.assertEqual(
+            30, len(check.NSE3_TASK_17_STATE_JUMP_TABLE)
+        )
+        self.assertEqual(
+            0x24EAF0, check.NSE3_TASK_17_STATE_JUMP_TABLE[0]
+        )
+        self.assertEqual(
+            0x24F19E, check.NSE3_TASK_17_STATE_JUMP_TABLE[0x1D]
+        )
+        self.assertEqual(
+            {
+                "channel_configure": 0x20CFFA,
+                "bitmap_search": 0x20FAEC,
+                "candidate_list": 0x214788,
+                "task_submit": 0x25FB4C,
+            },
+            check.NSE3_TASK_17_DIRECT_RADIO_TARGETS,
+        )
 
     def test_type_0x8a_uses_shared_controller_state_not_report_body(self):
         self.assertEqual(
