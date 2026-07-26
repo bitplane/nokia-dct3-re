@@ -1432,7 +1432,7 @@ TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS = {
     0x24E0BA: ("bl", "#0x27d5c0"),
 }
 TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS = {
-    # Standalone table-derived form: 1f 00 04 value.
+    # Argument-1 table-derived form: 1f 00 04 value.
     0x20D7B6: ("movs", "r2, #0x1f"),
     0x20D7B8: ("strb", "r2, [r1, #3]"),
     0x20D7BA: ("strb", "r0, [r1, #5]"),
@@ -1472,6 +1472,48 @@ TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS = {
     0x20F916: ("bl", "#0x20f0e0"),
     0x20F91C: ("adds", "r0, r4, #0"),
     0x20F924: ("bl", "#0x20f128"),
+}
+TYPE_0X1F_CONTROLLER_STATUS_ANCHORS = {
+    # The status-0x03ee/0x03f0/0x03f3 dispatcher.
+    0x20F8E4: ("push", "{r4, lr}"),
+    0x20F8EA: ("ldrsh", "r0, [r4, r0]"),
+    0x20F8EC: ("ldr", "r1, [pc, #0x1dc]"),
+    0x20F8EE: ("subs", "r0, r0, r1"),
+    0x20F8F0: ("cmp", "r0, #0"),
+    0x20F8F4: ("subs", "r0, #2"),
+    0x20F8F8: ("beq", "#0x20f91c"),
+    0x20F8FA: ("subs", "r0, #3"),
+    0x20F8FE: ("beq", "#0x20f90c"),
+    0x20F916: ("bl", "#0x20f0e0"),
+    0x20F924: ("bl", "#0x20f128"),
+    0x20F934: ("bl", "#0x20f3ec"),
+    # All three statuses are built by 0x27d5c0 and posted to task 11.
+    0x27D5C0: ("push", "{r4, r5, r6, r7, lr}"),
+    0x27D5C4: ("movs", "r0, #0xff"),
+    0x27D5CE: ("strh", "r5, [r4]"),
+    0x27D5D8: ("ldr", "r0, [pc, #0x328]"),
+    0x27D680: ("ldr", "r0, [pc, #0x28c]"),
+    0x27D8F6: ("movs", "r0, #0xb"),
+    0x27D8FA: ("bl", "#0x25fb4c"),
+    # Task-17 state cases 21, 20 and 22 publish 0x03ee, 0x03f3 and 0x03f0.
+    0x24E0B8: ("ldr", "r0, [pc, #0x32c]"),
+    0x24E0BA: ("bl", "#0x27d5c0"),
+    0x24E0C4: ("movs", "r0, #0"),
+    0x24E0C6: ("bl", "#0x27daf4"),
+    0x24E17C: ("ldr", "r0, [pc, #0x3c8]"),
+    0x24E17E: ("bl", "#0x27d5c0"),
+    0x24E1B0: ("bl", "#0x27daf4"),
+    0x24E2C8: ("movs", "r0, #0x3f"),
+    0x24E2CA: ("lsls", "r0, r0, #4"),
+    0x24E2CC: ("bl", "#0x27d5c0"),
+    # The formerly "standalone" flags-4 form is the r0 == 1 branch of
+    # 0x20d6bc; two direct callers supply that value.
+    0x20D6BC: ("push", "{r4, r5, r6, r7, lr}"),
+    0x20D6C8: ("cmp", "r0, #1"),
+    0x20D6CA: ("beq", "#0x20d78e"),
+    0x20D96E: ("bl", "#0x20d6bc"),
+    0x20DE26: ("bl", "#0x20d6bc"),
+    0x2116BE: ("bl", "#0x20d6bc"),
 }
 RADIO_REPORT_HANDLER_LITERALS = {
     0x211C68: 0x1393,
@@ -1581,6 +1623,13 @@ TYPE_0X1F_OTHER_CONSTRUCTOR_LITERALS = {
     0x20F144: 0x108FD4,
     0x20F16E: 0x108F50,
     0x20F17E: 0x108F82,
+}
+TYPE_0X1F_CONTROLLER_STATUS_LITERALS = {
+    0x20F8EC: 0x03EE,
+    0x27D5D8: 0x03E9,
+    0x27D680: 0x10A4E4,
+    0x24E0B8: 0x03EE,
+    0x24E17C: 0x03F3,
 }
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 RA_INFO_CONSUMER = 0x20DB1C
@@ -1825,9 +1874,9 @@ TYPE_0X1F_DIRECT_CONSTRUCTORS = [
     [0x27FEBC, 0x27FEBE],
 ]
 TYPE_0X1F_CONSTRUCTOR_ROUTINES = {
-    "standalone_0x20d78e": {
-        "routine": 0x20D78E,
-        "direct_calls": [],
+    "argument_1_branch_0x20d78e": {
+        "routine": 0x20D6BC,
+        "direct_calls": [0x20D96E, 0x20DE26, 0x2116BE],
         "wire_flags": [4],
     },
     "status_0x03f3": {
@@ -1855,6 +1904,26 @@ TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR = 0x20F3EC
 TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_DIRECT_CALLS = [0x20F934]
 TYPE_0X1F_STATUS_0X03EE = 0x03EE
 TYPE_0X1F_STATUS_0X03EE_PRODUCERS = [0x24E0B8]
+TYPE_0X1F_CONTROLLER_STATUS_PRODUCERS = {
+    0x03EE: 0x24E0B8,
+    0x03F0: 0x24E2C8,
+    0x03F3: 0x24E17C,
+}
+TYPE_0X1F_CONTROLLER_STATUS_CALLS = {
+    0x03EE: [0x24E0BA],
+    0x03F0: [0x24E2CC],
+    0x03F3: [0x24E17E],
+}
+TYPE_0X1F_CONTROLLER_STATUS_TASK_17_STATES = {
+    0x03EE: 21,
+    0x03F0: 22,
+    0x03F3: 20,
+}
+TYPE_0X1F_CONTROLLER_STATUS_DISPATCHER = 0x20F8E4
+TYPE_0X1F_CONTROLLER_STATUS_DISPATCHER_DIRECT_CALLS = [0x211C0A]
+TYPE_0X1F_ARGUMENT_BRANCH_ROUTINE = 0x20D6BC
+TYPE_0X1F_ARGUMENT_BRANCH_DIRECT_CALLS = [0x20D96E, 0x20DE26, 0x2116BE]
+TYPE_0X1F_ARGUMENT_BRANCH_CALL_VALUES = [0, 1, 1]
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -3188,6 +3257,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, TYPE_0X80_0X70_TASK_3_ANCHORS)
     decode_thumb_anchors(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS)
     decode_thumb_anchors(data, TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS)
+    decode_thumb_anchors(data, TYPE_0X1F_CONTROLLER_STATUS_ANCHORS)
     decode_thumb_anchors(data, NSE3_TASK_17_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
@@ -3197,6 +3267,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_OTHER_CONSTRUCTOR_LITERALS)
+    verify_thumb_literals(data, TYPE_0X1F_CONTROLLER_STATUS_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -3495,6 +3566,72 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{TYPE_0X1F_STATUS_0X03EE_PRODUCERS}, got "
             f"{type_0x1f_status_0x03ee_producers}"
         )
+    type_0x1f_controller_status_calls = {}
+    for index, insn in enumerate(instructions):
+        if (
+            not insn
+            or insn.mnemonic not in ("bl", "blx")
+            or immediate_target(insn) != 0x27D5C0
+        ):
+            continue
+        status = call_registers(
+            instructions, index, physical, FLASH_BASE
+        )["r0"]
+        if status in TYPE_0X1F_CONTROLLER_STATUS_CALLS:
+            type_0x1f_controller_status_calls.setdefault(
+                status, []
+            ).append(insn.address)
+    if type_0x1f_controller_status_calls != TYPE_0X1F_CONTROLLER_STATUS_CALLS:
+        raise ValueError(
+            "NSE-3 type-0x1f controller-status calls changed: expected "
+            f"{TYPE_0X1F_CONTROLLER_STATUS_CALLS}, got "
+            f"{type_0x1f_controller_status_calls}"
+        )
+    type_0x1f_controller_status_dispatcher_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn)
+        == TYPE_0X1F_CONTROLLER_STATUS_DISPATCHER
+    ]
+    if (
+        type_0x1f_controller_status_dispatcher_calls
+        != TYPE_0X1F_CONTROLLER_STATUS_DISPATCHER_DIRECT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 type-0x1f status-dispatcher call census changed: "
+            f"expected {TYPE_0X1F_CONTROLLER_STATUS_DISPATCHER_DIRECT_CALLS}, "
+            f"got {type_0x1f_controller_status_dispatcher_calls}"
+        )
+    type_0x1f_argument_branch_call_indices = [
+        index
+        for index, insn in enumerate(instructions)
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TYPE_0X1F_ARGUMENT_BRANCH_ROUTINE
+    ]
+    type_0x1f_argument_branch_calls = [
+        instructions[index].address
+        for index in type_0x1f_argument_branch_call_indices
+    ]
+    type_0x1f_argument_branch_call_values = [
+        call_registers(instructions, index, physical, FLASH_BASE)["r0"]
+        for index in type_0x1f_argument_branch_call_indices
+    ]
+    if (
+        type_0x1f_argument_branch_calls
+        != TYPE_0X1F_ARGUMENT_BRANCH_DIRECT_CALLS
+        or type_0x1f_argument_branch_call_values
+        != TYPE_0X1F_ARGUMENT_BRANCH_CALL_VALUES
+    ):
+        raise ValueError(
+            "NSE-3 type-0x1f argument-1 branch census changed: expected "
+            f"{TYPE_0X1F_ARGUMENT_BRANCH_DIRECT_CALLS}/"
+            f"{TYPE_0X1F_ARGUMENT_BRANCH_CALL_VALUES}, got "
+            f"{type_0x1f_argument_branch_calls}/"
+            f"{type_0x1f_argument_branch_call_values}"
+        )
     task_17_entry = effective_u32(
         physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
     )
@@ -3516,6 +3653,25 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 task-17 state jump table changed: expected "
             f"{NSE3_TASK_17_STATE_JUMP_TABLE}, got "
             f"{task_17_state_jump_table}"
+        )
+    type_0x1f_controller_status_state_entries = {
+        status: task_17_state_jump_table[state]
+        for status, state in
+        TYPE_0X1F_CONTROLLER_STATUS_TASK_17_STATES.items()
+    }
+    expected_type_0x1f_controller_status_state_entries = {
+        0x03EE: 0x24E0A6,
+        0x03F0: 0x24E222,
+        0x03F3: 0x24E136,
+    }
+    if (
+        type_0x1f_controller_status_state_entries
+        != expected_type_0x1f_controller_status_state_entries
+    ):
+        raise ValueError(
+            "NSE-3 type-0x1f controller state entries changed: expected "
+            f"{expected_type_0x1f_controller_status_state_entries}, got "
+            f"{type_0x1f_controller_status_state_entries}"
         )
     task_17_direct_radio_calls = {
         name: [
@@ -4019,13 +4175,18 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "declared_payload_bytes": 4,
                 "wire_source_offset": 3,
                 "common_prefix": [0x1F, 0],
-                "standalone_0x20d78e_form": {
+                "argument_1_branch_0x20d78e_form": {
                     "wire_flags": [4],
                     "wire_value":
                         "table_0x2bcfdc[(cell_0x10acf4_byte_8 & 0x1f)]",
                     "local_metadata_offset": 7,
                     "local_metadata_value": 0,
-                    "direct_callers": [],
+                    "owner_routine": TYPE_0X1F_ARGUMENT_BRANCH_ROUTINE,
+                    "owner_direct_calls":
+                        type_0x1f_argument_branch_calls,
+                    "owner_call_values":
+                        type_0x1f_argument_branch_call_values,
+                    "required_argument_0": 1,
                 },
                 "status_0x03f3_form": {
                     "constructor": 0x20F0E0,
@@ -4062,6 +4223,25 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     "wire_flags": [1, 6, 7],
                     "wire_value": "derived_timing_or_zero",
                     "local_metadata_offset": 7,
+                },
+                "controller_status_route": {
+                    "builder": 0x27D5C0,
+                    "destination_task": 11,
+                    "dispatcher": 0x20F8E4,
+                    "dispatcher_direct_calls":
+                        type_0x1f_controller_status_dispatcher_calls,
+                    "status_calls": type_0x1f_controller_status_calls,
+                    "task_17_states":
+                        TYPE_0X1F_CONTROLLER_STATUS_TASK_17_STATES,
+                    "task_17_state_entries":
+                        type_0x1f_controller_status_state_entries,
+                    "status_0x03f3_object_byte_2_source": 0x10A4E4,
+                    "possible_fallthrough_order": [
+                        0x03EE, 0x03F3, 0x03F0,
+                    ],
+                    "intervening_event_reader": 0x27DAF4,
+                    "unconditional_order": False,
+                    "independent_state_entries": True,
                 },
                 "forms_share_wire_profile": True,
                 "protocol_semantic_name_assigned": False,

@@ -447,8 +447,19 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(
             [4],
             check.TYPE_0X1F_CONSTRUCTOR_ROUTINES[
-                "standalone_0x20d78e"
+                "argument_1_branch_0x20d78e"
             ]["wire_flags"],
+        )
+        self.assertEqual(
+            [0x20D96E, 0x20DE26, 0x2116BE],
+            check.TYPE_0X1F_ARGUMENT_BRANCH_DIRECT_CALLS,
+        )
+        self.assertEqual(
+            [0, 1, 1], check.TYPE_0X1F_ARGUMENT_BRANCH_CALL_VALUES
+        )
+        self.assertEqual(
+            ("beq", "#0x20d78e"),
+            check.TYPE_0X1F_CONTROLLER_STATUS_ANCHORS[0x20D6CA],
         )
         self.assertEqual(
             [1],
@@ -509,6 +520,30 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(
             0x03EE,
             check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS[0x24E0B8],
+        )
+        self.assertEqual(
+            {
+                0x03EE: [0x24E0BA],
+                0x03F0: [0x24E2CC],
+                0x03F3: [0x24E17E],
+            },
+            check.TYPE_0X1F_CONTROLLER_STATUS_CALLS,
+        )
+        self.assertEqual(
+            {0x03EE: 21, 0x03F0: 22, 0x03F3: 20},
+            check.TYPE_0X1F_CONTROLLER_STATUS_TASK_17_STATES,
+        )
+        self.assertEqual(
+            ("lsls", "r0, r0, #4"),
+            check.TYPE_0X1F_CONTROLLER_STATUS_ANCHORS[0x24E2CA],
+        )
+        self.assertEqual(
+            ("bl", "#0x27d5c0"),
+            check.TYPE_0X1F_CONTROLLER_STATUS_ANCHORS[0x24E2CC],
+        )
+        self.assertEqual(
+            0x10A4E4,
+            check.TYPE_0X1F_CONTROLLER_STATUS_LITERALS[0x27D680],
         )
         self.assertEqual(
             0x1E08, check.RADIO_REPORT_HANDLER_LITERALS[0x27FEC0]

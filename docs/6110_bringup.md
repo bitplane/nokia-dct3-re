@@ -319,20 +319,39 @@ stores of type `0x1f`, not just this report-driven one:
 
 | Constructor context | Flags byte | Value byte | Local byte 7 |
 |---|---:|---|---|
-| Standalone routine `0x20d78e` | `04` | Table `0x2bcfdc`, indexed by the low five bits of cell `0x10acf4` byte 8 | Zero |
+| Argument-1 branch `0x20d6bc -> 0x20d78e` | `04` | Table `0x2bcfdc`, indexed by the low five bits of cell `0x10acf4` byte 8 | Zero |
 | Status `0x03f3`, routine `0x20f0e0` | `01` | Zero | Input object byte 2 |
 | Status `0x03f0`, routine `0x20f128` | `0d` | Cell `0x108f82` byte 1 | Byte selected from cell `0x108f50` |
 | Status `0x03ee`, routine `0x20f3ec` | `0c` or `0d` | Table `0x2bcfdc`, indexed by input byte 9 | Optional input byte `0x0b` |
 | Type-`0x80`/discriminator-`0x70` follow-up | `01`, `06` or `07` | Derived timing or zero | A report-derived value |
 
 The `0x03f3`, `0x03f0` and `0x03ee` forms are distinct cases of the same
-status dispatcher and have one direct constructor call each. The standalone
-`0x20d78e` form has no direct callsite and is retained as a possible
-table/jump target rather than declared unreachable. All five share the same
+status dispatcher and have one direct constructor call each. The flags-`04`
+form is not standalone: routine `0x20d6bc` branches to it when argument 0
+equals one. Its three direct callers supply values `0`, `1` and `1`, proving
+two ordinary entry paths to the form. All five share the same
 status-2 task-3 framing and four-byte type-`0x1f` wire profile. This supports
 a shared typed transport object with product/controller-specific construction
 policy; it does not yet establish the DSP-side meaning of individual flag
 bits or the value byte.
+
+The controller-status route is now exact too. Common builder `0x27d5c0`
+posts all three objects to task 11, whose sole call to dispatcher `0x20f8e4`
+selects the constructors arithmetically from base status `0x03ee`:
+
+| Task-17 state case | Published status | Selected form |
+|---:|---:|---|
+| 21 (`0x24e0a6`) | `0x03ee` at `0x24e0ba` | flags `0c/0d` |
+| 20 (`0x24e136`) | `0x03f3` at `0x24e17e` | flags `01` |
+| 22 (`0x24e222`) | computed `0x03f0` at `0x24e2cc` | flags `0d` |
+
+For `0x03f3`, the builder copies cell `0x10a4e4` into status-object byte 2;
+the selected constructor retains that only as local object byte 7, outside
+the four-byte payload. One gated fall-through path can publish
+`0x03ee -> 0x03f3 -> 0x03f0`, but calls to event reader `0x27daf4` and
+state-dependent branches intervene, and all three labels remain independent
+task-17 jump-table entries. The sequence is therefore possible, not an
+unconditional DSP lifecycle script.
 
 The separate cross-model gate independently finds the same status-2,
 four-byte, task-3 envelope in Nokia 3210 v6.00 and Nokia 3310 v6.39. Their
