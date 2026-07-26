@@ -36,13 +36,15 @@ Because six task-17 producer sites feed `0x03f1`, neither the external
 a checked protocol boundary without enabling the NSE-3 radio peer or
 promoting coverage.
 
-Authentication remains a cross-product frontier rather than a matrix
-promotion. With the separate `AUTHCFG` fixture enabled, both the proven 3210
-v6.00 and 3310 v6.39 firmware consume an MM Authentication Request, issue
-`A0 88 00 00 10` to the shared laboratory SIM and fetch all twelve SRES/Kc
-bytes. Neither currently emits MM Authentication Response. The default
-registration path remains unchanged, and no response, SIM task result or
-registration state is injected.
+Authentication is independently complete on the proven 3210 v6.00 and 3310
+v6.39 profiles. With the separate `AUTHCFG` fixture enabled, each consumes MM
+Authentication Request, issues `A0 88 00 00 10` to the shared laboratory SIM,
+fetches SRES/Kc, emits MM Authentication Response, accepts Location Updating
+Accept, persists EF_LOCI, releases the dedicated channel and returns to camp.
+`verify-radio-authentication-boundary` and
+`verify-3310-radio-authentication-boundary` reproduce those lifecycles without
+injecting a response, SIM task result or registration state. This shared
+protocol completion does not promote the still-unbooted NSE-3 profiles.
 
 The comparison also identifies SRAM `0x10fde1` as a possible v5.48 DSP
 verdict location. Exact v4.06 analysis rejects treating it as a portable

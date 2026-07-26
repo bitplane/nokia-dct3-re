@@ -1413,6 +1413,11 @@ ready value and no inherited NSE-8 or NHM-5 service grammar. The static JSON
 records these unknowns so later work cannot silently promote the shared layout
 into a working-handshake claim.
 
+`docs/6110_bootstrap_capture.md` turns the remaining DSP-owned result into a
+strict hardware-capture contract. Its validator pins the exact ROM3 firmware,
+the ordered `3/3` pre-upload exchange, all 64 acknowledgements, final `0x0b06`
+publication and non-sentinel verdict, and rejects HLE or patched completion.
+
 An independent implementation now provides a useful negative comparison.
 [`djr-747/nokia-dct3-emulator`](https://github.com/djr-747/nokia-dct3-emulator)
 commit `c50f7e272bf10c37a40c57174dbde84d9717b7e3` reports NSE-3 v5.48 booting
