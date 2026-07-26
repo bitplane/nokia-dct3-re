@@ -1189,6 +1189,41 @@ DSP_EXTERNAL_SOFTWARE_BYTES = (
     b"NSE-3Nx\n"
     b"(c) NMP.\x00"
 )
+DSP_INTERNAL_SOFTWARE_ANCHORS = {
+    # Startup clears the first byte of both independently formatted buffers.
+    0x237BF2: ("ldr", "r0, [pc, #0x270]"),
+    0x237BF4: ("strb", "r7, [r0]"),
+    0x237BF6: ("ldr", "r0, [pc, #0x270]"),
+    0x237BF8: ("strb", "r7, [r0]"),
+    # The inbound handler accepts two report types and converts byte 0x0b
+    # into a one-character ASCII identity for selector 9.
+    0x237D66: ("ldrb", "r1, [r4, #8]"),
+    0x237D8E: ("cmp", "r1, #0xc8"),
+    0x237D90: ("beq", "#0x237dbc"),
+    0x237D92: ("cmp", "r1, #0xa"),
+    0x237D94: ("beq", "#0x237dbc"),
+    0x237DBE: ("ldrb", "r1, [r4, #0xb]"),
+    0x237DC0: ("adds", "r1, #0x30"),
+    0x237DC2: ("strb", "r1, [r0, #4]"),
+    0x237DC8: ("strb", "r0, [r1, #5]"),
+    0x237DCA: ("movs", "r0, #9"),
+    0x237DCE: ("bl", "#0x28ead2"),
+    # Generic setter selector 9 copies at most ten bytes to 0x10bcf0.
+    0x28EAD4: ("adds", "r5, r1, #0"),
+    0x28EAD6: ("adds", "r6, r0, #0"),
+    0x28EAF2: ("subs", "r0, #2"),
+    0x28EAFC: ("cmp", "r7, #0xa"),
+    0x28EB02: ("ldr", "r6, [pc, #0x2d8]"),
+    0x28EB04: ("movs", "r0, #0xc"),
+    0x28EB0C: ("bl", "#0x2a44fc"),
+    0x28EB14: ("strb", "r0, [r1, #0xc]"),
+}
+DSP_INTERNAL_SOFTWARE_LITERALS = {
+    0x237BF2: 0x10BCF0,
+    0x237BF6: 0x10BCFC,
+    0x28EA16: 0x10BCF0,
+    0x28EB02: 0x10BCE4,
+}
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -2445,6 +2480,8 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, COBBA_ID_SERVICE_LITERALS)
     decode_thumb_anchors(data, DSP_BOOTSTRAP_POST_ANCHORS)
     verify_thumb_literals(data, DSP_BOOTSTRAP_POST_LITERALS)
+    decode_thumb_anchors(data, DSP_INTERNAL_SOFTWARE_ANCHORS)
+    verify_thumb_literals(data, DSP_INTERNAL_SOFTWARE_LITERALS)
     physical = swap16(data)
     external_software_pointer = effective_u32(
         physical, DSP_EXTERNAL_SOFTWARE_POINTER_TABLE - FLASH_BASE)
@@ -2465,6 +2502,19 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             f"{external_software_bytes!r}"
         )
     instructions = decode_image(physical, FLASH_BASE)
+    internal_software_setter_callers = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == 0x28EAD2
+    ]
+    if internal_software_setter_callers != [0x237DCE]:
+        raise ValueError(
+            "NSE-3 DSP internal-software setter callers changed: expected "
+            f"[0x237dce], got "
+            f"{[hex(address) for address in internal_software_setter_callers]}"
+        )
     direct_callers = [
         insn.address
         for insn in instructions
@@ -2611,6 +2661,15 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
                 "0x09_dsp_internal_software": {
                     "source": "runtime_ram",
                     "address": 0x10BCF0,
+                    "startup_state": "empty_string",
+                    "setter": 0x28EAD2,
+                    "setter_direct_callers":
+                        internal_software_setter_callers,
+                    "inbound_handler": 0x237D60,
+                    "accepted_message_types": [0x0A, 0xC8],
+                    "message_value_offset": 0x0B,
+                    "rendered_value": "single_ascii_digit",
+                    "exact_revision": "not_established",
                 },
                 "0x0c_system_asic": {
                     "source": "mad2_register",

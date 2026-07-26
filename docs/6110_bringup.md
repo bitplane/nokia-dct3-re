@@ -572,8 +572,10 @@ firmware rather than merely in our documentation:
 - `0x03` (DSP external software) dereferences the flash pointer at `0x2ab52c`
   to the NUL-terminated identity at `0x286098`: revision `25.3.531`, date
   `17-Dec-97`, product line `NSE-3Nx`, and copyright marker `(c) NMP.`;
-- `0x09` (DSP internal software) reads a separately populated runtime buffer
-  at `0x10bcf0`;
+- `0x09` (DSP internal software) reads runtime buffer `0x10bcf0`. Startup
+  clears it; the sole setter call accepts inbound report type `0x0a` or
+  `0xc8`, converts message byte 11 to one ASCII digit and stores it under
+  selector 9;
 - `0x0c` (system ASIC) reads MAD2 register `0x20000`; and
 - `0x0d` (COBBA) projects the bootstrap-captured `0x10000` word as `B06`.
 
@@ -591,6 +593,17 @@ bootstrap stream is executable DSP code or that all of revision `25.3.531`
 resides in that stream. Notably, the identity string address is not one of the
 halfwords selected by the stream's `0x20`-byte sampling stride, so the string
 is metadata rather than a byte-for-byte member of the derived stream.
+
+The internal-software namespace has the opposite provenance. Exact anchors
+pin startup's empty string, the report-type branches, byte extraction and
+ASCII conversion, generic setter geometry and formatter read. A whole-image
+direct-call census gives setter `0x28ead2` exactly one caller, `0x237dce`.
+The external image therefore establishes the report grammar but contains no
+fixed internal revision value. The service presentation may eventually render
+the received digit as a ROM label, but neither `ROM3` nor any other digit may
+be provisioned from the NSE-3 product name, MAD assembly, external revision
+`25.3.531`, or the v5.48 handset log. A matching runtime report remains
+required.
 
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, how the DSP derives or
