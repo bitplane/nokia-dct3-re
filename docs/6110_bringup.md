@@ -246,6 +246,17 @@ set/clear masks `0x02`, `0x04`, and `0x10` in controller flag cell
 route to separate handlers. This establishes paired event lifecycles on the
 MCU side without naming any pair as call Answer, End, or a DSP speech route.
 
+The producer side is bounded separately. Exact relocated signatures identify
+NSE-3's task-5 render post at `0x29e556` and generic packed-event generator at
+`0x29e604`. A whole-image call census recovers 946 direct calls to those APIs
+and resolves the packed event at 938 of them. None of those 938 publishes any
+event in `0x076f..0x0778`. Eight callsites remain runtime-built:
+`0x2524ce`, `0x252c3e`, `0x252e7c`, `0x252f76`, `0x253552`,
+`0x25a1f8`, `0x25a87e`, and `0x2a3472`. Several forward stored event
+fields or table entries, so their lack of an immediate constant is not
+producer-absence evidence. The exact verifier records this frontier as
+unresolved rather than claiming that the paired events are dormant.
+
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
 high-nibble-command/low-twelve-value decoder, but leaves the independent

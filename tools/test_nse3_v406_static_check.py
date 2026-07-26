@@ -232,6 +232,7 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             [0x259442, 0x259442],
             check.DSP_PARAMETER_EVENT_TARGETS[6:8],
         )
+        self.assertEqual(8, len(check.DSP_PARAMETER_UNRESOLVED_EVENT_CALLS))
 
     def test_dsp_bootstrap_result_rejects_generic_ready_one(self):
         physical = bytearray(b"\xff" * check.FLASH_SIZE)

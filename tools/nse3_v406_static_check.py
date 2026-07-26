@@ -18,10 +18,20 @@ import capstone
 
 try:
     from tools.mad2_static_census import analyze_image
-    from tools.message_census import decode_image, immediate_target, literal_value
+    from tools.message_census import (
+        decode_image,
+        extract_calls,
+        immediate_target,
+        literal_value,
+    )
 except ModuleNotFoundError:  # Direct execution from tools/.
     from mad2_static_census import analyze_image
-    from message_census import decode_image, immediate_target, literal_value
+    from message_census import (
+        decode_image,
+        extract_calls,
+        immediate_target,
+        literal_value,
+    )
 
 
 FLASH_BASE = 0x200000
@@ -492,6 +502,32 @@ DSP_PARAMETER_EVENT_TARGETS = [
     0x259442,
     0x2590FA,
     0x2590F4,
+]
+DSP_PARAMETER_EVENT_PRODUCER_ANCHORS = {
+    # Exact relocated counterparts of the independently reviewed NSE-8 event
+    # construction APIs.
+    0x29E556: ("lsls", "r0, r0, #0x10"),
+    0x29E558: ("push", "{r0, r1, r2, r3}"),
+    0x29E55A: ("push", "{r4, r7, lr}"),
+    0x29E566: ("ldrh", "r0, [r7]"),
+    0x29E568: ("strh", "r0, [r4]"),
+    0x29E604: ("lsls", "r0, r0, #0x10"),
+    0x29E606: ("push", "{r0, r1, r2, r3}"),
+    0x29E608: ("push", "{r4, r5, r7, lr}"),
+    0x29E60C: ("ldrh", "r0, [r7]"),
+    0x29E612: ("cmp", "r0, #0xdc"),
+    0x29E616: ("ldrh", "r0, [r7]"),
+    0x29E618: ("bl", "#0x29e5e8"),
+}
+DSP_PARAMETER_UNRESOLVED_EVENT_CALLS = [
+    0x2524CE,
+    0x252C3E,
+    0x252E7C,
+    0x252F76,
+    0x253552,
+    0x25A1F8,
+    0x25A87E,
+    0x2A3472,
 ]
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
@@ -1018,6 +1054,75 @@ def verify_dsp_parameter_08_boundary(data: bytes) -> dict:
     }
 
 
+def verify_dsp_parameter_event_producers(data: bytes) -> dict:
+    decode_thumb_anchors(data, DSP_PARAMETER_EVENT_PRODUCER_ANCHORS)
+    physical = swap16(data)
+    instructions = decode_image(physical, FLASH_BASE)
+    profile = {
+        "apis": [
+            {
+                "address": 0x29E604,
+                "name": "generic_event_generate",
+                "kind": "packed_event",
+                "arguments": {"packed_event": "r0"},
+            },
+            {
+                "address": 0x29E556,
+                "name": "task5_render_post",
+                "kind": "packed_event",
+                "arguments": {"packed_event": "r0", "descriptor": "r1"},
+            },
+        ]
+    }
+    calls = extract_calls(profile, instructions, physical, FLASH_BASE)
+    resolved = [
+        call
+        for call in calls
+        if call["arguments"].get("packed_event") is not None
+    ]
+    target_events = set(
+        range(DSP_PARAMETER_EVENT_BASE, DSP_PARAMETER_EVENT_BASE + 10)
+    )
+    matching = [
+        call
+        for call in resolved
+        if (call["arguments"]["packed_event"] & 0x1FFF) in target_events
+    ]
+    unresolved = [
+        call["callsite"]
+        for call in calls
+        if call["arguments"].get("packed_event") is None
+    ]
+    if len(calls) != 946 or len(resolved) != 938:
+        raise ValueError(
+            "NSE-3 packed-event call census changed: expected 946/938 "
+            f"total/resolved, got {len(calls)}/{len(resolved)}"
+        )
+    if matching:
+        raise ValueError(
+            "NSE-3 recovered a direct parameter-event producer unexpectedly: "
+            f"{matching}"
+        )
+    if unresolved != DSP_PARAMETER_UNRESOLVED_EVENT_CALLS:
+        raise ValueError(
+            "NSE-3 runtime-built packed-event callsites changed: expected "
+            f"{DSP_PARAMETER_UNRESOLVED_EVENT_CALLS}, got {unresolved}"
+        )
+    return {
+        "event_apis": {
+            "task5_render_post": 0x29E556,
+            "generic_event_generate": 0x29E604,
+        },
+        "direct_calls": len(calls),
+        "statically_resolved_calls": len(resolved),
+        "resolved_parameter_event_producers": [],
+        "runtime_built_calls": unresolved,
+        "runtime_built_calls_exclude_parameter_events": False,
+        "producer_absence_proven": False,
+        "next_evidence": "bound_runtime_built_values_or_organic_trace",
+    }
+
+
 def extract_dsp_bootstrap_stream(data: bytes) -> bytes:
     source_first = 0x200040
     source_words = 63 * 512 + 510
@@ -1164,6 +1269,9 @@ def verify(data: bytes) -> dict:
         "dspif_transport_boundary": verify_dspif_boundary(data),
         "radio_packet_boundary": verify_radio_packet_boundary(data),
         "dsp_parameter_08_boundary": verify_dsp_parameter_08_boundary(data),
+        "dsp_parameter_event_producers": verify_dsp_parameter_event_producers(
+            data
+        ),
         "dsp_bootstrap_transfer_boundary": verify_dsp_bootstrap_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {
