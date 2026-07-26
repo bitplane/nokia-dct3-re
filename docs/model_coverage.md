@@ -168,6 +168,24 @@ page at 16.980246 seconds and emits the paged RACH at 30.620707 seconds.
 Therefore the missing NHM-5 transition is not an artefact of stopping before
 the established NSE-8 admission latency.
 
+Complete receive-event traces also prevent transferring NSE-8 event numbers
+by resemblance. NSE-8 receives page event `0x0811`, then the later SI3-driven
+serving reconfiguration produces `0x03fc`, `0x07f9` and `0x0835`; `0x0835`
+immediately publishes internal event `0x0440` and RACH follows. NHM-5 receives
+its `0x08a2` page while its outer RR dispatcher is in idle state 7. Its later
+serving reconfiguration instead produces `0x0801`, `0x07fb`, `0x07d1`,
+`0x07dd`, `0x05e8`, `0x08d1` and `0x07d4`, all while that dispatcher remains
+in state 7. The product event grammars are structurally different; injecting
+NSE-8's `0x0835` into NHM-5 would not model a shared hardware response.
+
+The two post-page `CHANNEL_CHANGED_CNF` packets also do not fail NHM-5's
+product-specific body-bit correlation. Runtime at handler `0x2c4c28` shows
+that the pending-context pointer is null for both transactions, so the handler
+takes its context-null completion path before the comparison at
+`0x2c4c48..0x2c4c52`. The value-one body remains required only for the proved
+assigned-SDCCH context `0x0402/01/01`; changing the generic confirmation body
+cannot supply the missing paging handoff.
+
 Address-scoped writes to the RR global refine the post-release control flow.
 The `0x256f1a` release branch arms timer `0x9f`, waits for the real release
 events, cancels `0x9f`, sets RR state byte `r4+7` to one at `0x2570b8`, clears
