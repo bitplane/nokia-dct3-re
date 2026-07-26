@@ -647,6 +647,21 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x2A0CC6: ("ldr", "r0, [r3, #4]"),
     0x2A0CCA: ("lsrs", "r0, r0, #2"),
     0x2A0CCC: ("lsls", "r0, r0, #2"),
+    # The allocator chooses among eight runtime-built size classes.
+    0x260AF8: ("ldr", "r0, [r1, #0x18]"),
+    0x260B04: ("ldrh", "r1, [r1, #2]"),
+    0x260B06: ("cmp", "r1, r6"),
+    0x260B10: ("cmp", "r4, #8"),
+    # One exact 28-byte owner fills every payload byte from external service
+    # operation 0x40, then releases it to the same general allocator.
+    0x28EDF8: ("movs", "r0, #0x1c"),
+    0x28EDFA: ("bl", "#0x260abc"),
+    0x28EE06: ("movs", "r0, #0x40"),
+    0x28EE08: ("adds", "r1, r5, #0"),
+    0x28EE0A: ("movs", "r2, #0x1c"),
+    0x28EE0C: ("bl", "#0x29cf2a"),
+    0x28EF08: ("adds", "r0, r5, #0"),
+    0x28EF0A: ("bl", "#0x26069c"),
     # Event 0x0389 is the sole dispatcher case that reaches the remaining
     # runtime object constructor.  Its packed arguments are copied into the
     # runtime cell before the case loads cell[0] as the object input.
@@ -753,6 +768,32 @@ DSP_PARAMETER_PPM_DESCRIPTOR_VALUES = [
     0x13,
 ]
 DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS = []
+DSP_PARAMETER_ALLOCATOR_CENSUS = {
+    "calls": 1105,
+    "resolved_sizes": 924,
+    "runtime_sizes": 181,
+    "exact_28_byte_calls": [
+        0x214958,
+        0x21522E,
+        0x240922,
+        0x256D4E,
+        0x256DD4,
+        0x27ACDE,
+        0x27CD80,
+        0x27E128,
+        0x28EDFA,
+    ],
+}
+DSP_PARAMETER_STALE_EVENT_REUSE_OWNER = {
+    "allocation_callsite": 0x28EDFA,
+    "allocation_size": 0x1C,
+    "external_service_callsite": 0x28EE0C,
+    "external_service_operation": 0x40,
+    "external_service_length": 0x1C,
+    "release_callsite": 0x28EF0A,
+    "payload_event_offset": 0x12,
+    "payload_event_value": "external_service_data",
+}
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
     0x221640: [0x0C44],
@@ -1895,6 +1936,41 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "NSE-3 PPM descriptor value can name a ROM catalogue"
         )
 
+    allocator_profile = {
+        "apis": [
+            {
+                "address": 0x260ABC,
+                "name": "general_allocator",
+                "kind": "call",
+                "arguments": {"size": "r0"},
+            }
+        ]
+    }
+    allocator_calls = extract_calls(
+        allocator_profile, instructions, physical, FLASH_BASE
+    )
+    resolved_allocator_calls = [
+        call
+        for call in allocator_calls
+        if call["arguments"]["size"] is not None
+    ]
+    exact_28_byte_calls = [
+        call["callsite"]
+        for call in allocator_calls
+        if call["arguments"]["size"] == 0x1C
+    ]
+    allocator_census = {
+        "calls": len(allocator_calls),
+        "resolved_sizes": len(resolved_allocator_calls),
+        "runtime_sizes": len(allocator_calls) - len(resolved_allocator_calls),
+        "exact_28_byte_calls": exact_28_byte_calls,
+    }
+    if allocator_census != DSP_PARAMETER_ALLOCATOR_CENSUS:
+        raise ValueError(
+            "NSE-3 allocator census changed: expected "
+            f"{DSP_PARAMETER_ALLOCATOR_CENSUS}, got {allocator_census}"
+        )
+
     object_event_profile = {
         "apis": [
             {
@@ -2033,6 +2109,9 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                 "ppm_descriptor_values": ppm_descriptor_values,
                 "unresolved_runtime_value_calls":
                     DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS,
+                "allocator_census": allocator_census,
+                "stale_event_reuse_owner":
+                    DSP_PARAMETER_STALE_EVENT_REUSE_OWNER,
             },
         },
         "runtime_built_calls_exclude_parameter_events": False,

@@ -387,6 +387,38 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             [],
             check.DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS,
         )
+        self.assertEqual(
+            {
+                "calls": 1105,
+                "resolved_sizes": 924,
+                "runtime_sizes": 181,
+                "exact_28_byte_calls": [
+                    0x214958,
+                    0x21522E,
+                    0x240922,
+                    0x256D4E,
+                    0x256DD4,
+                    0x27ACDE,
+                    0x27CD80,
+                    0x27E128,
+                    0x28EDFA,
+                ],
+            },
+            check.DSP_PARAMETER_ALLOCATOR_CENSUS,
+        )
+        self.assertEqual(
+            {
+                "allocation_callsite": 0x28EDFA,
+                "allocation_size": 0x1C,
+                "external_service_callsite": 0x28EE0C,
+                "external_service_operation": 0x40,
+                "external_service_length": 0x1C,
+                "release_callsite": 0x28EF0A,
+                "payload_event_offset": 0x12,
+                "payload_event_value": "external_service_data",
+            },
+            check.DSP_PARAMETER_STALE_EVENT_REUSE_OWNER,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
         self.assertEqual(
             [0x256E2E],

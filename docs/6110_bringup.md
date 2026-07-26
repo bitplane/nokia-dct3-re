@@ -383,6 +383,22 @@ event provenance. The reused descriptor at `0x256e2e` can still retain an
 unwritten event halfword, so producer absence for `0x076f..0x0778` is not
 claimed.
 
+The allocator reuse boundary is now measured directly. A whole-image census
+finds 1,105 direct calls to allocator `0x260abc`; 924 sizes are statically
+resolved, 181 are runtime values, and nine resolved calls request exactly
+28 bytes. The allocator compares the request against eight class thresholds
+through a runtime-installed table, so equal request size is useful ownership
+evidence but static firmware cannot prove that other request sizes never
+share the class.
+
+One exact-size owner makes the stale-halfword risk concrete. Call `0x28edfa`
+allocates 28 bytes, `0x28ee0c` fills all 28 bytes from external-service
+operation `0x40`, and `0x28ef0a` returns the payload to the general allocator.
+Consequently its offset `+0x12` is service data and can survive into the
+unwritten branch of descriptor `0x256e2e` if the runtime class and allocation
+order permit reuse. No fixed value, zero-fill, or exclusion from
+`0x076f..0x0778` is claimed without the missing runtime evidence.
+
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
 high-nibble-command/low-twelve-value decoder, but leaves the independent
