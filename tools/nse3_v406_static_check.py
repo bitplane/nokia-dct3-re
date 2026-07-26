@@ -217,6 +217,22 @@ RADIO_PACKET_ANCHORS = {
     0x20FC84: ("movs", "r1, #1"),
     0x20FC86: ("lsls", "r1, r0"),
     0x20FC8A: ("strb", "r1, [r2, r0]"),
+    # CHANNEL_CONFIGURE is likewise constructed as a queue object, not inferred
+    # from the other products.  Its wire packet is type 0x02, length 20.
+    0x20D000: ("movs", "r0, #0x18"),
+    0x20D010: ("movs", "r0, #0x14"),
+    0x20D012: ("strb", "r0, [r4, #2]"),
+    0x20D018: ("movs", "r1, #2"),
+    0x20D01A: ("strb", "r1, [r4, #3]"),
+    # The first body byte is a controller-selected operation.  The constructor
+    # seeds 4; direct callers overwrite it with the evidenced 6/7 variants.
+    0x20D01C: ("movs", "r0, #4"),
+    0x20D01E: ("strb", "r0, [r4, #4]"),
+    0x20D1D4: ("movs", "r0, #7"),
+    0x20D1DA: ("ldr", "r0, [sp, #0xc]"),
+    0x20D1DC: ("strb", "r7, [r0, #4]"),
+    0x20D1E0: ("movs", "r0, #6"),
+    0x20D1E6: ("strb", "r0, [r1, #4]"),
 }
 RADIO_REPORT_DISPATCH_ANCHORS = {
     # Type 0x80 is handled directly.  Types 0x83..0x8f use a bounded jump
@@ -278,6 +294,32 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     # or NSE-8's independently recovered 0x48-byte internal stride.
     0x21403A: ("movs", "r0, #0x22"),
     0x214080: ("adds", "r4, #0x44"),
+    # CHANNEL_CHANGED_CNF is gated by controller state, then copied as a
+    # fixed eight-byte object and posted.  This handler does not inspect a
+    # confirmation payload byte before advancing controller state to three.
+    0x2804F8: ("ldr", "r0, [pc, #0x12c]"),
+    0x2804FA: ("ldrb", "r1, [r0, #7]"),
+    0x2804FC: ("cmp", "r1, #1"),
+    0x280508: ("cmp", "r1, #7"),
+    0x280532: ("ldr", "r0, [pc, #0xec]"),
+    0x280538: ("movs", "r1, #8"),
+    0x28053A: ("bl", "#0x276912"),
+    0x280548: ("movs", "r1, #3"),
+    0x28054A: ("strb", "r1, [r0]"),
+    # Task-side statuses 0x1393/0x1394 keep channel-change confirmation and
+    # RA_INFO as separate controller events.
+    0x211C68: ("ldr", "r1, [pc, #0x27c]"),
+    0x211CAE: ("ldr", "r1, [pc, #0x23c]"),
+    0x211DA4: ("ldr", "r0, [sp, #0x18]"),
+    0x211DA6: ("movs", "r1, #8"),
+    0x211DA8: ("bl", "#0x27693c"),
+    0x211D70: ("ldr", "r0, [sp, #0x18]"),
+    0x211D72: ("movs", "r1, #8"),
+    0x211D74: ("bl", "#0x27693c"),
+}
+RADIO_REPORT_HANDLER_LITERALS = {
+    0x211C68: 0x1393,
+    0x211CAE: 0x1394,
 }
 RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
 RADIO_REPORT_JUMP_TABLE = {
@@ -647,6 +689,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, RADIO_PACKET_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
+    verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     table_offset = RADIO_REPORT_JUMP_TABLE_ADDRESS - FLASH_BASE
     table = {
         packet_type: struct.unpack_from(
@@ -680,6 +723,14 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             },
             "nse8_search_bitmap_boundary_compatible": True,
         },
+        "channel_configure": {
+            "type": 0x02,
+            "wire_length": 20,
+            "object_allocation": 0x18,
+            "constructor": 0x20CFFA,
+            "operation_byte": 0,
+            "evidenced_operation_values": [4, 6, 7],
+        },
         "report_dispatch": {
             "routine": 0x2A20DC,
             "jump_table": RADIO_REPORT_JUMP_TABLE_ADDRESS,
@@ -712,6 +763,16 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "nse3_internal_candidate_stride": 0x44,
                 "nse8_internal_candidate_stride": 0x48,
                 "internal_candidate_layout_shared": False,
+            },
+            "channel_change": {
+                "confirmation_type": 0x89,
+                "confirmation_handler": 0x2804F4,
+                "task_status": 0x1393,
+                "ra_info_type": 0x84,
+                "ra_info_task_status": 0x1394,
+                "task_object_bytes": 8,
+                "confirmation_payload_read_by_handler": False,
+                "controller_state_after_confirmation": 3,
             },
         },
         "peer_profile": "disabled_pending_bootstrap_and_full_report_lifecycle",

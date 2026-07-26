@@ -178,6 +178,24 @@ report sequence and retry/completion rules have not all been closed. Enabling
 the existing NSE-8 lifecycle wholesale would therefore still overstate the
 evidence.
 
+The next acquisition transaction is also independently constructed. Routine
+`0x20cffa` allocates a `0x18`-byte queue object and emits
+`CHANNEL_CONFIGURE` type `0x02`, wire length 20. Its first body byte is a
+controller operation: the constructor seeds value 4 and evidenced callers
+overwrite it with 6 or 7. These values remain typed protocol data; no register
+or channel-mode meaning is assigned merely from their numeric form.
+
+Inbound type `0x89` reaches handler `0x2804f4`. It gates acceptance using
+controller state, converts the packet into a fixed eight-byte task object,
+posts status `0x1393`, and advances its controller state to 3. It does not
+read a confirmation body byte before that transition. Type `0x84` remains a
+separate fixed-size `RA_INFO` event with task status `0x1394`; the task
+dispatcher keeps the two paths distinct. This establishes the
+`CHANNEL_CONFIGURE -> CHANNEL_CHANGED_CNF` envelope and shows that the direct
+NSE-3 confirmation handler does not require the product-specific body-bit
+correlation recovered for NHM-5. It does not, by itself, prove which DSP
+report follows next in every controller state.
+
 The external image also proves the MCU side of a much larger bootstrap
 transfer. Routine `0x2858fc..0x2859ff` samples 32,766 halfwords from its own
 flash, beginning at reset entry `0x200040`, advancing by `0x20` bytes and
