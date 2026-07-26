@@ -129,7 +129,7 @@ private:
 		traffic_lapdm_establish,
 		traffic_contention_resolution,
 		traffic_release_acknowledgement,
-		nhm5_psw_search,
+		nhm5_terminal_control,
 		count
 	};
 

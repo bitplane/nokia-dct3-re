@@ -65,7 +65,8 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 			type20 = "00" * 68
 			type21 = "11" * 28
 			type22 = "22" * 32
-			results = "0010005800c4" + "ff" * 160
+			sch = "4012000000000058" + "00" * 26
+			configure = "04120200000000505000005800000000000a98fa"
 			path.write_text(
 				line(0x20, type20, 0.1)
 				+ line(0x21, type21 + "00000319", 0.2)
@@ -74,18 +75,23 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ line(0x21, type21 + "00000140", 0.5)
 				+ line(0x22, type22, 0.6)
 				+ line(0x56, "0058" + "ff" * 158, 2.0)
-				+ rx_line(0x8B, results, 2.1)
-				+ line(0x55, "03050000", 2.2)
+				+ rx_line(0x80, sch, 2.1)
+				+ line(0x02, configure, 2.2)
+				+ rx_line(0x8F, "00" * 8, 2.3)
+				+ rx_line(0x89, "00" * 8, 2.4)
+				+ rx_line(0x84, "00" * 8, 2.5)
+				+ rx_line(0x80, "5012" + "00" * 32, 2.6)
 			)
 			check_nhm5_search(path)
 
-	def test_nhm5_search_rejects_unproved_power_sweep_result(self):
+	def test_nhm5_search_rejects_failure_on_success_path(self):
 		with TemporaryDirectory() as directory:
 			path = Path(directory) / "error.log"
 			type20 = "00" * 68
 			type21 = "11" * 28
 			type22 = "22" * 32
-			results = "0010005800c4" + "ff" * 160
+			sch = "4012000000000058" + "00" * 26
+			configure = "04120200000000505000005800000000000a98fa"
 			path.write_text(
 				line(0x20, type20, 0.1)
 				+ line(0x21, type21 + "00000319", 0.2)
@@ -94,9 +100,13 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ line(0x21, type21 + "00000140", 0.5)
 				+ line(0x22, type22, 0.6)
 				+ line(0x56, "0058" + "ff" * 158, 2.0)
-				+ rx_line(0x8B, results, 2.1)
-				+ line(0x55, "03050000", 2.2)
-				+ rx_line(0x8A, "0058" + "00" * 6, 2.3)
+				+ rx_line(0x80, sch, 2.1)
+				+ line(0x02, configure, 2.2)
+				+ rx_line(0x8F, "00" * 8, 2.3)
+				+ rx_line(0x89, "00" * 8, 2.4)
+				+ rx_line(0x84, "00" * 8, 2.5)
+				+ rx_line(0x80, "5012" + "00" * 32, 2.6)
+				+ rx_line(0x8A, "0058" + "00" * 6, 2.7)
 			)
 			with self.assertRaises(SystemExit):
 				check_nhm5_search(path)

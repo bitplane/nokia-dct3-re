@@ -57,8 +57,8 @@ def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
 			"10b5a420f2f718fd041c0021a42249f051ff"
 			"a020a070022020805620e070"
 		),
-		# Four-byte type-0x55 power-sweep constructor reached only after task 10
-		# consumes the measurement results.
+		# Four-byte type-0x55 terminal/control constructor reached from the
+		# unsuccessful result path. It is not the start of the active sweep.
 		0x002A7BAA: bytes.fromhex(
 			"70b50d1c061c0820f2f72dfe041c002108224af066f8"
 			"0420a070022020805520e070"
@@ -139,32 +139,44 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 	packets = parse("nhm5", path)
 	search = next(packet for packet in packets
 			if packet["direction"] == "tx" and packet["type"] == 0x56)
-	results = next((packet for packet in packets
-			if packet["direction"] == "rx" and packet["type"] == 0x8B), None)
-	control = next((packet for packet in packets
-			if packet["direction"] == "tx" and packet["type"] == 0x55), None)
-	unsolicited_result = next((packet for packet in packets
-			if packet["direction"] == "rx" and packet["time"] >= control["time"]
-			and packet["type"] in (0x80, 0x8A)), None) if control is not None else None
-	if results is None or results["length"] != 166:
-		raise SystemExit("NHM-5 search did not receive its 166-byte type 0x8b result array")
-	if not results["data"].startswith("0010005800c4"):
-		raise SystemExit(
-			"NHM-5 type 0x8b did not report requested channel 0x0058 "
-			"at the laboratory cell's measured -60 dBm"
-		)
-	if control is None or control["length"] != 4 or control["data"] != "03050000":
-		raise SystemExit("NHM-5 did not organically publish the observed type 0x55 control")
-	if unsolicited_result is not None:
-		raise SystemExit(
-			"NHM-5 power-sweep frontier synthesized an unproved "
-			f"type 0x{unsolicited_result['type']:02x} result"
-		)
-	if not search["time"] <= results["time"] < control["time"]:
-		raise SystemExit("NHM-5 search/control transaction order changed")
+	def first(direction: str, packet_type: int, after: float) -> dict | None:
+		return next((packet for packet in packets
+				if packet["direction"] == direction and packet["type"] == packet_type
+				and packet["time"] >= after), None)
+
+	sch = first("rx", 0x80, search["time"])
+	configure = first("tx", 0x02, sch["time"] if sch else search["time"])
+	no_psw_left = first("rx", 0x8F, configure["time"] if configure else search["time"])
+	channel_changed = first("rx", 0x89, no_psw_left["time"] if no_psw_left else search["time"])
+	ra_info = first("rx", 0x84, channel_changed["time"] if channel_changed else search["time"])
+	bcch = first("rx", 0x80, ra_info["time"] if ra_info else search["time"])
+	no_psw_found = first("rx", 0x8A, search["time"])
+
+	if sch is None or sch["length"] != 34:
+		raise SystemExit("NHM-5 active candidate window did not receive its SCH block")
+	sch_data = bytes.fromhex(sch["data"])
+	if sch_data[0] != 0x40 or sch_data[6:8] != b"\x00\x58":
+		raise SystemExit("NHM-5 SCH did not identify requested channel 0x0058")
+	if configure is None or configure["length"] != 20:
+		raise SystemExit("NHM-5 SCH did not organically publish CHANNEL_CONFIGURE type 0x02/20")
+	configure_data = bytes.fromhex(configure["data"])
+	if configure_data[:3] != b"\x04\x12\x02" or configure_data[10:12] != b"\x00\x58":
+		raise SystemExit("NHM-5 CHANNEL_CONFIGURE did not preserve SCH/BSIC/channel fields")
+	if no_psw_left is None or channel_changed is None or ra_info is None:
+		raise SystemExit("NHM-5 channel-change completion sequence is incomplete")
+	if bcch is None or bytes.fromhex(bcch["data"])[0] != 0x50:
+		raise SystemExit("NHM-5 did not reach serving BCCH reception")
+	if no_psw_found is not None:
+		raise SystemExit("NHM-5 successful acquisition also received NO_PSW_FOUND")
+	if not (
+			search["time"] <= sch["time"] <= configure["time"] <=
+			no_psw_left["time"] <= channel_changed["time"] <=
+			ra_info["time"] <= bcch["time"]
+	):
+		raise SystemExit("NHM-5 acquisition transaction order changed")
 	print(
-		"NHM-5 search frontier: 56/160 candidate 0058 -> 8b/166 measured results -> "
-		"55/4 power-sweep request; no invented success or NO_PSW_FOUND result"
+		"NHM-5 acquisition: 56/160 candidate 0058 -> SCH -> organic 02/20 "
+		"CHANNEL_CONFIGURE -> NO_PSW_LEFT -> CHANNEL_CHANGED_CNF -> RA_INFO -> BCCH"
 	)
 
 

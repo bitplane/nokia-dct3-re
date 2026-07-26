@@ -558,7 +558,7 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"service_uplink_wait", "service_uplink_acknowledgement",
 		"traffic_channel_change", "traffic_lapdm_establish",
 		"traffic_contention_resolution", "traffic_release_acknowledgement",
-		"nhm5_psw_search"
+		"nhm5_terminal_control"
 	};
 	const unsigned index = unsigned(value);
 	return index < std::size(NAMES) ? NAMES[index] : "invalid";
@@ -574,7 +574,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 	// Fixed entries are declarative; 0xff marks phases whose report depends on
 	// request data or position within a correlated multi-report transaction.
 	static constexpr std::array<u8, phase::count> FIXED_REPORT = {
-		0x87, 0x87, 0x87, 0x8b, 0xff, 0xff, 0x84, 0xff,
+		0x87, 0x87, 0x87, 0xff, 0xff, 0xff, 0x84, 0xff,
 		0x8c, 0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89,
 		0xff, 0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80,
 		0x86, 0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80,
@@ -587,6 +587,10 @@ u8 nokia_radio_peer_device::next_report_type() const
 
 	switch (m_phase)
 	{
+	case phase::candidate_measurement:
+		if (m_protocol_profile == protocol_profile::nhm5_candidate_list)
+			return m_reports_remaining == 2 ? 0x80 : 0x8b;
+		return 0x8b;
 	case phase::candidate_sync:
 		return m_reports_remaining == 2 ? 0x8b : 0x80;
 	case phase::candidate_channel_change:
@@ -683,11 +687,11 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 	{
 		if (nhm5_search)
 		{
-			// NHM-5 has already reduced its firmware-owned channel database to
-			// the explicit candidates in type 0x56. Its recovered task-10 path
-			// consumes the corresponding 0x8b measurement array directly.
+			// Type 0x56 publishes NHM-5's firmware-selected candidate window.
+			// A usable candidate produces SCH before the alternative 0x8b
+			// measurement terminal closes that window.
 			m_phase = phase::candidate_measurement;
-			m_reports_remaining = 1;
+			m_reports_remaining = 2;
 		}
 		else
 		{
@@ -731,24 +735,31 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_phase == phase::candidate_measurement &&
 			m_reports_remaining == 0)
 	{
-		// Type 0x55 starts NHM-5's power-sweep/synchronisation operation. Its
-		// dispatcher distinguishes a channel-0x40 RECEIVED_BLOCK from type 0x8a
-		// NO_PSW_FOUND; neither is an acknowledgement. The RF condition and
-		// timing that select the successful result are not yet recovered, so
-		// stop at the firmware-owned request instead of inventing either result.
-		m_phase = phase::nhm5_psw_search;
+		// The type-0x8b measurement terminal makes NHM-5 publish this separate
+		// type-0x55 control. Successful acquisition instead supplies SCH while
+		// the preceding type-0x56 candidate window is active and never reaches
+		// this fallback branch.
+		m_phase = phase::nhm5_terminal_control;
 	}
 	else if (packet.type == 0x02 &&
-			(m_phase == phase::candidate_sync || m_phase == phase::selected_search) &&
-			m_reports_remaining == 0)
+			(((m_phase == phase::candidate_sync || m_phase == phase::selected_search) &&
+				m_reports_remaining == 0) ||
+			(m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+				m_phase == phase::candidate_measurement &&
+				m_reports_remaining == 1)))
 	{
 		// SCH reception makes the ROM issue CHANNEL_CONFIGURE during both initial
 		// acquisition and the later mode-0x40 selection pass. Complete the same
 		// recovered channel-change transaction while its acceptance window is open.
+		const bool nhm5_active_sync =
+				m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+				m_phase == phase::candidate_measurement;
 		const bool selected_plmn_search =
 				m_phase == phase::selected_search && m_search_mode == 0x50;
 		m_phase = selected_plmn_search ? phase::selected_channel_change : phase::candidate_channel_change;
-		m_reports_remaining = selected_plmn_search ? 1 : 2;
+		// NHM-5 publishes CHANNEL_CONFIGURE synchronously from the RX report's
+		// notify callback, after emit_report() has consumed that successful SCH.
+		m_reports_remaining = nhm5_active_sync ? 2 : (selected_plmn_search ? 1 : 2);
 		m_report_deferred = true;
 	}
 	else if (nse8_search && m_phase == phase::candidate_sync && m_reports_remaining == 0)
