@@ -52,6 +52,27 @@ EEPROM_ANCHORS = {
     0x29E90E: ("orrs", "r5, r2"),
     0x29E936: ("bics", "r5, r2"),
 }
+SIMI_ANCHORS = {
+    # Clock gate and initialization over the standard MAD2 SIMI window.
+    0x290510: ("movs", "r0, #0x20"),
+    0x290512: ("ldrb", "r1, [r4, #0xd]"),
+    0x29051C: ("movs", "r1, #0x3d"),
+    0x29051E: ("movs", "r0, #0x18"),
+    0x29052A: ("movs", "r1, #0x3e"),
+    0x29052C: ("movs", "r0, #0x1a"),
+    0x290538: ("movs", "r0, #0x39"),
+    0x29053A: ("movs", "r1, #0x32"),
+    # Activation, TX FIFO staging/commit, RX drain, and IIR acknowledge.
+    0x2900FA: ("movs", "r0, #0x80"),
+    0x2901B0: ("strb", "r3, [r1, #5]"),
+    0x2901B4: ("strb", "r3, [r1, #8]"),
+    0x2901C2: ("strb", "r3, [r1]"),
+    0x2901D0: ("strb", "r5, [r1, #8]"),
+    0x2903DE: ("ldrb", "r0, [r5, #5]"),
+    0x2903E4: ("ldrb", "r0, [r5]"),
+    0x290462: ("ldrb", "r0, [r1]"),
+    0x29046A: ("strb", "r0, [r1]"),
+}
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -191,12 +212,32 @@ def verify_eeprom_boundary(data: bytes) -> dict:
     }
 
 
+def verify_simi_boundary(data: bytes) -> dict:
+    decode_thumb_anchors(data, SIMI_ANCHORS)
+    return {
+        "driver_extent": {"start": 0x28FF84, "end": 0x2905F4},
+        "clock_gate": {"register": 0x2000D, "mask": 0x20},
+        "register_window": {"start": 0x20036, "end": 0x2003F},
+        "control": 0x20039,
+        "activation_mask": 0x80,
+        "tx_data": 0x20036,
+        "rx_data": 0x20037,
+        "interrupt_identification": 0x20038,
+        "rx_count": 0x2003C,
+        "rx_fifo_control": 0x2003D,
+        "tx_fifo_control": 0x2003E,
+        "tx_count": 0x2003F,
+        "synthetic_card_profile": "not_established",
+    }
+
+
 def verify(data: bytes) -> dict:
     return {
         "identity": verify_identity(data),
         "reset_boundary": verify_reset_boundary(data),
         "keypad_boundary": verify_keypad_boundary(data),
         "eeprom_boundary": verify_eeprom_boundary(data),
+        "simi_boundary": verify_simi_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {
             "rom3_compatibility": "candidate_not_proven",

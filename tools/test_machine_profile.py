@@ -31,7 +31,8 @@ class MachineProfileTest(unittest.TestCase):
             "make_3210_config",
             {
                 "power_on_column_mask": "0x01",
-                "sim_device": "true",
+                "simi_controller": "true",
+                "synthetic_sim_card": "true",
                 "dsp_service": "true",
                 "external_service": "true",
                 "radio_peer": "true",
@@ -73,6 +74,7 @@ class MachineProfileTest(unittest.TestCase):
                 "power_on_column_mask": "0x01",
                 "boot_rom_bypass": "false",
                 "keypad_five_rows": "true",
+                "simi_controller": "true",
                 "cobba_pcm.data_clock": "1'000'000",
                 "cobba_pcm.frame_clock": "8'000",
                 "cobba_pcm.sample_bits": "13",
@@ -90,7 +92,7 @@ class MachineProfileTest(unittest.TestCase):
             "constexpr nokia_product_config make_6110_config",
             "constexpr nokia_product_config make_conservative_config",
         )
-        for peer in ("sim_device", "dsp_service", "external_service", "radio_peer"):
+        for peer in ("synthetic_sim_card", "dsp_service", "external_service", "radio_peer"):
             self.assertNotIn(f"result.{peer} = true;", body)
 
         profile = self.driver.split(
@@ -151,7 +153,8 @@ class MachineProfileTest(unittest.TestCase):
         self.assert_profile_fields(
             "make_3330_config",
             {
-                "sim_device": "true",
+                "simi_controller": "true",
+                "synthetic_sim_card": "true",
                 "dsp_service": "true",
                 "external_service": "true",
                 "keypad_five_rows": "true",
@@ -173,7 +176,8 @@ class MachineProfileTest(unittest.TestCase):
         )
         self.assertIn("nokia_product_config result;", body)
         self.assertIn("result.power_on_column_mask = power_on_column_mask;", body)
-        self.assertIn("bool sim_device = false;", self.driver)
+        self.assertIn("bool simi_controller = false;", self.driver)
+        self.assertIn("bool synthetic_sim_card = false;", self.driver)
         self.assertIn("bool dsp_service = false;", self.driver)
         self.assertIn("bool external_service = false;", self.driver)
         self.assertIn("bool radio_peer = false;", self.driver)
@@ -204,7 +208,11 @@ class MachineProfileTest(unittest.TestCase):
             "{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 }",
             self.driver,
         )
-        self.assertIn("m_simi->set_enabled(m_product.sim_device &&", self.driver)
+        self.assertIn("m_simi->set_enabled(m_product.simi_controller &&", self.driver)
+        self.assertIn(
+            "m_simi->set_card_present(m_product.synthetic_sim_card &&",
+            self.driver,
+        )
 
     def test_3210_board_profile_routes_both_voltage_inputs(self):
         profile = self.driver.split(

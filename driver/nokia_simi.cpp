@@ -30,6 +30,7 @@ void nokia_simi_device::device_start()
 {
 	m_rx_timer = timer_alloc(FUNC(nokia_simi_device::rx_ready), this);
 	save_item(NAME(m_enabled));
+	save_item(NAME(m_card_present));
 	save_item(NAME(m_clock_enabled));
 	save_item(NAME(m_control));
 	save_item(NAME(m_rx_fifo));
@@ -94,10 +95,11 @@ void nokia_simi_device::control_w(u8 data)
 	m_iir = 0;
 	m_tx_ready_pending = false;
 	m_uart_tx_count = 0;
-	m_card->activate();
+	if (m_card_present)
+		m_card->activate();
 	// Deliver ATR outside the control-register write so its FIQ cannot
 	// re-enter the firmware's activation routine.
-	schedule_card_bytes(false, true);
+	schedule_card_bytes(false, m_card_present);
 }
 
 void nokia_simi_device::card_rx_w(u8 data)
@@ -207,8 +209,9 @@ void nokia_simi_device::tx_fifo_control_w(u8 data)
 		return;
 
 	const u16 rx_count_before = m_rx_count;
-	for (unsigned i = 0; i < m_uart_tx_count; i++)
-		m_card->rx_w(m_uart_tx_fifo[i]);
+	if (m_card_present)
+		for (unsigned i = 0; i < m_uart_tx_count; i++)
+			m_card->rx_w(m_uart_tx_fifo[i]);
 	m_uart_tx_count = 0;
 	schedule_card_bytes(true, m_rx_count != rx_count_before);
 }

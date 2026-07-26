@@ -91,6 +91,22 @@ for other products and accepts a typed per-product SCL bit; NSE-3 selects bit
 2. `make verify-6110-static` pins the instruction anchors that support this
 configuration.
 
+The v4.06 SIM driver is a contiguous firmware-owned surface at
+`0x28ff84..0x2905f4`. It gates the standard MAD2 SIM clock through
+`0x2000d.bit5`, initializes and activates the `0x20036..0x2003f` SIMI window,
+stages TX bytes through `0x36/0x3e/0x3f`, drains RX through `0x37/0x3c`, and
+dispatches/acknowledges the interrupt-identification register at `0x38`.
+`make verify-6110-static` checks representative initialization, activation,
+FIFO, RX and IIR instruction anchors. This establishes that the generic MAD2
+SIMI controller is physically applicable to NSE-3.
+
+It does not establish that the current synthetic Phase-2 card, its ATR/PPS
+timing, subscriber identity or provisioned files match a Nokia 6110. Product
+configuration now separates `simi_controller` from `synthetic_sim_card`:
+NSE-3 declares the controller but deliberately leaves the synthetic card
+absent. Existing validated products explicitly select both. SIM coverage and
+registration remain unpromoted.
+
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine
 therefore retains `NO_DUMP` internal ROMs and firmware-derived peers remain

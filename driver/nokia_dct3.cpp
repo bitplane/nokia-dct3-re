@@ -108,7 +108,8 @@ struct nokia_product_config
 {
 	u8 power_on_column_mask = 0x04;
 	bool boot_rom_bypass = true;
-	bool sim_device = false;
+	bool simi_controller = false;
+	bool synthetic_sim_card = false;
 	bool dsp_service = false;
 	bool external_service = false;
 	bool radio_peer = false;
@@ -143,7 +144,8 @@ constexpr nokia_product_config make_3210_config()
 {
 	nokia_product_config result;
 	result.power_on_column_mask = 0x01;
-	result.sim_device = true;
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service = true;
 	result.radio_peer = true;
@@ -184,7 +186,8 @@ constexpr nokia_product_config make_3210_config()
 constexpr nokia_product_config make_3310_config()
 {
 	nokia_product_config result;
-	result.sim_device = true;
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service = true;
 	result.radio_peer = true;
@@ -230,7 +233,8 @@ constexpr nokia_product_config make_3310_config()
 constexpr nokia_product_config make_3330_config()
 {
 	nokia_product_config result;
-	result.sim_device = true;
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service = true;
 	result.keypad_five_rows = true;
@@ -267,6 +271,7 @@ constexpr nokia_product_config make_6110_config()
 	result.power_on_column_mask = 0x01;
 	result.boot_rom_bypass = false;
 	result.keypad_five_rows = true;
+	result.simi_controller = true;
 	// NSE-3 Chapter 3 documents COBBA-GJ deriving a 1 MHz PCMDClk and
 	// 8 kHz PCMSClk, with a sign-extended 13-bit sample in a 16-bit word.
 	// Firmware-facing DSP, SIM, external-service and radio peers deliberately
@@ -737,7 +742,8 @@ void nokia_dct3_state::machine_reset()
 		m_ccont->set_adc_source(id, m_product.ccont_board.channel_defaults[id]);
 	m_ccont->set_wddisx_grounded(m_product.ccont_wddisx_grounded);
 	m_ccont->set_ready(BIT(hardware, 0));
-	m_simi->set_enabled(m_product.sim_device && BIT(hardware, 1));
+	m_simi->set_enabled(m_product.simi_controller && BIT(hardware, 1));
+	m_simi->set_card_present(m_product.synthetic_sim_card && BIT(hardware, 1));
 	m_dsp_hle->set_service_enabled(m_product.dsp_service && BIT(hardware, 2));
 	m_dsp_hle->set_external_service_enabled(m_product.external_service && BIT(hardware, 3));
 	m_external_service_peer->set_enabled(m_product.external_service && BIT(hardware, 3));

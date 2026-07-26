@@ -40,6 +40,16 @@ class SimDeviceSplitTest(unittest.TestCase):
         ):
             self.assertIn(f"m_simi->{method}", self.phone)
 
+    def test_controller_presence_is_separate_from_synthetic_card(self):
+        self.assertIn("void set_card_present(bool present)", self.simi_header)
+        self.assertIn("if (m_card_present)", self.simi)
+        self.assertIn(
+            "m_simi->set_enabled(m_product.simi_controller &&", self.phone
+        )
+        self.assertIn(
+            "m_simi->set_card_present(m_product.synthetic_sim_card &&", self.phone
+        )
+
     def test_character_timing_matches_observed_default_pps(self):
         self.assertIn("TA1=0x05", self.simi)
         self.assertIn("attotime::from_hz(960)", self.simi)

@@ -94,6 +94,28 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(2, result["scl_bit"])
         self.assertEqual(2, result["word_address_bytes"])
 
+    def test_simi_boundary_keeps_card_profile_unassigned(self):
+        image = bytearray(b"\xff" * check.FLASH_SIZE)
+        encodings = {
+            0x290510: "2020", 0x290512: "617b",
+            0x29051C: "3d21", 0x29051E: "1820",
+            0x29052A: "3e21", 0x29052C: "1a20",
+            0x290538: "3920", 0x29053A: "3221",
+            0x2900FA: "8020", 0x2901B0: "4b71",
+            0x2901B4: "0b72", 0x2901C2: "0b70",
+            0x2901D0: "0d72", 0x2903DE: "6879",
+            0x2903E4: "2878", 0x290462: "0878",
+            0x29046A: "0870",
+        }
+        for pc, encoded in encodings.items():
+            physical = bytes.fromhex(encoded)
+            offset = pc - check.FLASH_BASE
+            image[offset : offset + 2] = physical[::-1]
+        result = check.verify_simi_boundary(bytes(image))
+        self.assertEqual(0x20036, result["tx_data"])
+        self.assertEqual(0x20037, result["rx_data"])
+        self.assertEqual("not_established", result["synthetic_card_profile"])
+
 
 if __name__ == "__main__":
     unittest.main()
