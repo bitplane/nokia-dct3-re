@@ -662,6 +662,26 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x28EE0C: ("bl", "#0x29cf2a"),
     0x28EF08: ("adds", "r0, r5, #0"),
     0x28EF0A: ("bl", "#0x26069c"),
+    # The paired field writer first preserves the complete EEPROM block.  An
+    # inbound type-0xcb message supplies its byte-9 selector and byte-10
+    # payload directly; selector 4 replaces offsets 17..20, including the
+    # stale event halfword at offsets 18..19, before writing all 28 bytes.
+    0x23821E: ("ldrb", "r0, [r4, #8]"),
+    0x238220: ("cmp", "r0, #0xcb"),
+    0x238224: ("ldrb", "r0, [r4, #9]"),
+    0x238226: ("movs", "r1, #0xa"),
+    0x238228: ("adds", "r1, r1, r4"),
+    0x23822A: ("bl", "#0x28ecec"),
+    0x28ECF4: ("movs", "r0, #0x40"),
+    0x28ECF8: ("movs", "r2, #0x1c"),
+    0x28ECFA: ("bl", "#0x29cf2a"),
+    0x28ED12: ("subs", "r0, #1"),
+    0x28ED16: ("beq", "#0x28ed46"),
+    0x28ED5A: ("strb", "r0, [r2, #0x11]"),
+    0x28ED64: ("cmp", "r1, #4"),
+    0x28EDC6: ("movs", "r0, #0x40"),
+    0x28EDCA: ("movs", "r2, #0x1c"),
+    0x28EDCC: ("bl", "#0x29ce12"),
     # Event 0x0389 is the sole dispatcher case that reaches the remaining
     # runtime object constructor.  Its packed arguments are copied into the
     # runtime cell before the case loads cell[0] as the object input.
@@ -793,6 +813,18 @@ DSP_PARAMETER_STALE_EVENT_REUSE_OWNER = {
     "release_callsite": 0x28EF0A,
     "payload_event_offset": 0x12,
     "payload_event_value": "eeprom_data",
+    "eeprom_field_writer": {
+        "request_handler": 0x238218,
+        "request_type": 0xCB,
+        "selector_message_offset": 9,
+        "payload_message_offset": 10,
+        "writer": 0x28ECEC,
+        "field_selector": 4,
+        "field_block_offsets": [0x11, 0x12, 0x13, 0x14],
+        "event_offsets": [0x12, 0x13],
+        "write_callsite": 0x28EDCC,
+    },
+    "payload_event_mutability": "runtime_request_writable",
 }
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {

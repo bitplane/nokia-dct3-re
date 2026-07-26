@@ -416,6 +416,18 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
                 "release_callsite": 0x28EF0A,
                 "payload_event_offset": 0x12,
                 "payload_event_value": "eeprom_data",
+                "eeprom_field_writer": {
+                    "request_handler": 0x238218,
+                    "request_type": 0xCB,
+                    "selector_message_offset": 9,
+                    "payload_message_offset": 10,
+                    "writer": 0x28ECEC,
+                    "field_selector": 4,
+                    "field_block_offsets": [0x11, 0x12, 0x13, 0x14],
+                    "event_offsets": [0x12, 0x13],
+                    "write_callsite": 0x28EDCC,
+                },
+                "payload_event_mutability": "runtime_request_writable",
             },
             check.DSP_PARAMETER_STALE_EVENT_REUSE_OWNER,
         )

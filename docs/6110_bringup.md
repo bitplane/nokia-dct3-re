@@ -398,9 +398,25 @@ The callee is the same GenIO-backed serial-memory reader whose two-byte
 address framing is already pinned above; it is not the separate class-`0x40`
 external-service protocol. Consequently payload offset `+0x12` is EEPROM
 data and can survive into the unwritten branch of descriptor `0x256e2e` if
-the runtime class and allocation order permit reuse. The NSE-3 EEPROM remains
-`NO_DUMP`, so no fixed value, zero-fill, or exclusion from
-`0x076f..0x0778` is claimed without that missing product evidence.
+the runtime class and allocation order permit reuse.
+
+Those bytes are not immutable factory data. Message handler `0x238218`
+recognizes request type `0xcb`, passes byte 9 directly to the field writer as
+its selector and passes the payload beginning at byte 10. The writer
+`0x28ecec` first reads the complete EEPROM range `0x40..0x5b`. Selector 4
+decodes four payload bytes into range offsets `0x11..0x14`, which includes
+the possible stale event at offsets `0x12..0x13` (EEPROM `0x52..0x53`), then
+writes the complete 28-byte range back. Selectors 1 through 5 are accepted;
+other values return status 3. The exact verifier pins the request boundary,
+selector branch and paired serial-memory transactions.
+
+The NSE-3 EEPROM remains `NO_DUMP`, so neither the initial nor the
+request-updated value is known. Static firmware also cannot establish the
+allocator class/order at the later descriptor allocation. Therefore no
+fixed value, zero-fill, or exclusion from `0x076f..0x0778` is claimed.
+Recovering an EEPROM image would establish initial state, but a faithful
+runtime conclusion additionally needs the ordinary message history and
+allocation order that precede the descriptor branch.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
