@@ -96,6 +96,24 @@ internal boot/DSP handshake, or promote `noki6110` to booting. The machine
 therefore retains `NO_DUMP` internal ROMs and firmware-derived peers remain
 disabled.
 
+### Revision namespace guard
+
+Three revision labels must remain separate during bring-up:
+
+1. the MAD2 assembly/mask identity—Nokia's NSE-3 parts list calls F711604
+   “MAD2 ROM3”;
+2. the external flash build and its ROM3/ROM4 compatibility variant;
+3. any DSP software, mask-ROM or boot-protocol version reported through the
+   shared-memory handshake.
+
+The real v5.48 handset log reports both `DSP SW 40.3.617` and `DSP ISw ROM3`,
+but does not establish that every numeric `3` or `4` in the boot exchange names
+the MAD mask revision. In particular, an HLE responder returning a ready value
+of four is not evidence that an NSE-3 contains “ROM4”. Product configuration
+must eventually type these identities separately; until a trace or matching
+internal dump connects them, `noki6110` declares none of the firmware-derived
+values.
+
 Any later v5.48 replacement or comparison baseline must:
 
 1. be identified as Nokia 6110 NSE-3, not the later 6110 Navigator;
