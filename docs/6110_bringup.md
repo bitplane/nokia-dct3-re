@@ -250,12 +250,24 @@ The producer side is bounded separately. Exact relocated signatures identify
 NSE-3's task-5 render post at `0x29e556` and generic packed-event generator at
 `0x29e604`. A whole-image call census recovers 946 direct calls to those APIs
 and resolves the packed event at 938 of them. None of those 938 publishes any
-event in `0x076f..0x0778`. Eight callsites remain runtime-built:
+event in `0x076f..0x0778`. Eight callsites are runtime-built:
 `0x2524ce`, `0x252c3e`, `0x252e7c`, `0x252f76`, `0x253552`,
-`0x25a1f8`, `0x25a87e`, and `0x2a3472`. Several forward stored event
-fields or table entries, so their lack of an immediate constant is not
-producer-absence evidence. The exact verifier records this frontier as
-unresolved rather than claiming that the paired events are dormant.
+`0x25a1f8`, `0x25a87e`, and `0x2a3472`. Seven are now bounded without
+assuming a runtime state. The first four forward one common stored event
+field: all direct constructor inputs are enumerated, its self-reload does not
+enlarge the value set, its extended wrapper supplies `0x0578`, and the only
+otherwise forwarded input comes from nine fixed dispatcher calls
+(`0x0b55..0x0b61`). The fifth forwards the extended wrapper's sole completion
+event, `0x0268`. `0x25a1f8` locally chooses only `0x038c` or `0x038e`.
+Finally, `0x2a3472` uses a byte selector plus a binary input to address two
+16-byte records per selector; exhaustive inspection of all 512 addressable
+event halfwords finds no member of `0x076f..0x0778`.
+
+Only `0x25a87e` remains unresolved. It selects an event from either a
+runtime-owned object record or the SRAM table rooted at `0x1061a4`; the
+initial contents of SRAM are not evidence for its populated values. The exact
+verifier therefore reduces the dynamic frontier from eight calls to one, but
+still does not claim producer absence or that the paired events are dormant.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven

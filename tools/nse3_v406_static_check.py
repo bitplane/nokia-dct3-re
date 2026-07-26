@@ -520,15 +520,37 @@ DSP_PARAMETER_EVENT_PRODUCER_ANCHORS = {
     0x29E618: ("bl", "#0x29e5e8"),
 }
 DSP_PARAMETER_UNRESOLVED_EVENT_CALLS = [
-    0x2524CE,
-    0x252C3E,
-    0x252E7C,
-    0x252F76,
-    0x253552,
-    0x25A1F8,
     0x25A87E,
-    0x2A3472,
 ]
+DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
+    # Four runtime-built posts read the event stored by the common constructor.
+    0x2516B4: ("strh", "r6, [r1, #0x14]"),
+    0x251852: ("bl", "#0x251690"),
+    0x25186E: ("bl", "#0x251822"),
+    0x25187C: ("bl", "#0x251690"),
+    0x25340C: ("ldrh", "r2, [r4, #0x14]"),
+    0x25340E: ("bl", "#0x251690"),
+    0x26DBE4: ("adds", "r7, r0, #0"),
+    0x26DC9C: ("adds", "r2, r7, #0"),
+    0x26DC9E: ("bl", "#0x251690"),
+    # The fifth post reads the completion event stored by the sole extended
+    # constructor call.
+    0x251834: ("strh", "r3, [r0, #0x16]"),
+    0x25186A: ("movs", "r3, #0x4d"),
+    0x25186C: ("lsls", "r3, r3, #3"),
+    # One independent callsite has a two-value local construction.
+    0x25A1E4: ("movs", "r0, #0xe3"),
+    0x25A1E6: ("lsls", "r0, r0, #2"),
+    0x25A1EA: ("ldr", "r0, [pc, #0x300]"),
+    # The final classified call indexes two 16-byte records for every possible
+    # value of a byte-sized mode selector.
+    0x2A3458: ("ldrb", "r1, [r1]"),
+    0x2A345A: ("lsls", "r1, r1, #1"),
+    0x2A345C: ("adds", "r0, r0, r1"),
+    0x2A345E: ("lsls", "r0, r0, #4"),
+    0x2A3464: ("ldrh", "r5, [r4, #4]"),
+}
+DSP_PARAMETER_MODE_EVENT_TABLE_ADDRESS = 0x2B43F0
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
     0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
@@ -1056,6 +1078,7 @@ def verify_dsp_parameter_08_boundary(data: bytes) -> dict:
 
 def verify_dsp_parameter_event_producers(data: bytes) -> dict:
     decode_thumb_anchors(data, DSP_PARAMETER_EVENT_PRODUCER_ANCHORS)
+    decode_thumb_anchors(data, DSP_PARAMETER_RUNTIME_EVENT_ANCHORS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     profile = {
@@ -1088,11 +1111,6 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
         for call in resolved
         if (call["arguments"]["packed_event"] & 0x1FFF) in target_events
     ]
-    unresolved = [
-        call["callsite"]
-        for call in calls
-        if call["arguments"].get("packed_event") is None
-    ]
     if len(calls) != 946 or len(resolved) != 938:
         raise ValueError(
             "NSE-3 packed-event call census changed: expected 946/938 "
@@ -1103,11 +1121,151 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "NSE-3 recovered a direct parameter-event producer unexpectedly: "
             f"{matching}"
         )
-    if unresolved != DSP_PARAMETER_UNRESOLVED_EVENT_CALLS:
+    runtime_calls = [
+        call["callsite"]
+        for call in calls
+        if call["arguments"].get("packed_event") is None
+    ]
+    expected_runtime_calls = [
+        0x2524CE,
+        0x252C3E,
+        0x252E7C,
+        0x252F76,
+        0x253552,
+        0x25A1F8,
+        0x25A87E,
+        0x2A3472,
+    ]
+    if runtime_calls != expected_runtime_calls:
         raise ValueError(
             "NSE-3 runtime-built packed-event callsites changed: expected "
-            f"{DSP_PARAMETER_UNRESOLVED_EVENT_CALLS}, got {unresolved}"
+            f"{expected_runtime_calls}, got {runtime_calls}"
         )
+
+    constructor_profile = {
+        "apis": [
+            {
+                "address": 0x251690,
+                "name": "stored_event_constructor",
+                "kind": "constructor",
+                "arguments": {"event": "r2"},
+            },
+            {
+                "address": 0x251822,
+                "name": "extended_stored_event_constructor",
+                "kind": "constructor",
+                "arguments": {"event": "r2", "completion_event": "r3"},
+            },
+            {
+                "address": 0x26DBE2,
+                "name": "stored_event_dispatch",
+                "kind": "dispatcher",
+                "arguments": {"event": "r0"},
+            },
+        ]
+    }
+    constructor_calls = extract_calls(
+        constructor_profile, instructions, physical, FLASH_BASE
+    )
+    direct_constructor_events = {
+        call["callsite"]: call["arguments"]["event"]
+        for call in constructor_calls
+        if call["api_address"] == 0x251690
+    }
+    expected_direct_constructor_events = {
+        0x251852: None,  # forwarded by the sole extended constructor below
+        0x25187C: 0x0578,
+        0x25340E: None,  # reloads the existing field; does not enlarge its set
+        0x256444: 0x0BBE,
+        0x25654A: 0x0BC0,
+        0x2573E8: 0x0BBE,
+        0x257442: 0x0BBE,
+        0x26DC9E: None,  # forwarded by the bounded dispatcher below
+        0x2711F2: 0x08A1,
+        0x281FA0: 0x083F,
+        0x284A1C: 0x08DD,
+        0x291CF6: 0x09CA,
+        0x299D94: 0x06A8,
+        0x2A1572: 0x0348,
+        0x2A15AE: 0x0348,
+        0x2A375E: 0x0A7A,
+    }
+    if direct_constructor_events != expected_direct_constructor_events:
+        raise ValueError(
+            "NSE-3 stored-event constructor census changed: expected "
+            f"{expected_direct_constructor_events}, got {direct_constructor_events}"
+        )
+    extended_calls = [
+        call for call in constructor_calls if call["api_address"] == 0x251822
+    ]
+    if len(extended_calls) != 1 or extended_calls[0]["callsite"] != 0x25186E:
+        raise ValueError(
+            "NSE-3 extended stored-event constructor call topology changed"
+        )
+    extended_arguments = extended_calls[0]["arguments"]
+    if extended_arguments != {"event": 0x0578, "completion_event": 0x0268}:
+        raise ValueError(
+            "NSE-3 extended stored-event constructor values changed: "
+            f"{extended_arguments}"
+        )
+    dispatch_events = {
+        call["callsite"]: call["arguments"]["event"]
+        for call in constructor_calls
+        if call["api_address"] == 0x26DBE2
+    }
+    expected_dispatch_events = {
+        0x26DD28: 0x0B55,
+        0x26DD74: 0x0B55,
+        0x26DE68: 0x0B57,
+        0x26DE86: 0x0B56,
+        0x26DF1E: 0x0B61,
+        0x26E10C: 0x0B5D,
+        0x26E1A8: 0x0B5E,
+        0x26E7D6: 0x0B55,
+        0x26E8B0: 0x0B58,
+    }
+    if dispatch_events != expected_dispatch_events:
+        raise ValueError(
+            "NSE-3 stored-event dispatcher inputs changed: expected "
+            f"{expected_dispatch_events}, got {dispatch_events}"
+        )
+    stored_events = {
+        value
+        for value in direct_constructor_events.values()
+        if value is not None
+    } | set(dispatch_events.values()) | {extended_arguments["event"]}
+    if {value & 0x1FFF for value in stored_events} & target_events:
+        raise ValueError(
+            "NSE-3 stored-event constructors can publish a parameter event"
+        )
+    if extended_arguments["completion_event"] in target_events:
+        raise ValueError(
+            "NSE-3 completion event can publish a parameter event"
+        )
+
+    fixed_local_events = {0x038C, 0x038E}
+    if fixed_local_events & target_events:
+        raise ValueError("NSE-3 fixed local event overlaps parameter events")
+
+    mode_table_events = []
+    for selector in range(256):
+        for side in range(2):
+            record = selector * 2 + side
+            offset = (
+                DSP_PARAMETER_MODE_EVENT_TABLE_ADDRESS
+                - FLASH_BASE
+                + record * 0x10
+                + 4
+            )
+            mode_table_events.append(
+                int.from_bytes(physical[offset : offset + 2], "little")
+            )
+    if {value & 0x1FFF for value in mode_table_events} & target_events:
+        raise ValueError(
+            "NSE-3 byte-indexed mode event table contains a parameter event"
+        )
+
+    unresolved = DSP_PARAMETER_UNRESOLVED_EVENT_CALLS
     return {
         "event_apis": {
             "task5_render_post": 0x29E556,
@@ -1116,10 +1274,22 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
         "direct_calls": len(calls),
         "statically_resolved_calls": len(resolved),
         "resolved_parameter_event_producers": [],
-        "runtime_built_calls": unresolved,
+        "runtime_built_calls": runtime_calls,
+        "classified_runtime_built_calls": {
+            "stored_event_field": [
+                0x2524CE,
+                0x252C3E,
+                0x252E7C,
+                0x252F76,
+            ],
+            "stored_completion_event": [0x253552],
+            "fixed_local_values": [0x25A1F8],
+            "byte_domain_mode_table": [0x2A3472],
+        },
+        "remaining_unresolved_calls": unresolved,
         "runtime_built_calls_exclude_parameter_events": False,
         "producer_absence_proven": False,
-        "next_evidence": "bound_runtime_built_values_or_organic_trace",
+        "next_evidence": "bound_25a87e_runtime_record_population_or_organic_trace",
     }
 
 
