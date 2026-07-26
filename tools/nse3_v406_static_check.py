@@ -7054,8 +7054,9 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             "current_hle_ready_0x0001_satisfies_comparison": False,
             "service_projection": {
                 "selector": 0x0D,
-                "role": "COBBA identification",
+                "role": "three-character Bxx projection",
                 "corroboration": "Nokia 6110 service protocol: 0xc8/0x0d Get COBBA",
+                "physical_cobba_revision_semantic_proven": False,
                 "dsp_side_meaning": "not_established",
             },
             "service_identity_sources": {

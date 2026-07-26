@@ -235,16 +235,18 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 							m_bootstrap_exchange_count, machine().time().as_double());
 				break;
 
-			case bootstrap_completion_profile::nse3_v406_cobba_b06_second_unknown:
-				// NSE-3 v4.06 captures shared 0x000 as its COBBA identity and
-				// later requires 0x0b06.  Its post-transfer wait and second
-				// capture use shared 0x002, whose DSP-published value remains
-				// unknown.  Publish only the evidenced identity: leaving
-				// 0x002 zero deliberately prevents an invented boot success.
+			case bootstrap_completion_profile::nse3_final_b06_second_unknown:
+				// NSE-3 v4.06 captures shared 0x000 and later requires
+				// 0x0b06.  Both v5.48 variants prove the same comparison, even
+				// though a real v5.48 handset reports fitted COBBA B07; do not
+				// assign this bootstrap result a physical-silicon meaning.
+				// The second DSP-published value remains unknown.  Publish only
+				// the evidenced first result: leaving 0x002 zero deliberately
+				// prevents an invented boot success.
 				m_transport->peer_shared_w(0x000 / 2, 0x0b06);
 				if (m_trace_enabled)
 					LOGMASKED(LOG_DSP_HLE,
-							"dsp_hle: bootstrap partial exchanges=%u cobba=0b06 second=unknown t=%.6f\n",
+							"dsp_hle: bootstrap partial exchanges=%u first=0b06 second=unknown t=%.6f\n",
 							m_bootstrap_exchange_count, machine().time().as_double());
 				break;
 
@@ -253,9 +255,11 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 				// a DSP publication across shared 0x004/0x006, initialized to
 				// 0xffff, before entering the 64-block transfer.  They later
 				// wait for shared 0x002 to change away from 0xffff and capture
-				// 0x000/0x002.  Neither publication value is known from real
-				// hardware, so do not inherit v4.06's B06 partial completion
-				// or the generic ready words.
+				// 0x000/0x002.  The first final result must eventually be
+				// 0x0b06, but both pre-upload values and the second final
+				// result remain unknown.  Do not bypass the earlier exchange
+				// by selecting the final-only partial profile or generic ready
+				// words.
 				if (m_trace_enabled)
 					LOGMASKED(LOG_DSP_HLE,
 							"dsp_hle: NSE-3 v5.48 bootstrap publications unresolved; remaining fail-closed t=%.6f\n",

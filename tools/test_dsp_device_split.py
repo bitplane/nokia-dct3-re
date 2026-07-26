@@ -94,7 +94,7 @@ class DspDeviceSplitTest(unittest.TestCase):
             self.hle,
         )
         self.assertIn(
-            "bootstrap_completion_profile::nse3_v406_cobba_b06_second_unknown",
+            "bootstrap_completion_profile::nse3_final_b06_second_unknown",
             self.hle + self.phone,
         )
         self.assertIn("peer_shared_w(0x000 / 2, 0x0b06)", self.hle)

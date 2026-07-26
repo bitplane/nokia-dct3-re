@@ -1,5 +1,6 @@
 import hashlib
 import unittest
+from pathlib import Path
 
 from tools import nse3_v548_static_check as check
 
@@ -22,6 +23,14 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
         self.assertNotEqual(rom3["stream_sha1"], rom4["stream_sha1"])
         self.assertEqual(0x1C1C, rom4["loader"] - rom3["loader"])
         self.assertEqual(0x10, rom4["state"] - rom3["state"])
+        self.assertEqual(0x1C28, rom4["formatter"] - rom3["formatter"])
+        self.assertEqual(0x1C2C, rom4["acceptance"] - rom3["acceptance"])
+
+    def test_result_contract_is_not_named_as_physical_cobba(self):
+        source = Path(check.__file__).read_text(encoding="utf-8")
+        self.assertIn('"first_required_value": 0x0B06', source)
+        self.assertIn('"physical_cobba_revision_semantic_proven": False', source)
+        self.assertNotIn('"role": "COBBA identification"', source)
 
     def test_identity_rejects_short_image(self):
         with self.assertRaisesRegex(ValueError, "expected 0x100000 bytes"):

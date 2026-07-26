@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 import capstone
-from capstone.arm import ARM_OP_MEM, ARM_REG_PC
+from capstone.arm import ARM_OP_IMM, ARM_OP_MEM, ARM_REG_PC
 
 
 FLASH_BASE = 0x200000
@@ -21,7 +21,10 @@ VARIANTS = {
         "sha1": "5768841c9eb39c744f4fa04f0485e4f9ad4553b3",
         "sha256": "3ad47781485cb776910d30fa20d440a963eae90e847cfe24748b5c4ac2f8e6e3",
         "loader": 0x2833F4,
+        "loader_call": 0x297CF6,
         "state": 0x10BA28,
+        "formatter": 0x28C9DA,
+        "acceptance": 0x29799C,
         "stream_sha1": "73ddf5f79e421fdcfff7742e238fb24ea5f1fcfa",
         "identity": [b"V  5.48", b"08-09-99", b"40.3.617", b"14-Dec-98", b"NSE-3"],
     },
@@ -29,7 +32,10 @@ VARIANTS = {
         "sha1": "3bcc5c93ec247c63490e134196aab98a4e60c184",
         "sha256": "2adca0d661af2d8e7bed3e04d2941b6db9572a1eb10b2b1ebc545e33fbdd7c7f",
         "loader": 0x285010,
+        "loader_call": 0x299922,
         "state": 0x10BA38,
+        "formatter": 0x28E602,
+        "acceptance": 0x2995C8,
         "stream_sha1": "94e447d8386e010326fdfb261e247d6c0ac4d97a",
         "identity": [b"V 05.48", b"03-09-99", b"14-Dec-98", b"NSE-3"],
     },
@@ -43,6 +49,12 @@ def decoder() -> capstone.Cs:
     )
     result.detail = True
     return result
+
+
+def image_instructions(data: bytes) -> list[capstone.CsInsn]:
+    disassembler = decoder()
+    disassembler.skipdata = True
+    return list(disassembler.disasm(data, FLASH_BASE))
 
 
 def instruction(data: bytes, pc: int) -> capstone.CsInsn:
@@ -81,6 +93,33 @@ def verify_literal(data: bytes, pc: int, expected: int) -> None:
         raise ValueError(
             f"Thumb literal {pc:#x}: expected {expected:#x}, got {actual:#x}"
         )
+
+
+def immediate_target(decoded: capstone.CsInsn) -> int | None:
+    if (
+        decoded.mnemonic not in ("bl", "blx")
+        or len(decoded.operands) != 1
+        or decoded.operands[0].type != ARM_OP_IMM
+    ):
+        return None
+    return decoded.operands[0].imm
+
+
+def literal_value(data: bytes, decoded: capstone.CsInsn) -> int | None:
+    if (
+        decoded.mnemonic != "ldr"
+        or len(decoded.operands) != 2
+        or decoded.operands[1].type != ARM_OP_MEM
+        or decoded.operands[1].mem.base != ARM_REG_PC
+    ):
+        return None
+    address = (
+        ((decoded.address + 4) & ~3) + decoded.operands[1].mem.disp
+    )
+    offset = address - FLASH_BASE
+    if offset < 0 or offset + 4 > len(data):
+        return None
+    return int.from_bytes(data[offset : offset + 4], "big")
 
 
 def extract_bootstrap_stream(data: bytes) -> bytes:
@@ -147,6 +186,76 @@ def verify_variant(path: Path, name: str) -> dict:
     # State storage is separate between ROM3 and ROM4 even though the loader
     # algorithm is otherwise homologous.
     verify_literal(data, base + 0x8A, profile["state"])
+
+    # Both v5.48 variants later consume the first captured halfword at
+    # state+0x0c.  One path renders its nibbles as a three-character Bxx
+    # result, and another accepts only 0x0b06.  This is an exact external-MCU
+    # constraint; the independently reported physical COBBA B07 demonstrates
+    # that it must not be promoted to a fitted-silicon revision semantic.
+    first_result = profile["state"] + 0x0C
+    second_result = profile["state"] + 0x0E
+    formatter = profile["formatter"]
+    formatter_anchors = {
+        0x02: ("ldrh", "r0, [r1]"),
+        0x04: ("lsrs", "r0, r0, #8"),
+        0x0A: ("adds", "r0, #0x37"),
+        0x0C: ("strb", "r0, [r4]"),
+        0x0E: ("ldrh", "r0, [r1]"),
+        0x10: ("lsrs", "r0, r0, #4"),
+        0x16: ("adds", "r0, #0x30"),
+        0x18: ("strb", "r0, [r4, #1]"),
+        0x1A: ("ldrh", "r0, [r1]"),
+        0x20: ("adds", "r0, #0x30"),
+    }
+    verify_literal(data, formatter, first_result)
+    for delta, expected in formatter_anchors.items():
+        verify_instruction(data, formatter + delta, *expected)
+
+    acceptance = profile["acceptance"]
+    acceptance_anchors = {
+        0x02: ("ldrh", "r1, [r0]"),
+        0x06: ("cmp", "r1, r0"),
+    }
+    verify_literal(data, acceptance, first_result)
+    verify_literal(data, acceptance + 0x04, 0x0B06)
+    for delta, expected in acceptance_anchors.items():
+        verify_instruction(data, acceptance + delta, *expected)
+
+    verify_instruction(
+        data, profile["loader_call"], "bl", f"#{profile['loader']:#x}"
+    )
+    instructions = image_instructions(data)
+    direct_callers = [
+        decoded.address
+        for decoded in instructions
+        if immediate_target(decoded) == profile["loader"]
+    ]
+    if direct_callers != [profile["loader_call"]]:
+        raise ValueError(
+            f"{path}: expected sole loader caller {profile['loader_call']:#x}, "
+            f"got {[hex(address) for address in direct_callers]}"
+        )
+    result_literal_references = {
+        address: [
+            decoded.address
+            for decoded in instructions
+            if literal_value(data, decoded) == address
+        ]
+        for address in (first_result, second_result)
+    }
+    expected_first_references = [formatter, acceptance]
+    if result_literal_references[first_result] != expected_first_references:
+        raise ValueError(
+            f"{path}: first-result direct references changed: expected "
+            f"{[hex(address) for address in expected_first_references]}, got "
+            f"{[hex(address) for address in result_literal_references[first_result]]}"
+        )
+    if result_literal_references[second_result]:
+        raise ValueError(
+            f"{path}: second-result direct literal references changed: "
+            f"{[hex(address) for address in result_literal_references[second_result]]}"
+        )
+
     stream = extract_bootstrap_stream(data)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != profile["stream_sha1"]:
@@ -158,6 +267,7 @@ def verify_variant(path: Path, name: str) -> dict:
         "sha1": sha1,
         "sha256": sha256,
         "loader": base,
+        "loader_direct_callers": direct_callers,
         "shared_cells": [0x10000, 0x10002, 0x10004, 0x10006],
         "pre_upload_cells": [0x10004, 0x10006],
         "final_publication_cells": [0x10000, 0x10002],
@@ -165,6 +275,18 @@ def verify_variant(path: Path, name: str) -> dict:
         "transfer_blocks": 64,
         "stream_sha1": stream_sha1,
         "state": profile["state"],
+        "final_result_capture": {
+            "first_storage": first_result,
+            "first_direct_literal_references":
+                result_literal_references[first_result],
+            "first_required_value": 0x0B06,
+            "first_render": "B06",
+            "physical_cobba_revision_semantic_proven": False,
+            "second_storage": second_result,
+            "second_direct_literal_references":
+                result_literal_references[second_result],
+            "second_value": "unknown",
+        },
     }
 
 

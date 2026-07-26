@@ -317,13 +317,14 @@ constexpr nokia_product_config make_6110_config()
 	// transfer geometry rather than evidence for the HLE peer's completion
 	// counter. A separate ROM4 HLE can acknowledge all 64 blocks and still
 	// leaves this exact image waiting for a non-zero final publication at
-	// 0x10002. NSE-3 then projects captured shared word 0x10000 as COBBA
-	// identity B06 and a later path compares it against 0x0b06, so the generic
-	// HLE ready words of 1 are demonstrably incompatible. Type that unknown
-	// completion independently from transfer geometry. Publish only the
-	// evidenced COBBA identity while deliberately leaving the unknown second
-	// word zero, and keep the peer disabled pending its DSP-side semantics.
-	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::nse3_v406_cobba_b06_second_unknown;
+	// 0x10002. NSE-3 later compares captured shared word 0x10000 against
+	// 0x0b06, so the generic HLE ready words of 1 are demonstrably
+	// incompatible. Both v5.48 variants require the same value despite a real
+	// handset reporting fitted COBBA B07, so this is typed only as a firmware
+	// result, not a physical-silicon identity. Publish that evidenced first
+	// result while deliberately leaving the unknown second word zero, and keep
+	// the peer disabled pending its DSP-side semantics.
+	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::nse3_final_b06_second_unknown;
 	// The external MCU image correlates its 70 0d request with a framed
 	// type-74 completion through controller bit 2 and timer 14. NSE-8's exact
 	// decoder supplies the missing four-byte frame transformation. Type this
@@ -712,8 +713,9 @@ void nokia_dct3_state::machine_start()
 	m_pup->set_trace(m_trace_enabled);
 	// NSE-3's service package proves that v5.48 ROM3 and ROM4 use a
 	// pre-upload 0x10004/0x10006 exchange and a 0xffff final sentinel.
-	// Keep v4.06's independently recovered B06 partial completion confined to
-	// BIOS 0; the two v5.48 BIOSes remain deliberately fail-closed.
+	// Keep the final-only B06 partial completion confined to BIOS 0.  Both
+	// v5.48 BIOSes require B06 eventually, but their earlier pre-upload
+	// exchange remains unresolved, so they stay deliberately fail-closed.
 	if (m_product.nse3_bootstrap_selected_by_bios && system_bios() != 1)
 		m_dsp_hle->set_bootstrap_completion(
 				nokia_dsp_hle_device::bootstrap_completion_profile::

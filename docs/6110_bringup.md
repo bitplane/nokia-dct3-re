@@ -77,10 +77,21 @@ then capture the final `0x10000`/`0x10002` publications in product state.
 ROM3 and ROM4 stage different 65,536-byte streams, with SHA-1
 `73ddf5f79e421fdcfff7742e238fb24ea5f1fcfa` and
 `94e447d8386e010326fdfb261e247d6c0ac4d97a` respectively. Neither the
-pre-upload pair nor final pair's real DSP values are recovered, so both v5.48
-BIOSes select a typed unresolved profile and remain fail-closed. In
-particular, they cannot inherit v4.06's partial B06 publication or generic
-ready words.
+pre-upload pair nor the second final value is recovered, so both v5.48 BIOSes
+select a typed unresolved profile and remain fail-closed. The first final
+value is constrained independently: ROM3 and ROM4 each render it as a
+three-character `Bxx` string and later accept only `0x0b06`. Their sole direct
+loader calls, capture locations, formatter roots and comparisons are pinned by
+the gate. This does not make the two bootstrap protocols interchangeable:
+v5.48 cannot reach that final publication without the unresolved pre-upload
+exchange, and generic ready words remain incompatible.
+
+The real ROM3 handset log reports physical COBBA `B07` while this same v5.48
+external firmware requires the captured result `0x0b06`. That contradiction
+is useful negative evidence: the result may participate in a service
+projection, but it cannot safely be named as the fitted COBBA revision. The
+static JSON therefore records the firmware-required value and explicitly
+marks the physical-silicon semantic unproved.
 
 The driver now declares the manifest-proven ROM3 and ROM4 external images as
 separate BIOS choices and keeps their absent internal MAD2/DSP ROM inputs
@@ -1235,10 +1246,15 @@ ASIC-version byte at `0x20000`. This pairing independently agrees with the
 documented Nokia 6110 service commands `0xc8/0x0d Get COBBA` and
 `0xc8/0x0c Get system ASIC` in the
 [Gammu Nokia 6110 protocol reference](https://docs.gammu.org/protocol/n6110.html).
-The defensible MCU-side meaning is therefore **COBBA identification B06**, not
-“DSP ready” or “DSP software B06”.
+This proves that selector `0x0d` exposes the captured result as `B06`, and that
+the generic “DSP ready” value is wrong. It does not prove that `B06` is the
+fitted COBBA revision: both v5.48 images retain the same required result while
+an independently logged v5.48 ROM3 handset reports physical COBBA `B07`.
+The protocol-name correlation is evidence for the service projection, not
+enough to collapse bootstrap result, service label and silicon identity into
+one typed value.
 
-A separate later path compares that captured COBBA word against exactly
+A separate later path compares that captured first result against exactly
 `0x0b06` and branches away when it differs. The verifier pins the sole direct
 bootstrap call at `0x2973f0`, both result captures, selector pass-through,
 adjacent ASIC query, formatter and exact comparison. It also exhaustively
@@ -1337,7 +1353,7 @@ ring trace is still required for those DSP-side facts.
 
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, how the DSP derives or
-publishes the COBBA identity, what the write-only second captured word
+publishes the first bootstrap result, what the write-only second captured word
 represents, or
 what the intermediate non-zero acknowledgements mean.
 The matching internal DSP image is absent. In particular, “64 transfer blocks”
@@ -1374,20 +1390,20 @@ the same internal ROM.
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
 retain their three ready words of `1`; NSE-3 v4.06 selects
-`nse3_v406_cobba_b06_second_unknown`. That profile publishes only the evidenced
-`0x0b06` identity at shared `0x10000` and deliberately leaves `0x10002` zero.
+`nse3_final_b06_second_unknown`. That profile publishes only the evidenced
+`0x0b06` result at shared `0x10000` and deliberately leaves `0x10002` zero.
 Enabling its DSP service can therefore neither turn the observed 64-block
 geometry into the legacy ready-word publication nor invent a successful boot
 before the second word's DSP-side semantics are recovered.
 
-This completion profile is deliberately build-qualified rather than NSE-3-wide.
-The independently reported real v5.48 ROM3 handset identifies its COBBA as
-`B07`, not the v4.06 candidate's required `B06`. The log does not reveal
-v5.48's shared publication encoding or prove whether the difference follows
-firmware, COBBA assembly, board repair history or another production variant.
-It does prove that a future v5.48 image must not silently inherit v4.06's
-identity publication. Its build/board pairing needs a separately evidenced
-completion profile.
+Both v5.48 images independently require the same final first result. They do
+not select this partial profile because their distinct pre-upload
+`0x10004/0x10006` exchange remains unresolved, not because the final B06
+constraint differs. Conversely, the physical `B07` report must not be
+substituted into the firmware comparison. Product configuration keeps
+bootstrap publications, external-firmware build, internal ROM identity and
+physical COBBA identity separate until matching traces establish their
+relationships.
 
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine
@@ -1403,14 +1419,16 @@ Four revision labels must remain separate during bring-up:
 2. the external flash build and its ROM3/ROM4 compatibility variant;
 3. DSP external/internal software, mask-ROM and boot-protocol identities,
    retaining their separately evidenced sources; and
-4. the independently queried COBBA identification, which v4.06 renders as
-   `B06`.
+4. the physical COBBA identification, independently reported as `B07` on the
+   real v5.48 ROM3 handset; and
+5. the bootstrap-captured first result, which all three recovered external
+   images require to be `0x0b06` and render as `B06`.
 
 The real v5.48 handset log reports both `DSP SW 40.3.617` and `DSP ISw ROM3`,
 plus COBBA `B07`, but does not establish that every numeric `3` or `4` in the
 boot exchange names the MAD mask revision. In particular, an HLE responder
 returning a ready value of four is not evidence that an NSE-3 contains “ROM4”,
-and v5.48's `B07` must not replace v4.06's exact `B06` comparison. Product
+and physical `B07` must not replace the exact `B06` firmware comparison. Product
 configuration must eventually type these identities separately; until a trace
 or matching internal dump connects them, `noki6110` declares none of the
 firmware-derived values.
