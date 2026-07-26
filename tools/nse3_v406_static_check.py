@@ -1224,6 +1224,31 @@ DSP_INTERNAL_SOFTWARE_LITERALS = {
     0x28EA16: 0x10BCF0,
     0x28EB02: 0x10BCE4,
 }
+DSP_INTERNAL_SOFTWARE_OWNER_ANCHORS = {
+    # Task 2 entry and its object loop.
+    0x23A5CE: ("push", "{r4, r5, r6, lr}"),
+    0x23A5D0: ("bl", "#0x237a7a"),
+    0x23A5D8: ("movs", "r6, #1"),
+    # Object family 0x74 is dispatched to 0x237d60 except subcommand 0x32.
+    0x23A5FE: ("ldrb", "r0, [r4, #3]"),
+    0x23A624: ("subs", "r0, #0x32"),
+    0x23A632: ("ldrb", "r0, [r4, #8]"),
+    0x23A634: ("cmp", "r0, #0x32"),
+    0x23A636: ("beq", "#0x23a640"),
+    0x23A638: ("adds", "r0, r4, #0"),
+    0x23A63A: ("bl", "#0x237d60"),
+    0x23A63E: ("b", "#0x23a6a8"),
+    # Identity reports retain result 1, skip fallback reporting and release
+    # the received object without constructing an acknowledgement.
+    0x23A6A8: ("cmp", "r6, #0xff"),
+    0x23A6AA: ("bne", "#0x23a6b2"),
+    0x23A6B2: ("adds", "r0, r4, #0"),
+    0x23A6B4: ("bl", "#0x26069c"),
+}
+NSE3_TASK_TABLE = 0x2B74B0
+NSE3_TASK_RECORD_SIZE = 12
+NSE3_TASK_2_ENTRY_POINTER = 0x2B74C8
+NSE3_TASK_2_ENTRY = 0x23A5CF
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -2482,6 +2507,7 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, DSP_BOOTSTRAP_POST_LITERALS)
     decode_thumb_anchors(data, DSP_INTERNAL_SOFTWARE_ANCHORS)
     verify_thumb_literals(data, DSP_INTERNAL_SOFTWARE_LITERALS)
+    decode_thumb_anchors(data, DSP_INTERNAL_SOFTWARE_OWNER_ANCHORS)
     physical = swap16(data)
     external_software_pointer = effective_u32(
         physical, DSP_EXTERNAL_SOFTWARE_POINTER_TABLE - FLASH_BASE)
@@ -2501,7 +2527,27 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             f"{DSP_EXTERNAL_SOFTWARE_BYTES!r}, got "
             f"{external_software_bytes!r}"
         )
+    task_2_entry = effective_u32(
+        physical, NSE3_TASK_2_ENTRY_POINTER - FLASH_BASE)
+    if task_2_entry != NSE3_TASK_2_ENTRY:
+        raise ValueError(
+            "NSE-3 task-2 entry changed: expected "
+            f"{NSE3_TASK_2_ENTRY:#x}, got {task_2_entry!r}"
+        )
     instructions = decode_image(physical, FLASH_BASE)
+    internal_software_handler_callers = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == 0x237D60
+    ]
+    if internal_software_handler_callers != [0x23A63A]:
+        raise ValueError(
+            "NSE-3 DSP internal-software report-handler callers changed: "
+            f"expected [0x23a63a], got "
+            f"{[hex(address) for address in internal_software_handler_callers]}"
+        )
     internal_software_setter_callers = [
         insn.address
         for insn in instructions
@@ -2666,9 +2712,23 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
                     "setter_direct_callers":
                         internal_software_setter_callers,
                     "inbound_handler": 0x237D60,
+                    "inbound_handler_direct_callers":
+                        internal_software_handler_callers,
+                    "owner": {
+                        "task": 2,
+                        "task_table": NSE3_TASK_TABLE,
+                        "record_size": NSE3_TASK_RECORD_SIZE,
+                        "entry_pointer": NSE3_TASK_2_ENTRY_POINTER,
+                        "entry": task_2_entry,
+                        "object_family_offset": 3,
+                        "object_family": 0x74,
+                        "subcommand_offset": 8,
+                        "excluded_subcommand": 0x32,
+                    },
                     "accepted_message_types": [0x0A, 0xC8],
                     "message_value_offset": 0x0B,
                     "rendered_value": "single_ascii_digit",
+                    "acknowledgement": "none_object_released",
                     "exact_revision": "not_established",
                 },
                 "0x0c_system_asic": {

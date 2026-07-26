@@ -605,6 +605,22 @@ be provisioned from the NSE-3 product name, MAD assembly, external revision
 `25.3.531`, or the v5.48 handset log. A matching runtime report remains
 required.
 
+The report belongs to task 2 rather than the bootstrap routine. The exact task
+table begins at `0x2b74b0` with 12-byte records; its third entry at `0x2b74c8`
+is Thumb address `0x23a5cf`. That task's object dispatcher routes family
+`0x74` from object byte 3 to `0x237d60`, except subcommand `0x32` at byte 8,
+which has a separate branch. The accepted identity reports update the runtime
+buffer, retain the ordinary success result and release the received object;
+they construct no acknowledgement. Direct-call censuses pin the dispatcher
+and setter edges as unique.
+
+This establishes firmware ownership and message shape, but not the physical
+counterparty below task 2. It would be premature to inject the digit from the
+bootstrap responder or the class-`0x40` external-service peer merely because
+those components also interact with nearby service code. A runtime transport
+trace or matching internal image must connect object family `0x74` and report
+type `0x0a/0xc8` to the component that actually emits it.
+
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, how the DSP derives or
 publishes the COBBA identity, what the write-only second captured word
