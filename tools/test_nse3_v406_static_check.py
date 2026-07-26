@@ -453,6 +453,44 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x106CEA, check.RADIO_REPORT_HANDLER_LITERALS[0x2156EC]
         )
 
+    def test_type_0x88_repacks_timing_fields_for_candidate_control(self):
+        self.assertEqual(
+            0x1090FF, check.RADIO_REPORT_HANDLER_LITERALS[0x280468]
+        )
+        self.assertEqual(
+            0x13AC, check.RADIO_REPORT_HANDLER_LITERALS[0x280478]
+        )
+        self.assertEqual(
+            ("str", "r0, [r5, #4]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x28048A],
+        )
+        self.assertEqual(
+            ("strh", "r0, [r5, #8]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x280494],
+        )
+        self.assertEqual(
+            ("strh", "r0, [r5, #0xa]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x28049E],
+        )
+        self.assertEqual(
+            0x106B08, check.RADIO_REPORT_HANDLER_LITERALS[0x2172D4]
+        )
+        self.assertEqual(
+            0x106AF6, check.RADIO_REPORT_HANDLER_LITERALS[0x2172DC]
+        )
+        self.assertEqual(
+            ("bl", "#0x2142b2"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x21716E],
+        )
+        self.assertEqual(
+            ("bl", "#0x2159b0"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x217328],
+        )
+        self.assertEqual(
+            ("adds", "r4, #0x18"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x215A18],
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)

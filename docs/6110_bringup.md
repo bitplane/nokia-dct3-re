@@ -409,6 +409,24 @@ therefore share preprocessing infrastructure but implement distinct
 controller transitions; treating either as a generic search-complete reply
 would lose evidenced NSE-3 policy.
 
+Type `0x88` is also bounded as controller input rather than a search
+terminal. Handler `0x280464` discards it when controller byte `0x1090ff`
+equals 1. Otherwise it allocates a fresh 16-byte object with status
+`0x13ac` and repacks incoming object bytes `5..7` as a big-endian 24-bit
+value at +4, bytes `8..9` and `0x0a..0x0b` as 16-bit values at +8 and
++`0x0a`, and control bytes 4 and `0x0d` at +`0x0c` and +`0x0d`.
+
+The task-12 consumer at `0x2172d2` has two bounded paths. With state
+`0x106b08 == 3` and mode `0x106af6 == 2`, it derives a scalar from the
+24-bit field plus control/state offsets and passes that value to
+`0x2142b2`; that helper can arm timer `0x6e` only behind further
+controller gates. Outside that state/mode, a zero first control byte permits
+`0x2159b0` to match the report's first 16-bit value against +`0x0a` of
+24-byte candidate records and update record offsets +8, +`0x0e` and
++`0x0f`. Neither branch directly constructs a bitmap search or
+`CHANNEL_CONFIGURE` packet. The exact image therefore establishes a
+timing/candidate-update shape without assigning a DSP report name.
+
 There is a narrower relationship to one populated type-`0x1a` request path:
 builder `0x20e9cc` reads the same byte `0x1090ff`, distinguishes values 6
 and 7, and uses that state to populate request-object bytes `0x12..0x13`
