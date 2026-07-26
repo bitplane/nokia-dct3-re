@@ -388,6 +388,34 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             },
             check.NSE3_TASK_17_DIRECT_RADIO_TARGETS,
         )
+        self.assertEqual(0x71, check.RA_INFO_TIMER_CODE)
+        self.assertEqual(
+            bytes.fromhex("010b0000002bd70c"),
+            check.RA_INFO_TIMER_CONFIGURATION,
+        )
+        self.assertEqual(
+            bytes.fromhex("138c0000"),
+            check.RA_INFO_TIMER_EVENT_PREFIX,
+        )
+        self.assertEqual(
+            [0x20DC2C, 0x20DCC6], check.RA_INFO_TIMER_ARM_CALLS
+        )
+        self.assertEqual(
+            [0x20DD24, 0x20DD6C, 0x20F0B0],
+            check.RA_INFO_TIMER_CANCEL_CALLS,
+        )
+        self.assertEqual([], check.RA_INFO_TIMER_QUERY_CALLS)
+        self.assertEqual(
+            ("bl", "#0x2a4ac4"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x20DC22],
+        )
+        self.assertEqual(
+            ("cmp", "r1, r2"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x20DC50],
+        )
+        self.assertEqual(
+            0x108ED4, check.RADIO_REPORT_HANDLER_LITERALS[0x20DC4A]
+        )
 
     def test_type_0x8a_uses_shared_controller_state_not_report_body(self):
         self.assertEqual(

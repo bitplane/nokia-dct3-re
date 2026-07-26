@@ -1000,6 +1000,46 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x20DBFC: ("cmp", "r0, #1"),
     0x20DC02: ("bl", "#0x20d8d6"),
     0x20DC06: ("strb", "r0, [r6, #0x18]"),
+    # Timer 0x71 is the delayed alternative when RA_INFO controller byte
+    # +0x18 equals one.  A second controller event shares the same runtime
+    # duration derivation.  Expiry status 0x138c returns through task 11 and
+    # the unique general controller-event consumer.
+    0x20DC0A: ("movs", "r0, #0x71"),
+    0x20DC0C: ("movs", "r1, #0"),
+    0x20DC0E: ("bl", "#0x276648"),
+    0x20DC22: ("bl", "#0x2a4ac4"),
+    0x20DC2A: ("movs", "r0, #0x71"),
+    0x20DC2C: ("bl", "#0x25f146"),
+    0x20DCA4: ("movs", "r0, #0x71"),
+    0x20DCA6: ("movs", "r1, #0"),
+    0x20DCA8: ("bl", "#0x276648"),
+    0x20DCBC: ("bl", "#0x2a4ac4"),
+    0x20DCC4: ("movs", "r0, #0x71"),
+    0x20DCC6: ("bl", "#0x25f146"),
+    0x211EA6: ("movs", "r0, #0x71"),
+    0x211EA8: ("movs", "r1, #2"),
+    0x211EAA: ("bl", "#0x276648"),
+    0x211EAE: ("ldrb", "r0, [r4, #3]"),
+    0x211EB0: ("cmp", "r0, #1"),
+    0x20DC40: ("ldr", "r0, [pc, #0x374]"),
+    0x20DC4A: ("ldr", "r0, [pc, #0x29c]"),
+    0x20DC4C: ("ldrb", "r1, [r0, #1]"),
+    0x20DC4E: ("ldrb", "r2, [r0]"),
+    0x20DC50: ("cmp", "r1, r2"),
+    0x20DC5E: ("movs", "r0, #4"),
+    0x20DC60: ("bl", "#0x260abc"),
+    0x20DC7E: ("movs", "r1, #1"),
+    0x20DC80: ("strb", "r1, [r0, #0x12]"),
+    0x20DC82: ("bl", "#0x296008"),
+    0x20DC86: ("movs", "r0, #0"),
+    0x20DC88: ("strh", "r0, [r4, #0xe]"),
+    0x20DC8A: ("b", "#0x20dcee"),
+    0x20DD22: ("movs", "r0, #0x71"),
+    0x20DD24: ("bl", "#0x25ef90"),
+    0x20DD6A: ("movs", "r0, #0x71"),
+    0x20DD6C: ("bl", "#0x25ef90"),
+    0x20F0AE: ("movs", "r0, #0x71"),
+    0x20F0B0: ("bl", "#0x25ef90"),
     # The task-11 dispatcher keeps the surrounding controller-status family
     # numeric.  The fixed sizes and control calls are useful lifecycle
     # boundaries, but do not by themselves name the events.
@@ -1014,8 +1054,6 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x211E4A: ("movs", "r1, #8"),
     0x211E74: ("ldr", "r0, [sp, #0x18]"),
     0x211E76: ("movs", "r1, #0x28"),
-    0x211EA6: ("movs", "r0, #0x71"),
-    0x211EA8: ("movs", "r1, #2"),
     0x211EC0: ("movs", "r0, #0x72"),
     0x211EC8: ("movs", "r0, #0x67"),
     0x211ECA: ("movs", "r1, #2"),
@@ -1207,6 +1245,10 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x20DBB2: 0x052E,
     0x20DBD4: 0x108EE0,
     0x24CEB2: 0x10A3B8,
+    0x20DC40: 0x109196,
+    0x20DC4A: 0x108ED4,
+    0x20DC66: 0x0401,
+    0x20DC70: 0x10917C,
 }
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 RA_INFO_CONSUMER = 0x20DB1C
@@ -1376,6 +1418,13 @@ CONTROLLER_RECHECK_TIMER_ARM_CALLS = [
 ]
 CONTROLLER_RECHECK_TIMER_CANCEL_CALLS = [0x212092]
 CONTROLLER_RECHECK_TIMER_QUERY_CALLS = []
+RA_INFO_TIMER_CODE = 0x71
+RA_INFO_TIMER_CONFIGURATION = bytes.fromhex("010b0000002bd70c")
+RA_INFO_TIMER_EVENT_OBJECT = 0x2BD70C
+RA_INFO_TIMER_EVENT_PREFIX = bytes.fromhex("138c0000")
+RA_INFO_TIMER_ARM_CALLS = [0x20DC2C, 0x20DCC6]
+RA_INFO_TIMER_CANCEL_CALLS = [0x20DD24, 0x20DD6C, 0x20F0B0]
+RA_INFO_TIMER_QUERY_CALLS = []
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -2872,6 +2921,32 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{expected_controller_recheck_timer_calls}, got "
             f"{controller_recheck_timer_calls}"
         )
+    ra_info_timer_calls = {}
+    for target, name in (
+        (0x25F146, "arm"),
+        (0x25EF90, "cancel"),
+        (0x25F23C, "query"),
+    ):
+        ra_info_timer_calls[name] = [
+            insn.address
+            for index, insn in enumerate(instructions)
+            if insn
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+            and call_registers(
+                instructions, index, physical, FLASH_BASE
+            ).get("r0") == RA_INFO_TIMER_CODE
+        ]
+    expected_ra_info_timer_calls = {
+        "arm": RA_INFO_TIMER_ARM_CALLS,
+        "cancel": RA_INFO_TIMER_CANCEL_CALLS,
+        "query": RA_INFO_TIMER_QUERY_CALLS,
+    }
+    if ra_info_timer_calls != expected_ra_info_timer_calls:
+        raise ValueError(
+            "NSE-3 RA_INFO timer call census changed: expected "
+            f"{expected_ra_info_timer_calls}, got {ra_info_timer_calls}"
+        )
     candidate_list_builder_calls = [
         insn.address
         for insn in instructions
@@ -3023,6 +3098,38 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 controller-recheck timer event changed: expected "
             f"{CONTROLLER_RECHECK_TIMER_EVENT_PREFIX.hex()}, got "
             f"{controller_recheck_timer_event_prefix.hex()}"
+        )
+    ra_info_timer_configuration_address = (
+        TIMER_CONFIGURATION_TABLE_ADDRESS
+        + RA_INFO_TIMER_CODE * TIMER_CONFIGURATION_RECORD_BYTES
+    )
+    ra_info_timer_configuration = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            ra_info_timer_configuration_address + index,
+        )
+        for index in range(TIMER_CONFIGURATION_RECORD_BYTES)
+    )
+    if ra_info_timer_configuration != RA_INFO_TIMER_CONFIGURATION:
+        raise ValueError(
+            "NSE-3 RA_INFO timer configuration changed: expected "
+            f"{RA_INFO_TIMER_CONFIGURATION.hex()}, got "
+            f"{ra_info_timer_configuration.hex()}"
+        )
+    ra_info_timer_event_prefix = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            RA_INFO_TIMER_EVENT_OBJECT + index,
+        )
+        for index in range(len(RA_INFO_TIMER_EVENT_PREFIX))
+    )
+    if ra_info_timer_event_prefix != RA_INFO_TIMER_EVENT_PREFIX:
+        raise ValueError(
+            "NSE-3 RA_INFO timer event changed: expected "
+            f"{RA_INFO_TIMER_EVENT_PREFIX.hex()}, got "
+            f"{ra_info_timer_event_prefix.hex()}"
         )
     type_0x8c_fixed_object = bytes(
         cpu_byte(physical, FLASH_BASE, 0x2BCFA8 + index)
@@ -3281,6 +3388,31 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                         "numeric_control": {"code": 0x71, "argument": 0},
                         "timer_code": 0x71,
                         "duration_is_runtime_derived": True,
+                        "timer": {
+                            "configuration_address":
+                                ra_info_timer_configuration_address,
+                            "flags": ra_info_timer_configuration[0],
+                            "owner_task": ra_info_timer_configuration[1],
+                            "expiry_event_object":
+                                RA_INFO_TIMER_EVENT_OBJECT,
+                            "expiry_status": 0x138C,
+                            "arm_calls": ra_info_timer_calls["arm"],
+                            "ra_info_arm": 0x20DC2C,
+                            "other_controller_arm": 0x20DCC6,
+                            "cancel_calls": ra_info_timer_calls["cancel"],
+                            "query_calls": ra_info_timer_calls["query"],
+                            "duration_provider": 0x2A4AC4,
+                            "duration_unit": "not_established",
+                            "expiry_task_case": 0x211EA6,
+                            "expiry_control_argument": 2,
+                            "expiry_suppressed_controller_values": [1],
+                            "expiry_consumer": RA_INFO_CONSUMER,
+                            "expiry_consumer_branch": 0x20DC40,
+                            "expiry_requires_pending_counters_equal": True,
+                            "pending_counter_object": 0x108ED4,
+                            "direct_expiry_rearm": False,
+                            "direct_radio_constructor": None,
+                        },
                     },
                 },
                 "direct_bitmap_search_constructor": None,

@@ -351,6 +351,22 @@ individual task-17 state paths remain to be recovered, but this fixed
 boundary rules out treating the derived object itself as a direct radio
 request.
 
+The alternative timer path is exact too. Timer-table record `0x2b7958` is
+`01 0b 00 00 00 2b d7 0c`: flags 1, task-11 ownership and fixed expiry
+status `0x138c`. A whole-image census finds two arms, at `0x20dc2c` from
+the RA_INFO byte-`0x18 == 1` path and `0x20dcc6` from a separate controller
+event. Both obtain a runtime duration through `0x2a4ac4`. There are three
+cancellations (`0x20dd24`, `0x20dd6c`, `0x20f0b0`) and no query.
+
+Task-11 expiry case `0x211ea6` publishes numeric control `(0x71, 2)`,
+suppresses further work at controller substate 1, and otherwise returns to
+the uniquely called general consumer `0x20db1c`. Its status-`0x138c` branch
+at `0x20dc40` clears a controller flag, requires the two pending counters in
+`0x108ed4` to agree, prepares a four-byte internal status object if needed,
+and resets controller bookkeeping through `0x296008` and `0x20d1a4`. It
+does not directly rearm timer `0x71` or call a radio request constructor.
+The timer unit and the meaning of its runtime duration remain unknown.
+
 Thus the NSE-3 `RA_INFO` boundary carries compact control/timing data into
 the controller; it is not a zero-body completion like the direct type-`0x89`
 handler. The exact path calls neither the type-`0x1a` bitmap builder nor
