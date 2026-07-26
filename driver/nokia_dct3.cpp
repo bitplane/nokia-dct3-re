@@ -313,17 +313,20 @@ constexpr nokia_product_config make_6110_config()
 	// The external image also bounds task 9's 011c..0120 event dispatch and
 	// family-specific counter policy, but neither the event timer units nor
 	// the missing DSP's trigger policy.
-	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
-	// transfer geometry rather than evidence for the HLE peer's completion
-	// counter. A separate ROM4 HLE can acknowledge all 64 blocks and still
-	// leaves this exact image waiting for a non-zero final publication at
-	// 0x10002. NSE-3 later compares captured shared word 0x10000 against
+	// All three recovered NSE-3 images statically prove 64 alternating sparse
+	// flash-verification blocks. Own that exact transport count here rather
+	// than inheriting the conservative product default. A separate ROM4 HLE
+	// can acknowledge all 64 blocks and still leaves the exact v4.06 image
+	// waiting for a non-zero final publication at 0x10002. NSE-3 later
+	// compares captured shared word 0x10000 against
 	// 0x0b06, so the generic HLE ready words of 1 are demonstrably
 	// incompatible. Both v5.48 variants require the same value despite a real
 	// handset reporting fitted COBBA B07, so this is typed only as a firmware
 	// result, not a physical-silicon identity. Publish that evidenced first
-	// result while deliberately leaving the unknown second word zero, and keep
-	// the peer disabled pending its DSP-side semantics.
+	// result while deliberately leaving the unknown verdict untouched (reset
+	// zero in v4.06; MCU-parked 0xffff in v5.48), and keep the peer disabled
+	// pending DSP evidence.
+	result.dsp_bootstrap_exchanges = 64;
 	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::nse3_flash_verification_b06_verdict_unknown;
 	// The external MCU image correlates its 70 0d request with a framed
 	// type-74 completion through controller bit 2 and timer 14. NSE-8's exact

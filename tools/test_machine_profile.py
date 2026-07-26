@@ -93,6 +93,7 @@ class MachineProfileTest(unittest.TestCase):
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
                 "nse3_bootstrap_selected_by_bios": "true",
+                "dsp_bootstrap_exchanges": "64",
                 "cobba_pcm.data_clock": "1'000'000",
                 "cobba_pcm.frame_clock": "8'000",
                 "cobba_pcm.sample_bits": "13",
