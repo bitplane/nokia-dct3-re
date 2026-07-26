@@ -1168,6 +1168,41 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.EXTERNAL_SERVICE_DELAY_TIMER_ARMS,
         )
 
+    def test_external_service_mode_organically_selects_startup_type_0x70(self):
+        self.assertEqual(0x10B970, check.EXTERNAL_SERVICE_MODE_CELL)
+        self.assertEqual(
+            ("strb", "r4, [r0]"),
+            check.EXTERNAL_SERVICE_MODE_STARTUP_ANCHORS[0x285B1E],
+        )
+        self.assertEqual(
+            ("strb", "r0, [r4]"),
+            check.EXTERNAL_SERVICE_MODE_STARTUP_ANCHORS[0x285EB2],
+        )
+        self.assertEqual(
+            0x100E4,
+            check.EXTERNAL_SERVICE_MODE_STARTUP_LITERALS[0x285EA8],
+        )
+        self.assertEqual(
+            [0x29F31A],
+            check.EXTERNAL_SERVICE_MODE_PROMOTION_HANDLER_CALLS,
+        )
+        self.assertEqual(
+            [0x237B4C, 0x28EC52],
+            check.EXTERNAL_SERVICE_MODE_GETTER_CALLS,
+        )
+        self.assertEqual(
+            0x10FD78,
+            check.EXTERNAL_SERVICE_MODE_STARTUP_LITERALS[0x237AA6],
+        )
+        self.assertEqual(
+            bytes.fromhex("02007002"),
+            check.EXTERNAL_SERVICE_STARTUP_OBJECT,
+        )
+        self.assertEqual(
+            [0x237B78],
+            check.EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS,
+        )
+
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
         image[0x40:0x42] = b"\x12\x34"

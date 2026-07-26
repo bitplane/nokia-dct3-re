@@ -815,6 +815,22 @@ command. A future service peer can implement that initiator only when its
 trigger is independently evidenced; it need not and must not poke the
 controller byte.
 
+The prerequisite bit-2 path is also firmware-owned. DSPIF setup writes mode
+byte `0x10b970` to zero. Handler `0x285e7c`, reached from its sole direct
+dispatch call at `0x29f31a`, promotes that byte to one only when its current
+value and shared halfword `0x100e4` are both zero. Getter `0x297104` returns
+the byte unchanged and has exactly two direct callers.
+
+Task-2 initialization is the only caller of initializer `0x237a7a`. When the
+getter returns one, it sets controller bit 2 and uniquely submits the fixed
+task-3 object at `0x2b9be8`, whose bytes are `02 00 70 02`: queue status 2,
+zero declared payload, type `0x70`, and local byte 3 value 2. This supplies an
+organic upstream condition for the delayed command-`0x64` response. It does
+not prove what the mode represents, who causes the shared `0x100e4`
+condition, or that this empty task-3 type `0x70` is semantically the same as
+the later class-`0x40` application command `0x70`. They remain separately
+typed transports until a trace or DSP-side implementation connects them.
+
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,
 or the complete ordering around discovery and acknowledgements. Those facts

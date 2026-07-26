@@ -2323,6 +2323,59 @@ EXTERNAL_SERVICE_DELAY_TIMER_ARMS = {
     0x23A5F8: 0x0019,
     0x28FAE4: 0x007D,
 }
+EXTERNAL_SERVICE_MODE_STARTUP_ANCHORS = {
+    # DSPIF initialization writes zero to the mode byte.
+    0x285A3C: ("movs", "r4, #0"),
+    0x285B1C: ("ldr", "r0, [pc, #0x3a8]"),
+    0x285B1E: ("strb", "r4, [r0]"),
+    # A separately dispatched handler promotes mode zero to one only while
+    # shared halfword 0x100e4 is also zero.
+    0x285E9E: ("ldr", "r4, [pc, #0x28]"),
+    0x285EA2: ("ldrb", "r0, [r4]"),
+    0x285EA4: ("cmp", "r0, #0"),
+    0x285EA8: ("ldr", "r0, [pc, #0x1d8]"),
+    0x285EAA: ("ldrh", "r0, [r0]"),
+    0x285EAC: ("cmp", "r0, #0"),
+    0x285EB0: ("movs", "r0, #1"),
+    0x285EB2: ("strb", "r0, [r4]"),
+    0x29F31A: ("bl", "#0x285e7c"),
+    # The two-caller getter returns the byte unchanged.
+    0x297104: ("ldr", "r0, [pc, #0x3ac]"),
+    0x297106: ("ldrb", "r0, [r0]"),
+    0x297108: ("mov", "pc, lr"),
+    # Task-2 initialization is the sole caller of its initializer.  Mode one
+    # sets controller bit 2 and submits one fixed empty type-0x70 object.
+    0x23A5D0: ("bl", "#0x237a7a"),
+    0x237AA4: ("movs", "r6, #0x69"),
+    0x237AA6: ("ldr", "r5, [pc, #0x2b0]"),
+    0x237B4C: ("bl", "#0x297104"),
+    0x237B50: ("cmp", "r0, #1"),
+    0x237B6C: ("ldrb", "r1, [r6, r5]"),
+    0x237B6E: ("movs", "r0, #4"),
+    0x237B70: ("orrs", "r0, r1"),
+    0x237B72: ("strb", "r0, [r6, r5]"),
+    0x237B74: ("movs", "r0, #3"),
+    0x237B76: ("ldr", "r1, [pc, #0x2e8]"),
+    0x237B78: ("bl", "#0x25fb4c"),
+}
+EXTERNAL_SERVICE_MODE_STARTUP_LITERALS = {
+    0x285B1C: 0x10B970,
+    0x285E9E: 0x10B970,
+    0x285EA8: 0x100E4,
+    0x297104: 0x10B970,
+    0x237AA6: 0x10FD78,
+    0x237B76: 0x2B9BE8,
+}
+EXTERNAL_SERVICE_MODE_CELL = 0x10B970
+EXTERNAL_SERVICE_MODE_PROMOTION_HANDLER = 0x285E7C
+EXTERNAL_SERVICE_MODE_PROMOTION_HANDLER_CALLS = [0x29F31A]
+EXTERNAL_SERVICE_MODE_GETTER = 0x297104
+EXTERNAL_SERVICE_MODE_GETTER_CALLS = [0x237B4C, 0x28EC52]
+EXTERNAL_SERVICE_TASK_2_INITIALIZER = 0x237A7A
+EXTERNAL_SERVICE_TASK_2_INITIALIZER_CALLS = [0x23A5D0]
+EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS = 0x2B9BE8
+EXTERNAL_SERVICE_STARTUP_OBJECT = bytes.fromhex("02007002")
+EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS = [0x237B78]
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -3435,6 +3488,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_MODE_STARTUP_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
@@ -3443,6 +3497,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, TYPE_0X03_CONTROL_LITERALS)
     verify_thumb_literals(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS)
     verify_thumb_literals(data, EXTERNAL_SERVICE_DELAYED_STATUS_LITERALS)
+    verify_thumb_literals(data, EXTERNAL_SERVICE_MODE_STARTUP_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -3987,6 +4042,92 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 external-service delay-timer arms changed: expected "
             f"{EXTERNAL_SERVICE_DELAY_TIMER_ARMS}, got "
             f"{external_service_delay_timer_arms}"
+        )
+    external_service_mode_promotion_handler_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn)
+        == EXTERNAL_SERVICE_MODE_PROMOTION_HANDLER
+    ]
+    if (
+        external_service_mode_promotion_handler_calls
+        != EXTERNAL_SERVICE_MODE_PROMOTION_HANDLER_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 external-service mode-promotion calls changed: expected "
+            f"{EXTERNAL_SERVICE_MODE_PROMOTION_HANDLER_CALLS}, got "
+            f"{external_service_mode_promotion_handler_calls}"
+        )
+    external_service_mode_getter_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == EXTERNAL_SERVICE_MODE_GETTER
+    ]
+    if (
+        external_service_mode_getter_calls
+        != EXTERNAL_SERVICE_MODE_GETTER_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 external-service mode-getter calls changed: expected "
+            f"{EXTERNAL_SERVICE_MODE_GETTER_CALLS}, got "
+            f"{external_service_mode_getter_calls}"
+        )
+    external_service_task_2_initializer_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == EXTERNAL_SERVICE_TASK_2_INITIALIZER
+    ]
+    if (
+        external_service_task_2_initializer_calls
+        != EXTERNAL_SERVICE_TASK_2_INITIALIZER_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 task-2 initializer calls changed: expected "
+            f"{EXTERNAL_SERVICE_TASK_2_INITIALIZER_CALLS}, got "
+            f"{external_service_task_2_initializer_calls}"
+        )
+    external_service_startup_object = physical[
+        EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS - FLASH_BASE:
+        EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS - FLASH_BASE
+        + len(EXTERNAL_SERVICE_STARTUP_OBJECT)
+    ]
+    if external_service_startup_object != EXTERNAL_SERVICE_STARTUP_OBJECT:
+        raise ValueError(
+            "NSE-3 external-service startup object changed: expected "
+            f"{EXTERNAL_SERVICE_STARTUP_OBJECT.hex()}, got "
+            f"{external_service_startup_object.hex()}"
+        )
+    external_service_startup_object_submit_calls = []
+    for index, insn in enumerate(instructions):
+        if (
+            not insn
+            or insn.mnemonic not in ("bl", "blx")
+            or immediate_target(insn) != 0x25FB4C
+        ):
+            continue
+        registers = call_registers(
+            instructions, index, physical, FLASH_BASE
+        )
+        if (
+            registers["r0"] == 3
+            and registers["r1"]
+            == EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS
+        ):
+            external_service_startup_object_submit_calls.append(insn.address)
+    if (
+        external_service_startup_object_submit_calls
+        != EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 external-service startup-object submissions changed: "
+            f"expected {EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS}, got "
+            f"{external_service_startup_object_submit_calls}"
         )
     task_11_event_jump_table = {
         status: effective_u32(
@@ -5250,6 +5391,49 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     "single_boolean_verdict": False,
                     "external_v548_address_portable_as_semantics": False,
                     "bit_semantics_assigned": False,
+                },
+                "startup_mode": {
+                    "cell": EXTERNAL_SERVICE_MODE_CELL,
+                    "initialization": {
+                        "value": 0,
+                        "writer": 0x285B1E,
+                    },
+                    "conditional_promotion": {
+                        "handler":
+                            EXTERNAL_SERVICE_MODE_PROMOTION_HANDLER,
+                        "handler_calls":
+                            external_service_mode_promotion_handler_calls,
+                        "required_current_value": 0,
+                        "required_shared_halfword": 0x100E4,
+                        "required_shared_halfword_value": 0,
+                        "new_value": 1,
+                        "writer": 0x285EB2,
+                    },
+                    "getter": EXTERNAL_SERVICE_MODE_GETTER,
+                    "getter_calls": external_service_mode_getter_calls,
+                    "task_2_initializer":
+                        EXTERNAL_SERVICE_TASK_2_INITIALIZER,
+                    "task_2_initializer_calls":
+                        external_service_task_2_initializer_calls,
+                    "mode_1_action": {
+                        "sets_controller_bit": 2,
+                        "fixed_object": {
+                            "address":
+                                EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS,
+                            "bytes": list(
+                                external_service_startup_object
+                            ),
+                            "queue_status": 2,
+                            "declared_payload_bytes": 0,
+                            "type": 0x70,
+                            "local_metadata": 2,
+                            "destination_task": 3,
+                            "submit_calls":
+                                external_service_startup_object_submit_calls,
+                        },
+                    },
+                    "class_0x40_command_0x70_equivalence_proven": False,
+                    "mode_semantics_assigned": False,
                 },
                 "delayed_command_0x64_body_2": {
                     "intercept": 0x23A5D8,

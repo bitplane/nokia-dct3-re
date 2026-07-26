@@ -48,6 +48,14 @@ The timer has three other arms and the initiating DSP condition remains
 unknown, so this bounds a response contract without enabling or scripting the
 peer.
 
+The bit-2 prerequisite is now bounded too. DSPIF initialization writes mode
+cell `0x10b970` to zero; a uniquely dispatched handler can promote it to one
+only while shared halfword `0x100e4` is zero. Task-2 initialization maps mode
+one to controller bit 2 and uniquely submits fixed empty task-3 type `0x70`.
+No equivalence is claimed between that publication and class-`0x40` command
+`0x70`, and the missing DSP-side condition still prevents peer enablement or
+coverage promotion.
+
 ## Promotion rules
 
 The levels are cumulative:
