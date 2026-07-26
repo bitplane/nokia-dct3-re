@@ -226,6 +226,12 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             [check.DSP_PARAMETER_08_LITERALS[address]
              for address in (0x2837D8, 0x283AE8)],
         )
+        self.assertEqual(0x076F, check.DSP_PARAMETER_EVENT_BASE)
+        self.assertEqual(10, len(check.DSP_PARAMETER_EVENT_TARGETS))
+        self.assertEqual(
+            [0x259442, 0x259442],
+            check.DSP_PARAMETER_EVENT_TARGETS[6:8],
+        )
 
     def test_dsp_bootstrap_result_rejects_generic_ready_one(self):
         physical = bytearray(b"\xff" * check.FLASH_SIZE)

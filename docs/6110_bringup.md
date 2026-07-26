@@ -237,6 +237,15 @@ publication copies the live halfword into its shadow. This proves that command
 prove which higher call-control transition selects those table entries or
 what speech meaning, if any, belongs to their bits.
 
+The upstream dispatcher is now bounded as well. An exact ten-entry table at
+`0x257f40` covers messages `0x076f..0x0778`. Within it,
+`0x076f/0x0770`, `0x0773/0x0774`, and `0x0777/0x0778` respectively
+set/clear masks `0x02`, `0x04`, and `0x10` in controller flag cell
+`0x10ae9f`, then immediately call the parameter-state updater. Messages
+`0x0775/0x0776` are explicit no-ops in this table; the other two entries
+route to separate handlers. This establishes paired event lifecycles on the
+MCU side without naming any pair as call Answer, End, or a DSP speech route.
+
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
 high-nibble-command/low-twelve-value decoder, but leaves the independent

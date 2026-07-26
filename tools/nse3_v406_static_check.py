@@ -338,6 +338,54 @@ RADIO_REPORT_JUMP_TABLE = {
     0x8F: 0x2A2154,
 }
 DSP_PARAMETER_08_ANCHORS = {
+    # A bounded message dispatcher maps 0x076f..0x0778 through this exact
+    # ten-entry table.  Three entries are paired controller-flag setters and
+    # clearers that immediately run the parameter-state updater.
+    0x257F34: ("lsls", "r0, r0, #2"),
+    0x257F36: ("ldr", "r1, [pc, #0x3cc]"),
+    0x257F38: ("subs", "r1, r0, r1"),
+    0x257F3A: ("adr", "r0, #4"),
+    0x257F3C: ("ldr", "r0, [r0, r1]"),
+    0x257F3E: ("mov", "pc, r0"),
+    # Message 0x076f/0x0770 sets/clears controller flag 0x02.
+    0x2910AE: ("push", "{lr}"),
+    0x2910B0: ("ldr", "r0, [pc, #0x328]"),
+    0x2910B6: ("ldr", "r1, [pc, #0x31c]"),
+    0x2910B8: ("movs", "r0, #2"),
+    0x2910BC: ("orrs", "r0, r2"),
+    0x2910C0: ("bl", "#0x283560"),
+    0x2910C6: ("push", "{lr}"),
+    0x2910C8: ("ldr", "r0, [pc, #0x314]"),
+    0x2910CE: ("ldr", "r1, [pc, #0x304]"),
+    0x2910D0: ("movs", "r0, #0xfd"),
+    0x2910D4: ("ands", "r0, r2"),
+    0x2910D8: ("bl", "#0x283560"),
+    # Message 0x0773/0x0774 sets/clears controller flag 0x04.
+    0x2910DE: ("push", "{lr}"),
+    0x2910E0: ("ldr", "r0, [pc, #0x300]"),
+    0x2910E6: ("ldr", "r1, [pc, #0x2ec]"),
+    0x2910E8: ("movs", "r0, #4"),
+    0x2910EC: ("orrs", "r0, r2"),
+    0x2910F0: ("bl", "#0x283560"),
+    0x2910F6: ("push", "{lr}"),
+    0x2910F8: ("ldr", "r0, [pc, #0x2ec]"),
+    0x2910FE: ("ldr", "r1, [pc, #0x2d4]"),
+    0x291100: ("movs", "r0, #0xfb"),
+    0x291104: ("ands", "r0, r2"),
+    0x291108: ("bl", "#0x283560"),
+    # Message 0x0777/0x0778 sets/clears controller flag 0x10.
+    0x291334: ("push", "{lr}"),
+    0x291336: ("ldr", "r0, [pc, #0x128]"),
+    0x29133C: ("ldr", "r1, [pc, #0x94]"),
+    0x29133E: ("movs", "r0, #0x10"),
+    0x291342: ("orrs", "r0, r2"),
+    0x291346: ("bl", "#0x283560"),
+    0x29134C: ("push", "{lr}"),
+    0x29134E: ("ldr", "r0, [pc, #0x114]"),
+    0x291354: ("ldr", "r1, [pc, #0x7c]"),
+    0x291356: ("movs", "r0, #0xef"),
+    0x29135A: ("ands", "r0, r2"),
+    0x29135E: ("bl", "#0x283560"),
     # Generic DSP parameter writer: selector r0 is bounded to 0x00..0x2e and
     # dispatched through the adjacent table.
     0x285B7C: ("push", "{r4, r5, r6, r7, lr}"),
@@ -399,6 +447,19 @@ DSP_PARAMETER_08_ANCHORS = {
     0x283D6E: ("bl", "#0x285b7c"),
 }
 DSP_PARAMETER_08_LITERALS = {
+    0x257F36: 0x1DBC,
+    0x2910B0: 0x7809,
+    0x2910B6: 0x10AE9F,
+    0x2910C8: 0x780A,
+    0x2910CE: 0x10AE9F,
+    0x2910E0: 0x7807,
+    0x2910E6: 0x10AE9F,
+    0x2910F8: 0x7808,
+    0x2910FE: 0x10AE9F,
+    0x291336: 0x780D,
+    0x29133C: 0x10AE9F,
+    0x29134E: 0x780E,
+    0x291354: 0x10AE9F,
     0x285DE8: 0xFFFF8000,
     0x285DF0: 0x10B972,
     0x285D22: 0x100A8,
@@ -418,6 +479,20 @@ DSP_PARAMETER_SELECTOR_TABLE_ADDRESS = 0x2B85EC
 DSP_PARAMETER_SELECTOR_TABLE = bytes(
     [0x08, 0x09, 0x1B, 0x25, 0x20, 0x21, 0x22, 0x23, 0x24, 0x28, 0x2D]
 )
+DSP_PARAMETER_EVENT_TABLE_ADDRESS = 0x257F40
+DSP_PARAMETER_EVENT_BASE = 0x076F
+DSP_PARAMETER_EVENT_TARGETS = [
+    0x25912C,
+    0x259126,
+    0x25911C,
+    0x259110,
+    0x259106,
+    0x259100,
+    0x259442,
+    0x259442,
+    0x2590FA,
+    0x2590F4,
+]
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
     0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
@@ -891,6 +966,17 @@ def verify_dsp_parameter_08_boundary(data: bytes) -> dict:
             "NSE-3 DSP parameter state selector table changed: expected "
             f"{DSP_PARAMETER_SELECTOR_TABLE.hex()}, got {selectors.hex()}"
         )
+    event_table_offset = DSP_PARAMETER_EVENT_TABLE_ADDRESS - FLASH_BASE
+    event_targets = list(
+        struct.unpack_from(
+            f">{len(DSP_PARAMETER_EVENT_TARGETS)}I", data, event_table_offset
+        )
+    )
+    if event_targets != DSP_PARAMETER_EVENT_TARGETS:
+        raise ValueError(
+            "NSE-3 DSP parameter event table changed: expected "
+            f"{DSP_PARAMETER_EVENT_TARGETS}, got {event_targets}"
+        )
     return {
         "writer": 0x285B7C,
         "selector": 0x08,
@@ -910,6 +996,21 @@ def verify_dsp_parameter_08_boundary(data: bytes) -> dict:
             "indexed_value_tables": [0x2B85F8, 0x2B860C],
             "operation": "(previous & selected_mask) | indexed_value",
             "inside_controller_updater": True,
+        },
+        "controller_event_dispatch": {
+            "message_range": [
+                DSP_PARAMETER_EVENT_BASE,
+                DSP_PARAMETER_EVENT_BASE + len(event_targets) - 1,
+            ],
+            "table": DSP_PARAMETER_EVENT_TABLE_ADDRESS,
+            "targets": event_targets,
+            "paired_flag_transitions": [
+                {"set": 0x076F, "clear": 0x0770, "mask": 0x02},
+                {"set": 0x0773, "clear": 0x0774, "mask": 0x04},
+                {"set": 0x0777, "clear": 0x0778, "mask": 0x10},
+            ],
+            "flag_cell": 0x10AE9F,
+            "speech_semantics": "not_established",
         },
         "organic_answer_value": "not_established",
         "organic_end_value": "not_established",
