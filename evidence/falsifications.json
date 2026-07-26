@@ -647,7 +647,13 @@
     {
       "id": "nhm5_paging_stall_is_short_runtime", "status": "disproven",
       "hypothesis": "NHM-5 paging appears stalled only because the nine-second fixture ends before the admission latency observed on the proven NSE-8 path",
-      "conclusion": "The NSE-8 comparison receives its page at 16.980246 seconds and does not emit the paged RACH until 30.620707 seconds. A 32-second NHM-5 run covers the same post-page interval: after its page at 7.731663 seconds it performs correlated serving-channel changes and emits outbound DSP type 0x57/03050000 at 10.120796 seconds, but no later random access occurs. Runtime length is excluded; the type-0x57 consumer and the firmware event handoff remain unproved boundaries.",
+      "conclusion": "The NSE-8 comparison receives its page at 16.980246 seconds and does not emit the paged RACH until 30.620707 seconds. A 32-second NHM-5 run covers the same post-page interval: after its page at 7.731663 seconds it performs correlated serving-channel changes and emits outbound DSP type 0x57/03050000 at 10.120796 seconds, but no later random access occurs. Runtime length is excluded; subsequent constructor and event provenance also exclude type 0x57 as a page-specific reply boundary, leaving the firmware event handoff into paging admission unresolved.",
+      "evidence": ["docs/model_coverage.md"]
+    },
+    {
+      "id": "nhm5_paging_waits_for_type57_dsp_reply", "status": "disproven",
+      "hypothesis": "NHM-5 stops after outbound DSP type 0x57/03050000 because the emulator does not return its required acknowledgement",
+      "conclusion": "Runtime provenance identifies RR result 0x07d4 mapping to internal event 0x03ec at 0x2557d6..0x2557ea. The radio task receives type-c8 state, calls constructor 0x2a7fa0 from 0x232144 with arguments (3,0), publishes the exact four-byte body and proceeds directly through generic object release to its next event receive. No type-0x57-specific wait or response state exists. RR also produces event 0x03ec before the addressed page at 5.632798 seconds and after it at 10.119838 seconds. Type 0x57 is a state-selected channel/measurement terminal, not the missing page-admission handshake, and synthesising a DSP reply would be unsupported.",
       "evidence": ["docs/model_coverage.md"]
     }
   ]

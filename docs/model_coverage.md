@@ -218,10 +218,23 @@ or bypassing the parser would cross the current evidence boundary.
 
 The intervening type `0x57` is an outbound MCU-to-DSP publication, not an
 inbound `NO_PSW_FOUND` report, and its four-byte body is retained verbatim in
-the trace. The current peer has no reply contract for that packet. A reply
-must not be invented merely because it is the final outbound packet before
-the stall; its consumer and response semantics remain to be recovered from
-DSP-side evidence.
+the trace. Its firmware lifecycle is now bounded independently of the DSP.
+RR result `0x07d4` selects internal event `0x03ec` at `0x2557d6..0x2557ea`;
+the generic event builder `0x2a6d68` posts that event to the radio task's
+third event slot. The active radio-task branch receives an object of type
+`0xc8`, calls the type-`0x57` constructor at `0x2a7fa0` from `0x232144` with
+arguments `(3, 0)`, then branches directly to ordinary object release and the
+next event receive at `0x2324f0`. The constructor forms the exact body
+`03 05 00 00`: `0x2a7b4a` encodes selector three and table index zero into
+the first two bytes.
+
+There is no type-`0x57`-specific acknowledgement state after publication.
+Moreover RR produces the same internal `0x03ec` event at 5.632798 seconds,
+before the addressed page, and again at 10.119838 seconds; only the later
+radio-task state selects the observed terminal publication. Thus `0x57` is
+not a page-specific request/reply boundary and must not gain a synthetic DSP
+response. The paging failure remains the earlier missing firmware event that
+would transfer the saved parser result through `0x255ff8`.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
