@@ -67,6 +67,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 			type22 = "22" * 32
 			sch = "4012000000000058" + "00" * 26
 			configure = "04120200000000505000005800000000000a98fa"
+			si1 = "50120000000000580000" + "550619" + "00" * 5 + "80" + "00" * 15
 			path.write_text(
 				line(0x20, type20, 0.1)
 				+ line(0x21, type21 + "00000319", 0.2)
@@ -80,7 +81,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ rx_line(0x8F, "00" * 8, 2.3)
 				+ rx_line(0x89, "00" * 8, 2.4)
 				+ rx_line(0x84, "00" * 8, 2.5)
-				+ rx_line(0x80, "5012" + "00" * 32, 2.6)
+				+ rx_line(0x80, si1, 2.6)
 			)
 			check_nhm5_search(path)
 
@@ -92,6 +93,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 			type22 = "22" * 32
 			sch = "4012000000000058" + "00" * 26
 			configure = "04120200000000505000005800000000000a98fa"
+			si1 = "50120000000000580000" + "550619" + "00" * 5 + "80" + "00" * 15
 			path.write_text(
 				line(0x20, type20, 0.1)
 				+ line(0x21, type21 + "00000319", 0.2)
@@ -105,7 +107,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ rx_line(0x8F, "00" * 8, 2.3)
 				+ rx_line(0x89, "00" * 8, 2.4)
 				+ rx_line(0x84, "00" * 8, 2.5)
-				+ rx_line(0x80, "5012" + "00" * 32, 2.6)
+				+ rx_line(0x80, si1, 2.6)
 				+ rx_line(0x8A, "0058" + "00" * 6, 2.7)
 			)
 			with self.assertRaises(SystemExit):

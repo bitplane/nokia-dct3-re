@@ -150,6 +150,11 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 	channel_changed = first("rx", 0x89, no_psw_left["time"] if no_psw_left else search["time"])
 	ra_info = first("rx", 0x84, channel_changed["time"] if channel_changed else search["time"])
 	bcch = first("rx", 0x80, ra_info["time"] if ra_info else search["time"])
+	si1 = next((packet for packet in packets
+			if packet["direction"] == "rx" and packet["type"] == 0x80
+			and packet["time"] >= (ra_info["time"] if ra_info else search["time"])
+			and (data := bytes.fromhex(packet["data"]))[0] == 0x50
+			and data[12] == 0x19), None)
 	no_psw_found = first("rx", 0x8A, search["time"])
 
 	if sch is None or sch["length"] != 34:
@@ -166,6 +171,12 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 		raise SystemExit("NHM-5 channel-change completion sequence is incomplete")
 	if bcch is None or bytes.fromhex(bcch["data"])[0] != 0x50:
 		raise SystemExit("NHM-5 did not reach serving BCCH reception")
+	if si1 is None:
+		raise SystemExit("NHM-5 serving BCCH did not carry SI1")
+	si1_data = bytes.fromhex(si1["data"])[10:]
+	if si1_data[8] != 0x80 or any(si1_data[index]
+			for index in range(3, 19) if index != 8):
+		raise SystemExit("NHM-5 SI1 does not advertise its selected ARFCN 0x0058")
 	if no_psw_found is not None:
 		raise SystemExit("NHM-5 successful acquisition also received NO_PSW_FOUND")
 	if not (
@@ -176,7 +187,8 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 		raise SystemExit("NHM-5 acquisition transaction order changed")
 	print(
 		"NHM-5 acquisition: 56/160 candidate 0058 -> SCH -> organic 02/20 "
-		"CHANNEL_CONFIGURE -> NO_PSW_LEFT -> CHANNEL_CHANGED_CNF -> RA_INFO -> BCCH"
+		"CHANNEL_CONFIGURE -> NO_PSW_LEFT -> CHANNEL_CHANGED_CNF -> RA_INFO -> "
+		"BCCH SI1 advertising 0058"
 	)
 
 

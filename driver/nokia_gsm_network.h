@@ -30,7 +30,7 @@ public:
 	nokia_gsm_network_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
-	const std::array<u8, 24> &system_information(unsigned index) const;
+	std::array<u8, 24> system_information(unsigned index, u16 serving_arfcn) const;
 	std::array<u8, 24> paging_fill() const;
 	std::array<u8, 24> paging_request(
 			const u8 *mobile_identity, unsigned length) const;

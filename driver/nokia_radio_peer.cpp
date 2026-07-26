@@ -1266,12 +1266,17 @@ void nokia_radio_peer_device::emit_report()
 			// block when revalidating an already active serving channel.
 			static constexpr std::array<unsigned, 8> SI_BY_TC = { 0, 1, 2, 3, 1, 1, 2, 3 };
 			const unsigned tc = (frame_number / 51) & 7;
-			const auto &system_information = m_gsm_network->system_information(SI_BY_TC[tc]);
+			const auto system_information =
+					m_gsm_network->system_information(SI_BY_TC[tc], m_serving_arfcn);
 			std::copy(system_information.begin(), system_information.end(), std::begin(payload) + 10);
 		}
 		else
-			std::copy(m_gsm_network->system_information(2).begin(),
-					m_gsm_network->system_information(2).end(), std::begin(payload) + 10);
+		{
+			const auto system_information =
+					m_gsm_network->system_information(2, m_serving_arfcn);
+			std::copy(system_information.begin(), system_information.end(),
+					std::begin(payload) + 10);
+		}
 	}
 
 	if (report_type == 0x83)

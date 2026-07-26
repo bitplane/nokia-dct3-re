@@ -9,14 +9,14 @@ DEFINE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device,
 
 namespace {
 
-// Minimum broadcast set for a GSM 900 cell on ARFCN 1. The reserved test PLMN
+// Minimum broadcast set for a GSM 900 cell. The reserved test PLMN
 // 001-01 avoids coupling the synthetic network to handset network-lock data;
 // LAC and cell ID are both 1.
 constexpr std::array<std::array<u8, 24>, 4> SYSTEM_INFORMATION = {{
-	// SI1 Cell Channel Description uses GSM bitmap-0 format. ARFCN 1 is
-	// bit 0 of the final octet in that 16-octet field.
+	// SI1 Cell Channel Description uses GSM bitmap-0 format. The serving
+	// carrier is inserted by system_information().
 	{{ 0x55, 0x06, 0x19,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0x2b, 0 }},
 	{{ 0x59, 0x06, 0x1a, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0xff, 0, 0, 0, 0 }},
@@ -40,9 +40,21 @@ void nokia_gsm_network_device::device_start()
 {
 }
 
-const std::array<u8, 24> &nokia_gsm_network_device::system_information(unsigned index) const
+std::array<u8, 24> nokia_gsm_network_device::system_information(
+		unsigned index, u16 serving_arfcn) const
 {
-	return SYSTEM_INFORMATION[index % SYSTEM_INFORMATION.size()];
+	std::array<u8, 24> result =
+			SYSTEM_INFORMATION[index % SYSTEM_INFORMATION.size()];
+	if ((index % SYSTEM_INFORMATION.size()) == 0 &&
+			serving_arfcn >= 1 && serving_arfcn <= 124)
+	{
+		// TS 44.018 10.5.2.1b bitmap-0: ARFCN 1 is bit 0 of octet 18,
+		// and the remaining GSM-900 carriers run backwards through the
+		// sixteen-octet Cell Channel Description.
+		const unsigned bit = serving_arfcn - 1;
+		result[18 - bit / 8] |= 1U << (bit & 7);
+	}
+	return result;
 }
 
 std::array<u8, 24> nokia_gsm_network_device::paging_fill() const
