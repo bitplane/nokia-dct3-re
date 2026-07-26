@@ -30,6 +30,7 @@ distinction.
 | `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |
 | `cross_rom_confidence.md` | Cross-product and cross-ROM boot, idle, and input evidence. |
+| `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `structural_regression.md` | Acceptance profiles, semantic predicates, and frame oracles. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
 | `research_cleanup.md` | Repeatable cleanup protocol for hypotheses, naming residue, diagnostics, and evidence retention. |
