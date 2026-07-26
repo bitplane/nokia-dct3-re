@@ -225,7 +225,15 @@ pairs from a nine-entry table. Every selector-8 input in that table is
 This proves a real command codec and one service-mode caller, not that
 `0x8600` means Answer, speech enable, or any particular audio route.
 
-No organic Answer or End caller has yet been connected to this writer.
+The ordinary DSP-parameter updater supplies a second, non-service path. It
+compares live and shadow halfwords, then maps changed slots through the exact
+selector sequence `08,09,1b,25,20,21,22,23,24,28,2d`; selector 8 is slot
+zero. This proves that command 8 participates in normal parameter-state
+publication without proving which higher call-control transition changes
+slot zero or what value it writes.
+
+No organic Answer or End transition has yet been connected to that state
+slot.
 Consequently the 6110 product keeps its DSP speech-control configuration
 disabled. In particular, neither NSE-8's `0x0201` mask nor NHM-5's observed
 `0x060b -> 0x040a` lifecycle may be inherited merely because all three

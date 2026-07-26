@@ -365,16 +365,31 @@ DSP_PARAMETER_08_ANCHORS = {
     0x2391F2: ("movs", "r0, #8"),
     0x2391F4: ("movs", "r2, #1"),
     0x2391F6: ("bl", "#0x285b7c"),
+    # The normal parameter-state updater compares shadow/live words and
+    # submits changed slots through a selector table whose first entry is 8.
+    0x283D5E: ("ldrh", "r1, [r5]"),
+    0x283D60: ("mov", "r0, r8"),
+    0x283D62: ("ldrh", "r0, [r0]"),
+    0x283D64: ("cmp", "r0, r1"),
+    0x283D68: ("ldr", "r0, [pc, #0x2b8]"),
+    0x283D6A: ("ldrb", "r0, [r0]"),
+    0x283D6C: ("movs", "r2, #1"),
+    0x283D6E: ("bl", "#0x285b7c"),
 }
 DSP_PARAMETER_08_LITERALS = {
     0x285DE8: 0xFFFF8000,
     0x285DF0: 0x10B972,
     0x285D22: 0x100A8,
     0x2391E8: 0x2B986C,
+    0x283D68: 0x2B85EC,
 }
 DSP_PARAMETER_JUMP_TABLE_ADDRESS = 0x285BB0
 DSP_PARAMETER_08_MODE_TABLE_ADDRESS = 0x2B986C
 DSP_PARAMETER_08_MODE_VALUES = [0x0600] * 9
+DSP_PARAMETER_SELECTOR_TABLE_ADDRESS = 0x2B85EC
+DSP_PARAMETER_SELECTOR_TABLE = bytes(
+    [0x08, 0x09, 0x1B, 0x25, 0x20, 0x21, 0x22, 0x23, 0x24, 0x28, 0x2D]
+)
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
     0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
@@ -839,6 +854,15 @@ def verify_dsp_parameter_08_boundary(data: bytes) -> dict:
             f"NSE-3 DSP parameter 8 mode table changed: expected "
             f"{DSP_PARAMETER_08_MODE_VALUES}, got {mode_values}"
         )
+    selector_offset = DSP_PARAMETER_SELECTOR_TABLE_ADDRESS - FLASH_BASE
+    selectors = data[
+        selector_offset : selector_offset + len(DSP_PARAMETER_SELECTOR_TABLE)
+    ]
+    if selectors != DSP_PARAMETER_SELECTOR_TABLE:
+        raise ValueError(
+            "NSE-3 DSP parameter state selector table changed: expected "
+            f"{DSP_PARAMETER_SELECTOR_TABLE.hex()}, got {selectors.hex()}"
+        )
     return {
         "writer": 0x285B7C,
         "selector": 0x08,
@@ -848,6 +872,9 @@ def verify_dsp_parameter_08_boundary(data: bytes) -> dict:
         "sram_mirror": 0x10B972,
         "service_mode_caller": 0x2391BC,
         "service_mode_values": mode_values,
+        "state_delta_updater": 0x283D5E,
+        "state_selector_table": list(selectors),
+        "selector_08_state_slot": 0,
         "organic_answer_value": "not_established",
         "organic_end_value": "not_established",
         "speech_role": "not_established_from_selector_number",
