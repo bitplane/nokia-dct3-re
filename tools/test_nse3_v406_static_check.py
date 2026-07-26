@@ -562,6 +562,40 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x13A5, check.RADIO_REPORT_HANDLER_LITERALS[0x21138E]
         )
 
+    def test_timer_0x6e_joins_distinct_paths_as_controller_recheck(self):
+        self.assertEqual(0x6E, check.CONTROLLER_RECHECK_TIMER_CODE)
+        self.assertEqual(
+            bytes.fromhex("010c0000002be7b4"),
+            check.CONTROLLER_RECHECK_TIMER_CONFIGURATION,
+        )
+        self.assertEqual(
+            bytes.fromhex("13b00000"),
+            check.CONTROLLER_RECHECK_TIMER_EVENT_PREFIX,
+        )
+        self.assertEqual(
+            [0x2141E6, 0x214320, 0x21721C],
+            check.CONTROLLER_RECHECK_TIMER_ARM_CALLS,
+        )
+        self.assertEqual(
+            [0x212092], check.CONTROLLER_RECHECK_TIMER_CANCEL_CALLS
+        )
+        self.assertEqual([], check.CONTROLLER_RECHECK_TIMER_QUERY_CALLS)
+        self.assertEqual(
+            ("movs", "r1, #2"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x217262],
+        )
+        self.assertEqual(
+            ("cmp", "r1, #0x1a"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x217270],
+        )
+        self.assertEqual(
+            ("bl", "#0x212088"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x21740E],
+        )
+        self.assertEqual(
+            0x297001, check.RADIO_REPORT_HANDLER_LITERALS[0x21730A]
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)

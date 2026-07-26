@@ -868,6 +868,40 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x2113AA: ("bl", "#0x27693c"),
     0x2113AE: ("movs", "r0, #0xc"),
     0x2113B2: ("bl", "#0x25fb4c"),
+    # Timer 0x6e is armed with duration 8 from both derived-timing helper
+    # paths and the type-0x8f no-submission fallback.  Its sole cancellation
+    # path also publishes the caller's one-byte control value.
+    0x2141E2: ("movs", "r0, #0x6e"),
+    0x2141E4: ("movs", "r1, #8"),
+    0x2141E6: ("bl", "#0x25f146"),
+    0x2141EA: ("movs", "r0, #0x6e"),
+    0x2141EC: ("movs", "r1, #0"),
+    0x2141EE: ("bl", "#0x276648"),
+    0x21431C: ("movs", "r0, #0x6e"),
+    0x21431E: ("movs", "r1, #8"),
+    0x214320: ("bl", "#0x25f146"),
+    0x214324: ("movs", "r0, #0x6e"),
+    0x214326: ("movs", "r1, #0"),
+    0x214328: ("bl", "#0x276648"),
+    0x212090: ("movs", "r0, #0x6e"),
+    0x212092: ("bl", "#0x25ef90"),
+    0x212096: ("movs", "r0, #0x6e"),
+    0x212098: ("movs", "r1, #1"),
+    0x21209A: ("bl", "#0x276648"),
+    # Expiry status 0x13b0 calls numeric control (0x6e, 2), accepts states
+    # 6/7 and state 4 only outside context 0x1a, then re-enters 0x2142b2
+    # with fixed value 0x297001 through 0x212088(1).
+    0x217260: ("movs", "r0, #0x6e"),
+    0x217262: ("movs", "r1, #2"),
+    0x217264: ("bl", "#0x276648"),
+    0x217268: ("ldrb", "r0, [r6, #5]"),
+    0x21726A: ("cmp", "r0, #4"),
+    0x21726E: ("ldrb", "r1, [r6]"),
+    0x217270: ("cmp", "r1, #0x1a"),
+    0x217276: ("cmp", "r0, #6"),
+    0x21727C: ("cmp", "r0, #7"),
+    0x21740C: ("movs", "r0, #1"),
+    0x21740E: ("bl", "#0x212088"),
     # The task-side ALL_RSSI_RESULTS case accepts controller state 4 only for
     # the active type-0x1a search, and also accepts states 6 and 7.
     0x21732E: ("movs", "r0, #0x6b"),
@@ -1233,6 +1267,19 @@ SCALAR_MEASUREMENT_TIMER_QUERY_CALLS = [
     0x2163D2,
     0x2163E8,
 ]
+CONTROLLER_RECHECK_TIMER_CODE = 0x6E
+CONTROLLER_RECHECK_TIMER_CONFIGURATION = bytes.fromhex(
+    "010c0000002be7b4"
+)
+CONTROLLER_RECHECK_TIMER_EVENT_OBJECT = 0x2BE7B4
+CONTROLLER_RECHECK_TIMER_EVENT_PREFIX = bytes.fromhex("13b00000")
+CONTROLLER_RECHECK_TIMER_ARM_CALLS = [
+    0x2141E6,
+    0x214320,
+    0x21721C,
+]
+CONTROLLER_RECHECK_TIMER_CANCEL_CALLS = [0x212092]
+CONTROLLER_RECHECK_TIMER_QUERY_CALLS = []
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -2633,6 +2680,36 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 scalar-measurement timer call census changed: expected "
             f"{expected_scalar_timer_calls}, got {scalar_timer_calls}"
         )
+    controller_recheck_timer_calls = {}
+    for target, name in (
+        (0x25F146, "arm"),
+        (0x25EF90, "cancel"),
+        (0x25F23C, "query"),
+    ):
+        controller_recheck_timer_calls[name] = [
+            insn.address
+            for index, insn in enumerate(instructions)
+            if insn
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+            and call_registers(
+                instructions, index, physical, FLASH_BASE
+            ).get("r0") == CONTROLLER_RECHECK_TIMER_CODE
+        ]
+    expected_controller_recheck_timer_calls = {
+        "arm": CONTROLLER_RECHECK_TIMER_ARM_CALLS,
+        "cancel": CONTROLLER_RECHECK_TIMER_CANCEL_CALLS,
+        "query": CONTROLLER_RECHECK_TIMER_QUERY_CALLS,
+    }
+    if (
+        controller_recheck_timer_calls
+        != expected_controller_recheck_timer_calls
+    ):
+        raise ValueError(
+            "NSE-3 controller-recheck timer call census changed: expected "
+            f"{expected_controller_recheck_timer_calls}, got "
+            f"{controller_recheck_timer_calls}"
+        )
     candidate_list_builder_calls = [
         insn.address
         for insn in instructions
@@ -2746,6 +2823,44 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 scalar-measurement timer event changed: expected "
             f"{SCALAR_MEASUREMENT_TIMER_EVENT_PREFIX.hex()}, got "
             f"{scalar_timer_event_prefix.hex()}"
+        )
+    controller_recheck_timer_configuration_address = (
+        TIMER_CONFIGURATION_TABLE_ADDRESS
+        + CONTROLLER_RECHECK_TIMER_CODE * TIMER_CONFIGURATION_RECORD_BYTES
+    )
+    controller_recheck_timer_configuration = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            controller_recheck_timer_configuration_address + index,
+        )
+        for index in range(TIMER_CONFIGURATION_RECORD_BYTES)
+    )
+    if (
+        controller_recheck_timer_configuration
+        != CONTROLLER_RECHECK_TIMER_CONFIGURATION
+    ):
+        raise ValueError(
+            "NSE-3 controller-recheck timer configuration changed: expected "
+            f"{CONTROLLER_RECHECK_TIMER_CONFIGURATION.hex()}, got "
+            f"{controller_recheck_timer_configuration.hex()}"
+        )
+    controller_recheck_timer_event_prefix = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            CONTROLLER_RECHECK_TIMER_EVENT_OBJECT + index,
+        )
+        for index in range(len(CONTROLLER_RECHECK_TIMER_EVENT_PREFIX))
+    )
+    if (
+        controller_recheck_timer_event_prefix
+        != CONTROLLER_RECHECK_TIMER_EVENT_PREFIX
+    ):
+        raise ValueError(
+            "NSE-3 controller-recheck timer event changed: expected "
+            f"{CONTROLLER_RECHECK_TIMER_EVENT_PREFIX.hex()}, got "
+            f"{controller_recheck_timer_event_prefix.hex()}"
         )
     type_0x8c_fixed_object = bytes(
         cpu_byte(physical, FLASH_BASE, 0x2BCFA8 + index)
@@ -3194,6 +3309,42 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "direct_candidate_list_constructor": None,
                 "direct_channel_configure_constructor": None,
                 "direct_type_0x09_request_correlation": "not_established",
+                "semantic_name_assigned": False,
+            },
+            "controller_recheck_timer": {
+                "code": CONTROLLER_RECHECK_TIMER_CODE,
+                "configuration_address":
+                    controller_recheck_timer_configuration_address,
+                "flags": controller_recheck_timer_configuration[0],
+                "owner_task":
+                    controller_recheck_timer_configuration[1],
+                "expiry_event_object":
+                    CONTROLLER_RECHECK_TIMER_EVENT_OBJECT,
+                "expiry_status": 0x13B0,
+                "raw_duration": 8,
+                "duration_unit": "not_established",
+                "arm_calls": controller_recheck_timer_calls["arm"],
+                "arm_contexts": {
+                    "derived_timing_helper_0": 0x2141E6,
+                    "derived_timing_helper_1": 0x214320,
+                    "candidate_list_no_submission": 0x21721C,
+                },
+                "cancel_calls": controller_recheck_timer_calls["cancel"],
+                "query_calls": controller_recheck_timer_calls["query"],
+                "expiry_case": 0x217260,
+                "expiry_control_argument": 2,
+                "accepted_controller_states": [4, 6, 7],
+                "state_4_excludes_context": 0x1A,
+                "expiry_publication": {
+                    "routine": 0x212088,
+                    "argument": 1,
+                },
+                "recheck_helper": 0x2142B2,
+                "recheck_value": 0x297001,
+                "direct_expiry_rearm": False,
+                "helper_can_conditionally_rearm": True,
+                "joins_arm_contexts_as_shared_recheck": True,
+                "arm_contexts_are_same_report_stage": False,
                 "semantic_name_assigned": False,
             },
             "task_11_event_decoder": {

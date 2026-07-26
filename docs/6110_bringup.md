@@ -445,6 +445,24 @@ non-empty selection is submitted to task 3, advances controller byte
 the type-`0x8f` consumer then arms timer `0x6e` with raw duration 8 and
 numeric control argument zero.
 
+Timer `0x6e` is a shared delayed controller recheck, not a type-`0x8f`
+protocol acknowledgement. Its table record at `0x2b7940` is
+`01 0c 00 00 00 2b e7 b4`: flags 1, task-12 ownership and fixed expiry
+status `0x13b0`. A whole-image census finds exactly three arms, all with raw
+duration 8: the type-`0x8f` no-submission path at `0x21721c` and two gated
+derived-timing paths at `0x2141e6` and `0x214320`. There is one cancellation
+at `0x212092` and no query.
+
+The expiry case at `0x217260` publishes numeric control argument 2 and
+continues only in controller states 6 or 7, or state 4 outside context
+`0x1a`. The accepted path calls `0x212088(1)`, then re-enters helper
+`0x2142b2` with fixed value `0x297001`. The expiry case does not directly
+rearm the timer, although the helper can do so after applying its controller
+gates. This establishes conditional re-evaluation shared by distinct arm
+contexts; it does not merge the type-`0x88` timing input and type-`0x8f`
+candidate-list trigger into one report stage. The timer unit and the
+semantic names of those reports remain unknown.
+
 This proves that NSE-3 acquisition uses at least two distinct outbound radio
 representations: the type-`0x1a` populated bitmap and a later type-`0x09`
 candidate-key list. They are separate protocol stages sharing firmware
