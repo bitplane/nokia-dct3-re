@@ -156,6 +156,17 @@ subsequent 102-frame paging opportunity makes the parser repeat the same
 successful completion without waking the idle-RR admission path or producing
 RACH, so a missing network retry is also excluded.
 
+Address-scoped writes to the RR global refine the post-release control flow.
+The `0x256f1a` release branch arms timer `0x9f`, waits for the real release
+events, cancels `0x9f`, sets RR state byte `r4+7` to one at `0x2570b8`, clears
+`r4+0x0d` and `r4+0x0f`, and branches directly to the parser loop at
+`0x257376`. The addressed page then sets exactly `r4+0x0b`
+(`0x0010dc5f`) at `0x2573c8`. It does not write the A2-active byte
+`r4+0x14` (`0x0010dc68`); the nearby generic-queue write at `0x2a6e72`
+targets the distinct absolute byte `0x0010dc69`. This excludes both an
+incomplete release-state change and accidental aliasing of the queue flag
+with A2 state.
+
 The foreground RR loop at `0x255fbe` does not enter admission merely because
 the parser completion byte is set. It first waits for internal event
 `0x08cb`; only that event calls `0x255ff8`, which consumes the saved parser
@@ -182,11 +193,16 @@ traffic as the missing wake would be both ineffective and architecturally
 wrong. Reversing the release ordering so the real `0x89` confirmation is
 accepted before result `0x05e8` likewise does not change paging.
 
-The remaining failure is the firmware-owned foreground transition that should
-reach the A2 timed wait after return to idle. The next implementation must
-recover its real L1/RR prerequisite. Forcing A2, synthesising `0x08cb`,
-changing the addressed GSM page, or bypassing the parser would cross the
-current evidence boundary.
+The remaining failure is therefore more precise than a generic incomplete
+return to idle: the completed release path deliberately enters its page
+parser state, and the parser records the addressed request, but no evidenced
+event transfers that saved result to `0x255ff8`. Event `0x0802` is consumed
+by the top-level RR dispatcher at `0x254970` and event `0x0804` by the nested
+dispatcher at `0x255c28`; both route through `0x255adc` into the A2 setup
+path, but no static producer or post-release occurrence has yet been proved.
+The next implementation must recover the real producer and lifecycle of that
+handoff. Forcing A2, synthesising `0x08cb`, changing the addressed GSM page,
+or bypassing the parser would cross the current evidence boundary.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
