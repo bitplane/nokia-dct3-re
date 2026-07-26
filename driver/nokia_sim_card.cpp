@@ -39,12 +39,16 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_selected_df));
 	save_item(NAME(m_record_pointer));
 	save_item(NAME(m_receiving_body));
+	save_item(NAME(m_pending_response));
+	save_item(NAME(m_pending_response_len));
+	save_item(NAME(m_fcp_pending));
 	save_item(NAME(m_adn));
 	save_item(NAME(m_loci));
 	save_item(NAME(m_kc));
 	save_item(NAME(m_bcch));
 	save_item(NAME(m_sms));
 	save_item(NAME(m_smsp));
+	save_item(NAME(m_acm));
 	save_item(NAME(m_chv));
 	save_item(NAME(m_unblock_chv));
 	save_item(NAME(m_chv_attempts));
@@ -62,6 +66,8 @@ void nokia_sim_card_device::device_reset()
 	m_selected_df = 0x3f00;
 	m_record_pointer = 0;
 	m_receiving_body = false;
+	m_pending_response_len = 0;
+	m_fcp_pending = false;
 	m_chv_verified[0] = m_chv_verified[1] = false;
 }
 
@@ -75,6 +81,7 @@ void nokia_sim_card_device::nvram_default()
 	std::fill(std::begin(m_bcch), std::end(m_bcch), 0xff);
 	initialize_sms_files();
 	initialize_chv();
+	std::fill(std::begin(m_acm), std::end(m_acm), 0x00);
 	if (m_cached_location)
 	{
 		const u8 loci[] = { 0xff, 0xff, 0xff, 0xff, 0x00, 0xf1, 0x10, 0x00, 0x01, 0x00, 0x01 };
@@ -102,6 +109,7 @@ bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 		// admitted; initialize only the newly appended files.
 		initialize_sms_files();
 		initialize_chv();
+		std::fill(std::begin(m_acm), std::end(m_acm), 0x00);
 		return true;
 	}
 	if (sms_err || sms_actual != sizeof(m_sms))
@@ -115,6 +123,7 @@ bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 	{
 		// Preserve cards created before persistent CHV state was admitted.
 		initialize_chv();
+		std::fill(std::begin(m_acm), std::end(m_acm), 0x00);
 		return true;
 	}
 	if (chv_err || chv_actual != sizeof(m_chv))
@@ -133,6 +142,16 @@ bool nokia_sim_card_device::nvram_read(util::read_stream &file)
 			enabled_err || enabled_actual != 1)
 		return false;
 	m_chv1_enabled = enabled != 0;
+	auto const [acm_err, acm_actual] = util::read(file, m_acm, sizeof(m_acm));
+	if (!acm_err && acm_actual == 0)
+	{
+		// Preserve cards created before persistent advice-of-charge state was
+		// admitted; initialize only the append-only EF_ACM payload.
+		std::fill(std::begin(m_acm), std::end(m_acm), 0x00);
+		return true;
+	}
+	if (acm_err || acm_actual != sizeof(m_acm))
+		return false;
 	u8 trailing;
 	auto const [trailing_err, trailing_actual] = util::read(file, &trailing, 1);
 	return !trailing_err && trailing_actual == 0;
@@ -158,6 +177,7 @@ bool nokia_sim_card_device::nvram_write(util::write_stream &file)
 			file, m_unblock_attempts, sizeof(m_unblock_attempts));
 	const u8 enabled = m_chv1_enabled ? 1 : 0;
 	auto const [enabled_err, enabled_actual] = util::write(file, &enabled, 1);
+	auto const [acm_err, acm_actual] = util::write(file, m_acm, sizeof(m_acm));
 	return !loci_err && loci_actual == sizeof(m_loci) && !kc_err && kc_actual == sizeof(m_kc) &&
 			!bcch_err && bcch_actual == sizeof(m_bcch) &&
 			!sms_err && sms_actual == sizeof(m_sms) &&
@@ -166,7 +186,8 @@ bool nokia_sim_card_device::nvram_write(util::write_stream &file)
 			!unblock_err && unblock_actual == sizeof(m_unblock_chv) &&
 			!attempts_err && attempts_actual == sizeof(m_chv_attempts) &&
 			!unblock_attempts_err && unblock_attempts_actual == sizeof(m_unblock_attempts) &&
-			!enabled_err && enabled_actual == 1;
+			!enabled_err && enabled_actual == 1 &&
+			!acm_err && acm_actual == sizeof(m_acm);
 }
 
 void nokia_sim_card_device::initialize_sms_files()
@@ -215,6 +236,8 @@ void nokia_sim_card_device::activate()
 	m_selected_df = 0x3f00;
 	m_record_pointer = 0;
 	m_receiving_body = false;
+	m_pending_response_len = 0;
+	m_fcp_pending = false;
 	m_chv_verified[0] = m_chv_verified[1] = false;
 	emit_response(m_atr, m_atr_len);
 }
@@ -257,13 +280,18 @@ void nokia_sim_card_device::finish_header()
 	m_p1 = m_tx[2];
 	m_p2 = m_tx[3];
 	m_p3 = m_tx[4];
+	if (m_ins != 0xc0)
+	{
+		m_pending_response_len = 0;
+		m_fcp_pending = false;
+	}
 	if (m_trace)
 		LOGMASKED(LOG_SIM, "sim_device: header cla=%02x ins=%02x p1=%02x p2=%02x p3=%02x selected=%04x t=%.8f\n",
 				m_tx[0], m_ins, m_p1, m_p2, m_p3, m_selected_file,
 				machine().time().as_double());
 	if (m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
 			m_ins == 0x28 || m_ins == 0x2c || m_ins == 0xa4 ||
-			m_ins == 0xd6 || m_ins == 0xdc)
+			m_ins == 0x32 || m_ins == 0xd6 || m_ins == 0xdc)
 	{
 		const u8 procedure = m_ins;
 		m_tx_len = 0;
@@ -273,8 +301,17 @@ void nokia_sim_card_device::finish_header()
 		return;
 	}
 
-	if (m_ins == 0xc0 || m_ins == 0xf2)
+	if (m_ins == 0xc0 && m_pending_response_len != 0)
+		queue_pending_response(m_p3 ? m_p3 : 256);
+	else if (m_ins == 0xc0 && m_fcp_pending)
+	{
 		queue_fcp(m_selected_file, m_p3 ? m_p3 : 256);
+		m_fcp_pending = false;
+	}
+	else if (m_ins == 0xf2)
+		queue_fcp(m_selected_file, m_p3 ? m_p3 : 256);
+	else if (m_ins == 0xc0)
+		queue_status(0x94, 0x00);
 	else if (m_ins == 0xb0)
 		queue_read_binary(m_p3 ? m_p3 : 256);
 	else if (m_ins == 0xb2)
@@ -315,6 +352,13 @@ void nokia_sim_card_device::finish_body()
 		m_receiving_body = false;
 		return;
 	}
+	if (m_ins == 0x32)
+	{
+		increase_record();
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		return;
+	}
 	if (m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
 			m_ins == 0x28 || m_ins == 0x2c)
 	{
@@ -339,6 +383,7 @@ void nokia_sim_card_device::finish_body()
 		else
 		{
 			const bool df = is_directory(m_selected_file);
+			m_fcp_pending = true;
 			queue_status(0x9f, df ? 22 : 15);
 		}
 	}
@@ -540,6 +585,13 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 				0x04, 0, 0, 0, 0, 0x01, 0x02, 0x00, 0x00 };
 			if (file->mutable_data)
 				fcp[8] = 0x01; // READ is always; UPDATE requires disabled CHV1.
+			if (file->fid == 0x6f39)
+			{
+				// EF_ACM is READ/UPDATE/INCREASE under CHV1. Access-condition
+				// nibbles occupy READ|UPDATE in byte 8 and INCREASE|RFU in 9.
+				fcp[8] = 0x11;
+				fcp[9] = 0x10;
+			}
 			fcp[13] = file->structure == file_structure::linear_fixed ? 0x01 :
 				file->structure == file_structure::cyclic ? 0x03 : 0x00;
 			fcp[14] = file->record_length;
@@ -548,6 +600,26 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 		}
 	}
 	response[n++] = 0x90; response[n++] = 0x00;
+	emit_response(response, n);
+}
+
+void nokia_sim_card_device::queue_pending_response(unsigned requested)
+{
+	if (m_p1 != 0 || m_p2 != 0 || requested != m_pending_response_len)
+	{
+		m_pending_response_len = 0;
+		queue_status(0x67, 0x00);
+		return;
+	}
+
+	u8 response[260];
+	unsigned n = 0;
+	response[n++] = m_ins;
+	std::copy_n(m_pending_response, m_pending_response_len, response + n);
+	n += m_pending_response_len;
+	response[n++] = 0x90;
+	response[n++] = 0x00;
+	m_pending_response_len = 0;
 	emit_response(response, n);
 }
 
@@ -580,6 +652,11 @@ void nokia_sim_card_device::queue_read_record(unsigned requested)
 	if (!file || (file->structure != file_structure::linear_fixed && file->structure != file_structure::cyclic))
 	{
 		queue_status(0x94, 0x08);
+		return;
+	}
+	if (file->fid == 0x6f39 && m_chv1_enabled && !m_chv_verified[0])
+	{
+		queue_status(0x98, 0x04);
 		return;
 	}
 	if (requested != file->record_length)
@@ -700,6 +777,58 @@ void nokia_sim_card_device::update_record()
 	queue_status(0x90, 0x00);
 }
 
+void nokia_sim_card_device::increase_record()
+{
+	const file_descriptor *file = find_file(m_selected_file);
+	if (!file || file->structure != file_structure::cyclic)
+	{
+		queue_status(0x94, 0x08);
+		return;
+	}
+	if (m_p1 != 0 || m_p2 != 0)
+	{
+		queue_status(0x6b, 0x00);
+		return;
+	}
+	if (m_tx_len != 3 || file->record_length != 3)
+	{
+		queue_status(0x67, 0x00);
+		return;
+	}
+	if (!access_allowed(*file))
+	{
+		queue_status(0x98, 0x04);
+		return;
+	}
+	u8 *const data = mutable_file_data(file->fid);
+	if (!data)
+	{
+		queue_status(0x98, 0x04);
+		return;
+	}
+
+	const u32 current = (u32(data[0]) << 16) | (u32(data[1]) << 8) | data[2];
+	const u32 addend = (u32(m_tx[0]) << 16) | (u32(m_tx[1]) << 8) | m_tx[2];
+	const u32 increased = current + addend;
+	if (increased > 0x00ffffff)
+	{
+		queue_status(0x98, 0x50);
+		return;
+	}
+
+	data[0] = increased >> 16;
+	data[1] = increased >> 8;
+	data[2] = increased;
+	m_record_pointer = 1;
+	std::copy_n(data, 3, m_pending_response);
+	std::copy_n(m_tx, 3, m_pending_response + 3);
+	m_pending_response_len = 6;
+	if (m_trace)
+		LOGMASKED(LOG_SIM, "sim_device: increase fid=%04x value=%06x result=%06x t=%.8f\n",
+				file->fid, addend, increased, machine().time().as_double());
+	queue_status(0x9f, m_pending_response_len);
+}
+
 const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u16 fid)
 {
 	static constexpr file_descriptor files[] = {
@@ -729,7 +858,7 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x6fae, 0x7f20, 1, 0, file_structure::transparent, false },
 		{ 0x6f31, 0x7f20, 1, 0, file_structure::transparent, false },
 		{ 0x6f37, 0x7f20, 3, 0, file_structure::transparent, false },
-		{ 0x6f39, 0x7f20, 3, 0, file_structure::transparent, false },
+		{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true },
 		{ 0x6f41, 0x7f20, 5, 0, file_structure::transparent, false },
 		{ 0x6f43, 0x7f20, 2, 0, file_structure::transparent, false },
 		{ 0x6f46, 0x7f20, 17, 0, file_structure::transparent, false },
@@ -791,7 +920,6 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// GSM 11.11 defines zero as "ACMmax not valid": this profile enables AoC
 	// without imposing a subscriber call-charge limit.
 	static constexpr u8 acm_max[] = { 0x00, 0x00, 0x00 };
-	static constexpr u8 acm[] = { 0x00, 0x00, 0x00 };
 	static constexpr u8 puct[] = { 'G', 'B', 'P', 0x00, 0x00 };
 	// GSM 11.11 EF_AD: normal operation, with no additional administrative
 	// information in this phase-2 profile.  Erased 0xff bytes select no valid
@@ -844,7 +972,7 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	if (m_cphs_aoc && fid == 0x6f16 && offset < std::size(cphs_info)) return cphs_info[offset];
 	if (m_cphs_aoc && fid == 0x6f15 && offset < std::size(cphs_aoc)) return cphs_aoc[offset];
 	if (m_cphs_aoc && fid == 0x6f37 && offset < std::size(acm_max)) return acm_max[offset];
-	if (m_cphs_aoc && fid == 0x6f39 && offset < std::size(acm)) return acm[offset];
+	if (fid == 0x6f39 && offset < std::size(m_acm)) return m_acm[offset];
 	if (m_cphs_aoc && fid == 0x6f41 && offset < std::size(puct)) return puct[offset];
 	if (fid == 0x6f7e)
 		return m_loci[offset];
@@ -867,6 +995,7 @@ u8 *nokia_sim_card_device::mutable_file_data(u16 fid)
 	case 0x6f7e: return m_loci;
 	case 0x6f20: return m_kc;
 	case 0x6f74: return m_bcch;
+	case 0x6f39: return m_acm;
 	default: return nullptr;
 	}
 }

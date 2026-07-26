@@ -100,12 +100,13 @@ CONTACT SERVICE configuration fixture disables it through the standard MAME
 implements:
 
 - activation reset, ATR and PPS echo;
-- T=0 SELECT, STATUS, GET RESPONSE, READ BINARY, linear-fixed READ/UPDATE
-  RECORD and CHANGE CHV sequencing;
+- T=0 SELECT, STATUS, immediate GET RESPONSE, READ BINARY,
+  linear-fixed/cyclic READ/UPDATE RECORD, INCREASE and complete CHV command
+  sequencing;
 - current DF, selected EF and record-pointer state;
 - declared GSM 11.11 file metadata and synthetic profile content; and
-- persistent mutable `EF_ADN`, `EF_SMS` and `EF_SMSP` contents through MAME
-  device NVRAM.
+- persistent mutable `EF_ADN`, `EF_SMS`, `EF_SMSP` and cyclic `EF_ACM`
+  contents through MAME device NVRAM.
 
 It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
 device is disabled, SIMI reads and writes retain the legacy behavior used by the
@@ -121,10 +122,11 @@ The implemented surface is classified by ownership and evidence:
 | TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics remain inferred. |
 | IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
-| SELECT/STATUS/GET RESPONSE/READ behavior | Prototype card | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. Invalidation, full CHV state, errors and removal are incomplete. |
+| SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. Invalidation, broader errors and removal remain incomplete. |
 | UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
+| Cyclic EF_ACM and INCREASE | Standards-derived dormant contract | The descriptor, CHV1 access conditions, checked 24-bit addition, `98 50` overflow result, six-byte delayed response and append-only persistence follow GSM 11.11. NSE-3 constructs the exact `A0 32 00 00 03` APDU, but no product firmware acceptance trace currently exercises it. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
-| CHANGE CHV support | Dormant prototype | The procedure/body/status sequence is implemented, but the ordinary boot does not request it and no persistent credential semantics are validated. |
+| CHV support | Standards-derived dormant contract | VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK have persistent credentials/counters and reset-scoped verification. Ordinary boot does not exercise the complete lifecycle, so it is not a product-runtime promotion. |
 
 The model does not force firmware state or inject RTOS messages. Controller and
 card ownership are separate; remaining fidelity debt is ATR start/turnaround timing,

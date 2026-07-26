@@ -21,7 +21,8 @@ The device may provide behavior owned by a physical card:
 
 - activation and ATR;
 - T=0 procedure bytes and status words;
-- GSM 11.11 SELECT, STATUS, GET RESPONSE, READ BINARY/RECORD and CHV behavior;
+- GSM 11.11 SELECT, STATUS, GET RESPONSE, READ BINARY/RECORD, CHV and
+  cyclic-record INCREASE behavior;
 - persistent current DF/EF selection and coherent file metadata/content;
 - card-side serial response timing and protocol state.
 
@@ -45,10 +46,10 @@ The card currently supports:
 - T=0 command header/body sequencing;
 - SELECT and GET RESPONSE for MF, DF_GSM, and known EFs;
 - STATUS for the current directory;
-- READ BINARY and linear-fixed READ/UPDATE RECORD with a declared GSM
+- READ BINARY and linear-fixed/cyclic READ/UPDATE RECORD with a declared GSM
   filesystem;
 - persistent 50-record `EF_ADN`, ten-record `EF_SMS` and two-record `EF_SMSP`
-  synthetic files; and
+  synthetic files, plus the three-byte cyclic `EF_ACM`; and
 - save-state coverage for transport, selection and mutable card contents.
 
 The organic 3210 conversation currently reaches:
@@ -119,12 +120,23 @@ owned by the GSM fixture, not by a special SIM file or card-side decoder.
 
 ## Remaining card work
 
-The card filesystem covers boot and one complete mutable linear-record path.
+The card filesystem covers boot, mutable linear-record paths and the generic
+GSM 11.11 call-meter operation. `EF_ACM (6F39)` is a one-record, three-byte
+cyclic EF. Its READ, UPDATE and INCREASE access conditions are CHV1; INCREASE
+performs a checked 24-bit addition, returns `98 50` without mutation on
+overflow, and exposes the new value followed by the addend only through the
+immediately following six-byte GET RESPONSE. The record, pending response and
+record pointer have save-state coverage, while only the record is persistent
+card NVRAM. The CPHS AoC fixture advertises the service, but no handset has yet
+organically issued INCREASE, so this is standards-conformance coverage rather
+than a promoted product-runtime claim.
+
 Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
 
-- completing UPDATE BINARY, SEEK, cyclic/INCREASE, invalidation and CHV
-  semantics;
+- SEEK, invalidation and additional access-condition/error semantics;
+- RUN GSM ALGORITHM once an explicit laboratory A3/A8 and key profile is
+  selected, rather than embedding an assumed authentication shortcut;
 - supplying coherent FPLMN and optional EFs beyond the current matched
   IMSI/SST/PLMN-selector/SPN profile;
 - testing card removal, reset, timeout, parity/error, and proactive-SIM status;

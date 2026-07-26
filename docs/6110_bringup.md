@@ -151,11 +151,19 @@ Nokia product identity. Command coding, status words and retry semantics follow
 [ETSI GSM 11.11 v5.0.0](https://www.etsi.org/deliver/etsi_gts/11/1111/05.00.00_60/gsmts_1111v050000p.pdf),
 clauses 8.9--8.13, 9.2.9--9.2.13 and 9.4.
 
-The remaining unsupported constructors are INCREASE, RUN GSM ALGORITHM and
-the four SIM Toolkit commands. They continue to return `6d 00`. This is not
-permission to pre-implement an assumed 6110 boot script: an organic trace must
-establish which commands are actually issued, their file-selection context,
-parameters and status progression. Missing commands should then be
+INCREASE is now implemented as a generic GSM 11.11 card operation against the
+laboratory profile's real `EF_ACM`: a persistent three-byte cyclic record,
+CHV1 READ/UPDATE/INCREASE conditions, checked 24-bit addition, `98 50`
+overflow, and the specified six-byte result through the immediately following
+GET RESPONSE. This removes a genuine shared-card gap, but does not prove that
+NSE-3 reaches its constructor or promote 6110 runtime coverage.
+
+The remaining unsupported constructors are RUN GSM ALGORITHM and the four SIM
+Toolkit commands; they continue to return `6d 00`. This is not permission to
+pre-implement an assumed 6110 boot script: an organic trace must establish
+which commands are actually issued, their parameters and status progression.
+Authentication also needs an explicit laboratory A3/A8 and key profile, and
+Toolkit needs a proactive-service profile. Missing commands should be
 implemented generically from the applicable GSM SIM contract rather than
 special-cased for NSE-3.
 

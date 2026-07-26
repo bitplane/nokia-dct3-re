@@ -2,6 +2,7 @@ import unittest
 
 from tools.sim_phonebook_check import (
     CURRENT_NVRAM_LENGTH,
+    PRE_ACM_NVRAM_LENGTH,
     RECORD_COUNT,
     RECORD_LENGTH,
     validate_phonebook,
@@ -37,6 +38,11 @@ class SimPhonebookCheckTest(unittest.TestCase):
     def test_accepts_current_append_only_card_layout(self):
         trace, data = self.fixture()
         data.extend(bytes(CURRENT_NVRAM_LENGTH - len(data)))
+        validate_phonebook(trace, bytes(data))
+
+    def test_accepts_pre_acm_append_only_card_layout(self):
+        trace, data = self.fixture()
+        data.extend(bytes(PRE_ACM_NVRAM_LENGTH - len(data)))
         validate_phonebook(trace, bytes(data))
 
     def test_rejects_unversioned_card_layout(self):

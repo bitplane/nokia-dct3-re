@@ -127,6 +127,28 @@ class SimDeviceSplitTest(unittest.TestCase):
         )
         self.assertNotIn("noki6110", self.card + self.card_header)
 
+    def test_acm_is_persistent_cyclic_and_uses_delayed_response(self):
+        self.assertIn(
+            "{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true }",
+            self.card,
+        )
+        for token in (
+            "save_item(NAME(m_acm))",
+            "case 0x6f39: return m_acm",
+            "void nokia_sim_card_device::increase_record()",
+            "m_pending_response_len = 6",
+            "queue_status(0x9f, m_pending_response_len)",
+            "queue_status(0x98, 0x50)",
+            "void nokia_sim_card_device::queue_pending_response",
+            "requested != m_pending_response_len",
+            "m_fcp_pending = true",
+        ):
+            self.assertIn(token, self.card)
+        self.assertIn("u8 m_acm[3]", self.card_header)
+        self.assertIn("u8 m_pending_response[256]", self.card_header)
+        self.assertIn("fcp[8] = 0x11", self.card)
+        self.assertIn("fcp[9] = 0x10", self.card)
+
 
 if __name__ == "__main__":
     unittest.main()
