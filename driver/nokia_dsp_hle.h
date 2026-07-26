@@ -23,8 +23,19 @@ public:
 		unresolved
 	};
 
+	enum class service_control_profile : u8
+	{
+		none,
+		compact,
+		framed
+	};
+
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
+	void set_service_control_profile(service_control_profile profile)
+	{
+		m_service_control_profile = profile;
+	}
 	void set_service_delay_us(unsigned delay) { m_service_delay_us = delay; }
 	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
 	void set_parameter_command(u8 command)
@@ -93,6 +104,7 @@ private:
 	emu_timer *m_speech_timer = nullptr;
 	bool m_service_enabled = false;
 	bool m_external_service_enabled = false;
+	service_control_profile m_service_control_profile = service_control_profile::none;
 	bool m_trace_enabled = false;
 	unsigned m_service_delay_us = 5'000;
 	unsigned m_peer_poll_ms = 5;

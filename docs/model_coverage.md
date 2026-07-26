@@ -70,8 +70,14 @@ reach the v4.06 selector/status at bytes 8--9. The exact NSE-8 v6.00 decoder
 independently identifies the missing transformation: it inserts
 `00 (compact_length + 2) 01 00`, making compact `0d 00` into the
 layout-compatible NSE-3 candidate `00 04 01 00 0d 00`. This candidate is
-statically checked across both images but remains disabled because NSE-3
-request/response correlation and the semantic name are still unproved.
+statically checked across both images. NSE-3's initializer independently sets
+controller bit 2, sends `70 0d` and arms timer `14/c8`; the completion requires
+that bit, cancels timer 14, clears it and emits `70 0a`, while timer event
+`d4` is the alternative cleanup. Request/completion correlation is therefore
+proven without accepting the external “self-test” name. Compact and framed
+completion layouts are now separate typed HLE profiles; NSE-3 selects the
+framed profile, but it remains dormant because its DSP bootstrap completion
+and later DSP-owned service triggers remain unresolved.
 
 ## Promotion rules
 

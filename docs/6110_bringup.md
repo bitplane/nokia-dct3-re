@@ -872,13 +872,23 @@ bytes 4--7, and copies the compact DSP payload to byte 8. For compact payload
 untranslated DSPIF receive path places selector `0x0d` and status `0x00` at
 the exact offsets consumed by `0x237d60`.
 
-This is a reproducible, layout-compatible cross-ROM candidate, not yet an
-NSE-3 response contract. The independent HLE may describe a revision whose
-DSP receive path still contains the NSE-8-style decoder, while v4.06 expects
-the internal DSP to provide the expanded frame. Neither image proves that the
-NSE-3 `70 0d` request is answered by this payload or that the operation is a
-self-test. The candidate therefore remains disabled pending an internal-DSP
-image or an organic ring trace.
+The NSE-3 controller proves the request/completion correlation independently.
+In the same initializer, the mode-one arm clears pending byte `0x10fcae`, sets
+controller bit 2, submits `70 0d`, and later arms timer `0x14` for raw duration
+`0xc8`. The timer table assigns that timer to task 2 event `0xd4`. The inbound
+selector-`0x0d`/`0xd0` arm requires bit 2, cancels timer `0x14`, clears the bit
+and emits `70 0a`; event `0xd4` is the alternative timeout path and clears the
+same controller bits. This makes the expanded type-`0x74` message a
+request-derived completion rather than an unrelated layout match.
+
+The independent HLE may describe a revision whose DSP receive path still
+contains the NSE-8-style decoder, while v4.06 expects the internal DSP to
+provide the expanded frame. The generic HLE therefore expresses compact and
+framed service-control completions as separate typed profiles. NSE-3 selects
+the framed profile, but it remains dormant while the product's unresolved DSP
+bootstrap keeps DSP service disabled. The firmware does not name the
+transaction as a self-test, and this evidence does not establish the missing
+DSP bootstrap publications, service discovery triggers or channel map.
 
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,

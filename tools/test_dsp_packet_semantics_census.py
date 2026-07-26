@@ -11,6 +11,10 @@ class DspPacketSemanticsCensusTest(unittest.TestCase):
 				classify("tx", 0x70, bytes.fromhex("0d00")))
 		self.assertEqual(("service_control_completion", "derived from type-0x70/0d00"),
 				classify("rx", 0x74, bytes.fromhex("0d00")))
+		self.assertEqual(
+				("service_control_completion",
+				 "framed completion derived from type-0x70/0d00"),
+				classify("rx", 0x74, bytes.fromhex("000401000d00")))
 		self.assertEqual(("service_control_followup", "one-way publication after type-0x74 completion"),
 				classify("tx", 0x70, bytes.fromhex("0a09")))
 		self.assertEqual(("bootstrap_platform_word", "one-way DSP bootstrap publication"),

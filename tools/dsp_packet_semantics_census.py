@@ -65,6 +65,8 @@ def classify(direction: str, packet_type: int, data: bytes) -> tuple[str, str]:
 
 	if packet_type == 0x74 and data == bytes((0x0D, 0x00)):
 		return "service_control_completion", "derived from type-0x70/0d00"
+	if packet_type == 0x74 and data == bytes.fromhex("000401000d00"):
+		return "service_control_completion", "framed completion derived from type-0x70/0d00"
 	if packet_type == 0x8E:
 		frame_class, command = external_fields(data)
 		if frame_class == 0xD0 and len(data) >= 7:

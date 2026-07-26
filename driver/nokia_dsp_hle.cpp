@@ -142,7 +142,8 @@ void nokia_dsp_hle_device::publish_bootstrap_state()
 
 void nokia_dsp_hle_device::tx_commit_w(int state)
 {
-	if (state && (m_external_service_enabled || m_radio_peer->enabled()))
+	if (state && (m_external_service_enabled || m_radio_peer->enabled() ||
+			m_service_control_profile != service_control_profile::none))
 		m_packet_timer->adjust(attotime::from_usec(100));
 }
 
@@ -446,7 +447,8 @@ bool nokia_dsp_hle_device::consume_memory_upload(const nokia_dspif_device::packe
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 {
-	if (m_external_service_enabled || m_radio_peer->enabled())
+	if (m_external_service_enabled || m_radio_peer->enabled() ||
+			m_service_control_profile != service_control_profile::none)
 	{
 		nokia_dspif_device::packet packet;
 		while (m_transport->peek_tx_packet(packet))
@@ -455,14 +457,25 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 			if (m_external_service_enabled && packet.type == 0x05 &&
 					packet.length >= 9 && packet.length <= 75)
 				m_external_peer->receive_frame(packet.payload.data(), packet.length);
-			if (m_external_service_enabled && !m_service_control_completion_sent &&
+			if (m_service_control_profile != service_control_profile::none &&
+					!m_service_control_completion_sent &&
 					packet.type == 0x70 && packet.length == 2 &&
 					packet.payload[0] == 0x0d && packet.payload[1] == 0x00)
 			{
-				if (m_transport->enqueue_rx_packet(0x74, packet.payload.data(), packet.length))
+				static constexpr u8 compact_completion[] = { 0x0d, 0x00 };
+				static constexpr u8 framed_completion[] =
+						{ 0x00, 0x04, 0x01, 0x00, 0x0d, 0x00 };
+				const u8 *const completion =
+						m_service_control_profile == service_control_profile::framed ?
+						framed_completion : compact_completion;
+				const unsigned completion_length =
+						m_service_control_profile == service_control_profile::framed ?
+						std::size(framed_completion) : std::size(compact_completion);
+				if (m_transport->enqueue_rx_packet(0x74, completion, completion_length))
 				{
 					m_service_control_completion_sent = true;
-					m_external_peer->set_service_control_complete();
+					if (m_external_service_enabled)
+						m_external_peer->set_service_control_complete();
 					m_transport->notify_rx();
 				}
 			}

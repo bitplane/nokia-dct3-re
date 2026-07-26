@@ -41,6 +41,8 @@ class MachineProfileTest(unittest.TestCase):
                 "synthetic_sim_card": "true",
                 "dsp_service": "true",
                 "external_service_transport": "true",
+                "dsp_service_control":
+                    "nokia_dsp_hle_device::service_control_profile::compact",
                 "radio_peer": "true",
                 "dsp_service_delay_us": "4'000",
                 "dsp_peer_poll_ms": "4",
@@ -73,7 +75,12 @@ class MachineProfileTest(unittest.TestCase):
     def test_dsp_bootstrap_count_is_product_configuration(self):
         self.assert_profile_fields(
             "make_3310_config",
-            {"dsp_bootstrap_exchanges": "58", "keypad_five_rows": "true"},
+            {
+                "dsp_bootstrap_exchanges": "58",
+                "keypad_five_rows": "true",
+                "dsp_service_control":
+                    "nokia_dsp_hle_device::service_control_profile::compact",
+            },
         )
 
     def test_6110_profile_contains_only_documented_hardware_contracts(self):
@@ -97,6 +104,8 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_parameter_command": "0x08",
                 "dsp_bootstrap_completion":
                     "nokia_dsp_hle_device::bootstrap_completion_profile::unresolved",
+                "dsp_service_control":
+                    "nokia_dsp_hle_device::service_control_profile::framed",
             },
         )
         self.assertIn(

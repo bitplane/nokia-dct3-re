@@ -2440,6 +2440,63 @@ EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT = bytes.fromhex(
 )
 EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_BYTE_FIELDS = bytes.fromhex("02700a")
 EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS = [0x237DF8]
+EXTERNAL_SERVICE_CONTROL_TRANSACTION_ANCHORS = {
+    # The mode-one initializer clears the pending-state byte, sets controller
+    # bit 2 and submits the fixed 70 0d request.
+    0x237B68: ("mov", "r0, r8"),
+    0x237B6A: ("strb", "r7, [r0, #0xe]"),
+    0x237B6C: ("ldrb", "r1, [r6, r5]"),
+    0x237B6E: ("movs", "r0, #4"),
+    0x237B70: ("orrs", "r0, r1"),
+    0x237B72: ("strb", "r0, [r6, r5]"),
+    0x237B74: ("movs", "r0, #3"),
+    0x237B76: ("ldr", "r1, [pc, #0x2e8]"),
+    0x237B78: ("bl", "#0x25fb4c"),
+    # The same initializer subsequently arms timer 0x14 for raw duration c8.
+    0x237D40: ("movs", "r0, #0x14"),
+    0x237D42: ("movs", "r1, #0xc8"),
+    0x237D44: ("bl", "#0x25f146"),
+    # Timer event d4 is the alternative completion path.  While bit 2 is set,
+    # it marks the controller byte and clears bits 6 and 2.
+    0x23A500: ("ldr", "r0, [pc, #0x30c]"),
+    0x23A502: ("ldrb", "r1, [r0]"),
+    0x23A504: ("lsrs", "r1, r1, #3"),
+    0x23A506: ("bhs", "#0x23a51a"),
+    0x23A51A: ("ldr", "r2, [pc, #0x2e4]"),
+    0x23A51C: ("movs", "r1, #0xf"),
+    0x23A51E: ("strb", "r1, [r2]"),
+    0x23A520: ("movs", "r1, #0xbf"),
+    0x23A526: ("strb", "r1, [r0]"),
+    0x23A528: ("movs", "r1, #0xfb"),
+    0x23A52E: ("strb", "r1, [r0]"),
+}
+EXTERNAL_SERVICE_CONTROL_TRANSACTION_LITERALS = {
+    0x237B76: EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS,
+    0x23A500: 0x10FDE1,
+    0x23A51A: 0x10FCAF,
+}
+EXTERNAL_SERVICE_CONTROL_TIMER_CODE = 0x14
+EXTERNAL_SERVICE_CONTROL_TIMER_RAW_DURATION = 0xC8
+EXTERNAL_SERVICE_CONTROL_TIMER_CONFIGURATION = bytes.fromhex(
+    "01020000000000d4"
+)
+EXTERNAL_SERVICE_CONTROL_TIMER_ARM_CALLS = [
+    0x237D44,
+    0x26B498,
+    0x26C35E,
+]
+EXTERNAL_SERVICE_CONTROL_TIMER_CANCEL_CALLS = [
+    0x237DDE,
+    0x26B4B0,
+    0x26B554,
+    0x26BA72,
+    0x26BB1C,
+    0x26BC36,
+    0x26BC4E,
+]
+EXTERNAL_SERVICE_CONTROL_TIMER_QUERY_CALLS = []
+EXTERNAL_SERVICE_CONTROL_TIMER_OWNER_TASK = 2
+EXTERNAL_SERVICE_CONTROL_TIMER_EXPIRY_EVENT = 0xD4
 NSE8_TYPE_0X74_DECODER_ANCHORS = {
     # NSE-8 v6.00 receives the compact DSP object, allocates ten additional
     # bytes, preserves its type at object +3 and inserts the four-byte framed
@@ -3623,6 +3680,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_MODE_STARTUP_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROL_TRANSACTION_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
@@ -3633,6 +3691,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, EXTERNAL_SERVICE_DELAYED_STATUS_LITERALS)
     verify_thumb_literals(data, EXTERNAL_SERVICE_MODE_STARTUP_LITERALS)
     verify_thumb_literals(data, EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_LITERALS)
+    verify_thumb_literals(data, EXTERNAL_SERVICE_CONTROL_TRANSACTION_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -4373,6 +4432,36 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS}, got "
             f"{external_service_type_0x74_followup_submit_calls}"
         )
+    external_service_control_timer_calls = {}
+    for target, name in (
+        (0x25F146, "arm"),
+        (0x25EF90, "cancel"),
+        (0x25F23C, "query"),
+    ):
+        external_service_control_timer_calls[name] = [
+            insn.address
+            for index, insn in enumerate(instructions)
+            if insn
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+            and call_registers(
+                instructions, index, physical, FLASH_BASE
+            )["r0"] == EXTERNAL_SERVICE_CONTROL_TIMER_CODE
+        ]
+    expected_external_service_control_timer_calls = {
+        "arm": EXTERNAL_SERVICE_CONTROL_TIMER_ARM_CALLS,
+        "cancel": EXTERNAL_SERVICE_CONTROL_TIMER_CANCEL_CALLS,
+        "query": EXTERNAL_SERVICE_CONTROL_TIMER_QUERY_CALLS,
+    }
+    if (
+        external_service_control_timer_calls
+        != expected_external_service_control_timer_calls
+    ):
+        raise ValueError(
+            "NSE-3 external-service control timer calls changed: expected "
+            f"{expected_external_service_control_timer_calls}, got "
+            f"{external_service_control_timer_calls}"
+        )
     task_11_event_jump_table = {
         status: effective_u32(
             physical,
@@ -4544,6 +4633,28 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 external-service delay-timer configuration changed: "
             f"expected {EXTERNAL_SERVICE_DELAY_TIMER_CONFIGURATION.hex()}, "
             f"got {external_service_delay_timer_configuration.hex()}"
+        )
+    external_service_control_timer_configuration_address = (
+        TIMER_CONFIGURATION_TABLE_ADDRESS
+        + EXTERNAL_SERVICE_CONTROL_TIMER_CODE
+        * TIMER_CONFIGURATION_RECORD_BYTES
+    )
+    external_service_control_timer_configuration = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            external_service_control_timer_configuration_address + index,
+        )
+        for index in range(TIMER_CONFIGURATION_RECORD_BYTES)
+    )
+    if (
+        external_service_control_timer_configuration
+        != EXTERNAL_SERVICE_CONTROL_TIMER_CONFIGURATION
+    ):
+        raise ValueError(
+            "NSE-3 external-service control-timer configuration changed: "
+            f"expected {EXTERNAL_SERVICE_CONTROL_TIMER_CONFIGURATION.hex()}, "
+            f"got {external_service_control_timer_configuration.hex()}"
         )
     timer_configuration_address = (
         TIMER_CONFIGURATION_TABLE_ADDRESS
@@ -5713,6 +5824,33 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     "status_bits_consumed": [0, 1],
                     "required_controller_bit": 2,
                     "clears_controller_bits": [2, 6],
+                    "request_transaction": {
+                        "request_wire_bytes": [0x70, 0x0D],
+                        "sets_controller_bit": 2,
+                        "timer": {
+                            "code":
+                                EXTERNAL_SERVICE_CONTROL_TIMER_CODE,
+                            "raw_duration":
+                                EXTERNAL_SERVICE_CONTROL_TIMER_RAW_DURATION,
+                            "configuration_address":
+                                external_service_control_timer_configuration_address,
+                            "configuration": list(
+                                external_service_control_timer_configuration
+                            ),
+                            "owner_task":
+                                EXTERNAL_SERVICE_CONTROL_TIMER_OWNER_TASK,
+                            "expiry_event":
+                                EXTERNAL_SERVICE_CONTROL_TIMER_EXPIRY_EVENT,
+                            "arm_calls":
+                                external_service_control_timer_calls["arm"],
+                            "cancel_calls":
+                                external_service_control_timer_calls["cancel"],
+                            "query_calls":
+                                external_service_control_timer_calls["query"],
+                        },
+                        "completion_cancels_timer": True,
+                        "timeout_clears_controller_bits": [2, 6],
+                    },
                     "followup": {
                         "address":
                             EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT_ADDRESS,
@@ -5733,7 +5871,8 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     },
                     "external_self_test_name_accepted": False,
                     "raw_hle_reply_layout_compatible": False,
-                    "request_response_correlation_proven": False,
+                    "request_response_correlation_proven": True,
+                    "dsp_emission_policy_proven": False,
                 },
                 "delayed_command_0x64_body_2": {
                     "intercept": 0x23A5D8,

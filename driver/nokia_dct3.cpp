@@ -114,6 +114,8 @@ struct nokia_product_config
 	bool external_service_transport = false;
 	nokia_external_service_peer_device::application_profile external_service_application =
 			nokia_external_service_peer_device::application_profile::none;
+	nokia_dsp_hle_device::service_control_profile dsp_service_control =
+			nokia_dsp_hle_device::service_control_profile::none;
 	bool radio_peer = false;
 	nokia_radio_peer_device::wire_profile radio_wire =
 			nokia_radio_peer_device::wire_profile::none;
@@ -156,6 +158,7 @@ constexpr nokia_product_config make_3210_config()
 	result.external_service_transport = true;
 	result.external_service_application =
 			nokia_external_service_peer_device::application_profile::nse8;
+	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::compact;
 	result.radio_peer = true;
 	result.radio_wire = nokia_radio_peer_device::wire_profile::bitmap_search;
 	result.radio_acquisition =
@@ -201,6 +204,7 @@ constexpr nokia_product_config make_3310_config()
 	result.external_service_transport = true;
 	result.external_service_application =
 			nokia_external_service_peer_device::application_profile::nhm5;
+	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::compact;
 	result.radio_peer = true;
 	result.radio_wire = nokia_radio_peer_device::wire_profile::candidate_list;
 	result.radio_acquisition =
@@ -317,6 +321,12 @@ constexpr nokia_product_config make_6110_config()
 	// completion independently from transfer geometry and keep the peer
 	// disabled pending the full DSP-side publication semantics.
 	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::unresolved;
+	// The external MCU image correlates its 70 0d request with a framed
+	// type-74 completion through controller bit 2 and timer 14. NSE-8's exact
+	// decoder supplies the missing four-byte frame transformation. Type this
+	// proven request-derived boundary independently; it remains dormant while
+	// the unresolved NSE-3 DSP bootstrap keeps the DSP service disabled.
+	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::framed;
 	// Its external firmware independently proves the shared type-0x1a/68
 	// bitmap wire boundary. Record that separately from the still-unproved
 	// NSE-3 acquisition policy; a disabled peer cannot synthesize traffic.
@@ -734,6 +744,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	screen->set_visarea(0, product.lcd_visible_width - 1, 0, product.lcd_visible_height - 1);
 	m_dsp_hle->set_service_enabled(product.dsp_service);
 	m_dsp_hle->set_external_service_enabled(product.external_service_transport);
+	m_dsp_hle->set_service_control_profile(product.dsp_service_control);
 	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
 	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
 	m_dsp_hle->set_parameter_command(product.dsp_parameter_command);

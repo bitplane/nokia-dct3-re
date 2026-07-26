@@ -56,6 +56,20 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertNotIn("m_data_memory", self.transport)
         self.assertNotIn("m_data_memory", self.network + self.session)
 
+    def test_service_control_completion_framing_is_product_typed(self):
+        for token in (
+            "enum class service_control_profile",
+            "service_control_profile::compact",
+            "service_control_profile::framed",
+            "0x00, 0x04, 0x01, 0x00, 0x0d, 0x00",
+        ):
+            self.assertIn(token, self.hle + self.phone)
+        self.assertIn(
+            "set_service_control_profile(product.dsp_service_control)",
+            self.phone,
+        )
+        self.assertNotIn("service_control_profile", self.transport)
+
     def test_bootstrap_is_peer_publication_not_read_overlay(self):
         self.assertIn("peer_shared_w", self.transport)
         self.assertIn("publish_bootstrap_state", self.hle)

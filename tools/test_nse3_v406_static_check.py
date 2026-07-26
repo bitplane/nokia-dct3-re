@@ -1248,6 +1248,22 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             ("strb", "r1, [r4, #6]"),
             check.NSE8_TYPE_0X74_DECODER_ANCHORS[0x29BC36],
         )
+        self.assertEqual(
+            ("bl", "#0x25f146"),
+            check.EXTERNAL_SERVICE_CONTROL_TRANSACTION_ANCHORS[0x237D44],
+        )
+        self.assertEqual(
+            bytes.fromhex("01020000000000d4"),
+            check.EXTERNAL_SERVICE_CONTROL_TIMER_CONFIGURATION,
+        )
+        self.assertEqual(
+            [0x237D44, 0x26B498, 0x26C35E],
+            check.EXTERNAL_SERVICE_CONTROL_TIMER_ARM_CALLS,
+        )
+        self.assertEqual(
+            0xD4,
+            check.EXTERNAL_SERVICE_CONTROL_TIMER_EXPIRY_EVENT,
+        )
 
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)

@@ -207,6 +207,13 @@ response, including the segmented type-`0x51` DSP memory image and the
 non-`0d00` type-`0x70` publications. Do not infer request/reply behavior from
 packet type alone.
 
+The service-control completion layout is product-typed. NSE-8/NHM-5 use the
+compact type-`0x74` body `0d 00`. NSE-3 v4.06 receives the same logical
+completion only after the older decoder's four-byte framed prefix has already
+been applied, giving body `00 04 01 00 0d 00`. The HLE selects these as
+`compact` and `framed` profiles respectively. Selecting the NSE-3 framing does
+not enable its unresolved DSP bootstrap or application peer.
+
 The shared-service timer is one-shot: a nonzero MCU publication at `0x0e4`
 schedules one counter clear and one IRQ4 completion. Periodic zero-to-zero
 "completions" are idle IRQs whose absence preserves both ROM transport gates
