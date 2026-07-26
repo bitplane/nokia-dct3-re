@@ -337,6 +337,44 @@ RADIO_REPORT_JUMP_TABLE = {
     0x8E: 0x2A21BC,
     0x8F: 0x2A2154,
 }
+DSP_PARAMETER_08_ANCHORS = {
+    # Generic DSP parameter writer: selector r0 is bounded to 0x00..0x2e and
+    # dispatched through the adjacent table.
+    0x285B7C: ("push", "{r4, r5, r6, r7, lr}"),
+    0x285B86: ("adds", "r4, r0, #0"),
+    0x285BA2: ("cmp", "r0, #0x2e"),
+    0x285BA6: ("adr", "r1, #8"),
+    0x285BA8: ("lsls", "r0, r0, #2"),
+    0x285BAA: ("ldr", "r0, [r1, r0]"),
+    0x285BAC: ("mov", "pc, r0"),
+    # Selector 0x08 preserves the low twelve input bits, sets bit 15, mirrors
+    # the encoded word in SRAM, then reaches the shared-cell publication.
+    0x285DE8: ("ldr", "r0, [pc, #0x280]"),
+    0x285DEA: ("lsls", "r1, r6, #0x14"),
+    0x285DEC: ("lsrs", "r1, r1, #0x14"),
+    0x285DEE: ("orrs", "r0, r1"),
+    0x285DF0: ("ldr", "r1, [pc, #0x27c]"),
+    0x285DE4: ("strh", "r0, [r1]"),
+    0x285D22: ("ldr", "r2, [pc, #0x108]"),
+    0x285E30: ("ldrh", "r1, [r2]"),
+    0x285E3C: ("strh", "r0, [r2]"),
+    # One service-controlled mode routine submits table-derived selector 8/9
+    # pairs. This is a caller boundary, not an organic call-state claim.
+    0x2391E8: ("ldr", "r1, [pc, #0x378]"),
+    0x2391F0: ("ldrh", "r1, [r4]"),
+    0x2391F2: ("movs", "r0, #8"),
+    0x2391F4: ("movs", "r2, #1"),
+    0x2391F6: ("bl", "#0x285b7c"),
+}
+DSP_PARAMETER_08_LITERALS = {
+    0x285DE8: 0xFFFF8000,
+    0x285DF0: 0x10B972,
+    0x285D22: 0x100A8,
+    0x2391E8: 0x2B986C,
+}
+DSP_PARAMETER_JUMP_TABLE_ADDRESS = 0x285BB0
+DSP_PARAMETER_08_MODE_TABLE_ADDRESS = 0x2B986C
+DSP_PARAMETER_08_MODE_VALUES = [0x0600] * 9
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
     0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
@@ -779,6 +817,43 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     }
 
 
+def verify_dsp_parameter_08_boundary(data: bytes) -> dict:
+    decode_thumb_anchors(data, DSP_PARAMETER_08_ANCHORS)
+    verify_thumb_literals(data, DSP_PARAMETER_08_LITERALS)
+    table_offset = DSP_PARAMETER_JUMP_TABLE_ADDRESS - FLASH_BASE
+    selector_08_target = struct.unpack_from(
+        ">I", data, table_offset + 8 * 4
+    )[0]
+    if selector_08_target != 0x285DE8:
+        raise ValueError(
+            "NSE-3 DSP parameter selector 8 target changed: expected "
+            f"0x285de8, got {selector_08_target:#x}"
+        )
+    mode_offset = DSP_PARAMETER_08_MODE_TABLE_ADDRESS - FLASH_BASE
+    mode_values = [
+        struct.unpack_from(">H", data, mode_offset + index * 4)[0]
+        for index in range(len(DSP_PARAMETER_08_MODE_VALUES))
+    ]
+    if mode_values != DSP_PARAMETER_08_MODE_VALUES:
+        raise ValueError(
+            f"NSE-3 DSP parameter 8 mode table changed: expected "
+            f"{DSP_PARAMETER_08_MODE_VALUES}, got {mode_values}"
+        )
+    return {
+        "writer": 0x285B7C,
+        "selector": 0x08,
+        "selector_target": selector_08_target,
+        "input_encoding": "0x8000 | (value & 0x0fff)",
+        "shared_publication": 0x100A8,
+        "sram_mirror": 0x10B972,
+        "service_mode_caller": 0x2391BC,
+        "service_mode_values": mode_values,
+        "organic_answer_value": "not_established",
+        "organic_end_value": "not_established",
+        "speech_role": "not_established_from_selector_number",
+    }
+
+
 def extract_dsp_bootstrap_stream(data: bytes) -> bytes:
     source_first = 0x200040
     source_words = 63 * 512 + 510
@@ -924,6 +999,7 @@ def verify(data: bytes) -> dict:
         "simi_boundary": verify_simi_boundary(data),
         "dspif_transport_boundary": verify_dspif_boundary(data),
         "radio_packet_boundary": verify_radio_packet_boundary(data),
+        "dsp_parameter_08_boundary": verify_dsp_parameter_08_boundary(data),
         "dsp_bootstrap_transfer_boundary": verify_dsp_bootstrap_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {

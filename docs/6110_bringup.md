@@ -206,6 +206,31 @@ peer disabled. This prevents a future caller from treating identical bitmap
 packing as proof of the entire NSE-8 search lifecycle, while avoiding a copied
 NSE-3 packet codec.
 
+### DSP parameter selector 8
+
+The v4.06 external firmware also closes the encoding boundary for DSP
+parameter selector `0x08`, but not yet its organic call-state lifecycle.
+Generic writer `0x285b7c` bounds selectors to `0x00..0x2e` and dispatches them
+through an exact jump table. Selector 8 preserves the low twelve input bits,
+sets bit 15, mirrors the encoded word at SRAM `0x10b972`, and publishes it to
+shared cell `0x100a8`:
+
+```
+shared[0x0a8] = 0x8000 | (value & 0x0fff)
+```
+
+One service-controlled mode routine at `0x2391bc` submits selector-8/selector-9
+pairs from a nine-entry table. Every selector-8 input in that table is
+`0x0600`, producing shared word `0x8600`; the paired selector-9 values vary.
+This proves a real command codec and one service-mode caller, not that
+`0x8600` means Answer, speech enable, or any particular audio route.
+
+No organic Answer or End caller has yet been connected to this writer.
+Consequently the 6110 product keeps its DSP speech-control configuration
+disabled. In particular, neither NSE-8's `0x0201` mask nor NHM-5's observed
+`0x060b -> 0x040a` lifecycle may be inherited merely because all three
+products use numeric selector 8.
+
 The external image also proves the MCU side of a much larger bootstrap
 transfer. Routine `0x2858fc..0x2859ff` samples 32,766 halfwords from its own
 flash, beginning at reset entry `0x200040`, advancing by `0x20` bytes and
