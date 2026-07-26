@@ -13,7 +13,7 @@ CHECKPOINTS = (
         r"PCH no-identity fill channel=60 fn=")),
     ("IMSI Paging Request Type 1", re.compile(
         r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}"
-        r"31062101080910101032547698")),
+        r"31062110080910101032547698")),
     ("page publication", re.compile(
         r"PCH IMSI page transmitted channel=60 fn=")),
     ("paged random access", re.compile(

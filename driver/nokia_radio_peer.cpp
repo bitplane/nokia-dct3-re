@@ -935,8 +935,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
-		else
+		else if (m_protocol_profile == protocol_profile::nhm5_candidate_list)
 		{
+			// NHM-5 keeps ownership of the assigned SDCCH after an empty UI
+			// block and requests another transmit opportunity.  NSE-8 does not:
+			// injecting this retry into its contract shifts the later idle PCH
+			// schedule and makes an otherwise valid page miss its receive slot.
 			m_reports_remaining = 1;
 			m_wait_ticks = 59;
 			m_report_deferred = false;
@@ -1619,7 +1623,8 @@ void nokia_radio_peer_device::tick()
 	if (m_phase == phase::service_uplink_request &&
 			m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
-	if (m_phase == phase::lapdm_establish &&
+	if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+			m_phase == phase::lapdm_establish &&
 			m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
 	if ((m_phase == phase::candidate_ra_info || m_phase == phase::selected_ra_info) &&
@@ -1633,7 +1638,8 @@ void nokia_radio_peer_device::tick()
 			!(m_phase == phase::serving_bcch && m_wait_ticks != 0) &&
 			!(m_phase == phase::selected_bcch && m_wait_ticks != 0) &&
 			!(m_phase == phase::service_uplink_request && m_wait_ticks != 0) &&
-			!(m_phase == phase::lapdm_establish && m_wait_ticks != 0))
+			!(m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+				m_phase == phase::lapdm_establish && m_wait_ticks != 0))
 		emit_report();
 }
 

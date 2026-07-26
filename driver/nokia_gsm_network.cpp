@@ -81,14 +81,12 @@ std::array<u8, 24> nokia_gsm_network_device::paging_request(
 	if (length != 8)
 		return block;
 
-	// GSM 04.08 9.1.22 and 10.5.2.8. Request an SDCCH and preserve the IMSI
+	// GSM 04.08 9.1.22 and 10.5.2.5. Request an SDCCH and preserve the IMSI
 	// mobile-identity contents received organically during registration.
 	block[0] = 0x31;
 	block[1] = 0x06;
 	block[2] = 0x21;
-	// Page Mode occupies the high half-octet; CHANNEL (first mobile) is bits
-	// 2..1 of the low half-octet, where 01 means SDCCH.
-	block[3] = 0x01;
+	block[3] = 0x10;
 	block[4] = length;
 	std::copy_n(mobile_identity, length, block.begin() + 5);
 	return block;

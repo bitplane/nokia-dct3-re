@@ -6,7 +6,7 @@ from tools.radio_paging_trace_check import verify
 GOOD = """
 dsp_hle: LAPDm Channel Release acknowledged nr=2
 dsp_hle: PCH no-identity fill channel=60 fn=3657
-dspif_transport: RX enqueue type=80 payload=34 producer=0a4 data=601200000eaf00010000310621010809101010325476982b2b
+dspif_transport: RX enqueue type=80 payload=34 producer=0a4 data=601200000eaf00010000310621100809101010325476982b2b
 dsp_hle: PCH IMSI page transmitted channel=60 fn=3759
 dsp_hle: TX packet type=0c payload=8 words=5 radio_phase=random_access data=0000186c00ff0000
 dspif_transport: RX enqueue type=80 payload=34 producer=08c data=6012000012bf000100002d063f002000011818af
