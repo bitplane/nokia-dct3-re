@@ -223,15 +223,31 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 	else if (token == 0)
 	{
 		m_transport->peer_shared_w(0x100 / 2, 1);
-		if (++m_bootstrap_exchange_count == m_bootstrap_exchange_limit &&
-				m_bootstrap_completion ==
-						bootstrap_completion_profile::ready_words_one)
+		if (++m_bootstrap_exchange_count == m_bootstrap_exchange_limit)
 		{
-			for (offs_t offset = 0; offset <= (0x004 / 2); offset++)
-				m_transport->peer_shared_w(offset, 1);
-			if (m_trace_enabled)
-				LOGMASKED(LOG_DSP_HLE, "dsp_hle: bootstrap ready exchanges=%u t=%.6f\n",
-						m_bootstrap_exchange_count, machine().time().as_double());
+			switch (m_bootstrap_completion)
+			{
+			case bootstrap_completion_profile::ready_words_one:
+				for (offs_t offset = 0; offset <= (0x004 / 2); offset++)
+					m_transport->peer_shared_w(offset, 1);
+				if (m_trace_enabled)
+					LOGMASKED(LOG_DSP_HLE, "dsp_hle: bootstrap ready exchanges=%u t=%.6f\n",
+							m_bootstrap_exchange_count, machine().time().as_double());
+				break;
+
+			case bootstrap_completion_profile::cobba_b06_second_unknown:
+				// NSE-3 v4.06 captures shared 0x000 as its COBBA identity and
+				// later requires 0x0b06.  Its post-transfer wait and second
+				// capture use shared 0x002, whose DSP-published value remains
+				// unknown.  Publish only the evidenced identity: leaving
+				// 0x002 zero deliberately prevents an invented boot success.
+				m_transport->peer_shared_w(0x000 / 2, 0x0b06);
+				if (m_trace_enabled)
+					LOGMASKED(LOG_DSP_HLE,
+							"dsp_hle: bootstrap partial exchanges=%u cobba=0b06 second=unknown t=%.6f\n",
+							m_bootstrap_exchange_count, machine().time().as_double());
+				break;
+			}
 		}
 	}
 }

@@ -1337,9 +1337,12 @@ the same internal ROM.
 
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
-retain their three ready words of `1`; NSE-3 v4.06 selects `unresolved`.
-Enabling its DSP service can no longer silently turn the observed 64-block
-geometry into the legacy ready-word publication.
+retain their three ready words of `1`; NSE-3 v4.06 selects
+`cobba_b06_second_unknown`. That profile publishes only the evidenced
+`0x0b06` identity at shared `0x10000` and deliberately leaves `0x10002` zero.
+Enabling its DSP service can therefore neither turn the observed 64-block
+geometry into the legacy ready-word publication nor invent a successful boot
+before the second word's DSP-side semantics are recovered.
 
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine

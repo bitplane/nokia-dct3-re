@@ -93,6 +93,12 @@ class DspDeviceSplitTest(unittest.TestCase):
             "bootstrap_completion_profile::ready_words_one",
             self.hle,
         )
+        self.assertIn(
+            "bootstrap_completion_profile::cobba_b06_second_unknown",
+            self.hle + self.phone,
+        )
+        self.assertIn("peer_shared_w(0x000 / 2, 0x0b06)", self.hle)
+        self.assertNotIn("peer_shared_w(0x002 / 2, 0x0b06)", self.hle)
 
     def test_external_peer_uses_acknowledged_startup_phases(self):
         self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)

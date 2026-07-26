@@ -318,9 +318,10 @@ constexpr nokia_product_config make_6110_config()
 	// 0x10002. NSE-3 then projects captured shared word 0x10000 as COBBA
 	// identity B06 and a later path compares it against 0x0b06, so the generic
 	// HLE ready words of 1 are demonstrably incompatible. Type that unknown
-	// completion independently from transfer geometry and keep the peer
-	// disabled pending the full DSP-side publication semantics.
-	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::unresolved;
+	// completion independently from transfer geometry. Publish only the
+	// evidenced COBBA identity while deliberately leaving the unknown second
+	// word zero, and keep the peer disabled pending its DSP-side semantics.
+	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::cobba_b06_second_unknown;
 	// The external MCU image correlates its 70 0d request with a framed
 	// type-74 completion through controller bit 2 and timer 14. NSE-8's exact
 	// decoder supplies the missing four-byte frame transformation. Type this

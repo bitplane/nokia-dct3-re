@@ -103,7 +103,7 @@ class MachineProfileTest(unittest.TestCase):
                     "nokia_radio_peer_device::wire_profile::bitmap_search",
                 "dsp_parameter_command": "0x08",
                 "dsp_bootstrap_completion":
-                    "nokia_dsp_hle_device::bootstrap_completion_profile::unresolved",
+                    "nokia_dsp_hle_device::bootstrap_completion_profile::cobba_b06_second_unknown",
                 "dsp_service_control":
                     "nokia_dsp_hle_device::service_control_profile::framed",
             },

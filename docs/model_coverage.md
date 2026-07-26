@@ -19,7 +19,9 @@ The Nokia 6110 remains unpromoted after an independent ROM4-HLE comparison:
 the exact v4.06 candidate receives all 64 alternating transfer
 acknowledgements but still waits at `0x2859e0` for the missing non-zero
 `0x10002` publication. Its product profile therefore marks bootstrap
-completion `unresolved` independently from the evidenced transfer count. See
+completion `cobba_b06_second_unknown` independently from the evidenced
+transfer count. This publishes the proven identity only and remains
+fail-closed at the unknown second publication. See
 the reproducible comparison and provenance in `docs/6110_bringup.md`.
 
 The same comparison suggested an outbound type `0x03` control publication.
