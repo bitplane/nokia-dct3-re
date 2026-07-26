@@ -261,9 +261,11 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 				// 0x0b06.  Both v5.48 variants prove the same comparison, even
 				// though a real v5.48 handset reports fitted COBBA B07; do not
 				// assign this bootstrap result a physical-silicon meaning.
-				// The second DSP-published value remains unknown.  Publish only
-				// the evidenced first result: leaving 0x002 zero deliberately
-				// prevents an invented boot success.
+				// The second DSP-published value remains unknown.  The exact
+				// v5.48 MCU census proves it is capture-only after the wait, but
+				// its transition away from 0xffff is still required.  Publish
+				// only the evidenced first result and leave 0x002 at the MCU's
+				// parked sentinel to prevent an invented completion event.
 				m_transport->peer_shared_w(0x000 / 2, 0x0b06);
 				if (m_trace_enabled)
 					LOGMASKED(LOG_DSP_HLE,

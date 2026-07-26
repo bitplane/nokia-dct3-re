@@ -1434,6 +1434,17 @@ hardware. Zero is therefore an implementation convention, not evidence for
 NSE-3 v5.48's exact publication. The local completion profile continues to
 leave the second word unresolved.
 
+The exact-image census now closes the MCU side of that question. Each v5.48
+image has fourteen literal roots for its product-local bootstrap state
+(`0x10ba28` in ROM3 and `0x10ba38` in ROM4). Inspection of every root-owning
+routine finds no state pointer passed to another routine and no read of
+state offset `0x0e`; the loader's anchored `strh` capture is its sole MCU
+access. Thus the external firmware cares that shared `0x10002` changes away
+from the parked `0xffff`, but does not subsequently consume its numeric
+value. This narrows the missing contract to a DSP-owned completion event. It
+still does not justify publishing zero: zero would not satisfy the firmware's
+wait, and the exact non-sentinel hardware verdict remains unknown.
+
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
 retain their three ready words of `1`; NSE-3 v4.06 selects

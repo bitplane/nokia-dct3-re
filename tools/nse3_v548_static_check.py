@@ -24,6 +24,11 @@ VARIANTS = {
         "loader_call": 0x297CF6,
         "delay_helper": 0x2A4C48,
         "state": 0x10BA28,
+        "state_literal_roots": [
+            0x283226, 0x28331E, 0x28347E, 0x283626, 0x2836E4,
+            0x2838C8, 0x2838E8, 0x283908, 0x28392A, 0x283A5A,
+            0x283AF2, 0x297A04, 0x297B4E, 0x297C3C,
+        ],
         "internal_rom_service": 0x23751A,
         "internal_rom_service_call": 0x237532,
         "internal_rom_service_setter": 0x28CB36,
@@ -41,6 +46,11 @@ VARIANTS = {
         "loader_call": 0x299922,
         "delay_helper": 0x2A693C,
         "state": 0x10BA38,
+        "state_literal_roots": [
+            0x284E42, 0x284F3A, 0x28509A, 0x285242, 0x285300,
+            0x2854E4, 0x285504, 0x285524, 0x285546, 0x285676,
+            0x28570E, 0x299630, 0x29977A, 0x299868,
+        ],
         "internal_rom_service": 0x237A5A,
         "internal_rom_service_call": 0x237A72,
         "internal_rom_service_setter": 0x28E75E,
@@ -316,6 +326,17 @@ def verify_variant(path: Path, name: str) -> dict:
         ]
         for address in (pre_upload_storage, first_result, second_result)
     }
+    state_literal_roots = [
+        decoded.address
+        for decoded in instructions
+        if literal_value(data, decoded) == profile["state"]
+    ]
+    if state_literal_roots != profile["state_literal_roots"]:
+        raise ValueError(
+            f"{path}: bootstrap state literal roots changed: expected "
+            f"{[hex(address) for address in profile['state_literal_roots']]}, "
+            f"got {[hex(address) for address in state_literal_roots]}"
+        )
     expected_pre_upload_references = [
         internal_rom_service,
         internal_rom_diagnostic,
@@ -377,6 +398,7 @@ def verify_variant(path: Path, name: str) -> dict:
         "transfer_blocks": 64,
         "stream_sha1": stream_sha1,
         "state": profile["state"],
+        "state_literal_roots": state_literal_roots,
         "final_result_capture": {
             "first_storage": first_result,
             "first_direct_literal_references":
@@ -387,6 +409,13 @@ def verify_variant(path: Path, name: str) -> dict:
             "second_storage": second_result,
             "second_direct_literal_references":
                 result_literal_references[second_result],
+            # The exact-image whole-state census has fourteen literal roots.
+            # Inspection of every root-owning routine finds no state pointer
+            # passed to another routine and no read at state+0x0e.  The sole
+            # access is the loader's anchored STRH capture above.
+            "second_state_root_reads": [],
+            "second_pointer_escapes": [],
+            "second_mcu_access": "capture_write_only",
             "second_value": "unknown",
         },
     }

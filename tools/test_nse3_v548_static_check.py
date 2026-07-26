@@ -43,6 +43,19 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
         self.assertIn('"retry_delay_raw": 10', source)
         self.assertNotIn('"retry_delay_ms"', source)
 
+    def test_second_result_census_is_capture_only_not_a_guessed_value(self):
+        source = Path(check.__file__).read_text(encoding="utf-8")
+        for profile in check.VARIANTS.values():
+            self.assertEqual(14, len(profile["state_literal_roots"]))
+            self.assertEqual(
+                len(profile["state_literal_roots"]),
+                len(set(profile["state_literal_roots"])),
+            )
+        self.assertIn('"second_state_root_reads": []', source)
+        self.assertIn('"second_pointer_escapes": []', source)
+        self.assertIn('"second_mcu_access": "capture_write_only"', source)
+        self.assertIn('"second_value": "unknown"', source)
+
     def test_identity_rejects_short_image(self):
         with self.assertRaisesRegex(ValueError, "expected 0x100000 bytes"):
             check.verify_variant(
