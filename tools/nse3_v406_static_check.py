@@ -1164,15 +1164,71 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     # 24 report bytes inside a 0x40-byte task object.  Task 12 conditionally
     # feeds that object to the candidate updater, which owns the sole
     # non-consumer timer-0x6b arm.
+    0x2800B0: ("push", "{r4, r5, r6, r7, lr}"),
+    0x2800BC: ("ldrb", "r1, [r4, #8]"),
+    0x2800BE: ("ldrb", "r0, [r4, #7]"),
+    0x2800C6: ("ldrb", "r1, [r4, #9]"),
+    0x2800CC: ("str", "r0, [r1]"),
+    0x2800D2: ("ldrb", "r0, [r5, #0xf]"),
+    0x2800D4: ("cmp", "r0, #1"),
+    0x2800D8: ("ldrb", "r0, [r4, #4]"),
+    0x2800DA: ("cmp", "r0, #0x40"),
+    0x2800E0: ("ldrb", "r1, [r4, #4]"),
+    0x2800E2: ("ldrb", "r0, [r4, #6]"),
+    0x2800E8: ("cmp", "r1, #0x60"),
+    0x2800EE: ("ldrb", "r3, [r4, #0x10]"),
+    0x2800F2: ("cmp", "r2, #0x18"),
+    0x2800F8: ("strb", "r0, [r4, #4]"),
+    0x280100: ("subs", "r1, r1, r2"),
+    0x280102: ("cmp", "r1, #0"),
+    0x280108: ("subs", "r1, #0x10"),
+    0x280110: ("subs", "r1, #0x10"),
+    0x280116: ("subs", "r1, #0x10"),
+    0x28011C: ("subs", "r1, #0x10"),
+    0x280122: ("subs", "r1, #0x20"),
+    0x280128: ("subs", "r1, #0x10"),
+    0x28012A: ("cmp", "r1, #1"),
+    # Discriminator 0x40 alone reaches this controller branch.  Its flag
+    # gates either discard, post status 0x138e, cancel timer 0x1b, or build
+    # the status-0x139e object below.
+    0x2802E0: ("ldr", "r0, [r6, #0x7c]"),
+    0x2802EC: ("ldr", "r1, [pc, #0x2fc]"),
+    0x2802F0: ("str", "r0, [r6, #0x7c]"),
+    0x2802F2: ("ldrb", "r1, [r5, #0xf]"),
+    0x2802F4: ("cmp", "r1, #1"),
+    0x2802FA: ("cmp", "r1, #2"),
+    0x28030A: ("bne", "#0x28035c"),
     0x28030C: ("movs", "r0, #0x40"),
     0x28030E: ("bl", "#0x260abc"),
     0x280314: ("ldr", "r0, [pc, #0x2d8]"),
     0x280316: ("strh", "r0, [r5]"),
+    0x280318: ("ldrb", "r1, [r4, #8]"),
+    0x28031A: ("ldrb", "r0, [r4, #7]"),
+    0x280322: ("ldrb", "r1, [r4, #9]"),
+    0x280326: ("str", "r0, [r5, #4]"),
+    0x280328: ("ldrb", "r1, [r4, #0xb]"),
+    0x28032A: ("ldrb", "r0, [r4, #0xa]"),
+    0x280330: ("strh", "r0, [r5, #8]"),
+    0x280332: ("ldrb", "r0, [r4, #0xd]"),
+    0x280334: ("ldrb", "r1, [r4, #0xc]"),
+    0x28033A: ("strh", "r0, [r5, #0xa]"),
+    0x28033C: ("ldrb", "r0, [r4, #5]"),
+    0x28033E: ("strb", "r0, [r5, #0xc]"),
+    0x280340: ("ldrb", "r0, [r4, #6]"),
+    0x280342: ("strb", "r0, [r5, #0xd]"),
     0x280344: ("movs", "r0, #0xe"),
     0x280348: ("movs", "r1, #0xe"),
     0x28034C: ("movs", "r2, #0x18"),
+    0x28034E: ("bl", "#0x2a44fc"),
     0x280352: ("movs", "r0, #0xc"),
     0x280356: ("bl", "#0x25fb4c"),
+    0x28035C: ("ldr", "r0, [pc, #0x294]"),
+    0x280360: ("movs", "r0, #0xb"),
+    0x280364: ("bl", "#0x25fb4c"),
+    0x28036A: ("adds", "r0, r4, #0"),
+    0x28036C: ("bl", "#0x26069c"),
+    0x280370: ("movs", "r0, #0x1b"),
+    0x280372: ("bl", "#0x25ef90"),
     0x217418: ("strb", "r7, [r5, #9]"),
     0x21741A: ("ldr", "r0, [pc, #0x154]"),
     0x21741E: ("cmp", "r0, #2"),
@@ -1181,6 +1237,26 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x21742E: ("movs", "r1, #0x40"),
     0x217430: ("bl", "#0x2767aa"),
     0x217436: ("bl", "#0x2124a8"),
+    # The candidate updater is shared with one internal synthetic-object
+    # caller.  It indexes a 0x44-byte candidate record from object +8,
+    # requires object +0xd to be zero, and consumes copied byte +0xe.
+    0x2124A8: ("push", "{r4, r5, r6, r7, lr}"),
+    0x2124B0: ("ldrh", "r0, [r5, #8]"),
+    0x2124B2: ("bl", "#0x212348"),
+    0x2124B8: ("ldrb", "r0, [r5, #0xd]"),
+    0x2124BA: ("cmp", "r0, #0"),
+    0x2124D4: ("ldrb", "r0, [r5, #0xe]"),
+    0x2124F2: ("movs", "r0, #0x44"),
+    0x2124F4: ("muls", "r0, r4, r0"),
+    0x21251E: ("ldr", "r0, [r5, #4]"),
+    0x212520: ("movs", "r1, #0x33"),
+    0x212522: ("bl", "#0x2a3a98"),
+    0x21256A: ("ldr", "r0, [pc, #0x2dc]"),
+    0x21256E: ("bl", "#0x276a58"),
+    0x212642: ("ldr", "r0, [pc, #0x348]"),
+    0x212656: ("ldr", "r0, [pc, #0x208]"),
+    0x212658: ("ldrb", "r0, [r0]"),
+    0x21265A: ("cmp", "r0, #4"),
 }
 RADIO_REPORT_HANDLER_LITERALS = {
     0x211C68: 0x1393,
@@ -1203,6 +1279,11 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x212556: 0x0EB4,
     0x26017C: 0x100138,
     0x280314: 0x139E,
+    0x2800CA: 0x109078,
+    0x2800CE: 0x1090F0,
+    0x2800D0: 0x1090FC,
+    0x2802EC: 0xF5FFFFFF,
+    0x28035C: 0x138E,
     0x21741A: 0x106B08,
     0x217422: 0x106AF6,
     0x2171CE: 0x106B0D,
@@ -1249,6 +1330,9 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x20DC4A: 0x108ED4,
     0x20DC66: 0x0401,
     0x20DC70: 0x10917C,
+    0x2124F0: 0x106D3C,
+    0x212642: 0x106AA4,
+    0x212656: 0x1090FF,
 }
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 RA_INFO_CONSUMER = 0x20DB1C
@@ -1425,6 +1509,9 @@ RA_INFO_TIMER_EVENT_PREFIX = bytes.fromhex("138c0000")
 RA_INFO_TIMER_ARM_CALLS = [0x20DC2C, 0x20DCC6]
 RA_INFO_TIMER_CANCEL_CALLS = [0x20DD24, 0x20DD6C, 0x20F0B0]
 RA_INFO_TIMER_QUERY_CALLS = []
+TYPE_0X80_CANDIDATE_UPDATER = 0x2124A8
+TYPE_0X80_CANDIDATE_UPDATER_DIRECT_CALLS = [0x2126F0, 0x217436]
+TYPE_0X80_CANDIDATE_UPDATER_CODE_END = 0x21268A
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -2812,6 +2899,45 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS}, got "
             f"{ra_info_followup_calls}"
         )
+    type_0x80_candidate_updater_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TYPE_0X80_CANDIDATE_UPDATER
+    ]
+    if (
+        type_0x80_candidate_updater_calls
+        != TYPE_0X80_CANDIDATE_UPDATER_DIRECT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 type-0x80 candidate-updater call census changed: "
+            f"expected {TYPE_0X80_CANDIDATE_UPDATER_DIRECT_CALLS}, got "
+            f"{type_0x80_candidate_updater_calls}"
+        )
+    type_0x80_updater_request_calls = {
+        name: [
+            insn.address
+            for insn in instructions
+            if insn
+            and TYPE_0X80_CANDIDATE_UPDATER
+            <= insn.address
+            < TYPE_0X80_CANDIDATE_UPDATER_CODE_END
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+        ]
+        for name, target in (
+            ("channel_configure", 0x20CFFA),
+            ("bitmap_search", 0x20FAEC),
+            ("candidate_list", 0x214788),
+            ("task_submit", 0x25FB4C),
+        )
+    }
+    if any(type_0x80_updater_request_calls.values()):
+        raise ValueError(
+            "NSE-3 type-0x80 candidate updater acquired a direct request "
+            f"edge: {type_0x80_updater_request_calls}"
+        )
     task_17_entry = effective_u32(
         physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
     )
@@ -3325,6 +3451,70 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "evidenced_discriminator_values": [0x70, 0x80, 0xB0, 0xB1],
                 "principal_destination_task": 3,
                 "acquisition_terminal": False,
+                "semantic_name_assigned": False,
+            },
+            "type_0x80": {
+                "handler": 0x2800B0,
+                "report_discriminator_offset": 4,
+                "evidenced_discriminator_values": [
+                    0x40, 0x50, 0x60, 0x70,
+                    0x80, 0xA0, 0xB0, 0xB1,
+                ],
+                "discriminator_0x60_can_rewrite_to": 0x50,
+                "shared_value_24_be_offsets": [7, 8, 9],
+                "shared_value_24_cell": 0x109078,
+                "status_0x139e_branch": {
+                    "required_discriminator": 0x40,
+                    "controller_object": 0x1090FC,
+                    "controller_flags_offset": 0x7C,
+                    "cleared_controller_mask": 0x0A000000,
+                    "controller_state_object": 0x1090F0,
+                    "controller_state_offset": 0x0F,
+                    "task": 12,
+                    "status": 0x139E,
+                    "object_bytes": 0x40,
+                    "layout": {
+                        "value_24": 4,
+                        "value_16_be_0_from_report": [8, [0x0A, 0x0B]],
+                        "value_16_be_1_from_report": [0x0A, [0x0C, 0x0D]],
+                        "report_byte_5": 0x0C,
+                        "report_byte_6": 0x0D,
+                        "copied_report_source": 0x0E,
+                        "copied_report_destination": 0x0E,
+                        "copied_report_bytes": 0x18,
+                    },
+                    "alternate_status": 0x138E,
+                    "alternate_task": 11,
+                    "timer_0x1b_cancel_path": True,
+                },
+                "task_case": 0x217418,
+                "task_case_routes": {
+                    "state_0x106b08_equal_2": {
+                        "helper": 0x216E84,
+                        "followup": 0x2141BC,
+                    },
+                    "state_not_2_and_mode_0x106af6_equal_2": {
+                        "candidate_updater":
+                            TYPE_0X80_CANDIDATE_UPDATER,
+                    },
+                    "other": "no_candidate_update",
+                },
+                "candidate_updater": {
+                    "routine": TYPE_0X80_CANDIDATE_UPDATER,
+                    "direct_calls": type_0x80_candidate_updater_calls,
+                    "other_caller_builds_internal_synthetic_object":
+                        0x2126F0,
+                    "candidate_index_source_object_offset": 8,
+                    "requires_object_offset_0x0d_zero": True,
+                    "consumes_object_offset": 0x0E,
+                    "candidate_record_base": 0x106D3C,
+                    "candidate_controller": 0x106AA4,
+                    "candidate_record_bytes": 0x44,
+                    "can_arm_timer": 0x6B,
+                    "direct_request_calls":
+                        type_0x80_updater_request_calls,
+                },
+                "direct_acquisition_terminal": False,
                 "semantic_name_assigned": False,
             },
             "type_0x84": {

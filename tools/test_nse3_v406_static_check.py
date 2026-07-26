@@ -280,6 +280,50 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x106B08, check.RADIO_REPORT_HANDLER_LITERALS[0x2171F0]
         )
 
+    def test_type_0x80_discriminator_0x40_owns_candidate_update_path(self):
+        self.assertEqual(
+            ("ldrb", "r0, [r4, #4]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2800D8],
+        )
+        self.assertEqual(
+            ("cmp", "r0, #0x40"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2800DA],
+        )
+        self.assertEqual(
+            0x109078, check.RADIO_REPORT_HANDLER_LITERALS[0x2800CA]
+        )
+        self.assertEqual(
+            0xF5FFFFFF, check.RADIO_REPORT_HANDLER_LITERALS[0x2802EC]
+        )
+        self.assertEqual(
+            ("movs", "r2, #0x18"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x28034C],
+        )
+        self.assertEqual(
+            ("bl", "#0x2a44fc"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x28034E],
+        )
+        self.assertEqual(0x2124A8, check.TYPE_0X80_CANDIDATE_UPDATER)
+        self.assertEqual(
+            [0x2126F0, 0x217436],
+            check.TYPE_0X80_CANDIDATE_UPDATER_DIRECT_CALLS,
+        )
+        self.assertEqual(
+            ("ldrh", "r0, [r5, #8]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2124B0],
+        )
+        self.assertEqual(
+            ("ldrb", "r0, [r5, #0xd]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2124B8],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x44"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2124F2],
+        )
+        self.assertEqual(
+            0x106D3C, check.RADIO_REPORT_HANDLER_LITERALS[0x2124F0]
+        )
+
     def test_bitmap_constructors_keep_populated_and_zero_control_forms_distinct(self):
         self.assertEqual(0x09CD, check.RADIO_PACKET_LITERALS[0x20FD94])
         self.assertEqual(0x0445, check.RADIO_PACKET_LITERALS[0x24E74A])

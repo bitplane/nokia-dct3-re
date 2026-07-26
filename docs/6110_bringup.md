@@ -271,16 +271,39 @@ the measurement consumer. This proves the recurring
 loop. The timer unit and the trigger that first reaches the candidate-update
 arm were previously unproved.
 
-The MCU-side initial-arm path is now bounded too. A conditional type-`0x80`
-report branch constructs a `0x40`-byte task-12 object with status `0x139e`
-and preserves 24 report bytes. Task-12 case `0x217418` sends it to candidate
-updater `0x2124a8` when state byte `0x106b08` is not 2 and mode byte
-`0x106af6` is 2. That updater contains the sole non-consumer timer-`0x6b`
-arm at `0x212558`, further gated by a nonzero byte at `0x106afd`. This closes
-the external-MCU path from a received report into the recurring measurement
-timer, but not the missing DSP-side conditions that emit the type-`0x80`
-report or the meaning and unit of its timing. The raw durations therefore
-remain exact-image policy evidence rather than enabled peer timing.
+The MCU-side initial-arm path is now bounded too. Handler `0x2800b0` is a
+report multiplexer: object byte 4 admits distinct values `0x40`, `0x50`,
+`0x60`, `0x70`, `0x80`, `0xa0`, `0xb0` and `0xb1`, and one gated
+`0x60` form is rewritten to `0x50`. It always combines report bytes 7..9
+as a big-endian 24-bit value at `0x109078`, but only discriminator `0x40`
+reaches the status-`0x139e` controller branch.
+
+That branch first applies flags in controller object `0x1090fc`, clearing
+mask `0x0a000000`. Depending on the remaining flags and controller state it
+can release the report, cancel timer `0x1b`, or forward status `0x138e` to
+task 11. Only the remaining path allocates a `0x40`-byte task-12 object with
+status `0x139e`. It stores the 24-bit value at +4, report words
+`0x0a..0x0b` and `0x0c..0x0d` in big-endian form at +8 and +`0x0a`,
+copies report bytes 5 and 6 to +`0x0c` and +`0x0d`, and preserves 24
+further report bytes from +`0x0e` at the same object offset.
+
+Task-12 case `0x217418` has two separate continuations. State byte
+`0x106b08 == 2` uses helpers `0x216e84` and `0x2141bc`. Other states reach
+candidate updater `0x2124a8` only when mode byte `0x106af6 == 2`; all
+remaining modes skip candidate update. The updater has exactly two direct
+callers: this received-report path and internal synthetic-object builder
+`0x21269c`. It derives an index from object +8, requires object +`0x0d` to
+be zero, consumes copied byte +`0x0e`, and updates `0x44`-byte records based
+at `0x106d3c` under controller `0x106aa4`. Its code extent directly calls
+neither `CHANNEL_CONFIGURE`, either search builder nor the task-3 submit API.
+
+The updater does contain the sole non-consumer timer-`0x6b` arm at
+`0x212558`, further gated by a nonzero byte at `0x106afd`. This closes the
+external-MCU path from one specific received-report discriminator into the
+recurring measurement timer, but not the missing DSP-side conditions that
+emit the type-`0x80` report or the meaning and unit of its timing. The raw
+durations therefore remain exact-image policy evidence rather than enabled
+peer timing.
 
 The later state/type topology matches the NSE-8 acquisition family, but its
 consumer exposes a real product boundary: NSE-3 advances through internal
