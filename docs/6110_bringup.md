@@ -107,6 +107,26 @@ NSE-3 declares the controller but deliberately leaves the synthetic card
 absent. Existing validated products explicitly select both. SIM coverage and
 registration remain unpromoted.
 
+The same exact-image gate now establishes the firmware side of the generic
+DSPIF transport. The MCU-to-DSP ring occupies shared byte offsets
+`0x000..0x0a3`, with word cursors at `0x0a4/0x0a6`; the DSP-to-MCU ring
+occupies `0x100..0x1c7`, with word cursors at `0x1c8/0x1ca`. Firmware
+initializes the first pair to zero and the second pair to word offset `0x80`,
+then applies the corresponding wrap limits while producing and consuming
+records. The verifier checks both the Thumb operations and their effective
+shared-memory literals, including the `0x30000` DSPIF doorbell. These are the
+same transport boundaries expressed by the reusable `nokia_dspif_device`, so
+NSE-3 does not require a copied or product-specific ring implementation.
+
+This is deliberately a transport-only result. The external image shows a
+larger DSP initialization/upload routine and synchronization cells, but the
+matching internal DSP image is absent and the meanings of its bootstrap
+replies are not established. Consequently the NSE-3 profile still has no DSP
+peer, no guessed ready value and no inherited NSE-8 or NHM-5 service grammar.
+The static JSON records `internal_dsp_image: missing` and
+`bootstrap_reply_semantics: not_established` so later work cannot silently
+promote the shared layout into a working-handshake claim.
+
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine
 therefore retains `NO_DUMP` internal ROMs and firmware-derived peers remain
@@ -148,9 +168,10 @@ Once a baseline is present, promotion proceeds in this order:
 
 1. **Declared hardware (implemented):** TE28F800, 64 KiB SRAM, 8 KiB EEPROM,
    UE4 display and keypad, MIC2/EAR topology, and the documented PCM shape.
-2. **Boot/DSP boundary:** organic reset vector, ROM3/ROM4 identity, DSP upload
-   and handshake census. Any HLE service remains disabled until its packet
-   grammar is observed.
+2. **Boot/DSP boundary:** the generic shared-ring transport is established;
+   next recover the organic reset path, ROM3/ROM4 identity, DSP upload and
+   handshake census. Any HLE service remains disabled until its packet grammar
+   is observed.
 3. **Interactive:** firmware-rendered idle UI plus physical softkey,
    Send/End, navigation and digit acceptance.
 4. **SIM/radio:** recover the NSE-3 SIM transaction and radio packet profiles;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the reproducible NSE-3 v4.06 reset and direct-MMIO boundary.
+"""Verify reproducible NSE-3 v4.06 reset, peripheral and DSPIF boundaries.
 
 This checker is deliberately firmware-specific.  It proves properties of the
 identified normalized image; it does not assign semantics to MAD2 registers or
@@ -18,8 +18,10 @@ import capstone
 
 try:
     from tools.mad2_static_census import analyze_image
+    from tools.message_census import decode_image, literal_value
 except ModuleNotFoundError:  # Direct execution from tools/.
     from mad2_static_census import analyze_image
+    from message_census import decode_image, literal_value
 
 
 FLASH_BASE = 0x200000
@@ -73,6 +75,45 @@ SIMI_ANCHORS = {
     0x290462: ("ldrb", "r0, [r1]"),
     0x29046A: ("strb", "r0, [r1]"),
 }
+DSPIF_ANCHORS = {
+    # Doorbell write after a shared-memory request is accepted.
+    0x28564C: ("ldr", "r1, [pc, #0x3b8]"),
+    0x28564E: ("movs", "r0, #4"),
+    0x285650: ("strh", "r0, [r1]"),
+    # MCU-to-DSP ring construction, wrapping and producer commit.
+    0x2856D2: ("ldr", "r3, [pc, #0x34c]"),
+    0x2856D4: ("movs", "r2, #0xa4"),
+    0x2856E6: ("cmp", "r5, r1"),
+    0x2856EA: ("adds", "r5, r3, #0"),
+    0x28572A: ("strh", "r0, [r2]"),
+    # DSP-to-MCU occupancy and record consumption.
+    0x28577A: ("ldr", "r0, [pc, #0x3c0]"),
+    0x28577E: ("ldr", "r0, [pc, #0x3c0]"),
+    0x28578C: ("adds", "r0, #0x64"),
+    0x2857C8: ("ldr", "r4, [pc, #0x378]"),
+    0x2857F6: ("strh", "r1, [r6, r0]"),
+    # Cursor-pair free-space calculation and deterministic initialization.
+    0x2858A0: ("ldr", "r0, [pc, #0x2a4]"),
+    0x2858A2: ("ldrh", "r2, [r0]"),
+    0x2858A4: ("ldrh", "r1, [r0, #2]"),
+    0x285A42: ("ldr", "r0, [pc, #0x104]"),
+    0x285A44: ("strh", "r1, [r0]"),
+    0x285A46: ("ldr", "r3, [pc, #0xf8]"),
+    0x285A48: ("movs", "r2, #0x80"),
+    0x285A4A: ("strh", "r2, [r3]"),
+    0x285A4C: ("strh", "r2, [r3, #2]"),
+    0x285A4E: ("strh", "r1, [r0, #2]"),
+}
+DSPIF_LITERALS = {
+    0x28564C: 0x30000,
+    0x2856D2: 0x10000,
+    0x28577A: 0x101CA,
+    0x28577E: 0x101C8,
+    0x2857C8: 0x10100,
+    0x2858A0: 0x100A4,
+    0x285A42: 0x100A4,
+    0x285A46: 0x101C8,
+}
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -117,6 +158,19 @@ def decode_thumb_anchors(data: bytes, anchors: dict[int, tuple[str, str]]) -> No
         actual = (decoded[0].mnemonic, decoded[0].op_str) if decoded else None
         if actual != expected:
             raise ValueError(f"Thumb anchor {pc:#x}: expected {expected}, got {actual}")
+
+
+def verify_thumb_literals(data: bytes, literals: dict[int, int]) -> None:
+    physical = swap16(data)
+    instructions = decode_image(physical, FLASH_BASE)
+    by_address = {insn.address: insn for insn in instructions if insn}
+    for pc, expected in literals.items():
+        actual = literal_value(by_address.get(pc), physical, FLASH_BASE)
+        if actual != expected:
+            raise ValueError(
+                f"Thumb literal {pc:#x}: expected {expected:#x}, got "
+                f"{actual if actual is None else hex(actual)}"
+            )
 
 
 def verify_identity(data: bytes) -> dict:
@@ -231,6 +285,36 @@ def verify_simi_boundary(data: bytes) -> dict:
     }
 
 
+def verify_dspif_boundary(data: bytes) -> dict:
+    decode_thumb_anchors(data, DSPIF_ANCHORS)
+    verify_thumb_literals(data, DSPIF_LITERALS)
+    return {
+        "shared_window": {"start": 0x10000, "end": 0x10FFF},
+        "doorbell": 0x30000,
+        "mcu_to_dsp": {
+            "ring_start_byte": 0x000,
+            "ring_end_byte_exclusive": 0x0A4,
+            "producer_byte": 0x0A4,
+            "consumer_byte": 0x0A6,
+            "cursor_unit": "word",
+        },
+        "dsp_to_mcu": {
+            "ring_start_byte": 0x100,
+            "ring_end_byte_exclusive": 0x1C8,
+            "producer_byte": 0x1C8,
+            "consumer_byte": 0x1CA,
+            "cursor_unit": "word",
+        },
+        "cursor_initialization": {
+            "mcu_to_dsp": 0,
+            "dsp_to_mcu": 0x80,
+        },
+        "transport_component": "generic_nokia_dspif",
+        "internal_dsp_image": "missing",
+        "bootstrap_reply_semantics": "not_established",
+    }
+
+
 def verify(data: bytes) -> dict:
     return {
         "identity": verify_identity(data),
@@ -238,6 +322,7 @@ def verify(data: bytes) -> dict:
         "keypad_boundary": verify_keypad_boundary(data),
         "eeprom_boundary": verify_eeprom_boundary(data),
         "simi_boundary": verify_simi_boundary(data),
+        "dspif_transport_boundary": verify_dspif_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {
             "rom3_compatibility": "candidate_not_proven",

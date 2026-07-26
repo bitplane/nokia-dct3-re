@@ -116,6 +116,55 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(0x20037, result["rx_data"])
         self.assertEqual("not_established", result["synthetic_card_profile"])
 
+    def test_dspif_boundary_recovers_ring_geometry_without_reply_semantics(self):
+        physical = bytearray(b"\xff" * check.FLASH_SIZE)
+        encodings = {
+            0x28564C: "ee49", 0x28564E: "0420", 0x285650: "0880",
+            0x2856D2: "d34b", 0x2856D4: "a422",
+            0x2856E6: "8d42", 0x2856EA: "1d1c", 0x28572A: "1080",
+            0x28577A: "f048", 0x28577E: "f048", 0x28578C: "6430",
+            0x2857C8: "de4c", 0x2857F6: "3152",
+            0x2858A0: "a948", 0x2858A2: "0288", 0x2858A4: "4188",
+            0x285A42: "4148", 0x285A44: "0180",
+            0x285A46: "3e4b", 0x285A48: "8022",
+            0x285A4A: "1a80", 0x285A4C: "5a80", 0x285A4E: "4180",
+        }
+        for pc, encoded in encodings.items():
+            offset = pc - check.FLASH_BASE
+            physical[offset : offset + 2] = bytes.fromhex(encoded)
+        pools = {
+            0x285A08: 0x30000,
+            0x285A20: 0x10000,
+            0x285B3C: 0x101CA,
+            0x285B40: 0x101C8,
+            0x285B44: 0x10100,
+            0x285B48: 0x100A4,
+        }
+        for address, value in pools.items():
+            raw = ((value << 16) | (value >> 16)) & 0xFFFFFFFF
+            struct.pack_into("<I", physical, address - check.FLASH_BASE, raw)
+        result = check.verify_dspif_boundary(check.swap16(bytes(physical)))
+        self.assertEqual(0x0A4, result["mcu_to_dsp"]["producer_byte"])
+        self.assertEqual(0x1CA, result["dsp_to_mcu"]["consumer_byte"])
+        self.assertEqual("missing", result["internal_dsp_image"])
+        self.assertEqual(
+            "not_established", result["bootstrap_reply_semantics"]
+        )
+
+    def test_dspif_boundary_rejects_inherited_cursor_address(self):
+        physical = bytearray(b"\xff" * check.FLASH_SIZE)
+        # A syntactically valid LDR at the first literal anchor must not be
+        # enough when its effective pointer is from another product.
+        offset = 0x28564C - check.FLASH_BASE
+        physical[offset : offset + 2] = bytes.fromhex("ee49")
+        wrong = 0x101EC
+        raw = ((wrong << 16) | (wrong >> 16)) & 0xFFFFFFFF
+        struct.pack_into("<I", physical, 0x285A08 - check.FLASH_BASE, raw)
+        with self.assertRaisesRegex(ValueError, "Thumb literal"):
+            check.verify_thumb_literals(
+                check.swap16(bytes(physical)), {0x28564C: 0x30000}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
