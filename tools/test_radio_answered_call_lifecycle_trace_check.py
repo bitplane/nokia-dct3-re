@@ -29,6 +29,23 @@ class AnsweredCallLifecycleTraceCheckTest(unittest.TestCase):
         result = verify(GOOD)
         self.assertEqual(3, result["stable_tch_polls"])
         self.assertEqual(3, result["control_states"])
+        self.assertEqual("split", result["connected_producer_path"])
+
+    def test_accepts_observed_full_word_connected_producer(self):
+        trace = GOOD.replace(
+            "dsp_audio_shadow_write: address=0011206c old=0002 data=0203 "
+            "pc=0028d9a8 task=05 t=2\n"
+            "dsp_audio_shadow_write: address=0011206c old=0203 data=060b "
+            "pc=0028dd1c task=05 t=3\n",
+            "dsp_audio_shadow_write: address=0011206c old=040a data=060b "
+            "pc=0028d9a8 task=05 t=3\n",
+        )
+        result = verify(trace)
+        self.assertEqual("full-word", result["connected_producer_path"])
+
+    def test_rejects_unidentified_connected_producer(self):
+        with self.assertRaisesRegex(ValueError, "connected-state producer"):
+            verify(GOOD.replace("pc=0028d9a8 task=05 t=2", "pc=0028d9aa task=05 t=2"))
 
     def test_requires_release_complete(self):
         with self.assertRaisesRegex(ValueError, "CC Release Complete"):

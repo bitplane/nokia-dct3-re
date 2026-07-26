@@ -50,9 +50,13 @@
     observed command-`0x08` lifecycle captured by
     `make verify-radio-incoming-call-lifecycle`.
   - `radio_3310_speech_control_trace_check.py` — validates NHM-5's independent
-    command-`0x08` speech request/release lifecycle and rejects any media while
-    the product's PCM profile remains unsupported. It runs as part of
+    command-`0x08` speech request/release lifecycle and its independently
+    documented 1 MHz/125-clock PCM boundary. It runs as part of
     `make verify-3310-radio-incoming-call-lifecycle`.
+  - `radio_sacch_coexistence_trace_check.py` — validates live SACCH/TF
+    reservations one per 26-frame multiframe, four-phase rotation, and
+    continuing bidirectional speech. It joins FACCH, degradation and
+    save-state validation in `make verify-3310-radio-media-resilience`.
   - `radio_call_audio_wire_trace_check.py` — validates the address-independent
     MCU/DSP shared-control wire lifecycle, including stable answered traffic
     and organic teardown. The v5.01 gate is

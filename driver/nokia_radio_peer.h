@@ -215,6 +215,7 @@ private:
 	u64 m_downlink_facch_blocks = 0;
 	u64 m_uplink_bad_speech_blocks = 0;
 	u64 m_downlink_bad_speech_blocks = 0;
+	u64 m_sacch_slots = 0;
 	unsigned m_uplink_tch_burst_error_period = 0;
 	unsigned m_uplink_tch_burst_error_span = 0;
 	u64 m_uplink_tch_bursts = 0;

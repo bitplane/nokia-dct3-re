@@ -16,6 +16,10 @@ PCM_RE = re.compile(
 ROUTE_RE = re.compile(
     r"dsp_shared_control: command=08 value=([0-9a-f]{4}) commit=1 .*?t=([0-9.]+)"
 )
+DOORBELL_ROUTE_RE = re.compile(
+    r"dsp_hle: doorbell .*?wire=[0-9a-f]{4} "
+    r"speech_control=([0-9a-f]{4}) .*?t=([0-9.]+)"
+)
 STOP_RE = re.compile(r"dsp_hle: speech stop control=([0-9a-f]{4}) .*?t=([0-9.]+)")
 ENERGY_RE = re.compile(
     r"dsp_hle: speech tick .*?mic_peak=(\d+) ear_peak=(\d+) "
@@ -48,7 +52,13 @@ def canonical_timeline(text: str) -> str:
     return text[:begin] + text[end_of_line:]
 
 
-def check(path: Path) -> str:
+def check(
+        path: Path,
+        data_clock: int = 520_000,
+        frame_clock: int = 8_000,
+        frame_clocks: int = 65,
+        sync_clocks: int = 1,
+        word_clocks: int = 16) -> str:
     text = canonical_timeline(path.read_text(errors="replace"))
     if "speech blocked by unsupported PCM link" in text:
         raise ValueError("product PCM link was not supported")
@@ -62,9 +72,14 @@ def check(path: Path) -> str:
         (match.group(1), float(match.group(2)))
         for match in ROUTE_RE.finditer(text)
     ]
+    controls.extend(
+        (match.group(1), float(match.group(2)))
+        for match in DOORBELL_ROUTE_RE.finditer(text)
+    )
+    controls.sort(key=lambda item: item[1])
     routes = [time for value, time in controls if value == "060b"]
     if not routes:
-        raise ValueError("missing firmware-committed NSE-8 speech-route field")
+        raise ValueError("missing firmware-committed product speech-route field")
     route_time = routes[0]
     if len(samples) < 5:
         raise ValueError("too few DSP speech-clock observations")
@@ -72,10 +87,15 @@ def check(path: Path) -> str:
         tuple(map(int, match.groups()))
         for match in PCM_RE.finditer(text)
     ]
-    if not pcm or pcm[-1][0] < 100 or pcm[-1][1:4] != (520_000, 8_000, 65):
+    if (not pcm or pcm[-1][0] < 100 or
+            pcm[-1][1:4] != (data_clock, frame_clock, frame_clocks)):
         raise ValueError("MAD2/COBBA PCM clock boundary was not sustained")
     blocks, _, _, _, serial_clocks, idle_clocks = pcm[-1]
-    if serial_clocks != blocks * 160 * 65 or idle_clocks != blocks * 160 * 48:
+    idle_per_frame = frame_clocks - sync_clocks - word_clocks
+    if idle_per_frame < 0:
+        raise ValueError("configured PCM sync/word clocks exceed the frame")
+    if (serial_clocks != blocks * 160 * frame_clocks or
+            idle_clocks != blocks * 160 * idle_per_frame):
         raise ValueError("MAD2/COBBA serial word/idle placement was not sustained")
     if samples[0][:2] != (1, 0):
         raise ValueError(f"speech did not start at a fresh codec state: {samples[0]}")
@@ -132,9 +152,16 @@ def check(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=Path)
+    parser.add_argument("--data-clock", type=int, default=520_000)
+    parser.add_argument("--frame-clock", type=int, default=8_000)
+    parser.add_argument("--frame-clocks", type=int, default=65)
+    parser.add_argument("--sync-clocks", type=int, default=1)
+    parser.add_argument("--word-clocks", type=int, default=16)
     args = parser.parse_args()
     try:
-        print(check(args.log))
+        print(check(
+            args.log, args.data_clock, args.frame_clock, args.frame_clocks,
+            args.sync_clocks, args.word_clocks))
     except ValueError as error:
         raise SystemExit(f"FAIL - {error}") from error
 

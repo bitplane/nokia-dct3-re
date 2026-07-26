@@ -12,18 +12,6 @@ EVENTS = (
         re.compile(r"GSM service uplink sapi=0 pd=03 message=07 length=2 "),
     ),
     (
-        "connected-state first producer",
-        re.compile(
-            r"dsp_audio_shadow_write: address=0011206c old=0002 data=0203 "
-            r"pc=0028d9a8 task=05 "),
-    ),
-    (
-        "connected-state second producer",
-        re.compile(
-            r"dsp_audio_shadow_write: address=0011206c old=0203 data=060b "
-            r"pc=0028dd1c task=05 "),
-    ),
-    (
         "connected-state publication",
         re.compile(
             r"dsp_shared_control: command=08 value=060b commit=1 .*task=05 "),
@@ -81,14 +69,45 @@ EVENTS = (
     ),
 )
 
+CONNECTED_PRODUCERS = (
+    (
+        "split",
+        re.compile(
+            r"dsp_audio_shadow_write: address=0011206c old=0002 data=0203 "
+            r"pc=0028d9a8 task=05 .*"
+            r"dsp_audio_shadow_write: address=0011206c old=0203 data=060b "
+            r"pc=0028dd1c task=05 ",
+            re.DOTALL,
+        ),
+    ),
+    (
+        "full-word",
+        re.compile(
+            r"dsp_audio_shadow_write: address=0011206c old=040a data=060b "
+            r"pc=0028d9a8 task=05 "
+        ),
+    ),
+)
+
 
 def verify(text: str) -> dict[str, int]:
     cursor = 0
     positions = {}
+    connected_producer_path = None
     for label, pattern in EVENTS:
         match = pattern.search(text, cursor)
         if not match:
             raise ValueError(f"missing or out-of-order call lifecycle: {label}")
+        if label == "connected-state publication":
+            producer_text = text[cursor:match.start()]
+            connected_producer_path = next((
+                name for name, producer in CONNECTED_PRODUCERS
+                if producer.search(producer_text)
+            ), None)
+            if connected_producer_path is None:
+                raise ValueError(
+                    "missing or out-of-order call lifecycle: "
+                    "connected-state producer")
         positions[label] = match.start()
         cursor = match.end()
 
@@ -104,6 +123,7 @@ def verify(text: str) -> dict[str, int]:
     return {
         "stable_tch_polls": stable_polls,
         "control_states": 3,
+        "connected_producer_path": connected_producer_path,
     }
 
 

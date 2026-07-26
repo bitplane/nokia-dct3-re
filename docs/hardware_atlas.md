@@ -341,13 +341,15 @@ field `0x0201`, but not the individual physical meaning of bits 0 and 9.
 
 NHM-5 is kept separate from that NSE-8 bus profile. Nokia's *NHM-5NX System
 Module* timing chart establishes an 8 kHz frame and a 16-bit serial word whose
-bits 15--13 sign-extend a 13-bit linear sample. Its extracted copy does not
-preserve the master-clock/divider numerals, so no data clock is configured yet.
+bits 15--13 sign-extend a 13-bit linear sample. The original issue 1 09/00 PDF,
+pages 27--28, establishes a 1.000 MHz master clock derived as `13 MHz / 13`,
+then divided by 125 for the 8.0 kHz frame. The one-clock sync pulse and data
+changes on rising clock edges establish the typed falling-edge sample boundary.
 The independent Nokia *COBBA NHM-5/UB 4 V09* schematic, version 2.0
 (04.05.2001), does preserve the physical analogue nets: the built-in microphone
 pads feed MIC2P/MIC2N through L402 and the receiver uses EARP/EARN. The typed
 NHM-5 profile records those endpoint selections but deliberately leaves PCM
-timing and analogue gains unset.
+analogue gains unset; its independent 1 MHz/125-clock PCM profile is enabled.
 Primary references: Nokia's
 [NHM-5NX System Module](https://www.eserviceinfo.com/preview_html.php?fileid=26109&previewid=12728)
 and

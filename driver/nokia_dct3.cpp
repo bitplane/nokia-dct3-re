@@ -202,9 +202,21 @@ constexpr nokia_product_config make_3310_config()
 	// Nokia's NHM-5/UB 4 V09 COBBA schematic (version 2.0, 04.05.2001)
 	// independently wires the built-in differential microphone pads through
 	// L402 to MIC2P/MIC2N and the receiver to EARP/EARN. Record that topology
-	// without borrowing NSE-8's gains or enabling an unresolved PCM clock.
+	// without borrowing NSE-8's gains.
 	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
 	result.cobba_hle_voice.output = nokia_cobba_device::ear;
+	// NHM-5NX System Module issue 1 09/00, pages 27-28: COBBA-GJP
+	// divides RFIClk 13 MHz by 13 for a 1.000 MHz PCMDClk, then by 125
+	// for the 8.0 kHz PCMSClk. Its timing chart shows a one-clock sync
+	// pulse and a 16-bit, MSB-first word containing a sign-extended
+	// 13-bit linear sample; data changes on rising PCMDClk edges.
+	result.cobba_pcm.data_clock = 1'000'000;
+	result.cobba_pcm.frame_clock = 8'000;
+	result.cobba_pcm.sample_bits = 13;
+	result.cobba_pcm.sync_clocks = 1;
+	result.cobba_pcm.word_clocks = 16;
+	result.cobba_pcm.msb_first = true;
+	result.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
 	result.ccont_board = ADC_STANDARD;
 	return result;
 }
@@ -1627,6 +1639,13 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 void nokia_dct3_state::noki3310(machine_config &config)
 {
 	dct3_base(config);
+	// NHM-5/UB 4 V09 board topology terminates the internal receiver on
+	// COBBA EARP/EARN and the built-in microphone on MIC2P/MIC2N. These
+	// neutral host routes express connectivity only; product analogue gains
+	// remain unset until independently recovered.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(PRODUCT_3310);
 }
 

@@ -102,11 +102,18 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
             phone.index("void nokia_dct3_state::noki3210"):
             phone.index("void nokia_dct3_state::noki5210")
         ]
+        nhm5 = phone[
+            phone.index("void nokia_dct3_state::noki3310"):
+            phone.index("void nokia_dct3_state::dct3_32mbit_flash_base")
+        ]
         self.assertNotIn('MICROPHONE(config, "microphone", 1)', base)
         self.assertNotIn("m_cobba->add_route", base)
         self.assertIn('MICROPHONE(config, "microphone", 1)', nse8)
         self.assertIn("nokia_cobba_device::mic2", nse8)
         self.assertIn("nokia_cobba_device::ear", nse8)
+        self.assertIn('MICROPHONE(config, "microphone", 1)', nhm5)
+        self.assertIn("nokia_cobba_device::mic2", nhm5)
+        self.assertIn("nokia_cobba_device::ear", nhm5)
         self.assertIn("set_hle_voice_profile(", phone)
         self.assertIn("must never mutate this fallback", phone)
         self.assertNotIn("block.fill(0)", cobba)
@@ -122,7 +129,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("set_hle_voice_profile(", phone)
         self.assertIn("set_pcm_sample_bits(product.cobba_pcm.sample_bits)", phone)
 
-    def test_nhm5_topology_does_not_import_nse8_pcm_or_gains(self):
+    def test_nhm5_uses_its_independent_pcm_profile_without_nse8_gains(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         nhm5 = phone[
             phone.index("constexpr nokia_product_config make_3310_config()"):
@@ -134,9 +141,16 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn(
             "cobba_hle_voice.output = nokia_cobba_device::ear", nhm5
         )
-        self.assertNotIn("cobba_pcm.data_clock", nhm5)
-        self.assertNotIn("cobba_pcm.frame_clock", nhm5)
-        self.assertNotIn("cobba_pcm.sample_bits", nhm5)
+        self.assertIn("cobba_pcm.data_clock = 1'000'000", nhm5)
+        self.assertIn("cobba_pcm.frame_clock = 8'000", nhm5)
+        self.assertIn("cobba_pcm.sample_bits = 13", nhm5)
+        self.assertIn("cobba_pcm.sync_clocks = 1", nhm5)
+        self.assertIn("cobba_pcm.word_clocks = 16", nhm5)
+        self.assertIn("cobba_pcm.msb_first = true", nhm5)
+        self.assertIn(
+            "data_edge = nokia_mad2_pcm_device::clock_edge::falling", nhm5
+        )
+        self.assertNotIn("520'000", nhm5)
         self.assertNotIn("microphone_gain_db", nhm5)
         self.assertNotIn("output_gain_db", nhm5)
 

@@ -52,6 +52,28 @@ class RadioSpeechMediaTraceCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "bidirectional"):
                 check(log)
 
+    def test_accepts_nhm5_pcm_clock_shape(self):
+        with TemporaryDirectory() as directory:
+            log = Path(directory) / "error.log"
+            lines = [
+                "dsp_hle: doorbell pending=0000 wire=860b speech_control=060b t=9.990000",
+                "dsp_hle: speech tick uplink=1 downlink=0 pcm=1 pcm_clock=1000000/8000 pcm_shape=125 serial_clocks=20000/17280 mic_peak=0 ear_peak=0 nonzero=0/0 t=10.000000",
+                "gsm_voice_peer: exchange=1 uplink_peak=0 downlink_peak=4096 source=lab-1khz t=10.001000",
+                "dsp_hle: speech tick uplink=2 downlink=1 pcm=2 pcm_clock=1000000/8000 pcm_shape=125 serial_clocks=40000/34560 mic_peak=0 ear_peak=4096 nonzero=0/1 t=10.020000",
+                "dsp_hle: speech tick uplink=3 downlink=2 pcm=3 pcm_clock=1000000/8000 pcm_shape=125 serial_clocks=60000/51840 mic_peak=0 ear_peak=4096 nonzero=0/2 t=10.040000",
+                "dsp_hle: speech tick uplink=50 downlink=48 pcm=50 pcm_clock=1000000/8000 pcm_shape=125 serial_clocks=1000000/864000 mic_peak=0 ear_peak=4096 nonzero=0/48 t=11.000000",
+                "gsm_voice_peer: exchange=102 uplink_peak=0 downlink_peak=4096 source=lab-1khz t=11.999000",
+                "radio_l1: direction=downlink kind=facch good=1 count=1 fn=2170 t=11.999500",
+                "dsp_hle: speech tick uplink=102 downlink=100 pcm=102 pcm_clock=1000000/8000 pcm_shape=125 serial_clocks=2040000/1762560 mic_peak=0 ear_peak=4096 nonzero=0/100 t=12.000000",
+                "dsp_hle: doorbell pending=0000 wire=840a speech_control=040a t=12.010000",
+                "dsp_hle: speech stop control=040a uplink=102 downlink=100 t=12.020000",
+            ]
+            log.write_text("\n".join(lines))
+            self.assertIn(
+                "102 encoded",
+                check(log, 1_000_000, 8_000, 125),
+            )
+
     def test_rejects_unsupported_product_pcm_link(self):
         with TemporaryDirectory() as directory:
             log = Path(directory) / "error.log"

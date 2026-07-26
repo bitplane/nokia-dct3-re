@@ -6,9 +6,15 @@ import re
 from pathlib import Path
 
 try:
-    from tools.radio_speech_media_trace_check import canonical_timeline
+    from tools.radio_speech_media_trace_check import (
+        canonical_timeline,
+        DOORBELL_ROUTE_RE,
+    )
 except ModuleNotFoundError:
-    from radio_speech_media_trace_check import canonical_timeline
+    from radio_speech_media_trace_check import (
+        canonical_timeline,
+        DOORBELL_ROUTE_RE,
+    )
 
 
 ROUTE_RE = re.compile(
@@ -37,6 +43,12 @@ def check(path: Path) -> str:
         for value, time in ROUTE_RE.findall(text)
         if int(value, 16) & 0x0fff == 0x060b
     ]
+    routes.extend(
+        float(time)
+        for value, time in DOORBELL_ROUTE_RE.findall(text)
+        if int(value, 16) & 0x0fff == 0x060b
+    )
+    routes.sort()
     if not routes:
         raise ValueError("missing firmware speech-route request")
     route_time = routes[0]

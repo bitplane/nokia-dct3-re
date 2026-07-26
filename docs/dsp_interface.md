@@ -445,10 +445,26 @@ lifecycle, but not NSE-8's MAD2/COBBA clock shape. Nokia's *COBBA NHM-5/UB 4
 V09*, version 2.0, 04.05.2001, independently establishes the board topology:
 the built-in differential microphone reaches COBBA MIC2P/MIC2N through L402,
 while the receiver is connected to EARP/EARN. The NHM-5 product configuration
-records those endpoint selections without importing NSE-8 gain values. Its PCM
-profile remains disabled, and
-`radio_3310_speech_control_trace_check.py` rejects any speech tick until an
-independent PCM timing basis is added.
+records those endpoint selections without importing NSE-8 gain values. The
+original *NHM-5NX System Module*, issue 1 09/00, pages 27--28, independently
+closes the PCM bus: 1.000 MHz PCMDClk (`13 MHz / 13`), divided by 125 to an
+8.0 kHz PCMSClk, with a one-clock sync pulse and a 16-bit MSB-first word
+containing a sign-extended 13-bit sample. The timing chart changes data on
+rising edges, so the typed profile samples on falling edges. This is not
+NSE-8's 520 kHz/65-clock profile.
+
+`verify-3310-radio-incoming-call-lifecycle` proves that boundary in the
+organic firmware call: 150 uplink codec frames and 146 decoded downlink frames
+cross it, including 147 non-silent COBBA blocks, before physical End stops PCM.
+`verify-3310-radio-media-resilience` adds exact active-call save/load replay,
+bidirectional burst impairments and BFI concealment/recovery, FACCH
+substitution in both directions, and 33 live SACCH/TF reservations rotating
+through all four phases without stopping speech.
+`verify-3310-radio-physical-duplex` then isolates host capture and playback:
+250/250 MIC2 blocks are non-silent, the independent network decoder observes
+an unclipped non-silent uplink, and the EAR-only capture contains a 5.36-second
+1 kHz downlink run. Neutral host route scaling records connectivity, not an
+unproved NHM-5 analogue gain.
 
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result

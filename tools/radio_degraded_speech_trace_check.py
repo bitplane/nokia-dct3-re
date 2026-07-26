@@ -39,8 +39,16 @@ PEER_CONCEALMENT_RE = re.compile(
 )
 
 
-def check(path: Path) -> str:
-    clean_result = check_clean_media(path)
+def check(
+        path: Path,
+        data_clock: int = 520_000,
+        frame_clock: int = 8_000,
+        frame_clocks: int = 65,
+        sync_clocks: int = 1,
+        word_clocks: int = 16) -> str:
+    clean_result = check_clean_media(
+        path, data_clock, frame_clock, frame_clocks,
+        sync_clocks, word_clocks)
     text = canonical_timeline(path.read_text(errors="replace"))
     impairments = [
         (direction, int(burst), int(count), int(frame), float(time))
@@ -127,9 +135,16 @@ def check(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=Path)
+    parser.add_argument("--data-clock", type=int, default=520_000)
+    parser.add_argument("--frame-clock", type=int, default=8_000)
+    parser.add_argument("--frame-clocks", type=int, default=65)
+    parser.add_argument("--sync-clocks", type=int, default=1)
+    parser.add_argument("--word-clocks", type=int, default=16)
     args = parser.parse_args()
     try:
-        print(check(args.log))
+        print(check(
+            args.log, args.data_clock, args.frame_clock, args.frame_clocks,
+            args.sync_clocks, args.word_clocks))
     except ValueError as error:
         raise SystemExit(f"FAIL - {error}") from error
 

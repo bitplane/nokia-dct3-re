@@ -76,6 +76,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_downlink_facch_blocks));
 	save_item(NAME(m_uplink_bad_speech_blocks));
 	save_item(NAME(m_downlink_bad_speech_blocks));
+	save_item(NAME(m_sacch_slots));
 	save_item(NAME(m_uplink_tch_burst_error_period));
 	save_item(NAME(m_uplink_tch_burst_error_span));
 	save_item(NAME(m_uplink_tch_bursts));
@@ -184,6 +185,7 @@ void nokia_radio_peer_device::device_reset()
 	m_downlink_facch_blocks = 0;
 	m_uplink_bad_speech_blocks = 0;
 	m_downlink_bad_speech_blocks = 0;
+	m_sacch_slots = 0;
 	m_uplink_tch_bursts = 0;
 	m_uplink_tch_bursts_impaired = 0;
 	m_downlink_tch_bursts = 0;
@@ -364,6 +366,15 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	if (slot == gsm::tch_f::tdma_slot_kind::sacch)
 	{
 		const unsigned phase = gsm::tch_f::sacch_burst_index(frame_number, 1);
+		++m_sacch_slots;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: kind=sacch slot=%llu phase=%u "
+					"uplink_pending=%u downlink_pending=%u fn=%u t=%.6f\n",
+					m_sacch_slots, phase,
+					m_uplink_sacch_transmitter.snapshot().pending,
+					m_downlink_sacch_transmitter.snapshot().pending,
+					frame_number, machine().time().as_double());
 		const auto training = gsm::tch_f::training_sequence(2);
 		if (const auto uplink =
 					m_uplink_sacch_transmitter.next_burst(phase))
