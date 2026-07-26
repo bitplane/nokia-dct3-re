@@ -39,7 +39,8 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_search_mode));
 	save_item(NAME(m_access_ra));
 	save_item(NAME(m_access_frame));
-	save_item(NAME(m_search_has_arfcn1));
+	save_item(NAME(m_search_has_serving_arfcn));
+	save_item(NAME(m_serving_arfcn));
 	save_item(NAME(m_report_deferred));
 	save_item(NAME(m_search_requested));
 	save_item(NAME(m_selected_reports_remaining));
@@ -152,7 +153,8 @@ void nokia_radio_peer_device::device_reset()
 	m_search_mode = 0;
 	m_access_ra = 0;
 	m_access_frame = 0;
-	m_search_has_arfcn1 = false;
+	m_search_has_serving_arfcn = false;
+	m_serving_arfcn = 1;
 	m_report_deferred = false;
 	m_search_requested = false;
 	m_selected_reports_remaining = 0;
@@ -555,7 +557,8 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"release_channel_change", "service_downlink", "service_uplink_request",
 		"service_uplink_wait", "service_uplink_acknowledgement",
 		"traffic_channel_change", "traffic_lapdm_establish",
-		"traffic_contention_resolution", "traffic_release_acknowledgement"
+		"traffic_contention_resolution", "traffic_release_acknowledgement",
+		"nhm5_control_ack"
 	};
 	const unsigned index = unsigned(value);
 	return index < std::size(NAMES) ? NAMES[index] : "invalid";
@@ -575,7 +578,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 		0x8c, 0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89,
 		0xff, 0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80,
 		0x86, 0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80,
-		0x89, 0x86, 0x80, 0x80
+		0x89, 0x86, 0x80, 0x80, 0x8a
 	};
 
 	const u8 fixed = m_phase < FIXED_REPORT.size() ? FIXED_REPORT[m_phase] : 0x87;
@@ -596,7 +599,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 		return m_reports_remaining == 2 ? 0x8b : 0x87;
 	case phase::selected_search:
 		return m_reports_remaining == 2 ? 0x8b :
-				(((m_search_mode == 0x00 && m_search_has_arfcn1) ||
+				(((m_search_mode == 0x00 && m_search_has_serving_arfcn) ||
 					m_search_mode == 0x40 || m_search_mode == 0x50) ? 0x80 : 0x87);
 	case phase::selected_bcch:
 		return m_reports_remaining == 1 ? 0x87 :
@@ -637,27 +640,69 @@ u32 nokia_radio_peer_device::paging_frame_number(u32 minimum_frame_number) const
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
 {
-	if (packet.type == 0x1a && packet.length != 0)
+	const bool nse8_search =
+			m_protocol_profile == protocol_profile::nse8_bitmap_search &&
+			packet.type == 0x1a && packet.length != 0;
+	const bool nhm5_search =
+			m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+			packet.type == 0x56 && packet.length == 160;
+	const bool search = nse8_search || nhm5_search;
+
+	if (nse8_search)
 	{
 		m_search_mode = packet.payload[0];
 		// SEARCH_LIST carries a 512-bit ARFCN set after its four-byte control
 		// header. In the ROM-4 wire layout ARFCN 1 is bit 0 of byte 65.
-		m_search_has_arfcn1 = packet.length > 65 && BIT(packet.payload[65], 0);
+		m_serving_arfcn = 1;
+		m_search_has_serving_arfcn =
+				packet.length > 65 && BIT(packet.payload[65], 0);
+	}
+	else if (nhm5_search)
+	{
+		// NHM-5 constructs eighty big-endian channel entries and uses 0xffff
+		// for unused slots. Its independently recovered 0x8b consumer uses the
+		// same channel representation. The deterministic laboratory cell is
+		// placed on the first actual requested candidate, never on a channel
+		// inherited from the NSE-8 bitmap profile.
+		m_search_mode = 0;
+		m_search_has_serving_arfcn = false;
+		for (unsigned offset = 0; offset < packet.length; offset += 2)
+		{
+			const u16 candidate =
+					(packet.payload[offset] << 8) | packet.payload[offset + 1];
+			if (candidate != 0xffff)
+			{
+				m_serving_arfcn = candidate;
+				m_search_has_serving_arfcn = true;
+				break;
+			}
+		}
 	}
 
-	if (packet.type == 0x1a && m_phase == phase::inactive && m_reports_remaining == 0)
+	if (search && m_phase == phase::inactive && m_reports_remaining == 0)
 	{
-		// Initial SEARCH_LIST attempts end empty.  The firmware responds by
-		// narrowing its own channel bitmap and publishing the next request.
-		m_phase = phase::initial_search;
-		m_reports_remaining = 2;
+		if (nhm5_search)
+		{
+			// NHM-5 has already reduced its firmware-owned channel database to
+			// the explicit candidates in type 0x56. Its recovered task-10 path
+			// consumes the corresponding 0x8b measurement array directly.
+			m_phase = phase::candidate_measurement;
+			m_reports_remaining = 1;
+		}
+		else
+		{
+			// NSE-8's initial bitmap searches end empty. The firmware responds
+			// by narrowing its own channel bitmap and publishing the next request.
+			m_phase = phase::initial_search;
+			m_reports_remaining = 2;
+		}
 	}
 	else if (packet.type == 0x03 && m_phase == phase::initial_search && m_reports_remaining == 0)
 	{
 		m_phase = phase::post_deactivate_search;
 		m_reports_remaining = 2;
 	}
-	else if (packet.type == 0x1a && m_phase == phase::initial_search && m_reports_remaining == 0)
+	else if (nse8_search && m_phase == phase::initial_search && m_reports_remaining == 0)
 	{
 		// A SIM with cached EF_BCCH advances directly to the next bounded search
 		// mode instead of deactivating the empty initial scan.  It has the same
@@ -665,12 +710,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		m_phase = phase::post_deactivate_search;
 		m_reports_remaining = 2;
 	}
-	else if (packet.type == 0x1a && m_phase == phase::post_deactivate_search && m_reports_remaining == 0)
+	else if (nse8_search && m_phase == phase::post_deactivate_search && m_reports_remaining == 0)
 	{
 		m_phase = phase::candidate_measurement;
 		m_reports_remaining = 1;
 	}
-	else if (packet.type == 0x1a && m_phase == phase::candidate_measurement && m_reports_remaining == 0)
+	else if (nse8_search && m_phase == phase::candidate_measurement && m_reports_remaining == 0)
 	{
 		if (m_search_round >= 3)
 		{
@@ -680,6 +725,18 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		}
 		else
 			m_reports_remaining = 1;
+	}
+	else if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+			packet.type == 0x55 && packet.length == 4 &&
+			m_phase == phase::candidate_measurement &&
+			m_reports_remaining == 0)
+	{
+		// The state entered after NHM-5 consumes ALL_RSSI_RESULTS explicitly
+		// accepts report 0x8a in its task-10 dispatcher. Type 0x55 is built by
+		// 0x2a7baa as a four-byte control transaction; retain its payload as
+		// firmware-owned selectors and complete only that evidenced boundary.
+		m_phase = phase::nhm5_control_ack;
+		m_reports_remaining = 1;
 	}
 	else if (packet.type == 0x02 &&
 			(m_phase == phase::candidate_sync || m_phase == phase::selected_search) &&
@@ -694,7 +751,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		m_reports_remaining = selected_plmn_search ? 1 : 2;
 		m_report_deferred = true;
 	}
-	else if (packet.type == 0x1a && m_phase == phase::candidate_sync && m_reports_remaining == 0)
+	else if (nse8_search && m_phase == phase::candidate_sync && m_reports_remaining == 0)
 	{
 		// If the MCU rejects the measured candidate it requests the next search
 		// batch instead of issuing CHANNEL_CONFIGURE.  Close that finite scan
@@ -813,7 +870,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_report_deferred = false;
 		}
 	}
-	else if (packet.type == 0x1a && m_phase == phase::serving_bcch)
+	else if (nse8_search && m_phase == phase::serving_bcch)
 	{
 		// An explicit measurement request preempts the periodic serving-cell
 		// stream. Delaying it until an eight-block BCCH batch drains leaves its
@@ -825,12 +882,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		m_wait_ticks = 0;
 		m_report_deferred = true;
 	}
-	else if (packet.type == 0x1a && m_phase == phase::selected_search && m_reports_remaining == 0)
+	else if (nse8_search && m_phase == phase::selected_search && m_reports_remaining == 0)
 	{
 		m_reports_remaining = 2;
 		m_report_deferred = true;
 	}
-	else if (packet.type == 0x1a && m_phase == phase::candidate_retry && m_reports_remaining == 0)
+	else if (nse8_search && m_phase == phase::candidate_retry && m_reports_remaining == 0)
 	{
 		m_phase = phase::candidate_measurement;
 		m_reports_remaining = 1;
@@ -1053,16 +1110,21 @@ void nokia_radio_peer_device::emit_report()
 	{
 		// ALL_RSSI_RESULTS begins with a two-byte list header followed by forty
 		// four-byte records: big-endian ARFCN, flags and signed RSSI. Only ARFCN
-		// 1 exists. Two -109 dBm baselines establish the initial acquisition
+		// The selected candidate exists. Two -109 dBm baselines establish the initial acquisition
 		// history; subsequent values come from the deterministic laboratory-cell
 		// signal model so background measurements do not remain bit-identical.
 		payload[0] = 0x00;
 		payload[1] = 0x10;
 		for (unsigned result = 0; result < 40; ++result)
 		{
-			const bool serving_result = result == 0;
-			payload[2 + result * 4] = serving_result ? 0x00 : 0xff;
-			payload[3 + result * 4] = serving_result ? 0x01 : 0xff;
+			const bool serving_result =
+					result == 0 &&
+					(m_protocol_profile != protocol_profile::nhm5_candidate_list ||
+						m_search_has_serving_arfcn);
+			payload[2 + result * 4] =
+					serving_result ? u8(m_serving_arfcn >> 8) : 0xff;
+			payload[3 + result * 4] =
+					serving_result ? u8(m_serving_arfcn) : 0xff;
 			payload[5 + result * 4] = serving_result ?
 					(m_search_round < 2 ? u8(0x93) :
 						u8(m_gsm_network->serving_rssi(m_search_round - 2))) : 0x81;
@@ -1097,8 +1159,8 @@ void nokia_radio_peer_device::emit_report()
 		payload[3] = frame_number >> 16;
 		payload[4] = frame_number >> 8;
 		payload[5] = frame_number;
-		payload[6] = 0x00;
-		payload[7] = 0x01; // ARFCN 1, matching the selected RSSI candidate.
+		payload[6] = m_serving_arfcn >> 8;
+		payload[7] = m_serving_arfcn;
 
 		if (m_phase == phase::contention_resolution)
 		{

@@ -9,7 +9,7 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Radio lifecycle, paired GSM-FR/FACCH/degraded-media and isolated physical audio gates pass. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
 | Nokia 3210 NSE-8 v5.01 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Independent ROM gates cover the call lifecycle and isolated physical duplex. The same COBBA/DSP limitation applies. |
-| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its startup grammar is not the NSE-8 grammar, anchors the profile-selected `0x20/0x21/0x22` configuration constructors, and identifies `0x56` as the candidate-channel list. Its inbound result contract remains the next boundary. |
+| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` now proves its typed `0x56` candidate search, shared-but-independently-recovered `0x8b` result layout, organic `0x55` follow-up and `0x8a` completion. Serving-channel configuration remains the next boundary. |
 | Nokia 3330 NHM-6 v4.50E | Yes | Yes | No | No | No | No | No | `verify-3330-frontier` and `verify-3330-navigation`; later product contracts are not established. |
 | Nokia 3410 NHM-2 v5.46E | Yes | Yes | No | No | No | No | No | `verify-3410-frontier` and navigation/menu gates; later product contracts are not established. |
 | Nokia 6110 NSE-3 family | No | No | No | No | No | No | No | Hardware documentation informs shared DCT3 boundaries, but no local declared 6110 ROM/profile or executable acceptance gate exists. Acquire and identify a lawful firmware image before implementation claims. |
@@ -66,6 +66,18 @@ into consecutive payload entries, and stops after 80 entries. Both observed
 call sites pass their selected record through this producer before publication.
 The runtime packet therefore represents one big-endian candidate `0x0058`
 followed by 79 erased `0xffff` entries. This establishes a bounded
-candidate-channel-list command; it does not yet establish that the numeric
-value may be substituted with the NSE-8 laboratory ARFCN or that NHM-5 accepts
-the NSE-8 `0x8b` record layout.
+candidate-channel-list command. The peer places its laboratory cell on the
+requested channel rather than substituting NSE-8's ARFCN 1.
+
+The inbound result layout is independently established in NHM-5, not borrowed
+from NSE-8. Its consumer at `0x28aa0e` skips a two-byte header, reads the
+big-endian channel from object offsets 6/7 and signed RSSI from offset 9,
+advances four bytes and bounds the loop at 40 records. Thus the shared
+`0x8b/166` encoder is a genuine protocol-layer component used behind two typed
+command profiles: NSE-8 bitmap search and NHM-5 candidate-list search.
+
+After consuming the `0x8b` result for `0x0058`, v6.39 organically constructs
+type `0x55/4` at `0x2a7baa` with payload `03 05 00 00`. Its active task-10
+state explicitly accepts inbound type `0x8a`; completing that transaction
+advances without state forcing or a translated NSE-8 command. The current gate
+stops there because no later serving-channel command has yet been observed.

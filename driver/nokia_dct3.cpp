@@ -111,6 +111,8 @@ struct nokia_product_config
 	bool dsp_service = false;
 	bool external_service = false;
 	bool radio_peer = false;
+	nokia_radio_peer_device::protocol_profile radio_protocol =
+			nokia_radio_peer_device::protocol_profile::none;
 	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
 	unsigned dsp_bootstrap_exchanges = 64;
@@ -143,6 +145,8 @@ constexpr nokia_product_config make_3210_config()
 	result.dsp_service = true;
 	result.external_service = true;
 	result.radio_peer = true;
+	result.radio_protocol =
+			nokia_radio_peer_device::protocol_profile::nse8_bitmap_search;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
 	// Paired NSE-8 firmware independently constructs/removes this field around
@@ -181,6 +185,9 @@ constexpr nokia_product_config make_3310_config()
 	result.sim_device = true;
 	result.dsp_service = true;
 	result.external_service = true;
+	result.radio_peer = true;
+	result.radio_protocol =
+			nokia_radio_peer_device::protocol_profile::nhm5_candidate_list;
 	result.keypad_five_rows = true;
 	result.dsp_bootstrap_exchanges = 58;
 	result.dsp_service_delay_us = 4'000;
@@ -630,6 +637,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_cobba->set_hle_voice_profile(product.cobba_hle_voice);
 	m_external_service_peer->set_enabled(product.external_service);
 	m_radio_peer->set_enabled(product.radio_peer);
+	m_radio_peer->set_protocol_profile(product.radio_protocol);
 	m_b3_flash->set_enabled(product.flash_b3_block_lock);
 }
 

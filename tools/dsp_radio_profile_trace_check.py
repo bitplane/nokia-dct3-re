@@ -57,6 +57,18 @@ def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
 			"10b5a420f2f718fd041c0021a42249f051ff"
 			"a020a070022020805620e070"
 		),
+		# Four-byte type-0x55 constructor reached only after task 10 consumes
+		# the measurement results.
+		0x002A7BAA: bytes.fromhex(
+			"70b50d1c061c0820f2f72dfe041c002108224af066f8"
+			"0420a070022020805520e070"
+		),
+		# The 0x8b consumer advances forty four-byte records, reading the
+		# big-endian channel at object offsets 6/7 and signed RSSI at offset 9.
+		0x0028AA4C: bytes.fromhex(
+			"0120824601360435002e2cd500980069c188828889180089"
+			"4018404523dae879a979090240180004070c697a08060016"
+		),
 	}
 	for address, expected in constructors.items():
 		offset = address - 0x200000
@@ -116,14 +128,43 @@ def check_nhm5_startup(path: pathlib.Path, rom: pathlib.Path | None = None) -> N
 		check_nhm5_static(rom, packets)
 
 
+def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> None:
+	check_nhm5_startup(path, rom)
+	packets = parse("nhm5", path)
+	search = next(packet for packet in packets
+			if packet["direction"] == "tx" and packet["type"] == 0x56)
+	results = next((packet for packet in packets
+			if packet["direction"] == "rx" and packet["type"] == 0x8B), None)
+	control = next((packet for packet in packets
+			if packet["direction"] == "tx" and packet["type"] == 0x55), None)
+	ack = next((packet for packet in packets
+			if packet["direction"] == "rx" and packet["type"] == 0x8A), None)
+	if results is None or results["length"] != 166:
+		raise SystemExit("NHM-5 search did not receive its 166-byte type 0x8b result array")
+	if not results["data"].startswith("001000580093"):
+		raise SystemExit("NHM-5 type 0x8b did not report requested channel 0x0058")
+	if control is None or control["length"] != 4 or control["data"] != "03050000":
+		raise SystemExit("NHM-5 did not organically publish the observed type 0x55 control")
+	if ack is None or ack["length"] != 8:
+		raise SystemExit("NHM-5 type 0x55 control did not receive its type 0x8a completion")
+	if not search["time"] <= results["time"] < control["time"] <= ack["time"]:
+		raise SystemExit("NHM-5 search/control transaction order changed")
+	print(
+		"NHM-5 search frontier: 56/160 candidate 0058 -> 8b/166 results -> "
+		"55/4 control -> 8a/8 completion"
+	)
+
+
 def main() -> None:
 	parser = argparse.ArgumentParser()
 	parser.add_argument("log", type=pathlib.Path)
-	parser.add_argument("--profile", choices=("nhm5-startup",), required=True)
+	parser.add_argument("--profile", choices=("nhm5-startup", "nhm5-search"), required=True)
 	parser.add_argument("--rom", type=pathlib.Path)
 	args = parser.parse_args()
 	if args.profile == "nhm5-startup":
 		check_nhm5_startup(args.log, args.rom)
+	elif args.profile == "nhm5-search":
+		check_nhm5_search(args.log, args.rom)
 
 
 if __name__ == "__main__":

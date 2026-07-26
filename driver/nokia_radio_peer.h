@@ -15,6 +15,13 @@
 class nokia_radio_peer_device : public device_t
 {
 public:
+	enum class protocol_profile : u8
+	{
+		none,
+		nse8_bitmap_search,
+		nhm5_candidate_list
+	};
+
 	// GSM 06.10/ETSI TS 46.010 full-rate speech: one 20 ms, 260-bit
 	// parameter frame in the conventional 33-octet serial representation.
 	static constexpr unsigned speech_frame_octets = 33;
@@ -30,6 +37,7 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
+	void set_protocol_profile(protocol_profile profile) { m_protocol_profile = profile; }
 	void set_page_after_registration(bool enabled)
 	{
 		m_page_after_registration = enabled;
@@ -121,6 +129,7 @@ private:
 		traffic_lapdm_establish,
 		traffic_contention_resolution,
 		traffic_release_acknowledgement,
+		nhm5_control_ack,
 		count
 	};
 
@@ -152,6 +161,7 @@ private:
 	required_device<nokia_lapdm_link_device> m_lapdm_link;
 	emu_timer *m_burst_timer = nullptr;
 	bool m_enabled = false;
+	protocol_profile m_protocol_profile = protocol_profile::none;
 	bool m_trace_enabled = false;
 	unsigned m_reports_sent = 0;
 	unsigned m_reports_remaining = 0;
@@ -161,7 +171,8 @@ private:
 	u8 m_search_mode = 0;
 	u8 m_access_ra = 0;
 	u32 m_access_frame = 0;
-	bool m_search_has_arfcn1 = false;
+	bool m_search_has_serving_arfcn = false;
+	u16 m_serving_arfcn = 1;
 	bool m_report_deferred = false;
 	bool m_search_requested = false;
 	unsigned m_selected_reports_remaining = 0;

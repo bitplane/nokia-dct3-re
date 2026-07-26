@@ -584,8 +584,8 @@ verify-3310-radio-boundary:
 		RUN_DIR=$(RUN_DIR) SECONDS=4 RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/dsp_radio_profile_trace_check.py $(RUN_DIR)/error.log \
-		--profile nhm5-startup --rom roms/noki3310/3310f639e.fls
-	@echo "OK — 3310 v6.39 reached its distinct, untranslated radio boundary"
+		--profile nhm5-search --rom roms/noki3310/3310f639e.fls
+	@echo "OK — 3310 v6.39 completed its evidenced candidate measurement boundary"
 
 verify-3310-frontier:
 	@$(MAKE) --no-print-directory smoke-3310-639 RUN_DIR=$(RUN_DIR) SECONDS=15
