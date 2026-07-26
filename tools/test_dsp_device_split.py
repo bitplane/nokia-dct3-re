@@ -79,13 +79,14 @@ class DspDeviceSplitTest(unittest.TestCase):
 
     def test_transport_has_no_dsp_bootstrap_behavior_configuration(self):
         for token in (
-            "m_bootstrap_completion",
+            "m_bootstrap_completion", "m_bootstrap_preupload",
             "m_bootstrap_ping_pong", "m_code_block_request",
             "m_parked_boot_status", "m_boot_status_response",
         ):
             self.assertNotIn(token, self.transport)
             self.assertIn(token, self.hle)
         self.assertIn("shared_002_write_cb", self.transport)
+        self.assertIn("shared_006_write_cb", self.transport)
         self.assertIn("shared_0fe_read_cb", self.transport)
         self.assertIn("shared_100_write_cb", self.transport)
         self.assertIn("peer_shared_w(0x002 / 2, m_boot_status_response)", self.hle)
@@ -99,6 +100,14 @@ class DspDeviceSplitTest(unittest.TestCase):
         )
         self.assertIn("peer_shared_w(0x000 / 2, 0x0b06)", self.hle)
         self.assertNotIn("peer_shared_w(0x002 / 2, 0x0b06)", self.hle)
+        self.assertIn("bootstrap_preupload_profile::nse3_dsp_rom3_pair", self.hle)
+        self.assertIn("peer_shared_w(0x004 / 2, 3)", self.hle)
+        self.assertIn("peer_shared_w(0x006 / 2, 3)", self.hle)
+        self.assertIn(
+            "shared_006_write_cb().set(m_dsp_hle, "
+            "FUNC(nokia_dsp_hle_device::shared_006_write_w))",
+            self.phone,
+        )
 
     def test_external_peer_uses_acknowledged_startup_phases(self):
         self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)

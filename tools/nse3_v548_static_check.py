@@ -22,7 +22,13 @@ VARIANTS = {
         "sha256": "3ad47781485cb776910d30fa20d440a963eae90e847cfe24748b5c4ac2f8e6e3",
         "loader": 0x2833F4,
         "loader_call": 0x297CF6,
+        "delay_helper": 0x2A4C48,
         "state": 0x10BA28,
+        "internal_rom_service": 0x23751A,
+        "internal_rom_service_call": 0x237532,
+        "internal_rom_service_setter": 0x28CB36,
+        "internal_rom_diagnostic": 0x23A050,
+        "internal_rom_text": 0x23A2CC,
         "formatter": 0x28C9DA,
         "acceptance": 0x29799C,
         "stream_sha1": "73ddf5f79e421fdcfff7742e238fb24ea5f1fcfa",
@@ -33,7 +39,13 @@ VARIANTS = {
         "sha256": "2adca0d661af2d8e7bed3e04d2941b6db9572a1eb10b2b1ebc545e33fbdd7c7f",
         "loader": 0x285010,
         "loader_call": 0x299922,
+        "delay_helper": 0x2A693C,
         "state": 0x10BA38,
+        "internal_rom_service": 0x237A5A,
+        "internal_rom_service_call": 0x237A72,
+        "internal_rom_service_setter": 0x28E75E,
+        "internal_rom_diagnostic": 0x23A5CA,
+        "internal_rom_text": 0x23A84C,
         "formatter": 0x28E602,
         "acceptance": 0x2995C8,
         "stream_sha1": "94e447d8386e010326fdfb261e247d6c0ac4d97a",
@@ -187,6 +199,67 @@ def verify_variant(path: Path, name: str) -> dict:
     # algorithm is otherwise homologous.
     verify_literal(data, base + 0x8A, profile["state"])
 
+    # The pre-upload publication is bounded and recoverable independently
+    # from its real value.  Firmware waits for shared +4 to leave 0xffff,
+    # permits only a finite retry loop, stores the observed value at state+8,
+    # and enters the transfer only when shared +4 and +6 agree and the wait
+    # did not time out.
+    pre_upload_storage = profile["state"] + 0x08
+    pre_upload_anchors = {
+        0x92: ("ldrh", "r0, [r4, #4]"),
+        0x96: ("cmp", "r0, r1"),
+        0x98: ("bne", f"#{base + 0xc0:#x}"),
+        0x9E: ("movs", "r0, #0xa"),
+        0xA0: ("bl", f"#{profile['delay_helper']:#x}"),
+        0xA6: ("cmp", "r0, #0x14"),
+        0xB2: ("ldrh", "r1, [r4, #4]"),
+        0xB6: ("cmp", "r1, r0"),
+        0xC0: ("ldrh", "r1, [r4, #4]"),
+        0xC4: ("strh", "r1, [r0, #8]"),
+        0xC6: ("ldrh", "r0, [r4, #6]"),
+        0xC8: ("cmp", "r1, r0"),
+        0xCA: ("bne", f"#{base + 0x16c:#x}"),
+        0xD0: ("cmp", "r0, #0"),
+        0xD2: ("beq", f"#{base + 0x16c:#x}"),
+    }
+    for delta, expected in pre_upload_anchors.items():
+        verify_instruction(data, base + delta, *expected)
+    verify_literal(data, base + 0x94, 0xFFFF)
+    verify_literal(data, base + 0xB4, 0xFFFF)
+
+    internal_rom_service = profile["internal_rom_service"]
+    verify_literal(data, internal_rom_service, pre_upload_storage)
+    service_anchors = {
+        0x02: ("ldrh", "r0, [r0]"),
+        0x04: ("cmp", "r0, #0xa"),
+        0x0A: ("adds", "r0, #0x30"),
+        0x0C: ("strb", "r0, [r1, #0xc]"),
+        0x12: ("strb", "r1, [r0, #0xd]"),
+        0x14: ("movs", "r0, #9"),
+    }
+    for delta, expected in service_anchors.items():
+        verify_instruction(data, internal_rom_service + delta, *expected)
+    verify_instruction(
+        data,
+        profile["internal_rom_service_call"],
+        "bl",
+        f"#{profile['internal_rom_service_setter']:#x}",
+    )
+
+    internal_rom_diagnostic = profile["internal_rom_diagnostic"]
+    verify_literal(data, internal_rom_diagnostic, pre_upload_storage)
+    diagnostic_anchors = {
+        0x02: ("ldrh", "r0, [r0]"),
+        0x04: ("adds", "r0, #0x30"),
+        0x06: ("strb", "r0, [r7, #8]"),
+    }
+    for delta, expected in diagnostic_anchors.items():
+        verify_instruction(data, internal_rom_diagnostic + delta, *expected)
+    internal_rom_text = b"DSP ROM  \x00"
+    text_offset = profile["internal_rom_text"] - FLASH_BASE
+    if data[text_offset : text_offset + len(internal_rom_text)] != internal_rom_text:
+        raise ValueError(f"{path}: DSP ROM diagnostic text changed")
+
     # Both v5.48 variants later consume the first captured halfword at
     # state+0x0c.  One path renders its nibbles as a three-character Bxx
     # result, and another accepts only 0x0b06.  This is an exact external-MCU
@@ -241,8 +314,21 @@ def verify_variant(path: Path, name: str) -> dict:
             for decoded in instructions
             if literal_value(data, decoded) == address
         ]
-        for address in (first_result, second_result)
+        for address in (pre_upload_storage, first_result, second_result)
     }
+    expected_pre_upload_references = [
+        internal_rom_service,
+        internal_rom_diagnostic,
+    ]
+    if (
+        result_literal_references[pre_upload_storage]
+        != expected_pre_upload_references
+    ):
+        raise ValueError(
+            f"{path}: pre-upload result direct references changed: expected "
+            f"{[hex(address) for address in expected_pre_upload_references]}, "
+            f"got {[hex(address) for address in result_literal_references[pre_upload_storage]]}"
+        )
     expected_first_references = [formatter, acceptance]
     if result_literal_references[first_result] != expected_first_references:
         raise ValueError(
@@ -270,6 +356,22 @@ def verify_variant(path: Path, name: str) -> dict:
         "loader_direct_callers": direct_callers,
         "shared_cells": [0x10000, 0x10002, 0x10004, 0x10006],
         "pre_upload_cells": [0x10004, 0x10006],
+        "pre_upload_exchange": {
+            "initial_value": 0xFFFF,
+            "wait_cell": 0x10004,
+            "agreement_cell": 0x10006,
+            "transfer_requires_equality": True,
+            "retry_delay_raw": 10,
+            "retry_counter_limit": 20,
+            "timeout_is_fail_closed": True,
+            "captured_storage": pre_upload_storage,
+            "captured_direct_literal_references":
+                result_literal_references[pre_upload_storage],
+            "service_selector": 0x09,
+            "service_encoding": "single ASCII digit for values below 10",
+            "diagnostic_label": "DSP ROM",
+            "dsp_publication_value": "not_static",
+        },
         "final_publication_cells": [0x10000, 0x10002],
         "initial_sentinel": 0xFFFF,
         "transfer_blocks": 64,

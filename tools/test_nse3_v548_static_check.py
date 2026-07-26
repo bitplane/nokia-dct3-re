@@ -23,6 +23,10 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
         self.assertNotEqual(rom3["stream_sha1"], rom4["stream_sha1"])
         self.assertEqual(0x1C1C, rom4["loader"] - rom3["loader"])
         self.assertEqual(0x10, rom4["state"] - rom3["state"])
+        self.assertEqual(
+            0x10,
+            (rom4["state"] + 8) - (rom3["state"] + 8),
+        )
         self.assertEqual(0x1C28, rom4["formatter"] - rom3["formatter"])
         self.assertEqual(0x1C2C, rom4["acceptance"] - rom3["acceptance"])
 
@@ -31,6 +35,13 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
         self.assertIn('"first_required_value": 0x0B06', source)
         self.assertIn('"physical_cobba_revision_semantic_proven": False', source)
         self.assertNotIn('"role": "COBBA identification"', source)
+
+    def test_pre_upload_role_keeps_value_and_timing_units_separate(self):
+        source = Path(check.__file__).read_text(encoding="utf-8")
+        self.assertIn('"diagnostic_label": "DSP ROM"', source)
+        self.assertIn('"dsp_publication_value": "not_static"', source)
+        self.assertIn('"retry_delay_raw": 10', source)
+        self.assertNotIn('"retry_delay_ms"', source)
 
     def test_identity_rejects_short_image(self):
         with self.assertRaisesRegex(ValueError, "expected 0x100000 bytes"):

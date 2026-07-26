@@ -20,8 +20,13 @@ public:
 	enum class bootstrap_completion_profile : u8
 	{
 		ready_words_one,
-		nse3_final_b06_second_unknown,
-		nse3_v548_preupload_and_completion_unknown
+		nse3_final_b06_second_unknown
+	};
+
+	enum class bootstrap_preupload_profile : u8
+	{
+		none,
+		nse3_dsp_rom3_pair
 	};
 
 	enum class service_control_profile : u8
@@ -53,6 +58,10 @@ public:
 	{
 		m_bootstrap_completion = profile;
 	}
+	void set_bootstrap_preupload(bootstrap_preupload_profile profile)
+	{
+		m_bootstrap_preupload = profile;
+	}
 	void set_bootstrap_ping_pong(bool enabled) { m_bootstrap_ping_pong = enabled; }
 	void set_code_block_request(bool enabled) { m_code_block_request = enabled; }
 	void set_parked_boot_status(bool enabled, u16 response)
@@ -72,6 +81,7 @@ public:
 	void service_pending_w(int state);
 	void doorbell_w(int state);
 	void shared_002_write_w(int state);
+	void shared_006_write_w(int state);
 	void shared_0fe_read_w(int state);
 	void shared_0fe_write_w(int state);
 	void shared_100_read_w(int state);
@@ -114,6 +124,8 @@ private:
 	unsigned m_bootstrap_exchange_count = 0;
 	bootstrap_completion_profile m_bootstrap_completion =
 			bootstrap_completion_profile::ready_words_one;
+	bootstrap_preupload_profile m_bootstrap_preupload =
+			bootstrap_preupload_profile::none;
 	bool m_bootstrap_ping_pong = false;
 	bool m_code_block_request = false;
 	bool m_parked_boot_status = false;

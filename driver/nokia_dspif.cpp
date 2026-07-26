@@ -34,6 +34,7 @@ nokia_dspif_device::nokia_dspif_device(
 	m_service_pending_cb(*this),
 	m_doorbell_cb(*this),
 	m_shared_002_write_cb(*this),
+	m_shared_006_write_cb(*this),
 	m_shared_0fe_read_cb(*this),
 	m_shared_0fe_write_cb(*this),
 	m_shared_100_read_cb(*this),
@@ -71,7 +72,7 @@ u16 nokia_dspif_device::shared_r(offs_t offset)
 		m_shared_100_read_cb(1);
 		m_shared_100_read_cb(0);
 	}
-	if (m_trace_enabled && (byte_offset <= 0x004 || byte_offset == 0x0e0 ||
+	if (m_trace_enabled && (byte_offset <= 0x006 || byte_offset == 0x0e0 ||
 			byte_offset == 0x0fe || byte_offset == 0x100 ||
 			byte_offset == 0x0a4 || byte_offset == 0x0a6 ||
 			byte_offset == 0x0a8 || byte_offset == 0x0aa ||
@@ -85,7 +86,7 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 {
 	offset &= 0x7ff;
 	COMBINE_DATA(&m_ram[offset]);
-	if (m_trace_enabled && ((offset << 1) <= 0x004 || (offset << 1) == 0x0e0 ||
+	if (m_trace_enabled && ((offset << 1) <= 0x006 || (offset << 1) == 0x0e0 ||
 			(offset << 1) == 0x0e2 || (offset << 1) == 0x0e4 ||
 			(offset << 1) == 0x0fe || (offset << 1) == 0x100 ||
 			(offset << 1) == 0x0a8 || (offset << 1) == 0x0aa ||
@@ -113,6 +114,11 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 	{
 		m_shared_002_write_cb(1);
 		m_shared_002_write_cb(0);
+	}
+	if (offset == (0x006 / 2))
+	{
+		m_shared_006_write_cb(1);
+		m_shared_006_write_cb(0);
 	}
 	if (offset == (0x0fe / 2))
 	{

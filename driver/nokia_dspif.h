@@ -23,6 +23,7 @@ public:
 	auto service_pending_cb() { return m_service_pending_cb.bind(); }
 	auto doorbell_cb() { return m_doorbell_cb.bind(); }
 	auto shared_002_write_cb() { return m_shared_002_write_cb.bind(); }
+	auto shared_006_write_cb() { return m_shared_006_write_cb.bind(); }
 	auto shared_0fe_read_cb() { return m_shared_0fe_read_cb.bind(); }
 	auto shared_0fe_write_cb() { return m_shared_0fe_write_cb.bind(); }
 	auto shared_100_read_cb() { return m_shared_100_read_cb.bind(); }
@@ -66,6 +67,7 @@ private:
 	devcb_write_line m_service_pending_cb;
 	devcb_write_line m_doorbell_cb;
 	devcb_write_line m_shared_002_write_cb;
+	devcb_write_line m_shared_006_write_cb;
 	devcb_write_line m_shared_0fe_read_cb;
 	devcb_write_line m_shared_0fe_write_cb;
 	devcb_write_line m_shared_100_read_cb;

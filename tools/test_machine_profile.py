@@ -201,9 +201,9 @@ class MachineProfileTest(unittest.TestCase):
             "void nokia_dct3_state::post_load",
         )
         self.assertIn("m_product.nse3_bootstrap_selected_by_bios", start)
-        self.assertIn("system_bios() != 1", start)
+        self.assertIn("system_bios() == 2", start)
         self.assertIn(
-            "nse3_v548_preupload_and_completion_unknown",
+            "nse3_dsp_rom3_pair",
             start,
         )
 

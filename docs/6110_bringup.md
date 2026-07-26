@@ -76,15 +76,31 @@ After the final block they wait for `0x10002` to change away from `0xffff`,
 then capture the final `0x10000`/`0x10002` publications in product state.
 ROM3 and ROM4 stage different 65,536-byte streams, with SHA-1
 `73ddf5f79e421fdcfff7742e238fb24ea5f1fcfa` and
-`94e447d8386e010326fdfb261e247d6c0ac4d97a` respectively. Neither the
-pre-upload pair nor the second final value is recovered, so both v5.48 BIOSes
-select a typed unresolved profile and remain fail-closed. The first final
+`94e447d8386e010326fdfb261e247d6c0ac4d97a` respectively. The first final
 value is constrained independently: ROM3 and ROM4 each render it as a
 three-character `Bxx` string and later accept only `0x0b06`. Their sole direct
 loader calls, capture locations, formatter roots and comparisons are pinned by
 the gate. This does not make the two bootstrap protocols interchangeable:
-v5.48 cannot reach that final publication without the unresolved pre-upload
-exchange, and generic ready words remain incompatible.
+v5.48 cannot reach that final publication without first satisfying its
+pre-upload exchange, and generic ready words remain incompatible.
+
+The pre-upload value also has an exact external-MCU role. Both images permit a
+bounded wait for shared `0x10004` to leave `0xffff`, store the observed
+halfword, and proceed only when it equals shared `0x10006`. They then expose
+values below ten as a one-digit selector-`0x09` string and insert the same
+digit into literal diagnostic text `DSP ROM  `. Whole-image literal censuses
+find exactly those two consumers in each image. The delay helper receives raw
+value 10 and the retry counter is bounded at 20; its time unit remains
+unproved.
+
+The independently recorded matching v5.48 ROM3 handset reports
+`DSP ISw : ROM 3` in the same service namespace
+([GSMForum handset record](https://gsmforum.ru/threads/ishchu-proshivku-na-nse-3-6110-5-47.136332/)).
+Because that running handset necessarily passed the loader's equality gate,
+the ROM3 pair is constrained to `3/3`. The driver types that pre-upload
+publication separately and emits it only after firmware initializes both
+cells to `0xffff`. ROM4 has no matching handset record and does not inherit a
+speculative `4/4` pair from its package label.
 
 The real ROM3 handset log reports physical COBBA `B07` while this same v5.48
 external firmware requires the captured result `0x0b06`. That contradiction
@@ -1396,14 +1412,14 @@ Enabling its DSP service can therefore neither turn the observed 64-block
 geometry into the legacy ready-word publication nor invent a successful boot
 before the second word's DSP-side semantics are recovered.
 
-Both v5.48 images independently require the same final first result. They do
-not select this partial profile because their distinct pre-upload
-`0x10004/0x10006` exchange remains unresolved, not because the final B06
-constraint differs. Conversely, the physical `B07` report must not be
-substituted into the firmware comparison. Product configuration keeps
-bootstrap publications, external-firmware build, internal ROM identity and
-physical COBBA identity separate until matching traces establish their
-relationships.
+Both v5.48 images independently require the same final first result. ROM3
+combines this partial completion with its separately evidenced pre-upload
+`3/3` pair, but still halts at the unknown second final publication. ROM4
+halts earlier because its pre-upload value remains unresolved. Conversely,
+the physical `B07` report must not be substituted into the firmware
+comparison. Product configuration keeps bootstrap publications,
+external-firmware build, internal ROM identity and physical COBBA identity
+separate until matching traces establish their relationships.
 
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine

@@ -183,6 +183,27 @@ void nokia_dsp_hle_device::shared_002_write_w(int state)
 		m_transport->peer_shared_w(0x002 / 2, m_boot_status_response);
 }
 
+void nokia_dsp_hle_device::shared_006_write_w(int state)
+{
+	if (!state ||
+			m_bootstrap_preupload != bootstrap_preupload_profile::nse3_dsp_rom3_pair ||
+			m_transport->shared_word(0x004 / 2) != 0xffff ||
+			m_transport->shared_word(0x006 / 2) != 0xffff)
+		return;
+
+	// Both v5.48 loaders initialize this pair to 0xffff, wait for 0x004 to
+	// change and transfer only when 0x004 == 0x006.  ROM3 then exposes the
+	// captured value as selector 9 and labels it "DSP ROM"; the matching real
+	// handset reports "DSP ISw : ROM 3".  Keep this independent from the
+	// unresolved ROM4 value and from final bootstrap completion.
+	m_transport->peer_shared_w(0x004 / 2, 3);
+	m_transport->peer_shared_w(0x006 / 2, 3);
+	if (m_trace_enabled)
+		LOGMASKED(LOG_DSP_HLE,
+				"dsp_hle: NSE-3 pre-upload DSP ROM pair=3 t=%.6f\n",
+				machine().time().as_double());
+}
+
 void nokia_dsp_hle_device::shared_0fe_read_w(int state)
 {
 	if (state && m_bootstrap_ping_pong && m_transport->shared_word(0x0fe / 2) != 0)
@@ -250,21 +271,6 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 							m_bootstrap_exchange_count, machine().time().as_double());
 				break;
 
-			case bootstrap_completion_profile::nse3_v548_preupload_and_completion_unknown:
-				// Both manifest-labelled NSE-3 v5.48 variants first require
-				// a DSP publication across shared 0x004/0x006, initialized to
-				// 0xffff, before entering the 64-block transfer.  They later
-				// wait for shared 0x002 to change away from 0xffff and capture
-				// 0x000/0x002.  The first final result must eventually be
-				// 0x0b06, but both pre-upload values and the second final
-				// result remain unknown.  Do not bypass the earlier exchange
-				// by selecting the final-only partial profile or generic ready
-				// words.
-				if (m_trace_enabled)
-					LOGMASKED(LOG_DSP_HLE,
-							"dsp_hle: NSE-3 v5.48 bootstrap publications unresolved; remaining fail-closed t=%.6f\n",
-							machine().time().as_double());
-				break;
 			}
 		}
 	}

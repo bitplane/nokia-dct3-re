@@ -713,13 +713,14 @@ void nokia_dct3_state::machine_start()
 	m_pup->set_trace(m_trace_enabled);
 	// NSE-3's service package proves that v5.48 ROM3 and ROM4 use a
 	// pre-upload 0x10004/0x10006 exchange and a 0xffff final sentinel.
-	// Keep the final-only B06 partial completion confined to BIOS 0.  Both
-	// v5.48 BIOSes require B06 eventually, but their earlier pre-upload
-	// exchange remains unresolved, so they stay deliberately fail-closed.
-	if (m_product.nse3_bootstrap_selected_by_bios && system_bios() != 1)
-		m_dsp_hle->set_bootstrap_completion(
-				nokia_dsp_hle_device::bootstrap_completion_profile::
-						nse3_v548_preupload_and_completion_unknown);
+	// BIOS 2 is the package-proven v5.48 ROM3 image.  Its stored pre-upload
+	// value feeds selector 9 / "DSP ROM", and the matching real handset
+	// reports ROM 3; the loader proves the paired cell must agree.  ROM4 has
+	// no matching trace and deliberately inherits no guessed value.
+	if (m_product.nse3_bootstrap_selected_by_bios && system_bios() == 2)
+		m_dsp_hle->set_bootstrap_preupload(
+				nokia_dsp_hle_device::bootstrap_preupload_profile::
+						nse3_dsp_rom3_pair);
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 
 	m_timer_watchdog = timer_alloc(FUNC(nokia_dct3_state::timer_watchdog), this);
@@ -1808,6 +1809,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_dspif->service_pending_cb().set(FUNC(nokia_dct3_state::dsp_service_pending_w));
 	m_dspif->doorbell_cb().set(FUNC(nokia_dct3_state::dsp_doorbell_w));
 	m_dspif->shared_002_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_002_write_w));
+	m_dspif->shared_006_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_006_write_w));
 	m_dspif->shared_0fe_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_read_w));
 	m_dspif->shared_0fe_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_write_w));
 	m_dspif->shared_100_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_read_w));
