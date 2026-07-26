@@ -510,6 +510,68 @@ EXTERNAL_SERVICE_APPLICATION_ANCHORS = {
     0x239D34: ("movs", "r0, #0x20"),
     0x239D36: ("strb", "r0, [r4, #0x11]"),
 }
+EXTERNAL_SERVICE_CONTROLLER_ANCHORS = {
+    # Task 9 dispatches five contiguous scheduler/event values without
+    # exposing their application meanings in the external image.
+    0x273BB2: ("lsls", "r0, r0, #0x10"),
+    0x273BB6: ("movs", "r1, #0xff"),
+    0x273BB8: ("adds", "r1, #0x1d"),
+    0x273BBE: ("beq", "#0x273bf2"),
+    0x273BC4: ("beq", "#0x273bec"),
+    0x273BCA: ("beq", "#0x273be6"),
+    0x273BD0: ("beq", "#0x273be0"),
+    0x273BD8: ("strb", "r6, [r5, #8]"),
+    0x273BDA: ("bl", "#0x273256"),
+    0x273BE0: ("bl", "#0x27395a"),
+    0x273BE6: ("bl", "#0x273a00"),
+    0x273BEC: ("bl", "#0x273a48"),
+    0x273BF2: ("bl", "#0x273ab4"),
+    # Type 0x8d report flags increment three independent byte counters.  The
+    # aggregate reset threshold depends on the currently selected link family.
+    0x273B50: ("ldrb", "r2, [r0, #4]"),
+    0x273B56: ("ldrb", "r1, [r5, #5]"),
+    0x273B5A: ("strb", "r1, [r5, #5]"),
+    0x273B60: ("ldrb", "r1, [r5, #0xa]"),
+    0x273B64: ("strb", "r1, [r5, #0xa]"),
+    0x273B6A: ("ldrb", "r1, [r5, #3]"),
+    0x273B6E: ("strb", "r1, [r5, #3]"),
+    0x273B72: ("cmp", "r2, #0x1e"),
+    0x273B80: ("cmp", "r1, #0x5a"),
+    0x273B84: ("cmp", "r2, #0x1c"),
+    0x273B92: ("cmp", "r1, #0xe6"),
+    0x273B96: ("bl", "#0x2735dc"),
+    0x273B9A: ("bl", "#0x2738b2"),
+    # The common reset clears those counters and starts 0x1e discovery when
+    # its independently selected mode byte is zero.
+    0x2738B2: ("push", "{r4, lr}"),
+    0x2738B8: ("strb", "r1, [r0, #5]"),
+    0x2738BA: ("strb", "r1, [r0, #0xa]"),
+    0x2738BC: ("strb", "r1, [r0, #3]"),
+    0x2738D4: ("cmp", "r0, #0"),
+    0x2738D8: ("movs", "r0, #0x1e"),
+    0x2738DA: ("bl", "#0x273878"),
+    # Event 0x011d has an explicit retry byte, continues while its
+    # pre-increment value is at most ten and can issue 0x1c discovery.
+    # Event 0x011c has family-specific progress
+    # thresholds (two for 0x1e, ten for 0x1c) before advancing its list path.
+    0x273A48: ("push", "{r4, lr}"),
+    0x273A6E: ("ldrb", "r0, [r4, #1]"),
+    0x273A70: ("cmp", "r0, #0xa"),
+    0x273A84: ("movs", "r0, #0x1c"),
+    0x273A86: ("bl", "#0x273878"),
+    0x273A9C: ("ldrb", "r0, [r4, #1]"),
+    0x273A9E: ("adds", "r0, #1"),
+    0x273AA0: ("strb", "r0, [r4, #1]"),
+    0x273AB4: ("push", "{r4, r5, lr}"),
+    0x273ACC: ("cmp", "r0, #0x1e"),
+    0x273AD2: ("cmp", "r1, #2"),
+    0x273AD6: ("cmp", "r0, #0x1c"),
+    0x273ADC: ("cmp", "r0, #0xa"),
+    0x273B20: ("ldrb", "r0, [r4, #4]"),
+    0x273B22: ("adds", "r0, #1"),
+    0x273B24: ("strb", "r0, [r4, #4]"),
+    0x273B26: ("bl", "#0x273256"),
+}
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -1610,6 +1672,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     physical = swap16(data)
     task_9_entry = effective_u32(
@@ -1745,6 +1808,35 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             },
             "peer_start_delay": "not_established",
             "channel_bitmap": "not_established",
+            "peer_enablement": False,
+        },
+        "external_service_controller": {
+            "owner_task": 9,
+            "event_dispatch": {
+                "0x011c": 0x273AB4,
+                "0x011d": 0x273A48,
+                "0x011e": 0x273A00,
+                "0x011f": 0x27395A,
+                "0x0120": 0x273256,
+            },
+            "event_semantics": "not_established",
+            "type_8d_flag_counter_offsets": [3, 5, 10],
+            "aggregate_reset_thresholds": {
+                "0x1e": 0x5A,
+                "0x1c": 0xE6,
+            },
+            "reset_handler": 0x2738B2,
+            "reset_discovery_family": 0x1E,
+            "event_011d_retry_offset": 1,
+            "event_011d_retry_continues_while_preincrement_le": 10,
+            "event_011d_discovery_family": 0x1C,
+            "event_011c_progress_offset": 4,
+            "event_011c_progress_thresholds": {
+                "0x1e": 2,
+                "0x1c": 10,
+            },
+            "timer_units": "not_established",
+            "peer_originated_ordering": "not_established",
             "peer_enablement": False,
         },
         "peer_profile":

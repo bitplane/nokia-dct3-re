@@ -290,6 +290,9 @@ constexpr nokia_product_config make_6110_config()
 	// a product-specific command-64 status body. It does not establish the
 	// DSP-owned startup delay, advertised map contents or exchange ordering,
 	// so those proven receive-side pieces do not justify enabling the peer.
+	// The external image also bounds task 9's 011c..0120 event dispatch and
+	// family-specific counter policy, but neither the event timer units nor
+	// the missing DSP's trigger policy.
 	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
 	// transfer geometry rather than evidence for the HLE peer's completion
 	// counter. NSE-3 projects captured shared word 0x10000 as COBBA identity

@@ -292,6 +292,28 @@ belong to the unavailable internal DSP side. The product therefore continues
 to leave the external-service peer disabled: receiving and acknowledging
 commands is not evidence for synthesizing their triggers or contents.
 
+Task 9 nevertheless constrains the MCU controller around that boundary. Its
+main loop dispatches the contiguous event values `0x011c..0x0120` to
+`0x273ab4`, `0x273a48`, `0x273a00`, `0x27395a` and `0x273256`,
+respectively. The external image does not name those events or establish their
+timer units, so the verifier records the numeric mapping rather than assigning
+service meanings.
+
+Type-`0x8d` report flags increment three independent controller bytes at
+offsets 3, 5 and 10. Their aggregate reaches a reset/rediscovery path at
+`0x2738b2` when the selected family is `0x1e` and the sum is at least
+`0x5a`, or when it is `0x1c` and the sum is at least `0xe6`. The reset clears
+all three counters and can emit the already proven `0x1e` discovery frame.
+The `0x011d` path has a separate retry byte at offset 1, continues while its
+pre-increment value is at most ten, and can emit `0x1c` discovery. The
+`0x011c` path increments a progress byte at offset 4 until family-specific
+thresholds of two for `0x1e` or ten for `0x1c`.
+
+These are product controller policy, not portable peer delays. They further
+bound how NSE-3 reacts after task events and DSP reports, but do not prove when
+the missing DSP produces either. Accordingly they remain exact-image
+verification data rather than a scripted HLE lifecycle.
+
 ### DSP parameter selector 8
 
 The v4.06 external firmware also closes the encoding boundary for DSP

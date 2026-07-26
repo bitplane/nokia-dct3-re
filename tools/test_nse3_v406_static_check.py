@@ -249,6 +249,32 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x239D22],
         )
 
+    def test_external_service_controller_events_and_thresholds_are_product_evidence(self):
+        self.assertEqual(
+            ("bl", "#0x273ab4"),
+            check.EXTERNAL_SERVICE_CONTROLLER_ANCHORS[0x273BF2],
+        )
+        self.assertEqual(
+            ("bl", "#0x273a48"),
+            check.EXTERNAL_SERVICE_CONTROLLER_ANCHORS[0x273BEC],
+        )
+        self.assertEqual(
+            ("cmp", "r1, #0x5a"),
+            check.EXTERNAL_SERVICE_CONTROLLER_ANCHORS[0x273B80],
+        )
+        self.assertEqual(
+            ("cmp", "r1, #0xe6"),
+            check.EXTERNAL_SERVICE_CONTROLLER_ANCHORS[0x273B92],
+        )
+        self.assertEqual(
+            ("cmp", "r0, #0xa"),
+            check.EXTERNAL_SERVICE_CONTROLLER_ANCHORS[0x273A70],
+        )
+        self.assertEqual(
+            ("cmp", "r1, #2"),
+            check.EXTERNAL_SERVICE_CONTROLLER_ANCHORS[0x273AD2],
+        )
+
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
         image[0x40:0x42] = b"\x12\x34"
