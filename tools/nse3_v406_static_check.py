@@ -611,6 +611,13 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x22D692: ("movs", "r0, #0x10"),
     0x22D694: ("str", "r0, [sp, #0x14]"),
     0x22D6A0: ("bl", "#0x25a4f0"),
+    # The reused-heap descriptor's event can remain stale on one branch, but
+    # field +0x0c is overwritten by the zero-extended byte loop index.
+    0x256DEC: ("movs", "r7, #0"),
+    0x256E26: ("str", "r7, [r4, #0xc]"),
+    0x256E32: ("adds", "r0, r7, #1"),
+    0x256E34: ("lsls", "r0, r0, #0x18"),
+    0x256E36: ("lsrs", "r7, r0, #0x18"),
     # Event 0x0389 is the sole dispatcher case that reaches the remaining
     # runtime object constructor.  Its packed arguments are copied into the
     # runtime cell before the case loads cell[0] as the object input.
@@ -702,6 +709,8 @@ DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTOR_REASON = {
     "explicit_events": [0x13CE, 0x13CF],
     "unwritten_event_branch": 0x256E0C,
     "allocator_clears_payload": False,
+    "value_field_source": "zero_extended_byte_loop_index",
+    "value_field_can_be_rom_address": False,
 }
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.

@@ -322,6 +322,8 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
                 "explicit_events": [0x13CE, 0x13CF],
                 "unwritten_event_branch": 0x256E0C,
                 "allocator_clears_payload": False,
+                "value_field_source": "zero_extended_byte_loop_index",
+                "value_field_can_be_rom_address": False,
             },
             check.DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTOR_REASON,
         )

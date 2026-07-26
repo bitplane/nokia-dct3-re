@@ -284,10 +284,13 @@ store events `0x13cf` and `0x13ce`, but the branch at `0x256e0c` leaves
 free-list allocator at `0x260abc`; that routine returns the selected block's
 payload at header plus eight without clearing it. The missing store therefore
 cannot honestly be promoted to event zero: a reused block may retain an older
-halfword. The remaining evidence frontier is this one unwritten runtime value
-plus the alternative runtime-object record population. Both require further
-producer tracing or a bounded runtime trace. The exact verifier still does
-not claim producer absence or that the paired events are dormant.
+halfword. This uncertainty is field-specific: every loop iteration explicitly
+stores the zero-extended byte index `r7` into value field `+0x0c`, so this
+descriptor cannot retain or introduce a ROM catalogue address there. The
+remaining evidence frontier is the unwritten event halfword plus the other
+runtime-object record populations. Both require further producer tracing or a
+bounded runtime trace. The exact verifier still does not claim producer
+absence or that the paired events are dormant.
 
 The alternative representation is no longer structurally opaque. Its
 six-entry group table begins at `0x106a64` and is also zero-initialized by
