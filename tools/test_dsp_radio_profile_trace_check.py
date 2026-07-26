@@ -27,6 +27,12 @@ def si_parse_line(message_type: int, time: float) -> str:
 		f"data=49 06 {message_type:02x} 00 00 task=b2 t={time}\n"
 	)
 
+def si_complete_line(time: float) -> str:
+	return (
+		"nhm5_si_result: message=19 changed=01 result=00000000 "
+		f"channel=50 flags=0f/00/33 status=0002 task=b2 t={time}\n"
+	)
+
 
 class DspRadioProfileTraceCheckTest(unittest.TestCase):
 	def test_nhm5_boundary(self):
@@ -90,6 +96,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ rx_line(0x80, si1, 2.6)
 				+ "".join(si_parse_line(message_type, 2.7 + index / 10)
 					for index, message_type in enumerate((0x19, 0x1A, 0x1B, 0x1C)))
+				+ si_complete_line(3.1)
 			)
 			check_nhm5_search(path)
 
@@ -118,6 +125,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ rx_line(0x80, si1, 2.6)
 				+ "".join(si_parse_line(message_type, 2.7 + index / 10)
 					for index, message_type in enumerate((0x19, 0x1A, 0x1B, 0x1C)))
+				+ si_complete_line(3.1)
 				+ rx_line(0x8A, "0058" + "00" * 6, 2.7)
 			)
 			with self.assertRaises(SystemExit):

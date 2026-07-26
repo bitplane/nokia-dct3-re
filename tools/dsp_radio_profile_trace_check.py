@@ -192,6 +192,12 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			raise SystemExit(
 				f"NHM-5 firmware parser did not consume SI{message_type - 0x18}"
 			)
+	if not re.search(
+			r"nhm5_si_result: message=19 changed=01 result=00000000 "
+			r"channel=50 flags=0f/00/33 status=0002",
+			trace,
+	):
+		raise SystemExit("NHM-5 firmware did not complete its SI1-SI4 state")
 	if not (
 			search["time"] <= sch["time"] <= configure["time"] <=
 			no_psw_left["time"] <= channel_changed["time"] <=
@@ -201,7 +207,7 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 	print(
 		"NHM-5 acquisition: 56/160 candidate 0058 -> SCH -> organic 02/20 "
 		"CHANNEL_CONFIGURE -> NO_PSW_LEFT -> CHANNEL_CHANGED_CNF -> RA_INFO -> "
-		"BCCH SI1 advertising 0058; firmware parser consumed SI1-SI4"
+		"BCCH SI1 advertising 0058; firmware accepted a complete SI1-SI4 set"
 	)
 
 
