@@ -679,6 +679,12 @@
       "hypothesis": "A received PCH block carrying a future GSM frame number is being delivered too early and must be held until that exact TDMA frame",
       "conclusion": "Holding PCH reports until their numbered subscriber paging frame aligns NHM-5 delivery time with the report metadata, but destroys the proved NSE-8 lifecycle: its correctly addressed page produces no organic RACH even in a 40-second run. Restoring advance delivery restores the reference behavior. The future frame number is a Layer-1 scheduling contract that gives firmware advance notice of the CCCH paging opportunity, not a mislabeled immediate block.",
       "evidence": ["docs/model_coverage.md"]
+    },
+    {
+      "id": "nhm5_paging_needs_synthetic_admission_event", "status": "disproven",
+      "hypothesis": "The NHM-5 identity-matched page requires the emulator to synthesize event 0x0802, event 0x0804 or timer A2 expiry because its firmware producer is absent",
+      "conclusion": "The registered serving-report cadence delayed one whole multiframe after both BCCH and advance-delivered PCH, so decoded BCCH reports advanced two multiframes at a time and exposed only SI2/SI4 after release. Removing the redundant post-PCH BCCH delay restores SI1--SI4 coverage. NHM-5 then organically emits paged RACH, Paging Response and release, and the unchanged independent paging checker passes. The admission event and A2 lifecycle are firmware-owned consequences of a complete serving SI schedule; none is synthesized.",
+      "evidence": ["driver/nokia_radio_peer.cpp", "docs/model_coverage.md", "tools/radio_paging_trace_check.py"]
     }
   ]
 }

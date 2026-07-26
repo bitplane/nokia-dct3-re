@@ -9,7 +9,7 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Radio lifecycle, paired GSM-FR/FACCH/degraded-media and isolated physical audio gates pass. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
 | Nokia 3210 NSE-8 v5.01 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Independent ROM gates cover the call lifecycle and isolated physical duplex. The same COBBA/DSP limitation applies. |
-| Nokia 3310 NHM-5 v6.39 | Yes | Yes | Yes | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, `verify-3310-navigation`, and `verify-3310-radio-registration`. Its typed `0x56` candidate search selects and camps on ARFCN `0x0058`; SI1--SI4, Random Access and Immediate Assignment remain firmware-owned. The NHM-5 `CHANNEL_CHANGED_CNF` success bit is correlated with the pending assigned-channel context, after which v6.39 organically emits its LAPDm SABM and Location Updating Request. The independent network returns contention UA, Location Updating Accept and RR Channel Release; firmware acknowledges N(R)=1 and N(R)=2, persists `EF_LOCI`, deconfigures SDCCH and resumes steady BCCH/PCH monitoring. A correctly addressed Paging Request Type 1 now crosses the DSP transport, is reassembled by firmware and reaches the NHM-5 RR parser as result `0x08a2`; the missing boundary is the subsequent idle-RR admission/dispatch that should initiate RACH. No 3210 call or audio assumptions are claimed. |
+| Nokia 3310 NHM-5 v6.39 | Yes | Yes | Yes | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, `verify-3310-navigation`, `verify-3310-radio-registration`, and `verify-3310-radio-paging`. Its typed `0x56` candidate search selects and camps on ARFCN `0x0058`; SI1--SI4, Random Access and Immediate Assignment remain firmware-owned. The NHM-5 `CHANNEL_CHANGED_CNF` success bit is correlated with the pending assigned-channel context, after which v6.39 organically emits its LAPDm SABM and Location Updating Request. The independent network returns contention UA, Location Updating Accept and RR Channel Release; firmware acknowledges N(R)=1 and N(R)=2, persists `EF_LOCI`, deconfigures SDCCH and resumes steady BCCH/PCH monitoring. A correctly addressed Paging Request Type 1 crosses the DSP transport, exactly matches the SIM identity, and now organically produces paged RACH, Paging Response and release. Ringing, physical Answer/End and audio remain unproved; no 3210 call or audio assumptions are claimed. |
 | Nokia 3330 NHM-6 v4.50E | Yes | Yes | No | No | No | No | No | `verify-3330-frontier` and `verify-3330-navigation`; later product contracts are not established. |
 | Nokia 3410 NHM-2 v5.46E | Yes | Yes | No | No | No | No | No | `verify-3410-frontier` and navigation/menu gates; later product contracts are not established. |
 | Nokia 6110 NSE-3 family | No | No | No | No | No | No | No | Hardware documentation informs shared DCT3 boundaries, but no local declared 6110 ROM/profile or executable acceptance gate exists. Acquire and identify a lawful firmware image before implementation claims. |
@@ -167,32 +167,34 @@ notice of the subscriber's CCCH paging opportunity. Both product profiles
 already receive that generic scheduling contract.
 
 The separate RR admission path at `0x255ff8` checks that generic completion
-byte before selecting a decoder, but is not reached after the
-page. Delaying the page until well after SIM file activity has settled does
-not change the outcome. Repeating the correctly addressed request at every
-subsequent 102-frame paging opportunity makes the parser repeat the same
-successful completion without waking the idle-RR admission path or producing
-RACH, so a missing network retry is also excluded.
+byte before selecting a decoder. Under the former aliased BCCH cadence it was
+not reached after the page. Delaying the page until well after SIM file
+activity had settled did not change that outcome. Repeating the correctly
+addressed request at every subsequent 102-frame paging opportunity made the
+parser repeat the same successful completion without waking the idle-RR
+admission path or producing RACH, which excluded a missing network retry
+before the scheduling cause was found.
 
 The short nine-second trace was not by itself a sufficient latency bound:
 the proven NSE-8 path does not emit its paged RACH until 13.64 seconds after
 the page, with serving-cell revalidation in between. A 32-second NHM-5 run
-now covers that complete comparison window. NHM-5 receives its page at
+covered that complete comparison window. NHM-5 received its page at
 7.731663 seconds, performs two correlated channel changes after outbound DSP
 type `0x46`, emits outbound type `0x57/03050000` at 10.120796 seconds, and
-continues receiving BCCH/PCH reports through the end of the run without
+continued receiving BCCH/PCH reports through the end of the run without
 another random-access request. The corresponding NSE-8 trace receives its
 page at 16.980246 seconds and emits the paged RACH at 30.620707 seconds.
-Therefore the missing NHM-5 transition is not an artefact of stopping before
-the established NSE-8 admission latency.
+This proved that the then-missing NHM-5 transition was not an artefact of
+stopping before the established NSE-8 admission latency.
 
 The reconfiguration following the page is temporal, not causal. A matched
 15-second idle control with no network event emits the same
 `0x46 -> 0x02 -> 0x89 -> 0x02 -> 0x89 -> 0x57` sequence at
 10.079243..10.096980 seconds, versus 10.102477..10.120796 seconds in the
-paging fixture. It is periodic serving-cell maintenance. The addressed page
-has no proved downstream effect beyond its identity-matched `0x08a2` parser
-completion, and the maintenance terminal cannot stand in for page admission.
+paging fixture. It is periodic serving-cell maintenance. In the aliased
+cadence the addressed page had no downstream effect beyond its
+identity-matched `0x08a2` parser completion, and the maintenance terminal
+could not stand in for page admission.
 
 Complete receive-event traces also prevent transferring NSE-8 event numbers
 by resemblance. NSE-8 receives page event `0x0811`, then the later SI3-driven
@@ -210,7 +212,7 @@ that the pending-context pointer is null for both transactions, so the handler
 takes its context-null completion path before the comparison at
 `0x2c4c48..0x2c4c52`. The value-one body remains required only for the proved
 assigned-SDCCH context `0x0402/01/01`; changing the generic confirmation body
-cannot supply the missing paging handoff.
+could not supply the then-missing paging handoff.
 
 Address-scoped writes to the RR global refine the post-release control flow.
 The `0x256f1a` release branch arms timer `0x9f`, waits for the real release
@@ -236,7 +238,8 @@ A2's expiry event.
 RR initialization cancels timers `0x9f..0xa2`. During registration release it
 later arms only `0x9f`, for 80 ticks at `0x256f50`; its `0x08ca` expiry is
 received before the final channel-change request. The sole A2 arm site is
-`0x255ec0`, for 501 ticks, and the coherent paging trace never reaches it.
+`0x255ec0`, for 501 ticks, and the aliased-cadence paging trace never reached
+it.
 Task 13 still sends task 12 request `0x0a05` with selector one, which task 12
 stores at `0x0010e4bd`, but no evidence makes that request the producer of
 `0x08cb`.
@@ -249,16 +252,17 @@ traffic as the missing wake would be both ineffective and architecturally
 wrong. Reversing the release ordering so the real `0x89` confirmation is
 accepted before result `0x05e8` likewise does not change paging.
 
-The remaining failure is therefore more precise than a generic incomplete
-return to idle: the completed release path deliberately enters its page
-parser state, and the parser records the addressed request, but no evidenced
-event transfers that saved result to `0x255ff8`. Event `0x0802` is consumed
-by the top-level RR dispatcher at `0x254970` and event `0x0804` by the nested
-dispatcher at `0x255c28`; both route through `0x255adc` into the A2 setup
-path, but no static producer or post-release occurrence has yet been proved.
-The next implementation must recover the real producer and lifecycle of that
-handoff. Forcing A2, synthesising `0x08cb`, changing the addressed GSM page,
-or bypassing the parser would cross the current evidence boundary.
+The missing admission event was caused by report scheduling rather than an
+unimplemented DSP packet. While registered, the old serving cycle delayed a
+whole multiframe after both decoded BCCH and advance-delivered PCH reports.
+That made successive BCCH reports advance two 51-frame multiframes at a time,
+aliasing the eight-multiframe schedule to SI2 and SI4 after channel release.
+NHM-5 therefore never rebuilt a complete SI1--SI4 serving set around the
+addressed page. PCH is now kept in its own advance-notification slot without
+consuming another BCCH interval. The firmware consequently sees SI2, SI3,
+SI4 and SI1 in its own schedule, enters the existing `0x0802/0x0804` handoff,
+arms A2, emits paged RACH and completes Paging Response and release. No timer,
+event, parser result or firmware state is synthesized.
 
 The intervening type `0x57` is an outbound MCU-to-DSP publication, not an
 inbound `NO_PSW_FOUND` report, and its four-byte body is retained verbatim in

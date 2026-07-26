@@ -1394,9 +1394,16 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	}
 	else if (m_phase == phase::serving_bcch && report_type == 0x80)
 	{
-		// Space serving-cell samples at a 51-frame-multiframe cadence. The
-		// corresponding RSSI result follows before the next BCCH block.
-		m_wait_ticks = 59;
+		// Space decoded BCCH blocks at a 51-frame-multiframe cadence.  A PCH
+		// indication is already delivered in advance for its subscriber paging
+		// frame and must not consume another whole BCCH interval: doing so makes
+		// the interleaved report cycle advance two multiframes at a time and
+		// aliases the eight-multiframe SI schedule down to SI2/SI4.
+		const bool pch_report =
+				(m_registered || m_idle_common_control_active) &&
+				((m_reports_remaining + 1) % 3) == 2;
+		if (!pch_report)
+			m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::serving_bcch && report_type == 0x83 &&
 			m_reports_remaining == 0)
