@@ -661,6 +661,12 @@
       "hypothesis": "NHM-5 parses the addressed page but aborts before RACH because the emulator supplies the wrong CHANNEL_CHANGED_CNF body bit during its post-page serving-channel reconfiguration",
       "conclusion": "Both post-page type-0x89 packets reach NHM-5 handler 0x2c4c28 with a null pending-context pointer. The handler takes its context-null completion branch at 0x2c4c3a..0x2c4ca8 before the body-bit comparison used by the proved assigned-SDCCH context. The outer RR dispatcher remains in idle state 7 while it consumes 0x0801, 0x07fb, 0x07d1, 0x07dd, 0x05e8, 0x08d1 and 0x07d4. The confirmation is accepted; the still-missing boundary is the later firmware event that transfers saved page result 0x08a2 into admission, not a DSP status polarity.",
       "evidence": ["docs/dsp_interface.md", "docs/model_coverage.md"]
+    },
+    {
+      "id": "nhm5_page_triggers_serving_reconfiguration", "status": "disproven",
+      "hypothesis": "The NHM-5 serving-channel reconfiguration and type-0x57 terminal at about 10.1 seconds are the foreground response to the addressed page",
+      "conclusion": "A matched 15-second idle control with no queued page emits the same 0x46, two 0x02/0x89 exchanges and 0x57/03050000 at 10.079243..10.096980 seconds. The paging fixture emits them at 10.102477..10.120796 seconds. This is periodic serving-cell maintenance, not a page-triggered transition. The only proved effect of the correctly addressed page remains identity match plus parser result 0x08a2 in outer RR state 7.",
+      "evidence": ["docs/model_coverage.md"]
     }
   ]
 }

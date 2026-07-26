@@ -168,11 +168,19 @@ page at 16.980246 seconds and emits the paged RACH at 30.620707 seconds.
 Therefore the missing NHM-5 transition is not an artefact of stopping before
 the established NSE-8 admission latency.
 
+The reconfiguration following the page is temporal, not causal. A matched
+15-second idle control with no network event emits the same
+`0x46 -> 0x02 -> 0x89 -> 0x02 -> 0x89 -> 0x57` sequence at
+10.079243..10.096980 seconds, versus 10.102477..10.120796 seconds in the
+paging fixture. It is periodic serving-cell maintenance. The addressed page
+has no proved downstream effect beyond its identity-matched `0x08a2` parser
+completion, and the maintenance terminal cannot stand in for page admission.
+
 Complete receive-event traces also prevent transferring NSE-8 event numbers
 by resemblance. NSE-8 receives page event `0x0811`, then the later SI3-driven
 serving reconfiguration produces `0x03fc`, `0x07f9` and `0x0835`; `0x0835`
 immediately publishes internal event `0x0440` and RACH follows. NHM-5 receives
-its `0x08a2` page while its outer RR dispatcher is in idle state 7. Its later
+its `0x08a2` page while its outer RR dispatcher is in idle state 7. Periodic
 serving reconfiguration instead produces `0x0801`, `0x07fb`, `0x07d1`,
 `0x07dd`, `0x05e8`, `0x08d1` and `0x07d4`, all while that dispatcher remains
 in state 7. The product event grammars are structurally different; injecting
