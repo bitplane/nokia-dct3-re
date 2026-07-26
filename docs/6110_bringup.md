@@ -253,10 +253,10 @@ peer disabled. This prevents a future caller from treating identical bitmap
 packing as proof of the entire NSE-8 search lifecycle, while avoiding a copied
 NSE-3 packet codec.
 
-### External-service transport
+### External-service transport and application boundary
 
 NSE-3 also independently establishes the reusable external-service transport
-boundary without establishing a complete service application. DSPIF report
+boundary without establishing a complete peer lifecycle. DSPIF report
 types `0x8d` and `0x8e` stay outside the radio-report jump table and pass
 through wrapper `0x273e3e` to task 9. The exact task-table entry at
 `0x2b751c` points to `0x273b2d`; its loop recognizes link-family bytes `0x1e`
@@ -269,12 +269,28 @@ through the ordinary service transport. This is the same transport/discovery
 shape implemented by the generic `nokia_external_service_peer_device`; NSE-3
 does not need a copied framing component.
 
-It does not follow that the proven 3210/3310 application script is portable.
-The v4.06 anchors above do not yet establish NSE-3's registration delay,
-command `0x64` exchange, channel-map command `0x70`, advertised channels or
-acknowledgement ordering. The product therefore continues to leave the
-external-service peer disabled. Later work may share the transport while
-selecting a separately evidenced application profile.
+The application-frame boundary is independently shared too. Constructor
+`0x237a12` allocates payload length plus nine bytes, writes the learned
+destination and source nodes, zero at byte 2, class `0x40` at byte 3,
+big-endian length at bytes 4--5, the learned control byte at byte 6, value 1 at
+byte 7 and the application command at byte 8. Handler `0x2398d6` accepts
+channel-map command `0x70`, applies its map through `0x2398a0`, and returns a
+one-byte `0x70` acknowledgement containing that result. Its alternative path
+disables the map and returns an empty command-`0x71` acknowledgement.
+
+NSE-3 also constructs command `0x64` with a nine-byte body at `0x239cfc`.
+The result field is dynamic, while the seven fixed product bytes are
+`30 08 01 01 01 1f 20`. NSE-8 uses `45 0d 01 01 01 1b 58` in the
+corresponding frame. The command vocabulary and frame helper can therefore be
+shared, but the status body is genuine typed product configuration rather
+than a portable 3210 fixture.
+
+This MCU-side grammar still does not establish who initiates the exchange,
+NSE-3's registration/start delay, the advertised channel bitmap and services,
+or the complete ordering around discovery and acknowledgements. Those facts
+belong to the unavailable internal DSP side. The product therefore continues
+to leave the external-service peer disabled: receiving and acknowledging
+commands is not evidence for synthesizing their triggers or contents.
 
 ### DSP parameter selector 8
 

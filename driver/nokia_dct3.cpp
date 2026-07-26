@@ -286,7 +286,10 @@ constexpr nokia_product_config make_6110_config()
 	// Firmware-facing DSP, external-service and radio peers deliberately
 	// retain their disabled defaults. The external image establishes generic
 	// 0x1e/0x1c service framing and d0 discovery through DSP reports 8d/8e,
-	// but not NSE-3's registration/channel-map application script.
+	// plus the class-40 command 70/71 channel-map acknowledgement grammar and
+	// a product-specific command-64 status body. It does not establish the
+	// DSP-owned startup delay, advertised map contents or exchange ordering,
+	// so those proven receive-side pieces do not justify enabling the peer.
 	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
 	// transfer geometry rather than evidence for the HLE peer's completion
 	// counter. NSE-3 projects captured shared word 0x10000 as COBBA identity

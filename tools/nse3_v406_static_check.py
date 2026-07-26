@@ -455,6 +455,61 @@ EXTERNAL_SERVICE_TRANSPORT_ANCHORS = {
 }
 NSE3_TASK_9_ENTRY_POINTER = 0x2B751C
 NSE3_TASK_9_ENTRY = 0x273B2D
+EXTERNAL_SERVICE_APPLICATION_ANCHORS = {
+    # The class-0x40 allocator is shared in shape but relocated.  It writes
+    # learned destination/source nodes, class 0x40, big-endian body length,
+    # the transport control byte and command at byte 8.
+    0x237A12: ("push", "{r4, r5, r6, lr}"),
+    0x237A1A: ("adds", "r0, r5, #0"),
+    0x237A1C: ("adds", "r0, #9"),
+    0x237A22: ("bl", "#0x260abc"),
+    0x237A2C: ("strb", "r2, [r0]"),
+    0x237A32: ("strb", "r2, [r0, #1]"),
+    0x237A34: ("movs", "r2, #0"),
+    0x237A36: ("strb", "r2, [r0, #2]"),
+    0x237A38: ("movs", "r2, #0x40"),
+    0x237A3A: ("strb", "r2, [r0, #3]"),
+    0x237A44: ("strb", "r2, [r0, #4]"),
+    0x237A46: ("strb", "r5, [r0, #5]"),
+    0x237A50: ("strb", "r1, [r0, #7]"),
+    0x237A52: ("strb", "r6, [r0, #8]"),
+    # Incoming 0x70 installs a channel map and receives a one-byte 0x70
+    # acknowledgement; the alternative disables it and receives empty 0x71.
+    0x2398D6: ("push", "{r4, r5, lr}"),
+    0x2398DC: ("ldrb", "r0, [r4, #8]"),
+    0x2398DE: ("cmp", "r0, #0x70"),
+    0x2398F4: ("movs", "r1, #0x71"),
+    0x2398F6: ("movs", "r2, #0"),
+    0x2398F8: ("bl", "#0x237a12"),
+    0x239900: ("movs", "r1, #0x70"),
+    0x239902: ("movs", "r2, #1"),
+    0x239904: ("bl", "#0x237a12"),
+    0x23990C: ("bl", "#0x2398a0"),
+    0x239910: ("strb", "r0, [r5, #9]"),
+    0x239914: ("bl", "#0x237a58"),
+    # NSE-3 independently constructs command 0x64 with a nine-byte status
+    # body.  Its fixed product bytes differ from NSE-8 and must stay typed.
+    0x239CFC: ("push", "{r4, r5, r6, r7, lr}"),
+    0x239D02: ("mov", "r0, sp"),
+    0x239D04: ("movs", "r1, #0x64"),
+    0x239D06: ("movs", "r2, #9"),
+    0x239D08: ("bl", "#0x237a12"),
+    0x239D16: ("movs", "r0, #0"),
+    0x239D18: ("strb", "r0, [r4, #0xa]"),
+    0x239D1E: ("movs", "r7, #1"),
+    0x239D20: ("strb", "r7, [r4, #0xa]"),
+    0x239D22: ("movs", "r0, #0x30"),
+    0x239D24: ("strb", "r0, [r4, #0xb]"),
+    0x239D26: ("movs", "r0, #8"),
+    0x239D28: ("strb", "r0, [r4, #0xc]"),
+    0x239D2A: ("strb", "r7, [r4, #0xd]"),
+    0x239D2C: ("strb", "r7, [r4, #0xe]"),
+    0x239D2E: ("strb", "r7, [r4, #0xf]"),
+    0x239D30: ("movs", "r0, #0x1f"),
+    0x239D32: ("strb", "r0, [r4, #0x10]"),
+    0x239D34: ("movs", "r0, #0x20"),
+    0x239D36: ("strb", "r0, [r4, #0x11]"),
+}
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -1554,6 +1609,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, RADIO_REPORT_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     physical = swap16(data)
     task_9_entry = effective_u32(
@@ -1663,10 +1719,36 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "control_byte": 1,
             },
             "transport_component": "generic_nokia_external_service",
-            "application_registration_grammar": "not_established",
+            "peer_initiation_grammar": "not_established",
             "peer_enablement": False,
         },
-        "peer_profile": "disabled_pending_bootstrap_and_full_report_lifecycle",
+        "external_service_application": {
+            "frame_class": 0x40,
+            "constructor": 0x237A12,
+            "channel_map": {
+                "enable_command": 0x70,
+                "enable_handler": 0x2398D6,
+                "enable_acknowledgement_length": 1,
+                "disable_command": 0x71,
+                "disable_acknowledgement_length": 0,
+            },
+            "status": {
+                "command": 0x64,
+                "constructor_call": 0x239D08,
+                "payload_length": 9,
+                "result_offset": 1,
+                "result_values": [0, 1],
+                "fixed_product_bytes": [0x30, 0x08, 0x01, 0x01, 0x01, 0x1F, 0x20],
+                "nse8_fixed_product_bytes":
+                    [0x45, 0x0D, 0x01, 0x01, 0x01, 0x1B, 0x58],
+                "product_payload_shared": False,
+            },
+            "peer_start_delay": "not_established",
+            "channel_bitmap": "not_established",
+            "peer_enablement": False,
+        },
+        "peer_profile":
+            "disabled_pending_dsp_owned_initiation_map_and_ordering",
     }
 
 

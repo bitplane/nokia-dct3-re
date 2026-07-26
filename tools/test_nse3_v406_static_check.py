@@ -236,6 +236,18 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             ("movs", "r0, #0x1e"),
             check.EXTERNAL_SERVICE_TRANSPORT_ANCHORS[0x2738D8],
         )
+        self.assertEqual(
+            ("movs", "r1, #0x70"),
+            check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x239900],
+        )
+        self.assertEqual(
+            ("movs", "r1, #0x64"),
+            check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x239D04],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x30"),
+            check.EXTERNAL_SERVICE_APPLICATION_ANCHORS[0x239D22],
+        )
 
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
