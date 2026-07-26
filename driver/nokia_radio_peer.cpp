@@ -988,15 +988,28 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					packet.length - 2) ==
 				nokia_lapdm_link_device::uplink_result::downlink_acknowledgement)
 		{
-			if (m_trace_enabled)
+			const auto acknowledged =
+					m_gsm_session->pending_downlink_kind();
+			if (m_trace_enabled && acknowledged ==
+					nokia_gsm_session_device::downlink_kind::
+							location_update_accept)
 				LOGMASKED(LOG_RADIO,
 						"dsp_hle: LAPDm Location Updating Accept acknowledged nr=%u t=%.6f\n",
 						m_lapdm_link->pending_receive_sequence(),
 						machine().time().as_double());
-			if (m_gsm_session->downlink_acknowledged() ==
+			const auto action = m_gsm_session->downlink_acknowledged();
+			if (action ==
 					nokia_gsm_session_device::downlink_kind::channel_release)
 			{
 				m_phase = phase::rr_channel_release;
+				m_reports_remaining = 1;
+				m_report_deferred = true;
+			}
+			else if (acknowledged ==
+					nokia_gsm_session_device::downlink_kind::
+							authentication_request)
+			{
+				m_phase = phase::service_uplink_request;
 				m_reports_remaining = 1;
 				m_report_deferred = true;
 			}
@@ -1132,6 +1145,8 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			const auto action = acknowledge_downlink();
 			if (action == nokia_gsm_session_device::downlink_kind::release_complete)
 			{
+				m_registered =
+						m_gsm_session->registered_mobile_identity_length() == 8;
 				if (m_trace_enabled)
 					LOGMASKED(LOG_RADIO,
 							"dsp_hle: LAPDm service Channel Release acknowledged nr=%u t=%.6f\n",
@@ -1558,7 +1573,10 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	else if (m_phase == phase::contention_resolution && report_type == 0x80)
 	{
 		const auto action = m_gsm_session->contention_resolution_delivered();
-		if (action == nokia_gsm_session_device::downlink_kind::location_update_accept)
+		if (action ==
+				nokia_gsm_session_device::downlink_kind::location_update_accept ||
+				action ==
+				nokia_gsm_session_device::downlink_kind::authentication_request)
 		{
 			m_phase = phase::location_update_accept;
 			m_reports_remaining = 1;
@@ -1571,6 +1589,10 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 			m_report_deferred = true;
 		}
 		else if (action ==
+				nokia_gsm_session_device::downlink_kind::authentication_request ||
+				action ==
+				nokia_gsm_session_device::downlink_kind::authentication_reject ||
+				action ==
 				nokia_gsm_session_device::downlink_kind::cipher_mode_command ||
 				action == nokia_gsm_session_device::downlink_kind::mm_information)
 		{

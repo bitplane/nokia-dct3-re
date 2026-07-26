@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "nokia_gsm_network.h"
+#include "gsm_mm_authentication.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device,
 		"nokia_gsm_network", "Nokia DCT3 laboratory GSM network")
@@ -158,6 +159,41 @@ std::array<u8, 17> nokia_gsm_network_device::location_update_accept(
 	if (length >= 18 && location_update_request[9] == 8)
 		std::copy_n(location_update_request + 10, 8, message.begin() + 9);
 	return message;
+}
+
+const gsm::a3a8::block &nokia_gsm_network_device::laboratory_ki()
+{
+	static constexpr gsm::a3a8::block key = {
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
+	};
+	return key;
+}
+
+std::array<u8, 19> nokia_gsm_network_device::authentication_request() const
+{
+	// GSM 04.08 9.2.2: MM header, key sequence 0, and a 128-bit RAND.
+	static constexpr gsm::a3a8::block rand = {
+		0x23, 0x55, 0x3c, 0xbe, 0x96, 0x37, 0xa8, 0x9d,
+		0x21, 0x8a, 0xe6, 0x4d, 0xae, 0x47, 0xbf, 0x35
+	};
+	return gsm::mm::authentication::request(0, rand);
+}
+
+std::array<u8, 2> nokia_gsm_network_device::authentication_reject() const
+{
+	return gsm::mm::authentication::reject();
+}
+
+bool nokia_gsm_network_device::authentication_response_valid(
+		const u8 *information, unsigned length) const
+{
+	const auto request = authentication_request();
+	gsm::a3a8::block rand;
+	std::copy(request.begin() + 3, request.end(), rand.begin());
+	const auto expected = gsm::a3a8::aes_example(laboratory_ki(), rand);
+	return gsm::mm::authentication::response_valid(
+			expected, information, length);
 }
 
 std::array<u8, 3> nokia_gsm_network_device::cipher_mode_command() const

@@ -25,6 +25,8 @@ public:
 	enum class downlink_kind : u8
 	{
 		none,
+		authentication_request,
+		authentication_reject,
 		location_update_accept,
 		channel_release,
 		cipher_mode_command,
@@ -50,6 +52,10 @@ public:
 	nokia_gsm_session_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
+	void set_authentication_required(bool required)
+	{
+		m_authentication_required = required;
+	}
 	bool establish_layer3(const u8 *information, unsigned length);
 	bool queue_incoming_page(incoming_service service = incoming_service::none);
 	downlink_kind contention_resolution_delivered();
@@ -93,6 +99,9 @@ private:
 		awaiting_paging_response,
 		awaiting_contention_resolution,
 		awaiting_paging_contention_resolution,
+		awaiting_authentication_request_acknowledgement,
+		awaiting_authentication_response,
+		awaiting_authentication_reject_acknowledgement,
 		awaiting_location_update_accept_acknowledgement,
 		awaiting_channel_release_acknowledgement,
 		awaiting_cipher_mode_command_acknowledgement,
@@ -116,6 +125,7 @@ private:
 			u8 sapi = 0);
 
 	required_device<nokia_gsm_network_device> m_network;
+	bool m_authentication_required = false;
 	u8 m_state = u8(state::idle);
 	std::array<u8, maximum_layer3_length> m_established_layer3{};
 	unsigned m_established_layer3_length = 0;

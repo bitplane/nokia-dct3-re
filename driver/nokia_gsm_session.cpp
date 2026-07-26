@@ -107,6 +107,14 @@ nokia_gsm_session_device::contention_resolution_delivered()
 	if (m_state != u8(state::awaiting_contention_resolution))
 		return downlink_kind::none;
 
+	if (m_authentication_required)
+	{
+		const auto request = m_network->authentication_request();
+		m_state = u8(state::awaiting_authentication_request_acknowledgement);
+		return queue_downlink(downlink_kind::authentication_request,
+				request.data(), request.size());
+	}
+
 	const auto accept = m_network->location_update_accept(
 			m_established_layer3.data(), m_established_layer3_length);
 	m_state = u8(state::awaiting_location_update_accept_acknowledgement);
@@ -124,6 +132,24 @@ std::array<u8, 24> nokia_gsm_session_device::paging_request() const
 nokia_gsm_session_device::downlink_kind
 nokia_gsm_session_device::downlink_acknowledged()
 {
+	if (m_state == u8(state::awaiting_authentication_request_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::authentication_request))
+	{
+		clear_pending_downlink();
+		m_state = u8(state::awaiting_authentication_response);
+		return downlink_kind::none;
+	}
+
+	if (m_state == u8(state::awaiting_authentication_reject_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::authentication_reject))
+	{
+		const auto release = m_network->channel_release();
+		m_release_completes_registration = false;
+		m_state = u8(state::awaiting_channel_release_acknowledgement);
+		return queue_downlink(downlink_kind::channel_release,
+				release.data(), release.size());
+	}
+
 	if (m_state == u8(state::awaiting_location_update_accept_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::location_update_accept))
 	{
@@ -282,6 +308,24 @@ nokia_gsm_session_device::receive_layer3(
 
 	const u8 protocol_discriminator = information[0] & 0x0f;
 	const u8 message_type = information[1] & 0x3f;
+	if (sapi == 0 && m_state == u8(state::awaiting_authentication_response))
+	{
+		if (m_network->authentication_response_valid(information, length))
+		{
+			const auto accept = m_network->location_update_accept(
+					m_established_layer3.data(),
+					m_established_layer3_length);
+			m_state = u8(state::awaiting_location_update_accept_acknowledgement);
+			return queue_downlink(downlink_kind::location_update_accept,
+					accept.data(), accept.size());
+		}
+
+		const auto reject = m_network->authentication_reject();
+		m_state = u8(state::awaiting_authentication_reject_acknowledgement);
+		return queue_downlink(downlink_kind::authentication_reject,
+				reject.data(), reject.size());
+	}
+
 	if (sapi == 0 &&
 			(m_state == u8(state::incoming_call_active) ||
 			m_state == u8(state::awaiting_traffic_assignment) ||

@@ -650,6 +650,10 @@ void nokia_sim_card_device::queue_pending_response(unsigned requested)
 	n += m_pending_response_len;
 	response[n++] = 0x90;
 	response[n++] = 0x00;
+	if (m_trace)
+		LOGMASKED(LOG_SIM,
+				"sim_device: pending response ins=%02x length=%u status=9000 t=%.8f\n",
+				m_ins, m_pending_response_len, machine().time().as_double());
 	m_pending_response_len = 0;
 	emit_response(response, n);
 }

@@ -473,7 +473,8 @@ public:
 		m_vibration(*this, "vibration"),
 		m_hw_config(*this, "HWCFG"),
 		m_diag_config(*this, "DIAGCFG"),
-		m_network_config(*this, "NETCFG")
+		m_network_config(*this, "NETCFG"),
+		m_authentication_config(*this, "AUTHCFG")
 	{ }
 
 	void noki3330(machine_config &config);
@@ -586,6 +587,7 @@ private:
 	optional_ioport m_hw_config;
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
+	optional_ioport m_authentication_config;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
 
@@ -833,6 +835,8 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_enabled(m_product.radio_peer && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
+	m_gsm_session->set_authentication_required(
+			BIT(m_authentication_config.read_safe(0x00), 0));
 	m_radio_peer->set_page_after_registration(
 			BIT(network, 0) || BIT(network, 1) || BIT(network, 2) ||
 			BIT(network, 3));
@@ -850,13 +854,9 @@ void nokia_dct3_state::machine_reset()
 	// The removable laboratory subscriber explicitly selects 3GPP TS 55.205
 	// section 5's AES-based example A3/A8 profile.  A3/A8 is operator-owned;
 	// this key is synthetic fixture provisioning, not handset identity.
-	const gsm::a3a8::block lab_ki = {
-		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
-	};
 	m_sim_card->set_authentication(
 			nokia_sim_card_device::authentication_profile::gsm_aes_example,
-			lab_ki);
+			nokia_gsm_network_device::laboratory_ki());
 	const u8 atr[] = { 0x3b, 0x10, 0x05 };
 	m_sim_card->set_atr(atr, std::size(atr));
 	m_eeprom->write_scl(1);
@@ -1520,6 +1520,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x80, 0x00, "Four-burst uplink TCH fade per six multiframes")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x80, DEF_STR(On))
+
+	PORT_START("AUTHCFG")
+	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x01, DEF_STR(On))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3210 )

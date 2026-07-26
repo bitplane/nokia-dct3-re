@@ -1,0 +1,39 @@
+import unittest
+
+from tools.radio_authentication_boundary_trace_check import REQUEST, verify
+
+
+GOOD = f"""
+dspif_transport: RX enqueue type=80 payload=34 data=80000000000000000000{REQUEST}2b2b
+sim_device: header cla=a0 ins=88 p1=00 p2=00 p3=10 selected=7f20
+sim_device: body ins=88 length=16 selected=7f20
+sim_device: header cla=a0 ins=c0 p1=00 p2=00 p3=0c selected=7f20
+sim_device: pending response ins=c0 length=12 status=9000
+"""
+
+
+class AuthenticationBoundaryTraceCheckTest(unittest.TestCase):
+    def test_accepts_complete_organic_sim_frontier(self):
+        result = verify(GOOD)
+        self.assertEqual(1, result["authentication_requests"])
+        self.assertEqual(12, result["result_bytes_fetched"])
+        self.assertEqual(0, result["mm_authentication_responses"])
+        self.assertFalse(result["registration_promotion"])
+
+    def test_records_response_without_promoting_registration(self):
+        result = verify(
+            GOOD + "\ndsp_hle: GSM service uplink sapi=0 pd=05 "
+            "message=14 length=6\n"
+        )
+        self.assertEqual(1, result["mm_authentication_responses"])
+        self.assertFalse(result["registration_promotion"])
+
+    def test_rejects_missing_card_result(self):
+        with self.assertRaisesRegex(ValueError, "twelve-byte GET RESPONSE"):
+            verify(GOOD.replace(
+                "sim_device: pending response ins=c0 length=12 status=9000", ""
+            ))
+
+
+if __name__ == "__main__":
+    unittest.main()

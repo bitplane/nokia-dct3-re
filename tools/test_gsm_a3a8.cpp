@@ -1,5 +1,7 @@
 #include "../driver/gsm_a3a8.h"
+#include "../driver/gsm_mm_authentication.h"
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 
@@ -24,5 +26,23 @@ int main()
 	};
 	assert(result.sres == expected_sres);
 	assert(result.kc == expected_kc);
+
+	const auto request = gsm::mm::authentication::request(0, rand);
+	assert(request[0] == 0x05 && request[1] == 0x12 && request[2] == 0x00);
+	assert(std::equal(rand.begin(), rand.end(), request.begin() + 3));
+	std::array<std::uint8_t, 6> response = {
+		0x05, 0x14,
+		expected_sres[0], expected_sres[1],
+		expected_sres[2], expected_sres[3]
+	};
+	assert(gsm::mm::authentication::response_valid(
+			result, response.data(), response.size()));
+	response.back() ^= 1;
+	assert(!gsm::mm::authentication::response_valid(
+			result, response.data(), response.size()));
+	assert(!gsm::mm::authentication::response_valid(
+			result, response.data(), response.size() - 1));
+	assert(gsm::mm::authentication::reject() ==
+			(std::array<std::uint8_t, 2>{ 0x05, 0x11 }));
 	std::cout << "GSM A3/A8 example tests passed\n";
 }

@@ -242,9 +242,11 @@ immediately following GET RESPONSE. Because A3/A8 is operator-selectable, the
 card's default profile remains `none`; the synthetic laboratory subscriber
 explicitly selects 3GPP TS 55.205 section 5's AES example and a provisioned
 test key. `verify-gsm-a3a8` checks the resulting SRES/Kc projection against the
-FIPS-197 AES-128 example. No network authentication exchange or organic NSE-3
-command ordering is inferred, so this still does not promote 6110 runtime
-coverage.
+FIPS-197 AES-128 example. An opt-in network fixture now takes the already
+working 3210 and 3310 firmware through MM Authentication Request, the organic
+SIM command and its complete GET RESPONSE, but neither handset yet publishes
+MM Authentication Response. That cross-product frontier does not establish
+NSE-3 command ordering and does not promote 6110 runtime coverage.
 
 The four SIM Toolkit constructors remain unsupported and return `6d 00`.
 This is not permission to pre-implement an assumed 6110 boot script: an

@@ -136,9 +136,10 @@ establishes a concrete requirement. Later work includes:
 
 - SEEK, invalidation and additional access-condition/error semantics;
 - integrating the now-profiled RUN GSM ALGORITHM response with a matching
-  network-side authentication exchange; the default card deliberately has no
-  A3/A8, while the synthetic subscriber selects the independently tested
-  TS 55.205 section-5 AES example and an explicit laboratory key;
+  handset MM Authentication Response. The matching network challenge,
+  expected SRES and reject path are typed, and both 3210 and 3310 organically
+  run A3/A8 and fetch the result, but neither currently publishes the response.
+  The default network remains authentication-disabled;
 - supplying coherent FPLMN and optional EFs beyond the current matched
   IMSI/SST/PLMN-selector/SPN profile;
 - testing card removal, reset, timeout, parity/error, and proactive-SIM status;

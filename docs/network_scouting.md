@@ -285,7 +285,8 @@ be reintroduced as peer behavior:
 ## Remaining fidelity
 
 The checkpoint is registered and camped, not a complete cellular network.
-Known extensions are authentication/ciphering, periodic and mobility-driven
+Known extensions are completion of the opt-in authentication frontier,
+ciphering, periodic and mobility-driven
 Location Updating, deterministic answered-call speech/codec data, MO SMS and MT SMS CP/RP closure,
 multipart Smart Messaging and ringtone UI/persistence, handover, measurement reporting,
 loss/reselection, rejected registration and configurable multi-cell topology.
