@@ -283,6 +283,32 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             },
             check.DSP_PARAMETER_RUNTIME_OBJECT_EVENT_BOUNDED_ARGUMENTS,
         )
+        self.assertEqual(
+            {
+                "records": 124,
+                "unique_values": 32,
+                "rom_catalogue_values": 8,
+                "emitter_eligible_records": 31,
+                "emitter_eligible_rom_catalogue_values": 0,
+                "dispatch_bit_eligible_records": 0,
+            },
+            check.DSP_PARAMETER_FIXED_OBJECT_VALUE_CENSUS,
+        )
+        self.assertEqual(
+            {
+                0x22D686: {
+                    "value": 0x0013,
+                    "flags": 0x00,
+                    "event": 0x0389,
+                },
+                0x22D6A0: {
+                    "value": 0x0010,
+                    "flags": 0x00,
+                    "event": 0x0389,
+                },
+            },
+            check.DSP_PARAMETER_EXPLICIT_OBJECT_EVENT_DESCRIPTORS,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
         self.assertEqual(
             [0x256E2E],

@@ -599,6 +599,18 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x25B076: ("bl", "#0x25a7d0"),
     0x25B0B0: ("movs", "r0, #0xff"),
     0x25B0B2: ("bl", "#0x25a7d0"),
+    # Two runtime descriptors explicitly store event 0x0389.  Their complete
+    # stack template gives field +0x0c as 0x13/0x10 and clears flag +0x18.
+    0x22D654: ("movs", "r0, #0"),
+    0x22D658: ("str", "r0, [sp, #0x10]"),
+    0x22D65E: ("strh", "r1, [r0, #0x1a]"),
+    0x22D668: ("strb", "r0, [r1]"),
+    0x22D678: ("movs", "r0, #0x13"),
+    0x22D67A: ("str", "r0, [sp, #0x14]"),
+    0x22D686: ("bl", "#0x25a4f0"),
+    0x22D692: ("movs", "r0, #0x10"),
+    0x22D694: ("str", "r0, [sp, #0x14]"),
+    0x22D6A0: ("bl", "#0x25a4f0"),
     # Event 0x0389 is the sole dispatcher case that reaches the remaining
     # runtime object constructor.  Its packed arguments are copied into the
     # runtime cell before the case loads cell[0] as the object input.
@@ -634,6 +646,18 @@ DSP_PARAMETER_RUNTIME_OBJECT_EVENT_BOUNDED_ARGUMENTS = {
     0x231660: [0x0000, 0x0000],
     0x25A8FA: [None, 0x00FF],
     0x25B044: [None, 0x0000],
+}
+DSP_PARAMETER_FIXED_OBJECT_VALUE_CENSUS = {
+    "records": 124,
+    "unique_values": 32,
+    "rom_catalogue_values": 8,
+    "emitter_eligible_records": 31,
+    "emitter_eligible_rom_catalogue_values": 0,
+    "dispatch_bit_eligible_records": 0,
+}
+DSP_PARAMETER_EXPLICIT_OBJECT_EVENT_DESCRIPTORS = {
+    0x22D686: {"value": 0x0013, "flags": 0x00, "event": 0x0389},
+    0x22D6A0: {"value": 0x0010, "flags": 0x00, "event": 0x0389},
 }
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
@@ -1578,6 +1602,11 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
         )
 
     fixed_object_events = []
+    fixed_object_values = []
+    fixed_object_rom_values = []
+    emitter_eligible_records = 0
+    emitter_eligible_rom_values = 0
+    dispatch_bit_eligible_records = 0
     for object_address in sorted(fixed_object_addresses):
         object_offset = object_address - FLASH_BASE
         records_raw = int.from_bytes(
@@ -1597,15 +1626,37 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                 f"NSE-3 fixed object record range is invalid: "
                 f"{object_address:#x} -> {records:#x} count {record_count}"
             )
+        object_flags = physical[(object_offset + 6) ^ 1]
         for record in range(record_count):
-            event_offset = (
-                records - FLASH_BASE + record * 0x18 + 0x0E
-            )
+            record_offset = records - FLASH_BASE + record * 0x18
+            event_offset = record_offset + 0x0E
             fixed_object_events.append(
                 int.from_bytes(
                     physical[event_offset : event_offset + 2], "little"
                 )
             )
+            value_raw = int.from_bytes(
+                physical[record_offset + 8 : record_offset + 12], "little"
+            )
+            value = (
+                (value_raw << 16) | (value_raw >> 16)
+            ) & 0xFFFFFFFF
+            fixed_object_values.append(value)
+            value_is_rom = (
+                FLASH_BASE <= value < FLASH_BASE + len(physical)
+            )
+            if value_is_rom:
+                fixed_object_rom_values.append(value)
+            record_flags = physical[(record_offset + 0x14) ^ 1]
+            emitter_eligible = bool(
+                (record_flags & 0x20) or (object_flags & 0x10)
+            )
+            if emitter_eligible:
+                emitter_eligible_records += 1
+                if value_is_rom:
+                    emitter_eligible_rom_values += 1
+            if record_flags & 0x40:
+                dispatch_bit_eligible_records += 1
     if len(fixed_object_events) != 124:
         raise ValueError(
             "NSE-3 fixed object event census changed: expected 124, got "
@@ -1614,6 +1665,21 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
     if {value & 0x1FFF for value in fixed_object_events} & target_events:
         raise ValueError(
             "NSE-3 fixed object catalogue can publish a parameter event"
+        )
+    fixed_object_value_census = {
+        "records": len(fixed_object_values),
+        "unique_values": len(set(fixed_object_values)),
+        "rom_catalogue_values": len(fixed_object_rom_values),
+        "emitter_eligible_records": emitter_eligible_records,
+        "emitter_eligible_rom_catalogue_values":
+            emitter_eligible_rom_values,
+        "dispatch_bit_eligible_records": dispatch_bit_eligible_records,
+    }
+    if fixed_object_value_census != DSP_PARAMETER_FIXED_OBJECT_VALUE_CENSUS:
+        raise ValueError(
+            "NSE-3 fixed object value census changed: expected "
+            f"{DSP_PARAMETER_FIXED_OBJECT_VALUE_CENSUS}, got "
+            f"{fixed_object_value_census}"
         )
 
     object_event_profile = {
@@ -1742,6 +1808,9 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                     DSP_PARAMETER_RUNTIME_OBJECT_EVENT_BOUNDED_ARGUMENTS,
                 "object_emitter_calls": object_emitter_calls,
                 "object_emitter_has_stored_pointer": False,
+                "fixed_object_value_census": fixed_object_value_census,
+                "explicit_object_event_descriptors":
+                    DSP_PARAMETER_EXPLICIT_OBJECT_EVENT_DESCRIPTORS,
             },
         },
         "runtime_built_calls_exclude_parameter_events": False,

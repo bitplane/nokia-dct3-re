@@ -326,6 +326,27 @@ ROM still missing, a passive MAME trace cannot reach this firmware boundary
 organically, so that value is not fabricated through a direct-to-flash reset
 bypass. The exact verifier still does not claim producer absence.
 
+The fixed value population is now checked rather than inferred from that
+field's apparent use. The 124 fixed 24-byte records contain 32 distinct
+`+8` values, including eight values that are addresses of other ROM
+catalogues. Thirty-one records satisfy the static flag half of
+`0x25a8fa`'s producer condition, but none of those 31 contains one of the
+eight ROM catalogue addresses. No fixed record sets the `0x40` flag that
+gates producer `0x25b044`. Independently, none of the 81 fixed-ROM
+registered descriptors contains a ROM address in its corresponding `+0x0c`
+field. Thus a valid non-null catalogue input reaching event `0x0389` is not
+proven by any fixed record; it would have to come from a runtime-built record.
+Small fixed values are retained as opaque values rather than labelled as
+pointers or forced through the constructor.
+
+The two runtime descriptors that explicitly carry stored event `0x0389` are
+also complete stack templates, not unknown heaps. Registration call
+`0x22d686` supplies value field `+0x0c = 0x13`; call `0x22d6a0` supplies
+`+0x0c = 0x10`; both clear flag byte `+0x18`. Neither value is a catalogue
+address. This excludes those conspicuous event-labelled descriptors as a
+valid non-null constructor source, but does not exclude another runtime-built
+descriptor becoming the current record before producer `0x25a8fa` runs.
+
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
 high-nibble-command/low-twelve-value decoder, but leaves the independent
