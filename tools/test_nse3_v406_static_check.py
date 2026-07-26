@@ -545,6 +545,57 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x10A4E4,
             check.TYPE_0X1F_CONTROLLER_STATUS_LITERALS[0x27D680],
         )
+        self.assertEqual(0x03F1, check.TYPE_0X03_CONTROLLER_STATUS)
+        self.assertEqual(
+            [
+                0x24D7F0,
+                0x24D918,
+                0x24DC78,
+                0x24DFB4,
+                0x24DFD0,
+                0x24E374,
+            ],
+            check.TYPE_0X03_CONTROLLER_STATUS_CALLS,
+        )
+        self.assertEqual(
+            {
+                0x24D7F0: 15,
+                0x24D918: 17,
+                0x24DC78: 6,
+                0x24DFB4: 7,
+                0x24DFD0: 7,
+                0x24E374: 24,
+            },
+            check.TYPE_0X03_CONTROLLER_STATUS_TASK_17_STATES,
+        )
+        self.assertEqual(
+            bytes.fromhex("02000300"),
+            check.TYPE_0X03_FIXED_OBJECT,
+        )
+        self.assertEqual(
+            [0x20EAC6],
+            check.TYPE_0X03_FIXED_OBJECT_SUBMIT_CALLS,
+        )
+        self.assertEqual(
+            ("cmp", "r0, #0x1f"),
+            check.TYPE_0X03_CONTROL_ANCHORS[0x20EAA0],
+        )
+        self.assertEqual(
+            ("bl", "#0x20cffa"),
+            check.TYPE_0X03_CONTROL_ANCHORS[0x20EA06],
+        )
+        self.assertEqual(
+            0x2BD6FC,
+            check.TYPE_0X03_CONTROL_LITERALS[0x20EAC4],
+        )
+        self.assertEqual(
+            0x13A3,
+            check.TYPE_0X03_CONTROL_LITERALS[0x20E92A],
+        )
+        self.assertEqual(
+            0x1090FF,
+            check.TYPE_0X03_CONTROL_LITERALS[0x20E92E],
+        )
         self.assertEqual(
             0x1E08, check.RADIO_REPORT_HANDLER_LITERALS[0x27FEC0]
         )

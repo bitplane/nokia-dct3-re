@@ -645,6 +645,36 @@ candidate state, not alternative product-wide wire profiles. The semantic
 name of type `0x8f`, the exact declared-length/pair-padding interpretation,
 and the DSP conditions that emit the trigger remain unassigned.
 
+### Empty type-`0x03` controller publication
+
+An independent ROM4 HLE labels an empty outbound type `0x03` as
+`DEACTIVATE`. That label is useful as a search hypothesis, but the exact
+v4.06 ROM3 candidate does not yet prove the protocol meaning or its position
+in an acquisition sequence. It does independently prove the wire object and
+the controller choice that emits it.
+
+The fixed task-3 object at `0x2bd6fc` is exactly `02 00 03 00`: queue status
+2, declared body length zero and type `0x03`. Its unique fixed-object
+submission is at `0x20eac6`. Task-11 status `0x03f1` reaches dispatcher
+`0x20f014`; its `0x20f06c` arm is the sole caller of route `0x20ea98`.
+That route submits the empty object only when controller context
+`0x108f18` equals `0x1f` and helper `0x27a174` returns zero.
+
+The alternate branch uses the same task-12 status builder `0x20e920`, then
+builder `0x20e9cc` supplies context `0x1a` to the established
+`CHANNEL_CONFIGURE` constructor at `0x20cffa` and submits the resulting
+type-`0x02` object. Both choices therefore publish task-12 status `0x13a3`;
+the firmware evidence makes type `0x03` a context-gated alternative to the
+context-`0x1a` channel request, not a second spelling of that request.
+
+Status `0x03f1` itself has six calls to the common status builder, arising
+from task-17 states 15, 17, 6, 7, 7 and 24. Those independent producers rule
+out inferring one mandatory lifecycle or a sequence such as
+type `0x1a` -> `0x03` -> `0x1a`. Until a DSP-side consumer, protocol document
+or organic trace supplies stronger evidence, the checker deliberately
+records no semantic name and the disabled NSE-3 radio peer emits no synthetic
+reply.
+
 Adjacent type `0x8c` does not establish the missing acknowledgement edge.
 Handler `0x2804c0` releases the received object before reading any body
 field. It suppresses its fixed notification when controller byte

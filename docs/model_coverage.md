@@ -22,6 +22,16 @@ acknowledgements but still waits at `0x2859e0` for the missing non-zero
 completion `unresolved` independently from the evidenced transfer count. See
 the reproducible comparison and provenance in `docs/6110_bringup.md`.
 
+The same comparison suggested an outbound type `0x03` control publication.
+Exact v4.06 analysis independently proves its fixed, zero-body task-3 object
+and its task-11 status-`0x03f1` route. A controller-context/helper guard
+selects it as the alternative to a context-`0x1a`
+`CHANNEL_CONFIGURE`; both branches publish task-12 status `0x13a3`.
+Because six task-17 producer sites feed `0x03f1`, neither the external
+`DEACTIVATE` label nor a single acquisition ordering is accepted. This adds
+a checked protocol boundary without enabling the NSE-3 radio peer or
+promoting coverage.
+
 ## Promotion rules
 
 The levels are cumulative:

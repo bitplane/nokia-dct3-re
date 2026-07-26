@@ -1631,6 +1631,62 @@ TYPE_0X1F_CONTROLLER_STATUS_LITERALS = {
     0x24E0B8: 0x03EE,
     0x24E17C: 0x03F3,
 }
+TYPE_0X03_CONTROL_ANCHORS = {
+    # Task-11 status 0x03f1 has one dispatcher arm.  It reaches a controller
+    # routine which either submits a fixed, empty type-0x03 object or enters
+    # the context-0x1a CHANNEL_CONFIGURE builder.
+    0x20F014: ("push", "{r4, lr}"),
+    0x20F01C: ("ldr", "r0, [pc, #0x37c]"),
+    0x20F02E: ("beq", "#0x20f06c"),
+    0x20F06C: ("bl", "#0x20ea98"),
+    0x20EA98: ("push", "{r4, lr}"),
+    0x20EA9C: ("ldr", "r0, [pc, #0xa8]"),
+    0x20EAA0: ("cmp", "r0, #0x1f"),
+    0x20EAA6: ("bl", "#0x27a174"),
+    0x20EAAA: ("cmp", "r0, #0"),
+    0x20EAAE: ("bl", "#0x20e920"),
+    0x20EAC2: ("movs", "r0, #3"),
+    0x20EAC4: ("ldr", "r1, [pc, #0x84]"),
+    0x20EAC6: ("bl", "#0x25fb4c"),
+    0x20EAEA: ("bl", "#0x20e920"),
+    0x20EAEE: ("bl", "#0x20e9cc"),
+    # The shared builder publishes status 0x13a3 to task 12 and carries the
+    # current controller byte as its one runtime field.
+    0x20E920: ("push", "{r4, lr}"),
+    0x20E92A: ("ldr", "r0, [pc, #0x1f0]"),
+    0x20E92C: ("strh", "r0, [r4]"),
+    0x20E92E: ("ldr", "r0, [pc, #0x1f0]"),
+    0x20E930: ("ldrb", "r0, [r0]"),
+    0x20E93C: ("movs", "r0, #0xc"),
+    0x20E940: ("bl", "#0x25fb4c"),
+    # The alternative builder explicitly supplies context 0x1a to the
+    # established CHANNEL_CONFIGURE constructor and then submits to task 3.
+    0x20E9CC: ("push", "{r4, r5, r6, r7, lr}"),
+    0x20EA04: ("movs", "r1, #0x1a"),
+    0x20EA06: ("bl", "#0x20cffa"),
+    0x20EA6E: ("movs", "r0, #3"),
+    0x20EA72: ("bl", "#0x25fb4c"),
+    # All six task-17 producers use the common status-object builder.
+    0x24D7F0: ("bl", "#0x27d5c0"),
+    0x24D918: ("bl", "#0x27d5c0"),
+    0x24DC78: ("bl", "#0x27d5c0"),
+    0x24DFB4: ("bl", "#0x27d5c0"),
+    0x24DFD0: ("bl", "#0x27d5c0"),
+    0x24E374: ("bl", "#0x27d5c0"),
+}
+TYPE_0X03_CONTROL_LITERALS = {
+    0x20F01C: 0x03ED,
+    0x20EA9C: 0x108F18,
+    0x20EAC4: 0x2BD6FC,
+    0x20E92A: 0x13A3,
+    0x20E92E: 0x1090FF,
+    0x24D7EE: 0x03F1,
+    0x24D916: 0x03F1,
+    0x24DC76: 0x03F1,
+    0x24DFB2: 0x03F1,
+    0x24DFCE: 0x03F1,
+    0x24E372: 0x03F1,
+}
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 RA_INFO_CONSUMER = 0x20DB1C
 RA_INFO_CONSUMER_DIRECT_CALLS = [0x211EB6]
@@ -1924,6 +1980,30 @@ TYPE_0X1F_CONTROLLER_STATUS_DISPATCHER_DIRECT_CALLS = [0x211C0A]
 TYPE_0X1F_ARGUMENT_BRANCH_ROUTINE = 0x20D6BC
 TYPE_0X1F_ARGUMENT_BRANCH_DIRECT_CALLS = [0x20D96E, 0x20DE26, 0x2116BE]
 TYPE_0X1F_ARGUMENT_BRANCH_CALL_VALUES = [0, 1, 1]
+TYPE_0X03_CONTROLLER_STATUS = 0x03F1
+TYPE_0X03_CONTROLLER_STATUS_CALLS = [
+    0x24D7F0,
+    0x24D918,
+    0x24DC78,
+    0x24DFB4,
+    0x24DFD0,
+    0x24E374,
+]
+TYPE_0X03_CONTROLLER_STATUS_TASK_17_STATES = {
+    0x24D7F0: 15,
+    0x24D918: 17,
+    0x24DC78: 6,
+    0x24DFB4: 7,
+    0x24DFD0: 7,
+    0x24E374: 24,
+}
+TYPE_0X03_STATUS_DISPATCHER = 0x20F014
+TYPE_0X03_STATUS_DISPATCHER_DIRECT_CALLS = [0x211C20]
+TYPE_0X03_ROUTE = 0x20EA98
+TYPE_0X03_ROUTE_DIRECT_CALLS = [0x20F06C]
+TYPE_0X03_FIXED_OBJECT_ADDRESS = 0x2BD6FC
+TYPE_0X03_FIXED_OBJECT = bytes.fromhex("02000300")
+TYPE_0X03_FIXED_OBJECT_SUBMIT_CALLS = [0x20EAC6]
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -3258,6 +3338,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS)
     decode_thumb_anchors(data, TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS)
     decode_thumb_anchors(data, TYPE_0X1F_CONTROLLER_STATUS_ANCHORS)
+    decode_thumb_anchors(data, TYPE_0X03_CONTROL_ANCHORS)
     decode_thumb_anchors(data, NSE3_TASK_17_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
@@ -3268,6 +3349,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_OTHER_CONSTRUCTOR_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_CONTROLLER_STATUS_LITERALS)
+    verify_thumb_literals(data, TYPE_0X03_CONTROL_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -3632,6 +3714,84 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{type_0x1f_argument_branch_calls}/"
             f"{type_0x1f_argument_branch_call_values}"
         )
+    type_0x03_controller_status_calls = []
+    for index, insn in enumerate(instructions):
+        if (
+            not insn
+            or insn.mnemonic not in ("bl", "blx")
+            or immediate_target(insn) != 0x27D5C0
+        ):
+            continue
+        if (
+            call_registers(instructions, index, physical, FLASH_BASE)["r0"]
+            == TYPE_0X03_CONTROLLER_STATUS
+        ):
+            type_0x03_controller_status_calls.append(insn.address)
+    if type_0x03_controller_status_calls != TYPE_0X03_CONTROLLER_STATUS_CALLS:
+        raise ValueError(
+            "NSE-3 type-0x03 controller-status calls changed: expected "
+            f"{TYPE_0X03_CONTROLLER_STATUS_CALLS}, got "
+            f"{type_0x03_controller_status_calls}"
+        )
+    type_0x03_status_dispatcher_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TYPE_0X03_STATUS_DISPATCHER
+    ]
+    if type_0x03_status_dispatcher_calls != TYPE_0X03_STATUS_DISPATCHER_DIRECT_CALLS:
+        raise ValueError(
+            "NSE-3 type-0x03 status-dispatcher calls changed: expected "
+            f"{TYPE_0X03_STATUS_DISPATCHER_DIRECT_CALLS}, got "
+            f"{type_0x03_status_dispatcher_calls}"
+        )
+    type_0x03_route_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TYPE_0X03_ROUTE
+    ]
+    if type_0x03_route_calls != TYPE_0X03_ROUTE_DIRECT_CALLS:
+        raise ValueError(
+            "NSE-3 type-0x03 route calls changed: expected "
+            f"{TYPE_0X03_ROUTE_DIRECT_CALLS}, got {type_0x03_route_calls}"
+        )
+    type_0x03_fixed_object = physical[
+        TYPE_0X03_FIXED_OBJECT_ADDRESS - FLASH_BASE:
+        TYPE_0X03_FIXED_OBJECT_ADDRESS - FLASH_BASE
+        + len(TYPE_0X03_FIXED_OBJECT)
+    ]
+    if type_0x03_fixed_object != TYPE_0X03_FIXED_OBJECT:
+        raise ValueError(
+            "NSE-3 fixed type-0x03 object changed: expected "
+            f"{TYPE_0X03_FIXED_OBJECT.hex()}, got "
+            f"{type_0x03_fixed_object.hex()}"
+        )
+    type_0x03_fixed_object_submit_calls = []
+    for index, insn in enumerate(instructions):
+        if (
+            not insn
+            or insn.mnemonic not in ("bl", "blx")
+            or immediate_target(insn) != 0x25FB4C
+        ):
+            continue
+        registers = call_registers(instructions, index, physical, FLASH_BASE)
+        if (
+            registers["r0"] == 3
+            and registers["r1"] == TYPE_0X03_FIXED_OBJECT_ADDRESS
+        ):
+            type_0x03_fixed_object_submit_calls.append(insn.address)
+    if (
+        type_0x03_fixed_object_submit_calls
+        != TYPE_0X03_FIXED_OBJECT_SUBMIT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 fixed type-0x03 submission calls changed: expected "
+            f"{TYPE_0X03_FIXED_OBJECT_SUBMIT_CALLS}, got "
+            f"{type_0x03_fixed_object_submit_calls}"
+        )
     task_17_entry = effective_u32(
         physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
     )
@@ -3653,6 +3813,28 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 task-17 state jump table changed: expected "
             f"{NSE3_TASK_17_STATE_JUMP_TABLE}, got "
             f"{task_17_state_jump_table}"
+        )
+    type_0x03_controller_status_state_entries = {
+        state: task_17_state_jump_table[state]
+        for state in sorted(
+            set(TYPE_0X03_CONTROLLER_STATUS_TASK_17_STATES.values())
+        )
+    }
+    expected_type_0x03_controller_status_state_entries = {
+        6: 0x24DC22,
+        7: 0x24DEEC,
+        15: 0x24D70A,
+        17: 0x24D8B0,
+        24: 0x24E33A,
+    }
+    if (
+        type_0x03_controller_status_state_entries
+        != expected_type_0x03_controller_status_state_entries
+    ):
+        raise ValueError(
+            "NSE-3 type-0x03 controller state entries changed: expected "
+            f"{expected_type_0x03_controller_status_state_entries}, got "
+            f"{type_0x03_controller_status_state_entries}"
         )
     type_0x1f_controller_status_state_entries = {
         status: task_17_state_jump_table[state]
@@ -4165,6 +4347,46 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "principal_destination_task": 3,
                 "acquisition_terminal": False,
                 "semantic_name_assigned": False,
+            },
+            "type_0x03": {
+                "fixed_object": {
+                    "address": TYPE_0X03_FIXED_OBJECT_ADDRESS,
+                    "bytes": list(type_0x03_fixed_object),
+                    "queue_status": 2,
+                    "declared_payload_bytes": 0,
+                    "type": 3,
+                    "destination_task": 3,
+                    "submit_calls": type_0x03_fixed_object_submit_calls,
+                },
+                "controller_status": TYPE_0X03_CONTROLLER_STATUS,
+                "controller_status_calls": type_0x03_controller_status_calls,
+                "task_17_states_by_call":
+                    TYPE_0X03_CONTROLLER_STATUS_TASK_17_STATES,
+                "task_17_state_entries":
+                    type_0x03_controller_status_state_entries,
+                "status_dispatcher": TYPE_0X03_STATUS_DISPATCHER,
+                "status_dispatcher_calls": type_0x03_status_dispatcher_calls,
+                "route": TYPE_0X03_ROUTE,
+                "route_calls": type_0x03_route_calls,
+                "fixed_object_branch": {
+                    "required_context_cell": 0x108F18,
+                    "required_context_value": 0x1F,
+                    "precondition_helper": 0x27A174,
+                    "required_helper_result": 0,
+                },
+                "alternative_branch": {
+                    "builder": 0x20E9CC,
+                    "channel_configure_constructor": 0x20CFFA,
+                    "channel_configure_context": 0x1A,
+                    "submit_call": 0x20EA72,
+                },
+                "both_branches_publish_task_12_status": {
+                    "builder": 0x20E920,
+                    "status": 0x13A3,
+                    "calls": [0x20EAAE, 0x20EAEA],
+                },
+                "external_deactivate_label_accepted": False,
+                "protocol_semantic_name_assigned": False,
             },
             "type_0x1f": {
                 "direct_constructor_sites": type_0x1f_direct_constructors,
