@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the organic handset-to-SIM authentication frontier."""
+"""Verify organic GSM authentication through registration and return to camp."""
 
 from __future__ import annotations
 
@@ -50,7 +50,8 @@ def verify(text: str) -> dict:
         )
     queued_primitives = [
         line for line in text.splitlines()
-        if "radio_pending_primitive:" in line and "data=1000" in line
+        if "radio_pending_primitive:" in line
+        and "old=0000 data=1000" in line
     ]
     if len(queued_primitives) != 1:
         raise ValueError(
@@ -61,6 +62,33 @@ def verify(text: str) -> dict:
         line for line in text.splitlines()
         if "GSM service uplink sapi=0 pd=05 message=14 length=6" in line
     ]
+    if len(authentication_responses) != 1:
+        raise ValueError(
+            "expected one organic MM Authentication Response, found "
+            f"{len(authentication_responses)}"
+        )
+
+    lifecycle = (
+        ("Location Updating Accept", "032245050200f11000011708"),
+        ("Accept acknowledgement", "data=0080034101"),
+        ("Channel Release acknowledgement",
+         "LAPDm service Channel Release acknowledged nr=3"),
+        ("Release acknowledgement", "data=0080036101"),
+        ("EF_LOCI location update",
+         "sim_device: update-binary fid=6f7e offset=4 length=5"),
+        ("EF_LOCI status update",
+         "sim_device: update-binary fid=6f7e offset=10 length=1"),
+        ("channel deconfiguration", "radio_phase=release_channel_change"),
+        ("release confirmation", "RX enqueue type=89 payload=8"),
+        ("return to idle PCH", "1506210001f0"),
+    )
+    cursor = text.find(authentication_responses[0])
+    for label, needle in lifecycle:
+        cursor = text.find(needle, cursor)
+        if cursor < 0:
+            raise ValueError(f"missing or out-of-order authentication checkpoint: {label}")
+        cursor += len(needle)
+
     return {
         "authentication_requests": 1,
         "run_gsm_algorithm_commands": 1,
@@ -68,7 +96,7 @@ def verify(text: str) -> dict:
         "firmware_results_accepted": 1,
         "sres_primitives_queued": 1,
         "mm_authentication_responses": len(authentication_responses),
-        "registration_promotion": False,
+        "registration_promotion": True,
     }
 
 
@@ -85,7 +113,7 @@ def main() -> None:
         f"accepted={result['firmware_results_accepted']} "
         f"queued={result['sres_primitives_queued']} "
         f"MM-responses={result['mm_authentication_responses']} "
-        "promotion=no"
+        "promotion=yes"
     )
 
 

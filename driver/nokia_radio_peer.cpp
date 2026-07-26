@@ -1196,7 +1196,11 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		else
 		{
 			// The firmware can return an idle UI/fill block while a service waits
-			// for user input or an upper-layer response.
+			// for user input or an upper-layer response.  The assigned SDCCH
+			// continues to have independent downlink opportunities during that
+			// wait; alternate a decoded fill opportunity with the next uplink
+			// request instead of polling only the uplink direction forever.
+			m_followup_downlink_opportunity = true;
 			m_phase = phase::service_uplink_request;
 			m_reports_remaining = 1;
 			m_wait_ticks = 100;

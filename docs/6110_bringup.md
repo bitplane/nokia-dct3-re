@@ -249,11 +249,11 @@ now show both products also accept typed result `0x0066` and copy Kc. Their
 internal event routing is genuinely product-specific (`0x0a01` to task 15 on
 NSE-8, `0x0a65` to task 12 on NHM-5), but both relocated consumers queue the
 SRES primitive and set the homologous pending bit `0x10`. Runtime watching
-shows that bit remains pending across repeated valid BLOCK_REQUEST reports;
-neither handset's result reaches the modeled radio boundary as MM
-Authentication Response. The remaining frontier is therefore the lower-radio
-primitive flush, not SIM completion, result layout or internal task routing.
-That cross-product frontier does not establish
+shows the bit is consumed when the assigned SDCCH continues alternating
+decoded downlink opportunities with uplink BLOCK_REQUESTs. Both handsets emit
+MM Authentication Response, accept the ensuing Location Updating Accept,
+persist EF_LOCI, release the channel and resume camp. That cross-product
+completion does not establish
 NSE-3 command ordering and does not promote 6110 runtime coverage.
 
 The four SIM Toolkit constructors remain unsupported and return `6d 00`.

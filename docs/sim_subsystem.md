@@ -125,7 +125,7 @@ The implemented surface is classified by ownership and evidence:
 | SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. Invalidation, broader errors and removal remain incomplete. |
 | UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
 | Cyclic EF_ACM and INCREASE | Standards-derived dormant contract | The descriptor, CHV1 access conditions, checked 24-bit addition, `98 50` overflow result, six-byte delayed response and append-only persistence follow GSM 11.11. NSE-3 constructs the exact `A0 32 00 00 03` APDU, but no product firmware acceptance trace currently exercises it. |
-| RUN GSM ALGORITHM | Organic card frontier | The card accepts only `A0 88 00 00 10`, consumes the 16-byte RAND and exposes `SRES || Kc` through the immediately following twelve-byte GET RESPONSE. A3/A8 remains explicitly operator-selectable: the card defaults to no algorithm, while the synthetic laboratory subscriber selects TS 55.205 section 5's AES example and a separately provisioned test key. The AES projection has an independent FIPS-derived vector gate. With authentication explicitly enabled, both 3210 v6.00 and 3310 v6.39 organically execute the command, fetch all twelve bytes, require typed result `0x0066`, copy Kc and call their product-relative SRES publication helper. Neither yet emits MM Authentication Response on the modeled radio boundary, so registration is not promoted by this fixture. |
+| RUN GSM ALGORITHM | Organic authenticated registration | The card accepts only `A0 88 00 00 10`, consumes the 16-byte RAND and exposes `SRES || Kc` through the immediately following twelve-byte GET RESPONSE. A3/A8 remains explicitly operator-selectable: the card defaults to no algorithm, while the synthetic laboratory subscriber selects TS 55.205 section 5's AES example and a separately provisioned test key. The AES projection has an independent FIPS-derived vector gate. With authentication explicitly enabled, both 3210 v6.00 and 3310 v6.39 organically execute the command, fetch all twelve bytes, require typed result `0x0066`, copy Kc, publish SRES and emit MM Authentication Response. Both then accept Location Updating Accept, persist EF_LOCI, release the dedicated channel and return to camp. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
 | CHV support | Standards-derived dormant contract | VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK have persistent credentials/counters and reset-scoped verification. Ordinary boot does not exercise the complete lifecycle, so it is not a product-runtime promotion. |
 
@@ -139,10 +139,11 @@ A3/A8 are operator-selectable, and section 5 defines the explicit AES projection
 used by this laboratory card. It is not labelled as the historical operator
 algorithm of any emulated subscriber.
 
-`make verify-radio-authentication-boundary` reproduces the 3210 side of that
-frontier from a clean card: one standards-shaped MM Authentication Request,
+`make verify-radio-authentication-boundary` reproduces the 3210 lifecycle from
+a clean card: one standards-shaped MM Authentication Request,
 one firmware-issued RUN GSM ALGORITHM, one twelve-byte GET RESPONSE and the
-firmware's accepted-result branch and queued outbound radio primitive. The
+firmware's accepted-result branch, queued outbound radio primitive and MM
+Authentication Response. The
 v6.00 consumer is at `0x2068bc`;
 NHM-5 v6.39 has the same instruction-for-instruction contract relocated to
 `0x21bca4`. Both require command result `2`, GET RESPONSE result `0x0066`,
@@ -151,12 +152,10 @@ in internal routing: NSE-8 posts status `0x0a01` to task 15 and NHM-5 posts
 `0x0a65` to task 12. Their relocated consumers nevertheless converge on the
 same radio-state contract: copy the SRES primitive and set pending bit `0x10`.
 Runtime writes prove that bit is set at `0x10d12c` and `0x10ab90`
-respectively, but it remains pending across repeated valid dedicated-channel
-BLOCK_REQUEST reports. This bottoms the current failure out below SIM/card
-completion and internal event routing, at the lower-radio primitive flush. The
-network session has typed success and reject continuations and persists them
-through its ordinary saved state, but the gate deliberately reports the
-currently observed MM-response count instead of manufacturing completion.
+respectively. Continuing independent downlink opportunities on the assigned
+SDCCH lets each asynchronous firmware result reach the next uplink request.
+The gate requires authenticated Location Updating Accept, EF_LOCI persistence,
+dedicated-channel release and return to idle camp.
 
 The synthetic mandatory-file sizes come from the firmware table at `0x2e0c04`. Implemented content
 includes ICCID `2FE2`, ECC `6FB7`, LP `6F05`, IMSI `6F07`, SST `6F38`,
