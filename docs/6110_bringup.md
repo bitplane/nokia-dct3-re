@@ -1403,6 +1403,37 @@ post-transfer publications. It does **not** establish that the other
 implementation is incorrect for its v5.48 image, or that v4.06 and v5.48 use
 the same internal ROM.
 
+A follow-up comparison used current upstream commit
+`31c06f4954ed78abfdfb7c87a1e1ae9703ba9cab` (26 July 2026) and this
+repository's exact recovered v5.48 images, without modifying the upstream
+profile:
+
+```
+./build/dct3_boot_trace 6110_nse3_v548_rom3_ppmb.fls 100000000
+./build/dct3_boot_trace 6110_nse3_v548_rom4_ppmb.fls 100000000
+```
+
+Both runs consumed the full 100,000,000-instruction budget without a wild-PC
+or assertion stop. ROM3 reached 69 DSP acknowledgements and 3,588 LCD data
+writes; ROM4 reached 69 acknowledgements and 5,160 LCD data writes. This is
+reproducibility evidence for transport and for both external images'
+ability to progress under that implementation. It is **not** an identity
+observation: the upstream NSE-3 product profile supplies the same hard-coded
+ready value `4` to both files. Local static analysis proves that each firmware
+accepts any equal, non-sentinel `0x10004/0x10006` pair. The ROM3 run therefore
+demonstrates that boot progress cannot distinguish `3/3` from `4/4`; it does
+not overturn the matching real-handset `DSP ISw : ROM 3` record. Conversely,
+the package label plus a ROM4 HLE value is insufficient to promote ROM4's
+pair to `4/4` without a matching handset service report, DSP trace, or
+internal-ROM analysis.
+
+The same upstream HLE returns zero when the MCU parks final shared `0x10002`
+at `0xffff`. Its hardware-bridge path describes that cell as a one-shot
+fingerprint-verification verdict and permits non-zero results on other
+hardware. Zero is therefore an implementation convention, not evidence for
+NSE-3 v5.48's exact publication. The local completion profile continues to
+leave the second word unresolved.
+
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
 retain their three ready words of `1`; NSE-3 v4.06 selects
@@ -1415,7 +1446,9 @@ before the second word's DSP-side semantics are recovered.
 Both v5.48 images independently require the same final first result. ROM3
 combines this partial completion with its separately evidenced pre-upload
 `3/3` pair, but still halts at the unknown second final publication. ROM4
-halts earlier because its pre-upload value remains unresolved. Conversely,
+halts earlier because its pre-upload value remains unresolved. A regression
+gate explicitly rejects both a BIOS-3 publication branch and an invented
+`nse3_dsp_rom4_pair` profile. Conversely,
 the physical `B07` report must not be substituted into the firmware
 comparison. Product configuration keeps bootstrap publications,
 external-firmware build, internal ROM identity and physical COBBA identity

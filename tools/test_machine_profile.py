@@ -206,6 +206,11 @@ class MachineProfileTest(unittest.TestCase):
             "nse3_dsp_rom3_pair",
             start,
         )
+        # The package-labelled ROM4 image is BIOS 3.  A third-party HLE can
+        # advance both exact v5.48 images with a self-consistent 4/4 pair, so
+        # progress through the equality gate does not identify the fitted DSP.
+        self.assertNotIn("system_bios() == 3", start)
+        self.assertNotIn("nse3_dsp_rom4_pair", start)
 
     def test_6110_has_ue4_keypad_instead_of_inherited_input_map(self):
         matrix = self.driver.split("static INPUT_PORTS_START( noki6110 )", 1)[1]
