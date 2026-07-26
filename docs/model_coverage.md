@@ -51,10 +51,13 @@ peer.
 The bit-2 prerequisite is now bounded too. DSPIF initialization writes mode
 cell `0x10b970` to zero; a uniquely dispatched handler can promote it to one
 only while shared halfword `0x100e4` is zero. Task-2 initialization maps mode
-one to controller bit 2 and uniquely submits fixed empty task-3 type `0x70`.
-No equivalence is claimed between that publication and class-`0x40` command
-`0x70`, and the missing DSP-side condition still prevents peer enablement or
-coverage promotion.
+one to controller bit 2 and uniquely submits task-3 type `0x70` with
+one-byte body `0x0d`; the checker independently verifies normalized storage
+and lane-correct MCU byte fields. Task 3 queues it without type-specific
+inspection and passes stream `70 0d` to the generic DSPIF TX writer. No
+equivalence is claimed between that raw DSPIF publication and class-`0x40`
+command `0x70`, and the missing DSP response condition still prevents peer
+enablement or coverage promotion.
 
 ## Promotion rules
 

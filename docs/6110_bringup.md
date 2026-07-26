@@ -653,9 +653,11 @@ v4.06 ROM3 candidate does not yet prove the protocol meaning or its position
 in an acquisition sequence. It does independently prove the wire object and
 the controller choice that emits it.
 
-The fixed task-3 object at `0x2bd6fc` is exactly `02 00 03 00`: queue status
-2, declared body length zero and type `0x03`. Its unique fixed-object
-submission is at `0x20eac6`. Task-11 status `0x03f1` reaches dispatcher
+The fixed task-3 object at `0x2bd6fc` has normalized storage bytes
+`02 00 03 00`. The status halfword is 2; after the MAD2 byte-lane crossing,
+task 3 reads byte 2 as declared length zero and byte 3 as type `0x03`. Its
+unique fixed-object submission is at `0x20eac6`. Task-11 status `0x03f1`
+reaches dispatcher
 `0x20f014`; its `0x20f06c` arm is the sole caller of route `0x20ea98`.
 That route submits the empty object only when controller context
 `0x108f18` equals `0x1f` and helper `0x27a174` returns zero.
@@ -823,13 +825,20 @@ the byte unchanged and has exactly two direct callers.
 
 Task-2 initialization is the only caller of initializer `0x237a7a`. When the
 getter returns one, it sets controller bit 2 and uniquely submits the fixed
-task-3 object at `0x2b9be8`, whose bytes are `02 00 70 02`: queue status 2,
-zero declared payload, type `0x70`, and local byte 3 value 2. This supplies an
-organic upstream condition for the delayed command-`0x64` response. It does
-not prove what the mode represents, who causes the shared `0x100e4`
-condition, or that this empty task-3 type `0x70` is semantically the same as
-the later class-`0x40` application command `0x70`. They remain separately
-typed transports until a trace or DSP-side implementation connects them.
+task-3 object at `0x2b9be8`. Its first six normalized storage bytes are
+`02 00 70 02 00 0d`: status halfword 2, while lane-correct MCU byte reads give
+declared stream length 2 and stream `70 0d`. It therefore publishes type
+`0x70` with one-byte body `0x0d`. Task 3 applies no type-specific branch:
+status 2 queues the object and the common output loop passes byte 2 as length
+and object +3 as source to DSPIF TX writer `0x285746`. The request therefore
+reaches the DSP byte-stream boundary organically.
+
+This supplies an upstream condition for the delayed command-`0x64` response.
+It does not prove what the mode represents, who causes the shared `0x100e4`
+condition, which DSP report follows `70 0d`, or that this raw DSPIF type
+`0x70` is semantically the same as the later class-`0x40` application command
+`0x70`. They remain separately typed transports until a trace or DSP-side
+implementation connects them.
 
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,

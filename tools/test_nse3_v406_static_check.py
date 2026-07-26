@@ -573,6 +573,10 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.TYPE_0X03_FIXED_OBJECT,
         )
         self.assertEqual(
+            bytes.fromhex("0003"),
+            check.TYPE_0X03_FIXED_OBJECT_BYTE_FIELDS,
+        )
+        self.assertEqual(
             [0x20EAC6],
             check.TYPE_0X03_FIXED_OBJECT_SUBMIT_CALLS,
         )
@@ -1195,8 +1199,12 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.EXTERNAL_SERVICE_MODE_STARTUP_LITERALS[0x237AA6],
         )
         self.assertEqual(
-            bytes.fromhex("02007002"),
+            bytes.fromhex("02007002000d"),
             check.EXTERNAL_SERVICE_STARTUP_OBJECT,
+        )
+        self.assertEqual(
+            bytes.fromhex("02700d"),
+            check.EXTERNAL_SERVICE_STARTUP_OBJECT_BYTE_FIELDS,
         )
         self.assertEqual(
             [0x237B78],

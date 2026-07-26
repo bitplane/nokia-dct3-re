@@ -2003,6 +2003,7 @@ TYPE_0X03_ROUTE = 0x20EA98
 TYPE_0X03_ROUTE_DIRECT_CALLS = [0x20F06C]
 TYPE_0X03_FIXED_OBJECT_ADDRESS = 0x2BD6FC
 TYPE_0X03_FIXED_OBJECT = bytes.fromhex("02000300")
+TYPE_0X03_FIXED_OBJECT_BYTE_FIELDS = bytes.fromhex("0003")
 TYPE_0X03_FIXED_OBJECT_SUBMIT_CALLS = [0x20EAC6]
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
@@ -2374,7 +2375,8 @@ EXTERNAL_SERVICE_MODE_GETTER_CALLS = [0x237B4C, 0x28EC52]
 EXTERNAL_SERVICE_TASK_2_INITIALIZER = 0x237A7A
 EXTERNAL_SERVICE_TASK_2_INITIALIZER_CALLS = [0x23A5D0]
 EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS = 0x2B9BE8
-EXTERNAL_SERVICE_STARTUP_OBJECT = bytes.fromhex("02007002")
+EXTERNAL_SERVICE_STARTUP_OBJECT = bytes.fromhex("02007002000d")
+EXTERNAL_SERVICE_STARTUP_OBJECT_BYTE_FIELDS = bytes.fromhex("02700d")
 EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS = [0x237B78]
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
@@ -3917,6 +3919,23 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{TYPE_0X03_FIXED_OBJECT.hex()}, got "
             f"{type_0x03_fixed_object.hex()}"
         )
+    type_0x03_fixed_object_byte_fields = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            TYPE_0X03_FIXED_OBJECT_ADDRESS + offset,
+        )
+        for offset in range(2, 4)
+    )
+    if (
+        type_0x03_fixed_object_byte_fields
+        != TYPE_0X03_FIXED_OBJECT_BYTE_FIELDS
+    ):
+        raise ValueError(
+            "NSE-3 fixed type-0x03 MCU byte fields changed: expected "
+            f"{TYPE_0X03_FIXED_OBJECT_BYTE_FIELDS.hex()}, got "
+            f"{type_0x03_fixed_object_byte_fields.hex()}"
+        )
     type_0x03_fixed_object_submit_calls = []
     for index, insn in enumerate(instructions):
         if (
@@ -4102,6 +4121,23 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 external-service startup object changed: expected "
             f"{EXTERNAL_SERVICE_STARTUP_OBJECT.hex()}, got "
             f"{external_service_startup_object.hex()}"
+        )
+    external_service_startup_object_byte_fields = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS + offset,
+        )
+        for offset in range(2, 5)
+    )
+    if (
+        external_service_startup_object_byte_fields
+        != EXTERNAL_SERVICE_STARTUP_OBJECT_BYTE_FIELDS
+    ):
+        raise ValueError(
+            "NSE-3 external-service startup MCU byte fields changed: "
+            f"expected {EXTERNAL_SERVICE_STARTUP_OBJECT_BYTE_FIELDS.hex()}, "
+            f"got {external_service_startup_object_byte_fields.hex()}"
         )
     external_service_startup_object_submit_calls = []
     for index, insn in enumerate(instructions):
@@ -4629,10 +4665,13 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "type_0x03": {
                 "fixed_object": {
                     "address": TYPE_0X03_FIXED_OBJECT_ADDRESS,
-                    "bytes": list(type_0x03_fixed_object),
+                    "storage_bytes": list(type_0x03_fixed_object),
+                    "mcu_byte_fields_from_offset_2":
+                        list(type_0x03_fixed_object_byte_fields),
                     "queue_status": 2,
                     "declared_payload_bytes": 0,
                     "type": 3,
+                    "wire_bytes": [3],
                     "destination_task": 3,
                     "submit_calls": type_0x03_fixed_object_submit_calls,
                 },
@@ -5420,16 +5459,28 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                         "fixed_object": {
                             "address":
                                 EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS,
-                            "bytes": list(
+                            "storage_bytes": list(
                                 external_service_startup_object
                             ),
+                            "mcu_byte_fields_from_offset_2": list(
+                                external_service_startup_object_byte_fields
+                            ),
                             "queue_status": 2,
-                            "declared_payload_bytes": 0,
+                            "declared_stream_bytes": 2,
                             "type": 0x70,
-                            "local_metadata": 2,
+                            "payload": [0x0D],
+                            "wire_bytes": [0x70, 0x0D],
                             "destination_task": 3,
                             "submit_calls":
                                 external_service_startup_object_submit_calls,
+                            "task_3_transport": {
+                                "entry": NSE3_TASK_3_ENTRY,
+                                "status_2_queue": 0x298BD6,
+                                "length_load": 0x298C82,
+                                "stream_source": 0x298C84,
+                                "dspif_tx_writer": 0x285746,
+                                "type_specific_branch": False,
+                            },
                         },
                     },
                     "class_0x40_command_0x70_equivalence_proven": False,
