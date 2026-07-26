@@ -581,7 +581,7 @@ verify-dsp-bootstrap-3310:
 
 verify-3310-radio-boundary:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
-		RUN_DIR=$(RUN_DIR) SECONDS=4 RUN_VERBOSE=1
+		RUN_DIR=$(RUN_DIR) SECONDS=5 RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/dsp_radio_profile_trace_check.py $(RUN_DIR)/error.log \
 		--profile nhm5-search --rom roms/noki3310/3310f639e.fls

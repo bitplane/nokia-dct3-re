@@ -30,7 +30,8 @@ def si_parse_line(message_type: int, time: float) -> str:
 def si_complete_line(time: float) -> str:
 	return (
 		"nhm5_si_result: message=19 changed=01 result=00000000 "
-		f"channel=50 flags=0f/00/33 status=0002 task=b2 t={time}\n"
+		f"channel=50 flags=0f/00/33 status=0002 ready=00 gate=00000004 "
+		f"task=b2 t={time}\n"
 	)
 
 
@@ -79,7 +80,9 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 			type22 = "22" * 32
 			sch = "4012000000000058" + "00" * 26
 			configure = "04120200000000505000005800000000000a98fa"
+			idle_configure = "0412020900000010600000581000000000297000"
 			si1 = "50120000000000580000" + "550619" + "00" * 5 + "80" + "00" * 15
+			pch = "60120000000000580000" + "1506210001f0" + "2b" * 18
 			path.write_text(
 				line(0x20, type20, 0.1)
 				+ line(0x21, type21 + "00000319", 0.2)
@@ -97,6 +100,9 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ "".join(si_parse_line(message_type, 2.7 + index / 10)
 					for index, message_type in enumerate((0x19, 0x1A, 0x1B, 0x1C)))
 				+ si_complete_line(3.1)
+				+ line(0x02, idle_configure, 3.2)
+				+ rx_line(0x80, pch, 3.3)
+				+ rx_line(0x80, si1, 3.4)
 			)
 			check_nhm5_search(path)
 

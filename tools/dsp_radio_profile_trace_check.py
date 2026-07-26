@@ -157,6 +157,19 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			and packet["time"] >= (ra_info["time"] if ra_info else search["time"])
 			and (data := bytes.fromhex(packet["data"]))[0] == 0x50
 			and data[12] == 0x19), None)
+	idle_configure = next((packet for packet in packets
+			if packet["direction"] == "tx" and packet["type"] == 0x02
+			and packet["time"] > configure["time"]
+			and (data := bytes.fromhex(packet["data"]))[8] == 0x60), None)
+	idle_pch = next((packet for packet in packets
+			if idle_configure is not None and packet["direction"] == "rx"
+			and packet["type"] == 0x80 and packet["time"] > idle_configure["time"]
+			and (data := bytes.fromhex(packet["data"]))[0] == 0x60
+			and data[12] == 0x21), None)
+	idle_bcch = next((packet for packet in packets
+			if idle_pch is not None and packet["direction"] == "rx"
+			and packet["type"] == 0x80 and packet["time"] > idle_pch["time"]
+			and bytes.fromhex(packet["data"])[0] == 0x50), None)
 	no_psw_found = first("rx", 0x8A, search["time"])
 
 	if sch is None or sch["length"] != 34:
@@ -181,6 +194,10 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 		raise SystemExit("NHM-5 SI1 does not advertise its selected ARFCN 0x0058")
 	if no_psw_found is not None:
 		raise SystemExit("NHM-5 successful acquisition also received NO_PSW_FOUND")
+	if idle_configure is None or idle_pch is None or idle_bcch is None:
+		raise SystemExit(
+			"NHM-5 did not coexist idle channel-0x60 PCH with serving BCCH"
+		)
 	parsed_si = [
 		int(match.group(1), 16)
 		for match in re.finditer(
@@ -194,7 +211,7 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			)
 	if not re.search(
 			r"nhm5_si_result: message=19 changed=01 result=00000000 "
-			r"channel=50 flags=0f/00/33 status=0002",
+			r"channel=50 flags=0f/00/33 status=0002 ready=00 gate=00000004",
 			trace,
 	):
 		raise SystemExit("NHM-5 firmware did not complete its SI1-SI4 state")
@@ -207,7 +224,8 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 	print(
 		"NHM-5 acquisition: 56/160 candidate 0058 -> SCH -> organic 02/20 "
 		"CHANNEL_CONFIGURE -> NO_PSW_LEFT -> CHANNEL_CHANGED_CNF -> RA_INFO -> "
-		"BCCH SI1 advertising 0058; firmware accepted a complete SI1-SI4 set"
+		"BCCH SI1 advertising 0058; firmware accepted a complete SI1-SI4 set -> "
+		"idle PCH/BCCH coexistence"
 	)
 
 

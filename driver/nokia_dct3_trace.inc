@@ -127,12 +127,14 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 		const u32 result = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
 		LOGMASKED(LOG_DSP_BOUNDARY,
 				"nhm5_si_result: message=%02x changed=%02x result=%08x channel=%02x "
-				"flags=%02x/%02x/%02x status=%04x task=%02x t=%.6f\n",
+				"flags=%02x/%02x/%02x status=%04x ready=%02x gate=%08x "
+				"task=%02x t=%.6f\n",
 				fw_byte(block + 2),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R7) & 0xff,
 				fw_dword(result + 4), fw_byte(state + 4), fw_byte(state + 0x0e),
 				fw_byte(state + 0x12), fw_byte(state + 0x19),
-				fw_word(state + 0x1a), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				fw_word(state + 0x1a), fw_byte(state + 0x11),
+				fw_dword(0x0010dc80), fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
 	}
 	if (pc == addr && (addr == 0x0020a026 || addr == 0x0020a02c) && m_trace_enabled)

@@ -45,6 +45,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_search_requested));
 	save_item(NAME(m_selected_reports_remaining));
 	save_item(NAME(m_registered));
+	save_item(NAME(m_idle_common_control_active));
 	save_item(NAME(m_pch_fill_delivered));
 	save_item(NAME(m_page_transmitted));
 	save_item(NAME(m_traffic_channel_active));
@@ -159,6 +160,7 @@ void nokia_radio_peer_device::device_reset()
 	m_search_requested = false;
 	m_selected_reports_remaining = 0;
 	m_registered = false;
+	m_idle_common_control_active = false;
 	m_pch_fill_delivered = false;
 	m_page_transmitted = false;
 	m_traffic_channel_active = false;
@@ -596,7 +598,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 	case phase::candidate_channel_change:
 		return m_reports_remaining == 2 ? 0x8f : 0x89;
 	case phase::serving_bcch:
-		if (m_registered)
+		if (m_registered || m_idle_common_control_active)
 			return (m_reports_remaining % 3) == 1 ? 0x83 : 0x80;
 		return (m_reports_remaining & 1) == 0 ? 0x80 : 0x83;
 	case phase::candidate_retry:
@@ -618,12 +620,14 @@ u8 nokia_radio_peer_device::next_report_type() const
 
 unsigned nokia_radio_peer_device::serving_cycle_reports() const
 {
-	return m_registered ? 12 : 8;
+	return (m_registered || m_idle_common_control_active) ? 12 : 8;
 }
 
 bool nokia_radio_peer_device::serving_pch_report() const
 {
-	return m_phase == phase::serving_bcch && m_registered &&
+	if (m_phase != phase::serving_bcch)
+		return false;
+	return (m_registered || m_idle_common_control_active) &&
 			(m_reports_remaining % 3) == 2;
 }
 
@@ -789,7 +793,11 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			packet.length >= 9 && packet.payload[8] == 0x60)
 	{
 		// After serving-cell selection the ROM configures logical channel 0x12,
-		// encoded as DSP receive channel 0x60.
+		// encoded as DSP receive channel 0x60. This transitions NHM-5 from
+		// acquisition BCCH to its idle common-control receiver; subsequent
+		// decoded blocks on that receiver are PCH/AGCH, not more SI payloads.
+		m_idle_common_control_active =
+				m_protocol_profile == protocol_profile::nhm5_candidate_list;
 		m_phase = phase::serving_channel_change;
 		m_reports_remaining = 1;
 		m_report_deferred = true;
@@ -1243,7 +1251,7 @@ void nokia_radio_peer_device::emit_report()
 					nokia_gsm_session_device::incoming_service::call :
 					nokia_gsm_session_device::incoming_service::none;
 			const bool transmit_page =
-					m_page_after_registration && m_pch_fill_delivered &&
+					m_registered && m_page_after_registration && m_pch_fill_delivered &&
 					!m_page_transmitted &&
 					m_gsm_session->queue_incoming_page(service);
 			const auto block = transmit_page ?

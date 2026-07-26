@@ -177,6 +177,7 @@ private:
 	bool m_search_requested = false;
 	unsigned m_selected_reports_remaining = 0;
 	bool m_registered = false;
+	bool m_idle_common_control_active = false;
 	bool m_page_after_registration = false;
 	bool m_incoming_call_after_registration = false;
 	bool m_incoming_sms_after_registration = false;
