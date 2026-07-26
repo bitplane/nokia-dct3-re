@@ -15,9 +15,12 @@ class Radio3310IncomingCallBoundaryCheckTest(unittest.TestCase):
             "RX enqueue type=80 payload=34 data=8012000006ce0058000003022905324762704221000000",
             "GSM service uplink sapi=0 pd=06 message=32 length=2",
             "RX enqueue type=80 payload=34 data=8012000006d100580000032445030504046002008134015c0581551532f4",
+            "GSM service uplink sapi=0 pd=03 message=08 length=11",
+            "GSM service uplink sapi=0 pd=03 message=01 length=2",
+            "TX packet type=02 payload=20 data=041202000271012fc1",
         )))
 
-    def test_rejects_call_confirmed_past_frontier(self):
+    def test_rejects_traffic_sabm_past_frontier(self):
         text = "\n".join((
             "LAPDm Channel Release acknowledged nr=2",
             "PCH IMSI page transmitted channel=60 fn=1719",
@@ -28,7 +31,10 @@ class Radio3310IncomingCallBoundaryCheckTest(unittest.TestCase):
             "RX enqueue type=80 payload=34 data=8012000006ce0058000003022905324762704221000000",
             "GSM service uplink sapi=0 pd=06 message=32 length=2",
             "RX enqueue type=80 payload=34 data=8012000006d100580000032445030504046002008134015c0581551532f4",
-            "GSM service uplink sapi=0 pd=03 message=08",
+            "GSM service uplink sapi=0 pd=03 message=08 length=11",
+            "GSM service uplink sapi=0 pd=03 message=01 length=2",
+            "TX packet type=02 payload=20 data=041202000271012fc1",
+            "TX packet type=1b radio_phase=traffic_lapdm_establish",
         ))
         with self.assertRaisesRegex(ValueError, "promote"):
             verify(text)

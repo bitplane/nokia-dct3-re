@@ -59,6 +59,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_page_transmitted));
 	save_item(NAME(m_traffic_channel_active));
 	save_item(NAME(m_downlink_offset));
+	save_item(NAME(m_followup_downlink_opportunity));
 	save_item(NAME(m_downlink_speech));
 	save_item(NAME(m_downlink_speech_good));
 	save_item(NAME(m_uplink_speech));
@@ -174,6 +175,7 @@ void nokia_radio_peer_device::device_reset()
 	m_page_transmitted = false;
 	m_traffic_channel_active = false;
 	m_downlink_offset = 0;
+	m_followup_downlink_opportunity = false;
 	clear_speech_queues();
 	m_uplink_speech_received = 0;
 	m_tdma_frame_number = 0;
@@ -1099,6 +1101,8 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				m_report_deferred = true;
 				return;
 			}
+			const auto acknowledged_kind =
+					m_gsm_session->pending_downlink_kind();
 			const auto action = acknowledge_downlink();
 			if (action == nokia_gsm_session_device::downlink_kind::release_complete)
 			{
@@ -1125,6 +1129,15 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			}
 			else
 			{
+				// A terminal network CC message does not suspend the assigned
+				// physical channel.  Once its uplink acknowledgement has been
+				// confirmed by the DSP, provide the following decoded downlink
+				// opportunity so an already queued mobile response can enter
+				// LAPDm.
+				m_followup_downlink_opportunity =
+						acknowledged_kind ==
+								nokia_gsm_session_device::downlink_kind::
+										incoming_call_setup;
 				m_phase = phase::service_uplink_request;
 				m_reports_remaining = 1;
 				m_report_deferred = true;
@@ -1577,8 +1590,18 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	}
 	else if (m_phase == phase::service_uplink_request && report_type == 0x86)
 	{
-		m_phase = phase::service_uplink_wait;
-		m_reports_remaining = 0;
+		if (m_followup_downlink_opportunity)
+		{
+			m_followup_downlink_opportunity = false;
+			m_phase = phase::service_uplink_acknowledgement;
+			m_reports_remaining = 1;
+			m_report_deferred = true;
+		}
+		else
+		{
+			m_phase = phase::service_uplink_wait;
+			m_reports_remaining = 0;
+		}
 	}
 	else if (m_phase == phase::service_uplink_acknowledgement && report_type == 0x80)
 	{

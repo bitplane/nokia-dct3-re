@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the evidenced NHM-5 incoming-call frontier through CC SETUP."""
+"""Verify the evidenced NHM-5 incoming-call frontier through CC Alerting."""
 
 import pathlib
 import re
@@ -29,10 +29,16 @@ CHECKPOINTS = (
     ("incoming SETUP", re.compile(
         r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
         r"03[0-9a-f]{2}45030504046002008134015c0581551532f4")),
+    ("Call Confirmed", re.compile(
+        r"GSM service uplink sapi=0 pd=03 message=08 length=11")),
+    ("Alerting", re.compile(
+        r"GSM service uplink sapi=0 pd=03 message=01 length=2")),
+    ("traffic-channel configuration", re.compile(
+        r"TX packet type=02 payload=20 .*data=041202000271012fc1")),
 )
 
-CALL_CONFIRMED = re.compile(
-    r"GSM service uplink sapi=0 pd=03 message=08")
+TRAFFIC_SABM = re.compile(
+    r"TX packet type=1b .*radio_phase=traffic_lapdm_establish")
 
 
 def verify(text: str) -> None:
@@ -44,7 +50,7 @@ def verify(text: str) -> None:
                 f"missing or out-of-order NHM-5 call-boundary checkpoint: {label}")
         cursor = match.end()
 
-    if CALL_CONFIRMED.search(text, cursor):
+    if TRAFFIC_SABM.search(text, cursor):
         raise ValueError(
             "NHM-5 advanced beyond the documented frontier; promote the gate")
 
@@ -58,7 +64,7 @@ def main() -> int:
     except ValueError as error:
         print(error, file=sys.stderr)
         return 1
-    print("OK - NHM-5 organically reached incoming CC SETUP; Call Confirmed remains absent")
+    print("OK - NHM-5 organically emitted Call Confirmed and Alerting, then requested TCH")
     return 0
 
 
