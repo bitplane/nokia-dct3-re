@@ -75,6 +75,40 @@ SIMI_ANCHORS = {
     0x290462: ("ldrb", "r0, [r1]"),
     0x29046A: ("strb", "r0, [r1]"),
 }
+SIM_ATR_PPS_ANCHORS = {
+    # The higher SIM manager accepts direct and inverse convention then walks
+    # the interface-byte presence bits from T0/TDn.
+    0x275240: ("ldrb", "r0, [r5, #1]"),
+    0x275246: ("movs", "r1, #0x3b"),
+    0x275248: ("subs", "r0, r0, r1"),
+    0x27524E: ("subs", "r0, #4"),
+    0x275254: ("ldrb", "r2, [r5, #2]"),
+    0x275260: ("lsrs", "r3, r2, #5"),
+    0x27527C: ("lsrs", "r2, r2, #1"),
+    0x2752C2: ("mov", "r1, ip"),
+    0x2752C4: ("cmp", "r0, r1"),
+    # Ordinary TA1 values, including the lab card's 0x05, select a default
+    # PPS request.  TA1=0x94 has its own independently checksummed request.
+    0x2752D2: ("mov", "r0, sp"),
+    0x2752D4: ("ldrb", "r0, [r0, #2]"),
+    0x2752D6: ("movs", "r1, #0x11"),
+    0x2752DE: ("subs", "r0, #0x83"),
+    0x2752E4: ("movs", "r0, #1"),
+    0x2752E8: ("movs", "r0, #0xff"),
+    0x2752EA: ("strb", "r0, [r5, #0x18]"),
+    0x2752EC: ("strb", "r6, [r5, #0x19]"),
+    0x2752EE: ("strb", "r0, [r5, #0x1a]"),
+    0x2752F2: ("movs", "r0, #2"),
+    0x2752FC: ("strb", "r0, [r5, #0x18]"),
+    0x2752FE: ("movs", "r0, #0x10"),
+    0x275300: ("strb", "r0, [r5, #0x19]"),
+    0x275302: ("movs", "r0, #0x94"),
+    0x275304: ("strb", "r0, [r5, #0x1a]"),
+    0x275306: ("movs", "r0, #0x7b"),
+    0x275308: ("strb", "r0, [r5, #0x1b]"),
+    # The parsed ATR is reached organically from the SIM manager loop.
+    0x275C14: ("bl", "#0x27520a"),
+}
 DSPIF_ANCHORS = {
     # Doorbell write after a shared-memory request is accepted.
     0x28564C: ("ldr", "r1, [pc, #0x3b8]"),
@@ -396,6 +430,7 @@ def verify_eeprom_boundary(data: bytes) -> dict:
 
 def verify_simi_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, SIMI_ANCHORS)
+    decode_thumb_anchors(data, SIM_ATR_PPS_ANCHORS)
     return {
         "driver_extent": {"start": 0x28FF84, "end": 0x2905F4},
         "clock_gate": {"register": 0x2000D, "mask": 0x20},
@@ -409,7 +444,18 @@ def verify_simi_boundary(data: bytes) -> dict:
         "rx_fifo_control": 0x2003D,
         "tx_fifo_control": 0x2003E,
         "tx_count": 0x2003F,
-        "synthetic_card_profile": "not_established",
+        "atr_contract": {
+            "conventions": [0x3B, 0x3F],
+            "interface_bytes": "parsed_from_T0_TDn_presence_bits",
+        },
+        "pps_contract": {
+            "ordinary_ta1": [0xFF, 0x00, 0xFF],
+            "ta1_94": [0xFF, 0x10, 0x94, 0x7B],
+        },
+        "lab_card_atr": [0x3B, 0x10, 0x05],
+        "lab_card_atr_pps_compatible": True,
+        "subscriber_filesystem_profile": "removable_lab_fixture_not_nse3_identity",
+        "initial_apdu_sequence": "requires_organic_boot_trace",
     }
 
 

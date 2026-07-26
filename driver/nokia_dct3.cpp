@@ -272,9 +272,14 @@ constexpr nokia_product_config make_6110_config()
 	result.boot_rom_bypass = false;
 	result.keypad_five_rows = true;
 	result.simi_controller = true;
+	// NSE-3 v4.06 accepts direct/inverse convention ATRs, parses the T0/TDn
+	// interface-byte chain and maps the lab card's TA1=0x05 to PPS ff 00 ff.
+	// Compose that removable standards-shaped test card; its subscriber files
+	// are fixture policy and do not claim Nokia 6110 product identity.
+	result.synthetic_sim_card = true;
 	// NSE-3 Chapter 3 documents COBBA-GJ deriving a 1 MHz PCMDClk and
 	// 8 kHz PCMSClk, with a sign-extended 13-bit sample in a 16-bit word.
-	// Firmware-facing DSP, SIM, external-service and radio peers deliberately
+	// Firmware-facing DSP, external-service and radio peers deliberately
 	// retain their disabled defaults until an identified NSE-3 ROM is traced.
 	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
 	// transfer geometry rather than evidence for the HLE peer's completion

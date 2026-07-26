@@ -100,12 +100,20 @@ dispatches/acknowledges the interrupt-identification register at `0x38`.
 FIFO, RX and IIR instruction anchors. This establishes that the generic MAD2
 SIMI controller is physically applicable to NSE-3.
 
-It does not establish that the current synthetic Phase-2 card, its ATR/PPS
-timing, subscriber identity or provisioned files match a Nokia 6110. Product
-configuration now separates `simi_controller` from `synthetic_sim_card`:
-NSE-3 declares the controller but deliberately leaves the synthetic card
-absent. Existing validated products explicitly select both. SIM coverage and
-registration remain unpromoted.
+The higher v4.06 SIM manager independently establishes the removable-card
+opening contract. It accepts both direct (`3b`) and inverse (`3f`) convention,
+walks the interface-byte chain from the T0/TDn presence bits, and maps ordinary
+TA1 values—including the lab card's `05`—to PPS `ff 00 ff`. TA1 `94` instead
+selects the separately checksummed high-speed request `ff 10 94 7b`.
+`make verify-6110-static` pins that parser and its organic call from the SIM
+manager loop.
+
+NSE-3 therefore composes the existing standards-shaped removable lab card:
+its `3b 10 05` ATR is demonstrably accepted and retains the controller's
+default serial rate. The card's synthetic subscriber identity and filesystem
+remain fixture policy, not Nokia 6110 product identity or an NSE-3 ROM special
+case. The firmware's first APDU sequence still requires an organic boot trace,
+so SIM and registration coverage remain unpromoted.
 
 The same exact-image gate now establishes the firmware side of the generic
 DSPIF transport. The MCU-to-DSP ring occupies shared byte offsets

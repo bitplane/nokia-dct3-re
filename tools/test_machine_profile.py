@@ -75,6 +75,7 @@ class MachineProfileTest(unittest.TestCase):
                 "boot_rom_bypass": "false",
                 "keypad_five_rows": "true",
                 "simi_controller": "true",
+                "synthetic_sim_card": "true",
                 "cobba_pcm.data_clock": "1'000'000",
                 "cobba_pcm.frame_clock": "8'000",
                 "cobba_pcm.sample_bits": "13",
@@ -92,7 +93,7 @@ class MachineProfileTest(unittest.TestCase):
             "constexpr nokia_product_config make_6110_config",
             "constexpr nokia_product_config make_conservative_config",
         )
-        for peer in ("synthetic_sim_card", "dsp_service", "external_service", "radio_peer"):
+        for peer in ("dsp_service", "external_service", "radio_peer"):
             self.assertNotIn(f"result.{peer} = true;", body)
 
         profile = self.driver.split(

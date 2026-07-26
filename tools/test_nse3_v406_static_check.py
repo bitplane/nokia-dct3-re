@@ -94,7 +94,7 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(2, result["scl_bit"])
         self.assertEqual(2, result["word_address_bytes"])
 
-    def test_simi_boundary_keeps_card_profile_unassigned(self):
+    def test_simi_boundary_recovers_atr_pps_without_assigning_subscriber_identity(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
         encodings = {
             0x290510: "2020", 0x290512: "617b",
@@ -106,15 +106,36 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x2901D0: "0d72", 0x2903DE: "6879",
             0x2903E4: "2878", 0x290462: "0878",
             0x29046A: "0870",
+            0x275240: "6878", 0x275246: "3b21",
+            0x275248: "401a", 0x27524E: "0438",
+            0x275254: "aa78", 0x275260: "5309",
+            0x27527C: "5208", 0x2752C2: "6146",
+            0x2752C4: "8842", 0x2752D2: "6846",
+            0x2752D4: "8078", 0x2752D6: "1121",
+            0x2752DE: "8338", 0x2752E4: "0120",
+            0x2752E8: "ff20", 0x2752EA: "2876",
+            0x2752EC: "6e76", 0x2752EE: "a876",
+            0x2752F2: "0220", 0x2752FC: "2876",
+            0x2752FE: "1020", 0x275300: "6876",
+            0x275302: "9420", 0x275304: "a876",
+            0x275306: "7b20", 0x275308: "e876",
+            0x275C14: "fff7f9fa",
         }
         for pc, encoded in encodings.items():
             physical = bytes.fromhex(encoded)
             offset = pc - check.FLASH_BASE
-            image[offset : offset + 2] = physical[::-1]
+            for index in range(0, len(physical), 2):
+                image[offset + index : offset + index + 2] = physical[index : index + 2][::-1]
         result = check.verify_simi_boundary(bytes(image))
         self.assertEqual(0x20036, result["tx_data"])
         self.assertEqual(0x20037, result["rx_data"])
-        self.assertEqual("not_established", result["synthetic_card_profile"])
+        self.assertEqual([0x3B, 0x10, 0x05], result["lab_card_atr"])
+        self.assertEqual([0xFF, 0x00, 0xFF], result["pps_contract"]["ordinary_ta1"])
+        self.assertTrue(result["lab_card_atr_pps_compatible"])
+        self.assertEqual(
+            "removable_lab_fixture_not_nse3_identity",
+            result["subscriber_filesystem_profile"],
+        )
 
     def test_dspif_boundary_recovers_ring_geometry_without_reply_semantics(self):
         physical = bytearray(b"\xff" * check.FLASH_SIZE)
