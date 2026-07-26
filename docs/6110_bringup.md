@@ -519,8 +519,15 @@ A separate later path compares that captured COBBA word against exactly
 bootstrap call at `0x2973f0`, both result captures, selector pass-through,
 adjacent ASIC query, formatter and exact comparison. It also exhaustively
 censuses direct literals: `0x10b97a` has only the formatter and comparison
-references, while `0x10b97c` has none. Indirect/table-mediated use remains
-outside that negative result, so the second word is still unconstrained.
+references, while `0x10b97c` has none.
+
+The second word is an offset inside the larger DSP state object at `0x10b970`,
+so the verifier also enumerates all thirteen literal roots of that object.
+Inspection of every directly rooted access finds one write to offset `+0x0c`,
+the capture at `0x2859e8`, and no read. The external MCU image therefore has
+no direct consumer of the second publication after capture. Indirect or
+table-mediated addressing remains outside that negative result, and absence
+of a consumer does not constrain the DSP-published value.
 Publishing the generic HLE ready word `0x0001` cannot satisfy all NSE-3
 firmware paths.
 
@@ -542,7 +549,8 @@ word.
 
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, how the DSP derives or
-publishes the COBBA identity, what the second captured word represents, or
+publishes the COBBA identity, what the write-only second captured word
+represents, or
 what the intermediate non-zero acknowledgements mean.
 The matching internal DSP image is absent. In particular, “64 transfer blocks”
 is not interchangeable with the existing HLE peer's product-configured

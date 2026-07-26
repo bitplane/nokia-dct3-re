@@ -502,6 +502,17 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
                 check.swap16(bytes(physical)), {pc: 0x0B06}
             )
 
+    def test_second_bootstrap_word_has_no_direct_mcu_consumer(self):
+        self.assertEqual(0x10B970, check.DSP_BOOTSTRAP_STATE_BASE)
+        self.assertEqual(
+            [
+                0x28574A, 0x285842, 0x2859E4, 0x285A50, 0x285B1C,
+                0x285D0C, 0x285D2C, 0x285D4C, 0x285D6E, 0x285E9E,
+                0x285F3C, 0x297104, 0x297246,
+            ],
+            check.DSP_BOOTSTRAP_STATE_BASE_REFERENCES,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

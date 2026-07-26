@@ -1051,6 +1051,22 @@ DSP_BOOTSTRAP_RESULT_LITERALS = {
     0x298E82: 0x10B97A,
     0x298E86: 0x0B06,
 }
+DSP_BOOTSTRAP_STATE_BASE = 0x10B970
+DSP_BOOTSTRAP_STATE_BASE_REFERENCES = [
+    0x28574A,
+    0x285842,
+    0x2859E4,
+    0x285A50,
+    0x285B1C,
+    0x285D0C,
+    0x285D2C,
+    0x285D4C,
+    0x285D6E,
+    0x285E9E,
+    0x285F3C,
+    0x297104,
+    0x297246,
+]
 COBBA_ID_SERVICE_ANCHORS = {
     # The service handler passes request byte 9 through as formatter selector.
     0x2382E4: ("ldrb", "r0, [r4, #9]"),
@@ -2369,6 +2385,19 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             "NSE-3 DSP result literal references changed: expected "
             f"{expected_result_references}, got {result_literal_references}"
         )
+    state_base_references = [
+        insn.address
+        for insn in instructions
+        if insn
+        and literal_value(insn, physical, FLASH_BASE) ==
+            DSP_BOOTSTRAP_STATE_BASE
+    ]
+    if state_base_references != DSP_BOOTSTRAP_STATE_BASE_REFERENCES:
+        raise ValueError(
+            "NSE-3 DSP bootstrap state-object references changed: expected "
+            f"{[hex(address) for address in DSP_BOOTSTRAP_STATE_BASE_REFERENCES]}, "
+            f"got {[hex(address) for address in state_base_references]}"
+        )
     stream = extract_dsp_bootstrap_stream(data)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != DSP_BOOTSTRAP_STREAM_SHA1:
@@ -2416,6 +2445,13 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             "shared_0x10002": {
                 "storage": 0x10B97C,
                 "direct_literal_references": result_literal_references[0x10B97C],
+                "state_object_base": DSP_BOOTSTRAP_STATE_BASE,
+                "state_object_base_references": state_base_references,
+                "direct_base_relative_accesses": {
+                    "writes": [0x2859E8],
+                    "reads": [],
+                },
+                "external_mcu_consumption": "none_direct",
                 "value_constraint": "not_established",
             },
             "current_hle_ready_0x0001_satisfies_comparison": False,
