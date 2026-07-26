@@ -410,12 +410,12 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             {
                 "allocation_callsite": 0x28EDFA,
                 "allocation_size": 0x1C,
-                "external_service_callsite": 0x28EE0C,
-                "external_service_operation": 0x40,
-                "external_service_length": 0x1C,
+                "eeprom_read_callsite": 0x28EE0C,
+                "eeprom_address": 0x40,
+                "eeprom_length": 0x1C,
                 "release_callsite": 0x28EF0A,
                 "payload_event_offset": 0x12,
-                "payload_event_value": "external_service_data",
+                "payload_event_value": "eeprom_data",
             },
             check.DSP_PARAMETER_STALE_EVENT_REUSE_OWNER,
         )

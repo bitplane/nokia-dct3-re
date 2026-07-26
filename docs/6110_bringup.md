@@ -392,12 +392,15 @@ evidence but static firmware cannot prove that other request sizes never
 share the class.
 
 One exact-size owner makes the stale-halfword risk concrete. Call `0x28edfa`
-allocates 28 bytes, `0x28ee0c` fills all 28 bytes from external-service
-operation `0x40`, and `0x28ef0a` returns the payload to the general allocator.
-Consequently its offset `+0x12` is service data and can survive into the
-unwritten branch of descriptor `0x256e2e` if the runtime class and allocation
-order permit reuse. No fixed value, zero-fill, or exclusion from
-`0x076f..0x0778` is claimed without the missing runtime evidence.
+allocates 28 bytes, `0x28ee0c` reads 28 bytes beginning at serial EEPROM
+address `0x40`, and `0x28ef0a` returns the payload to the general allocator.
+The callee is the same GenIO-backed serial-memory reader whose two-byte
+address framing is already pinned above; it is not the separate class-`0x40`
+external-service protocol. Consequently payload offset `+0x12` is EEPROM
+data and can survive into the unwritten branch of descriptor `0x256e2e` if
+the runtime class and allocation order permit reuse. The NSE-3 EEPROM remains
+`NO_DUMP`, so no fixed value, zero-fill, or exclusion from
+`0x076f..0x0778` is claimed without that missing product evidence.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven

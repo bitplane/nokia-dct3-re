@@ -652,8 +652,8 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x260B04: ("ldrh", "r1, [r1, #2]"),
     0x260B06: ("cmp", "r1, r6"),
     0x260B10: ("cmp", "r4, #8"),
-    # One exact 28-byte owner fills every payload byte from external service
-    # operation 0x40, then releases it to the same general allocator.
+    # One exact 28-byte owner fills every payload byte from serial EEPROM
+    # address 0x40, then releases it to the same general allocator.
     0x28EDF8: ("movs", "r0, #0x1c"),
     0x28EDFA: ("bl", "#0x260abc"),
     0x28EE06: ("movs", "r0, #0x40"),
@@ -787,12 +787,12 @@ DSP_PARAMETER_ALLOCATOR_CENSUS = {
 DSP_PARAMETER_STALE_EVENT_REUSE_OWNER = {
     "allocation_callsite": 0x28EDFA,
     "allocation_size": 0x1C,
-    "external_service_callsite": 0x28EE0C,
-    "external_service_operation": 0x40,
-    "external_service_length": 0x1C,
+    "eeprom_read_callsite": 0x28EE0C,
+    "eeprom_address": 0x40,
+    "eeprom_length": 0x1C,
     "release_callsite": 0x28EF0A,
     "payload_event_offset": 0x12,
-    "payload_event_value": "external_service_data",
+    "payload_event_value": "eeprom_data",
 }
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
