@@ -48,6 +48,14 @@ def verify(text: str) -> dict:
         raise ValueError(
             f"expected one firmware-accepted authentication result, found {len(consumers)}"
         )
+    queued_primitives = [
+        line for line in text.splitlines()
+        if "radio_pending_primitive:" in line and "data=1000" in line
+    ]
+    if len(queued_primitives) != 1:
+        raise ValueError(
+            f"expected one queued SRES radio primitive, found {len(queued_primitives)}"
+        )
 
     authentication_responses = [
         line for line in text.splitlines()
@@ -58,6 +66,7 @@ def verify(text: str) -> dict:
         "run_gsm_algorithm_commands": 1,
         "result_bytes_fetched": 12,
         "firmware_results_accepted": 1,
+        "sres_primitives_queued": 1,
         "mm_authentication_responses": len(authentication_responses),
         "registration_promotion": False,
     }
@@ -74,6 +83,7 @@ def main() -> None:
         f"SIM-runs={result['run_gsm_algorithm_commands']} "
         f"fetched={result['result_bytes_fetched']} "
         f"accepted={result['firmware_results_accepted']} "
+        f"queued={result['sres_primitives_queued']} "
         f"MM-responses={result['mm_authentication_responses']} "
         "promotion=no"
     )

@@ -142,12 +142,18 @@ algorithm of any emulated subscriber.
 `make verify-radio-authentication-boundary` reproduces the 3210 side of that
 frontier from a clean card: one standards-shaped MM Authentication Request,
 one firmware-issued RUN GSM ALGORITHM, one twelve-byte GET RESPONSE and the
-firmware's accepted-result branch. The v6.00 consumer is at `0x2068bc`;
+firmware's accepted-result branch and queued outbound radio primitive. The
+v6.00 consumer is at `0x2068bc`;
 NHM-5 v6.39 has the same instruction-for-instruction contract relocated to
 `0x21bca4`. Both require command result `2`, GET RESPONSE result `0x0066`,
-copy the eight-byte Kc, and call their SRES publisher. This bottoms the current
-failure out below the SIM/card callback and above the still-missing radio-task
-publication. The
+copy the eight-byte Kc, and call their SRES publisher. The products then diverge
+in internal routing: NSE-8 posts status `0x0a01` to task 15 and NHM-5 posts
+`0x0a65` to task 12. Their relocated consumers nevertheless converge on the
+same radio-state contract: copy the SRES primitive and set pending bit `0x10`.
+Runtime writes prove that bit is set at `0x10d12c` and `0x10ab90`
+respectively, but it remains pending across repeated valid dedicated-channel
+BLOCK_REQUEST reports. This bottoms the current failure out below SIM/card
+completion and internal event routing, at the lower-radio primitive flush. The
 network session has typed success and reject continuations and persists them
 through its ordinary saved state, but the gate deliberately reports the
 currently observed MM-response count instead of manufacturing completion.

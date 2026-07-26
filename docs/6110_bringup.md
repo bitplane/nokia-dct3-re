@@ -245,11 +245,15 @@ test key. `verify-gsm-a3a8` checks the resulting SRES/Kc projection against the
 FIPS-197 AES-128 example. An opt-in network fixture now takes the already
 working 3210 and 3310 firmware through MM Authentication Request, the organic
 SIM command and its complete GET RESPONSE. Exact-image and runtime evidence
-now show both products also accept typed result `0x0066`, copy Kc and invoke
-their relocated SRES publication helper; neither handset's result then reaches
-the modeled radio boundary as MM Authentication Response. The remaining
-frontier is therefore the shared radio-task publication path, not SIM
-completion or result layout. That cross-product frontier does not establish
+now show both products also accept typed result `0x0066` and copy Kc. Their
+internal event routing is genuinely product-specific (`0x0a01` to task 15 on
+NSE-8, `0x0a65` to task 12 on NHM-5), but both relocated consumers queue the
+SRES primitive and set the homologous pending bit `0x10`. Runtime watching
+shows that bit remains pending across repeated valid BLOCK_REQUEST reports;
+neither handset's result reaches the modeled radio boundary as MM
+Authentication Response. The remaining frontier is therefore the lower-radio
+primitive flush, not SIM completion, result layout or internal task routing.
+That cross-product frontier does not establish
 NSE-3 command ordering and does not promote 6110 runtime coverage.
 
 The four SIM Toolkit constructors remain unsupported and return `6d 00`.
