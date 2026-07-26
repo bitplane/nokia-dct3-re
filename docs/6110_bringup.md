@@ -157,6 +157,22 @@ outside that negative result, so the second word is still unconstrained.
 Publishing the generic HLE ready word `0x0001` cannot satisfy all NSE-3
 firmware paths.
 
+The surrounding service selectors also preserve the revision namespaces in
+firmware rather than merely in our documentation:
+
+- `0x03` (DSP external software) follows a flash-indirect source rooted at
+  `0x2ab52c`;
+- `0x09` (DSP internal software) reads a separately populated runtime buffer
+  at `0x10bcf0`;
+- `0x0c` (system ASIC) reads MAD2 register `0x20000`; and
+- `0x0d` (COBBA) projects the bootstrap-captured `0x10000` word as `B06`.
+
+The exact-image gate pins all four dispatch/source paths. A product profile
+must therefore never use COBBA `B06` as a DSP software revision, MAD mask
+revision or ROM3/ROM4 flash selector. Conversely, learning one of those other
+identities cannot supply the missing DSP-side rule that publishes the COBBA
+word.
+
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, how the DSP derives or
 publishes the COBBA identity, what the second captured word represents, or
@@ -177,13 +193,15 @@ disabled.
 
 ### Revision namespace guard
 
-Three revision labels must remain separate during bring-up:
+Four revision labels must remain separate during bring-up:
 
 1. the MAD2 assembly/mask identity—Nokia's NSE-3 parts list calls F711604
    “MAD2 ROM3”;
 2. the external flash build and its ROM3/ROM4 compatibility variant;
-3. any DSP software, mask-ROM or boot-protocol version reported through the
-   shared-memory handshake.
+3. DSP external/internal software, mask-ROM and boot-protocol identities,
+   retaining their separately evidenced sources; and
+4. the independently queried COBBA identification, which v4.06 renders as
+   `B06`.
 
 The real v5.48 handset log reports both `DSP SW 40.3.617` and `DSP ISw ROM3`,
 but does not establish that every numeric `3` or `4` in the boot exchange names

@@ -225,9 +225,20 @@ COBBA_ID_SERVICE_ANCHORS = {
     # Adjacent selector 0x0c reads MAD2's ASIC-version byte.
     0x28E9A0: ("ldr", "r0, [pc, #0x334]"),
     0x28E9A2: ("ldrb", "r2, [r0]"),
+    # Selectors 0x09 and 0x03 use separate RAM and flash-indirect sources.
+    0x28E914: ("cmp", "r7, #9"),
+    0x28E918: ("beq", "#0x28ea16"),
+    0x28E928: ("subs", "r0, #1"),
+    0x28E92A: ("cmp", "r0, #0"),
+    0x28E92C: ("beq", "#0x28ea1e"),
+    0x28EA16: ("ldr", "r5, [pc, #0x2c8]"),
+    0x28EA1E: ("ldr", "r0, [pc, #0x2c8]"),
+    0x28EA72: ("ldr", "r5, [r0]"),
 }
 COBBA_ID_SERVICE_LITERALS = {
     0x28E9A0: 0x20000,
+    0x28EA16: 0x10BCF0,
+    0x28EA1E: 0x2AB52C,
 }
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
@@ -536,6 +547,27 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
                 "role": "COBBA identification",
                 "corroboration": "Nokia 6110 service protocol: 0xc8/0x0d Get COBBA",
                 "dsp_side_meaning": "not_established",
+            },
+            "service_identity_sources": {
+                "0x03_dsp_external_software": {
+                    "source": "flash_indirect",
+                    "pointer_table": 0x2AB52C,
+                },
+                "0x09_dsp_internal_software": {
+                    "source": "runtime_ram",
+                    "address": 0x10BCF0,
+                },
+                "0x0c_system_asic": {
+                    "source": "mad2_register",
+                    "address": 0x20000,
+                },
+                "0x0d_cobba": {
+                    "source": "bootstrap_captured_shared_word",
+                    "shared_address": 0x10000,
+                    "captured_address": 0x10B97A,
+                    "render": "B06",
+                },
+                "namespaces_are_interchangeable": False,
             },
         },
         "claims": {
