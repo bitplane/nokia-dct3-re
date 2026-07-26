@@ -921,10 +921,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 	{
 		// SEND_BLOCK has a two-byte DSP channel header followed by LAPDm. A
 		// SABM with information invokes contention resolution, whose UA echoes
-		// that information field exactly.
-		if (m_lapdm_link->receive_uplink(packet.payload.data() + 2,
-					packet.length - 2) ==
-				nokia_lapdm_link_device::uplink_result::establish_indication &&
+		// that information field exactly.  An empty UI block does not end the
+		// assigned-channel transmit schedule: the DSP requests the next SDCCH
+		// block at the following 51-frame multiframe opportunity.
+		const auto result = m_lapdm_link->receive_uplink(
+				packet.payload.data() + 2, packet.length - 2);
+		if (result == nokia_lapdm_link_device::uplink_result::establish_indication &&
 				m_gsm_session->establish_layer3(
 					m_lapdm_link->layer3_information().data(),
 					m_lapdm_link->layer3_length()))
@@ -932,6 +934,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_phase = phase::contention_resolution;
 			m_reports_remaining = 1;
 			m_report_deferred = true;
+		}
+		else
+		{
+			m_reports_remaining = 1;
+			m_wait_ticks = 59;
+			m_report_deferred = false;
 		}
 	}
 	else if (packet.type == 0x1b &&
@@ -1601,6 +1609,9 @@ void nokia_radio_peer_device::tick()
 	if (m_phase == phase::service_uplink_request &&
 			m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
+	if (m_phase == phase::lapdm_establish &&
+			m_reports_remaining != 0 && m_wait_ticks != 0)
+		--m_wait_ticks;
 	if ((m_phase == phase::candidate_ra_info || m_phase == phase::selected_ra_info) &&
 			m_reports_remaining == 0 && m_wait_ticks != 0 && --m_wait_ticks == 0)
 		m_reports_remaining = 1;
@@ -1611,7 +1622,8 @@ void nokia_radio_peer_device::tick()
 			!(m_phase == phase::candidate_sync && m_wait_ticks != 0) &&
 			!(m_phase == phase::serving_bcch && m_wait_ticks != 0) &&
 			!(m_phase == phase::selected_bcch && m_wait_ticks != 0) &&
-			!(m_phase == phase::service_uplink_request && m_wait_ticks != 0))
+			!(m_phase == phase::service_uplink_request && m_wait_ticks != 0) &&
+			!(m_phase == phase::lapdm_establish && m_wait_ticks != 0))
 		emit_report();
 }
 

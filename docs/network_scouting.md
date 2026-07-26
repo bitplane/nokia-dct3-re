@@ -216,7 +216,10 @@ queues Channel Release. The link then requires the handset's second SAPI-0 RR,
 acknowledging N(R)=2, before physical teardown. A focused registration
 extra-uplink probe after that acknowledgement returned only the firmware's
 ordinary `01 03 01` UI/fill frame, so the SDCCH registration path still does
-not invent DISC. In contrast, the assigned TCH/F call organically exposes an
+not invent DISC. Empty assigned-SDCCH uplinks likewise retain the real
+multiframe `BLOCK_REQUEST` cadence instead of stopping the DSP schedule or
+being replaced with a fabricated Layer-3 message. In contrast, the assigned
+TCH/F call organically exposes an
 empty new-link SABM, Assignment Complete and a final DISC. The peer returns
 standards-shaped UA frames only for those observed transactions, then confirms
 the ROM's own deconfiguration request.

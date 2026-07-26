@@ -114,6 +114,13 @@ boundary is Layer 2 establishment on that assigned channel. The first
 requested uplink is the firmware's ordinary empty `01 03 01` UI/fill frame,
 not SABM and not a Location Updating Request. The emulator must not replace it
 with a synthetic MM payload or infer registration from Random Access alone.
+Static analysis closes the immediate cause: `0x2c4d78` selects the fill-frame
+constructor at `0x2a7b04` while the firmware's pending SDCCH pointer
+`0x001114b0` is null. The alternative path releases a firmware-built LAPDm
+object populated by `0x2a7cb4`; therefore the missing Location Updating Request
+is an upstream firmware/MM-state boundary, not an unparsed peer frame. The DSP
+continues issuing paced `BLOCK_REQUEST` transactions after an empty uplink, as
+real SDCCH scheduling requires, but repeated organic requests remain empty.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
