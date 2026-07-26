@@ -244,7 +244,29 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x1061A4,
             check.DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS,
         )
+        self.assertEqual(
+            0x106A64,
+            check.DSP_PARAMETER_OBJECT_GROUP_TABLE_ADDRESS,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
+        self.assertEqual(
+            [0x256E2E],
+            check.DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTORS,
+        )
+        self.assertEqual(
+            {
+                "callsite": 0x256E2E,
+                "allocator": 0x260ABC,
+                "allocation_size": 0x1C,
+                "explicit_events": [0x13CE, 0x13CF],
+                "unwritten_event_branch": 0x256E0C,
+                "allocator_clears_payload": False,
+            },
+            check.DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTOR_REASON,
+        )
+        self.assertEqual(
+            29, len(check.DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS)
+        )
 
     def test_dsp_bootstrap_result_rejects_generic_ready_one(self):
         physical = bytearray(b"\xff" * check.FLASH_SIZE)

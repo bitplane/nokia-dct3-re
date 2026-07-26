@@ -274,11 +274,29 @@ The table's population boundary is also recovered. The sole constructor at
 the selected 28-byte SRAM record. A whole-image census finds 116 direct calls:
 81 use fixed ROM descriptors, five use descriptors reconstructed from the
 startup SRAM copy image, and 30 construct or select descriptors at runtime.
-None of the 86 fixed descriptors supplies `0x076f..0x0778`. The remaining
-evidence frontier is therefore those 30 runtime descriptors plus the
-alternative runtime-object record population—not the table's initial state.
-The exact verifier still does not claim producer absence or that the paired
-events are dormant.
+None of the 86 fixed descriptors supplies `0x076f..0x0778`. Exact local
+construction and forwarding analysis now bounds 29 of the 30 runtime
+descriptors as well; their complete value sets also exclude the target range.
+
+The last descriptor is registered at `0x256e2e`. Two branches explicitly
+store events `0x13cf` and `0x13ce`, but the branch at `0x256e0c` leaves
+`descriptor[0x12]` unwritten. Its 28-byte allocation comes from the general
+free-list allocator at `0x260abc`; that routine returns the selected block's
+payload at header plus eight without clearing it. The missing store therefore
+cannot honestly be promoted to event zero: a reused block may retain an older
+halfword. The remaining evidence frontier is this one unwritten runtime value
+plus the alternative runtime-object record population. Both require further
+producer tracing or a bounded runtime trace. The exact verifier still does
+not claim producer absence or that the paired events are dormant.
+
+The alternative representation is no longer structurally opaque. Its
+six-entry group table begins at `0x106a64` and is also zero-initialized by
+startup: none of the same 109 copy records supplies it. Group byte `+9`
+selects the representation. Zero follows the group's runtime pointer, indexes
+a 24-byte object record with group byte `+6`, and reads the event halfword at
+record `+0x0e`; nonzero follows the registered 28-byte record chain described
+above and reads `+0x12`. This establishes the exact object/event boundary, but
+not the values later installed through the mode-zero runtime pointer.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven

@@ -566,10 +566,76 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x25A510: ("ldrh", "r1, [r2, #0x12]"),
     0x25A512: ("strh", "r1, [r4, #0x12]"),
     0x25A5B2: ("cmp", "r5, #0x50"),
+    # One runtime descriptor is intentionally left unresolved.  Its 28-byte
+    # allocation is returned from the free-list payload at header+8 without a
+    # clear, and the r1==0 branch does not write descriptor[0x12].  The other
+    # two branches explicitly store 0x13cf or 0x13ce.
+    0x256DD2: ("movs", "r0, #0x1c"),
+    0x256DD4: ("bl", "#0x260abc"),
+    0x256E08: ("cmp", "r1, #0"),
+    0x256E0C: ("movs", "r0, #0x5c"),
+    0x256E18: ("strh", "r0, [r4, #0x12]"),
+    0x256E20: ("strh", "r0, [r4, #0x12]"),
+    0x260C68: ("str", "r0, [r4, #4]"),
+    0x260CAC: ("movs", "r0, #8"),
+    0x260CAE: ("adds", "r0, r0, r4"),
+    # The unresolved publisher has two genuinely different backing formats.
+    # Group mode zero indexes 24-byte object records and reads event +0x0e;
+    # nonzero mode follows the registered 28-byte SRAM record chain and reads
+    # event +0x12.
+    0x25A7F4: ("ldrb", "r0, [r6, #9]"),
+    0x25A7FA: ("ldr", "r1, [r6]"),
+    0x25A800: ("ldrb", "r3, [r6, #6]"),
+    0x25A80E: ("ldrh", "r3, [r0, #0xe]"),
+    0x25A83C: ("ldrh", "r1, [r0, #0x12]"),
 }
 DSP_PARAMETER_MODE_EVENT_TABLE_ADDRESS = 0x2B43F0
 DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS = 0x1061A4
+DSP_PARAMETER_OBJECT_GROUP_TABLE_ADDRESS = 0x106A64
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
+DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
+    0x221640: [0x0C44],
+    0x22168A: [0x0C44],
+    0x221C34: [0x0C4A],
+    0x221C80: [0x0C4A],
+    0x2258CC: [0x0C4A],
+    0x22D686: [0x0389],
+    0x22D6A0: [0x0389],
+    0x256D96: [0x00DC],
+    0x25A604: [0x00DC],
+    0x265094: list(range(8)) + [0x0C60],
+    0x27018C: [0x01C2],
+    0x2701A8: [0x01C2],
+    0x270286: [0x01C2],
+    0x2702D2: [0x01C2],
+    0x270610: [0x01B0],
+    0x270D70: [0x01A7],
+    0x270DDC: [0x01A7],
+    0x278454: [0x0322],
+    0x27851C: [0x00DC, 0x0230],
+    0x27876A: [0x0230],
+    0x278792: [0x0387],
+    0x2787B8: [0x05E0],
+    # 0x27ad0c forwards r3 through 0x27acc0.  Four callers are fixed and the
+    # fifth supplies its loop index r4, bounded to 0..4.
+    0x27AD0C: list(range(5)) + [0x0387, 0x0394, 0x1964, 0x1965],
+    0x27CDF0: [0x0FA4],
+    0x27E11E: [0x0AB5],
+    # Both calls begin with the complete 28-byte template at 0x2bc75c.
+    0x2847A8: [0x0000],
+    0x2847F0: [0x0000],
+    0x28B5DA: [0x03A2],
+    0x28B628: [0x03A5, 0x03FB],
+}
+DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTORS = [0x256E2E]
+DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTOR_REASON = {
+    "callsite": 0x256E2E,
+    "allocator": 0x260ABC,
+    "allocation_size": 0x1C,
+    "explicit_events": [0x13CE, 0x13CF],
+    "unwritten_event_branch": 0x256E0C,
+    "allocator_clears_payload": False,
+}
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
     0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
@@ -1290,6 +1356,7 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
     copy_cursor = NSE3_COPY_TABLE_ADDRESS
     copy_records = 0
     runtime_table_copied = False
+    object_group_table_copied = False
     while True:
         offset = copy_cursor - FLASH_BASE
         size = (
@@ -1311,6 +1378,12 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             < destination + size
         ):
             runtime_table_copied = True
+        if (
+            destination
+            <= DSP_PARAMETER_OBJECT_GROUP_TABLE_ADDRESS
+            < destination + size
+        ):
+            object_group_table_copied = True
         for index in range(size):
             # Byte lanes cross within each flash halfword on this image.
             source_offset = (source - FLASH_BASE + index) ^ 1
@@ -1327,6 +1400,10 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
     if runtime_table_copied:
         raise ValueError(
             "NSE-3 runtime event-record table unexpectedly has a flash image"
+        )
+    if object_group_table_copied:
+        raise ValueError(
+            "NSE-3 object-group table unexpectedly has a flash image"
         )
 
     registration_profile = {
@@ -1380,10 +1457,31 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             f"got {len(registrations)}, {fixed_rom_descriptors}, "
             f"{fixed_sram_descriptors}, {len(runtime_registration_calls)}"
         )
+    expected_runtime_registration_calls = sorted(
+        [
+            *DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS,
+            *DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTORS,
+        ]
+    )
+    if runtime_registration_calls != expected_runtime_registration_calls:
+        raise ValueError(
+            "NSE-3 runtime registration callsites changed: expected "
+            f"{expected_runtime_registration_calls}, got "
+            f"{runtime_registration_calls}"
+        )
     if {value & 0x1FFF for value in fixed_registration_events} & target_events:
         raise ValueError(
             "NSE-3 fixed runtime-record registration can publish a "
             "parameter event"
+        )
+    classified_runtime_events = {
+        value & 0x1FFF
+        for values in DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS.values()
+        for value in values
+    }
+    if classified_runtime_events & target_events:
+        raise ValueError(
+            "NSE-3 bounded runtime descriptor can publish a parameter event"
         )
 
     unresolved = DSP_PARAMETER_UNRESOLVED_EVENT_CALLS
@@ -1416,14 +1514,28 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "fixed_rom_descriptors": fixed_rom_descriptors,
             "startup_sram_descriptors": fixed_sram_descriptors,
             "runtime_descriptors": runtime_registration_calls,
+            "bounded_runtime_descriptor_events":
+                DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS,
+            "unresolved_runtime_descriptors":
+                DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTORS,
+            "unresolved_runtime_descriptor_reason":
+                DSP_PARAMETER_UNRESOLVED_RUNTIME_DESCRIPTOR_REASON,
             "fixed_descriptors_exclude_parameter_events": True,
+            "bounded_runtime_descriptors_exclude_parameter_events": True,
             "startup_copy_records": copy_records,
             "table_zero_initialized": True,
-            "object_record_population": "unresolved",
+            "object_records": {
+                "group_table": DSP_PARAMETER_OBJECT_GROUP_TABLE_ADDRESS,
+                "group_table_zero_initialized": True,
+                "record_stride": 0x18,
+                "event_offset": 0x0E,
+                "population": "unresolved",
+            },
         },
         "runtime_built_calls_exclude_parameter_events": False,
         "producer_absence_proven": False,
-        "next_evidence": "bound_30_runtime_descriptors_and_object_records_or_trace",
+        "next_evidence":
+            "trace_256e2e_unwritten_payload_and_object_records_at_runtime",
     }
 
 
