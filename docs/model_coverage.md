@@ -40,6 +40,14 @@ bit 6 as its result. The bit meanings and initial state remain unassigned.
 No firmware state is forced, no DSP peer is enabled and coverage remains
 unpromoted.
 
+The exact image now also proves one organic transition through that bitfield:
+with bit 2 set, incoming command `0x64`/body byte 0 equal to 2 sets bit 4 and
+arms shared timer `0x13` for raw duration `0x19`. Its task-2 expiry event
+`0xd3` clears bit 4 and publishes the typed status with control argument 2.
+The timer has three other arms and the initiating DSP condition remains
+unknown, so this bounds a response contract without enabling or scripting the
+peer.
+
 ## Promotion rules
 
 The levels are cumulative:

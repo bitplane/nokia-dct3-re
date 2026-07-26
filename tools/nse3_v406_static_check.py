@@ -2291,6 +2291,38 @@ EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS = {
 EXTERNAL_SERVICE_CONTROLLER_FLAG_CELL = 0x10FDE1
 EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_ROOT = 0x10FD78
 EXTERNAL_SERVICE_CONTROLLER_FLAG_DERIVED_OFFSET = 0x69
+EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS = {
+    # Task 2 intercepts command 0x64/body[0] == 2 only while controller bit 2
+    # is set.  It sets bit 4, arms timer 0x13 and skips ordinary dispatch.
+    0x23A5D4: ("ldr", "r5, [pc, #0x238]"),
+    0x23A5DA: ("ldrb", "r0, [r5]"),
+    0x23A5DC: ("lsrs", "r0, r0, #3"),
+    0x23A5E0: ("ldrb", "r0, [r4, #9]"),
+    0x23A5E2: ("cmp", "r0, #2"),
+    0x23A5E6: ("ldrb", "r0, [r4, #8]"),
+    0x23A5E8: ("cmp", "r0, #0x64"),
+    0x23A5EC: ("movs", "r0, #0x10"),
+    0x23A5EE: ("ldrb", "r1, [r5]"),
+    0x23A5F0: ("orrs", "r0, r1"),
+    0x23A5F2: ("strb", "r0, [r5]"),
+    0x23A5F4: ("movs", "r0, #0x13"),
+    0x23A5F6: ("movs", "r1, #0x19"),
+    0x23A5F8: ("bl", "#0x25f146"),
+    0x23A5FC: ("b", "#0x23a6a8"),
+}
+EXTERNAL_SERVICE_DELAYED_STATUS_LITERALS = {
+    0x23A5D4: 0x10FDE1,
+}
+EXTERNAL_SERVICE_DELAY_TIMER_CODE = 0x13
+EXTERNAL_SERVICE_DELAY_TIMER_CONFIGURATION = bytes.fromhex(
+    "03020000000000d3"
+)
+EXTERNAL_SERVICE_DELAY_TIMER_ARMS = {
+    0x237D3C: 0x036E,
+    0x23A53E: 0x01F5,
+    0x23A5F8: 0x0019,
+    0x28FAE4: 0x007D,
+}
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -3402,6 +3434,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
@@ -3409,6 +3442,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, TYPE_0X1F_CONTROLLER_STATUS_LITERALS)
     verify_thumb_literals(data, TYPE_0X03_CONTROL_LITERALS)
     verify_thumb_literals(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS)
+    verify_thumb_literals(data, EXTERNAL_SERVICE_DELAYED_STATUS_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -3932,6 +3966,28 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 task-17 acquired a direct radio-constructor/submit call: "
             f"{task_17_direct_radio_calls}"
         )
+    external_service_delay_timer_arms = {}
+    for index, insn in enumerate(instructions):
+        if (
+            not insn
+            or insn.mnemonic not in ("bl", "blx")
+            or immediate_target(insn) != 0x25F146
+        ):
+            continue
+        registers = call_registers(
+            instructions, index, physical, FLASH_BASE
+        )
+        if registers["r0"] == EXTERNAL_SERVICE_DELAY_TIMER_CODE:
+            external_service_delay_timer_arms[insn.address] = registers["r1"]
+    if (
+        external_service_delay_timer_arms
+        != EXTERNAL_SERVICE_DELAY_TIMER_ARMS
+    ):
+        raise ValueError(
+            "NSE-3 external-service delay-timer arms changed: expected "
+            f"{EXTERNAL_SERVICE_DELAY_TIMER_ARMS}, got "
+            f"{external_service_delay_timer_arms}"
+        )
     task_11_event_jump_table = {
         status: effective_u32(
             physical,
@@ -4081,6 +4137,28 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
         raise ValueError(
             f"NSE-3 task-12 status jump table changed: expected "
             f"{TASK_12_STATUS_JUMP_TABLE}, got {task_12_table}"
+        )
+    external_service_delay_timer_configuration_address = (
+        TIMER_CONFIGURATION_TABLE_ADDRESS
+        + EXTERNAL_SERVICE_DELAY_TIMER_CODE
+        * TIMER_CONFIGURATION_RECORD_BYTES
+    )
+    external_service_delay_timer_configuration = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            external_service_delay_timer_configuration_address + index,
+        )
+        for index in range(TIMER_CONFIGURATION_RECORD_BYTES)
+    )
+    if (
+        external_service_delay_timer_configuration
+        != EXTERNAL_SERVICE_DELAY_TIMER_CONFIGURATION
+    ):
+        raise ValueError(
+            "NSE-3 external-service delay-timer configuration changed: "
+            f"expected {EXTERNAL_SERVICE_DELAY_TIMER_CONFIGURATION.hex()}, "
+            f"got {external_service_delay_timer_configuration.hex()}"
         )
     timer_configuration_address = (
         TIMER_CONFIGURATION_TABLE_ADDRESS
@@ -5172,6 +5250,36 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     "single_boolean_verdict": False,
                     "external_v548_address_portable_as_semantics": False,
                     "bit_semantics_assigned": False,
+                },
+                "delayed_command_0x64_body_2": {
+                    "intercept": 0x23A5D8,
+                    "required_controller_bit": 2,
+                    "command_object_offset": 8,
+                    "command": 0x64,
+                    "body_0_object_offset": 9,
+                    "body_0": 2,
+                    "sets_controller_bit": 4,
+                    "skips_ordinary_dispatch": True,
+                    "timer": {
+                        "code": EXTERNAL_SERVICE_DELAY_TIMER_CODE,
+                        "raw_duration": 0x19,
+                        "arm_call": 0x23A5F8,
+                        "configuration_address":
+                            external_service_delay_timer_configuration_address,
+                        "configuration": list(
+                            external_service_delay_timer_configuration
+                        ),
+                        "owner_task": 2,
+                        "expiry_event": 0xD3,
+                        "all_arms_by_raw_duration":
+                            external_service_delay_timer_arms,
+                        "dedicated_to_this_path": False,
+                    },
+                    "expiry_bit_4_consumer": 0x23A584,
+                    "expiry_bit_4_clear": 0x23A590,
+                    "status_publisher": 0x239CFC,
+                    "status_publisher_control_argument": 2,
+                    "peer_trigger_policy_established": False,
                 },
             },
             "peer_start_delay": "not_established",

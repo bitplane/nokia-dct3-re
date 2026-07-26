@@ -797,6 +797,24 @@ Consequently the driver does not acquire a writable `verdict` hook and must
 not force this byte to pass startup. Any future peer must cause the
 firmware-observed transitions through the recovered DSP/service protocol.
 
+One such transition is now exact. In task 2, controller bit 2 enables a
+special intercept for command `0x64` whose first body byte is 2. The intercept
+sets controller bit 4, arms timer `0x13` with raw duration `0x19`, and skips
+the ordinary command dispatcher. Timer-table record `0x2b7668` is
+`03 02 00 00 00 00 00 d3`: flags 3, task-2 ownership and expiry event
+`0xd3`. When that event arrives with bit 4 still set, the established
+consumer clears the bit and publishes the typed command-`0x64` status with
+control argument 2.
+
+Timer `0x13` is not dedicated to this exchange. A complete arm census finds
+four callers with raw durations `0x036e`, `0x01f5`, `0x0019` and `0x007d`;
+the command intercept is only the `0x0019` arm. This proves an organic,
+timer-mediated response path without proving the timer unit, meanings of
+controller bits 2/4, or which missing DSP condition sends the initiating
+command. A future service peer can implement that initiator only when its
+trigger is independently evidenced; it need not and must not poke the
+controller byte.
+
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,
 or the complete ordering around discovery and acknowledgements. Those facts

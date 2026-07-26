@@ -1136,6 +1136,38 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS[0x23A54C],
         )
 
+    def test_external_service_delayed_status_is_timer_owned_not_forced_state(self):
+        self.assertEqual(
+            ("cmp", "r0, #0x64"),
+            check.EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS[0x23A5E8],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x10"),
+            check.EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS[0x23A5EC],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x13"),
+            check.EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS[0x23A5F4],
+        )
+        self.assertEqual(
+            ("b", "#0x23a6a8"),
+            check.EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS[0x23A5FC],
+        )
+        self.assertEqual(0x13, check.EXTERNAL_SERVICE_DELAY_TIMER_CODE)
+        self.assertEqual(
+            bytes.fromhex("03020000000000d3"),
+            check.EXTERNAL_SERVICE_DELAY_TIMER_CONFIGURATION,
+        )
+        self.assertEqual(
+            {
+                0x237D3C: 0x036E,
+                0x23A53E: 0x01F5,
+                0x23A5F8: 0x0019,
+                0x28FAE4: 0x007D,
+            },
+            check.EXTERNAL_SERVICE_DELAY_TIMER_ARMS,
+        )
+
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
         image[0x40:0x42] = b"\x12\x34"
