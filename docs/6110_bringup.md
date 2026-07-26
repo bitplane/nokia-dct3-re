@@ -243,6 +243,26 @@ NSE-3 confirmation handler does not require the product-specific body-bit
 correlation recovered for NHM-5. It does not, by itself, prove which DSP
 report follows next in every controller state.
 
+The surrounding report-to-task boundary is now exact enough to prevent an
+NSE-8 sequence from being inferred from that single confirmation. Type
+`0x84` posts status `0x1394` to task 11; types `0x87`, `0x89` and `0x8a`
+post `0x138f`, `0x1393` and `0x1390` there as fixed eight-byte objects.
+Type `0x83` selects between task-11 status `0x139f` and task-12 status
+`0x13a0` using runtime state, preserving a `0x2c`-byte object. Task 12
+separately receives type `0x88` as status `0x13ac` in 16 bytes, type `0x8b`
+as status `0x13b8` in `0xa8` bytes, and type `0x8f` as status `0x13b7` in
+eight bytes.
+
+Task 11's controller dispatcher recognizes the numeric status set
+`0x1389`, `0x138a`, `0x138c`, `0x138e..0x1390`, `0x1392..0x1397`,
+`0x139f` and `0x13bb`. Its branches establish fixed object sizes and four
+numeric control calls: `(0x67, 2)`, `(0x72, 2)`, `(0x71, 2)` and
+`(0x68, 2)` for statuses `0x1389`, `0x138a`, `0x138c` and `0x1397`
+respectively. The exact-image output records those numbers and state gates,
+but deliberately assigns no protocol names to the otherwise unidentified
+statuses. This closes more of the MCU-side lifecycle graph while leaving DSP
+initiation and complete report ordering unproved.
+
 The emulator configuration now reflects this evidence directly. Radio
 `wire_profile` selects only packet representation (`bitmap_search` or
 `candidate_list`), while `acquisition_profile` selects the product-specific

@@ -395,10 +395,108 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x211D70: ("ldr", "r0, [sp, #0x18]"),
     0x211D72: ("movs", "r1, #8"),
     0x211D74: ("bl", "#0x27693c"),
+    # The task-11 dispatcher keeps the surrounding controller-status family
+    # numeric.  The fixed sizes and control calls are useful lifecycle
+    # boundaries, but do not by themselves name the events.
+    0x211C72: ("ldr", "r1, [pc, #0x280]"),
+    0x211C9C: ("subs", "r0, #2"),
+    0x211CAE: ("ldr", "r1, [pc, #0x23c]"),
+    0x211CC8: ("subs", "r0, #8"),
+    0x211CCE: ("subs", "r0, #0x1c"),
+    0x211E34: ("ldr", "r0, [sp, #0x18]"),
+    0x211E36: ("movs", "r1, #0x1c"),
+    0x211E48: ("ldr", "r0, [sp, #0x18]"),
+    0x211E4A: ("movs", "r1, #8"),
+    0x211E74: ("ldr", "r0, [sp, #0x18]"),
+    0x211E76: ("movs", "r1, #0x28"),
+    0x211EA6: ("movs", "r0, #0x71"),
+    0x211EA8: ("movs", "r1, #2"),
+    0x211EC0: ("movs", "r0, #0x72"),
+    0x211EC8: ("movs", "r0, #0x67"),
+    0x211ECA: ("movs", "r1, #2"),
+    # Several DSP reports are converted into fixed task objects.  These
+    # routes establish task/status/object geometry independently of the
+    # higher-level meaning of each report.
+    0x27FD50: ("movs", "r0, #0x9d"),
+    0x27FD52: ("lsls", "r0, r0, #5"),
+    0x27FD58: ("movs", "r1, #0x2c"),
+    0x27FD6A: ("ldr", "r0, [pc, #0x308]"),
+    0x2803AC: ("ldr", "r0, [pc, #0x24c]"),
+    0x2803B2: ("movs", "r1, #8"),
+    0x2803B8: ("movs", "r0, #0xb"),
+    0x2803DC: ("ldr", "r0, [pc, #0x224]"),
+    0x2803E2: ("movs", "r1, #8"),
+    0x2803E8: ("movs", "r0, #0xc"),
+    0x280418: ("ldr", "r0, [pc, #0x1ec]"),
+    0x28041E: ("movs", "r1, #8"),
+    0x280424: ("movs", "r0, #0xb"),
+    0x28043C: ("ldr", "r0, [pc, #0x1d0]"),
+    0x280442: ("movs", "r1, #8"),
+    0x280448: ("movs", "r0, #0xb"),
+    0x280478: ("ldr", "r0, [pc, #0x198]"),
+    0x2804AA: ("movs", "r1, #0x10"),
+    0x2804B0: ("movs", "r0, #0xc"),
+    0x280532: ("ldr", "r0, [pc, #0xec]"),
+    0x28053E: ("movs", "r0, #0xb"),
+    0x280552: ("ldr", "r0, [pc, #0xe4]"),
+    0x28055E: ("movs", "r0, #0xc"),
 }
 RADIO_REPORT_HANDLER_LITERALS = {
     0x211C68: 0x1393,
+    0x211C72: 0x1389,
     0x211CAE: 0x1394,
+    0x27FD6A: 0x139F,
+    0x2803AC: 0x1394,
+    0x2803DC: 0x13B7,
+    0x280418: 0x1390,
+    0x28043C: 0x138F,
+    0x280478: 0x13AC,
+    0x280532: 0x1393,
+    0x280552: 0x13B8,
+}
+FIXED_RADIO_TASK_ROUTES = {
+    "0x83": {
+        "routes": [
+            {"task": 11, "status": 0x139F},
+            {"task": 12, "status": 0x13A0},
+        ],
+        "object_bytes": 0x2C,
+        "selection_depends_on_runtime_state": True,
+    },
+    "0x84": {"task": 11, "status": 0x1394, "object_bytes": 8},
+    "0x87": {"task": 11, "status": 0x138F, "object_bytes": 8},
+    "0x88": {"task": 12, "status": 0x13AC, "object_bytes": 0x10},
+    "0x89": {"task": 11, "status": 0x1393, "object_bytes": 8},
+    "0x8a": {"task": 11, "status": 0x1390, "object_bytes": 8},
+    "0x8b": {"task": 12, "status": 0x13B8, "object_bytes": 0xA8},
+    "0x8f": {"task": 12, "status": 0x13B7, "object_bytes": 8},
+}
+TASK_11_CONTROLLER_DISPATCH = {
+    "routine": 0x2119D8,
+    "numeric_statuses": [
+        0x1389, 0x138A, 0x138C, 0x138E, 0x138F, 0x1390,
+        0x1392, 0x1393, 0x1394, 0x1395, 0x1396, 0x1397,
+        0x139F, 0x13BB,
+    ],
+    "fixed_object_bytes": {
+        "0x138e": 0x28,
+        "0x138f": 8,
+        "0x1390": 8,
+        "0x1392": 0x1C,
+        "0x1393": 8,
+        "0x1394": 8,
+        "0x1395": 4,
+        "0x1396": 4,
+        "0x139f": 0x2C,
+        "0x13bb": 4,
+    },
+    "fixed_control_calls": {
+        "0x1389": {"code": 0x67, "argument": 2},
+        "0x138a": {"code": 0x72, "argument": 2},
+        "0x138c": {"code": 0x71, "argument": 2},
+        "0x1397": {"code": 0x68, "argument": 2},
+    },
+    "semantic_names_assigned": False,
 }
 RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
 RADIO_REPORT_JUMP_TABLE = {
@@ -1821,6 +1919,8 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "confirmation_payload_read_by_handler": False,
                 "controller_state_after_confirmation": 3,
             },
+            "fixed_task_routes": FIXED_RADIO_TASK_ROUTES,
+            "task_11_controller_dispatch": TASK_11_CONTROLLER_DISPATCH,
         },
         "external_service_transport": {
             "dsp_report_types": [0x8D, 0x8E],

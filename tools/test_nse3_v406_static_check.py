@@ -221,6 +221,30 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
                 check.swap16(bytes(physical)), {0x28564C: 0x30000}
             )
 
+    def test_radio_report_routes_keep_task_11_and_task_12_distinct(self):
+        self.assertEqual(
+            [
+                {"task": 11, "status": 0x139F},
+                {"task": 12, "status": 0x13A0},
+            ],
+            check.FIXED_RADIO_TASK_ROUTES["0x83"]["routes"],
+        )
+        self.assertEqual(
+            {"task": 12, "status": 0x13B8, "object_bytes": 0xA8},
+            check.FIXED_RADIO_TASK_ROUTES["0x8b"],
+        )
+        self.assertEqual(
+            [0x67, 0x72, 0x71, 0x68],
+            [
+                route["code"]
+                for route in
+                check.TASK_11_CONTROLLER_DISPATCH["fixed_control_calls"].values()
+            ],
+        )
+        self.assertFalse(
+            check.TASK_11_CONTROLLER_DISPATCH["semantic_names_assigned"]
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)
