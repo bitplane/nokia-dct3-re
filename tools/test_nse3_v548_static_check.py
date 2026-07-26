@@ -55,6 +55,17 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
             source,
         )
 
+    def test_complete_group7_directory_is_revision_relocated_not_generic(self):
+        rom3 = check.VARIANTS["rom3"]
+        rom4 = check.VARIANTS["rom4"]
+        self.assertEqual(94, rom3["eeprom_group7_count"])
+        self.assertEqual(94, rom4["eeprom_group7_count"])
+        self.assertEqual(0, rom3["eeprom_group7_offset_bias"])
+        self.assertEqual(0x28, rom4["eeprom_group7_offset_bias"])
+        source = Path(check.__file__).read_text(encoding="utf-8")
+        self.assertIn('"geometry_matches_other_variant_after_bias": True', source)
+        self.assertIn('"whole_eeprom_migration_proven": False', source)
+
     def test_result_contract_is_not_named_as_physical_cobba(self):
         source = Path(check.__file__).read_text(encoding="utf-8")
         self.assertIn('"first_required_value": 0x0B06', source)

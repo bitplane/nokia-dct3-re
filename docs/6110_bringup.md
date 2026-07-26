@@ -1479,6 +1479,21 @@ exact firmware layout and begin from a legally obtained matching 24C64 image;
 an erased device cannot be turned into calibrated factory state by copying
 only these security records.
 
+The comparison is not limited to the security subset. Each exact image has 94
+consecutive group-7 descriptors. After subtracting `0x28` from every ROM4
+EEPROM offset, the complete ordered `{id, offset, length}` stream is
+byte-identical to ROM3 and has normalized SHA-256
+`5a2bd07c998431ffd716db8526337e3f32662a2774916c8278df9d3bc040fb9e`.
+ROM3's referenced span is `0x0353..0x1d6b`; ROM4's is
+`0x037b..0x1d93`. This proves a revision-level relocation rule for group 7,
+including its intentional aliases and overlaps.
+
+It does not prove that a complete ROM3 EEPROM can be converted to ROM4 by
+moving that span. Records outside group 7, the common identity area, RF
+calibration, checksums and data bytes themselves are not classified by this
+census. The checker therefore records matching normalized geometry while
+explicitly rejecting a whole-EEPROM migration claim.
+
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
 retain their three ready words of `1`; NSE-3 v4.06 selects

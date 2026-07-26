@@ -30,6 +30,8 @@ VARIANTS = {
             0x283AF2, 0x297A04, 0x297B4E, 0x297C3C,
         ],
         "eeprom_security_directory": 0x2B8524,
+        "eeprom_group7_count": 94,
+        "eeprom_group7_offset_bias": 0,
         "eeprom_security_records": {
             0x0701: (0x2B8524, 0x0358, 0x0008),
             0x0702: (0x2B852C, 0x0360, 0x002C),
@@ -66,6 +68,8 @@ VARIANTS = {
             0x28570E, 0x299630, 0x29977A, 0x299868,
         ],
         "eeprom_security_directory": 0x2B9838,
+        "eeprom_group7_count": 94,
+        "eeprom_group7_offset_bias": 0x28,
         "eeprom_security_records": {
             0x0701: (0x2B9838, 0x0380, 0x0008),
             0x0702: (0x2B9840, 0x0388, 0x002C),
@@ -214,6 +218,40 @@ def verify_variant(path: Path, name: str) -> dict:
                 f"expected {expected_descriptor.hex()}, "
                 f"got {actual_descriptor.hex()}"
             )
+
+    normalized_group7 = bytearray()
+    group7_offsets = []
+    group7_end_offsets = []
+    group7_base = profile["eeprom_security_directory"]
+    for index in range(profile["eeprom_group7_count"]):
+        descriptor = group7_base + index * 8
+        descriptor_offset = descriptor - FLASH_BASE
+        raw = data[descriptor_offset : descriptor_offset + 8]
+        record = int.from_bytes(raw[0:4], "big")
+        offset = int.from_bytes(raw[4:6], "big")
+        length = int.from_bytes(raw[6:8], "big")
+        if record >> 8 != 0x07:
+            raise ValueError(
+                f"{path}: group-7 descriptor {index} has record {record:#x}"
+            )
+        normalized_offset = offset - profile["eeprom_group7_offset_bias"]
+        if normalized_offset < 0:
+            raise ValueError(
+                f"{path}: group-7 descriptor {record:#06x} underflows bias"
+            )
+        normalized_group7.extend(record.to_bytes(4, "big"))
+        normalized_group7.extend(normalized_offset.to_bytes(2, "big"))
+        normalized_group7.extend(length.to_bytes(2, "big"))
+        group7_offsets.append(offset)
+        group7_end_offsets.append(offset + length)
+    normalized_group7_sha256 = hashlib.sha256(normalized_group7).hexdigest()
+    expected_group7_sha256 = (
+        "5a2bd07c998431ffd716db8526337e3f32662a2774916c8278df9d3bc040fb9e"
+    )
+    if normalized_group7_sha256 != expected_group7_sha256:
+        raise ValueError(
+            f"{path}: normalized group-7 directory fingerprint changed"
+        )
 
     validator = profile["security_validator"]
     security_anchors = {
@@ -489,6 +527,15 @@ def verify_variant(path: Path, name: str) -> dict:
         "state": profile["state"],
         "state_literal_roots": state_literal_roots,
         "eeprom_security_directory": profile["eeprom_security_directory"],
+        "eeprom_group7_directory": {
+            "record_count": profile["eeprom_group7_count"],
+            "offset_bias": profile["eeprom_group7_offset_bias"],
+            "minimum_offset": min(group7_offsets),
+            "maximum_end_offset": max(group7_end_offsets),
+            "normalized_sha256": normalized_group7_sha256,
+            "geometry_matches_other_variant_after_bias": True,
+            "whole_eeprom_migration_proven": False,
+        },
         "eeprom_security_records": {
             f"{record:#06x}": {
                 "descriptor": descriptor,
