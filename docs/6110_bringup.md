@@ -452,6 +452,24 @@ candidate state, not alternative product-wide wire profiles. The semantic
 name of type `0x8f`, the exact declared-length/pair-padding interpretation,
 and the DSP conditions that emit the trigger remain unassigned.
 
+Adjacent type `0x8c` does not establish the missing acknowledgement edge.
+Handler `0x2804c0` releases the received object before reading any body
+field. It suppresses its fixed notification when controller byte
+`0x1090ff` equals 1 or controller context `0x1090fa` equals `0x1a`;
+otherwise it posts the four-byte ROM object at `0x2bcfa8`, containing status
+`0x1395`, to task 11. Those gates distinguish bitmap context from other
+controller contexts, but do not test type `0x09` or the candidate-list
+builder's success state.
+
+Task-11 case `0x211d44` sets flag `0x20` in its controller object. When
+controller substate is not 2 it forwards a separate four-byte object to task
+17. At substate 2 it passes `0x1395` through central decoder `0x210da8`;
+the decoder's `0x211346` arm immediately sees that same substate and emits a
+four-byte task-12 status-`0x13a5` object. The exact type-`0x8c` path reaches
+neither the bitmap builder, the type-`0x09` candidate-list builder nor
+`CHANNEL_CONFIGURE`. It remains a bodyless non-bitmap-context notification,
+not a claimed candidate-list acknowledgement.
+
 There is a narrower relationship to one populated type-`0x1a` request path:
 builder `0x20e9cc` reads the same byte `0x1090ff`, distinguishes values 6
 and 7, and uses that state to populate request-object bytes `0x12..0x13`

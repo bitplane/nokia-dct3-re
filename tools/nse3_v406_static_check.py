@@ -816,6 +816,58 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x21486C: ("ldr", "r0, [pc, #0x2a4]"),
     0x21486E: ("strb", "r1, [r0]"),
     0x214876: ("movs", "r0, #0"),
+    # Type 0x8c discards its received object and conditionally posts a fixed
+    # status-0x1395 object.  The gate excludes controller value 1 and current
+    # context 0x1a, but does not inspect or identify a preceding type-0x09
+    # request.
+    0x2804C0: ("push", "{r4, lr}"),
+    0x2804C2: ("bl", "#0x26069c"),
+    0x2804C6: ("ldr", "r0, [pc, #0x150]"),
+    0x2804C8: ("ldrb", "r1, [r0, #5]"),
+    0x2804CA: ("cmp", "r1, #1"),
+    0x2804CE: ("ldrb", "r0, [r0]"),
+    0x2804D0: ("cmp", "r0, #0x1a"),
+    0x2804D4: ("ldr", "r4, [pc, #0x144]"),
+    0x2804D8: ("movs", "r1, #4"),
+    0x2804DA: ("bl", "#0x276912"),
+    0x2804DE: ("movs", "r0, #0xb"),
+    0x2804E2: ("bl", "#0x25fb4c"),
+    # Task 11 status 0x1395 sets a controller flag.  Substate 2 enters the
+    # central decoder and becomes task-12 status 0x13a5; other substates
+    # forward a separate four-byte object to task 17.
+    0x211D44: ("ldr", "r0, [sp, #0x18]"),
+    0x211D46: ("movs", "r1, #4"),
+    0x211D48: ("bl", "#0x27693c"),
+    0x211D4C: ("movs", "r1, #0x20"),
+    0x211D50: ("ldrb", "r0, [r0, #0x1a]"),
+    0x211D52: ("orrs", "r1, r0"),
+    0x211D56: ("strb", "r1, [r0, #0x1a]"),
+    0x211D58: ("ldr", "r0, [sp, #0x10]"),
+    0x211D5A: ("ldrb", "r0, [r0, #0xc]"),
+    0x211D5C: ("cmp", "r0, #2"),
+    0x211D62: ("ldr", "r0, [sp, #0x14]"),
+    0x211D64: ("movs", "r1, #4"),
+    0x211D66: ("bl", "#0x27693c"),
+    0x211D6A: ("movs", "r0, #0x11"),
+    0x211D6E: ("b", "#0x211b2c"),
+    0x211ED6: ("ldr", "r0, [sp, #0x18]"),
+    0x211ED8: ("bl", "#0x210da8"),
+    0x211346: ("ldr", "r0, [pc, #0x140]"),
+    0x21134A: ("ldrb", "r0, [r0, #0xc]"),
+    0x21134C: ("cmp", "r0, #2"),
+    0x211386: ("movs", "r0, #4"),
+    0x211388: ("bl", "#0x260abc"),
+    0x21138E: ("ldr", "r0, [pc, #0x180]"),
+    0x211390: ("strh", "r0, [r4]"),
+    0x211392: ("ldr", "r0, [r5, #0x18]"),
+    0x211398: ("movs", "r0, #2"),
+    0x21139E: ("movs", "r0, #4"),
+    0x2113A2: ("movs", "r0, #2"),
+    0x2113A4: ("strb", "r0, [r4, #3]"),
+    0x2113A8: ("movs", "r1, #4"),
+    0x2113AA: ("bl", "#0x27693c"),
+    0x2113AE: ("movs", "r0, #0xc"),
+    0x2113B2: ("bl", "#0x25fb4c"),
     # The task-side ALL_RSSI_RESULTS case accepts controller state 4 only for
     # the active type-0x1a search, and also accepts states 6 and 7.
     0x21732E: ("movs", "r0, #0x6b"),
@@ -1057,7 +1109,12 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x21478A: 0x106AA4,
     0x21481E: 0x109107,
     0x21486C: 0x106B08,
+    0x2804C6: 0x1090FA,
+    0x2804D4: 0x2BCFA8,
+    0x211346: 0x10917C,
+    0x21138E: 0x13A5,
 }
+TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 CANDIDATE_LIST_REQUEST_BUILDER = 0x214788
 CANDIDATE_LIST_REQUEST_BUILDER_DIRECT_CALLS = [0x216192, 0x217210]
 TASK_11_EVENT_DECODER = 0x210DA8
@@ -2690,6 +2747,16 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{SCALAR_MEASUREMENT_TIMER_EVENT_PREFIX.hex()}, got "
             f"{scalar_timer_event_prefix.hex()}"
         )
+    type_0x8c_fixed_object = bytes(
+        cpu_byte(physical, FLASH_BASE, 0x2BCFA8 + index)
+        for index in range(len(TYPE_0X8C_FIXED_OBJECT))
+    )
+    if type_0x8c_fixed_object != TYPE_0X8C_FIXED_OBJECT:
+        raise ValueError(
+            "NSE-3 type-0x8c fixed object changed: expected "
+            f"{TYPE_0X8C_FIXED_OBJECT.hex()}, got "
+            f"{type_0x8c_fixed_object.hex()}"
+        )
     search_timer_configuration_address = (
         TIMER_CONFIGURATION_TABLE_ADDRESS
         + SEARCH_SUBMISSION_TIMER_CODE * TIMER_CONFIGURATION_RECORD_BYTES
@@ -3094,6 +3161,39 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "direct_bitmap_search_constructor": None,
                 "direct_channel_configure_constructor": None,
                 "acquisition_stage": "candidate_list_request",
+                "semantic_name_assigned": False,
+            },
+            "type_0x8c": {
+                "handler": 0x2804C0,
+                "received_object_disposition": "released_before_gates",
+                "report_body_read": False,
+                "controller_context": 0x1090FA,
+                "controller_byte": 0x1090FF,
+                "suppressed_controller_values": [1],
+                "suppressed_context_values": [0x1A],
+                "fixed_object": 0x2BCFA8,
+                "task": 11,
+                "task_status": 0x1395,
+                "task_object_bytes": 4,
+                "task_case": 0x211D44,
+                "task_case_sets_flag": {
+                    "controller_object_offset": 0x1A,
+                    "mask": 0x20,
+                },
+                "controller_substate_2_path": {
+                    "event_decoder": 0x210DA8,
+                    "event_decoder_branch": 0x211346,
+                    "task_12_status": 0x13A5,
+                    "task_12_object_bytes": 4,
+                },
+                "other_substates_path": {
+                    "destination_task": 0x11,
+                    "object_bytes": 4,
+                },
+                "direct_bitmap_search_constructor": None,
+                "direct_candidate_list_constructor": None,
+                "direct_channel_configure_constructor": None,
+                "direct_type_0x09_request_correlation": "not_established",
                 "semantic_name_assigned": False,
             },
             "task_11_event_decoder": {

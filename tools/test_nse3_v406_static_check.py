@@ -532,6 +532,36 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.RADIO_REPORT_HANDLER_ANCHORS[0x217218],
         )
 
+    def test_type_0x8c_fixed_notification_is_not_assumed_type_0x09_ack(self):
+        self.assertEqual(
+            bytes.fromhex("13950000"), check.TYPE_0X8C_FIXED_OBJECT
+        )
+        self.assertEqual(
+            0x1090FA, check.RADIO_REPORT_HANDLER_LITERALS[0x2804C6]
+        )
+        self.assertEqual(
+            0x2BCFA8, check.RADIO_REPORT_HANDLER_LITERALS[0x2804D4]
+        )
+        self.assertEqual(
+            ("cmp", "r1, #1"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2804CA],
+        )
+        self.assertEqual(
+            ("cmp", "r0, #0x1a"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2804D0],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x11"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x211D6A],
+        )
+        self.assertEqual(
+            ("bl", "#0x210da8"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x211ED8],
+        )
+        self.assertEqual(
+            0x13A5, check.RADIO_REPORT_HANDLER_LITERALS[0x21138E]
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)
