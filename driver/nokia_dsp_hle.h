@@ -20,7 +20,7 @@ public:
 	enum class bootstrap_completion_profile : u8
 	{
 		ready_words_one,
-		nse3_final_b06_second_unknown
+		nse3_flash_verification_b06_verdict_unknown
 	};
 
 	enum class bootstrap_preupload_profile : u8

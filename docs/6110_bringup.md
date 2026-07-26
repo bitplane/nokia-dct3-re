@@ -1510,7 +1510,7 @@ explicitly rejecting a whole-EEPROM migration claim.
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
 retain their three ready words of `1`; NSE-3 v4.06 selects
-`nse3_final_b06_second_unknown`. That profile publishes only the evidenced
+`nse3_flash_verification_b06_verdict_unknown`. That profile publishes only the evidenced
 `0x0b06` result at shared `0x10000` and deliberately leaves `0x10002` zero.
 Enabling its DSP service can therefore neither turn the observed 64-block
 geometry into the legacy ready-word publication nor invent a successful boot

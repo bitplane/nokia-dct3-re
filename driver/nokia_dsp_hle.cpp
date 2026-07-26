@@ -256,20 +256,23 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 							m_bootstrap_exchange_count, machine().time().as_double());
 				break;
 
-			case bootstrap_completion_profile::nse3_final_b06_second_unknown:
+			case bootstrap_completion_profile::
+					nse3_flash_verification_b06_verdict_unknown:
 				// NSE-3 v4.06 captures shared 0x000 and later requires
 				// 0x0b06.  Both v5.48 variants prove the same comparison, even
 				// though a real v5.48 handset reports fitted COBBA B07; do not
 				// assign this bootstrap result a physical-silicon meaning.
-				// The second DSP-published value remains unknown.  The exact
-				// v5.48 MCU census proves it is capture-only after the wait, but
-				// its transition away from 0xffff is still required.  Publish
-				// only the evidenced first result and leave 0x002 at the MCU's
-				// parked sentinel to prevent an invented completion event.
+				// The 64 KiB transfer is a one-halfword-per-0x20-byte sparse
+				// projection of external MCU flash, not DSP program code.  The
+				// second DSP publication is its verification verdict.  Its
+				// numeric value is capture-only after the wait, but transition
+				// away from 0xffff is required.  Publish only the evidenced
+				// first result and leave 0x002 parked to prevent an invented
+				// verification success.
 				m_transport->peer_shared_w(0x000 / 2, 0x0b06);
 				if (m_trace_enabled)
 					LOGMASKED(LOG_DSP_HLE,
-							"dsp_hle: bootstrap partial exchanges=%u first=0b06 second=unknown t=%.6f\n",
+							"dsp_hle: flash verification partial exchanges=%u first=0b06 verdict=unknown t=%.6f\n",
 							m_bootstrap_exchange_count, machine().time().as_double());
 				break;
 
