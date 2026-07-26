@@ -183,11 +183,23 @@ enabling a radio peer. Two independent v4.06 control paths allocate
 `0x48`-byte queue objects and construct DSP packet type `0x1a` with wire
 length 68, but they are not equivalent searches. The ordinary constructor at
 `0x20faec` derives and packs its search set, publishes it through task 3 and
-arms numeric timer `0x1b` with raw duration `0x09cd`; neither the timer unit
-nor its expiry meaning is assigned. The timer table gives code `0x1b` flags
+arms numeric timer `0x1b` with raw duration `0x09cd`; the timer unit remains
+unknown. The timer table gives code `0x1b` flags
 `0x03`, owner task 4 and configured value `0x000000db`, so it is specifically
-not evidence for a direct task-11/task-12 search-completion event. Its gated
-task-11 caller supplies
+not evidence for a direct task-11/task-12 search-completion event.
+
+Task 4 is the shared DSP/radio dispatcher at `0x2a20dc`, and it arms the same
+timer at task entry before any search submission. Every processed input
+increments a shared counter at `0x10c4ce`. When value `0xdb` arrives with a
+nonzero count, the task rearms `0x1b` and clears the counter; when the count
+is zero it calls `0x2962c2` with argument 1. That routine either rearms the
+same timer or, under a separate set of system-state gates, calls
+`0x2974ae`/`0x297504`; the latter feeds `(1, 0x1b)` to `0x260568` and arms
+another timer. Those gates are not radio-search state. The search constructor
+therefore refreshes task-wide activity machinery, not a search-specific
+completion timeout.
+
+Its gated task-11 caller supplies
 constructor argument 1, while the constructor can internally select argument
 6 when it obtains a bounded candidate source.
 

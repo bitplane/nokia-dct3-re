@@ -344,6 +344,32 @@ RADIO_PACKET_ANCHORS = {
     0x20D1DC: ("strb", "r7, [r0, #4]"),
     0x20D1E0: ("movs", "r0, #6"),
     0x20D1E6: ("strb", "r0, [r1, #4]"),
+    # Task 4 owns the shared DSP/radio dispatcher.  It arms timer 0x1b at
+    # task entry, counts every processed input, and treats configured value
+    # 0xdb as a task-wide activity event rather than a search completion.
+    0x2A20DC: ("push", "{r4, r5, r6, r7, lr}"),
+    0x2A20E4: ("movs", "r0, #0x1b"),
+    0x2A20E6: ("ldr", "r1, [pc, #0x160]"),
+    0x2A20E8: ("bl", "#0x25f146"),
+    0x2A20FA: ("ldrh", "r0, [r5, #2]"),
+    0x2A20FC: ("adds", "r0, #1"),
+    0x2A20FE: ("strh", "r0, [r5, #2]"),
+    0x2A2228: ("cmp", "r4, #0xdb"),
+    0x2A222E: ("ldrh", "r0, [r5, #2]"),
+    0x2A2230: ("cmp", "r0, #0"),
+    0x2A2236: ("movs", "r0, #0x1b"),
+    0x2A2238: ("ldr", "r1, [pc, #0xc]"),
+    0x2A223A: ("bl", "#0x25f146"),
+    0x2A223E: ("strh", "r7, [r5, #2]"),
+    0x2A20F2: ("movs", "r0, #1"),
+    0x2A20F4: ("bl", "#0x2962c2"),
+    0x296364: ("movs", "r0, #0x1b"),
+    0x296366: ("ldr", "r1, [pc, #0x358]"),
+    0x296368: ("bl", "#0x25f146"),
+    0x297504: ("push", "{lr}"),
+    0x297506: ("movs", "r0, #1"),
+    0x297508: ("movs", "r1, #0x1b"),
+    0x29750A: ("bl", "#0x260568"),
 }
 RADIO_PACKET_LITERALS = {
     0x211356: 0x109105,
@@ -351,6 +377,9 @@ RADIO_PACKET_LITERALS = {
     0x2174E6: 0x106B0D,
     0x217506: 0x106B0D,
     0x24E74A: 0x0445,
+    0x2A20E6: 0x09CD,
+    0x2A2238: 0x09CD,
+    0x296366: 0x09CD,
 }
 RADIO_REPORT_DISPATCH_ANCHORS = {
     # Type 0x80 is handled directly.  Types 0x83..0x8f use a bounded jump
@@ -681,6 +710,8 @@ MEASUREMENT_TIMER_EVENT_OBJECT = 0x2BE7B0
 MEASUREMENT_TIMER_EVENT_PREFIX = bytes.fromhex("13aa0000")
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
+NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
+NSE3_TASK_4_ENTRY = 0x2A20DD
 RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
 RADIO_REPORT_JUMP_TABLE = {
     0x83: 0x2A21A2,
@@ -2012,6 +2043,13 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     physical = swap16(data)
+    task_4_entry = effective_u32(
+        physical, NSE3_TASK_4_ENTRY_POINTER - FLASH_BASE)
+    if task_4_entry != NSE3_TASK_4_ENTRY:
+        raise ValueError(
+            "NSE-3 task-4 entry changed: expected "
+            f"{NSE3_TASK_4_ENTRY:#x}, got {task_4_entry!r}"
+        )
     task_9_entry = effective_u32(
         physical, NSE3_TASK_9_ENTRY_POINTER - FLASH_BASE)
     if task_9_entry != NSE3_TASK_9_ENTRY:
@@ -2113,7 +2151,18 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                         "configured_value": int.from_bytes(
                             search_timer_configuration[4:8], "big"
                         ),
-                        "expiry_semantics": "not_established",
+                        "owner_entry": task_4_entry,
+                        "task_entry_also_arms_timer": True,
+                        "processed_input_counter": 0x10C4CE,
+                        "configured_value_case": 0x2A2228,
+                        "when_activity_nonzero":
+                            "rearm_and_clear_shared_counter",
+                        "when_activity_zero": {
+                            "routine": 0x2962C2,
+                            "argument": 1,
+                        },
+                        "search_specific": False,
+                        "semantic_name": "not_assigned",
                     },
                 },
                 "zero_bitmap_control": {

@@ -293,6 +293,11 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             bytes.fromhex("03040000000000db"),
             check.SEARCH_SUBMISSION_TIMER_CONFIGURATION,
         )
+        self.assertEqual(0x2B74E0, check.NSE3_TASK_4_ENTRY_POINTER)
+        self.assertEqual(0x2A20DD, check.NSE3_TASK_4_ENTRY)
+        self.assertEqual(
+            ("cmp", "r4, #0xdb"), check.RADIO_PACKET_ANCHORS[0x2A2228]
+        )
 
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
