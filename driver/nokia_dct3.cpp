@@ -278,9 +278,10 @@ constexpr nokia_product_config make_6110_config()
 	// retain their disabled defaults until an identified NSE-3 ROM is traced.
 	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
 	// transfer geometry rather than evidence for the HLE peer's completion
-	// counter. A later firmware path compares captured shared word 0x10000
-	// against 0x0b06, so the generic HLE ready value 1 is demonstrably not a
-	// compatible NSE-3 result. Keep the peer disabled pending full semantics.
+	// counter. NSE-3 projects captured shared word 0x10000 as COBBA identity
+	// B06 and a later path compares it against 0x0b06, so the generic HLE ready
+	// value 1 is demonstrably incompatible. Keep the peer disabled pending the
+	// full DSP-side publication semantics.
 	result.cobba_pcm.data_clock = 1'000'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	result.cobba_pcm.sample_bits = 13;

@@ -137,17 +137,30 @@ guessing through a missing peer.
 
 The post-transfer results are no longer completely unconstrained. After the
 final non-zero wait, the routine copies shared `0x10000` to SRAM `0x10b97a`
-and shared `0x10002` to `0x10b97c`. One diagnostic path formats the first
-captured word nibblewise as `B06`; a separate later path compares it against
-exactly `0x0b06` and branches away when it differs. The verifier pins the sole
-direct bootstrap call at `0x2973f0`, both result captures, the formatter and
-the exact comparison. This proves that publishing the generic HLE ready word
-`0x0001` cannot satisfy all NSE-3 firmware paths. No equivalent value
-constraint has yet been recovered for the captured `0x10002` word.
+and shared `0x10002` to `0x10b97c`. The service-response handler passes request
+byte 9 unchanged to its information formatter. Selector `0x0d` formats the
+first captured word nibblewise as `B06`; adjacent selector `0x0c` reads MAD2's
+ASIC-version byte at `0x20000`. This pairing independently agrees with the
+documented Nokia 6110 service commands `0xc8/0x0d Get COBBA` and
+`0xc8/0x0c Get system ASIC` in the
+[Gammu Nokia 6110 protocol reference](https://docs.gammu.org/protocol/n6110.html).
+The defensible MCU-side meaning is therefore **COBBA identification B06**, not
+“DSP ready” or “DSP software B06”.
+
+A separate later path compares that captured COBBA word against exactly
+`0x0b06` and branches away when it differs. The verifier pins the sole direct
+bootstrap call at `0x2973f0`, both result captures, selector pass-through,
+adjacent ASIC query, formatter and exact comparison. It also exhaustively
+censuses direct literals: `0x10b97a` has only the formatter and comparison
+references, while `0x10b97c` has none. Indirect/table-mediated use remains
+outside that negative result, so the second word is still unconstrained.
+Publishing the generic HLE ready word `0x0001` cannot satisfy all NSE-3
+firmware paths.
 
 This remains deliberately MCU-side evidence. We do not yet know whether the
-staged stream is DSP code, its DSP-side destination, what non-zero response
-values mean beyond that exact comparison, or what publishes the final words.
+staged stream is DSP code, its DSP-side destination, how the DSP derives or
+publishes the COBBA identity, what the second captured word represents, or
+what the intermediate non-zero acknowledgements mean.
 The matching internal DSP image is absent. In particular, “64 transfer blocks”
 is not interchangeable with the existing HLE peer's product-configured
 completion counter: that counter embeds response policy, while this gate

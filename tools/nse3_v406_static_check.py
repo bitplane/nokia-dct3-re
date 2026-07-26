@@ -207,6 +207,28 @@ DSP_BOOTSTRAP_RESULT_LITERALS = {
     0x298E82: 0x10B97A,
     0x298E86: 0x0B06,
 }
+COBBA_ID_SERVICE_ANCHORS = {
+    # The service handler passes request byte 9 through as formatter selector.
+    0x2382E4: ("ldrb", "r0, [r4, #9]"),
+    0x2382E6: ("adds", "r1, r5, #0"),
+    0x2382E8: ("movs", "r2, #0x32"),
+    0x2382EA: ("bl", "#0x28e8f6"),
+    0x238312: ("ldrb", "r1, [r4, #9]"),
+    0x238314: ("strb", "r1, [r0, #9]"),
+    # Formatter dispatch reaches the captured-word branch at selector 0x0d.
+    0x28E93C: ("movs", "r0, #0xb"),
+    0x28E93E: ("subs", "r0, r7, r0"),
+    0x28E944: ("subs", "r0, #1"),
+    0x28E948: ("beq", "#0x28e9a0"),
+    0x28E94A: ("subs", "r0, #1"),
+    0x28E94E: ("beq", "#0x28e976"),
+    # Adjacent selector 0x0c reads MAD2's ASIC-version byte.
+    0x28E9A0: ("ldr", "r0, [pc, #0x334]"),
+    0x28E9A2: ("ldrb", "r2, [r0]"),
+}
+COBBA_ID_SERVICE_LITERALS = {
+    0x28E9A0: 0x20000,
+}
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -426,10 +448,13 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, DSP_BOOTSTRAP_LITERALS)
     decode_thumb_anchors(data, DSP_BOOTSTRAP_RESULT_ANCHORS)
     verify_thumb_literals(data, DSP_BOOTSTRAP_RESULT_LITERALS)
+    decode_thumb_anchors(data, COBBA_ID_SERVICE_ANCHORS)
+    verify_thumb_literals(data, COBBA_ID_SERVICE_LITERALS)
     physical = swap16(data)
+    instructions = decode_image(physical, FLASH_BASE)
     direct_callers = [
         insn.address
-        for insn in decode_image(physical, FLASH_BASE)
+        for insn in instructions
         if insn
         and insn.mnemonic in ("bl", "blx")
         and immediate_target(insn) == 0x2858FC
@@ -438,6 +463,23 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
         raise ValueError(
             "NSE-3 DSP bootstrap direct callers changed: expected "
             f"[0x2973f0], got {[hex(address) for address in direct_callers]}"
+        )
+    result_literal_references = {
+        address: [
+            insn.address
+            for insn in instructions
+            if insn and literal_value(insn, physical, FLASH_BASE) == address
+        ]
+        for address in (0x10B97A, 0x10B97C)
+    }
+    expected_result_references = {
+        0x10B97A: [0x28E976, 0x298E82],
+        0x10B97C: [],
+    }
+    if result_literal_references != expected_result_references:
+        raise ValueError(
+            "NSE-3 DSP result literal references changed: expected "
+            f"{expected_result_references}, got {result_literal_references}"
         )
     stream = extract_dsp_bootstrap_stream(data)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
@@ -477,17 +519,24 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
             "direct_callers": direct_callers,
             "shared_0x10000": {
                 "storage": 0x10B97A,
+                "direct_literal_references": result_literal_references[0x10B97A],
                 "exact_comparison": 0x0B06,
                 "comparison_pc": 0x298E88,
-                "diagnostic_render": "B06",
+                "service_render": "B06",
                 "render_pc": 0x28E976,
             },
             "shared_0x10002": {
                 "storage": 0x10B97C,
+                "direct_literal_references": result_literal_references[0x10B97C],
                 "value_constraint": "not_established",
             },
             "current_hle_ready_0x0001_satisfies_comparison": False,
-            "word_meaning": "not_established",
+            "service_projection": {
+                "selector": 0x0D,
+                "role": "COBBA identification",
+                "corroboration": "Nokia 6110 service protocol: 0xc8/0x0d Get COBBA",
+                "dsp_side_meaning": "not_established",
+            },
         },
         "claims": {
             "stream_is_dsp_code": "not_established",
