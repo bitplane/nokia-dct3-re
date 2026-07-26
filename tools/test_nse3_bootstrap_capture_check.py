@@ -1,6 +1,10 @@
 import unittest
 
-from tools.nse3_bootstrap_capture_check import ROM3_V548_SHA1, verify
+from tools.nse3_bootstrap_capture_check import (
+    ROM3_V548_SHA1,
+    ROM4_V548_SHA1,
+    verify,
+)
 
 
 def good_capture():
@@ -50,6 +54,29 @@ class Nse3BootstrapCaptureCheckTest(unittest.TestCase):
         capture = good_capture()
         capture["firmware"]["sha1"] = "00" * 20
         with self.assertRaisesRegex(ValueError, "pinned NSE-3"):
+            verify(capture)
+
+    def test_accepts_observed_rom4_pair_without_presuming_its_value(self):
+        capture = good_capture()
+        capture["firmware"] = {
+            "variant": "v5.48-rom4-ppmb",
+            "sha1": ROM4_V548_SHA1,
+        }
+        capture["events"][3]["value"] = 4
+        capture["events"][4]["value"] = 4
+        result = verify(capture)
+        self.assertEqual([4, 4], result["preupload_pair"])
+        self.assertEqual("v5.48-rom4-ppmb", result["firmware_variant"])
+
+    def test_rejects_presumed_unequal_rom4_pair(self):
+        capture = good_capture()
+        capture["firmware"] = {
+            "variant": "v5.48-rom4-ppmb",
+            "sha1": ROM4_V548_SHA1,
+        }
+        capture["events"][3]["value"] = 4
+        capture["events"][4]["value"] = 3
+        with self.assertRaisesRegex(ValueError, "equal single-digit"):
             verify(capture)
 
     def test_rejects_missing_exchange(self):

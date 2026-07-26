@@ -1417,6 +1417,16 @@ into a working-handshake claim.
 strict hardware-capture contract. Its validator pins the exact ROM3 firmware,
 the ordered `3/3` pre-upload exchange, all 64 acknowledgements, final `0x0b06`
 publication and non-sentinel verdict, and rejects HLE or patched completion.
+It also accepts the exact ROM4 image while requiring its equal single-digit
+pair to be observed rather than inferred from the package label.
+
+A historical real-handset mismatch report independently quotes the firmware
+UI as `USE SW FOR DSP ROM 4` after incompatible software was flashed
+([Elektroda report](https://www.elektroda.pl/rtvforum/topic899678.html)).
+This corroborates that the displayed pre-upload token is a physical DSP-ROM
+compatibility identity. It does not identify both publications for either
+local image or recover the later verification verdict, so it does not justify
+an automatic ROM4 `4/4` profile.
 
 An independent implementation now provides a useful negative comparison.
 [`djr-747/nokia-dct3-emulator`](https://github.com/djr-747/nokia-dct3-emulator)

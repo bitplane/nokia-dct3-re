@@ -10,6 +10,18 @@ from pathlib import Path
 
 
 ROM3_V548_SHA1 = "5768841c9eb39c744f4fa04f0485e4f9ad4553b3"
+ROM4_V548_SHA1 = "3bcc5c93ec247c63490e134196aab98a4e60c184"
+
+FIRMWARE_VARIANTS = {
+    "v5.48-rom3-ppmb": {
+        "sha1": ROM3_V548_SHA1,
+        "identified_pair": 3,
+    },
+    "v5.48-rom4-ppmb": {
+        "sha1": ROM4_V548_SHA1,
+        "identified_pair": None,
+    },
+}
 
 
 def verify(document: dict) -> dict:
@@ -19,10 +31,12 @@ def verify(document: dict) -> dict:
         raise ValueError("capture is not identified as Nokia 6110 NSE-3")
 
     firmware = document.get("firmware", {})
-    if firmware.get("sha1") != ROM3_V548_SHA1:
-        raise ValueError("capture does not use the pinned NSE-3 v5.48 ROM3 image")
-    if firmware.get("variant") != "v5.48-rom3-ppmb":
-        raise ValueError("capture firmware variant is not v5.48 ROM3 PPM B")
+    variant = firmware.get("variant")
+    if variant not in FIRMWARE_VARIANTS:
+        raise ValueError("capture firmware variant is not a pinned NSE-3 v5.48 image")
+    variant_profile = FIRMWARE_VARIANTS[variant]
+    if firmware.get("sha1") != variant_profile["sha1"]:
+        raise ValueError("capture does not use the pinned NSE-3 firmware image")
 
     source = document.get("source", {})
     if source.get("kind") != "real_handset":
@@ -48,15 +62,36 @@ def verify(document: dict) -> dict:
         {"owner": "mcu", "action": "write", "offset": 0x002, "value": 0xFFFF},
         {"owner": "mcu", "action": "write", "offset": 0x004, "value": 0xFFFF},
         {"owner": "mcu", "action": "write", "offset": 0x006, "value": 0xFFFF},
-        {"owner": "dsp", "action": "write", "offset": 0x004, "value": 3},
-        {"owner": "dsp", "action": "write", "offset": 0x006, "value": 3},
     ]
     normalized = [
         {key: event.get(key) for key in ("owner", "action", "offset", "value")}
         for event in events
     ]
     if normalized[: len(expected_prefix)] != expected_prefix:
-        raise ValueError("capture does not prove the ordered ROM3 3/3 pre-upload exchange")
+        raise ValueError("capture does not prove the ordered pre-upload sentinels")
+    pair_events = normalized[len(expected_prefix):len(expected_prefix) + 2]
+    if (
+        len(pair_events) != 2
+        or pair_events[0].get("owner") != "dsp"
+        or pair_events[0].get("action") != "write"
+        or pair_events[0].get("offset") != 0x004
+        or pair_events[1].get("owner") != "dsp"
+        or pair_events[1].get("action") != "write"
+        or pair_events[1].get("offset") != 0x006
+    ):
+        raise ValueError("capture does not prove the ordered DSP pre-upload pair")
+    preupload_pair = [event.get("value") for event in pair_events]
+    if (
+        not all(isinstance(value, int) and 0 <= value < 10 for value in preupload_pair)
+        or preupload_pair[0] != preupload_pair[1]
+    ):
+        raise ValueError("DSP pre-upload pair must be equal single-digit values")
+    identified_pair = variant_profile["identified_pair"]
+    if identified_pair is not None and preupload_pair != [identified_pair] * 2:
+        raise ValueError(
+            f"{variant} requires the independently identified "
+            f"{identified_pair}/{identified_pair} pair"
+        )
 
     acknowledgements = [
         event for event in events
@@ -92,8 +127,9 @@ def verify(document: dict) -> dict:
         raise ValueError("final DSP publications precede completion of the 64 exchanges")
 
     return {
-        "firmware_sha1": ROM3_V548_SHA1,
-        "preupload_pair": [3, 3],
+        "firmware_variant": variant,
+        "firmware_sha1": variant_profile["sha1"],
+        "preupload_pair": preupload_pair,
         "exchange_count": 64,
         "first_result": 0x0B06,
         "verification_verdict": verdict,
@@ -119,8 +155,9 @@ def main() -> int:
     except ValueError as error:
         raise SystemExit(str(error)) from None
     print(
-        "NSE-3 ROM3 hardware bootstrap: "
-        f"pair=3/3 exchanges={result['exchange_count']} "
+        "NSE-3 hardware bootstrap: "
+        f"variant={result['firmware_variant']} "
+        f"pair={result['preupload_pair'][0]}/{result['preupload_pair'][1]} "
         f"first={result['first_result']:04x} "
         f"verdict={result['verification_verdict']:04x}"
     )
