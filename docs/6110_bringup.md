@@ -278,6 +278,24 @@ report multiplexer: object byte 4 admits distinct values `0x40`, `0x50`,
 as a big-endian 24-bit value at `0x109078`, but only discriminator `0x40`
 reaches the status-`0x139e` controller branch.
 
+The complete direct route table is:
+
+| Byte 4 | Direct handler route |
+|---:|---|
+| `0x40` | Controller flags select release, timer-`0x1b` cancellation, task-11 status `0x138e`, or task-12 status `0x139e`. |
+| `0x50` | Calls controller helper `0x28000c`; later mismatch handling can post status `0x13c8` to task 13. |
+| `0x60` | Runs timing validation at `0x2801a0`; an accepted path posts status `0x040b` to task 14, while one gated form is first rewritten to `0x50`. |
+| `0x70` | Builds an eight-byte status-`0x13d0` object for task 12, then calls follow-up `0x27fdc4`. |
+| `0x80` | Preserves a `0x28`-byte object as status `0x040b` for task 14. |
+| `0xa0` | Preserves a `0x28`-byte status-`0x043b` object and passes it to service helper `0x279b72`, which selects service `0x13`. |
+| `0xb0`, `0xb1` | Report byte 6 equal to 1 is released; other values share the status-`0x040b` task-14 route. |
+
+Across the complete handler extent, none of these arms directly calls
+`CHANNEL_CONFIGURE`, the type-`0x1a` bitmap builder or the type-`0x09`
+candidate-list builder. Their numeric statuses and first consumers are
+therefore preserved without treating them as parallel acquisition
+terminals.
+
 That branch first applies flags in controller object `0x1090fc`, clearing
 mask `0x0a000000`. Depending on the remaining flags and controller state it
 can release the report, cancel timer `0x1b`, or forward status `0x138e` to

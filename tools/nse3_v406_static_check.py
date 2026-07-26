@@ -1188,6 +1188,56 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x280122: ("subs", "r1, #0x20"),
     0x280128: ("subs", "r1, #0x10"),
     0x28012A: ("cmp", "r1, #1"),
+    # The other discriminator arms remain distinct from candidate status
+    # 0x139e: 0xa0 uses service helper 0x279b72; 0x80 and accepted 0xb0/0xb1
+    # post status 0x040b to task 14; 0x70 posts compact status 0x13d0 to task
+    # 12; 0x60 enters a timing-validation path; and 0x50 calls 0x28000c
+    # before a possible status-0x13c8 task-13 publication.
+    0x28013A: ("cmp", "r0, #1"),
+    0x280140: ("ldr", "r0, [pc, #0x3a8]"),
+    0x280142: ("strh", "r0, [r4]"),
+    0x280146: ("movs", "r1, #0x28"),
+    0x280148: ("bl", "#0x276912"),
+    0x28014E: ("bl", "#0x279b72"),
+    0x279B72: ("push", "{lr}"),
+    0x279B74: ("adds", "r1, r0, #0"),
+    0x279B76: ("movs", "r0, #0x13"),
+    0x279B78: ("bl", "#0x25fc98"),
+    0x280154: ("ldr", "r0, [pc, #0x15c]"),
+    0x280156: ("strh", "r0, [r4]"),
+    0x280158: ("ldrb", "r0, [r4, #4]"),
+    0x28015A: ("strb", "r0, [r4, #0xb]"),
+    0x28015C: ("ldrb", "r0, [r4, #6]"),
+    0x28015E: ("strb", "r0, [r4, #0xc]"),
+    0x280162: ("movs", "r1, #0x28"),
+    0x280164: ("bl", "#0x276912"),
+    0x280168: ("movs", "r0, #0xe"),
+    0x28016C: ("movs", "r0, #8"),
+    0x28016E: ("bl", "#0x260abc"),
+    0x280174: ("ldr", "r0, [pc, #0x378]"),
+    0x280176: ("strh", "r0, [r5]"),
+    0x280186: ("str", "r0, [r5, #4]"),
+    0x28018A: ("movs", "r1, #8"),
+    0x28018C: ("bl", "#0x276912"),
+    0x280190: ("movs", "r0, #0xc"),
+    0x280194: ("bl", "#0x25fb4c"),
+    0x280198: ("adds", "r0, r4, #0"),
+    0x28019A: ("bl", "#0x27fdc4"),
+    0x2801A0: ("ldrb", "r1, [r4, #8]"),
+    0x2801AE: ("mov", "r8, r0"),
+    0x280234: ("ldrb", "r0, [r5, #0xa]"),
+    0x280236: ("cmp", "r0, #0x1a"),
+    0x280266: ("ldr", "r0, [pc, #0x4c]"),
+    0x280268: ("strh", "r0, [r4]"),
+    0x280284: ("adds", "r0, r4, #0"),
+    0x280286: ("movs", "r1, #0x28"),
+    0x280288: ("bl", "#0x276912"),
+    0x28028C: ("movs", "r0, #0xe"),
+    0x280290: ("bl", "#0x25fb4c"),
+    0x2802B8: ("bl", "#0x28000c"),
+    0x2802D8: ("ldr", "r0, [pc, #0x31c]"),
+    0x2802DA: ("strh", "r0, [r4]"),
+    0x2802DC: ("movs", "r0, #0xd"),
     # Discriminator 0x40 alone reaches this controller branch.  Its flag
     # gates either discard, post status 0x138e, cancel timer 0x1b, or build
     # the status-0x139e object below.
@@ -1284,6 +1334,11 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x2800D0: 0x1090FC,
     0x2802EC: 0xF5FFFFFF,
     0x28035C: 0x138E,
+    0x280140: 0x043B,
+    0x280154: 0x040B,
+    0x280174: 0x13D0,
+    0x280266: 0x040B,
+    0x2802D8: 0x13C8,
     0x21741A: 0x106B08,
     0x217422: 0x106AF6,
     0x2171CE: 0x106B0D,
@@ -1512,6 +1567,49 @@ RA_INFO_TIMER_QUERY_CALLS = []
 TYPE_0X80_CANDIDATE_UPDATER = 0x2124A8
 TYPE_0X80_CANDIDATE_UPDATER_DIRECT_CALLS = [0x2126F0, 0x217436]
 TYPE_0X80_CANDIDATE_UPDATER_CODE_END = 0x21268A
+TYPE_0X80_DISCRIMINATOR_ROUTES = {
+    0x40: {
+        "principal_status": 0x139E,
+        "principal_task": 12,
+        "alternates": ["release", "timer_0x1b_cancel", "status_0x138e_task_11"],
+    },
+    0x50: {
+        "helper": 0x28000C,
+        "alternate_status": 0x13C8,
+        "alternate_task": 13,
+    },
+    0x60: {
+        "timing_validation": 0x2801A0,
+        "accepted_status": 0x040B,
+        "accepted_task": 14,
+        "can_rewrite_to": 0x50,
+    },
+    0x70: {
+        "status": 0x13D0,
+        "task": 12,
+        "object_bytes": 8,
+        "followup": 0x27FDC4,
+    },
+    0x80: {
+        "status": 0x040B,
+        "task": 14,
+        "object_bytes": 0x28,
+    },
+    0xA0: {
+        "status": 0x043B,
+        "object_bytes": 0x28,
+        "service_helper": 0x279B72,
+        "service_id": 0x13,
+    },
+    0xB0: {
+        "report_byte_6_equal_1": "release",
+        "otherwise": "status_0x040b_task_14",
+    },
+    0xB1: {
+        "report_byte_6_equal_1": "release",
+        "otherwise": "status_0x040b_task_14",
+    },
+}
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -2938,6 +3036,26 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 type-0x80 candidate updater acquired a direct request "
             f"edge: {type_0x80_updater_request_calls}"
         )
+    type_0x80_handler_request_calls = {
+        name: [
+            insn.address
+            for insn in instructions
+            if insn
+            and 0x2800B0 <= insn.address < 0x280394
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+        ]
+        for name, target in (
+            ("channel_configure", 0x20CFFA),
+            ("bitmap_search", 0x20FAEC),
+            ("candidate_list", 0x214788),
+        )
+    }
+    if any(type_0x80_handler_request_calls.values()):
+        raise ValueError(
+            "NSE-3 type-0x80 handler acquired a direct radio request edge: "
+            f"{type_0x80_handler_request_calls}"
+        )
     task_17_entry = effective_u32(
         physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
     )
@@ -3460,6 +3578,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     0x40, 0x50, 0x60, 0x70,
                     0x80, 0xA0, 0xB0, 0xB1,
                 ],
+                "discriminator_routes": TYPE_0X80_DISCRIMINATOR_ROUTES,
                 "discriminator_0x60_can_rewrite_to": 0x50,
                 "shared_value_24_be_offsets": [7, 8, 9],
                 "shared_value_24_cell": 0x109078,
@@ -3515,6 +3634,8 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                         type_0x80_updater_request_calls,
                 },
                 "direct_acquisition_terminal": False,
+                "direct_radio_request_calls":
+                    type_0x80_handler_request_calls,
                 "semantic_name_assigned": False,
             },
             "type_0x84": {

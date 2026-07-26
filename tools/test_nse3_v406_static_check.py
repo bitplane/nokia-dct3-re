@@ -323,6 +323,33 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(
             0x106D3C, check.RADIO_REPORT_HANDLER_LITERALS[0x2124F0]
         )
+        self.assertEqual(
+            [0x40, 0x50, 0x60, 0x70, 0x80, 0xA0, 0xB0, 0xB1],
+            sorted(check.TYPE_0X80_DISCRIMINATOR_ROUTES),
+        )
+        self.assertEqual(
+            0x13D0,
+            check.TYPE_0X80_DISCRIMINATOR_ROUTES[0x70]["status"],
+        )
+        self.assertEqual(
+            0x279B72,
+            check.TYPE_0X80_DISCRIMINATOR_ROUTES[0xA0][
+                "service_helper"
+            ],
+        )
+        self.assertEqual(
+            "release",
+            check.TYPE_0X80_DISCRIMINATOR_ROUTES[0xB1][
+                "report_byte_6_equal_1"
+            ],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x13"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x279B76],
+        )
+        self.assertEqual(
+            0x13C8, check.RADIO_REPORT_HANDLER_LITERALS[0x2802D8]
+        )
 
     def test_bitmap_constructors_keep_populated_and_zero_control_forms_distinct(self):
         self.assertEqual(0x09CD, check.RADIO_PACKET_LITERALS[0x20FD94])
