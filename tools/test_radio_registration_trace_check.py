@@ -34,6 +34,17 @@ NHM5_GOOD = GOOD.replace(
 ).replace(
     "data=041202000000001a600000010000000f00000000",
     "data=041202000000001a600000580000000f00000000",
+).replace(
+    "dsp_hle: TX packet type=0c payload=8 words=5 radio_phase=random_access "
+    "data=0000096b00000000",
+    "dsp_hle: TX packet type=0c payload=8 words=5 radio_phase=random_access "
+    "data=0000096b00000000\n"
+    "dsp_hle: TX packet type=02 payload=20 radio_phase=assigned_channel_change\n"
+    "dspif_transport: RX enqueue type=89 payload=8 data=0100000000000000",
+).replace(
+    "dsp_hle: radio peer RX type=89 sequence=53",
+    "dspif_transport: RX enqueue type=89 payload=8 data=0000000000000000\n"
+    "dsp_hle: radio peer RX type=89 sequence=53",
 )
 
 
@@ -49,6 +60,24 @@ class RegistrationTraceCheckTest(unittest.TestCase):
             verify(NHM5_GOOD.replace(
                 "data=041202000000001a600000580000000f00000000",
                 "data=041202000000001a600000010000000f00000000",
+            ), "nhm5")
+
+    def test_nhm5_rejects_assignment_value_zero(self):
+        with self.assertRaisesRegex(ValueError, "assigned-channel confirmation"):
+            verify(NHM5_GOOD.replace(
+                "data=0100000000000000",
+                "data=0000000000000000",
+                1,
+            ), "nhm5")
+
+    def test_nhm5_rejects_release_value_one(self):
+        marker = "data=0000000000000000\n" \
+            "dsp_hle: radio peer RX type=89 sequence=53"
+        with self.assertRaisesRegex(ValueError, "release-channel confirmation"):
+            verify(NHM5_GOOD.replace(
+                marker,
+                "data=0100000000000000\n"
+                "dsp_hle: radio peer RX type=89 sequence=53",
             ), "nhm5")
 
     def test_rejects_retry(self):

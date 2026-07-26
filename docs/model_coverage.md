@@ -125,6 +125,11 @@ that complete ordered lifecycle, exactly one request, SIM persistence and
 steady post-release camp. No firmware state, internal message or synthetic
 uplink payload is injected.
 
+The release transaction has the complementary recovered context
+`0x0409/01/00` and therefore requires confirmation value zero. The NHM-5
+registration gate checks both correlations; value one is not treated as a
+generic success flag.
+
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
 `0x2a7baa` with payload `03 05 00 00`; it is a terminal/control publication,

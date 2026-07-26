@@ -194,7 +194,7 @@ activated the synthetic EEPROM's unmodeled network-lock policy and displayed
 | RX `0x83` | serving-channel level | correlated RSSI between paced BCCH blocks |
 | RX `0x84` | RA_INFO | timing input used by the access controller |
 | RX `0x87` | NO_BCCH_LEFT | finite search terminal only when no usable cell remains |
-| RX `0x89` | CHANNEL_CHANGED_CNF | response to an organic channel-configure request; NHM-5 correlates body bit 0 with its pending context and requires success value one |
+| RX `0x89` | CHANNEL_CHANGED_CNF | response to an organic channel-configure request; NHM-5 correlates body bit 0 with its pending context: assigned SDCCH requires one and release requires zero |
 | RX `0x8c` | IDLE_RA completion | completes receiver/random-access configuration |
 | RX `0x8f` | NO_PSW_LEFT | closes the initial power-scan work list |
 | MCU `0x0c` | IDLE_RA/random access | form 0 carries the CHANNEL REQUEST octet |
@@ -232,6 +232,9 @@ transition. An NSE-8-compatible all-zero body is therefore not a generic
 success response: NHM-5 discards it and continues returning UI/fill frames.
 The product-typed peer supplies value one, after which the ROM itself exposes
 the same standards-shaped Location Updating lifecycle and updates `EF_LOCI`.
+The later release context is independently `0x0409/01/00`; its confirmation
+therefore carries zero. A fixed “success=one” interpretation is invalid even
+within NHM-5 and leaves the release confirmation rejected.
 
 After registration, channel `0x50` continues to carry BCCH while channel
 `0x60` carries the decoded PCH/AGCH blocks already associated with the

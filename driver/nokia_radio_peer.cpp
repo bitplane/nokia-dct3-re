@@ -1311,10 +1311,10 @@ void nokia_radio_peer_device::emit_report()
 			m_protocol_profile == protocol_profile::nhm5_candidate_list)
 	{
 		// NHM-5's CHANNEL_CHANGED_CNF consumer correlates payload bit 0 with
-		// the pending RR channel-change context.  A completed change carries
-		// success value one; an all-zero NSE-8-style payload is discarded
-		// before the assigned-channel state can arm LAPDm.
-		payload[0] = 0x01;
+		// the pending RR channel-change context.  Assignment carries value one
+		// while release carries zero; treating one as a generic success leaves
+		// the ROM in dedicated RR state after physical deconfiguration.
+		payload[0] = m_phase == phase::release_channel_change ? 0x00 : 0x01;
 	}
 
 	if (report_type == 0x84 && m_phase == phase::random_access)

@@ -84,6 +84,24 @@ def verify(text: str, profile: str = "nse8") -> None:
     if len(requests) != 1:
         raise ValueError(f"expected one Location Updating Request, observed {len(requests)}")
 
+    if profile == "nhm5":
+        assigned_confirmation = re.search(
+            r"radio_phase=assigned_channel_change[^\n]*"
+            r"(?:\n.*)*?RX enqueue type=89 payload=8 .*data=0100000000000000",
+            text,
+        )
+        if not assigned_confirmation:
+            raise ValueError(
+                "missing NHM-5 assigned-channel confirmation value one")
+        release_confirmation = re.search(
+            r"radio_phase=release_channel_change[^\n]*"
+            r"(?:\n.*)*?RX enqueue type=89 payload=8 .*data=0000000000000000",
+            text,
+        )
+        if not release_confirmation:
+            raise ValueError(
+                "missing NHM-5 release-channel confirmation value zero")
+
     release = text.find("radio_phase=release_channel_change")
     steady_bcch = len(re.findall(
         r"RX enqueue type=80 payload=34 .*data=50", text[release:]))
