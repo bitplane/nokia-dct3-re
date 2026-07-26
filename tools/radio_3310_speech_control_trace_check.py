@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify NHM-5's firmware-owned speech request without claiming a PCM link."""
+"""Verify NHM-5's firmware-owned speech request without claiming a PCM bus."""
 
 import pathlib
 import re
@@ -34,7 +34,7 @@ def verify(text: str) -> None:
 
     if "dsp_hle: speech tick" in text:
         raise ValueError(
-            "NHM-5 produced speech despite its unsupported PCM profile")
+            "NHM-5 produced speech despite its unresolved PCM bus timing")
 
 
 def main() -> int:
@@ -47,8 +47,8 @@ def main() -> int:
         print(error, file=sys.stderr)
         return 1
     print(
-        "OK - NHM-5 requested and released speech while its unproved PCM "
-        "profile carried no media")
+        "OK - NHM-5 requested and released speech while its unresolved PCM "
+        "bus timing carried no media")
     return 0
 
 

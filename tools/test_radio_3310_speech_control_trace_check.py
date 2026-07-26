@@ -21,7 +21,7 @@ class Radio3310SpeechControlTraceCheckTest(unittest.TestCase):
             verify(TRACE.rsplit("\n", 2)[0])
 
     def test_rejects_unproved_media(self):
-        with self.assertRaisesRegex(ValueError, "unsupported PCM profile"):
+        with self.assertRaisesRegex(ValueError, "unresolved PCM bus timing"):
             verify(TRACE + "dsp_hle: speech tick uplink=1 downlink=0\n")
 
 

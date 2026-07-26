@@ -122,6 +122,24 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("set_hle_voice_profile(", phone)
         self.assertIn("set_pcm_sample_bits(product.cobba_pcm.sample_bits)", phone)
 
+    def test_nhm5_topology_does_not_import_nse8_pcm_or_gains(self):
+        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        nhm5 = phone[
+            phone.index("constexpr nokia_product_config make_3310_config()"):
+            phone.index("constexpr nokia_product_config make_3330_config()")
+        ]
+        self.assertIn(
+            "cobba_hle_voice.microphone = nokia_cobba_device::mic2", nhm5
+        )
+        self.assertIn(
+            "cobba_hle_voice.output = nokia_cobba_device::ear", nhm5
+        )
+        self.assertNotIn("cobba_pcm.data_clock", nhm5)
+        self.assertNotIn("cobba_pcm.frame_clock", nhm5)
+        self.assertNotIn("cobba_pcm.sample_bits", nhm5)
+        self.assertNotIn("microphone_gain_db", nhm5)
+        self.assertNotIn("output_gain_db", nhm5)
+
     def test_audio_profiles_are_grouped_and_configuration_only(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         pcm = (ROOT / "driver/nokia_mad2_pcm.h").read_text()

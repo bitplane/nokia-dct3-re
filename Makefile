@@ -754,7 +754,7 @@ verify-3310-radio-incoming-call-lifecycle:
 		$(RUN_DIR)/error.log --ended
 	$(PYTHON) tools/radio_3310_speech_control_trace_check.py \
 		$(RUN_DIR)/error.log
-	@echo "OK — NHM-5 call control returned to idle; speech control remained bounded by its unknown PCM profile"
+	@echo "OK — NHM-5 call control returned to idle; speech control remained bounded by unresolved PCM bus timing"
 
 verify-radio-incoming-call:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=36 \

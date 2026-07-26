@@ -338,6 +338,21 @@ values and GSM-codec-domain samples as interchangeable. Generic COBBA and MAD2
 defaults remain unconfigured. Paired firmware proves the combined
 command-`0x08` speech-path
 field `0x0201`, but not the individual physical meaning of bits 0 and 9.
+
+NHM-5 is kept separate from that NSE-8 bus profile. Nokia's *NHM-5NX System
+Module* timing chart establishes an 8 kHz frame and a 16-bit serial word whose
+bits 15--13 sign-extend a 13-bit linear sample. Its extracted copy does not
+preserve the master-clock/divider numerals, so no data clock is configured yet.
+The independent Nokia *COBBA NHM-5/UB 4 V09* schematic, version 2.0
+(04.05.2001), does preserve the physical analogue nets: the built-in microphone
+pads feed MIC2P/MIC2N through L402 and the receiver uses EARP/EARN. The typed
+NHM-5 profile records those endpoint selections but deliberately leaves PCM
+timing and analogue gains unset.
+Primary references: Nokia's
+[NHM-5NX System Module](https://www.eserviceinfo.com/preview_html.php?fileid=26109&previewid=12728)
+and
+[NHM-5/UB 4 V09 schematic](https://emoc.org/materiel/telephone_mobile_nokia_3310/3310_schematics/nhm-5_schematics.pdf).
+
 Paired negative-composition runs also prove that disabling this PCM component
 blocks all handset codec/uplink media without stopping the independent
 network downlink or firmware-controlled teardown. See the

@@ -195,10 +195,16 @@ constexpr nokia_product_config make_3310_config()
 	// NHM-5 independently publishes command 0x08 value 0x060b immediately
 	// after organic Answer, then 0x040a during physical-End teardown. Those
 	// values satisfy and clear the same recovered speech-request field, but do
-	// not establish a PCM bus or analogue route for this product.
+	// not establish a PCM bus for this product.
 	result.dsp_speech_control_command = 0x08;
 	result.dsp_speech_control_mask = 0x0201;
 	result.dsp_speech_control_enabled = 0x0201;
+	// Nokia's NHM-5/UB 4 V09 COBBA schematic (version 2.0, 04.05.2001)
+	// independently wires the built-in differential microphone pads through
+	// L402 to MIC2P/MIC2N and the receiver to EARP/EARN. Record that topology
+	// without borrowing NSE-8's gains or enabling an unresolved PCM clock.
+	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	result.cobba_hle_voice.output = nokia_cobba_device::ear;
 	result.ccont_board = ADC_STANDARD;
 	return result;
 }
