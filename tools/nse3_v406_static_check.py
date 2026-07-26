@@ -344,6 +344,35 @@ RADIO_PACKET_ANCHORS = {
     0x20D1DC: ("strb", "r7, [r0, #4]"),
     0x20D1E0: ("movs", "r0, #6"),
     0x20D1E6: ("strb", "r0, [r1, #4]"),
+    # There are five direct callers in the exact image.  Four preserve the
+    # constructor's operation 4; only the first path above can select 6/7.
+    # All five finish the packet before submitting it to task 3.
+    0x20D1BE: ("add", "r0, sp, #0xc"),
+    0x20D1C0: ("movs", "r1, #0x10"),
+    0x20D1C2: ("bl", "#0x20cffa"),
+    0x20D40E: ("movs", "r0, #3"),
+    0x20D412: ("bl", "#0x25fb4c"),
+    0x20DA5C: ("add", "r0, sp, #0xc"),
+    0x20DA5E: ("movs", "r1, #0x1a"),
+    0x20DA60: ("bl", "#0x20cffa"),
+    0x20DAB2: ("movs", "r0, #3"),
+    0x20DAB6: ("bl", "#0x25fb4c"),
+    0x20EA02: ("mov", "r0, sp"),
+    0x20EA04: ("movs", "r1, #0x1a"),
+    0x20EA06: ("bl", "#0x20cffa"),
+    0x20EA6E: ("movs", "r0, #3"),
+    0x20EA72: ("bl", "#0x25fb4c"),
+    0x210A08: ("ldr", "r0, [pc, #0x364]"),
+    0x210A0A: ("ldrb", "r1, [r0, r1]"),
+    0x210A0C: ("add", "r0, sp, #0xc"),
+    0x210A0E: ("bl", "#0x20cffa"),
+    0x210AAE: ("movs", "r0, #3"),
+    0x210AB2: ("bl", "#0x25fb4c"),
+    0x210CA6: ("mov", "r0, sp"),
+    0x210CA8: ("movs", "r1, #0x50"),
+    0x210CAA: ("bl", "#0x20cffa"),
+    0x210CDE: ("movs", "r0, #3"),
+    0x210CE2: ("bl", "#0x25fb4c"),
     # Task 4 owns the shared DSP/radio dispatcher.  It arms timer 0x1b at
     # task entry, counts every processed input, and treats configured value
     # 0xdb as a task-wide activity event rather than a search completion.
@@ -380,7 +409,52 @@ RADIO_PACKET_LITERALS = {
     0x2A20E6: 0x09CD,
     0x2A2238: 0x09CD,
     0x296366: 0x09CD,
+    0x210A08: 0x2BD710,
 }
+CHANNEL_CONFIGURE_DIRECT_CALLS = [
+    0x20D1C2,
+    0x20DA60,
+    0x20EA06,
+    0x210A0E,
+    0x210CAA,
+]
+CHANNEL_CONFIGURE_CALLER_PROFILES = [
+    {
+        "callsite": 0x20D1C2,
+        "constructor_argument": 0x10,
+        "operation_values": [4, 6, 7],
+        "submit_call": 0x20D412,
+        "destination_task": 3,
+    },
+    {
+        "callsite": 0x20DA60,
+        "constructor_argument": 0x1A,
+        "operation_values": [4],
+        "submit_call": 0x20DAB6,
+        "destination_task": 3,
+    },
+    {
+        "callsite": 0x20EA06,
+        "constructor_argument": 0x1A,
+        "operation_values": [4],
+        "submit_call": 0x20EA72,
+        "destination_task": 3,
+    },
+    {
+        "callsite": 0x210A0E,
+        "constructor_argument": "table_0x2bd710",
+        "operation_values": [4],
+        "submit_call": 0x210AB2,
+        "destination_task": 3,
+    },
+    {
+        "callsite": 0x210CAA,
+        "constructor_argument": 0x50,
+        "operation_values": [4],
+        "submit_call": 0x210CE2,
+        "destination_task": 3,
+    },
+]
 RADIO_REPORT_DISPATCH_ANCHORS = {
     # Type 0x80 is handled directly.  Types 0x83..0x8f use a bounded jump
     # table; the holes 0x85/0x8d/0x8e deliberately fall through.
@@ -460,6 +534,12 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x211DA4: ("ldr", "r0, [sp, #0x18]"),
     0x211DA6: ("movs", "r1, #8"),
     0x211DA8: ("bl", "#0x27693c"),
+    0x211DB4: ("ldrb", "r0, [r4, #0xb]"),
+    0x211DB6: ("cmp", "r0, #0x10"),
+    0x211DBE: ("ldrb", "r0, [r4, #3]"),
+    0x211DC0: ("cmp", "r0, #1"),
+    0x211DC6: ("cmp", "r0, #2"),
+    0x211DCC: ("bl", "#0x211550"),
     0x211D70: ("ldr", "r0, [sp, #0x18]"),
     0x211D72: ("movs", "r1, #8"),
     0x211D74: ("bl", "#0x27693c"),
@@ -2043,6 +2123,19 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     physical = swap16(data)
+    instructions = decode_image(physical, FLASH_BASE)
+    channel_configure_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == 0x20CFFA
+    ]
+    if channel_configure_calls != CHANNEL_CONFIGURE_DIRECT_CALLS:
+        raise ValueError(
+            "NSE-3 CHANNEL_CONFIGURE direct-call census changed: expected "
+            f"{CHANNEL_CONFIGURE_DIRECT_CALLS}, got {channel_configure_calls}"
+        )
     task_4_entry = effective_u32(
         physical, NSE3_TASK_4_ENTRY_POINTER - FLASH_BASE)
     if task_4_entry != NSE3_TASK_4_ENTRY:
@@ -2192,6 +2285,12 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "constructor": 0x20CFFA,
             "operation_byte": 0,
             "evidenced_operation_values": [4, 6, 7],
+            "direct_call_count": len(channel_configure_calls),
+            "direct_calls": channel_configure_calls,
+            "caller_profiles": CHANNEL_CONFIGURE_CALLER_PROFILES,
+            "all_submit_to_task": 3,
+            "operation_specific_confirmation_path":
+                "not_established",
         },
         "report_dispatch": {
             "routine": 0x2A20DC,
@@ -2290,11 +2389,16 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "confirmation_type": 0x89,
                 "confirmation_handler": 0x2804F4,
                 "task_status": 0x1393,
+                "task_case": 0x211DA4,
                 "ra_info_type": 0x84,
                 "ra_info_task_status": 0x1394,
                 "task_object_bytes": 8,
                 "confirmation_payload_read_by_handler": False,
                 "controller_state_after_confirmation": 3,
+                "task_case_controller_byte_offset": 3,
+                "task_case_suppressed_continuation_values": [1, 2],
+                "task_case_other_continuation": 0x211550,
+                "operation_value_read_by_confirmation_path": False,
             },
             "fixed_task_routes": FIXED_RADIO_TASK_ROUTES,
             "task_11_controller_dispatch": TASK_11_CONTROLLER_DISPATCH,

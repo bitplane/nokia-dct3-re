@@ -299,6 +299,37 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             ("cmp", "r4, #0xdb"), check.RADIO_PACKET_ANCHORS[0x2A2228]
         )
 
+    def test_channel_configure_caller_profiles_preserve_distinct_contexts(self):
+        self.assertEqual(
+            [0x20D1C2, 0x20DA60, 0x20EA06, 0x210A0E, 0x210CAA],
+            check.CHANNEL_CONFIGURE_DIRECT_CALLS,
+        )
+        self.assertEqual(
+            [[4, 6, 7], [4], [4], [4], [4]],
+            [
+                profile["operation_values"]
+                for profile in check.CHANNEL_CONFIGURE_CALLER_PROFILES
+            ],
+        )
+        self.assertEqual(
+            [0x10, 0x1A, 0x1A, "table_0x2bd710", 0x50],
+            [
+                profile["constructor_argument"]
+                for profile in check.CHANNEL_CONFIGURE_CALLER_PROFILES
+            ],
+        )
+        self.assertTrue(
+            all(
+                profile["destination_task"] == 3
+                for profile in check.CHANNEL_CONFIGURE_CALLER_PROFILES
+            )
+        )
+        self.assertEqual(0x2BD710, check.RADIO_PACKET_LITERALS[0x210A08])
+        self.assertEqual(
+            ("bl", "#0x211550"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x211DCC],
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)

@@ -303,6 +303,17 @@ controller operation: the constructor seeds value 4 and evidenced callers
 overwrite it with 6 or 7. These values remain typed protocol data; no register
 or channel-mode meaning is assigned merely from their numeric form.
 
+An exhaustive direct-call census now bounds the request side rather than
+sampling those overwrite sites. The exact image has five calls to
+`0x20cffa`: `0x20d1c2`, `0x20da60`, `0x20ea06`, `0x210a0e` and
+`0x210caa`. Their second constructor arguments are respectively `0x10`,
+`0x1a`, `0x1a`, a byte selected from table `0x2bd710`, and `0x50`. Only
+the `0x10` caller can replace operation 4 with 6 or 7; the other four retain
+4. Each path finishes its own body fields and submits the resulting object to
+task 3. The repeated `0x1a` argument therefore represents two independent
+request-building paths, not duplicate callsite noise, while the dynamic path
+prevents the set of request contexts from being reduced to four literals.
+
 Inbound type `0x89` reaches handler `0x2804f4`. It gates acceptance using
 controller state, converts the packet into a fixed eight-byte task object,
 posts status `0x1393`, and advances its controller state to 3. It does not
@@ -313,6 +324,15 @@ dispatcher keeps the two paths distinct. This establishes the
 NSE-3 confirmation handler does not require the product-specific body-bit
 correlation recovered for NHM-5. It does not, by itself, prove which DSP
 report follows next in every controller state.
+
+The task-11 `0x1393` case is correspondingly state-driven rather than
+operation-driven. After accepting the eight-byte object it suppresses its
+`0x211550` continuation for controller-byte-3 values 1 and 2 and takes that
+continuation for other values. Neither the direct handler nor this task case
+reads the outbound operation value. Static evidence therefore does not
+justify assigning separate confirmation packets or follow-up reports to
+operations 4, 6 and 7; that correlation still requires the missing DSP-side
+ordering or an organic trace.
 
 The surrounding report-to-task boundary is now exact enough to prevent an
 NSE-8 sequence from being inferred from that single confirmation. Type
