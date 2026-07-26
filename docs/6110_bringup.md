@@ -305,11 +305,21 @@ catalogues. Parsing each catalogue's count and 24-byte record array enumerates
 124 addressable event halfwords; none is in `0x076f..0x0778`. The sole
 runtime-object call is `0x27c17c`, which loads its object pointer from SRAM
 cell `0x10b284`. That cell is also absent from the startup copy table and
-therefore begins at zero, but later firmware message handling writes it. This
-reduces the alternative-object frontier from an unspecified population to one
-identified constructor input. With the internal boot ROM still missing, a
-passive MAME trace cannot reach this firmware boundary organically, so the
-remaining value is not fabricated through a direct-to-flash reset bypass.
+therefore begins at zero, but later firmware message handling writes it.
+
+The writer is now bounded to packed event `0x0389`. Its dispatcher case loads
+cell `0x10b284[0]` and invokes the constructor, while the common packed-event
+argument copier stores the event's arguments into that cell. A whole-image
+call census finds exactly three direct producers of `0x0389`: callsite
+`0x231660` supplies fixed arguments `(0, 0)`, `0x25a8fa` supplies two
+runtime values, and `0x25b044` supplies one runtime value followed by zero.
+The first producer therefore cannot introduce a non-null object pointer; the
+other two remain data-dependent and are not reinterpreted as fixed catalogue
+addresses. This reduces the alternative-object frontier from an unspecified
+population to two identified dynamic producer inputs. With the internal boot
+ROM still missing, a passive MAME trace cannot reach this firmware boundary
+organically, so those values are not fabricated through a direct-to-flash
+reset bypass. The exact verifier still does not claim producer absence.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven

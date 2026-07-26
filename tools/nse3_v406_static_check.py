@@ -588,12 +588,30 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x25A800: ("ldrb", "r3, [r6, #6]"),
     0x25A80E: ("ldrh", "r3, [r0, #0xe]"),
     0x25A83C: ("ldrh", "r1, [r0, #0x12]"),
+    # Event 0x0389 is the sole dispatcher case that reaches the remaining
+    # runtime object constructor.  Its packed arguments are copied into the
+    # runtime cell before the case loads cell[0] as the object input.
+    0x27BA10: ("movs", "r1, #0xe1"),
+    0x27BA12: ("lsls", "r1, r1, #2"),
+    0x27BA1C: ("subs", "r1, #3"),
+    0x27BA22: ("b", "#0x27c174"),
+    0x27C174: ("ldr", "r0, [pc, #0x2a0]"),
+    0x27C176: ("ldr", "r0, [r0]"),
+    0x27C17C: ("bl", "#0x25b0cc"),
+    0x29DFB8: ("ldr", "r1, [pc, #0x190]"),
+    0x29DFBC: ("str", "r2, [r1]"),
 }
 DSP_PARAMETER_MODE_EVENT_TABLE_ADDRESS = 0x2B43F0
 DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS = 0x1061A4
 DSP_PARAMETER_OBJECT_GROUP_TABLE_ADDRESS = 0x106A64
 DSP_PARAMETER_RUNTIME_OBJECT_CELL_ADDRESS = 0x10B284
 DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS = [0x27C17C]
+DSP_PARAMETER_RUNTIME_OBJECT_EVENT = 0x0389
+DSP_PARAMETER_RUNTIME_OBJECT_EVENT_PRODUCERS = {
+    0x231660: [0x0000, 0x0000],
+    0x25A8FA: [None, None],
+    0x25B044: [None, 0x0000],
+}
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
     0x221640: [0x0C44],
@@ -1575,6 +1593,43 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "NSE-3 fixed object catalogue can publish a parameter event"
         )
 
+    object_event_profile = {
+        "apis": [
+            {
+                "address": 0x29E604,
+                "name": "runtime_object_event_generate",
+                "kind": "packed_event",
+                "arguments": {
+                    "packed_event": "r0",
+                    "arg1": "r1",
+                    "arg2": "r2",
+                },
+            }
+        ]
+    }
+    object_event_calls = [
+        call
+        for call in extract_calls(
+            object_event_profile, instructions, physical, FLASH_BASE
+        )
+        if (
+            call["arguments"]["packed_event"] is not None
+            and (
+                call["arguments"]["packed_event"] & 0x1FFF
+            ) == DSP_PARAMETER_RUNTIME_OBJECT_EVENT
+        )
+    ]
+    object_event_producers = {
+        call["callsite"]: call["arguments"]["argument_words"]
+        for call in object_event_calls
+    }
+    if object_event_producers != DSP_PARAMETER_RUNTIME_OBJECT_EVENT_PRODUCERS:
+        raise ValueError(
+            "NSE-3 runtime object event producers changed: expected "
+            f"{DSP_PARAMETER_RUNTIME_OBJECT_EVENT_PRODUCERS}, got "
+            f"{object_event_producers}"
+        )
+
     unresolved = DSP_PARAMETER_UNRESOLVED_EVENT_CALLS
     return {
         "event_apis": {
@@ -1630,6 +1685,8 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                 "runtime_object_cell_zero_initialized": True,
                 "unresolved_constructors":
                     DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS,
+                "constructor_event": DSP_PARAMETER_RUNTIME_OBJECT_EVENT,
+                "constructor_event_producers": object_event_producers,
             },
         },
         "runtime_built_calls_exclude_parameter_events": False,

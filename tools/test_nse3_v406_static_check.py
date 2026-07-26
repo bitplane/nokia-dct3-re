@@ -256,6 +256,15 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             [0x27C17C],
             check.DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS,
         )
+        self.assertEqual(0x0389, check.DSP_PARAMETER_RUNTIME_OBJECT_EVENT)
+        self.assertEqual(
+            {
+                0x231660: [0x0000, 0x0000],
+                0x25A8FA: [None, None],
+                0x25B044: [None, 0x0000],
+            },
+            check.DSP_PARAMETER_RUNTIME_OBJECT_EVENT_PRODUCERS,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
         self.assertEqual(
             [0x256E2E],
