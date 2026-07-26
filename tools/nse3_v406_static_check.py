@@ -500,6 +500,21 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x28054E: ("push", "{r4, lr}"),
     0x280558: ("movs", "r1, #0xa8"),
     0x28055A: ("bl", "#0x276912"),
+    # Type 0x84 is suppressed only at controller value 1.  Otherwise the
+    # handler replaces the leading halfword with status 0x1394 and preserves
+    # the remaining six bytes in an eight-byte task-11 object.
+    0x280398: ("push", "{r4, lr}"),
+    0x28039C: ("ldr", "r0, [pc, #0x260]"),
+    0x28039E: ("ldrb", "r0, [r0]"),
+    0x2803A0: ("cmp", "r0, #1"),
+    0x2803A4: ("adds", "r0, r4, #0"),
+    0x2803A6: ("bl", "#0x26069c"),
+    0x2803AC: ("ldr", "r0, [pc, #0x24c]"),
+    0x2803AE: ("strh", "r0, [r4]"),
+    0x2803B2: ("movs", "r1, #8"),
+    0x2803B4: ("bl", "#0x276912"),
+    0x2803B8: ("movs", "r0, #0xb"),
+    0x2803BC: ("bl", "#0x25fb4c"),
     # Type 0x8a does not consume a report-body field in its direct handler.
     # It gates on controller byte 0x1090ff, clears shared flag bit 1, and posts
     # the unchanged fixed object to task 11 as status 0x1390.
@@ -946,6 +961,45 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x211D70: ("ldr", "r0, [sp, #0x18]"),
     0x211D72: ("movs", "r1, #8"),
     0x211D74: ("bl", "#0x27693c"),
+    0x211D78: ("ldrb", "r0, [r4, #3]"),
+    0x211D7A: ("cmp", "r0, #1"),
+    0x211D7E: ("b", "#0x211eb4"),
+    0x211EB4: ("ldr", "r0, [sp, #0x18]"),
+    0x211EB6: ("bl", "#0x20db1c"),
+    # The unique status-object consumer dispatches 0x1394 to a branch that
+    # reads preserved bytes 4..7.  Byte 4 is copied directly; bytes 5..7 form
+    # one big-endian 24-bit scalar used by three fixed-divisor conversions.
+    0x20DB1C: ("push", "{r4, r5, r6, r7, lr}"),
+    0x20DB20: ("movs", "r0, #0"),
+    0x20DB22: ("ldrsh", "r1, [r4, r0]"),
+    0x20DB80: ("ldr", "r6, [pc, #0x11c]"),
+    0x20DB82: ("ldrb", "r0, [r6, #0x12]"),
+    0x20DB84: ("cmp", "r0, #0"),
+    0x20DB90: ("movs", "r0, #8"),
+    0x20DB92: ("bl", "#0x260abc"),
+    0x20DB98: ("movs", "r0, #1"),
+    0x20DB9A: ("lsls", "r0, r0, #0xa"),
+    0x20DB9C: ("strh", "r0, [r5]"),
+    0x20DB9E: ("ldrb", "r0, [r4, #4]"),
+    0x20DBA0: ("strb", "r0, [r5, #2]"),
+    0x20DBA2: ("ldrb", "r1, [r4, #6]"),
+    0x20DBA4: ("ldrb", "r0, [r4, #5]"),
+    0x20DBAC: ("ldrb", "r1, [r4, #7]"),
+    0x20DBB4: ("bl", "#0x2a3e94"),
+    0x20DBBC: ("strb", "r0, [r5, #3]"),
+    0x20DBC2: ("bl", "#0x2a3e94"),
+    0x20DBC6: ("strb", "r0, [r5, #4]"),
+    0x20DBCC: ("bl", "#0x2a3e94"),
+    0x20DBD0: ("strb", "r0, [r5, #5]"),
+    0x20DBEA: ("adds", "r0, r5, #0"),
+    0x20DBEC: ("movs", "r1, #8"),
+    0x20DBEE: ("bl", "#0x27693c"),
+    0x20DBF2: ("movs", "r0, #0x11"),
+    0x20DBF6: ("bl", "#0x25fb4c"),
+    0x20DBFA: ("ldrb", "r0, [r6, #0x18]"),
+    0x20DBFC: ("cmp", "r0, #1"),
+    0x20DC02: ("bl", "#0x20d8d6"),
+    0x20DC06: ("strb", "r0, [r6, #0x18]"),
     # The task-11 dispatcher keeps the surrounding controller-status family
     # numeric.  The fixed sizes and control calls are useful lifecycle
     # boundaries, but do not by themselves name the events.
@@ -1096,6 +1150,7 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x211CAE: 0x1394,
     0x27FD6A: 0x139F,
     0x2803AC: 0x1394,
+    0x28039C: 0x1090FF,
     0x2803DC: 0x13B7,
     0x280418: 0x1390,
     0x2803FC: 0x1090FC,
@@ -1147,8 +1202,16 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x2804D4: 0x2BCFA8,
     0x211346: 0x10917C,
     0x21138E: 0x13A5,
+    0x20DB24: 0x03EB,
+    0x20DB80: 0x10917C,
+    0x20DBB2: 0x052E,
+    0x20DBD4: 0x108EE0,
 }
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
+RA_INFO_CONSUMER = 0x20DB1C
+RA_INFO_CONSUMER_DIRECT_CALLS = [0x211EB6]
+RA_INFO_FOLLOWUP_HELPER = 0x20D8D6
+RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS = [0x20DC02]
 CANDIDATE_LIST_REQUEST_BUILDER = 0x214788
 CANDIDATE_LIST_REQUEST_BUILDER_DIRECT_CALLS = [0x216192, 0x217210]
 TASK_11_EVENT_DECODER = 0x210DA8
@@ -2641,6 +2704,31 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"expected {TASK_11_EVENT_DECODER_DIRECT_CALLS}, "
             f"got {task_11_event_decoder_calls}"
         )
+    ra_info_consumer_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == RA_INFO_CONSUMER
+    ]
+    if ra_info_consumer_calls != RA_INFO_CONSUMER_DIRECT_CALLS:
+        raise ValueError(
+            "NSE-3 RA_INFO consumer direct-call census changed: expected "
+            f"{RA_INFO_CONSUMER_DIRECT_CALLS}, got {ra_info_consumer_calls}"
+        )
+    ra_info_followup_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == RA_INFO_FOLLOWUP_HELPER
+    ]
+    if ra_info_followup_calls != RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS:
+        raise ValueError(
+            "NSE-3 RA_INFO follow-up direct-call census changed: expected "
+            f"{RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS}, got "
+            f"{ra_info_followup_calls}"
+        )
     task_11_event_jump_table = {
         status: effective_u32(
             physical,
@@ -3058,6 +3146,53 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "acquisition_terminal": False,
                 "semantic_name_assigned": False,
             },
+            "type_0x84": {
+                "handler": 0x280398,
+                "acceptance_controller_byte": 0x1090FF,
+                "discarded_controller_values": [1],
+                "leading_status_replaced": True,
+                "preserved_object_offsets": [2, 3, 4, 5, 6, 7],
+                "task": 11,
+                "task_status": 0x1394,
+                "task_object_bytes": 8,
+                "task_case": 0x211D70,
+                "task_case_suppressed_controller_values": [1],
+                "consumer": RA_INFO_CONSUMER,
+                "consumer_direct_calls": ra_info_consumer_calls,
+                "consumer_status_branch": 0x20DB80,
+                "consumer_gate": {
+                    "controller_object": 0x10917C,
+                    "offset": 0x12,
+                    "required_value": 0,
+                },
+                "input_layout": {
+                    "control_byte": 4,
+                    "value_24_be": [5, 6, 7],
+                },
+                "task_17_publication": {
+                    "status": 0x0400,
+                    "object_bytes": 8,
+                    "control_source_offset": 4,
+                    "value_24_source_offsets": [5, 6, 7],
+                    "conversion_divisors": [0x052E, 0x33, 0x1A],
+                    "destination_task": 0x11,
+                },
+                "conditional_followup": {
+                    "controller_object_offset": 0x18,
+                    "direct_helper_for_values_except": 1,
+                    "helper": RA_INFO_FOLLOWUP_HELPER,
+                    "helper_direct_calls": ra_info_followup_calls,
+                    "helper_result_stored_to_controller_offset": 0x18,
+                    "value_1_path": {
+                        "numeric_control": {"code": 0x71, "argument": 0},
+                        "timer_code": 0x71,
+                        "duration_is_runtime_derived": True,
+                    },
+                },
+                "direct_bitmap_search_constructor": None,
+                "direct_channel_configure_constructor": None,
+                "direct_acquisition_terminal": False,
+            },
             "type_0x8a": {
                 "handler": 0x2803F8,
                 "report_body_read_by_direct_handler": False,
@@ -3363,6 +3498,9 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "ra_info_type": 0x84,
                 "ra_info_task_status": 0x1394,
                 "task_object_bytes": 8,
+                "ra_info_body_consumed": True,
+                "ra_info_consumer": RA_INFO_CONSUMER,
+                "ra_info_direct_channel_configure_edge": False,
                 "confirmation_payload_read_by_handler": False,
                 "controller_state_after_confirmation": 3,
                 "task_case_controller_byte_offset": 3,

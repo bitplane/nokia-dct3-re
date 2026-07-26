@@ -330,6 +330,44 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.RADIO_REPORT_HANDLER_ANCHORS[0x211DCC],
         )
 
+    def test_type_0x84_ra_info_preserves_and_consumes_compact_body(self):
+        self.assertEqual(
+            0x1090FF, check.RADIO_REPORT_HANDLER_LITERALS[0x28039C]
+        )
+        self.assertEqual(
+            ("strh", "r0, [r4]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2803AE],
+        )
+        self.assertEqual(
+            ("movs", "r1, #8"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2803B2],
+        )
+        self.assertEqual(0x20DB1C, check.RA_INFO_CONSUMER)
+        self.assertEqual([0x211EB6], check.RA_INFO_CONSUMER_DIRECT_CALLS)
+        self.assertEqual(
+            ("ldrb", "r0, [r4, #4]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x20DB9E],
+        )
+        self.assertEqual(
+            ("ldrb", "r0, [r4, #5]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x20DBA4],
+        )
+        self.assertEqual(
+            ("ldrb", "r1, [r4, #6]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x20DBA2],
+        )
+        self.assertEqual(
+            ("ldrb", "r1, [r4, #7]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x20DBAC],
+        )
+        self.assertEqual(
+            0x052E, check.RADIO_REPORT_HANDLER_LITERALS[0x20DBB2]
+        )
+        self.assertEqual(0x20D8D6, check.RA_INFO_FOLLOWUP_HELPER)
+        self.assertEqual(
+            [0x20DC02], check.RA_INFO_FOLLOWUP_HELPER_DIRECT_CALLS
+        )
+
     def test_type_0x8a_uses_shared_controller_state_not_report_body(self):
         self.assertEqual(
             0x1090FC, check.RADIO_REPORT_HANDLER_LITERALS[0x2803FC]

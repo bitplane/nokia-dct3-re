@@ -317,13 +317,36 @@ prevents the set of request contexts from being reduced to four literals.
 Inbound type `0x89` reaches handler `0x2804f4`. It gates acceptance using
 controller state, converts the packet into a fixed eight-byte task object,
 posts status `0x1393`, and advances its controller state to 3. It does not
-read a confirmation body byte before that transition. Type `0x84` remains a
-separate fixed-size `RA_INFO` event with task status `0x1394`; the task
-dispatcher keeps the two paths distinct. This establishes the
-`CHANNEL_CONFIGURE -> CHANNEL_CHANGED_CNF` envelope and shows that the direct
-NSE-3 confirmation handler does not require the product-specific body-bit
-correlation recovered for NHM-5. It does not, by itself, prove which DSP
-report follows next in every controller state.
+read a confirmation body byte before that transition.
+
+Type `0x84` is materially different rather than an empty second
+acknowledgement. Handler `0x280398` discards the object only when controller
+byte `0x1090ff` equals 1. Otherwise it replaces only the leading halfword
+with task-11 status `0x1394`, preserving object bytes 2 through 7 in the
+fixed eight-byte object. Task case `0x211d70` suppresses further processing
+only at controller-object byte-3 value 1; all other values enter
+`0x20db1c`, which has exactly that one direct caller.
+
+The `0x1394` branch at `0x20db80` proves that the preserved report body is
+meaningful. It first requires controller-object byte `0x12` to be zero,
+copies input byte 4 into a newly allocated eight-byte status-`0x0400`
+object, and combines bytes 5, 6 and 7 as one big-endian 24-bit value. Fixed
+divisors `0x052e`, `0x33` and `0x1a` derive three output fields; another
+field masks input byte 4 using a runtime shift, and the final field mirrors
+a controller flag. The result is posted to task 17. When controller-object
+byte `0x18` is not 1, the same 24-bit value is passed to the uniquely called
+helper `0x20d8d6` and its result is stored back at byte `0x18`; value 1
+instead enters a timer-`0x71` scheduling path.
+
+Thus the NSE-3 `RA_INFO` boundary carries compact control/timing data into
+the controller; it is not a zero-body completion like the direct type-`0x89`
+handler. The exact path calls neither the type-`0x1a` bitmap builder nor
+`CHANNEL_CONFIGURE`, so static adjacency does not establish a direct
+confirmation-to-RA_INFO edge or the DSP-side emission order. The independently
+bounded `CHANNEL_CONFIGURE -> CHANNEL_CHANGED_CNF` envelope shows that the
+direct NSE-3 confirmation handler does not require the product-specific
+body-bit correlation recovered for NHM-5. It does not, by itself, prove
+which DSP report follows next in every controller state.
 
 The task-11 `0x1393` case is correspondingly state-driven rather than
 operation-driven. After accepting the eight-byte object it suppresses its
