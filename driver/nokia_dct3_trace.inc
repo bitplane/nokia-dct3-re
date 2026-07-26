@@ -105,6 +105,21 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R5), fw_byte(0x0010dbd7),
 				fw_byte(0x0010edb4), fw_byte(0x0010edb6), fw_byte(0x0010edc1),
 				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	// NHM-5 v6.39 reaches this boundary after copying the 23-octet BCCH L3
+	// block. The following instructions validate RR protocol discriminator 6
+	// and dispatch System Information message types 0x19 through 0x1c.
+	if (pc == addr && addr == 0x002934cc && m_trace_enabled)
+	{
+		const u32 block = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
+		LOGMASKED(LOG_DSP_BOUNDARY, "nhm5_bcch_parse: channel=%02x block=%08x data=",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R8) & 0xff, block);
+		for (unsigned index = 0;
+				block >= NOKIA_RAM_BASE && block + index < NOKIA_RAM_END && index < 23;
+				++index)
+			LOGMASKED(LOG_DSP_BOUNDARY, "%02x", fw_byte(block + index));
+		LOGMASKED(LOG_DSP_BOUNDARY, " task=%02x t=%.6f\n",
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
 	if (pc == addr && (addr == 0x0020a026 || addr == 0x0020a02c) && m_trace_enabled)
 	{
 		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);

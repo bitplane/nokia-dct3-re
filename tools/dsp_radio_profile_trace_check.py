@@ -5,6 +5,7 @@ import argparse
 import collections
 import hashlib
 import pathlib
+import re
 
 try:
 	from tools.dsp_packet_semantics_census import parse
@@ -137,6 +138,7 @@ def check_nhm5_startup(path: pathlib.Path, rom: pathlib.Path | None = None) -> N
 def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> None:
 	check_nhm5_startup(path, rom)
 	packets = parse("nhm5", path)
+	trace = path.read_text(errors="replace")
 	search = next(packet for packet in packets
 			if packet["direction"] == "tx" and packet["type"] == 0x56)
 	def first(direction: str, packet_type: int, after: float) -> dict | None:
@@ -179,6 +181,17 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 		raise SystemExit("NHM-5 SI1 does not advertise its selected ARFCN 0x0058")
 	if no_psw_found is not None:
 		raise SystemExit("NHM-5 successful acquisition also received NO_PSW_FOUND")
+	parsed_si = [
+		int(match.group(1), 16)
+		for match in re.finditer(
+			r"nhm5_bcch_parse: channel=50 .*?06\D+([0-9a-fA-F]{2})", trace
+		)
+	]
+	for message_type in (0x19, 0x1A, 0x1B, 0x1C):
+		if message_type not in parsed_si:
+			raise SystemExit(
+				f"NHM-5 firmware parser did not consume SI{message_type - 0x18}"
+			)
 	if not (
 			search["time"] <= sch["time"] <= configure["time"] <=
 			no_psw_left["time"] <= channel_changed["time"] <=
@@ -188,7 +201,7 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 	print(
 		"NHM-5 acquisition: 56/160 candidate 0058 -> SCH -> organic 02/20 "
 		"CHANNEL_CONFIGURE -> NO_PSW_LEFT -> CHANNEL_CHANGED_CNF -> RA_INFO -> "
-		"BCCH SI1 advertising 0058"
+		"BCCH SI1 advertising 0058; firmware parser consumed SI1-SI4"
 	)
 
 
