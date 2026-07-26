@@ -16,6 +16,7 @@ public:
 	auto vibrator_enable_cb() { return m_vibrator_enable_cb.bind(); }
 
 	void set_trace(bool enabled) { m_trace = enabled; }
+	void set_eeprom_scl_bit(u8 bit) { m_eeprom_scl_bit = bit; }
 
 	static bool owns(offs_t offset);
 	u8 read(offs_t offset);
@@ -39,6 +40,7 @@ private:
 	devcb_write_line m_buzzer_enable_cb;
 	devcb_write_line m_vibrator_enable_cb;
 	u8 m_regs[0x100] = {0};
+	u8 m_eeprom_scl_bit = 3;
 	bool m_trace = false;
 };
 

@@ -70,6 +70,30 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "normal 5x5 keypad"):
             check.verify_keypad_boundary(bytes(image))
 
+    def test_eeprom_boundary_recovers_sda_scl_and_address_width(self):
+        image = bytearray(b"\xff" * check.FLASH_SIZE)
+        # swap16 Thumb encodings at the identified routine anchors.
+        encodings = {
+            0x29CDD2: "380a",
+            0x29CDE0: "3806",
+            0x29CDE2: "000e",
+            0x29E8C4: "8024",
+            0x29E8C8: "2033",
+            0x29E8CA: "0120",
+            0x29E8CC: "0422",
+            0x29E8D4: "1979",
+            0x29E90E: "1543",
+            0x29E936: "9543",
+        }
+        for pc, encoded in encodings.items():
+            physical = bytes.fromhex(encoded)
+            offset = pc - check.FLASH_BASE
+            image[offset : offset + 2] = physical[::-1]
+        result = check.verify_eeprom_boundary(bytes(image))
+        self.assertEqual(0, result["sda_bit"])
+        self.assertEqual(2, result["scl_bit"])
+        self.assertEqual(2, result["word_address_bytes"])
+
 
 if __name__ == "__main__":
     unittest.main()

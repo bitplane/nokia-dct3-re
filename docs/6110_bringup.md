@@ -80,6 +80,17 @@ respectively. This corrected the initially reversed side-key labels in the
 driver. Power is code `0x0d` in the separate special table. The verifier checks
 the source bytes rather than accepting the input declaration as its own proof.
 
+The external EEPROM boundary is now firmware-checked as well. The v4.06
+transaction routine at `0x29cd88` emits the high and low halves of a 16-bit
+word address for the large-device mode required by the documented 8 KiB
+serial EEPROM. Its byte sender at `0x29e8bc` uses MAD2 GenIO signal register
+`0x20020`: bit 0 is SDA, with its open-drain direction at `0x20024` bit 0,
+while bit 2 is SCL. This exposed a genuine profile error—the generic PUP
+default used bit 3 for SCL. The PUP device now keeps that compatibility default
+for other products and accepts a typed per-product SCL bit; NSE-3 selects bit
+2. `make verify-6110-static` pins the instruction anchors that support this
+configuration.
+
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine
 therefore retains `NO_DUMP` internal ROMs and firmware-derived peers remain

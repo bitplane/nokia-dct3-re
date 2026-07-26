@@ -57,7 +57,7 @@ void nokia_pup_device::update_genio()
 	const u8 signal = m_regs[GENIO_SIGNAL];
 	const u8 direction = m_regs[GENIO_DIRECTION];
 	m_eeprom_sda_write_cb(BIT(direction, 0) ? BIT(signal, 0) : 1);
-	m_eeprom_scl_write_cb(BIT(signal, 3));
+	m_eeprom_scl_write_cb(BIT(signal, m_eeprom_scl_bit));
 }
 
 void nokia_pup_device::update_buzzer()

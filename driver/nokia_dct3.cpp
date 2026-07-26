@@ -135,6 +135,7 @@ struct nokia_product_config
 	u8 lcd_controller_height = 48;
 	u8 lcd_visible_width = 84;
 	u8 lcd_visible_height = 48;
+	u8 pup_eeprom_scl_bit = 3;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
 
@@ -279,6 +280,9 @@ constexpr nokia_product_config make_6110_config()
 	result.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
 	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
 	result.cobba_hle_voice.output = nokia_cobba_device::ear;
+	// NSE-3 v4.06's bit-banged 24C64 routines drive GenIO signal bit 2
+	// as SCL; SDA is signal/direction bit 0.
+	result.pup_eeprom_scl_bit = 2;
 	return result;
 }
 
@@ -667,6 +671,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_mad2->set_dsp_release_mask(product.dsp_release_mask);
 	m_kbgpio->set_five_rows(product.keypad_five_rows);
 	m_kbgpio->set_power_on_column_mask(product.power_on_column_mask);
+	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
 	m_lcd->set_geometry(product.lcd_controller_width, product.lcd_controller_height,
 			product.lcd_visible_width, product.lcd_visible_height);
 	screen_device *const screen = subdevice<screen_device>("screen");

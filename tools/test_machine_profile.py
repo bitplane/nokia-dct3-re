@@ -79,7 +79,12 @@ class MachineProfileTest(unittest.TestCase):
                 "cobba_pcm.word_clocks": "16",
                 "cobba_hle_voice.microphone": "nokia_cobba_device::mic2",
                 "cobba_hle_voice.output": "nokia_cobba_device::ear",
+                "pup_eeprom_scl_bit": "2",
             },
+        )
+        self.assertIn(
+            "m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);",
+            self.driver,
         )
         body = self.function_body(
             "constexpr nokia_product_config make_6110_config",

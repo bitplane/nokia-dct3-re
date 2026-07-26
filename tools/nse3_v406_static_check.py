@@ -38,6 +38,20 @@ KEYMAP = bytes.fromhex(
 )
 SPECIAL_KEYMAP_ADDRESS = 0x2BE8D8
 SPECIAL_KEYMAP = bytes.fromhex("3e 3e 3e 3e 0d")
+EEPROM_ANCHORS = {
+    # Two-byte word-address framing in the common serial-memory transaction.
+    0x29CDD2: ("lsrs", "r0, r7, #8"),
+    0x29CDE0: ("lsls", "r0, r7, #0x18"),
+    0x29CDE2: ("lsrs", "r0, r0, #0x18"),
+    # Low-level byte sender: GenIO signal 0x20, SDA mask 1, SCL mask 4.
+    0x29E8C4: ("movs", "r4, #0x80"),
+    0x29E8C8: ("adds", "r3, #0x20"),
+    0x29E8CA: ("movs", "r0, #1"),
+    0x29E8CC: ("movs", "r2, #4"),
+    0x29E8D4: ("ldrb", "r1, [r3, #4]"),
+    0x29E90E: ("orrs", "r5, r2"),
+    0x29E936: ("bics", "r5, r2"),
+}
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -71,6 +85,17 @@ def swap16(data: bytes) -> bytes:
     result = bytearray(data)
     result[0::2], result[1::2] = data[1::2], data[0::2]
     return bytes(result)
+
+
+def decode_thumb_anchors(data: bytes, anchors: dict[int, tuple[str, str]]) -> None:
+    decoder = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+    physical = swap16(data)
+    for pc, expected in anchors.items():
+        offset = pc - FLASH_BASE
+        decoded = list(decoder.disasm(physical[offset : offset + 4], pc, count=1))
+        actual = (decoded[0].mnemonic, decoded[0].op_str) if decoded else None
+        if actual != expected:
+            raise ValueError(f"Thumb anchor {pc:#x}: expected {expected}, got {actual}")
 
 
 def verify_identity(data: bytes) -> dict:
@@ -152,11 +177,26 @@ def verify_keypad_boundary(data: bytes) -> dict:
     }
 
 
+def verify_eeprom_boundary(data: bytes) -> dict:
+    decode_thumb_anchors(data, EEPROM_ANCHORS)
+    return {
+        "transaction": 0x29CD88,
+        "byte_sender": 0x29E8BC,
+        "genio_signal": 0x20020,
+        "genio_direction": 0x20024,
+        "sda_bit": 0,
+        "scl_bit": 2,
+        "word_address_bytes": 2,
+        "device_geometry_source": "NSE-3 parts list: 8 KiB serial EEPROM",
+    }
+
+
 def verify(data: bytes) -> dict:
     return {
         "identity": verify_identity(data),
         "reset_boundary": verify_reset_boundary(data),
         "keypad_boundary": verify_keypad_boundary(data),
+        "eeprom_boundary": verify_eeprom_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {
             "rom3_compatibility": "candidate_not_proven",
