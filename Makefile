@@ -742,7 +742,7 @@ verify-3310-radio-incoming-call-ui:
 	test -n "$$frame" || { echo "no answered 3310 call frame produced in $(RUN_DIR)"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" \
 		--sha256 $(ORACLE_3310_ANSWERED_UI_SHA)
-	@echo "OK — NHM-5 emitted Call Confirmed/Alerting and physical Answer changed the UI to End"
+	@echo "OK — NHM-5 completed Connect/Connect Ack and physical Answer changed the UI to End"
 
 verify-radio-incoming-call:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=36 \

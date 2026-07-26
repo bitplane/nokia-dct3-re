@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the evidenced NHM-5 incoming-call frontier through CC Alerting."""
+"""Verify the evidenced NHM-5 incoming-call frontier through CC Connect Ack."""
 
 import pathlib
 import re
@@ -45,6 +45,9 @@ CHECKPOINTS = (
 
 CONNECT = re.compile(
     r"GSM service uplink sapi=0 pd=03 message=07 length=2")
+CONNECT_ACKNOWLEDGE = re.compile(
+    r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
+    r"03[0-9a-f]{2}09030f")
 
 
 def verify(text: str, answered: bool = False) -> None:
@@ -56,8 +59,16 @@ def verify(text: str, answered: bool = False) -> None:
                 f"missing or out-of-order NHM-5 call-boundary checkpoint: {label}")
         cursor = match.end()
 
-    if answered and not CONNECT.search(text, cursor):
-        raise ValueError("missing NHM-5 physical-answer checkpoint: Connect")
+    if answered:
+        connects = list(CONNECT.finditer(text, cursor))
+        if not connects:
+            raise ValueError("missing NHM-5 physical-answer checkpoint: Connect")
+        if len(connects) != 1:
+            raise ValueError(
+                "NHM-5 retransmitted Connect before network acknowledgement")
+        if not CONNECT_ACKNOWLEDGE.search(text, connects[0].end()):
+            raise ValueError(
+                "missing NHM-5 network checkpoint: Connect Acknowledge")
 
 
 def main() -> int:
@@ -72,7 +83,9 @@ def main() -> int:
     except ValueError as error:
         print(error, file=sys.stderr)
         return 1
-    suffix = " and physical Answer emitted Connect" if len(sys.argv) == 3 else ""
+    suffix = (
+        " and physical Answer completed Connect/Connect Acknowledge"
+        if len(sys.argv) == 3 else "")
     print("OK - NHM-5 organically completed traffic assignment" + suffix)
     return 0
 

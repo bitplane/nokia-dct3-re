@@ -1061,6 +1061,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			// therefore require a standalone LAPDm RR first.
 			const auto pending_kind =
 					m_gsm_session->pending_downlink_kind();
+			m_wait_ticks = 0;
 			if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
 					pending_kind ==
 							nokia_gsm_session_device::downlink_kind::
@@ -1086,6 +1087,8 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_phase = action != nokia_gsm_session_device::downlink_kind::none ?
 					phase::service_downlink : phase::service_uplink_request;
 			m_reports_remaining = 1;
+			if (action != nokia_gsm_session_device::downlink_kind::none)
+				m_wait_ticks = 0;
 			m_report_deferred = true;
 		}
 		else if (result ==
@@ -1119,6 +1122,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			{
 				m_phase = phase::service_downlink;
 				m_reports_remaining = 1;
+				m_wait_ticks = 0;
 				m_report_deferred = true;
 				if (m_protocol_profile ==
 							protocol_profile::nhm5_candidate_list &&
