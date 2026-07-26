@@ -1314,7 +1314,39 @@ INPUT_CHANGED_MEMBER( nokia_dct3_state::mbus_rx_byte )
 	}
 }
 
+static INPUT_PORTS_START( dct3_network_config )
+	// External network-event fixtures may queue a bounded incoming service.
+	// The default cell remains passive after registration.
+	PORT_START("NETCFG")
+	PORT_CONFNAME(0x01, 0x00, "Queue one incoming page after registration")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x01, DEF_STR(On))
+	PORT_CONFNAME(0x02, 0x00, "Queue one incoming call after registration")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x02, DEF_STR(On))
+	PORT_CONFNAME(0x04, 0x00, "Queue one incoming SMS after registration")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x04, DEF_STR(On))
+	PORT_CONFNAME(0x08, 0x00, "Queue one incoming Smart Messaging ringtone")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x08, DEF_STR(On))
+	PORT_CONFNAME(0x10, 0x00, "Laboratory network speech loopback")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x10, DEF_STR(On))
+	PORT_CONFNAME(0x20, 0x00, "Laboratory remote 1 kHz voice source")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x20, DEF_STR(On))
+	PORT_CONFNAME(0x40, 0x00, "Four-burst downlink TCH fade per six multiframes")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x40, DEF_STR(On))
+	PORT_CONFNAME(0x80, 0x00, "Four-burst uplink TCH fade per six multiframes")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x80, DEF_STR(On))
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki3210 )
+	PORT_INCLUDE(dct3_network_config)
+
 	// Nokia 3210 v5.01/v6.00 share this ROM-derived matrix. COL.n is the
 	// firmware read bit and bits 1..4 are driven rows; power uses the special
 	// all-rows scan. Names describe the handset controls, while PORT_CODE gives
@@ -1394,36 +1426,11 @@ static INPUT_PORTS_START( noki3210 )
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x02, DEF_STR(On))
 
-	// External network-event fixtures may queue a bounded incoming service.
-	// The default cell remains passive after registration.
-	PORT_START("NETCFG")
-	PORT_CONFNAME(0x01, 0x00, "Queue one incoming page after registration")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x01, DEF_STR(On))
-	PORT_CONFNAME(0x02, 0x00, "Queue one incoming call after registration")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x02, DEF_STR(On))
-	PORT_CONFNAME(0x04, 0x00, "Queue one incoming SMS after registration")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x04, DEF_STR(On))
-	PORT_CONFNAME(0x08, 0x00, "Queue one incoming Smart Messaging ringtone")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x08, DEF_STR(On))
-	PORT_CONFNAME(0x10, 0x00, "Laboratory network speech loopback")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x10, DEF_STR(On))
-	PORT_CONFNAME(0x20, 0x00, "Laboratory remote 1 kHz voice source")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x20, DEF_STR(On))
-	PORT_CONFNAME(0x40, 0x00, "Four-burst downlink TCH fade per six multiframes")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x40, DEF_STR(On))
-	PORT_CONFNAME(0x80, 0x00, "Four-burst uplink TCH fade per six multiframes")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x80, DEF_STR(On))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3310 )
+	PORT_INCLUDE(dct3_network_config)
+
 	// NHM-5 v6.39 keymap: raw key = row * 5 + column. Unlike the
 	// four-active-row 3210 layout, the 3310 uses every row of the MAD2 5x5 scan.
 	PORT_START("COL.0")
