@@ -311,9 +311,28 @@ for task 13; or preserve a `0x28`-byte status-`0x040b` object for task 14.
 The task-3 form is now separated from its adjacent instrumentation. Its
 object byte 2 is four and task 3's status-2 queue eventually passes exactly
 four bytes starting at object +3 to byte-stream helper `0x285746`. The
-wire-side bytes are therefore `1f 00`, a controller-flags byte with
-statically constructed values `01`, `06` or `07`, and a derived timing byte
-or zero. Object byte 7 is local metadata beyond that declared payload.
+wire-side bytes are therefore `1f 00`, a controller-flags byte, and one
+value byte. Object byte 7 is local metadata beyond that declared payload.
+
+An exhaustive register-independent constructor census finds five direct
+stores of type `0x1f`, not just this report-driven one:
+
+| Constructor context | Flags byte | Value byte | Local byte 7 |
+|---|---:|---|---|
+| Standalone routine `0x20d78e` | `04` | Table `0x2bcfdc`, indexed by the low five bits of cell `0x10acf4` byte 8 | Zero |
+| Status `0x03f3`, routine `0x20f0e0` | `01` | Zero | Input object byte 2 |
+| Status `0x03f0`, routine `0x20f128` | `0d` | Cell `0x108f82` byte 1 | Byte selected from cell `0x108f50` |
+| Status `0x03ee`, routine `0x20f3ec` | `0c` or `0d` | Table `0x2bcfdc`, indexed by input byte 9 | Optional input byte `0x0b` |
+| Type-`0x80`/discriminator-`0x70` follow-up | `01`, `06` or `07` | Derived timing or zero | A report-derived value |
+
+The `0x03f3`, `0x03f0` and `0x03ee` forms are distinct cases of the same
+status dispatcher and have one direct constructor call each. The standalone
+`0x20d78e` form has no direct callsite and is retained as a possible
+table/jump target rather than declared unreachable. All five share the same
+status-2 task-3 framing and four-byte type-`0x1f` wire profile. This supports
+a shared typed transport object with product/controller-specific construction
+policy; it does not yet establish the DSP-side meaning of individual flag
+bits or the value byte.
 
 Before task submission, `0x2768b4` receives the same object with argument
 `0x1e08`. An exact census finds nine callers with arguments

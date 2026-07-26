@@ -1393,6 +1393,86 @@ TYPE_0X80_0X70_TASK_3_ANCHORS = {
     0x298C84: ("adds", "r1, r5, #3"),
     0x298C86: ("bl", "#0x285746"),
 }
+TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS = {
+    0x20F3EC: ("push", "{r4, r5, r6, r7, lr}"),
+    0x20F3FA: ("adds", "r5, r0, #0"),
+    0x20F44C: ("movs", "r0, #8"),
+    0x20F44E: ("bl", "#0x260abc"),
+    0x20F454: ("movs", "r0, #2"),
+    0x20F458: ("strh", "r0, [r7]"),
+    0x20F45A: ("strb", "r4, [r7, #4]"),
+    0x20F45C: ("movs", "r0, #4"),
+    0x20F45E: ("strb", "r0, [r7, #2]"),
+    0x20F460: ("movs", "r0, #0x1f"),
+    0x20F462: ("strb", "r0, [r7, #3]"),
+    0x20F464: ("strb", "r4, [r7, #5]"),
+    0x20F466: ("ldrb", "r0, [r5, #0xa]"),
+    0x20F47C: ("ldrb", "r0, [r5, #0xb]"),
+    0x20F47E: ("strb", "r0, [r7, #7]"),
+    0x20F480: ("movs", "r0, #1"),
+    0x20F486: ("strb", "r0, [r7, #5]"),
+    0x20F49C: ("ldrb", "r3, [r5, #9]"),
+    0x20F49E: ("ldrb", "r2, [r2, r3]"),
+    0x20F4A2: ("strb", "r2, [r7, #6]"),
+    0x20F4AE: ("movs", "r0, #0xfd"),
+    0x20F4B4: ("strb", "r0, [r7, #5]"),
+    0x20F4B6: ("movs", "r0, #0xc"),
+    0x20F4BC: ("strb", "r0, [r7, #5]"),
+    0x20F4BE: ("movs", "r0, #3"),
+    0x20F4C2: ("bl", "#0x25fb4c"),
+    # The sole direct caller is selected by status 0x03ee.
+    0x20F8E4: ("push", "{r4, lr}"),
+    0x20F8EA: ("ldrsh", "r0, [r4, r0]"),
+    0x20F8EC: ("ldr", "r1, [pc, #0x1dc]"),
+    0x20F8F0: ("cmp", "r0, #0"),
+    0x20F92A: ("adds", "r0, r4, #0"),
+    0x20F934: ("bl", "#0x20f3ec"),
+    # Status 0x03ee itself has one separate literal producer.
+    0x24E0B8: ("ldr", "r0, [pc, #0x32c]"),
+    0x24E0BA: ("bl", "#0x27d5c0"),
+}
+TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS = {
+    # Standalone table-derived form: 1f 00 04 value.
+    0x20D7B6: ("movs", "r2, #0x1f"),
+    0x20D7B8: ("strb", "r2, [r1, #3]"),
+    0x20D7BA: ("strb", "r0, [r1, #5]"),
+    0x20D7C8: ("ldr", "r2, [pc, #0x324]"),
+    0x20D7CA: ("ldrb", "r0, [r0, #8]"),
+    0x20D7D0: ("ldrb", "r0, [r2, r0]"),
+    0x20D7D2: ("strb", "r0, [r1, #6]"),
+    0x20D7DA: ("movs", "r0, #4"),
+    0x20D7E0: ("strb", "r0, [r1, #5]"),
+    0x20D7E2: ("movs", "r0, #3"),
+    0x20D7E4: ("bl", "#0x25fb4c"),
+    # Status-0x03f3 form: 1f 00 01 00 with byte 7 kept local.
+    0x20F0E0: ("push", "{r4, lr}"),
+    0x20F0F8: ("movs", "r2, #0x1f"),
+    0x20F0FA: ("strb", "r2, [r1, #3]"),
+    0x20F0FE: ("ldrb", "r0, [r4, #2]"),
+    0x20F100: ("strb", "r0, [r1, #7]"),
+    0x20F102: ("movs", "r0, #1"),
+    0x20F110: ("strb", "r0, [r1, #5]"),
+    0x20F112: ("movs", "r0, #3"),
+    0x20F114: ("bl", "#0x25fb4c"),
+    # Status-0x03f0 form: 1f 00 0d value with byte 7 kept local.
+    0x20F128: ("push", "{r4, r5, r6, r7, lr}"),
+    0x20F168: ("movs", "r1, #0x1f"),
+    0x20F16A: ("strb", "r1, [r5, #3]"),
+    0x20F172: ("ldrb", "r0, [r0, r6]"),
+    0x20F174: ("strb", "r0, [r5, #7]"),
+    0x20F176: ("movs", "r0, #0xd"),
+    0x20F17C: ("strb", "r0, [r5, #5]"),
+    0x20F180: ("ldrb", "r1, [r0, #1]"),
+    0x20F182: ("strb", "r1, [r5, #6]"),
+    0x20F190: ("strb", "r0, [r5, #5]"),
+    0x20F192: ("movs", "r0, #3"),
+    0x20F196: ("bl", "#0x25fb4c"),
+    # The status dispatcher owns the 0x03f3 and 0x03f0 direct calls.
+    0x20F90C: ("adds", "r0, r4, #0"),
+    0x20F916: ("bl", "#0x20f0e0"),
+    0x20F91C: ("adds", "r0, r4, #0"),
+    0x20F924: ("bl", "#0x20f128"),
+}
 RADIO_REPORT_HANDLER_LITERALS = {
     0x211C68: 0x1393,
     0x211C72: 0x1389,
@@ -1481,6 +1561,26 @@ RADIO_REPORT_HANDLER_LITERALS = {
 TYPE_0X80_0X70_TRACE_HELPER_LITERALS = {
     0x2768D2: 0x1E08,
     0x2768DE: 0x0803,
+}
+TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS = {
+    0x20F3FC: 0x1090F0,
+    0x20F3FE: 0x109112,
+    0x20F410: 0x1101,
+    0x20F49A: 0x2BCFDC,
+    0x20F8EC: 0x03EE,
+    0x24E0B8: 0x03EE,
+}
+TYPE_0X1F_OTHER_CONSTRUCTOR_LITERALS = {
+    0x20D78E: 0x108ED4,
+    0x20D7C4: 0x10ACF4,
+    0x20D7C8: 0x2BCFDC,
+    0x20D7D4: 0x109082,
+    0x20F118: 0x109101,
+    0x20F136: 0x109080,
+    0x20F13A: 0x1090FC,
+    0x20F144: 0x108FD4,
+    0x20F16E: 0x108F50,
+    0x20F17E: 0x108F82,
 }
 TYPE_0X8C_FIXED_OBJECT = bytes.fromhex("13950000")
 RA_INFO_CONSUMER = 0x20DB1C
@@ -1717,6 +1817,44 @@ TYPE_0X80_0X70_TRACE_HELPER_ARGUMENTS = [
 ]
 NSE3_TASK_3_ENTRY_POINTER = 0x2B74D4
 NSE3_TASK_3_ENTRY = 0x298AB9
+TYPE_0X1F_DIRECT_CONSTRUCTORS = [
+    [0x20D7B6, 0x20D7B8],
+    [0x20F0F8, 0x20F0FA],
+    [0x20F168, 0x20F16A],
+    [0x20F460, 0x20F462],
+    [0x27FEBC, 0x27FEBE],
+]
+TYPE_0X1F_CONSTRUCTOR_ROUTINES = {
+    "standalone_0x20d78e": {
+        "routine": 0x20D78E,
+        "direct_calls": [],
+        "wire_flags": [4],
+    },
+    "status_0x03f3": {
+        "routine": 0x20F0E0,
+        "direct_calls": [0x20F916],
+        "wire_flags": [1],
+    },
+    "status_0x03f0": {
+        "routine": 0x20F128,
+        "direct_calls": [0x20F924],
+        "wire_flags": [0x0D],
+    },
+    "status_0x03ee": {
+        "routine": 0x20F3EC,
+        "direct_calls": [0x20F934],
+        "wire_flags": [0x0C, 0x0D],
+    },
+    "report_0x80_0x70": {
+        "routine": 0x27FDC4,
+        "direct_calls": [0x28019A],
+        "wire_flags": [1, 6, 7],
+    },
+}
+TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR = 0x20F3EC
+TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_DIRECT_CALLS = [0x20F934]
+TYPE_0X1F_STATUS_0X03EE = 0x03EE
+TYPE_0X1F_STATUS_0X03EE_PRODUCERS = [0x24E0B8]
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -3048,6 +3186,8 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
     decode_thumb_anchors(data, TYPE_0X80_0X70_TRACE_HELPER_ANCHORS)
     decode_thumb_anchors(data, TYPE_0X80_0X70_TASK_3_ANCHORS)
+    decode_thumb_anchors(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS)
+    decode_thumb_anchors(data, TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS)
     decode_thumb_anchors(data, NSE3_TASK_17_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_ANCHORS)
@@ -3055,6 +3195,8 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_APPLICATION_DISPATCH_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
+    verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
+    verify_thumb_literals(data, TYPE_0X1F_OTHER_CONSTRUCTOR_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -3273,6 +3415,85 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
         raise ValueError(
             "NSE-3 task-3 entry changed: expected "
             f"{NSE3_TASK_3_ENTRY:#x}, got {task_3_entry:#x}"
+        )
+    type_0x1f_direct_constructors = []
+    for index, insn in enumerate(instructions[:-1]):
+        next_insn = instructions[index + 1]
+        if (
+            not insn
+            or not next_insn
+            or insn.mnemonic != "movs"
+            or not insn.op_str.endswith(", #0x1f")
+            or next_insn.mnemonic != "strb"
+        ):
+            continue
+        source_register = insn.op_str.split(",", 1)[0]
+        if (
+            next_insn.op_str.startswith(f"{source_register}, [")
+            and "#3]" in next_insn.op_str
+        ):
+            type_0x1f_direct_constructors.append(
+                [insn.address, next_insn.address]
+            )
+    if type_0x1f_direct_constructors != TYPE_0X1F_DIRECT_CONSTRUCTORS:
+        raise ValueError(
+            "NSE-3 direct type-0x1f constructor census changed: expected "
+            f"{TYPE_0X1F_DIRECT_CONSTRUCTORS}, got "
+            f"{type_0x1f_direct_constructors}"
+        )
+    type_0x1f_constructor_routines = {}
+    for name, expected in TYPE_0X1F_CONSTRUCTOR_ROUTINES.items():
+        calls = [
+            insn.address
+            for insn in instructions
+            if insn
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == expected["routine"]
+        ]
+        if calls != expected["direct_calls"]:
+            raise ValueError(
+                f"NSE-3 type-0x1f {name} call census changed: expected "
+                f"{expected['direct_calls']}, got {calls}"
+            )
+        type_0x1f_constructor_routines[name] = {
+            **expected,
+            "direct_calls": calls,
+        }
+    type_0x1f_status_0x03ee_constructor_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR
+    ]
+    if (
+        type_0x1f_status_0x03ee_constructor_calls
+        != TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_DIRECT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 status-0x03ee type-0x1f constructor call census changed: "
+            f"expected {TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_DIRECT_CALLS}, got "
+            f"{type_0x1f_status_0x03ee_constructor_calls}"
+        )
+    type_0x1f_status_0x03ee_producers = [
+        insn.address
+        for index, insn in enumerate(instructions[:-1])
+        if insn
+        and insn.mnemonic == "ldr"
+        and literal_value(insn, physical, FLASH_BASE)
+        == TYPE_0X1F_STATUS_0X03EE
+        and instructions[index + 1]
+        and instructions[index + 1].mnemonic in ("bl", "blx")
+        and immediate_target(instructions[index + 1]) == 0x27D5C0
+    ]
+    if (
+        type_0x1f_status_0x03ee_producers
+        != TYPE_0X1F_STATUS_0X03EE_PRODUCERS
+    ):
+        raise ValueError(
+            "NSE-3 status-0x03ee producer census changed: expected "
+            f"{TYPE_0X1F_STATUS_0X03EE_PRODUCERS}, got "
+            f"{type_0x1f_status_0x03ee_producers}"
         )
     task_17_entry = effective_u32(
         physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
@@ -3788,6 +4009,63 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "principal_destination_task": 3,
                 "acquisition_terminal": False,
                 "semantic_name_assigned": False,
+            },
+            "type_0x1f": {
+                "direct_constructor_sites": type_0x1f_direct_constructors,
+                "direct_constructor_count": 5,
+                "constructor_routines": type_0x1f_constructor_routines,
+                "task": 3,
+                "queue_status": 2,
+                "declared_payload_bytes": 4,
+                "wire_source_offset": 3,
+                "common_prefix": [0x1F, 0],
+                "standalone_0x20d78e_form": {
+                    "wire_flags": [4],
+                    "wire_value":
+                        "table_0x2bcfdc[(cell_0x10acf4_byte_8 & 0x1f)]",
+                    "local_metadata_offset": 7,
+                    "local_metadata_value": 0,
+                    "direct_callers": [],
+                },
+                "status_0x03f3_form": {
+                    "constructor": 0x20F0E0,
+                    "wire_flags": [1],
+                    "wire_value": 0,
+                    "local_metadata_offset": 7,
+                    "local_metadata_source_offset": 2,
+                },
+                "status_0x03f0_form": {
+                    "constructor": 0x20F128,
+                    "wire_flags": [0x0D],
+                    "wire_value": "cell_0x108f82_byte_1",
+                    "local_metadata_offset": 7,
+                    "local_metadata_source":
+                        "cell_0x108f50_plus_runtime_index_0x82",
+                },
+                "status_0x03ee_form": {
+                    "constructor": TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR,
+                    "direct_calls": type_0x1f_status_0x03ee_constructor_calls,
+                    "status_producers":
+                        type_0x1f_status_0x03ee_producers,
+                    "input_offsets": {
+                        "optional_value_present": 0x0A,
+                        "optional_local_metadata": 0x0B,
+                        "table_index": 9,
+                    },
+                    "table": 0x2BCFDC,
+                    "wire_flags": [0x0C, 0x0D],
+                    "wire_value": "table_0x2bcfdc[input_byte_9]",
+                    "local_metadata_offset": 7,
+                },
+                "report_type_0x80_discriminator_0x70_form": {
+                    "constructor": 0x27FEB4,
+                    "wire_flags": [1, 6, 7],
+                    "wire_value": "derived_timing_or_zero",
+                    "local_metadata_offset": 7,
+                },
+                "forms_share_wire_profile": True,
+                "protocol_semantic_name_assigned": False,
+                "dsp_side_consumer": "not_established",
             },
             "type_0x80": {
                 "handler": 0x2800B0,

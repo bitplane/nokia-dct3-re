@@ -435,6 +435,82 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.TYPE_0X80_0X70_TASK_3_ANCHORS[0x298C86],
         )
         self.assertEqual(
+            [
+                [0x20D7B6, 0x20D7B8],
+                [0x20F0F8, 0x20F0FA],
+                [0x20F168, 0x20F16A],
+                [0x20F460, 0x20F462],
+                [0x27FEBC, 0x27FEBE],
+            ],
+            check.TYPE_0X1F_DIRECT_CONSTRUCTORS,
+        )
+        self.assertEqual(
+            [4],
+            check.TYPE_0X1F_CONSTRUCTOR_ROUTINES[
+                "standalone_0x20d78e"
+            ]["wire_flags"],
+        )
+        self.assertEqual(
+            [1],
+            check.TYPE_0X1F_CONSTRUCTOR_ROUTINES["status_0x03f3"][
+                "wire_flags"
+            ],
+        )
+        self.assertEqual(
+            [0x0D],
+            check.TYPE_0X1F_CONSTRUCTOR_ROUTINES["status_0x03f0"][
+                "wire_flags"
+            ],
+        )
+        self.assertEqual(
+            ("movs", "r2, #0x1f"),
+            check.TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS[0x20D7B6],
+        )
+        self.assertEqual(
+            ("movs", "r2, #0x1f"),
+            check.TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS[0x20F0F8],
+        )
+        self.assertEqual(
+            ("movs", "r1, #0x1f"),
+            check.TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS[0x20F168],
+        )
+        self.assertEqual(
+            ("bl", "#0x20f128"),
+            check.TYPE_0X1F_OTHER_CONSTRUCTOR_ANCHORS[0x20F924],
+        )
+        self.assertEqual(
+            0x2BCFDC,
+            check.TYPE_0X1F_OTHER_CONSTRUCTOR_LITERALS[0x20D7C8],
+        )
+        self.assertEqual(0x20F3EC, check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR)
+        self.assertEqual(
+            [0x20F934], check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_DIRECT_CALLS
+        )
+        self.assertEqual(0x03EE, check.TYPE_0X1F_STATUS_0X03EE)
+        self.assertEqual(
+            [0x24E0B8], check.TYPE_0X1F_STATUS_0X03EE_PRODUCERS
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x1f"),
+            check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS[0x20F460],
+        )
+        self.assertEqual(
+            ("ldrb", "r2, [r2, r3]"),
+            check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS[0x20F49E],
+        )
+        self.assertEqual(
+            ("bl", "#0x25fb4c"),
+            check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_ANCHORS[0x20F4C2],
+        )
+        self.assertEqual(
+            0x2BCFDC,
+            check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS[0x20F49A],
+        )
+        self.assertEqual(
+            0x03EE,
+            check.TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS[0x24E0B8],
+        )
+        self.assertEqual(
             0x1E08, check.RADIO_REPORT_HANDLER_LITERALS[0x27FEC0]
         )
         self.assertEqual(
