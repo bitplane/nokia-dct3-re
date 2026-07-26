@@ -141,6 +141,71 @@ SIM_T0_STATUS_ANCHORS = {
     0x27596C: ("subs", "r0, #0x30"),
     0x275972: ("subs", "r0, #0x10"),
 }
+SIM_APDU_CONSTRUCTOR_ANCHORS = {
+    # Contiguous GSM SIM command constructors all author CLA A0 and an
+    # instruction byte before submitting the command object through 0x286b6a.
+    0x286C5C: ("movs", "r1, #0xa0"),
+    0x286C60: ("movs", "r1, #0x20"),
+    0x286CDC: ("movs", "r0, #0xa0"),
+    0x286CE0: ("movs", "r0, #0xdc"),
+    0x286D34: ("movs", "r0, #0xa0"),
+    0x286D38: ("movs", "r0, #0xd6"),
+    0x286D88: ("movs", "r0, #0xa0"),
+    0x286D8C: ("movs", "r0, #0x2c"),
+    0x286E06: ("movs", "r2, #0xa0"),
+    0x286E0A: ("movs", "r2, #0xf2"),
+    0x286E6A: ("movs", "r1, #0xa0"),
+    0x286E6E: ("movs", "r1, #0x14"),
+    0x286EB8: ("movs", "r2, #0xa0"),
+    0x286EBC: ("movs", "r2, #0x10"),
+    0x286F08: ("movs", "r2, #0xa0"),
+    0x286F0C: ("movs", "r2, #0x12"),
+    0x286F48: ("movs", "r2, #0xa0"),
+    0x286F4C: ("movs", "r2, #0xa4"),
+    0x286FA8: ("movs", "r2, #0xa0"),
+    0x286FAC: ("movs", "r2, #0xa4"),
+    0x286FFE: ("movs", "r1, #0xa0"),
+    0x287002: ("movs", "r1, #0x88"),
+    0x2870C0: ("movs", "r1, #0xa0"),
+    0x2870C4: ("movs", "r1, #0xb2"),
+    0x2870F6: ("movs", "r1, #0xa0"),
+    0x2870FA: ("movs", "r1, #0xb0"),
+    0x287148: ("movs", "r3, #0xa0"),
+    0x28714C: ("movs", "r3, #0x32"),
+    0x287194: ("movs", "r2, #0xa0"),
+    0x287198: ("movs", "r2, #0xc0"),
+    0x2871D6: ("movs", "r1, #0xa0"),
+    0x2871DA: ("movs", "r1, #0x28"),
+    0x28723E: ("movs", "r1, #0xa0"),
+    0x287242: ("movs", "r1, #0x26"),
+    0x287398: ("movs", "r0, #0xa0"),
+    0x28739C: ("movs", "r0, #0xc2"),
+    0x28753E: ("movs", "r1, #0xa0"),
+    0x287542: ("movs", "r1, #0x24"),
+    0x286C9E: ("bl", "#0x286b6a"),
+    0x287592: ("bl", "#0x286b6a"),
+}
+SIM_APDU_CONSTRUCTORS = [
+    {"address": 0x286C40, "instruction": 0x20, "name": "VERIFY_CHV"},
+    {"address": 0x286CB6, "instruction": 0xDC, "name": "UPDATE_RECORD"},
+    {"address": 0x286D14, "instruction": 0xD6, "name": "UPDATE_BINARY"},
+    {"address": 0x286D6A, "instruction": 0x2C, "name": "UNBLOCK_CHV"},
+    {"address": 0x286DF0, "instruction": 0xF2, "name": "STATUS"},
+    {"address": 0x286E4C, "instruction": 0x14, "name": "TERMINAL_PROFILE"},
+    {"address": 0x286E9E, "instruction": 0x10, "name": "TERMINAL_RESPONSE"},
+    {"address": 0x286EF0, "instruction": 0x12, "name": "FETCH"},
+    {"address": 0x286F30, "instruction": 0xA4, "name": "SELECT"},
+    {"address": 0x286F90, "instruction": 0xA4, "name": "SELECT"},
+    {"address": 0x286FE4, "instruction": 0x88, "name": "RUN_GSM_ALGORITHM"},
+    {"address": 0x2870A4, "instruction": 0xB2, "name": "READ_RECORD"},
+    {"address": 0x2870DC, "instruction": 0xB0, "name": "READ_BINARY"},
+    {"address": 0x287130, "instruction": 0x32, "name": "INCREASE"},
+    {"address": 0x28717E, "instruction": 0xC0, "name": "GET_RESPONSE"},
+    {"address": 0x2871BC, "instruction": 0x28, "name": "ENABLE_CHV"},
+    {"address": 0x287224, "instruction": 0x26, "name": "DISABLE_CHV"},
+    {"address": 0x287310, "instruction": 0xC2, "name": "ENVELOPE"},
+    {"address": 0x287520, "instruction": 0x24, "name": "CHANGE_CHV"},
+]
 DSPIF_ANCHORS = {
     # Doorbell write after a shared-memory request is accepted.
     0x28564C: ("ldr", "r1, [pc, #0x3b8]"),
@@ -1208,6 +1273,20 @@ def verify_simi_boundary(data: bytes) -> dict:
         },
         "subscriber_filesystem_profile": "removable_lab_fixture_not_nse3_identity",
         "initial_apdu_sequence": "requires_organic_boot_trace",
+    }
+
+
+def verify_sim_apdu_boundary(data: bytes) -> dict:
+    decode_thumb_anchors(data, SIM_APDU_CONSTRUCTOR_ANCHORS)
+    return {
+        "class": 0xA0,
+        "constructor_extent": {"start": 0x286C40, "end": 0x2875A8},
+        "common_submit": 0x286B6A,
+        "constructors": SIM_APDU_CONSTRUCTORS,
+        "unique_instructions": sorted(
+            {constructor["instruction"] for constructor in SIM_APDU_CONSTRUCTORS}
+        ),
+        "sequence": "data_driven_requires_organic_boot_trace",
     }
 
 
@@ -2384,6 +2463,7 @@ def verify(data: bytes) -> dict:
         "keypad_boundary": verify_keypad_boundary(data),
         "eeprom_boundary": verify_eeprom_boundary(data),
         "simi_boundary": verify_simi_boundary(data),
+        "sim_apdu_boundary": verify_sim_apdu_boundary(data),
         "dspif_transport_boundary": verify_dspif_boundary(data),
         "radio_packet_boundary": verify_radio_packet_boundary(data),
         "dsp_parameter_08_boundary": verify_dsp_parameter_08_boundary(data),

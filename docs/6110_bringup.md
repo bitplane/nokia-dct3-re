@@ -115,10 +115,37 @@ remain fixture policy, not Nokia 6110 product identity or an NSE-3 ROM special
 case. The same static gate pins the T=0 status classifier: the card's normal
 `67`, `90`, `94`, `98` and `9f` families all have explicit firmware paths,
 while its `6d 00` unsupported-instruction response reaches the generic command
-error path. The command objects themselves are data-driven, so this does not
-prove an instruction set or transaction order. The firmware's first APDU
-sequence still requires an organic boot trace; SIM and registration coverage
-remain unpromoted.
+error path. That status classifier alone does not prove an instruction set or
+transaction order. The firmware's first APDU sequence still requires an
+organic boot trace; SIM and registration coverage remain unpromoted.
+
+The command-construction layer is now bounded independently of that missing
+ordering. The contiguous routines at `0x286c40..0x2875a8` construct class
+`a0` APDUs and submit every command object through `0x286b6a`. Their 18
+unique instructions are:
+
+| Instruction | Firmware constructor meaning |
+| --- | --- |
+| `10`, `12`, `14`, `c2` | TERMINAL RESPONSE, FETCH, TERMINAL PROFILE, ENVELOPE |
+| `20`, `24`, `26`, `28`, `2c` | VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK CHV |
+| `32`, `88` | INCREASE and RUN GSM ALGORITHM |
+| `a4`, `b0`, `b2`, `c0` | SELECT, READ BINARY, READ RECORD and GET RESPONSE |
+| `d6`, `dc`, `f2` | UPDATE BINARY, UPDATE RECORD and STATUS |
+
+There are two separately stateful SELECT constructors; this is 19
+constructors, not a duplicate-byte search presented as 19 instructions. The
+exact verifier pins each CLA/instruction authoring site plus the first and
+last common-submit calls.
+
+This vocabulary also makes the shared lab-card boundary explicit. Its current
+standards-shaped core implements SELECT, READ BINARY, READ RECORD, GET
+RESPONSE, UPDATE BINARY, UPDATE RECORD, STATUS and CHANGE CHV. It deliberately
+returns `6d 00` for the other NSE-3 constructors. That is sufficient evidence
+for a reusable generic SIM command layer, but not permission to pre-implement
+an assumed 6110 boot script: an organic trace must establish which commands
+are actually issued, their file-selection context, parameters and status
+progression. Missing commands should then be implemented generically from the
+applicable GSM SIM contract rather than special-cased for NSE-3.
 
 The same exact-image gate now establishes the firmware side of the generic
 DSPIF transport. The MCU-to-DSP ring occupies shared byte offsets

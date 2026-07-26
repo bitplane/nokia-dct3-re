@@ -154,6 +154,24 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             result["subscriber_filesystem_profile"],
         )
 
+    def test_sim_apdu_constructor_vocabulary_is_product_evidence(self):
+        self.assertEqual(
+            [
+                0x10, 0x12, 0x14, 0x20, 0x24, 0x26, 0x28, 0x2C, 0x32,
+                0x88, 0xA4, 0xB0, 0xB2, 0xC0, 0xC2, 0xD6, 0xDC, 0xF2,
+            ],
+            sorted(
+                {
+                    constructor["instruction"]
+                    for constructor in check.SIM_APDU_CONSTRUCTORS
+                }
+            ),
+        )
+        self.assertEqual(2, sum(
+            constructor["instruction"] == 0xA4
+            for constructor in check.SIM_APDU_CONSTRUCTORS
+        ))
+
     def test_dspif_boundary_recovers_ring_geometry_without_reply_semantics(self):
         physical = bytearray(b"\xff" * check.FLASH_SIZE)
         encodings = {
