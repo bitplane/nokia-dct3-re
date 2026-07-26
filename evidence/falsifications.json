@@ -629,8 +629,14 @@
     {
       "id": "nhm5_paging_requires_network_repetition", "status": "disproven",
       "hypothesis": "NHM-5 v6.39 ignores the single laboratory IMSI page because it requires the network to repeat the request",
-      "conclusion": "The firmware parser returns 0x08a2 and sets shared page-pending byte 0x0010dc5f for the first request and for correctly addressed repetitions at every subsequent 102-frame paging opportunity. No repetition reaches the separate idle-RR admission path at 0x255ff8 or produces RACH. The unresolved boundary is the firmware-owned wake-up/registration contract between parser completion and idle RR, not network retry count.",
+      "conclusion": "The firmware parser returns 0x08a2 and sets shared parser-completion byte 0x0010dc5f for the first request and for correctly addressed repetitions at every subsequent 102-frame paging opportunity. No repetition reaches the separate RR admission path at 0x255ff8 or produces RACH. The unresolved boundary is the firmware-owned transition from its background parser loop into paging admission, not network retry count.",
       "evidence": ["docs/model_coverage.md"]
+    },
+    {
+      "id": "nhm5_release_confirmation_requires_zero", "status": "disproven",
+      "hypothesis": "NHM-5 context 0x0409/01/00 requires CHANNEL_CHANGED_CNF body bit zero to complete RR release",
+      "conclusion": "Handler 0x2c4c28 recognizes pending-context word 0x0409 and branches to 0x2c4ca8 before the body-bit comparison used by ordinary contexts. Runtime follows that special branch with the reproduced zero body. Delivering the same real confirmation immediately, before RR result 0x05e8 instead of after it, is also accepted but does not enable later paging. Zero remains the observed release body, not a proved acceptance requirement or the missing idle-transition timing contract.",
+      "evidence": ["docs/dsp_interface.md", "docs/model_coverage.md", "docs/network_scouting.md"]
     }
   ]
 }

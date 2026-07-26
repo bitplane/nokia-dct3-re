@@ -232,9 +232,12 @@ transition. An NSE-8-compatible all-zero body is therefore not a generic
 success response: NHM-5 discards it and continues returning UI/fill frames.
 The product-typed peer supplies value one, after which the ROM itself exposes
 the same standards-shaped Location Updating lifecycle and updates `EF_LOCI`.
-The later release context is independently `0x0409/01/00`; its confirmation
-therefore carries zero. A fixed “success=one” interpretation is invalid even
-within NHM-5 and leaves the release confirmation rejected.
+The later release context is independently `0x0409/01/00`, and the reproduced
+confirmation carries zero. The ROM recognizes `0x0409` before comparing the
+body bit and takes a dedicated release-completion branch for either value;
+zero is therefore observed rather than proved mandatory. A fixed
+“success=one” interpretation is still invalid for the assigned-channel
+transaction, whose non-`0x0409` context does perform the correlation.
 
 After registration, channel `0x50` continues to carry BCCH while channel
 `0x60` carries the decoded PCH/AGCH blocks already associated with the

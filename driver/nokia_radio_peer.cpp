@@ -1315,9 +1315,9 @@ void nokia_radio_peer_device::emit_report()
 			m_protocol_profile == protocol_profile::nhm5_candidate_list)
 	{
 		// NHM-5's CHANNEL_CHANGED_CNF consumer correlates payload bit 0 with
-		// the pending RR channel-change context.  Assignment carries value one
-		// while release carries zero; treating one as a generic success leaves
-		// the ROM in dedicated RR state after physical deconfiguration.
+		// ordinary pending channel-change contexts. Assignment requires value
+		// one. The recovered 0x0409 release context takes a special completion
+		// branch before that comparison; zero remains its observed DSP body.
 		payload[0] = m_phase == phase::release_channel_change ? 0x00 : 0x01;
 	}
 
