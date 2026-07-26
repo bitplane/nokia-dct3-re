@@ -131,6 +131,36 @@ shared-memory literals, including the `0x30000` DSPIF doorbell. These are the
 same transport boundaries expressed by the reusable `nokia_dspif_device`, so
 NSE-3 does not require a copied or product-specific ring implementation.
 
+The exact-image gate also closes the MCU-side radio packet envelope without
+enabling a radio peer. Two independent v4.06 control paths allocate
+`0x48`-byte queue objects and construct DSP packet type `0x1a` with wire
+length 68. The ordinary constructor at `0x20faec` derives and packs its search
+set; the second at `0x216f72` emits the same type and length from a separate
+controller path. Task-side code reads the object length at `+2`, passes
+`object + 3` (type followed by body) to the generic DSPIF writer at
+`0x285746`, and frees the object only after submission. This proves a genuine
+NSE-3 bitmap-shaped `SEARCH_LIST` command, rather than compatibility inferred
+only from NSE-8 packet sizes.
+
+The receive side is independently bounded. DSPIF parser `0x285794` preserves
+the received length at queue-object byte `+2` and packet type at `+3`.
+Dispatcher `0x2a20dc` routes type `0x80` directly and uses a bounded table for
+radio reports `0x83`, `0x84`, `0x86..0x8c` and `0x8f`. Its handler topology
+matches the established MDI vocabulary: received block, RSSI/RA information,
+block request, search terminals, timing offset, channel-change confirmation
+and random-access completion. In particular, type `0x8b` is copied as a
+`0xa8`-byte queue object: the four-byte queue envelope plus a 166-byte DSP
+packet containing forty four-byte result records. Types `0x8d`, `0x8e`,
+`0x95`, `0x9b` and the `0x70..0x7f` family are classified separately and are
+not folded into the radio report table.
+
+This is strong evidence that the shared radio layer is the correct
+architectural home, but it is not yet proof that every NSE-8 report-body
+field, bitmap bit numbering, retry rule or completion sequence is identical.
+The 6110 therefore still selects no radio-peer profile. The next gate is to
+recover the body offsets and lifecycle consumed by the NSE-3 search handlers,
+then compare those explicit contracts with the typed bitmap-search profile.
+
 The external image also proves the MCU side of a much larger bootstrap
 transfer. Routine `0x2858fc..0x2859ff` samples 32,766 halfwords from its own
 flash, beginning at reset entry `0x200040`, advancing by `0x20` bytes and

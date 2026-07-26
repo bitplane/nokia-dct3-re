@@ -170,6 +170,99 @@ DSPIF_LITERALS = {
     0x285A42: 0x100A4,
     0x285A46: 0x101C8,
 }
+RADIO_PACKET_ANCHORS = {
+    # The normal L1 search path allocates a 0x48-byte queue object and emits
+    # an independently constructed type-0x1a, length-68 DSP packet.
+    0x20FB7C: ("movs", "r0, #0x48"),
+    0x20FB84: ("movs", "r0, #2"),
+    0x20FB8A: ("strh", "r0, [r1]"),
+    0x20FB92: ("movs", "r0, #0x44"),
+    0x20FB94: ("strb", "r0, [r1, #2]"),
+    0x20FB96: ("movs", "r0, #0x1a"),
+    0x20FB98: ("strb", "r0, [r1, #3]"),
+    # A second control path constructs the same wire packet rather than
+    # borrowing a static NSE-8 fixture.
+    0x216F74: ("movs", "r0, #0x48"),
+    0x216F7E: ("movs", "r2, #0x48"),
+    0x216F84: ("movs", "r0, #2"),
+    0x216F86: ("strh", "r0, [r4]"),
+    0x216F88: ("movs", "r0, #0x44"),
+    0x216F8A: ("strb", "r0, [r4, #2]"),
+    0x216F8C: ("movs", "r0, #0x1a"),
+    0x216F8E: ("strb", "r0, [r4, #3]"),
+    # The task-side queue pump passes object +3 (type followed by body) and
+    # the firmware-supplied length to the generic DSPIF packet writer.
+    0x298C78: ("ldrb", "r1, [r5, #2]"),
+    0x298C82: ("ldrb", "r0, [r5, #2]"),
+    0x298C84: ("adds", "r1, r5, #3"),
+    0x298C86: ("bl", "#0x285746"),
+    # DSPIF RX materializes the received length at object +2 and type at +3.
+    0x2857E6: ("ldr", "r0, [r5]"),
+    0x2857E8: ("strb", "r7, [r0, #2]"),
+    0x2857EA: ("ldr", "r0, [r5]"),
+    0x2857EE: ("strb", "r1, [r0, #3]"),
+}
+RADIO_REPORT_DISPATCH_ANCHORS = {
+    # Type 0x80 is handled directly.  Types 0x83..0x8f use a bounded jump
+    # table; the holes 0x85/0x8d/0x8e deliberately fall through.
+    0x2A2108: ("movs", "r1, #0x80"),
+    0x2A210A: ("subs", "r1, r0, r1"),
+    0x2A210E: ("beq", "#0x2a21aa"),
+    0x2A2110: ("subs", "r1, #3"),
+    0x2A2112: ("cmp", "r1, #0xc"),
+    0x2A2114: ("bhi", "#0x2a21bc"),
+    0x2A21AA: ("adds", "r0, r4, #0"),
+    0x2A21AC: ("bl", "#0x2800b0"),
+    0x2A2156: ("bl", "#0x2803c8"),
+    0x2A215E: ("bl", "#0x2804c0"),
+    0x2A2166: ("bl", "#0x28054e"),
+    0x2A216E: ("bl", "#0x2803f8"),
+    0x2A2176: ("bl", "#0x2804f4"),
+    0x2A217E: ("bl", "#0x280464"),
+    0x2A2186: ("bl", "#0x28042e"),
+    0x2A2194: ("bl", "#0x27fa34"),
+    0x2A219C: ("bl", "#0x280398"),
+    0x2A21A4: ("bl", "#0x27fd40"),
+    # The later classifier owns the broker/service families separately from
+    # the radio jump-table handlers.
+    0x2A21BC: ("movs", "r1, #0x8d"),
+    0x2A21C0: ("cmp", "r1, #1"),
+    0x2A21C4: ("subs", "r1, #8"),
+    0x2A21CA: ("subs", "r1, #6"),
+    0x2A21D0: ("movs", "r1, #0xf0"),
+    0x2A21D4: ("cmp", "r1, #0x70"),
+}
+RADIO_REPORT_HANDLER_ANCHORS = {
+    # Fixed copies/posts constrain the important report object geometries.
+    # Type 0x8b preserves a 0xa8-byte object (four-byte queue envelope plus
+    # the 166-byte DSP packet), matching forty four-byte result records.
+    0x28054E: ("push", "{r4, lr}"),
+    0x280558: ("movs", "r1, #0xa8"),
+    0x28055A: ("bl", "#0x276912"),
+    # Type 0x88 consumes its timing/report body fields through object +0x0d.
+    0x28047C: ("ldrb", "r1, [r4, #6]"),
+    0x280486: ("ldrb", "r0, [r4, #7]"),
+    0x28048C: ("ldrb", "r0, [r4, #9]"),
+    0x280496: ("ldrb", "r1, [r4, #0xb]"),
+    0x2804A0: ("ldrb", "r0, [r4, #4]"),
+    0x2804A4: ("ldrb", "r0, [r4, #0xd]"),
+}
+RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
+RADIO_REPORT_JUMP_TABLE = {
+    0x83: 0x2A21A2,
+    0x84: 0x2A219A,
+    0x85: 0x2A21BC,
+    0x86: 0x2A2192,
+    0x87: 0x2A2184,
+    0x88: 0x2A217C,
+    0x89: 0x2A2174,
+    0x8A: 0x2A216C,
+    0x8B: 0x2A2164,
+    0x8C: 0x2A215C,
+    0x8D: 0x2A21BC,
+    0x8E: 0x2A21BC,
+    0x8F: 0x2A2154,
+}
 DSP_BOOTSTRAP_ANCHORS = {
     # Shared bootstrap/header setup.
     0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
@@ -518,6 +611,68 @@ def verify_dspif_boundary(data: bytes) -> dict:
     }
 
 
+def verify_radio_packet_boundary(data: bytes) -> dict:
+    decode_thumb_anchors(data, RADIO_PACKET_ANCHORS)
+    decode_thumb_anchors(data, RADIO_REPORT_DISPATCH_ANCHORS)
+    decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
+    table_offset = RADIO_REPORT_JUMP_TABLE_ADDRESS - FLASH_BASE
+    table = {
+        packet_type: struct.unpack_from(
+            ">I", data, table_offset + (packet_type - 0x83) * 4
+        )[0]
+        for packet_type in RADIO_REPORT_JUMP_TABLE
+    }
+    if table != RADIO_REPORT_JUMP_TABLE:
+        raise ValueError(
+            f"NSE-3 radio report jump table changed: expected "
+            f"{RADIO_REPORT_JUMP_TABLE}, got {table}"
+        )
+    return {
+        "transport": {
+            "tx_queue_pump": 0x298C82,
+            "tx_writer": 0x285746,
+            "object_length_offset": 2,
+            "wire_start_offset": 3,
+            "rx_parser": 0x285794,
+            "rx_type_offset": 3,
+        },
+        "search_list": {
+            "type": 0x1A,
+            "wire_length": 68,
+            "object_allocation": 0x48,
+            "constructors": [0x20FAEC, 0x216F72],
+            "representation": "bitmap_shaped",
+            "nse8_body_compatibility": "not_yet_established",
+        },
+        "report_dispatch": {
+            "routine": 0x2A20DC,
+            "jump_table": RADIO_REPORT_JUMP_TABLE_ADDRESS,
+            "radio_handlers": {
+                "0x80": 0x2800B0,
+                "0x83": 0x27FD40,
+                "0x84": 0x280398,
+                "0x86": 0x27FA34,
+                "0x87": 0x28042E,
+                "0x88": 0x280464,
+                "0x89": 0x2804F4,
+                "0x8a": 0x2803F8,
+                "0x8b": 0x28054E,
+                "0x8c": 0x2804C0,
+                "0x8f": 0x2803C8,
+            },
+            "separate_service_families": ["0x8d", "0x8e", "0x95", "0x9b", "0x70..0x7f"],
+            "all_rssi_results": {
+                "type": 0x8B,
+                "wire_length": 166,
+                "queue_object_bytes": 0xA8,
+                "record_count": 40,
+                "record_bytes": 4,
+            },
+        },
+        "peer_profile": "disabled_pending_report_body_and_lifecycle_proof",
+    }
+
+
 def extract_dsp_bootstrap_stream(data: bytes) -> bytes:
     source_first = 0x200040
     source_words = 63 * 512 + 510
@@ -662,6 +817,7 @@ def verify(data: bytes) -> dict:
         "eeprom_boundary": verify_eeprom_boundary(data),
         "simi_boundary": verify_simi_boundary(data),
         "dspif_transport_boundary": verify_dspif_boundary(data),
+        "radio_packet_boundary": verify_radio_packet_boundary(data),
         "dsp_bootstrap_transfer_boundary": verify_dsp_bootstrap_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {
