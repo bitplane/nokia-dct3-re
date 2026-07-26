@@ -693,9 +693,13 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		{
 			// Type 0x56 publishes NHM-5's firmware-selected candidate window.
 			// A usable candidate produces SCH before the alternative 0x8b
-			// measurement terminal closes that window.
+			// measurement terminal closes that window. Do not collapse the
+			// acquisition into adjacent TDMA ticks: use the complete
+			// eight-multiframe BCCH validation interval that the selected-cell
+			// path below also requires.
 			m_phase = phase::candidate_measurement;
 			m_reports_remaining = 2;
+			m_wait_ticks = 8 * 51;
 		}
 		else
 		{
@@ -1263,7 +1267,7 @@ void nokia_radio_peer_device::emit_report()
 		else if (payload[0] == 0x60)
 		{
 			const auto assignment = m_gsm_network->immediate_assignment(
-					m_access_ra, frame_number);
+					m_access_ra, frame_number, m_serving_arfcn);
 			std::copy(assignment.begin(), assignment.end(), std::begin(payload) + 10);
 		}
 		else if (payload[0] == 0x50)
@@ -1585,6 +1589,9 @@ void nokia_radio_peer_device::tick()
 	if (!m_enabled)
 		return;
 
+	if (m_phase == phase::candidate_measurement &&
+			m_reports_remaining != 0 && m_wait_ticks != 0)
+		--m_wait_ticks;
 	if (m_phase == phase::candidate_sync && m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
 	if (m_phase == phase::serving_bcch && m_reports_remaining != 0 && m_wait_ticks != 0)
@@ -1600,6 +1607,7 @@ void nokia_radio_peer_device::tick()
 	if (m_report_deferred)
 		m_report_deferred = false;
 	else if (m_reports_remaining != 0 &&
+			!(m_phase == phase::candidate_measurement && m_wait_ticks != 0) &&
 			!(m_phase == phase::candidate_sync && m_wait_ticks != 0) &&
 			!(m_phase == phase::serving_bcch && m_wait_ticks != 0) &&
 			!(m_phase == phase::selected_bcch && m_wait_ticks != 0) &&

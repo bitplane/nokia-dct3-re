@@ -36,7 +36,8 @@ public:
 			const u8 *mobile_identity, unsigned length) const;
 	paging_group subscriber_paging_group(
 			const u8 *mobile_identity, unsigned length) const;
-	std::array<u8, 24> immediate_assignment(u8 random_access, u32 frame_number) const;
+	std::array<u8, 24> immediate_assignment(
+			u8 random_access, u32 frame_number, u16 serving_arfcn) const;
 	std::array<u8, 17> location_update_accept(
 			const u8 *location_update_request, unsigned length) const;
 	std::array<u8, 3> cipher_mode_command() const;

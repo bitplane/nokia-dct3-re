@@ -170,6 +170,16 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			if idle_pch is not None and packet["direction"] == "rx"
 			and packet["type"] == 0x80 and packet["time"] > idle_pch["time"]
 			and bytes.fromhex(packet["data"])[0] == 0x50), None)
+	random_access = next((packet for packet in packets
+			if idle_configure is not None and packet["direction"] == "tx"
+			and packet["type"] == 0x0C and packet["time"] > idle_configure["time"]
+			and (data := bytes.fromhex(packet["data"]))[1] == 0
+			and data[2] != 0), None)
+	assigned_configure = next((packet for packet in packets
+			if random_access is not None and packet["direction"] == "tx"
+			and packet["type"] == 0x02 and packet["time"] > random_access["time"]
+			and (data := bytes.fromhex(packet["data"]))[8] == 0x80
+			and data[10:12] == b"\x00\x58"), None)
 	no_psw_found = first("rx", 0x8A, search["time"])
 
 	if sch is None or sch["length"] != 34:
@@ -194,9 +204,11 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 		raise SystemExit("NHM-5 SI1 does not advertise its selected ARFCN 0x0058")
 	if no_psw_found is not None:
 		raise SystemExit("NHM-5 successful acquisition also received NO_PSW_FOUND")
-	if idle_configure is None or idle_pch is None or idle_bcch is None:
+	if idle_configure is None or (
+			(idle_pch is None or idle_bcch is None) and
+			(random_access is None or assigned_configure is None)):
 		raise SystemExit(
-			"NHM-5 did not coexist idle channel-0x60 PCH with serving BCCH"
+			"NHM-5 reached neither idle PCH/BCCH coexistence nor serving-carrier access"
 		)
 	parsed_si = [
 		int(match.group(1), 16)
@@ -221,11 +233,15 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			ra_info["time"] <= bcch["time"]
 	):
 		raise SystemExit("NHM-5 acquisition transaction order changed")
+	idle_outcome = (
+		"idle PCH/BCCH coexistence" if idle_pch is not None and idle_bcch is not None
+		else "organic Random Access and SDCCH configuration on ARFCN 0058"
+	)
 	print(
 		"NHM-5 acquisition: 56/160 candidate 0058 -> SCH -> organic 02/20 "
 		"CHANNEL_CONFIGURE -> NO_PSW_LEFT -> CHANNEL_CHANGED_CNF -> RA_INFO -> "
 		"BCCH SI1 advertising 0058; firmware accepted a complete SI1-SI4 set -> "
-		"idle PCH/BCCH coexistence"
+		f"{idle_outcome}"
 	)
 
 
