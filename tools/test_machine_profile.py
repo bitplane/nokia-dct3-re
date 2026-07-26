@@ -85,6 +85,7 @@ class MachineProfileTest(unittest.TestCase):
                 "pup_eeprom_scl_bit": "2",
                 "radio_wire":
                     "nokia_radio_peer_device::wire_profile::bitmap_search",
+                "dsp_parameter_command": "0x08",
             },
         )
         self.assertIn(
@@ -98,6 +99,8 @@ class MachineProfileTest(unittest.TestCase):
         for peer in ("dsp_service", "external_service", "radio_peer"):
             self.assertNotIn(f"result.{peer} = true;", body)
         self.assertNotIn("result.radio_acquisition =", body)
+        self.assertNotIn("result.dsp_speech_request_mask =", body)
+        self.assertNotIn("result.dsp_speech_request_value =", body)
 
         profile = self.driver.split(
             "void nokia_dct3_state::noki6110(machine_config &config)", 1

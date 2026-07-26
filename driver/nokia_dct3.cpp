@@ -126,9 +126,9 @@ struct nokia_product_config
 	u16 dsp_boot_status_response = 0;
 	unsigned dsp_service_delay_us = 5'000;
 	unsigned dsp_peer_poll_ms = 5;
-	u8 dsp_speech_control_command = 0xff;
-	u16 dsp_speech_control_mask = 0;
-	u16 dsp_speech_control_enabled = 0;
+	u8 dsp_parameter_command = 0xff;
+	u16 dsp_speech_request_mask = 0;
+	u16 dsp_speech_request_value = 0;
 	nokia_mad2_pcm_device::bus_profile cobba_pcm;
 	nokia_cobba_device::hle_voice_profile cobba_hle_voice;
 	bool flash_b3_block_lock = false;
@@ -158,9 +158,9 @@ constexpr nokia_product_config make_3210_config()
 	result.dsp_peer_poll_ms = 4;
 	// Paired NSE-8 firmware independently constructs/removes this field around
 	// Answer while retaining the separate 0x0408 dedicated-channel field.
-	result.dsp_speech_control_command = 0x08;
-	result.dsp_speech_control_mask = 0x0201;
-	result.dsp_speech_control_enabled = 0x0201;
+	result.dsp_parameter_command = 0x08;
+	result.dsp_speech_request_mask = 0x0201;
+	result.dsp_speech_request_value = 0x0201;
 	result.cobba_pcm.data_clock = 520'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	// DCT3 MAD2/COBBA-GJ PCM timing diagrams show a 16-bit serial word
@@ -205,9 +205,9 @@ constexpr nokia_product_config make_3310_config()
 	// after organic Answer, then 0x040a during physical-End teardown. Those
 	// values satisfy and clear the same recovered speech-request field, but do
 	// not establish a PCM bus for this product.
-	result.dsp_speech_control_command = 0x08;
-	result.dsp_speech_control_mask = 0x0201;
-	result.dsp_speech_control_enabled = 0x0201;
+	result.dsp_parameter_command = 0x08;
+	result.dsp_speech_request_mask = 0x0201;
+	result.dsp_speech_request_value = 0x0201;
 	// Nokia's NHM-5/UB 4 V09 COBBA schematic (version 2.0, 04.05.2001)
 	// independently wires the built-in differential microphone pads through
 	// L402 to MIC2P/MIC2N and the receiver to EARP/EARN. Record that topology
@@ -295,6 +295,10 @@ constexpr nokia_product_config make_6110_config()
 	// bitmap wire boundary. Record that separately from the still-unproved
 	// NSE-3 acquisition policy; a disabled peer cannot synthesize traffic.
 	result.radio_wire = nokia_radio_peer_device::wire_profile::bitmap_search;
+	// NSE-3 independently publishes selector 8 as 0x8000 | value[11:0].
+	// Decode that proven wire command, but leave the speech-request predicate
+	// empty until an organic Answer/End transition identifies its semantics.
+	result.dsp_parameter_command = 0x08;
 	result.cobba_pcm.data_clock = 1'000'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	result.cobba_pcm.sample_bits = 13;
@@ -705,10 +709,10 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_dsp_hle->set_external_service_enabled(product.external_service);
 	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
 	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
-	m_dsp_hle->set_speech_control(
-			product.dsp_speech_control_command,
-			product.dsp_speech_control_mask,
-			product.dsp_speech_control_enabled);
+	m_dsp_hle->set_parameter_command(product.dsp_parameter_command);
+	m_dsp_hle->set_speech_request_policy(
+			product.dsp_speech_request_mask,
+			product.dsp_speech_request_value);
 	m_mad2_pcm->set_bus_profile(product.cobba_pcm);
 	m_cobba->set_pcm_sample_bits(product.cobba_pcm.sample_bits);
 	// This explicitly configures the HLE's internal-handset path. A future

@@ -233,9 +233,11 @@ publication without proving which higher call-control transition changes
 slot zero or what value it writes.
 
 No organic Answer or End transition has yet been connected to that state
-slot.
-Consequently the 6110 product keeps its DSP speech-control configuration
-disabled. In particular, neither NSE-8's `0x0201` mask nor NHM-5's observed
+slot. Product configuration therefore declares selector 8's proven
+high-nibble-command/low-twelve-value decoder, but leaves the independent
+speech-request mask/value policy empty. The HLE can observe an NSE-3
+selector-8 publication without treating it as a request for media. In
+particular, neither NSE-8's `0x0201` mask nor NHM-5's observed
 `0x060b -> 0x040a` lifecycle may be inherited merely because all three
 products use numeric selector 8.
 

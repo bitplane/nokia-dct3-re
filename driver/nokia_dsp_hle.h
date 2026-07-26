@@ -21,11 +21,14 @@ public:
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_delay_us(unsigned delay) { m_service_delay_us = delay; }
 	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
-	void set_speech_control(u8 command, u16 mask, u16 enabled)
+	void set_parameter_command(u8 command)
 	{
-		m_speech_control_command = command;
-		m_speech_control_mask = mask;
-		m_speech_control_enabled = enabled;
+		m_parameter_command = command;
+	}
+	void set_speech_request_policy(u16 mask, u16 value)
+	{
+		m_speech_request_mask = mask;
+		m_speech_request_value = value;
 	}
 	void set_bootstrap_exchange_limit(unsigned exchanges) { m_bootstrap_exchange_limit = exchanges; }
 	void set_bootstrap_ping_pong(bool enabled) { m_bootstrap_ping_pong = enabled; }
@@ -92,9 +95,9 @@ private:
 	u16 m_boot_status_response = 0;
 	u16 m_mcu_control_word = 0;
 	u16 m_mcu_control_wire = 0;
-	u8 m_speech_control_command = 0xff;
-	u16 m_speech_control_mask = 0;
-	u16 m_speech_control_enabled = 0;
+	u8 m_parameter_command = 0xff;
+	u16 m_speech_request_mask = 0;
+	u16 m_speech_request_value = 0;
 	std::array<u16, 0x10000> m_data_memory = { 0 };
 	std::array<u8, 0x10000> m_data_memory_loaded = { 0 };
 	nokia_gsm_fr_codec m_speech_codec;

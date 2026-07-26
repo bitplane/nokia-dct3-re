@@ -42,9 +42,9 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_boot_status_response));
 	save_item(NAME(m_mcu_control_word));
 	save_item(NAME(m_mcu_control_wire));
-	save_item(NAME(m_speech_control_command));
-	save_item(NAME(m_speech_control_mask));
-	save_item(NAME(m_speech_control_enabled));
+	save_item(NAME(m_parameter_command));
+	save_item(NAME(m_speech_request_mask));
+	save_item(NAME(m_speech_request_value));
 	save_item(NAME(m_data_memory));
 	save_item(NAME(m_data_memory_loaded));
 	save_item(NAME(m_speech_active));
@@ -161,7 +161,7 @@ void nokia_dsp_hle_device::doorbell_w(int state)
 		// table's first sixteen entries and bits 11..0 carry its value.
 		// Preserve command 0x08's applied state when later command 0x09
 		// transactions reuse the same physical word.
-		if ((m_mcu_control_wire >> 12) == m_speech_control_command)
+		if ((m_mcu_control_wire >> 12) == m_parameter_command)
 		{
 			m_mcu_control_word = m_mcu_control_wire & 0x0fff;
 			m_mcu_control_word_cb(m_mcu_control_word);
@@ -259,9 +259,9 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 	// Product configuration carries the recovered field so another MAD2/DSP
 	// variant need not inherit NSE-8 wiring.
 	const bool dsp_speech_route =
-			m_speech_control_mask != 0 &&
-			(m_mcu_control_word & m_speech_control_mask) ==
-					m_speech_control_enabled;
+			m_speech_request_mask != 0 &&
+			(m_mcu_control_word & m_speech_request_mask) ==
+					m_speech_request_value;
 	const bool requested =
 			m_radio_peer->speech_channel_active() && dsp_speech_route;
 	const bool pcm_link_ready = m_mad2_pcm->link_ready();

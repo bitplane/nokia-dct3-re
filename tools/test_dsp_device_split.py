@@ -37,9 +37,9 @@ class DspDeviceSplitTest(unittest.TestCase):
         for token in (
             "m_mcu_control_wire >> 12",
             "m_mcu_control_wire & 0x0fff",
-            "m_speech_control_command",
-            "m_speech_control_mask",
-            "m_speech_control_enabled",
+            "m_parameter_command",
+            "m_speech_request_mask",
+            "m_speech_request_value",
         ):
             self.assertIn(token, self.hle)
         # The paired-ROM evidence supports a masked field transition, not an
