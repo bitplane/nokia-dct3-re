@@ -440,6 +440,56 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x28053E: ("movs", "r0, #0xb"),
     0x280552: ("ldr", "r0, [pc, #0xe4]"),
     0x28055E: ("movs", "r0, #0xc"),
+    # Type 0x86 is not an acquisition-terminal shortcut.  Its first report
+    # body byte selects four numeric paths, and those paths primarily publish
+    # objects to task 3.
+    0x27FA42: ("ldrb", "r0, [r5, #4]"),
+    0x27FA44: ("movs", "r1, #0x70"),
+    0x27FA4C: ("subs", "r0, #0x10"),
+    0x27FA52: ("subs", "r0, #0x30"),
+    0x27FA58: ("subs", "r0, #1"),
+    0x27FAAC: ("movs", "r0, #3"),
+    0x27FAB0: ("bl", "#0x25fb4c"),
+    0x27FB42: ("movs", "r0, #3"),
+    0x27FB46: ("bl", "#0x25fb4c"),
+    # Task 12 uses a bounded status table for 0x13aa..0x13ba.  The direct
+    # type-0x8b route is 0x13b8 and ingests 160 result bytes; status 0x13aa
+    # is a distinct controller event that performs the state-gated
+    # measurement-consumer transition.
+    0x217078: ("bl", "#0x25fd9c"),
+    0x217086: ("ldrh", "r0, [r4]"),
+    0x217088: ("movs", "r1, #0x9d"),
+    0x21708A: ("lsls", "r1, r1, #5"),
+    0x2170D2: ("ldr", "r1, [pc, #0x37c]"),
+    0x2170F4: ("subs", "r0, #2"),
+    0x2170F6: ("cmp", "r0, #0x10"),
+    0x217102: ("adr", "r1, #8"),
+    0x217104: ("lsls", "r0, r0, #2"),
+    0x217106: ("ldr", "r0, [r1, r0]"),
+    0x217108: ("mov", "pc, r0"),
+    0x21718C: ("ldrb", "r0, [r6, #0xd]"),
+    0x2171B4: ("movs", "r0, #0xa8"),
+    0x2171C2: ("movs", "r1, #6"),
+    0x2171C8: ("movs", "r2, #0xa0"),
+    0x2171CA: ("bl", "#0x2a44fc"),
+    0x21732E: ("movs", "r0, #0x6b"),
+    0x217330: ("movs", "r1, #2"),
+    0x217332: ("bl", "#0x276648"),
+    # The measurement consumer rearms numeric controller timer 0x6b.  State
+    # four selects a different raw duration, but the external image does not
+    # establish the timer unit.
+    0x214090: ("mov", "r0, sl"),
+    0x214092: ("ldrb", "r0, [r0]"),
+    0x214094: ("cmp", "r0, #4"),
+    0x214098: ("movs", "r0, #0x6b"),
+    0x21409A: ("ldr", "r1, [pc, #0x350]"),
+    0x21409C: ("bl", "#0x25f146"),
+    0x2140A0: ("movs", "r0, #0x6b"),
+    0x2140A2: ("movs", "r1, #0"),
+    0x2140A4: ("bl", "#0x276648"),
+    0x2140AE: ("movs", "r0, #0x6b"),
+    0x2140B0: ("ldr", "r1, [pc, #0x33c]"),
+    0x2140B2: ("bl", "#0x25f146"),
 }
 RADIO_REPORT_HANDLER_LITERALS = {
     0x211C68: 0x1393,
@@ -453,6 +503,9 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x280478: 0x13AC,
     0x280532: 0x1393,
     0x280552: 0x13B8,
+    0x2170D2: 0x13A3,
+    0x21409A: 0x04E6,
+    0x2140B0: 0x0EB4,
 }
 FIXED_RADIO_TASK_ROUTES = {
     "0x83": {
@@ -497,6 +550,26 @@ TASK_11_CONTROLLER_DISPATCH = {
         "0x1397": {"code": 0x68, "argument": 2},
     },
     "semantic_names_assigned": False,
+}
+TASK_12_STATUS_JUMP_TABLE_ADDRESS = 0x21710C
+TASK_12_STATUS_JUMP_TABLE = {
+    0x13AA: 0x21732E,
+    0x13AB: 0x217150,
+    0x13AC: 0x2172D2,
+    0x13AD: 0x2172C4,
+    0x13AE: 0x2172BA,
+    0x13AF: 0x217288,
+    0x13B0: 0x217260,
+    0x13B1: 0x217252,
+    0x13B2: 0x21724A,
+    0x13B3: 0x21723C,
+    0x13B4: 0x217150,
+    0x13B5: 0x217150,
+    0x13B6: 0x217150,
+    0x13B7: 0x217208,
+    0x13B8: 0x21718C,
+    0x13B9: 0x21717E,
+    0x13BA: 0x217174,
 }
 RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
 RADIO_REPORT_JUMP_TABLE = {
@@ -1847,6 +1920,19 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"NSE-3 radio report jump table changed: expected "
             f"{RADIO_REPORT_JUMP_TABLE}, got {table}"
         )
+    task_12_table = {
+        status: effective_u32(
+            physical,
+            TASK_12_STATUS_JUMP_TABLE_ADDRESS - FLASH_BASE
+            + (status - 0x13AA) * 4,
+        )
+        for status in TASK_12_STATUS_JUMP_TABLE
+    }
+    if task_12_table != TASK_12_STATUS_JUMP_TABLE:
+        raise ValueError(
+            f"NSE-3 task-12 status jump table changed: expected "
+            f"{TASK_12_STATUS_JUMP_TABLE}, got {task_12_table}"
+        )
     return {
         "transport": {
             "tx_queue_pump": 0x298C82,
@@ -1899,15 +1985,39 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "queue_object_bytes": 0xA8,
                 "record_count": 40,
                 "record_bytes": 4,
+                "task": 12,
+                "task_status": 0x13B8,
+                "ingest_case": 0x21718C,
+                "body_copy_offset": 6,
+                "body_copy_bytes": 0xA0,
             },
             "search_lifecycle": {
-                "all_rssi_task_case": 0x21732E,
+                "measurement_controller_status": 0x13AA,
+                "measurement_controller_case": 0x21732E,
                 "active_search_type": 0x1A,
                 "accepted_controller_states": [4, 6, 7],
                 "measurement_consumer": 0x213FBC,
                 "nse3_internal_candidate_stride": 0x44,
                 "nse8_internal_candidate_stride": 0x48,
                 "internal_candidate_layout_shared": False,
+                "direct_0x13b8_to_0x13aa_correlation": "not_established",
+                "measurement_recurrence": {
+                    "controller_status": 0x13AA,
+                    "timer_code": 0x6B,
+                    "status_entry_control_argument": 2,
+                    "consumer_rearm_control_argument": 0,
+                    "raw_duration_when_state_4": 0x0EB4,
+                    "raw_duration_other_states": 0x04E6,
+                    "duration_unit": "not_established",
+                },
+            },
+            "type_0x86": {
+                "handler": 0x27FA34,
+                "report_body_discriminator_offset": 0,
+                "evidenced_discriminator_values": [0x70, 0x80, 0xB0, 0xB1],
+                "principal_destination_task": 3,
+                "acquisition_terminal": False,
+                "semantic_name_assigned": False,
             },
             "channel_change": {
                 "confirmation_type": 0x89,
@@ -1921,6 +2031,13 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             },
             "fixed_task_routes": FIXED_RADIO_TASK_ROUTES,
             "task_11_controller_dispatch": TASK_11_CONTROLLER_DISPATCH,
+            "task_12_controller_dispatch": {
+                "jump_table": TASK_12_STATUS_JUMP_TABLE_ADDRESS,
+                "jump_table_routes": TASK_12_STATUS_JUMP_TABLE,
+                "measurement_status": 0x13AA,
+                "result_ingest_status": 0x13B8,
+                "statuses_are_distinct": True,
+            },
         },
         "external_service_transport": {
             "dsp_report_types": [0x8D, 0x8E],

@@ -208,14 +208,29 @@ the bit index. Since the DSP wire begins at object byte 3 and the peer payload
 excludes the type byte, ARFCN 1 is bit 0 of payload byte 65. This is exactly the
 numbering currently decoded by the NSE-8 bitmap-search path.
 
-The task-side type-`0x8b` case independently accepts controller state 4 only
-when the active command is type `0x1a`, and also accepts states 6 and 7 before
-entering measurement consumer `0x213fbc`. This state/type topology matches the
-NSE-8 acquisition family, but the consumer exposes a real product boundary:
-NSE-3 advances through internal candidates in `0x44`-byte strides, whereas
-NSE-8 uses `0x48`. Those are firmware-private controller objects, not the
-shared four-byte DSP result records, and must not become a radio-peer wire
-setting.
+The task boundary is more staged than the packet geometry alone suggested.
+Type `0x8b` posts task-12 status `0x13b8`; its case at `0x21718c` copies the
+160-byte result body from object byte 6 and enters product-local result
+processing. A separate task-12 status, `0x13aa`, reaches case `0x21732e`.
+Only that later controller case accepts state 4 when the active command is
+type `0x1a`, also accepts states 6 and 7, and enters measurement consumer
+`0x213fbc`. The external image does not yet establish a direct
+`0x13b8 -> 0x13aa` edge, so receipt of the DSP result packet must not be
+treated as immediate search completion.
+
+Status `0x13aa` is nevertheless a recurring measurement-controller boundary,
+not an unstructured queue value. Its entry calls numeric controller operation
+`(0x6b, 2)` before the measurement consumer. The consumer rearms code `0x6b`
+with operation argument zero and selects raw duration `0x0eb4` in controller
+state 4 or `0x04e6` otherwise. The timer unit and the event producer remain
+unproved, so these values stay exact-image policy evidence rather than enabled
+peer timing.
+
+The later state/type topology matches the NSE-8 acquisition family, but its
+consumer exposes a real product boundary: NSE-3 advances through internal
+candidates in `0x44`-byte strides, whereas NSE-8 uses `0x48`. Those are
+firmware-private controller objects, not the shared four-byte DSP result
+records, and must not become a radio-peer wire setting.
 
 Together these findings establish that bitmap packing and the principal
 measurement terminal belong in the shared radio layer while firmware-private
@@ -262,6 +277,13 @@ respectively. The exact-image output records those numbers and state gates,
 but deliberately assigns no protocol names to the otherwise unidentified
 statuses. This closes more of the MCU-side lifecycle graph while leaving DSP
 initiation and complete report ordering unproved.
+
+The type-`0x86` path is independently unsuitable as a shortcut to that
+acquisition terminal. Handler `0x27fa34` dispatches on its first report-body
+byte with evidenced values `0x70`, `0x80`, `0xb0` and `0xb1`; its principal
+outputs are task-3 objects and numeric internal notifications. Their meanings
+are not assigned by the exact image, and this handler does not establish the
+missing `0x13b8 -> 0x13aa` controller edge.
 
 The emulator configuration now reflects this evidence directly. Radio
 `wire_profile` selects only packet representation (`bitmap_search` or

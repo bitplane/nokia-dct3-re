@@ -244,6 +244,18 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertFalse(
             check.TASK_11_CONTROLLER_DISPATCH["semantic_names_assigned"]
         )
+        self.assertEqual(
+            0x21718C, check.TASK_12_STATUS_JUMP_TABLE[0x13B8]
+        )
+        self.assertEqual(
+            0x21732E, check.TASK_12_STATUS_JUMP_TABLE[0x13AA]
+        )
+        self.assertNotEqual(
+            check.TASK_12_STATUS_JUMP_TABLE[0x13B8],
+            check.TASK_12_STATUS_JUMP_TABLE[0x13AA],
+        )
+        self.assertEqual(0x04E6, check.RADIO_REPORT_HANDLER_LITERALS[0x21409A])
+        self.assertEqual(0x0EB4, check.RADIO_REPORT_HANDLER_LITERALS[0x2140B0])
 
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
