@@ -276,6 +276,9 @@ constexpr nokia_product_config make_6110_config()
 	// 8 kHz PCMSClk, with a sign-extended 13-bit sample in a 16-bit word.
 	// Firmware-facing DSP, SIM, external-service and radio peers deliberately
 	// retain their disabled defaults until an identified NSE-3 ROM is traced.
+	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
+	// transfer geometry rather than evidence for the HLE peer's completion
+	// counter or reply values; do not configure the latter from that number.
 	result.cobba_pcm.data_clock = 1'000'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	result.cobba_pcm.sample_bits = 13;

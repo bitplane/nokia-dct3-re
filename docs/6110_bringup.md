@@ -118,14 +118,33 @@ shared-memory literals, including the `0x30000` DSPIF doorbell. These are the
 same transport boundaries expressed by the reusable `nokia_dspif_device`, so
 NSE-3 does not require a copied or product-specific ring implementation.
 
-This is deliberately a transport-only result. The external image shows a
-larger DSP initialization/upload routine and synchronization cells, but the
-matching internal DSP image is absent and the meanings of its bootstrap
-replies are not established. Consequently the NSE-3 profile still has no DSP
-peer, no guessed ready value and no inherited NSE-8 or NHM-5 service grammar.
-The static JSON records `internal_dsp_image: missing` and
-`bootstrap_reply_semantics: not_established` so later work cannot silently
-promote the shared layout into a working-handshake claim.
+The external image also proves the MCU side of a much larger bootstrap
+transfer. Routine `0x2858fc..0x2859ff` samples 32,766 halfwords from its own
+flash, beginning at reset entry `0x200040`, advancing by `0x20` bytes and
+ending at `0x2fffe0`. It stages 63 complete 512-word blocks at shared
+`0x10200..0x105ff`, followed by 510 more sampled words and two explicit
+`0xffff` terminators in a final block. The resulting 65,536-byte staged stream
+has SHA-1 `f708ffd71e430f41c47f12e18128cf4deffb5845`.
+
+After each of these 64 transfer blocks, the MCU selects shared cell `0x100fe`
+or `0x10100` from the low bit of the block index, writes zero to the selected
+cell and waits for the opposite cell to become non-zero. After the final
+exchange it additionally waits for `0x10002` to become non-zero. The verifier
+pins the loop bounds, source/destination strides, literals, alternating
+accesses, terminators and derived stream fingerprint. This establishes the
+external firmware's transfer schedule without requiring a running emulator or
+guessing through a missing peer.
+
+This remains deliberately MCU-side evidence. We do not yet know whether the
+staged stream is DSP code, its DSP-side destination, what non-zero response
+values mean, or what publishes the final word. The matching internal DSP image
+is absent. In particular, “64 transfer blocks” is not interchangeable with the
+existing HLE peer's product-configured completion counter: that counter embeds
+response policy, while this gate establishes only transfer geometry and
+non-zero waits. Consequently the NSE-3 profile still has no DSP peer, no
+guessed ready value and no inherited NSE-8 or NHM-5 service grammar. The
+static JSON records these unknowns so later work cannot silently promote the
+shared layout into a working-handshake claim.
 
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine

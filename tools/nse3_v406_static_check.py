@@ -114,6 +114,65 @@ DSPIF_LITERALS = {
     0x285A42: 0x100A4,
     0x285A46: 0x101C8,
 }
+DSP_BOOTSTRAP_ANCHORS = {
+    # Shared bootstrap/header setup.
+    0x2858FC: ("push", "{r4, r5, r6, r7, lr}"),
+    0x285904: ("ldr", "r5, [pc, #0x118]"),
+    0x285906: ("strh", "r0, [r5]"),
+    0x285908: ("strh", "r0, [r5, #2]"),
+    0x28592A: ("ldr", "r1, [pc, #0x22c]"),
+    # 512-word staging loop: sequential shared destination, flash stride 0x20.
+    0x285970: ("ldr", "r2, [pc, #0x1ec]"),
+    0x285972: ("ldr", "r7, [pc, #0x1f0]"),
+    0x285976: ("ldr", "r5, [pc, #0x1f0]"),
+    0x28597A: ("movs", "r0, #1"),
+    0x28597C: ("lsls", "r0, r0, #9"),
+    0x28597E: ("ldrh", "r6, [r5]"),
+    0x285980: ("strh", "r6, [r1]"),
+    0x285982: ("adds", "r1, #2"),
+    0x285984: ("adds", "r5, #0x20"),
+    0x28598A: ("bne", "#0x28597e"),
+    # Alternating zero request and non-zero wait across the two cells.
+    0x28598C: ("lsrs", "r0, r3, #1"),
+    0x285990: ("strh", "r4, [r2]"),
+    0x285992: ("ldrh", "r0, [r2, #2]"),
+    0x28599A: ("strh", "r4, [r2, #2]"),
+    0x28599E: ("ldrh", "r0, [r2]"),
+    0x2859A4: ("adds", "r3, #1"),
+    0x2859A6: ("cmp", "r3, #0x3f"),
+    0x2859A8: ("blo", "#0x28597a"),
+    # Final 510 sampled words and two explicit 0xffff terminators.
+    0x2859AA: ("movs", "r0, #0xff"),
+    0x2859AC: ("adds", "r0, #0xff"),
+    0x2859AE: ("ldrh", "r6, [r5]"),
+    0x2859B0: ("strh", "r6, [r1]"),
+    0x2859B2: ("adds", "r1, #2"),
+    0x2859B4: ("adds", "r5, #0x20"),
+    0x2859BA: ("bne", "#0x2859ae"),
+    0x2859BC: ("ldr", "r0, [pc, #0x1ac]"),
+    0x2859BE: ("strh", "r0, [r1]"),
+    0x2859C0: ("adds", "r1, #2"),
+    0x2859C2: ("strh", "r0, [r1]"),
+    # Final alternating exchange followed by an external publication wait.
+    0x2859C8: ("lsrs", "r0, r3, #1"),
+    0x2859CC: ("strh", "r4, [r2]"),
+    0x2859CE: ("ldrh", "r0, [r2, #2]"),
+    0x2859D6: ("strh", "r4, [r2, #2]"),
+    0x2859D8: ("ldrh", "r0, [r2]"),
+    0x2859DE: ("ldrh", "r0, [r1, #2]"),
+    0x2859E0: ("cmp", "r0, #0"),
+    0x2859E2: ("beq", "#0x2859de"),
+    0x2859FE: ("pop", "{r4, r5, r6, r7, pc}"),
+}
+DSP_BOOTSTRAP_LITERALS = {
+    0x285904: 0x10000,
+    0x28592A: 0x100F6,
+    0x285970: 0x100FE,
+    0x285972: 0x10200,
+    0x285976: 0x200040,
+    0x2859BC: 0xFFFF,
+}
+DSP_BOOTSTRAP_STREAM_SHA1 = "f708ffd71e430f41c47f12e18128cf4deffb5845"
 EXPECTED_CENSUS = {
     "literal_seeds": 225,
     "resolved_accesses": 548,
@@ -315,6 +374,63 @@ def verify_dspif_boundary(data: bytes) -> dict:
     }
 
 
+def extract_dsp_bootstrap_stream(data: bytes) -> bytes:
+    source_first = 0x200040
+    source_words = 63 * 512 + 510
+    stream = bytearray()
+    for index in range(source_words):
+        offset = source_first - FLASH_BASE + index * 0x20
+        stream.extend(data[offset : offset + 2])
+    stream.extend(b"\xff\xff\xff\xff")
+    return bytes(stream)
+
+
+def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
+    decode_thumb_anchors(data, DSP_BOOTSTRAP_ANCHORS)
+    verify_thumb_literals(data, DSP_BOOTSTRAP_LITERALS)
+    stream = extract_dsp_bootstrap_stream(data)
+    stream_sha1 = hashlib.sha1(stream).hexdigest()
+    if stream_sha1 != DSP_BOOTSTRAP_STREAM_SHA1:
+        raise ValueError(
+            "NSE-3 DSP bootstrap stream changed: expected "
+            f"{DSP_BOOTSTRAP_STREAM_SHA1}, got {stream_sha1}"
+        )
+    return {
+        "routine": {"start": 0x2858FC, "end": 0x285A00},
+        "sampled_flash": {
+            "first_halfword": 0x200040,
+            "last_halfword": 0x2FFFE0,
+            "stride_bytes": 0x20,
+            "source_words": 32766,
+        },
+        "staging": {
+            "shared_start": 0x10200,
+            "shared_end_exclusive": 0x10600,
+            "words_per_block": 512,
+            "full_source_blocks": 63,
+            "tail_source_words": 510,
+            "tail_words": [0xFFFF, 0xFFFF],
+            "transfer_blocks": 64,
+            "total_staged_words": 32768,
+            "stream_sha1": stream_sha1,
+        },
+        "synchronization": {
+            "cells": [0x100FE, 0x10100],
+            "selection": "block_index_bit_0",
+            "request_value": 0,
+            "wait_condition": "opposite_cell_nonzero",
+            "post_transfer_publication_wait": 0x10002,
+            "reply_meaning": "not_established",
+        },
+        "claims": {
+            "stream_is_dsp_code": "not_established",
+            "dsp_destination": "not_established",
+            "response_values": "nonzero_only",
+            "internal_dsp_image": "missing",
+        },
+    }
+
+
 def verify(data: bytes) -> dict:
     return {
         "identity": verify_identity(data),
@@ -323,6 +439,7 @@ def verify(data: bytes) -> dict:
         "eeprom_boundary": verify_eeprom_boundary(data),
         "simi_boundary": verify_simi_boundary(data),
         "dspif_transport_boundary": verify_dspif_boundary(data),
+        "dsp_bootstrap_transfer_boundary": verify_dsp_bootstrap_boundary(data),
         "mad2_direct_access_census": verify_mad2_census(data),
         "claims": {
             "rom3_compatibility": "candidate_not_proven",
@@ -345,6 +462,8 @@ def main() -> None:
         "verified NSE-3 v4.06 static boundary: "
         f"entry={result['reset_boundary']['entry']:#x}, "
         f"MAD2-sites={result['mad2_direct_access_census']['resolved_accesses']}, "
+        f"DSP-transfer-blocks="
+        f"{result['dsp_bootstrap_transfer_boundary']['staging']['transfer_blocks']}, "
         "boot-promotion=no"
     )
 

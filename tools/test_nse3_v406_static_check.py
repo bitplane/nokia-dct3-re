@@ -165,6 +165,17 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
                 check.swap16(bytes(physical)), {0x28564C: 0x30000}
             )
 
+    def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
+        image = bytearray(b"\xff" * check.FLASH_SIZE)
+        image[0x40:0x42] = b"\x12\x34"
+        image[0x60:0x62] = b"\x56\x78"
+        last = 0x2FFFE0 - check.FLASH_BASE
+        image[last : last + 2] = b"\x9a\xbc"
+        stream = check.extract_dsp_bootstrap_stream(bytes(image))
+        self.assertEqual(0x10000, len(stream))
+        self.assertEqual(b"\x12\x34\x56\x78", stream[:4])
+        self.assertEqual(b"\x9a\xbc\xff\xff\xff\xff", stream[-6:])
+
 
 if __name__ == "__main__":
     unittest.main()
