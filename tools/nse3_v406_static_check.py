@@ -1225,6 +1225,31 @@ DSP_INTERNAL_SOFTWARE_LITERALS = {
     0x28EB02: 0x10BCE4,
 }
 DSP_INTERNAL_SOFTWARE_OWNER_ANCHORS = {
+    # DSPIF RX creates the ordinary queue envelope directly from a DSP-to-MCU
+    # ring record: fixed source 0x18, destination task 2, ring length, then
+    # ring type/family.  Thus family 0x74 is supplied across DSPIF rather than
+    # by the bootstrap responder or external-service peer.
+    0x2857DC: ("movs", "r1, #0x18"),
+    0x2857DE: ("strb", "r1, [r0]"),
+    0x2857E2: ("movs", "r1, #2"),
+    0x2857E4: ("strb", "r1, [r0, #1]"),
+    0x2857E6: ("ldr", "r0, [r5]"),
+    0x2857E8: ("strb", "r7, [r0, #2]"),
+    0x2857EA: ("ldr", "r0, [r5]"),
+    0x2857EC: ("mov", "r1, r8"),
+    0x2857EE: ("strb", "r1, [r0, #3]"),
+    # The radio/DSPIF owner polls the DSP ring and submits that same object to
+    # its normal router.  The route wrapper does not rewrite the envelope.
+    0x2A2208: ("bl", "#0x25fd9c"),
+    0x2A2216: ("bl", "#0x28580a"),
+    0x2A221A: ("adds", "r4, r0, #0"),
+    0x2A2222: ("adds", "r0, r4, #0"),
+    0x2A2224: ("bl", "#0x2a1f52"),
+    0x2A1F52: ("push", "{lr}"),
+    0x2A1F54: ("adds", "r1, r0, #0"),
+    0x2A1F56: ("movs", "r0, #0xd"),
+    0x2A1F58: ("lsls", "r0, r0, #9"),
+    0x2A1F5A: ("bl", "#0x2a1ec6"),
     # Task 2 entry and its object loop.
     0x23A5CE: ("push", "{r4, r5, r6, lr}"),
     0x23A5D0: ("bl", "#0x237a7a"),
@@ -2724,6 +2749,24 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
                         "object_family": 0x74,
                         "subcommand_offset": 8,
                         "excluded_subcommand": 0x32,
+                    },
+                    "transport": {
+                        "physical_boundary": "dsp_to_mcu_shared_ring",
+                        "materializer": 0x285794,
+                        "queue_envelope": {
+                            "source_offset": 0,
+                            "source": 0x18,
+                            "destination_offset": 1,
+                            "destination_task": 2,
+                            "length_offset": 2,
+                            "family_offset": 3,
+                        },
+                        "ring_poll": 0x28580A,
+                        "router_call": 0x2A2224,
+                        "router_wrapper": 0x2A1F52,
+                        "bootstrap_responder_is_source": False,
+                        "external_service_peer_is_source": False,
+                        "internal_dsp_producer_logic": "not_available",
                     },
                     "accepted_message_types": [0x0A, 0xC8],
                     "message_value_offset": 0x0B,

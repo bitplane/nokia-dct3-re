@@ -614,12 +614,24 @@ buffer, retain the ordinary success result and release the received object;
 they construct no acknowledgement. Direct-call censuses pin the dispatcher
 and setter edges as unique.
 
-This establishes firmware ownership and message shape, but not the physical
-counterparty below task 2. It would be premature to inject the digit from the
-bootstrap responder or the class-`0x40` external-service peer merely because
-those components also interact with nearby service code. A runtime transport
-trace or matching internal image must connect object family `0x74` and report
-type `0x0a/0xc8` to the component that actually emits it.
+The MCU-side physical boundary below task 2 is also recoverable. DSPIF receive
+routine `0x285794` consumes one DSP-to-MCU shared-ring record and constructs
+the queue object in place. It writes fixed source byte `0x18` at object byte 0
+and destination task `2` at byte 1, then copies the ring length to byte 2 and
+the ring type to byte 3. The radio/DSPIF owner at `0x2a20dc` alternates its
+ordinary task receive with DSPIF poll `0x28580a`; a returned ring object is
+passed unchanged at `0x2a2224` through router wrapper `0x2a1f52`. Family
+`0x74` therefore reaches task 2 across the DSP-to-MCU shared ring. It is not
+emitted by the bootstrap responder or by the class-`0x40` external-service
+peer.
+
+This closes the MCU transport route, not the missing DSP implementation. The
+external image contains no proof of the internal DSP routine that produces
+type `0x74`, when it sends report type `0x0a` versus `0xc8`, or which internal
+ROM digit it would report on the fitted handset. Consequently an NSE-3 DSP
+peer may eventually publish this report through generic DSPIF, but it must not
+invent its value or trigger policy. A matching internal image or a runtime
+ring trace is still required for those DSP-side facts.
 
 This remains deliberately MCU-side evidence. We do not yet know whether the
 staged stream is DSP code, its DSP-side destination, how the DSP derives or

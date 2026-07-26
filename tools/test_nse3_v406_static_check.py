@@ -553,6 +553,18 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual(12, check.NSE3_TASK_RECORD_SIZE)
         self.assertEqual(0x2B74C8, check.NSE3_TASK_2_ENTRY_POINTER)
         self.assertEqual(0x23A5CF, check.NSE3_TASK_2_ENTRY)
+        self.assertEqual(
+            ("movs", "r1, #2"),
+            check.DSP_INTERNAL_SOFTWARE_OWNER_ANCHORS[0x2857E2],
+        )
+        self.assertEqual(
+            ("bl", "#0x28580a"),
+            check.DSP_INTERNAL_SOFTWARE_OWNER_ANCHORS[0x2A2216],
+        )
+        self.assertEqual(
+            ("bl", "#0x2a1f52"),
+            check.DSP_INTERNAL_SOFTWARE_OWNER_ANCHORS[0x2A2224],
+        )
 
 
 if __name__ == "__main__":
