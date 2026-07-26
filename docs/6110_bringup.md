@@ -344,6 +344,23 @@ separately receives type `0x88` as status `0x13ac` in 16 bytes, type `0x8b`
 as status `0x13b8` in `0xa8` bytes, and type `0x8f` as status `0x13b7` in
 eight bytes.
 
+The type-`0x83` split is now bounded rather than merely described as
+runtime-selected. Handler `0x27fd40` reads controller byte `0x1090ff`.
+Value 1 releases the report without posting it. Value 3 preserves the
+`0x2c`-byte object as task-11 status `0x139f`; its consumer stores only
+signed report byte 6 in shared cell `0x10918d`. Every other value posts
+task-12 status `0x13a0`.
+
+The `0x13a0` consumer at `0x2173b0` passes report bytes 4, 6, 7, 8 and 9
+through `0x21630c`. That routine maintains a five-sample rolling scalar
+state and conditionally arms or cancels timer `0x6c`. The consumer then
+selects product-local helpers `0x216424` or `0x216cb4` from mode
+`0x106af6` and controller states 6/7. Neither the task-11 nor task-12 arm
+directly constructs a bitmap search or `CHANNEL_CONFIGURE` request. Type
+`0x83` is therefore established as controller-routed scalar measurement
+input, but not as the missing acquisition terminal; the timer unit and DSP
+emission conditions remain unknown.
+
 Type `0x8a` does not close the missing search-result sequence. Its direct
 handler `0x2803f8` reads no report-body field. It discards the object only
 when controller byte `0x1090ff` equals 1; for every other value it clears
