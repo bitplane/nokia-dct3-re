@@ -618,6 +618,18 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x256E32: ("adds", "r0, r7, #1"),
     0x256E34: ("lsls", "r0, r0, #0x18"),
     0x256E36: ("lsrs", "r7, r0, #0x18"),
+    # Runtime descriptor 0x278792 is the organic bridge into the sole
+    # event-fed object constructor: +0x0c is ROM catalogue 0x2b01d8 and
+    # flag +0x18 is the producer's 0x40 gate.
+    0x278770: ("str", "r0, [sp, #8]"),
+    0x278772: ("str", "r4, [sp, #0xc]"),
+    0x278776: ("ldr", "r0, [pc, #0x34c]"),
+    0x278778: ("str", "r0, [sp, #0x14]"),
+    0x278780: ("ldr", "r0, [pc, #0x344]"),
+    0x278782: ("strh", "r0, [r1, #0x1a]"),
+    0x278788: ("movs", "r1, #0x40"),
+    0x27878A: ("strb", "r1, [r0]"),
+    0x278792: ("bl", "#0x25a4f0"),
     # Event 0x0389 is the sole dispatcher case that reaches the remaining
     # runtime object constructor.  Its packed arguments are copied into the
     # runtime cell before the case loads cell[0] as the object input.
@@ -666,6 +678,34 @@ DSP_PARAMETER_EXPLICIT_OBJECT_EVENT_DESCRIPTORS = {
     0x22D686: {"value": 0x0013, "flags": 0x00, "event": 0x0389},
     0x22D6A0: {"value": 0x0010, "flags": 0x00, "event": 0x0389},
 }
+DSP_PARAMETER_RUNTIME_OBJECT_INSTALLER = {
+    "registration_callsite": 0x278792,
+    "stored_event": 0x0387,
+    "value": 0x2B01D8,
+    "flags": 0x40,
+    "producer_callsite": 0x25B044,
+    "constructor_event": 0x0389,
+    "constructor_callsite": 0x27C17C,
+}
+DSP_PARAMETER_RUNTIME_OBJECT_CATALOGUE = {
+    "address": 0x2B01D8,
+    "records": 0x2B00E8,
+    "record_count": 9,
+    "events": [
+        0x00DC,
+        0x05E0,
+        0x05E0,
+        0x05E0,
+        0x0387,
+        0x05E0,
+        0x05E0,
+        0x0387,
+        0x01F4,
+    ],
+    "values": [0, 0x47, 0x0D, 0x0C, 0x2B00DC, 0x6D, 0x0B, 0x2B043C, 0],
+    "record_flags": [0, 8, 8, 8, 8, 8, 8, 8, 8],
+}
+DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS = [0x28B628]
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
     0x221640: [0x0C44],
@@ -1691,6 +1731,53 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             f"{fixed_object_value_census}"
         )
 
+    runtime_catalogue = DSP_PARAMETER_RUNTIME_OBJECT_CATALOGUE
+    runtime_object_offset = runtime_catalogue["address"] - FLASH_BASE
+    runtime_records_raw = int.from_bytes(
+        physical[runtime_object_offset : runtime_object_offset + 4], "little"
+    )
+    runtime_records = (
+        (runtime_records_raw << 16) | (runtime_records_raw >> 16)
+    ) & 0xFFFFFFFF
+    runtime_record_count = physical[(runtime_object_offset + 4) ^ 1]
+    runtime_events = []
+    runtime_values = []
+    runtime_flags = []
+    for record in range(runtime_record_count):
+        record_offset = (
+            runtime_records - FLASH_BASE + record * 0x18
+        )
+        runtime_events.append(
+            int.from_bytes(
+                physical[record_offset + 0x0E : record_offset + 0x10],
+                "little",
+            )
+        )
+        value_raw = int.from_bytes(
+            physical[record_offset + 8 : record_offset + 12], "little"
+        )
+        runtime_values.append(
+            ((value_raw << 16) | (value_raw >> 16)) & 0xFFFFFFFF
+        )
+        runtime_flags.append(physical[(record_offset + 0x14) ^ 1])
+    recovered_runtime_catalogue = {
+        "address": runtime_catalogue["address"],
+        "records": runtime_records,
+        "record_count": runtime_record_count,
+        "events": runtime_events,
+        "values": runtime_values,
+        "record_flags": runtime_flags,
+    }
+    if recovered_runtime_catalogue != runtime_catalogue:
+        raise ValueError(
+            "NSE-3 event-fed object catalogue changed: expected "
+            f"{runtime_catalogue}, got {recovered_runtime_catalogue}"
+        )
+    if {value & 0x1FFF for value in runtime_events} & target_events:
+        raise ValueError(
+            "NSE-3 event-fed object catalogue can publish a parameter event"
+        )
+
     object_event_profile = {
         "apis": [
             {
@@ -1820,6 +1907,11 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                 "fixed_object_value_census": fixed_object_value_census,
                 "explicit_object_event_descriptors":
                     DSP_PARAMETER_EXPLICIT_OBJECT_EVENT_DESCRIPTORS,
+                "runtime_object_installer":
+                    DSP_PARAMETER_RUNTIME_OBJECT_INSTALLER,
+                "runtime_object_catalogue": recovered_runtime_catalogue,
+                "unresolved_runtime_value_calls":
+                    DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS,
             },
         },
         "runtime_built_calls_exclude_parameter_events": False,

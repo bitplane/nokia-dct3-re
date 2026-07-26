@@ -309,6 +309,53 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             },
             check.DSP_PARAMETER_EXPLICIT_OBJECT_EVENT_DESCRIPTORS,
         )
+        self.assertEqual(
+            {
+                "registration_callsite": 0x278792,
+                "stored_event": 0x0387,
+                "value": 0x2B01D8,
+                "flags": 0x40,
+                "producer_callsite": 0x25B044,
+                "constructor_event": 0x0389,
+                "constructor_callsite": 0x27C17C,
+            },
+            check.DSP_PARAMETER_RUNTIME_OBJECT_INSTALLER,
+        )
+        self.assertEqual(
+            {
+                "address": 0x2B01D8,
+                "records": 0x2B00E8,
+                "record_count": 9,
+                "events": [
+                    0x00DC,
+                    0x05E0,
+                    0x05E0,
+                    0x05E0,
+                    0x0387,
+                    0x05E0,
+                    0x05E0,
+                    0x0387,
+                    0x01F4,
+                ],
+                "values": [
+                    0,
+                    0x47,
+                    0x0D,
+                    0x0C,
+                    0x2B00DC,
+                    0x6D,
+                    0x0B,
+                    0x2B043C,
+                    0,
+                ],
+                "record_flags": [0, 8, 8, 8, 8, 8, 8, 8, 8],
+            },
+            check.DSP_PARAMETER_RUNTIME_OBJECT_CATALOGUE,
+        )
+        self.assertEqual(
+            [0x28B628],
+            check.DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
         self.assertEqual(
             [0x256E2E],

@@ -350,6 +350,29 @@ address. This excludes those conspicuous event-labelled descriptors as a
 valid non-null constructor source, but does not exclude another runtime-built
 descriptor becoming the current record before producer `0x25a8fa` runs.
 
+The valid non-null constructor source is now recovered independently.
+Registration call `0x278792` builds a 28-byte descriptor with stored event
+`0x0387`, value field `+0x0c = 0x2b01d8`, and flag byte `+0x18 = 0x40`.
+That flag is the exact gate at producer `0x25b044`; the producer emits packed
+event `0x0389` with `(0x2b01d8, 0)`, and dispatcher call `0x27c17c`
+passes the first argument to constructor `0x25b0cc`. This is an organic
+firmware data path, not a forced SRAM value.
+
+Catalogue `0x2b01d8` is itself bounded: it addresses nine 24-byte records at
+`0x2b00e8`. Their event sequence is `00dc, 05e0, 05e0, 05e0, 0387,
+05e0, 05e0, 0387, 01f4`; none lies in `0x076f..0x0778`. Two records
+refer to nested ROM catalogues `0x2b00dc` and `0x2b043c`, but neither the
+catalogue header nor their record flags satisfies an `0x0389` producer gate.
+The exact verifier parses this catalogue rather than accepting the addresses
+as labels.
+
+A field-specific pass over the other runtime descriptor constructors bounds
+their `+0x0c` values to small integers, SRAM/heap pointers, or ROM values
+whose producer flags are clear. One parser-built descriptor at `0x28b628`
+still takes `+0x0c` from a runtime record word and remains unresolved. It is
+not used to justify the recovered installer path, and producer absence is
+still not claimed.
+
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven
 high-nibble-command/low-twelve-value decoder, but leaves the independent
