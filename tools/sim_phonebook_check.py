@@ -8,11 +8,23 @@ from pathlib import Path
 
 RECORD_LENGTH = 32
 RECORD_COUNT = 50
+ADN_LENGTH = RECORD_LENGTH * RECORD_COUNT
+PRE_SMS_NVRAM_LENGTH = ADN_LENGTH
+PRE_CHV_NVRAM_LENGTH = ADN_LENGTH + 11 + 9 + 16 + (10 * 176) + (2 * 44)
+CURRENT_NVRAM_LENGTH = PRE_CHV_NVRAM_LENGTH + (2 * 8) + (2 * 8) + 2 + 2 + 1
+SUPPORTED_NVRAM_LENGTHS = {
+    PRE_SMS_NVRAM_LENGTH,
+    PRE_CHV_NVRAM_LENGTH,
+    CURRENT_NVRAM_LENGTH,
+}
 
 
 def validate_phonebook(trace: str, data: bytes) -> None:
-    if len(data) != RECORD_LENGTH * RECORD_COUNT:
-        raise ValueError(f"SIM NVRAM has {len(data)} bytes, expected 1600")
+    if len(data) not in SUPPORTED_NVRAM_LENGTHS:
+        expected = ", ".join(str(length) for length in sorted(SUPPORTED_NVRAM_LENGTHS))
+        raise ValueError(
+            f"SIM NVRAM has {len(data)} bytes, expected one of {expected}"
+        )
     if "ins=dc p1=01 p2=04 p3=20 selected=6f3a" not in trace:
         raise ValueError("firmware did not issue absolute UPDATE RECORD for EF_ADN record 1")
     if "update fid=6f3a record=1 length=32" not in trace:
@@ -24,7 +36,8 @@ def validate_phonebook(trace: str, data: bytes) -> None:
     if data[:RECORD_LENGTH] != expected:
         actual = data[:RECORD_LENGTH].hex(" ")
         raise ValueError(f"record 1 is not the expected GSM 11.11 ADA/123 record: {actual}")
-    if data[RECORD_LENGTH:] != bytes([0xff]) * (len(data) - RECORD_LENGTH):
+    adn = data[:ADN_LENGTH]
+    if adn[RECORD_LENGTH:] != bytes([0xff]) * (ADN_LENGTH - RECORD_LENGTH):
         raise ValueError("the fixture modified more than one ADN record")
 
 

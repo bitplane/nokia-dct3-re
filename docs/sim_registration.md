@@ -194,6 +194,16 @@ a new `0x0a2e`, returning to the router branch above. None of the seven completi
 the object-bearing input to the task-15 operation, not either status in this local loop
 (ledger `task15_09ee_is_peer_ingress`).
 
+The reusable card now owns GSM 11.11 CHV state independently of this
+disabled-CHV1 boot fixture. VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK share
+persistent credentials and retry counters; verification is cleared on card
+activation/reset, while blocked/enabled state survives through card NVRAM.
+Mutable-file updates require CHV1 to be disabled or verified. The default
+profile keeps CHV1 disabled, so the established 3210 conversation above does
+not acquire a manufactured PIN step. NSE-3's independently recovered command
+constructors exercise the same generic boundary without adding a
+product-specific APDU script.
+
 ## Adjacent paths and exclusions
 
 - The global callback sweep deliberately supplies `0x05e2`; it is not a constructor sweep.

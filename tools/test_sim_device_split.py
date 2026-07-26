@@ -104,6 +104,29 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn("case 0x6f3c: return m_sms", self.card)
         self.assertIn("case 0x6f42: return m_smsp", self.card)
 
+    def test_chv_state_is_generic_persistent_and_session_scoped(self):
+        for token in (
+            "m_chv[2][8]", "m_unblock_chv[2][8]",
+            "m_chv_attempts[2]", "m_unblock_attempts[2]",
+            "m_chv1_enabled", "m_chv_verified[2]",
+        ):
+            self.assertIn(token, self.card_header)
+        for token in (
+            "save_item(NAME(m_chv))",
+            "save_item(NAME(m_unblock_chv))",
+            "save_item(NAME(m_chv_attempts))",
+            "save_item(NAME(m_unblock_attempts))",
+            "void nokia_sim_card_device::process_chv()",
+            "m_chv_verified[0] = m_chv_verified[1] = false",
+            "queue_status(0x98, 0x08)",
+            "queue_status(0x98, 0x40)",
+        ):
+            self.assertIn(token, self.card)
+        self.assertIn(
+            "!m_chv1_enabled || m_chv_verified[0]", self.card
+        )
+        self.assertNotIn("noki6110", self.card + self.card_header)
+
 
 if __name__ == "__main__":
     unittest.main()

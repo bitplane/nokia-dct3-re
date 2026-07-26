@@ -137,15 +137,27 @@ constructors, not a duplicate-byte search presented as 19 instructions. The
 exact verifier pins each CLA/instruction authoring site plus the first and
 last common-submit calls.
 
-This vocabulary also makes the shared lab-card boundary explicit. Its current
+This vocabulary also makes the shared lab-card boundary explicit. Its
 standards-shaped core implements SELECT, READ BINARY, READ RECORD, GET
-RESPONSE, UPDATE BINARY, UPDATE RECORD, STATUS and CHANGE CHV. It deliberately
-returns `6d 00` for the other NSE-3 constructors. That is sufficient evidence
-for a reusable generic SIM command layer, but not permission to pre-implement
-an assumed 6110 boot script: an organic trace must establish which commands
-are actually issued, their file-selection context, parameters and status
-progression. Missing commands should then be implemented generically from the
-applicable GSM SIM contract rather than special-cased for NSE-3.
+RESPONSE, UPDATE BINARY, UPDATE RECORD and STATUS. The recovered command set
+motivated a generic GSM 11.11 CHV component rather than an NSE-3 handler:
+VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK now share persistent credentials,
+three-attempt CHV and ten-attempt unblock counters, blocked/enabled state and
+reset-scoped verification. Mutable-file access follows CHV1 disabled or
+verified state, and directory status reports the live counters. Existing
+pre-CHV card NVRAM is migrated by initializing only the appended security
+state. The laboratory credentials remain synthetic card provisioning, not
+Nokia product identity. Command coding, status words and retry semantics follow
+[ETSI GSM 11.11 v5.0.0](https://www.etsi.org/deliver/etsi_gts/11/1111/05.00.00_60/gsmts_1111v050000p.pdf),
+clauses 8.9--8.13, 9.2.9--9.2.13 and 9.4.
+
+The remaining unsupported constructors are INCREASE, RUN GSM ALGORITHM and
+the four SIM Toolkit commands. They continue to return `6d 00`. This is not
+permission to pre-implement an assumed 6110 boot script: an organic trace must
+establish which commands are actually issued, their file-selection context,
+parameters and status progression. Missing commands should then be
+implemented generically from the applicable GSM SIM contract rather than
+special-cased for NSE-3.
 
 The same exact-image gate now establishes the firmware side of the generic
 DSPIF transport. The MCU-to-DSP ring occupies shared byte offsets

@@ -1,6 +1,11 @@
 import unittest
 
-from tools.sim_phonebook_check import RECORD_COUNT, RECORD_LENGTH, validate_phonebook
+from tools.sim_phonebook_check import (
+    CURRENT_NVRAM_LENGTH,
+    RECORD_COUNT,
+    RECORD_LENGTH,
+    validate_phonebook,
+)
 
 
 class SimPhonebookCheckTest(unittest.TestCase):
@@ -28,6 +33,17 @@ class SimPhonebookCheckTest(unittest.TestCase):
         _, data = self.fixture()
         with self.assertRaisesRegex(ValueError, "did not issue"):
             validate_phonebook("", bytes(data))
+
+    def test_accepts_current_append_only_card_layout(self):
+        trace, data = self.fixture()
+        data.extend(bytes(CURRENT_NVRAM_LENGTH - len(data)))
+        validate_phonebook(trace, bytes(data))
+
+    def test_rejects_unversioned_card_layout(self):
+        trace, data = self.fixture()
+        data.append(0)
+        with self.assertRaisesRegex(ValueError, "expected one of"):
+            validate_phonebook(trace, bytes(data))
 
 
 if __name__ == "__main__":

@@ -45,6 +45,11 @@ private:
 	void queue_read_record(unsigned requested);
 	void update_binary();
 	void update_record();
+	void process_chv();
+	void initialize_chv();
+	bool chv_matches(unsigned index, const u8 *value) const;
+	void chv_failure(unsigned index);
+	void unblock_failure(unsigned index);
 	static const file_descriptor *find_file(u16 fid);
 	static bool is_directory(u16 fid);
 	bool is_known_file(u16 fid) const;
@@ -82,6 +87,12 @@ private:
 	u8 m_bcch[16] = { 0 };
 	u8 m_sms[sms_record_count * sms_record_length] = { 0 };
 	u8 m_smsp[smsp_record_count * smsp_record_length] = { 0 };
+	u8 m_chv[2][8] = { { 0 }, { 0 } };
+	u8 m_unblock_chv[2][8] = { { 0 }, { 0 } };
+	u8 m_chv_attempts[2] = { 3, 3 };
+	u8 m_unblock_attempts[2] = { 10, 10 };
+	bool m_chv1_enabled = false;
+	bool m_chv_verified[2] = { false, false };
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_SIM_CARD, nokia_sim_card_device)
