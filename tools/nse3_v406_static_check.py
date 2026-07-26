@@ -1103,7 +1103,6 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x217086: ("ldrh", "r0, [r4]"),
     0x217088: ("movs", "r1, #0x9d"),
     0x21708A: ("lsls", "r1, r1, #5"),
-    0x2170D2: ("ldr", "r1, [pc, #0x37c]"),
     0x2170F4: ("subs", "r0, #2"),
     0x2170F6: ("cmp", "r0, #0x10"),
     0x217102: ("adr", "r1, #8"),
@@ -1223,6 +1222,48 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x280194: ("bl", "#0x25fb4c"),
     0x280198: ("adds", "r0, r4, #0"),
     0x28019A: ("bl", "#0x27fdc4"),
+    # Status 0x13d0 has an explicit task-12 case after the 0x13a3-based
+    # numeric dispatch.  It offsets object +4 by 0x68, stores that value in
+    # candidate controller state, and conditionally enters 0x2142b2.
+    0x2170D2: ("ldr", "r1, [pc, #0x37c]"),
+    0x2170F4: ("subs", "r0, #2"),
+    0x2170FA: ("subs", "r0, #0x26"),
+    0x2170FC: ("cmp", "r0, #0"),
+    0x2170FE: ("beq", "#0x21715c"),
+    0x21715C: ("ldr", "r0, [r4, #4]"),
+    0x21715E: ("adds", "r1, r0, #0"),
+    0x217160: ("adds", "r1, #0x68"),
+    0x217162: ("str", "r1, [r5, #0x20]"),
+    0x217164: ("ldr", "r1, [pc, #0x388]"),
+    0x217168: ("cmp", "r1, #1"),
+    # The unique direct follow-up consumes detailed original-report flags and
+    # can publish a numeric task-3 object or task-13/task-14 controller objects.
+    # Those are separate from search and CHANNEL_CONFIGURE constructors.
+    0x27FDC4: ("push", "{r4, r5, r6, r7, lr}"),
+    0x27FDD0: ("ldrb", "r0, [r6, #6]"),
+    0x27FDD2: ("cmp", "r0, #1"),
+    0x27FE28: ("ldrb", "r0, [r6, #0xf]"),
+    0x27FE34: ("ldrb", "r0, [r6, #0xe]"),
+    0x27FED0: ("ldrb", "r0, [r6, #0x12]"),
+    0x27FED8: ("ldrb", "r0, [r6, #0x10]"),
+    0x27FEE0: ("ldrb", "r0, [r6, #0x13]"),
+    0x27FEEA: ("ldrb", "r0, [r6, #0x14]"),
+    0x27FEB4: ("movs", "r0, #2"),
+    0x27FEB6: ("strh", "r0, [r4]"),
+    0x27FEB8: ("movs", "r0, #4"),
+    0x27FEBA: ("strb", "r0, [r4, #2]"),
+    0x27FEBC: ("movs", "r0, #0x1f"),
+    0x27FEBE: ("strb", "r0, [r4, #3]"),
+    0x27FEC0: ("ldr", "r0, [pc, #0x1c8]"),
+    0x27FEC8: ("movs", "r0, #3"),
+    0x27FECC: ("bl", "#0x25fb4c"),
+    0x27FF00: ("ldr", "r0, [pc, #0x18c]"),
+    0x27FF02: ("strh", "r0, [r6]"),
+    0x27FF0C: ("movs", "r0, #0xd"),
+    0x27FF10: ("bl", "#0x25fb4c"),
+    0x27FF16: ("ldr", "r0, [pc, #0x39c]"),
+    0x27FF18: ("strh", "r0, [r6]"),
+    0x27FF2A: ("movs", "r0, #0xe"),
     0x2801A0: ("ldrb", "r1, [r4, #8]"),
     0x2801AE: ("mov", "r8, r0"),
     0x280234: ("ldrb", "r0, [r5, #0xa]"),
@@ -1339,6 +1380,10 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x280174: 0x13D0,
     0x280266: 0x040B,
     0x2802D8: 0x13C8,
+    0x217164: 0x106B0B,
+    0x27FEC0: 0x1E08,
+    0x27FF00: 0x13C8,
+    0x27FF16: 0x040B,
     0x21741A: 0x106B08,
     0x217422: 0x106AF6,
     0x2171CE: 0x106B0D,
@@ -1610,6 +1655,9 @@ TYPE_0X80_DISCRIMINATOR_ROUTES = {
         "otherwise": "status_0x040b_task_14",
     },
 }
+TYPE_0X80_STATUS_0X13D0_PRODUCERS = [0x280174]
+TYPE_0X80_0X70_FOLLOWUP = 0x27FDC4
+TYPE_0X80_0X70_FOLLOWUP_DIRECT_CALLS = [0x28019A]
 SEARCH_SUBMISSION_TIMER_CODE = 0x1B
 SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 NSE3_TASK_4_ENTRY_POINTER = 0x2B74E0
@@ -3056,6 +3104,60 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 type-0x80 handler acquired a direct radio request edge: "
             f"{type_0x80_handler_request_calls}"
         )
+    type_0x80_status_0x13d0_producers = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic == "ldr"
+        and literal_value(insn, physical, FLASH_BASE) == 0x13D0
+    ]
+    if (
+        type_0x80_status_0x13d0_producers
+        != TYPE_0X80_STATUS_0X13D0_PRODUCERS
+    ):
+        raise ValueError(
+            "NSE-3 status-0x13d0 producer census changed: expected "
+            f"{TYPE_0X80_STATUS_0X13D0_PRODUCERS}, got "
+            f"{type_0x80_status_0x13d0_producers}"
+        )
+    type_0x80_0x70_followup_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TYPE_0X80_0X70_FOLLOWUP
+    ]
+    if (
+        type_0x80_0x70_followup_calls
+        != TYPE_0X80_0X70_FOLLOWUP_DIRECT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 type-0x80/0x70 follow-up call census changed: expected "
+            f"{TYPE_0X80_0X70_FOLLOWUP_DIRECT_CALLS}, got "
+            f"{type_0x80_0x70_followup_calls}"
+        )
+    type_0x80_0x70_followup_request_calls = {
+        name: [
+            insn.address
+            for insn in instructions
+            if insn
+            and TYPE_0X80_0X70_FOLLOWUP
+            <= insn.address
+            < 0x27FFA6
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+        ]
+        for name, target in (
+            ("channel_configure", 0x20CFFA),
+            ("bitmap_search", 0x20FAEC),
+            ("candidate_list", 0x214788),
+        )
+    }
+    if any(type_0x80_0x70_followup_request_calls.values()):
+        raise ValueError(
+            "NSE-3 type-0x80/0x70 follow-up acquired a direct radio "
+            f"constructor edge: {type_0x80_0x70_followup_request_calls}"
+        )
     task_17_entry = effective_u32(
         physical, NSE3_TASK_17_ENTRY_POINTER - FLASH_BASE
     )
@@ -3605,6 +3707,54 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     "alternate_status": 0x138E,
                     "alternate_task": 11,
                     "timer_0x1b_cancel_path": True,
+                },
+                "discriminator_0x70_path": {
+                    "status_0x13d0_producers":
+                        type_0x80_status_0x13d0_producers,
+                    "status_object": {
+                        "task": 12,
+                        "object_bytes": 8,
+                        "value_24_offset": 4,
+                    },
+                    "task_12_case": 0x21715C,
+                    "task_12_effect": {
+                        "value_24_added_offset": 0x68,
+                        "destination_controller": 0x106AA4,
+                        "destination_offset": 0x20,
+                        "conditional_gate_cell": 0x106B0B,
+                        "conditional_gate_value": 1,
+                        "conditional_helper": 0x2142B2,
+                    },
+                    "direct_followup": {
+                        "routine": TYPE_0X80_0X70_FOLLOWUP,
+                        "direct_calls": type_0x80_0x70_followup_calls,
+                        "original_report_offsets_consumed": [
+                            6, 0x0E, 0x0F, 0x10, 0x12, 0x13, 0x14,
+                        ],
+                        "possible_publications": [
+                            {
+                                "destination_task": 3,
+                                "object_status": 2,
+                                "object_bytes": 8,
+                                "object_byte_2": 4,
+                                "object_byte_3": 0x1F,
+                                "publication_helper_argument": 0x1E08,
+                            },
+                            {
+                                "destination_task": 13,
+                                "status": 0x13C8,
+                                "object_bytes": 0x28,
+                            },
+                            {
+                                "destination_task": 14,
+                                "status": 0x040B,
+                                "object_bytes": 0x28,
+                            },
+                        ],
+                        "direct_radio_request_calls":
+                            type_0x80_0x70_followup_request_calls,
+                    },
+                    "direct_acquisition_terminal": False,
                 },
                 "task_case": 0x217418,
                 "task_case_routes": {

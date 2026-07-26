@@ -351,6 +351,67 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x13C8, check.RADIO_REPORT_HANDLER_LITERALS[0x2802D8]
         )
 
+    def test_type_0x80_discriminator_0x70_updates_timing_controller(self):
+        self.assertEqual(
+            [0x280174], check.TYPE_0X80_STATUS_0X13D0_PRODUCERS
+        )
+        self.assertEqual(0x27FDC4, check.TYPE_0X80_0X70_FOLLOWUP)
+        self.assertEqual(
+            [0x28019A], check.TYPE_0X80_0X70_FOLLOWUP_DIRECT_CALLS
+        )
+        self.assertEqual(
+            ("beq", "#0x21715c"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2170FE],
+        )
+        self.assertEqual(
+            ("ldr", "r0, [r4, #4]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x21715C],
+        )
+        self.assertEqual(
+            ("adds", "r1, #0x68"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x217160],
+        )
+        self.assertEqual(
+            0x106B0B, check.RADIO_REPORT_HANDLER_LITERALS[0x217164]
+        )
+        self.assertEqual(
+            ("bl", "#0x2142b2"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x21716E],
+        )
+        self.assertEqual(
+            ("ldrb", "r0, [r6, #6]"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x27FDD0],
+        )
+        self.assertEqual(
+            ("movs", "r0, #3"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x27FEC8],
+        )
+        self.assertEqual(
+            ("bl", "#0x25fb4c"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x27FECC],
+        )
+        self.assertEqual(
+            0x1E08, check.RADIO_REPORT_HANDLER_LITERALS[0x27FEC0]
+        )
+        self.assertEqual(
+            0x13C8, check.RADIO_REPORT_HANDLER_LITERALS[0x27FF00]
+        )
+        self.assertEqual(
+            ("movs", "r0, #0xd"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x27FF0C],
+        )
+        self.assertEqual(
+            ("bl", "#0x25fb4c"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x27FF10],
+        )
+        self.assertEqual(
+            0x040B, check.RADIO_REPORT_HANDLER_LITERALS[0x27FF16]
+        )
+        self.assertEqual(
+            ("movs", "r0, #0xe"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x27FF2A],
+        )
+
     def test_bitmap_constructors_keep_populated_and_zero_control_forms_distinct(self):
         self.assertEqual(0x09CD, check.RADIO_PACKET_LITERALS[0x20FD94])
         self.assertEqual(0x0445, check.RADIO_PACKET_LITERALS[0x24E74A])

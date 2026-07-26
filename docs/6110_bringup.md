@@ -290,11 +290,33 @@ The complete direct route table is:
 | `0xa0` | Preserves a `0x28`-byte status-`0x043b` object and passes it to service helper `0x279b72`, which selects service `0x13`. |
 | `0xb0`, `0xb1` | Report byte 6 equal to 1 is released; other values share the status-`0x040b` task-14 route. |
 
+The `0x70` arm is now bounded beyond that first publication. Status
+`0x13d0` has exactly one literal producer in the image, at `0x280174`.
+The handler stores the shared big-endian 24-bit value at offset +4 in its
+eight-byte task-12 object. Task 12 recognizes `0x13d0` explicitly after
+arithmetic dispatch from base status `0x13a3`: case `0x21715c` adds
+`0x68` to the received value and stores it at controller
+`0x106aa4 + 0x20`. If byte `0x106b0b` equals one, the case also calls
+the already bounded timer-`0x6e` controller-recheck helper `0x2142b2`.
+This makes the compact report a genuine candidate/timing-controller
+input rather than a terminal notification.
+
+The subsequent call to `0x27fdc4` is also unique in the image. It receives
+the original report, not the compact task-12 copy, and tests fields at
+offsets 6, `0x0e`, `0x0f`, `0x10`, `0x12`, `0x13` and `0x14`. Depending
+on those fields and controller state, it may publish an eight-byte object
+with status 2, bytes 2 and 3 equal to `04 1f`, and helper argument
+`0x1e08` to task 3; preserve a `0x28`-byte status-`0x13c8` object for
+task 13; or preserve a `0x28`-byte status-`0x040b` object for task 14.
+These numeric layouts are recorded without assigning protocol meanings
+to the task-3 object or `0x1e08`.
+
 Across the complete handler extent, none of these arms directly calls
 `CHANNEL_CONFIGURE`, the type-`0x1a` bitmap builder or the type-`0x09`
-candidate-list builder. Their numeric statuses and first consumers are
+candidate-list builder. The complete `0x27fdc4..0x27ffa6` follow-up also
+calls none of them. Their numeric statuses and first consumers are
 therefore preserved without treating them as parallel acquisition
-terminals.
+terminals or inferring a transitive radio request.
 
 That branch first applies flags in controller object `0x1090fc`, clearing
 mask `0x0a000000`. Depending on the remaining flags and controller state it
