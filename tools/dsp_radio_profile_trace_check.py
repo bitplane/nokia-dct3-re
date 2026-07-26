@@ -51,6 +51,12 @@ def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
 		0x002C2A02: bytes.fromhex("022020802020a0702220e070"),
 		0x002C2A5E: bytes.fromhex("022020804420a0702020e070"),
 		0x002C2AB8: bytes.fromhex("022020802020a0702120e070"),
+		# Allocate/clear 0xa4 bytes, publish a 0xa0-byte type-0x56 payload,
+		# then fill all 160 candidate bytes with the erased-entry sentinel.
+		0x002A7DD8: bytes.fromhex(
+			"10b5a420f2f718fd041c0021a42249f051ff"
+			"a020a070022020805620e070"
+		),
 	}
 	for address, expected in constructors.items():
 		offset = address - 0x200000
@@ -59,7 +65,8 @@ def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
 
 	print(
 		"NHM-5 static boundary: type 22/32 and 20/68 are exact profile-selected ROM "
-		"tables; type 21/32 is a separately constructed two-table composite"
+		"tables; type 21/32 is a separately constructed two-table composite; "
+		"type 56/160 is a firmware-built 80-entry candidate-channel list"
 	)
 
 

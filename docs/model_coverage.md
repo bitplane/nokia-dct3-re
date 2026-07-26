@@ -9,7 +9,7 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Radio lifecycle, paired GSM-FR/FACCH/degraded-media and isolated physical audio gates pass. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
 | Nokia 3210 NSE-8 v5.01 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Independent ROM gates cover the call lifecycle and isolated physical duplex. The same COBBA/DSP limitation applies. |
-| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its startup grammar is not the NSE-8 grammar and anchors the profile-selected `0x20/0x21/0x22` configuration constructors; inbound reports and `0x56` remain unresolved. |
+| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its startup grammar is not the NSE-8 grammar, anchors the profile-selected `0x20/0x21/0x22` configuration constructors, and identifies `0x56` as the candidate-channel list. Its inbound result contract remains the next boundary. |
 | Nokia 3330 NHM-6 v4.50E | Yes | Yes | No | No | No | No | No | `verify-3330-frontier` and `verify-3330-navigation`; later product contracts are not established. |
 | Nokia 3410 NHM-2 v5.46E | Yes | Yes | No | No | No | No | No | `verify-3410-frontier` and navigation/menu gates; later product contracts are not established. |
 | Nokia 6110 NSE-3 family | No | No | No | No | No | No | No | Hardware documentation informs shared DCT3 boundaries, but no local declared 6110 ROM/profile or executable acceptance gate exists. Acquire and identify a lawful firmware image before implementation claims. |
@@ -56,4 +56,16 @@ The common initializer at `0x2c2c26` invokes the `0x3c`, `0x21`, `0x22`, and
 in the ordinary queue object, and the task-side transport reaches the shared
 ring through `0x2bc6e0`/commit store `0x2bc6c4`. This proves configuration-table
 ownership and packet identity, but not individual RF field meanings or a reply
-contract. Type `0x56` is deliberately still unclassified.
+contract.
+
+The later type `0x56` is separately constructed at `0x2a7dd8`. Firmware
+allocates and clears a 164-byte queue object, declares a 160-byte payload and
+fills that payload with `0xff`. The producer at `0x28a0d0` walks 16-byte
+firmware-owned channel records, copies the two channel bytes from offsets 6/7
+into consecutive payload entries, and stops after 80 entries. Both observed
+call sites pass their selected record through this producer before publication.
+The runtime packet therefore represents one big-endian candidate `0x0058`
+followed by 79 erased `0xffff` entries. This establishes a bounded
+candidate-channel-list command; it does not yet establish that the numeric
+value may be substituted with the NSE-8 laboratory ARFCN or that NHM-5 accepts
+the NSE-8 `0x8b` record layout.
