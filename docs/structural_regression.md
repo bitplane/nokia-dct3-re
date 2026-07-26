@@ -206,7 +206,14 @@ single-run target.
 profile and requires the deterministic idle-screen frame. The profile supplies
 only device-boundary behavior: the shared DSP/external-service/SIM models, the
 58-exchange DSP calibration and the standard-channel 3310 battery-pack tuple.
-No firmware address or state is changed by the gate.
+No firmware address or state is changed by the gate. Unless
+`PRESERVE_NVRAM=1` is requested explicitly, the harness removes the correctly
+suffixed `noki3310_3` mutable flash, EEPROM and SIM files before each run so
+MAME reconstructs them from the declared ROM regions and card defaults. Two
+independent clean directories reproduce idle hash
+`5871dd93badb1fa410dd22a6b7a12cf2d3b8f938e1514e989858dd45a2b35b74`;
+the earlier oracle had silently depended on an undeclared persisted user
+profile.
 
 `make verify-3310-menu` extends that run with two separated physical Menu
 switch cycles. The first is consumed by the ROM's wake/debounce lifecycle; the
@@ -216,7 +223,8 @@ deterministic `Phone book` menu. The gate changes only MAME input fields.
 `make verify-3310-navigation` continues through the same physical matrix into
 the Phone book submenu, moves the highlight once, and checks that the resulting
 frame is deterministic. A separate run repeats that prefix and uses two
-physical C-key cycles to return to the exact `verify-3310-frontier` idle frame.
+physical C-key cycles followed by an explicit 1.8-second firmware settling
+interval to return to the exact `verify-3310-frontier` idle frame.
 The two endpoints prevent a broken key path from passing merely because a
 later screen happens to look plausible.
 

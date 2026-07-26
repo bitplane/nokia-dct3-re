@@ -55,7 +55,9 @@ RUN_ENV ?=
 RUN_VERBOSE ?= 0
 RUN_EXTRA_ARGS ?=
 RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
-NVRAM_SYSTEM := $(if $(and $(filter noki3210,$(PHONE)),$(filter 501,$(BIOS))),noki3210_1,$(PHONE))
+NVRAM_SYSTEM := $(strip $(if $(and $(filter noki3210,$(PHONE)),$(filter 501,$(BIOS))),noki3210_1,\
+	$(if $(and $(filter noki3310,$(PHONE)),$(filter 639,$(BIOS))),noki3310_3,\
+	$(if $(and $(filter noki3330,$(PHONE)),$(filter 450e,$(BIOS))),noki3330_1,$(PHONE)))))
 PRESERVE_NVRAM ?= 0
 PROVISIONED_IMEI_PREFIX ?=
 ERASED_IDENTITY_SECURITY_CODE ?=
@@ -79,7 +81,7 @@ ORACLE_RADIO_OPERATOR_CROP_SHA ?= 59dd0d4f80f705c98be148c7f60f3171d2b66d7a434fba
 ORACLE_STRUCT ?= oracles/noki3210-default.struct
 ORACLE_FRONTIER_STRUCT ?= oracles/noki3210-frontier.struct
 ORACLE_V501_STRUCT ?= oracles/noki3210-v501-smoke.struct
-ORACLE_3310_IDLE_SHA ?= 45cc33c77474936613e4add081d437bafd2f8686e27e3b985ad69283168852f9
+ORACLE_3310_IDLE_SHA ?= 5871dd93badb1fa410dd22a6b7a12cf2d3b8f938e1514e989858dd45a2b35b74
 ORACLE_3310_MENU_SHA ?= e0890d021f0e11de1978f9ecbcfa0321191ac3741da1379f82337c715079851a
 ORACLE_3310_PHONEBOOK_NAV_SHA ?= 06ea6abd47a1c603fc60382a2ba7e78d7a1247de2a13079374b48fd6796e793e
 ORACLE_3310_ANSWERED_UI_SHA ?= a9330101aff6ef85f7bc8625794c707a3a7a45f9b426be0548b2af1a86dfb0f5
@@ -417,7 +419,8 @@ prepare-run-nvram: build
 			cp "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)" \
 				"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 		fi; \
-	elif [ "$(PHONE)" = "noki3410" ] && [ "$(PRESERVE_NVRAM)" != "1" ]; then \
+	elif { [ "$(PHONE)" = "noki3310" ] || [ "$(PHONE)" = "noki3330" ] || \
+			[ "$(PHONE)" = "noki3410" ]; } && [ "$(PRESERVE_NVRAM)" != "1" ]; then \
 		rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/flash" \
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card" \
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
@@ -640,8 +643,8 @@ verify-3310-navigation:
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3310 navigation frame produced in $(RUN_DIR)_forward"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_PHONEBOOK_NAV_SHA)
-	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_return SECONDS=14 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down,wait700,c,wait700,c NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_return SECONDS=16 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,enter,wait700,enter,wait700,down,wait700,c,wait700,c,wait1800 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
 	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no informative 3310 return frame produced in $(RUN_DIR)_return"; exit 1; }; \

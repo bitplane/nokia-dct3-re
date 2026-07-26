@@ -221,6 +221,24 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("bool external_service_transport = false;", self.driver)
         self.assertIn("bool radio_peer = false;", self.driver)
 
+    def test_multi_model_frontiers_reset_the_correct_bios_nvram_namespace(self):
+        self.assertIn("noki3310_3", self.makefile)
+        self.assertIn("noki3330_1", self.makefile)
+        prepare = self.makefile.split("prepare-run-nvram: build", 1)[1].split(
+            "\nrun:", 1
+        )[0]
+        for phone in ("noki3310", "noki3330", "noki3410"):
+            self.assertIn(f'[ "$(PHONE)" = "{phone}" ]', prepare)
+        for store in ("flash", "sim_card", "eeprom"):
+            self.assertIn(
+                f'"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/{store}"',
+                prepare,
+            )
+        self.assertIn(
+            "5871dd93badb1fa410dd22a6b7a12cf2d3b8f938e1514e989858dd45a2b35b74",
+            self.makefile,
+        )
+
     def test_external_service_application_is_typed_per_supported_product(self):
         self.assertIn("enum class application_profile", self.external_service_header)
         self.assertIn(
