@@ -416,6 +416,45 @@ RADIO_REPORT_JUMP_TABLE = {
     0x8E: 0x2A21BC,
     0x8F: 0x2A2154,
 }
+EXTERNAL_SERVICE_TRANSPORT_ANCHORS = {
+    # DSP reports 0x8d/0x8e remain outside the radio table and are posted to
+    # task 9 through the ordinary queue API.
+    0x2A21FA: ("adds", "r0, r4, #0"),
+    0x2A21FC: ("bl", "#0x273e3e"),
+    0x273E3E: ("push", "{lr}"),
+    0x273E40: ("adds", "r1, r0, #0"),
+    0x273E42: ("movs", "r0, #9"),
+    0x273E44: ("bl", "#0x25fc98"),
+    # Task 9 recognizes link families 0x1e/0x1c and gives type 0x8e to its
+    # service-frame parser rather than a radio handler.
+    0x273B2C: ("push", "{r4, r5, r6, lr}"),
+    0x273B36: ("ldrb", "r1, [r0]"),
+    0x273B38: ("cmp", "r1, #0x1e"),
+    0x273B3C: ("cmp", "r1, #0x1c"),
+    0x273B40: ("ldrb", "r1, [r0, #3]"),
+    0x273B42: ("cmp", "r1, #0x8d"),
+    0x273B46: ("cmp", "r1, #0x8e"),
+    0x273B4A: ("bl", "#0x273368"),
+    # Startup authors a seven-byte discovery frame: caller-supplied link
+    # family, ff, 00, class d0, word 1, and byte 6 set to 1.
+    0x273878: ("push", "{r4, r5, lr}"),
+    0x27387C: ("movs", "r0, #7"),
+    0x27387E: ("bl", "#0x260abc"),
+    0x27388C: ("strb", "r5, [r4]"),
+    0x27388E: ("movs", "r0, #0xff"),
+    0x273890: ("strb", "r0, [r4, #1]"),
+    0x273892: ("movs", "r0, #0"),
+    0x273894: ("strb", "r0, [r4, #2]"),
+    0x273896: ("movs", "r0, #0xd0"),
+    0x273898: ("strb", "r0, [r4, #3]"),
+    0x27389A: ("movs", "r0, #1"),
+    0x27389C: ("strh", "r0, [r4, #4]"),
+    0x27389E: ("strb", "r0, [r4, #6]"),
+    0x2738D8: ("movs", "r0, #0x1e"),
+    0x2738DA: ("bl", "#0x273878"),
+}
+NSE3_TASK_9_ENTRY_POINTER = 0x2B751C
+NSE3_TASK_9_ENTRY = 0x273B2D
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -1514,7 +1553,16 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, RADIO_PACKET_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
+    physical = swap16(data)
+    task_9_entry = effective_u32(
+        physical, NSE3_TASK_9_ENTRY_POINTER - FLASH_BASE)
+    if task_9_entry != NSE3_TASK_9_ENTRY:
+        raise ValueError(
+            "NSE-3 task-9 entry changed: expected "
+            f"{NSE3_TASK_9_ENTRY:#x}, got {task_9_entry!r}"
+        )
     table_offset = RADIO_REPORT_JUMP_TABLE_ADDRESS - FLASH_BASE
     table = {
         packet_type: struct.unpack_from(
@@ -1599,6 +1647,24 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "confirmation_payload_read_by_handler": False,
                 "controller_state_after_confirmation": 3,
             },
+        },
+        "external_service_transport": {
+            "dsp_report_types": [0x8D, 0x8E],
+            "owner_task": 9,
+            "task_entry": task_9_entry,
+            "accepted_link_families": [0x1C, 0x1E],
+            "discovery_frame": {
+                "length": 7,
+                "link_family": 0x1E,
+                "destination": 0xFF,
+                "source": 0x00,
+                "class": 0xD0,
+                "control_word": 1,
+                "control_byte": 1,
+            },
+            "transport_component": "generic_nokia_external_service",
+            "application_registration_grammar": "not_established",
+            "peer_enablement": False,
         },
         "peer_profile": "disabled_pending_bootstrap_and_full_report_lifecycle",
     }

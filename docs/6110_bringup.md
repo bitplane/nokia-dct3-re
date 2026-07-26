@@ -253,6 +253,29 @@ peer disabled. This prevents a future caller from treating identical bitmap
 packing as proof of the entire NSE-8 search lifecycle, while avoiding a copied
 NSE-3 packet codec.
 
+### External-service transport
+
+NSE-3 also independently establishes the reusable external-service transport
+boundary without establishing a complete service application. DSPIF report
+types `0x8d` and `0x8e` stay outside the radio-report jump table and pass
+through wrapper `0x273e3e` to task 9. The exact task-table entry at
+`0x2b751c` points to `0x273b2d`; its loop recognizes link-family bytes `0x1e`
+and `0x1c`, and routes type `0x8e` to service-frame parser `0x273368`.
+
+Startup independently authors a seven-byte discovery frame. Constructor
+`0x273878` writes caller-supplied family `0x1e`, destination `0xff`, source
+`0x00`, class `0xd0`, control word `1`, and byte 6 value `1`, then submits it
+through the ordinary service transport. This is the same transport/discovery
+shape implemented by the generic `nokia_external_service_peer_device`; NSE-3
+does not need a copied framing component.
+
+It does not follow that the proven 3210/3310 application script is portable.
+The v4.06 anchors above do not yet establish NSE-3's registration delay,
+command `0x64` exchange, channel-map command `0x70`, advertised channels or
+acknowledgement ordering. The product therefore continues to leave the
+external-service peer disabled. Later work may share the transport while
+selecting a separately evidenced application profile.
+
 ### DSP parameter selector 8
 
 The v4.06 external firmware also closes the encoding boundary for DSP

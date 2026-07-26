@@ -284,7 +284,9 @@ constexpr nokia_product_config make_6110_config()
 	// NSE-3 Chapter 3 documents COBBA-GJ deriving a 1 MHz PCMDClk and
 	// 8 kHz PCMSClk, with a sign-extended 13-bit sample in a 16-bit word.
 	// Firmware-facing DSP, external-service and radio peers deliberately
-	// retain their disabled defaults until an identified NSE-3 ROM is traced.
+	// retain their disabled defaults. The external image establishes generic
+	// 0x1e/0x1c service framing and d0 discovery through DSP reports 8d/8e,
+	// but not NSE-3's registration/channel-map application script.
 	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
 	// transfer geometry rather than evidence for the HLE peer's completion
 	// counter. NSE-3 projects captured shared word 0x10000 as COBBA identity

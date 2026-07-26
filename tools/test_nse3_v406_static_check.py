@@ -221,6 +221,22 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
                 check.swap16(bytes(physical)), {0x28564C: 0x30000}
             )
 
+    def test_external_service_transport_is_shared_without_inheriting_application_script(self):
+        self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
+        self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)
+        self.assertEqual(
+            ("cmp", "r1, #0x8e"),
+            check.EXTERNAL_SERVICE_TRANSPORT_ANCHORS[0x273B46],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0xd0"),
+            check.EXTERNAL_SERVICE_TRANSPORT_ANCHORS[0x273896],
+        )
+        self.assertEqual(
+            ("movs", "r0, #0x1e"),
+            check.EXTERNAL_SERVICE_TRANSPORT_ANCHORS[0x2738D8],
+        )
+
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
         image[0x40:0x42] = b"\x12\x34"
