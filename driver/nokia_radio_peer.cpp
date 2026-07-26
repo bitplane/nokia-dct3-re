@@ -8,6 +8,15 @@
 #define VERBOSE (LOG_RADIO)
 #include "logmacro.h"
 
+namespace {
+// NHM-5 acknowledges MM Information at Layer 2 before its MM/UI consumer has
+// completed the visible time-update transaction.  Its accepted MT-call path
+// requires the following SETUP to remain queued across that firmware-owned
+// transaction.  This is a product timing contract, not a forced firmware
+// event; NSE-8 continues to use acknowledgement-only pacing.
+constexpr unsigned NHM5_MM_INFORMATION_SETTLE_TICKS = 1000;
+}
+
 DEFINE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device,
 		"nokia_radio_peer", "Nokia DCT3 radio peer HLE")
 
@@ -1050,6 +1059,11 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			// therefore require a standalone LAPDm RR first.
 			const auto pending_kind =
 					m_gsm_session->pending_downlink_kind();
+			if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+					pending_kind ==
+							nokia_gsm_session_device::downlink_kind::
+									incoming_call_setup)
+				m_wait_ticks = NHM5_MM_INFORMATION_SETTLE_TICKS;
 			const bool queued_information =
 					pending_kind !=
 							nokia_gsm_session_device::downlink_kind::none &&
@@ -1102,6 +1116,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				m_phase = phase::service_downlink;
 				m_reports_remaining = 1;
 				m_report_deferred = true;
+				if (m_protocol_profile ==
+							protocol_profile::nhm5_candidate_list &&
+						action ==
+								nokia_gsm_session_device::downlink_kind::
+										incoming_call_setup)
+					m_wait_ticks = NHM5_MM_INFORMATION_SETTLE_TICKS;
 			}
 			else
 			{
@@ -1630,6 +1650,9 @@ void nokia_radio_peer_device::tick()
 	if (m_phase == phase::service_uplink_request &&
 			m_reports_remaining != 0 && m_wait_ticks != 0)
 		--m_wait_ticks;
+	if (m_phase == phase::service_downlink &&
+			m_reports_remaining != 0 && m_wait_ticks != 0)
+		--m_wait_ticks;
 	if (m_protocol_profile == protocol_profile::nhm5_candidate_list &&
 			m_phase == phase::lapdm_establish &&
 			m_reports_remaining != 0 && m_wait_ticks != 0)
@@ -1644,6 +1667,7 @@ void nokia_radio_peer_device::tick()
 			!(m_phase == phase::candidate_sync && m_wait_ticks != 0) &&
 			!(m_phase == phase::serving_bcch && m_wait_ticks != 0) &&
 			!(m_phase == phase::selected_bcch && m_wait_ticks != 0) &&
+			!(m_phase == phase::service_downlink && m_wait_ticks != 0) &&
 			!(m_phase == phase::service_uplink_request && m_wait_ticks != 0) &&
 			!(m_protocol_profile == protocol_profile::nhm5_candidate_list &&
 				m_phase == phase::lapdm_establish && m_wait_ticks != 0))
