@@ -66,8 +66,12 @@ consumer, which reads status bits from queue-object byte 9 and organically
 emits lane-correct DSPIF follow-up `70 0a`. The semantic label, compact ring
 layout and direct request/reply correlation remain unaccepted. Exact DSPIF RX
 places raw payload at object byte 4, proving compact payload `0d 00` cannot
-reach the v4.06 selector/status at bytes 8--9; the peer therefore stays
-disabled.
+reach the v4.06 selector/status at bytes 8--9. The exact NSE-8 v6.00 decoder
+independently identifies the missing transformation: it inserts
+`00 (compact_length + 2) 01 00`, making compact `0d 00` into the
+layout-compatible NSE-3 candidate `00 04 01 00 0d 00`. This candidate is
+statically checked across both images but remains disabled because NSE-3
+request/response correlation and the semantic name are still unproved.
 
 ## Promotion rules
 

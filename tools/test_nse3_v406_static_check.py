@@ -1236,6 +1236,18 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             [0x237DF8],
             check.EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS,
         )
+        self.assertEqual(
+            bytes.fromhex("00040100"),
+            check.NSE8_TYPE_0X74_INSERTED_PREFIX,
+        )
+        self.assertEqual(
+            bytes.fromhex("000401000d00"),
+            check.NSE3_TYPE_0X74_CROSS_ROM_CANDIDATE_PAYLOAD,
+        )
+        self.assertEqual(
+            ("strb", "r1, [r4, #6]"),
+            check.NSE8_TYPE_0X74_DECODER_ANCHORS[0x29BC36],
+        )
 
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)

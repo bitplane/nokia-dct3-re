@@ -45,6 +45,9 @@ FLASH_SIZE = 0x100000
 SRAM_BASE = 0x100000
 SRAM_SIZE = 0x10000
 EXPECTED_SHA1 = "5025a6ac3b4a13714211fde903f27f92cbb7c9b6"
+NSE8_V600_SWAP16_EXPECTED_SHA1 = (
+    "735de56910a9902c5f2f16d0f2ff0168fb123e0a"
+)
 VECTOR_SOURCE = 0x200180
 KEYMAP_ADDRESS = 0x2BE8BC
 KEYMAP = bytes.fromhex(
@@ -2437,6 +2440,32 @@ EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT = bytes.fromhex(
 )
 EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_BYTE_FIELDS = bytes.fromhex("02700a")
 EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS = [0x237DF8]
+NSE8_TYPE_0X74_DECODER_ANCHORS = {
+    # NSE-8 v6.00 receives the compact DSP object, allocates ten additional
+    # bytes, preserves its type at object +3 and inserts the four-byte framed
+    # service prefix before copying the compact payload to object +8.
+    0x29BC12: ("ldrb", "r0, [r5, #2]"),
+    0x29BC14: ("adds", "r0, #0xa"),
+    0x29BC1A: ("bl", "#0x26afe0"),
+    0x29BC28: ("ldrb", "r1, [r5, #3]"),
+    0x29BC2A: ("strb", "r1, [r4, #3]"),
+    0x29BC2C: ("strb", "r0, [r4, #4]"),
+    0x29BC2E: ("ldrb", "r1, [r5, #2]"),
+    0x29BC30: ("adds", "r1, #2"),
+    0x29BC32: ("strb", "r1, [r4, #5]"),
+    0x29BC34: ("movs", "r1, #1"),
+    0x29BC36: ("strb", "r1, [r4, #6]"),
+    0x29BC38: ("strb", "r0, [r4, #7]"),
+    0x29BC3A: ("movs", "r0, #8"),
+    0x29BC3E: ("movs", "r1, #4"),
+    0x29BC42: ("ldrb", "r2, [r5, #2]"),
+    0x29BC44: ("bl", "#0x2b5c7c"),
+}
+NSE8_TYPE_0X74_COMPACT_PAYLOAD = bytes.fromhex("0d00")
+NSE8_TYPE_0X74_INSERTED_PREFIX = bytes.fromhex("00040100")
+NSE3_TYPE_0X74_CROSS_ROM_CANDIDATE_PAYLOAD = (
+    NSE8_TYPE_0X74_INSERTED_PREFIX + NSE8_TYPE_0X74_COMPACT_PAYLOAD
+)
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -3363,6 +3392,49 @@ def verify_identity(data: bytes) -> dict:
     if digest != EXPECTED_SHA1:
         raise ValueError(f"expected NSE-3 v4.06 SHA-1 {EXPECTED_SHA1}, got {digest}")
     return {"size": len(data), "sha1": digest}
+
+
+def verify_nse8_type_0x74_decoder_reference(data: bytes) -> dict:
+    digest = hashlib.sha1(data).hexdigest()
+    if len(data) != 0x200000:
+        raise ValueError(
+            f"expected 0x200000-byte NSE-8 reference flash, got {len(data):#x}"
+        )
+    if digest != NSE8_V600_SWAP16_EXPECTED_SHA1:
+        raise ValueError(
+            "expected NSE-8 v6.00 swap16 reference SHA-1 "
+            f"{NSE8_V600_SWAP16_EXPECTED_SHA1}, got {digest}"
+        )
+    decoder = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+    for pc, expected in NSE8_TYPE_0X74_DECODER_ANCHORS.items():
+        offset = pc - FLASH_BASE
+        decoded = list(decoder.disasm(data[offset : offset + 4], pc, count=1))
+        actual = (decoded[0].mnemonic, decoded[0].op_str) if decoded else None
+        if actual != expected:
+            raise ValueError(
+                f"NSE-8 type-0x74 decoder anchor {pc:#x}: "
+                f"expected {expected}, got {actual}"
+            )
+    compact_length = len(NSE8_TYPE_0X74_COMPACT_PAYLOAD)
+    inserted_prefix = bytes((0, compact_length + 2, 1, 0))
+    if inserted_prefix != NSE8_TYPE_0X74_INSERTED_PREFIX:
+        raise ValueError(
+            "NSE-8 type-0x74 inserted prefix derivation changed: "
+            f"expected {NSE8_TYPE_0X74_INSERTED_PREFIX.hex()}, "
+            f"got {inserted_prefix.hex()}"
+        )
+    return {
+        "identity": {"size": len(data), "sha1": digest},
+        "decoder": 0x29BC00,
+        "compact_payload": list(NSE8_TYPE_0X74_COMPACT_PAYLOAD),
+        "inserted_prefix": list(inserted_prefix),
+        "expanded_payload": list(
+            inserted_prefix + NSE8_TYPE_0X74_COMPACT_PAYLOAD
+        ),
+        "nse3_layout_compatible": True,
+        "nse3_semantic_equivalence_proven": False,
+        "nse3_request_response_correlation_proven": False,
+    }
 
 
 def verify_reset_boundary(data: bytes) -> dict:
@@ -6967,9 +7039,16 @@ def verify(data: bytes) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("flash", type=Path)
+    parser.add_argument("--nse8-reference", type=Path)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
     result = verify(args.flash.read_bytes())
+    if args.nse8_reference:
+        result["cross_rom_type_0x74_decoder_reference"] = (
+            verify_nse8_type_0x74_decoder_reference(
+                args.nse8_reference.read_bytes()
+            )
+        )
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(result, indent=2) + "\n")

@@ -861,10 +861,24 @@ The exact DSPIF RX envelope in fact rules out that compact reply for v4.06 as
 written. RX allocates raw payload length plus four, stores the ring type at
 queue-object byte 3 and copies raw payload from byte 4. A two-byte raw payload
 `0d 00` therefore reaches bytes 4--5, not the selector/status bytes 8--9 used
-by `0x237d60`. The independent HLE may describe another ROM4 firmware
-revision or omit four peer-owned prefix bytes, but its reply must not be
-reused for this image without that distinction. The semantic name and correct
-DSP response body remain unresolved.
+by `0x237d60`.
+
+The missing transformation is independently visible in the proven NSE-8
+v6.00 image. Its type-`0x70..0x7f` decoder at `0x29bc00` preserves the raw
+type, inserts frame bytes `00 (compact_length + 2) 01 00` at queue-object
+bytes 4--7, and copies the compact DSP payload to byte 8. For compact payload
+`0d 00`, that produces the six-byte expanded payload
+`00 04 01 00 0d 00`. Supplying those six bytes directly through NSE-3's
+untranslated DSPIF receive path places selector `0x0d` and status `0x00` at
+the exact offsets consumed by `0x237d60`.
+
+This is a reproducible, layout-compatible cross-ROM candidate, not yet an
+NSE-3 response contract. The independent HLE may describe a revision whose
+DSP receive path still contains the NSE-8-style decoder, while v4.06 expects
+the internal DSP to provide the expanded frame. Neither image proves that the
+NSE-3 `70 0d` request is answered by this payload or that the operation is a
+self-test. The candidate therefore remains disabled pending an internal-DSP
+image or an organic ring trace.
 
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,

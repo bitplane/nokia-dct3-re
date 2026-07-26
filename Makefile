@@ -313,6 +313,7 @@ normalize-6110:
 verify-6110-static:
 	$(VENV)/bin/python tools/nse3_v406_static_check.py \
 		roms/noki6110/6110_nse3_v406_rom3_candidate.fls \
+		--nse8-reference roms/3210f600a_swap16.bin \
 		--json run_census/nse3_v406_static_boundary.json
 
 verify-dct3-type-1f-static:
