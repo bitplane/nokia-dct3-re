@@ -32,6 +32,22 @@ class MamePatchHygieneTest(unittest.TestCase):
         self.assertIn("m_top_boot_sector && byte_address", self.flash)
         self.assertIn("m_bot_boot_sector && byte_address", self.flash)
 
+    def test_nse3_te28f800_has_its_own_one_megabyte_part(self):
+        body = self.flash.split(
+            "intel_te28f800_device::intel_te28f800_device", 1
+        )[1].split(
+            "intel_te28f160_device::intel_te28f160_device", 1
+        )[0]
+        self.assertIn("INTEL_TE28F800", body)
+        self.assertIn("0x100000", body)
+        self.assertIn("m_parameter_block_size = 8 * 1024;", body)
+        self.assertIn("m_parameter_block_count = 8;", body)
+        self.assertIn("class intel_te28f800_device", self.flash_h)
+        self.assertIn(
+            "DECLARE_DEVICE_TYPE(INTEL_TE28F800,",
+            self.flash_h,
+        )
+
     def test_lcd_defaults_and_command_mask_are_preserved(self):
         self.assertIn("m_controller_width(84)", self.lcd)
         self.assertIn("m_controller_banks(6)", self.lcd)

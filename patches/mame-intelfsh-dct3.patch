@@ -10,6 +10,14 @@ index 5b41774ad3c..8d28aebbb94 100644
  DEFINE_DEVICE_TYPE(TMS_29F040,               tms_29f040_device,               "tms_29f040",               "Texas Instruments 29F040 Flash")
  
  DEFINE_DEVICE_TYPE(PANASONIC_MN63F805MNP,    panasonic_mn63f805mnp_device,    "panasonic_mn63f805mnp",    "Panasonic MN63F805MNP Flash")
+@@ -125,6 +126,7 @@ DEFINE_DEVICE_TYPE(SHARP_LH28F400,           sharp_lh28f400_device,           "s
+ DEFINE_DEVICE_TYPE(SHARP_LH28F400,           sharp_lh28f400_device,           "sharp_lh28f400",           "Sharp LH28F400 Flash")
+ DEFINE_DEVICE_TYPE(INTEL_E28F008SA,          intel_e28f008sa_device,          "intel_e28f008sa",          "Intel E28F008SA Flash")
+ DEFINE_DEVICE_TYPE(INTEL_TE28F160,           intel_te28f160_device,           "intel_te28f160",           "Intel TE28F160 Flash")
++DEFINE_DEVICE_TYPE(INTEL_TE28F800,           intel_te28f800_device,           "intel_te28f800",           "Intel TE28F800 Flash")
+ DEFINE_DEVICE_TYPE(SHARP_LH28F160S3,         sharp_lh28f160s3_device,         "sharp_lh28f160s3",         "Sharp LH28F160S3 Flash")
+ DEFINE_DEVICE_TYPE(INTEL_TE28F320,           intel_te28f320_device,           "intel_te28f320",           "Intel TE28F320 Flash")
+ DEFINE_DEVICE_TYPE(SHARP_LH28F320BF,         sharp_lh28f320bf_device,         "sharp_lh28f320bf",         "Sharp LH28F320BFHE-PBTL Flash")
 @@ -163,10 +164,14 @@ intelfsh_device::intelfsh_device(const machine_config &mconfig, device_type type
  		m_device_id2(0),
  		m_device_id3(0),
@@ -41,7 +49,21 @@ index 5b41774ad3c..8d28aebbb94 100644
  panasonic_mn63f805mnp_device::panasonic_mn63f805mnp_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh8_device(mconfig, PANASONIC_MN63F805MNP, tag, owner, clock, 0x10000, MFG_PANASONIC, 0x1b) { m_sector_is_4k = true; }
  
-@@ -304,7 +318,12 @@ sharp_lh28f160s3_device::sharp_lh28f160s3_device(const machine_config &mconfig,
+@@ -297,5 +311,13 @@ sharp_lh28f400_device::sharp_lh28f400_device(const machine_config &mconfig, cons
+ 	: intelfsh16_device(mconfig, SHARP_LH28F400, tag, owner, clock, 0x80000, MFG_SHARP, 0xed) { }
+ 
++intel_te28f800_device::intel_te28f800_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
++	: intelfsh16_device(mconfig, INTEL_TE28F800, tag, owner, clock, 0x100000, MFG_INTEL, 0x9c)
++{
++	m_top_boot_sector = true;
++	m_parameter_block_size = 8 * 1024;
++	m_parameter_block_count = 8;
++}
++
+ intel_te28f160_device::intel_te28f160_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+ 	: intelfsh16_device(mconfig, INTEL_TE28F160, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
+ 
+@@ -304,7 +327,12 @@ sharp_lh28f160s3_device::sharp_lh28f160s3_device(const machine_config &mconfig,
  	: intelfsh16_device(mconfig, SHARP_LH28F160S3, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
  
  intel_te28f320_device::intel_te28f320_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
@@ -138,7 +160,20 @@ index 5274f6b3d3c..d202eb686d6 100644
  class panasonic_mn63f805mnp_device : public intelfsh8_device
  {
  public:
-@@ -440,6 +450,7 @@ DECLARE_DEVICE_TYPE(MACRONIX_29L001MC,       macronix_29l001mc_device)
+@@ -306,6 +316,12 @@ class sharp_lh28f400_device : public intelfsh16_device
+ {
+ public:
+ 	sharp_lh28f400_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
+ };
+ 
++class intel_te28f800_device : public intelfsh16_device
++{
++public:
++	intel_te28f800_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
++};
++
+ class intel_te28f160_device : public intelfsh16_device
+@@ -440,6 +457,7 @@ DECLARE_DEVICE_TYPE(MACRONIX_29L001MC,       macronix_29l001mc_device)
  DECLARE_DEVICE_TYPE(MACRONIX_29LV160TMC,     macronix_29lv160tmc_device)
  DECLARE_DEVICE_TYPE(ST_M29W640GB,            st_m29w640gb_device)
  DECLARE_DEVICE_TYPE(ST_M29W640FT,            st_m29w640ft_device)
@@ -146,3 +181,10 @@ index 5274f6b3d3c..d202eb686d6 100644
  DECLARE_DEVICE_TYPE(TMS_29F040,              tms_29f040_device)
  
  DECLARE_DEVICE_TYPE(PANASONIC_MN63F805MNP,   panasonic_mn63f805mnp_device)
+@@ -454,5 +472,6 @@ DECLARE_DEVICE_TYPE(SHARP_LH28F400,          sharp_lh28f400_device)
+ DECLARE_DEVICE_TYPE(SHARP_LH28F400,          sharp_lh28f400_device)
+ DECLARE_DEVICE_TYPE(INTEL_E28F008SA,         intel_e28f008sa_device)
++DECLARE_DEVICE_TYPE(INTEL_TE28F800,           intel_te28f800_device)
+ DECLARE_DEVICE_TYPE(INTEL_TE28F160,          intel_te28f160_device)
+ DECLARE_DEVICE_TYPE(SHARP_LH28F160S3,        sharp_lh28f160s3_device)
+ DECLARE_DEVICE_TYPE(INTEL_TE28F320,          intel_te28f320_device)

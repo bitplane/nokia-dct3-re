@@ -66,6 +66,79 @@ class MachineProfileTest(unittest.TestCase):
             {"dsp_bootstrap_exchanges": "58", "keypad_five_rows": "true"},
         )
 
+    def test_6110_profile_contains_only_documented_hardware_contracts(self):
+        self.assert_profile_fields(
+            "make_6110_config",
+            {
+                "power_on_column_mask": "0x01",
+                "boot_rom_bypass": "false",
+                "keypad_five_rows": "true",
+                "cobba_pcm.data_clock": "1'000'000",
+                "cobba_pcm.frame_clock": "8'000",
+                "cobba_pcm.sample_bits": "13",
+                "cobba_pcm.word_clocks": "16",
+                "cobba_hle_voice.microphone": "nokia_cobba_device::mic2",
+                "cobba_hle_voice.output": "nokia_cobba_device::ear",
+            },
+        )
+        body = self.function_body(
+            "constexpr nokia_product_config make_6110_config",
+            "constexpr nokia_product_config make_conservative_config",
+        )
+        for peer in ("sim_device", "dsp_service", "external_service", "radio_peer"):
+            self.assertNotIn(f"result.{peer} = true;", body)
+
+        profile = self.driver.split(
+            "void nokia_dct3_state::noki6110(machine_config &config)", 1
+        )[1].split("void nokia_dct3_state::noki7110", 1)[0]
+        for declaration in (
+            "dct3_nse3_map",
+            'INTEL_TE28F800(config.replace(), "flash");',
+            "I2C_24C64(config.replace(), m_eeprom);",
+            "nokia_cobba_device::ear",
+            "nokia_cobba_device::mic2",
+            "apply_product_config(PRODUCT_6110);",
+        ):
+            self.assertIn(declaration, profile)
+
+    def test_6110_map_uses_nse3_physical_extents_without_later_rom2_alias(self):
+        body = self.function_body(
+            "void nokia_dct3_state::dct3_nse3_map",
+            "INPUT_CHANGED_MEMBER",
+        )
+        self.assertIn("map(0x00100000, 0x0010ffff)", body)
+        self.assertIn("map(0x00200000, 0x002fffff)", body)
+        self.assertIn("map(0x00a00000, 0x00ffffff).unmaprw()", body)
+        self.assertNotIn("rom2_mirror_r", body)
+        self.assertNotIn("eeprom_r", body)
+
+        reset = self.function_body(
+            "void nokia_dct3_state::machine_reset",
+            "TIMER_CALLBACK_MEMBER",
+        )
+        self.assertIn("if (m_product.boot_rom_bypass)", reset)
+        self.assertIn("NOKIA_FLASH_ENTRY", reset)
+
+        rom = self.driver.split("ROM_START( noki6110 )", 1)[1].split(
+            "ROM_END", 1
+        )[0]
+        self.assertIn('ROM_REGION16_BE(0x100000, "flash"', rom)
+        self.assertIn('ROM_REGION(0x02000, "eeprom"', rom)
+        self.assertIn("nse3_rom3_f711604_boot.bin", rom)
+        self.assertEqual(rom.count("NO_DUMP"), 6)
+        self.assertNotIn("MAD2_INTERNAL_ROMS", rom)
+
+    def test_6110_has_ue4_keypad_instead_of_inherited_input_map(self):
+        matrix = self.driver.split("static INPUT_PORTS_START( noki6110 )", 1)[1]
+        matrix = matrix.split("INPUT_PORTS_END", 1)[0]
+        for control in (
+            "Flip", "Volume Up", "Volume Down", "Left Softkey",
+            "Right Softkey", "Send", "End / Mode", "Up", "Down",
+        ):
+            self.assertIn(f'PORT_NAME("{control}")', matrix)
+        for digit in "0123456789":
+            self.assertIn(f'PORT_NAME("Keypad {digit}")', matrix)
+
     def test_3330_owns_observed_peer_adc_keypad_and_bootstrap_defaults(self):
         self.assert_profile_fields(
             "make_3330_config",
@@ -99,6 +172,7 @@ class MachineProfileTest(unittest.TestCase):
 
     def test_each_machine_applies_one_explicit_product_profile(self):
         expected = {
+            "noki6110": ("dct3_base(config);", "PRODUCT_6110"),
             "noki3310": ("dct3_base(config);", "PRODUCT_3310"),
             "noki3330": ("dct3_32mbit_flash_base(config);", "PRODUCT_3330"),
             "noki3210": ("dct3_base(config);", "PRODUCT_3210"),

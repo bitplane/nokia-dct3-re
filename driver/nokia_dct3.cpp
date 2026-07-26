@@ -107,6 +107,7 @@ constexpr nokia_ccont_board_profile ADC_STANDARD = {
 struct nokia_product_config
 {
 	u8 power_on_column_mask = 0x04;
+	bool boot_rom_bypass = true;
 	bool sim_device = false;
 	bool dsp_service = false;
 	bool external_service = false;
@@ -259,6 +260,28 @@ constexpr nokia_product_config make_3410_config()
 	return result;
 }
 
+constexpr nokia_product_config make_6110_config()
+{
+	nokia_product_config result;
+	result.power_on_column_mask = 0x01;
+	result.boot_rom_bypass = false;
+	result.keypad_five_rows = true;
+	// NSE-3 Chapter 3 documents COBBA-GJ deriving a 1 MHz PCMDClk and
+	// 8 kHz PCMSClk, with a sign-extended 13-bit sample in a 16-bit word.
+	// Firmware-facing DSP, SIM, external-service and radio peers deliberately
+	// retain their disabled defaults until an identified NSE-3 ROM is traced.
+	result.cobba_pcm.data_clock = 1'000'000;
+	result.cobba_pcm.frame_clock = 8'000;
+	result.cobba_pcm.sample_bits = 13;
+	result.cobba_pcm.sync_clocks = 1;
+	result.cobba_pcm.word_clocks = 16;
+	result.cobba_pcm.msb_first = true;
+	result.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
+	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	result.cobba_hle_voice.output = nokia_cobba_device::ear;
+	return result;
+}
+
 // Preserve the previous 64-exchange behavior for unvalidated products. This is
 // an explicit compatibility calibration, not a recovered cross-DCT3 constant.
 constexpr nokia_product_config make_conservative_config(u8 power_on_column_mask = 0x04)
@@ -272,6 +295,7 @@ constexpr nokia_product_config PRODUCT_3210 = make_3210_config();
 constexpr nokia_product_config PRODUCT_3310 = make_3310_config();
 constexpr nokia_product_config PRODUCT_3330 = make_3330_config();
 constexpr nokia_product_config PRODUCT_3410 = make_3410_config();
+constexpr nokia_product_config PRODUCT_6110 = make_6110_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
 constexpr nokia_product_config PRODUCT_5X10 = make_conservative_config(0x10);
 constexpr nokia_product_config PRODUCT_8XXX = make_conservative_config(0x10);
@@ -379,6 +403,7 @@ public:
 
 	void noki3330(machine_config &config);
 	void noki3410(machine_config &config);
+	void noki6110(machine_config &config);
 	void noki7110(machine_config &config);
 	void noki6210(machine_config &config);
 	void dct3_base(machine_config &config);
@@ -426,6 +451,7 @@ private:
 	void rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
 
 	void dct3_map(address_map &map) ATTR_COLD;
+	void dct3_nse3_map(address_map &map) ATTR_COLD;
 
 	void trace_interrupt_register(char operation, offs_t offset, uint8_t data);
 	void mad2_fiq_w(int state);
@@ -459,7 +485,7 @@ private:
 			offs_t address, uint16_t old_data, uint16_t data);
 	required_device<cpu_device> m_maincpu;
 	required_device<nokia_b3_flash_device> m_b3_flash;
-	required_device<i2c_24c128_device> m_eeprom;
+	required_device<i2cmem_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
 	required_device<nokia_cobba_device> m_cobba;
 	required_device<nokia_gensio_device> m_gensio;
@@ -672,7 +698,11 @@ void nokia_dct3_state::machine_reset()
 
 	// according to the boot rom disassembly here http://www.nokix.pasjagsm.pl/help/blacksphere/sub_100hardware/sub_arm/sub_bootrom.htm
 	// flash entry point is at 0x200040, we can probably reassemble the above code, but for now this should be enough.
-	m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, NOKIA_FLASH_ENTRY);
+	// Existing executable profiles retain the historical boot-ROM bypass.
+	// Products whose boot ROM has not been identified must start at the ARM
+	// reset vector instead of inheriting a later firmware entry assumption.
+	if (m_product.boot_rom_bypass)
+		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, NOKIA_FLASH_ENTRY);
 
 	memset(m_mad2_regs, 0, 0x100);
 	update_dsp_tones();
@@ -1316,6 +1346,25 @@ void nokia_dct3_state::dct3_map(address_map &map)
 	map(0x00e00000, 0x00ffffff).unmaprw();                                                                   // Reserved
 }
 
+void nokia_dct3_state::dct3_nse3_map(address_map &map)
+{
+	map.global_mask(0x00ffffff);
+	map(0x00000000, 0x0000ffff).mirror(0x80000).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));                // boot ROM / RAM
+	map(0x00010000, 0x00010fff).mirror(0x8f000).rw(FUNC(nokia_dct3_state::dsp_ram_r), FUNC(nokia_dct3_state::dsp_ram_w));        // DSP shared memory
+	map(0x00020000, 0x000200ff).mirror(0x8ff00).rw(FUNC(nokia_dct3_state::mad2_io_r), FUNC(nokia_dct3_state::mad2_io_w));         // IO
+	map(0x00030000, 0x00030003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));   // DSPIF
+	map(0x00040000, 0x00040003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));   // MCUIF
+	// NSE-3's parts list establishes the physical extents. Undocumented
+	// ROM2/alias decode remains unmapped rather than borrowing a later board.
+	map(0x00100000, 0x0010ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));       // 64 KiB SRAM
+	map(0x00110000, 0x001fffff).unmaprw();
+	map(0x00200000, 0x002fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));   // 1 MiB TE28F800
+	map(0x00300000, 0x009fffff).unmaprw();
+	// The 24C64 is reached through PUP's documented serial signals. No NSE-3
+	// evidence establishes a parallel EEPROMSelX alias.
+	map(0x00a00000, 0x00ffffff).unmaprw();
+}
+
 INPUT_CHANGED_MEMBER( nokia_dct3_state::key_irq )
 {
 	m_kbgpio->input_changed();
@@ -1487,6 +1536,51 @@ static INPUT_PORTS_START( noki3310 )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 4") PORT_CODE(KEYCODE_4) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 7") PORT_CODE(KEYCODE_7) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad *") PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("PWR")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Power") PORT_CODE(KEYCODE_SPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x1e, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( noki6110 )
+	// UE4 service-manual matrix. COL.n selects a documented column and each
+	// bit is its row; the power key is exposed separately for MAD2's all-row
+	// cold-start scan.
+	PORT_START("COL.0")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_OTHER ) PORT_NAME("Flip") PORT_TOGGLE PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x0e, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("COL.1")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Volume Up") PORT_CODE(KEYCODE_PGUP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Left Softkey") PORT_CODE(KEYCODE_ENTER) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 1") PORT_CODE(KEYCODE_1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 2") PORT_CODE(KEYCODE_2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 3") PORT_CODE(KEYCODE_3) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.2")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Send") PORT_CODE(KEYCODE_S) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Up") PORT_CODE(KEYCODE_UP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 4") PORT_CODE(KEYCODE_4) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 5") PORT_CODE(KEYCODE_5) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 6") PORT_CODE(KEYCODE_6) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.3")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("End / Mode") PORT_CODE(KEYCODE_E) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Down") PORT_CODE(KEYCODE_DOWN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 7") PORT_CODE(KEYCODE_7) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 8") PORT_CODE(KEYCODE_8) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 9") PORT_CODE(KEYCODE_9) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.4")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Volume Down") PORT_CODE(KEYCODE_PGDN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Right Softkey") PORT_CODE(KEYCODE_BACKSPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad *") PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 0") PORT_CODE(KEYCODE_0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad #") PORT_CODE(KEYCODE_MINUS) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
 
 	PORT_START("PWR")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Power") PORT_CODE(KEYCODE_SPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
@@ -1702,6 +1796,20 @@ void nokia_dct3_state::noki3410(machine_config &config)
 	apply_product_config(PRODUCT_3410);
 }
 
+void nokia_dct3_state::noki6110(machine_config &config)
+{
+	dct3_base(config);
+	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nse3_map);
+	INTEL_TE28F800(config.replace(), "flash");
+	I2C_24C64(config.replace(), m_eeprom);
+	// NSE-3's internal differential receiver and microphone terminate at
+	// COBBA EAR and MIC2. Neutral routes declare wiring, not unproved gain.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
+	apply_product_config(PRODUCT_6110);
+}
+
 void nokia_dct3_state::noki7110(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
@@ -1740,6 +1848,24 @@ ROM_START( noki3210 )
 	ROM_REGION(0x04000, "eeprom", ROMREGION_ERASEFF)
 	ROMX_LOAD("3210 v600 eeprom.bin", 0x00000, 0x04000, CRC(e236395f) SHA1(14f207b6b6e04945d26049df404723830bc765e7), ROM_BIOS(0))
 	ROMX_LOAD("3210 v501 eeprom.bin", 0x00000, 0x04000, CRC(82dc441c) SHA1(4cbc156da79d49610dd0018d3eaf8f8cbcbc05bf), ROM_BIOS(1))
+ROM_END
+
+ROM_START( noki6110 )
+	// NSE-3 uses MAD2 ROM3 F711604. The later shared MAD2 dumps are not a
+	// substitute, so keep every proprietary execution input explicitly absent.
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASE00)
+	ROM_LOAD("nse3_rom3_f711604_boot.bin", 0x00000, 0x10000, NO_DUMP)
+
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00)
+	ROM_LOAD("nse3_rom3_dsp_prom.bin", 0x00000, 0x0c000, NO_DUMP)
+	ROM_LOAD("nse3_rom3_dsp_drom.bin", 0x0c000, 0x04000, NO_DUMP)
+	ROM_LOAD("nse3_rom3_dsp_pdrom.bin", 0x10000, 0x01000, NO_DUMP)
+
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("6110_nse3_mcu_ppm.bin", 0x000000, 0x100000, NO_DUMP)
+
+	ROM_REGION(0x02000, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("6110_nse3_eeprom.bin", 0x00000, 0x02000, NO_DUMP)
 ROM_END
 
 ROM_START( noki3310 )
@@ -1862,6 +1988,7 @@ ROM_END
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
 SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empty_init, "Nokia", "Nokia 3210", 0 )
+SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
