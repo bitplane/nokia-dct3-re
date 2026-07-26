@@ -256,6 +256,29 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         )
         self.assertEqual(0x04E6, check.RADIO_REPORT_HANDLER_LITERALS[0x21409A])
         self.assertEqual(0x0EB4, check.RADIO_REPORT_HANDLER_LITERALS[0x2140B0])
+        self.assertEqual(
+            bytes.fromhex("030c0000002be7b0"),
+            check.MEASUREMENT_TIMER_CONFIGURATION,
+        )
+        self.assertEqual(
+            bytes.fromhex("13aa0000"), check.MEASUREMENT_TIMER_EVENT_PREFIX
+        )
+        self.assertEqual(
+            {
+                "task": 12,
+                "status": 0x139E,
+                "object_bytes": 0x40,
+                "copied_report_bytes": 0x18,
+                "conditional_route": True,
+            },
+            check.FIXED_RADIO_TASK_ROUTES["0x80"],
+        )
+        self.assertEqual(
+            0x106B0D, check.RADIO_REPORT_HANDLER_LITERALS[0x2171CE]
+        )
+        self.assertEqual(
+            0x106B08, check.RADIO_REPORT_HANDLER_LITERALS[0x2171F0]
+        )
 
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)

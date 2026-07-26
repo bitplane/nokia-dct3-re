@@ -218,13 +218,41 @@ type `0x1a`, also accepts states 6 and 7, and enters measurement consumer
 `0x13b8 -> 0x13aa` edge, so receipt of the DSP result packet must not be
 treated as immediate search completion.
 
+The direct post-ingestion call graph is bounded as well. Runtime mode byte
+`0x106b0d` selects no call to `0x2143f4` for value 1, calls it with argument
+1 for value 2, or calls it with argument 2 followed by `0x214494` otherwise.
+When state byte `0x106b08` is not 3 and no saved result buffer exists, the
+case can also call result forwarder `0x214670`. None of these direct branches
+constructs a DSP request. A later transitive request sequence remains
+possible, but is not established by the external image; result ingestion is
+therefore not evidence for synthesizing the next DSP report or command.
+
 Status `0x13aa` is nevertheless a recurring measurement-controller boundary,
 not an unstructured queue value. Its entry calls numeric controller operation
 `(0x6b, 2)` before the measurement consumer. The consumer rearms code `0x6b`
 with operation argument zero and selects raw duration `0x0eb4` in controller
-state 4 or `0x04e6` otherwise. The timer unit and the event producer remain
-unproved, so these values stay exact-image policy evidence rather than enabled
-peer timing.
+state 4 or `0x04e6` otherwise.
+
+The expiry producer is now exact. Generic timer initialization consumes
+eight-byte records from table `0x2b75d0`; timer `0x6b` has flags `0x03`, owner
+task 12 and event-object pointer `0x2be7b0`. That fixed object begins with
+status `0x13aa`. The whole-image direct-arm census finds only three sites:
+candidate-update arm `0x212558` plus the two state-selected rearm paths inside
+the measurement consumer. This proves the recurring
+`timer 0x6b -> task 12/status 0x13aa -> measurement consumer -> timer 0x6b`
+loop. The timer unit and the trigger that first reaches the candidate-update
+arm were previously unproved.
+
+The MCU-side initial-arm path is now bounded too. A conditional type-`0x80`
+report branch constructs a `0x40`-byte task-12 object with status `0x139e`
+and preserves 24 report bytes. Task-12 case `0x217418` sends it to candidate
+updater `0x2124a8` when state byte `0x106b08` is not 2 and mode byte
+`0x106af6` is 2. That updater contains the sole non-consumer timer-`0x6b`
+arm at `0x212558`, further gated by a nonzero byte at `0x106afd`. This closes
+the external-MCU path from a received report into the recurring measurement
+timer, but not the missing DSP-side conditions that emit the type-`0x80`
+report or the meaning and unit of its timing. The raw durations therefore
+remain exact-image policy evidence rather than enabled peer timing.
 
 The later state/type topology matches the NSE-8 acquisition family, but its
 consumer exposes a real product boundary: NSE-3 advances through internal

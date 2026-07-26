@@ -472,6 +472,18 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x2171C2: ("movs", "r1, #6"),
     0x2171C8: ("movs", "r2, #0xa0"),
     0x2171CA: ("bl", "#0x2a44fc"),
+    0x2171CE: ("ldr", "r0, [pc, #0x358]"),
+    0x2171D2: ("cmp", "r0, #1"),
+    0x2171D6: ("cmp", "r0, #2"),
+    0x2171DA: ("movs", "r0, #2"),
+    0x2171DE: ("bl", "#0x2143f4"),
+    0x2171E2: ("bl", "#0x214494"),
+    0x2171E8: ("movs", "r0, #1"),
+    0x2171EC: ("bl", "#0x2143f4"),
+    0x2171F0: ("ldr", "r0, [pc, #0x37c]"),
+    0x2171F4: ("cmp", "r0, #3"),
+    0x2171FA: ("ldr", "r0, [r5, #0x24]"),
+    0x217202: ("bl", "#0x214670"),
     0x21732E: ("movs", "r0, #0x6b"),
     0x217330: ("movs", "r1, #2"),
     0x217332: ("bl", "#0x276648"),
@@ -490,6 +502,42 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x2140AE: ("movs", "r0, #0x6b"),
     0x2140B0: ("ldr", "r1, [pc, #0x33c]"),
     0x2140B2: ("bl", "#0x25f146"),
+    # The only other direct timer-0x6b arm is in the candidate-update path.
+    0x212552: ("ldr", "r1, [pc, #0x2ec]"),
+    0x212556: ("ldr", "r1, [pc, #0x2ec]"),
+    0x212558: ("movs", "r0, #0x6b"),
+    0x21255A: ("bl", "#0x25f146"),
+    # Generic timer initialization copies flags and owner task from an
+    # eight-byte firmware table into each twelve-byte runtime timer record.
+    0x260170: ("push", "{r4, r5, r6, lr}"),
+    0x26017C: ("ldr", "r1, [pc, #0x3d4]"),
+    0x260184: ("ldrb", "r2, [r5, #1]"),
+    0x260186: ("strb", "r2, [r1, #6]"),
+    0x260188: ("ldrb", "r2, [r5]"),
+    0x26018A: ("strb", "r2, [r1, #7]"),
+    0x260190: ("adds", "r5, #8"),
+    0x260192: ("adds", "r1, #0xc"),
+    # A type-0x80 report branch constructs task-12 status 0x139e, preserving
+    # 24 report bytes inside a 0x40-byte task object.  Task 12 conditionally
+    # feeds that object to the candidate updater, which owns the sole
+    # non-consumer timer-0x6b arm.
+    0x28030C: ("movs", "r0, #0x40"),
+    0x28030E: ("bl", "#0x260abc"),
+    0x280314: ("ldr", "r0, [pc, #0x2d8]"),
+    0x280316: ("strh", "r0, [r5]"),
+    0x280344: ("movs", "r0, #0xe"),
+    0x280348: ("movs", "r1, #0xe"),
+    0x28034C: ("movs", "r2, #0x18"),
+    0x280352: ("movs", "r0, #0xc"),
+    0x280356: ("bl", "#0x25fb4c"),
+    0x217418: ("strb", "r7, [r5, #9]"),
+    0x21741A: ("ldr", "r0, [pc, #0x154]"),
+    0x21741E: ("cmp", "r0, #2"),
+    0x217422: ("ldr", "r0, [pc, #0x198]"),
+    0x217426: ("cmp", "r0, #2"),
+    0x21742E: ("movs", "r1, #0x40"),
+    0x217430: ("bl", "#0x2767aa"),
+    0x217436: ("bl", "#0x2124a8"),
 }
 RADIO_REPORT_HANDLER_LITERALS = {
     0x211C68: 0x1393,
@@ -506,8 +554,23 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x2170D2: 0x13A3,
     0x21409A: 0x04E6,
     0x2140B0: 0x0EB4,
+    0x212552: 0x04E6,
+    0x212556: 0x0EB4,
+    0x26017C: 0x100138,
+    0x280314: 0x139E,
+    0x21741A: 0x106B08,
+    0x217422: 0x106AF6,
+    0x2171CE: 0x106B0D,
+    0x2171F0: 0x106B08,
 }
 FIXED_RADIO_TASK_ROUTES = {
+    "0x80": {
+        "task": 12,
+        "status": 0x139E,
+        "object_bytes": 0x40,
+        "copied_report_bytes": 0x18,
+        "conditional_route": True,
+    },
     "0x83": {
         "routes": [
             {"task": 11, "status": 0x139F},
@@ -571,6 +634,12 @@ TASK_12_STATUS_JUMP_TABLE = {
     0x13B9: 0x21717E,
     0x13BA: 0x217174,
 }
+TIMER_CONFIGURATION_TABLE_ADDRESS = 0x2B75D0
+TIMER_CONFIGURATION_RECORD_BYTES = 8
+MEASUREMENT_TIMER_CODE = 0x6B
+MEASUREMENT_TIMER_CONFIGURATION = bytes.fromhex("030c0000002be7b0")
+MEASUREMENT_TIMER_EVENT_OBJECT = 0x2BE7B0
+MEASUREMENT_TIMER_EVENT_PREFIX = bytes.fromhex("13aa0000")
 RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
 RADIO_REPORT_JUMP_TABLE = {
     0x83: 0x2A21A2,
@@ -1933,6 +2002,30 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"NSE-3 task-12 status jump table changed: expected "
             f"{TASK_12_STATUS_JUMP_TABLE}, got {task_12_table}"
         )
+    timer_configuration_address = (
+        TIMER_CONFIGURATION_TABLE_ADDRESS
+        + MEASUREMENT_TIMER_CODE * TIMER_CONFIGURATION_RECORD_BYTES
+    )
+    timer_configuration = bytes(
+        cpu_byte(physical, FLASH_BASE, timer_configuration_address + index)
+        for index in range(TIMER_CONFIGURATION_RECORD_BYTES)
+    )
+    if timer_configuration != MEASUREMENT_TIMER_CONFIGURATION:
+        raise ValueError(
+            "NSE-3 measurement timer configuration changed: expected "
+            f"{MEASUREMENT_TIMER_CONFIGURATION.hex()}, got "
+            f"{timer_configuration.hex()}"
+        )
+    timer_event_prefix = bytes(
+        cpu_byte(physical, FLASH_BASE, MEASUREMENT_TIMER_EVENT_OBJECT + index)
+        for index in range(len(MEASUREMENT_TIMER_EVENT_PREFIX))
+    )
+    if timer_event_prefix != MEASUREMENT_TIMER_EVENT_PREFIX:
+        raise ValueError(
+            "NSE-3 measurement timer event changed: expected "
+            f"{MEASUREMENT_TIMER_EVENT_PREFIX.hex()}, got "
+            f"{timer_event_prefix.hex()}"
+        )
     return {
         "transport": {
             "tx_queue_pump": 0x298C82,
@@ -1990,6 +2083,23 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "ingest_case": 0x21718C,
                 "body_copy_offset": 6,
                 "body_copy_bytes": 0xA0,
+                "direct_processing": {
+                    "mode_cell": 0x106B0D,
+                    "mode_1": "no_0x2143f4_call",
+                    "mode_2": {
+                        "processor": 0x2143F4,
+                        "argument": 1,
+                    },
+                    "other_modes": {
+                        "processor": 0x2143F4,
+                        "argument": 2,
+                        "followup": 0x214494,
+                    },
+                    "state_cell": 0x106B08,
+                    "optional_result_forwarder": 0x214670,
+                    "direct_dsp_request_constructor": None,
+                    "transitive_request_sequence": "not_established",
+                },
             },
             "search_lifecycle": {
                 "measurement_controller_status": 0x13AA,
@@ -2004,6 +2114,25 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "measurement_recurrence": {
                     "controller_status": 0x13AA,
                     "timer_code": 0x6B,
+                    "timer_configuration_table":
+                        TIMER_CONFIGURATION_TABLE_ADDRESS,
+                    "timer_configuration_record_bytes":
+                        TIMER_CONFIGURATION_RECORD_BYTES,
+                    "timer_flags": timer_configuration[0],
+                    "owner_task": timer_configuration[1],
+                    "expiry_event_object": MEASUREMENT_TIMER_EVENT_OBJECT,
+                    "expiry_event_status": 0x13AA,
+                    "direct_arm_calls": [0x212558, 0x214098, 0x2140AE],
+                    "initial_arm_path": {
+                        "report_type": 0x80,
+                        "task_status": 0x139E,
+                        "task_case": 0x217418,
+                        "candidate_updater": 0x2124A8,
+                        "arm_call": 0x212558,
+                        "task_state_0x106b08_not_equal": 2,
+                        "mode_0x106af6_equal": 2,
+                        "candidate_update_flag_0x106afd_nonzero": True,
+                    },
                     "status_entry_control_argument": 2,
                     "consumer_rearm_control_argument": 0,
                     "raw_duration_when_state_4": 0x0EB4,
@@ -2036,6 +2165,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "jump_table_routes": TASK_12_STATUS_JUMP_TABLE,
                 "measurement_status": 0x13AA,
                 "result_ingest_status": 0x13B8,
+                "candidate_update_status": 0x139E,
                 "statuses_are_distinct": True,
             },
         },
