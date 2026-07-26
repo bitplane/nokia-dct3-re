@@ -48,9 +48,31 @@ CONNECT = re.compile(
 CONNECT_ACKNOWLEDGE = re.compile(
     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
     r"03[0-9a-f]{2}09030f")
+TEARDOWN_CHECKPOINTS = (
+    ("Disconnect", re.compile(
+        r"GSM service uplink sapi=0 pd=03 message=25 length=5")),
+    ("network Release", re.compile(
+        r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
+        r"03[0-9a-f]{2}09032d")),
+    ("Release Complete", re.compile(
+        r"GSM service uplink sapi=0 pd=03 message=2a length=2")),
+    ("RR Channel Release", re.compile(
+        r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
+        r"03[0-9a-f]{2}0d060d00")),
+    ("traffic-link release UA", re.compile(
+        r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}017301")),
+    ("NHM-5 release channel transaction", re.compile(
+        r"TX packet type=02 payload=20 .*"
+        r"data=041202001117001a6000005800000014")),
+    ("release channel confirmation", re.compile(
+        r"RX enqueue type=89 payload=8 .*data=0000000000000000")),
+    ("idle PCH schedule", re.compile(
+        r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}"
+        r"1506210001f0")),
+)
 
 
-def verify(text: str, answered: bool = False) -> None:
+def verify(text: str, answered: bool = False, ended: bool = False) -> None:
     cursor = 0
     for label, pattern in CHECKPOINTS:
         match = pattern.search(text, cursor)
@@ -59,33 +81,50 @@ def verify(text: str, answered: bool = False) -> None:
                 f"missing or out-of-order NHM-5 call-boundary checkpoint: {label}")
         cursor = match.end()
 
-    if answered:
+    if answered or ended:
         connects = list(CONNECT.finditer(text, cursor))
         if not connects:
             raise ValueError("missing NHM-5 physical-answer checkpoint: Connect")
         if len(connects) != 1:
             raise ValueError(
                 "NHM-5 retransmitted Connect before network acknowledgement")
-        if not CONNECT_ACKNOWLEDGE.search(text, connects[0].end()):
+        connect_acknowledge = CONNECT_ACKNOWLEDGE.search(
+            text, connects[0].end())
+        if not connect_acknowledge:
             raise ValueError(
                 "missing NHM-5 network checkpoint: Connect Acknowledge")
+        cursor = connect_acknowledge.end()
+
+    if ended:
+        for label, pattern in TEARDOWN_CHECKPOINTS:
+            match = pattern.search(text, cursor)
+            if not match:
+                raise ValueError(
+                    "missing or out-of-order NHM-5 teardown checkpoint: "
+                    f"{label}")
+            cursor = match.end()
 
 
 def main() -> int:
     if len(sys.argv) not in (2, 3) or (
-            len(sys.argv) == 3 and sys.argv[2] != "--answered"):
+            len(sys.argv) == 3 and
+            sys.argv[2] not in ("--answered", "--ended")):
         raise SystemExit(
             "usage: radio_3310_incoming_call_boundary_check.py "
-            "MAME_ERROR_LOG [--answered]")
+            "MAME_ERROR_LOG [--answered|--ended]")
+    mode = sys.argv[2] if len(sys.argv) == 3 else ""
     try:
         verify(pathlib.Path(sys.argv[1]).read_text(errors="replace"),
-               answered=len(sys.argv) == 3)
+               answered=mode == "--answered", ended=mode == "--ended")
     except ValueError as error:
         print(error, file=sys.stderr)
         return 1
-    suffix = (
-        " and physical Answer completed Connect/Connect Acknowledge"
-        if len(sys.argv) == 3 else "")
+    suffix = {
+        "--answered":
+            " and physical Answer completed Connect/Connect Acknowledge",
+        "--ended":
+            " and physical End returned the radio to idle",
+    }.get(mode, "")
     print("OK - NHM-5 organically completed traffic assignment" + suffix)
     return 0
 

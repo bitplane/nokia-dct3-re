@@ -427,6 +427,15 @@ assigned transition requires value one, the TCH transition requires zero,
 and the release body is not proved to be semantically constrained even though
 zero remains the reproduced value.
 
+The complete physical End trace also distinguishes the release request itself.
+After Disconnect/Release/Release Complete and traffic-link UA, NHM-5 publishes
+`041202001117001a600000580000001400000001`; the corresponding established
+NSE-8 traffic teardown carries byte `0x08` at the position where NHM-5 carries
+`0x14`. The typed radio profiles accept only their independently observed
+transaction forms. No bit-field meaning is assigned to either byte. Confirming
+the NHM-5 request with the recovered zero-body `0x89` stops TCH/F burst
+transport and restores the ordinary `0x60` PCH/AGCH plus serving-cell schedule.
+
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result
 completion, but it is not the only entrance to finalizer `0x219e30`: direct

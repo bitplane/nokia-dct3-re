@@ -842,12 +842,20 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 	else if (packet.type == 0x02 && m_phase == phase::release_deconfigure &&
 			packet.length >= 16 && packet.payload[8] == 0x60 &&
 			(packet.payload[15] == 0x0f ||
-				(m_traffic_channel_active && packet.payload[15] == 0x08)))
+				(m_traffic_channel_active &&
+					((m_protocol_profile ==
+								protocol_profile::nse8_bitmap_search &&
+							packet.payload[15] == 0x08) ||
+						(m_protocol_profile ==
+								protocol_profile::nhm5_candidate_list &&
+							packet.payload[15] == 0x14)))))
 	{
 		// RR Channel Release makes the ROM issue the same CHANNEL_CONFIGURE
 		// transaction used to establish channel 0x60. The recovered SDCCH
-		// deconfiguration flag is 0x0f; the organic TCH/F path uses 0x08.
-		// Confirm it at the DSP boundary; the firmware owns the return to idle.
+		// deconfiguration byte is 0x0f. The independently observed TCH/F
+		// transactions carry 0x08 on NSE-8 and 0x14 on NHM-5; keep those exact
+		// product-profile contracts typed without assigning an unproved bit
+		// meaning. Confirm the transaction here; the firmware owns return to idle.
 		m_phase = phase::release_channel_change;
 		m_reports_remaining = 1;
 		m_report_deferred = true;
