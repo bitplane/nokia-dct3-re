@@ -667,6 +667,18 @@
       "hypothesis": "The NHM-5 serving-channel reconfiguration and type-0x57 terminal at about 10.1 seconds are the foreground response to the addressed page",
       "conclusion": "A matched 15-second idle control with no queued page emits the same 0x46, two 0x02/0x89 exchanges and 0x57/03050000 at 10.079243..10.096980 seconds. The paging fixture emits them at 10.102477..10.120796 seconds. This is periodic serving-cell maintenance, not a page-triggered transition. The only proved effect of the correctly addressed page remains identity match plus parser result 0x08a2 in outer RR state 7.",
       "evidence": ["docs/model_coverage.md"]
+    },
+    {
+      "id": "nhm5_page_result_is_only_message_decode", "status": "disproven",
+      "hypothesis": "NHM-5 result 0x08a2 proves only that Paging Request Type 1 decoded, so malformed identity matching could still explain the missing RACH",
+      "conclusion": "The page parser calls 0x28056a with mobile-identity IE 0x17. That helper recovers the stored SIM identity through 0x290462, compares length and bytes through 0x2f0dd0, and returns one only for an exact match. The addressed IMSI reaches 0x08a2 while a different valid IMSI does not. The missing transition is downstream of exact subscriber identity matching, not in page encoding or SIM identity state.",
+      "evidence": ["docs/model_coverage.md"]
+    },
+    {
+      "id": "pch_report_must_arrive_on_numbered_frame", "status": "disproven",
+      "hypothesis": "A received PCH block carrying a future GSM frame number is being delivered too early and must be held until that exact TDMA frame",
+      "conclusion": "Holding PCH reports until their numbered subscriber paging frame aligns NHM-5 delivery time with the report metadata, but destroys the proved NSE-8 lifecycle: its correctly addressed page produces no organic RACH even in a 40-second run. Restoring advance delivery restores the reference behavior. The future frame number is a Layer-1 scheduling contract that gives firmware advance notice of the CCCH paging opportunity, not a mislabeled immediate block.",
+      "evidence": ["docs/model_coverage.md"]
     }
   ]
 }

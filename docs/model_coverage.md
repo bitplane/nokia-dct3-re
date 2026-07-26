@@ -148,6 +148,24 @@ result `0x08a2`. Ordinary no-identity PCH fill blocks on the same transport
 produce zero, so the page is distinguished and parsed rather than discarded
 as fill. The active result branch is `0x2573c0`: it sets parser-completion byte
 `0x0010dc5f`, releases the received object and resumes the parser wait loop.
+This result is stronger than a message-type decode. The Paging Request path
+calls `0x28056a` for mobile-identity IE `0x17`; that helper recovers the SIM
+identity through `0x290462`, compares its length and bytes with `0x2f0dd0`,
+and returns one only on an exact match. The addressed request reaches
+`0x08a2`; a request carrying another valid IMSI does not. Thus the unresolved
+boundary is after subscriber identity matching, not in Paging Request
+construction or SIM identity availability.
+
+The frame number in the received-block report is also intentionally a
+scheduled future paging frame. A quarantined experiment delayed each PCH
+report until that numbered TDMA frame. It made the NHM-5 report timestamp and
+frame number coincide, but the proved NSE-8 reference then accepted no page
+and emitted no RACH in a 40-second run. Restoring advance delivery restores
+the established NSE-8 page-to-RACH lifecycle. The frame number is therefore
+not a stale label to be corrected at delivery time: it gives Layer 1 advance
+notice of the subscriber's CCCH paging opportunity. Both product profiles
+already receive that generic scheduling contract.
+
 The separate RR admission path at `0x255ff8` checks that generic completion
 byte before selecting a decoder, but is not reached after the
 page. Delaying the page until well after SIM file activity has settled does
