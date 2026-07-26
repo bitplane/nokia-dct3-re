@@ -35,7 +35,12 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
 
         self.assertIn("pcm_rate = 8'000", cobba)
         self.assertIn("pcm_block_samples = 160", cobba)
-        self.assertIn("attotime::from_msec(20)", dsp)
+        self.assertIn(
+            "const attotime speech_period = m_mad2_pcm->block_period()", dsp
+        )
+        self.assertIn(
+            "m_speech_timer->adjust(speech_period, 0, speech_period)", dsp
+        )
         tick = dsp[
             dsp.index("TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)"):
             dsp.index("void nokia_dsp_hle_device::drain_responses")
@@ -65,6 +70,9 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         header = (ROOT / "driver/nokia_mad2_pcm.h").read_text()
         self.assertIn("u32 m_data_clock = 0", header)
         self.assertIn("u32 m_frame_clock = 0", header)
+        self.assertIn(
+            "nokia_cobba_device::pcm_block_samples, m_frame_clock", header
+        )
         self.assertIn("m_data_clock % m_frame_clock", pcm)
         self.assertIn("m_frames_transferred += dsp_to_cobba.size()", pcm)
         self.assertIn("m_sync_clocks == 1", pcm)
@@ -201,7 +209,8 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_network_receiver.receive", burst)
         self.assertIn("m_handset_receiver.receive", burst)
         self.assertNotIn("from_msec(20)", burst)
-        self.assertIn("attotime::from_msec(20)", dsp)
+        self.assertNotIn("from_msec(20)", dsp)
+        self.assertIn("m_mad2_pcm->block_period()", dsp)
         self.assertIn("m_speech_codec.snapshot()", dsp)
         self.assertIn("m_speech_codec.restore(m_speech_codec_state)", dsp)
         self.assertIn("STRUCT_MEMBER(m_speech_codec_state.channels, dp0)", dsp)

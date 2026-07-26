@@ -727,13 +727,16 @@ predictor. The standalone verifier covers loss before first speech, first-loss
 substitution, the 320 ms mute bound, clean recovery, invalid state rejection
 and sample-identical save/load branching in mid-loss.
 
-The DSP HLE clocks this boundary every 20 ms only when both the TCH/F and the
-product-configured command-`0x08` speech field are active. It reads one microphone block
-through `nokia_mad2_pcm_device`, encodes and submits the uplink frame, then
-decodes any downlink frame and transfers one earpiece block through the same
-full-duplex boundary. The PCM device owns the product-configured 520 kHz
-`PCMDClk` and 8 kHz `PCMSClk` contract. Their integral ratio gives 65 serial
-data-clock periods per full-duplex frame. NSE-3 MAD2/COBBA-GJ documentation
+The DSP HLE services this boundary only when both the TCH/F and the
+product-configured command-`0x08` speech field are active. Its timer period is
+derived from the PCM endpoint's 160-sample block and product-configured frame
+clock, rather than being a second DSP-local timing constant. For NSE-8 this is
+160 / 8 kHz = 20 ms. Each service reads one microphone block through
+`nokia_mad2_pcm_device`, encodes and submits the uplink frame, then decodes any
+downlink frame and transfers one earpiece block through the same full-duplex
+boundary. The PCM device owns the product-configured 520 kHz `PCMDClk` and
+8 kHz `PCMSClk` contract. Their integral ratio gives 65 serial data-clock
+periods per full-duplex frame. NSE-3 MAD2/COBBA-GJ documentation
 establishes a 16-bit word containing sign-extended 13-bit linear PCM (bits
 15--13 repeat the sign and bits 12--0 carry the converter value).
 Same-ASIC Nokia troubleshooting material establishes the one-clock,
@@ -752,8 +755,8 @@ to start the HLE data plane. The product's PCM profile must also describe the
 supported 8 kHz, integral-clock, one-sync-clock, 16-bit MSB-first
 falling-edge link. Default or unknown product profiles therefore remain inert
 instead of emitting synthetic silent GSM frames. If COBBA rejects a live
-transfer, that 20 ms uplink frame is not encoded or submitted; the failure is
-counted and the organic media verifier treats either condition as an error.
+transfer, that configured PCM block is not encoded or submitted; the failure
+is counted and the organic media verifier treats either condition as an error.
 `make verify-radio-pcm-missing` proves this negative contract under both
 v6.00 and independently relocated v5.01. Each firmware organically requests
 its speech route and later completes call teardown, but the disabled PCM

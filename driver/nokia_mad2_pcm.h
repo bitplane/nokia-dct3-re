@@ -47,6 +47,13 @@ public:
 
 	u32 data_clock() const { return m_data_clock; }
 	u32 frame_clock() const { return m_frame_clock; }
+	attotime block_period() const
+	{
+		return m_frame_clock
+				? attotime::from_ticks(
+						nokia_cobba_device::pcm_block_samples, m_frame_clock)
+				: attotime::never;
+	}
 	u32 data_clocks_per_frame() const
 	{
 		return m_frame_clock && (m_data_clock % m_frame_clock) == 0

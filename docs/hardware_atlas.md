@@ -295,14 +295,16 @@ command `0x08` with value `0x060b`; helper `0x290cf4` writes encoded word
 unanswered control produces no non-ring shared writes at this point. A
 separate task-9 sequence programs the known oscillator surface for a 900 Hz,
 120.8 ms acknowledgement tone. Thus `[0x0a8]` is now the proved lower
-call-audio control frontier, while the DSP-internal interpretation and
-MAD2-to-COBBA PCM bus remain unmodeled.
+call-audio control frontier. The DSP-internal interpretation remains
+unmodelled; the evidenced MAD2-to-COBBA PCM wire contract is described below.
 
 The first media-plane slice is now explicit: the radio peer owns bounded
 33-octet GSM full-rate uplink/downlink queues, enabled by organic RR traffic
 assignment; a separate GSM-FR codec owns only the
 33-octet/160-sample transcoding contract; and the DSP clocks those blocks to a
-separate 8 kHz COBBA converter endpoint every 20 ms. The paired-ROM
+separate 8 kHz COBBA converter endpoint. The 20 ms block cadence is derived
+from those 160 samples and the product's configured frame clock rather than
+duplicated as an HLE timer constant. The paired-ROM
 command-`0x08` speech field `0x0201`, independently configured per product,
 gates that PCM clock while the `0x0408` dedicated-channel field remains
 separate. No audio is injected at the UI. The laboratory network's optional

@@ -55,6 +55,9 @@ continuing uplink/downlink frame counts, and non-zero COBBA receiver blocks;
 the same gate passes under v6.00 and v5.01 with 150 uplink frames, 145
 downlink frames and 145 non-silent receiver blocks. This is an energy-bearing
 boundary test, not a fixture write into handset PCM or call-control state.
+That cadence is calculated by the MAD2 PCM endpoint from the configured
+160-sample, 8 kHz converter contract; the DSP HLE carries no independent
+20 ms timer constant.
 `radio_physical_uplink_trace_check.py` covers the opposite direction in
 audio-enabled runs. An external host source enters through MAME's microphone
 record stream; the gate requires at least 100 non-silent, unclipped COBBA

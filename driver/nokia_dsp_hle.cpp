@@ -90,7 +90,11 @@ void nokia_dsp_hle_device::device_reset()
 	m_response_timer->adjust(attotime::never);
 	m_keepalive_timer->adjust(m_service_enabled ? attotime::from_seconds(1) : attotime::never,
 			0, attotime::from_seconds(1));
-	m_speech_timer->adjust(attotime::from_msec(20), 0, attotime::from_msec(20));
+	// The PCM endpoint owns converter rate and transfer-block shape. Derive
+	// the DSP service cadence from that physical contract so a product cannot
+	// silently combine one serial-bus profile with an unrelated HLE timer.
+	const attotime speech_period = m_mad2_pcm->block_period();
+	m_speech_timer->adjust(speech_period, 0, speech_period);
 	m_service_control_completion_sent = false;
 	m_bootstrap_exchange_count = 0;
 	m_mcu_control_word = 0;

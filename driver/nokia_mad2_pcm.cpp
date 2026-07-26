@@ -53,8 +53,7 @@ bool nokia_mad2_pcm_device::link_ready() const
 			m_word_clocks == 16 &&
 			m_msb_first &&
 			m_data_edge == u8(clock_edge::falling) &&
-			clocks_per_frame >= u32(m_sync_clocks + m_word_clocks) &&
-			nokia_cobba_device::pcm_block_samples == (m_frame_clock / 50);
+			clocks_per_frame >= u32(m_sync_clocks + m_word_clocks);
 }
 
 bool nokia_mad2_pcm_device::transfer_frame_block(
