@@ -9,7 +9,7 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Radio lifecycle, paired GSM-FR/FACCH/degraded-media and isolated physical audio gates pass. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
 | Nokia 3210 NSE-8 v5.01 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Independent ROM gates cover the call lifecycle and isolated physical duplex. The same COBBA/DSP limitation applies. |
-| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its typed `0x56` active candidate window, SCH success on requested ARFCN `0x0058`, organic type-`0x02/20` channel configuration, `NO_PSW_LEFT`, channel-change confirmation, RA information and sustained serving BCCH/RSSI reception. SI1 is generated for that selected carrier rather than retaining the 3210 cell's ARFCN-1 bitmap. A v6.39 parser-boundary trace independently proves that channel `0x50` delivers RR protocol discriminator 6, that the firmware's real dispatcher consumes SI1, SI2, SI3 and SI4, and that its product-specific state reaches the complete `0x0f` SI set. The firmware then organically configures decoded channel `0x60`; the peer treats that as activation of the idle common-control receiver and proves standards-shaped no-identity PCH coexisting with continued channel-`0x50` BCCH rather than treating it as registration or replacing BCCH wholesale. The independently recovered `0x8b` result array and type-`0x55` terminal path remain valid unsuccessful-search contracts; `0x8a` is the failure result `NO_PSW_FOUND`. Registration is still unproved: transport, SI dispatch, SI completeness and idle BCCH/PCH coexistence are bottomed out, leaving the MM/SIM-ready Location Updating trigger as the next boundary. |
+| Nokia 3310 NHM-5 v6.39 | Yes | Yes | No | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, and `verify-3310-navigation`. `verify-3310-radio-boundary` proves its typed `0x56` active candidate window, SCH success on requested ARFCN `0x0058`, organic type-`0x02/20` channel configuration, `NO_PSW_LEFT`, channel-change confirmation, RA information and sustained serving BCCH/RSSI reception. SI1 is generated for that selected carrier rather than retaining the 3210 cell's ARFCN-1 bitmap. A v6.39 parser-boundary trace independently proves that channel `0x50` delivers RR protocol discriminator 6, that the firmware's real dispatcher consumes SI1, SI2, SI3 and SI4, and that its product-specific state reaches the complete `0x0f` SI set. The firmware then organically configures decoded channel `0x60`; the peer treats that as activation of the idle common-control receiver and proves standards-shaped no-identity PCH coexisting with continued channel-`0x50` BCCH rather than treating it as registration or replacing BCCH wholesale. The independently recovered `0x8b` result array and type-`0x55` terminal path remain valid unsuccessful-search contracts; `0x8a` is the failure result `NO_PSW_FOUND`. Registration is still unproved: transport, SI dispatch, SI completeness, SIM IMSI/LOCI reads, the selected-cell state transition and the SIM/cell cross-task publication are bottomed out. The next boundary is the MM interpretation of that publication before Location Updating access. |
 | Nokia 3330 NHM-6 v4.50E | Yes | Yes | No | No | No | No | No | `verify-3330-frontier` and `verify-3330-navigation`; later product contracts are not established. |
 | Nokia 3410 NHM-2 v5.46E | Yes | Yes | No | No | No | No | No | `verify-3410-frontier` and navigation/menu gates; later product contracts are not established. |
 | Nokia 6110 NSE-3 family | No | No | No | No | No | No | No | Hardware documentation informs shared DCT3 boundaries, but no local declared 6110 ROM/profile or executable acceptance gate exists. Acquire and identify a lawful firmware image before implementation claims. |
@@ -89,8 +89,22 @@ RSSI reports and issues its own later serving-channel configuration. The
 generic laboratory network encodes SI1 bitmap-0 from the selected serving
 ARFCN, so NHM-5 receives a cell allocation containing `0x0058`; it does not
 inherit NSE-8's ARFCN-1 cell allocation. This removes a real cross-product
-contradiction, but does not promote registration: v6.39 has not yet exposed
-its system-information acceptance or MM registration transition.
+contradiction, but does not promote registration.
+
+An opt-in v6.39 firmware-boundary analysis now closes the next internal
+frontier without assigning new protocol meanings. The SI parser accepts SI1
+through SI4, reaches its complete `0x0f` set, and drives the selected-cell
+machine from state 8 through state 4 to state 6 with a successful return.
+Independently, the SIM task reads `EF_LOCI`, `EF_IMSI`, `EF_ACC`, the PLMN
+selector and the remaining enabled files through SIMI/T=0. Once both inputs
+exist, firmware posts a cross-task object containing the laboratory LAI and
+routes its own follow-on result objects. The default card still contains
+`EF_LOCI` status “location not updated”; a retained cached-LAI explanation for
+the missing update is therefore false. No Random Access for Location Updating
+follows, so the live frontier is downstream MM interpretation of the organic
+SIM/cell publication and upstream of any DSP access command. The emulator must
+not bridge that internal interval by writing MM state or synthesising a task
+message.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
