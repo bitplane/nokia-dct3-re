@@ -109,6 +109,28 @@ SIM_ATR_PPS_ANCHORS = {
     # The parsed ATR is reached organically from the SIM manager loop.
     0x275C14: ("bl", "#0x27520a"),
 }
+SIM_T0_STATUS_ANCHORS = {
+    # The SIM manager copies SW1/SW2 from the received T=0 object and
+    # classifies the standards-defined families used by the lab card.
+    0x2758F4: ("ldrb", "r0, [r1, #1]"),
+    0x2758FA: ("ldrb", "r3, [r1, #2]"),
+    0x275900: ("cmp", "r0, #0x92"),
+    0x275906: ("movs", "r1, #0x67"),
+    0x27590E: ("subs", "r0, #8"),
+    0x275914: ("subs", "r0, #0x21"),
+    0x27591A: ("subs", "r0, #1"),
+    0x275922: ("movs", "r1, #0x93"),
+    0x27592A: ("subs", "r0, #1"),
+    0x275930: ("subs", "r0, #4"),
+    0x275936: ("subs", "r0, #7"),
+    # SW2 is further decoded for the 0x94 and 0x98 error families.
+    0x275954: ("subs", "r0, r3, #2"),
+    0x27595A: ("subs", "r0, #2"),
+    0x275960: ("subs", "r0, #4"),
+    0x275966: ("subs", "r0, #8"),
+    0x27596C: ("subs", "r0, #0x30"),
+    0x275972: ("subs", "r0, #0x10"),
+}
 DSPIF_ANCHORS = {
     # Doorbell write after a shared-memory request is accepted.
     0x28564C: ("ldr", "r1, [pc, #0x3b8]"),
@@ -431,6 +453,7 @@ def verify_eeprom_boundary(data: bytes) -> dict:
 def verify_simi_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, SIMI_ANCHORS)
     decode_thumb_anchors(data, SIM_ATR_PPS_ANCHORS)
+    decode_thumb_anchors(data, SIM_T0_STATUS_ANCHORS)
     return {
         "driver_extent": {"start": 0x28FF84, "end": 0x2905F4},
         "clock_gate": {"register": 0x2000D, "mask": 0x20},
@@ -454,6 +477,12 @@ def verify_simi_boundary(data: bytes) -> dict:
         },
         "lab_card_atr": [0x3B, 0x10, 0x05],
         "lab_card_atr_pps_compatible": True,
+        "t0_status_families": [0x67, 0x6F, 0x90, 0x91, 0x92, 0x93, 0x94, 0x98, 0x9F],
+        "lab_card_explicit_status_families": [0x67, 0x90, 0x94, 0x98, 0x9F],
+        "unsupported_instruction_status": {
+            "status": [0x6D, 0x00],
+            "firmware_path": "generic_command_error",
+        },
         "subscriber_filesystem_profile": "removable_lab_fixture_not_nse3_identity",
         "initial_apdu_sequence": "requires_organic_boot_trace",
     }

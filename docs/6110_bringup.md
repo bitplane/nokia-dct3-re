@@ -112,8 +112,13 @@ NSE-3 therefore composes the existing standards-shaped removable lab card:
 its `3b 10 05` ATR is demonstrably accepted and retains the controller's
 default serial rate. The card's synthetic subscriber identity and filesystem
 remain fixture policy, not Nokia 6110 product identity or an NSE-3 ROM special
-case. The firmware's first APDU sequence still requires an organic boot trace,
-so SIM and registration coverage remain unpromoted.
+case. The same static gate pins the T=0 status classifier: the card's normal
+`67`, `90`, `94`, `98` and `9f` families all have explicit firmware paths,
+while its `6d 00` unsupported-instruction response reaches the generic command
+error path. The command objects themselves are data-driven, so this does not
+prove an instruction set or transaction order. The firmware's first APDU
+sequence still requires an organic boot trace; SIM and registration coverage
+remain unpromoted.
 
 The same exact-image gate now establishes the firmware side of the generic
 DSPIF transport. The MCU-to-DSP ring occupies shared byte offsets

@@ -120,6 +120,15 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x275302: "9420", 0x275304: "a876",
             0x275306: "7b20", 0x275308: "e876",
             0x275C14: "fff7f9fa",
+            0x2758F4: "4878", 0x2758FA: "8b78",
+            0x275900: "9228", 0x275906: "6721",
+            0x27590E: "0838", 0x275914: "2138",
+            0x27591A: "0138", 0x275922: "9321",
+            0x27592A: "0138", 0x275930: "0438",
+            0x275936: "0738", 0x275954: "981e",
+            0x27595A: "0238", 0x275960: "0438",
+            0x275966: "0838", 0x27596C: "3038",
+            0x275972: "1038",
         }
         for pc, encoded in encodings.items():
             physical = bytes.fromhex(encoded)
@@ -132,6 +141,14 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
         self.assertEqual([0x3B, 0x10, 0x05], result["lab_card_atr"])
         self.assertEqual([0xFF, 0x00, 0xFF], result["pps_contract"]["ordinary_ta1"])
         self.assertTrue(result["lab_card_atr_pps_compatible"])
+        self.assertEqual(
+            [0x67, 0x90, 0x94, 0x98, 0x9F],
+            result["lab_card_explicit_status_families"],
+        )
+        self.assertEqual(
+            "generic_command_error",
+            result["unsupported_instruction_status"]["firmware_path"],
+        )
         self.assertEqual(
             "removable_lab_fixture_not_nse3_identity",
             result["subscriber_filesystem_profile"],
