@@ -9,7 +9,7 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Radio lifecycle, paired GSM-FR/FACCH/degraded-media and isolated physical audio gates pass. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
 | Nokia 3210 NSE-8 v5.01 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Independent ROM gates cover the call lifecycle and isolated physical duplex. The same COBBA/DSP limitation applies. |
-| Nokia 3310 NHM-5 v6.39 | Yes | Yes | Yes | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, `verify-3310-navigation`, and `verify-3310-radio-registration`. Its typed `0x56` candidate search selects and camps on ARFCN `0x0058`; SI1--SI4, Random Access and Immediate Assignment remain firmware-owned. The NHM-5 `CHANNEL_CHANGED_CNF` success bit is correlated with the pending assigned-channel context, after which v6.39 organically emits its LAPDm SABM and Location Updating Request. The independent network returns contention UA, Location Updating Accept and RR Channel Release; firmware acknowledges N(R)=1 and N(R)=2, persists `EF_LOCI`, deconfigures SDCCH and resumes steady BCCH/PCH monitoring. The next boundary is paging and call control; no 3210 call or audio assumptions are claimed. |
+| Nokia 3310 NHM-5 v6.39 | Yes | Yes | Yes | No | No | No | No | `verify-dsp-bootstrap-3310`, `verify-3310-frontier`, `verify-3310-navigation`, and `verify-3310-radio-registration`. Its typed `0x56` candidate search selects and camps on ARFCN `0x0058`; SI1--SI4, Random Access and Immediate Assignment remain firmware-owned. The NHM-5 `CHANNEL_CHANGED_CNF` success bit is correlated with the pending assigned-channel context, after which v6.39 organically emits its LAPDm SABM and Location Updating Request. The independent network returns contention UA, Location Updating Accept and RR Channel Release; firmware acknowledges N(R)=1 and N(R)=2, persists `EF_LOCI`, deconfigures SDCCH and resumes steady BCCH/PCH monitoring. A correctly addressed Paging Request Type 1 now crosses the DSP transport, is reassembled by firmware and reaches the NHM-5 RR parser as result `0x08a2`; the missing boundary is the subsequent idle-RR admission/dispatch that should initiate RACH. No 3210 call or audio assumptions are claimed. |
 | Nokia 3330 NHM-6 v4.50E | Yes | Yes | No | No | No | No | No | `verify-3330-frontier` and `verify-3330-navigation`; later product contracts are not established. |
 | Nokia 3410 NHM-2 v5.46E | Yes | Yes | No | No | No | No | No | `verify-3410-frontier` and navigation/menu gates; later product contracts are not established. |
 | Nokia 6110 NSE-3 family | No | No | No | No | No | No | No | Hardware documentation informs shared DCT3 boundaries, but no local declared 6110 ROM/profile or executable acceptance gate exists. Acquire and identify a lawful firmware image before implementation claims. |
@@ -129,6 +129,28 @@ The release transaction has the complementary recovered context
 `0x0409/01/00` and therefore requires confirmation value zero. The NHM-5
 registration gate checks both correlations; value one is not treated as a
 generic success flag.
+
+## NHM-5 v6.39 paging boundary
+
+The first post-registration page is no longer an unexplained transport loss.
+The peer emits channel-`0x60` `RECEIVED_BLOCK` with a 22-octet Paging Request
+Type 1 carrying the registered IMSI. Firmware routine `0x260994` accepts the
+complete block as result `0x061a`, copies the L3 body into its channel state,
+and `0x2607b2` constructs received-block event `0x05eb`. The event is posted to
+NHM-5 task 13 and received by the loop at `0x2a75a0`; its payload retains
+protocol discriminator `0x06`, message type `0x21`, channel-needed SDCCH and
+the exact mobile identity.
+
+The task passes that object to parser `0x280664`, which classifies the page as
+result `0x08a2`. Ordinary no-identity PCH fill blocks on the same transport
+produce zero, so the page is distinguished and parsed rather than discarded
+as fill. Delaying the page until well after SIM file activity has settled does
+not change the outcome. The remaining failure is after this classification:
+no organic RACH follows and neither known higher RR paging decoder entry is
+reached. Consequently the next implementation must recover the NHM-5
+idle-RR registration/admission contract for `0x08a2`; changing GSM paging
+octets, forcing firmware state or bypassing the parser would cross the current
+evidence boundary.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
