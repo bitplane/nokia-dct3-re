@@ -512,6 +512,15 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             ],
             check.DSP_BOOTSTRAP_STATE_BASE_REFERENCES,
         )
+        self.assertEqual(
+            {
+                0x297358: 0x20001,
+                0x260254: 0x2000C,
+                0x26025A: 0x100020,
+                0x260260: 0x10C284,
+            },
+            check.DSP_BOOTSTRAP_POST_LITERALS,
+        )
 
 
 if __name__ == "__main__":

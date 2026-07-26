@@ -527,9 +527,22 @@ Inspection of every directly rooted access finds one write to offset `+0x0c`,
 the capture at `0x2859e8`, and no read. The external MCU image therefore has
 no direct consumer of the second publication after capture. Indirect or
 table-mediated addressing remains outside that negative result, and absence
-of a consumer does not constrain the DSP-published value.
+of a consumer does not constrain the exact DSP-published value. It is,
+however, required to be non-zero: `0x2859de..0x2859e2` spins on the same
+shared `0x10002` halfword before capturing it.
 Publishing the generic HLE ready word `0x0001` cannot satisfy all NSE-3
 firmware paths.
+
+The sole bootstrap wrapper at `0x2973c6` also rules out a hidden immediate
+result check. It preserves a MAD2 byte read from `0x20001` before transfer,
+calls the complete 64-block routine, then branches only on bit 0 of that
+preserved byte. When clear, helper `0x28ef38` compares EEPROM word `0x74`
+against zero and writes zero only when it differs. In both cases firmware
+unconditionally continues through `0x260252`; it neither tests the bootstrap
+return register nor reads either captured word first. Whole-image direct-call
+censuses give each wrapper/helper/continuation edge exactly one caller. The
+EEPROM update is therefore pre-existing MAD2 configuration housekeeping, not
+a DSP completion-status response.
 
 The surrounding service selectors also preserve the revision namespaces in
 firmware rather than merely in our documentation:

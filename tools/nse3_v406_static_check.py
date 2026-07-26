@@ -1067,6 +1067,41 @@ DSP_BOOTSTRAP_STATE_BASE_REFERENCES = [
     0x297104,
     0x297246,
 ]
+DSP_BOOTSTRAP_POST_ANCHORS = {
+    # The wrapper preserves the pre-transfer MAD2 byte in r4.
+    0x2973C8: ("bl", "#0x297356"),
+    0x2973CC: ("adds", "r4, r0, #0"),
+    0x2973F0: ("bl", "#0x2858fc"),
+    # Its low bit selects only an EEPROM configuration update. Neither
+    # captured publication nor a bootstrap return code is tested here.
+    0x2973F4: ("lsrs", "r0, r4, #1"),
+    0x2973F6: ("blo", "#0x2973fe"),
+    0x2973F8: ("movs", "r0, #0"),
+    0x2973FA: ("bl", "#0x28ef38"),
+    0x2973FE: ("bl", "#0x260252"),
+    # The conditional helper reads EEPROM word 0x74 and writes only if the
+    # requested zero differs.
+    0x28EF3E: ("strh", "r0, [r1]"),
+    0x28EF40: ("movs", "r0, #0x74"),
+    0x28EF46: ("bl", "#0x29cf2a"),
+    0x28EF52: ("cmp", "r0, r1"),
+    0x28EF54: ("beq", "#0x28ef62"),
+    0x28EF56: ("movs", "r0, #0x74"),
+    0x28EF5C: ("bl", "#0x29ce12"),
+    # The following initialization is unconditional and does not receive a
+    # bootstrap result argument.
+    0x260252: ("push", "{r4, r5, r6, lr}"),
+    0x260254: ("ldr", "r1, [pc, #0x44]"),
+    0x260258: ("strb", "r0, [r1]"),
+    0x26025A: ("ldr", "r4, [pc, #0x1e4]"),
+    0x260260: ("ldr", "r0, [pc, #0x300]"),
+}
+DSP_BOOTSTRAP_POST_LITERALS = {
+    0x297358: 0x20001,
+    0x260254: 0x2000C,
+    0x26025A: 0x100020,
+    0x260260: 0x10C284,
+}
 COBBA_ID_SERVICE_ANCHORS = {
     # The service handler passes request byte 9 through as formatter selector.
     0x2382E4: ("ldrb", "r0, [r4, #9]"),
@@ -2354,6 +2389,8 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, DSP_BOOTSTRAP_RESULT_LITERALS)
     decode_thumb_anchors(data, COBBA_ID_SERVICE_ANCHORS)
     verify_thumb_literals(data, COBBA_ID_SERVICE_LITERALS)
+    decode_thumb_anchors(data, DSP_BOOTSTRAP_POST_ANCHORS)
+    verify_thumb_literals(data, DSP_BOOTSTRAP_POST_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     direct_callers = [
@@ -2367,6 +2404,26 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
         raise ValueError(
             "NSE-3 DSP bootstrap direct callers changed: expected "
             f"[0x2973f0], got {[hex(address) for address in direct_callers]}"
+        )
+    post_callers = {
+        target: [
+            insn.address
+            for insn in instructions
+            if insn
+            and insn.mnemonic in ("bl", "blx")
+            and immediate_target(insn) == target
+        ]
+        for target in (0x297356, 0x28EF38, 0x260252)
+    }
+    expected_post_callers = {
+        0x297356: [0x2973C8],
+        0x28EF38: [0x2973FA],
+        0x260252: [0x2973FE],
+    }
+    if post_callers != expected_post_callers:
+        raise ValueError(
+            "NSE-3 DSP post-transfer caller topology changed: expected "
+            f"{expected_post_callers}, got {post_callers}"
         )
     result_literal_references = {
         address: [
@@ -2452,7 +2509,7 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
                     "reads": [],
                 },
                 "external_mcu_consumption": "none_direct",
-                "value_constraint": "not_established",
+                "value_constraint": "nonzero_required_for_bootstrap_return",
             },
             "current_hle_ready_0x0001_satisfies_comparison": False,
             "service_projection": {
@@ -2482,6 +2539,22 @@ def verify_dsp_bootstrap_boundary(data: bytes) -> dict:
                 },
                 "namespaces_are_interchangeable": False,
             },
+        },
+        "post_transfer": {
+            "wrapper": 0x2973C6,
+            "pre_transfer_mad2_byte": 0x20001,
+            "configuration_bit": 0,
+            "bootstrap_return_value_tested": False,
+            "captured_results_tested_before_continuation": False,
+            "conditional_eeprom_sync": {
+                "condition": "pre_transfer_mad2_0x20001_bit_0_clear",
+                "helper": 0x28EF38,
+                "word_address": 0x74,
+                "requested_value": 0,
+                "write_only_when_changed": True,
+            },
+            "unconditional_continuation": 0x260252,
+            "direct_callers": post_callers,
         },
         "claims": {
             "stream_is_dsp_code": "not_established",
