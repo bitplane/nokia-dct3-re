@@ -235,7 +235,7 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 							m_bootstrap_exchange_count, machine().time().as_double());
 				break;
 
-			case bootstrap_completion_profile::cobba_b06_second_unknown:
+			case bootstrap_completion_profile::nse3_v406_cobba_b06_second_unknown:
 				// NSE-3 v4.06 captures shared 0x000 as its COBBA identity and
 				// later requires 0x0b06.  Its post-transfer wait and second
 				// capture use shared 0x002, whose DSP-published value remains

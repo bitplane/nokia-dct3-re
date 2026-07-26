@@ -1338,11 +1338,20 @@ the same internal ROM.
 The driver therefore types bootstrap completion separately from exchange
 count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
 retain their three ready words of `1`; NSE-3 v4.06 selects
-`cobba_b06_second_unknown`. That profile publishes only the evidenced
+`nse3_v406_cobba_b06_second_unknown`. That profile publishes only the evidenced
 `0x0b06` identity at shared `0x10000` and deliberately leaves `0x10002` zero.
 Enabling its DSP service can therefore neither turn the observed 64-block
 geometry into the legacy ready-word publication nor invent a successful boot
 before the second word's DSP-side semantics are recovered.
+
+This completion profile is deliberately build-qualified rather than NSE-3-wide.
+The independently reported real v5.48 ROM3 handset identifies its COBBA as
+`B07`, not the v4.06 candidate's required `B06`. The log does not reveal
+v5.48's shared publication encoding or prove whether the difference follows
+firmware, COBBA assembly, board repair history or another production variant.
+It does prove that a future v5.48 image must not silently inherit v4.06's
+identity publication. Its build/board pairing needs a separately evidenced
+completion profile.
 
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine
@@ -1362,12 +1371,13 @@ Four revision labels must remain separate during bring-up:
    `B06`.
 
 The real v5.48 handset log reports both `DSP SW 40.3.617` and `DSP ISw ROM3`,
-but does not establish that every numeric `3` or `4` in the boot exchange names
-the MAD mask revision. In particular, an HLE responder returning a ready value
-of four is not evidence that an NSE-3 contains “ROM4”. Product configuration
-must eventually type these identities separately; until a trace or matching
-internal dump connects them, `noki6110` declares none of the firmware-derived
-values.
+plus COBBA `B07`, but does not establish that every numeric `3` or `4` in the
+boot exchange names the MAD mask revision. In particular, an HLE responder
+returning a ready value of four is not evidence that an NSE-3 contains “ROM4”,
+and v5.48's `B07` must not replace v4.06's exact `B06` comparison. Product
+configuration must eventually type these identities separately; until a trace
+or matching internal dump connects them, `noki6110` declares none of the
+firmware-derived values.
 
 Any later v5.48 replacement or comparison baseline must:
 

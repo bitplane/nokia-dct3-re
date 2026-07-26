@@ -321,7 +321,7 @@ constexpr nokia_product_config make_6110_config()
 	// completion independently from transfer geometry. Publish only the
 	// evidenced COBBA identity while deliberately leaving the unknown second
 	// word zero, and keep the peer disabled pending its DSP-side semantics.
-	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::cobba_b06_second_unknown;
+	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::nse3_v406_cobba_b06_second_unknown;
 	// The external MCU image correlates its 70 0d request with a framed
 	// type-74 completion through controller bit 2 and timer 14. NSE-8's exact
 	// decoder supplies the missing four-byte frame transformation. Type this
