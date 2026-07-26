@@ -67,6 +67,13 @@ clipped checkpoint cannot be hidden by the final sample. The public target
 runs v6.00 and v5.01 at real-time speed; each passes with 250/250 non-silent
 microphone blocks, its revision-specific control oracle, sustained media,
 FACCH interruption/recovery and organic End-to-idle teardown.
+The same gate uses a second, non-looped PulseAudio sink for handset playback.
+`radio_physical_downlink_check.py` analyzes its recorded mono 8 kHz waveform
+and requires a sustained 1 kHz component for longer than the bounded answer
+tone. `pulse_route_mame.py` selects only MAME's live streams by application
+identity; the host defaults are preserved and restored. The source generator
+uses FFmpeg's explicit Pulse `-device` option, preventing accidental default-
+speaker playback from masquerading as microphone input.
 `make verify-radio-incoming-call-lifecycle` presses the context-sensitive Navi
 key again after that stable interval. It requires organic CC
 Disconnect/Release/Release Complete, the release channel change, and the

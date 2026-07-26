@@ -808,15 +808,27 @@ and source-close contract; no Nokia device receives a test-source option.
 With the external source attenuated to retain headroom after NSE-8's +18 dB
 MIC2 gain, the paired real-time acceptance run produced 250/250 non-silent
 COBBA microphone blocks on both v6.00 and v5.01. Whole-call microphone/network
-peaks were 6872/6992 and 10664/10848 respectively. The verifier examines the
+peaks were 1280/1296 and 1264/1432 respectively. The verifier examines the
 maximum over the complete call rather than relying on a possibly silent final
 checkpoint. It requires at least 100 non-silent microphone blocks, decoded
 uplink energy above the GSM-FR silence floor, and rejects clipping at any
 checkpoint. `make verify-radio-physical-uplink` runs both firmware revisions,
-creates a temporary isolated PulseAudio sink, drives its monitor with an
-attenuated host-side 1 kHz stream, selects that monitor only for MAME, and
-removes it on exit. MAME is throttled to real time so its capture demand
-matches the host source instead of manufacturing underrun discontinuities.
+creates separate temporary PulseAudio source and playback sinks, and drives
+only the source sink with an attenuated host-side 1 kHz stream. FFmpeg's Pulse
+output requires its explicit `-device` option; treating the output URL as the
+sink name silently selected the server default and could feed handset playback
+back into the microphone. A small application-identity router moves only
+MAME's live capture/playback streams onto the isolated endpoints, while the
+script preserves and restores the host defaults. MAME is throttled to real
+time so its capture demand matches the host source instead of manufacturing
+underrun discontinuities.
+
+The playback sink's monitor is independently recorded as mono 16-bit PCM at
+8 kHz. `radio_physical_downlink_check.py` rejects silence, clipping, unrelated
+tones and a short answer-tone-only capture; it requires at least 500 ms of
+consecutive 20 ms windows carrying the network peer's 1 kHz service signal.
+The paired runs measured playback peak/RMS 10461/648.2 with a 5.32-second
+service-tone run on v6.00 and 9372/614.8 with a 5.34-second run on v5.01.
 Each run also checks the revision-appropriate firmware control oracle, speech
 media, FACCH interruption and recovery, and an organic physical End back to
 idle.

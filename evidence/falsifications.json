@@ -619,6 +619,12 @@
       "hypothesis": "Because an answered call emits no new MCU packet-ring family, it also produces no answer-specific control below that ring",
       "conclusion": "A complete changed-write trace shows task 5 committing shared-control command 0x08 with value 0x060b between organic CC Connect and Connect Acknowledge, publishing encoded word 0x860b at shared offset 0x0a8 and ringing DSPIF command 4. A matched unlocked-but-unanswered run has no non-ring writes after the corresponding point. A separate task-9 sequence programs a 900 Hz oscillator and stops it after 120.8 ms; its bounded UI-tone behavior is not speech. Command 0x08 is the proved lower call-audio control frontier, but its bit semantics and the DSP-to-COBBA PCM consequence remain unknown.",
       "evidence": ["docs/dsp_interface.md", "docs/network_scouting.md", "tools/radio_answered_audio_boundary_trace_check.py"]
+    },
+    {
+      "id": "ffmpeg_pulse_output_url_selects_sink", "status": "disproven",
+      "hypothesis": "Passing a PulseAudio sink name as FFmpeg's output URL directs the physical-uplink service tone to that isolated sink",
+      "conclusion": "A direct monitor capture remained bit-exact silence despite the FFmpeg process running. The Pulse output muxer exposes device selection through its -device option; the output URL is not the sink selector. Using -device makes the isolated monitor carry the attenuated 1 kHz waveform. After independently routing MAME capture and playback, paired v6.00/v5.01 calls produce plausible microphone/network peaks 1280/1296 and 1264/1432 while separate playback captures contain sustained decoded downlink. The earlier high physical-uplink peaks are retired because default-speaker feedback could satisfy them.",
+      "evidence": ["tools/run_physical_uplink_gate.sh", "tools/radio_physical_downlink_check.py", "docs/dsp_interface.md"]
     }
   ]
 }

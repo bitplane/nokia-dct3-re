@@ -368,7 +368,10 @@ Each real-time run carries 250/250 non-silent, unclipped COBBA blocks through
 the configured 13-bit serial representation, MAD2 and DSP encoding to
 non-silent output from the network peer's independent GSM-FR decoder, then
 physically Ends the call and observes firmware-driven teardown. Whole-call
-microphone/network peaks were 6872/6992 for v6.00 and 10664/10848 for v5.01.
+microphone/network peaks were 1280/1296 for v6.00 and 1264/1432 for v5.01.
+An independent playback sink proves the opposite physical endpoint without
+looping it into the microphone: v6.00/v5.01 peak/RMS were 10461/648.2 and
+9372/614.8, with 5.32/5.34 seconds of sustained decoded 1 kHz audio.
 The test source never appears in the Nokia machine configuration or handset
 data path.
 

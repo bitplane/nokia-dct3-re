@@ -68,6 +68,14 @@
     pinned MAME PulseAudio record-stream support is supplied by
     `mame-pulseaudio-input.patch`; the Nokia machine itself has no laboratory
     microphone generator.
+  - `radio_physical_downlink_check.py` — analyzes the physical gate's isolated
+    host playback recording. It requires mono 16-bit PCM at 8 kHz, non-clipped
+    energy and at least 500 ms of consecutive windows bearing the network
+    peer's 1 kHz speech, excluding a silent stream or the short Answer tone.
+  - `pulse_route_mame.py` — moves only MAME's Pulse capture/playback streams to
+    the gate's separate source and playback sinks. This avoids feedback while
+    leaving existing host streams unmoved; the harness restores the original
+    default endpoints on every exit path.
   - `dsp_rom_audit.py` — distinguishes real nonuniform DSP regions from
     checksum-valid uniform fill placeholders (`make audit-dsp-roms`).
   - `dsp_upload_extract.py` — reconstructs contiguous type-`0x51`
