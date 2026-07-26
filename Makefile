@@ -736,7 +736,7 @@ verify-3310-radio-incoming-call-ui:
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py \
-		$(RUN_DIR)/error.log
+		$(RUN_DIR)/error.log --answered
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 	test -n "$$frame" || { echo "no answered 3310 call frame produced in $(RUN_DIR)"; exit 1; }; \

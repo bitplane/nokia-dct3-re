@@ -1348,10 +1348,12 @@ void nokia_radio_peer_device::emit_report()
 			m_protocol_profile == protocol_profile::nhm5_candidate_list)
 	{
 		// NHM-5's CHANNEL_CHANGED_CNF consumer correlates payload bit 0 with
-		// ordinary pending channel-change contexts. Assignment requires value
-		// one. The recovered 0x0409 release context takes a special completion
-		// branch before that comparison; zero remains its observed DSP body.
-		payload[0] = m_phase == phase::release_channel_change ? 0x00 : 0x01;
+		// ordinary pending channel-change contexts. Assigned SDCCH context
+		// 0x0402/01/01 requires one; the independently observed TCH/F context
+		// 0x0402/00/01 requires zero. The recovered 0x0409 release context takes
+		// a special completion branch before that comparison; zero remains its
+		// observed DSP body.
+		payload[0] = m_phase == phase::assigned_channel_change ? 0x01 : 0x00;
 	}
 
 	if (report_type == 0x84 && m_phase == phase::random_access)

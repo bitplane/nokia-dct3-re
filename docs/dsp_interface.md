@@ -413,13 +413,19 @@ SABM and its Location Updating Request. This is not inferred from NSE-8, whose
 accepted confirmation body remains zero.
 
 The same bit is correlation data rather than a universal success flag.
+After organic Call Confirmed and Alerting, NHM-5's independent TCH/F
+configuration creates context `0x0402/00/01`. It therefore requires bit zero;
+returning the assigned-SDCCH value one makes the same handler reject the
+confirmation. The zero response produces a selector-`0xb0` new-main-link SABM,
+contention UA and organic Assignment Complete.
 After RR Channel Release, NHM-5's pending context is `0x0409/01/00` and the
 modeled DSP returns the observed zero body. However, handler `0x2c4c28`
 recognizes first word `0x0409` at `0x2c4c42--0x2c4c46` and branches directly
 to release completion at `0x2c4ca8`, before the bit comparison at
 `0x2c4c48--0x2c4c52`. Runtime tracing confirms this special branch. Thus the
-assigned transition requires value one, while the release body is not proved
-to be semantically constrained even though zero remains the reproduced value.
+assigned transition requires value one, the TCH transition requires zero,
+and the release body is not proved to be semantically constrained even though
+zero remains the reproduced value.
 
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result

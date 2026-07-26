@@ -18,9 +18,12 @@ class Radio3310IncomingCallBoundaryCheckTest(unittest.TestCase):
             "GSM service uplink sapi=0 pd=03 message=08 length=11",
             "GSM service uplink sapi=0 pd=03 message=01 length=2",
             "TX packet type=02 payload=20 data=041202000271012fc1",
+            "TX packet type=1b data=00b0013f01",
+            "RX enqueue type=80 payload=34 data=b01200000a3a00580000017301",
+            "GSM service uplink sapi=0 pd=06 message=29 length=3",
         )))
 
-    def test_rejects_traffic_sabm_past_frontier(self):
+    def test_answered_mode_requires_connect(self):
         text = "\n".join((
             "LAPDm Channel Release acknowledged nr=2",
             "PCH IMSI page transmitted channel=60 fn=1719",
@@ -34,10 +37,14 @@ class Radio3310IncomingCallBoundaryCheckTest(unittest.TestCase):
             "GSM service uplink sapi=0 pd=03 message=08 length=11",
             "GSM service uplink sapi=0 pd=03 message=01 length=2",
             "TX packet type=02 payload=20 data=041202000271012fc1",
-            "TX packet type=1b radio_phase=traffic_lapdm_establish",
+            "TX packet type=1b data=00b0013f01",
+            "RX enqueue type=80 payload=34 data=b01200000a3a00580000017301",
+            "GSM service uplink sapi=0 pd=06 message=29 length=3",
         ))
-        with self.assertRaisesRegex(ValueError, "promote"):
-            verify(text)
+        with self.assertRaisesRegex(ValueError, "Connect"):
+            verify(text, answered=True)
+        verify(text + "\nGSM service uplink sapi=0 pd=03 message=07 length=2",
+               answered=True)
 
 
 if __name__ == "__main__":
