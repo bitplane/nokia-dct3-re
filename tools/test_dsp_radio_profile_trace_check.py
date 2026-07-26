@@ -65,7 +65,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 			type20 = "00" * 68
 			type21 = "11" * 28
 			type22 = "22" * 32
-			results = "001000580093" + "ff" * 160
+			results = "0010005800c4" + "ff" * 160
 			path.write_text(
 				line(0x20, type20, 0.1)
 				+ line(0x21, type21 + "00000319", 0.2)
@@ -76,7 +76,7 @@ class DspRadioProfileTraceCheckTest(unittest.TestCase):
 				+ line(0x56, "0058" + "ff" * 158, 2.0)
 				+ rx_line(0x8B, results, 2.1)
 				+ line(0x55, "03050000", 2.2)
-				+ rx_line(0x8A, "00" * 8, 2.3)
+				+ rx_line(0x8A, "0058" + "00" * 6, 2.3)
 			)
 			check_nhm5_search(path)
 

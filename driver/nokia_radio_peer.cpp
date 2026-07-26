@@ -1110,9 +1110,11 @@ void nokia_radio_peer_device::emit_report()
 	{
 		// ALL_RSSI_RESULTS begins with a two-byte list header followed by forty
 		// four-byte records: big-endian ARFCN, flags and signed RSSI. Only ARFCN
-		// The selected candidate exists. Two -109 dBm baselines establish the initial acquisition
-		// history; subsequent values come from the deterministic laboratory-cell
-		// signal model so background measurements do not remain bit-identical.
+		// 0 carries the selected candidate. NSE-8's recovered acquisition flow
+		// establishes two -109 dBm history entries before using the laboratory
+		// signal model. NHM-5's independent consumer rejects values below
+		// -104 dBm, so its explicit candidate list receives the measured cell
+		// strength directly instead of inheriting NSE-8's acquisition history.
 		payload[0] = 0x00;
 		payload[1] = 0x10;
 		for (unsigned result = 0; result < 40; ++result)
@@ -1126,8 +1128,11 @@ void nokia_radio_peer_device::emit_report()
 			payload[3 + result * 4] =
 					serving_result ? u8(m_serving_arfcn) : 0xff;
 			payload[5 + result * 4] = serving_result ?
-					(m_search_round < 2 ? u8(0x93) :
-						u8(m_gsm_network->serving_rssi(m_search_round - 2))) : 0x81;
+					(m_protocol_profile == protocol_profile::nhm5_candidate_list ?
+						u8(m_gsm_network->serving_rssi(m_search_round)) :
+						(m_search_round < 2 ? u8(0x93) :
+							u8(m_gsm_network->serving_rssi(m_search_round - 2)))) :
+					0x81;
 		}
 	}
 
@@ -1276,6 +1281,18 @@ void nokia_radio_peer_device::emit_report()
 		payload[1] = m_access_frame >> 16;
 		payload[2] = m_access_frame >> 8;
 		payload[3] = m_access_frame;
+	}
+
+	if (report_type == 0x8a &&
+			m_protocol_profile == protocol_profile::nhm5_candidate_list &&
+			m_phase == phase::nhm5_control_ack)
+	{
+		// NHM-5's consumer at 0x28a19c reads a big-endian channel from report
+		// object offsets 4/5 and resolves it against the candidate database
+		// populated by the preceding 0x8b results. Echo the selected requested
+		// channel; zero would deliberately fail that lookup.
+		payload[0] = m_serving_arfcn >> 8;
+		payload[1] = m_serving_arfcn;
 	}
 
 	const unsigned payload_length = report_type == 0x8b ? 166 : report_type == 0x80 ? 34 : 8;

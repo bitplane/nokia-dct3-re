@@ -69,6 +69,12 @@ def check_nhm5_static(path: pathlib.Path, packets: list[dict]) -> None:
 			"0120824601360435002e2cd500980069c188828889180089"
 			"4018404523dae879a979090240180004070c697a08060016"
 		),
+		# The 0x8a completion consumer reads its big-endian channel at report
+		# object offsets 4/5 and resolves it against the populated candidates.
+		0x0028A19C: bytes.fromhex(
+			"30b50d1ca04c41790079000208180004000ca168fef74fff"
+			"a060002812d0"
+		),
 	}
 	for address, expected in constructors.items():
 		offset = address - 0x200000
@@ -141,17 +147,20 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			if packet["direction"] == "rx" and packet["type"] == 0x8A), None)
 	if results is None or results["length"] != 166:
 		raise SystemExit("NHM-5 search did not receive its 166-byte type 0x8b result array")
-	if not results["data"].startswith("001000580093"):
-		raise SystemExit("NHM-5 type 0x8b did not report requested channel 0x0058")
+	if not results["data"].startswith("0010005800c4"):
+		raise SystemExit(
+			"NHM-5 type 0x8b did not report requested channel 0x0058 "
+			"at the laboratory cell's measured -60 dBm"
+		)
 	if control is None or control["length"] != 4 or control["data"] != "03050000":
 		raise SystemExit("NHM-5 did not organically publish the observed type 0x55 control")
-	if ack is None or ack["length"] != 8:
+	if ack is None or ack["length"] != 8 or not ack["data"].startswith("0058"):
 		raise SystemExit("NHM-5 type 0x55 control did not receive its type 0x8a completion")
 	if not search["time"] <= results["time"] < control["time"] <= ack["time"]:
 		raise SystemExit("NHM-5 search/control transaction order changed")
 	print(
-		"NHM-5 search frontier: 56/160 candidate 0058 -> 8b/166 results -> "
-		"55/4 control -> 8a/8 completion"
+		"NHM-5 search frontier: 56/160 candidate 0058 -> 8b/166 measured results -> "
+		"55/4 control -> channel-keyed 8a/8 completion"
 	)
 
 
