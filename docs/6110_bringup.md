@@ -1173,6 +1173,34 @@ ready value and no inherited NSE-8 or NHM-5 service grammar. The static JSON
 records these unknowns so later work cannot silently promote the shared layout
 into a working-handshake claim.
 
+An independent implementation now provides a useful negative comparison.
+[`djr-747/nokia-dct3-emulator`](https://github.com/djr-747/nokia-dct3-emulator)
+commit `c50f7e272bf10c37a40c57174dbde84d9717b7e3` reports NSE-3 v5.48 booting
+with a ROM4 HLE profile. Its profile deliberately does not run the recovered
+5110 DSP image on the 6110, but supplies ROM4 ready value `4` and a prepared
+NSE-3 external EEPROM. Running this repository's exact v4.06 candidate in that
+revision's unmodified headless harness gives a narrower result:
+
+```
+ROM4_LOG=1 ./build/dct3_boot_trace \
+  6110_nse3_v406_rom3_candidate.fls 100000000
+```
+
+The harness recognizes NSE-3 and services all alternating transfers, reporting
+66 DSP acknowledgements. It nevertheless stops in the firmware's final wait at
+PC `0x2859e0`, where `shared[0x002]` (`0x10002`) is still zero; no LCD command
+or data has been written. This independently reproduces the precise frontier
+of the static gate: transport acknowledgements alone do not supply v4.06's
+post-transfer publications. It does **not** establish that the other
+implementation is incorrect for its v5.48 image, or that v4.06 and v5.48 use
+the same internal ROM.
+
+The driver therefore types bootstrap completion separately from exchange
+count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
+retain their three ready words of `1`; NSE-3 v4.06 selects `unresolved`.
+Enabling its DSP service can no longer silently turn the observed 64-block
+geometry into the legacy ready-word publication.
+
 These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
 internal boot/DSP handshake, or promote `noki6110` to booting. The machine
 therefore retains `NO_DUMP` internal ROMs and firmware-derived peers remain

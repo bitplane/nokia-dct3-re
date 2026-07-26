@@ -95,6 +95,8 @@ class MachineProfileTest(unittest.TestCase):
                 "radio_wire":
                     "nokia_radio_peer_device::wire_profile::bitmap_search",
                 "dsp_parameter_command": "0x08",
+                "dsp_bootstrap_completion":
+                    "nokia_dsp_hle_device::bootstrap_completion_profile::unresolved",
             },
         )
         self.assertIn(
@@ -205,6 +207,11 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("apply_product_config(PRODUCT_3330);", profile)
         self.assertIn(
             "m_dsp_hle->set_bootstrap_exchange_limit(product.dsp_bootstrap_exchanges);",
+            self.driver,
+        )
+        self.assertIn(
+            "m_dsp_hle->set_bootstrap_completion("
+            "product.dsp_bootstrap_completion);",
             self.driver,
         )
 

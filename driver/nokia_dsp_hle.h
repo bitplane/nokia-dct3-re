@@ -17,6 +17,12 @@ class nokia_dsp_hle_device : public device_t
 public:
 	nokia_dsp_hle_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
+	enum class bootstrap_completion_profile : u8
+	{
+		ready_words_one,
+		unresolved
+	};
+
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_delay_us(unsigned delay) { m_service_delay_us = delay; }
@@ -31,6 +37,10 @@ public:
 		m_speech_request_value = value;
 	}
 	void set_bootstrap_exchange_limit(unsigned exchanges) { m_bootstrap_exchange_limit = exchanges; }
+	void set_bootstrap_completion(bootstrap_completion_profile profile)
+	{
+		m_bootstrap_completion = profile;
+	}
 	void set_bootstrap_ping_pong(bool enabled) { m_bootstrap_ping_pong = enabled; }
 	void set_code_block_request(bool enabled) { m_code_block_request = enabled; }
 	void set_parked_boot_status(bool enabled, u16 response)
@@ -89,6 +99,8 @@ private:
 	bool m_service_control_completion_sent = false;
 	unsigned m_bootstrap_exchange_limit = 64;
 	unsigned m_bootstrap_exchange_count = 0;
+	bootstrap_completion_profile m_bootstrap_completion =
+			bootstrap_completion_profile::ready_words_one;
 	bool m_bootstrap_ping_pong = false;
 	bool m_code_block_request = false;
 	bool m_parked_boot_status = false;

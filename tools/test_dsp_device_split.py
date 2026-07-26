@@ -65,6 +65,7 @@ class DspDeviceSplitTest(unittest.TestCase):
 
     def test_transport_has_no_dsp_bootstrap_behavior_configuration(self):
         for token in (
+            "m_bootstrap_completion",
             "m_bootstrap_ping_pong", "m_code_block_request",
             "m_parked_boot_status", "m_boot_status_response",
         ):
@@ -74,6 +75,10 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertIn("shared_0fe_read_cb", self.transport)
         self.assertIn("shared_100_write_cb", self.transport)
         self.assertIn("peer_shared_w(0x002 / 2, m_boot_status_response)", self.hle)
+        self.assertIn(
+            "bootstrap_completion_profile::ready_words_one",
+            self.hle,
+        )
 
     def test_external_peer_uses_acknowledged_startup_phases(self):
         self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)

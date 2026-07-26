@@ -222,7 +222,9 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 	else if (token == 0)
 	{
 		m_transport->peer_shared_w(0x100 / 2, 1);
-		if (++m_bootstrap_exchange_count == m_bootstrap_exchange_limit)
+		if (++m_bootstrap_exchange_count == m_bootstrap_exchange_limit &&
+				m_bootstrap_completion ==
+						bootstrap_completion_profile::ready_words_one)
 		{
 			for (offs_t offset = 0; offset <= (0x004 / 2); offset++)
 				m_transport->peer_shared_w(offset, 1);

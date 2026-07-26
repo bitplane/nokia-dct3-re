@@ -122,6 +122,8 @@ struct nokia_product_config
 	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
 	unsigned dsp_bootstrap_exchanges = 64;
+	nokia_dsp_hle_device::bootstrap_completion_profile dsp_bootstrap_completion =
+			nokia_dsp_hle_device::bootstrap_completion_profile::ready_words_one;
 	bool dsp_bootstrap_ping_pong = false;
 	bool dsp_code_block_request = false;
 	bool dsp_parked_boot_status = false;
@@ -307,10 +309,14 @@ constexpr nokia_product_config make_6110_config()
 	// the missing DSP's trigger policy.
 	// v4.06 statically proves 64 alternating DSP transfer blocks, but that is
 	// transfer geometry rather than evidence for the HLE peer's completion
-	// counter. NSE-3 projects captured shared word 0x10000 as COBBA identity
-	// B06 and a later path compares it against 0x0b06, so the generic HLE ready
-	// value 1 is demonstrably incompatible. Keep the peer disabled pending the
-	// full DSP-side publication semantics.
+	// counter. A separate ROM4 HLE can acknowledge all 64 blocks and still
+	// leaves this exact image waiting for a non-zero final publication at
+	// 0x10002. NSE-3 then projects captured shared word 0x10000 as COBBA
+	// identity B06 and a later path compares it against 0x0b06, so the generic
+	// HLE ready words of 1 are demonstrably incompatible. Type that unknown
+	// completion independently from transfer geometry and keep the peer
+	// disabled pending the full DSP-side publication semantics.
+	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::unresolved;
 	// Its external firmware independently proves the shared type-0x1a/68
 	// bitmap wire boundary. Record that separately from the still-unproved
 	// NSE-3 acquisition policy; a disabled peer cannot synthesize traffic.
@@ -711,6 +717,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 {
 	m_product = product;
 	m_dsp_hle->set_bootstrap_exchange_limit(product.dsp_bootstrap_exchanges);
+	m_dsp_hle->set_bootstrap_completion(product.dsp_bootstrap_completion);
 	m_dsp_hle->set_bootstrap_ping_pong(product.dsp_bootstrap_ping_pong);
 	m_dsp_hle->set_code_block_request(product.dsp_code_block_request);
 	m_dsp_hle->set_parked_boot_status(product.dsp_parked_boot_status,
