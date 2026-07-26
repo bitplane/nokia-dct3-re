@@ -494,6 +494,13 @@ def verify_variant(path: Path, name: str) -> dict:
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != profile["stream_sha1"]:
         raise ValueError(f"{path}: unexpected staged bootstrap stream")
+    stream_source_first = FLASH_BASE + 0x40
+    stream_source_stride = 0x20
+    stream_source_last = (
+        stream_source_first + (STREAM_WORDS - 1) * stream_source_stride
+    )
+    if stream_source_last != 0x2FFFE0:
+        raise ValueError(f"{path}: unexpected sparse stream source extent")
 
     return {
         "variant": name,
@@ -524,6 +531,17 @@ def verify_variant(path: Path, name: str) -> dict:
         "initial_sentinel": 0xFFFF,
         "transfer_blocks": 64,
         "stream_sha1": stream_sha1,
+        "stream_classification": {
+            "role": "sparse_external_flash_verification_candidate",
+            "sampled_halfwords": STREAM_WORDS,
+            "source_first": stream_source_first,
+            "source_last": stream_source_last,
+            "source_stride_bytes": stream_source_stride,
+            "explicit_terminator_halfwords": 2,
+            "staged_bytes": len(stream),
+            "contiguous_dsp_code_image": False,
+            "dsp_verdict_algorithm": "unknown",
+        },
         "state": profile["state"],
         "state_literal_roots": state_literal_roots,
         "eeprom_security_directory": profile["eeprom_security_directory"],

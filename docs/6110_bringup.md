@@ -84,6 +84,20 @@ the gate. This does not make the two bootstrap protocols interchangeable:
 v5.48 cannot reach that final publication without first satisfying its
 pre-upload exchange, and generic ready words remain incompatible.
 
+These streams are not contiguous DSP program images. Each contains 32,766
+halfwords sampled from external flash `0x200040..0x2fffe0` at a fixed
+`0x20`-byte stride, followed by two explicit `0xffff` terminators. That spans
+almost the complete 1 MiB MCU image while retaining only one halfword per
+32-byte interval. The exact-image JSON therefore classifies it as a sparse
+external-flash verification candidate rather than “DSP code”.
+
+The collaborator's real-DSP bridge independently identifies the homologous
+cross-flash projection on another DCT3 product as firmware-fingerprint
+material and observes the DSP publish a verdict after consuming it. That is
+strong architectural corroboration, but it does not recover NSE-3's internal
+algorithm or exact `0x10002` verdict. Locally, “sparse verification input” is
+proven; the DSP-side computation remains unknown.
+
 The pre-upload value also has an exact external-MCU role. Both images permit a
 bounded wait for shared `0x10004` to leave `0xffff`, store the observed
 halfword, and proceed only when it equals shared `0x10006`. They then expose
@@ -1322,11 +1336,11 @@ word.
 The external-software string is stronger than the previously reported source
 root: the verifier now checks the pointer value and every byte through its NUL
 terminator. It identifies the DSP external-software namespace carried by this
-v4.06 image; it does not by itself prove that the sparsely sampled 64 KiB
-bootstrap stream is executable DSP code or that all of revision `25.3.531`
-resides in that stream. Notably, the identity string address is not one of the
-halfwords selected by the stream's `0x20`-byte sampling stride, so the string
-is metadata rather than a byte-for-byte member of the derived stream.
+v4.06 image; the sparsely sampled 64 KiB verification stream is not a
+contiguous executable DSP image and cannot contain all of revision
+`25.3.531`. Notably, the identity string address is not one of the halfwords
+selected by the stream's `0x20`-byte sampling stride, so the string is
+metadata rather than a byte-for-byte member of the derived stream.
 
 The internal-software namespace has the opposite provenance. Exact anchors
 pin startup's empty string, the report-type branches, byte extraction and
@@ -1367,11 +1381,10 @@ peer may eventually publish this report through generic DSPIF, but it must not
 invent its value or trigger policy. A matching internal image or a runtime
 ring trace is still required for those DSP-side facts.
 
-This remains deliberately MCU-side evidence. We do not yet know whether the
-staged stream is DSP code, its DSP-side destination, how the DSP derives or
-publishes the first bootstrap result, what the write-only second captured word
-represents, or
-what the intermediate non-zero acknowledgements mean.
+This remains deliberately MCU-side evidence. The staged stream is now bounded
+as sparse external-flash verification input rather than DSP code. We still do
+not know its DSP-side consumer, how the DSP derives or publishes either final
+result, or what the intermediate non-zero acknowledgements mean.
 The matching internal DSP image is absent. In particular, “64 transfer blocks”
 is not interchangeable with the existing HLE peer's product-configured
 completion counter: that counter embeds response policy, while this gate

@@ -16,6 +16,16 @@ class Nse3V548StaticCheckTests(unittest.TestCase):
         self.assertEqual(b"\x00\x00\x00\x01", stream[:4])
         self.assertEqual(b"\xff\xff\xff\xff", stream[-4:])
 
+    def test_sparse_flash_projection_is_not_classified_as_dsp_code(self):
+        source = Path(check.__file__).read_text(encoding="utf-8")
+        self.assertEqual(0x2FFFE0, 0x200040 + (check.STREAM_WORDS - 1) * 0x20)
+        self.assertIn(
+            '"role": "sparse_external_flash_verification_candidate"',
+            source,
+        )
+        self.assertIn('"contiguous_dsp_code_image": False', source)
+        self.assertIn('"dsp_verdict_algorithm": "unknown"', source)
+
     def test_manifest_variants_remain_distinct(self):
         rom3 = check.VARIANTS["rom3"]
         rom4 = check.VARIANTS["rom4"]
