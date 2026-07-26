@@ -51,6 +51,31 @@ unprefixed `V 4.06` version spelling is consistent with contemporary ROM3
 version tables, so the BIOS is explicitly labelled “ROM3 candidate”. The
 matching F711604 internal boot/DSP ROMs and 24C64 contents remain `NO_DUMP`.
 
+### Reproducible static boundary
+
+`make verify-6110-static` checks the exact normalized v4.06 image before making
+any structural claim. The big-endian ARM entry at `0x200040` reads and
+byte-reorders the flash header word, writes it to the MCUIF window at
+`0x040000`, establishes CPU-mode stacks, copies eight vector words from
+`0x200180` to address zero, clears interrupt masks, and changes to Thumb state
+at `0x2000e4`. Its stack literals (`0x100020`, `0x10c508`, and `0x10f9d8`)
+all lie inside the documented 64 KiB NSE-3 SRAM. This independently supports
+the declared flash and SRAM boundaries; it does not establish what consumes
+the MCUIF header word.
+
+The same checker byte-swaps the identified image only for the existing
+conservative Thumb literal analysis. It resolves 548 direct MAD2 accesses from
+225 literal seeds at 41 distinct byte offsets, with a maximum offset of
+`0x3f`. This is an address-surface census, not a register map: dynamic and
+table-driven accesses remain outside it, and no offset is assigned a meaning
+without separate evidence. The checker pins these results to the exact
+firmware hash and emits `run_census/nse3_v406_static_boundary.json`.
+
+These findings do **not** prove that v4.06 matches F711604 ROM3, recover the
+internal boot/DSP handshake, or promote `noki6110` to booting. The machine
+therefore retains `NO_DUMP` internal ROMs and firmware-derived peers remain
+disabled.
+
 Any later v5.48 replacement or comparison baseline must:
 
 1. be identified as Nokia 6110 NSE-3, not the later 6110 Navigator;
