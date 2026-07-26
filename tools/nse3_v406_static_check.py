@@ -201,6 +201,22 @@ RADIO_PACKET_ANCHORS = {
     0x2857E8: ("strb", "r7, [r0, #2]"),
     0x2857EA: ("ldr", "r0, [r5]"),
     0x2857EE: ("strb", "r1, [r0, #3]"),
+    # In the mode-6 bitmap builder, channel N is converted to N-1, divided by
+    # eight, and addressed backwards from object byte 69.  The low three bits
+    # select the bit within that byte.  Since the DSP wire begins at object
+    # byte 3 and payload excludes the type byte, ARFCN 1 is payload[65] bit 0.
+    0x20FC64: ("ldr", "r0, [sp, #0x34]"),
+    0x20FC66: ("subs", "r0, r0, #1"),
+    0x20FC68: ("asrs", "r1, r0, #2"),
+    0x20FC6E: ("asrs", "r2, r1, #3"),
+    0x20FC72: ("subs", "r1, r1, r2"),
+    0x20FC76: ("movs", "r2, #0x45"),
+    0x20FC7E: ("movs", "r3, #7"),
+    0x20FC80: ("bics", "r1, r3"),
+    0x20FC82: ("subs", "r0, r0, r1"),
+    0x20FC84: ("movs", "r1, #1"),
+    0x20FC86: ("lsls", "r1, r0"),
+    0x20FC8A: ("strb", "r1, [r2, r0]"),
 }
 RADIO_REPORT_DISPATCH_ANCHORS = {
     # Type 0x80 is handled directly.  Types 0x83..0x8f use a bounded jump
@@ -246,6 +262,22 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x280496: ("ldrb", "r1, [r4, #0xb]"),
     0x2804A0: ("ldrb", "r0, [r4, #4]"),
     0x2804A4: ("ldrb", "r0, [r4, #0xd]"),
+    # The task-side ALL_RSSI_RESULTS case accepts controller state 4 only for
+    # the active type-0x1a search, and also accepts states 6 and 7.
+    0x21732E: ("movs", "r0, #0x6b"),
+    0x21736C: ("bl", "#0x215a48"),
+    0x217336: ("ldrb", "r0, [r6, #5]"),
+    0x217338: ("cmp", "r0, #4"),
+    0x21733C: ("ldrb", "r1, [r6]"),
+    0x21733E: ("cmp", "r1, #0x1a"),
+    0x217342: ("cmp", "r0, #6"),
+    0x217346: ("cmp", "r0, #7"),
+    0x21734C: ("bl", "#0x213fbc"),
+    # NSE-3's internal candidate records are product-local 0x44-byte objects.
+    # This must not be confused with the shared four-byte DSP result records
+    # or NSE-8's independently recovered 0x48-byte internal stride.
+    0x21403A: ("movs", "r0, #0x22"),
+    0x214080: ("adds", "r4, #0x44"),
 }
 RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
 RADIO_REPORT_JUMP_TABLE = {
@@ -642,7 +674,11 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "object_allocation": 0x48,
             "constructors": [0x20FAEC, 0x216F72],
             "representation": "bitmap_shaped",
-            "nse8_body_compatibility": "not_yet_established",
+            "arfcn_bit_numbering": {
+                "arfcn_1": {"payload_byte": 65, "bit": 0},
+                "formula": "payload[65-floor((arfcn-1)/8)] bit ((arfcn-1)%8)",
+            },
+            "nse8_search_bitmap_boundary_compatible": True,
         },
         "report_dispatch": {
             "routine": 0x2A20DC,
@@ -668,8 +704,17 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "record_count": 40,
                 "record_bytes": 4,
             },
+            "search_lifecycle": {
+                "all_rssi_task_case": 0x21732E,
+                "active_search_type": 0x1A,
+                "accepted_controller_states": [4, 6, 7],
+                "measurement_consumer": 0x213FBC,
+                "nse3_internal_candidate_stride": 0x44,
+                "nse8_internal_candidate_stride": 0x48,
+                "internal_candidate_layout_shared": False,
+            },
         },
-        "peer_profile": "disabled_pending_report_body_and_lifecycle_proof",
+        "peer_profile": "disabled_pending_bootstrap_and_full_report_lifecycle",
     }
 
 

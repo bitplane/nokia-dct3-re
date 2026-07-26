@@ -154,12 +154,29 @@ packet containing forty four-byte result records. Types `0x8d`, `0x8e`,
 `0x95`, `0x9b` and the `0x70..0x7f` family are classified separately and are
 not folded into the radio report table.
 
-This is strong evidence that the shared radio layer is the correct
-architectural home, but it is not yet proof that every NSE-8 report-body
-field, bitmap bit numbering, retry rule or completion sequence is identical.
-The 6110 therefore still selects no radio-peer profile. The next gate is to
-recover the body offsets and lifecycle consumed by the NSE-3 search handlers,
-then compare those explicit contracts with the typed bitmap-search profile.
+The search bitmap boundary is now exact rather than merely shape-compatible.
+The ordinary constructor subtracts one from the ARFCN, divides by eight,
+addresses backwards from queue-object byte 69 and uses the low three bits as
+the bit index. Since the DSP wire begins at object byte 3 and the peer payload
+excludes the type byte, ARFCN 1 is bit 0 of payload byte 65. This is exactly the
+numbering currently decoded by the NSE-8 bitmap-search path.
+
+The task-side type-`0x8b` case independently accepts controller state 4 only
+when the active command is type `0x1a`, and also accepts states 6 and 7 before
+entering measurement consumer `0x213fbc`. This state/type topology matches the
+NSE-8 acquisition family, but the consumer exposes a real product boundary:
+NSE-3 advances through internal candidates in `0x44`-byte strides, whereas
+NSE-8 uses `0x48`. Those are firmware-private controller objects, not the
+shared four-byte DSP result records, and must not become a radio-peer wire
+setting.
+
+Together these findings establish that bitmap packing and the principal
+measurement terminal belong in the shared radio layer while firmware-private
+candidate storage does not. The 6110 still selects no radio peer: its missing
+internal boot/DSP image prevents organic transport startup, and the remaining
+report sequence and retry/completion rules have not all been closed. Enabling
+the existing NSE-8 lifecycle wholesale would therefore still overstate the
+evidence.
 
 The external image also proves the MCU side of a much larger bootstrap
 transfer. Routine `0x2858fc..0x2859ff` samples 32,766 halfwords from its own
