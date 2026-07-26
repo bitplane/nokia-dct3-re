@@ -296,7 +296,20 @@ selects the representation. Zero follows the group's runtime pointer, indexes
 a 24-byte object record with group byte `+6`, and reads the event halfword at
 record `+0x0e`; nonzero follows the registered 28-byte record chain described
 above and reads `+0x12`. This establishes the exact object/event boundary, but
-not the values later installed through the mode-zero runtime pointer.
+not by itself the values later installed through the mode-zero runtime
+pointer.
+
+The mode-zero constructor at `0x25b0cc` is now censused independently. Its 45
+direct callers include 44 fixed-ROM object inputs representing 35 unique
+catalogues. Parsing each catalogue's count and 24-byte record array enumerates
+124 addressable event halfwords; none is in `0x076f..0x0778`. The sole
+runtime-object call is `0x27c17c`, which loads its object pointer from SRAM
+cell `0x10b284`. That cell is also absent from the startup copy table and
+therefore begins at zero, but later firmware message handling writes it. This
+reduces the alternative-object frontier from an unspecified population to one
+identified constructor input. With the internal boot ROM still missing, a
+passive MAME trace cannot reach this firmware boundary organically, so the
+remaining value is not fabricated through a direct-to-flash reset bypass.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven

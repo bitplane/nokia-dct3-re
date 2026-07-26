@@ -592,6 +592,8 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
 DSP_PARAMETER_MODE_EVENT_TABLE_ADDRESS = 0x2B43F0
 DSP_PARAMETER_RUNTIME_RECORD_TABLE_ADDRESS = 0x1061A4
 DSP_PARAMETER_OBJECT_GROUP_TABLE_ADDRESS = 0x106A64
+DSP_PARAMETER_RUNTIME_OBJECT_CELL_ADDRESS = 0x10B284
+DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS = [0x27C17C]
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
     0x221640: [0x0C44],
@@ -1357,6 +1359,7 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
     copy_records = 0
     runtime_table_copied = False
     object_group_table_copied = False
+    runtime_object_cell_copied = False
     while True:
         offset = copy_cursor - FLASH_BASE
         size = (
@@ -1384,6 +1387,12 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             < destination + size
         ):
             object_group_table_copied = True
+        if (
+            destination
+            <= DSP_PARAMETER_RUNTIME_OBJECT_CELL_ADDRESS
+            < destination + size
+        ):
+            runtime_object_cell_copied = True
         for index in range(size):
             # Byte lanes cross within each flash halfword on this image.
             source_offset = (source - FLASH_BASE + index) ^ 1
@@ -1404,6 +1413,10 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
     if object_group_table_copied:
         raise ValueError(
             "NSE-3 object-group table unexpectedly has a flash image"
+        )
+    if runtime_object_cell_copied:
+        raise ValueError(
+            "NSE-3 runtime object cell unexpectedly has a flash image"
         )
 
     registration_profile = {
@@ -1484,6 +1497,84 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "NSE-3 bounded runtime descriptor can publish a parameter event"
         )
 
+    object_constructor_profile = {
+        "apis": [
+            {
+                "address": 0x25B0CC,
+                "name": "object_group_constructor",
+                "kind": "constructor",
+                "arguments": {"object": "r0"},
+            }
+        ]
+    }
+    object_constructors = extract_calls(
+        object_constructor_profile, instructions, physical, FLASH_BASE
+    )
+    fixed_object_addresses = set()
+    unresolved_object_constructors = []
+    for call in object_constructors:
+        object_address = call["arguments"]["object"]
+        if object_address is None:
+            unresolved_object_constructors.append(call["callsite"])
+        elif FLASH_BASE <= object_address < FLASH_BASE + len(physical):
+            fixed_object_addresses.add(object_address)
+        else:
+            raise ValueError(
+                "NSE-3 object constructor input outside fixed ROM or runtime: "
+                f"{object_address:#x}"
+            )
+    if (
+        len(object_constructors) != 45
+        or len(fixed_object_addresses) != 35
+        or unresolved_object_constructors
+            != DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS
+    ):
+        raise ValueError(
+            "NSE-3 object constructor census changed: expected 45 calls, "
+            "35 unique fixed objects and one unresolved call; got "
+            f"{len(object_constructors)}, {len(fixed_object_addresses)}, "
+            f"{unresolved_object_constructors}"
+        )
+
+    fixed_object_events = []
+    for object_address in sorted(fixed_object_addresses):
+        object_offset = object_address - FLASH_BASE
+        records_raw = int.from_bytes(
+            physical[object_offset : object_offset + 4], "little"
+        )
+        records = (
+            (records_raw << 16) | (records_raw >> 16)
+        ) & 0xFFFFFFFF
+        # Byte-addressed flash lanes cross inside each halfword in this image.
+        record_count = physical[(object_offset + 4) ^ 1]
+        records_end = records + record_count * 0x18
+        if not (
+            FLASH_BASE <= records
+            and records_end <= FLASH_BASE + len(physical)
+        ):
+            raise ValueError(
+                f"NSE-3 fixed object record range is invalid: "
+                f"{object_address:#x} -> {records:#x} count {record_count}"
+            )
+        for record in range(record_count):
+            event_offset = (
+                records - FLASH_BASE + record * 0x18 + 0x0E
+            )
+            fixed_object_events.append(
+                int.from_bytes(
+                    physical[event_offset : event_offset + 2], "little"
+                )
+            )
+    if len(fixed_object_events) != 124:
+        raise ValueError(
+            "NSE-3 fixed object event census changed: expected 124, got "
+            f"{len(fixed_object_events)}"
+        )
+    if {value & 0x1FFF for value in fixed_object_events} & target_events:
+        raise ValueError(
+            "NSE-3 fixed object catalogue can publish a parameter event"
+        )
+
     unresolved = DSP_PARAMETER_UNRESOLVED_EVENT_CALLS
     return {
         "event_apis": {
@@ -1529,13 +1620,22 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                 "group_table_zero_initialized": True,
                 "record_stride": 0x18,
                 "event_offset": 0x0E,
-                "population": "unresolved",
+                "constructor": 0x25B0CC,
+                "constructor_calls": len(object_constructors),
+                "unique_fixed_objects": len(fixed_object_addresses),
+                "fixed_events": len(fixed_object_events),
+                "fixed_objects_exclude_parameter_events": True,
+                "runtime_object_cell":
+                    DSP_PARAMETER_RUNTIME_OBJECT_CELL_ADDRESS,
+                "runtime_object_cell_zero_initialized": True,
+                "unresolved_constructors":
+                    DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS,
             },
         },
         "runtime_built_calls_exclude_parameter_events": False,
         "producer_absence_proven": False,
         "next_evidence":
-            "trace_256e2e_unwritten_payload_and_object_records_at_runtime",
+            "trace_256e2e_unwritten_payload_and_27c17c_runtime_object",
     }
 
 

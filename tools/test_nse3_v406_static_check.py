@@ -248,6 +248,14 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x106A64,
             check.DSP_PARAMETER_OBJECT_GROUP_TABLE_ADDRESS,
         )
+        self.assertEqual(
+            0x10B284,
+            check.DSP_PARAMETER_RUNTIME_OBJECT_CELL_ADDRESS,
+        )
+        self.assertEqual(
+            [0x27C17C],
+            check.DSP_PARAMETER_UNRESOLVED_OBJECT_CONSTRUCTORS,
+        )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)
         self.assertEqual(
             [0x256E2E],
