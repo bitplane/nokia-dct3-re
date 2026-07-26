@@ -352,8 +352,39 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             },
             check.DSP_PARAMETER_RUNTIME_OBJECT_CATALOGUE,
         )
+        self.assertEqual(0x2BEAE8, check.DSP_PARAMETER_PPM_ROOT_POINTER_CELL)
+        self.assertEqual(0x2C0000, check.DSP_PARAMETER_PPM_ROOT)
         self.assertEqual(
-            [0x28B628],
+            [
+                {
+                    "address": 0x2C002C,
+                    "length": 0x0234,
+                    "tag": 0x4C504353,
+                },
+                {
+                    "address": 0x2C0260,
+                    "length": 0x01B4,
+                    "tag": 0x47534D43,
+                },
+                {
+                    "address": 0x2C0414,
+                    "length": 0x28BC,
+                    "tag": 0x464F4E54,
+                },
+                {
+                    "address": 0x2C2CD0,
+                    "length": 0x35998,
+                    "tag": 0x54455854,
+                },
+            ],
+            check.DSP_PARAMETER_PPM_TOP_LEVEL_NODES,
+        )
+        self.assertEqual(
+            [0x01, 0x02, 0x0D, 0x0F, 0x18, 0x1A, 0x1B, 0x13],
+            check.DSP_PARAMETER_PPM_DESCRIPTOR_VALUES,
+        )
+        self.assertEqual(
+            [],
             check.DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS,
         )
         self.assertEqual(0x2A5008, check.NSE3_COPY_TABLE_ADDRESS)

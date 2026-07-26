@@ -368,10 +368,20 @@ as labels.
 
 A field-specific pass over the other runtime descriptor constructors bounds
 their `+0x0c` values to small integers, SRAM/heap pointers, or ROM values
-whose producer flags are clear. One parser-built descriptor at `0x28b628`
-still takes `+0x0c` from a runtime record word and remains unresolved. It is
-not used to justify the recovered installer path, and producer absence is
-still not claimed.
+whose producer flags are clear. The final parser-built descriptor at
+`0x28b628` is now bounded by reproducing its PPM traversal. Firmware root cell
+`0x2beae8` names the identified PPM at `0x2c0000`; its top-level walk reaches
+`TEXT` at `0x2c2cd0`, then advances through aligned child lengths. The nine
+non-terminal child values are `33, 01, 02, 0d, 0f, 18, 1a, 1b, 13`.
+Firmware skips `0x33`, registers the remaining eight and stops at the zero
+child at `0x2f8658`. None can name a ROM catalogue. The exact verifier
+replays the root, top-level and child walks and no runtime descriptor value
+source remains unclassified.
+
+This closes the alternative-object value provenance, not the independent
+event provenance. The reused descriptor at `0x256e2e` can still retain an
+unwritten event halfword, so producer absence for `0x076f..0x0778` is not
+claimed.
 
 No organic Answer or End transition has yet been connected to that state
 slot. Product configuration therefore declares selector 8's proven

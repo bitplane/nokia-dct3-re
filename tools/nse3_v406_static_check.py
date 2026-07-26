@@ -630,6 +630,23 @@ DSP_PARAMETER_RUNTIME_EVENT_ANCHORS = {
     0x278788: ("movs", "r1, #0x40"),
     0x27878A: ("strb", "r1, [r0]"),
     0x278792: ("bl", "#0x25a4f0"),
+    # The final runtime descriptor enumerates PPM TEXT children.  It skips
+    # value 0x33, stops at zero, and stores every other child word at +0x0c.
+    0x28B5E8: ("ldr", "r0, [r4]"),
+    0x28B5EA: ("cmp", "r0, #0x33"),
+    0x28B5EE: ("cmp", "r0, #0"),
+    0x28B5F2: ("str", "r0, [sp, #0x24]"),
+    0x28B628: ("bl", "#0x25a4f0"),
+    # Firmware PPM root validation and NEXT/TEXT traversal primitives.
+    0x2A0BF2: ("ldr", "r0, [pc, #0x188]"),
+    0x2A0BFA: ("ldr", "r1, [r0]"),
+    0x2A0BFC: ("ldr", "r2, [pc, #0x180]"),
+    0x2A0C4E: ("ldr", "r0, [r4]"),
+    0x2A0C50: ("movs", "r1, #0x2c"),
+    0x2A0C5A: ("ldr", "r2, [r1, #8]"),
+    0x2A0CC6: ("ldr", "r0, [r3, #4]"),
+    0x2A0CCA: ("lsrs", "r0, r0, #2"),
+    0x2A0CCC: ("lsls", "r0, r0, #2"),
     # Event 0x0389 is the sole dispatcher case that reaches the remaining
     # runtime object constructor.  Its packed arguments are copied into the
     # runtime cell before the case loads cell[0] as the object input.
@@ -705,7 +722,37 @@ DSP_PARAMETER_RUNTIME_OBJECT_CATALOGUE = {
     "values": [0, 0x47, 0x0D, 0x0C, 0x2B00DC, 0x6D, 0x0B, 0x2B043C, 0],
     "record_flags": [0, 8, 8, 8, 8, 8, 8, 8, 8],
 }
-DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS = [0x28B628]
+DSP_PARAMETER_PPM_ROOT_POINTER_CELL = 0x2BEAE8
+DSP_PARAMETER_PPM_ROOT = 0x2C0000
+DSP_PARAMETER_PPM_TOP_LEVEL_NODES = [
+    {"address": 0x2C002C, "length": 0x0234, "tag": 0x4C504353},
+    {"address": 0x2C0260, "length": 0x01B4, "tag": 0x47534D43},
+    {"address": 0x2C0414, "length": 0x28BC, "tag": 0x464F4E54},
+    {"address": 0x2C2CD0, "length": 0x35998, "tag": 0x54455854},
+]
+DSP_PARAMETER_PPM_TEXT_CHILDREN = [
+    {"address": 0x2C2CE4, "value": 0x33, "length": 0x023E},
+    {"address": 0x2C2F24, "value": 0x01, "length": 0x5043},
+    {"address": 0x2C7F68, "value": 0x02, "length": 0x5A4A},
+    {"address": 0x2CD9B4, "value": 0x0D, "length": 0x52DA},
+    {"address": 0x2D2C90, "value": 0x0F, "length": 0x52D3},
+    {"address": 0x2D7F64, "value": 0x18, "length": 0x513E},
+    {"address": 0x2DD0A4, "value": 0x1A, "length": 0xA290},
+    {"address": 0x2E7334, "value": 0x1B, "length": 0xB6A8},
+    {"address": 0x2F29DC, "value": 0x13, "length": 0x5C79},
+    {"address": 0x2F8658, "value": 0x00, "length": 0x0010},
+]
+DSP_PARAMETER_PPM_DESCRIPTOR_VALUES = [
+    0x01,
+    0x02,
+    0x0D,
+    0x0F,
+    0x18,
+    0x1A,
+    0x1B,
+    0x13,
+]
+DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS = []
 NSE3_COPY_TABLE_ADDRESS = 0x2A5008
 DSP_PARAMETER_RUNTIME_DESCRIPTOR_EVENTS = {
     0x221640: [0x0C44],
@@ -1778,6 +1825,76 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
             "NSE-3 event-fed object catalogue can publish a parameter event"
         )
 
+    def effective_word(address: int) -> int:
+        offset = address - FLASH_BASE
+        raw = int.from_bytes(physical[offset : offset + 4], "little")
+        return ((raw << 16) | (raw >> 16)) & 0xFFFFFFFF
+
+    ppm_root = effective_word(DSP_PARAMETER_PPM_ROOT_POINTER_CELL)
+    if (
+        ppm_root != DSP_PARAMETER_PPM_ROOT
+        or effective_word(ppm_root) != 0x50504D00
+    ):
+        raise ValueError(
+            "NSE-3 PPM root changed: expected "
+            f"{DSP_PARAMETER_PPM_ROOT:#x}, got {ppm_root:#x}"
+        )
+    ppm_nodes = []
+    node = ppm_root + 0x2C
+    for _ in range(32):
+        length = effective_word(node + 4)
+        tag = effective_word(node + 8)
+        ppm_nodes.append(
+            {"address": node, "length": length, "tag": tag}
+        )
+        if tag == 0x54455854:
+            break
+        if length == 0:
+            raise ValueError("NSE-3 PPM top-level walk reached zero length")
+        node += length
+    if ppm_nodes != DSP_PARAMETER_PPM_TOP_LEVEL_NODES:
+        raise ValueError(
+            "NSE-3 PPM top-level nodes changed: expected "
+            f"{DSP_PARAMETER_PPM_TOP_LEVEL_NODES}, got {ppm_nodes}"
+        )
+
+    ppm_text_children = []
+    child = node + 0x14
+    for _ in range(256):
+        value = effective_word(child)
+        length = effective_word(child + 4)
+        ppm_text_children.append(
+            {"address": child, "value": value, "length": length}
+        )
+        if value == 0:
+            break
+        if length == 0:
+            raise ValueError("NSE-3 PPM TEXT walk reached zero length")
+        child += (length + 3) & ~3
+    if ppm_text_children != DSP_PARAMETER_PPM_TEXT_CHILDREN:
+        raise ValueError(
+            "NSE-3 PPM TEXT children changed: expected "
+            f"{DSP_PARAMETER_PPM_TEXT_CHILDREN}, got {ppm_text_children}"
+        )
+    ppm_descriptor_values = [
+        child["value"]
+        for child in ppm_text_children
+        if child["value"] not in (0, 0x33)
+    ]
+    if ppm_descriptor_values != DSP_PARAMETER_PPM_DESCRIPTOR_VALUES:
+        raise ValueError(
+            "NSE-3 PPM descriptor values changed: expected "
+            f"{DSP_PARAMETER_PPM_DESCRIPTOR_VALUES}, got "
+            f"{ppm_descriptor_values}"
+        )
+    if any(
+        FLASH_BASE <= value < FLASH_BASE + len(physical)
+        for value in ppm_descriptor_values
+    ):
+        raise ValueError(
+            "NSE-3 PPM descriptor value can name a ROM catalogue"
+        )
+
     object_event_profile = {
         "apis": [
             {
@@ -1910,6 +2027,10 @@ def verify_dsp_parameter_event_producers(data: bytes) -> dict:
                 "runtime_object_installer":
                     DSP_PARAMETER_RUNTIME_OBJECT_INSTALLER,
                 "runtime_object_catalogue": recovered_runtime_catalogue,
+                "ppm_root": ppm_root,
+                "ppm_top_level_nodes": ppm_nodes,
+                "ppm_text_children": ppm_text_children,
+                "ppm_descriptor_values": ppm_descriptor_values,
                 "unresolved_runtime_value_calls":
                     DSP_PARAMETER_UNRESOLVED_RUNTIME_VALUE_CALLS,
             },
