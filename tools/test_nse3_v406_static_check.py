@@ -359,6 +359,34 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             ("cmp", "r0, #7"), check.RADIO_PACKET_ANCHORS[0x20E9E2]
         )
 
+    def test_task_11_decoder_keeps_type_0x87_and_0x8a_paths_distinct(self):
+        self.assertEqual(0x210DA8, check.TASK_11_EVENT_DECODER)
+        self.assertEqual(
+            [0x211CFC, 0x211D1A, 0x211E66, 0x211E8A, 0x211E98, 0x211ED8],
+            check.TASK_11_EVENT_DECODER_DIRECT_CALLS,
+        )
+        self.assertEqual(
+            0x2112A4, check.TASK_11_EVENT_JUMP_TABLE[0x138F]
+        )
+        self.assertEqual(
+            0x211288, check.TASK_11_EVENT_JUMP_TABLE[0x1390]
+        )
+        self.assertEqual(
+            ("bl", "#0x20faec"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x211360],
+        )
+        self.assertEqual(
+            ("bl", "#0x20fa18"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x2112B8],
+        )
+        self.assertEqual(
+            ("bl", "#0x25ef90"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x280452],
+        )
+        self.assertEqual(
+            0x109178, check.RADIO_REPORT_HANDLER_LITERALS[0x280432]
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)

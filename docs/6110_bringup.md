@@ -352,6 +352,29 @@ object as `0x1390`. Task 11 deliberately merges statuses `0x138f` and
 `0x1390` at case `0x211e48`, where shared flag gates and controller state
 determine further processing through `0x210da8`.
 
+That common case is not the end of the distinction. `0x210da8` is a central
+task-11 event decoder with exactly six direct callers, all inside the same
+dispatcher. Its exact ten-entry table covers statuses `0x138e..0x1397` and
+routes `0x138f` to `0x2112a4` but `0x1390` to `0x211288`.
+
+The type-`0x87`/status-`0x138f` branch writes value `0x0d` to controller byte
+`0x109107`, then tests the two pending-object slots at
+`0x108ed4 + 0x20` and `+ 0x30`. With neither slot populated it calls shared
+control routine `0x20fa18`; with either populated it calls the populated
+bitmap constructor `0x20faec` with argument 2. The type-`0x87` direct handler
+also clears shared flag `0x02` unconditionally and cancels timer `0x1b`
+after posting `0x138f`. This is a proven report-to-search-resubmission edge,
+although the report's semantic name and the DSP conditions that emit it
+remain unassigned.
+
+The type-`0x8a`/status-`0x1390` branch instead increments counter
+`0x109184`, compares it with runtime threshold provider `0x28f2ae`, and
+can reach `0x20fa18` only after the threshold and an additional shared-flag
+gate. It contains no direct bitmap-constructor call. The two reports
+therefore share preprocessing infrastructure but implement distinct
+controller transitions; treating either as a generic search-complete reply
+would lose evidenced NSE-3 policy.
+
 There is a narrower relationship to one populated type-`0x1a` request path:
 builder `0x20e9cc` reads the same byte `0x1090ff`, distinguishes values 6
 and 7, and uses that state to populate request-object bytes `0x12..0x13`

@@ -543,6 +543,53 @@ RADIO_REPORT_HANDLER_ANCHORS = {
     0x211E60: ("cmp", "r0, #1"),
     0x211E66: ("bl", "#0x210da8"),
     0x211E6E: ("lsrs", "r0, r1, #0x1b"),
+    # The common task-11 event decoder retains the 0x138f/0x1390 distinction.
+    # Its 0x138f arm can resubmit the populated bitmap; its 0x1390 arm only
+    # advances a counter and may enter shared control after threshold/flag
+    # gates.
+    0x210DA8: ("push", "{r4, r5, r6, r7, lr}"),
+    0x210DB8: ("movs", "r0, #0"),
+    0x210DBA: ("ldrsh", "r1, [r5, r0]"),
+    0x210DBC: ("ldr", "r0, [pc, #0x304]"),
+    0x210DCE: ("subs", "r0, #4"),
+    0x210DD0: ("cmp", "r0, #9"),
+    0x210DD4: ("adr", "r2, #4"),
+    0x210DD6: ("lsls", "r0, r0, #2"),
+    0x210DD8: ("ldr", "r0, [r2, r0]"),
+    0x210DDA: ("mov", "pc, r0"),
+    0x211288: ("ldr", "r4, [pc, #0x1fc]"),
+    0x21128A: ("ldrh", "r0, [r4, #8]"),
+    0x21128C: ("adds", "r0, #1"),
+    0x21128E: ("strh", "r0, [r4, #8]"),
+    0x211290: ("bl", "#0x28f2ae"),
+    0x211294: ("ldrh", "r1, [r4, #8]"),
+    0x211296: ("cmp", "r1, r0"),
+    0x21129C: ("ldr", "r0, [r4, #0x18]"),
+    0x21129E: ("lsrs", "r0, r0, #0x15"),
+    0x2112A4: ("ldr", "r1, [pc, #0x238]"),
+    0x2112A6: ("movs", "r0, #0xd"),
+    0x2112A8: ("strb", "r0, [r1]"),
+    0x2112AA: ("ldr", "r0, [pc, #0x244]"),
+    0x2112AC: ("ldr", "r1, [r0, #0x30]"),
+    0x2112B2: ("ldr", "r0, [r0, #0x20]"),
+    0x2112B8: ("bl", "#0x20fa18"),
+    0x2112BE: ("movs", "r0, #2"),
+    0x211360: ("bl", "#0x20faec"),
+    # Type 0x87 clears the same shared flag as type 0x8a, but is unconditional
+    # and additionally cancels timer 0x1b after posting status 0x138f.
+    0x28042E: ("push", "{r4, lr}"),
+    0x280432: ("ldr", "r1, [pc, #0x1d8]"),
+    0x280434: ("movs", "r0, #0xfd"),
+    0x280436: ("ldrb", "r2, [r1]"),
+    0x280438: ("ands", "r0, r2"),
+    0x28043A: ("strb", "r0, [r1]"),
+    0x28043C: ("ldr", "r0, [pc, #0x1d0]"),
+    0x280442: ("movs", "r1, #8"),
+    0x280444: ("bl", "#0x276912"),
+    0x280448: ("movs", "r0, #0xb"),
+    0x28044C: ("bl", "#0x25fb4c"),
+    0x280450: ("movs", "r0, #0x1b"),
+    0x280452: ("bl", "#0x25ef90"),
     # The task-side ALL_RSSI_RESULTS case accepts controller state 4 only for
     # the active type-0x1a search, and also accepts states 6 and 7.
     0x21732E: ("movs", "r0, #0x6b"),
@@ -757,6 +804,33 @@ RADIO_REPORT_HANDLER_LITERALS = {
     0x2171F0: 0x106B08,
     0x211E56: 0x10FECC,
     0x211E6A: 0x109178,
+    0x210DBC: 0x1389,
+    0x211288: 0x10917C,
+    0x2112A4: 0x109107,
+    0x2112AA: 0x108ED4,
+    0x280432: 0x109178,
+}
+TASK_11_EVENT_DECODER = 0x210DA8
+TASK_11_EVENT_DECODER_DIRECT_CALLS = [
+    0x211CFC,
+    0x211D1A,
+    0x211E66,
+    0x211E8A,
+    0x211E98,
+    0x211ED8,
+]
+TASK_11_EVENT_JUMP_TABLE_ADDRESS = 0x210DDC
+TASK_11_EVENT_JUMP_TABLE = {
+    0x138E: 0x2112C2,
+    0x138F: 0x2112A4,
+    0x1390: 0x211288,
+    0x1391: 0x211236,
+    0x1392: 0x21109E,
+    0x1393: 0x210E04,
+    0x1394: 0x210E04,
+    0x1395: 0x211346,
+    0x1396: 0x21109E,
+    0x1397: 0x211098,
 }
 FIXED_RADIO_TASK_ROUTES = {
     "0x80": {
@@ -2183,6 +2257,32 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 CHANNEL_CONFIGURE direct-call census changed: expected "
             f"{CHANNEL_CONFIGURE_DIRECT_CALLS}, got {channel_configure_calls}"
         )
+    task_11_event_decoder_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == TASK_11_EVENT_DECODER
+    ]
+    if task_11_event_decoder_calls != TASK_11_EVENT_DECODER_DIRECT_CALLS:
+        raise ValueError(
+            "NSE-3 task-11 event-decoder direct-call census changed: "
+            f"expected {TASK_11_EVENT_DECODER_DIRECT_CALLS}, "
+            f"got {task_11_event_decoder_calls}"
+        )
+    task_11_event_jump_table = {
+        status: effective_u32(
+            physical,
+            TASK_11_EVENT_JUMP_TABLE_ADDRESS - FLASH_BASE
+            + (status - 0x138E) * 4,
+        )
+        for status in TASK_11_EVENT_JUMP_TABLE
+    }
+    if task_11_event_jump_table != TASK_11_EVENT_JUMP_TABLE:
+        raise ValueError(
+            "NSE-3 task-11 event jump table changed: expected "
+            f"{TASK_11_EVENT_JUMP_TABLE}, got {task_11_event_jump_table}"
+        )
     task_4_entry = effective_u32(
         physical, NSE3_TASK_4_ENTRY_POINTER - FLASH_BASE)
     if task_4_entry != NSE3_TASK_4_ENTRY:
@@ -2449,6 +2549,14 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "task_case_shared_with_status": 0x138F,
                 "task_case_counter": 0x10FECC,
                 "task_case_progress_helper": 0x210DA8,
+                "event_decoder_branch": 0x211288,
+                "event_decoder_behavior": {
+                    "counter_cell": 0x109184,
+                    "threshold_provider": 0x28F2AE,
+                    "shared_control_routine_after_threshold_and_flag":
+                        0x20FA18,
+                    "direct_search_submission": False,
+                },
                 "shared_state_relationship": {
                     "request_constructor_call": 0x20EA06,
                     "request_type": 0x1A,
@@ -2459,6 +2567,44 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                 "direct_request_to_report_edge": "not_established",
                 "acquisition_terminal": False,
                 "semantic_name_assigned": False,
+            },
+            "type_0x87": {
+                "handler": 0x28042E,
+                "report_body_read_by_direct_handler": False,
+                "cleared_shared_flag": {
+                    "cell": 0x109178,
+                    "mask": 0x02,
+                },
+                "task": 11,
+                "task_status": 0x138F,
+                "task_object_bytes": 8,
+                "post_submission_timer_cancel": 0x1B,
+                "task_case": 0x211E48,
+                "task_case_shared_with_status": 0x1390,
+                "event_decoder_branch": 0x2112A4,
+                "event_decoder_behavior": {
+                    "controller_byte": 0x109107,
+                    "controller_byte_value": 0x0D,
+                    "pending_object_base": 0x108ED4,
+                    "pending_object_offsets": [0x20, 0x30],
+                    "when_neither_pending": {
+                        "routine": 0x20FA18,
+                    },
+                    "when_either_pending": {
+                        "populated_bitmap_constructor": 0x20FAEC,
+                        "argument": 2,
+                    },
+                },
+                "direct_search_resubmission_edge": True,
+                "semantic_name_assigned": False,
+            },
+            "task_11_event_decoder": {
+                "routine": TASK_11_EVENT_DECODER,
+                "direct_calls": task_11_event_decoder_calls,
+                "all_direct_callers_within_task_11_dispatcher": True,
+                "jump_table": TASK_11_EVENT_JUMP_TABLE_ADDRESS,
+                "jump_table_routes": task_11_event_jump_table,
+                "status_0x138f_and_0x1390_distinct": True,
             },
             "channel_change": {
                 "confirmation_type": 0x89,
