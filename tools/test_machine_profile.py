@@ -93,7 +93,7 @@ class MachineProfileTest(unittest.TestCase):
         )[1].split("void nokia_dct3_state::noki7110", 1)[0]
         for declaration in (
             "dct3_nse3_map",
-            'INTEL_TE28F800(config.replace(), "flash");',
+            'INTEL_28F800B3T(config.replace(), "flash");',
             "I2C_24C64(config.replace(), m_eeprom);",
             "nokia_cobba_device::ear",
             "nokia_cobba_device::mic2",

@@ -34,17 +34,18 @@ class MamePatchHygieneTest(unittest.TestCase):
 
     def test_nse3_te28f800_has_its_own_one_megabyte_part(self):
         body = self.flash.split(
-            "intel_te28f800_device::intel_te28f800_device", 1
+            "intel_28f800b3t_device::intel_28f800b3t_device", 1
         )[1].split(
             "intel_te28f160_device::intel_te28f160_device", 1
         )[0]
-        self.assertIn("INTEL_TE28F800", body)
+        self.assertIn("INTEL_28F800B3T", body)
         self.assertIn("0x100000", body)
+        self.assertIn("MFG_INTEL, 0x8892", body)
         self.assertIn("m_parameter_block_size = 8 * 1024;", body)
         self.assertIn("m_parameter_block_count = 8;", body)
-        self.assertIn("class intel_te28f800_device", self.flash_h)
+        self.assertIn("class intel_28f800b3t_device", self.flash_h)
         self.assertIn(
-            "DECLARE_DEVICE_TYPE(INTEL_TE28F800,",
+            "DECLARE_DEVICE_TYPE(INTEL_28F800B3T,",
             self.flash_h,
         )
 

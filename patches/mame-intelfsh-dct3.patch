@@ -14,7 +14,7 @@ index 5b41774ad3c..8d28aebbb94 100644
  DEFINE_DEVICE_TYPE(SHARP_LH28F400,           sharp_lh28f400_device,           "sharp_lh28f400",           "Sharp LH28F400 Flash")
  DEFINE_DEVICE_TYPE(INTEL_E28F008SA,          intel_e28f008sa_device,          "intel_e28f008sa",          "Intel E28F008SA Flash")
  DEFINE_DEVICE_TYPE(INTEL_TE28F160,           intel_te28f160_device,           "intel_te28f160",           "Intel TE28F160 Flash")
-+DEFINE_DEVICE_TYPE(INTEL_TE28F800,           intel_te28f800_device,           "intel_te28f800",           "Intel TE28F800 Flash")
++DEFINE_DEVICE_TYPE(INTEL_28F800B3T,          intel_28f800b3t_device,          "intel_28f800b3t",          "Intel 28F800B3-T Flash")
  DEFINE_DEVICE_TYPE(SHARP_LH28F160S3,         sharp_lh28f160s3_device,         "sharp_lh28f160s3",         "Sharp LH28F160S3 Flash")
  DEFINE_DEVICE_TYPE(INTEL_TE28F320,           intel_te28f320_device,           "intel_te28f320",           "Intel TE28F320 Flash")
  DEFINE_DEVICE_TYPE(SHARP_LH28F320BF,         sharp_lh28f320bf_device,         "sharp_lh28f320bf",         "Sharp LH28F320BFHE-PBTL Flash")
@@ -52,8 +52,8 @@ index 5b41774ad3c..8d28aebbb94 100644
 @@ -297,5 +311,13 @@ sharp_lh28f400_device::sharp_lh28f400_device(const machine_config &mconfig, cons
  	: intelfsh16_device(mconfig, SHARP_LH28F400, tag, owner, clock, 0x80000, MFG_SHARP, 0xed) { }
  
-+intel_te28f800_device::intel_te28f800_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-+	: intelfsh16_device(mconfig, INTEL_TE28F800, tag, owner, clock, 0x100000, MFG_INTEL, 0x9c)
++intel_28f800b3t_device::intel_28f800b3t_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
++	: intelfsh16_device(mconfig, INTEL_28F800B3T, tag, owner, clock, 0x100000, MFG_INTEL, 0x8892)
 +{
 +	m_top_boot_sector = true;
 +	m_parameter_block_size = 8 * 1024;
@@ -166,10 +166,10 @@ index 5274f6b3d3c..d202eb686d6 100644
  	sharp_lh28f400_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
  };
  
-+class intel_te28f800_device : public intelfsh16_device
++class intel_28f800b3t_device : public intelfsh16_device
 +{
 +public:
-+	intel_te28f800_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
++	intel_28f800b3t_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
 +};
 +
  class intel_te28f160_device : public intelfsh16_device
@@ -184,7 +184,7 @@ index 5274f6b3d3c..d202eb686d6 100644
 @@ -454,5 +472,6 @@ DECLARE_DEVICE_TYPE(SHARP_LH28F400,          sharp_lh28f400_device)
  DECLARE_DEVICE_TYPE(SHARP_LH28F400,          sharp_lh28f400_device)
  DECLARE_DEVICE_TYPE(INTEL_E28F008SA,         intel_e28f008sa_device)
-+DECLARE_DEVICE_TYPE(INTEL_TE28F800,           intel_te28f800_device)
++DECLARE_DEVICE_TYPE(INTEL_28F800B3T,          intel_28f800b3t_device)
  DECLARE_DEVICE_TYPE(INTEL_TE28F160,          intel_te28f160_device)
  DECLARE_DEVICE_TYPE(SHARP_LH28F160S3,        sharp_lh28f160s3_device)
  DECLARE_DEVICE_TYPE(INTEL_TE28F320,          intel_te28f320_device)

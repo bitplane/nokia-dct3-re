@@ -14,7 +14,7 @@ Nokia's *NSE-3 Series Transceivers, Chapter 3 System Module*, Original
 | Boundary | NSE-3 contract | Emulator consequence |
 | --- | --- | --- |
 | MAD | MAD2 with ARM and TI Lead DSP; the parts list identifies ROM3 variant `F711604` | Do not assume a later product's boot ROM or bootstrap exchange count. ROM3 and ROM4 firmware pairs must be labelled separately. |
-| Program flash | Intel `TE28F800`, 512K x 16, 120 ns; 8 Mbit total | `noki6110` composes an explicit 1 MiB TE28F800 component. It does not use the later 2 MiB TE28F160 compatibility device. |
+| Program flash | Parts list: Intel `TE28F800`, 512K x 16, 120 ns; handset flashing log: `28F800B3-T`, ID `0089:8892` | `noki6110` composes an explicit 1 MiB Intel 28F800B3-T top-boot component. It does not use the later 2 MiB TE28F160 compatibility device. |
 | Work RAM | 64K x 8 (512 Kbit) SRAM | The NSE-3 address map exposes only 64 KiB of work RAM. Unproved upper aliases remain unmapped pending firmware analysis. |
 | EEPROM | 8 KiB serial EEPROM | `noki6110` composes a 24C64-class device and a separate 8 KiB `NO_DUMP` region on PUP's serial signals. It does not truncate a 3210 image or invent a parallel alias. |
 | Display | UE4 GD40 COG module with 84 x 48 one-bit display RAM and a serial interface | The existing 84 x 48 serial LCD component is structurally applicable; command compatibility still needs a boot trace. |
@@ -27,6 +27,9 @@ Primary source:
 [Nokia NSE-3 service-manual archive and extracted text](https://files.elektroda.pl/55977%2Cnokia%2B6110%2Bservice%2Bmanual.html).
 The standalone system-module copy is
 [NSE-3 Chapter 3](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6110/03SYS%20%5B73%5D.pdf).
+An independent handset flashing report identifies ROM 3 and the fitted flash
+as `Int 28F800B3-T`, manufacturer/device ID `0089:8892`:
+[NSE-3 v5.48 flashing log](https://gsmforum.ru/threads/ishchu-proshivku-na-nse-3-6110-5-47.136332/).
 
 ## Firmware baseline
 

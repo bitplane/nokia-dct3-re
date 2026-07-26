@@ -1800,7 +1800,7 @@ void nokia_dct3_state::noki6110(machine_config &config)
 {
 	dct3_base(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nse3_map);
-	INTEL_TE28F800(config.replace(), "flash");
+	INTEL_28F800B3T(config.replace(), "flash");
 	I2C_24C64(config.replace(), m_eeprom);
 	// NSE-3's internal differential receiver and microphone terminate at
 	// COBBA EAR and MIC2. Neutral routes declare wiring, not unproved gain.
