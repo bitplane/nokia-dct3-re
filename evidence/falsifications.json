@@ -625,6 +625,12 @@
       "hypothesis": "Passing a PulseAudio sink name as FFmpeg's output URL directs the physical-uplink service tone to that isolated sink",
       "conclusion": "A direct monitor capture remained bit-exact silence despite the FFmpeg process running. The Pulse output muxer exposes device selection through its -device option; the output URL is not the sink selector. Using -device makes the isolated monitor carry the attenuated 1 kHz waveform. After independently routing MAME capture and playback, paired v6.00/v5.01 calls produce plausible microphone/network peaks 1280/1296 and 1264/1432 while separate playback captures contain sustained decoded downlink. The earlier high physical-uplink peaks are retired because default-speaker feedback could satisfy them.",
       "evidence": ["tools/run_physical_uplink_gate.sh", "tools/radio_physical_downlink_check.py", "docs/dsp_interface.md"]
+    },
+    {
+      "id": "nhm5_paging_requires_network_repetition", "status": "disproven",
+      "hypothesis": "NHM-5 v6.39 ignores the single laboratory IMSI page because it requires the network to repeat the request",
+      "conclusion": "The firmware parser returns 0x08a2 and sets shared page-pending byte 0x0010dc5f for the first request and for correctly addressed repetitions at every subsequent 102-frame paging opportunity. No repetition reaches the separate idle-RR admission path at 0x255ff8 or produces RACH. The unresolved boundary is the firmware-owned wake-up/registration contract between parser completion and idle RR, not network retry count.",
+      "evidence": ["docs/model_coverage.md"]
     }
   ]
 }

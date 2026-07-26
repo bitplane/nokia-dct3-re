@@ -144,13 +144,21 @@ the exact mobile identity.
 The task passes that object to parser `0x280664`, which classifies the page as
 result `0x08a2`. Ordinary no-identity PCH fill blocks on the same transport
 produce zero, so the page is distinguished and parsed rather than discarded
-as fill. Delaying the page until well after SIM file activity has settled does
-not change the outcome. The remaining failure is after this classification:
-no organic RACH follows and neither known higher RR paging decoder entry is
-reached. Consequently the next implementation must recover the NHM-5
-idle-RR registration/admission contract for `0x08a2`; changing GSM paging
-octets, forcing firmware state or bypassing the parser would cross the current
-evidence boundary.
+as fill. The active result branch is `0x2573c0`: it sets the parser context's
+page-pending byte at `0x0010dc5f`, releases the received object and resumes the
+parser wait loop. The separate idle-RR admission path at `0x255ff8` checks that
+same byte before selecting the page decoder, but is not reached after the
+page. Delaying the page until well after SIM file activity has settled does
+not change the outcome. Repeating the correctly addressed request at every
+subsequent 102-frame paging opportunity makes the parser repeat the same
+successful completion without waking the idle-RR admission path or producing
+RACH, so a missing network retry is also excluded.
+
+The remaining failure is therefore the firmware-owned wake-up/registration
+contract between the parser completion flag and idle RR. Consequently the
+next implementation must recover that NHM-5 contract; changing GSM paging
+octets, forcing firmware state, synthesising an internal wake-up or bypassing
+the parser would cross the current evidence boundary.
 
 The alternative `0x8b` measurement terminal still has its independently
 recovered 40-record layout. That path organically constructs type `0x55/4` at
