@@ -1211,6 +1211,32 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS,
         )
 
+    def test_type_0x74_controller_response_emits_lane_correct_70_0a(self):
+        self.assertEqual(
+            ("ldrb", "r1, [r4, #8]"),
+            check.EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_ANCHORS[0x237D66],
+        )
+        self.assertEqual(
+            ("beq", "#0x237dd4"),
+            check.EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_ANCHORS[0x237D8C],
+        )
+        self.assertEqual(
+            [0x23A63A],
+            check.EXTERNAL_SERVICE_TYPE_0X74_HANDLER_CALLS,
+        )
+        self.assertEqual(
+            bytes.fromhex("02007002090a"),
+            check.EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT,
+        )
+        self.assertEqual(
+            bytes.fromhex("02700a"),
+            check.EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_BYTE_FIELDS,
+        )
+        self.assertEqual(
+            [0x237DF8],
+            check.EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS,
+        )
+
     def test_dsp_bootstrap_stream_preserves_stride_extent_and_terminators(self):
         image = bytearray(b"\xff" * check.FLASH_SIZE)
         image[0x40:0x42] = b"\x12\x34"

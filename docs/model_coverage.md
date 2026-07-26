@@ -59,6 +59,16 @@ equivalence is claimed between that raw DSPIF publication and class-`0x40`
 command `0x70`, and the missing DSP response condition still prevents peer
 enablement or coverage promotion.
 
+An independent HLE labels `70 0d` as a self-test and replies with type
+`0x74` payload `0d 00`. Exact v4.06 proves only the bounded MCU side:
+task-2 family `0x74` selectors `0x0d` and `0xd0` share a bit-2-gated status
+consumer, which reads status bits from queue-object byte 9 and organically
+emits lane-correct DSPIF follow-up `70 0a`. The semantic label, compact ring
+layout and direct request/reply correlation remain unaccepted. Exact DSPIF RX
+places raw payload at object byte 4, proving compact payload `0d 00` cannot
+reach the v4.06 selector/status at bytes 8--9; the peer therefore stays
+disabled.
+
 ## Promotion rules
 
 The levels are cumulative:

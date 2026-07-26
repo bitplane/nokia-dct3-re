@@ -2378,6 +2378,65 @@ EXTERNAL_SERVICE_STARTUP_OBJECT_ADDRESS = 0x2B9BE8
 EXTERNAL_SERVICE_STARTUP_OBJECT = bytes.fromhex("02007002000d")
 EXTERNAL_SERVICE_STARTUP_OBJECT_BYTE_FIELDS = bytes.fromhex("02700d")
 EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS = [0x237B78]
+EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_ANCHORS = {
+    # DSPIF RX builds a four-byte task envelope and copies the raw ring
+    # payload at object +4.  A compact two-byte raw payload therefore cannot
+    # directly populate the controller selector/status at object +8/+9.
+    0x2857CC: ("lsrs", "r7, r0, #8"),
+    0x2857CE: ("adds", "r0, r7, #0"),
+    0x2857D0: ("adds", "r0, #4"),
+    0x2857D6: ("bl", "#0x260abc"),
+    0x2857E8: ("strb", "r7, [r0, #2]"),
+    0x2857EE: ("strb", "r1, [r0, #3]"),
+    0x285844: ("ldr", "r4, [sp]"),
+    0x285846: ("adds", "r4, #4"),
+    0x285848: ("str", "r4, [r3, #0x18]"),
+    0x285862: ("ldrh", "r4, [r2]"),
+    0x285864: ("strh", "r4, [r5]"),
+    # The sole task-2 family-0x74 handler call reaches a byte-8 dispatcher.
+    # Values 0x0d and 0xd0 share this arm.
+    0x23A63A: ("bl", "#0x237d60"),
+    0x237D60: ("push", "{r4, r5, r6, r7, lr}"),
+    0x237D66: ("ldrb", "r1, [r4, #8]"),
+    0x237D68: ("movs", "r0, #0xd"),
+    0x237D6E: ("beq", "#0x237dd4"),
+    0x237D88: ("subs", "r0, #0x9a"),
+    0x237D8C: ("beq", "#0x237dd4"),
+    # The shared arm requires controller bit 2, clears it, invokes one helper
+    # and uniquely submits fixed raw DSPIF stream 70 0a through task 3.
+    0x237DD4: ("ldr", "r5, [pc, #0x390]"),
+    0x237DD6: ("ldrb", "r0, [r5]"),
+    0x237DD8: ("lsrs", "r0, r0, #3"),
+    0x237DDA: ("blo", "#0x237e4a"),
+    0x237DE2: ("movs", "r0, #0xfb"),
+    0x237DE8: ("strb", "r0, [r5]"),
+    0x237DF0: ("bl", "#0x28fe0a"),
+    0x237DF4: ("movs", "r0, #3"),
+    0x237DF6: ("ldr", "r1, [pc, #0x374]"),
+    0x237DF8: ("bl", "#0x25fb4c"),
+    # Object byte 9 supplies two status bits to controller-state fields.  Both
+    # arms clear controller bit 6; no success/failure meaning is assigned.
+    0x237DFC: ("ldrb", "r0, [r4, #9]"),
+    0x237DFE: ("lsrs", "r1, r0, #1"),
+    0x237E0A: ("movs", "r0, #0xbf"),
+    0x237E10: ("strb", "r0, [r5]"),
+    0x237E12: ("ldrb", "r0, [r4, #9]"),
+    0x237E14: ("lsrs", "r0, r0, #2"),
+    0x237E20: ("movs", "r1, #0xbf"),
+    0x237E26: ("strb", "r1, [r5]"),
+}
+EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_LITERALS = {
+    0x237DD4: 0x10FDE1,
+    0x237DF6: 0x2B9BCC,
+}
+EXTERNAL_SERVICE_TYPE_0X74_HANDLER = 0x237D60
+EXTERNAL_SERVICE_TYPE_0X74_HANDLER_CALLS = [0x23A63A]
+EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT_ADDRESS = 0x2B9BCC
+EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT = bytes.fromhex(
+    "02007002090a"
+)
+EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_BYTE_FIELDS = bytes.fromhex("02700a")
+EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS = [0x237DF8]
 DSP_PARAMETER_08_ANCHORS = {
     # A bounded message dispatcher maps 0x076f..0x0778 through this exact
     # ten-entry table.  Three entries are paired controller-flag setters and
@@ -3491,6 +3550,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_DELAYED_STATUS_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_MODE_STARTUP_ANCHORS)
+    decode_thumb_anchors(data, EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_ANCHORS)
     verify_thumb_literals(data, RADIO_REPORT_HANDLER_LITERALS)
     verify_thumb_literals(data, TYPE_0X80_0X70_TRACE_HELPER_LITERALS)
     verify_thumb_literals(data, TYPE_0X1F_STATUS_0X03EE_CONSTRUCTOR_LITERALS)
@@ -3500,6 +3560,7 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
     verify_thumb_literals(data, EXTERNAL_SERVICE_CONTROLLER_FLAG_LITERALS)
     verify_thumb_literals(data, EXTERNAL_SERVICE_DELAYED_STATUS_LITERALS)
     verify_thumb_literals(data, EXTERNAL_SERVICE_MODE_STARTUP_LITERALS)
+    verify_thumb_literals(data, EXTERNAL_SERVICE_TYPE_0X74_RESPONSE_LITERALS)
     physical = swap16(data)
     instructions = decode_image(physical, FLASH_BASE)
     channel_configure_calls = [
@@ -4164,6 +4225,81 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "NSE-3 external-service startup-object submissions changed: "
             f"expected {EXTERNAL_SERVICE_STARTUP_OBJECT_SUBMIT_CALLS}, got "
             f"{external_service_startup_object_submit_calls}"
+        )
+    external_service_type_0x74_handler_calls = [
+        insn.address
+        for insn in instructions
+        if insn
+        and insn.mnemonic in ("bl", "blx")
+        and immediate_target(insn) == EXTERNAL_SERVICE_TYPE_0X74_HANDLER
+    ]
+    if (
+        external_service_type_0x74_handler_calls
+        != EXTERNAL_SERVICE_TYPE_0X74_HANDLER_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 type-0x74 handler calls changed: expected "
+            f"{EXTERNAL_SERVICE_TYPE_0X74_HANDLER_CALLS}, got "
+            f"{external_service_type_0x74_handler_calls}"
+        )
+    external_service_type_0x74_followup_object = physical[
+        EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT_ADDRESS - FLASH_BASE:
+        EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT_ADDRESS - FLASH_BASE
+        + len(EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT)
+    ]
+    if (
+        external_service_type_0x74_followup_object
+        != EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT
+    ):
+        raise ValueError(
+            "NSE-3 type-0x74 follow-up object changed: expected "
+            f"{EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT.hex()}, got "
+            f"{external_service_type_0x74_followup_object.hex()}"
+        )
+    external_service_type_0x74_followup_byte_fields = bytes(
+        cpu_byte(
+            physical,
+            FLASH_BASE,
+            EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT_ADDRESS + offset,
+        )
+        for offset in range(2, 5)
+    )
+    if (
+        external_service_type_0x74_followup_byte_fields
+        != EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_BYTE_FIELDS
+    ):
+        raise ValueError(
+            "NSE-3 type-0x74 follow-up MCU byte fields changed: expected "
+            f"{EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_BYTE_FIELDS.hex()}, got "
+            f"{external_service_type_0x74_followup_byte_fields.hex()}"
+        )
+    external_service_type_0x74_followup_submit_calls = []
+    for index, insn in enumerate(instructions):
+        if (
+            not insn
+            or insn.mnemonic not in ("bl", "blx")
+            or immediate_target(insn) != 0x25FB4C
+        ):
+            continue
+        registers = call_registers(
+            instructions, index, physical, FLASH_BASE
+        )
+        if (
+            registers["r0"] == 3
+            and registers["r1"]
+            == EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT_ADDRESS
+        ):
+            external_service_type_0x74_followup_submit_calls.append(
+                insn.address
+            )
+    if (
+        external_service_type_0x74_followup_submit_calls
+        != EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS
+    ):
+        raise ValueError(
+            "NSE-3 type-0x74 follow-up submissions changed: expected "
+            f"{EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_SUBMIT_CALLS}, got "
+            f"{external_service_type_0x74_followup_submit_calls}"
         )
     task_11_event_jump_table = {
         status: effective_u32(
@@ -5485,6 +5621,47 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
                     },
                     "class_0x40_command_0x70_equivalence_proven": False,
                     "mode_semantics_assigned": False,
+                },
+                "type_0x74_response": {
+                    "task_2_handler": EXTERNAL_SERVICE_TYPE_0X74_HANDLER,
+                    "handler_calls":
+                        external_service_type_0x74_handler_calls,
+                    "selector_object_offset": 8,
+                    "shared_arm_values": [0x0D, 0xD0],
+                    "status_object_offset": 9,
+                    "dspif_rx_envelope": {
+                        "header_bytes": 4,
+                        "raw_type_object_offset": 3,
+                        "raw_payload_object_offset": 4,
+                        "compact_hle_payload_selector_object_offset": 4,
+                        "compact_hle_payload_status_object_offset": 5,
+                        "handler_selector_object_offset": 8,
+                        "handler_status_object_offset": 9,
+                    },
+                    "status_bits_consumed": [0, 1],
+                    "required_controller_bit": 2,
+                    "clears_controller_bits": [2, 6],
+                    "followup": {
+                        "address":
+                            EXTERNAL_SERVICE_TYPE_0X74_FOLLOWUP_OBJECT_ADDRESS,
+                        "storage_bytes": list(
+                            external_service_type_0x74_followup_object
+                        ),
+                        "mcu_byte_fields_from_offset_2": list(
+                            external_service_type_0x74_followup_byte_fields
+                        ),
+                        "declared_stream_bytes": 2,
+                        "wire_bytes": [0x70, 0x0A],
+                        "type": 0x70,
+                        "payload": [0x0A],
+                        "destination_task": 3,
+                        "submit_calls":
+                            external_service_type_0x74_followup_submit_calls,
+                        "dspif_tx_writer": 0x285746,
+                    },
+                    "external_self_test_name_accepted": False,
+                    "raw_hle_reply_layout_compatible": False,
+                    "request_response_correlation_proven": False,
                 },
                 "delayed_command_0x64_body_2": {
                     "intercept": 0x23A5D8,

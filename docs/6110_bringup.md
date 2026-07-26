@@ -840,6 +840,32 @@ condition, which DSP report follows `70 0d`, or that this raw DSPIF type
 `0x70`. They remain separately typed transports until a trace or DSP-side
 implementation connects them.
 
+The independent ROM4 HLE calls `70 0d` a self-test request and proposes a raw
+type-`0x74` completion carrying `0d 00`. The exact v4.06 image supports a
+narrower controller relationship, not that complete label or raw layout.
+Task 2's sole family-`0x74` handler call reaches `0x237d60`, which dispatches
+on queue-object byte 8. Selector values `0x0d` and `0xd0` share one arm; it
+runs only while controller bit 2 is set, then clears that bit and consumes
+bits 0 and 1 from object byte 9 into separate controller fields. Both status
+arms also clear controller bit 6.
+
+The response arm invokes one private helper and uniquely submits another fixed
+task-3 object at `0x2b9bcc`. Lane-correct fields give declared stream length 2
+and stream `70 0a`, so the generic task-3 path returns raw DSPIF type `0x70`
+with one-byte body `0x0a`. This establishes a controller-gated inbound
+type-`0x74` arm and organic DSPIF follow-up. It does not establish that raw
+ring payload `0d 00` answers the earlier `70 0d`, or that the operation is a
+self-test.
+
+The exact DSPIF RX envelope in fact rules out that compact reply for v4.06 as
+written. RX allocates raw payload length plus four, stores the ring type at
+queue-object byte 3 and copies raw payload from byte 4. A two-byte raw payload
+`0d 00` therefore reaches bytes 4--5, not the selector/status bytes 8--9 used
+by `0x237d60`. The independent HLE may describe another ROM4 firmware
+revision or omit four peer-owned prefix bytes, but its reply must not be
+reused for this image without that distinction. The semantic name and correct
+DSP response body remain unresolved.
+
 This MCU-side grammar still does not establish who initiates the exchange,
 NSE-3's registration/start delay, the advertised channel bitmap and services,
 or the complete ordering around discovery and acknowledgements. Those facts
