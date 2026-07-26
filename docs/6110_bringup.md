@@ -344,6 +344,23 @@ separately receives type `0x88` as status `0x13ac` in 16 bytes, type `0x8b`
 as status `0x13b8` in `0xa8` bytes, and type `0x8f` as status `0x13b7` in
 eight bytes.
 
+Type `0x8a` does not close the missing search-result sequence. Its direct
+handler `0x2803f8` reads no report-body field. It discards the object only
+when controller byte `0x1090ff` equals 1; for every other value it clears
+bit `0x02` in shared word `0x109178` and posts the unchanged eight-byte
+object as `0x1390`. Task 11 deliberately merges statuses `0x138f` and
+`0x1390` at case `0x211e48`, where shared flag gates and controller state
+determine further processing through `0x210da8`.
+
+There is a narrower relationship to one populated type-`0x1a` request path:
+builder `0x20e9cc` reads the same byte `0x1090ff`, distinguishes values 6
+and 7, and uses that state to populate request-object bytes `0x12..0x13`
+before its `0x20ea06` constructor call. The other type-`0x1a` builder is a
+separate path. Shared state therefore relates one request form to type
+`0x8a` acceptance, but the exact MCU image supplies no direct
+request-to-report edge and no payload discriminator that would make
+`0x8a` a search terminal.
+
 Task 11's controller dispatcher recognizes the numeric status set
 `0x1389`, `0x138a`, `0x138c`, `0x138e..0x1390`, `0x1392..0x1397`,
 `0x139f` and `0x13bb`. Its branches establish fixed object sizes and four

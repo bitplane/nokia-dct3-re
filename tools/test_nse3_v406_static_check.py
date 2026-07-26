@@ -330,6 +330,35 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             check.RADIO_REPORT_HANDLER_ANCHORS[0x211DCC],
         )
 
+    def test_type_0x8a_uses_shared_controller_state_not_report_body(self):
+        self.assertEqual(
+            0x1090FC, check.RADIO_REPORT_HANDLER_LITERALS[0x2803FC]
+        )
+        self.assertEqual(
+            ("cmp", "r1, #1"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x280400],
+        )
+        self.assertEqual(
+            ("movs", "r1, #0xfd"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x280412],
+        )
+        self.assertEqual(
+            ("b", "#0x211e48"),
+            check.RADIO_REPORT_HANDLER_ANCHORS[0x211C9A],
+        )
+        self.assertEqual(
+            0x10FECC, check.RADIO_REPORT_HANDLER_LITERALS[0x211E56]
+        )
+        self.assertEqual(
+            0x109178, check.RADIO_REPORT_HANDLER_LITERALS[0x211E6A]
+        )
+        self.assertEqual(
+            ("cmp", "r0, #6"), check.RADIO_PACKET_ANCHORS[0x20E9DA]
+        )
+        self.assertEqual(
+            ("cmp", "r0, #7"), check.RADIO_PACKET_ANCHORS[0x20E9E2]
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)
