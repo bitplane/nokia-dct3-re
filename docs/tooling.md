@@ -92,6 +92,10 @@
   - `dsp_memory_upload_trace_check.py` — proves every firmware type-`0x51`
     fragment was applied at the same address and that the complete image is
     contiguous (`make verify-dsp-memory-upload` covers both 3210 ROMs).
+  - `dct3_type_1f_static_check.py` — independently censuses the status-2,
+    four-byte task-3 type-`0x1f` constructors in identified 3210, 3310 and
+    6110 images, proving the shared envelope while retaining distinct product
+    flag/value policies (`make verify-dct3-type-1f-static`).
   - `gensio_trace_check.py` — validates CCONT phase/status plus the shared
     v5.01/v6.00 SELECT-latch initialization and read-modify-write contract.
   - `test_message_census.py`, `test_find_thumb_signature.py`,

@@ -334,6 +334,14 @@ a shared typed transport object with product/controller-specific construction
 policy; it does not yet establish the DSP-side meaning of individual flag
 bits or the value byte.
 
+The separate cross-model gate independently finds the same status-2,
+four-byte, task-3 envelope in Nokia 3210 v6.00 and Nokia 3310 v6.39. Their
+policies are not interchangeable: NSE-8 has four specialized constructors,
+NHM-5 has one parameterized four-bit builder, and NSE-3 has the five forms
+above. The generic boundary is therefore only `1f 00 flags value`; flag/value
+construction stays in product/controller policy. See
+`docs/dct3_type_1f.md`.
+
 Before task submission, `0x2768b4` receives the same object with argument
 `0x1e08`. An exact census finds nine callers with arguments
 `1e00..1e05` and `1e08` (not every value occurs). The helper applies the
