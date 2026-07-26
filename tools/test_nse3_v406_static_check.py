@@ -280,6 +280,20 @@ class Nse3V406StaticCheckTests(unittest.TestCase):
             0x106B08, check.RADIO_REPORT_HANDLER_LITERALS[0x2171F0]
         )
 
+    def test_bitmap_constructors_keep_populated_and_zero_control_forms_distinct(self):
+        self.assertEqual(0x09CD, check.RADIO_PACKET_LITERALS[0x20FD94])
+        self.assertEqual(0x0445, check.RADIO_PACKET_LITERALS[0x24E74A])
+        self.assertEqual(
+            ("movs", "r2, #0x48"), check.RADIO_PACKET_ANCHORS[0x216F7E]
+        )
+        self.assertEqual(
+            ("orrs", "r0, r1"), check.RADIO_PACKET_ANCHORS[0x216F98]
+        )
+        self.assertEqual(
+            bytes.fromhex("03040000000000db"),
+            check.SEARCH_SUBMISSION_TIMER_CONFIGURATION,
+        )
+
     def test_external_service_transport_is_shared_without_inheriting_application_script(self):
         self.assertEqual(0x2B751C, check.NSE3_TASK_9_ENTRY_POINTER)
         self.assertEqual(0x273B2D, check.NSE3_TASK_9_ENTRY)

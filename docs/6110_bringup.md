@@ -181,9 +181,25 @@ NSE-3 does not require a copied or product-specific ring implementation.
 The exact-image gate also closes the MCU-side radio packet envelope without
 enabling a radio peer. Two independent v4.06 control paths allocate
 `0x48`-byte queue objects and construct DSP packet type `0x1a` with wire
-length 68. The ordinary constructor at `0x20faec` derives and packs its search
-set; the second at `0x216f72` emits the same type and length from a separate
-controller path. Task-side code reads the object length at `+2`, passes
+length 68, but they are not equivalent searches. The ordinary constructor at
+`0x20faec` derives and packs its search set, publishes it through task 3 and
+arms numeric timer `0x1b` with raw duration `0x09cd`; neither the timer unit
+nor its expiry meaning is assigned. The timer table gives code `0x1b` flags
+`0x03`, owner task 4 and configured value `0x000000db`, so it is specifically
+not evidence for a direct task-11/task-12 search-completion event. Its gated
+task-11 caller supplies
+constructor argument 1, while the constructor can internally select argument
+6 when it obtains a bounded candidate source.
+
+The second form at `0x216f72` first zero-fills its entire `0x48`-byte object,
+then writes the type/length envelope and sets object byte 5 to `0x13`. It is
+reached from task-12 status `0x0445` after `0x216f10` clears two private
+forty-record buffers and after the case updates runtime mode byte `0x106b0d`.
+The fixed `0x0445` producer is outside the radio-report dispatcher. This
+proves a zero-bitmap control form, not a second populated cell search or an
+organic acquisition phase.
+
+Task-side code reads the object length at `+2`, passes
 `object + 3` (type followed by body) to the generic DSPIF writer at
 `0x285746`, and frees the object only after submission. This proves a genuine
 NSE-3 bitmap-shaped `SEARCH_LIST` command, rather than compatibility inferred

@@ -269,6 +269,38 @@ RADIO_PACKET_ANCHORS = {
     0x216F8A: ("strb", "r0, [r4, #2]"),
     0x216F8C: ("movs", "r0, #0x1a"),
     0x216F8E: ("strb", "r0, [r4, #3]"),
+    # The ordinary constructor is reached from a gated task-11 controller
+    # path, publishes the populated bitmap through task 3 and arms timer
+    # 0x1b.  Its caller supplies mode one; the constructor can internally
+    # select mode six from its candidate source.
+    0x21134A: ("ldrb", "r0, [r0, #0xc]"),
+    0x21134C: ("cmp", "r0, #2"),
+    0x211350: ("ldr", "r0, [r5, #0x18]"),
+    0x211356: ("ldr", "r0, [pc, #0x1a8]"),
+    0x21135A: ("cmp", "r0, #7"),
+    0x21135E: ("movs", "r0, #1"),
+    0x211360: ("bl", "#0x20faec"),
+    0x20FD10: ("movs", "r0, #3"),
+    0x20FD14: ("bl", "#0x25fb4c"),
+    0x20FD92: ("movs", "r0, #0x1b"),
+    0x20FD94: ("ldr", "r1, [pc, #0x384]"),
+    0x20FD96: ("bl", "#0x25f146"),
+    # The second constructor is a zero-bitmap control form.  Task-12 status
+    # 0x0445 clears private result buffers, updates its runtime mode byte and
+    # then publishes the zeroed type-0x1a packet through task 3.
+    0x2174E0: ("ldrb", "r0, [r4, #2]"),
+    0x2174E6: ("ldr", "r0, [pc, #0x40]"),
+    0x217502: ("bl", "#0x216f10"),
+    0x217506: ("ldr", "r1, [pc, #0x20]"),
+    0x21750A: ("strb", "r0, [r1]"),
+    0x21750C: ("bl", "#0x216f72"),
+    0x216F7C: ("movs", "r1, #0"),
+    0x216F80: ("bl", "#0x2a4f44"),
+    0x216F94: ("movs", "r0, #3"),
+    0x216F96: ("ldrb", "r1, [r4, #5]"),
+    0x216F98: ("orrs", "r0, r1"),
+    0x24E74A: ("ldr", "r0, [pc, #0x3d4]"),
+    0x24E74C: ("b", "#0x24e710"),
     # The task-side queue pump passes object +3 (type followed by body) and
     # the firmware-supplied length to the generic DSPIF packet writer.
     0x298C78: ("ldrb", "r1, [r5, #2]"),
@@ -312,6 +344,13 @@ RADIO_PACKET_ANCHORS = {
     0x20D1DC: ("strb", "r7, [r0, #4]"),
     0x20D1E0: ("movs", "r0, #6"),
     0x20D1E6: ("strb", "r0, [r1, #4]"),
+}
+RADIO_PACKET_LITERALS = {
+    0x211356: 0x109105,
+    0x20FD94: 0x09CD,
+    0x2174E6: 0x106B0D,
+    0x217506: 0x106B0D,
+    0x24E74A: 0x0445,
 }
 RADIO_REPORT_DISPATCH_ANCHORS = {
     # Type 0x80 is handled directly.  Types 0x83..0x8f use a bounded jump
@@ -640,6 +679,8 @@ MEASUREMENT_TIMER_CODE = 0x6B
 MEASUREMENT_TIMER_CONFIGURATION = bytes.fromhex("030c0000002be7b0")
 MEASUREMENT_TIMER_EVENT_OBJECT = 0x2BE7B0
 MEASUREMENT_TIMER_EVENT_PREFIX = bytes.fromhex("13aa0000")
+SEARCH_SUBMISSION_TIMER_CODE = 0x1B
+SEARCH_SUBMISSION_TIMER_CONFIGURATION = bytes.fromhex("03040000000000db")
 RADIO_REPORT_JUMP_TABLE_ADDRESS = 0x2A2120
 RADIO_REPORT_JUMP_TABLE = {
     0x83: 0x2A21A2,
@@ -1962,6 +2003,7 @@ def verify_dspif_boundary(data: bytes) -> dict:
 
 def verify_radio_packet_boundary(data: bytes) -> dict:
     decode_thumb_anchors(data, RADIO_PACKET_ANCHORS)
+    verify_thumb_literals(data, RADIO_PACKET_LITERALS)
     decode_thumb_anchors(data, RADIO_REPORT_DISPATCH_ANCHORS)
     decode_thumb_anchors(data, RADIO_REPORT_HANDLER_ANCHORS)
     decode_thumb_anchors(data, EXTERNAL_SERVICE_TRANSPORT_ANCHORS)
@@ -2026,6 +2068,23 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             f"{MEASUREMENT_TIMER_EVENT_PREFIX.hex()}, got "
             f"{timer_event_prefix.hex()}"
         )
+    search_timer_configuration_address = (
+        TIMER_CONFIGURATION_TABLE_ADDRESS
+        + SEARCH_SUBMISSION_TIMER_CODE * TIMER_CONFIGURATION_RECORD_BYTES
+    )
+    search_timer_configuration = bytes(
+        cpu_byte(
+            physical, FLASH_BASE,
+            search_timer_configuration_address + index,
+        )
+        for index in range(TIMER_CONFIGURATION_RECORD_BYTES)
+    )
+    if search_timer_configuration != SEARCH_SUBMISSION_TIMER_CONFIGURATION:
+        raise ValueError(
+            "NSE-3 search-submission timer configuration changed: expected "
+            f"{SEARCH_SUBMISSION_TIMER_CONFIGURATION.hex()}, got "
+            f"{search_timer_configuration.hex()}"
+        )
     return {
         "transport": {
             "tx_queue_pump": 0x298C82,
@@ -2039,7 +2098,37 @@ def verify_radio_packet_boundary(data: bytes) -> dict:
             "type": 0x1A,
             "wire_length": 68,
             "object_allocation": 0x48,
-            "constructors": [0x20FAEC, 0x216F72],
+            "constructors": {
+                "populated_bitmap": {
+                    "address": 0x20FAEC,
+                    "caller": 0x211360,
+                    "caller_argument": 1,
+                    "destination_task": 3,
+                    "post_submission_timer": {
+                        "code": 0x1B,
+                        "raw_duration": 0x09CD,
+                        "unit": "not_established",
+                        "flags": search_timer_configuration[0],
+                        "owner_task": search_timer_configuration[1],
+                        "configured_value": int.from_bytes(
+                            search_timer_configuration[4:8], "big"
+                        ),
+                        "expiry_semantics": "not_established",
+                    },
+                },
+                "zero_bitmap_control": {
+                    "address": 0x216F72,
+                    "task_status": 0x0445,
+                    "task_case": 0x2174E0,
+                    "private_buffer_reset": 0x216F10,
+                    "bitmap_zero_fill_bytes": 0x48,
+                    "control_byte_object_offset": 5,
+                    "control_byte_value": 0x13,
+                    "destination_task": 3,
+                    "fixed_event_producer": 0x24E74A,
+                    "organic_acquisition_phase": "not_established",
+                },
+            },
             "representation": "bitmap_shaped",
             "arfcn_bit_numbering": {
                 "arfcn_1": {"payload_byte": 65, "bit": 0},
