@@ -685,6 +685,12 @@
       "hypothesis": "The NHM-5 identity-matched page requires the emulator to synthesize event 0x0802, event 0x0804 or timer A2 expiry because its firmware producer is absent",
       "conclusion": "The registered serving-report cadence delayed one whole multiframe after both BCCH and advance-delivered PCH, so decoded BCCH reports advanced two multiframes at a time and exposed only SI2/SI4 after release. Removing the redundant post-PCH BCCH delay restores SI1--SI4 coverage. NHM-5 then organically emits paged RACH, Paging Response and release, and the unchanged independent paging checker passes. The admission event and A2 lifecycle are firmware-owned consequences of a complete serving SI schedule; none is synthesized.",
       "evidence": ["driver/nokia_radio_peer.cpp", "docs/model_coverage.md", "tools/radio_paging_trace_check.py"]
+    },
+    {
+      "id": "nhm5_incoming_call_matches_nse8_cipher_wire", "status": "disproven",
+      "hypothesis": "After Paging Response, NHM-5 must publish NSE-8's exact DSP cipher-control body before the shared network can deliver an incoming call",
+      "conclusion": "With the same standards-defined no-cipher command, NHM-5 organically publishes type 0x14 body 001affffffffffffffff0000 rather than NSE-8's 00f4ffffffffffffffff0000, then emits Cipher Mode Complete, accepts MM Information and receives the full incoming CC SETUP. The first current divergence is the absent Call Confirmed after SETUP. Cipher-control payload identity is product-specific evidence and must not be inherited from the 3210 checker.",
+      "evidence": ["docs/model_coverage.md", "tools/radio_3310_incoming_call_boundary_check.py"]
     }
   ]
 }
