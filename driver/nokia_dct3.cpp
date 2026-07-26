@@ -123,6 +123,7 @@ struct nokia_product_config
 			nokia_radio_peer_device::acquisition_profile::none;
 	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
+	bool nse3_bootstrap_selected_by_bios = false;
 	unsigned dsp_bootstrap_exchanges = 64;
 	nokia_dsp_hle_device::bootstrap_completion_profile dsp_bootstrap_completion =
 			nokia_dsp_hle_device::bootstrap_completion_profile::ready_words_one;
@@ -295,6 +296,7 @@ constexpr nokia_product_config make_6110_config()
 	// Compose that removable standards-shaped test card; its subscriber files
 	// are fixture policy and do not claim Nokia 6110 product identity.
 	result.synthetic_sim_card = true;
+	result.nse3_bootstrap_selected_by_bios = true;
 	// NSE-3 Chapter 3 documents COBBA-GJ deriving a 1 MHz PCMDClk and
 	// 8 kHz PCMSClk, with a sign-extended 13-bit sample in a 16-bit word.
 	// Firmware-facing DSP, external-service and radio peers deliberately
@@ -708,6 +710,14 @@ void nokia_dct3_state::machine_start()
 	// composition and hardware timing are configured by machine_config.
 	m_trace_enabled = machine().options().verbose();
 	m_pup->set_trace(m_trace_enabled);
+	// NSE-3's service package proves that v5.48 ROM3 and ROM4 use a
+	// pre-upload 0x10004/0x10006 exchange and a 0xffff final sentinel.
+	// Keep v4.06's independently recovered B06 partial completion confined to
+	// BIOS 0; the two v5.48 BIOSes remain deliberately fail-closed.
+	if (m_product.nse3_bootstrap_selected_by_bios && system_bios() != 1)
+		m_dsp_hle->set_bootstrap_completion(
+				nokia_dsp_hle_device::bootstrap_completion_profile::
+						nse3_v548_preupload_and_completion_unknown);
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 
 	m_timer_watchdog = timer_alloc(FUNC(nokia_dct3_state::timer_watchdog), this);
@@ -1929,21 +1939,33 @@ ROM_START( noki3210 )
 ROM_END
 
 ROM_START( noki6110 )
+	ROM_SYSTEM_BIOS(0, "406", "v4.06 PPM B (ROM3 candidate)")
+	ROM_SYSTEM_BIOS(1, "548", "v5.48 PPM B (ROM3)")
+	ROM_SYSTEM_BIOS(2, "548r4", "v05.48 PPM B (ROM4)")
+
 	// NSE-3 uses MAD2 ROM3 F711604. The later shared MAD2 dumps are not a
-	// substitute, so keep every proprietary execution input explicitly absent.
+	// substitute.  The v5.48 package explicitly separates a ROM4 image family,
+	// so keep its still-unidentified internal ROMs separately absent.
 	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASE00)
-	ROM_LOAD("nse3_rom3_f711604_boot.bin", 0x00000, 0x10000, NO_DUMP)
+	ROMX_LOAD("nse3_rom3_f711604_boot.bin", 0x00000, 0x10000, NO_DUMP, ROM_BIOS(0))
+	ROMX_LOAD("nse3_rom3_f711604_boot.bin", 0x00000, 0x10000, NO_DUMP, ROM_BIOS(1))
+	ROMX_LOAD("nse3_rom4_boot.bin", 0x00000, 0x10000, NO_DUMP, ROM_BIOS(2))
 
 	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00)
-	ROM_LOAD("nse3_rom3_dsp_prom.bin", 0x00000, 0x0c000, NO_DUMP)
-	ROM_LOAD("nse3_rom3_dsp_drom.bin", 0x0c000, 0x04000, NO_DUMP)
-	ROM_LOAD("nse3_rom3_dsp_pdrom.bin", 0x10000, 0x01000, NO_DUMP)
+	ROMX_LOAD("nse3_rom3_dsp_prom.bin", 0x00000, 0x0c000, NO_DUMP, ROM_BIOS(0))
+	ROMX_LOAD("nse3_rom3_dsp_prom.bin", 0x00000, 0x0c000, NO_DUMP, ROM_BIOS(1))
+	ROMX_LOAD("nse3_rom4_dsp_prom.bin", 0x00000, 0x0c000, NO_DUMP, ROM_BIOS(2))
+	ROMX_LOAD("nse3_rom3_dsp_drom.bin", 0x0c000, 0x04000, NO_DUMP, ROM_BIOS(0))
+	ROMX_LOAD("nse3_rom3_dsp_drom.bin", 0x0c000, 0x04000, NO_DUMP, ROM_BIOS(1))
+	ROMX_LOAD("nse3_rom4_dsp_drom.bin", 0x0c000, 0x04000, NO_DUMP, ROM_BIOS(2))
+	ROMX_LOAD("nse3_rom3_dsp_pdrom.bin", 0x10000, 0x01000, NO_DUMP, ROM_BIOS(0))
+	ROMX_LOAD("nse3_rom3_dsp_pdrom.bin", 0x10000, 0x01000, NO_DUMP, ROM_BIOS(1))
+	ROMX_LOAD("nse3_rom4_dsp_pdrom.bin", 0x10000, 0x01000, NO_DUMP, ROM_BIOS(2))
 
 	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
-	ROM_SYSTEM_BIOS(0, "406", "v4.06 PPM B (ROM3 candidate)")
-	ROM_SYSTEM_BIOS(1, "548", "v5.48 PPM B")
 	ROMX_LOAD("6110_nse3_v406_rom3_candidate.fls", 0x000000, 0x100000, CRC(78f6dce9) SHA1(5025a6ac3b4a13714211fde903f27f92cbb7c9b6), ROM_BIOS(0))
-	ROMX_LOAD("6110_nse3_v548_rom3.fls", 0x000000, 0x100000, NO_DUMP, ROM_BIOS(1))
+	ROMX_LOAD("6110_nse3_v548_rom3_ppmb.fls", 0x000000, 0x100000, CRC(451cde56) SHA1(5768841c9eb39c744f4fa04f0485e4f9ad4553b3), ROM_BIOS(1))
+	ROMX_LOAD("6110_nse3_v548_rom4_ppmb.fls", 0x000000, 0x100000, CRC(83f67ad4) SHA1(3bcc5c93ec247c63490e134196aab98a4e60c184), ROM_BIOS(2))
 
 	ROM_REGION(0x02000, "eeprom", ROMREGION_ERASEFF)
 	ROM_LOAD("6110_nse3_eeprom.bin", 0x00000, 0x02000, NO_DUMP)

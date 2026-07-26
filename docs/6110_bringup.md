@@ -34,13 +34,23 @@ as `Int 28F800B3-T`, manufacturer/device ID `0089:8892`:
 ## Firmware baseline
 
 Public historical indexes consistently label the final GSM NSE-3 release as
-v5.48 and describe an MCU + PPM B archive of about 1.07 MiB. They are discovery
-leads, not identity evidence. The currently indexed firmware.center NSE-3
-directory is empty, and surviving free links terminate at obsolete hosts.
+v5.48 and describe an MCU + PPM B archive of about 1.07 MiB. The currently
+indexed firmware.center NSE-3 directory is empty and the old free-host links
+are dead, but Internet Archive item `Nokia_DCT3_firmwares` preserves the
+original Wintesla payload in three independently hashed wrappers.
 
-Internet Archive's `Nokia_DCT3_firmwares` collection supplies an earlier,
-original `Nse-3_v4.06.exe` service package. Its independently hashed Wintesla
-members normalize reproducibly to exactly 1 MiB: MCU
+The package manifest directly distinguishes `ImageFile=nse3nx_5.480` from
+`Rom4ImageFile=nse3nx05.480`, with corresponding ordinary and ROM4 PPM members
+for every language pack. PPM B normalization produces separate, exact 1 MiB
+ROM3 and ROM4 images. ROM3's embedded `V  5.48`, `08-09-99`, DSP software
+`40.3.617` and `14-Dec-98` strings corroborate the independent real-ROM3
+handset log. ROM4 instead embeds `V 05.48`, dated `03-09-99`. Complete source,
+member and normalized hashes are recorded in `roms/README.md`; neither image
+inherits the other's internal-ROM or bootstrap identity.
+
+The same collection supplies the earlier original `Nse-3_v4.06.exe` service
+package. Its independently hashed Wintesla members normalize reproducibly to
+exactly 1 MiB: MCU
 `0x200000..0x2bebff`, an erased gap through `0x2bffff`, and PPM B
 `0x2c0000..0x2fffff`. The normalized image has SHA-1
 `5025a6ac3b4a13714211fde903f27f92cbb7c9b6`; full source/member hashes and the
@@ -50,6 +60,32 @@ This is a real firmware-analysis baseline, but not a boot promotion. Its
 unprefixed `V 4.06` version spelling is consistent with contemporary ROM3
 version tables, so the BIOS is explicitly labelled “ROM3 candidate”. The
 matching F711604 internal boot/DSP ROMs and 24C64 contents remain `NO_DUMP`.
+
+### v5.48 ROM3/ROM4 bootstrap split
+
+`make verify-6110-v548-static` pins both normalized images independently.
+Their homologous loaders are at `0x2833f4` (ROM3) and `0x285010` (ROM4), a
+consistent `0x1c1c` relocation, but they are not compatible with the v4.06
+completion profile. Both initialize shared halfwords `0x10000` to zero and
+`0x10002`, `0x10004`, `0x10006` to `0xffff`. Before uploading, they wait for
+the DSP to alter `0x10004` and require it to agree with `0x10006`. Only then
+do they stage the same 64-block, 32-byte-stride projection of their respective
+flash image through `0x10200`.
+
+After the final block they wait for `0x10002` to change away from `0xffff`,
+then capture the final `0x10000`/`0x10002` publications in product state.
+ROM3 and ROM4 stage different 65,536-byte streams, with SHA-1
+`73ddf5f79e421fdcfff7742e238fb24ea5f1fcfa` and
+`94e447d8386e010326fdfb261e247d6c0ac4d97a` respectively. Neither the
+pre-upload pair nor final pair's real DSP values are recovered, so both v5.48
+BIOSes select a typed unresolved profile and remain fail-closed. In
+particular, they cannot inherit v4.06's partial B06 publication or generic
+ready words.
+
+The driver now declares the manifest-proven ROM3 and ROM4 external images as
+separate BIOS choices and keeps their absent internal MAD2/DSP ROM inputs
+separate. This is an identity and architecture promotion, not a booting
+promotion.
 
 ### Reproducible static boundary
 

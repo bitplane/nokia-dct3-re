@@ -247,6 +247,20 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 							"dsp_hle: bootstrap partial exchanges=%u cobba=0b06 second=unknown t=%.6f\n",
 							m_bootstrap_exchange_count, machine().time().as_double());
 				break;
+
+			case bootstrap_completion_profile::nse3_v548_preupload_and_completion_unknown:
+				// Both manifest-labelled NSE-3 v5.48 variants first require
+				// a DSP publication across shared 0x004/0x006, initialized to
+				// 0xffff, before entering the 64-block transfer.  They later
+				// wait for shared 0x002 to change away from 0xffff and capture
+				// 0x000/0x002.  Neither publication value is known from real
+				// hardware, so do not inherit v4.06's B06 partial completion
+				// or the generic ready words.
+				if (m_trace_enabled)
+					LOGMASKED(LOG_DSP_HLE,
+							"dsp_hle: NSE-3 v5.48 bootstrap publications unresolved; remaining fail-closed t=%.6f\n",
+							machine().time().as_double());
+				break;
 			}
 		}
 	}

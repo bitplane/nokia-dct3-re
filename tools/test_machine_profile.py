@@ -92,6 +92,7 @@ class MachineProfileTest(unittest.TestCase):
                 "keypad_five_rows": "true",
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
+                "nse3_bootstrap_selected_by_bios": "true",
                 "cobba_pcm.data_clock": "1'000'000",
                 "cobba_pcm.frame_clock": "8'000",
                 "cobba_pcm.sample_bits": "13",
@@ -185,8 +186,26 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("6110_nse3_v406_rom3_candidate.fls", rom)
         self.assertIn("CRC(78f6dce9)", rom)
         self.assertIn("SHA1(5025a6ac3b4a13714211fde903f27f92cbb7c9b6)", rom)
-        self.assertEqual(rom.count("NO_DUMP"), 6)
+        self.assertIn("6110_nse3_v548_rom3_ppmb.fls", rom)
+        self.assertIn("CRC(451cde56)", rom)
+        self.assertIn("SHA1(5768841c9eb39c744f4fa04f0485e4f9ad4553b3)", rom)
+        self.assertIn("6110_nse3_v548_rom4_ppmb.fls", rom)
+        self.assertIn("CRC(83f67ad4)", rom)
+        self.assertIn("SHA1(3bcc5c93ec247c63490e134196aab98a4e60c184)", rom)
+        self.assertIn("nse3_rom4_boot.bin", rom)
+        self.assertEqual(rom.count("NO_DUMP"), 13)
         self.assertNotIn("MAD2_INTERNAL_ROMS", rom)
+
+        start = self.function_body(
+            "void nokia_dct3_state::machine_start",
+            "void nokia_dct3_state::post_load",
+        )
+        self.assertIn("m_product.nse3_bootstrap_selected_by_bios", start)
+        self.assertIn("system_bios() != 1", start)
+        self.assertIn(
+            "nse3_v548_preupload_and_completion_unknown",
+            start,
+        )
 
     def test_6110_has_ue4_keypad_instead_of_inherited_input_map(self):
         matrix = self.driver.split("static INPUT_PORTS_START( noki6110 )", 1)[1]

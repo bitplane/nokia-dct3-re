@@ -128,7 +128,7 @@ INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
 .PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3310-radio-registration verify-3310-radio-paging verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
-.PHONY: verify-cobba-control normalize-6110 verify-6110-static
+.PHONY: verify-cobba-control normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -142,6 +142,8 @@ help:
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
 	@echo "make test-tools     run the static-tool and EEPROM-profile unit tests"
 	@echo "make verify-6110-static verify the identified NSE-3 v4.06 static boundary"
+	@echo "make normalize-6110-v548 extract the evidenced NSE-3 v5.48 ROM3/ROM4 PPM-B images"
+	@echo "make verify-6110-v548-static verify distinct NSE-3 v5.48 ROM3/ROM4 bootstrap boundaries"
 	@echo "make run-manifest-* reproduce named default/deep-gsm/contact/3330 evidence runs"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
@@ -302,6 +304,7 @@ normalize-3410:
 	cp roms/noki3210/boot_rom roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3410/
 
 NOKI6110_V406_DIR ?= /home/gaz/tmp/nokia6110_firmware/v4.06/NSE-3
+NOKI6110_V548_DIR ?= /home/gaz/tmp/nse3-v548-review/pkg_548
 
 normalize-6110:
 	$(PYTHON) tools/extract_dct3_wintesla.py \
@@ -310,11 +313,29 @@ normalize-6110:
 		--flash-output roms/noki6110/6110_nse3_v406_rom3_candidate.fls \
 		--expect-flash-sha1 5025a6ac3b4a13714211fde903f27f92cbb7c9b6
 
+normalize-6110-v548:
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--mcu "$(NOKI6110_V548_DIR)/nse3nx_5.480" \
+		--ppm "$(NOKI6110_V548_DIR)/nse3nx_5.48b" \
+		--flash-output roms/noki6110/6110_nse3_v548_rom3_ppmb.fls \
+		--expect-flash-sha1 5768841c9eb39c744f4fa04f0485e4f9ad4553b3
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--mcu "$(NOKI6110_V548_DIR)/nse3nx05.480" \
+		--ppm "$(NOKI6110_V548_DIR)/nse3nx05.48b" \
+		--flash-output roms/noki6110/6110_nse3_v548_rom4_ppmb.fls \
+		--expect-flash-sha1 3bcc5c93ec247c63490e134196aab98a4e60c184
+
 verify-6110-static:
 	$(VENV)/bin/python tools/nse3_v406_static_check.py \
 		roms/noki6110/6110_nse3_v406_rom3_candidate.fls \
 		--nse8-reference roms/3210f600a_swap16.bin \
 		--json run_census/nse3_v406_static_boundary.json
+
+verify-6110-v548-static:
+	$(VENV)/bin/python tools/nse3_v548_static_check.py \
+		--rom3 roms/noki6110/6110_nse3_v548_rom3_ppmb.fls \
+		--rom4 roms/noki6110/6110_nse3_v548_rom4_ppmb.fls \
+		--json run_census/nse3_v548_static_boundary.json
 
 verify-dct3-type-1f-static:
 	$(VENV)/bin/python tools/dct3_type_1f_static_check.py \
@@ -385,6 +406,7 @@ evidence-check:
 test-tools:
 	$(VENV)/bin/python -m unittest tools/test_extract_dct3_wintesla.py
 	$(VENV)/bin/python -m unittest tools/test_nse3_v406_static_check.py
+	$(VENV)/bin/python -m unittest tools/test_nse3_v548_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_dct3_type_1f_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_registration_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_cobba_control_trace_check.py

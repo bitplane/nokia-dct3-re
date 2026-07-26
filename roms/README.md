@@ -117,7 +117,7 @@ This pair is a labelled portability input rather than the canonical 3310 MAME
 set. Its PMM is BIOS-specific and must not be combined with the older declared
 3310 images.
 
-### Nokia 6110 NSE-3 v4.06
+### Nokia 6110 NSE-3
 
 The primary service manual specifies a 1 MiB Intel TE28F800 program flash and
 an independent 8 KiB serial EEPROM. Internet Archive item
@@ -146,10 +146,33 @@ spelling is therefore a ROM3 candidate, not yet proof. The driver declares it
 under that label but cannot promote booting until the matching F711604 internal
 boot/DSP ROMs are acquired or independently dumped.
 
-Historical indexes still identify v5.48 MCU + PPM B as the final baseline.
-Surviving free download links are dead; GSMForum retains v4.06/v5.40/v5.47/
-v5.48 and ROM4 attachments behind paid authentication. Keep seeking an
-accessible, hashable v5.48 source without treating filenames as identity proof.
+The same Internet Archive item also preserves three differently wrapped copies
+of the final v5.48 Wintesla payload:
+
+| source | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `nse3_548.exe` | 2,371,584 | `01631387b7f587903d28053ef9dc1a9fb59ad6342e29cc766e1b06127dbc9f25` |
+| `nse3_v5.48.exe` | 2,376,521 | `39b7304d2bde3da01073aaa9b631db04b98b91117ba90b3f5eb5b985560be20b` |
+| `nse3_v548.exe` | 2,329,558 | `806270f50857039b5bcf49f7261a46e5424fb6c1bca1802b45aaf1c6bfc55218` |
+
+Their extracted 36-file payload trees are byte-identical. The package's own
+`nse-3.ini` names `nse3nx_5.480` as `ImageFile` and `nse3nx05.480` as
+`Rom4ImageFile`; each market entry likewise pairs `nse3nx_5.48?` with an
+explicit `Rom4PpmFile=NSE3NX05.48?`. This is direct package evidence for the
+ROM3/ROM4 split rather than an inference from filename punctuation.
+
+For language pack B, the source members and normalized images are:
+
+| identity | Source members (bytes, SHA-256) | Normalized 1 MiB image (CRC32, SHA-1, SHA-256) |
+| --- | --- | --- |
+| v5.48 ROM3 | `nse3nx_5.480` (782,176, `bff2b8418bdb726acb1450e570bdb00ac3860f5d1375f4f080edb68ea4dfa822`); `nse3nx_5.48b` (262,432, `7d5ba47f879b9f57df3c6fe1847d128b329eed4a565d4273db3ddce1f3cd0395`) | `451cde56`, `5768841c9eb39c744f4fa04f0485e4f9ad4553b3`, `3ad47781485cb776910d30fa20d440a963eae90e847cfe24748b5c4ac2f8e6e3` |
+| v5.48 ROM4 | `nse3nx05.480` (787,040, `5126588116fa441c0fe0586b4dd4866941e9512783dde69581c136a8a19b272a`); `nse3nx05.48b` (262,432, `e07eb7521711c001514eb6ae3868ed28f011b1fd98f72fb6648bdd8ce47bee7c`) | `83f67ad4`, `3bcc5c93ec247c63490e134196aab98a4e60c184`, `2adca0d661af2d8e7bed3e04d2941b6db9572a1eb10b2b1ebc545e33fbdd7c7f` |
+
+`make normalize-6110-v548` validates every Wintesla record and produces both
+ignored images. ROM3 embeds `V  5.48`, `08-09-99`, DSP software `40.3.617`
+dated `14-Dec-98`, matching the independent ROM3 handset log. ROM4 embeds
+`V 05.48`, `03-09-99`; it is kept separate and is not assigned ROM3's
+bootstrap contract.
 
 Do not pad a later image, reuse a 3210 EEPROM, or declare a 2 MiB flash device.
 The hardware and staged acceptance requirements are in
