@@ -80,15 +80,15 @@ class DspDeviceSplitTest(unittest.TestCase):
     def test_bootstrap_is_peer_publication_not_read_overlay(self):
         self.assertIn("peer_shared_w", self.transport)
         self.assertIn("publish_bootstrap_state", self.hle)
+        self.assertIn("publish_bootstrap_completion", self.hle)
         self.assertNotIn("bootstrap_r", self.hle + self.phone)
-        self.assertIn("m_bootstrap_exchange_limit", self.hle)
+        self.assertIn("m_bootstrap.exchange_limit", self.hle)
         self.assertNotIn("m_bootstrap_exchange_count == 64", self.hle)
 
     def test_transport_has_no_dsp_bootstrap_behavior_configuration(self):
         for token in (
-            "m_bootstrap_completion", "m_bootstrap_preupload",
-            "m_bootstrap_ping_pong", "m_code_block_request",
-            "m_parked_boot_status", "m_boot_status_response",
+            "bootstrap_contract", "bootstrap_exchange_strategy",
+            "bootstrap_pair_contract", "bootstrap_parked_contract",
         ):
             self.assertNotIn(token, self.transport)
             self.assertIn(token, self.hle)
@@ -96,22 +96,26 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertIn("shared_006_write_cb", self.transport)
         self.assertIn("shared_0fe_read_cb", self.transport)
         self.assertIn("shared_100_write_cb", self.transport)
-        self.assertIn("peer_shared_w(0x002 / 2, m_boot_status_response)", self.hle)
         self.assertIn(
-            "bootstrap_completion_profile::ready_words_one",
-            self.hle,
+            "set_bootstrap_contract(product.dsp_bootstrap)",
+            self.phone,
         )
         self.assertIn(
-            "bootstrap_completion_profile::"
-            "nse3_flash_verification_b06_verdict_unknown",
-            self.hle + self.phone,
+            "BOOTSTRAP_FLASH_VERIFICATION_PARTIAL",
+            self.phone,
         )
-        self.assertIn("peer_shared_w(0x000 / 2, 0x0b06)", self.hle)
-        self.assertNotIn("peer_shared_w(0x002 / 2, 0x0b06)", self.hle)
-        self.assertNotIn("nse3_final_b06_second_unknown", self.hle + self.phone)
-        self.assertIn("bootstrap_preupload_profile::nse3_dsp_rom3_pair", self.hle)
-        self.assertIn("peer_shared_w(0x004 / 2, 3)", self.hle)
-        self.assertIn("peer_shared_w(0x006 / 2, 3)", self.hle)
+        self.assertIn("{ 0x000, 0x0b06 }", self.phone)
+        self.assertNotIn("{ 0x002, 0x0b06 }", self.phone)
+        self.assertIn("BOOTSTRAP_FLASH_VERIFICATION_ROM3", self.phone)
+        self.assertIn("0x004, 0x006, 0xffff, 0x0003", self.phone)
+        for retired in (
+            "bootstrap_completion_profile", "bootstrap_preupload_profile",
+            "dsp_bootstrap_ping_pong", "dsp_code_block_request",
+            "dsp_parked_boot_status", "dsp_boot_status_response",
+        ):
+            self.assertNotIn(retired, self.hle + self.phone)
+        for product in ("nse3", "nse8", "nhm5"):
+            self.assertNotIn(product, self.hle.lower())
         self.assertIn(
             "shared_006_write_cb().set(m_dsp_hle, "
             "FUNC(nokia_dsp_hle_device::shared_006_write_w))",

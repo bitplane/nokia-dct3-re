@@ -78,7 +78,7 @@ class MachineProfileTest(unittest.TestCase):
         self.assert_profile_fields(
             "make_3310_config",
             {
-                "dsp_bootstrap_exchanges": "58",
+                "dsp_bootstrap": "BOOTSTRAP_READY_58",
                 "keypad_five_rows": "true",
                 "dsp_service_control":
                     "DSP_SERVICE_CONTROL_COMPACT",
@@ -95,8 +95,8 @@ class MachineProfileTest(unittest.TestCase):
                 "keypad_five_rows": "true",
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
-                "nse3_bootstrap_selected_by_bios": "true",
-                "dsp_bootstrap_exchanges": "64",
+                "dsp_bootstrap":
+                    "BOOTSTRAP_FLASH_VERIFICATION_PARTIAL",
                 "cobba_pcm.data_clock": "1'000'000",
                 "cobba_pcm.frame_clock": "8'000",
                 "cobba_pcm.sample_bits": "13",
@@ -105,8 +105,6 @@ class MachineProfileTest(unittest.TestCase):
                 "cobba_hle_voice.output": "nokia_cobba_device::ear",
                 "pup_eeprom_scl_bit": "2",
                 "dsp_parameter_command": "0x08",
-                "dsp_bootstrap_completion":
-                    "nokia_dsp_hle_device::bootstrap_completion_profile::nse3_flash_verification_b06_verdict_unknown",
                 "dsp_service_control":
                     "DSP_SERVICE_CONTROL_FRAMED",
             },
@@ -129,6 +127,8 @@ class MachineProfileTest(unittest.TestCase):
         self.assertNotIn("result.radio =", body)
         self.assertNotIn("result.dsp_speech_request_mask =", body)
         self.assertNotIn("result.dsp_speech_request_value =", body)
+        self.assertIn("2, BOOTSTRAP_FLASH_VERIFICATION_ROM3", body)
+        self.assertNotIn("3, BOOTSTRAP_FLASH_VERIFICATION_ROM3", body)
 
         profile = self.driver.split(
             "void nokia_dct3_state::noki6110(machine_config &config)", 1
@@ -207,17 +207,20 @@ class MachineProfileTest(unittest.TestCase):
             "void nokia_dct3_state::machine_start",
             "void nokia_dct3_state::post_load",
         )
-        self.assertIn("m_product.nse3_bootstrap_selected_by_bios", start)
-        self.assertIn("system_bios() == 2", start)
+        self.assertIn("m_product.dsp_bootstrap_override", start)
         self.assertIn(
-            "nse3_dsp_rom3_pair",
+            "system_bios() == m_product.dsp_bootstrap_override->bios",
+            start,
+        )
+        self.assertIn(
+            "set_bootstrap_contract",
             start,
         )
         # The package-labelled ROM4 image is BIOS 3.  A third-party HLE can
         # advance both exact v5.48 images with a self-consistent 4/4 pair, so
         # progress through the equality gate does not identify the fitted DSP.
         self.assertNotIn("system_bios() == 3", start)
-        self.assertNotIn("nse3_dsp_rom4_pair", start)
+        self.assertNotIn("BOOTSTRAP_FLASH_VERIFICATION_ROM4", self.driver)
 
     def test_6110_has_ue4_keypad_instead_of_inherited_input_map(self):
         matrix = self.driver.split("static INPUT_PORTS_START( noki6110 )", 1)[1]
@@ -238,6 +241,7 @@ class MachineProfileTest(unittest.TestCase):
                 "synthetic_sim_card": "true",
                 "dsp_service": "true",
                 "external_service_transport": "true",
+                "dsp_bootstrap": "BOOTSTRAP_READY_64",
                 "keypad_five_rows": "true",
                 "ccont_board": "ADC_STANDARD",
             },
@@ -246,12 +250,7 @@ class MachineProfileTest(unittest.TestCase):
         profile = profile.split("void nokia_dct3_state::noki3210", 1)[0]
         self.assertIn("apply_product_config(PRODUCT_3330);", profile)
         self.assertIn(
-            "m_dsp_hle->set_bootstrap_exchange_limit(product.dsp_bootstrap_exchanges);",
-            self.driver,
-        )
-        self.assertIn(
-            "m_dsp_hle->set_bootstrap_completion("
-            "product.dsp_bootstrap_completion);",
+            "m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);",
             self.driver,
         )
 
@@ -262,6 +261,7 @@ class MachineProfileTest(unittest.TestCase):
         )
         self.assertIn("nokia_product_config result;", body)
         self.assertIn("result.power_on_column_mask = power_on_column_mask;", body)
+        self.assertIn("result.dsp_bootstrap = BOOTSTRAP_READY_64;", body)
         self.assertIn("bool simi_controller = false;", self.driver)
         self.assertIn("bool synthetic_sim_card = false;", self.driver)
         self.assertIn("bool dsp_service = false;", self.driver)
@@ -378,9 +378,7 @@ class MachineProfileTest(unittest.TestCase):
             "make_3410_config",
             {
                 "power_on_column_mask": "0x02",
-                "dsp_bootstrap_ping_pong": "true",
-                "dsp_code_block_request": "true",
-                "dsp_parked_boot_status": "true",
+                "dsp_bootstrap": "BOOTSTRAP_PING_PONG",
                 "dsp_service_delay_us": "50",
                 "flash_b3_block_lock": "true",
                 "dsp_reset_running_status": "0x53",

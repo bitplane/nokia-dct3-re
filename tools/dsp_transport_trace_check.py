@@ -16,7 +16,8 @@ def require(text: str, pattern: str, label: str) -> int:
 
 def check_bootstrap_completion(text: str, expected_exchanges: int) -> dict[str, int]:
     ready = re.search(
-        rf"dsp_hle: bootstrap ready exchanges={expected_exchanges}", text)
+        rf"dsp_hle: bootstrap completion exchanges={expected_exchanges} "
+        r"publications=3", text)
     if ready is None:
         raise ValueError(
             f"missing DSP bootstrap completion at {expected_exchanges} exchanges")
@@ -48,7 +49,10 @@ def check(text: str, full_session: bool, conformance: bool = False,
         "service_pending": require(text, r"RAM W off=0e4 data=000[1-9a-f]", "service pending publication"),
         "service_complete": require(text, r"IRQ4 service-complete", "service completion IRQ4"),
     }
-    ready = re.findall(r"dsp_hle: bootstrap ready exchanges=([0-9]+)", text)
+    ready = re.findall(
+        r"dsp_hle: bootstrap completion exchanges=([0-9]+) publications=3",
+        text,
+    )
     if expected_bootstrap_exchanges is not None:
         if ready != [str(expected_bootstrap_exchanges)]:
             raise ValueError(

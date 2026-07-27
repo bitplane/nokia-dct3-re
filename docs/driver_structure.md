@@ -26,7 +26,8 @@ firmware adapter to the external service/test peer; the request-driven
 DSP behavior is split at its evidenced boundaries: `nokia_dspif_device` owns
 shared RAM, DSPIF, packet rings and FIQ0/IRQ4 signaling;
 `nokia_dsp_hle_device` owns all bootstrap mailbox policy, peer-published shared
-state and service timing; DSPIF carries no DSP-behavior configuration, making
+state and service timing through one atomic product bootstrap contract with
+private exchange helpers; DSPIF carries no DSP-behavior configuration, making
 the HLE a replaceable backend seam;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
 session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation

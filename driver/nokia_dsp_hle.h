@@ -11,22 +11,51 @@
 #include "nokia_radio_peer.h"
 
 #include <array>
+#include <optional>
 
 class nokia_dsp_hle_device : public device_t
 {
 public:
 	nokia_dsp_hle_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
-	enum class bootstrap_completion_profile : u8
+	enum class bootstrap_exchange_strategy : u8
 	{
-		ready_words_one,
-		nse3_flash_verification_b06_verdict_unknown
+		disabled,
+		zero_acknowledge,
+		ping_pong
 	};
 
-	enum class bootstrap_preupload_profile : u8
+	struct bootstrap_publication
 	{
-		none,
-		nse3_dsp_rom3_pair
+		u16 offset = 0;
+		u16 value = 0;
+	};
+
+	struct bootstrap_pair_contract
+	{
+		u16 first_offset = 0;
+		u16 second_offset = 0;
+		u16 sentinel = 0;
+		u16 response = 0;
+	};
+
+	struct bootstrap_parked_contract
+	{
+		u16 offset = 0;
+		u16 sentinel = 0;
+		u16 response = 0;
+	};
+
+	struct bootstrap_contract
+	{
+		bootstrap_exchange_strategy exchange =
+				bootstrap_exchange_strategy::disabled;
+		unsigned exchange_limit = 0;
+		std::array<bootstrap_publication, 3> completion = {};
+		u8 completion_count = 0;
+		std::optional<bootstrap_pair_contract> preupload;
+		std::optional<bootstrap_parked_contract> parked;
+		u16 service_code_block_request = 0;
 	};
 
 	struct service_control_contract
@@ -58,21 +87,9 @@ public:
 		m_speech_request_mask = mask;
 		m_speech_request_value = value;
 	}
-	void set_bootstrap_exchange_limit(unsigned exchanges) { m_bootstrap_exchange_limit = exchanges; }
-	void set_bootstrap_completion(bootstrap_completion_profile profile)
+	void set_bootstrap_contract(bootstrap_contract contract)
 	{
-		m_bootstrap_completion = profile;
-	}
-	void set_bootstrap_preupload(bootstrap_preupload_profile profile)
-	{
-		m_bootstrap_preupload = profile;
-	}
-	void set_bootstrap_ping_pong(bool enabled) { m_bootstrap_ping_pong = enabled; }
-	void set_code_block_request(bool enabled) { m_code_block_request = enabled; }
-	void set_parked_boot_status(bool enabled, u16 response)
-	{
-		m_parked_boot_status = enabled;
-		m_boot_status_response = response;
+		m_bootstrap = contract;
 	}
 	auto mcu_control_word_cb() { return m_mcu_control_word_cb.bind(); }
 	u16 mcu_control_word() const { return m_mcu_control_word; }
@@ -105,6 +122,12 @@ private:
 	void drain_responses();
 	void schedule_response();
 	void publish_bootstrap_state();
+	void publish_bootstrap_completion();
+	bool bootstrap_ping_pong() const;
+	void handle_bootstrap_exchange_read(u16 offset);
+	void handle_bootstrap_exchange_write(u16 offset);
+	void handle_bootstrap_parked_write(u16 callback_offset);
+	void handle_bootstrap_preupload_write(u16 callback_offset);
 	void prepare_speech_codec_save();
 	void restore_speech_codec_state();
 	bool consume_memory_upload(const nokia_dspif_device::packet &packet);
@@ -125,16 +148,8 @@ private:
 	unsigned m_service_delay_us = 5'000;
 	unsigned m_peer_poll_ms = 5;
 	bool m_service_control_completion_sent = false;
-	unsigned m_bootstrap_exchange_limit = 64;
 	unsigned m_bootstrap_exchange_count = 0;
-	bootstrap_completion_profile m_bootstrap_completion =
-			bootstrap_completion_profile::ready_words_one;
-	bootstrap_preupload_profile m_bootstrap_preupload =
-			bootstrap_preupload_profile::none;
-	bool m_bootstrap_ping_pong = false;
-	bool m_code_block_request = false;
-	bool m_parked_boot_status = false;
-	u16 m_boot_status_response = 0;
+	bootstrap_contract m_bootstrap;
 	u16 m_mcu_control_word = 0;
 	u16 m_mcu_control_wire = 0;
 	u8 m_parameter_command = 0xff;

@@ -34,12 +34,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_service_delay_us));
 	save_item(NAME(m_peer_poll_ms));
 	save_item(NAME(m_service_control_completion_sent));
-	save_item(NAME(m_bootstrap_exchange_limit));
 	save_item(NAME(m_bootstrap_exchange_count));
-	save_item(NAME(m_bootstrap_ping_pong));
-	save_item(NAME(m_code_block_request));
-	save_item(NAME(m_parked_boot_status));
-	save_item(NAME(m_boot_status_response));
 	save_item(NAME(m_mcu_control_word));
 	save_item(NAME(m_mcu_control_wire));
 	save_item(NAME(m_parameter_command));
@@ -133,11 +128,40 @@ void nokia_dsp_hle_device::publish_bootstrap_state()
 	// Transition timing is not recovered. Publish the minimum reset-visible DSP
 	// state synchronously, through DSPIF-owned shared RAM, before the MCU starts.
 	m_transport->peer_shared_w(0x0e0 / 2, 0);
-	if (!m_bootstrap_ping_pong)
+	if (m_bootstrap.exchange ==
+			bootstrap_exchange_strategy::zero_acknowledge)
 	{
 		m_transport->peer_shared_w(0x0fe / 2, 1);
 		m_transport->peer_shared_w(0x100 / 2, 1);
 	}
+}
+
+bool nokia_dsp_hle_device::bootstrap_ping_pong() const
+{
+	return m_bootstrap.exchange == bootstrap_exchange_strategy::ping_pong;
+}
+
+void nokia_dsp_hle_device::publish_bootstrap_completion()
+{
+	const unsigned count = std::min<unsigned>(
+			m_bootstrap.completion_count, m_bootstrap.completion.size());
+	for (unsigned index = 0; index < count; ++index)
+	{
+		const bootstrap_publication &publication =
+				m_bootstrap.completion[index];
+		m_transport->peer_shared_w(
+				publication.offset / 2, publication.value);
+		if (m_trace_enabled)
+			LOGMASKED(LOG_DSP_HLE,
+					"dsp_hle: bootstrap publication offset=%03x value=%04x t=%.6f\n",
+					publication.offset, publication.value,
+					machine().time().as_double());
+	}
+	if (m_trace_enabled)
+		LOGMASKED(LOG_DSP_HLE,
+				"dsp_hle: bootstrap completion exchanges=%u publications=%u t=%.6f\n",
+				m_bootstrap_exchange_count, count,
+				machine().time().as_double());
 }
 
 void nokia_dsp_hle_device::tx_commit_w(int state)
@@ -179,112 +203,115 @@ void nokia_dsp_hle_device::doorbell_w(int state)
 
 void nokia_dsp_hle_device::shared_002_write_w(int state)
 {
-	if (state && m_parked_boot_status && m_transport->shared_word(0x002 / 2) == 0xffff)
-		m_transport->peer_shared_w(0x002 / 2, m_boot_status_response);
+	if (state)
+		handle_bootstrap_parked_write(0x002);
+}
+
+void nokia_dsp_hle_device::handle_bootstrap_parked_write(
+		u16 callback_offset)
+{
+	if (!m_bootstrap.parked)
+		return;
+	const bootstrap_parked_contract &parked = *m_bootstrap.parked;
+	if (parked.offset == callback_offset &&
+			m_transport->shared_word(parked.offset / 2) == parked.sentinel)
+		m_transport->peer_shared_w(parked.offset / 2, parked.response);
 }
 
 void nokia_dsp_hle_device::shared_006_write_w(int state)
 {
-	if (!state ||
-			m_bootstrap_preupload != bootstrap_preupload_profile::nse3_dsp_rom3_pair ||
-			m_transport->shared_word(0x004 / 2) != 0xffff ||
-			m_transport->shared_word(0x006 / 2) != 0xffff)
+	if (state)
+		handle_bootstrap_preupload_write(0x006);
+}
+
+void nokia_dsp_hle_device::handle_bootstrap_preupload_write(
+		u16 callback_offset)
+{
+	if (!m_bootstrap.preupload)
+		return;
+	const bootstrap_pair_contract &preupload = *m_bootstrap.preupload;
+	if (preupload.second_offset != callback_offset ||
+			m_transport->shared_word(preupload.first_offset / 2) !=
+					preupload.sentinel ||
+			m_transport->shared_word(preupload.second_offset / 2) !=
+					preupload.sentinel)
 		return;
 
-	// Both v5.48 loaders initialize this pair to 0xffff, wait for 0x004 to
-	// change and transfer only when 0x004 == 0x006.  ROM3 then exposes the
-	// captured value as selector 9 and labels it "DSP ROM"; the matching real
-	// handset reports "DSP ISw : ROM 3".  Keep this independent from the
-	// unresolved ROM4 value and from final bootstrap completion.
-	m_transport->peer_shared_w(0x004 / 2, 3);
-	m_transport->peer_shared_w(0x006 / 2, 3);
+	m_transport->peer_shared_w(
+			preupload.first_offset / 2, preupload.response);
+	m_transport->peer_shared_w(
+			preupload.second_offset / 2, preupload.response);
 	if (m_trace_enabled)
 		LOGMASKED(LOG_DSP_HLE,
-				"dsp_hle: NSE-3 pre-upload DSP ROM pair=3 t=%.6f\n",
-				machine().time().as_double());
+				"dsp_hle: bootstrap preupload first=%03x second=%03x value=%04x t=%.6f\n",
+				preupload.first_offset, preupload.second_offset,
+				preupload.response, machine().time().as_double());
 }
 
 void nokia_dsp_hle_device::shared_0fe_read_w(int state)
 {
-	if (state && m_bootstrap_ping_pong && m_transport->shared_word(0x0fe / 2) != 0)
-		m_transport->peer_shared_w(0x0fe / 2, 0);
+	if (state)
+		handle_bootstrap_exchange_read(0x0fe);
 }
 
 void nokia_dsp_hle_device::shared_0fe_write_w(int state)
 {
-	if (!state)
-		return;
-	const u16 token = m_transport->shared_word(0x0fe / 2);
-	if (m_bootstrap_ping_pong)
-	{
-		m_transport->peer_shared_w(0x0fe / 2, 0);
-		m_transport->peer_shared_w(0x100 / 2, token != 0 ? token : 1);
-	}
-	else if (token == 0)
-		m_transport->peer_shared_w(0x0fe / 2, 1);
+	if (state)
+		handle_bootstrap_exchange_write(0x0fe);
 }
 
 void nokia_dsp_hle_device::shared_100_read_w(int state)
 {
-	if (state && m_bootstrap_ping_pong && m_transport->shared_word(0x100 / 2) != 0 &&
-			m_transport->shared_word(0x1ca / 2) == 0)
-		m_transport->peer_shared_w(0x100 / 2, 0);
+	if (state)
+		handle_bootstrap_exchange_read(0x100);
 }
 
 void nokia_dsp_hle_device::shared_100_write_w(int state)
 {
-	if (!state)
+	if (state)
+		handle_bootstrap_exchange_write(0x100);
+}
+
+void nokia_dsp_hle_device::handle_bootstrap_exchange_read(u16 offset)
+{
+	if (!bootstrap_ping_pong() ||
+			m_transport->shared_word(offset / 2) == 0 ||
+			(offset == 0x100 &&
+				m_transport->shared_word(0x1ca / 2) != 0))
 		return;
-	const u16 token = m_transport->shared_word(0x100 / 2);
-	if (m_bootstrap_ping_pong && m_transport->shared_word(0x1ca / 2) == 0)
+	m_transport->peer_shared_w(offset / 2, 0);
+}
+
+void nokia_dsp_hle_device::handle_bootstrap_exchange_write(u16 offset)
+{
+	const u16 token = m_transport->shared_word(offset / 2);
+	if (bootstrap_ping_pong())
 	{
-		m_transport->peer_shared_w(0x100 / 2, 0);
-		m_transport->peer_shared_w(0x0fe / 2, token != 0 ? token : 1);
+		if (offset == 0x100 &&
+				m_transport->shared_word(0x1ca / 2) != 0)
+			return;
+		const u16 peer_offset = offset == 0x0fe ? 0x100 : 0x0fe;
+		m_transport->peer_shared_w(offset / 2, 0);
+		m_transport->peer_shared_w(
+				peer_offset / 2, token != 0 ? token : 1);
 	}
-	else if (token == 0)
+	else if (m_bootstrap.exchange ==
+				bootstrap_exchange_strategy::zero_acknowledge &&
+			token == 0)
 	{
-		m_transport->peer_shared_w(0x100 / 2, 1);
-		if (++m_bootstrap_exchange_count == m_bootstrap_exchange_limit)
-		{
-			switch (m_bootstrap_completion)
-			{
-			case bootstrap_completion_profile::ready_words_one:
-				for (offs_t offset = 0; offset <= (0x004 / 2); offset++)
-					m_transport->peer_shared_w(offset, 1);
-				if (m_trace_enabled)
-					LOGMASKED(LOG_DSP_HLE, "dsp_hle: bootstrap ready exchanges=%u t=%.6f\n",
-							m_bootstrap_exchange_count, machine().time().as_double());
-				break;
-
-			case bootstrap_completion_profile::
-					nse3_flash_verification_b06_verdict_unknown:
-				// NSE-3 v4.06 captures shared 0x000 and later requires
-				// 0x0b06.  Both v5.48 variants prove the same comparison, even
-				// though a real v5.48 handset reports fitted COBBA B07; do not
-				// assign this bootstrap result a physical-silicon meaning.
-				// The 64 KiB transfer is a one-halfword-per-0x20-byte sparse
-				// projection of external MCU flash, not DSP program code.  The
-				// second DSP publication is its verification verdict.  Its
-				// numeric value is capture-only after the wait, but transition
-				// away from 0xffff is required.  Publish only the evidenced
-				// first result and leave 0x002 parked to prevent an invented
-				// verification success.
-				m_transport->peer_shared_w(0x000 / 2, 0x0b06);
-				if (m_trace_enabled)
-					LOGMASKED(LOG_DSP_HLE,
-							"dsp_hle: flash verification partial exchanges=%u first=0b06 verdict=unknown t=%.6f\n",
-							m_bootstrap_exchange_count, machine().time().as_double());
-				break;
-
-			}
-		}
+		m_transport->peer_shared_w(offset / 2, 1);
+		if (offset == 0x100 &&
+				++m_bootstrap_exchange_count ==
+						m_bootstrap.exchange_limit)
+			publish_bootstrap_completion();
 	}
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
 {
-	if (m_code_block_request)
-		m_transport->peer_shared_w(0x0e2 / 2, 1);
+	if (m_bootstrap.service_code_block_request != 0)
+		m_transport->peer_shared_w(
+				0x0e2 / 2, m_bootstrap.service_code_block_request);
 	m_transport->complete_service();
 }
 

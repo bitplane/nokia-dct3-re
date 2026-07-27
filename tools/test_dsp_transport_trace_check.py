@@ -12,7 +12,7 @@ dspif_transport: peer RAM W off=0fe data=0001
 dspif_transport: peer RAM W off=100 data=0001
 dspif_transport: RAM W off=0fe data=0000
 dspif_transport: RAM W off=100 data=0000
-dsp_hle: bootstrap ready exchanges=64
+dsp_hle: bootstrap completion exchanges=64 publications=3
 dspif_transport: doorbell command=0004 pending=0000
 dspif_transport: RAM W off=0e4 data=0002
 dspif_transport: IRQ4 service-complete
@@ -42,14 +42,16 @@ class DspTransportTraceCheckTest(unittest.TestCase):
             "dspif_transport: RAM W off=100 data=0000\n"
             for _ in range(58)
         )
-        text = requests + "dsp_hle: bootstrap ready exchanges=58\n"
+        text = requests + (
+            "dsp_hle: bootstrap completion exchanges=58 publications=3\n"
+        )
         self.assertEqual(
             check_bootstrap_completion(text, 58), {"bootstrap_exchanges": 58})
 
     def test_completion_only_rejects_an_incomplete_pair(self):
         text = (
             "dspif_transport: RAM W off=0fe data=0000\n"
-            "dsp_hle: bootstrap ready exchanges=1\n"
+            "dsp_hle: bootstrap completion exchanges=1 publications=3\n"
         )
         with self.assertRaisesRegex(ValueError, "word 100"):
             check_bootstrap_completion(text, 1)

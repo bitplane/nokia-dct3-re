@@ -28,7 +28,10 @@ The implementation has three explicit owners:
    correlation, channel map and healthy-state sequencing.
 
 The transport contains no service commands, session state, bootstrap policy or
-DSP-product configuration. It stores shared RAM and DSPIF registers, frames
+DSP-product configuration. The selected HLE consumes one atomic typed
+bootstrap contract containing generic exchange strategy and bounded
+shared-memory publications; handset evidence remains in machine composition.
+DSPIF stores shared RAM and registers, frames
 packets, maintains ring indices, and reports address-level mailbox accesses to
 the selected DSP backend. The HLE alone interprets the `0x002`, `0x0fe` and
 `0x100` bootstrap dialogue, publishes the 3410 parked-loader response, and

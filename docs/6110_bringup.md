@@ -1563,13 +1563,14 @@ calibration, checksums and data bytes themselves are not classified by this
 census. The checker therefore records matching normalized geometry while
 explicitly rejecting a whole-EEPROM migration claim.
 
-The driver therefore types bootstrap completion separately from exchange
-count, ping-pong transport and parked-loader status. Proven 3210/3310 profiles
-retain their three ready words of `1`; NSE-3 v4.06 selects
-`nse3_flash_verification_b06_verdict_unknown`. That profile publishes only
+The driver now selects one atomic bootstrap contract containing an exchange
+strategy and independently evidenced optional pre-upload, parked-status,
+service-request and completion-publication phases. Proven 3210/3310 contracts
+retain their three ready words of `1`; the base NSE-3 contract publishes only
 the evidenced `0x0b06` result at shared `0x10000` and deliberately does not
 write `0x10002`: it remains reset-zero for v4.06 and at the MCU's parked
-`0xffff` sentinel for v5.48.
+`0xffff` sentinel for v5.48. Keeping those phases as nested typed data preserves
+their separate provenance without allowing incompatible partial settings.
 Enabling its DSP service can therefore neither turn the observed 64-block
 geometry into the legacy ready-word publication nor invent a successful boot
 before the second word's DSP-side semantics are recovered.

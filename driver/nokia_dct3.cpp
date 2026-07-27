@@ -17,6 +17,7 @@
 #include "emuopts.h"
 
 #include <array>
+#include <optional>
 #include <unordered_map>
 
 #include "cpu/arm7/arm7.h"
@@ -106,6 +107,12 @@ constexpr nokia_ccont_board_profile ADC_STANDARD = {
 
 struct nokia_product_config
 {
+	struct bootstrap_bios_override
+	{
+		u8 bios = 0xff;
+		nokia_dsp_hle_device::bootstrap_contract contract;
+	};
+
 	u8 power_on_column_mask = 0x04;
 	bool boot_rom_bypass = true;
 	bool simi_controller = false;
@@ -117,14 +124,8 @@ struct nokia_product_config
 	nokia_radio_peer_device::protocol_contract radio;
 	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
-	bool nse3_bootstrap_selected_by_bios = false;
-	unsigned dsp_bootstrap_exchanges = 64;
-	nokia_dsp_hle_device::bootstrap_completion_profile dsp_bootstrap_completion =
-			nokia_dsp_hle_device::bootstrap_completion_profile::ready_words_one;
-	bool dsp_bootstrap_ping_pong = false;
-	bool dsp_code_block_request = false;
-	bool dsp_parked_boot_status = false;
-	u16 dsp_boot_status_response = 0;
+	nokia_dsp_hle_device::bootstrap_contract dsp_bootstrap;
+	std::optional<bootstrap_bios_override> dsp_bootstrap_override;
 	unsigned dsp_service_delay_us = 5'000;
 	unsigned dsp_peer_poll_ms = 5;
 	u8 dsp_parameter_command = 0xff;
@@ -178,6 +179,49 @@ constexpr nokia_external_service_peer_device::application_contract
 	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
 };
 
+constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_READY_64 = {
+	nokia_dsp_hle_device::bootstrap_exchange_strategy::zero_acknowledge,
+	64,
+	{{ { 0x000, 0x0001 }, { 0x002, 0x0001 }, { 0x004, 0x0001 } }},
+	3, std::nullopt, std::nullopt, 0
+};
+
+constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_READY_58 = {
+	nokia_dsp_hle_device::bootstrap_exchange_strategy::zero_acknowledge,
+	58,
+	{{ { 0x000, 0x0001 }, { 0x002, 0x0001 }, { 0x004, 0x0001 } }},
+	3, std::nullopt, std::nullopt, 0
+};
+
+constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_PING_PONG = {
+	nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+	0, {}, 0, std::nullopt,
+	nokia_dsp_hle_device::bootstrap_parked_contract {
+		0x002, 0xffff, 0x0000
+	},
+	0x0001
+};
+
+constexpr nokia_dsp_hle_device::bootstrap_contract
+		BOOTSTRAP_FLASH_VERIFICATION_PARTIAL = {
+	nokia_dsp_hle_device::bootstrap_exchange_strategy::zero_acknowledge,
+	64,
+	{{ { 0x000, 0x0b06 } }},
+	1, std::nullopt, std::nullopt, 0
+};
+
+constexpr nokia_dsp_hle_device::bootstrap_contract
+		BOOTSTRAP_FLASH_VERIFICATION_ROM3 = {
+	nokia_dsp_hle_device::bootstrap_exchange_strategy::zero_acknowledge,
+	64,
+	{{ { 0x000, 0x0b06 } }},
+	1,
+	nokia_dsp_hle_device::bootstrap_pair_contract {
+		0x004, 0x006, 0xffff, 0x0003
+	},
+	std::nullopt, 0
+};
+
 constexpr nokia_product_config make_3210_config()
 {
 	nokia_product_config result;
@@ -188,6 +232,7 @@ constexpr nokia_product_config make_3210_config()
 	result.external_service_transport = true;
 	result.external_service = EXTERNAL_SERVICE_NSE8;
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	result.dsp_bootstrap = BOOTSTRAP_READY_64;
 	result.radio = RADIO_NSE8;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
@@ -232,7 +277,7 @@ constexpr nokia_product_config make_3310_config()
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	result.radio = RADIO_NHM5;
 	result.keypad_five_rows = true;
-	result.dsp_bootstrap_exchanges = 58;
+	result.dsp_bootstrap = BOOTSTRAP_READY_58;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
 	// NHM-5 independently publishes command 0x08 value 0x060b immediately
@@ -277,6 +322,7 @@ constexpr nokia_product_config make_3330_config()
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service_transport = true;
+	result.dsp_bootstrap = BOOTSTRAP_READY_64;
 	result.keypad_five_rows = true;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
@@ -291,9 +337,7 @@ constexpr nokia_product_config make_3410_config()
 {
 	nokia_product_config result = make_3330_config();
 	result.power_on_column_mask = 0x02;
-	result.dsp_bootstrap_ping_pong = true;
-	result.dsp_code_block_request = true;
-	result.dsp_parked_boot_status = true;
+	result.dsp_bootstrap = BOOTSTRAP_PING_PONG;
 	result.dsp_service_delay_us = 50;
 	result.flash_b3_block_lock = true;
 	result.dsp_reset_running_status = 0x53;
@@ -317,7 +361,6 @@ constexpr nokia_product_config make_6110_config()
 	// Compose that removable standards-shaped test card; its subscriber files
 	// are fixture policy and do not claim Nokia 6110 product identity.
 	result.synthetic_sim_card = true;
-	result.nse3_bootstrap_selected_by_bios = true;
 	// NSE-3 Chapter 3 documents COBBA-GJ deriving a 1 MHz PCMDClk and
 	// 8 kHz PCMSClk, with a sign-extended 13-bit sample in a 16-bit word.
 	// Firmware-facing DSP, external-service and radio peers deliberately
@@ -347,8 +390,10 @@ constexpr nokia_product_config make_6110_config()
 	// result while deliberately leaving the unknown verdict untouched (reset
 	// zero in v4.06; MCU-parked 0xffff in v5.48), and keep the peer disabled
 	// pending DSP evidence.
-	result.dsp_bootstrap_exchanges = 64;
-	result.dsp_bootstrap_completion = nokia_dsp_hle_device::bootstrap_completion_profile::nse3_flash_verification_b06_verdict_unknown;
+	result.dsp_bootstrap = BOOTSTRAP_FLASH_VERIFICATION_PARTIAL;
+	result.dsp_bootstrap_override = nokia_product_config::bootstrap_bios_override {
+		2, BOOTSTRAP_FLASH_VERIFICATION_ROM3
+	};
 	// The external MCU image correlates its 70 0d request with a framed
 	// type-74 completion through controller bit 2 and timer 14. NSE-8's exact
 	// decoder supplies the missing four-byte frame transformation. Type this
@@ -383,6 +428,7 @@ constexpr nokia_product_config make_conservative_config(u8 power_on_column_mask 
 {
 	nokia_product_config result;
 	result.power_on_column_mask = power_on_column_mask;
+	result.dsp_bootstrap = BOOTSTRAP_READY_64;
 	return result;
 }
 
@@ -738,16 +784,13 @@ void nokia_dct3_state::machine_start()
 	// composition and hardware timing are configured by machine_config.
 	m_trace_enabled = machine().options().verbose();
 	m_pup->set_trace(m_trace_enabled);
-	// NSE-3's service package proves that v5.48 ROM3 and ROM4 use a
-	// pre-upload 0x10004/0x10006 exchange and a 0xffff final sentinel.
-	// BIOS 2 is the package-proven v5.48 ROM3 image.  Its stored pre-upload
-	// value feeds selector 9 / "DSP ROM", and the matching real handset
-	// reports ROM 3; the loader proves the paired cell must agree.  ROM4 has
-	// no matching trace and deliberately inherits no guessed value.
-	if (m_product.nse3_bootstrap_selected_by_bios && system_bios() == 2)
-		m_dsp_hle->set_bootstrap_preupload(
-				nokia_dsp_hle_device::bootstrap_preupload_profile::
-						nse3_dsp_rom3_pair);
+	// A BIOS-specific override replaces the whole bootstrap contract rather
+	// than mutating one phase. Products without a matching evidenced variant
+	// retain their base contract and cannot inherit another image's tokens.
+	if (m_product.dsp_bootstrap_override &&
+			system_bios() == m_product.dsp_bootstrap_override->bios)
+		m_dsp_hle->set_bootstrap_contract(
+				m_product.dsp_bootstrap_override->contract);
 	m_ram = std::make_unique<uint16_t[]>((NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1);
 
 	m_timer_watchdog = timer_alloc(FUNC(nokia_dct3_state::timer_watchdog), this);
@@ -767,12 +810,7 @@ void nokia_dct3_state::post_load()
 void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 {
 	m_product = product;
-	m_dsp_hle->set_bootstrap_exchange_limit(product.dsp_bootstrap_exchanges);
-	m_dsp_hle->set_bootstrap_completion(product.dsp_bootstrap_completion);
-	m_dsp_hle->set_bootstrap_ping_pong(product.dsp_bootstrap_ping_pong);
-	m_dsp_hle->set_code_block_request(product.dsp_code_block_request);
-	m_dsp_hle->set_parked_boot_status(product.dsp_parked_boot_status,
-			product.dsp_boot_status_response);
+	m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
 	m_mad2->set_dsp_reset_running_status(product.dsp_reset_running_status);
 	m_mad2->set_dsp_release_mask(product.dsp_release_mask);
 	m_kbgpio->set_five_rows(product.keypad_five_rows);
