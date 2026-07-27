@@ -13,7 +13,7 @@ firmware result:
 | hardware entry point | quarantined research helper |
 |---|---|
 | `flash_r/w` | thin routing through `nokia_b3_flash_device`; selected read-only contract probes run before the physical read |
-| `ram_w`   (≈3 lines) | none; only the backing-store write |
+| `ram_w` | backing-store write plus calls to observation-only helpers for the focused audio/authentication gates |
 | `ram_r`   (≈2 lines)  | none; display provisioning now arrives through EEPROM/NV |
 | `mad2_io_r/w` | functional register routing and board-output helpers, followed by observation-only MAD2 trace helpers |
 

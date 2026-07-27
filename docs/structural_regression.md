@@ -228,6 +228,16 @@ interval to return to the exact `verify-3310-frontier` idle frame.
 The two endpoints prevent a broken key path from passing merely because a
 later screen happens to look plausible.
 
+`make verify-3310-radio-authentication-boundary` protects the independent
+NHM-5 authenticated-registration lifecycle. The call-control gates then cover
+paging, incoming SETUP, ringing, physical Navi Answer/End and clean return to
+PCH. `make verify-3310-radio-media-resilience` requires the product's
+1 MHz/125-clock PCM profile, exact active-call save-state replay, bidirectional
+FACCH/BFI recovery and SACCH/TF coexistence. The isolated
+`make verify-3310-radio-physical-duplex` gate routes host capture only through
+MIC2 and playback only through EAR; UI or protocol-level audio injection is
+not accepted.
+
 `make verify-3330-frontier` starts from the canonical virgin PMM and drives its
 real first-boot editors through physical five-row keypad switches: stored phone
 code `12345`, time `12:00`, and date `01.01.2002`. The final frame must be the

@@ -4,10 +4,11 @@ This document defines the retained lower-radio model and its verified boundary.
 The current checkpoint includes organic cell selection, Location Updating,
 acceptance, SIM persistence, dedicated-channel release, return to serving-cell
 monitoring, PCH fill, one bounded paging/Paging Response lifecycle, one
-bounded mobile-terminated call-control attempt and one persistently delivered
-ordinary mobile-terminated SMS, plus one bounded port-addressed Nokia ringtone
-delivery. The call now includes TCH/F assignment and FACCH link establishment
-and release; speech frames, codec audio and packet data remain outside it.
+bounded mobile-terminated call lifecycle with physical Answer/End and
+bidirectional GSM-FR, one persistently delivered ordinary mobile-terminated
+SMS, plus one bounded port-addressed Nokia ringtone delivery. Media coverage
+includes FACCH substitution, degraded-frame handling, SACCH coexistence,
+save-state replay and isolated physical microphone/playback paths.
 
 ## Ownership
 
@@ -119,27 +120,21 @@ the generated erased-identity security verifier. Physical `12345` input lets
 the ROM leave its security editor; the already queued page is then processed
 organically. The input harness observes only the mapped PUP buzzer gate before
 pressing physical Answer. The ROM stops the ringtone, emits CC Connect, accepts
-Connect Acknowledge and remains on TCH/F. During the retained answered
-interval, MCU-to-DSP traffic consists of one LAPDm RR, periodic empty
-type-`0x1b` blocks on selector `0xf0`, and one already-classified type-`0x05`
-external-service poll. No new speech-frame or codec-configuration packet
-family appears in the packet ring. A complete shared-window changed-write trace
-does find the next lower entrance: task 5 commits shared-control command
-`0x08/0x060b` between CC Connect and Connect Acknowledge, producing encoded
-word `0x860b` at offset `0x0a8` and a DSPIF command-4 doorbell. A matched
-unlocked but unanswered run has no corresponding non-ring writes. A later
-task-9 group produces only a 900 Hz, 120.8 ms acknowledgement tone and stops;
-it is separately classified from the answer-only command. Command `0x08` is
-therefore the current call-audio control frontier. Its bit fields and any
-DSP-to-COBBA PCM action remain unknown.
+Connect Acknowledge and remains on TCH/F. The independently recovered
+command-`0x08` lifecycle and product PCM profile then gate the generic speech
+pipeline; neither the call-control state nor empty packet-ring polls start
+media by themselves.
 
 `make verify-radio-incoming-call-lifecycle` presses the context-sensitive Navi
 key again after the stable answered interval. The resulting Disconnect,
 network Release, Release Complete and release channel change are organic.
 Across that sequence the firmware-owned DSP desired word moves from idle
 `0x0002` to answered `0x060b`, post-release `0x040a`, and back to idle
-`0x0002`. This closes the signalling/control teardown lifecycle without
-treating those values as a speech implementation or guessing bit meanings.
+`0x0002`. The media gates carry GSM-FR through channel coding, interleaving,
+burst transport, FACCH substitution, degraded-frame handling and SACCH
+reservation before this organic teardown. The physical gate admits host audio
+only through the configured MIC2/EAR board endpoints. Exact COBBA mux/gain
+semantics and the individual command-bit meanings remain unassigned.
 
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes
@@ -286,11 +281,12 @@ be reintroduced as peer behavior:
 
 ## Remaining fidelity
 
-The checkpoint is registered and camped, not a complete cellular network.
-Known extensions are ciphering, periodic and mobility-driven
-Location Updating, deterministic answered-call speech/codec data, MO SMS and MT SMS CP/RP closure,
-multipart Smart Messaging and ringtone UI/persistence, handover, measurement reporting,
-loss/reselection, rejected registration and configurable multi-cell topology.
+The checkpoint includes authenticated registration, bounded MT call control
+and bidirectional full-rate speech, but it is not a complete cellular network.
+Known extensions are A5 ciphering, periodic and mobility-driven Location
+Updating, MO SMS, MT SMS CP/RP closure, multipart Smart Messaging and ringtone
+UI/persistence, handover, measurement reporting, loss/reselection, rejected
+registration and configurable multi-cell topology.
 Each extension must begin with an organic MCU request or a standards-defined
 network event and retain the same request-correlation rule.
 
@@ -302,14 +298,17 @@ The checkpoint is accepted when:
 
 1. `make verify-radio-camp` passes;
 2. `make verify-radio-registration` proves one accepted update and steady camp;
-3. `make verify-radio-paging` proves the one-page bounded entrance;
-4. `make verify-radio-incoming-call` proves the bounded MT call attempt;
-5. `make verify-radio-incoming-sms` proves segmented MT text delivery and the
+3. `make verify-radio-authentication-boundary` and its 3310 counterpart prove
+   organic handset-to-SIM authentication and authenticated registration;
+4. `make verify-radio-paging` proves the one-page bounded entrance;
+5. the 3210 and 3310 lifecycle/media gates prove physical Answer/End,
+   bidirectional speech, FACCH/BFI/SACCH coexistence and clean teardown;
+6. `make verify-radio-incoming-sms` proves segmented MT text delivery and the
    exact persistent unread SIM record;
-6. `make verify-radio-incoming-smart-message` proves the first part of a
+7. `make verify-radio-incoming-smart-message` proves the first part of a
    two-part port-addressed Nokia ringtone across nine stop-and-wait LAPDm
    segments, distinct from ordinary `EF_SMS` filing, while retaining the
    second part until the handset organically closes CP/RP;
-7. `make verify-radio-operator` proves the unobscured operator frame;
-8. the default coherent frontier and tool/evidence suites remain green; and
-9. no diagnostic packet scenario or firmware-state force is retained.
+8. `make verify-radio-operator` proves the unobscured operator frame;
+9. the default coherent frontier and tool/evidence suites remain green; and
+10. no diagnostic packet scenario or firmware-state force is retained.

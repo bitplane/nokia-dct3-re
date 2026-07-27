@@ -15,7 +15,7 @@ SEARCH_LIST, measurement, channel-change, BCCH, random-access, LAPDm, Location
 Updating, RR release, and operator-presentation contracts for one deterministic
 laboratory cell. This proves that the transport composes in the normal
 scheduler, but not that the external class-`0x40` peer is DSP-owned or that
-unimplemented mobility, paging, authentication, calls, or SMS are implied.
+unimplemented mobility, handover, MO SMS or broader services are implied.
 
 ## The two hardware windows
 
