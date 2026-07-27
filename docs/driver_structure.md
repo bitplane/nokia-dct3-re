@@ -18,7 +18,9 @@ firmware result:
 | `mad2_io_r/w` | functional register routing and board-output helpers, followed by observation-only MAD2 trace helpers |
 
 MAME's native `pcd8544_device` and `I2C_24C128` model the display and external
-EEPROM. Headless LCD capture and scripted keypad input belong to the Lua
+EEPROM. One validated product geometry contract configures controller RAM and
+the visible MAME viewport together; unsupported products cannot resize only
+the screen behind the controller. Headless LCD capture and scripted keypad input belong to the Lua
 acceptance harness; the production driver contains neither a second LCD parser
 nor synthetic key state. CCONT is an explicit local `nokia_ccont_device` owning its serial
 registers, ADC results, RTC, interrupt state and watchdog. Task 7 remains the

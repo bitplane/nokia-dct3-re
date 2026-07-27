@@ -34,13 +34,40 @@ class DisplayPathTest(unittest.TestCase):
         self.assertIn('m_visible_height', self.lcd_patch)
         self.assertIn('m_controller_width(84)', self.lcd_patch)
         self.assertIn('m_visible_height(48)', self.lcd_patch)
-        for assignment in (
-            'result.lcd_controller_width = 102;',
-            'result.lcd_controller_height = 72;',
-            'result.lcd_visible_width = 96;',
-            'result.lcd_visible_height = 65;',
+        for declaration in (
+            'struct display_geometry_contract',
+            'constexpr bool valid() const',
+            'constexpr display_geometry_contract DISPLAY_3410',
+            '102, 72, 96, 65',
+            'result.display = DISPLAY_3410;',
+            'm_lcd->set_geometry(product.display.controller_width',
+            'screen->set_size(product.display.visible_width',
         ):
-            self.assertIn(assignment, self.phone)
+            self.assertIn(declaration, self.phone)
+        self.assertIn('visible_width <= controller_width', self.phone)
+        self.assertIn('visible_height <= controller_height', self.phone)
+        self.assertIn('if (!product.display.valid())', self.phone)
+        for retired in (
+            'lcd_controller_width',
+            'lcd_controller_height',
+            'lcd_visible_width',
+            'lcd_visible_height',
+        ):
+            self.assertNotIn(retired, self.phone)
+
+    def test_unvalidated_products_do_not_bypass_the_geometry_contract(self):
+        for machine, next_machine in (
+            ('noki7110', 'noki6210'),
+            ('noki6210', 'noki3410'),
+        ):
+            body = self.phone.split(
+                f'void nokia_dct3_state::{machine}(machine_config &config)', 1
+            )[1].split(
+                f'void nokia_dct3_state::{next_machine}(machine_config &config)',
+                1,
+            )[0]
+            self.assertNotIn('set_size', body)
+            self.assertNotIn('set_visarea', body)
 
     def test_default_y_command_mask_is_unchanged(self):
         self.assertIn('m_controller_banks > 8 ? 0x0f : 0x07', self.lcd_patch)

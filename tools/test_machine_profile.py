@@ -388,8 +388,7 @@ class MachineProfileTest(unittest.TestCase):
                 "flash_b3_block_lock": "true",
                 "dsp_reset_running_status": "0x53",
                 "dsp_release_mask": "0x04",
-                "lcd_controller_width": "102",
-                "lcd_controller_height": "72",
+                "display": "DISPLAY_3410",
             },
         )
         profile = self.driver.split("void nokia_dct3_state::noki3410(machine_config &config)", 1)[1]

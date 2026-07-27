@@ -105,6 +105,22 @@ constexpr nokia_ccont_board_profile ADC_STANDARD = {
 	{ 2, 0 }, 1, 3, 4, 5
 };
 
+struct display_geometry_contract
+{
+	u8 controller_width = 84;
+	u8 controller_height = 48;
+	u8 visible_width = 84;
+	u8 visible_height = 48;
+
+	constexpr bool valid() const
+	{
+		return controller_width != 0 && controller_height != 0 &&
+				visible_width != 0 && visible_height != 0 &&
+				visible_width <= controller_width &&
+				visible_height <= controller_height;
+	}
+};
+
 struct nokia_product_config
 {
 	struct bootstrap_bios_override
@@ -134,10 +150,7 @@ struct nokia_product_config
 	bool flash_b3_block_lock = false;
 	u8 dsp_reset_running_status = 0;
 	u8 dsp_release_mask = 0;
-	u8 lcd_controller_width = 84;
-	u8 lcd_controller_height = 48;
-	u8 lcd_visible_width = 84;
-	u8 lcd_visible_height = 48;
+	display_geometry_contract display;
 	u8 pup_eeprom_scl_bit = 3;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
@@ -181,6 +194,12 @@ constexpr nokia_dsp_hle_device::speech_control_contract
 		DSP_SPEECH_CONTROL_NSE3_COMMAND = {
 	0x08, std::nullopt
 };
+
+constexpr display_geometry_contract DISPLAY_3410 = {
+	102, 72, 96, 65
+};
+static_assert(display_geometry_contract{}.valid());
+static_assert(DISPLAY_3410.valid());
 
 // These values currently match but remain separate evidence: NSE-8 and NHM-5
 // have independent organic startup and call gates. A new product must supply
@@ -356,10 +375,7 @@ constexpr nokia_product_config make_3410_config()
 	result.flash_b3_block_lock = true;
 	result.dsp_reset_running_status = 0x53;
 	result.dsp_release_mask = 0x04;
-	result.lcd_controller_width = 102;
-	result.lcd_controller_height = 72;
-	result.lcd_visible_width = 96;
-	result.lcd_visible_height = 65;
+	result.display = DISPLAY_3410;
 	return result;
 }
 
@@ -830,11 +846,19 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_kbgpio->set_five_rows(product.keypad_five_rows);
 	m_kbgpio->set_power_on_column_mask(product.power_on_column_mask);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
-	m_lcd->set_geometry(product.lcd_controller_width, product.lcd_controller_height,
-			product.lcd_visible_width, product.lcd_visible_height);
+	if (!product.display.valid())
+		fatalerror("DCT3: invalid product display geometry %ux%u/%ux%u",
+				product.display.controller_width,
+				product.display.controller_height,
+				product.display.visible_width,
+				product.display.visible_height);
+	m_lcd->set_geometry(product.display.controller_width,
+			product.display.controller_height, product.display.visible_width,
+			product.display.visible_height);
 	screen_device *const screen = subdevice<screen_device>("screen");
-	screen->set_size(product.lcd_visible_width, product.lcd_visible_height);
-	screen->set_visarea(0, product.lcd_visible_width - 1, 0, product.lcd_visible_height - 1);
+	screen->set_size(product.display.visible_width, product.display.visible_height);
+	screen->set_visarea(0, product.display.visible_width - 1,
+			0, product.display.visible_height - 1);
 	m_dsp_hle->set_service_enabled(product.dsp_service);
 	m_dsp_hle->set_external_service_enabled(product.external_service_transport);
 	m_dsp_hle->set_service_control_contract(product.dsp_service_control);
@@ -1997,16 +2021,12 @@ void nokia_dct3_state::noki7110(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
 	apply_product_config(PRODUCT_DEFAULT);
-
-	subdevice<screen_device>("screen")->set_size(96, 65);    // Epson SED1565
 }
 
 void nokia_dct3_state::noki6210(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
 	apply_product_config(PRODUCT_DEFAULT);
-
-	subdevice<screen_device>("screen")->set_size(96, 60);
 }
 
 // MAD2 internal ROMS

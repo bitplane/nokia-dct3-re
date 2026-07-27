@@ -9,7 +9,7 @@ not compatibility mechanisms.
 | Subsystem | Current shape | Next architectural step |
 | --- | --- | --- |
 | ARM7, flash and RAM | MAME CPU/flash devices plus product-owned maps; reset and flash behavior are exercised across four products | Validate further address-decode and retention behavior when another product diverges. |
-| PCD8544-family display | MAME device with product geometry and viewport configuration | Add a separate controller only when a recovered command set falls outside this family. |
+| PCD8544-family display | MAME device with one validated product contract applying controller geometry and viewport configuration atomically | Add a separate controller only when a recovered command set falls outside this family. |
 | External EEPROM | MAME `I2C_24C128` on mapped MAD2 GenIO pins plus generated provisioning input | Validate write/timing behavior, legitimate provisioning, ROM-aware fallback extraction, and parallel-window semantics. |
 | CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression; deterministic binary RTC and enabled documented watchdog/WDDISX boundary | Establish physical GENSIO/ADC latency, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |
 | MAD2 | `nokia_mad2_device` owns the CTSI core, timers, interrupt controller, CPU routing, one-shot ARM clock-stop/routed-wake behavior and the established digital-baseband reset domain; board/peripheral windows remain phone-owned or extracted separately | Recover the exact sleep-clock divider tree, transition latency, FIQ8 source and rail sequencing; move further windows only after their individual contracts pass the same gate. |

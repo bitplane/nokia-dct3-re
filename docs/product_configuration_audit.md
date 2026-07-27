@@ -54,15 +54,23 @@ its evidenced command decoder with no speech predicate, so decoding cannot
 silently enable media. PCM, radio, service-control and analogue routing remain
 separate hardware and protocol boundaries.
 
+## Completed display-geometry refactor
+
+Display controller and viewport dimensions now form one typed geometry
+contract. The LCD controller and MAME screen consume the same contract, and
+zero-sized or controller-exceeding viewports are rejected centrally. The 3410
+retains its evidenced 102-by-72 controller RAM and 96-by-65 viewport. The
+unsupported 7110 and 6210 no longer resize only the screen while silently
+leaving the controller at 84-by-48; they retain conservative defaults until
+their different controller is modeled.
+
 ## Next bounded refactor
 
-Display controller and viewport dimensions are the next coherent scalar
-cluster. They should become one typed geometry contract so controller RAM and
-visible-area dimensions are applied together and invalid zero or overlarge
-viewports can be rejected centrally. MAD2 DSP-reset wiring is the following
-smaller candidate. Broadly wrapping all enable flags in a capability object is
-still not justified: several apparently related flags deliberately encode
-independent negative or dormant evidence.
+MAD2 DSP-reset wiring is the next coherent pair: running-status readback and
+release mask should form one typed wiring contract applied atomically.
+Broadly wrapping all enable flags in a capability object is still not
+justified: several apparently related flags deliberately encode independent
+negative or dormant evidence.
 
 ## Acceptance status discovered by the audit
 
