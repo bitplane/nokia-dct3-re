@@ -29,7 +29,9 @@ class MameSourceComplianceTest(unittest.TestCase):
 
     def test_firmware_trace_quarantine_remains_small_and_observational(self):
         text = (DRIVER / "nokia_dct3_trace.inc").read_text()
-        self.assertLess(len(text.splitlines()), 240)
+        # Keep the quarantine reviewable even as independently gated
+        # cross-product observations are moved out of the production driver.
+        self.assertLess(len(text.splitlines()), 260)
         self.assertNotIn("COMBINE_DATA", text)
         self.assertNotIn("set_state_int", text)
         self.assertNotIn("enqueue_rx_packet", text)

@@ -559,6 +559,8 @@ private:
 	uint32_t fw_dword(offs_t address) const;
 	void trace_dsp_audio_shadow_write(
 			offs_t address, uint16_t old_data, uint16_t data);
+	void trace_radio_pending_primitive_write(
+			offs_t address, uint16_t old_data, uint16_t data);
 	required_device<cpu_device> m_maincpu;
 	required_device<nokia_b3_flash_device> m_b3_flash;
 	required_device<i2cmem_device> m_eeprom;
@@ -1086,14 +1088,8 @@ void nokia_dct3_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 	if (m_trace_enabled && old_data != m_ram[offset])
 	{
 		trace_dsp_audio_shadow_write(address, old_data, m_ram[offset]);
-		if (address == 0x0010d12c || address == 0x0010d168 ||
-				address == 0x0010ab90 || address == 0x0010abcc)
-			LOGMASKED(LOG_DSP_BOUNDARY,
-					"radio_pending_primitive: address=%08x old=%04x data=%04x "
-					"pc=%08x task=%02x t=%.6f\n",
-					address, old_data, m_ram[offset], m_maincpu->pc(),
-					fw_byte(0x00100022),
-					machine().time().as_double());
+		trace_radio_pending_primitive_write(
+				address, old_data, m_ram[offset]);
 	}
 }
 

@@ -6,6 +6,27 @@ contracts that can only be recovered from an identified firmware image. Until
 both sides are available, the coverage matrix remains `Unsupported`; the
 declared machine intentionally contains `NO_DUMP` execution inputs.
 
+## Current status and resumption point
+
+This file retains the investigation history because negative results prevent
+later work from quietly reintroducing 3210 assumptions. The current actionable
+state is:
+
+| Area | Established | Still required for promotion |
+| --- | --- | --- |
+| Product hardware | 1 MiB TE28F800 flash, 64 KiB SRAM, external 24C64, UE4 display/keypad, SIMI, MIC2/EAR and the 1 MHz/8 kHz 13-in-16 PCM shape | Matching internal MAD2 boot/DSP ROMs and an EEPROM from the same revision |
+| External firmware | Exact v4.06 candidate plus separately normalized v5.48 ROM3 and ROM4 images | No external-image ambiguity remains |
+| MCU bootstrap | Four shared cells, ROM3 `3/3` pre-upload identity, 64 sparse-flash transfers, final first result `0x0b06`, and fail-closed waits | Physical DSP's final non-sentinel verification publication; ROM4's observed pair |
+| Protocol surfaces | SIM command vocabulary, DSPIF rings, external-service framing, radio wire envelopes and selector-8 encoding are statically bounded | Organic DSP initiation/order, radio acquisition policy and speech-control lifecycle |
+| Executable coverage | None; all firmware-derived peers remain disabled | A capture accepted by `make verify-6110-bootstrap-capture`, or matching internal ROMs that reproduce it |
+
+Do not resume by enabling the generic DSP peer, using a direct-to-flash reset,
+copying the collaborator's hard-coded completion, treating physical COBBA
+`B07` as bootstrap result `0x0b06`, or choosing any non-sentinel verdict merely
+because the MCU does not inspect its numeric value. The hardware-capture format
+and provenance requirements are in `docs/6110_bootstrap_capture.md`; product
+promotion remains governed by `docs/model_coverage.md`.
+
 ## Primary hardware evidence
 
 Nokia's *NSE-3 Series Transceivers, Chapter 3 System Module*, Original

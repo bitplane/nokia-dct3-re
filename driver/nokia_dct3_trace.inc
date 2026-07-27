@@ -35,6 +35,21 @@ void nokia_dct3_state::trace_dsp_audio_shadow_write(
 			fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 }
 
+void nokia_dct3_state::trace_radio_pending_primitive_write(
+		offs_t address, uint16_t old_data, uint16_t data)
+{
+	if (address != 0x0010d12c && address != 0x0010d168 &&
+			address != 0x0010ab90 && address != 0x0010abcc)
+		return;
+
+	LOGMASKED(LOG_DSP_BOUNDARY,
+			"radio_pending_primitive: address=%08x old=%04x data=%04x "
+			"pc=%08x task=%02x t=%.6f\n",
+			address, old_data, data, m_maincpu->pc(),
+			fw_byte(FW_SCHED_RUNNING_TASK_ID),
+			machine().time().as_double());
+}
+
 uint8_t nokia_dct3_state::fw_byte(offs_t address) const
 {
 	const uint16_t word = fw_word(address);
