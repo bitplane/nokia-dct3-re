@@ -69,6 +69,16 @@ class MameSourceComplianceTest(unittest.TestCase):
                 self.assertNotIn("nse8", text)
                 self.assertNotIn("nhm5", text)
 
+    def test_driver_has_no_runtime_handset_name_dispatch(self):
+        text = (DRIVER / "nokia_dct3.cpp").read_text()
+        for token in (
+            "machine().system().name",
+            "machine().system().parent",
+            "driver_name",
+        ):
+            with self.subTest(token=token):
+                self.assertNotIn(token, text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -47,11 +47,11 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
   tuple advances organically through CONTACT SERVICE to the security editor.
 - The acquired virgin PMM stores phone code `12345` and requires first-boot time
   and date entry. Physical keypad input submits the code, `12:00`, and
-  `01.01.2002`; firmware accepts each editor and reaches deterministic idle.
-  `make verify-3330-frontier` protects that complete lifecycle.
-- `make verify-3330-navigation` enters Phone book, moves to Messages, and uses C
-  to return to the exact idle oracle. No firmware hook, task message, RAM state,
-  guessed reply or application-specific path participates.
+  `01.01.2002`. The current run reaches a deterministic CONTACT SERVICE frame
+  rather than the stored idle oracle, so `make verify-3330-frontier` and
+  `make verify-3330-navigation` are retained as failing investigation gates.
+  No firmware hook, task message, RAM state, guessed reply or
+  application-specific path participates.
 
 ## Nokia 3410 NHM-2 v5.46
 
@@ -69,9 +69,9 @@ without a hook or data repair and performs no soft reset. The unattended phone
 then blanks the LCD through its ordinary idle lifecycle. The former frontier
 gate accidentally treated that all-white 96-by-65 capture as an idle oracle
 because its blank-frame filter only recognized the 84-by-48 products.
-`make verify-3410-frontier` now uses one physical End-key cycle to wake the
-firmware-owned idle UI and protects that actual frame by exact LCD hash from a
-fresh NVRAM directory. The product uses the shared PCD8544-family serial
+`make verify-3410-frontier` uses one physical End-key cycle to wake the
+firmware-owned UI from a fresh NVRAM directory, but its present stable output
+does not match the stored idle oracle. The product uses the shared PCD8544-family serial
 protocol through MAME's native device, extended with default-preserving
 configurable geometry: 102-by-72 controller RAM and a 96-by-65 visible
 viewport.
@@ -81,9 +81,9 @@ The five-row keypad is also ROM-derived. The scanner indexes the active
 key `0x19` and Names maps to `0x1a`. IRQ0, deferred scanning, debounce and ROM
 mapping all execute organically. Menu content remains firmware-owned: physical
 Menu emits the press object consumed by task 5 and draws `Messages`.
-`make verify-3410-menu` protects that exact screen, while
-`make verify-3410-navigation` independently opens it and uses physical End to
-return to the exact idle frame. Send and End are separate cells in this map and
+The menu and navigation fixtures independently exercise physical Menu and End,
+but are not promotion evidence until their oracle status is re-established.
+Send and End are separate cells in this map and
 are exposed as ordinary MAME inputs; no firmware hook, RAM forcing, injected
 message or guessed peer reply participates.
 

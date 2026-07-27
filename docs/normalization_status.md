@@ -14,8 +14,9 @@ that the driver is ready for upstream submission.
 - Reviewed runtime manifests retain the class-`0x40` service and coherent
   generic-service/SIM observations that established those contracts. Their
   broad firmware-PC trace generators have been retired.
-- `verify-3330-frontier` and `verify-3330-navigation` protect the v4.50
-  virgin-PMM setup, idle and physical-key menu lifecycle.
+- The 3330 virgin-PMM frontier and navigation runs remain reproducible, but
+  their current stable CONTACT SERVICE output does not match the stored idle
+  oracle. They are investigation gates, not passing promotion evidence.
 
 ## Current application baseline
 

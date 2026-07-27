@@ -241,18 +241,24 @@ not accepted.
 `make verify-3330-frontier` starts from the canonical virgin PMM and drives its
 real first-boot editors through physical five-row keypad switches: stored phone
 code `12345`, time `12:00`, and date `01.01.2002`. The final frame must be the
-deterministic v4.50 idle screen. `make verify-3330-navigation` repeats that
+deterministic v4.50 idle screen. The current run instead produces stable hash
+`7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d1024ab91c1e55c1f8e`
+and fails the stored oracle. `make verify-3330-navigation` repeats that
 provisioning prefix in isolated NVRAM, enters Phone book, moves to Messages,
-and independently proves that C returns to the same idle oracle.
+and is likewise retained as a failing investigation gate until that divergence
+is explained.
 
 `make verify-3410-frontier` starts from the canonical virgin NHM-2 PMM, lets
 firmware compact the M28W320ECT parameter blocks, and uses one physical End-key
 cycle to wake the idle UI after its normal blank-display timeout. The gate
 rejects all-white 96-by-65 captures and requires the exact visible idle frame
-plus zero soft resets. `make verify-3410-menu` instead presses the physical
+plus zero soft resets. Its current stable hash
+`e25ff95856e78489015a5116b2c7f42f19b40cc6e5ac637b3a1d7e066739bb26`
+does not match the stored oracle. `make verify-3410-menu` instead presses the physical
 Menu key and requires the exact `Messages` screen. `make
 verify-3410-navigation` proves both endpoints in isolated runs: Menu must open
-`Messages`, then End must return to the same idle hash. These fixtures operate
+`Messages`, then End must return to the same idle hash. These remain
+investigation gates until their current oracle divergences are resolved. The fixtures operate
 only MAME matrix fields; they do not write firmware state or post messages.
 
 The default runner reseeds an isolated per-run NVRAM directory from the

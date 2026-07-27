@@ -26,6 +26,7 @@ distinction.
 | `mad2_static_access.md` | Generated paired-ROM census of direct MAD2 MMIO accesses. |
 | `driver_structure.md` | Code ownership and quarantine rules. |
 | `driver_vision.md` | Current modularization path and configuration taxonomy. |
+| `product_configuration_audit.md` | Post-refactor product-contract dependency audit and next bounded refactor. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
 | `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |
