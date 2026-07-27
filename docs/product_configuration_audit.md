@@ -90,12 +90,18 @@ frontier divergence rather than manufacture another wrapper.
 
 ## Acceptance status discovered by the audit
 
-The 3330 and 3410 runs are reproducible but their checked-in LCD oracles do not
-currently match. The stable outputs remain:
+The audit's two divergences were caused by one omitted typed DSP contract.
+Both NHM-6 and NHM-2 organically send type `0x70` payload `0d00`; leaving their
+compact `0x74/0d00` completion disabled caused the observed CONTACT SERVICE and
+non-idle outputs. The original oracles were not replaced. Fresh-PMM frontier,
+save-state and physical navigation gates now reproduce them, and NHM-2 declares
+its product fields explicitly rather than inheriting the NHM-6 builder.
 
-- 3330: `7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d1024ab91c1e55c1f8e`
-- 3410: `e25ff95856e78489015a5116b2c7f42f19b40cc6e5ac637b3a1d7e066739bb26`
-
-Those hashes are observations, not replacement acceptance oracles. Model
-promotion stays conservative until the divergence is explained and the named
-frontier/navigation gates pass again.
+The negative-composition controls also exposed a separate input-ownership
+mistake: `HWCFG` and `DIAGCFG` had been nested in the 3210 keypad ports, while
+other products silently received the optional-port fallback. They now belong
+to the shared DCT3 input contract, which the standalone 3410 and 6110 matrices
+include explicitly. `make verify-model-frontier-negative` removes only the DSP
+service at that boundary. The 3330 then organically returns to CONTACT SERVICE
+without FIQ0, while the 3410 remains at its deterministic non-idle frontier
+without FIQ0; neither negative result is a promoted oracle.

@@ -371,6 +371,10 @@ constexpr nokia_product_config make_3330_config()
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service_transport = true;
+	// NHM-6 independently emits type 0x70 payload 0d00 during its boot
+	// self-test and consumes the compact type 0x74 completion. Keep this
+	// separate from the still-empty application-service contract.
+	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	result.dsp_bootstrap = BOOTSTRAP_READY_64;
 	result.keypad_wiring = KEYPAD_NHM6;
 	result.dsp_service_delay_us = 4'000;
@@ -384,13 +388,22 @@ constexpr nokia_product_config make_3330_config()
 // readiness semantics live in MAD2, while the board wiring remains here.
 constexpr nokia_product_config make_3410_config()
 {
-	nokia_product_config result = make_3330_config();
+	nokia_product_config result;
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
+	result.dsp_service = true;
+	result.external_service_transport = true;
+	// NHM-2 independently emits the compact 70/0d00 request during organic
+	// boot and requires its 74/0d00 completion before exposing idle.
+	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	result.keypad_wiring = KEYPAD_NHM2;
 	result.dsp_bootstrap = BOOTSTRAP_PING_PONG;
 	result.dsp_service_delay_us = 50;
+	result.dsp_peer_poll_ms = 4;
 	result.flash_b3_block_lock = true;
 	result.dsp_reset_wiring = DSP_RESET_WIRING_3410;
 	result.display = DISPLAY_3410;
+	result.ccont_board = ADC_STANDARD;
 	return result;
 }
 
@@ -1637,6 +1650,37 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
+
+	// Standard MAME configuration inputs keep negative-composition tests out of
+	// process-global environment state. These are shared hardware boundaries,
+	// not properties of any one product's keypad matrix.
+	PORT_START("HWCFG")
+	PORT_CONFNAME(HWCFG_CCONT_READY, HWCFG_CCONT_READY, "CCONT readiness")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_CCONT_READY, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_SIM_DEVICE, HWCFG_SIM_DEVICE, "SIM interface")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_SIM_DEVICE, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_DSP_SERVICE, HWCFG_DSP_SERVICE, "DSP service HLE")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_DSP_SERVICE, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_EXTERNAL_SERVICE, HWCFG_EXTERNAL_SERVICE, "External service HLE")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_EXTERNAL_SERVICE, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_RADIO_PEER, HWCFG_RADIO_PEER, "Radio peer HLE")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_RADIO_PEER, DEF_STR(On))
+	PORT_CONFNAME(HWCFG_PCM_LINK, HWCFG_PCM_LINK, "MAD2/COBBA PCM link")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(HWCFG_PCM_LINK, DEF_STR(On))
+
+	PORT_START("DIAGCFG")
+	PORT_CONFNAME(0x01, 0x00, "Run DSPIF conformance check")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x01, DEF_STR(On))
+	PORT_CONFNAME(0x02, 0x00, "Run COBBA control conformance check")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x02, DEF_STR(On))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3210 )
@@ -1690,37 +1734,6 @@ static INPUT_PORTS_START( noki3210 )
 		PORT_POSITIONS(0xff) PORT_SENSITIVITY(100) PORT_KEYDELTA(1)
 		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::mbus_rx_byte), 0)
 
-	// Standard MAME configuration inputs keep negative-composition tests out of
-	// process-global environment state. Normal machine profiles enable every
-	// component they own; external test cfg files may remove one explicitly.
-	PORT_START("HWCFG")
-	PORT_CONFNAME(HWCFG_CCONT_READY, HWCFG_CCONT_READY, "CCONT readiness")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(HWCFG_CCONT_READY, DEF_STR(On))
-	PORT_CONFNAME(HWCFG_SIM_DEVICE, HWCFG_SIM_DEVICE, "SIM interface")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(HWCFG_SIM_DEVICE, DEF_STR(On))
-	PORT_CONFNAME(HWCFG_DSP_SERVICE, HWCFG_DSP_SERVICE, "DSP service HLE")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(HWCFG_DSP_SERVICE, DEF_STR(On))
-	PORT_CONFNAME(HWCFG_EXTERNAL_SERVICE, HWCFG_EXTERNAL_SERVICE, "External service HLE")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(HWCFG_EXTERNAL_SERVICE, DEF_STR(On))
-	PORT_CONFNAME(HWCFG_RADIO_PEER, HWCFG_RADIO_PEER, "Radio peer HLE")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(HWCFG_RADIO_PEER, DEF_STR(On))
-	PORT_CONFNAME(HWCFG_PCM_LINK, HWCFG_PCM_LINK, "MAD2/COBBA PCM link")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(HWCFG_PCM_LINK, DEF_STR(On))
-
-	PORT_START("DIAGCFG")
-	PORT_CONFNAME(0x01, 0x00, "Run DSPIF conformance check")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x01, DEF_STR(On))
-	PORT_CONFNAME(0x02, 0x00, "Run COBBA control conformance check")
-	PORT_CONFSETTING(0x00, DEF_STR(Off))
-	PORT_CONFSETTING(0x02, DEF_STR(On))
-
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3310 )
@@ -1767,6 +1780,8 @@ static INPUT_PORTS_START( noki3310 )
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki6110 )
+	PORT_INCLUDE(dct3_network_config)
+
 	// UE4 service-manual matrix. COL.n selects a documented column and each
 	// bit is its row; the power key is exposed separately for MAD2's all-row
 	// cold-start scan.
@@ -1812,6 +1827,8 @@ static INPUT_PORTS_START( noki6110 )
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki3410 )
+	PORT_INCLUDE(dct3_network_config)
+
 	// NHM-2 v5.46 keymap table at 0x4c5130, indexed as row * 5 + column
 	// by the scanner at 0x3e496e.  The numeric block matches the 3310,
 	// while the two softkeys, scroll keys and send/end keys occupy the

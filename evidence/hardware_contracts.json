@@ -164,7 +164,12 @@
     },
     {
       "id": "noki3330_product_profile_interactive", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
-      "boundary": "3330 v4.50 PPM E completes 64 DSP bootstrap exchanges and reaches deterministic idle with the shared request-driven DSP, external-service and SIM peers, a calibrated 3310-derived CCONT raw tuple, and the five-row keypad contract. Physical switches complete the virgin PMM's 12345 security, time and date editors, navigate Phone book to Messages, and return to the exact idle oracle; no firmware or RAM state is forced. Successful boot does not establish NHM-6 PCB signal identity",
+      "boundary": "3330 v4.50 PPM E organically emits DSP type 0x70 payload 0d00 and requires its independently typed compact 0x74/0d00 completion through FIQ0. With that product contract it completes 64 bootstrap exchanges, fresh-PMM 12345/time/date editors, a save-state round trip, deterministic idle and physical navigation to Messages and back; omitting the completion reproduces CONTACT SERVICE. No oracle, firmware or RAM state is changed. Successful boot does not establish NHM-6 PCB signal identity",
+      "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]
+    },
+    {
+      "id": "noki3410_product_profile_interactive", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
+      "boundary": "3410 v5.46 PPM E organically compacts its virgin PMM and emits DSP type 0x70 payload 0d00. Its explicit NHM-2 compact 0x74/0d00 completion crosses FIQ0 before the firmware exposes idle. Fresh-PMM save-state, physical Menu/End, Messages and exact return-to-idle gates pass with zero soft resets; NHM-2 does not inherit the NHM-6 product builder",
       "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]
     },
     {

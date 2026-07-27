@@ -14,9 +14,9 @@ that the driver is ready for upstream submission.
 - Reviewed runtime manifests retain the class-`0x40` service and coherent
   generic-service/SIM observations that established those contracts. Their
   broad firmware-PC trace generators have been retired.
-- The 3330 virgin-PMM frontier and navigation runs remain reproducible, but
-  their current stable CONTACT SERVICE output does not match the stored idle
-  oracle. They are investigation gates, not passing promotion evidence.
+- The 3330 and 3410 fresh-PMM frontier and navigation gates pass again. Both
+  firmware images organically emit compact DSP request `70/0d00`; their typed
+  product contracts return `74/0d00` through FIQ0 before the UI is promoted.
 
 ## Current application baseline
 

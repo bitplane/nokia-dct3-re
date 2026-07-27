@@ -47,11 +47,11 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
   tuple advances organically through CONTACT SERVICE to the security editor.
 - The acquired virgin PMM stores phone code `12345` and requires first-boot time
   and date entry. Physical keypad input submits the code, `12:00`, and
-  `01.01.2002`. The current run reaches a deterministic CONTACT SERVICE frame
-  rather than the stored idle oracle, so `make verify-3330-frontier` and
-  `make verify-3330-navigation` are retained as failing investigation gates.
-  No firmware hook, task message, RAM state, guessed reply or
-  application-specific path participates.
+  `01.01.2002`, reaches deterministic idle, navigates to Messages and returns.
+  NHM-6 organically sends DSP type `0x70` payload `0d00`; the independently
+  typed compact `0x74/0d00` completion traverses FIQ0. Omitting that product
+  contract reproduces CONTACT SERVICE, which identified the regression without
+  changing the PMM or oracle.
 
 ## Nokia 3410 NHM-2 v5.46
 
@@ -70,8 +70,10 @@ then blanks the LCD through its ordinary idle lifecycle. The former frontier
 gate accidentally treated that all-white 96-by-65 capture as an idle oracle
 because its blank-frame filter only recognized the 84-by-48 products.
 `make verify-3410-frontier` uses one physical End-key cycle to wake the
-firmware-owned UI from a fresh NVRAM directory, but its present stable output
-does not match the stored idle oracle. The product uses the shared PCD8544-family serial
+firmware-owned UI from a fresh NVRAM directory and reproduces the stored idle
+oracle. NHM-2 independently emits the same compact DSP request and now owns
+its completion contract explicitly rather than inheriting NHM-6 configuration.
+The product uses the shared PCD8544-family serial
 protocol through MAME's native device, extended with default-preserving
 configurable geometry: 102-by-72 controller RAM and a 96-by-65 visible
 viewport.
@@ -81,8 +83,8 @@ The five-row keypad is also ROM-derived. The scanner indexes the active
 key `0x19` and Names maps to `0x1a`. IRQ0, deferred scanning, debounce and ROM
 mapping all execute organically. Menu content remains firmware-owned: physical
 Menu emits the press object consumed by task 5 and draws `Messages`.
-The menu and navigation fixtures independently exercise physical Menu and End,
-but are not promotion evidence until their oracle status is re-established.
+The menu and navigation fixtures independently exercise physical Menu and End
+and reproduce the Messages and return-to-idle oracles.
 Send and End are separate cells in this map and
 are exposed as ordinary MAME inputs; no firmware hook, RAM forcing, injected
 message or guessed peer reply participates.
@@ -221,6 +223,15 @@ forcing-free, no-override endpoint by exact frame hash.
 The count remains an evidenced calibration, not a recovered protocol constant.
 A future real-DSP or protocol-derived completion condition should replace both
 counts if that boundary becomes observable.
+
+NHM-6 v4.50E and NHM-2 v5.46E independently emit the same compact service
+request. Their product profiles now name its completion contract explicitly;
+NHM-2 does not inherit the NHM-6 builder. Positive frontier gates require the
+resulting DSP-to-MCU FIQ0 as a semantic predicate, in addition to stable idle
+and physical-navigation frames. A shared `HWCFG` fixture can remove only the
+DSP service peer: `make verify-model-frontier-negative` then proves that FIQ0
+is absent and that both products deterministically fail to reach their promoted
+frontiers. This is dependency evidence, not a replacement acceptance oracle.
 
 ## Acceptance criteria
 

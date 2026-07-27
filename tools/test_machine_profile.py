@@ -245,6 +245,7 @@ class MachineProfileTest(unittest.TestCase):
                 "synthetic_sim_card": "true",
                 "dsp_service": "true",
                 "external_service_transport": "true",
+                "dsp_service_control": "DSP_SERVICE_CONTROL_COMPACT",
                 "dsp_bootstrap": "BOOTSTRAP_READY_64",
                 "keypad_wiring": "KEYPAD_NHM6",
                 "ccont_board": "ADC_STANDARD",
@@ -381,12 +382,19 @@ class MachineProfileTest(unittest.TestCase):
         self.assert_profile_fields(
             "make_3410_config",
             {
+                "simi_controller": "true",
+                "synthetic_sim_card": "true",
+                "dsp_service": "true",
+                "external_service_transport": "true",
+                "dsp_service_control": "DSP_SERVICE_CONTROL_COMPACT",
                 "keypad_wiring": "KEYPAD_NHM2",
                 "dsp_bootstrap": "BOOTSTRAP_PING_PONG",
                 "dsp_service_delay_us": "50",
+                "dsp_peer_poll_ms": "4",
                 "flash_b3_block_lock": "true",
                 "dsp_reset_wiring": "DSP_RESET_WIRING_3410",
                 "display": "DISPLAY_3410",
+                "ccont_board": "ADC_STANDARD",
             },
         )
         profile = self.driver.split("void nokia_dct3_state::noki3410(machine_config &config)", 1)[1]
