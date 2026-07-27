@@ -42,7 +42,8 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_service": "true",
                 "external_service_transport": "true",
                 "dsp_service_control":
-                    "nokia_dsp_hle_device::service_control_profile::compact",
+                    "DSP_SERVICE_CONTROL_COMPACT",
+                "external_service": "EXTERNAL_SERVICE_NSE8",
                 "radio": "RADIO_NSE8",
                 "dsp_service_delay_us": "4'000",
                 "dsp_peer_poll_ms": "4",
@@ -80,7 +81,8 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_bootstrap_exchanges": "58",
                 "keypad_five_rows": "true",
                 "dsp_service_control":
-                    "nokia_dsp_hle_device::service_control_profile::compact",
+                    "DSP_SERVICE_CONTROL_COMPACT",
+                "external_service": "EXTERNAL_SERVICE_NHM5",
             },
         )
 
@@ -106,7 +108,7 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_bootstrap_completion":
                     "nokia_dsp_hle_device::bootstrap_completion_profile::nse3_flash_verification_b06_verdict_unknown",
                 "dsp_service_control":
-                    "nokia_dsp_hle_device::service_control_profile::framed",
+                    "DSP_SERVICE_CONTROL_FRAMED",
             },
         )
         self.assertIn(
@@ -287,47 +289,42 @@ class MachineProfileTest(unittest.TestCase):
             self.makefile,
         )
 
-    def test_external_service_application_is_typed_per_supported_product(self):
-        self.assertIn("enum class application_profile", self.external_service_header)
+    def test_external_service_application_is_one_typed_product_contract(self):
         self.assertIn(
-            "application_profile m_application_profile = "
-            "application_profile::none;",
+            "struct application_contract", self.external_service_header
+        )
+        self.assertIn(
+            "application_contract m_application;",
             self.external_service_header,
         )
         self.assertIn(
-            "product.external_service_application",
+            "product.external_service",
             self.driver,
         )
-        profiles = {
-            "make_3210_config": "application_profile::nse8",
-            "make_3310_config": "application_profile::nhm5",
+        contracts = {
+            "make_3210_config": "EXTERNAL_SERVICE_NSE8",
+            "make_3310_config": "EXTERNAL_SERVICE_NHM5",
         }
-        for builder, profile in profiles.items():
+        for builder, contract in contracts.items():
             body = self.function_body(
                 f"constexpr nokia_product_config {builder}()",
                 "constexpr nokia_product_config",
             )
-            self.assertIn(profile, body)
+            self.assertIn(f"result.external_service = {contract};", body)
 
         for builder in ("make_3330_config", "make_6110_config"):
             body = self.function_body(
                 f"constexpr nokia_product_config {builder}()",
                 "constexpr nokia_product_config",
             )
-            self.assertNotIn("external_service_application =", body)
+            self.assertNotIn("external_service =", body)
 
-        self.assertEqual(
-            self.external_service.count(
-                "static constexpr profile_contract NSE8"
-            ),
-            1,
-        )
-        self.assertEqual(
-            self.external_service.count(
-                "static constexpr profile_contract NHM5"
-            ),
-            1,
-        )
+        self.assertIn("EXTERNAL_SERVICE_NSE8", self.driver)
+        self.assertIn("EXTERNAL_SERVICE_NHM5", self.driver)
+        self.assertNotIn("application_profile", self.external_service)
+        self.assertNotIn("application_profile", self.external_service_header)
+        self.assertNotIn("nse8", self.external_service.lower())
+        self.assertNotIn("nhm5", self.external_service.lower())
 
     def test_each_machine_applies_one_explicit_product_profile(self):
         expected = {

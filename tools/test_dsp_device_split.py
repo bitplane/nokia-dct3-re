@@ -58,17 +58,24 @@ class DspDeviceSplitTest(unittest.TestCase):
 
     def test_service_control_completion_framing_is_product_typed(self):
         for token in (
-            "enum class service_control_profile",
-            "service_control_profile::compact",
-            "service_control_profile::framed",
+            "struct service_control_contract",
+            "DSP_SERVICE_CONTROL_COMPACT",
+            "DSP_SERVICE_CONTROL_FRAMED",
             "0x00, 0x04, 0x01, 0x00, 0x0d, 0x00",
         ):
             self.assertIn(token, self.hle + self.phone)
         self.assertIn(
-            "set_service_control_profile(product.dsp_service_control)",
+            "set_service_control_contract(product.dsp_service_control)",
             self.phone,
         )
-        self.assertNotIn("service_control_profile", self.transport)
+        self.assertNotIn("service_control_contract", self.transport)
+        self.assertNotIn("service_control_profile", self.hle + self.phone)
+
+    def test_reusable_service_devices_have_no_product_named_profiles(self):
+        for token in ("nse8", "nhm5"):
+            self.assertNotIn(token, (self.hle + self.external).lower())
+        for token in ("application_profile", "service_control_profile"):
+            self.assertNotIn(token, self.hle + self.external)
 
     def test_bootstrap_is_peer_publication_not_read_overlay(self):
         self.assertIn("peer_shared_w", self.transport)

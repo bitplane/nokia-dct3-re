@@ -25,15 +25,15 @@ channels `0x5f` and `0x62`, its startup delay and its ordering are evidenced
 only for NSE-8/NHM-5. They must remain separately typed and disabled for NSE-3
 until its missing DSP side or a hardware trace establishes them.
 
-The implementation now mirrors that ownership. Product configuration selects
-an `application_profile` independently from the lower external-service
-transport. NSE-8 and NHM-5 have separate typed contracts even where their
-currently evidenced values match. `none` is the default for NSE-3, NHM-6,
-NHM-2 and unvalidated products, so enabling or exercising their lower DSP
-transport cannot silently inject the 3210/3310 registration delay, status
-payload or channel bitmap. The existing 3330 and 3410 frontier gates still
-reach their documented idle/interactive levels with this application profile
-disabled.
+The implementation now mirrors that ownership. Product configuration supplies
+one complete application contract independently from the lower
+external-service transport. NSE-8 and NHM-5 have separately named contracts
+even where their currently evidenced values match. The contract remains empty
+for NSE-3, NHM-6, NHM-2 and unvalidated products, so enabling or exercising
+their lower DSP transport cannot silently inject the 3210/3310 registration
+delay, status payload or channel bitmap. The existing 3330 and 3410 frontier
+gates still reach their documented idle/interactive levels with application
+behavior disabled.
 
 The machine-readable evidence is produced by `tools/message_census.py`. The ROM
 scan covers all 98 recovered calls to `service_message_alloc_234634`; all five

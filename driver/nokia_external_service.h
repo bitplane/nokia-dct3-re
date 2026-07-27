@@ -9,11 +9,21 @@
 class nokia_external_service_peer_device : public device_t
 {
 public:
-	enum class application_profile : u8
+	struct application_contract
 	{
-		none,
-		nse8,
-		nhm5,
+		unsigned start_delay_ticks = 0;
+		u8 registration_result = 0;
+		u8 registration_sequence = 0;
+		u8 channel_map_byte_a = 0;
+		u8 channel_map_mask_a = 0;
+		u8 channel_map_byte_b = 0;
+		u8 channel_map_mask_b = 0;
+		u8 channel_map_sequence = 0;
+
+		constexpr bool enabled() const
+		{
+			return start_delay_ticks != 0;
+		}
 	};
 
 	struct response
@@ -28,9 +38,9 @@ public:
 			const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
-	void set_application_profile(application_profile profile)
+	void set_application_contract(application_contract contract)
 	{
-		m_application_profile = profile;
+		m_application = contract;
 	}
 	void receive_frame(const u8 *payload, unsigned length);
 	void set_service_control_complete();
@@ -43,32 +53,19 @@ protected:
 	virtual void device_reset() override;
 
 private:
-	struct profile_contract
-	{
-		unsigned start_delay_ticks;
-		u8 registration_result;
-		u8 registration_sequence;
-		u8 channel_map_byte_a;
-		u8 channel_map_mask_a;
-		u8 channel_map_byte_b;
-		u8 channel_map_mask_b;
-		u8 channel_map_sequence;
-	};
-
 	static constexpr u8 DISCOVERY_NODE = 0x02;
 	static constexpr unsigned QUEUE_SIZE = 8;
 
 	bool queue_response(const u8 *payload, unsigned length, bool notify = true);
 	bool queue_transport_ack(const u8 *payload, unsigned length);
 	bool queue_service_frame(u8 command, u8 result, u8 sequence);
-	const profile_contract *contract() const;
 	bool application_enabled() const
 	{
-		return m_enabled && m_application_profile != application_profile::none;
+		return m_enabled && m_application.enabled();
 	}
 
 	bool m_enabled = false;
-	application_profile m_application_profile = application_profile::none;
+	application_contract m_application;
 	bool m_trace_enabled = false;
 	bool m_discovery_complete = false;
 	bool m_service_control_complete = false;

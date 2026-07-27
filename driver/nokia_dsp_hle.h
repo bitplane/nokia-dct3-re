@@ -29,18 +29,23 @@ public:
 		nse3_dsp_rom3_pair
 	};
 
-	enum class service_control_profile : u8
+	struct service_control_contract
 	{
-		none,
-		compact,
-		framed
+		std::array<u8, 6> completion = { 0 };
+		u8 completion_length = 0;
+
+		constexpr bool enabled() const
+		{
+			return completion_length != 0 &&
+					completion_length <= completion.size();
+		}
 	};
 
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
-	void set_service_control_profile(service_control_profile profile)
+	void set_service_control_contract(service_control_contract contract)
 	{
-		m_service_control_profile = profile;
+		m_service_control = contract;
 	}
 	void set_service_delay_us(unsigned delay) { m_service_delay_us = delay; }
 	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
@@ -115,7 +120,7 @@ private:
 	emu_timer *m_speech_timer = nullptr;
 	bool m_service_enabled = false;
 	bool m_external_service_enabled = false;
-	service_control_profile m_service_control_profile = service_control_profile::none;
+	service_control_contract m_service_control;
 	bool m_trace_enabled = false;
 	unsigned m_service_delay_us = 5'000;
 	unsigned m_peer_poll_ms = 5;

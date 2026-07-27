@@ -112,10 +112,8 @@ struct nokia_product_config
 	bool synthetic_sim_card = false;
 	bool dsp_service = false;
 	bool external_service_transport = false;
-	nokia_external_service_peer_device::application_profile external_service_application =
-			nokia_external_service_peer_device::application_profile::none;
-	nokia_dsp_hle_device::service_control_profile dsp_service_control =
-			nokia_dsp_hle_device::service_control_profile::none;
+	nokia_external_service_peer_device::application_contract external_service;
+	nokia_dsp_hle_device::service_control_contract dsp_service_control;
 	nokia_radio_peer_device::protocol_contract radio;
 	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
@@ -155,6 +153,31 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM5 = {
 	0x14, 0x01, 1'000, true
 };
 
+constexpr nokia_dsp_hle_device::service_control_contract
+		DSP_SERVICE_CONTROL_COMPACT = {
+	{ 0x0d, 0x00 }, 2
+};
+
+constexpr nokia_dsp_hle_device::service_control_contract
+		DSP_SERVICE_CONTROL_FRAMED = {
+	{ 0x00, 0x04, 0x01, 0x00, 0x0d, 0x00 }, 6
+};
+
+// These values currently match but remain separate evidence: NSE-8 and NHM-5
+// have independent organic startup and call gates. A new product must supply
+// its own complete contract rather than inheriting either handset.
+constexpr nokia_external_service_peer_device::application_contract
+		EXTERNAL_SERVICE_NSE8 = {
+	36, 0x01, 0x42,
+	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
+};
+
+constexpr nokia_external_service_peer_device::application_contract
+		EXTERNAL_SERVICE_NHM5 = {
+	36, 0x01, 0x42,
+	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
+};
+
 constexpr nokia_product_config make_3210_config()
 {
 	nokia_product_config result;
@@ -163,9 +186,8 @@ constexpr nokia_product_config make_3210_config()
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service_transport = true;
-	result.external_service_application =
-			nokia_external_service_peer_device::application_profile::nse8;
-	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::compact;
+	result.external_service = EXTERNAL_SERVICE_NSE8;
+	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	result.radio = RADIO_NSE8;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
@@ -206,9 +228,8 @@ constexpr nokia_product_config make_3310_config()
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service_transport = true;
-	result.external_service_application =
-			nokia_external_service_peer_device::application_profile::nhm5;
-	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::compact;
+	result.external_service = EXTERNAL_SERVICE_NHM5;
+	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	result.radio = RADIO_NHM5;
 	result.keypad_five_rows = true;
 	result.dsp_bootstrap_exchanges = 58;
@@ -247,7 +268,7 @@ constexpr nokia_product_config make_3310_config()
 // keypad. The 3310 analog tuple is retained as a calibrated compatibility
 // profile: it advances the virgin PMM organically, but does not prove NHM-6
 // PCB signal identity. Its lower external-service transport remains available,
-// but the application profile defaults to none: the independent NHM-6 gates
+// but the application contract remains empty: the independent NHM-6 gates
 // do not establish NHM-5's delay, registration body or channel bitmap.
 constexpr nokia_product_config make_3330_config()
 {
@@ -333,7 +354,7 @@ constexpr nokia_product_config make_6110_config()
 	// decoder supplies the missing four-byte frame transformation. Type this
 	// proven request-derived boundary independently; it remains dormant while
 	// the unresolved NSE-3 DSP bootstrap keeps the DSP service disabled.
-	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::framed;
+	result.dsp_service_control = DSP_SERVICE_CONTROL_FRAMED;
 	// Its external firmware independently proves the shared type-0x1a/68
 	// bitmap wire boundary. Record that separately from the still-unproved
 	// NSE-3 acquisition policy; a disabled peer cannot synthesize traffic.
@@ -764,7 +785,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	screen->set_visarea(0, product.lcd_visible_width - 1, 0, product.lcd_visible_height - 1);
 	m_dsp_hle->set_service_enabled(product.dsp_service);
 	m_dsp_hle->set_external_service_enabled(product.external_service_transport);
-	m_dsp_hle->set_service_control_profile(product.dsp_service_control);
+	m_dsp_hle->set_service_control_contract(product.dsp_service_control);
 	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
 	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
 	m_dsp_hle->set_parameter_command(product.dsp_parameter_command);
@@ -777,8 +798,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	// real DSP backend must instead select paths through COBBA's serial
 	// control transport; MCU speech state must never mutate this fallback.
 	m_cobba->set_hle_voice_profile(product.cobba_hle_voice);
-	m_external_service_peer->set_application_profile(
-			product.external_service_application);
+	m_external_service_peer->set_application_contract(product.external_service);
 	m_external_service_peer->set_enabled(product.external_service_transport);
 	m_radio_peer->set_protocol_contract(product.radio);
 	m_radio_peer->set_enabled(product.radio.enabled());
