@@ -71,14 +71,22 @@ contract. The default contract preserves ordinary latch behavior; the 3410
 selects its evidenced `0x53`/`0x04` pair atomically, and half-configured pairs
 are rejected.
 
-## Next bounded refactor
+## Completed KBGPIO board-wiring refactor
 
-The next coherent board-wiring pair is KBGPIO row topology and the power-key
-column mask. They should form one typed keypad wiring contract so a five-row
-matrix cannot accidentally retain an unrelated product's power-key wiring.
-Broadly wrapping all remaining enable flags in a capability object is still not
-justified: several apparently related flags deliberately encode independent
-negative or dormant evidence.
+KBGPIO row topology and the power-on column mask now form one device-owned
+wiring contract. Each evidenced product selects a separately named complete
+contract, even where NHM-5 and NHM-6 currently share values. Invalid row counts,
+multi-column power masks and masks outside the five physical columns are
+rejected by the device.
+
+## Next target
+
+No remaining scalar cluster has the same clear ownership and invalid-combination
+problem. DSP service delay and peer polling describe different mechanisms; SIM
+controller presence and card presence must remain independently testable; flash,
+EEPROM, boot and analogue settings belong to separate boundaries. The next
+useful pass should therefore investigate the reproducible 3330 CONTACT SERVICE
+frontier divergence rather than manufacture another wrapper.
 
 ## Acceptance status discovered by the audit
 

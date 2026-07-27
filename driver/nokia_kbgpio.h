@@ -8,12 +8,26 @@ class nokia_kbgpio_device : public device_t
 public:
 	nokia_kbgpio_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
+	struct wiring_contract
+	{
+		u8 rows = 4;
+		u8 power_on_column_mask = 0x04;
+
+		constexpr bool valid() const
+		{
+			return (rows == 4 || rows == 5) &&
+					power_on_column_mask != 0 &&
+					(power_on_column_mask & ~0x1f) == 0 &&
+					(power_on_column_mask &
+							(power_on_column_mask - 1)) == 0;
+		}
+	};
+
 	auto matrix_cb(unsigned column) { return m_matrix_cb[column].bind(); }
 	auto power_cb() { return m_power_cb.bind(); }
 	auto irq_cb() { return m_irq_cb.bind(); }
 
-	void set_five_rows(bool enabled) { m_five_rows = enabled; }
-	void set_power_on_column_mask(u8 mask) { m_power_on_column_mask = mask; }
+	void set_wiring_contract(wiring_contract contract);
 
 	static bool owns(offs_t offset);
 	u8 read(offs_t offset);
@@ -38,9 +52,8 @@ private:
 	u8 m_regs[0x100] = {0};
 	u8 m_columns = 0x1f;
 	u8 m_power_on = 0xff;
-	u8 m_power_on_column_mask = 0x04;
+	wiring_contract m_wiring;
 	bool m_irq_latched = false;
-	bool m_five_rows = false;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_KBGPIO, nokia_kbgpio_device)

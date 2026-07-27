@@ -52,7 +52,8 @@ within offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrup
 pending/masks, ARM IRQ/FIQ routing, and product-typed DSP reset/release
 readback wiring. Attached devices signal it through
 callbacks. `nokia_kbgpio_device` owns the sparse keyboard register families,
-matrix scan, cold-boot latch and IRQ edge state; product input ports and MAD2
+matrix scan, cold-boot latch, IRQ edge state and one validated product wiring
+contract for row topology and power-on column; product input ports and MAD2
 IRQ0 routing remain callbacks. `nokia_pup_device` owns output control, buzzer,
 vibrator and GenIO latches and drives the external EEPROM/audio/output devices
 through callbacks. `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, RX/TX holding

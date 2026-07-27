@@ -26,12 +26,13 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
         self.assertIn("required_device<nokia_kbgpio_device> m_kbgpio", self.phone)
         self.assertIn('matrix_cb(0).set_ioport("COL.0")', self.phone)
         self.assertIn('power_cb().set_ioport("PWR")', self.phone)
-        self.assertIn("set_five_rows(product.keypad_five_rows)", self.phone)
-        self.assertIn("set_power_on_column_mask(product.power_on_column_mask)", self.phone)
+        self.assertIn("set_wiring_contract(product.keypad_wiring)", self.phone)
         self.assertIn("m_mad2->set_irq_line(KEYPAD_IRQ_LINE_NUM, state)", self.phone)
 
     def test_power_on_latch_distinguishes_cold_and_domain_reset(self):
-        self.assertIn("m_power_on = ~m_power_on_column_mask", self.device)
+        self.assertIn(
+            "m_power_on = ~m_wiring.power_on_column_mask", self.device
+        )
         self.assertIn("clear_power_on_latch", self.header)
         self.assertIn("m_kbgpio->clear_power_on_latch()", self.phone)
 
@@ -46,6 +47,27 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
             self.assertIn(token, source)
         self.assertNotIn("pc()", source)
         self.assertNotRegex(source, r"0x2[0-9a-f]{5}")
+
+    def test_row_topology_and_power_column_are_one_typed_contract(self):
+        source = self.device + self.header + self.phone
+        for token in (
+            "struct wiring_contract",
+            "m_wiring.rows == 5",
+            "const unsigned row_count = m_wiring.rows",
+            "if (!contract.valid())",
+            "KEYPAD_NSE8",
+            "KEYPAD_NHM5",
+            "KEYPAD_NHM6",
+            "KEYPAD_NHM2",
+            "KEYPAD_NSE3",
+        ):
+            self.assertIn(token, source)
+        for retired in (
+            "set_five_rows",
+            "set_power_on_column_mask",
+            "keypad_five_rows",
+        ):
+            self.assertNotIn(retired, source)
 
 
 if __name__ == "__main__":

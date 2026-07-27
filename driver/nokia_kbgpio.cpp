@@ -20,6 +20,14 @@ nokia_kbgpio_device::nokia_kbgpio_device(const machine_config &mconfig, const ch
 {
 }
 
+void nokia_kbgpio_device::set_wiring_contract(wiring_contract contract)
+{
+	if (!contract.valid())
+		fatalerror("KBGPIO: invalid wiring rows=%u power-column-mask=%02x",
+				contract.rows, contract.power_on_column_mask);
+	m_wiring = contract;
+}
+
 bool nokia_kbgpio_device::owns(offs_t offset)
 {
 	return (offset >= 0x28 && offset <= 0x2b) ||
@@ -40,7 +48,7 @@ void nokia_kbgpio_device::device_reset()
 {
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
 	m_columns = 0x1f;
-	m_power_on = ~m_power_on_column_mask;
+	m_power_on = ~m_wiring.power_on_column_mask;
 	m_irq_latched = false;
 	update_irq();
 }
@@ -48,16 +56,17 @@ void nokia_kbgpio_device::device_reset()
 u8 nokia_kbgpio_device::sample_columns(bool consume_power_on)
 {
 	u8 data = 0x1f;
-	const u8 row_mask = m_five_rows ? 0x1f : 0x0f;
+	const bool five_rows = m_wiring.rows == 5;
+	const u8 row_mask = five_rows ? 0x1f : 0x0f;
 	const u8 rows_low = m_regs[ROW_DIRECTION] & ~m_regs[ROW_SIGNAL] & row_mask;
-	const unsigned row_count = m_five_rows ? 5 : 4;
+	const unsigned row_count = m_wiring.rows;
 
 	for (unsigned column = 0; column < 5; column++)
 	{
 		const u8 keys = m_matrix_cb[column]();
 		for (unsigned row = 0; row < row_count; row++)
 		{
-			const unsigned key_bit = m_five_rows ? row : row + 1;
+			const unsigned key_bit = five_rows ? row : row + 1;
 			if (BIT(rows_low, row) && !BIT(keys, key_bit))
 				data &= ~(u8(1) << column);
 		}

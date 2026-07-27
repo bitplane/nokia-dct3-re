@@ -36,7 +36,7 @@ class MachineProfileTest(unittest.TestCase):
         self.assert_profile_fields(
             "make_3210_config",
             {
-                "power_on_column_mask": "0x01",
+                "keypad_wiring": "KEYPAD_NSE8",
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
                 "dsp_service": "true",
@@ -81,7 +81,7 @@ class MachineProfileTest(unittest.TestCase):
             "make_3310_config",
             {
                 "dsp_bootstrap": "BOOTSTRAP_READY_58",
-                "keypad_five_rows": "true",
+                "keypad_wiring": "KEYPAD_NHM5",
                 "dsp_service_control":
                     "DSP_SERVICE_CONTROL_COMPACT",
                 "external_service": "EXTERNAL_SERVICE_NHM5",
@@ -94,9 +94,8 @@ class MachineProfileTest(unittest.TestCase):
         self.assert_profile_fields(
             "make_6110_config",
             {
-                "power_on_column_mask": "0x01",
+                "keypad_wiring": "KEYPAD_NSE3",
                 "boot_rom_bypass": "false",
-                "keypad_five_rows": "true",
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
                 "dsp_bootstrap":
@@ -247,7 +246,7 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_service": "true",
                 "external_service_transport": "true",
                 "dsp_bootstrap": "BOOTSTRAP_READY_64",
-                "keypad_five_rows": "true",
+                "keypad_wiring": "KEYPAD_NHM6",
                 "ccont_board": "ADC_STANDARD",
             },
         )
@@ -265,7 +264,7 @@ class MachineProfileTest(unittest.TestCase):
             "constexpr nokia_product_config PRODUCT_3210",
         )
         self.assertIn("nokia_product_config result;", body)
-        self.assertIn("result.power_on_column_mask = power_on_column_mask;", body)
+        self.assertIn("result.keypad_wiring = keypad_wiring;", body)
         self.assertIn("result.dsp_bootstrap = BOOTSTRAP_READY_64;", body)
         self.assertIn("bool simi_controller = false;", self.driver)
         self.assertIn("bool synthetic_sim_card = false;", self.driver)
@@ -382,7 +381,7 @@ class MachineProfileTest(unittest.TestCase):
         self.assert_profile_fields(
             "make_3410_config",
             {
-                "power_on_column_mask": "0x02",
+                "keypad_wiring": "KEYPAD_NHM2",
                 "dsp_bootstrap": "BOOTSTRAP_PING_PONG",
                 "dsp_service_delay_us": "50",
                 "flash_b3_block_lock": "true",

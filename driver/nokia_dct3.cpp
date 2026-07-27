@@ -129,7 +129,7 @@ struct nokia_product_config
 		nokia_dsp_hle_device::bootstrap_contract contract;
 	};
 
-	u8 power_on_column_mask = 0x04;
+	nokia_kbgpio_device::wiring_contract keypad_wiring;
 	bool boot_rom_bypass = true;
 	bool simi_controller = false;
 	bool synthetic_sim_card = false;
@@ -138,7 +138,6 @@ struct nokia_product_config
 	nokia_external_service_peer_device::application_contract external_service;
 	nokia_dsp_hle_device::service_control_contract dsp_service_control;
 	nokia_radio_peer_device::protocol_contract radio;
-	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
 	nokia_dsp_hle_device::bootstrap_contract dsp_bootstrap;
 	std::optional<bootstrap_bios_override> dsp_bootstrap_override;
@@ -207,6 +206,17 @@ constexpr nokia_mad2_device::dsp_reset_wiring_contract
 static_assert(nokia_mad2_device::dsp_reset_wiring_contract{}.valid());
 static_assert(DSP_RESET_WIRING_3410.valid());
 
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE8 = { 4, 0x01 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE3 = { 5, 0x01 };
+static_assert(KEYPAD_NSE8.valid());
+static_assert(KEYPAD_NHM5.valid());
+static_assert(KEYPAD_NHM6.valid());
+static_assert(KEYPAD_NHM2.valid());
+static_assert(KEYPAD_NSE3.valid());
+
 // These values currently match but remain separate evidence: NSE-8 and NHM-5
 // have independent organic startup and call gates. A new product must supply
 // its own complete contract rather than inheriting either handset.
@@ -268,7 +278,7 @@ constexpr nokia_dsp_hle_device::bootstrap_contract
 constexpr nokia_product_config make_3210_config()
 {
 	nokia_product_config result;
-	result.power_on_column_mask = 0x01;
+	result.keypad_wiring = KEYPAD_NSE8;
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
@@ -317,7 +327,7 @@ constexpr nokia_product_config make_3310_config()
 	result.external_service = EXTERNAL_SERVICE_NHM5;
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	result.radio = RADIO_NHM5;
-	result.keypad_five_rows = true;
+	result.keypad_wiring = KEYPAD_NHM5;
 	result.dsp_bootstrap = BOOTSTRAP_READY_58;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
@@ -362,7 +372,7 @@ constexpr nokia_product_config make_3330_config()
 	result.dsp_service = true;
 	result.external_service_transport = true;
 	result.dsp_bootstrap = BOOTSTRAP_READY_64;
-	result.keypad_five_rows = true;
+	result.keypad_wiring = KEYPAD_NHM6;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
 	result.ccont_board = ADC_STANDARD;
@@ -375,7 +385,7 @@ constexpr nokia_product_config make_3330_config()
 constexpr nokia_product_config make_3410_config()
 {
 	nokia_product_config result = make_3330_config();
-	result.power_on_column_mask = 0x02;
+	result.keypad_wiring = KEYPAD_NHM2;
 	result.dsp_bootstrap = BOOTSTRAP_PING_PONG;
 	result.dsp_service_delay_us = 50;
 	result.flash_b3_block_lock = true;
@@ -387,9 +397,8 @@ constexpr nokia_product_config make_3410_config()
 constexpr nokia_product_config make_6110_config()
 {
 	nokia_product_config result;
-	result.power_on_column_mask = 0x01;
+	result.keypad_wiring = KEYPAD_NSE3;
 	result.boot_rom_bypass = false;
-	result.keypad_five_rows = true;
 	result.simi_controller = true;
 	// NSE-3 v4.06 accepts direct/inverse convention ATRs, parses the T0/TDn
 	// interface-byte chain and maps the lab card's TA1=0x05 to PPS ff 00 ff.
@@ -459,10 +468,11 @@ constexpr nokia_product_config make_6110_config()
 
 // Preserve the previous 64-exchange behavior for unvalidated products. This is
 // an explicit compatibility calibration, not a recovered cross-DCT3 constant.
-constexpr nokia_product_config make_conservative_config(u8 power_on_column_mask = 0x04)
+constexpr nokia_product_config make_conservative_config(
+		nokia_kbgpio_device::wiring_contract keypad_wiring = {})
 {
 	nokia_product_config result;
-	result.power_on_column_mask = power_on_column_mask;
+	result.keypad_wiring = keypad_wiring;
 	result.dsp_bootstrap = BOOTSTRAP_READY_64;
 	return result;
 }
@@ -473,8 +483,10 @@ constexpr nokia_product_config PRODUCT_3330 = make_3330_config();
 constexpr nokia_product_config PRODUCT_3410 = make_3410_config();
 constexpr nokia_product_config PRODUCT_6110 = make_6110_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
-constexpr nokia_product_config PRODUCT_5X10 = make_conservative_config(0x10);
-constexpr nokia_product_config PRODUCT_8XXX = make_conservative_config(0x10);
+constexpr nokia_product_config PRODUCT_5X10 =
+		make_conservative_config({ 4, 0x10 });
+constexpr nokia_product_config PRODUCT_8XXX =
+		make_conservative_config({ 4, 0x10 });
 
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
@@ -847,8 +859,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_product = product;
 	m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
-	m_kbgpio->set_five_rows(product.keypad_five_rows);
-	m_kbgpio->set_power_on_column_mask(product.power_on_column_mask);
+	m_kbgpio->set_wiring_contract(product.keypad_wiring);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
 	if (!product.display.valid())
 		fatalerror("DCT3: invalid product display geometry %ux%u/%ux%u",
