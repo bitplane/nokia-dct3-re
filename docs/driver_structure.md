@@ -29,7 +29,8 @@ shared RAM, DSPIF, packet rings and FIQ0/IRQ4 signaling;
 state and service timing; DSPIF carries no DSP-behavior configuration, making
 the HLE a replaceable backend seam;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
-session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation; and
+session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation
+behind one typed protocol contract and private acquisition strategies; and
 `nokia_lapdm_link_device` owns decoded LAPDm establishment state, contention
 identity, sequence numbers, stop-and-wait downlink segmentation and pending
 downlink acknowledgements;
@@ -104,9 +105,11 @@ their documented surviving domains.
 
 ## Component completion gate
 
-A subsystem leaves this driver only when its external interface is explicit, save-state fields are
-registered, configuration contains no firmware addresses, and both the 3210 oracle and the current
-cross-ROM smoke pass. Phone-specific constants remain in machine configuration.
+A subsystem leaves this driver only when its external interface is explicit,
+save-state fields are registered, configuration contains no firmware addresses,
+and the applicable 3210 paired-ROM, 3310 independent-product and current
+cross-ROM gates pass. Phone-specific constants remain in typed machine
+configuration.
 
 The local 3330 PPM E Wintesla records are normalized reproducibly by
 `make normalize-3330` and exercised by `make smoke-3330e`. This is a labelled

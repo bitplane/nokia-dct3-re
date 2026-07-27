@@ -58,6 +58,17 @@ class MameSourceComplianceTest(unittest.TestCase):
                 self.assertNotIn("getenv", text)
                 self.assertNotIn("NOKIA_DCT3_", text)
 
+    def test_generic_gsm_layers_do_not_branch_on_handset_families(self):
+        for name in (
+            "nokia_gsm_session.cpp",
+            "nokia_lapdm_link.cpp",
+            "gsm_tch_f_l1.cpp",
+        ):
+            with self.subTest(source=name):
+                text = (DRIVER / name).read_text().lower()
+                self.assertNotIn("nse8", text)
+                self.assertNotIn("nhm5", text)
+
 
 if __name__ == "__main__":
     unittest.main()

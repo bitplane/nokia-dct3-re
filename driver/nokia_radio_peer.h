@@ -15,18 +15,25 @@
 class nokia_radio_peer_device : public device_t
 {
 public:
-	enum class wire_profile : u8
+	enum class acquisition_strategy : u8
 	{
 		none,
-		bitmap_search,
-		candidate_list
+		bitmap_multistage,
+		candidate_window
 	};
 
-	enum class acquisition_profile : u8
+	struct protocol_contract
 	{
-		none,
-		nse8,
-		nhm5
+		acquisition_strategy acquisition = acquisition_strategy::none;
+		u8 traffic_release_parameter = 0;
+		u8 assigned_channel_confirmation = 0;
+		unsigned mm_information_settle_ticks = 0;
+		bool repeat_empty_assigned_uplink = false;
+
+		constexpr bool enabled() const
+		{
+			return acquisition != acquisition_strategy::none;
+		}
 	};
 
 	// GSM 06.10/ETSI TS 46.010 full-rate speech: one 20 ms, 260-bit
@@ -44,10 +51,9 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
-	void set_wire_profile(wire_profile profile) { m_wire_profile = profile; }
-	void set_acquisition_profile(acquisition_profile profile)
+	void set_protocol_contract(protocol_contract contract)
 	{
-		m_acquisition_profile = profile;
+		m_protocol = contract;
 	}
 	void set_page_after_registration(bool enabled)
 	{
@@ -145,10 +151,25 @@ private:
 	};
 
 	static const char *phase_name(u8 value);
+	enum class search_request : u8
+	{
+		none,
+		bitmap_multistage,
+		candidate_window
+	};
+	search_request decode_search_request(
+			const nokia_dspif_device::packet &packet);
+	bool handle_search_request(search_request request);
+	bool handle_acquisition_packet(
+			const nokia_dspif_device::packet &packet);
+	bool phase_waits() const;
 	u8 next_report_type() const;
 	unsigned serving_cycle_reports() const;
 	bool serving_pch_report() const;
 	u32 paging_frame_number(u32 minimum_frame_number) const;
+	void encode_measurement_report(u8 *payload) const;
+	void encode_channel_confirmation(u8 *payload) const;
+	void encode_random_access_info(u8 *payload);
 	void emit_report();
 	void advance_after_report(u8 report_type);
 	static constexpr unsigned speech_queue_depth = 8;
@@ -172,8 +193,7 @@ private:
 	required_device<nokia_lapdm_link_device> m_lapdm_link;
 	emu_timer *m_burst_timer = nullptr;
 	bool m_enabled = false;
-	wire_profile m_wire_profile = wire_profile::none;
-	acquisition_profile m_acquisition_profile = acquisition_profile::none;
+	protocol_contract m_protocol;
 	bool m_trace_enabled = false;
 	unsigned m_reports_sent = 0;
 	unsigned m_reports_remaining = 0;

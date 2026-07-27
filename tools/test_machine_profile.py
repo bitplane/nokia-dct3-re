@@ -43,7 +43,7 @@ class MachineProfileTest(unittest.TestCase):
                 "external_service_transport": "true",
                 "dsp_service_control":
                     "nokia_dsp_hle_device::service_control_profile::compact",
-                "radio_peer": "true",
+                "radio": "RADIO_NSE8",
                 "dsp_service_delay_us": "4'000",
                 "dsp_peer_poll_ms": "4",
                 "ccont_board": "ADC_3210",
@@ -66,7 +66,8 @@ class MachineProfileTest(unittest.TestCase):
             "set_external_service_enabled(product.external_service_transport)",
             apply,
         )
-        self.assertIn("set_enabled(product.radio_peer)", apply)
+        self.assertIn("set_protocol_contract(product.radio)", apply)
+        self.assertIn("set_enabled(product.radio.enabled())", apply)
         self.assertIn("set_service_delay_us(product.dsp_service_delay_us)", apply)
         self.assertIn("set_peer_poll_ms(product.dsp_peer_poll_ms)", apply)
         self.assertNotIn("nokia_env_u32", apply)
@@ -101,8 +102,6 @@ class MachineProfileTest(unittest.TestCase):
                 "cobba_hle_voice.microphone": "nokia_cobba_device::mic2",
                 "cobba_hle_voice.output": "nokia_cobba_device::ear",
                 "pup_eeprom_scl_bit": "2",
-                "radio_wire":
-                    "nokia_radio_peer_device::wire_profile::bitmap_search",
                 "dsp_parameter_command": "0x08",
                 "dsp_bootstrap_completion":
                     "nokia_dsp_hle_device::bootstrap_completion_profile::nse3_flash_verification_b06_verdict_unknown",
@@ -118,14 +117,14 @@ class MachineProfileTest(unittest.TestCase):
             "constexpr nokia_product_config make_6110_config",
             "constexpr nokia_product_config make_conservative_config",
         )
-        for peer in ("dsp_service", "external_service", "radio_peer"):
+        for peer in ("dsp_service", "external_service"):
             field = (
                 "external_service_transport"
                 if peer == "external_service"
                 else peer
             )
             self.assertNotIn(f"result.{field} = true;", body)
-        self.assertNotIn("result.radio_acquisition =", body)
+        self.assertNotIn("result.radio =", body)
         self.assertNotIn("result.dsp_speech_request_mask =", body)
         self.assertNotIn("result.dsp_speech_request_value =", body)
 
@@ -142,23 +141,28 @@ class MachineProfileTest(unittest.TestCase):
         ):
             self.assertIn(declaration, profile)
 
-    def test_radio_wire_and_acquisition_policy_are_product_typed_separately(self):
+    def test_radio_protocol_is_one_typed_product_contract(self):
         self.assertIn(
-            "nokia_radio_peer_device::wire_profile radio_wire",
+            "nokia_radio_peer_device::protocol_contract radio",
             self.driver,
         )
         self.assertIn(
-            "nokia_radio_peer_device::acquisition_profile radio_acquisition",
+            "result.radio = RADIO_NSE8;",
             self.driver,
         )
         self.assertIn(
-            "m_radio_peer->set_wire_profile(product.radio_wire);",
+            "result.radio = RADIO_NHM5;",
             self.driver,
         )
         self.assertIn(
-            "m_radio_peer->set_acquisition_profile(product.radio_acquisition);",
+            "m_radio_peer->set_protocol_contract(product.radio);",
             self.driver,
         )
+        for retired in (
+            "wire_profile", "acquisition_profile", "radio_wire",
+            "radio_acquisition", "bool radio_peer",
+        ):
+            self.assertNotIn(retired, self.driver)
 
     def test_6110_map_uses_nse3_physical_extents_without_later_rom2_alias(self):
         body = self.function_body(
@@ -260,7 +264,10 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("bool synthetic_sim_card = false;", self.driver)
         self.assertIn("bool dsp_service = false;", self.driver)
         self.assertIn("bool external_service_transport = false;", self.driver)
-        self.assertIn("bool radio_peer = false;", self.driver)
+        self.assertIn(
+            "nokia_radio_peer_device::protocol_contract radio;",
+            self.driver,
+        )
 
     def test_multi_model_frontiers_reset_the_correct_bios_nvram_namespace(self):
         self.assertIn("noki3310_3", self.makefile)

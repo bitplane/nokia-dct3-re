@@ -838,15 +838,16 @@ outputs are task-3 objects and numeric internal notifications. Their meanings
 are not assigned by the exact image, and this handler does not establish the
 missing `0x13b8 -> 0x13aa` controller edge.
 
-The emulator configuration now reflects this evidence directly. Radio
-`wire_profile` selects only packet representation (`bitmap_search` or
-`candidate_list`), while `acquisition_profile` selects the product-specific
-sequencing and timing policy (`nse8` or `nhm5`). The 3210 and 3310 select both
-halves of their proven contracts. The 6110 selects the proven shared
-`bitmap_search` wire format but leaves acquisition policy `none` and keeps the
-peer disabled. This prevents a future caller from treating identical bitmap
-packing as proof of the entire NSE-8 search lifecycle, while avoiding a copied
-NSE-3 packet codec.
+The emulator configuration now reflects this evidence directly. A radio peer
+is enabled only by one complete typed protocol contract: acquisition packet
+grammar and sequencing, channel confirmation, traffic release, assigned-link
+continuation and MM pacing are selected atomically. The 3210 and 3310 each
+select an independently proved complete contract. The 6110's shared bitmap
+packing remains documented evidence but is deliberately not expressible as a
+partial runtime contract, so its radio peer stays disabled until the NSE-3
+acquisition lifecycle is proved. This prevents identical bitmap packing from
+being mistaken for proof of the entire NSE-8 search lifecycle without copying
+an NSE-3 packet codec prematurely.
 
 ### External-service transport and application boundary
 

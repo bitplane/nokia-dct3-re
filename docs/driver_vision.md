@@ -20,7 +20,7 @@ not compatibility mechanisms.
 | Buzzer | MZT-03C represented by a MAME beeper driven through the extracted PUP enable and 13 MHz divider; mapped-MMIO and organic user-alarm lifecycles are regression-tested | Recover volume/acoustic response. DSP/COBBA tones are modeled separately. |
 | Vibrator | Optional vibra battery pack exposed as a named MAME output from the extracted PUP enable gate; the separate control latch is retained | Exercise an organic alert/call path and recover the frequency/mode encoding. |
 | Backlight | Unmodeled; the service manual places separate LCD/key-light outputs behind COBBA and the UI-Switch, while paired-ROM traces falsify a direct GenIO-bit-6 model | Recover the firmware command at the MAD2-to-COBBA boundary before adding illumination outputs. |
-| Startup/service/GSM peers | `nokia_external_service_peer_device` owns request-driven class-`0x40` service sessions; `nokia_radio_peer_device` owns Nokia L1 transaction correlation plus BCCH/PCH and dedicated-channel scheduling; `nokia_lapdm_link_device` owns decoded bidirectional SAPI-0/SAPI-3 establishment, sequence and release state; `nokia_gsm_session_device` owns registration, paging and bounded incoming-call/SMS Layer-3 state; `nokia_gsm_network_device` owns immutable standards-shaped cell/message data including ordinary text and a bounded two-part port-addressed Smart Messaging vector | Validate each logical peer against another ROM family without treating DSPIF transport as peer ownership; extend the proved deterministic answered-call boundary only when organic speech traffic exposes a lower interface, recover the SMS CP/RP closing tail so the queued second Smart Message part can run, and keep codec work separate. |
+| Startup/service/GSM peers | `nokia_external_service_peer_device` owns request-driven class-`0x40` service sessions; `nokia_radio_peer_device` owns Nokia L1 correlation and scheduling behind one immutable protocol contract, with private bitmap-multistage and candidate-window acquisition strategies; `nokia_lapdm_link_device` owns decoded bidirectional SAPI-0/SAPI-3 establishment, sequence and release state; `nokia_gsm_session_device` owns registration, paging and bounded incoming-call/SMS Layer-3 state; `nokia_gsm_network_device` owns immutable standards-shaped cell/message data. Shared dedicated-channel, call and speech behavior consumes contract values rather than branching on handset families. | Validate each logical peer against another ROM family without treating DSPIF transport as peer ownership; recover the SMS CP/RP closing tail so the queued second Smart Message part can run; extend mobility and ciphering only from organic traffic. |
 
 See `mad2_fidelity.md` for register-level implementation status and
 `driver_structure.md` for ownership rules.
@@ -73,6 +73,13 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
    precision.
 5. Extend product coverage through typed profiles and device data, never
    firmware-PC compatibility branches.
+
+The radio protocol is configured atomically. A product selects one complete
+contract containing its acquisition strategy, channel-confirmation policy,
+traffic-release parameter, assigned-link continuation and MM pacing. Partial
+wire/acquisition combinations are not representable; a product with only a
+static wire observation remains disabled until its acquisition lifecycle is
+proved.
 
 ## Engineering rules
 

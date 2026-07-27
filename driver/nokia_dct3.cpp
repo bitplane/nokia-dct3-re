@@ -116,11 +116,7 @@ struct nokia_product_config
 			nokia_external_service_peer_device::application_profile::none;
 	nokia_dsp_hle_device::service_control_profile dsp_service_control =
 			nokia_dsp_hle_device::service_control_profile::none;
-	bool radio_peer = false;
-	nokia_radio_peer_device::wire_profile radio_wire =
-			nokia_radio_peer_device::wire_profile::none;
-	nokia_radio_peer_device::acquisition_profile radio_acquisition =
-			nokia_radio_peer_device::acquisition_profile::none;
+	nokia_radio_peer_device::protocol_contract radio;
 	bool keypad_five_rows = false;
 	bool ccont_wddisx_grounded = false;
 	bool nse3_bootstrap_selected_by_bios = false;
@@ -149,6 +145,16 @@ struct nokia_product_config
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
 
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NSE8 = {
+	nokia_radio_peer_device::acquisition_strategy::bitmap_multistage,
+	0x08, 0x00, 0, false
+};
+
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM5 = {
+	nokia_radio_peer_device::acquisition_strategy::candidate_window,
+	0x14, 0x01, 1'000, true
+};
+
 constexpr nokia_product_config make_3210_config()
 {
 	nokia_product_config result;
@@ -160,10 +166,7 @@ constexpr nokia_product_config make_3210_config()
 	result.external_service_application =
 			nokia_external_service_peer_device::application_profile::nse8;
 	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::compact;
-	result.radio_peer = true;
-	result.radio_wire = nokia_radio_peer_device::wire_profile::bitmap_search;
-	result.radio_acquisition =
-			nokia_radio_peer_device::acquisition_profile::nse8;
+	result.radio = RADIO_NSE8;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
 	// Paired NSE-8 firmware independently constructs/removes this field around
@@ -206,10 +209,7 @@ constexpr nokia_product_config make_3310_config()
 	result.external_service_application =
 			nokia_external_service_peer_device::application_profile::nhm5;
 	result.dsp_service_control = nokia_dsp_hle_device::service_control_profile::compact;
-	result.radio_peer = true;
-	result.radio_wire = nokia_radio_peer_device::wire_profile::candidate_list;
-	result.radio_acquisition =
-			nokia_radio_peer_device::acquisition_profile::nhm5;
+	result.radio = RADIO_NHM5;
 	result.keypad_five_rows = true;
 	result.dsp_bootstrap_exchanges = 58;
 	result.dsp_service_delay_us = 4'000;
@@ -337,7 +337,6 @@ constexpr nokia_product_config make_6110_config()
 	// Its external firmware independently proves the shared type-0x1a/68
 	// bitmap wire boundary. Record that separately from the still-unproved
 	// NSE-3 acquisition policy; a disabled peer cannot synthesize traffic.
-	result.radio_wire = nokia_radio_peer_device::wire_profile::bitmap_search;
 	// NSE-3 independently publishes selector 8 as 0x8000 | value[11:0].
 	// Decode that proven wire command, but leave the speech-request predicate
 	// empty until an organic Answer/End transition identifies its semantics.
@@ -781,9 +780,8 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_external_service_peer->set_application_profile(
 			product.external_service_application);
 	m_external_service_peer->set_enabled(product.external_service_transport);
-	m_radio_peer->set_enabled(product.radio_peer);
-	m_radio_peer->set_wire_profile(product.radio_wire);
-	m_radio_peer->set_acquisition_profile(product.radio_acquisition);
+	m_radio_peer->set_protocol_contract(product.radio);
+	m_radio_peer->set_enabled(product.radio.enabled());
 	m_b3_flash->set_enabled(product.flash_b3_block_lock);
 }
 
@@ -834,7 +832,7 @@ void nokia_dct3_state::machine_reset()
 			m_product.external_service_transport && BIT(hardware, 3));
 	m_external_service_peer->set_enabled(
 			m_product.external_service_transport && BIT(hardware, 3));
-	m_radio_peer->set_enabled(m_product.radio_peer && BIT(hardware, 4));
+	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
 	m_gsm_session->set_authentication_required(
