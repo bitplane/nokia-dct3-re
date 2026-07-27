@@ -45,6 +45,8 @@ class MachineProfileTest(unittest.TestCase):
                     "DSP_SERVICE_CONTROL_COMPACT",
                 "external_service": "EXTERNAL_SERVICE_NSE8",
                 "radio": "RADIO_NSE8",
+                "dsp_speech_control":
+                    "DSP_SPEECH_CONTROL_NSE8",
                 "dsp_service_delay_us": "4'000",
                 "dsp_peer_poll_ms": "4",
                 "ccont_board": "ADC_3210",
@@ -83,6 +85,8 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_service_control":
                     "DSP_SERVICE_CONTROL_COMPACT",
                 "external_service": "EXTERNAL_SERVICE_NHM5",
+                "dsp_speech_control":
+                    "DSP_SPEECH_CONTROL_NHM5",
             },
         )
 
@@ -104,7 +108,8 @@ class MachineProfileTest(unittest.TestCase):
                 "cobba_hle_voice.microphone": "nokia_cobba_device::mic2",
                 "cobba_hle_voice.output": "nokia_cobba_device::ear",
                 "pup_eeprom_scl_bit": "2",
-                "dsp_parameter_command": "0x08",
+                "dsp_speech_control":
+                    "DSP_SPEECH_CONTROL_NSE3_COMMAND",
                 "dsp_service_control":
                     "DSP_SERVICE_CONTROL_FRAMED",
             },
@@ -125,8 +130,8 @@ class MachineProfileTest(unittest.TestCase):
             )
             self.assertNotIn(f"result.{field} = true;", body)
         self.assertNotIn("result.radio =", body)
-        self.assertNotIn("result.dsp_speech_request_mask =", body)
-        self.assertNotIn("result.dsp_speech_request_value =", body)
+        self.assertNotIn("DSP_SPEECH_CONTROL_NSE8", body)
+        self.assertNotIn("DSP_SPEECH_CONTROL_NHM5", body)
         self.assertIn("2, BOOTSTRAP_FLASH_VERIFICATION_ROM3", body)
         self.assertNotIn("3, BOOTSTRAP_FLASH_VERIFICATION_ROM3", body)
 

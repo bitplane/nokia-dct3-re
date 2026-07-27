@@ -128,9 +128,7 @@ struct nokia_product_config
 	std::optional<bootstrap_bios_override> dsp_bootstrap_override;
 	unsigned dsp_service_delay_us = 5'000;
 	unsigned dsp_peer_poll_ms = 5;
-	u8 dsp_parameter_command = 0xff;
-	u16 dsp_speech_request_mask = 0;
-	u16 dsp_speech_request_value = 0;
+	nokia_dsp_hle_device::speech_control_contract dsp_speech_control;
 	nokia_mad2_pcm_device::bus_profile cobba_pcm;
 	nokia_cobba_device::hle_voice_profile cobba_hle_voice;
 	bool flash_b3_block_lock = false;
@@ -162,6 +160,26 @@ constexpr nokia_dsp_hle_device::service_control_contract
 constexpr nokia_dsp_hle_device::service_control_contract
 		DSP_SERVICE_CONTROL_FRAMED = {
 	{ 0x00, 0x04, 0x01, 0x00, 0x0d, 0x00 }, 6
+};
+
+// These predicates currently match but remain separate evidence. NSE-8 and
+// NHM-5 each prove command 0x08 and field 0x0201 through their own organic
+// Answer/End lifecycle.
+constexpr nokia_dsp_hle_device::speech_control_contract
+		DSP_SPEECH_CONTROL_NSE8 = {
+	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
+};
+
+constexpr nokia_dsp_hle_device::speech_control_contract
+		DSP_SPEECH_CONTROL_NHM5 = {
+	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
+};
+
+// NSE-3 proves selector 8's wire decoder, but no organic call has identified a
+// speech-request predicate. Keep command decoding without enabling speech.
+constexpr nokia_dsp_hle_device::speech_control_contract
+		DSP_SPEECH_CONTROL_NSE3_COMMAND = {
+	0x08, std::nullopt
 };
 
 // These values currently match but remain separate evidence: NSE-8 and NHM-5
@@ -238,9 +256,7 @@ constexpr nokia_product_config make_3210_config()
 	result.dsp_peer_poll_ms = 4;
 	// Paired NSE-8 firmware independently constructs/removes this field around
 	// Answer while retaining the separate 0x0408 dedicated-channel field.
-	result.dsp_parameter_command = 0x08;
-	result.dsp_speech_request_mask = 0x0201;
-	result.dsp_speech_request_value = 0x0201;
+	result.dsp_speech_control = DSP_SPEECH_CONTROL_NSE8;
 	result.cobba_pcm.data_clock = 520'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	// DCT3 MAD2/COBBA-GJ PCM timing diagrams show a 16-bit serial word
@@ -284,9 +300,7 @@ constexpr nokia_product_config make_3310_config()
 	// after organic Answer, then 0x040a during physical-End teardown. Those
 	// values satisfy and clear the same recovered speech-request field, but do
 	// not establish a PCM bus for this product.
-	result.dsp_parameter_command = 0x08;
-	result.dsp_speech_request_mask = 0x0201;
-	result.dsp_speech_request_value = 0x0201;
+	result.dsp_speech_control = DSP_SPEECH_CONTROL_NHM5;
 	// Nokia's NHM-5/UB 4 V09 COBBA schematic (version 2.0, 04.05.2001)
 	// independently wires the built-in differential microphone pads through
 	// L402 to MIC2P/MIC2N and the receiver to EARP/EARN. Record that topology
@@ -406,7 +420,7 @@ constexpr nokia_product_config make_6110_config()
 	// NSE-3 independently publishes selector 8 as 0x8000 | value[11:0].
 	// Decode that proven wire command, but leave the speech-request predicate
 	// empty until an organic Answer/End transition identifies its semantics.
-	result.dsp_parameter_command = 0x08;
+	result.dsp_speech_control = DSP_SPEECH_CONTROL_NSE3_COMMAND;
 	result.cobba_pcm.data_clock = 1'000'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	result.cobba_pcm.sample_bits = 13;
@@ -826,10 +840,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_dsp_hle->set_service_control_contract(product.dsp_service_control);
 	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
 	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
-	m_dsp_hle->set_parameter_command(product.dsp_parameter_command);
-	m_dsp_hle->set_speech_request_policy(
-			product.dsp_speech_request_mask,
-			product.dsp_speech_request_value);
+	m_dsp_hle->set_speech_control_contract(product.dsp_speech_control);
 	m_mad2_pcm->set_bus_profile(product.cobba_pcm);
 	m_cobba->set_pcm_sample_bits(product.cobba_pcm.sample_bits);
 	// This explicitly configures the HLE's internal-handset path. A future

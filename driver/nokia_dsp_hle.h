@@ -70,6 +70,30 @@ public:
 		}
 	};
 
+	struct speech_request_predicate
+	{
+		u16 mask = 0;
+		u16 value = 0;
+	};
+
+	struct speech_control_contract
+	{
+		std::optional<u8> parameter_command;
+		std::optional<speech_request_predicate> request;
+
+		constexpr bool accepts_parameter_command(u16 wire) const
+		{
+			return parameter_command &&
+					(wire >> 12) == *parameter_command;
+		}
+
+		constexpr bool speech_requested(u16 control) const
+		{
+			return request && request->mask != 0 &&
+					(control & request->mask) == request->value;
+		}
+	};
+
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_control_contract(service_control_contract contract)
@@ -78,14 +102,9 @@ public:
 	}
 	void set_service_delay_us(unsigned delay) { m_service_delay_us = delay; }
 	void set_peer_poll_ms(unsigned period) { m_peer_poll_ms = period; }
-	void set_parameter_command(u8 command)
+	void set_speech_control_contract(speech_control_contract contract)
 	{
-		m_parameter_command = command;
-	}
-	void set_speech_request_policy(u16 mask, u16 value)
-	{
-		m_speech_request_mask = mask;
-		m_speech_request_value = value;
+		m_speech_control = contract;
 	}
 	void set_bootstrap_contract(bootstrap_contract contract)
 	{
@@ -152,9 +171,7 @@ private:
 	bootstrap_contract m_bootstrap;
 	u16 m_mcu_control_word = 0;
 	u16 m_mcu_control_wire = 0;
-	u8 m_parameter_command = 0xff;
-	u16 m_speech_request_mask = 0;
-	u16 m_speech_request_value = 0;
+	speech_control_contract m_speech_control;
 	std::array<u16, 0x10000> m_data_memory = { 0 };
 	std::array<u8, 0x10000> m_data_memory_loaded = { 0 };
 	nokia_gsm_fr_codec m_speech_codec;

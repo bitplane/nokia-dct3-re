@@ -40,23 +40,28 @@ named focused consumer. The quarantine remains observational, bounded by its
 structural test, and contains no firmware result writes or injected messages.
 There is therefore no dead trace family to retire in this pass.
 
-## Next bounded refactor
+## Completed bounded refactor
 
-The remaining coherent scalar cluster is DSP speech-control policy:
+DSP speech-control policy now forms one typed contract containing:
 
 - parameter command;
 - request mask; and
 - request value.
 
-These should become one typed contract with an explicitly absent predicate.
-That representation must preserve NSE-3's evidenced command decoder without
-pretending that its speech-start predicate is known. It must not absorb PCM,
-radio, service-control or analogue routing, which are separate hardware and
-protocol boundaries.
+The predicate is explicitly optional. NSE-8 and NHM-5 select independently
+named contracts backed by their separate organic call lifecycles. NSE-3 selects
+its evidenced command decoder with no speech predicate, so decoding cannot
+silently enable media. PCM, radio, service-control and analogue routing remain
+separate hardware and protocol boundaries.
 
-Display dimensions and MAD2 DSP-reset wiring are smaller typed-configuration
-candidates after that pass. Broadly wrapping all enable flags in a capability
-object is not justified: several apparently related flags deliberately encode
+## Next bounded refactor
+
+Display controller and viewport dimensions are the next coherent scalar
+cluster. They should become one typed geometry contract so controller RAM and
+visible-area dimensions are applied together and invalid zero or overlarge
+viewports can be rejected centrally. MAD2 DSP-reset wiring is the following
+smaller candidate. Broadly wrapping all enable flags in a capability object is
+still not justified: several apparently related flags deliberately encode
 independent negative or dormant evidence.
 
 ## Acceptance status discovered by the audit

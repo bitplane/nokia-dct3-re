@@ -35,16 +35,35 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertNotIn("mcu_control_word", self.transport)
         self.assertNotIn("mcu_control_word", self.network + self.session)
         for token in (
-            "m_mcu_control_wire >> 12",
+            "accepts_parameter_command(m_mcu_control_wire)",
             "m_mcu_control_wire & 0x0fff",
-            "m_parameter_command",
-            "m_speech_request_mask",
-            "m_speech_request_value",
+            "m_speech_control",
+            "speech_requested(m_mcu_control_word)",
         ):
             self.assertIn(token, self.hle)
         # The paired-ROM evidence supports a masked field transition, not an
         # NSE-8 whole-word state machine embedded in the generic DSP device.
         self.assertNotIn("m_mcu_control_word == 0x060b", self.hle)
+
+    def test_speech_control_is_one_typed_product_contract(self):
+        for token in (
+            "struct speech_control_contract",
+            "struct speech_request_predicate",
+            "DSP_SPEECH_CONTROL_NSE8",
+            "DSP_SPEECH_CONTROL_NHM5",
+            "DSP_SPEECH_CONTROL_NSE3_COMMAND",
+            "set_speech_control_contract(product.dsp_speech_control)",
+        ):
+            self.assertIn(token, self.hle + self.phone)
+        for retired in (
+            "set_parameter_command",
+            "set_speech_request_policy",
+            "dsp_parameter_command",
+            "dsp_speech_request_mask",
+            "dsp_speech_request_value",
+        ):
+            self.assertNotIn(retired, self.hle + self.phone)
+        self.assertNotIn("speech_control_contract", self.transport)
 
     def test_dsp_hle_owns_dsp_addressed_memory_upload(self):
         for token in (

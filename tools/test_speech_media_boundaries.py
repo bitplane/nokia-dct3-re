@@ -56,7 +56,9 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         )
         self.assertIn("transfer_frame_block", tick)
         self.assertIn("m_radio_peer->speech_channel_active()", tick)
-        self.assertIn("m_speech_request_mask", tick)
+        self.assertIn(
+            "m_speech_control.speech_requested(m_mcu_control_word)", tick
+        )
         self.assertIn("m_mad2_pcm->link_ready()", tick)
         self.assertIn("const bool active = requested && pcm_link_ready", tick)
         rejected = tick.index("if (!m_mad2_pcm->transfer_frame_block")
