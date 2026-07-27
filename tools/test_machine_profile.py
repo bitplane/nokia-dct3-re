@@ -386,8 +386,7 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_bootstrap": "BOOTSTRAP_PING_PONG",
                 "dsp_service_delay_us": "50",
                 "flash_b3_block_lock": "true",
-                "dsp_reset_running_status": "0x53",
-                "dsp_release_mask": "0x04",
+                "dsp_reset_wiring": "DSP_RESET_WIRING_3410",
                 "display": "DISPLAY_3410",
             },
         )

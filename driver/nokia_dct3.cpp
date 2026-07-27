@@ -148,8 +148,7 @@ struct nokia_product_config
 	nokia_mad2_pcm_device::bus_profile cobba_pcm;
 	nokia_cobba_device::hle_voice_profile cobba_hle_voice;
 	bool flash_b3_block_lock = false;
-	u8 dsp_reset_running_status = 0;
-	u8 dsp_release_mask = 0;
+	nokia_mad2_device::dsp_reset_wiring_contract dsp_reset_wiring;
 	display_geometry_contract display;
 	u8 pup_eeprom_scl_bit = 3;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
@@ -200,6 +199,13 @@ constexpr display_geometry_contract DISPLAY_3410 = {
 };
 static_assert(display_geometry_contract{}.valid());
 static_assert(DISPLAY_3410.valid());
+
+constexpr nokia_mad2_device::dsp_reset_wiring_contract
+		DSP_RESET_WIRING_3410 = {
+	0x53, 0x04
+};
+static_assert(nokia_mad2_device::dsp_reset_wiring_contract{}.valid());
+static_assert(DSP_RESET_WIRING_3410.valid());
 
 // These values currently match but remain separate evidence: NSE-8 and NHM-5
 // have independent organic startup and call gates. A new product must supply
@@ -373,8 +379,7 @@ constexpr nokia_product_config make_3410_config()
 	result.dsp_bootstrap = BOOTSTRAP_PING_PONG;
 	result.dsp_service_delay_us = 50;
 	result.flash_b3_block_lock = true;
-	result.dsp_reset_running_status = 0x53;
-	result.dsp_release_mask = 0x04;
+	result.dsp_reset_wiring = DSP_RESET_WIRING_3410;
 	result.display = DISPLAY_3410;
 	return result;
 }
@@ -841,8 +846,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 {
 	m_product = product;
 	m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
-	m_mad2->set_dsp_reset_running_status(product.dsp_reset_running_status);
-	m_mad2->set_dsp_release_mask(product.dsp_release_mask);
+	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
 	m_kbgpio->set_five_rows(product.keypad_five_rows);
 	m_kbgpio->set_power_on_column_mask(product.power_on_column_mask);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);

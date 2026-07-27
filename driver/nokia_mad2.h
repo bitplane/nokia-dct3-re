@@ -9,6 +9,22 @@ class nokia_mad2_device : public device_t
 public:
 	nokia_mad2_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
+	struct dsp_reset_wiring_contract
+	{
+		u8 running_status = 0;
+		u8 release_mask = 0;
+
+		constexpr bool enabled() const
+		{
+			return running_status != 0 && release_mask != 0;
+		}
+
+		constexpr bool valid() const
+		{
+			return (running_status == 0) == (release_mask == 0);
+		}
+	};
+
 	auto fiq_cb() { return m_fiq_cb.bind(); }
 	auto irq_cb() { return m_irq_cb.bind(); }
 	auto irq_ack_cb() { return m_irq_ack_cb.bind(); }
@@ -20,8 +36,7 @@ public:
 	void set_timer1_hz(u32 value) { m_timer1_hz = value; }
 	void set_fiq8_hz(u32 value) { m_fiq8_hz = value; }
 	void set_timer0_catchup(bool value) { m_timer0_catchup = value; }
-	void set_dsp_reset_running_status(u8 value) { m_dsp_reset_running_status = value; }
-	void set_dsp_release_mask(u8 value) { m_dsp_release_mask = value; }
+	void set_dsp_reset_wiring_contract(dsp_reset_wiring_contract contract);
 
 	u8 read(offs_t offset);
 	void write(offs_t offset, u8 data);
@@ -84,8 +99,7 @@ private:
 	u32 m_timer1_hz = 1'057;
 	u32 m_fiq8_hz = 1000;
 	bool m_timer0_catchup = false;
-	u8 m_dsp_reset_running_status = 0;
-	u8 m_dsp_release_mask = 0;
+	dsp_reset_wiring_contract m_dsp_reset_wiring;
 	bool m_timer_trace = false;
 	bool m_interrupt_trace = false;
 	bool m_clock_trace = false;

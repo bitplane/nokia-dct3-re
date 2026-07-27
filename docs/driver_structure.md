@@ -49,7 +49,8 @@ connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0,
 declared file metadata, persistent mutable ADN/SMS/SMSP records and
 the synthetic GSM 11.11 contents. `nokia_mad2_device` owns the CTSI registers
 within offsets `0x00..0x16`: reset/clock/watchdog latches, timer state, interrupt
-pending/masks, and ARM IRQ/FIQ routing. Attached devices signal it through
+pending/masks, ARM IRQ/FIQ routing, and product-typed DSP reset/release
+readback wiring. Attached devices signal it through
 callbacks. `nokia_kbgpio_device` owns the sparse keyboard register families,
 matrix scan, cold-boot latch and IRQ edge state; product input ports and MAD2
 IRQ0 routing remain callbacks. `nokia_pup_device` owns output control, buzzer,

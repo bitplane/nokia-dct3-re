@@ -33,6 +33,15 @@ nokia_mad2_device::nokia_mad2_device(
 {
 }
 
+void nokia_mad2_device::set_dsp_reset_wiring_contract(
+		dsp_reset_wiring_contract contract)
+{
+	if (!contract.valid())
+		fatalerror("MAD2: invalid DSP reset wiring status=%02x mask=%02x",
+				contract.running_status, contract.release_mask);
+	m_dsp_reset_wiring = contract;
+}
+
 void nokia_mad2_device::device_start()
 {
 	m_timer_trace = machine().options().verbose();
@@ -95,10 +104,10 @@ u8 nokia_mad2_device::read(offs_t offset)
 		// line; MAD2 reports the running status only after that line is asserted.
 		// When reset is reasserted, ready bit 4 must read low even if a prior
 		// read-modify-write copied it into the software-visible latch.
-		if (m_dsp_reset_running_status)
+		if (m_dsp_reset_wiring.enabled())
 		{
-			if (m_regs[offset] & m_dsp_release_mask)
-				return m_dsp_reset_running_status;
+			if (m_regs[offset] & m_dsp_reset_wiring.release_mask)
+				return m_dsp_reset_wiring.running_status;
 			return m_regs[offset] & ~0x10;
 		}
 		return m_regs[offset];

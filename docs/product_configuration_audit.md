@@ -64,11 +64,19 @@ unsupported 7110 and 6210 no longer resize only the screen while silently
 leaving the controller at 84-by-48; they retain conservative defaults until
 their different controller is modeled.
 
+## Completed MAD2 DSP-reset wiring refactor
+
+MAD2 DSP running-status readback and its release mask now form one typed wiring
+contract. The default contract preserves ordinary latch behavior; the 3410
+selects its evidenced `0x53`/`0x04` pair atomically, and half-configured pairs
+are rejected.
+
 ## Next bounded refactor
 
-MAD2 DSP-reset wiring is the next coherent pair: running-status readback and
-release mask should form one typed wiring contract applied atomically.
-Broadly wrapping all enable flags in a capability object is still not
+The next coherent board-wiring pair is KBGPIO row topology and the power-key
+column mask. They should form one typed keypad wiring contract so a five-row
+matrix cannot accidentally retain an unrelated product's power-key wiring.
+Broadly wrapping all remaining enable flags in a capability object is still not
 justified: several apparently related flags deliberately encode independent
 negative or dormant evidence.
 

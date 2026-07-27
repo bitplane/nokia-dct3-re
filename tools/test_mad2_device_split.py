@@ -81,6 +81,26 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn("reset_digital_baseband();", watchdog)
         self.assertIn("set_reset_cause(0x02)", watchdog)
 
+    def test_dsp_reset_readback_uses_one_typed_wiring_contract(self):
+        source = self.device + self.header
+        for token in (
+            "struct dsp_reset_wiring_contract",
+            "m_dsp_reset_wiring.enabled()",
+            "m_dsp_reset_wiring.release_mask",
+            "m_dsp_reset_wiring.running_status",
+            "if (!contract.valid())",
+            "set_dsp_reset_wiring_contract(product.dsp_reset_wiring)",
+            "DSP_RESET_WIRING_3410",
+        ):
+            self.assertIn(token, source + self.phone)
+        for retired in (
+            "set_dsp_reset_running_status",
+            "set_dsp_release_mask",
+            "dsp_reset_running_status",
+            "dsp_release_mask",
+        ):
+            self.assertNotIn(retired, source + self.phone)
+
 
 if __name__ == "__main__":
     unittest.main()
