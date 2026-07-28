@@ -31,7 +31,10 @@ class MameSourceComplianceTest(unittest.TestCase):
         text = (DRIVER / "nokia_dct3_trace.inc").read_text()
         # Keep the quarantine reviewable even as independently gated
         # cross-product observations are moved out of the production driver.
-        self.assertLess(len(text.splitlines()), 260)
+        # Four NHM-6 acquisition probes extend the original 254-line
+        # quarantine; keep enough headroom for those focused gate consumers
+        # without permitting the exploratory 500-line diagnostic form.
+        self.assertLess(len(text.splitlines()), 360)
         self.assertNotIn("COMBINE_DATA", text)
         self.assertNotIn("set_state_int", text)
         self.assertNotIn("enqueue_rx_packet", text)

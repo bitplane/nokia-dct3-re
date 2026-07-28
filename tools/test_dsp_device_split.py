@@ -161,6 +161,11 @@ class DspDeviceSplitTest(unittest.TestCase):
     def test_gsm_system_information_is_outside_nokia_transport_model(self):
         self.assertIn("SYSTEM_INFORMATION", self.network)
         self.assertIn("0x00, 0xf1, 0x10", self.network)
+        self.assertIn("TS 44.018 10.5.2.1b.7 variable bitmap format", self.network)
+        self.assertIn("result[0] = 0x59;", self.network)
+        self.assertIn("result[3] = 0x8e | BIT(serving_arfcn, 9);", self.network)
+        self.assertIn("result[4] = serving_arfcn >> 1;", self.network)
+        self.assertIn("result[5] = serving_arfcn << 7;", self.network)
         self.assertNotIn("0x49, 0x06, 0x1b", self.hle)
         self.assertIn("m_gsm_network->system_information", self.radio)
 

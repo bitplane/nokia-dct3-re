@@ -62,6 +62,8 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_lab_voice_source));
 	save_item(NAME(m_uplink_speech_received));
 	save_item(NAME(m_tdma_frame_number));
+	save_item(NAME(m_bcch_frame_number));
+	save_item(NAME(m_bcch_frame_valid));
 	save_item(NAME(m_l1_traffic_active));
 	save_item(NAME(m_uplink_facch_blocks));
 	save_item(NAME(m_downlink_facch_blocks));
@@ -171,6 +173,8 @@ void nokia_radio_peer_device::device_reset()
 	clear_speech_queues();
 	m_uplink_speech_received = 0;
 	m_tdma_frame_number = 0;
+	m_bcch_frame_number = 0;
+	m_bcch_frame_valid = false;
 	m_l1_traffic_active = false;
 	m_uplink_facch_blocks = 0;
 	m_downlink_facch_blocks = 0;
@@ -715,7 +719,11 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 		// measurement terminal and preserves the full SI validation interval.
 		m_phase = phase::candidate_measurement;
 		m_reports_remaining = 2;
-		m_wait_ticks = 8 * 51;
+		// One 51-frame GSM control multiframe spans 59 peer polls at the
+		// calibrated four-millisecond service cadence used below for BCCH.
+		// Keep this eight-multiframe window in the same unit; 8 * 51 confused
+		// TDMA frames with peer polls and shortened acquisition by about 256 ms.
+		m_wait_ticks = 8 * 59;
 		return true;
 	}
 
@@ -925,11 +933,26 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// encoded as DSP receive channel 0x60. This transitions NHM-5 from
 		// acquisition BCCH to its idle common-control receiver; subsequent
 		// decoded blocks on that receiver are PCH/AGCH, not more SI payloads.
+		const bool completes_candidate_validation =
+				!m_idle_common_control_active &&
+				m_protocol.acquisition == acquisition_strategy::candidate_window;
 		m_idle_common_control_active =
 				m_protocol.acquisition == acquisition_strategy::candidate_window;
 		m_phase = phase::serving_channel_change;
 		m_reports_remaining = 1;
-		m_report_deferred = true;
+		if (completes_candidate_validation && m_bcch_frame_valid)
+		{
+			// The first common-control activation closes the acquisition batch.
+			// Complete the current eight-multiframe SI schedule at its next TC0
+			// boundary before confirming that transition. This preserves the
+			// ordering between decoded-SI publication and CHANNEL_CHANGED_CNF
+			// without assigning a product-specific delay.
+			const unsigned tc = (m_bcch_frame_number / 51) & 7;
+			m_wait_ticks = (8 - tc) * 59;
+			m_report_deferred = false;
+		}
+		else
+			m_report_deferred = true;
 	}
 	else if (packet.type == 0x02 && m_phase == phase::selected_bcch &&
 			packet.length >= 9 && packet.payload[8] == 0x60)
@@ -1317,6 +1340,24 @@ void nokia_radio_peer_device::emit_report()
 				(machine().time().as_ticks(13'000) / 60) % 2'715'648;
 		if (pch_report)
 			frame_number = paging_frame_number(frame_number);
+		else if (payload[0] == 0x50)
+		{
+			// Decoded BCCH blocks occupy successive 51-frame control
+			// multiframes. Firmware processing can defer a peer poll slightly;
+			// resampling the wall clock here used to repeat or skip TC values,
+			// corrupting the eight-multiframe SI schedule presented on-air.
+			// Anchor the first block to real GSM time, then advance the
+			// transport boundary by exactly one multiframe per decoded block.
+			if (!m_bcch_frame_valid)
+			{
+				m_bcch_frame_number = (frame_number / 51) * 51;
+				m_bcch_frame_valid = true;
+			}
+			else
+				m_bcch_frame_number =
+						(m_bcch_frame_number + 51) % 2'715'648;
+			frame_number = m_bcch_frame_number;
+		}
 		payload[3] = frame_number >> 16;
 		payload[4] = frame_number >> 8;
 		payload[5] = frame_number;
@@ -1743,6 +1784,7 @@ bool nokia_radio_peer_device::phase_waits() const
 	case phase::candidate_sync:
 	case phase::serving_bcch:
 	case phase::selected_bcch:
+	case phase::serving_channel_change:
 	case phase::service_downlink:
 	case phase::service_uplink_request:
 		return m_wait_ticks != 0;

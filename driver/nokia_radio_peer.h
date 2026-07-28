@@ -230,6 +230,8 @@ private:
 	u8 m_uplink_speech_count = 0;
 	u64 m_uplink_speech_received = 0;
 	u32 m_tdma_frame_number = 0;
+	u32 m_bcch_frame_number = 0;
+	bool m_bcch_frame_valid = false;
 	bool m_l1_traffic_active = false;
 	gsm::tch_f::diagonal_transmitter m_uplink_transmitter;
 	gsm::tch_f::diagonal_receiver m_network_receiver;

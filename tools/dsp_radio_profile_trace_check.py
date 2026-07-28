@@ -227,6 +227,12 @@ def check_nhm5_search(path: pathlib.Path, rom: pathlib.Path | None = None) -> No
 			trace,
 	):
 		raise SystemExit("NHM-5 firmware did not complete its SI1-SI4 state")
+	if random_access is not None and not re.search(
+			r"dsp_type46_call: firmware=nhm5 .*t=", trace
+	):
+		raise SystemExit(
+			"NHM-5 automatic access path did not traverse its type-0x46 constructor"
+		)
 	if not (
 			search["time"] <= sch["time"] <= configure["time"] <=
 			no_psw_left["time"] <= channel_changed["time"] <=

@@ -157,14 +157,106 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 		LOGMASKED(LOG_DSP_BOUNDARY,
 				"nhm5_si_result: message=%02x changed=%02x result=%08x channel=%02x "
 				"flags=%02x/%02x/%02x status=%04x ready=%02x gate=%08x "
+				"selector_si=%08x/%08x/%08x selector_event=%08x/%04x/%08x "
 				"task=%02x t=%.6f\n",
 				fw_byte(block + 2),
 				m_maincpu->state_int(arm7_cpu_device::ARM7_R7) & 0xff,
 				fw_dword(result + 4), fw_byte(state + 4), fw_byte(state + 0x0e),
 				fw_byte(state + 0x12), fw_byte(state + 0x19),
 				fw_word(state + 0x1a), fw_byte(state + 0x11),
-				fw_dword(0x0010dc80), fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				fw_dword(0x0010dc80),
+				fw_dword(0x0011195c), fw_dword(0x00111960),
+				fw_dword(0x00111964), fw_dword(0x00111ab8),
+				fw_word(0x00111abc), fw_dword(0x00111ac0),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID),
 				machine().time().as_double());
+	}
+	// NHM-6 v4.50E relocates and extends the NHM-5 BCCH consumer. These
+	// observational probes are anchored by an independently reproduced
+	// invariant-instruction comparison; retain opaque state bytes until the
+	// divergent cell-suitability transition is understood.
+	if (pc == addr && addr == 0x002ba578 && m_trace_enabled)
+	{
+		const u32 block = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
+		LOGMASKED(LOG_DSP_BOUNDARY, "nhm6_bcch_parse: channel=%02x block=%08x data=",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R8) & 0xff, block);
+		for (unsigned index = 0;
+				block >= NOKIA_RAM_BASE && block + index < NOKIA_RAM_END && index < 23;
+				++index)
+			LOGMASKED(LOG_DSP_BOUNDARY, "%02x", fw_byte(block + index));
+		LOGMASKED(LOG_DSP_BOUNDARY, " task=%02x t=%.6f\n",
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && addr == 0x002ba8e2 && m_trace_enabled)
+	{
+		const u32 state = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		const u32 block = m_maincpu->state_int(arm7_cpu_device::ARM7_R5);
+		const u32 result = m_maincpu->state_int(arm7_cpu_device::ARM7_R6);
+		LOGMASKED(LOG_DSP_BOUNDARY,
+				"nhm6_si_terminal: message=%02x changed=%02x state=%08x state_data=",
+				fw_byte(block + 2),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R7) & 0xff, state);
+		for (unsigned index = 0;
+				state >= NOKIA_RAM_BASE && state + index < NOKIA_RAM_END && index < 0x20;
+				++index)
+			LOGMASKED(LOG_DSP_BOUNDARY, "%02x", fw_byte(state + index));
+		LOGMASKED(LOG_DSP_BOUNDARY, " result=%08x result_data=", result);
+		for (unsigned index = 0;
+				result >= NOKIA_RAM_BASE && result + index < NOKIA_RAM_END && index < 0x10;
+				++index)
+			LOGMASKED(LOG_DSP_BOUNDARY, "%02x", fw_byte(result + index));
+		LOGMASKED(LOG_DSP_BOUNDARY,
+				" selector_si=%08x/%08x/%08x selector_event=%08x/%04x/%08x "
+				"task=%02x t=%.6f\n",
+				fw_dword(0x00125cb0), fw_dword(0x00125cb4),
+				fw_dword(0x00125cb8),
+				fw_dword(0x00126050), fw_word(0x00126054),
+				fw_dword(0x00126058),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && (addr == 0x00294000 || addr == 0x002c5e88) &&
+			m_trace_enabled)
+	{
+		const bool nhm6 = addr == 0x002c5e88;
+		const u32 caller = m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1);
+		if (caller == (nhm6 ? 0x002c64c2 : 0x002946ae))
+		{
+			const u32 state = nhm6 ? 0x00125ca8 : 0x00111954;
+			const u32 selected_si = fw_dword(state + 8);
+			LOGMASKED(LOG_DSP_BOUNDARY,
+					"radio_si_after_advance: firmware=%s selected_si=%08x "
+					"selected_type=%04x alternate_si=%08x caller=%08x "
+					"task=%02x t=%.6f\n",
+					nhm6 ? "nhm6" : "nhm5", selected_si,
+					selected_si >= NOKIA_RAM_BASE && selected_si + 1 < NOKIA_RAM_END ?
+							fw_word(selected_si) : 0xffff,
+					fw_dword(state + 0x0c), caller,
+					fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+		}
+	}
+	if (pc == addr && (addr == 0x00295068 || addr == 0x002c6e7a) &&
+			m_trace_enabled)
+	{
+		const bool nhm6 = addr == 0x002c6e7a;
+		const u32 input = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		const u32 event = m_maincpu->state_int(arm7_cpu_device::ARM7_R4);
+		const u32 state = nhm6 ? 0x00125ca8 : 0x00111954;
+		LOGMASKED(LOG_DSP_BOUNDARY,
+				"radio_si_selector_insert: firmware=%s input=%08x type=%04x "
+				"caller=%08x event=%08x event_data=",
+				nhm6 ? "nhm6" : "nhm5", input,
+				input >= NOKIA_RAM_BASE && input + 1 < NOKIA_RAM_END ?
+						fw_word(input) : 0xffff,
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14) & ~u32(1),
+				event);
+		for (unsigned index = 0;
+				event >= NOKIA_RAM_BASE && event + index < NOKIA_RAM_END && index < 0x20;
+				++index)
+			LOGMASKED(LOG_DSP_BOUNDARY, "%02x", fw_byte(event + index));
+		LOGMASKED(LOG_DSP_BOUNDARY,
+				" current=%08x pending=%08x task=%02x t=%.6f\n",
+				fw_dword(state + 8), fw_dword(state + 0x0c),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 	}
 	if (pc == addr && (addr == 0x0020a026 || addr == 0x0020a02c) && m_trace_enabled)
 	{

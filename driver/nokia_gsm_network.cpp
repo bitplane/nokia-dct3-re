@@ -14,8 +14,9 @@ namespace {
 // 001-01 avoids coupling the synthetic network to handset network-lock data;
 // LAC and cell ID are both 1.
 constexpr std::array<std::array<u8, 24>, 4> SYSTEM_INFORMATION = {{
-	// SI1 Cell Channel Description uses GSM bitmap-0 format. The serving
-	// carrier is inserted by system_information().
+	// SI1 Cell Channel Description is completed by system_information() using
+	// bitmap-0 for GSM 900 or a variable bitmap for a single non-GSM-900
+	// laboratory carrier.
 	{{ 0x55, 0x06, 0x19,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0x2b, 0 }},
@@ -44,9 +45,10 @@ void nokia_gsm_network_device::device_start()
 std::array<u8, 24> nokia_gsm_network_device::system_information(
 		unsigned index, u16 serving_arfcn) const
 {
+	const unsigned message_index = index % SYSTEM_INFORMATION.size();
 	std::array<u8, 24> result =
-			SYSTEM_INFORMATION[index % SYSTEM_INFORMATION.size()];
-	if ((index % SYSTEM_INFORMATION.size()) == 0 &&
+			SYSTEM_INFORMATION[message_index];
+	if (message_index == 0 &&
 			serving_arfcn >= 1 && serving_arfcn <= 124)
 	{
 		// TS 44.018 10.5.2.1b bitmap-0: ARFCN 1 is bit 0 of octet 18,
@@ -54,6 +56,42 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 		// sixteen-octet Cell Channel Description.
 		const unsigned bit = serving_arfcn - 1;
 		result[18 - bit / 8] |= 1U << (bit & 7);
+	}
+	else if (message_index == 0 &&
+			serving_arfcn <= 1023)
+	{
+		// TS 44.018 10.5.2.1b.7 variable bitmap format. The origin itself is
+		// always a member of the set, so a one-carrier cell has no relative
+		// RF-channel bits set. This represents DCS 1800 (and other non-bitmap-0
+		// ARFCNs) without assigning product-specific meaning to the carrier.
+		// Its mandatory SI1 Rest Octets byte is already the following 0x2b:
+		// no NCH, DCS 1800 band indicator, then the standard padding pattern.
+		result[0] = 0x59;
+		result[3] = 0x8e | BIT(serving_arfcn, 9);
+		result[4] = serving_arfcn >> 1;
+		result[5] = serving_arfcn << 7;
+		std::fill(result.begin() + 6, result.begin() + 19, 0);
+	}
+
+	if (m_cell_profile == cell_profile::barred)
+	{
+		// TS 44.018 10.5.2.29: CELL_BAR_ACCESS is bit 2 of the first
+		// RACH Control Parameters octet. SI3 and SI4 must describe the same
+		// cell-access policy.
+		if (message_index == 2)
+			result[16] |= 0x02;
+		else if (message_index == 3)
+			result[10] |= 0x02;
+	}
+	else if (m_cell_profile == cell_profile::unattainable_rxlev)
+	{
+		// TS 44.018 10.5.2.34: RXLEV_ACCESS_MIN=63 requires approximately
+		// -48 dBm. The laboratory carrier's evidenced serving level is lower,
+		// so this remains a valid broadcast cell which is unsuitable here.
+		if (message_index == 2)
+			result[15] = (result[15] & 0xc0) | 0x3f;
+		else if (message_index == 3)
+			result[9] = (result[9] & 0xc0) | 0x3f;
 	}
 	return result;
 }

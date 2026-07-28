@@ -47,6 +47,55 @@ The validated 3210 product configuration enables one deterministic laboratory
 cell. It remains explicitly an HLE test network, not a complete configurable
 GSM system; a named negative fixture can disable it.
 
+NHM-6 v4.50E independently exercises the candidate-window acquisition grammar:
+its firmware publishes an eighty-entry type-`0x56` list whose first real
+candidate is `0x0337`, accepts the correlated SCH/channel-change sequence and
+parses the paced SI1--SI4 set. Physical completion of the fresh-PMM security,
+time and date editors then leads to automatic CHANNEL REQUEST, Immediate
+Assignment and Location Updating on the assigned SDCCH. The peer retains the
+generic repeated assigned-uplink schedule used by this grammar.
+
+That DCS candidate also exposed a generic network-fixture defect. SI1 formerly
+used only the GSM-900 bitmap-0 Cell Channel Description, leaving an empty
+allocation for ARFCN 823. The network now encodes a single non-GSM-900 carrier
+with the TS 44.018 variable-bitmap format and includes the mandatory SI1 Rest
+Octets byte whose band indicator identifies DCS 1800. NHM-6 receives the
+resulting origin `0x0337` description organically.
+
+`make verify-3330-radio-boundary` now proves the corrected positive boundary.
+The peer preserves successive 51-frame BCCH multiframe numbers and completes
+the in-progress eight-multiframe acquisition schedule before confirming the
+first idle common-control activation. This lets the firmware's already queued
+SI4 publication precede `CHANNEL_CHANGED_CNF`; NHM-6 then selects its `0x03ec`
+node and organically emits type `0x46`. The former type-`0x57` path remains a
+negative regression signature and still receives no fabricated reply.
+
+The assigned-channel confirmation is independently product-evidenced.
+NHM-6 handler `0x320be0` is instruction-identical to NHM-5's correlation
+check: it masks body byte `+4` bit zero and compares it with byte `+2` of the
+pending channel-change context. The organic NHM-6 SDCCH transition requires
+one; zero reproducibly leaves the ROM transmitting only UI/fill frames. With
+the correlated value, `make verify-3330-radio-registration` proves automatic
+CHANNEL REQUEST, Immediate Assignment, LAPDm Location Updating Request and
+Accept, both receive-sequence acknowledgements, EF_LOCI writes, release
+deconfiguration and steady camp on ARFCN 823. No NHM-5 payload or firmware
+state is injected.
+
+`make verify-3330-radio-registration-preserved` reuses the first run's NVRAM
+and proves that a cold boot issues the persisted LAI/TMSI form of Location
+Updating, accepts it, preserves the already-current EF_LOCI status and returns
+to camp. `make verify-3330-radio-registration-state` restores during the same
+organic lifecycle and requires an identical replay after the save-state
+boundary.
+
+Cell suitability is a separate, typed laboratory-network policy rather than a
+product branch. `make verify-3330-radio-unsuitable-cells` broadcasts two
+standards-shaped negative cells: one sets CELL_BAR_ACCESS consistently in SI3
+and SI4, and one advertises an RXLEV_ACCESS_MIN above the measured serving
+level. NHM-6 parses both sets but remains on its own incomplete-cell path,
+without automatic-access publication, CHANNEL REQUEST, Location Updating or
+EF_LOCI writes.
+
 ## Verified sequence
 
 `make verify-radio-camp` proves serving-cell acquisition. The stronger

@@ -245,7 +245,9 @@ class MachineProfileTest(unittest.TestCase):
                 "synthetic_sim_card": "true",
                 "dsp_service": "true",
                 "external_service_transport": "true",
+                "external_service": "EXTERNAL_SERVICE_NHM6",
                 "dsp_service_control": "DSP_SERVICE_CONTROL_COMPACT",
+                "radio": "RADIO_NHM6",
                 "dsp_bootstrap": "BOOTSTRAP_READY_64",
                 "keypad_wiring": "KEYPAD_NHM6",
                 "ccont_board": "ADC_STANDARD",
@@ -309,6 +311,7 @@ class MachineProfileTest(unittest.TestCase):
         contracts = {
             "make_3210_config": "EXTERNAL_SERVICE_NSE8",
             "make_3310_config": "EXTERNAL_SERVICE_NHM5",
+            "make_3330_config": "EXTERNAL_SERVICE_NHM6",
         }
         for builder, contract in contracts.items():
             body = self.function_body(
@@ -317,7 +320,7 @@ class MachineProfileTest(unittest.TestCase):
             )
             self.assertIn(f"result.external_service = {contract};", body)
 
-        for builder in ("make_3330_config", "make_6110_config"):
+        for builder in ("make_6110_config",):
             body = self.function_body(
                 f"constexpr nokia_product_config {builder}()",
                 "constexpr nokia_product_config",
@@ -326,6 +329,7 @@ class MachineProfileTest(unittest.TestCase):
 
         self.assertIn("EXTERNAL_SERVICE_NSE8", self.driver)
         self.assertIn("EXTERNAL_SERVICE_NHM5", self.driver)
+        self.assertIn("EXTERNAL_SERVICE_NHM6", self.driver)
         self.assertNotIn("application_profile", self.external_service)
         self.assertNotIn("application_profile", self.external_service_header)
         self.assertNotIn("nse8", self.external_service.lower())

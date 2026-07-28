@@ -11,6 +11,13 @@
 class nokia_gsm_network_device : public device_t
 {
 public:
+	enum class cell_profile : u8
+	{
+		suitable,
+		barred,
+		unattainable_rxlev
+	};
+
 	static constexpr unsigned maximum_layer3_length = 176;
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
@@ -32,6 +39,7 @@ public:
 	nokia_gsm_network_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
+	void set_cell_profile(cell_profile profile) { m_cell_profile = profile; }
 	std::array<u8, 24> system_information(unsigned index, u16 serving_arfcn) const;
 	std::array<u8, 24> paging_fill() const;
 	std::array<u8, 24> paging_request(
@@ -62,6 +70,9 @@ public:
 
 protected:
 	virtual void device_start() override;
+
+private:
+	cell_profile m_cell_profile = cell_profile::suitable;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device)

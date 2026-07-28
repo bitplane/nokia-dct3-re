@@ -163,6 +163,11 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM5 = {
 	0x14, 0x01, 1'000, true
 };
 
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
+	nokia_radio_peer_device::acquisition_strategy::candidate_window,
+	0x00, 0x01, 0, true
+};
+
 constexpr nokia_dsp_hle_device::service_control_contract
 		DSP_SERVICE_CONTROL_COMPACT = {
 	{ 0x0d, 0x00 }, 2
@@ -228,6 +233,12 @@ constexpr nokia_external_service_peer_device::application_contract
 
 constexpr nokia_external_service_peer_device::application_contract
 		EXTERNAL_SERVICE_NHM5 = {
+	36, 0x01, 0x42,
+	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
+};
+
+constexpr nokia_external_service_peer_device::application_contract
+		EXTERNAL_SERVICE_NHM6 = {
 	36, 0x01, 0x42,
 	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
 };
@@ -371,10 +382,11 @@ constexpr nokia_product_config make_3330_config()
 	result.synthetic_sim_card = true;
 	result.dsp_service = true;
 	result.external_service_transport = true;
+	result.external_service = EXTERNAL_SERVICE_NHM6;
 	// NHM-6 independently emits type 0x70 payload 0d00 during its boot
-	// self-test and consumes the compact type 0x74 completion. Keep this
-	// separate from the still-empty application-service contract.
+	// self-test and consumes the compact type 0x74 completion.
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	result.radio = RADIO_NHM6;
 	result.dsp_bootstrap = BOOTSTRAP_READY_64;
 	result.keypad_wiring = KEYPAD_NHM6;
 	result.dsp_service_delay_us = 4'000;
@@ -600,6 +612,7 @@ public:
 		m_hw_config(*this, "HWCFG"),
 		m_diag_config(*this, "DIAGCFG"),
 		m_network_config(*this, "NETCFG"),
+		m_cell_config(*this, "CELLCFG"),
 		m_authentication_config(*this, "AUTHCFG")
 	{ }
 
@@ -715,6 +728,7 @@ private:
 	optional_ioport m_hw_config;
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
+	optional_ioport m_cell_config;
 	optional_ioport m_authentication_config;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
@@ -956,6 +970,21 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
+	switch (m_cell_config.read_safe(0x00) & 0x03)
+	{
+	case 1:
+		m_gsm_network->set_cell_profile(
+				nokia_gsm_network_device::cell_profile::barred);
+		break;
+	case 2:
+		m_gsm_network->set_cell_profile(
+				nokia_gsm_network_device::cell_profile::unattainable_rxlev);
+		break;
+	default:
+		m_gsm_network->set_cell_profile(
+				nokia_gsm_network_device::cell_profile::suitable);
+		break;
+	}
 	m_gsm_session->set_authentication_required(
 			BIT(m_authentication_config.read_safe(0x00), 0));
 	m_radio_peer->set_page_after_registration(
@@ -1645,6 +1674,12 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x80, 0x00, "Four-burst uplink TCH fade per six multiframes")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x80, DEF_STR(On))
+
+	PORT_START("CELLCFG")
+	PORT_CONFNAME(0x03, 0x00, "Laboratory serving-cell profile")
+	PORT_CONFSETTING(0x00, "Suitable")
+	PORT_CONFSETTING(0x01, "Access barred")
+	PORT_CONFSETTING(0x02, "Unattainable RXLEV_ACCESS_MIN")
 
 	PORT_START("AUTHCFG")
 	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")

@@ -5,7 +5,7 @@ from tools.radio_registration_trace_check import verify
 
 GOOD = """
 dsp_hle: TX packet type=0c payload=8 words=5 radio_phase=random_access data=0000096b00000000
-dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=contention_resolution data=0080013f4905087000f000fffe
+dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=contention_resolution data=0080013f4905087000f000fffe30080910101032547698
 dspif_transport: RX enqueue type=80 payload=34 producer=09c data=8012000049b50001000001734905087000f000fffe330809101010325476982b2b2b
 radio_mm_parse: phase=return object=001017d0 payload=00101b10 result=00000048 mm=00/00/00/00
 display_frontier: operator-resource data=00 f1 10 01 00
@@ -47,6 +47,22 @@ NHM5_GOOD = GOOD.replace(
     "dsp_hle: radio peer RX type=89 sequence=53",
 )
 
+NHM6_GOOD = NHM5_GOOD.replace(
+    "00580000030045050200f110",
+    "03370000030045050200f110",
+).replace(
+    "data=041202000000001a600000580000000f00000000",
+    "data=041202000000001a600003370000000f00000000",
+)
+
+NHM6_PRESERVED_GOOD = NHM6_GOOD.replace(
+    "4905087000f000fffe",
+    "4905087200f1100001",
+).replace(
+    "sim_device: update-binary fid=6f7e offset=10 length=1\n",
+    "",
+)
+
 
 class RegistrationTraceCheckTest(unittest.TestCase):
     def test_complete_registration(self):
@@ -54,6 +70,24 @@ class RegistrationTraceCheckTest(unittest.TestCase):
 
     def test_complete_nhm5_registration(self):
         verify(NHM5_GOOD, "nhm5")
+
+    def test_complete_nhm6_registration(self):
+        verify(NHM6_GOOD, "nhm6")
+
+    def test_complete_nhm6_preserved_registration(self):
+        verify(NHM6_PRESERVED_GOOD, "nhm6", preserved=True)
+
+    def test_preserved_registration_rejects_fresh_identity(self):
+        with self.assertRaisesRegex(ValueError, "persisted LAI/TMSI"):
+            verify(NHM6_GOOD, "nhm6", preserved=True)
+
+    def test_nhm6_rejects_assignment_value_zero(self):
+        with self.assertRaisesRegex(ValueError, "assigned-channel confirmation"):
+            verify(NHM6_GOOD.replace(
+                "data=0100000000000000",
+                "data=0000000000000000",
+                1,
+            ), "nhm6")
 
     def test_nhm5_rejects_nse8_channel_deconfiguration(self):
         with self.assertRaisesRegex(ValueError, "RR channel deconfiguration"):
