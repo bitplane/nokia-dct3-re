@@ -96,6 +96,26 @@ level. NHM-6 parses both sets but remains on its own incomplete-cell path,
 without automatic-access publication, CHANNEL REQUEST, Location Updating or
 EF_LOCI writes.
 
+NHM-6 paging reuses the same network/session/LAPDm implementation proven by
+NSE-8 and NHM-5. `make verify-3330-radio-paging` starts after organic
+registration release, requires a no-identity fill in the IMSI-derived TS 45.002
+paging group, transmits exactly one Paging Request Type 1 for the registered
+identity, and observes the firmware's CHANNEL REQUEST, Immediate Assignment,
+Paging Response, release acknowledgement and return to PCH fill. The preserved
+cold-boot gate repeats the transaction after the LAI/TMSI-form Location
+Updating request. Two save-state gates replay identically immediately before
+page delivery and during the assigned-SDCCH exchange.
+
+The paging pass added no NHM-6 behavior branch. The post-registration PCH-fill
+latch, paging-group calculation, on-air/monitored DRX distinction, page
+construction and negative profiles are generic network or radio contracts.
+NHM-5 and NHM-6 continue to differ only through their existing typed acquisition
+and channel-confirmation contracts. `make verify-3330-radio-paging-negatives`
+proves that a page sent in another DRX group is not exposed at the handset's
+decoded-PCH boundary, and that a valid page for another IMSI or an invalid
+Mobile Identity LV cannot trigger RR access. A barred cell cannot reach paging
+at all.
+
 ## Verified sequence
 
 `make verify-radio-camp` proves serving-cell acquisition. The stronger

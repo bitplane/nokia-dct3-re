@@ -43,10 +43,15 @@ def verify(text: str) -> None:
     if len(pages) != 1:
         raise ValueError(f"expected exactly one IMSI page, observed {len(pages)}")
 
+    # Candidate acquisition can expose PCH before Location Updating, when no
+    # registered subscriber identity exists and the fallback group is used.
+    # Validate only the post-registration paging interval owned by this gate.
+    registration_release = text.find("LAPDm Channel Release acknowledged nr=2")
+    post_registration = text[registration_release:]
     paging_frames = [
         int(value) for value in re.findall(
             r"PCH (?:no-identity fill|IMSI page transmitted) channel=60 fn=(\d+)",
-            text)
+            post_registration)
     ]
     if not paging_frames or any(
             frame % 51 != 36 or (frame // 51) % 2 != 1

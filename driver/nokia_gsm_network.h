@@ -18,6 +18,14 @@ public:
 		unattainable_rxlev
 	};
 
+	enum class paging_profile : u8
+	{
+		matched,
+		wrong_group,
+		unmatched_identity,
+		malformed_request
+	};
+
 	static constexpr unsigned maximum_layer3_length = 176;
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
@@ -40,12 +48,19 @@ public:
 			device_t *owner, u32 clock = 0);
 
 	void set_cell_profile(cell_profile profile) { m_cell_profile = profile; }
+	void set_paging_profile(paging_profile profile) { m_paging_profile = profile; }
 	std::array<u8, 24> system_information(unsigned index, u16 serving_arfcn) const;
 	std::array<u8, 24> paging_fill() const;
 	std::array<u8, 24> paging_request(
 			const u8 *mobile_identity, unsigned length) const;
 	paging_group subscriber_paging_group(
 			const u8 *mobile_identity, unsigned length) const;
+	paging_group paging_request_group(
+			const u8 *mobile_identity, unsigned length) const;
+	bool paging_request_monitored() const
+	{
+		return m_paging_profile != paging_profile::wrong_group;
+	}
 	std::array<u8, 24> immediate_assignment(
 			u8 random_access, u32 frame_number, u16 serving_arfcn) const;
 	std::array<u8, 17> location_update_accept(
@@ -73,6 +88,7 @@ protected:
 
 private:
 	cell_profile m_cell_profile = cell_profile::suitable;
+	paging_profile m_paging_profile = paging_profile::matched;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device)

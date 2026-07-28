@@ -613,6 +613,7 @@ public:
 		m_diag_config(*this, "DIAGCFG"),
 		m_network_config(*this, "NETCFG"),
 		m_cell_config(*this, "CELLCFG"),
+		m_page_config(*this, "PAGECFG"),
 		m_authentication_config(*this, "AUTHCFG")
 	{ }
 
@@ -729,6 +730,7 @@ private:
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
 	optional_ioport m_cell_config;
+	optional_ioport m_page_config;
 	optional_ioport m_authentication_config;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
@@ -983,6 +985,25 @@ void nokia_dct3_state::machine_reset()
 	default:
 		m_gsm_network->set_cell_profile(
 				nokia_gsm_network_device::cell_profile::suitable);
+		break;
+	}
+	switch (m_page_config.read_safe(0x00) & 0x03)
+	{
+	case 1:
+		m_gsm_network->set_paging_profile(
+				nokia_gsm_network_device::paging_profile::wrong_group);
+		break;
+	case 2:
+		m_gsm_network->set_paging_profile(
+				nokia_gsm_network_device::paging_profile::unmatched_identity);
+		break;
+	case 3:
+		m_gsm_network->set_paging_profile(
+				nokia_gsm_network_device::paging_profile::malformed_request);
+		break;
+	default:
+		m_gsm_network->set_paging_profile(
+				nokia_gsm_network_device::paging_profile::matched);
 		break;
 	}
 	m_gsm_session->set_authentication_required(
@@ -1680,6 +1701,13 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x00, "Suitable")
 	PORT_CONFSETTING(0x01, "Access barred")
 	PORT_CONFSETTING(0x02, "Unattainable RXLEV_ACCESS_MIN")
+
+	PORT_START("PAGECFG")
+	PORT_CONFNAME(0x03, 0x00, "Laboratory paging profile")
+	PORT_CONFSETTING(0x00, "Matched subscriber and group")
+	PORT_CONFSETTING(0x01, "Wrong paging group")
+	PORT_CONFSETTING(0x02, "Unmatched IMSI")
+	PORT_CONFSETTING(0x03, "Malformed Paging Request")
 
 	PORT_START("AUTHCFG")
 	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")

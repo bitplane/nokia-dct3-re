@@ -30,6 +30,10 @@ constexpr std::array<std::array<u8, 24>, 4> SYSTEM_INFORMATION = {{
 		0x2b, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b }}
 }};
 
+constexpr std::array<u8, 9> CCCH_BLOCK_OFFSETS = {
+	6, 12, 16, 22, 26, 32, 36, 42, 46
+};
+
 } // anonymous namespace
 
 nokia_gsm_network_device::nokia_gsm_network_device(
@@ -128,6 +132,21 @@ std::array<u8, 24> nokia_gsm_network_device::paging_request(
 	block[3] = 0x10;
 	block[4] = length;
 	std::copy_n(mobile_identity, length, block.begin() + 5);
+	if (m_paging_profile == paging_profile::unmatched_identity)
+	{
+		// Preserve a valid IMSI encoding while addressing a different
+		// subscriber. The last BCD digit is changed without relying on a
+		// fixture-specific replacement identity.
+		u8 &last = block[5 + length - 1];
+		const u8 digit = last >> 4;
+		last = (last & 0x0f) | (((digit + 1) % 10) << 4);
+	}
+	else if (m_paging_profile == paging_profile::malformed_request)
+	{
+		// Paging Request Type 1 carries an LV Mobile Identity. A length larger
+		// than the eight encoded IMSI octets is structurally invalid.
+		block[4] = length + 1;
+	}
 	return block;
 }
 
@@ -150,14 +169,33 @@ nokia_gsm_network_device::subscriber_paging_group(
 		return (packed & 1) ? octet >> 4 : octet & 0x0f;
 	};
 	const unsigned last_three = digit(12) * 100 + digit(13) * 10 + digit(14);
-	static constexpr std::array<u8, 9> CCCH_BLOCK_OFFSETS = {
-		6, 12, 16, 22, 26, 32, 36, 42, 46
-	};
 	const unsigned group = last_three % (CCCH_BLOCK_OFFSETS.size() * 2);
 	return {
 		u8(group / CCCH_BLOCK_OFFSETS.size()),
 		CCCH_BLOCK_OFFSETS[group % CCCH_BLOCK_OFFSETS.size()]
 	};
+}
+
+nokia_gsm_network_device::paging_group
+nokia_gsm_network_device::paging_request_group(
+		const u8 *mobile_identity, unsigned length) const
+{
+	paging_group result = subscriber_paging_group(mobile_identity, length);
+	if (m_paging_profile == paging_profile::wrong_group)
+	{
+		// Transmit on the next standards-defined CCCH paging block, which is
+		// deliberately not the registered IMSI's DRX group.
+		auto found = std::find(
+				CCCH_BLOCK_OFFSETS.begin(), CCCH_BLOCK_OFFSETS.end(),
+				result.frame_offset);
+		const unsigned index = found == CCCH_BLOCK_OFFSETS.end() ?
+				0 : found - CCCH_BLOCK_OFFSETS.begin();
+		result.frame_offset =
+				CCCH_BLOCK_OFFSETS[(index + 1) % CCCH_BLOCK_OFFSETS.size()];
+		if (result.frame_offset == CCCH_BLOCK_OFFSETS[0])
+			result.multiframe_phase ^= 1;
+	}
+	return result;
 }
 
 std::array<u8, 24> nokia_gsm_network_device::immediate_assignment(

@@ -648,12 +648,17 @@ bool nokia_radio_peer_device::serving_pch_report() const
 			(m_reports_remaining % 3) == 2;
 }
 
-u32 nokia_radio_peer_device::paging_frame_number(u32 minimum_frame_number) const
+u32 nokia_radio_peer_device::paging_frame_number(
+		u32 minimum_frame_number, bool request) const
 {
 	static constexpr u32 FRAME_NUMBER_MODULUS = 26 * 51 * 2048;
-	const auto group = m_gsm_network->subscriber_paging_group(
-			m_gsm_session->registered_mobile_identity().data(),
-			m_gsm_session->registered_mobile_identity_length());
+	const auto group = request ?
+			m_gsm_network->paging_request_group(
+					m_gsm_session->registered_mobile_identity().data(),
+					m_gsm_session->registered_mobile_identity_length()) :
+			m_gsm_network->subscriber_paging_group(
+					m_gsm_session->registered_mobile_identity().data(),
+					m_gsm_session->registered_mobile_identity_length());
 	u32 multiframe = minimum_frame_number / 51;
 	if ((multiframe & 1) != group.multiframe_phase)
 		++multiframe;
@@ -1128,6 +1133,11 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			{
 				m_registered =
 						m_gsm_session->registered_mobile_identity_length() == 8;
+				// A fill observed before Location Updating does not establish
+				// the registered subscriber's post-release paging cadence.
+				// Require one correctly phased idle PCH fill before queuing the
+				// bounded page requested by the laboratory network.
+				m_pch_fill_delivered = false;
 				m_phase = phase::release_deconfigure;
 				m_reports_remaining = 0;
 			}
@@ -1305,6 +1315,7 @@ void nokia_radio_peer_device::emit_report()
 {
 	u8 payload[166] = { 0 };
 	bool transmitted_page = false;
+	bool off_group_page = false;
 	const u8 report_type = next_report_type();
 	if (m_phase == phase::lapdm_establish ||
 			m_phase == phase::location_update_ack_request ||
@@ -1432,11 +1443,14 @@ void nokia_radio_peer_device::emit_report()
 					m_registered && m_page_after_registration && m_pch_fill_delivered &&
 					!m_page_transmitted &&
 					m_gsm_session->queue_incoming_page(service);
-			const auto block = transmit_page ?
+			const bool monitored_page =
+					transmit_page && m_gsm_network->paging_request_monitored();
+			const auto block = monitored_page ?
 					m_gsm_session->paging_request() :
 					m_gsm_network->paging_fill();
 			std::copy(block.begin(), block.end(), std::begin(payload) + 10);
-			transmitted_page = transmit_page;
+			transmitted_page = monitored_page;
+			off_group_page = transmit_page && !monitored_page;
 		}
 		else if (payload[0] == 0x60)
 		{
@@ -1496,13 +1510,23 @@ void nokia_radio_peer_device::emit_report()
 	{
 		const u32 frame_number =
 				(payload[3] << 16) | (payload[4] << 8) | payload[5];
-		if (transmitted_page)
+		if (transmitted_page || off_group_page)
 		{
 			m_page_transmitted = true;
 			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: PCH IMSI page transmitted channel=60 fn=%u t=%.6f\n",
-						frame_number, machine().time().as_double());
+			{
+				if (off_group_page)
+					LOGMASKED(LOG_RADIO,
+							"dsp_hle: PCH off-group IMSI page not monitored "
+							"channel=60 air_fn=%u monitor_fn=%u t=%.6f\n",
+							paging_frame_number(frame_number, true), frame_number,
+							machine().time().as_double());
+				else
+					LOGMASKED(LOG_RADIO,
+							"dsp_hle: PCH IMSI page transmitted channel=60 "
+							"fn=%u t=%.6f\n",
+							frame_number, machine().time().as_double());
+			}
 		}
 		else if (!m_pch_fill_delivered)
 		{

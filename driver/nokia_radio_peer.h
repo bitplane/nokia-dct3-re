@@ -166,7 +166,7 @@ private:
 	u8 next_report_type() const;
 	unsigned serving_cycle_reports() const;
 	bool serving_pch_report() const;
-	u32 paging_frame_number(u32 minimum_frame_number) const;
+	u32 paging_frame_number(u32 minimum_frame_number, bool request = false) const;
 	void encode_measurement_report(u8 *payload) const;
 	void encode_channel_confirmation(u8 *payload) const;
 	void encode_random_access_info(u8 *payload);
