@@ -165,7 +165,7 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM5 = {
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x00, 0x01, 0, true
+	0x14, 0x01, 0, true
 };
 
 constexpr nokia_dsp_hle_device::service_control_contract
