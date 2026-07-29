@@ -71,9 +71,12 @@ Its v6.00 callers cover low-voltage shutdown (`0x21e40c`), charging completion
 (`0x21f8de`), callback `0x5d` terminal completion (`0x27b3b6`), and controller
 status `0x0795` (`0x255c3c`). A physical two-second power-key hold exercises the
 last route, changes task 1 to mode `0x000c`, reaches terminal event `0x0074`,
-clears SIM enable, and blanks the LCD through firmware-owned teardown. A short
-press leaves the phone interactive. `make verify-power-lifecycle` protects
-both outcomes.
+blanks the LCD and writes zero to CCONT's watchdog/power register. CCONT then
+removes the digital-baseband rail immediately. The last frame-sampled firmware
+RAM byte named `final_sim_enable` remains `0x01` because the CPU stops before a
+later frame sample; it is retained as diagnostic RAM, not interpreted as live
+SIM power. A short press leaves both the phone and baseband rail active.
+`make verify-power-lifecycle` protects both outcomes through the CCONT boundary.
 
 Callback `0x5d` is the paired report-6/7 status dispatcher. Input `0x0348`
 posts report 6; inputs `0x05e1`, `0x05e7`, and `0x05dc` start timer class

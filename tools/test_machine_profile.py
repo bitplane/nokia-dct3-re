@@ -286,8 +286,8 @@ class MachineProfileTest(unittest.TestCase):
     def test_multi_model_frontiers_reset_the_correct_bios_nvram_namespace(self):
         self.assertIn("noki3310_3", self.makefile)
         self.assertIn("noki3330_1", self.makefile)
-        prepare = self.makefile.split("prepare-run-nvram: build", 1)[1].split(
-            "\nrun:", 1
+        prepare = self.makefile.split("prepare-run-files:", 1)[1].split(
+            "\nprepare-run-nvram:", 1
         )[0]
         for phone in ("noki3310", "noki3330", "noki3410"):
             self.assertIn(f'[ "$(PHONE)" = "{phone}" ]', prepare)

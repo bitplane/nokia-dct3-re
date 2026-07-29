@@ -248,8 +248,10 @@ The power-key interrupt path is stable across the two ROMs: v6.00 handler
 firmware transition, but no default edge timing. A focused physical-input
 regression distinguishes the ordinary short-press UI action from a two-second
 hold: the latter reaches task-1 mode `0x000c`, terminal event `0x0074`, clears
-SIM enable and tears down the display organically. CCONT
-watchdog-register data `0x00` enters the hardware power-off path. CCONT's
+the display and organically writes CCONT watchdog-register data `0x00`, which
+enters the hardware power-off path. The frame-sampled firmware RAM byte
+reported as `final_sim_enable` remains at its last pre-off value after the CPU
+rail drops and is not a physical SIM-power oracle. CCONT's
 watchdog is an eight-bit down-counter: every nonzero register write directly
 loads that many seconds, so the observed `0x20` and `0x31` writes select 32- and
 49-second windows. `0x3f` is therefore a 63-second load, not a disable command;
@@ -398,6 +400,15 @@ lifecycle from this hardware gate.
 `make verify-charger-lifecycle RUN_DIR=<dir>` separately proves charger-present
 startup, selector-5/IRQ2 service and the physical mode-`0x0009` -> `0x000c` ->
 `0x0005` acting-dead transition.
+
+`make verify-power-lifecycle JOBS=4 RUN_DIR=<unique-dir>` distinguishes a short
+physical key press from an operational shutdown. The short leg must remain in
+mode `0x0004`, retain the live SIM state and never emit `ccont_power:
+event=off`. The long leg must reach mode `0x000c` and event `0x0074`, then emit
+the organic CCONT rail-off event after an exact pre-key save/load round trip.
+Both NSE-8 v6.00 and v5.01 independently show this ordering.
+`make verify-power-lifecycle-v501 JOBS=4 RUN_DIR=<unique-dir>` repeats the same
+semantic gate with the independently mapped v5.01 firmware.
 
 `make verify-charger-wake RUN_DIR=<dir>` proves the powered-off lifecycle:
 CCONT removes power, a later charger edge raises cause `0x04`, firmware reads

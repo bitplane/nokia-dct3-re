@@ -387,10 +387,35 @@ silently changing product data. The structural oracle records the
 profile-backed baseline, including its four stable EEPROM transactions and
 corresponding FIQ/CCONT accounting.
 
+Direct WebSocket acceptance targets use the same `prepare-run-files` contract
+as `make run`: known LCD mirrors and the append-only MAME log are cleared, and
+mutable handset NVRAM is reseeded unless `PRESERVE_NVRAM=1` is explicit.
+Provisioning/cold-boot and provisioning/call pairs name their shared NVRAM
+directory explicitly. Reusing a `RUN_DIR` therefore reruns a fresh-state gate;
+it cannot silently inherit an earlier host-call session. Relative and absolute
+run roots are both supported, subject to ordinary host write permissions.
+
 MAME names the alternate v5.01 BIOS NVRAM system `noki3210_1`; the Makefile
 seeds that directory explicitly rather than the default `noki3210` directory.
 This distinction is load-bearing: regenerating a v5.01 EEPROM while retaining
 an older `noki3210_1/eeprom` silently runs the stale product state.
+
+The post-outgoing-call acceptance sweep uses unique roots and four build jobs:
+
+- `make verify-power-lifecycle verify-power-lifecycle-v501 JOBS=4
+  RUN_DIR=run_cleanup_power`;
+- `make verify-radio-outgoing-call-host-media JOBS=4
+  RUN_DIR=run_cleanup_host_media`;
+- `make verify-3410-radio-outgoing-call-host-termination
+  verify-3410-radio-outgoing-call-host-media JOBS=4
+  RUN_DIR=run_cleanup_3410_host`;
+- `make verify-3310-radio-outgoing-call-host-termination JOBS=4
+  RUN_DIR=run_cleanup_3310_host`; and
+- `make verify-3330-radio-outgoing-call-host-termination JOBS=4
+  RUN_DIR=run_cleanup_3330_host`.
+
+The complete 3210 hostile/reconnect/save-state list remains catalogued in the
+outgoing-call section above; these commands are the focused cleanup gates.
 
 ## Summary fields
 

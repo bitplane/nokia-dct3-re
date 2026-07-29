@@ -11,6 +11,15 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         cls.header = (ROOT / "driver/nokia_gsm_call_adapter.h").read_text()
         cls.source = (ROOT / "driver/nokia_gsm_call_adapter.cpp").read_text()
         cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.generic_sources = "\n".join(
+            (ROOT / path).read_text()
+            for path in (
+                "driver/nokia_gsm_call_adapter.cpp",
+                "driver/nokia_gsm_session.cpp",
+                "driver/nokia_gsm_voice_peer.cpp",
+                "driver/nokia_radio_peer.cpp",
+            )
+        )
 
     def test_host_thread_only_queues_bounded_decisions(self):
         callback = self.source.split(
@@ -101,6 +110,19 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
             "m_radio_peer->set_host_voice_peer(host_call_adapter)",
             self.driver,
         )
+
+    def test_generic_call_components_have_no_product_dispatch(self):
+        for product in (
+            "noki3210",
+            "noki3310",
+            "noki3330",
+            "noki3410",
+            "NSE8",
+            "NHM5",
+            "NHM6",
+            "NHM2",
+        ):
+            self.assertNotIn(product, self.generic_sources)
 
 
 if __name__ == "__main__":

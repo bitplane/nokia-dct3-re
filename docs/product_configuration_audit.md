@@ -181,6 +181,12 @@ Shared Make variables and standards-level trace vocabulary do not replace
 product acceptance. Packet grammar, correlation values, ordering and release
 transactions remain independently checked.
 
+The generic host-call/session/voice/radio sources contain no handset or product
+identifier dispatch. Direct WebSocket targets now enter the same fresh or
+explicitly preserved NVRAM preparation boundary as ordinary runs, so fixture
+reuse is not a hidden product input. A structural test protects both
+properties.
+
 No further wrapper is justified by the current evidence. DSP service delay and
 peer polling describe different mechanisms; SIM controller presence and card
 presence must remain independently testable; flash, EEPROM, boot and analogue

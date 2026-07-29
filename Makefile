@@ -148,6 +148,15 @@ HOST_CALL_3330_PORT ?= 18088
 HOST_CALL_PHYSICAL_MEDIA_PORT ?= 18089
 NOKI3210_OUTGOING_DIAL_KEYS := 1,2,3,4,5,enter,wait1000,c,wait500,c,wait1000,5,5,5,1,2,3,4,enter
 NOKI3210_OUTGOING_NO_ANSWER_KEYS := $(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting,wait3000,enter
+
+# Direct WebSocket runners do not enter through `make run`. Give them the same
+# generated-artifact and NVRAM preparation contract without rebuilding MAME.
+define prepare_host_run
+$(MAKE) --no-print-directory prepare-run-files \
+	PHONE=$(2) BIOS=$(3) RUN_DIR="$(1)" \
+	RUN_NVRAM_DIR="$(abspath $(1))/nvram" PRESERVE_NVRAM=0
+endef
+
 RADIO_PCM_MISSING_ARGS := -cfg_directory ../fixtures/radio_pcm_missing
 RADIO_INCOMING_CALL_DEGRADED_ARGS := -cfg_directory ../fixtures/radio_incoming_call_degraded
 RADIO_INCOMING_SMS_ARGS := -cfg_directory ../fixtures/radio_incoming_sms
@@ -164,7 +173,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
 .PHONY: verify-3330-radio-incoming-call-lifecycle
@@ -233,6 +242,7 @@ help:
 	@echo "make verify-ccont-mask check masked-pending delivery on CCONT IRQ2"
 	@echo "make verify-alarm    set and ring a user alarm through organic keypad input"
 	@echo "make verify-power-lifecycle check short-press UI and long-press shutdown behavior"
+	@echo "make verify-power-lifecycle-v501 repeat the power gate on NSE-8 v5.01"
 	@echo "make verify-charger-lifecycle check charger-present startup and power-key policy"
 	@echo "make verify-charger-wake check powered-off charger restart and reset cause"
 	@echo "make verify-gensio  check two-ROM endpoint and SELECT-register contracts"
@@ -520,7 +530,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_gsm_authentication_split.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_outgoing_call_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3410_registration_negative_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_acceptance_run_isolation.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_cobba_control_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_physical_downlink_check.py
 	$(VENV)/bin/python -m unittest tools/test_pulse_route_mame.py
@@ -552,7 +562,10 @@ run-manifest-3330:
 	@$(MAKE) --no-print-directory smoke-3330e RUN_DIR=run_manifest_3330 SECONDS=3
 	cp $(MAME_DIR)/error.log run_manifest_3330/error.log
 
-prepare-run-nvram: build
+prepare-run-files:
+	@mkdir -p "$(RUN_DIR)"
+	@find "$(RUN_DIR)" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -delete
+	@truncate -s 0 "$(MAME_DIR)/error.log"
 	@if [ "$(PHONE)" = "noki3210" ]; then \
 		mkdir -p "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)"; \
 		if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
@@ -569,10 +582,9 @@ prepare-run-nvram: build
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 	fi
 
+prepare-run-nvram: build prepare-run-files
+
 run: prepare-run-nvram
-	@mkdir -p $(RUN_DIR)
-	@find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -delete
-	@truncate -s 0 $(MAME_DIR)/error.log
 	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		./mame $(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
@@ -1392,7 +1404,7 @@ verify-radio-outgoing-call-host-adapter:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1437,7 +1449,7 @@ verify-radio-outgoing-call-host-local-end:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),wait5000,enter \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1468,7 +1480,7 @@ verify-radio-outgoing-call-host-termination:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1502,7 +1514,7 @@ verify-radio-outgoing-call-host-alerting-termination:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1534,7 +1546,7 @@ verify-radio-outgoing-call-host-media:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1566,7 +1578,7 @@ verify-radio-outgoing-call-host-reconnect:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1599,7 +1611,7 @@ verify-radio-outgoing-call-host-alerting-reconnect:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1631,7 +1643,7 @@ verify-radio-outgoing-call-host-media-restore:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1664,7 +1676,7 @@ verify-radio-outgoing-call-host-release-restore:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1699,7 +1711,7 @@ verify-radio-outgoing-call-host-two-calls:
 	trap restore_default EXIT; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
 		ERASED_IDENTITY_SECURITY_CODE=12345; \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),wait5000,c,wait500,c,wait1000,5,5,5,1,2,3,4,enter \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1723,7 +1735,7 @@ verify-radio-outgoing-call-host-two-calls:
 verify-3410-radio-outgoing-call-host-termination:
 	@set -e; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS); \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3410,546e); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 \
@@ -1749,7 +1761,7 @@ verify-3410-radio-outgoing-call-host-termination:
 verify-3410-radio-outgoing-call-host-media:
 	@set -e; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS); \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3410,546e); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 \
@@ -1775,7 +1787,7 @@ verify-3410-radio-outgoing-call-host-media:
 verify-3310-radio-outgoing-call-host-termination:
 	@set -e; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS); \
-	mkdir -p $(RUN_DIR); \
+	$(call prepare_host_run,$(RUN_DIR),noki3310,639); \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,enter \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 \
@@ -1805,7 +1817,10 @@ verify-3330-radio-outgoing-call-host-termination: normalize-3330
 		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \
 	$(PYTHON) tools/check_model_frontier_summary.py \
 		$(RUN_DIR)_provision/boot_summary.txt --require-fiq0; \
-	mkdir -p $(RUN_DIR)_call; \
+	$(MAKE) --no-print-directory prepare-run-files \
+		PHONE=noki3330 BIOS=450e RUN_DIR="$(RUN_DIR)_call" \
+		RUN_NVRAM_DIR="$(abspath $(RUN_DIR)_provision)/nvram" \
+		PRESERVE_NVRAM=1; \
 	env NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 \
@@ -2216,12 +2231,29 @@ verify-alarm:
 
 verify-power-lifecycle:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_short SECONDS=18 \
+		RUN_VERBOSE=1 \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	$(PYTHON) tools/power_lifecycle_check.py short $(RUN_DIR)_power_short/boot_summary.txt
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_long SECONDS=20 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	$(PYTHON) tools/power_lifecycle_check.py long $(RUN_DIR)_power_long/boot_summary.txt
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_power_short/error.log
+	$(PYTHON) tools/power_lifecycle_check.py short \
+		$(RUN_DIR)_power_short/boot_summary.txt \
+		--log $(RUN_DIR)_power_short/error.log
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_long SECONDS=22 \
+		RUN_VERBOSE=1 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 NOKIA_DCT3_STATE_ROUNDTRIP_AT=10.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_power_long/error.log
+	grep -Fqx 'state_roundtrip=pass' \
+		$(RUN_DIR)_power_long/boot_summary.txt
+	$(PYTHON) tools/power_lifecycle_check.py long \
+		$(RUN_DIR)_power_long/boot_summary.txt \
+		--log $(RUN_DIR)_power_long/error.log
 	@echo "OK — physical power-key short/long firmware lifecycles reproduced"
+
+verify-power-lifecycle-v501:
+	@$(MAKE) --no-print-directory verify-power-lifecycle \
+		PHONE=noki3210 BIOS=501 \
+		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
+		EEPROM_BASENAME='3210 v501 eeprom.bin' \
+		RUN_DIR=$(RUN_DIR)_v501 JOBS=$(JOBS)
 
 verify-charger-lifecycle:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_connected SECONDS=18 \

@@ -11,6 +11,11 @@ that the driver is ready for upstream submission.
 - `make verify-frontier` protects the request-driven external-service peer plus ordinary
   SIMI/FIQ6 card path. It ends in task-1 mode `0x0004`, flags `0x0f`, service-session
   status `0x49`, no-SIM clear, and SIM enable set.
+- The NSE-8 v6.00 and v5.01 power gates distinguish frame-sampled firmware RAM
+  from physical power: a long key hold reaches mode `0x000c`/event `0x0074`
+  and organically removes the digital-baseband rail through CCONT after
+  save/load. The frozen `final_sim_enable` byte is diagnostic, not a rail
+  oracle.
 - Reviewed runtime manifests retain the class-`0x40` service and coherent
   generic-service/SIM observations that established those contracts. Their
   broad firmware-PC trace generators have been retired.
