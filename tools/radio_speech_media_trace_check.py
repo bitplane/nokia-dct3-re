@@ -21,6 +21,9 @@ DOORBELL_ROUTE_RE = re.compile(
     r"speech_control=([0-9a-f]{4}) .*?t=([0-9.]+)"
 )
 STOP_RE = re.compile(r"dsp_hle: speech stop control=([0-9a-f]{4}) .*?t=([0-9.]+)")
+PHYSICAL_END_RE = re.compile(
+    r"GSM service uplink sapi=0 pd=03 message=25 length=5 .*?t=([0-9.]+)"
+)
 ENERGY_RE = re.compile(
     r"dsp_hle: speech tick .*?mic_peak=(\d+) ear_peak=(\d+) "
     r"nonzero=(\d+)/(\d+)"
@@ -138,7 +141,18 @@ def check(
         if not stops:
             raise ValueError("PCM did not stop during organic call teardown")
         value, stop_time = min(stops, key=lambda item: abs(item[1] - disables[0]))
-        if value not in ("060b", "040a") or abs(stop_time - disables[0]) > 0.050:
+        route_owned_stop = (
+            value == "040a" and abs(stop_time - disables[0]) <= 0.050
+        )
+        physical_ends = [
+            float(time) for time in PHYSICAL_END_RE.findall(text)
+            if route_time < float(time) <= disables[0]
+        ]
+        channel_owned_stop = (
+            value == "060b" and physical_ends and
+            physical_ends[-1] <= stop_time <= disables[0]
+        )
+        if not route_owned_stop and not channel_owned_stop:
             raise ValueError(
                 "PCM stop did not coincide with TCH/firmware-route teardown"
             )

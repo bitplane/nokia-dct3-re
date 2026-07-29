@@ -204,6 +204,11 @@ constexpr nokia_dsp_hle_device::speech_control_contract
 	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
 };
 
+constexpr nokia_dsp_hle_device::speech_control_contract
+		DSP_SPEECH_CONTROL_NHM2 = {
+	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
+};
+
 // NSE-3 proves selector 8's wire decoder, but no organic call has identified a
 // speech-request predicate. Keep command decoding without enabling speech.
 constexpr nokia_dsp_hle_device::speech_control_contract
@@ -455,6 +460,23 @@ constexpr nokia_product_config make_3410_config()
 	result.dsp_bootstrap = BOOTSTRAP_PING_PONG;
 	result.dsp_service_delay_us = 50;
 	result.dsp_peer_poll_ms = 4;
+	// NHM-2 independently publishes command 0x08 value 0x060b immediately
+	// after physical Send answers the call and 0x040a during physical-End
+	// teardown. This establishes the speech-request field without inheriting
+	// an NHM-5/NHM-6 firmware contract.
+	result.dsp_speech_control = DSP_SPEECH_CONTROL_NHM2;
+	// Nokia's combined NHM-2/5/6 repair material identifies COBBA-GJP N100.
+	// Its codec SIO derives 1 MHz PCMDClk from 13 MHz / 13 and 8 kHz PCMSClk
+	// by /125, with a one-clock sync and sign-extended 13-in-16 serial word.
+	// The fitted NHM-2 analogue microphone and receiver routes remain unknown.
+	result.cobba_pcm.data_clock = 1'000'000;
+	result.cobba_pcm.frame_clock = 8'000;
+	result.cobba_pcm.sample_bits = 13;
+	result.cobba_pcm.sync_clocks = 1;
+	result.cobba_pcm.word_clocks = 16;
+	result.cobba_pcm.msb_first = true;
+	result.cobba_pcm.data_edge =
+			nokia_mad2_pcm_device::clock_edge::falling;
 	result.flash_b3_block_lock = true;
 	result.dsp_reset_wiring = DSP_RESET_WIRING_3410;
 	result.display = DISPLAY_3410;

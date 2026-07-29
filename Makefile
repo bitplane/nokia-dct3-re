@@ -1135,7 +1135,10 @@ verify-3410-radio-incoming-call-lifecycle:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py \
 		$(RUN_DIR)/error.log
-	@echo "OK — NHM-2 rang, completed physical Answer/End and returned to PCH"
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)/error.log --data-clock 1000000 --frame-clock 8000 \
+		--frame-clocks 125 --sync-clocks 1 --word-clocks 16
+	@echo "OK — NHM-2 carried internal GSM-FR media through physical Answer/End and returned to PCH"
 
 verify-3330-radio-media-resilience: verify-3330-radio-incoming-call-lifecycle
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \

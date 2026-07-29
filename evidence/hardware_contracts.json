@@ -189,8 +189,13 @@
     },
     {
       "id": "noki3410_organic_incoming_call", "subsystem": "radio", "status": "validated", "confidence": "strong",
-      "boundary": "NHM-2 v5.46E organically recognizes an IMSI page, completes cipher/MM/CC setup, configures one TCH/F despite publishing Call Confirmed twice, drives the MAD2 buzzer, accepts physical Send and End, exchanges Connect Acknowledge and Release, confirms its independently observed 0x14 release CHANNEL_CONFIGURE parameter and returns to idle PCH. Media and analogue wiring remain outside this promotion",
+      "boundary": "NHM-2 v5.46E organically recognizes an IMSI page, completes cipher/MM/CC setup, configures one TCH/F despite publishing Call Confirmed twice, drives the MAD2 buzzer, accepts physical Send and End, exchanges Connect Acknowledge and Release, confirms its independently observed 0x14 release CHANNEL_CONFIGURE parameter and returns to idle PCH. Analogue wiring remains outside this promotion",
       "evidence": ["docs/model_coverage.md", "driver/nokia_dct3.cpp", "driver/nokia_gsm_session.cpp", "tools/radio_3410_incoming_call_lifecycle_check.py", "Makefile"]
+    },
+    {
+      "id": "noki3410_internal_speech_media", "subsystem": "audio", "status": "validated", "confidence": "strong",
+      "boundary": "NHM-2 v5.46E organically publishes command-0x08 value 0x060b after physical Send and 0x040a during End. Combined NHM-2/5/6 repair material identifies COBBA-GJP N100 and its documented 1 MHz PCMDClk, 8 kHz PCMSClk and sign-extended 13-in-16 word. An independently typed NHM-2 profile sustains timed MAD2-COBBA PCM, bidirectional GSM-FR and non-silent downlink until TCH-owned teardown. The fitted analogue microphone and receiver routes remain unknown",
+      "evidence": ["docs/model_coverage.md", "driver/nokia_dct3.cpp", "tools/radio_speech_media_trace_check.py", "Makefile"]
     },
     {
       "id": "ccont_charger_power_wake", "subsystem": "ccont", "status": "partial", "confidence": "strong",
