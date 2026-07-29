@@ -137,6 +137,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
 .PHONY: verify-3330-radio-incoming-call-lifecycle
+.PHONY: verify-3330-radio-media-resilience
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -202,6 +203,7 @@ help:
 	@echo "make verify-3310-radio-incoming-call-boundary check NHM-5 through incoming CC SETUP"
 	@echo "make verify-3310-radio-incoming-call-ui check NHM-5 ringing and physical Answer UI"
 	@echo "make verify-3330-radio-incoming-call-lifecycle check NHM-6 through physical Answer/End"
+	@echo "make verify-3330-radio-media-resilience check NHM-6 media, degradation and save-state replay"
 	@echo "make verify-radio-incoming-call check organic MT SETUP, Alerting and bounded clearing"
 	@echo "make verify-radio-incoming-call-answered check physical Answer, ringing and post-answer DSP traffic"
 	@echo "make verify-radio-incoming-call-lifecycle check physical Answer-to-End CC and DSP-control teardown"
@@ -1003,7 +1005,30 @@ verify-3330-radio-incoming-call-lifecycle: normalize-3330
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py \
 		$(RUN_DIR)_call/error.log
-	@echo "OK — NHM-6 completed physical Answer/End and returned call control to idle"
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)_call/error.log --data-clock 1000000 --frame-clock 8000 \
+		--frame-clocks 125 --sync-clocks 1 --word-clocks 16
+	@echo "OK — NHM-6 carried bidirectional GSM-FR media and returned call control to idle"
+
+verify-3330-radio-media-resilience: verify-3330-radio-incoming-call-lifecycle
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_degraded SECONDS=24 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=13.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_degraded/error.log
+	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py \
+		$(RUN_DIR)_degraded/error.log
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
+		$(RUN_DIR)_degraded/error.log
+	$(PYTHON) tools/radio_degraded_speech_trace_check.py \
+		$(RUN_DIR)_degraded/error.log --data-clock 1000000 --frame-clock 8000 \
+		--frame-clocks 125 --sync-clocks 1 --word-clocks 16
+	$(PYTHON) tools/radio_facch_interruption_trace_check.py \
+		$(RUN_DIR)_degraded/error.log
+	$(PYTHON) tools/radio_sacch_coexistence_trace_check.py \
+		$(RUN_DIR)_degraded/error.log
+	@echo "OK — NHM-6 media survived FACCH, bidirectional BFIs and exact save-state replay"
 
 verify-3310-radio-media-resilience:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \

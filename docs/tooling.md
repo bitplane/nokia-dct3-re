@@ -57,6 +57,9 @@
     cipher/MM entrance, TCH assignment, physical Navi Answer/End, its
     independently observed speech-control wire and clean return to PCH. It
     runs under `make verify-3330-radio-incoming-call-lifecycle`.
+    The lifecycle and `make verify-3330-radio-media-resilience` compose it
+    with the generic speech, degradation, FACCH, SACCH and save-state checkers
+    using NHM-6's 1 MHz/125-clock profile.
   - `radio_sacch_coexistence_trace_check.py` — validates live SACCH/TF
     reservations one per 26-frame multiframe, four-phase rotation, and
     continuing bidirectional speech. It joins FACCH, degradation and

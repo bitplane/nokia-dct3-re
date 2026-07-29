@@ -168,6 +168,11 @@
       "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]
     },
     {
+      "id": "noki3330_internal_speech_media", "subsystem": "audio", "status": "validated", "confidence": "strong",
+      "boundary": "NHM-6 v4.50E organically publishes command-0x08 values 0x060b on physical Answer and 0x040a on physical End. Nokia's combined NHM-2/5/6 repair material identifies the common COBBA-GJP N100 audio boundary, whose documented codec SIO derives 1 MHz PCMDClk from 13 MHz / 13 and 8 kHz PCMSClk by /125 with a sign-extended 13-in-16 word. With an independently declared NHM-6 profile, preserved-PMM calls sustain bidirectional GSM-FR, FACCH stealing, bidirectional bad frames and concealment, four-phase SACCH coexistence, exact active-call save-state replay and clean teardown. No NHM-5 analogue route or gain is inherited",
+      "evidence": ["docs/model_coverage.md", "docs/network_scouting.md", "driver/nokia_dct3.cpp", "Makefile"]
+    },
+    {
       "id": "noki3410_product_profile_interactive", "subsystem": "cross_rom", "status": "validated", "confidence": "strong",
       "boundary": "3410 v5.46 PPM E organically compacts its virgin PMM and emits DSP type 0x70 payload 0d00. Its explicit NHM-2 compact 0x74/0d00 completion crosses FIQ0 before the firmware exposes idle. Fresh-PMM save-state, physical Menu/End, Messages and exact return-to-idle gates pass with zero soft resets; NHM-2 does not inherit the NHM-6 product builder",
       "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]

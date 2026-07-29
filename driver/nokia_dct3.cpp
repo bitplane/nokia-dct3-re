@@ -398,8 +398,20 @@ constexpr nokia_product_config make_3330_config()
 	result.dsp_peer_poll_ms = 4;
 	// NHM-6 independently publishes command 0x08 value 0x060b immediately
 	// after organic physical Answer and 0x040a during physical-End teardown.
-	// This establishes speech control, but not NHM-5's PCM or analogue wiring.
+	// This establishes speech control independently of NHM-5.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NHM6;
+	// Nokia's combined NHM-2/5/6 service material identifies the common
+	// COBBA-GJP N100 audio boundary. COBBA-GJP documentation fixes its codec
+	// SIO at RFIClk/13 = 1 MHz and PCMSClk at /125 = 8 kHz, with the same
+	// one-clock sync and sign-extended 13-in-16 serial word. Keep this as an
+	// independent NHM-6 profile; it does not import NHM-5 analogue routing.
+	result.cobba_pcm.data_clock = 1'000'000;
+	result.cobba_pcm.frame_clock = 8'000;
+	result.cobba_pcm.sample_bits = 13;
+	result.cobba_pcm.sync_clocks = 1;
+	result.cobba_pcm.word_clocks = 16;
+	result.cobba_pcm.msb_first = true;
+	result.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
 	result.ccont_board = ADC_STANDARD;
 	return result;
 }

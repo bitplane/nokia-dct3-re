@@ -93,6 +93,14 @@ state. The gate requires the NHM-6 cipher publication, TCH assignment,
 Connect/acknowledgement, command-`0x08` `0x860b` speech request, physical Navi
 Disconnect, Release Complete, `0x14` channel release, `0x840a` speech release
 and return to PCH.
+
+That lifecycle additionally requires at least 100 sustained frames in both
+directions over the independently declared 1 MHz/8 kHz, 125-clock NHM-6 PCM
+profile. `make verify-3330-radio-media-resilience` adds bidirectional burst
+impairment, FACCH/BFI recovery, SACCH coexistence and exact active-call
+save-state replay before the same physical teardown. The fixture can enable
+only the product-owned PCM component; removing or invalidating its typed
+profile leaves speech blocked.
 `make verify-radio-call-state-roundtrip` additionally saves during the stable
 speech interval under both v6.00 and independently relocated v5.01, records
 two seconds of DSP/network media evolution, restores the save, and records the

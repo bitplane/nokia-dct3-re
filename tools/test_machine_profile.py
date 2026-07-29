@@ -251,6 +251,10 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_bootstrap": "BOOTSTRAP_READY_64",
                 "keypad_wiring": "KEYPAD_NHM6",
                 "dsp_speech_control": "DSP_SPEECH_CONTROL_NHM6",
+                "cobba_pcm.data_clock": "1'000'000",
+                "cobba_pcm.frame_clock": "8'000",
+                "cobba_pcm.sample_bits": "13",
+                "cobba_pcm.word_clocks": "16",
                 "ccont_board": "ADC_STANDARD",
             },
         )

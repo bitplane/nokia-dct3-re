@@ -131,6 +131,10 @@ peer polling describe different mechanisms; SIM controller presence and card
 presence must remain independently testable; flash, EEPROM, boot and analogue
 settings belong to separate boundaries. NHM-6 now owns a separately evidenced
 command-`0x08` speech-control contract: its organic Answer/End lifecycle
-publishes `0x060b` and `0x040a`. It deliberately does not inherit NHM-5's PCM
-or analogue contracts. The next functional boundary is NHM-6 internal media,
-which requires independent PCM evidence.
+publishes `0x060b` and `0x040a`. Nokia's combined NHM-2/5/6 repair material
+identifies the common COBBA-GJP N100 audio boundary, while the COBBA-GJP system
+documentation fixes its codec SIO at 1 MHz/8 kHz with 125 clocks per frame and
+a sign-extended 13-in-16 word. NHM-6 therefore owns an independently declared
+profile even though its values match NHM-5. It does not inherit NHM-5's
+analogue routes or gains. The remaining NHM-6 target is physical duplex after
+the fitted microphone input and receiver topology are independently identified.
