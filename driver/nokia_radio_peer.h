@@ -19,7 +19,8 @@ public:
 	{
 		none,
 		bitmap_multistage,
-		candidate_window
+		candidate_window,
+		autonomous_band_scan
 	};
 
 	struct protocol_contract
@@ -155,7 +156,8 @@ private:
 	{
 		none,
 		bitmap_multistage,
-		candidate_window
+		candidate_window,
+		autonomous_band_scan
 	};
 	enum class paging_schedule : u8
 	{
@@ -164,6 +166,9 @@ private:
 	};
 	search_request decode_search_request(
 			const nokia_dspif_device::packet &packet);
+	bool decode_candidate_window(
+			const nokia_dspif_device::packet &packet, bool ignore_zero);
+	bool candidate_window_acquisition() const;
 	bool handle_search_request(search_request request);
 	bool handle_acquisition_packet(
 			const nokia_dspif_device::packet &packet);

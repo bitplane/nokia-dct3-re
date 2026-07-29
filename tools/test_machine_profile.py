@@ -396,6 +396,8 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_service": "true",
                 "external_service_transport": "true",
                 "dsp_service_control": "DSP_SERVICE_CONTROL_COMPACT",
+                "external_service": "EXTERNAL_SERVICE_NHM2",
+                "radio": "RADIO_NHM2",
                 "keypad_wiring": "KEYPAD_NHM2",
                 "dsp_bootstrap": "BOOTSTRAP_PING_PONG",
                 "dsp_service_delay_us": "50",

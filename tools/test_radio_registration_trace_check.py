@@ -55,9 +55,28 @@ NHM6_GOOD = NHM5_GOOD.replace(
     "data=041202000000001a600003370000000f00000000",
 )
 
+NHM2_GOOD = NHM5_GOOD.replace(
+    "00580000030045050200f110",
+    "00010000030045050200f110",
+).replace(
+    "data=041202000000001a600000580000000f00000000",
+    "data=041202000000001a600000010000000f00000000",
+)
+
 NHM6_PRESERVED_GOOD = NHM6_GOOD.replace(
     "4905087000f000fffe",
     "4905087200f1100001",
+).replace(
+    "sim_device: update-binary fid=6f7e offset=10 length=1\n",
+    "",
+)
+
+NHM2_PRESERVED_GOOD = NHM2_GOOD.replace(
+    "4905087000f000fffe",
+    "4905087200f1100001",
+).replace(
+    "sim_device: update-binary fid=6f7e offset=4 length=5\n",
+    "",
 ).replace(
     "sim_device: update-binary fid=6f7e offset=10 length=1\n",
     "",
@@ -73,6 +92,12 @@ class RegistrationTraceCheckTest(unittest.TestCase):
 
     def test_complete_nhm6_registration(self):
         verify(NHM6_GOOD, "nhm6")
+
+    def test_complete_nhm2_registration(self):
+        verify(NHM2_GOOD, "nhm2")
+
+    def test_complete_nhm2_preserved_registration_without_redundant_loci_write(self):
+        verify(NHM2_PRESERVED_GOOD, "nhm2", preserved=True)
 
     def test_complete_nhm6_preserved_registration(self):
         verify(NHM6_PRESERVED_GOOD, "nhm6", preserved=True)

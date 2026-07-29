@@ -588,6 +588,13 @@ const char *nokia_radio_peer_device::phase_name() const
 	return phase_name(m_phase);
 }
 
+bool nokia_radio_peer_device::candidate_window_acquisition() const
+{
+	return m_protocol.acquisition == acquisition_strategy::candidate_window ||
+			m_protocol.acquisition ==
+					acquisition_strategy::autonomous_band_scan;
+}
+
 u8 nokia_radio_peer_device::next_report_type() const
 {
 	// Fixed entries are declarative; 0xff marks phases whose report depends on
@@ -607,7 +614,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 	switch (m_phase)
 	{
 	case phase::candidate_measurement:
-		if (m_protocol.acquisition == acquisition_strategy::candidate_window)
+		if (candidate_window_acquisition())
 			return m_reports_remaining == 2 ? 0x80 : 0x8b;
 		return 0x8b;
 	case phase::candidate_sync:
@@ -685,30 +692,52 @@ auto nokia_radio_peer_device::decode_search_request(
 		return search_request::bitmap_multistage;
 
 	case acquisition_strategy::candidate_window:
-		if (packet.type != 0x56 || packet.length != 160)
+		if (!decode_candidate_window(packet, false))
 			return search_request::none;
-		// Candidate-window requests contain eighty big-endian channels and use
-		// 0xffff for unused slots. Place the laboratory cell on the first
-		// actual request rather than inheriting another product's ARFCN.
-		m_search_mode = 0;
-		m_search_has_serving_arfcn = false;
-		for (unsigned offset = 0; offset < packet.length; offset += 2)
-		{
-			const u16 candidate =
-					(packet.payload[offset] << 8) | packet.payload[offset + 1];
-			if (candidate != 0xffff)
-			{
-				m_serving_arfcn = candidate;
-				m_search_has_serving_arfcn = true;
-				break;
-			}
-		}
 		return search_request::candidate_window;
+
+	case acquisition_strategy::autonomous_band_scan:
+		if (decode_candidate_window(packet, true))
+			return search_request::candidate_window;
+		if (packet.type != 0x55 || packet.length != 2 ||
+				packet.payload[0] != 0x03 || packet.payload[1] != 0x05)
+			return search_request::none;
+		// NHM-2 asks the DSP to scan the supported bands rather than passing an
+		// MCU-built candidate list. The laboratory cell is a valid GSM 900
+		// carrier; its exact channel is network topology, not handset state.
+		m_search_mode = packet.payload[1];
+		m_serving_arfcn = 1;
+		m_search_has_serving_arfcn = true;
+		return search_request::autonomous_band_scan;
 
 	case acquisition_strategy::none:
 		return search_request::none;
 	}
 	return search_request::none;
+}
+
+bool nokia_radio_peer_device::decode_candidate_window(
+		const nokia_dspif_device::packet &packet, bool ignore_zero)
+{
+	if (packet.type != 0x56 || packet.length != 160)
+		return false;
+	// Candidate-window requests contain eighty big-endian channels and use
+	// 0xffff for unused slots. NHM-2's autonomous-scan publication also pads
+	// the list with zeroes before its first real candidate.
+	m_search_mode = 0;
+	m_search_has_serving_arfcn = false;
+	for (unsigned offset = 0; offset < packet.length; offset += 2)
+	{
+		const u16 candidate =
+				(packet.payload[offset] << 8) | packet.payload[offset + 1];
+		if (candidate != 0xffff && (!ignore_zero || candidate != 0x0000))
+		{
+			m_serving_arfcn = candidate;
+			m_search_has_serving_arfcn = true;
+			break;
+		}
+	}
+	return true;
 }
 
 bool nokia_radio_peer_device::handle_search_request(search_request request)
@@ -718,7 +747,12 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 
 	if (request == search_request::candidate_window)
 	{
-		if (m_phase != phase::inactive || m_reports_remaining != 0)
+		const bool autonomous_scan_complete =
+				m_protocol.acquisition ==
+						acquisition_strategy::autonomous_band_scan &&
+				m_phase == phase::candidate_measurement;
+		if ((!autonomous_scan_complete && m_phase != phase::inactive) ||
+				m_reports_remaining != 0)
 			return false;
 		// Candidate-window acquisition reports SCH before its alternative
 		// measurement terminal and preserves the full SI validation interval.
@@ -729,6 +763,15 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 		// Keep this eight-multiframe window in the same unit; 8 * 51 confused
 		// TDMA frames with peer polls and shortened acquisition by about 256 ms.
 		m_wait_ticks = 8 * 59;
+		return true;
+	}
+
+	if (request == search_request::autonomous_band_scan)
+	{
+		if (m_phase != phase::inactive || m_reports_remaining != 0)
+			return false;
+		m_phase = phase::candidate_measurement;
+		m_reports_remaining = 1;
 		return true;
 	}
 
@@ -825,7 +868,7 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 bool nokia_radio_peer_device::handle_acquisition_packet(
 		const nokia_dspif_device::packet &packet)
 {
-	if (m_protocol.acquisition == acquisition_strategy::candidate_window &&
+	if (candidate_window_acquisition() &&
 			packet.type == 0x55 && packet.length == 4 &&
 			m_phase == phase::candidate_measurement &&
 			m_reports_remaining == 0)
@@ -841,12 +884,12 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 			(((m_phase == phase::candidate_sync ||
 					m_phase == phase::selected_search) &&
 				m_reports_remaining == 0) ||
-			(m_protocol.acquisition == acquisition_strategy::candidate_window &&
+			(candidate_window_acquisition() &&
 				m_phase == phase::candidate_measurement &&
 				m_reports_remaining == 1)))
 	{
 		const bool active_candidate_window =
-				m_protocol.acquisition == acquisition_strategy::candidate_window &&
+				candidate_window_acquisition() &&
 				m_phase == phase::candidate_measurement;
 		const bool selected_plmn_search =
 				m_phase == phase::selected_search && m_search_mode == 0x50;
@@ -874,14 +917,14 @@ void nokia_radio_peer_device::encode_measurement_report(u8 *payload) const
 	{
 		const bool serving_result =
 				result == 0 &&
-				(m_protocol.acquisition != acquisition_strategy::candidate_window ||
+				(!candidate_window_acquisition() ||
 					m_search_has_serving_arfcn);
 		payload[2 + result * 4] =
 				serving_result ? u8(m_serving_arfcn >> 8) : 0xff;
 		payload[3 + result * 4] =
 				serving_result ? u8(m_serving_arfcn) : 0xff;
 		payload[5 + result * 4] = serving_result ?
-				(m_protocol.acquisition == acquisition_strategy::candidate_window ?
+				(candidate_window_acquisition() ?
 					u8(m_gsm_network->serving_rssi(m_search_round)) :
 					(m_search_round < 2 ? u8(0x93) :
 						u8(m_gsm_network->serving_rssi(m_search_round - 2)))) :
@@ -897,7 +940,7 @@ void nokia_radio_peer_device::encode_channel_confirmation(u8 *payload) const
 
 void nokia_radio_peer_device::encode_random_access_info(u8 *payload)
 {
-	m_access_frame = (machine().time().as_ticks(13'000) / 60) % 2'715'648;
+	m_access_frame = m_tdma_frame_number % 2'715'648;
 	payload[0] = m_access_ra;
 	payload[1] = m_access_frame >> 16;
 	payload[2] = m_access_frame >> 8;
@@ -940,9 +983,9 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// decoded blocks on that receiver are PCH/AGCH, not more SI payloads.
 		const bool completes_candidate_validation =
 				!m_idle_common_control_active &&
-				m_protocol.acquisition == acquisition_strategy::candidate_window;
+				candidate_window_acquisition();
 		m_idle_common_control_active =
-				m_protocol.acquisition == acquisition_strategy::candidate_window;
+				candidate_window_acquisition();
 		m_phase = phase::serving_channel_change;
 		m_reports_remaining = 1;
 		if (completes_candidate_validation && m_bcch_frame_valid)
@@ -1347,8 +1390,14 @@ void nokia_radio_peer_device::emit_report()
 				((m_phase < phase::candidate_channel_change ||
 					m_phase == phase::selected_search) ? 0x40 : 0x50);
 		payload[1] = 0x12; // BSIC of the laboratory cell, for SCH and BCCH.
+		// Frame numbering belongs to the radio Layer-1 clock, not the host
+		// scheduler instant at which the DSP happens to collect a report.
+		// m_tdma_frame_number is advanced by the GSM burst timer and is saved
+		// with the rest of the L1 state, so SCH/BCCH metadata remains coherent
+		// across save/load instead of moving by a frame after a slightly
+		// different firmware poll latency.
 		u32 frame_number = m_phase == phase::random_access ? m_access_frame :
-				(machine().time().as_ticks(13'000) / 60) % 2'715'648;
+				m_tdma_frame_number % 2'715'648;
 		if (pch_report)
 			frame_number = paging_frame_number(
 					frame_number, paging_schedule::monitored);

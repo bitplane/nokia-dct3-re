@@ -16,7 +16,14 @@ def _records(
     for line in lines[begin + 1:end]:
         for token in tokens:
             if token in line:
-                result.append(line[line.index(token):])
+                record = line[line.index(token):]
+                # MAME may resume a firmware-owned timer a fraction of a
+                # millisecond either side of the reference host callback.
+                # The emulated timeline is checked separately above; compare
+                # the protocol record (including GSM frame numbers and every
+                # payload byte), not the diagnostic print instant.
+                record = re.sub(r" t=[0-9.]+$", "", record)
+                result.append(record)
                 break
     return result
 

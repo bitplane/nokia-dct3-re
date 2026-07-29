@@ -96,6 +96,24 @@ level. NHM-6 parses both sets but remains on its own incomplete-cell path,
 without automatic-access publication, CHANNEL REQUEST, Location Updating or
 EF_LOCI writes.
 
+NHM-2 v5.46E independently exposes a third acquisition grammar. Its autonomous
+band-scan request receives one standards-shaped GSM-900 RSSI result; firmware
+then organically publishes the ARFCN-1 candidate list consumed by the shared
+candidate-window SCH/SI path. Its product contract declares assigned-channel
+confirmation value one and no candidate-report repetition or inherited NHM-6
+settle delay. Its external-service application separately declares the
+firmware-acknowledged `0x41`/`0x42` sequences.
+
+`make verify-3410-radio-registration-preserved` proves fresh-PMM and retained
+LAI/TMSI Location Updating through EF_LOCI handling, RR release and steady
+camp. `make verify-3410-radio-registration-state` restores before acquisition
+and after SDCCH assignment while requiring byte-identical protocol records and
+completion of registration. `make verify-3410-radio-unsuitable-cells` reuses
+the generic barred and RXLEV_ACCESS_MIN cell profiles and adds a typed network
+assignment profile whose Immediate Assignment deliberately echoes the wrong
+random-access octet. The firmware rejects all three organically without
+Location Updating or subscriber-state mutation.
+
 NHM-6 paging reuses the same network/session/LAPDm implementation proven by
 NSE-8 and NHM-5. `make verify-3330-radio-paging` starts after organic
 registration release, requires a no-identity fill in the IMSI-derived TS 45.002

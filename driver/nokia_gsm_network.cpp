@@ -215,6 +215,8 @@ std::array<u8, 24> nokia_gsm_network_device::immediate_assignment(
 		0x2b, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b,
 		0x2b, 0x2b, 0x2b, 0x2b, 0x2b, 0x2b
 	};
+	if (m_assignment_profile == assignment_profile::mismatched_request_reference)
+		block[7] ^= 0x01;
 	return block;
 }
 

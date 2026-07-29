@@ -26,6 +26,12 @@ public:
 		malformed_request
 	};
 
+	enum class assignment_profile : u8
+	{
+		matched_request,
+		mismatched_request_reference
+	};
+
 	static constexpr unsigned maximum_layer3_length = 176;
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
@@ -51,6 +57,10 @@ public:
 
 	void set_cell_profile(cell_profile profile) { m_cell_profile = profile; }
 	void set_paging_profile(paging_profile profile) { m_paging_profile = profile; }
+	void set_assignment_profile(assignment_profile profile)
+	{
+		m_assignment_profile = profile;
+	}
 	std::array<u8, 24> system_information(unsigned index, u16 serving_arfcn) const;
 	std::array<u8, 24> paging_fill() const;
 	std::array<u8, 24> paging_request(
@@ -93,6 +103,8 @@ protected:
 private:
 	cell_profile m_cell_profile = cell_profile::suitable;
 	paging_profile m_paging_profile = paging_profile::matched;
+	assignment_profile m_assignment_profile =
+			assignment_profile::matched_request;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device)

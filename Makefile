@@ -138,6 +138,8 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
 .PHONY: verify-3330-radio-incoming-call-lifecycle
 .PHONY: verify-3330-radio-media-resilience
+.PHONY: verify-3410-radio-registration verify-3410-radio-registration-preserved
+.PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -187,6 +189,9 @@ help:
 	@echo "make verify-3310-radio-boundary preserve the evidenced NHM-5 packet grammar"
 	@echo "make verify-3330-radio-boundary preserve the evidenced NHM-6 DCS/SI frontier"
 	@echo "make verify-3310-radio-registration check NHM-5 Location Updating and steady camp"
+	@echo "make verify-3410-radio-registration check NHM-2 Location Updating and steady camp"
+	@echo "make verify-3410-radio-registration-state check NHM-2 acquisition/SDCCH save-state replay"
+	@echo "make verify-3410-radio-unsuitable-cells check NHM-2 cell and assignment rejection"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
 	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
 	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
@@ -439,6 +444,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_nse3_v548_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_dct3_type_1f_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_gsm_authentication_split.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_3410_registration_negative_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
 	$(VENV)/bin/python -m unittest tools/test_cobba_control_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_physical_downlink_check.py
@@ -726,6 +732,55 @@ verify-3330-radio-unsuitable-cells: normalize-3330
 	$(PYTHON) tools/radio_3330_unsuitable_cell_trace_check.py \
 		$(RUN_DIR)_rxlev/error.log --profile rxlev
 
+verify-3410-radio-registration: normalize-3410
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+		RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log \
+		--profile nhm2
+
+verify-3410-radio-registration-preserved:
+	@$(MAKE) --no-print-directory verify-3410-radio-registration \
+		RUN_DIR=$(RUN_DIR)_fresh
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+		RUN_DIR=$(RUN_DIR)_cold SECONDS=30 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)_cold/error.log --profile nhm2 --preserved
+
+verify-3410-radio-registration-state: normalize-3410
+	@for boundary in pre assigned; do \
+		if test "$$boundary" = pre; then at=8.5; replay=300; else at=22.190; replay=60; fi; \
+		$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=30 RUN_VERBOSE=1 \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_registration_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log --profile nhm2 || exit; \
+	done
+
+verify-3410-radio-unsuitable-cells: normalize-3410
+	@for profile in barred rxlev; do \
+		fixture=radio_cell_$$profile; \
+		$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+			RUN_DIR=$(RUN_DIR)_$$profile SECONDS=30 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" \
+			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200' || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \
+			$(RUN_DIR)_$$profile/error.log --profile $$profile || exit; \
+	done
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+		RUN_DIR=$(RUN_DIR)_assignment SECONDS=30 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_assignment_mismatch' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_assignment/error.log
+	$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \
+		$(RUN_DIR)_assignment/error.log --profile assignment
+
 verify-3310-frontier:
 	@$(MAKE) --no-print-directory smoke-3310-639 RUN_DIR=$(RUN_DIR) SECONDS=15
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
@@ -799,6 +854,7 @@ verify-3410-frontier: normalize-3410
 verify-3410-menu: normalize-3410
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR) \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram SECONDS=22 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_disabled' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
@@ -810,6 +866,7 @@ verify-3410-menu: normalize-3410
 verify-3410-navigation: normalize-3410
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_menu \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_menu)/nvram SECONDS=22 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_disabled' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
 	@frame=$$(find $(RUN_DIR)_menu -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
@@ -817,6 +874,7 @@ verify-3410-navigation: normalize-3410
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_MESSAGES_SHA)
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_return \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_return)/nvram SECONDS=24 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_disabled' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
 	@frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \

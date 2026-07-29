@@ -17,6 +17,11 @@ that the driver is ready for upstream submission.
 - The 3330 and 3410 fresh-PMM frontier and navigation gates pass again. Both
   firmware images organically emit compact DSP request `70/0d00`; their typed
   product contracts return `74/0d00` through FIQ0 before the UI is promoted.
+- The 3410 registration profile is normalized through fresh/preserved PMM,
+  two save-state boundaries and three negative network compositions. Its
+  autonomous band scan and external-service sequences are explicit NHM-2
+  contracts; standards-level cell, assignment, LAPDm and MM behavior remains
+  shared.
 
 ## Current application baseline
 

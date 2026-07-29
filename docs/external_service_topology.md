@@ -32,8 +32,11 @@ contracts even where their currently evidenced values match. NHM-6
 independently acknowledges command `0x64` result `0x01`, sequence `0x42`, then
 the 64-byte command-`0x70` map selecting channels `0x5f` and `0x62`, sequence
 `0x43`; this runtime boundary establishes its values without claiming shared
-firmware addresses. The contract remains empty for NSE-3, NHM-2 and
-unvalidated products, so enabling or exercising their lower DSP transport
+firmware addresses. NHM-2 independently emits and acknowledges the same
+command set with its own sequence values `0x41` and `0x42`; its separately
+declared application contract is part of the organic registration gate. The
+contract remains empty for NSE-3 and unvalidated products, so enabling or
+exercising their lower DSP transport
 cannot silently inject another product's registration delay, status payload
 or channel bitmap.
 

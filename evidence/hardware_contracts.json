@@ -178,6 +178,11 @@
       "evidence": ["docs/cross_rom_confidence.md", "driver/nokia_dct3.cpp", "Makefile"]
     },
     {
+      "id": "noki3410_organic_registration", "subsystem": "radio", "status": "validated", "confidence": "strong",
+      "boundary": "NHM-2 v5.46E independently emits an autonomous band scan, publishes an ARFCN-1 candidate after a standards-shaped RSSI result, parses SI1-SI4, requests and accepts an assigned SDCCH, sends Location Updating through LAPDm, persists EF_LOCI, releases RR and returns to steady camp. Fresh and preserved PMM plus pre-acquisition and assigned-channel save/load gates pass. Access-barred, unattainable-RXLEV and mismatched Immediate Assignment request-reference fixtures do not reach Location Updating or mutate subscriber state",
+      "evidence": ["docs/network_scouting.md", "docs/model_coverage.md", "driver/nokia_dct3.cpp", "driver/nokia_radio_peer.cpp", "tools/radio_registration_trace_check.py", "tools/radio_3410_registration_negative_trace_check.py", "Makefile"]
+    },
+    {
       "id": "ccont_charger_power_wake", "subsystem": "ccont", "status": "partial", "confidence": "strong",
       "boundary": "CCONT watchdog data 0x00 removes the MAD2 digital baseband domain while CCONT and nonvolatile storage persist. A later physical charger edge exposes reset-cause bit 2, resets the CPU and attached MAD2 peripheral domain, and both 3210 v6.00 and v5.01 organically read the cause and VCHAR before settling in acting-dead mode 0x0005. Physical rail timing and battery/current dynamics remain unmodeled",
       "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md", "tools/charger_wake_check.py"]

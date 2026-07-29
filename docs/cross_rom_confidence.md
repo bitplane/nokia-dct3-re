@@ -89,6 +89,16 @@ Send and End are separate cells in this map and
 are exposed as ordinary MAME inputs; no firmware hook, RAM forcing, injected
 message or guessed peer reply participates.
 
+NHM-2 also independently emits an autonomous band-scan request and publishes
+its ARFCN-1 candidate after one standards-shaped RSSI result. Its typed radio
+contract uses assigned-channel confirmation value one, while its external
+application uses organically acknowledged sequences `0x41` and `0x42`.
+`make verify-3410-radio-registration-preserved` proves fresh and retained-PMM
+Location Updating, SIM persistence, release and steady camp. The paired
+save-state gate restores before acquisition and during assigned-SDCCH LAPDm.
+Barred and unattainable-RXLEV cells produce no access, and a standards-shaped
+Immediate Assignment with a mismatched request reference is ignored.
+
 ### Conditional power lifecycle control
 
 Signature matching finds the same four-owner report-7 topology in 3330 v4.50,

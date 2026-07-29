@@ -126,6 +126,14 @@ The candidate-window acquisition terminal was also renamed from the historical
 belongs to the candidate-window strategy selected independently by NHM-5 and
 NHM-6.
 
+The later NHM-2 registration pass preserves the same boundary. Its typed
+product fields select an autonomous band-scan entrance, assigned-channel
+confirmation value one and independently observed external-service sequences.
+Once firmware publishes its candidate window, decoding, SCH/SI delivery,
+assignment, LAPDm and MM use the generic components. The network's negative
+Immediate Assignment profile alters only the standards-defined request
+reference and contains no handset-family dispatch.
+
 No further wrapper is justified by the current evidence. DSP service delay and
 peer polling describe different mechanisms; SIM controller presence and card
 presence must remain independently testable; flash, EEPROM, boot and analogue

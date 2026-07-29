@@ -273,6 +273,19 @@ Menu key and requires the exact `Messages` screen. `make
 verify-3410-navigation` proves both endpoints in isolated runs: Menu must open
 `Messages`, then End must return to the same idle hash. The fixtures operate
 only MAME matrix fields; they do not write firmware state or post messages.
+These exact historical UI oracles use the named `radio_disabled` hardware
+composition so registered signal/operator pixels cannot be mistaken for an
+MMI regression. Default-hardware registration is proven by the separate
+NHM-2 radio gates below.
+
+`make verify-3410-radio-registration-preserved` extends that physical
+fresh-PMM prefix through NHM-2's autonomous scan, ARFCN-1 SI1–SI4, SDCCH
+Location Updating, EF_LOCI persistence, release and steady camp, then repeats
+the lifecycle from retained PMM. `make verify-3410-radio-registration-state`
+requires protocol-identical replay both before acquisition and between
+assignment and LAPDm completion. `make verify-3410-radio-unsuitable-cells`
+proves barred, unattainable-RXLEV and mismatched-request-reference inputs do
+not promote the handset into Location Updating.
 
 `make verify-model-frontier-state` performs isolated mid-frontier save/load
 round trips for both products. The positive frontier summaries require FIQ0,

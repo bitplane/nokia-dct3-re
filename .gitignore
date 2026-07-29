@@ -59,3 +59,9 @@ captures/
 # ad-hoc message-topology census outputs (canonical conclusions live in docs/)
 run_*_events.json
 run_*_events.txt
+
+# MAME writes a default configuration beside named negative-network fixtures.
+fixtures/radio_cell_barred/default.cfg
+fixtures/radio_cell_rxlev/default.cfg
+fixtures/radio_assignment_mismatch/default.cfg
+fixtures/radio_disabled/default.cfg

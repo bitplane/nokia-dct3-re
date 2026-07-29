@@ -168,6 +168,11 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 	0x14, 0x01, 0, true
 };
 
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
+	nokia_radio_peer_device::acquisition_strategy::autonomous_band_scan,
+	0x00, 0x01, 0, false
+};
+
 constexpr nokia_dsp_hle_device::service_control_contract
 		DSP_SERVICE_CONTROL_COMPACT = {
 	{ 0x0d, 0x00 }, 2
@@ -246,6 +251,16 @@ constexpr nokia_external_service_peer_device::application_contract
 		EXTERNAL_SERVICE_NHM6 = {
 	36, 0x01, 0x42,
 	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
+};
+
+// NHM-2 v5.46 independently emits the same discovery-close and application
+// registration grammar before its radio lifecycle. Keep the contract
+// product-owned even though its recovered field values coincide with the
+// independently gated NHM-5 and NHM-6 applications.
+constexpr nokia_external_service_peer_device::application_contract
+		EXTERNAL_SERVICE_NHM2 = {
+	36, 0x01, 0x41,
+	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x42
 };
 
 constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_READY_64 = {
@@ -429,6 +444,10 @@ constexpr nokia_product_config make_3410_config()
 	// NHM-2 independently emits the compact 70/0d00 request during organic
 	// boot and requires its 74/0d00 completion before exposing idle.
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	// Its organic 05/d0 discovery publications establish a separate
+	// application entrance; do not inherit another product's builder.
+	result.external_service = EXTERNAL_SERVICE_NHM2;
+	result.radio = RADIO_NHM2;
 	result.keypad_wiring = KEYPAD_NHM2;
 	result.dsp_bootstrap = BOOTSTRAP_PING_PONG;
 	result.dsp_service_delay_us = 50;
@@ -634,6 +653,7 @@ public:
 		m_diag_config(*this, "DIAGCFG"),
 		m_network_config(*this, "NETCFG"),
 		m_cell_config(*this, "CELLCFG"),
+		m_assignment_config(*this, "ASSIGNCFG"),
 		m_page_config(*this, "PAGECFG"),
 		m_authentication_config(*this, "AUTHCFG")
 	{ }
@@ -751,6 +771,7 @@ private:
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
 	optional_ioport m_cell_config;
+	optional_ioport m_assignment_config;
 	optional_ioport m_page_config;
 	optional_ioport m_authentication_config;
 
@@ -1007,6 +1028,12 @@ void nokia_dct3_state::machine_reset()
 	};
 	m_gsm_network->set_cell_profile(
 			CELL_PROFILES[m_cell_config.read_safe(0x00) & 0x03]);
+	m_gsm_network->set_assignment_profile(
+			BIT(m_assignment_config.read_safe(0x00), 0) ?
+				nokia_gsm_network_device::assignment_profile::
+						mismatched_request_reference :
+				nokia_gsm_network_device::assignment_profile::
+						matched_request);
 	m_gsm_network->set_paging_profile(
 			PAGING_PROFILES[m_page_config.read_safe(0x00) & 0x03]);
 	m_gsm_session->set_authentication_required(
@@ -1711,6 +1738,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x01, "Wrong paging group")
 	PORT_CONFSETTING(0x02, "Unmatched IMSI")
 	PORT_CONFSETTING(0x03, "Malformed Paging Request")
+
+	PORT_START("ASSIGNCFG")
+	PORT_CONFNAME(0x01, 0x00, "Immediate Assignment request reference")
+	PORT_CONFSETTING(0x00, "Match CHANNEL REQUEST")
+	PORT_CONFSETTING(0x01, "Mismatched random-access octet")
 
 	PORT_START("AUTHCFG")
 	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")

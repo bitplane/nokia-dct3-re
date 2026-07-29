@@ -52,12 +52,18 @@ PROFILE_CHECKPOINTS = {
             r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
             r"030045050200f11000011708")),
     ),
+    "nhm2": (
+        ("Location Updating Accept", re.compile(
+            r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
+            r"030045050200f11000011708")),
+    ),
 }
 
 PROFILE_ARFCN = {
     "nse8": "0001",
     "nhm5": "0058",
     "nhm6": "0337",
+    "nhm2": "0001",
 }
 
 COMMON_POST_ACCEPT_CHECKPOINTS = (
@@ -70,12 +76,21 @@ def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
     if profile not in PROFILE_CHECKPOINTS:
         raise ValueError(f"unknown registration profile: {profile}")
 
+    if preserved and profile == "nhm2":
+        after_accept = tuple(
+            checkpoint for checkpoint in COMMON_CHECKPOINTS_AFTER_ACCEPT
+            if not checkpoint[0].startswith("EF_LOCI"))
+    elif preserved:
+        after_accept = tuple(
+            checkpoint for checkpoint in COMMON_CHECKPOINTS_AFTER_ACCEPT
+            if checkpoint[0] != "EF_LOCI status update")
+    else:
+        after_accept = COMMON_CHECKPOINTS_AFTER_ACCEPT
+
     checkpoints = (
         COMMON_CHECKPOINTS_BEFORE_ACCEPT
         + PROFILE_CHECKPOINTS[profile]
-        + (COMMON_CHECKPOINTS_AFTER_ACCEPT if not preserved else
-           tuple(checkpoint for checkpoint in COMMON_CHECKPOINTS_AFTER_ACCEPT
-                 if checkpoint[0] != "EF_LOCI status update"))
+        + after_accept
         + (("RR channel deconfiguration", re.compile(
             r"TX packet type=02 .*radio_phase=release_channel_change "
             rf"data=041202000000001a6000{PROFILE_ARFCN[profile]}"
@@ -98,12 +113,15 @@ def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
         raise ValueError(f"expected one Location Updating Request, observed {len(requests)}")
     if preserved and not re.search(
             r"TX packet type=1b .*data=0080013f[0-9a-f]*"
-            r"4905087200f110000130080910101032547698",
+            r"4905087200f11000013[03]080910101032547698",
             text):
         raise ValueError(
             "preserved cold boot did not use the persisted LAI/TMSI location update")
+    if preserved and profile == "nhm2" and re.search(
+            r"sim_device: update-binary fid=6f7e", text):
+        raise ValueError("NHM-2 redundantly mutated persisted EF_LOCI")
 
-    if profile in ("nhm5", "nhm6"):
+    if profile in ("nhm5", "nhm6", "nhm2"):
         assigned_confirmation = re.search(
             r"radio_phase=assigned_channel_change[^\n]*"
             r"(?:\n.*)*?RX enqueue type=89 payload=8 .*data=0100000000000000",
