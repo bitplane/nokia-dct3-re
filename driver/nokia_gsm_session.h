@@ -179,6 +179,7 @@ private:
 	downlink_kind apply_outgoing_termination();
 	void publish_call_alerting_output();
 	void publish_release_waiting_output();
+	void clear_dedicated_cipher();
 	downlink_kind queue_downlink(
 			downlink_kind kind, const u8 *information, unsigned length,
 			u8 sapi = 0);

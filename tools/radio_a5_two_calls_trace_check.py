@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 ACTIVATION = re.compile(r"gsm_cipher: event=activated algorithm=1")
+CLEAR = re.compile(r"gsm_cipher: event=cleared algorithm=1")
 COMMAND = re.compile(r"data=8012[0-9a-f]*063501")
 REQUEST = re.compile(r"GSM outgoing request id=(\d+)")
 PCH = re.compile(r"PCH no-identity fill")
@@ -18,12 +19,13 @@ def check(text: str) -> list[str]:
     errors: list[str] = []
     requests = list(REQUEST.finditer(text))
     activations = list(ACTIVATION.finditer(text))
+    clears = list(CLEAR.finditer(text))
     commands = list(COMMAND.finditer(text))
     if [match.group(1) for match in requests] != ["1", "2"]:
         errors.append("expected two distinct sequential outgoing requests")
         return errors
-    if len(commands) != 2 or len(activations) != 2:
-        errors.append("each call must negotiate A5/1 exactly once")
+    if len(commands) != 2 or len(activations) != 2 or len(clears) != 2:
+        errors.append("each call must activate and clear A5/1 exactly once")
         return errors
     between = PCH.search(text, requests[0].end(), commands[1].start())
     if not between:
@@ -31,10 +33,13 @@ def check(text: str) -> list[str]:
     for index, command in enumerate(commands):
         request = requests[index]
         activation = activations[index]
+        clear = clears[index]
         if not command.start() < activation.start() < request.start():
             errors.append(
                 f"call {index + 1} did not order command, activation and request"
             )
+        if not request.start() < clear.start():
+            errors.append(f"call {index + 1} cleared cipher before its request")
     return errors
 
 

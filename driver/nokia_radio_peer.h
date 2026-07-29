@@ -203,6 +203,8 @@ private:
 	void deliver_lapdm_downlink(
 			const std::array<u8, nokia_lapdm_link_device::frame_length> &frame,
 			u8 *payload, u32 reference_frame);
+	bool apply_active_cipher(gsm::tch_f::burst_payload &payload,
+			u32 frame_number, gsm::a5::direction direction) const;
 	TIMER_CALLBACK_MEMBER(burst_tick);
 
 	required_device<nokia_dspif_device> m_transport;

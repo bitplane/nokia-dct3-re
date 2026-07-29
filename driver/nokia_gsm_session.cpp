@@ -109,6 +109,16 @@ void nokia_gsm_session_device::device_reset()
 	clear_pending_downlink();
 }
 
+void nokia_gsm_session_device::clear_dedicated_cipher()
+{
+	if (m_cipher_active)
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_cipher: event=cleared algorithm=%u t=%.6f\n",
+				m_cipher_algorithm, machine().time().as_double());
+	m_cipher_active = false;
+	m_cipher_command_pending = false;
+}
+
 bool nokia_gsm_session_device::establish_layer3(
 		const u8 *information, unsigned length)
 {
@@ -522,8 +532,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 			m_smart_message_part_index = 0;
 		}
 		m_state = u8(state::idle);
-		m_cipher_active = false;
-		m_cipher_command_pending = false;
+		clear_dedicated_cipher();
 		return downlink_kind::release_complete;
 	}
 
@@ -792,8 +801,7 @@ nokia_gsm_session_device::receive_layer3(
 		publish_call_alerting_output();
 		m_incoming_service = u8(incoming_service::none);
 		m_state = u8(state::idle);
-		m_cipher_active = false;
-		m_cipher_command_pending = false;
+		clear_dedicated_cipher();
 		return downlink_kind::release_complete;
 	}
 

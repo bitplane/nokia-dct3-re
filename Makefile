@@ -137,6 +137,9 @@ RADIO_OUTGOING_NO_ANSWER_ARGS := -cfg_directory ../fixtures/radio_outgoing_no_an
 RADIO_OUTGOING_SERVICE_REJECT_ARGS := -cfg_directory ../fixtures/radio_outgoing_service_reject
 RADIO_OUTGOING_DELAYED_BUSY_ARGS := -cfg_directory ../fixtures/radio_outgoing_delayed_busy
 RADIO_OUTGOING_HOST_ADAPTER_ARGS := -cfg_directory ../fixtures/radio_outgoing_host_adapter
+HOST_CALL_CONFIG_ARGS ?= $(RADIO_OUTGOING_HOST_ADAPTER_ARGS)
+HOST_RELEASE_SECURITY_CHECK ?= :
+HOST_TWO_CALL_SECURITY_CHECK ?= :
 HOST_CALL_ADAPTER_PORT ?= 18080
 HOST_CALL_ADAPTER_THROTTLE ?= -nothrottle
 HOST_CALL_TERMINATION_PORT ?= 18081
@@ -206,6 +209,8 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-radio-outgoing-call-host-media-restore
 .PHONY: verify-radio-outgoing-call-host-release-restore
 .PHONY: verify-radio-outgoing-call-host-two-calls
+.PHONY: verify-radio-a5-1-host-release-restore
+.PHONY: verify-radio-a5-1-host-two-calls
 .PHONY: verify-radio-outgoing-call-host-physical-media
 .PHONY: verify-3310-radio-outgoing-call-host-termination
 .PHONY: verify-3330-radio-outgoing-call-host-termination
@@ -301,6 +306,9 @@ help:
 	@echo "make verify-radio-outgoing-call-host-reconnect check reconnect/restore epoch resynchronisation"
 	@echo "make verify-radio-outgoing-call-host-media-restore check restored media cursors"
 	@echo "make verify-radio-outgoing-call-host-release-restore check in-release deterministic replay"
+	@echo "make verify-gsm-a5 verify-gsm-xcch-l1 check generic A5 and ciphered xCCH"
+	@echo "make verify-radio-a5-1-incoming-call check organic encrypted MT call and media"
+	@echo "make verify-radio-a5-1-host-{release-restore,two-calls} check host/cipher isolation"
 	@echo "make verify-radio-outgoing-call-host-physical-media check non-silent physical host loopback"
 	@echo "make verify-{3310,3330,3410}-radio-outgoing-call-lifecycle check product MO calls"
 	@echo "make verify-radio-incoming-call-lifecycle-v501 check the cross-ROM MCU/DSP audio-control wire"
@@ -1801,14 +1809,20 @@ verify-radio-outgoing-call-host-release-restore:
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
-			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-verbose $(HOST_CALL_CONFIG_ARGS) -http \
 			-http_port $(HOST_CALL_MEDIA_PORT) \
-			-cfg_directory ../fixtures/radio_a5_1_host \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
-	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(HOST_RELEASE_SECURITY_CHECK); \
 	$(PYTHON) tools/radio_outgoing_host_release_restore_trace_check.py \
 		$(RUN_DIR)/error.log
+
+verify-radio-a5-1-host-release-restore:
+	@$(MAKE) --no-print-directory \
+		verify-radio-outgoing-call-host-release-restore \
+		RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) \
+		HOST_CALL_CONFIG_ARGS='-cfg_directory ../fixtures/radio_a5_1_host' \
+		HOST_RELEASE_SECURITY_CHECK='$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log'
 
 verify-radio-outgoing-call-host-two-calls:
 	@set -e; \
@@ -1834,14 +1848,20 @@ verify-radio-outgoing-call-host-two-calls:
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
-			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-verbose $(HOST_CALL_CONFIG_ARGS) -http \
 			-http_port $(HOST_CALL_TWO_CALLS_PORT) \
-			-cfg_directory ../fixtures/radio_a5_1_host \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
-	$(PYTHON) tools/radio_a5_two_calls_trace_check.py $(RUN_DIR)/error.log; \
+	$(HOST_TWO_CALL_SECURITY_CHECK); \
 	$(PYTHON) tools/radio_outgoing_host_two_calls_trace_check.py \
 		$(RUN_DIR)/error.log
+
+verify-radio-a5-1-host-two-calls:
+	@$(MAKE) --no-print-directory \
+		verify-radio-outgoing-call-host-two-calls \
+		RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) \
+		HOST_CALL_CONFIG_ARGS='-cfg_directory ../fixtures/radio_a5_1_host' \
+		HOST_TWO_CALL_SECURITY_CHECK='$(PYTHON) tools/radio_a5_two_calls_trace_check.py $(RUN_DIR)/error.log'
 
 verify-3410-radio-outgoing-call-host-termination:
 	@set -e; \

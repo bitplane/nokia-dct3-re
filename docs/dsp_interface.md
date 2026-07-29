@@ -961,8 +961,9 @@ The same component maps each block through the eight-burst diagonal
 interleaver, combines old and new block halves at the four-burst cadence, and
 packs the resulting 114 data bits and `hl`/`hu` flags into the 148-bit GMSK
 normal-burst shape. Training sequence 2 comes from the cell's assigned BCC,
-not from a media fixture. The 114-bit field is the explicit future A5
-cipher/decipher seam; training, tail and stealing bits remain outside it.
+not from a media fixture. A5/0 or A5/1 now operates on exactly that 114-bit
+field after interleaving and before normal-burst packing; training, tail and
+stealing bits remain outside it.
 SACCH/FACCH's shared 184-bit FIRE and convolutional coding is implemented
 independently, and FACCH stealing marks the first four `hu` and last four
 `hl` flags as TS 45.003 requires.

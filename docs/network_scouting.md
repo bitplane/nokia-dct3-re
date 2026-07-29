@@ -418,7 +418,8 @@ stale-epoch rejection and ordinary clearing under the restored epoch.
 request, decision and release state cannot leak across sequential calls: the
 second organic SETUP receives a new ID only after the first returns to PCH,
 an old-ID decision is rejected, and the second call has its own complete
-CC/RR teardown.
+CC/RR teardown. `make verify-radio-a5-1-host-two-calls` additionally requires
+each call to activate and clear its own A5/1 dedicated-channel context.
 
 `make verify-radio-outgoing-call-host-hostile` holds execution to realtime so
 the client is connected before firmware SETUP. Malformed JSON and an
@@ -442,6 +443,9 @@ snapshots after the generic session has acknowledged network Disconnect and
 entered `awaiting_handset_release`. A saved diagnostic output exposes only
 that predicate to the harness; reference and restored CC/RR tails must match
 exactly and both return to PCH.
+`make verify-radio-a5-1-host-release-restore` runs the same invariant after
+organic authentication and A5/1 activation while retaining the socket-free
+save image.
 
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes

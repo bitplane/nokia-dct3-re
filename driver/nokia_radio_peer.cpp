@@ -278,6 +278,17 @@ void nokia_radio_peer_device::deliver_lapdm_downlink(
 				u8(context.algorithm), frames.front(), frames.back());
 }
 
+bool nokia_radio_peer_device::apply_active_cipher(
+		gsm::tch_f::burst_payload &payload, u32 frame_number,
+		gsm::a5::direction direction) const
+{
+	if (!m_gsm_session->cipher_active())
+		return true;
+	return gsm::a5::apply(payload, m_gsm_session->cipher_algorithm(),
+			m_gsm_session->cipher_key(),
+			gsm::a5::count_from_frame_number(frame_number), direction);
+}
+
 bool nokia_radio_peer_device::speech_channel_active() const
 {
 	// This is the physical, speech-mode TCH/F assigned by RR. Call-control
@@ -443,22 +454,17 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 			auto transmitted = *uplink;
 			if (m_gsm_session->cipher_active())
 			{
-				gsm::a5::apply(transmitted,
-						m_gsm_session->cipher_algorithm(),
-						m_gsm_session->cipher_key(),
-						gsm::a5::count_from_frame_number(frame_number),
-						gsm::a5::direction::uplink);
+				if (!apply_active_cipher(transmitted, frame_number,
+						gsm::a5::direction::uplink))
+					return;
 				++m_uplink_ciphered_bursts;
 			}
 			const auto air =
 					gsm::tch_f::pack_normal_burst(transmitted, training);
 			auto received = gsm::tch_f::unpack_normal_burst(air);
-			if (m_gsm_session->cipher_active())
-				gsm::a5::apply(received,
-						m_gsm_session->cipher_algorithm(),
-						m_gsm_session->cipher_key(),
-						gsm::a5::count_from_frame_number(frame_number),
-						gsm::a5::direction::uplink);
+			if (!apply_active_cipher(received, frame_number,
+					gsm::a5::direction::uplink))
+				return;
 			m_network_sacch_receiver.receive(received);
 		}
 		if (const auto downlink =
@@ -467,22 +473,17 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 			auto transmitted = *downlink;
 			if (m_gsm_session->cipher_active())
 			{
-				gsm::a5::apply(transmitted,
-						m_gsm_session->cipher_algorithm(),
-						m_gsm_session->cipher_key(),
-						gsm::a5::count_from_frame_number(frame_number),
-						gsm::a5::direction::downlink);
+				if (!apply_active_cipher(transmitted, frame_number,
+						gsm::a5::direction::downlink))
+					return;
 				++m_downlink_ciphered_bursts;
 			}
 			const auto air =
 					gsm::tch_f::pack_normal_burst(transmitted, training);
 			auto received = gsm::tch_f::unpack_normal_burst(air);
-			if (m_gsm_session->cipher_active())
-				gsm::a5::apply(received,
-						m_gsm_session->cipher_algorithm(),
-						m_gsm_session->cipher_key(),
-						gsm::a5::count_from_frame_number(frame_number),
-						gsm::a5::direction::downlink);
+			if (!apply_active_cipher(received, frame_number,
+					gsm::a5::direction::downlink))
+				return;
 			m_handset_sacch_receiver.receive(received);
 		}
 		return;
@@ -523,16 +524,14 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	auto network_payload = gsm::tch_f::unpack_normal_burst(uplink_air);
 	if (m_gsm_session->cipher_active())
 	{
-		gsm::a5::apply(uplink_payload, m_gsm_session->cipher_algorithm(),
-				m_gsm_session->cipher_key(),
-				gsm::a5::count_from_frame_number(frame_number),
-				gsm::a5::direction::uplink);
+		if (!apply_active_cipher(uplink_payload, frame_number,
+				gsm::a5::direction::uplink))
+			return;
 		uplink_air = gsm::tch_f::pack_normal_burst(uplink_payload, training);
 		network_payload = gsm::tch_f::unpack_normal_burst(uplink_air);
-		gsm::a5::apply(network_payload, m_gsm_session->cipher_algorithm(),
-				m_gsm_session->cipher_key(),
-				gsm::a5::count_from_frame_number(frame_number),
-				gsm::a5::direction::uplink);
+		if (!apply_active_cipher(network_payload, frame_number,
+				gsm::a5::direction::uplink))
+			return;
 		++m_uplink_ciphered_bursts;
 		if (m_trace_enabled && m_uplink_ciphered_bursts == 1)
 			LOGMASKED(LOG_RADIO,
@@ -620,7 +619,7 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 			{
 				auto payload = m_downlink_transmitter.next_burst();
 				++m_downlink_tch_bursts;
-				// A generic deterministic hard-error profile at the future A5
+				// A generic deterministic hard-error profile before the A5
 				// seam. Preserve FACCH so media degradation cannot force call
 				// control success or failure.
 				if (m_downlink_tch_burst_error_period &&
@@ -643,10 +642,9 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 			}();
 	if (m_gsm_session->cipher_active())
 	{
-		gsm::a5::apply(downlink_payload, m_gsm_session->cipher_algorithm(),
-				m_gsm_session->cipher_key(),
-				gsm::a5::count_from_frame_number(frame_number),
-				gsm::a5::direction::downlink);
+		if (!apply_active_cipher(downlink_payload, frame_number,
+				gsm::a5::direction::downlink))
+			return;
 		++m_downlink_ciphered_bursts;
 		if (m_trace_enabled && m_downlink_ciphered_bursts == 1)
 			LOGMASKED(LOG_RADIO,
@@ -657,11 +655,9 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	auto downlink_air =
 			gsm::tch_f::pack_normal_burst(downlink_payload, training);
 	auto handset_payload = gsm::tch_f::unpack_normal_burst(downlink_air);
-	if (m_gsm_session->cipher_active())
-		gsm::a5::apply(handset_payload, m_gsm_session->cipher_algorithm(),
-				m_gsm_session->cipher_key(),
-				gsm::a5::count_from_frame_number(frame_number),
-				gsm::a5::direction::downlink);
+	if (!apply_active_cipher(handset_payload, frame_number,
+			gsm::a5::direction::downlink))
+		return;
 	const auto handset_block = m_handset_receiver.receive(handset_payload);
 	if (handset_block &&
 			handset_block->kind == gsm::tch_f::traffic_block_kind::facch)
