@@ -5,42 +5,51 @@ import pathlib
 import re
 import sys
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from tools.radio_call_lifecycle_common import (
+    ALERTING,
+    ASSIGNMENT_COMPLETE,
+    CIPHER_MODE_COMPLETE,
+    CONNECT,
+    CONNECT_ACKNOWLEDGE,
+    DISCONNECT,
+    IDLE_PCH,
+    IMSI_PAGE,
+    NETWORK_RELEASE,
+    REGISTRATION_RELEASE,
+    RELEASE_CONFIRMATION,
+    RR_CHANNEL_RELEASE,
+    TRAFFIC_RELEASE_UA,
+    require_count,
+    require_ordered,
+)
+
 
 CHECKPOINTS = (
-    ("registration release", r"LAPDm Channel Release acknowledged nr=2"),
-    ("IMSI page", r"PCH IMSI page transmitted channel=60 fn="),
-    ("Cipher Mode Complete",
-     r"GSM service uplink sapi=0 pd=06 message=32 length=2"),
+    ("registration release", REGISTRATION_RELEASE),
+    ("IMSI page", IMSI_PAGE),
+    ("Cipher Mode Complete", CIPHER_MODE_COMPLETE),
     ("Call Confirmed",
      r"GSM service uplink sapi=0 pd=03 message=08 length=5"),
     ("traffic configuration",
      r"TX packet type=02 payload=20 .*"
      r"data=041202000271012fc10000010000000400000000"),
-    ("Assignment Complete",
-     r"GSM service uplink sapi=0 pd=06 message=29 length=3"),
-    ("Alerting", r"GSM service uplink sapi=0 pd=03 message=01 length=2"),
+    ("Assignment Complete", ASSIGNMENT_COMPLETE),
+    ("Alerting", ALERTING),
     ("MAD2 buzzer", r"\[:pup\] buzzer: enabled=1 "),
-    ("physical Answer", r"GSM service uplink sapi=0 pd=03 message=07 length=2"),
-    ("Connect Acknowledge",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-     r"03[0-9a-f]{2}09030f"),
-    ("physical End", r"GSM service uplink sapi=0 pd=03 message=25 length=5"),
-    ("network Release",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-     r"03[0-9a-f]{2}09032d"),
-    ("RR Channel Release",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-     r"03[0-9a-f]{2}0d060d00"),
-    ("traffic-link release UA",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}017301"),
+    ("physical Answer", CONNECT),
+    ("Connect Acknowledge", CONNECT_ACKNOWLEDGE),
+    ("physical End", DISCONNECT),
+    ("network Release", NETWORK_RELEASE),
+    ("RR Channel Release", RR_CHANNEL_RELEASE),
+    ("traffic-link release UA", TRAFFIC_RELEASE_UA),
     ("NHM-2 release transaction",
      r"TX packet type=02 payload=20 .*"
      r"data=041202001117001a600000010000001400000001"),
-    ("release confirmation",
-     r"RX enqueue type=89 payload=8 .*data=0000000000000000"),
-    ("idle PCH",
-     r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}"
-     r"1506210001f0"),
+    ("release confirmation", RELEASE_CONFIRMATION),
+    ("idle PCH", IDLE_PCH),
 )
 
 TRAFFIC_CONFIG = re.compile(
@@ -50,20 +59,13 @@ CALL_CONFIRMED = re.compile(
 
 
 def verify(text: str) -> None:
-    cursor = 0
-    for label, expression in CHECKPOINTS:
-        match = re.search(expression, text[cursor:])
-        if not match:
-            raise ValueError(
-                f"missing or out-of-order NHM-2 call checkpoint: {label}")
-        cursor += match.end()
-
-    if len(TRAFFIC_CONFIG.findall(text)) != 1:
-        raise ValueError(
-            "NHM-2 incoming call must issue exactly one traffic assignment")
-    if len(CALL_CONFIRMED.findall(text)) != 2:
-        raise ValueError(
-            "NHM-2 lifecycle did not retain its observed repeated Call Confirmed")
+    require_ordered(text, CHECKPOINTS, "NHM-2")
+    require_count(
+        text, TRAFFIC_CONFIG, 1,
+        "NHM-2 incoming call must issue exactly one traffic assignment")
+    require_count(
+        text, CALL_CONFIRMED, 2,
+        "NHM-2 lifecycle did not retain its observed repeated Call Confirmed")
 
 
 def main() -> int:

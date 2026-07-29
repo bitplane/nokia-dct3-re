@@ -186,28 +186,29 @@ constexpr nokia_dsp_hle_device::service_control_contract
 	{ 0x00, 0x04, 0x01, 0x00, 0x0d, 0x00 }, 6
 };
 
-// These predicates currently match but remain separate evidence. NSE-8,
-// NHM-5 and NHM-6 each prove command 0x08 and field 0x0201 through their own
-// organic Answer/End lifecycle.
 constexpr nokia_dsp_hle_device::speech_control_contract
-		DSP_SPEECH_CONTROL_NSE8 = {
-	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
-};
+		make_dct3_speech_control_contract()
+{
+	return {
+		0x08,
+		nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
+	};
+}
+
+// These named contracts currently have equal values but retain independent
+// evidence and product-owned selection. Equality does not establish shared
+// firmware semantics or analogue topology.
+constexpr nokia_dsp_hle_device::speech_control_contract
+		DSP_SPEECH_CONTROL_NSE8 = make_dct3_speech_control_contract();
 
 constexpr nokia_dsp_hle_device::speech_control_contract
-		DSP_SPEECH_CONTROL_NHM5 = {
-	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
-};
+		DSP_SPEECH_CONTROL_NHM5 = make_dct3_speech_control_contract();
 
 constexpr nokia_dsp_hle_device::speech_control_contract
-		DSP_SPEECH_CONTROL_NHM6 = {
-	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
-};
+		DSP_SPEECH_CONTROL_NHM6 = make_dct3_speech_control_contract();
 
 constexpr nokia_dsp_hle_device::speech_control_contract
-		DSP_SPEECH_CONTROL_NHM2 = {
-	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
-};
+		DSP_SPEECH_CONTROL_NHM2 = make_dct3_speech_control_contract();
 
 // NSE-3 proves selector 8's wire decoder, but no organic call has identified a
 // speech-request predicate. Keep command decoding without enabling speech.

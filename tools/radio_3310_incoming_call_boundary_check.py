@@ -5,81 +5,73 @@ import pathlib
 import re
 import sys
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from tools.radio_call_lifecycle_common import (
+    ALERTING,
+    ASSIGNMENT_COMPLETE,
+    CIPHER_MODE_COMPLETE,
+    CONNECT,
+    CONNECT_ACKNOWLEDGE,
+    DISCONNECT,
+    IDLE_PCH,
+    IMSI_PAGE,
+    INCOMING_SETUP,
+    MM_INFORMATION,
+    NETWORK_RELEASE,
+    NO_CIPHER_COMMAND,
+    PAGING_CONTENTION_UA,
+    PAGING_RESPONSE,
+    REGISTRATION_RELEASE,
+    RELEASE_COMPLETE,
+    RELEASE_CONFIRMATION,
+    RR_CHANNEL_RELEASE,
+    TRAFFIC_RELEASE_UA,
+    TRAFFIC_SABM,
+    TRAFFIC_UA,
+    require_ordered,
+)
+
 
 CHECKPOINTS = (
-    ("registration release", re.compile(
-        r"LAPDm Channel Release acknowledged nr=2")),
-    ("IMSI page", re.compile(
-        r"PCH IMSI page transmitted channel=60 fn=")),
-    ("Paging Response", re.compile(
-        r"TX packet type=1b .*data=0080013f410627")),
-    ("contention-resolution UA", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]*0173410627")),
-    ("no-cipher Cipher Mode Command", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
-        r"03000d063500")),
+    ("registration release", REGISTRATION_RELEASE),
+    ("IMSI page", IMSI_PAGE),
+    ("Paging Response", PAGING_RESPONSE),
+    ("contention-resolution UA", PAGING_CONTENTION_UA),
+    ("no-cipher Cipher Mode Command", NO_CIPHER_COMMAND),
     ("NHM-5 cipher-control publication", re.compile(
         r"TX packet type=14 payload=12 .*"
         r"data=001affffffffffffffff0000")),
-    ("MM Information", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
-        r"03[0-9a-f]{2}2905324762704221000000")),
-    ("Cipher Mode Complete", re.compile(
-        r"GSM service uplink sapi=0 pd=06 message=32 length=2")),
-    ("incoming SETUP", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
-        r"03[0-9a-f]{2}45030504046002008134015c0581551532f4")),
+    ("MM Information", MM_INFORMATION),
+    ("Cipher Mode Complete", CIPHER_MODE_COMPLETE),
+    ("incoming SETUP", INCOMING_SETUP),
     ("Call Confirmed", re.compile(
         r"GSM service uplink sapi=0 pd=03 message=08 length=11")),
-    ("Alerting", re.compile(
-        r"GSM service uplink sapi=0 pd=03 message=01 length=2")),
+    ("Alerting", ALERTING),
     ("traffic-channel configuration", re.compile(
         r"TX packet type=02 payload=20 .*data=041202000271012fc1")),
-    ("traffic-main-link SABM", re.compile(
-        r"TX packet type=1b .*data=00b0013f01")),
-    ("traffic-main-link UA", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}017301")),
-    ("Assignment Complete", re.compile(
-        r"GSM service uplink sapi=0 pd=06 message=29 length=3")),
+    ("traffic-main-link SABM", TRAFFIC_SABM),
+    ("traffic-main-link UA", TRAFFIC_UA),
+    ("Assignment Complete", ASSIGNMENT_COMPLETE),
 )
 
-CONNECT = re.compile(
-    r"GSM service uplink sapi=0 pd=03 message=07 length=2")
-CONNECT_ACKNOWLEDGE = re.compile(
-    r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-    r"03[0-9a-f]{2}09030f")
 TEARDOWN_CHECKPOINTS = (
-    ("Disconnect", re.compile(
-        r"GSM service uplink sapi=0 pd=03 message=25 length=5")),
-    ("network Release", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-        r"03[0-9a-f]{2}09032d")),
-    ("Release Complete", re.compile(
-        r"GSM service uplink sapi=0 pd=03 message=2a length=2")),
-    ("RR Channel Release", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-        r"03[0-9a-f]{2}0d060d00")),
-    ("traffic-link release UA", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}017301")),
+    ("Disconnect", DISCONNECT),
+    ("network Release", NETWORK_RELEASE),
+    ("Release Complete", RELEASE_COMPLETE),
+    ("RR Channel Release", RR_CHANNEL_RELEASE),
+    ("traffic-link release UA", TRAFFIC_RELEASE_UA),
     ("NHM-5 release channel transaction", re.compile(
         r"TX packet type=02 payload=20 .*"
         r"data=041202001117001a6000005800000014")),
-    ("release channel confirmation", re.compile(
-        r"RX enqueue type=89 payload=8 .*data=0000000000000000")),
-    ("idle PCH schedule", re.compile(
-        r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}"
-        r"1506210001f0")),
+    ("release channel confirmation", RELEASE_CONFIRMATION),
+    ("idle PCH schedule", IDLE_PCH),
 )
 
 
 def verify(text: str, answered: bool = False, ended: bool = False) -> None:
-    cursor = 0
-    for label, pattern in CHECKPOINTS:
-        match = pattern.search(text, cursor)
-        if not match:
-            raise ValueError(
-                f"missing or out-of-order NHM-5 call-boundary checkpoint: {label}")
-        cursor = match.end()
+    cursor = require_ordered(text, CHECKPOINTS, "NHM-5")
 
     if answered or ended:
         connects = list(CONNECT.finditer(text, cursor))
@@ -96,13 +88,7 @@ def verify(text: str, answered: bool = False, ended: bool = False) -> None:
         cursor = connect_acknowledge.end()
 
     if ended:
-        for label, pattern in TEARDOWN_CHECKPOINTS:
-            match = pattern.search(text, cursor)
-            if not match:
-                raise ValueError(
-                    "missing or out-of-order NHM-5 teardown checkpoint: "
-                    f"{label}")
-            cursor = match.end()
+        require_ordered(text, TEARDOWN_CHECKPOINTS, "NHM-5 teardown", cursor)
 
 
 def main() -> int:

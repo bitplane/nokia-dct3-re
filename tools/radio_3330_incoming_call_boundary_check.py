@@ -5,76 +5,75 @@ import pathlib
 import re
 import sys
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from tools.radio_call_lifecycle_common import (
+    ALERTING,
+    ASSIGNMENT_COMPLETE,
+    CIPHER_MODE_COMPLETE,
+    CONNECT,
+    CONNECT_ACKNOWLEDGE,
+    DISCONNECT,
+    IDLE_PCH,
+    IMSI_PAGE,
+    INCOMING_SETUP,
+    MM_INFORMATION,
+    NETWORK_RELEASE,
+    NO_CIPHER_COMMAND,
+    PAGING_CONTENTION_UA,
+    PAGING_RESPONSE,
+    REGISTRATION_RELEASE,
+    RELEASE_COMPLETE,
+    RELEASE_CONFIRMATION,
+    RR_CHANNEL_RELEASE,
+    TRAFFIC_RELEASE_UA,
+    TRAFFIC_SABM,
+    TRAFFIC_UA,
+    require_count,
+    require_ordered,
+)
+
 
 CHECKPOINTS = (
-    ("registration release", r"LAPDm Channel Release acknowledged nr=2"),
-    ("IMSI page", r"PCH IMSI page transmitted channel=60 fn="),
-    ("Paging Response", r"TX packet type=1b .*data=0080013f410627"),
-    ("contention-resolution UA",
-     r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]*0173410627"),
-    ("Cipher Mode Command",
-     r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}03000d063500"),
+    ("registration release", REGISTRATION_RELEASE),
+    ("IMSI page", IMSI_PAGE),
+    ("Paging Response", PAGING_RESPONSE),
+    ("contention-resolution UA", PAGING_CONTENTION_UA),
+    ("Cipher Mode Command", NO_CIPHER_COMMAND),
     ("NHM-6 cipher publication",
      r"TX packet type=14 payload=12 .*data=0060ffffffffffffffff0000"),
-    ("MM Information",
-     r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
-     r"03[0-9a-f]{2}2905324762704221000000"),
-    ("Cipher Mode Complete",
-     r"GSM service uplink sapi=0 pd=06 message=32 length=2"),
-    ("incoming SETUP",
-     r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
-     r"03[0-9a-f]{2}45030504046002008134015c0581551532f4"),
+    ("MM Information", MM_INFORMATION),
+    ("Cipher Mode Complete", CIPHER_MODE_COMPLETE),
+    ("incoming SETUP", INCOMING_SETUP),
     ("Call Confirmed",
      r"GSM service uplink sapi=0 pd=03 message=08 length=11"),
-    ("Alerting", r"GSM service uplink sapi=0 pd=03 message=01 length=2"),
+    ("Alerting", ALERTING),
     ("traffic configuration",
      r"TX packet type=02 payload=20 .*data=041202000271012fc1"),
-    ("traffic SABM", r"TX packet type=1b .*data=00b0013f01"),
-    ("traffic UA",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}017301"),
-    ("Assignment Complete",
-     r"GSM service uplink sapi=0 pd=06 message=29 length=3"),
-    ("physical Answer", r"GSM service uplink sapi=0 pd=03 message=07 length=2"),
+    ("traffic SABM", TRAFFIC_SABM),
+    ("traffic UA", TRAFFIC_UA),
+    ("Assignment Complete", ASSIGNMENT_COMPLETE),
+    ("physical Answer", CONNECT),
     ("speech request", r"wire=860b speech_control=060b"),
-    ("Connect Acknowledge",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-     r"03[0-9a-f]{2}09030f"),
-    ("physical End", r"GSM service uplink sapi=0 pd=03 message=25 length=5"),
-    ("network Release",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-     r"03[0-9a-f]{2}09032d"),
-    ("Release Complete",
-     r"GSM service uplink sapi=0 pd=03 message=2a length=2"),
-    ("RR Channel Release",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}"
-     r"03[0-9a-f]{2}0d060d00"),
-    ("traffic release UA",
-     r"RX enqueue type=80 payload=34 .*data=b0[0-9a-f]{18}017301"),
+    ("Connect Acknowledge", CONNECT_ACKNOWLEDGE),
+    ("physical End", DISCONNECT),
+    ("network Release", NETWORK_RELEASE),
+    ("Release Complete", RELEASE_COMPLETE),
+    ("RR Channel Release", RR_CHANNEL_RELEASE),
+    ("traffic release UA", TRAFFIC_RELEASE_UA),
     ("NHM-6 release transaction",
      r"TX packet type=02 payload=20 .*"
      r"data=041202001117001a600003370000001400000001"),
-    ("release confirmation",
-     r"RX enqueue type=89 payload=8 .*data=0000000000000000"),
+    ("release confirmation", RELEASE_CONFIRMATION),
     ("speech release", r"wire=840a speech_control=040a"),
-    ("idle PCH",
-     r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}"
-     r"1506210001f0"),
+    ("idle PCH", IDLE_PCH),
 )
 
 
 def verify(text: str) -> None:
-    cursor = 0
-    for label, expression in CHECKPOINTS:
-        match = re.search(expression, text[cursor:])
-        if not match:
-            raise ValueError(
-                f"missing or out-of-order NHM-6 call checkpoint: {label}")
-        cursor += match.end()
-
-    if len(re.findall(
-            r"GSM service uplink sapi=0 pd=03 message=07 length=2",
-            text)) != 1:
-        raise ValueError("NHM-6 must emit exactly one Connect")
+    require_ordered(text, CHECKPOINTS, "NHM-6")
+    require_count(text, CONNECT, 1, "NHM-6 must emit exactly one Connect")
 
 
 def main() -> int:

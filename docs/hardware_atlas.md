@@ -355,6 +355,14 @@ Primary references: Nokia's
 and
 [NHM-5/UB 4 V09 schematic](https://emoc.org/materiel/telephone_mobile_nokia_3310/3310_schematics/nhm-5_schematics.pdf).
 
+NHM-6 and NHM-2 independently select the same digital COBBA-GJP geometry.
+Their organic firmware calls each publish command-`0x08` values `0x060b` and
+`0x040a`, and their typed 1 MHz/8 kHz 13-in-16 profiles carry bidirectional
+GSM-FR. Equal values are initialized mechanically from one constexpr value but
+remain separately named product evidence. The combined repair material does
+not identify either fitted microphone input or receiver net, so neither
+product inherits NHM-5's MIC2/EAR topology or physical-duplex status.
+
 Paired negative-composition runs also prove that disabling this PCM component
 blocks all handset codec/uplink media without stopping the independent
 network downlink or firmware-controlled teardown. See the

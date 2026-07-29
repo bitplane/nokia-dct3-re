@@ -137,15 +137,36 @@ NHM-2 paging adds no product field at all: page construction, DRX group
 selection, monitored/transmitted scheduling, session state and LAPDm release
 are the same generic components already exercised by NHM-5 and NHM-6.
 
+## Frozen post-NHM-2 frontier
+
+This cleanup starts from commit `6b30852` (`speech control`). Its named
+acceptance surface is:
+
+- `make verify-radio-incoming-call-lifecycle`;
+- `make verify-3310-radio-incoming-call-lifecycle`;
+- `make verify-3330-radio-media-resilience`;
+- `make verify-3410-radio-registration-preserved
+  verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells`;
+- `make verify-3410-radio-paging-preserved verify-3410-radio-paging-state
+  verify-3410-radio-paging-negatives`; and
+- `make verify-3410-radio-incoming-call-lifecycle`.
+
+Shared Make variables and standards-level trace vocabulary do not replace
+product acceptance. Packet grammar, correlation values, ordering and release
+transactions remain independently checked.
+
 No further wrapper is justified by the current evidence. DSP service delay and
 peer polling describe different mechanisms; SIM controller presence and card
 presence must remain independently testable; flash, EEPROM, boot and analogue
-settings belong to separate boundaries. NHM-6 now owns a separately evidenced
-command-`0x08` speech-control contract: its organic Answer/End lifecycle
-publishes `0x060b` and `0x040a`. Nokia's combined NHM-2/5/6 repair material
+settings belong to separate boundaries. NHM-6 and NHM-2 own separately
+evidenced command-`0x08` speech-control contracts: each organic Answer/End
+lifecycle publishes `0x060b` and `0x040a`. Their separately named product
+contracts use one constexpr initializer for the equal wire predicate; this
+removes mechanical duplication without asserting shared firmware semantics.
+Nokia's combined NHM-2/5/6 repair material
 identifies the common COBBA-GJP N100 audio boundary, while the COBBA-GJP system
 documentation fixes its codec SIO at 1 MHz/8 kHz with 125 clocks per frame and
-a sign-extended 13-in-16 word. NHM-6 therefore owns an independently declared
-profile even though its values match NHM-5. It does not inherit NHM-5's
-analogue routes or gains. The remaining NHM-6 target is physical duplex after
-the fitted microphone input and receiver topology are independently identified.
+a sign-extended 13-in-16 word. Both products own independently declared
+profiles even though their values match NHM-5. Neither inherits NHM-5's
+analogue routes or gains. Physical duplex remains pending identification of
+each fitted microphone input and receiver topology.

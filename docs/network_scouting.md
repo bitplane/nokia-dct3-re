@@ -265,6 +265,23 @@ both directions, four-phase SACCH/TF reservation, subsequent good-frame
 recovery, physical End and clean PCH return. This promotes internal media only;
 no host microphone or receiver route is enabled.
 
+`make verify-3410-radio-incoming-call-lifecycle` applies the same standards-
+level session and LAPDm owners to NHM-2 while retaining its packet grammar and
+ordering. NHM-2 publishes Call Confirmed twice around its first completed
+assignment. The generic session records a saved per-call
+`traffic_assignment_issued` invariant, so the repeated CC message cannot start
+a second RR assignment. Firmware then drives the MAD2 buzzer, physical Send
+produces Connect, and physical End produces Disconnect. NHM-2 confirms its
+independently observed `0x14` release transaction and returns to PCH.
+
+The same run independently observes command-`0x08` values `0x060b` and
+`0x040a`, sustains bidirectional GSM-FR across its typed 1 MHz/8 kHz
+COBBA-GJP link, and carries non-silent downlink PCM. NHM-2 removes the active
+TCH before its later `0x040a` publication, so the generic media gate accepts
+channel-owned shutdown only after physical End and before route clearing.
+This ordering does not weaken the requirement that both release boundaries
+occur. No analogue microphone or receiver route is inferred.
+
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes
 LAPDm SAPI 3 exactly

@@ -7,6 +7,7 @@ def trace(omit=None):
     lines = []
     for label, expression in CHECKPOINTS:
         if label != omit:
+            expression = getattr(expression, "pattern", expression)
             lines.append(expression.replace(".*", " sample ").replace(
                 "[0-9a-f]*", "").replace("[0-9a-f]{18}", "000000000000000000")
                 .replace("[0-9a-f]{2}", "00").replace("\\", ""))

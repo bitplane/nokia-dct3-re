@@ -466,6 +466,17 @@ an unclipped non-silent uplink, and the EAR-only capture contains a 5.36-second
 1 kHz downlink run. Neutral host route scaling records connectivity, not an
 unproved NHM-5 analogue gain.
 
+NHM-6 and NHM-2 independently close the same digital boundary without
+inheriting NHM-5 firmware semantics or analogue topology. Each organic call
+publishes command-`0x08` values `0x060b` on Answer and `0x040a` on End.
+Combined NHM-2/5/6 repair material identifies their COBBA-GJP N100, while the
+documented converter interface supplies the same 1 MHz/8 kHz, one-sync-clock,
+13-in-16 MSB-first shape. Separately named product contracts select that equal
+predicate and bus geometry. NHM-6 passes degradation, FACCH/SACCH and
+active-call replay; NHM-2 currently proves ordinary bidirectional internal
+media and non-silent downlink. Neither product is assigned NHM-5's MIC2/EAR
+routes or analogue gains.
+
 This corrects the earlier claim that no fixed-status DSP handler can produce
 the task-17 completion. Status `0x1391` remains the explicit lower-result
 completion, but it is not the only entrance to finalizer `0x219e30`: direct
@@ -825,6 +836,14 @@ its speech route and later completes call teardown, but the disabled PCM
 component permits no DSP codec tick and no good uplink delivery. The
 independent network transmitter continues producing downlink frames; missing
 handset hardware does not incorrectly stop the remote endpoint.
+
+Speech also stops when the physical TCH ceases to exist. NSE-8/NHM-5/NHM-6
+publish their observed route-clear close to that transition. NHM-2 instead
+removes TCH first and publishes `0x040a` about 130 ms later. The semantic media
+gate therefore accepts a channel-owned stop only between physical End and the
+later route clear; a route-owned stop must remain within 50 ms of `0x040a`.
+This preserves both independent gates rather than treating call-control state
+alone as a speech request.
 
 MAME saves those two codec histories alongside the DSP HLE, rather than
 serializing libgsm pointers or allocator padding. Combined with the complete
