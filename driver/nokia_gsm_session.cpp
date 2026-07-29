@@ -24,6 +24,7 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_registered_mobile_identity_length));
 	save_item(NAME(m_release_completes_registration));
 	save_item(NAME(m_call_alerting));
+	save_item(NAME(m_traffic_assignment_issued));
 	save_item(NAME(m_incoming_service));
 	save_item(NAME(m_smart_message_part_index));
 	save_item(NAME(m_pending_downlink.kind));
@@ -45,6 +46,7 @@ void nokia_gsm_session_device::device_reset()
 	m_registered_mobile_identity_length = 0;
 	m_release_completes_registration = false;
 	m_call_alerting = false;
+	m_traffic_assignment_issued = false;
 	publish_call_alerting_output();
 	m_incoming_service = u8(incoming_service::none);
 	m_smart_message_part_index = 0;
@@ -86,6 +88,7 @@ bool nokia_gsm_session_device::queue_incoming_page(incoming_service service)
 	if (m_state != u8(state::idle) || m_registered_mobile_identity_length != 8)
 		return false;
 	m_incoming_service = u8(service);
+	m_traffic_assignment_issued = false;
 	if (service != incoming_service::smart_message)
 		m_smart_message_part_index = 0;
 	m_state = u8(state::awaiting_paging_response);
@@ -343,8 +346,13 @@ nokia_gsm_session_device::receive_layer3(
 	{
 		if (message_type == 0x08)
 		{
-			if (m_state != u8(state::incoming_call_active))
+			// Some handsets repeat Call Confirmed after the dedicated channel
+			// assignment has completed.  It is still the same CC transaction,
+			// so it must not start a second RR assignment.
+			if (m_state != u8(state::incoming_call_active) ||
+					m_traffic_assignment_issued)
 				return downlink_kind::none;
+			m_traffic_assignment_issued = true;
 			const auto assignment = m_network->traffic_assignment();
 			m_state = u8(state::awaiting_traffic_assignment);
 			return queue_downlink(downlink_kind::traffic_assignment,
@@ -393,6 +401,7 @@ nokia_gsm_session_device::receive_layer3(
 		m_established_layer3_length = 0;
 		m_release_completes_registration = false;
 		m_call_alerting = false;
+		m_traffic_assignment_issued = false;
 		publish_call_alerting_output();
 		m_incoming_service = u8(incoming_service::none);
 		m_state = u8(state::idle);

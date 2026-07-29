@@ -170,7 +170,10 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
 	nokia_radio_peer_device::acquisition_strategy::autonomous_band_scan,
-	0x00, 0x01, 0, false
+	// NHM-2 v5.46 organically publishes 0x14 in byte 15 of its TCH/F
+	// release CHANNEL_CONFIGURE transaction, matching the independently
+	// observed NHM-5/NHM-6 parameter without implying a bit meaning.
+	0x14, 0x01, 0, false
 };
 
 constexpr nokia_dsp_hle_device::service_control_contract

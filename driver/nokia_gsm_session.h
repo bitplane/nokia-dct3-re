@@ -135,6 +135,7 @@ private:
 	unsigned m_registered_mobile_identity_length = 0;
 	bool m_release_completes_registration = false;
 	bool m_call_alerting = false;
+	bool m_traffic_assignment_issued = false;
 	u8 m_incoming_service = u8(incoming_service::none);
 	u8 m_smart_message_part_index = 0;
 	downlink_message m_pending_downlink;
