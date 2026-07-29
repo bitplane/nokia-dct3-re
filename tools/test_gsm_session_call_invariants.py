@@ -73,6 +73,73 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
                 self.source.split("configured_outgoing_call_outcome", 1)[1],
             )
 
+    def test_asynchronous_decision_queue_is_saved_and_id_correlated(self):
+        for field in (
+            "m_outgoing_decision_accepted",
+            "m_outgoing_decision",
+            "m_outgoing_decision_request_id",
+            "m_outgoing_policy_request_id",
+        ):
+            self.assertIn(f"save_item(NAME({field}));", self.source)
+        submit = self.source.split(
+            "bool nokia_gsm_session_device::submit_outgoing_decision", 1)[1]
+        submit = submit.split(
+            "nokia_gsm_session_device::apply_outgoing_decision", 1)[0]
+        self.assertIn("request_id != m_outgoing_request_id", submit)
+        self.assertIn("m_outgoing_decision_accepted", submit)
+        self.assertIn("service_reject", submit)
+        self.assertIn("state::awaiting_outgoing_decision", submit)
+        self.assertIn("TIMER_CALLBACK_MEMBER", self.source)
+
+    def test_host_termination_is_saved_correlated_and_network_owned(self):
+        for field in (
+            "m_outgoing_termination_accepted",
+            "m_outgoing_termination_request_id",
+            "m_outgoing_termination_cause",
+        ):
+            self.assertIn(f"save_item(NAME({field}));", self.source)
+
+    def test_release_save_gate_is_observational_saved_state(self):
+        self.assertIn("bool m_release_waiting = false;", self.header)
+        self.assertIn("save_item(NAME(m_release_waiting));", self.source)
+        self.assertIn(
+            '"nokia_gsm_call_release_waiting_handset"', self.source
+        )
+        transition = self.source.split(
+            "state::awaiting_network_disconnect_acknowledgement", 1
+        )[1].split("return downlink_kind::none;", 1)[0]
+        self.assertIn("m_state = u8(state::awaiting_handset_release)", transition)
+        self.assertIn("m_release_waiting = true", transition)
+        submit = self.source.split(
+            "bool nokia_gsm_session_device::submit_outgoing_termination", 1
+        )[1].split(
+            "nokia_gsm_session_device::apply_outgoing_termination", 1
+        )[0]
+        self.assertIn("request_id != m_outgoing_request_id", submit)
+        self.assertIn("!m_outgoing_decision_accepted", submit)
+        self.assertIn("m_mobile_originated_call", submit)
+        apply = self.source.split(
+            "nokia_gsm_session_device::apply_outgoing_termination", 1
+        )[1].split(
+            "nokia_gsm_session_device::apply_outgoing_decision", 1
+        )[0]
+        self.assertIn("m_network->call_disconnect", apply)
+        self.assertIn("state::awaiting_network_disconnect_acknowledgement", apply)
+
+    def test_async_network_clear_enters_generic_radio_downlink_scheduler(self):
+        radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
+        tick = radio.split(
+            "void nokia_radio_peer_device::tick()", 1
+        )[1].split(
+            "bool nokia_radio_peer_device::fast_completion_pending", 1
+        )[0]
+        self.assertIn("m_gsm_session->pending_downlink_kind()", tick)
+        self.assertIn("phase::service_uplink_request", tick)
+        self.assertIn("phase::service_downlink", tick)
+        for product in ("noki3210", "noki3310", "noki3330", "noki3410",
+                        "NHM-", "NSE-"):
+            self.assertNotIn(product, tick)
+
     def test_non_call_cm_service_and_malformed_identity_fail_closed(self):
         establishment = self.source.split(
             "const bool cm_service_request =", 1)[1]

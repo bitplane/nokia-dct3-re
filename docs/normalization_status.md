@@ -32,7 +32,15 @@ that the driver is ready for upstream submission.
   release and restored PCH cadence. The generic session now retains a saved
   request ID and called digits, while network-owned deterministic policy proves
   busy, no-answer and CM-service-reject outcomes with clean RR release. An
-  asynchronous external decision interface remains separate.
+  ID-correlated, single-consumption submission interface and emulation-timed
+  delayed policy are save-state proven before busy teardown. The optional
+  WebSocket adapter publishes the same typed request and admits validated host
+  decisions, remote clears and GSM-FR through bounded cross-thread queues; GSM
+  sequencing remains in the session. Request IDs and transport epochs prevent
+  cross-call/restore leakage. Reconnect republishes request, phase and saved
+  media cursors. Live gates cover overload, local-End isolation, alerting and
+  traffic reconnect, sequential calls, non-silent physical host loopback and
+  save/load before decision, during media and within CC/RR release.
 - NHM-2 incoming calls and internal media are normalized through organic
   ringing, physical Send/End, one TCH assignment despite repeated Call
   Confirmed, command-`0x08` values `0x060b`/`0x040a`, timed 1 MHz/8 kHz

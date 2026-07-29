@@ -34,6 +34,7 @@
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
 #include "nokia_gensio.h"
+#include "nokia_gsm_call_adapter.h"
 #include "nokia_gsm_network.h"
 #include "nokia_gsm_session.h"
 #include "nokia_gsm_voice_peer.h"
@@ -664,6 +665,7 @@ public:
 		m_dspif(*this, "dspif"),
 		m_dsp_hle(*this, "dsp_hle"),
 		m_external_service_peer(*this, "external_service_peer"),
+		m_gsm_call_adapter(*this, "gsm_call_adapter"),
 		m_gsm_network(*this, "gsm_network"),
 		m_gsm_session(*this, "gsm_session"),
 		m_lapdm_link(*this, "lapdm_link"),
@@ -682,7 +684,9 @@ public:
 		m_assignment_config(*this, "ASSIGNCFG"),
 		m_page_config(*this, "PAGECFG"),
 		m_authentication_config(*this, "AUTHCFG"),
-		m_outgoing_call_config(*this, "CALLCFG")
+		m_outgoing_call_config(*this, "CALLCFG"),
+		m_outgoing_call_delay_config(*this, "CALLDELAY"),
+		m_outgoing_call_host_config(*this, "CALLHOST")
 	{ }
 
 	void noki3330(machine_config &config);
@@ -783,6 +787,7 @@ private:
 	required_device<nokia_dspif_device> m_dspif;
 	required_device<nokia_dsp_hle_device> m_dsp_hle;
 	required_device<nokia_external_service_peer_device> m_external_service_peer;
+	required_device<nokia_gsm_call_adapter_device> m_gsm_call_adapter;
 	required_device<nokia_gsm_network_device> m_gsm_network;
 	required_device<nokia_gsm_session_device> m_gsm_session;
 	required_device<nokia_lapdm_link_device> m_lapdm_link;
@@ -802,6 +807,8 @@ private:
 	optional_ioport m_page_config;
 	optional_ioport m_authentication_config;
 	optional_ioport m_outgoing_call_config;
+	optional_ioport m_outgoing_call_delay_config;
+	optional_ioport m_outgoing_call_host_config;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
 
@@ -1073,6 +1080,13 @@ void nokia_dct3_state::machine_reset()
 	m_gsm_network->set_outgoing_call_outcome(
 			OUTGOING_CALL_OUTCOMES[
 					m_outgoing_call_config.read_safe(0x00) & 0x03]);
+	m_gsm_session->set_outgoing_decision_delay_ms(
+			BIT(m_outgoing_call_delay_config.read_safe(0x00), 0) ? 3000 : 0);
+	const bool host_call_adapter =
+			BIT(m_outgoing_call_host_config.read_safe(0x00), 0);
+	m_gsm_session->set_outgoing_fallback_enabled(!host_call_adapter);
+	m_gsm_call_adapter->set_enabled(host_call_adapter);
+	m_radio_peer->set_host_voice_peer(host_call_adapter);
 	m_gsm_session->set_authentication_required(
 			BIT(m_authentication_config.read_safe(0x00), 0));
 	m_radio_peer->set_page_after_registration(
@@ -1793,6 +1807,16 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x02, "Remote user does not answer")
 	PORT_CONFSETTING(0x03, "MM service rejected")
 
+	PORT_START("CALLDELAY")
+	PORT_CONFNAME(0x01, 0x00, "Laboratory outgoing-call decision delivery")
+	PORT_CONFSETTING(0x00, "Immediate")
+	PORT_CONFSETTING(0x01, "Deferred by 3 emulated seconds")
+
+	PORT_START("CALLHOST")
+	PORT_CONFNAME(0x01, 0x00, "Host outgoing-call adapter")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x01, DEF_STR(On))
+
 	// Standard MAME configuration inputs keep negative-composition tests out of
 	// process-global environment state. These are shared hardware boundaries,
 	// not properties of any one product's keypad matrix.
@@ -2092,6 +2116,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
 	NOKIA_GSM_SESSION(config, m_gsm_session);
+	NOKIA_GSM_CALL_ADAPTER(config, m_gsm_call_adapter);
 	NOKIA_LAPDM_LINK(config, m_lapdm_link);
 	NOKIA_RADIO_PEER(config, m_radio_peer);
 	m_dspif->tx_commit_cb().set(FUNC(nokia_dct3_state::dsp_tx_commit_w));

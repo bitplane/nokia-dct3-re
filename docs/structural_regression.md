@@ -75,6 +75,72 @@ TCH; no-answer must not Connect; service rejection must not accept CM, observe
 SETUP or create request state. All three return to a newly observed PCH fill.
 `verify-radio-outgoing-call-no-answer-state` repeats local clearing after an
 exact save/load while Alerting.
+`verify-radio-outgoing-call-delayed-decision-state` saves before a delayed
+post-SETUP decision, then requires the same request ID to be queued and
+consumed before the busy Disconnect. It therefore detects unsaved timer,
+request or decision state, duplicate consumption and transport shortcuts.
+`verify-radio-outgoing-call-host-adapter` additionally starts MAME's loopback
+WebSocket endpoint and requires the exact request JSON, bounded parser
+failures, stale-ID rejection, one accepted busy decision, duplicate rejection
+and ordinary CC/RR teardown with the deterministic fallback disabled.
+`verify-radio-outgoing-call-host-termination` and
+`verify-radio-outgoing-call-host-alerting-termination` submit a separately
+typed, cause-16 termination correlated to that saved request. The former
+crosses an exact save/load while the accepted termination is pending and
+requires its deterministic replay through Connect Acknowledge before it is
+consumed; the latter
+holds the call at network Alerting. Both reject a wrong ID and a duplicate,
+then require network Disconnect, handset Release, network Release Complete,
+RR Channel Release and a new PCH fill. The WebSocket callback only bounds and
+queues the event; the saved generic session owns when it becomes a GSM
+downlink and all subsequent CC/RR state.
+`verify-radio-outgoing-call-host-media` additionally waits for the typed
+connected-state publication, returns 200 good uplink GSM-FR frames as
+contiguously sequenced downlink frames, and requires every frame to be accepted
+under the same request ID before remote clearing. The structural media test
+locates this boundary after independent uplink TCH/F decoding and before
+downlink coding/interleaving/burst transport, while forbidding adapter
+dependencies on DSP or COBBA. This is encoded silence transport coverage;
+non-silent host audio is deliberately not inferred from it.
+`verify-radio-outgoing-call-host-physical-media` adds the isolated physical
+boundary: a host 1 kHz microphone source crosses COBBA, firmware speech
+control, uplink TCH/F and the WebSocket as organically encoded GSM-FR. The host
+returns those exact correlated frames; they cross downlink TCH/F and the
+handset PCM/playback route. The composite gate requires 200 non-silent
+microphone/network frames, sustained non-silent physical playback, ordinary
+remote clearing and rejection of media after release. It does not require a
+lossy speech-codec round trip to preserve the pure-tone spectral oracle used
+by the independent synthetic-network-source test.
+`verify-radio-outgoing-call-host-reconnect` disconnects before the decision
+and again during traffic, requiring request/state snapshots without changing
+the transport epoch. It then crosses save/load, requires an incremented epoch
+and a restored snapshot, rejects a termination from the old epoch and accepts
+the current event through ordinary clearing. Adapter sockets and callback
+queues are explicitly absent from save registration.
+`verify-radio-outgoing-call-host-two-calls` completes two separately dialled
+busy calls. Request IDs advance from one to two only after the first RR release
+and PCH return; a late request-one decision is rejected while request two is
+pending, and the second call then clears independently.
+`verify-radio-outgoing-call-host-hostile` connects before SETUP at realtime
+speed, submits malformed and unsupported messages plus more pre-SETUP
+terminations than the 16-entry callback queue can hold, and requires both
+state-neutral rejection and an explicit overflow count. The later organic
+request and correlated busy decision must remain independently valid.
+`verify-radio-outgoing-call-host-local-end` requires physical handset
+Disconnect and complete RR teardown before stale host termination/media are
+submitted and rejected. `verify-radio-outgoing-call-host-alerting-reconnect`
+requires request and Alerting state republication without an epoch change.
+`verify-radio-outgoing-call-host-media-restore` requires saved media cursors,
+old-epoch rejection and 80 contiguous restored frames.
+`verify-radio-outgoing-call-host-release-restore` waits on the saved,
+observational `awaiting_handset_release` output and compares the reference and
+restored CC/RR release records exactly.
+
+Product promotion pairs each `verify-*-radio-outgoing-call-lifecycle` target
+with its host target. The 3410 principal additionally runs
+`verify-3410-radio-outgoing-call-host-media`; the 3310 and preserved-PMM 3330
+run their focused `host-termination` targets. Shared host checkers contain no
+product DSP, PCM or analogue assumptions.
 `radio_physical_uplink_trace_check.py` covers the opposite direction in
 audio-enabled runs. An external host source enters through MAME's microphone
 record stream; the gate requires at least 100 non-silent, unclipped COBBA

@@ -89,6 +89,7 @@ public:
 		m_voice_peer->set_lab_test_source(enabled);
 		m_lab_voice_source = enabled;
 	}
+	void set_host_voice_peer(bool enabled) { m_host_voice_peer = enabled; }
 	bool enabled() const { return m_enabled; }
 	void receive_packet(const nokia_dspif_device::packet &packet);
 	void tick();
@@ -227,6 +228,7 @@ private:
 	bool m_incoming_smart_message_after_registration = false;
 	bool m_speech_loopback = false;
 	bool m_lab_voice_source = false;
+	bool m_host_voice_peer = false;
 	bool m_pch_fill_delivered = false;
 	bool m_page_transmitted = false;
 	bool m_traffic_channel_active = false;

@@ -60,6 +60,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_uplink_speech_count));
 	save_item(NAME(m_speech_loopback));
 	save_item(NAME(m_lab_voice_source));
+	save_item(NAME(m_host_voice_peer));
 	save_item(NAME(m_uplink_speech_received));
 	save_item(NAME(m_tdma_frame_number));
 	save_item(NAME(m_bcch_frame_number));
@@ -458,7 +459,7 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 		}
 		speech_frame network_downlink{};
 		bool have_downlink = false;
-		if (m_lab_voice_source)
+		if (m_lab_voice_source || m_host_voice_peer)
 		{
 			nokia_gsm_voice_peer_device::speech_frame peer_uplink{};
 			const nokia_gsm_voice_peer_device::speech_frame *peer_uplink_frame =
@@ -1935,6 +1936,21 @@ void nokia_radio_peer_device::tick()
 {
 	if (!m_enabled)
 		return;
+
+	// A host or other network policy may enqueue Layer 3 while the assigned
+	// link is waiting for the mobile's next uplink opportunity. Promote that
+	// saved session message into the ordinary decoded downlink/FACCH path;
+	// the producer never owns radio scheduling.
+	if (m_traffic_channel_active &&
+			m_phase == phase::service_uplink_request &&
+			m_gsm_session->pending_downlink_kind() !=
+					nokia_gsm_session_device::downlink_kind::none)
+	{
+		m_phase = phase::service_downlink;
+		m_reports_remaining = 1;
+		m_wait_ticks = 0;
+		m_report_deferred = true;
+	}
 
 	if (m_reports_remaining != 0 && phase_waits())
 		--m_wait_ticks;

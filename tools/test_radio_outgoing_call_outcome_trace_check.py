@@ -70,6 +70,28 @@ class OutgoingCallOutcomeTraceTest(unittest.TestCase):
             require_state_roundtrip=True,
         )
 
+    def test_deferred_decision_is_correlated_and_ordered(self):
+        deferred = (
+            COMMON
+            + "state_roundtrip: result=pass\n"
+            + "gsm_session: outgoing decision queued id=1 outcome=1\n"
+            + "gsm_session: outgoing decision consumed id=1 outcome=1\n"
+            + BUSY.removeprefix(COMMON)
+        )
+        check(
+            deferred,
+            "busy",
+            require_state_roundtrip=True,
+            require_deferred_decision=True,
+        )
+        with self.assertRaisesRegex(ValueError, "wrong outcome"):
+            check(
+                deferred.replace("outcome=1", "outcome=2"),
+                "busy",
+                require_state_roundtrip=True,
+                require_deferred_decision=True,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,12 @@ NETWORK_RELEASE_COMPLETE = re.compile(
     r"GSM service downlink kind=\d+ sapi=0 pd=03 message=2a length=2"
 )
 STATE_ROUNDTRIP = re.compile(r"state_roundtrip: result=pass")
+DECISION_QUEUED = re.compile(
+    r"gsm_session: outgoing decision queued id=1 outcome=(?P<outcome>\d+)"
+)
+DECISION_CONSUMED = re.compile(
+    r"gsm_session: outgoing decision consumed id=1 outcome=(?P<outcome>\d+)"
+)
 
 
 def _forbid(text: str, patterns: tuple[tuple[str, re.Pattern[str]], ...]) -> None:
@@ -68,7 +74,8 @@ def check(
         text: str,
         outcome: str,
         expected_number: str = "5551234",
-        require_state_roundtrip: bool = False) -> None:
+        require_state_roundtrip: bool = False,
+        require_deferred_decision: bool = False) -> None:
     if require_state_roundtrip and not STATE_ROUNDTRIP.search(text):
         raise ValueError("missing successful save-state roundtrip")
     if outcome == "service-reject":
@@ -142,6 +149,21 @@ def check(
     else:
         raise ValueError(f"unknown outgoing-call outcome {outcome!r}")
     _check_request(text, expected_number)
+    if require_deferred_decision:
+        expected = {"busy": "1", "no-answer": "2"}[outcome]
+        deferred = (
+            ("saved outgoing request", REQUEST),
+            *((("save-state roundtrip", STATE_ROUNDTRIP),)
+              if require_state_roundtrip else ()),
+            ("queued asynchronous decision", DECISION_QUEUED),
+            ("consumed asynchronous decision", DECISION_CONSUMED),
+        )
+        require_ordered(text, deferred, "deferred outgoing decision")
+        for pattern in (DECISION_QUEUED, DECISION_CONSUMED):
+            match = pattern.search(text)
+            assert match is not None
+            if match.group("outcome") != expected:
+                raise ValueError("deferred decision carried the wrong outcome")
 
 
 def main() -> int:
@@ -153,6 +175,7 @@ def main() -> int:
     )
     parser.add_argument("--number", default="5551234")
     parser.add_argument("--require-state-roundtrip", action="store_true")
+    parser.add_argument("--require-deferred-decision", action="store_true")
     args = parser.parse_args()
     try:
         check(
@@ -160,6 +183,7 @@ def main() -> int:
             args.outcome,
             args.number,
             args.require_state_roundtrip,
+            args.require_deferred_decision,
         )
     except ValueError as error:
         print(f"FAIL - {error}")

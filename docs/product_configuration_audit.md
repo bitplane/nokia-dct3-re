@@ -155,10 +155,27 @@ acceptance surface is:
 - `make verify-radio-outgoing-call-busy
   verify-radio-outgoing-call-no-answer
   verify-radio-outgoing-call-no-answer-state
-  verify-radio-outgoing-call-service-reject`;
+  verify-radio-outgoing-call-service-reject
+  verify-radio-outgoing-call-delayed-decision-state`;
+- `make verify-radio-outgoing-call-host-adapter`;
+- `make verify-radio-outgoing-call-host-termination
+  verify-radio-outgoing-call-host-alerting-termination
+  verify-radio-outgoing-call-host-media
+  verify-radio-outgoing-call-host-physical-media`;
+- `make verify-radio-outgoing-call-host-reconnect
+  verify-radio-outgoing-call-host-alerting-reconnect
+  verify-radio-outgoing-call-host-media-restore
+  verify-radio-outgoing-call-host-release-restore`;
+- `make verify-radio-outgoing-call-host-hostile
+  verify-radio-outgoing-call-host-local-end
+  verify-radio-outgoing-call-host-two-calls`;
 - `make verify-3310-radio-outgoing-call-lifecycle`;
 - `make verify-3330-radio-outgoing-call-lifecycle`; and
-- `make verify-3410-radio-outgoing-call-lifecycle`.
+- `make verify-3410-radio-outgoing-call-lifecycle`;
+- `make verify-3310-radio-outgoing-call-host-termination
+  verify-3330-radio-outgoing-call-host-termination`; and
+- `make verify-3410-radio-outgoing-call-host-termination
+  verify-3410-radio-outgoing-call-host-media`.
 
 Shared Make variables and standards-level trace vocabulary do not replace
 product acceptance. Packet grammar, correlation values, ordering and release

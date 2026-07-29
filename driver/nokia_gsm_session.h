@@ -62,6 +62,18 @@ public:
 	{
 		m_authentication_required = required;
 	}
+	void set_outgoing_decision_delay_ms(unsigned delay)
+	{
+		m_outgoing_decision_delay_ms = delay;
+	}
+	void set_outgoing_fallback_enabled(bool enabled)
+	{
+		m_outgoing_fallback_enabled = enabled;
+	}
+	bool submit_outgoing_decision(
+			u32 request_id,
+			nokia_gsm_network_device::outgoing_call_outcome outcome);
+	bool submit_outgoing_termination(u32 request_id, u8 cause = 0x10);
 	bool establish_layer3(const u8 *information, unsigned length);
 	bool queue_incoming_page(incoming_service service = incoming_service::none);
 	downlink_kind contention_resolution_delivered();
@@ -103,6 +115,16 @@ public:
 	{
 		return m_state == u8(state::incoming_call_active);
 	}
+	bool outgoing_call_connected() const
+	{
+		return m_mobile_originated_call &&
+				m_state == u8(state::incoming_call_active);
+	}
+	bool outgoing_call_alerting() const
+	{
+		return m_mobile_originated_call &&
+				m_state == u8(state::outgoing_call_alerting);
+	}
 
 protected:
 	virtual void device_start() override;
@@ -124,6 +146,7 @@ private:
 		awaiting_cm_service_reject_acknowledgement,
 		awaiting_outgoing_call_setup,
 		awaiting_call_proceeding_acknowledgement,
+		awaiting_outgoing_decision,
 		awaiting_call_alerting_acknowledgement,
 		awaiting_outgoing_connect_acknowledgement,
 		outgoing_call_alerting,
@@ -145,13 +168,18 @@ private:
 	};
 
 	void clear_pending_downlink();
+	downlink_kind apply_outgoing_decision();
+	downlink_kind apply_outgoing_termination();
 	void publish_call_alerting_output();
+	void publish_release_waiting_output();
 	downlink_kind queue_downlink(
 			downlink_kind kind, const u8 *information, unsigned length,
 			u8 sapi = 0);
+	TIMER_CALLBACK_MEMBER(outgoing_decision_timer);
 
 	required_device<nokia_gsm_network_device> m_network;
 	output_finder<> m_call_alerting_output;
+	output_finder<> m_release_waiting_output;
 	bool m_authentication_required = false;
 	u8 m_state = u8(state::idle);
 	std::array<u8, maximum_layer3_length> m_established_layer3{};
@@ -160,6 +188,7 @@ private:
 	unsigned m_registered_mobile_identity_length = 0;
 	bool m_release_completes_registration = false;
 	bool m_call_alerting = false;
+	bool m_release_waiting = false;
 	bool m_traffic_assignment_issued = false;
 	bool m_mobile_originated_call = false;
 	u8 m_call_transaction = 0;
@@ -167,6 +196,17 @@ private:
 	u32 m_outgoing_request_id = 0;
 	std::array<u8, 32> m_outgoing_called_digits{};
 	unsigned m_outgoing_called_digits_length = 0;
+	bool m_outgoing_decision_accepted = false;
+	u8 m_outgoing_decision =
+			u8(nokia_gsm_network_device::outgoing_call_outcome::connect);
+	u32 m_outgoing_decision_request_id = 0;
+	u32 m_outgoing_policy_request_id = 0;
+	bool m_outgoing_termination_accepted = false;
+	u32 m_outgoing_termination_request_id = 0;
+	u8 m_outgoing_termination_cause = 0x10;
+	unsigned m_outgoing_decision_delay_ms = 0;
+	bool m_outgoing_fallback_enabled = true;
+	emu_timer *m_outgoing_decision_timer = nullptr;
 	u8 m_incoming_service = u8(incoming_service::none);
 	u8 m_smart_message_part_index = 0;
 	downlink_message m_pending_downlink;

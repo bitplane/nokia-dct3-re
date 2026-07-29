@@ -244,6 +244,54 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_voice_peer->start_call()", radio)
         self.assertNotIn("sine_1khz", dsp + cobba)
 
+    def test_host_gsm_fr_media_stays_between_air_l1_and_voice_peer(self):
+        voice = (
+            (ROOT / "driver/nokia_gsm_voice_peer.cpp").read_text()
+            + (ROOT / "driver/nokia_gsm_voice_peer.h").read_text()
+        )
+        radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
+        adapter = (ROOT / "driver/nokia_gsm_call_adapter.cpp").read_text()
+        self.assertIn("host_queue_depth = 8", voice)
+        for field in (
+            "m_host_request_id",
+            "m_host_uplink_sequence",
+            "m_host_downlink_sequence",
+            "m_host_uplink",
+            "m_host_uplink_time_us",
+            "m_host_downlink",
+        ):
+            self.assertIn(f"save_item(NAME({field}))", voice)
+        self.assertIn(
+            "save_codec_state(m_host_downlink_decoder_state, 2)", voice
+        )
+        self.assertIn(
+            "m_host_downlink_decoder_state = "
+            "m_host_downlink_decoder.snapshot()",
+            voice,
+        )
+        self.assertIn("request_id != m_host_request_id", voice)
+        self.assertIn("sequence != m_host_downlink_sequence", voice)
+        self.assertIn("m_host_downlink_underruns", voice)
+        exchange = voice.split(
+            "bool nokia_gsm_voice_peer_device::exchange", 1
+        )[1]
+        self.assertIn("frame_queue_pop(m_host_downlink", exchange)
+        self.assertIn("m_host_downlink_decoder.decode", exchange)
+        l1 = radio.split(
+            "TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)", 1
+        )[1].split(
+            "const char *nokia_radio_peer_device::phase_name", 1
+        )[0]
+        self.assertLess(
+            l1.index("m_network_receiver.receive"),
+            l1.index("m_voice_peer->exchange"),
+        )
+        voice_exchange = l1.index("m_voice_peer->exchange")
+        self.assertIn(
+            "gsm::tch_f::encode_speech(packed)", l1[voice_exchange:])
+        self.assertNotIn("nokia_cobba", adapter)
+        self.assertNotIn("nokia_dsp_hle", adapter)
+
     def test_layer1_has_an_independent_tdma_burst_clock(self):
         l1 = (
             (ROOT / "driver/gsm_tch_f_l1.cpp").read_text()

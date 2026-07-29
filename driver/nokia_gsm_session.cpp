@@ -2,7 +2,12 @@
 // copyright-holders:Sandro Ronco, Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_gsm_session.h"
+
+#define LOG_GSM_SESSION (1U << 0)
+#define VERBOSE (LOG_GSM_SESSION)
+#include "logmacro.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_GSM_SESSION, nokia_gsm_session_device,
 		"nokia_gsm_session", "Nokia DCT3 GSM Layer 3 session")
@@ -11,12 +16,16 @@ nokia_gsm_session_device::nokia_gsm_session_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_GSM_SESSION, tag, owner, clock),
 	m_network(*this, "^gsm_network"),
-	m_call_alerting_output(*this, "nokia_gsm_call_alerting")
+	m_call_alerting_output(*this, "nokia_gsm_call_alerting"),
+	m_release_waiting_output(*this, "nokia_gsm_call_release_waiting_handset")
 {
 }
 
 void nokia_gsm_session_device::device_start()
 {
+	m_outgoing_decision_timer =
+			timer_alloc(FUNC(nokia_gsm_session_device::outgoing_decision_timer),
+					this);
 	save_item(NAME(m_state));
 	save_item(NAME(m_established_layer3));
 	save_item(NAME(m_established_layer3_length));
@@ -24,6 +33,7 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_registered_mobile_identity_length));
 	save_item(NAME(m_release_completes_registration));
 	save_item(NAME(m_call_alerting));
+	save_item(NAME(m_release_waiting));
 	save_item(NAME(m_traffic_assignment_issued));
 	save_item(NAME(m_mobile_originated_call));
 	save_item(NAME(m_call_transaction));
@@ -31,6 +41,13 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_outgoing_request_id));
 	save_item(NAME(m_outgoing_called_digits));
 	save_item(NAME(m_outgoing_called_digits_length));
+	save_item(NAME(m_outgoing_decision_accepted));
+	save_item(NAME(m_outgoing_decision));
+	save_item(NAME(m_outgoing_decision_request_id));
+	save_item(NAME(m_outgoing_policy_request_id));
+	save_item(NAME(m_outgoing_termination_accepted));
+	save_item(NAME(m_outgoing_termination_request_id));
+	save_item(NAME(m_outgoing_termination_cause));
 	save_item(NAME(m_incoming_service));
 	save_item(NAME(m_smart_message_part_index));
 	save_item(NAME(m_pending_downlink.kind));
@@ -40,6 +57,10 @@ void nokia_gsm_session_device::device_start()
 	machine().save().register_postload(
 			save_prepost_delegate(
 				FUNC(nokia_gsm_session_device::publish_call_alerting_output),
+				this));
+	machine().save().register_postload(
+			save_prepost_delegate(
+				FUNC(nokia_gsm_session_device::publish_release_waiting_output),
 				this));
 }
 
@@ -52,6 +73,7 @@ void nokia_gsm_session_device::device_reset()
 	m_registered_mobile_identity_length = 0;
 	m_release_completes_registration = false;
 	m_call_alerting = false;
+	m_release_waiting = false;
 	m_traffic_assignment_issued = false;
 	m_mobile_originated_call = false;
 	m_call_transaction = 0;
@@ -59,7 +81,17 @@ void nokia_gsm_session_device::device_reset()
 	m_outgoing_request_id = 0;
 	m_outgoing_called_digits.fill(0);
 	m_outgoing_called_digits_length = 0;
+	m_outgoing_decision_accepted = false;
+	m_outgoing_decision =
+			u8(nokia_gsm_network_device::outgoing_call_outcome::connect);
+	m_outgoing_decision_request_id = 0;
+	m_outgoing_policy_request_id = 0;
+	m_outgoing_termination_accepted = false;
+	m_outgoing_termination_request_id = 0;
+	m_outgoing_termination_cause = 0x10;
+	m_outgoing_decision_timer->adjust(attotime::never);
 	publish_call_alerting_output();
+	publish_release_waiting_output();
 	m_incoming_service = u8(incoming_service::none);
 	m_smart_message_part_index = 0;
 	clear_pending_downlink();
@@ -216,30 +248,24 @@ nokia_gsm_session_device::downlink_acknowledged()
 	if (m_state == u8(state::awaiting_call_proceeding_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::call_proceeding))
 	{
-		if (m_network->configured_outgoing_call_outcome() ==
-				nokia_gsm_network_device::outgoing_call_outcome::busy)
-		{
-			const auto disconnect =
-					m_network->call_disconnect(m_call_transaction, 0x11);
-			m_state = u8(state::awaiting_network_disconnect_acknowledgement);
-			return queue_downlink(downlink_kind::call_disconnect,
-					disconnect.data(), disconnect.size());
-		}
-		m_traffic_assignment_issued = true;
-		const auto assignment = m_network->traffic_assignment();
-		m_state = u8(state::awaiting_traffic_assignment);
-		return queue_downlink(downlink_kind::traffic_assignment,
-				assignment.data(), assignment.size());
+		if (m_outgoing_decision_accepted)
+			return apply_outgoing_decision();
+		clear_pending_downlink();
+		m_state = u8(state::awaiting_outgoing_decision);
+		return downlink_kind::none;
 	}
 
 	if (m_state == u8(state::awaiting_call_alerting_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::call_alerting))
 	{
-		if (m_network->configured_outgoing_call_outcome() ==
+		if (nokia_gsm_network_device::outgoing_call_outcome(
+					m_outgoing_decision) ==
 				nokia_gsm_network_device::outgoing_call_outcome::no_answer)
 		{
 			clear_pending_downlink();
 			m_state = u8(state::outgoing_call_alerting);
+			if (m_outgoing_termination_accepted)
+				return apply_outgoing_termination();
 			return downlink_kind::none;
 		}
 		const auto connect = m_network->call_connect(m_call_transaction);
@@ -253,6 +279,8 @@ nokia_gsm_session_device::downlink_acknowledged()
 	{
 		clear_pending_downlink();
 		m_state = u8(state::awaiting_handset_release);
+		m_release_waiting = true;
+		publish_release_waiting_output();
 		return downlink_kind::none;
 	}
 
@@ -424,6 +452,13 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_outgoing_request_pending = false;
 		m_outgoing_called_digits.fill(0);
 		m_outgoing_called_digits_length = 0;
+		m_outgoing_decision_accepted = false;
+		m_outgoing_decision_request_id = 0;
+		m_outgoing_policy_request_id = 0;
+		m_outgoing_termination_accepted = false;
+		m_outgoing_termination_request_id = 0;
+		m_outgoing_termination_cause = 0x10;
+		m_outgoing_decision_timer->adjust(attotime::never);
 		if (!more_smart_message_parts)
 		{
 			m_incoming_service = u8(incoming_service::none);
@@ -499,6 +534,18 @@ nokia_gsm_session_device::receive_layer3(
 		if (m_outgoing_request_id == 0)
 			++m_outgoing_request_id;
 		m_outgoing_request_pending = true;
+		m_outgoing_decision_accepted = false;
+		m_outgoing_decision_request_id = 0;
+		if (m_outgoing_fallback_enabled)
+		{
+			m_outgoing_policy_request_id = m_outgoing_request_id;
+			const auto outcome = m_network->configured_outgoing_call_outcome();
+			if (m_outgoing_decision_delay_ms == 0)
+				submit_outgoing_decision(m_outgoing_request_id, outcome);
+			else
+				m_outgoing_decision_timer->adjust(
+						attotime::from_msec(m_outgoing_decision_delay_ms));
+		}
 		const auto proceeding =
 				m_network->call_proceeding(m_call_transaction);
 		m_state = u8(state::awaiting_call_proceeding_acknowledgement);
@@ -576,6 +623,8 @@ nokia_gsm_session_device::receive_layer3(
 	if (sapi == 0 && m_state == u8(state::awaiting_handset_release) &&
 			protocol_discriminator == 0x03)
 	{
+		m_release_waiting = false;
+		publish_release_waiting_output();
 		if (message_type == 0x2d)
 		{
 			const auto complete =
@@ -617,8 +666,12 @@ nokia_gsm_session_device::receive_layer3(
 	{
 		clear_pending_downlink();
 		m_call_alerting = false;
+		m_release_waiting = false;
 		publish_call_alerting_output();
+		publish_release_waiting_output();
 		m_state = u8(state::incoming_call_active);
+		if (m_outgoing_termination_accepted)
+			return apply_outgoing_termination();
 		return downlink_kind::none;
 	}
 
@@ -636,6 +689,13 @@ nokia_gsm_session_device::receive_layer3(
 		m_outgoing_request_pending = false;
 		m_outgoing_called_digits.fill(0);
 		m_outgoing_called_digits_length = 0;
+		m_outgoing_decision_accepted = false;
+		m_outgoing_decision_request_id = 0;
+		m_outgoing_policy_request_id = 0;
+		m_outgoing_termination_accepted = false;
+		m_outgoing_termination_request_id = 0;
+		m_outgoing_termination_cause = 0x10;
+		m_outgoing_decision_timer->adjust(attotime::never);
 		publish_call_alerting_output();
 		m_incoming_service = u8(incoming_service::none);
 		m_state = u8(state::idle);
@@ -664,9 +724,125 @@ nokia_gsm_session_device::receive_layer3(
 	return downlink_kind::none;
 }
 
+bool nokia_gsm_session_device::submit_outgoing_decision(
+		u32 request_id,
+		nokia_gsm_network_device::outgoing_call_outcome outcome)
+{
+	if (!m_outgoing_request_pending || request_id == 0 ||
+			request_id != m_outgoing_request_id ||
+			m_outgoing_decision_accepted ||
+			outcome ==
+					nokia_gsm_network_device::outgoing_call_outcome::
+							service_reject)
+		return false;
+	m_outgoing_decision_accepted = true;
+	m_outgoing_decision = u8(outcome);
+	m_outgoing_decision_request_id = request_id;
+	if (machine().options().verbose())
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: outgoing decision queued id=%u outcome=%u t=%.6f\n",
+				request_id, unsigned(outcome), machine().time().as_double());
+	if (m_state == u8(state::awaiting_outgoing_decision))
+		apply_outgoing_decision();
+	return true;
+}
+
+bool nokia_gsm_session_device::submit_outgoing_termination(
+		u32 request_id, u8 cause)
+{
+	const bool call_in_progress =
+			m_state == u8(state::awaiting_call_proceeding_acknowledgement) ||
+			m_state == u8(state::awaiting_outgoing_decision) ||
+			m_state == u8(state::awaiting_traffic_assignment) ||
+			m_state == u8(state::awaiting_assignment_complete) ||
+			m_state == u8(state::awaiting_call_alerting_acknowledgement) ||
+			m_state == u8(state::awaiting_outgoing_connect_acknowledgement) ||
+			m_state == u8(state::outgoing_call_alerting) ||
+			m_state == u8(state::incoming_call_active);
+	if (!m_mobile_originated_call || !m_outgoing_request_pending ||
+			request_id == 0 || request_id != m_outgoing_request_id ||
+			!m_outgoing_decision_accepted ||
+			m_outgoing_termination_accepted || !call_in_progress ||
+			cause == 0 || cause > 0x7f)
+		return false;
+	m_outgoing_termination_accepted = true;
+	m_outgoing_termination_request_id = request_id;
+	m_outgoing_termination_cause = cause;
+	if (machine().options().verbose())
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: outgoing termination queued id=%u cause=%u t=%.6f\n",
+				request_id, cause, machine().time().as_double());
+	if (m_state == u8(state::outgoing_call_alerting) ||
+			m_state == u8(state::incoming_call_active))
+		apply_outgoing_termination();
+	return true;
+}
+
+nokia_gsm_session_device::downlink_kind
+nokia_gsm_session_device::apply_outgoing_termination()
+{
+	if (!m_outgoing_termination_accepted ||
+			m_outgoing_termination_request_id != m_outgoing_request_id)
+		return downlink_kind::none;
+	if (machine().options().verbose())
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: outgoing termination consumed id=%u cause=%u t=%.6f\n",
+				m_outgoing_termination_request_id,
+				m_outgoing_termination_cause, machine().time().as_double());
+	m_call_alerting = false;
+	publish_call_alerting_output();
+	const auto disconnect = m_network->call_disconnect(
+			m_call_transaction, m_outgoing_termination_cause);
+	m_state = u8(state::awaiting_network_disconnect_acknowledgement);
+	return queue_downlink(downlink_kind::call_disconnect,
+			disconnect.data(), disconnect.size());
+}
+
+nokia_gsm_session_device::downlink_kind
+nokia_gsm_session_device::apply_outgoing_decision()
+{
+	if (!m_outgoing_decision_accepted ||
+			m_outgoing_decision_request_id != m_outgoing_request_id)
+		return downlink_kind::none;
+	if (machine().options().verbose())
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: outgoing decision consumed id=%u outcome=%u t=%.6f\n",
+				m_outgoing_decision_request_id, m_outgoing_decision,
+				machine().time().as_double());
+	const auto outcome =
+			nokia_gsm_network_device::outgoing_call_outcome(
+					m_outgoing_decision);
+	if (outcome == nokia_gsm_network_device::outgoing_call_outcome::busy)
+	{
+		const auto disconnect =
+				m_network->call_disconnect(m_call_transaction, 0x11);
+		m_state = u8(state::awaiting_network_disconnect_acknowledgement);
+		return queue_downlink(downlink_kind::call_disconnect,
+				disconnect.data(), disconnect.size());
+	}
+	m_traffic_assignment_issued = true;
+	const auto assignment = m_network->traffic_assignment();
+	m_state = u8(state::awaiting_traffic_assignment);
+	return queue_downlink(downlink_kind::traffic_assignment,
+			assignment.data(), assignment.size());
+}
+
+TIMER_CALLBACK_MEMBER(nokia_gsm_session_device::outgoing_decision_timer)
+{
+	if (m_outgoing_policy_request_id != 0)
+		submit_outgoing_decision(
+				m_outgoing_policy_request_id,
+				m_network->configured_outgoing_call_outcome());
+}
+
 void nokia_gsm_session_device::publish_call_alerting_output()
 {
 	m_call_alerting_output = m_call_alerting;
+}
+
+void nokia_gsm_session_device::publish_release_waiting_output()
+{
+	m_release_waiting_output = m_release_waiting;
 }
 
 bool nokia_gsm_session_device::begin_traffic_assignment()

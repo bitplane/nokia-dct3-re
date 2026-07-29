@@ -315,6 +315,133 @@ RR and the speech route, including across an alerting save/load roundtrip.
 `service-reject` sends CM Service Reject before SETUP and releases the SDCCH,
 so it creates neither a call request nor traffic/media state. These are
 standards-level laboratory outcomes, not an asynchronous host-call backend.
+`make verify-radio-outgoing-call-delayed-decision-state` additionally holds the
+post-SETUP session after Call Proceeding, crosses save/load, and accepts a
+decision three emulated seconds after the saved request was created. The
+decision is correlated by request ID, accepted once, queued as an ordinary
+session downlink and transported by the existing LAPDm scheduler. Stale,
+duplicate and MM-service-reject values fail the public post-SETUP submission
+contract. This establishes the scheduler/save-state seam for a future host
+adapter without making host wall-clock time part of GSM behavior.
+
+The optional host binding is `nokia_gsm_call_adapter_device`, enabled
+independently of the laboratory fallback. With MAME's HTTP server enabled it
+registers `/nokia/dct3/calls` and publishes one text WebSocket event:
+`{"type":"outgoing_call","request_id":1,"epoch":1,"digits":"5551234"}`. A host may
+return `outgoing_call_decision` with the same ID and `connect`, `busy` or
+`no_answer`; every inbound event must echo the current epoch. The HTTP thread
+validates a maximum 256-byte JSON message and
+places it in a bounded 16-entry queue; only a device timer on the emulation
+thread calls the session submission interface. MM service rejection is
+deliberately absent because it precedes the post-SETUP host request.
+
+After a decision has been accepted, the host may submit
+`{"type":"outgoing_call_terminate","request_id":1,"epoch":1,"cause":16}`. Cause is
+optional and defaults to GSM normal clearing (`0x10`); zero and values outside
+the seven-bit GSM cause domain are rejected. The session saves the accepted
+termination identity and cause. If it arrives while assignment or connection
+is still progressing, it remains pending until the ordinary firmware-owned
+Alerting or connected boundary, then enters the same network Disconnect,
+handset Release, network Release Complete and RR release path used by other
+network-originated clears. It cannot terminate an incoming call, a request
+before its post-SETUP decision, a different request or a call already being
+cleared.
+
+`make verify-radio-outgoing-call-host-adapter` runs both sides over loopback.
+It rejects malformed JSON, a stale request ID and an unsupported MM decision,
+accepts one matching busy decision, rejects its duplicate, sends the ordinary
+cause-17 Disconnect and returns through CC/RR to PCH. No fallback decision may
+appear while host mode is selected.
+
+`make verify-radio-outgoing-call-host-termination` proves connected remote
+clearing after handset Connect Acknowledge, including save/load after
+termination acceptance but before the connected boundary. The replay consumes
+the saved event again at the same emulated timestamp and repeats the same
+standards-shaped clearing; no host event is resent.
+`make verify-radio-outgoing-call-host-alerting-termination` independently
+proves remote clearing while the call remains at network Alerting. Each live
+gate sends a wrong request ID, one matching event and its duplicate, and
+requires exactly one accepted and consumed cause-16 termination followed by a
+fresh PCH fill.
+
+Connected host media uses the conventional 33-octet GSM 06.10 full-rate frame
+at the network side of the air interface. The emulator publishes
+`outgoing_call_media_uplink` with request ID, monotonically increasing
+sequence, saved `emulation_time_us`, good/BFI status and 66 lowercase
+hexadecimal digits. A host returns
+`outgoing_call_media_downlink` with the matching request ID, its own contiguous
+sequence starting at zero, `source_time_us` copied or assigned by the host, and
+the same 33-octet representation. Timestamps are correlation metadata only:
+they never schedule a burst or change the independent 20 ms air clock. These frames
+are downstream of independent TCH/F burst reception and upstream of downlink
+channel coding, diagonal interleaving, normal-burst packing and FACCH
+substitution. They do not enter COBBA PCM, DSP speech control or UI state
+directly.
+
+The emulation-owned uplink and downlink queues each hold eight frames and are
+included in save states. Uplink backpressure drops the newest frame and counts
+an overrun; a full downlink queue rejects the input without advancing its
+expected sequence, allowing retry. Missing host downlink produces an encoded
+silence frame and counts an underrun, keeping the 20 ms air clock independent
+of host scheduling. FACCH/BFI uplink opportunities are published with
+`good=false`. Ending or changing the correlated call clears both queues and
+sequence spaces, so late media cannot enter a later call.
+
+`make verify-radio-outgoing-call-host-media` returns 200 organically decoded
+uplink frames over the live WebSocket, requires all 200 downlink frames to be
+accepted contiguously, transports them through downlink TCH/F and then clears
+the call remotely. Its current source is handset silence; it proves the
+encoded-media transport boundary, sequencing and teardown, not non-silent
+host audio. `make verify-radio-outgoing-call-host-physical-media` supplies the
+separate non-silent proof: an isolated physical microphone source crosses the
+handset PCM and uplink air path, 200 decoded GSM-FR frames are echoed through
+the typed host boundary, and the returned frames cross downlink TCH/F and the
+physical playback endpoint. GSM-FR is a lossy speech codec, so this gate
+requires sustained correlated non-silent playback rather than reusing the
+synthetic network source's pure-tone spectral oracle.
+
+Every adapter message also carries a transport `epoch`. Ordinary disconnect
+and reconnect retains the epoch and republishes the current outgoing request,
+followed by connected state when applicable. Sockets, HTTP-thread queues and
+callbacks are not serialized. Loading a state discards queued external input,
+advances the non-serialized epoch and republishes the restored request/state.
+Connected state includes `media_uplink_sequence` and
+`media_downlink_sequence`: the first queued uplink frame that will be
+published and the next downlink frame the emulator will accept. These are
+emulator-owned saved cursors, so a post-restore host does not infer continuity
+from transport history.
+Messages from the prior epoch are rejected before reaching the session or
+voice peer. `make verify-radio-outgoing-call-host-reconnect` proves
+pre-decision and in-traffic reconnect, in-traffic save/load, epoch advancement,
+stale-epoch rejection and ordinary clearing under the restored epoch.
+`make verify-radio-outgoing-call-host-two-calls` additionally proves that
+request, decision and release state cannot leak across sequential calls: the
+second organic SETUP receives a new ID only after the first returns to PCH,
+an old-ID decision is rejected, and the second call has its own complete
+CC/RR teardown.
+
+`make verify-radio-outgoing-call-host-hostile` holds execution to realtime so
+the client is connected before firmware SETUP. Malformed JSON and an
+unsupported event are ignored, all validly shaped pre-SETUP terminations are
+rejected by the generic session, and a burst beyond the aggregate 16-event
+callback bound produces an explicit overflow count without CC, RR, radio or
+subscriber mutation. The subsequent organic request still accepts its own
+correlated busy decision and clears normally.
+
+`make verify-radio-outgoing-call-host-local-end` completes physical handset
+Disconnect, network Release, RR release and PCH before submitting stale
+termination and media; both are rejected without a network-originated
+Disconnect. `make verify-radio-outgoing-call-host-alerting-reconnect`
+republishes the request and Alerting snapshot under the unchanged epoch before
+a fresh remote clear.
+
+`make verify-radio-outgoing-call-host-media-restore` rejects an old-epoch
+media frame after save/load, then accepts 80 frames contiguously from the
+restored cursor. `make verify-radio-outgoing-call-host-release-restore`
+snapshots after the generic session has acknowledged network Disconnect and
+entered `awaiting_handset_release`. A saved diagnostic output exposes only
+that predicate to the harness; reference and restored CC/RR tails must match
+exactly and both return to PCH.
 
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes

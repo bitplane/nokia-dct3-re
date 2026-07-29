@@ -18,6 +18,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
 	driver/nokia_dspif.cpp driver/nokia_dspif.h \
 	driver/nokia_external_service.cpp driver/nokia_external_service.h \
+	driver/nokia_gsm_call_adapter.cpp driver/nokia_gsm_call_adapter.h \
 	driver/nokia_gensio.cpp driver/nokia_gensio.h \
 	driver/gsm_a3a8.cpp driver/gsm_a3a8.h \
 	driver/gsm_mm_authentication.cpp driver/gsm_mm_authentication.h \
@@ -132,6 +133,19 @@ RADIO_OUTGOING_CALL_ARGS := -cfg_directory ../fixtures/radio_outgoing_call
 RADIO_OUTGOING_BUSY_ARGS := -cfg_directory ../fixtures/radio_outgoing_busy
 RADIO_OUTGOING_NO_ANSWER_ARGS := -cfg_directory ../fixtures/radio_outgoing_no_answer
 RADIO_OUTGOING_SERVICE_REJECT_ARGS := -cfg_directory ../fixtures/radio_outgoing_service_reject
+RADIO_OUTGOING_DELAYED_BUSY_ARGS := -cfg_directory ../fixtures/radio_outgoing_delayed_busy
+RADIO_OUTGOING_HOST_ADAPTER_ARGS := -cfg_directory ../fixtures/radio_outgoing_host_adapter
+HOST_CALL_ADAPTER_PORT ?= 18080
+HOST_CALL_ADAPTER_THROTTLE ?= -nothrottle
+HOST_CALL_TERMINATION_PORT ?= 18081
+HOST_CALL_ALERTING_TERMINATION_PORT ?= 18082
+HOST_CALL_MEDIA_PORT ?= 18083
+HOST_CALL_RECONNECT_PORT ?= 18084
+HOST_CALL_TWO_CALLS_PORT ?= 18085
+HOST_CALL_3410_PORT ?= 18086
+HOST_CALL_3310_PORT ?= 18087
+HOST_CALL_3330_PORT ?= 18088
+HOST_CALL_PHYSICAL_MEDIA_PORT ?= 18089
 NOKI3210_OUTGOING_DIAL_KEYS := 1,2,3,4,5,enter,wait1000,c,wait500,c,wait1000,5,5,5,1,2,3,4,enter
 NOKI3210_OUTGOING_NO_ANSWER_KEYS := $(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting,wait3000,enter
 RADIO_PCM_MISSING_ARGS := -cfg_directory ../fixtures/radio_pcm_missing
@@ -164,6 +178,23 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-radio-outgoing-call-busy verify-radio-outgoing-call-no-answer
 .PHONY: verify-radio-outgoing-call-service-reject
 .PHONY: verify-radio-outgoing-call-no-answer-state
+.PHONY: verify-radio-outgoing-call-delayed-decision-state
+.PHONY: verify-radio-outgoing-call-host-adapter
+.PHONY: verify-radio-outgoing-call-host-hostile
+.PHONY: verify-radio-outgoing-call-host-local-end
+.PHONY: verify-radio-outgoing-call-host-termination
+.PHONY: verify-radio-outgoing-call-host-alerting-termination
+.PHONY: verify-radio-outgoing-call-host-media
+.PHONY: verify-radio-outgoing-call-host-reconnect
+.PHONY: verify-radio-outgoing-call-host-alerting-reconnect
+.PHONY: verify-radio-outgoing-call-host-media-restore
+.PHONY: verify-radio-outgoing-call-host-release-restore
+.PHONY: verify-radio-outgoing-call-host-two-calls
+.PHONY: verify-radio-outgoing-call-host-physical-media
+.PHONY: verify-3310-radio-outgoing-call-host-termination
+.PHONY: verify-3330-radio-outgoing-call-host-termination
+.PHONY: verify-3410-radio-outgoing-call-host-termination
+.PHONY: verify-3410-radio-outgoing-call-host-media
 .PHONY: verify-3310-radio-outgoing-call-lifecycle
 .PHONY: verify-3330-radio-outgoing-call-lifecycle
 .PHONY: verify-3410-radio-outgoing-call-lifecycle
@@ -247,6 +278,13 @@ help:
 	@echo "make verify-radio-outgoing-call-no-answer check local End before network Connect"
 	@echo "make verify-radio-outgoing-call-no-answer-state check alerting save-state replay"
 	@echo "make verify-radio-outgoing-call-service-reject check rejected CM service and RR release"
+	@echo "make verify-radio-outgoing-call-delayed-decision-state check queued decision across save/load"
+	@echo "make verify-radio-outgoing-call-host-adapter check WebSocket request/decision routing"
+	@echo "make verify-radio-outgoing-call-host-media check correlated timestamped GSM-FR transport"
+	@echo "make verify-radio-outgoing-call-host-reconnect check reconnect/restore epoch resynchronisation"
+	@echo "make verify-radio-outgoing-call-host-media-restore check restored media cursors"
+	@echo "make verify-radio-outgoing-call-host-release-restore check in-release deterministic replay"
+	@echo "make verify-radio-outgoing-call-host-physical-media check non-silent physical host loopback"
 	@echo "make verify-{3310,3330,3410}-radio-outgoing-call-lifecycle check product MO calls"
 	@echo "make verify-radio-incoming-call-lifecycle-v501 check the cross-ROM MCU/DSP audio-control wire"
 	@echo "make verify-radio-degraded-speech check burst errors, bad frames and media recovery"
@@ -482,7 +520,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_gsm_authentication_split.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_outgoing_call_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3410_registration_negative_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_radio_outgoing_call_outcome_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_cobba_control_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_physical_downlink_check.py
 	$(VENV)/bin/python -m unittest tools/test_pulse_route_mame.py
@@ -1327,6 +1365,470 @@ verify-radio-outgoing-call-no-answer-state:
 verify-radio-outgoing-call-service-reject:
 	$(call verify_3210_outgoing_outcome,40,$(RADIO_OUTGOING_SERVICE_REJECT_ARGS),$(NOKI3210_OUTGOING_DIAL_KEYS),service-reject)
 
+verify-radio-outgoing-call-delayed-decision-state:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_DELAYED_BUSY_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \
+		$(RUN_DIR)/error.log --outcome busy --require-state-roundtrip \
+		--require-deferred-decision
+
+verify-radio-outgoing-call-host-adapter:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_ADAPTER_PORT) --cwd $(MAME_DIR) \
+			$(HOST_CALL_ADAPTER_RUNNER_ARGS) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			$(HOST_CALL_ADAPTER_THROTTLE) \
+			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_ADAPTER_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \
+		$(RUN_DIR)/error.log --outcome busy; \
+	$(PYTHON) tools/radio_outgoing_host_adapter_trace_check.py \
+		$(RUN_DIR)/error.log; \
+	if test -n "$(HOST_CALL_ADAPTER_EXTRA_CHECKER)"; then \
+		$(PYTHON) $(HOST_CALL_ADAPTER_EXTRA_CHECKER) $(RUN_DIR)/error.log; \
+	fi
+
+verify-radio-outgoing-call-host-hostile:
+	$(MAKE) --no-print-directory verify-radio-outgoing-call-host-adapter \
+		JOBS=$(JOBS) RUN_DIR=$(RUN_DIR) \
+		HOST_CALL_ADAPTER_RUNNER_ARGS=--hostile-pre-setup \
+		HOST_CALL_ADAPTER_THROTTLE=-throttle \
+		HOST_CALL_ADAPTER_EXTRA_CHECKER=tools/radio_outgoing_host_hostile_trace_check.py
+
+verify-radio-outgoing-call-host-local-end:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),wait5000,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_local_end_gate.py \
+			--port $(HOST_CALL_ADAPTER_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-throttle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_ADAPTER_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_local_end_trace_check.py \
+		$(RUN_DIR)/error.log
+
+verify-radio-outgoing-call-host-termination:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_AT=24.6 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_TERMINATION_PORT) --cwd $(MAME_DIR) \
+			--decision connect --terminate -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_TERMINATION_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
+		$(RUN_DIR)/error.log --require-state-roundtrip
+
+verify-radio-outgoing-call-host-alerting-termination:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_ALERTING_TERMINATION_PORT) --cwd $(MAME_DIR) \
+			--decision no_answer --terminate -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_ALERTING_TERMINATION_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
+		$(RUN_DIR)/error.log --phase alerting
+
+verify-radio-outgoing-call-host-media:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_MEDIA_PORT) --cwd $(MAME_DIR) \
+			--decision connect --media-frames 200 -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_MEDIA_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_media_trace_check.py \
+		$(RUN_DIR)/error.log --frames 200
+
+verify-radio-outgoing-call-host-reconnect:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_AT=28.0 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_reconnect_gate.py \
+			--port $(HOST_CALL_RECONNECT_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_RECONNECT_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_reconnect_trace_check.py \
+		$(RUN_DIR)/error.log
+
+verify-radio-outgoing-call-host-alerting-reconnect:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_reconnect_gate.py \
+			--port $(HOST_CALL_ALERTING_TERMINATION_PORT) \
+			--cwd $(MAME_DIR) --phase alerting -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_ALERTING_TERMINATION_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_reconnect_trace_check.py \
+		$(RUN_DIR)/error.log --phase alerting
+
+verify-radio-outgoing-call-host-media-restore:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_AT=28.0 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_media_restore_gate.py \
+			--port $(HOST_CALL_RECONNECT_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_RECONNECT_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_media_restore_trace_check.py \
+		$(RUN_DIR)/error.log --frames 80
+
+verify-radio-outgoing-call-host-release-restore:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_AT=0 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_WAIT_RELEASE=1 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_MEDIA_PORT) --cwd $(MAME_DIR) \
+			--decision connect --media-frames 200 -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_MEDIA_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_release_restore_trace_check.py \
+		$(RUN_DIR)/error.log
+
+verify-radio-outgoing-call-host-two-calls:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),wait5000,c,wait500,c,wait1000,5,5,5,1,2,3,4,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_two_calls_gate.py \
+			--port $(HOST_CALL_TWO_CALLS_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_TWO_CALLS_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_two_calls_trace_check.py \
+		$(RUN_DIR)/error.log
+
+verify-3410-radio-outgoing-call-host-termination:
+	@set -e; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS); \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=120 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=240 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_3410_PORT) --cwd $(MAME_DIR) \
+			--decision connect --terminate -- \
+			./mame noki3410 -bios 546e -rompath roms -log \
+			-video none -sound none -keyboardprovider none \
+			-mouseprovider none -lightgunprovider none -joystickprovider none \
+			-midiprovider none -skip_gameinfo -nothrottle \
+			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_3410_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
+		$(RUN_DIR)/error.log
+
+verify-3410-radio-outgoing-call-host-media:
+	@set -e; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS); \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=120 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=240 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_3410_PORT) --cwd $(MAME_DIR) \
+			--decision connect --media-frames 200 -- \
+			./mame noki3410 -bios 546e -rompath roms -log \
+			-video none -sound none -keyboardprovider none \
+			-mouseprovider none -lightgunprovider none -joystickprovider none \
+			-midiprovider none -skip_gameinfo -nothrottle \
+			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_3410_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_media_trace_check.py \
+		$(RUN_DIR)/error.log --frames 200
+
+verify-3310-radio-outgoing-call-host-termination:
+	@set -e; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS); \
+	mkdir -p $(RUN_DIR); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_3310_PORT) --cwd $(MAME_DIR) \
+			--decision connect --terminate -- \
+			./mame noki3310 -bios 639 -rompath roms -log \
+			-video none -sound none -keyboardprovider none \
+			-mouseprovider none -lightgunprovider none -joystickprovider none \
+			-midiprovider none -skip_gameinfo -nothrottle \
+			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_3310_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
+		$(RUN_DIR)/error.log
+
+verify-3330-radio-outgoing-call-host-termination: normalize-3330
+	@set -e; \
+	$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \
+	$(PYTHON) tools/check_model_frontier_summary.py \
+		$(RUN_DIR)_provision/boot_summary.txt --require-fiq0; \
+	mkdir -p $(RUN_DIR)_call; \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=200 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)_call) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR)_call)/boot_summary.txt \
+		$(PYTHON) tools/run_host_call_adapter_gate.py \
+			--port $(HOST_CALL_3330_PORT) --cwd $(MAME_DIR) \
+			--decision connect --terminate -- \
+			./mame noki3330 -bios 450e -rompath roms -log \
+			-video none -sound none -keyboardprovider none \
+			-mouseprovider none -lightgunprovider none -joystickprovider none \
+			-midiprovider none -skip_gameinfo -nothrottle \
+			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
+			-http_port $(HOST_CALL_3330_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR)_provision/nvram) \
+			-seconds_to_run 32; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
+		$(RUN_DIR)_call/error.log
+
 verify-3310-radio-outgoing-call-lifecycle:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
 		RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 \
@@ -1495,6 +1997,14 @@ verify-radio-physical-uplink:
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
 		EEPROM_BASENAME='3210 v501 eeprom.bin' \
 		AUDIO_CONTROL_CHECKER=tools/radio_call_audio_wire_trace_check.py
+
+verify-radio-outgoing-call-host-physical-media:
+	HOST_MEDIA_PORT=$(HOST_CALL_PHYSICAL_MEDIA_PORT) \
+		RUN_DIR=$(RUN_DIR) RUN_SECONDS=38 \
+		POST_READY_KEYS='$(NOKI3210_OUTGOING_DIAL_KEYS)' \
+		POST_READY_DELAY_MS=12000 POST_READY_DURATION_MS=220 \
+		POST_READY_GAP_MS=280 \
+		tools/run_physical_uplink_gate.sh
 
 verify-3310-radio-physical-duplex:
 	PHONE=noki3310 BIOS=639 ROM=roms/noki3310/3310f639e.fls \

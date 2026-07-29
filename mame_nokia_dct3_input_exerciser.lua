@@ -3,6 +3,9 @@ local cpu = machine.devices[":maincpu"]
 local space = cpu.spaces["program"]
 local call_alerting_output =
 		machine.devices[":gsm_session"]:output("nokia_gsm_call_alerting")
+local call_release_waiting_output =
+		machine.devices[":gsm_session"]:output(
+				"nokia_gsm_call_release_waiting_handset")
 local output_dir = os.getenv("NOKIA_DCT3_SNAPSHOT_DIR") or ".."
 local boot_summary_path = os.getenv("NOKIA_DCT3_BOOT_SUMMARY")
 local ram_dump_path = os.getenv("NOKIA_DCT3_RAM_DUMP")
@@ -91,6 +94,8 @@ ccont_mask_fixture_at = env_number("NOKIA_DCT3_CCONT_MASK_FIXTURE_AT", -1)
 mad2_sleep_fixture_at = env_number("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT", -1)
 local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
 local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
+local state_roundtrip_wait_release =
+		os.getenv("NOKIA_DCT3_STATE_ROUNDTRIP_WAIT_RELEASE") == "1"
 local state_roundtrip_end_delay = env_number(
 		"NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS", -1) / 1000
 local state_roundtrip_replay = env_number(
@@ -765,6 +770,17 @@ end
 if state_roundtrip_at >= 0 then
 	local state_timer = coroutine.create(function()
 		emu.wait(state_roundtrip_at)
+		if state_roundtrip_wait_release then
+			local deadline = emulation_seconds() + 60
+			repeat emu.wait(0.001) until
+					call_release_waiting_output:get() ~= 0 or
+					emulation_seconds() >= deadline
+			if call_release_waiting_output:get() == 0 then
+				machine:logerror("state_roundtrip: release wait timeout\n")
+				return
+			end
+		end
+		local state_roundtrip_requested_at = emulation_seconds()
 		local snapshot = {
 			mode = space:read_u16(v501 and 0x11224c or 0x1123f0),
 			counter = space:read_u16(0x20010),
@@ -814,7 +830,7 @@ if state_roundtrip_at >= 0 then
 			"state_roundtrip: result=%s timer_delta=%04x mode=%04x "
 				.. "requested_at=%.6f t=%.6f\n",
 			structural.state_roundtrip, counter_delta, snapshot.mode,
-			state_roundtrip_at, emulation_seconds()))
+			state_roundtrip_requested_at, emulation_seconds()))
 		if state_roundtrip_replay > 0 then
 			emu.wait(state_roundtrip_replay)
 			machine:logerror(string.format(

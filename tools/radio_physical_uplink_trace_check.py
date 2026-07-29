@@ -10,16 +10,14 @@ ENERGY_RE = re.compile(
     r"dsp_hle: speech tick uplink=(\d+) downlink=(\d+) .*?"
     r"mic_peak=(\d+) ear_peak=(\d+) nonzero=(\d+)/(\d+)"
 )
-VOICE_PEER_RE = re.compile(
-    r"gsm_voice_peer: exchange=(\d+) uplink_peak=(\d+) "
-    r"downlink_peak=(\d+) source=lab-1khz"
-)
-
-
-def check(path: Path) -> str:
+def check(path: Path, source: str = "lab-1khz") -> str:
     text = path.read_text(errors="replace")
     energy = [tuple(map(int, match.groups())) for match in ENERGY_RE.finditer(text)]
-    peer = [tuple(map(int, match.groups())) for match in VOICE_PEER_RE.finditer(text)]
+    peer_re = re.compile(
+        r"gsm_voice_peer: exchange=(\d+) uplink_peak=(\d+) "
+        rf"downlink_peak=(\d+) source={re.escape(source)}"
+    )
+    peer = [tuple(map(int, match.groups())) for match in peer_re.finditer(text)]
     if not energy or energy[-1][0] < 100:
         raise ValueError("physical microphone path did not sustain 100 DSP frames")
 
@@ -46,9 +44,12 @@ def check(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=Path)
+    parser.add_argument(
+        "--source", choices=("lab-1khz", "silence"), default="lab-1khz"
+    )
     args = parser.parse_args()
     try:
-        print(check(args.log))
+        print(check(args.log, args.source))
     except ValueError as error:
         raise SystemExit(f"FAIL - {error}") from error
 
