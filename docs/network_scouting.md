@@ -116,6 +116,15 @@ decoded-PCH boundary, and that a valid page for another IMSI or an invalid
 Mobile Identity LV cannot trigger RR access. A barred cell cannot reach paging
 at all.
 
+The subsequent cleanup made that distinction structural: the radio peer asks
+for explicitly named monitored or transmitted schedules, and derives page
+visibility by comparing the two network-computed groups. Acceptance tooling
+extracts the subscriber identity from the organic Location Updating Request and
+derives its group rather than embedding the laboratory IMSI or frame offset.
+The historical `nhm5_terminal_control` phase name is now the neutral
+`candidate_terminal_control`; it belongs to the candidate-window acquisition
+strategy used by both NHM-5 and NHM-6.
+
 ## Verified sequence
 
 `make verify-radio-camp` proves serving-cell acquisition. The stronger

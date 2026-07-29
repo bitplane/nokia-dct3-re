@@ -4,6 +4,7 @@ from tools.radio_paging_trace_check import verify
 
 
 GOOD = """
+dsp_hle: TX packet type=1b payload=25 words=14 radio_phase=contention_resolution data=0080013f49050800000000000030080910101032547698
 dsp_hle: LAPDm Channel Release acknowledged nr=2
 dsp_hle: PCH no-identity fill channel=60 fn=3657
 dspif_transport: RX enqueue type=80 payload=34 producer=0a4 data=601200000eaf00010000310621100809101010325476982b2b
@@ -31,7 +32,7 @@ class PagingTraceCheckTest(unittest.TestCase):
 
     def test_rejects_wrong_paged_identity(self):
         bad = GOOD.replace("0910101032547698", "0910101000000000", 1)
-        with self.assertRaisesRegex(ValueError, "IMSI Paging Request"):
+        with self.assertRaisesRegex(ValueError, "registered subscriber"):
             verify(bad)
 
     def test_rejects_missing_paging_response(self):

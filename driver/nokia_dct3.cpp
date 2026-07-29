@@ -972,40 +972,22 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
-	switch (m_cell_config.read_safe(0x00) & 0x03)
-	{
-	case 1:
-		m_gsm_network->set_cell_profile(
-				nokia_gsm_network_device::cell_profile::barred);
-		break;
-	case 2:
-		m_gsm_network->set_cell_profile(
-				nokia_gsm_network_device::cell_profile::unattainable_rxlev);
-		break;
-	default:
-		m_gsm_network->set_cell_profile(
-				nokia_gsm_network_device::cell_profile::suitable);
-		break;
-	}
-	switch (m_page_config.read_safe(0x00) & 0x03)
-	{
-	case 1:
-		m_gsm_network->set_paging_profile(
-				nokia_gsm_network_device::paging_profile::wrong_group);
-		break;
-	case 2:
-		m_gsm_network->set_paging_profile(
-				nokia_gsm_network_device::paging_profile::unmatched_identity);
-		break;
-	case 3:
-		m_gsm_network->set_paging_profile(
-				nokia_gsm_network_device::paging_profile::malformed_request);
-		break;
-	default:
-		m_gsm_network->set_paging_profile(
-				nokia_gsm_network_device::paging_profile::matched);
-		break;
-	}
+	static constexpr std::array CELL_PROFILES = {
+		nokia_gsm_network_device::cell_profile::suitable,
+		nokia_gsm_network_device::cell_profile::barred,
+		nokia_gsm_network_device::cell_profile::unattainable_rxlev,
+		nokia_gsm_network_device::cell_profile::suitable
+	};
+	static constexpr std::array PAGING_PROFILES = {
+		nokia_gsm_network_device::paging_profile::matched,
+		nokia_gsm_network_device::paging_profile::wrong_group,
+		nokia_gsm_network_device::paging_profile::unmatched_identity,
+		nokia_gsm_network_device::paging_profile::malformed_request
+	};
+	m_gsm_network->set_cell_profile(
+			CELL_PROFILES[m_cell_config.read_safe(0x00) & 0x03]);
+	m_gsm_network->set_paging_profile(
+			PAGING_PROFILES[m_page_config.read_safe(0x00) & 0x03]);
 	m_gsm_session->set_authentication_required(
 			BIT(m_authentication_config.read_safe(0x00), 0));
 	m_radio_peer->set_page_after_registration(

@@ -146,7 +146,7 @@ private:
 		traffic_lapdm_establish,
 		traffic_contention_resolution,
 		traffic_release_acknowledgement,
-		nhm5_terminal_control,
+		candidate_terminal_control,
 		count
 	};
 
@@ -157,6 +157,11 @@ private:
 		bitmap_multistage,
 		candidate_window
 	};
+	enum class paging_schedule : u8
+	{
+		monitored,
+		transmitted
+	};
 	search_request decode_search_request(
 			const nokia_dspif_device::packet &packet);
 	bool handle_search_request(search_request request);
@@ -166,7 +171,8 @@ private:
 	u8 next_report_type() const;
 	unsigned serving_cycle_reports() const;
 	bool serving_pch_report() const;
-	u32 paging_frame_number(u32 minimum_frame_number, bool request = false) const;
+	u32 paging_frame_number(
+			u32 minimum_frame_number, paging_schedule schedule) const;
 	void encode_measurement_report(u8 *payload) const;
 	void encode_channel_confirmation(u8 *payload) const;
 	void encode_random_access_info(u8 *payload);

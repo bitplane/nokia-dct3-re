@@ -42,6 +42,8 @@ public:
 	{
 		u8 multiframe_phase;
 		u8 frame_offset;
+
+		constexpr bool operator==(const paging_group &) const = default;
 	};
 
 	nokia_gsm_network_device(const machine_config &mconfig, const char *tag,
@@ -57,9 +59,11 @@ public:
 			const u8 *mobile_identity, unsigned length) const;
 	paging_group paging_request_group(
 			const u8 *mobile_identity, unsigned length) const;
-	bool paging_request_monitored() const
+	bool paging_request_monitored(
+			const u8 *mobile_identity, unsigned length) const
 	{
-		return m_paging_profile != paging_profile::wrong_group;
+		return paging_request_group(mobile_identity, length) ==
+				subscriber_paging_group(mobile_identity, length);
 	}
 	std::array<u8, 24> immediate_assignment(
 			u8 random_access, u32 frame_number, u16 serving_arfcn) const;

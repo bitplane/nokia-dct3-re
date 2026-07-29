@@ -79,15 +79,6 @@ contract, even where NHM-5 and NHM-6 currently share values. Invalid row counts,
 multi-column power masks and masks outside the five physical columns are
 rejected by the device.
 
-## Next target
-
-No remaining scalar cluster has the same clear ownership and invalid-combination
-problem. DSP service delay and peer polling describe different mechanisms; SIM
-controller presence and card presence must remain independently testable; flash,
-EEPROM, boot and analogue settings belong to separate boundaries. The next
-useful pass should therefore investigate the reproducible 3330 CONTACT SERVICE
-frontier divergence rather than manufacture another wrapper.
-
 ## Acceptance status discovered by the audit
 
 The audit's two divergences were caused by one omitted typed DSP contract.
@@ -105,3 +96,38 @@ include explicitly. `make verify-model-frontier-negative` removes only the DSP
 service at that boundary. The 3330 then organically returns to CONTACT SERVICE
 without FIQ0, while the 3410 remains at its deterministic non-idle frontier
 without FIQ0; neither negative result is a promoted oracle.
+
+## Completed registration/paging cleanup
+
+The NHM-6 registration and paging passes introduced no product dispatch in the
+network, session or LAPDm devices. Their post-acquisition behavior remains the
+same shared state machine used by NSE-8 and NHM-5. The only retained radio
+differences are the pre-existing atomic `protocol_contract` fields for
+acquisition grammar, assigned-channel confirmation, repeated assigned-uplink
+cadence, MM settle time and the still-opaque traffic-release parameter.
+
+The paging boundary now names the handset-monitored and network-transmitted DRX
+schedules explicitly. Whether a transmitted page is monitored is derived by
+comparing their standards-defined paging groups, rather than by inspecting a
+negative-fixture selector in the radio peer. Laboratory cell and paging
+selectors are mapped through typed tables at machine reset; they do not create
+phone-model branches.
+
+Trace acceptance no longer embeds the laboratory IMSI or its known `(phase,
+frame-offset)` result. It extracts the identity from the organic Location
+Updating Request, derives the TS 45.002 paging group, and requires the page and
+Paging Response to carry that same identity. Negative gates derive their
+matched/unmatched assertions from the same registration evidence. Registration
+and paging save-state gates share one replay comparator.
+
+The candidate-window acquisition terminal was also renamed from the historical
+`nhm5_terminal_control` to the operation-based
+`candidate_terminal_control`. NHM-5 first exposed that state, but the state
+belongs to the candidate-window strategy selected independently by NHM-5 and
+NHM-6.
+
+No further wrapper is justified by the current evidence. DSP service delay and
+peer polling describe different mechanisms; SIM controller presence and card
+presence must remain independently testable; flash, EEPROM, boot and analogue
+settings belong to separate boundaries. The next functional target is the
+organic NHM-6 incoming-call lifecycle.

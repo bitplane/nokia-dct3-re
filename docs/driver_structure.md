@@ -42,7 +42,10 @@ downlink acknowledgements;
 `nokia_gsm_session_device` owns the per-handset Layer-3 request and
 acknowledgement-gated registration, paging, bounded call and SMS transactions; and
 `nokia_gsm_network_device` owns
-immutable standards-shaped cell, RR, MM, call-control and SMS data. The
+standards-shaped cell, RR, MM, call-control and SMS data plus typed laboratory
+cell/page variants used by negative gates. It derives subscriber and transmitted
+DRX groups independently; the radio peer owns only their decoded-block
+transport. The
 phone state only composes those devices and wires DSPIF callbacks to MAD2.
 `nokia_simi_device` owns the MAD2 register/FIFO/IIR/FIQ-facing controller and
 connects by reset/byte callbacks to `nokia_sim_card_device`, which owns T=0,
@@ -86,7 +89,8 @@ fixtures.
 Digital-baseband reset explicitly resets the stateful radio-correlation,
 LAPDm-link and GSM-session peers alongside MAD2, DSPIF, DSP HLE, service peer,
 SIMI and the LCD. The GSM network device contains immutable laboratory-cell
-data; it has no transaction state to reset. CCONT, flash and EEPROM remain on
+message data and reset-selected fixture policy; it has no transaction state to
+reset. CCONT, flash and EEPROM remain on
 their documented surviving domains.
 
 ## Rules
