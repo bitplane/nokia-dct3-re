@@ -544,8 +544,15 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 			if (m_trace_enabled)
 			{
 				std::string payload_hex;
-				for (unsigned index = 0; index < packet.length; ++index)
-					payload_hex += util::string_format("%02x", packet.payload[index]);
+				const bool cipher_secret =
+						packet.type == 0x14 && packet.length >= 10 &&
+						packet.payload[0] != 0x00;
+				if (cipher_secret)
+					payload_hex = "<redacted>";
+				else
+					for (unsigned index = 0; index < packet.length; ++index)
+						payload_hex += util::string_format(
+								"%02x", packet.payload[index]);
 				LOGMASKED(LOG_DSP_HLE, "dsp_hle: TX packet type=%02x payload=%u words=%u radio_phase=%s data=%s t=%.6f\n",
 						packet.type, packet.length, packet.words, m_radio_peer->phase_name(), payload_hex,
 						machine().time().as_double());

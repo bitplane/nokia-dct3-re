@@ -189,10 +189,16 @@ void nokia_dspif_device::consume_tx_packet(const packet &value)
 {
 	peer_shared_w(TX_CONSUMER, (m_ram[TX_CONSUMER] + value.words) % TX_WORDS);
 	if (m_trace_enabled)
+	{
+		const bool cipher_secret =
+				value.type == 0x14 && value.length >= 10 &&
+				value.payload[0] != 0x00;
 		LOGMASKED(LOG_DSPIF, "dspif_transport: TX consume type=%02x payload=%u words=%u consumer=%02x data=%s t=%.6f\n",
 				value.type, value.length, value.words, m_ram[TX_CONSUMER],
-				packet_hex(value.payload.data(), value.length).c_str(),
+				cipher_secret ? "<redacted>" :
+						packet_hex(value.payload.data(), value.length).c_str(),
 				machine().time().as_double());
+	}
 }
 
 bool nokia_dspif_device::enqueue_rx_packet(u8 type, const u8 *payload, unsigned payload_length)

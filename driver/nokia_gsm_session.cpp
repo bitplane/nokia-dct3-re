@@ -27,6 +27,12 @@ void nokia_gsm_session_device::device_start()
 			timer_alloc(FUNC(nokia_gsm_session_device::outgoing_decision_timer),
 					this);
 	save_item(NAME(m_state));
+	save_item(NAME(m_cipher_algorithm));
+	save_item(NAME(m_cipher_key));
+	save_item(NAME(m_cipher_key_valid));
+	save_item(NAME(m_cipher_command_pending));
+	save_item(NAME(m_cipher_active));
+	save_item(NAME(m_authentication_for_service));
 	save_item(NAME(m_established_layer3));
 	save_item(NAME(m_established_layer3_length));
 	save_item(NAME(m_registered_mobile_identity));
@@ -67,6 +73,12 @@ void nokia_gsm_session_device::device_start()
 void nokia_gsm_session_device::device_reset()
 {
 	m_state = u8(state::idle);
+	m_cipher_algorithm = u8(gsm::a5::algorithm::a5_0);
+	m_cipher_key.fill(0);
+	m_cipher_key_valid = false;
+	m_cipher_command_pending = false;
+	m_cipher_active = false;
+	m_authentication_for_service = false;
 	m_established_layer3.fill(0);
 	m_established_layer3_length = 0;
 	m_registered_mobile_identity.fill(0);
@@ -169,9 +181,25 @@ nokia_gsm_session_device::contention_resolution_delivered()
 	{
 		if (m_incoming_service != u8(incoming_service::none))
 		{
-			// Exercise the firmware's real DSP cipher-control publication while
-			// keeping this laboratory connection explicitly unciphered.
+			if (m_network->cipher_algorithm() !=
+							gsm::a5::algorithm::a5_0 &&
+					!m_cipher_key_valid)
+			{
+				const auto request = m_network->authentication_request();
+				m_authentication_for_service = true;
+				m_state =
+						u8(state::awaiting_authentication_request_acknowledgement);
+				return queue_downlink(downlink_kind::authentication_request,
+						request.data(), request.size());
+			}
+			// Exercise the firmware's real DSP cipher-control publication.
+			// A5/0 remains explicitly clear; A5/1 becomes pending only with
+			// an authenticated live key context.
 			const auto information = m_network->cipher_mode_command();
+			m_cipher_algorithm = u8(m_network->cipher_algorithm());
+			m_cipher_command_pending =
+					m_network->cipher_algorithm() != gsm::a5::algorithm::a5_0 &&
+					m_cipher_key_valid;
 			m_state = u8(state::awaiting_cipher_mode_command_acknowledgement);
 			return queue_downlink(downlink_kind::cipher_mode_command,
 					information.data(), information.size());
@@ -197,6 +225,25 @@ nokia_gsm_session_device::contention_resolution_delivered()
 			return queue_downlink(downlink_kind::cm_service_reject,
 					reject.data(), reject.size());
 		}
+		if (m_network->cipher_algorithm() !=
+				gsm::a5::algorithm::a5_0)
+		{
+			if (!m_cipher_key_valid)
+			{
+				const auto request = m_network->authentication_request();
+				m_authentication_for_service = true;
+				m_state =
+						u8(state::awaiting_authentication_request_acknowledgement);
+				return queue_downlink(downlink_kind::authentication_request,
+						request.data(), request.size());
+			}
+			const auto command = m_network->cipher_mode_command();
+			m_cipher_algorithm = u8(m_network->cipher_algorithm());
+			m_cipher_command_pending = true;
+			m_state = u8(state::awaiting_cipher_mode_command_acknowledgement);
+			return queue_downlink(downlink_kind::cipher_mode_command,
+					command.data(), command.size());
+		}
 		const auto accept = m_network->cm_service_accept();
 		m_state = u8(state::awaiting_cm_service_accept_acknowledgement);
 		return queue_downlink(downlink_kind::cm_service_accept,
@@ -205,6 +252,9 @@ nokia_gsm_session_device::contention_resolution_delivered()
 
 	if (m_authentication_required)
 	{
+		m_cipher_key.fill(0);
+		m_cipher_key_valid = false;
+		m_authentication_for_service = false;
 		const auto request = m_network->authentication_request();
 		m_state = u8(state::awaiting_authentication_request_acknowledgement);
 		return queue_downlink(downlink_kind::authentication_request,
@@ -364,6 +414,13 @@ nokia_gsm_session_device::downlink_acknowledged()
 			return queue_downlink(downlink_kind::sapi3_establishment,
 					nullptr, 0, 3);
 		}
+		if (m_mobile_originated_call)
+		{
+			const auto accept = m_network->cm_service_accept();
+			m_state = u8(state::awaiting_cm_service_accept_acknowledgement);
+			return queue_downlink(downlink_kind::cm_service_accept,
+					accept.data(), accept.size());
+		}
 	}
 
 	if (m_state == u8(state::awaiting_sms_sapi3_establishment) &&
@@ -465,6 +522,8 @@ nokia_gsm_session_device::downlink_acknowledged()
 			m_smart_message_part_index = 0;
 		}
 		m_state = u8(state::idle);
+		m_cipher_active = false;
+		m_cipher_command_pending = false;
 		return downlink_kind::release_complete;
 	}
 
@@ -480,6 +539,22 @@ nokia_gsm_session_device::receive_layer3(
 
 	const u8 protocol_discriminator = information[0] & 0x0f;
 	const u8 message_type = information[1] & 0x3f;
+	if (sapi == 0 && protocol_discriminator == 0x06 &&
+			message_type == 0x32)
+	{
+		if (gsm::a5::activation_allowed(
+				gsm::a5::algorithm(m_cipher_algorithm),
+				m_cipher_key_valid, m_cipher_command_pending, sapi,
+				information, length))
+		{
+			m_cipher_active = true;
+			m_cipher_command_pending = false;
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_cipher: event=activated algorithm=%u t=%.6f\n",
+					m_cipher_algorithm, machine().time().as_double());
+		}
+		return downlink_kind::none;
+	}
 	if (sapi == 0 && m_state == u8(state::awaiting_outgoing_call_setup) &&
 			protocol_discriminator == 0x03 && message_type == 0x05)
 	{
@@ -557,6 +632,21 @@ nokia_gsm_session_device::receive_layer3(
 	{
 		if (m_network->authentication_response_valid(information, length))
 		{
+			m_cipher_key = m_network->authentication_result().kc;
+			m_cipher_key_valid = true;
+			if (m_authentication_for_service)
+			{
+				m_authentication_for_service = false;
+				const auto command = m_network->cipher_mode_command();
+				m_cipher_algorithm = u8(m_network->cipher_algorithm());
+				m_cipher_command_pending =
+						m_network->cipher_algorithm() !=
+								gsm::a5::algorithm::a5_0;
+				m_state =
+						u8(state::awaiting_cipher_mode_command_acknowledgement);
+				return queue_downlink(downlink_kind::cipher_mode_command,
+						command.data(), command.size());
+			}
 			const auto accept = m_network->location_update_accept(
 					m_established_layer3.data(),
 					m_established_layer3_length);
@@ -566,6 +656,9 @@ nokia_gsm_session_device::receive_layer3(
 		}
 
 		const auto reject = m_network->authentication_reject();
+		m_authentication_for_service = false;
+		m_cipher_key.fill(0);
+		m_cipher_key_valid = false;
 		m_state = u8(state::awaiting_authentication_reject_acknowledgement);
 		return queue_downlink(downlink_kind::authentication_reject,
 				reject.data(), reject.size());
@@ -699,6 +792,8 @@ nokia_gsm_session_device::receive_layer3(
 		publish_call_alerting_output();
 		m_incoming_service = u8(incoming_service::none);
 		m_state = u8(state::idle);
+		m_cipher_active = false;
+		m_cipher_command_pending = false;
 		return downlink_kind::release_complete;
 	}
 

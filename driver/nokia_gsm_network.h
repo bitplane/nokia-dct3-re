@@ -5,6 +5,7 @@
 #define MAME_NOKIA_NOKIA_GSM_NETWORK_H
 
 #include "gsm_a3a8.h"
+#include "gsm_a5.h"
 
 #include <array>
 
@@ -73,6 +74,11 @@ public:
 	{
 		m_outgoing_call_outcome = outcome;
 	}
+	void set_cipher_algorithm(gsm::a5::algorithm selected)
+	{
+		m_cipher_algorithm = selected;
+	}
+	gsm::a5::algorithm cipher_algorithm() const { return m_cipher_algorithm; }
 	outgoing_call_outcome configured_outgoing_call_outcome() const
 	{
 		return m_outgoing_call_outcome;
@@ -99,6 +105,7 @@ public:
 	std::array<u8, 2> authentication_reject() const;
 	bool authentication_response_valid(
 			const u8 *information, unsigned length) const;
+	gsm::a3a8::result authentication_result() const;
 	static const gsm::a3a8::block &laboratory_ki();
 	std::array<u8, 3> cipher_mode_command() const;
 	std::array<u8, 2> cm_service_accept() const;
@@ -130,6 +137,7 @@ private:
 			assignment_profile::matched_request;
 	outgoing_call_outcome m_outgoing_call_outcome =
 			outgoing_call_outcome::connect;
+	gsm::a5::algorithm m_cipher_algorithm = gsm::a5::algorithm::a5_0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device)

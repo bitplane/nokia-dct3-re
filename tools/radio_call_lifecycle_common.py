@@ -7,13 +7,15 @@ from typing import Iterable, Pattern
 PatternLike = str | Pattern[str]
 
 REGISTRATION_RELEASE = re.compile(
-    r"LAPDm Channel Release acknowledged nr=2")
+    r"LAPDm .*Channel Release acknowledged nr=.")
 IMSI_PAGE = re.compile(r"PCH IMSI page transmitted channel=60 fn=")
 PAGING_RESPONSE = re.compile(r"TX packet type=1b .*data=0080013f410627")
 PAGING_CONTENTION_UA = re.compile(
     r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]*0173410627")
 NO_CIPHER_COMMAND = re.compile(
     r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}03000d063500")
+CIPHER_MODE_COMMAND = re.compile(
+    r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}03000d06350[01]")
 MM_INFORMATION = re.compile(
     r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
     r"03[0-9a-f]{2}2905324762704221000000")

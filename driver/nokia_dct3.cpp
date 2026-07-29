@@ -684,6 +684,7 @@ public:
 		m_assignment_config(*this, "ASSIGNCFG"),
 		m_page_config(*this, "PAGECFG"),
 		m_authentication_config(*this, "AUTHCFG"),
+		m_cipher_config(*this, "CIPHERCFG"),
 		m_outgoing_call_config(*this, "CALLCFG"),
 		m_outgoing_call_delay_config(*this, "CALLDELAY"),
 		m_outgoing_call_host_config(*this, "CALLHOST")
@@ -806,6 +807,7 @@ private:
 	optional_ioport m_assignment_config;
 	optional_ioport m_page_config;
 	optional_ioport m_authentication_config;
+	optional_ioport m_cipher_config;
 	optional_ioport m_outgoing_call_config;
 	optional_ioport m_outgoing_call_delay_config;
 	optional_ioport m_outgoing_call_host_config;
@@ -1087,8 +1089,15 @@ void nokia_dct3_state::machine_reset()
 	m_gsm_session->set_outgoing_fallback_enabled(!host_call_adapter);
 	m_gsm_call_adapter->set_enabled(host_call_adapter);
 	m_radio_peer->set_host_voice_peer(host_call_adapter);
+	static constexpr std::array CIPHER_ALGORITHMS = {
+		gsm::a5::algorithm::a5_0,
+		gsm::a5::algorithm::a5_1
+	};
+	m_gsm_network->set_cipher_algorithm(
+			CIPHER_ALGORITHMS[m_cipher_config.read_safe(0x00) & 0x01]);
 	m_gsm_session->set_authentication_required(
-			BIT(m_authentication_config.read_safe(0x00), 0));
+			BIT(m_authentication_config.read_safe(0x00), 0) ||
+			m_gsm_network->cipher_algorithm() != gsm::a5::algorithm::a5_0);
 	m_radio_peer->set_page_after_registration(
 			BIT(network, 0) || BIT(network, 1) || BIT(network, 2) ||
 			BIT(network, 3));
@@ -1366,14 +1375,16 @@ uint16_t nokia_dct3_state::dsp_ram_r(offs_t offset)
 	const uint32_t pc = m_maincpu->pc();
 	const uint64_t trace_key = (uint64_t(pc) << 11) | offset;
 	const unsigned byte_offset = offset << 1;
+	const bool dsp_tx_packet_word = byte_offset < 0x0a4;
 	if (m_trace_enabled &&
-			(byte_offset <= 0x004 || byte_offset == 0x0a6 ||
+			!dsp_tx_packet_word &&
+			(byte_offset == 0x0a6 ||
 			 byte_offset == 0x0a8 || byte_offset == 0x0aa || byte_offset == 0x0e0 ||
 			 byte_offset == 0x0e4 || byte_offset == 0x0fe || byte_offset == 0x100 ||
 			 byte_offset == 0x1c8))
 		LOGMASKED(LOG_DSP_SHARED, "dsp_shared_observe: off=%03x data=%04x pc=%08x t=%.6f\n",
 				byte_offset, data, pc, machine().time().as_double());
-	if (m_trace_enabled)
+	if (m_trace_enabled && !dsp_tx_packet_word)
 	{
 		auto [trace_item, inserted] = m_dsp_shared_trace_reads.emplace(trace_key, data);
 		if (inserted || trace_item->second != data)
@@ -1393,7 +1404,12 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 	m_dspif->shared_w(offset, data, mem_mask);
 	const uint16_t new_data = m_dspif->shared_word(offset);
 	const unsigned byte_offset = offset << 1;
-	if (m_trace_enabled && old_data != new_data)
+	// Words below the TX producer at 0x0a4 are the DSP-to-MCU packet ring.
+	// Semantic packet tracing happens in DSPIF after a complete packet is
+	// available and can redact cipher-control key material.  Raw word logging
+	// here would disclose Kc before that classification is possible.
+	const bool dsp_tx_packet_word = byte_offset < 0x0a4;
+	if (m_trace_enabled && old_data != new_data && !dsp_tx_packet_word)
 		LOGMASKED(LOG_DSP_SHARED,
 				"dsp_shared_write: off=%03x old=%04x data=%04x pc=%08x t=%.6f\n",
 				byte_offset, old_data, new_data, m_maincpu->pc(),
@@ -1799,6 +1815,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
+
+	PORT_START("CIPHERCFG")
+	PORT_CONFNAME(0x01, 0x00, "Laboratory GSM cipher policy")
+	PORT_CONFSETTING(0x00, "A5/0 (unciphered)")
+	PORT_CONFSETTING(0x01, "A5/1")
 
 	PORT_START("CALLCFG")
 	PORT_CONFNAME(0x03, 0x00, "Laboratory outgoing-call outcome")

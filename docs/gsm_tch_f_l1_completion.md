@@ -11,7 +11,7 @@ are emulated.
 | Class 1a parity, class 1 convolutional protection and class 2 bits | TS 45.003 parity polynomial, K=5 rate-1/2 encoder and hard-decision Viterbi decoder | Clean round trip, isolated hard errors, parity/tail checks and unprotected class-2 corruption tests |
 | 456-bit blocks and eight-burst diagonal interleaving | Independent stateful diagonal transmitter and receiver | Continuous speech/FACCH/erasure stream tests |
 | Normal bursts, training and stealing flags | 148-bit GMSK burst packing, set-1 TSC table, explicit `hl`/`hu` | Field-position, tail, TSC 2 and FACCH stealing tests |
-| Ciphering boundary | `burst_payload::data` contains exactly the 114 cipherable data bits | Structural boundary test; training, tails and stealing flags remain outside |
+| Ciphering boundary | Generic A5/0 and A5/1 operate on `burst_payload::data` after coding/interleaving and before normal-burst packing; COUNT comes from the scheduled TDMA frame and each direction is independent | Published A5/1 known-answer vector, wrong-key/frame/direction negatives, organic encrypted TCH/F/FACCH/SACCH and exact save-state replay; training, tails and stealing flags remain outside |
 | TDMA timing | Exact 60/13 ms timer and 26-frame timeslot-1 schedule | Schedule tests plus organic calls; 24 traffic, one idle and one SACCH position per multiframe |
 | FACCH substitution | Organic `0xb0` LAPDm blocks enter FIRE/convolutional coding, replace queued speech and cross explicit BFI boundaries | Paired-ROM runtime oracle observes v6.00/v5.01 uplink/downlink FACCH counts 4/4 and 4/3, concealment increments on both independent receivers, more than 100 recovered speech frames and clean teardown |
 | SACCH coexistence | Four-burst rectangular coding plus stateful empty-safe endpoints over 104 frames | All-timeslot phase/wrap tests and live reserved positions; no invented measurement payload |
@@ -27,3 +27,7 @@ Meaningful SACCH measurement reports and downlink SACCH system information are
 not fabricated. Their Nokia DSP-side ownership remains an evidence question,
 but the standards-defined Layer 1 transport and scheduling contract is ready
 for those 184 information bits.
+
+The parallel SDCCH boundary is documented in `gsm_a5_ciphering.md`. LAPDm
+blocks now cross the same 184-bit xCCH encoder/decoder and four ciphered normal
+bursts rather than applying A5 to decoded Layer 3.

@@ -79,6 +79,10 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_downlink_tch_burst_error_span));
 	save_item(NAME(m_downlink_tch_bursts));
 	save_item(NAME(m_downlink_tch_bursts_impaired));
+	save_item(NAME(m_uplink_ciphered_bursts));
+	save_item(NAME(m_downlink_ciphered_bursts));
+	save_item(NAME(m_uplink_ciphered_xcch_blocks));
+	save_item(NAME(m_downlink_ciphered_xcch_blocks));
 
 	auto save_diagonal_transmitter =
 			[this](gsm::tch_f::diagonal_transmitter &endpoint, int index)
@@ -186,6 +190,10 @@ void nokia_radio_peer_device::device_reset()
 	m_uplink_tch_bursts_impaired = 0;
 	m_downlink_tch_bursts = 0;
 	m_downlink_tch_bursts_impaired = 0;
+	m_uplink_ciphered_bursts = 0;
+	m_downlink_ciphered_bursts = 0;
+	m_uplink_ciphered_xcch_blocks = 0;
+	m_downlink_ciphered_xcch_blocks = 0;
 	reset_l1_pipeline();
 }
 
@@ -211,6 +219,63 @@ void nokia_radio_peer_device::restore_l1_block_kinds()
 		downlink.queue[k].kind =
 				gsm::tch_f::traffic_block_kind(m_downlink_l1_block_kinds[k]);
 	}
+}
+
+nokia_lapdm_link_device::uplink_result
+nokia_radio_peer_device::receive_lapdm_uplink(
+		const u8 *frame, unsigned length)
+{
+	if (length < gsm::tch_f::packed_control_block{}.size())
+		return nokia_lapdm_link_device::uplink_result::ignored;
+	gsm::xcch::block clear;
+	std::copy_n(frame, clear.size(), clear.begin());
+	const bool ciphered = m_gsm_session->cipher_active() ||
+			m_gsm_session->cipher_command_pending();
+	const gsm::xcch::cipher_context context{
+		ciphered ? m_gsm_session->cipher_algorithm() :
+				gsm::a5::algorithm::a5_0,
+		m_gsm_session->cipher_key(), gsm::a5::direction::uplink
+	};
+	const auto frames = gsm::xcch::sdcch8_subchannel0_frames(
+			m_tdma_frame_number, gsm::a5::direction::uplink);
+	const auto decoded = gsm::xcch::transport(clear, frames, context, context);
+	if (!decoded.good)
+		return nokia_lapdm_link_device::uplink_result::ignored;
+	if (ciphered)
+		++m_uplink_ciphered_xcch_blocks;
+	if (ciphered && m_trace_enabled && m_uplink_ciphered_xcch_blocks == 1)
+		LOGMASKED(LOG_RADIO,
+				"radio_l1: kind=xcch direction=uplink algorithm=%u first_fn=%u last_fn=%u\n",
+				u8(context.algorithm), frames.front(), frames.back());
+	return m_lapdm_link->receive_uplink(
+			decoded.data.data(), decoded.data.size());
+}
+
+void nokia_radio_peer_device::deliver_lapdm_downlink(
+		const std::array<u8, nokia_lapdm_link_device::frame_length> &frame,
+		u8 *payload, u32 reference_frame)
+{
+	gsm::xcch::block clear;
+	std::copy_n(frame.begin(), clear.size(), clear.begin());
+	const bool ciphered = m_gsm_session->cipher_active();
+	const gsm::xcch::cipher_context context{
+		ciphered ? m_gsm_session->cipher_algorithm() :
+				gsm::a5::algorithm::a5_0,
+		m_gsm_session->cipher_key(), gsm::a5::direction::downlink
+	};
+	const auto frames = gsm::xcch::sdcch8_subchannel0_frames(
+			reference_frame, gsm::a5::direction::downlink);
+	const auto decoded = gsm::xcch::transport(clear, frames, context, context);
+	if (!decoded.good)
+		return;
+	std::copy(decoded.data.begin(), decoded.data.end(), payload);
+	payload[decoded.data.size()] = frame[decoded.data.size()];
+	if (ciphered)
+		++m_downlink_ciphered_xcch_blocks;
+	if (ciphered && m_trace_enabled && m_downlink_ciphered_xcch_blocks == 1)
+		LOGMASKED(LOG_RADIO,
+				"radio_l1: kind=xcch direction=downlink algorithm=%u first_fn=%u last_fn=%u\n",
+				u8(context.algorithm), frames.front(), frames.back());
 }
 
 bool nokia_radio_peer_device::speech_channel_active() const
@@ -375,16 +440,50 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 		if (const auto uplink =
 					m_uplink_sacch_transmitter.next_burst(phase))
 		{
-			const auto air = gsm::tch_f::pack_normal_burst(*uplink, training);
-			m_network_sacch_receiver.receive(
-					gsm::tch_f::unpack_normal_burst(air));
+			auto transmitted = *uplink;
+			if (m_gsm_session->cipher_active())
+			{
+				gsm::a5::apply(transmitted,
+						m_gsm_session->cipher_algorithm(),
+						m_gsm_session->cipher_key(),
+						gsm::a5::count_from_frame_number(frame_number),
+						gsm::a5::direction::uplink);
+				++m_uplink_ciphered_bursts;
+			}
+			const auto air =
+					gsm::tch_f::pack_normal_burst(transmitted, training);
+			auto received = gsm::tch_f::unpack_normal_burst(air);
+			if (m_gsm_session->cipher_active())
+				gsm::a5::apply(received,
+						m_gsm_session->cipher_algorithm(),
+						m_gsm_session->cipher_key(),
+						gsm::a5::count_from_frame_number(frame_number),
+						gsm::a5::direction::uplink);
+			m_network_sacch_receiver.receive(received);
 		}
 		if (const auto downlink =
 					m_downlink_sacch_transmitter.next_burst(phase))
 		{
-			const auto air = gsm::tch_f::pack_normal_burst(*downlink, training);
-			m_handset_sacch_receiver.receive(
-					gsm::tch_f::unpack_normal_burst(air));
+			auto transmitted = *downlink;
+			if (m_gsm_session->cipher_active())
+			{
+				gsm::a5::apply(transmitted,
+						m_gsm_session->cipher_algorithm(),
+						m_gsm_session->cipher_key(),
+						gsm::a5::count_from_frame_number(frame_number),
+						gsm::a5::direction::downlink);
+				++m_downlink_ciphered_bursts;
+			}
+			const auto air =
+					gsm::tch_f::pack_normal_burst(transmitted, training);
+			auto received = gsm::tch_f::unpack_normal_burst(air);
+			if (m_gsm_session->cipher_active())
+				gsm::a5::apply(received,
+						m_gsm_session->cipher_algorithm(),
+						m_gsm_session->cipher_key(),
+						gsm::a5::count_from_frame_number(frame_number),
+						gsm::a5::direction::downlink);
+			m_handset_sacch_receiver.receive(received);
 		}
 		return;
 	}
@@ -421,8 +520,27 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 	}
 	auto uplink_air =
 			gsm::tch_f::pack_normal_burst(uplink_payload, training);
-	const auto network_block = m_network_receiver.receive(
-			gsm::tch_f::unpack_normal_burst(uplink_air));
+	auto network_payload = gsm::tch_f::unpack_normal_burst(uplink_air);
+	if (m_gsm_session->cipher_active())
+	{
+		gsm::a5::apply(uplink_payload, m_gsm_session->cipher_algorithm(),
+				m_gsm_session->cipher_key(),
+				gsm::a5::count_from_frame_number(frame_number),
+				gsm::a5::direction::uplink);
+		uplink_air = gsm::tch_f::pack_normal_burst(uplink_payload, training);
+		network_payload = gsm::tch_f::unpack_normal_burst(uplink_air);
+		gsm::a5::apply(network_payload, m_gsm_session->cipher_algorithm(),
+				m_gsm_session->cipher_key(),
+				gsm::a5::count_from_frame_number(frame_number),
+				gsm::a5::direction::uplink);
+		++m_uplink_ciphered_bursts;
+		if (m_trace_enabled && m_uplink_ciphered_bursts == 1)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: kind=cipher direction=uplink algorithm=%u fn=%u count=%u\n",
+					u8(m_gsm_session->cipher_algorithm()), frame_number,
+					gsm::a5::count_from_frame_number(frame_number));
+	}
+	const auto network_block = m_network_receiver.receive(network_payload);
 	if (network_block &&
 			network_block->kind == gsm::tch_f::traffic_block_kind::facch)
 	{
@@ -497,7 +615,7 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 		}
 	}
 
-	auto downlink_air = gsm::tch_f::pack_normal_burst(
+	auto downlink_payload =
 			[&]()
 			{
 				auto payload = m_downlink_transmitter.next_burst();
@@ -522,9 +640,29 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 								frame_number, machine().time().as_double());
 				}
 				return payload;
-			}(), training);
-	const auto handset_block = m_handset_receiver.receive(
-			gsm::tch_f::unpack_normal_burst(downlink_air));
+			}();
+	if (m_gsm_session->cipher_active())
+	{
+		gsm::a5::apply(downlink_payload, m_gsm_session->cipher_algorithm(),
+				m_gsm_session->cipher_key(),
+				gsm::a5::count_from_frame_number(frame_number),
+				gsm::a5::direction::downlink);
+		++m_downlink_ciphered_bursts;
+		if (m_trace_enabled && m_downlink_ciphered_bursts == 1)
+			LOGMASKED(LOG_RADIO,
+					"radio_l1: kind=cipher direction=downlink algorithm=%u fn=%u count=%u\n",
+					u8(m_gsm_session->cipher_algorithm()), frame_number,
+					gsm::a5::count_from_frame_number(frame_number));
+	}
+	auto downlink_air =
+			gsm::tch_f::pack_normal_burst(downlink_payload, training);
+	auto handset_payload = gsm::tch_f::unpack_normal_burst(downlink_air);
+	if (m_gsm_session->cipher_active())
+		gsm::a5::apply(handset_payload, m_gsm_session->cipher_algorithm(),
+				m_gsm_session->cipher_key(),
+				gsm::a5::count_from_frame_number(frame_number),
+				gsm::a5::direction::downlink);
+	const auto handset_block = m_handset_receiver.receive(handset_payload);
 	if (handset_block &&
 			handset_block->kind == gsm::tch_f::traffic_block_kind::facch)
 	{
@@ -1062,7 +1200,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_phase == phase::traffic_lapdm_establish &&
 			packet.length >= 5 && packet.payload[1] == 0xb0)
 	{
-		if (m_lapdm_link->receive_uplink(packet.payload.data() + 2,
+		if (receive_lapdm_uplink(packet.payload.data() + 2,
 					packet.length - 2) ==
 				nokia_lapdm_link_device::uplink_result::establish_indication)
 		{
@@ -1102,7 +1240,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// that information field exactly.  An empty UI block does not end the
 		// assigned-channel transmit schedule: the DSP requests the next SDCCH
 		// block at the following 51-frame multiframe opportunity.
-		const auto result = m_lapdm_link->receive_uplink(
+		const auto result = receive_lapdm_uplink(
 				packet.payload.data() + 2, packet.length - 2);
 		if (result == nokia_lapdm_link_device::uplink_result::establish_indication &&
 				m_gsm_session->establish_layer3(
@@ -1144,7 +1282,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_phase == phase::location_update_acknowledgement &&
 			packet.length >= 5 && packet.payload[1] == 0x80)
 	{
-		if (m_lapdm_link->receive_uplink(packet.payload.data() + 2,
+		if (receive_lapdm_uplink(packet.payload.data() + 2,
 					packet.length - 2) ==
 				nokia_lapdm_link_device::uplink_result::downlink_acknowledgement)
 		{
@@ -1179,7 +1317,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_phase == phase::channel_release_acknowledgement &&
 			packet.length >= 5 && packet.payload[1] == 0x80)
 	{
-		const auto result = m_lapdm_link->receive_uplink(
+		const auto result = receive_lapdm_uplink(
 				packet.payload.data() + 2, packet.length - 2);
 		if (result == nokia_lapdm_link_device::uplink_result::downlink_acknowledgement)
 		{
@@ -1226,7 +1364,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					gsm::tch_f::encode_control(
 						gsm::tch_f::unpack_control(control)));
 		}
-		const auto result = m_lapdm_link->receive_uplink(
+		const auto result = receive_lapdm_uplink(
 				packet.payload.data() + 2, packet.length - 2);
 		auto acknowledge_downlink =
 				[this]() -> nokia_gsm_session_device::downlink_kind
@@ -1472,31 +1610,31 @@ void nokia_radio_peer_device::emit_report()
 		if (m_phase == phase::contention_resolution)
 		{
 			const auto frame = m_lapdm_link->build_ua();
-			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
 		else if (m_phase == phase::traffic_contention_resolution)
 		{
 			const auto frame = m_lapdm_link->build_ua();
-			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
 		else if (m_phase == phase::traffic_release_acknowledgement)
 		{
 			const auto frame = m_lapdm_link->build_release_ua();
-			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
 		else if (m_phase == phase::location_update_accept)
 		{
 			const auto &message = m_gsm_session->pending_downlink();
 			const auto frame = m_lapdm_link->build_information_frame(
 					0, message.data.data(), message.length);
-			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
 		else if (m_phase == phase::rr_channel_release)
 		{
 			const auto &message = m_gsm_session->pending_downlink();
 			const auto frame = m_lapdm_link->build_information_frame(
 					0, message.data.data(), message.length);
-			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
 		else if (m_phase == phase::service_downlink)
 		{
@@ -1523,13 +1661,13 @@ void nokia_radio_peer_device::emit_report()
 						message.sapi, message.data.data() + m_downlink_offset,
 						count, more_data);
 			}
-			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
 		else if (m_phase == phase::service_uplink_acknowledgement)
 		{
 			const auto frame = m_lapdm_link->build_receive_ready(
 					m_lapdm_link->layer3_sapi());
-			std::copy(frame.begin(), frame.end(), std::begin(payload) + 10);
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
 		else if (pch_report)
 		{

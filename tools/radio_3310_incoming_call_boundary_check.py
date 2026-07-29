@@ -11,6 +11,7 @@ if __package__ in (None, ""):
 from tools.radio_call_lifecycle_common import (
     ALERTING,
     ASSIGNMENT_COMPLETE,
+    CIPHER_MODE_COMMAND,
     CIPHER_MODE_COMPLETE,
     CONNECT,
     CONNECT_ACKNOWLEDGE,
@@ -20,7 +21,6 @@ from tools.radio_call_lifecycle_common import (
     INCOMING_SETUP,
     MM_INFORMATION,
     NETWORK_RELEASE,
-    NO_CIPHER_COMMAND,
     PAGING_CONTENTION_UA,
     PAGING_RESPONSE,
     REGISTRATION_RELEASE,
@@ -39,10 +39,9 @@ CHECKPOINTS = (
     ("IMSI page", IMSI_PAGE),
     ("Paging Response", PAGING_RESPONSE),
     ("contention-resolution UA", PAGING_CONTENTION_UA),
-    ("no-cipher Cipher Mode Command", NO_CIPHER_COMMAND),
+    ("Cipher Mode Command", CIPHER_MODE_COMMAND),
     ("NHM-5 cipher-control publication", re.compile(
-        r"TX packet type=14 payload=12 .*"
-        r"data=001affffffffffffffff0000")),
+        r"TX packet type=14 payload=12")),
     ("MM Information", MM_INFORMATION),
     ("Cipher Mode Complete", CIPHER_MODE_COMPLETE),
     ("incoming SETUP", INCOMING_SETUP),

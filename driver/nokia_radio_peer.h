@@ -3,7 +3,9 @@
 
 #ifndef MAME_NOKIA_NOKIA_RADIO_PEER_H
 #define MAME_NOKIA_NOKIA_RADIO_PEER_H
+#include "gsm_a5.h"
 #include "gsm_tch_f_l1.h"
+#include "gsm_xcch_l1.h"
 #include "nokia_dspif.h"
 #include "nokia_gsm_network.h"
 #include "nokia_gsm_session.h"
@@ -196,6 +198,11 @@ private:
 	void reset_l1_pipeline();
 	void prepare_l1_save();
 	void restore_l1_block_kinds();
+	nokia_lapdm_link_device::uplink_result receive_lapdm_uplink(
+			const u8 *frame, unsigned length);
+	void deliver_lapdm_downlink(
+			const std::array<u8, nokia_lapdm_link_device::frame_length> &frame,
+			u8 *payload, u32 reference_frame);
 	TIMER_CALLBACK_MEMBER(burst_tick);
 
 	required_device<nokia_dspif_device> m_transport;
@@ -271,6 +278,10 @@ private:
 	unsigned m_downlink_tch_burst_error_span = 0;
 	u64 m_downlink_tch_bursts = 0;
 	u64 m_downlink_tch_bursts_impaired = 0;
+	u64 m_uplink_ciphered_bursts = 0;
+	u64 m_downlink_ciphered_bursts = 0;
+	u64 m_uplink_ciphered_xcch_blocks = 0;
+	u64 m_downlink_ciphered_xcch_blocks = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device)

@@ -266,20 +266,25 @@ std::array<u8, 2> nokia_gsm_network_device::authentication_reject() const
 bool nokia_gsm_network_device::authentication_response_valid(
 		const u8 *information, unsigned length) const
 {
+	return gsm::mm::authentication::response_valid(
+			authentication_result(), information, length);
+}
+
+gsm::a3a8::result nokia_gsm_network_device::authentication_result() const
+{
 	const auto request = authentication_request();
 	gsm::a3a8::block rand;
 	std::copy(request.begin() + 3, request.end(), rand.begin());
-	const auto expected = gsm::a3a8::aes_example(laboratory_ki(), rand);
-	return gsm::mm::authentication::response_valid(
-			expected, information, length);
+	return gsm::a3a8::aes_example(laboratory_ki(), rand);
 }
 
 std::array<u8, 3> nokia_gsm_network_device::cipher_mode_command() const
 {
-	// GSM 04.08 9.1.9. This exercises the handset's cipher-control boundary
-	// while explicitly selecting SC=0 (no ciphering). Subsequent laboratory
-	// frames therefore remain clear; this is not an A5 implementation.
-	return { 0x06, 0x35, 0x00 };
+	// GSM 04.08 9.1.9: SC in bit 0; algorithm identifier in bits 3..1.
+	// A5/0 has SC clear.  A5/1 uses identifier zero with SC set.
+	const u8 setting = m_cipher_algorithm == gsm::a5::algorithm::a5_0 ?
+			0x00 : u8(1 | ((u8(m_cipher_algorithm) - 1) << 1));
+	return { 0x06, 0x35, setting };
 }
 
 std::array<u8, 2> nokia_gsm_network_device::cm_service_accept() const

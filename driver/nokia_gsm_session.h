@@ -125,6 +125,13 @@ public:
 		return m_mobile_originated_call &&
 				m_state == u8(state::outgoing_call_alerting);
 	}
+	gsm::a5::algorithm cipher_algorithm() const
+	{
+		return gsm::a5::algorithm(m_cipher_algorithm);
+	}
+	const gsm::a5::key &cipher_key() const { return m_cipher_key; }
+	bool cipher_active() const { return m_cipher_active; }
+	bool cipher_command_pending() const { return m_cipher_command_pending; }
 
 protected:
 	virtual void device_start() override;
@@ -181,6 +188,12 @@ private:
 	output_finder<> m_call_alerting_output;
 	output_finder<> m_release_waiting_output;
 	bool m_authentication_required = false;
+	bool m_authentication_for_service = false;
+	u8 m_cipher_algorithm = u8(gsm::a5::algorithm::a5_0);
+	gsm::a5::key m_cipher_key{};
+	bool m_cipher_key_valid = false;
+	bool m_cipher_command_pending = false;
+	bool m_cipher_active = false;
 	u8 m_state = u8(state::idle);
 	std::array<u8, maximum_layer3_length> m_established_layer3{};
 	unsigned m_established_layer3_length = 0;

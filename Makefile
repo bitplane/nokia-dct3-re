@@ -21,8 +21,10 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_gsm_call_adapter.cpp driver/nokia_gsm_call_adapter.h \
 	driver/nokia_gensio.cpp driver/nokia_gensio.h \
 	driver/gsm_a3a8.cpp driver/gsm_a3a8.h \
+	driver/gsm_a5.cpp driver/gsm_a5.h \
 	driver/gsm_mm_authentication.cpp driver/gsm_mm_authentication.h \
 	driver/gsm_tch_f_l1.cpp driver/gsm_tch_f_l1.h \
+	driver/gsm_xcch_l1.cpp driver/gsm_xcch_l1.h \
 	driver/nokia_gsm_fr_codec.cpp driver/nokia_gsm_fr_codec.h \
 	driver/nokia_gsm_network.cpp driver/nokia_gsm_network.h \
 	driver/nokia_gsm_session.cpp driver/nokia_gsm_session.h \
@@ -173,17 +175,22 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
 .PHONY: verify-3330-radio-incoming-call-lifecycle
-.PHONY: verify-3410-radio-incoming-call-lifecycle
+.PHONY: verify-3410-radio-incoming-call-lifecycle verify-3410-radio-a5-1-incoming-call
 .PHONY: verify-3330-radio-media-resilience
 .PHONY: verify-3410-radio-registration verify-3410-radio-registration-preserved
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
+.PHONY: verify-radio-a5-1-outgoing-call
+.PHONY: verify-radio-a5-1-sdcch-state
+.PHONY: verify-3310-radio-a5-1-incoming-call verify-3330-radio-a5-1-incoming-call
+.PHONY: verify-3310-radio-a5-1-outgoing-call verify-3330-radio-a5-1-outgoing-call
+.PHONY: verify-3410-radio-a5-1-outgoing-call
 .PHONY: verify-radio-outgoing-call-busy verify-radio-outgoing-call-no-answer
 .PHONY: verify-radio-outgoing-call-service-reject
 .PHONY: verify-radio-outgoing-call-no-answer-state
@@ -383,6 +390,21 @@ verify-gsm-a3a8:
 		-o scratchpad/test_gsm_a3a8
 	scratchpad/test_gsm_a3a8
 
+verify-gsm-a5:
+	mkdir -p scratchpad
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic \
+		driver/gsm_a5.cpp tools/test_gsm_a5.cpp \
+		-o scratchpad/test_gsm_a5
+	scratchpad/test_gsm_a5
+
+verify-gsm-xcch-l1:
+	mkdir -p scratchpad
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic \
+		driver/gsm_a5.cpp driver/gsm_tch_f_l1.cpp \
+		driver/gsm_xcch_l1.cpp tools/test_gsm_xcch_l1.cpp \
+		-o scratchpad/test_gsm_xcch_l1
+	scratchpad/test_gsm_xcch_l1
+
 verify-dsp-speech-control-static:
 	$(VENV)/bin/python tools/dsp_speech_control_static_check.py \
 		--v600 roms/3210f600a_swap16.bin \
@@ -472,7 +494,7 @@ roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
 	done
 
 build: overlay roms $(LIBGSM_ARCHIVE)
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/nokia_gsm_fr_codec.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 LDFLAGS="-Wl,--whole-archive $(LIBGSM_ARCHIVE) -Wl,--no-whole-archive" -j$(JOBS)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_fr_codec.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp USE_QTDEBUG=0 LDFLAGS="-Wl,--whole-archive $(LIBGSM_ARCHIVE) -Wl,--no-whole-archive" -j$(JOBS)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
@@ -532,6 +554,9 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_acceptance_run_isolation.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_cobba_control_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_a5_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_a5_state_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_a5_two_calls_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_physical_downlink_check.py
 	$(VENV)/bin/python -m unittest tools/test_pulse_route_mame.py
 
@@ -1219,6 +1244,18 @@ verify-3410-radio-incoming-call-lifecycle:
 		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	@echo "OK — NHM-2 carried internal GSM-FR media through physical Answer/End and returned to PCH"
 
+verify-3410-radio-a5-1-incoming-call:
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py \
+		$(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
 verify-3330-radio-media-resilience: verify-3330-radio-incoming-call-lifecycle
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
 		RUN_DIR=$(RUN_DIR)_degraded SECONDS=24 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
@@ -1300,6 +1337,76 @@ verify-radio-incoming-call-lifecycle:
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-a5-1-incoming-call:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-a5-1-state:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.5 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
+		$(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \
+		$(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-a5-1-sdcch-state:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=24.16 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=50 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=5000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_state_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-a5-1-outgoing-call:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-outgoing-call-lifecycle:
@@ -1696,8 +1803,10 @@ verify-radio-outgoing-call-host-release-restore:
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_MEDIA_PORT) \
+			-cfg_directory ../fixtures/radio_a5_1_host \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_release_restore_trace_check.py \
 		$(RUN_DIR)/error.log
 
@@ -1727,8 +1836,10 @@ verify-radio-outgoing-call-host-two-calls:
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_TWO_CALLS_PORT) \
+			-cfg_directory ../fixtures/radio_a5_1_host \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_two_calls_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_two_calls_trace_check.py \
 		$(RUN_DIR)/error.log
 
@@ -1854,6 +1965,30 @@ verify-3310-radio-outgoing-call-lifecycle:
 	$(PYTHON) tools/radio_speech_media_trace_check.py \
 		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
+verify-3310-radio-a5-1-incoming-call:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait3000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py \
+		$(RUN_DIR)/error.log --ended
+	$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+verify-3310-radio-a5-1-outgoing-call:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
 verify-3330-radio-outgoing-call-lifecycle: normalize-3330
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
 		RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
@@ -1871,12 +2006,59 @@ verify-3330-radio-outgoing-call-lifecycle: normalize-3330
 	$(PYTHON) tools/radio_speech_media_trace_check.py \
 		$(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
+verify-3330-radio-a5-1-incoming-call: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(PYTHON) tools/check_model_frontier_summary.py \
+		$(RUN_DIR)_provision/boot_summary.txt --require-fiq0
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_call SECONDS=28 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py \
+		$(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+verify-3330-radio-a5-1-outgoing-call: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(PYTHON) tools/check_model_frontier_summary.py \
+		$(RUN_DIR)_provision/boot_summary.txt --require-fiq0
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_call SECONDS=32 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
 verify-3410-radio-outgoing-call-lifecycle:
 	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
 		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=120 NOKIA_DCT3_POST_READY_KEY_GAP_MS=240'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py \
+		$(RUN_DIR)/error.log --release-complete optional
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+verify-3410-radio-a5-1-outgoing-call:
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=120 NOKIA_DCT3_POST_READY_KEY_GAP_MS=240'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py \
 		$(RUN_DIR)/error.log --release-complete optional
 	$(PYTHON) tools/radio_speech_media_trace_check.py \
@@ -2001,6 +2183,29 @@ verify-radio-degraded-speech:
 		$(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py \
 		$(RUN_DIR)_v501/error.log
+
+verify-radio-a5-1-degraded:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	degraded_env='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,waitbuzzer,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=28.51 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' \
+		RUN_ENV="$$degraded_env"; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
+		$(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \
+		$(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-physical-uplink:
 	$(MAKE) --no-print-directory verify-radio-physical-uplink-one \

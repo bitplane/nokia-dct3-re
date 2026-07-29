@@ -27,8 +27,8 @@ save-state replay and isolated physical microphone/playback paths.
   numbers or Nokia scheduling.
 - After registration it retains the organically supplied IMSI mobile identity.
   Named network-event fixtures may move the idle session through Paging
-  Response into either bounded RR release or an SC=0 cipher-control exchange
-  followed by an unciphered MM connection,
+  Response into bounded RR release, explicit A5/0, or authenticated A5/1
+  cipher-mode activation followed by a ciphered MM connection,
   deterministic MM Information, mobile-terminated call control or SAPI-3 SMS.
 - `nokia_lapdm_link_device` owns the decoded dedicated-link boundary: SABM
   validation, contention-resolution identity, UA/DISC release and downlink
@@ -590,12 +590,16 @@ be reintroduced as peer behavior:
 
 The checkpoint includes authenticated registration, bounded MT call control
 and bidirectional full-rate speech, but it is not a complete cellular network.
-Known extensions are A5 ciphering, periodic and mobility-driven Location
-Updating, MO SMS, MT SMS CP/RP closure, multipart Smart Messaging and ringtone
+Known extensions are periodic and mobility-driven Location Updating, MO SMS,
+MT SMS CP/RP closure, multipart Smart Messaging and ringtone
 UI/persistence, handover, measurement reporting, loss/reselection, rejected
 registration and configurable multi-cell topology.
 Each extension must begin with an organic MCU request or a standards-defined
 network event and retain the same request-correlation rule.
+
+`gsm_a5_ciphering.md` records the implemented A5/0/A5/1 policy, organic
+authentication and Cipher Mode transition, SDCCH/TCH burst boundaries,
+save-state contract and the evidence-based decision to reject A5/2 for now.
 
 `grey_salamander_integration.md` catalogues the external compatibility
 knowledge available for those extensions, the local ownership boundary, and

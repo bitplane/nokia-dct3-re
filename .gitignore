@@ -29,6 +29,7 @@ mame/
 venv/
 run_*/
 run_*.log
+/run-*/
 !tools/run_manifests/
 !tools/run_manifests/*.json
 run/
