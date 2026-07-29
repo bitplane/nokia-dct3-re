@@ -30,12 +30,14 @@ public:
 		location_update_accept,
 		channel_release,
 		cm_service_accept,
+		cm_service_reject,
 		cipher_mode_command,
 		mm_information,
 		incoming_call_setup,
 		call_proceeding,
 		call_alerting,
 		call_connect,
+		call_disconnect,
 		traffic_assignment,
 		sapi3_establishment,
 		incoming_sms_cp_data,
@@ -82,6 +84,16 @@ public:
 	{
 		return m_registered_mobile_identity_length;
 	}
+	bool outgoing_request_pending() const { return m_outgoing_request_pending; }
+	u32 outgoing_request_id() const { return m_outgoing_request_id; }
+	const std::array<u8, 32> &outgoing_called_digits() const
+	{
+		return m_outgoing_called_digits;
+	}
+	unsigned outgoing_called_digits_length() const
+	{
+		return m_outgoing_called_digits_length;
+	}
 	bool idle() const { return m_state == u8(state::idle); }
 	bool awaiting_traffic_assignment() const
 	{
@@ -109,10 +121,14 @@ private:
 		awaiting_location_update_accept_acknowledgement,
 		awaiting_channel_release_acknowledgement,
 		awaiting_cm_service_accept_acknowledgement,
+		awaiting_cm_service_reject_acknowledgement,
 		awaiting_outgoing_call_setup,
 		awaiting_call_proceeding_acknowledgement,
 		awaiting_call_alerting_acknowledgement,
 		awaiting_outgoing_connect_acknowledgement,
+		outgoing_call_alerting,
+		awaiting_network_disconnect_acknowledgement,
+		awaiting_handset_release,
 		awaiting_cipher_mode_command_acknowledgement,
 		awaiting_mm_information_acknowledgement,
 		awaiting_incoming_call_setup_acknowledgement,
@@ -147,6 +163,10 @@ private:
 	bool m_traffic_assignment_issued = false;
 	bool m_mobile_originated_call = false;
 	u8 m_call_transaction = 0;
+	bool m_outgoing_request_pending = false;
+	u32 m_outgoing_request_id = 0;
+	std::array<u8, 32> m_outgoing_called_digits{};
+	unsigned m_outgoing_called_digits_length = 0;
 	u8 m_incoming_service = u8(incoming_service::none);
 	u8 m_smart_message_part_index = 0;
 	downlink_message m_pending_downlink;

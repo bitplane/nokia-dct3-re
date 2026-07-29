@@ -1263,6 +1263,24 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_gsm_session->receive_layer3(
 					m_lapdm_link->layer3_sapi(),
 					information.data(), m_lapdm_link->layer3_length());
+			if (m_trace_enabled &&
+					m_lapdm_link->layer3_sapi() == 0 &&
+					(information[0] & 0x0f) == 0x03 &&
+					(information[1] & 0x3f) == 0x05 &&
+					m_gsm_session->outgoing_request_pending())
+			{
+				std::string digits;
+				for (unsigned index = 0;
+						index <
+								m_gsm_session->outgoing_called_digits_length();
+						++index)
+					digits += char('0' +
+							m_gsm_session->outgoing_called_digits()[index]);
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: GSM outgoing request id=%u digits=%s t=%.6f\n",
+						m_gsm_session->outgoing_request_id(),
+						digits.c_str(), machine().time().as_double());
+			}
 			// A queued L3 response is itself an I frame and piggybacks N(R) for
 			// this uplink. Link establishment is a SABM and cannot piggyback
 			// N(R); terminal session results likewise carry no message. Both
@@ -1773,6 +1791,8 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		}
 		else if (action ==
 				nokia_gsm_session_device::downlink_kind::cm_service_accept ||
+				action ==
+				nokia_gsm_session_device::downlink_kind::cm_service_reject ||
 				action ==
 				nokia_gsm_session_device::downlink_kind::authentication_request ||
 				action ==

@@ -67,6 +67,14 @@ CC/RR teardown and a new post-release PCH fill. The 3310, preserved-PMM 3330
 and 3410 variants retain their independently checked radio, PCM and release
 contracts. `make verify-radio-outgoing-call-state` additionally requires exact
 active-call digital replay across save/load before ordinary physical teardown.
+The `verify-radio-outgoing-call-busy`,
+`verify-radio-outgoing-call-no-answer` and
+`verify-radio-outgoing-call-service-reject` gates require distinct negative
+lifecycle invariants rather than a changed final screen. Busy must not assign
+TCH; no-answer must not Connect; service rejection must not accept CM, observe
+SETUP or create request state. All three return to a newly observed PCH fill.
+`verify-radio-outgoing-call-no-answer-state` repeats local clearing after an
+exact save/load while Alerting.
 `radio_physical_uplink_trace_check.py` covers the opposite direction in
 audio-enabled runs. An external host source enters through MAME's microphone
 record stream; the gate requires at least 100 non-silent, unclipped COBBA

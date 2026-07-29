@@ -681,7 +681,8 @@ public:
 		m_cell_config(*this, "CELLCFG"),
 		m_assignment_config(*this, "ASSIGNCFG"),
 		m_page_config(*this, "PAGECFG"),
-		m_authentication_config(*this, "AUTHCFG")
+		m_authentication_config(*this, "AUTHCFG"),
+		m_outgoing_call_config(*this, "CALLCFG")
 	{ }
 
 	void noki3330(machine_config &config);
@@ -800,6 +801,7 @@ private:
 	optional_ioport m_assignment_config;
 	optional_ioport m_page_config;
 	optional_ioport m_authentication_config;
+	optional_ioport m_outgoing_call_config;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
 
@@ -1062,6 +1064,15 @@ void nokia_dct3_state::machine_reset()
 						matched_request);
 	m_gsm_network->set_paging_profile(
 			PAGING_PROFILES[m_page_config.read_safe(0x00) & 0x03]);
+	static constexpr std::array OUTGOING_CALL_OUTCOMES = {
+		nokia_gsm_network_device::outgoing_call_outcome::connect,
+		nokia_gsm_network_device::outgoing_call_outcome::busy,
+		nokia_gsm_network_device::outgoing_call_outcome::no_answer,
+		nokia_gsm_network_device::outgoing_call_outcome::service_reject
+	};
+	m_gsm_network->set_outgoing_call_outcome(
+			OUTGOING_CALL_OUTCOMES[
+					m_outgoing_call_config.read_safe(0x00) & 0x03]);
 	m_gsm_session->set_authentication_required(
 			BIT(m_authentication_config.read_safe(0x00), 0));
 	m_radio_peer->set_page_after_registration(
@@ -1774,6 +1785,13 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
+
+	PORT_START("CALLCFG")
+	PORT_CONFNAME(0x03, 0x00, "Laboratory outgoing-call outcome")
+	PORT_CONFSETTING(0x00, "Connect")
+	PORT_CONFSETTING(0x01, "Remote user busy")
+	PORT_CONFSETTING(0x02, "Remote user does not answer")
+	PORT_CONFSETTING(0x03, "MM service rejected")
 
 	// Standard MAME configuration inputs keep negative-composition tests out of
 	// process-global environment state. These are shared hardware boundaries,

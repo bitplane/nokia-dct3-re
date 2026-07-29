@@ -152,6 +152,10 @@ acceptance surface is:
 - `make verify-3410-radio-incoming-call-lifecycle`;
 - `make verify-radio-outgoing-call-lifecycle
   verify-radio-outgoing-call-state`;
+- `make verify-radio-outgoing-call-busy
+  verify-radio-outgoing-call-no-answer
+  verify-radio-outgoing-call-no-answer-state
+  verify-radio-outgoing-call-service-reject`;
 - `make verify-3310-radio-outgoing-call-lifecycle`;
 - `make verify-3330-radio-outgoing-call-lifecycle`; and
 - `make verify-3410-radio-outgoing-call-lifecycle`.

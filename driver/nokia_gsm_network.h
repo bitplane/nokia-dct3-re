@@ -32,6 +32,14 @@ public:
 		mismatched_request_reference
 	};
 
+	enum class outgoing_call_outcome : u8
+	{
+		connect,
+		busy,
+		no_answer,
+		service_reject
+	};
+
 	static constexpr unsigned maximum_layer3_length = 176;
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
@@ -61,6 +69,14 @@ public:
 	{
 		m_assignment_profile = profile;
 	}
+	void set_outgoing_call_outcome(outgoing_call_outcome outcome)
+	{
+		m_outgoing_call_outcome = outcome;
+	}
+	outgoing_call_outcome configured_outgoing_call_outcome() const
+	{
+		return m_outgoing_call_outcome;
+	}
 	std::array<u8, 24> system_information(unsigned index, u16 serving_arfcn) const;
 	std::array<u8, 24> paging_fill() const;
 	std::array<u8, 24> paging_request(
@@ -86,11 +102,13 @@ public:
 	static const gsm::a3a8::block &laboratory_ki();
 	std::array<u8, 3> cipher_mode_command() const;
 	std::array<u8, 2> cm_service_accept() const;
+	std::array<u8, 3> cm_service_reject() const;
 	std::array<u8, 10> mm_information() const;
 	std::array<u8, 17> incoming_call_setup() const;
 	std::array<u8, 2> call_proceeding(u8 transaction) const;
 	std::array<u8, 2> call_alerting(u8 transaction) const;
 	std::array<u8, 2> call_connect(u8 transaction) const;
+	std::array<u8, 5> call_disconnect(u8 transaction, u8 cause) const;
 	std::array<u8, 8> traffic_assignment() const;
 	std::array<u8, 36> incoming_sms_cp_data() const;
 	unsigned incoming_smart_message_part_count() const;
@@ -98,6 +116,7 @@ public:
 	std::array<u8, 2> sms_cp_ack(u8 transaction) const;
 	std::array<u8, 2> connect_acknowledge(u8 transaction) const;
 	std::array<u8, 2> call_release(u8 transaction) const;
+	std::array<u8, 2> call_release_complete(u8 transaction) const;
 	std::array<u8, 3> channel_release() const;
 	s8 serving_rssi(unsigned sample) const;
 
@@ -109,6 +128,8 @@ private:
 	paging_profile m_paging_profile = paging_profile::matched;
 	assignment_profile m_assignment_profile =
 			assignment_profile::matched_request;
+	outgoing_call_outcome m_outgoing_call_outcome =
+			outgoing_call_outcome::connect;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device)

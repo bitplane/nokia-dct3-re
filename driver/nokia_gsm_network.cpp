@@ -289,6 +289,13 @@ std::array<u8, 2> nokia_gsm_network_device::cm_service_accept() const
 	return { 0x05, 0x21 };
 }
 
+std::array<u8, 3> nokia_gsm_network_device::cm_service_reject() const
+{
+	// GSM 04.08 9.2.6. Cause 0x20 is "service option not supported"; it
+	// rejects this MM connection without fabricating a call-control result.
+	return { 0x05, 0x22, 0x20 };
+}
+
 std::array<u8, 10> nokia_gsm_network_device::mm_information() const
 {
 	// GSM 04.08 9.2.15. Keep this deterministic: 2026-07-24 12:00:00 UTC.
@@ -330,6 +337,16 @@ std::array<u8, 2> nokia_gsm_network_device::call_connect(
 {
 	// GSM 04.08 9.3.5. Connect the same mobile-originated CC transaction.
 	return { u8(transaction ^ 0x80), 0x07 };
+}
+
+std::array<u8, 5> nokia_gsm_network_device::call_disconnect(
+		u8 transaction, u8 cause) const
+{
+	// GSM 04.08 9.3.7 and 10.5.4.11. The cause IE uses the public-network,
+	// local-user location and an extension-qualified Q.850 cause value.
+	return {
+		u8(transaction ^ 0x80), 0x25, 0x02, 0xe0, u8(0x80 | cause)
+	};
 }
 
 std::array<u8, 8> nokia_gsm_network_device::traffic_assignment() const
@@ -480,6 +497,12 @@ std::array<u8, 2> nokia_gsm_network_device::connect_acknowledge(
 std::array<u8, 2> nokia_gsm_network_device::call_release(u8 transaction) const
 {
 	return { u8(transaction ^ 0x80), 0x2d };
+}
+
+std::array<u8, 2> nokia_gsm_network_device::call_release_complete(
+		u8 transaction) const
+{
+	return { u8(transaction ^ 0x80), 0x2a };
 }
 
 std::array<u8, 3> nokia_gsm_network_device::channel_release() const

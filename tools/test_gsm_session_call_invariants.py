@@ -42,6 +42,37 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
         self.assertIn(
             "m_network->call_connect(m_call_transaction)", self.source)
 
+    def test_outgoing_request_is_saved_and_product_independent(self):
+        for field in (
+            "m_outgoing_request_pending",
+            "m_outgoing_request_id",
+            "m_outgoing_called_digits",
+            "m_outgoing_called_digits_length",
+        ):
+            self.assertIn(f"save_item(NAME({field}));", self.source)
+        request = self.source.split(
+            "m_outgoing_request_pending = true;", 1)[0]
+        request = request.rsplit(
+            "m_state == u8(state::awaiting_outgoing_call_setup)", 1)[1]
+        for product in ("noki", "NHM", "NSE"):
+            self.assertNotIn(product, request)
+
+    def test_network_outcomes_are_generic_and_standards_shaped(self):
+        compact_source = "".join(self.source.split())
+        for outcome in ("busy", "no_answer", "service_reject"):
+            self.assertIn(
+                f"outgoing_call_outcome::{outcome}", compact_source)
+        self.assertIn(
+            "m_network->call_disconnect(m_call_transaction, 0x11)",
+            self.source,
+        )
+        for product in ("noki3210", "noki3310", "noki3330", "noki3410",
+                        "NHM-", "NSE-"):
+            self.assertNotIn(
+                product,
+                self.source.split("configured_outgoing_call_outcome", 1)[1],
+            )
+
     def test_non_call_cm_service_and_malformed_identity_fail_closed(self):
         establishment = self.source.split(
             "const bool cm_service_request =", 1)[1]
@@ -61,6 +92,7 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
         self.assertIn("identifier == 0x04", setup)
         self.assertIn("identifier == 0x5e", setup)
         self.assertIn("!speech_bearer || !called_party", setup)
+        self.assertIn("m_outgoing_called_digits_length == 0", setup)
 
 
 if __name__ == "__main__":

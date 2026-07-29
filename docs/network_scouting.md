@@ -305,6 +305,17 @@ other products. Each gate sustains at least 250 encoded and 244 decoded
 non-silent frames. `make verify-radio-outgoing-call-state` additionally
 replays an active NSE-8 call exactly through save/load before physical End.
 
+The NSE-8 outcome gates separate deterministic network policy from the
+firmware-owned request and CC/RR lifecycle. A valid SETUP creates one saved,
+monotonic request identifier and retains the decoded digits. `busy` returns
+Disconnect with GSM cause 17 before any TCH assignment, then accepts the
+handset Release and supplies Release Complete. `no-answer` performs the single
+assignment and Alerting but never sends Connect; physical End still closes CC,
+RR and the speech route, including across an alerting save/load roundtrip.
+`service-reject` sends CM Service Reject before SETUP and releases the SDCCH,
+so it creates neither a call request nor traffic/media state. These are
+standards-level laboratory outcomes, not an asynchronous host-call backend.
+
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes
 LAPDm SAPI 3 exactly
