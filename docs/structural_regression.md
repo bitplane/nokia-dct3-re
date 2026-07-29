@@ -58,6 +58,15 @@ boundary test, not a fixture write into handset PCM or call-control state.
 That cadence is calculated by the MAD2 PCM endpoint from the configured
 160-sample, 8 kHz converter contract; the DSP HLE carries no independent
 20 ms timer constant.
+
+`make verify-radio-outgoing-call-lifecycle` physically enters `5551234` and
+presses Call. It requires the firmware-owned CM Service Request and SETUP,
+standards-shaped Call Proceeding/Alerting/Connect, exactly one traffic
+assignment, Connect Acknowledge, sustained non-silent GSM-FR, physical End,
+CC/RR teardown and a new post-release PCH fill. The 3310, preserved-PMM 3330
+and 3410 variants retain their independently checked radio, PCM and release
+contracts. `make verify-radio-outgoing-call-state` additionally requires exact
+active-call digital replay across save/load before ordinary physical teardown.
 `radio_physical_uplink_trace_check.py` covers the opposite direction in
 audio-enabled runs. An external host source enters through MAME's microphone
 record stream; the gate requires at least 100 non-silent, unclipped COBBA

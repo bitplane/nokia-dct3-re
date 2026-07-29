@@ -282,6 +282,13 @@ std::array<u8, 3> nokia_gsm_network_device::cipher_mode_command() const
 	return { 0x06, 0x35, 0x00 };
 }
 
+std::array<u8, 2> nokia_gsm_network_device::cm_service_accept() const
+{
+	// GSM 04.08 9.2.5. The network accepts the MM connection requested by the
+	// handset before any mobile-originated call-control transaction begins.
+	return { 0x05, 0x21 };
+}
+
 std::array<u8, 10> nokia_gsm_network_device::mm_information() const
 {
 	// GSM 04.08 9.2.15. Keep this deterministic: 2026-07-24 12:00:00 UTC.
@@ -301,6 +308,28 @@ std::array<u8, 17> nokia_gsm_network_device::incoming_call_setup() const
 		0x34, 0x01,
 		0x5c, 0x05, 0x81, 0x55, 0x15, 0x32, 0xf4
 	};
+}
+
+std::array<u8, 2> nokia_gsm_network_device::call_proceeding(
+		u8 transaction) const
+{
+	// GSM 04.08 9.3.3. Preserve the transaction allocated by the mobile while
+	// setting the network-to-mobile transaction-identifier flag.
+	return { u8(transaction ^ 0x80), 0x02 };
+}
+
+std::array<u8, 2> nokia_gsm_network_device::call_alerting(
+		u8 transaction) const
+{
+	// GSM 04.08 9.3.1. The remote laboratory subscriber is now alerting.
+	return { u8(transaction ^ 0x80), 0x01 };
+}
+
+std::array<u8, 2> nokia_gsm_network_device::call_connect(
+		u8 transaction) const
+{
+	// GSM 04.08 9.3.5. Connect the same mobile-originated CC transaction.
+	return { u8(transaction ^ 0x80), 0x07 };
 }
 
 std::array<u8, 8> nokia_gsm_network_device::traffic_assignment() const

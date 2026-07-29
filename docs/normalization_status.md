@@ -26,6 +26,11 @@ that the driver is ready for upstream submission.
   pre-page/assigned save-state and wrong-group/unmatched/malformed/barred
   compositions all use the generic network, paging-group, session and LAPDm
   components.
+- Deterministic mobile-originated speech calls are normalized across NSE-8,
+  NHM-5, NHM-6 and NHM-2: physical dial, CM Service, called-number SETUP,
+  one TCH assignment, Alerting/Connect, bidirectional media, product-specific
+  release and restored PCH cadence. Backend decisions and failure outcomes
+  remain a separate interface rather than fixture flags in the session.
 - NHM-2 incoming calls and internal media are normalized through organic
   ringing, physical Send/End, one TCH assignment despite repeated Call
   Confirmed, command-`0x08` values `0x060b`/`0x040a`, timed 1 MHz/8 kHz

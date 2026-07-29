@@ -128,6 +128,7 @@ RADIO_PAGING_ARGS := -cfg_directory ../fixtures/radio_paging
 RADIO_AUTHENTICATION_ARGS := -cfg_directory ../fixtures/radio_authentication
 RADIO_INCOMING_CALL_ARGS := -cfg_directory ../fixtures/radio_incoming_call
 RADIO_INCOMING_CALL_ANSWERED_ARGS := -cfg_directory ../fixtures/radio_incoming_call_answered
+RADIO_OUTGOING_CALL_ARGS := -cfg_directory ../fixtures/radio_outgoing_call
 RADIO_PCM_MISSING_ARGS := -cfg_directory ../fixtures/radio_pcm_missing
 RADIO_INCOMING_CALL_DEGRADED_ARGS := -cfg_directory ../fixtures/radio_incoming_call_degraded
 RADIO_INCOMING_SMS_ARGS := -cfg_directory ../fixtures/radio_incoming_sms
@@ -154,6 +155,10 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
+.PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
+.PHONY: verify-3310-radio-outgoing-call-lifecycle
+.PHONY: verify-3330-radio-outgoing-call-lifecycle
+.PHONY: verify-3410-radio-outgoing-call-lifecycle
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -228,6 +233,9 @@ help:
 	@echo "make verify-radio-incoming-call check organic MT SETUP, Alerting and bounded clearing"
 	@echo "make verify-radio-incoming-call-answered check physical Answer, ringing and post-answer DSP traffic"
 	@echo "make verify-radio-incoming-call-lifecycle check physical Answer-to-End CC and DSP-control teardown"
+	@echo "make verify-radio-outgoing-call-lifecycle check physical dial-to-End MO call and media"
+	@echo "make verify-radio-outgoing-call-state check exact active MO-call save-state replay"
+	@echo "make verify-{3310,3330,3410}-radio-outgoing-call-lifecycle check product MO calls"
 	@echo "make verify-radio-incoming-call-lifecycle-v501 check the cross-ROM MCU/DSP audio-control wire"
 	@echo "make verify-radio-degraded-speech check burst errors, bad frames and media recovery"
 	@echo "make verify-radio-physical-uplink check external microphone through timed Layer 1"
@@ -459,7 +467,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_nse3_v406_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_nse3_v548_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_dct3_type_1f_static_check.py
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_gsm_authentication_split.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_gsm_authentication_split.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_outgoing_call_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3410_registration_negative_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py
@@ -1231,6 +1239,77 @@ verify-radio-incoming-call-lifecycle:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-outgoing-call-lifecycle:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1000,c,wait500,c,wait1000,5,5,5,1,2,3,4,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+verify-radio-outgoing-call-state:
+	@set -e; \
+	restore_default() { \
+		$(MAKE) --no-print-directory eeprom-profile; \
+		cp "roms/noki3210/$(EEPROM_BASENAME)" \
+			"$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)"; \
+	}; \
+	trap restore_default EXIT; \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1000,c,wait500,c,wait1000,5,5,5,1,2,3,4,enter,waitalerting NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
+		$(RUN_DIR)/error.log
+
+verify-3310-radio-outgoing-call-lifecycle:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+verify-3330-radio-outgoing-call-lifecycle: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(PYTHON) tools/check_model_frontier_summary.py \
+		$(RUN_DIR)_provision/boot_summary.txt --require-fiq0
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_call SECONDS=32 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py \
+		$(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+verify-3410-radio-outgoing-call-lifecycle:
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=120 NOKIA_DCT3_POST_READY_KEY_GAP_MS=240'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py \
+		$(RUN_DIR)/error.log --release-complete optional
+	$(PYTHON) tools/radio_speech_media_trace_check.py \
+		$(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
 verify-radio-incoming-call-lifecycle-v501:
 	@set -e; \

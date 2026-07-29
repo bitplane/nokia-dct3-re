@@ -32,6 +32,36 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
             "if (m_state == u8(state::awaiting_release_complete)", 1)[1]
         self.assertIn("m_traffic_assignment_issued = false;", release)
 
+    def test_mobile_originated_transaction_state_is_saved(self):
+        for field in ("m_mobile_originated_call", "m_call_transaction"):
+            self.assertIn(f"save_item(NAME({field}));", self.source)
+        self.assertIn(
+            "m_network->call_proceeding(m_call_transaction)", self.source)
+        self.assertIn(
+            "m_network->call_alerting(m_call_transaction)", self.source)
+        self.assertIn(
+            "m_network->call_connect(m_call_transaction)", self.source)
+
+    def test_non_call_cm_service_and_malformed_identity_fail_closed(self):
+        establishment = self.source.split(
+            "const bool cm_service_request =", 1)[1]
+        establishment = establishment.split(
+            "m_established_layer3.fill(0);", 1)[0]
+        self.assertIn("(information[2] & 0x0f) == 0x01", establishment)
+        self.assertIn("identity_length == 0 || identity_length > 8", establishment)
+        self.assertIn(
+            "identity_length_offset + 1 + identity_length > length",
+            establishment,
+        )
+
+    def test_outgoing_setup_requires_speech_and_called_party(self):
+        setup = self.source.split(
+            "m_state == u8(state::awaiting_outgoing_call_setup)", 1)[1]
+        setup = setup.split("m_call_transaction = information[0];", 1)[0]
+        self.assertIn("identifier == 0x04", setup)
+        self.assertIn("identifier == 0x5e", setup)
+        self.assertIn("!speech_bearer || !called_party", setup)
+
 
 if __name__ == "__main__":
     unittest.main()

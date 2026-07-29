@@ -25,6 +25,8 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_release_completes_registration));
 	save_item(NAME(m_call_alerting));
 	save_item(NAME(m_traffic_assignment_issued));
+	save_item(NAME(m_mobile_originated_call));
+	save_item(NAME(m_call_transaction));
 	save_item(NAME(m_incoming_service));
 	save_item(NAME(m_smart_message_part_index));
 	save_item(NAME(m_pending_downlink.kind));
@@ -47,6 +49,8 @@ void nokia_gsm_session_device::device_reset()
 	m_release_completes_registration = false;
 	m_call_alerting = false;
 	m_traffic_assignment_issued = false;
+	m_mobile_originated_call = false;
+	m_call_transaction = 0;
 	publish_call_alerting_output();
 	m_incoming_service = u8(incoming_service::none);
 	m_smart_message_part_index = 0;
@@ -67,17 +71,40 @@ bool nokia_gsm_session_device::establish_layer3(
 			m_state == u8(state::awaiting_paging_response) &&
 			(information[0] & 0x0f) == 0x06 &&
 			(information[1] & 0x3f) == 0x27;
-	if (!location_update_request && !paging_response)
+	const bool cm_service_request =
+			m_state == u8(state::idle) &&
+			(information[0] & 0x0f) == 0x05 &&
+			(information[1] & 0x3f) == 0x24 &&
+			length >= 6 &&
+			(information[2] & 0x0f) == 0x01;
+	if (!location_update_request && !paging_response && !cm_service_request)
 		return false;
+	if (cm_service_request)
+	{
+		// GSM 04.08 9.2.9: accept only a structurally complete mobile-
+		// originating call request. Other CM service types belong to their own
+		// sessions and must not accidentally enter call control.
+		const unsigned classmark_length = information[3];
+		const unsigned identity_length_offset = 4 + classmark_length;
+		if (identity_length_offset >= length)
+			return false;
+		const unsigned identity_length = information[identity_length_offset];
+		if (identity_length == 0 || identity_length > 8 ||
+				identity_length_offset + 1 + identity_length > length)
+			return false;
+	}
 
 	m_established_layer3.fill(0);
 	std::copy_n(information, length, m_established_layer3.begin());
 	m_established_layer3_length = length;
 	clear_pending_downlink();
 	m_release_completes_registration = location_update_request;
-	m_state = u8(location_update_request ?
-			state::awaiting_contention_resolution :
-			state::awaiting_paging_contention_resolution);
+	m_mobile_originated_call = cm_service_request;
+	m_call_transaction = 0;
+	m_traffic_assignment_issued = false;
+	m_state = u8(paging_response ?
+			state::awaiting_paging_contention_resolution :
+			state::awaiting_contention_resolution);
 	return true;
 }
 
@@ -118,6 +145,15 @@ nokia_gsm_session_device::contention_resolution_delivered()
 	if (m_state != u8(state::awaiting_contention_resolution))
 		return downlink_kind::none;
 
+	if ((m_established_layer3[0] & 0x0f) == 0x05 &&
+			(m_established_layer3[1] & 0x3f) == 0x24)
+	{
+		const auto accept = m_network->cm_service_accept();
+		m_state = u8(state::awaiting_cm_service_accept_acknowledgement);
+		return queue_downlink(downlink_kind::cm_service_accept,
+				accept.data(), accept.size());
+	}
+
 	if (m_authentication_required)
 	{
 		const auto request = m_network->authentication_request();
@@ -143,6 +179,40 @@ std::array<u8, 24> nokia_gsm_session_device::paging_request() const
 nokia_gsm_session_device::downlink_kind
 nokia_gsm_session_device::downlink_acknowledged()
 {
+	if (m_state == u8(state::awaiting_cm_service_accept_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::cm_service_accept))
+	{
+		clear_pending_downlink();
+		m_state = u8(state::awaiting_outgoing_call_setup);
+		return downlink_kind::none;
+	}
+
+	if (m_state == u8(state::awaiting_call_proceeding_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::call_proceeding))
+	{
+		m_traffic_assignment_issued = true;
+		const auto assignment = m_network->traffic_assignment();
+		m_state = u8(state::awaiting_traffic_assignment);
+		return queue_downlink(downlink_kind::traffic_assignment,
+				assignment.data(), assignment.size());
+	}
+
+	if (m_state == u8(state::awaiting_call_alerting_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::call_alerting))
+	{
+		const auto connect = m_network->call_connect(m_call_transaction);
+		m_state = u8(state::awaiting_outgoing_connect_acknowledgement);
+		return queue_downlink(downlink_kind::call_connect,
+				connect.data(), connect.size());
+	}
+
+	if (m_state == u8(state::awaiting_outgoing_connect_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::call_connect))
+	{
+		clear_pending_downlink();
+		return downlink_kind::none;
+	}
+
 	if (m_state == u8(state::awaiting_authentication_request_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::authentication_request))
 	{
@@ -319,6 +389,40 @@ nokia_gsm_session_device::receive_layer3(
 
 	const u8 protocol_discriminator = information[0] & 0x0f;
 	const u8 message_type = information[1] & 0x3f;
+	if (sapi == 0 && m_state == u8(state::awaiting_outgoing_call_setup) &&
+			protocol_discriminator == 0x03 && message_type == 0x05)
+	{
+		bool speech_bearer = false;
+		bool called_party = false;
+		for (unsigned offset = 2; offset < length;)
+		{
+			const u8 identifier = information[offset];
+			if (BIT(identifier, 7))
+			{
+				++offset;
+				continue;
+			}
+			if (offset + 1 >= length)
+				return downlink_kind::none;
+			const unsigned value_length = information[offset + 1];
+			if (offset + 2 + value_length > length)
+				return downlink_kind::none;
+			if (identifier == 0x04 && value_length >= 1)
+				speech_bearer = (information[offset + 2] & 0x07) == 0x00;
+			else if (identifier == 0x5e && value_length >= 2)
+				called_party = true;
+			offset += 2 + value_length;
+		}
+		if (!speech_bearer || !called_party || BIT(information[0], 7))
+			return downlink_kind::none;
+		m_call_transaction = information[0];
+		const auto proceeding =
+				m_network->call_proceeding(m_call_transaction);
+		m_state = u8(state::awaiting_call_proceeding_acknowledgement);
+		return queue_downlink(downlink_kind::call_proceeding,
+				proceeding.data(), proceeding.size());
+	}
+
 	if (sapi == 0 && m_state == u8(state::awaiting_authentication_response))
 	{
 		if (m_network->authentication_response_valid(information, length))
@@ -389,6 +493,27 @@ nokia_gsm_session_device::receive_layer3(
 			m_state == u8(state::awaiting_assignment_complete) &&
 			protocol_discriminator == 0x06 && message_type == 0x29)
 	{
+		if (m_mobile_originated_call)
+		{
+			m_call_alerting = true;
+			publish_call_alerting_output();
+			const auto alerting =
+					m_network->call_alerting(m_call_transaction);
+			m_state = u8(state::awaiting_call_alerting_acknowledgement);
+			return queue_downlink(downlink_kind::call_alerting,
+					alerting.data(), alerting.size());
+		}
+		m_state = u8(state::incoming_call_active);
+		return downlink_kind::none;
+	}
+
+	if (sapi == 0 &&
+			m_state == u8(state::awaiting_outgoing_connect_acknowledgement) &&
+			protocol_discriminator == 0x03 && message_type == 0x0f)
+	{
+		clear_pending_downlink();
+		m_call_alerting = false;
+		publish_call_alerting_output();
 		m_state = u8(state::incoming_call_active);
 		return downlink_kind::none;
 	}
@@ -402,6 +527,8 @@ nokia_gsm_session_device::receive_layer3(
 		m_release_completes_registration = false;
 		m_call_alerting = false;
 		m_traffic_assignment_issued = false;
+		m_mobile_originated_call = false;
+		m_call_transaction = 0;
 		publish_call_alerting_output();
 		m_incoming_service = u8(incoming_service::none);
 		m_state = u8(state::idle);

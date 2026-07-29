@@ -85,8 +85,12 @@ public:
 			const u8 *information, unsigned length) const;
 	static const gsm::a3a8::block &laboratory_ki();
 	std::array<u8, 3> cipher_mode_command() const;
+	std::array<u8, 2> cm_service_accept() const;
 	std::array<u8, 10> mm_information() const;
 	std::array<u8, 17> incoming_call_setup() const;
+	std::array<u8, 2> call_proceeding(u8 transaction) const;
+	std::array<u8, 2> call_alerting(u8 transaction) const;
+	std::array<u8, 2> call_connect(u8 transaction) const;
 	std::array<u8, 8> traffic_assignment() const;
 	std::array<u8, 36> incoming_sms_cp_data() const;
 	unsigned incoming_smart_message_part_count() const;

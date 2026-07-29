@@ -149,7 +149,12 @@ acceptance surface is:
   verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells`;
 - `make verify-3410-radio-paging-preserved verify-3410-radio-paging-state
   verify-3410-radio-paging-negatives`; and
-- `make verify-3410-radio-incoming-call-lifecycle`.
+- `make verify-3410-radio-incoming-call-lifecycle`;
+- `make verify-radio-outgoing-call-lifecycle
+  verify-radio-outgoing-call-state`;
+- `make verify-3310-radio-outgoing-call-lifecycle`;
+- `make verify-3330-radio-outgoing-call-lifecycle`; and
+- `make verify-3410-radio-outgoing-call-lifecycle`.
 
 Shared Make variables and standards-level trace vocabulary do not replace
 product acceptance. Packet grammar, correlation values, ordering and release

@@ -282,6 +282,29 @@ channel-owned shutdown only after physical End and before route clearing.
 This ordering does not weaken the requirement that both release boundaries
 occur. No analogue microphone or receiver route is inferred.
 
+`make verify-radio-outgoing-call-lifecycle` proves the complementary mobile-
+originated path from physical number entry. The handset issues its own random
+access and an SDCCH SABM carrying CM Service Request; the generic session
+accepts only the mobile-originating-call service type with a bounded Classmark
+and Mobile Identity. After acknowledgement-gated CM Service Accept, firmware
+emits SETUP containing its speech bearer and the physically entered called
+number `5551234`. The network preserves firmware's transaction identifier
+through Call Proceeding, one TCH/F Assignment, Alerting and Connect. Firmware
+then sends Assignment Complete and Connect Acknowledge, carries bidirectional
+GSM-FR, and physical End produces Disconnect, Release/Release Complete where
+the product publishes it, RR release, route clearing and a newly observed PCH
+fill. The post-release PCH marker deliberately clears the prior idle-fill
+cache, preventing a later page from bypassing the restored paging cadence.
+
+The corresponding NHM-5, NHM-6 and NHM-2 targets reuse only that standards-
+level lifecycle. They retain their independent Nokia radio grammar, traffic
+release transactions, speech-control contracts and PCM profiles. NHM-6 runs
+from preserved PMM; NHM-2 uses physical Send/End and its evidenced release
+tail, which does not publish the same CC Release Complete sequence as the
+other products. Each gate sustains at least 250 encoded and 244 decoded
+non-silent frames. `make verify-radio-outgoing-call-state` additionally
+replays an active NSE-8 call exactly through save/load before physical End.
+
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes
 LAPDm SAPI 3 exactly

@@ -1108,6 +1108,22 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					m_lapdm_link->layer3_information().data(),
 					m_lapdm_link->layer3_length()))
 		{
+			if (m_trace_enabled)
+			{
+				const auto &information = m_lapdm_link->layer3_information();
+				std::string information_hex;
+				for (unsigned index = 0;
+						index < m_lapdm_link->layer3_length(); ++index)
+					information_hex += util::string_format(
+							"%02x", information[index]);
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: GSM service establish sapi=%u pd=%02x message=%02x length=%u data=%s t=%.6f\n",
+						m_lapdm_link->layer3_sapi(),
+						information[0] & 0x0f, information[1] & 0x3f,
+						m_lapdm_link->layer3_length(),
+						information_hex.c_str(),
+						machine().time().as_double());
+			}
 			m_phase = phase::contention_resolution;
 			m_reports_remaining = 1;
 			m_report_deferred = true;
@@ -1230,12 +1246,20 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			}
 			const auto &information = m_lapdm_link->layer3_information();
 			if (m_trace_enabled)
+			{
+				std::string information_hex;
+				for (unsigned index = 0;
+						index < m_lapdm_link->layer3_length(); ++index)
+					information_hex += util::string_format(
+							"%02x", information[index]);
 				LOGMASKED(LOG_RADIO,
-						"dsp_hle: GSM service uplink sapi=%u pd=%02x message=%02x length=%u t=%.6f\n",
+						"dsp_hle: GSM service uplink sapi=%u pd=%02x message=%02x length=%u data=%s t=%.6f\n",
 						m_lapdm_link->layer3_sapi(),
 						information[0] & 0x0f, information[1] & 0x3f,
 						m_lapdm_link->layer3_length(),
+						information_hex.c_str(),
 						machine().time().as_double());
+			}
 			m_gsm_session->receive_layer3(
 					m_lapdm_link->layer3_sapi(),
 					information.data(), m_lapdm_link->layer3_length());
@@ -1302,6 +1326,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				m_phase = phase::release_deconfigure;
 				m_reports_remaining = 0;
 				m_page_transmitted = false;
+				m_pch_fill_delivered = false;
 			}
 			else if (action != nokia_gsm_session_device::downlink_kind::none)
 			{
@@ -1457,6 +1482,13 @@ void nokia_radio_peer_device::emit_report()
 		else if (m_phase == phase::service_downlink)
 		{
 			const auto &message = m_gsm_session->pending_downlink();
+			if (m_trace_enabled && m_downlink_offset == 0 &&
+					message.length >= 2)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: GSM service downlink kind=%u sapi=%u pd=%02x message=%02x length=%u t=%.6f\n",
+						message.kind, message.sapi,
+						message.data[0] & 0x0f, message.data[1] & 0x3f,
+						message.length, machine().time().as_double());
 			std::array<u8, nokia_lapdm_link_device::frame_length> frame;
 			if (message.kind == u8(
 					nokia_gsm_session_device::downlink_kind::sapi3_establishment))
@@ -1740,6 +1772,8 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 			m_report_deferred = true;
 		}
 		else if (action ==
+				nokia_gsm_session_device::downlink_kind::cm_service_accept ||
+				action ==
 				nokia_gsm_session_device::downlink_kind::authentication_request ||
 				action ==
 				nokia_gsm_session_device::downlink_kind::authentication_reject ||

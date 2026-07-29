@@ -29,9 +29,13 @@ public:
 		authentication_reject,
 		location_update_accept,
 		channel_release,
+		cm_service_accept,
 		cipher_mode_command,
 		mm_information,
 		incoming_call_setup,
+		call_proceeding,
+		call_alerting,
+		call_connect,
 		traffic_assignment,
 		sapi3_establishment,
 		incoming_sms_cp_data,
@@ -104,6 +108,11 @@ private:
 		awaiting_authentication_reject_acknowledgement,
 		awaiting_location_update_accept_acknowledgement,
 		awaiting_channel_release_acknowledgement,
+		awaiting_cm_service_accept_acknowledgement,
+		awaiting_outgoing_call_setup,
+		awaiting_call_proceeding_acknowledgement,
+		awaiting_call_alerting_acknowledgement,
+		awaiting_outgoing_connect_acknowledgement,
 		awaiting_cipher_mode_command_acknowledgement,
 		awaiting_mm_information_acknowledgement,
 		awaiting_incoming_call_setup_acknowledgement,
@@ -136,6 +145,8 @@ private:
 	bool m_release_completes_registration = false;
 	bool m_call_alerting = false;
 	bool m_traffic_assignment_issued = false;
+	bool m_mobile_originated_call = false;
+	u8 m_call_transaction = 0;
 	u8 m_incoming_service = u8(incoming_service::none);
 	u8 m_smart_message_part_index = 0;
 	downlink_message m_pending_downlink;
