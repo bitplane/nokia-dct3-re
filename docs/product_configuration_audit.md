@@ -133,6 +133,9 @@ Once firmware publishes its candidate window, decoding, SCH/SI delivery,
 assignment, LAPDm and MM use the generic components. The network's negative
 Immediate Assignment profile alters only the standards-defined request
 reference and contains no handset-family dispatch.
+NHM-2 paging adds no product field at all: page construction, DRX group
+selection, monitored/transmitted scheduling, session state and LAPDm release
+are the same generic components already exercised by NHM-5 and NHM-6.
 
 No further wrapper is justified by the current evidence. DSP service delay and
 peer polling describe different mechanisms; SIM controller presence and card

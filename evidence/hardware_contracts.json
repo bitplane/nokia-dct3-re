@@ -183,6 +183,11 @@
       "evidence": ["docs/network_scouting.md", "docs/model_coverage.md", "driver/nokia_dct3.cpp", "driver/nokia_radio_peer.cpp", "tools/radio_registration_trace_check.py", "tools/radio_3410_registration_negative_trace_check.py", "Makefile"]
     },
     {
+      "id": "noki3410_organic_paging", "subsystem": "radio", "status": "validated", "confidence": "strong",
+      "boundary": "After organic NHM-2 registration, the generic paging scheduler derives the subscriber DRX group, delivers no-identity fill and one IMSI Paging Request Type 1, and firmware organically performs random access, assigned-SDCCH LAPDm Paging Response, RR release and return to PCH fill. Fresh and preserved PMM plus pre-page and assigned-exchange save/load gates pass. Wrong-group, unmatched, malformed and barred-cell fixtures produce no Paging Response or subscriber mutation",
+      "evidence": ["docs/network_scouting.md", "docs/model_coverage.md", "tools/radio_paging_trace_check.py", "tools/radio_paging_state_roundtrip_trace_check.py", "tools/radio_paging_negative_trace_check.py", "Makefile"]
+    },
+    {
       "id": "ccont_charger_power_wake", "subsystem": "ccont", "status": "partial", "confidence": "strong",
       "boundary": "CCONT watchdog data 0x00 removes the MAD2 digital baseband domain while CCONT and nonvolatile storage persist. A later physical charger edge exposes reset-cause bit 2, resets the CPU and attached MAD2 peripheral domain, and both 3210 v6.00 and v5.01 organically read the cause and VCHAR before settling in acting-dead mode 0x0005. Physical rail timing and battery/current dynamics remain unmodeled",
       "evidence": ["docs/ccont_subsystem.md", "docs/mad2_fidelity.md", "tools/charger_wake_check.py"]

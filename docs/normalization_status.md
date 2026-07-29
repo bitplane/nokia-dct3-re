@@ -22,6 +22,10 @@ that the driver is ready for upstream submission.
   autonomous band scan and external-service sequences are explicit NHM-2
   contracts; standards-level cell, assignment, LAPDm and MM behavior remains
   shared.
+- NHM-2 paging is normalized without a driver branch: fresh/preserved,
+  pre-page/assigned save-state and wrong-group/unmatched/malformed/barred
+  compositions all use the generic network, paging-group, session and LAPDm
+  components.
 
 ## Current application baseline
 

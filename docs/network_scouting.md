@@ -114,6 +114,21 @@ assignment profile whose Immediate Assignment deliberately echoes the wrong
 random-access octet. The firmware rejects all three organically without
 Location Updating or subscriber-state mutation.
 
+NHM-2 paging requires no product branch. `make verify-3410-radio-paging`
+continues from organic registration through no-identity PCH fill in the
+IMSI-derived TS 45.002 group, one Paging Request Type 1, automatic CHANNEL
+REQUEST, correlated Immediate Assignment, LAPDm Paging Response, bounded RR
+release and return to fill. The preserved-PMM gate repeats the lifecycle after
+the retained LAI/TMSI Location Updating form. Save/load gates cover the
+pre-page interval and the assigned-SDCCH response exchange.
+
+The generic paging-negative profiles also pass unchanged on NHM-2. A page in
+another DRX group is not exposed at the decoded-PCH boundary; unmatched and
+malformed identities produce no CHANNEL REQUEST or subscriber mutation; and a
+barred cell cannot reach paging. These gates establish paging only. Ringing,
+physical Answer/End and call teardown remain the separate promotion boundary
+for Call control.
+
 NHM-6 paging reuses the same network/session/LAPDm implementation proven by
 NSE-8 and NHM-5. `make verify-3330-radio-paging` starts after organic
 registration release, requires a no-identity fill in the IMSI-derived TS 45.002

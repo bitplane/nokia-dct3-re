@@ -78,7 +78,7 @@ def main() -> int:
         verify(args.log.read_text(errors="replace"), args.profile)
     except ValueError as error:
         raise SystemExit(str(error)) from None
-    print(f"OK - NHM-6 rejected the {args.profile} page without RR access")
+    print(f"OK - handset rejected the {args.profile} page without RR access")
     return 0
 
 

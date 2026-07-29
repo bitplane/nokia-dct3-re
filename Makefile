@@ -140,6 +140,8 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3330-radio-media-resilience
 .PHONY: verify-3410-radio-registration verify-3410-radio-registration-preserved
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
+.PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
+.PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
 
 help:
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
@@ -192,6 +194,7 @@ help:
 	@echo "make verify-3410-radio-registration check NHM-2 Location Updating and steady camp"
 	@echo "make verify-3410-radio-registration-state check NHM-2 acquisition/SDCCH save-state replay"
 	@echo "make verify-3410-radio-unsuitable-cells check NHM-2 cell and assignment rejection"
+	@echo "make verify-3410-radio-paging check NHM-2 PCH access and Paging Response"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
 	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
 	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
@@ -1009,6 +1012,60 @@ verify-3330-radio-paging-negatives: normalize-3330
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_paging_unsuitable'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_unsuitable/error.log
 	$(PYTHON) tools/radio_3330_unsuitable_cell_trace_check.py \
+		$(RUN_DIR)_unsuitable/error.log --profile barred
+
+verify-3410-radio-paging: normalize-3410
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+		RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nhm2
+	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
+
+verify-3410-radio-paging-preserved:
+	@$(MAKE) --no-print-directory verify-3410-radio-paging \
+		RUN_DIR=$(RUN_DIR)_fresh
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+		RUN_DIR=$(RUN_DIR)_cold SECONDS=30 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)_cold/error.log --profile nhm2 --preserved
+	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)_cold/error.log
+
+verify-3410-radio-paging-state: normalize-3410
+	@for boundary in before assigned; do \
+		if test "$$boundary" = before; then at=23.30; replay=500; else at=24.82; replay=100; fi; \
+		$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=35 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_paging_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log || exit; \
+	done
+
+verify-3410-radio-paging-negatives: normalize-3410
+	@for profile in wrong_group unmatched malformed; do \
+		fixture=$$(echo $$profile | tr _ -); \
+		$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+			RUN_DIR=$(RUN_DIR)_$$profile SECONDS=30 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_paging_$$profile" \
+			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200' || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		$(PYTHON) tools/radio_paging_negative_trace_check.py \
+			$(RUN_DIR)_$$profile/error.log --profile $$fixture || exit; \
+	done
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e \
+		RUN_DIR=$(RUN_DIR)_unsuitable SECONDS=30 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_paging_unsuitable' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_unsuitable/error.log
+	$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \
 		$(RUN_DIR)_unsuitable/error.log --profile barred
 
 verify-3310-radio-incoming-call-boundary:

@@ -98,6 +98,12 @@ Location Updating, SIM persistence, release and steady camp. The paired
 save-state gate restores before acquisition and during assigned-SDCCH LAPDm.
 Barred and unattainable-RXLEV cells produce no access, and a standards-shaped
 Immediate Assignment with a mismatched request reference is ignored.
+The same default-hardware profile then completes generic IMSI paging without
+new NHM-2 packet grammar: correctly grouped fill and one page lead to organic
+random access, assigned-SDCCH Paging Response, release and return to fill.
+Fresh/preserved PMM, two paging save-state boundaries and wrong-group,
+unmatched, malformed and barred-cell negatives pass. This proves paging but
+does not yet establish ringing or physical call control.
 
 ### Conditional power lifecycle control
 

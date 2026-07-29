@@ -287,6 +287,13 @@ assignment and LAPDm completion. `make verify-3410-radio-unsuitable-cells`
 proves barred, unattainable-RXLEV and mismatched-request-reference inputs do
 not promote the handset into Location Updating.
 
+`make verify-3410-radio-paging-preserved` proves one correctly grouped page,
+organic Paging Response and clean release after both fresh and retained-PMM
+registration. `make verify-3410-radio-paging-state` replays before page
+delivery and during the assigned exchange. The negative paging gate requires
+continued idle fill without RR access for wrong-group, unmatched and malformed
+pages, while the unsuitable-cell composition must never reach paging.
+
 `make verify-model-frontier-state` performs isolated mid-frontier save/load
 round trips for both products. The positive frontier summaries require FIQ0,
 complete LCD transfers and zero soft resets in addition to their LCD oracles.
