@@ -51,6 +51,7 @@ class DspDeviceSplitTest(unittest.TestCase):
             "struct speech_request_predicate",
             "DSP_SPEECH_CONTROL_NSE8",
             "DSP_SPEECH_CONTROL_NHM5",
+            "DSP_SPEECH_CONTROL_NHM6",
             "DSP_SPEECH_CONTROL_NSE3_COMMAND",
             "set_speech_control_contract(product.dsp_speech_control)",
         ):

@@ -250,6 +250,7 @@ class MachineProfileTest(unittest.TestCase):
                 "radio": "RADIO_NHM6",
                 "dsp_bootstrap": "BOOTSTRAP_READY_64",
                 "keypad_wiring": "KEYPAD_NHM6",
+                "dsp_speech_control": "DSP_SPEECH_CONTROL_NHM6",
                 "ccont_board": "ADC_STANDARD",
             },
         )

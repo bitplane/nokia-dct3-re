@@ -1,6 +1,8 @@
 local machine = manager.machine
 local cpu = machine.devices[":maincpu"]
 local space = cpu.spaces["program"]
+local call_alerting_output =
+		machine.devices[":gsm_session"]:output("nokia_gsm_call_alerting")
 local output_dir = os.getenv("NOKIA_DCT3_SNAPSHOT_DIR") or ".."
 local boot_summary_path = os.getenv("NOKIA_DCT3_BOOT_SUMMARY")
 local ram_dump_path = os.getenv("NOKIA_DCT3_RAM_DUMP")
@@ -465,6 +467,18 @@ if #post_keys > 0 then
 							emulation_seconds() >= deadline
 					if (space:read_u8(0x20015) & 0x20) == 0 then
 						machine:logerror("input-wait: buzzer timeout\n")
+						return
+					end
+				elseif name == "waitalerting" then
+					-- Observe the firmware-owned CC Alerting publication.  This
+					-- output is diagnostic only; the following key still crosses
+					-- the ordinary physical matrix and firmware UI.
+					local deadline = emulation_seconds() + 20
+					repeat emu.wait(0.005) until
+							call_alerting_output:get() ~= 0 or
+							emulation_seconds() >= deadline
+					if call_alerting_output:get() == 0 then
+						machine:logerror("input-wait: call alerting timeout\n")
 						return
 					end
 				else

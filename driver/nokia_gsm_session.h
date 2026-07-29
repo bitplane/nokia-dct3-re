@@ -120,11 +120,13 @@ private:
 	};
 
 	void clear_pending_downlink();
+	void publish_call_alerting_output();
 	downlink_kind queue_downlink(
 			downlink_kind kind, const u8 *information, unsigned length,
 			u8 sapi = 0);
 
 	required_device<nokia_gsm_network_device> m_network;
+	output_finder<> m_call_alerting_output;
 	bool m_authentication_required = false;
 	u8 m_state = u8(state::idle);
 	std::array<u8, maximum_layer3_length> m_established_layer3{};
@@ -132,6 +134,7 @@ private:
 	std::array<u8, 8> m_registered_mobile_identity{};
 	unsigned m_registered_mobile_identity_length = 0;
 	bool m_release_completes_registration = false;
+	bool m_call_alerting = false;
 	u8 m_incoming_service = u8(incoming_service::none);
 	u8 m_smart_message_part_index = 0;
 	downlink_message m_pending_downlink;

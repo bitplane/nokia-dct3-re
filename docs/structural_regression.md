@@ -84,6 +84,15 @@ It deliberately assigns no semantic names to the control bits.
 Answer-to-End flow under the independently relocated v5.01 firmware and checks
 the invariant shared-offset-`0x0a8` wire lifecycle
 `0x8002 -> 0x860b -> 0x840a -> 0x8002`.
+
+`make verify-3330-radio-incoming-call-lifecycle` first validates organic
+fresh-PMM provisioning, then cold-boots that preserved state. Its input
+orchestration observes a read-only firmware-owned CC Alerting output before
+pressing the physical Navi matrix key; it does not write call or firmware
+state. The gate requires the NHM-6 cipher publication, TCH assignment,
+Connect/acknowledgement, command-`0x08` `0x860b` speech request, physical Navi
+Disconnect, Release Complete, `0x14` channel release, `0x840a` speech release
+and return to PCH.
 `make verify-radio-call-state-roundtrip` additionally saves during the stable
 speech interval under both v6.00 and independently relocated v5.01, records
 two seconds of DSP/network media evolution, restores the save, and records the

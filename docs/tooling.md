@@ -53,6 +53,10 @@
     command-`0x08` speech request/release lifecycle and its independently
     documented 1 MHz/125-clock PCM boundary. It runs as part of
     `make verify-3310-radio-incoming-call-lifecycle`.
+  - `radio_3330_incoming_call_boundary_check.py` — validates NHM-6 paging,
+    cipher/MM entrance, TCH assignment, physical Navi Answer/End, its
+    independently observed speech-control wire and clean return to PCH. It
+    runs under `make verify-3330-radio-incoming-call-lifecycle`.
   - `radio_sacch_coexistence_trace_check.py` — validates live SACCH/TF
     reservations one per 26-frame multiframe, four-phase rotation, and
     continuing bidirectional speech. It joins FACCH, degradation and

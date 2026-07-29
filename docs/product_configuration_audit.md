@@ -129,5 +129,8 @@ NHM-6.
 No further wrapper is justified by the current evidence. DSP service delay and
 peer polling describe different mechanisms; SIM controller presence and card
 presence must remain independently testable; flash, EEPROM, boot and analogue
-settings belong to separate boundaries. The next functional target is the
-organic NHM-6 incoming-call lifecycle.
+settings belong to separate boundaries. NHM-6 now owns a separately evidenced
+command-`0x08` speech-control contract: its organic Answer/End lifecycle
+publishes `0x060b` and `0x040a`. It deliberately does not inherit NHM-5's PCM
+or analogue contracts. The next functional boundary is NHM-6 internal media,
+which requires independent PCM evidence.

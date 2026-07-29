@@ -44,6 +44,13 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn("space:read_u8(0x20015) & 0x20", self.harness)
         self.assertIn('machine:logerror("input-wait: buzzer timeout', self.harness)
 
+    def test_sequence_can_wait_for_firmware_owned_call_alerting(self):
+        self.assertIn('name == "waitalerting"', self.harness)
+        waiter = self.harness.split('name == "waitalerting"', 1)[1]
+        waiter = waiter.split("\n\t\t\t\telse", 1)[0]
+        self.assertIn("call_alerting_output:get()", waiter)
+        self.assertNotIn("space:write_", waiter)
+
     def test_shutdown_publishes_the_terminal_lcd_mirror(self):
         stop = self.harness.split("emu.add_machine_stop_notifier", 1)[1]
         self.assertIn("queue_lcd_dump()", stop)

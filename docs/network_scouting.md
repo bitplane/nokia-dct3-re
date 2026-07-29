@@ -214,6 +214,16 @@ reservation before this organic teardown. The physical gate admits host audio
 only through the configured MIC2/EAR board endpoints. Exact COBBA mux/gain
 semantics and the individual command-bit meanings remain unassigned.
 
+`make verify-3330-radio-incoming-call-lifecycle` applies the same standards-
+level network/session path to NHM-6 without borrowing NHM-5 packet grammar.
+After a validated fresh-PMM provisioning run, a preserved-PMM cold boot clears
+the firmware security and unbacked clock editors with physical keys, waits on the read-only CC
+Alerting publication, and uses ordinary Navi matrix presses for Answer and
+End. The firmware emits Connect, Disconnect and Release Complete, the radio
+uses NHM-6's `0x14` release transaction, and the DSP independently publishes
+`0x860b` then `0x840a`. This proves call control and speech intent only; NHM-6
+PCM and analogue media remain unknown.
+
 `make verify-radio-incoming-sms` selects the ordinary-text fixture. It reuses
 the same page, SC=0 cipher-control and unciphered MM entrance, establishes
 LAPDm SAPI 3 exactly

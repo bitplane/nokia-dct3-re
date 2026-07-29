@@ -178,9 +178,9 @@ constexpr nokia_dsp_hle_device::service_control_contract
 	{ 0x00, 0x04, 0x01, 0x00, 0x0d, 0x00 }, 6
 };
 
-// These predicates currently match but remain separate evidence. NSE-8 and
-// NHM-5 each prove command 0x08 and field 0x0201 through their own organic
-// Answer/End lifecycle.
+// These predicates currently match but remain separate evidence. NSE-8,
+// NHM-5 and NHM-6 each prove command 0x08 and field 0x0201 through their own
+// organic Answer/End lifecycle.
 constexpr nokia_dsp_hle_device::speech_control_contract
 		DSP_SPEECH_CONTROL_NSE8 = {
 	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
@@ -188,6 +188,11 @@ constexpr nokia_dsp_hle_device::speech_control_contract
 
 constexpr nokia_dsp_hle_device::speech_control_contract
 		DSP_SPEECH_CONTROL_NHM5 = {
+	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
+};
+
+constexpr nokia_dsp_hle_device::speech_control_contract
+		DSP_SPEECH_CONTROL_NHM6 = {
 	0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0201, 0x0201 }
 };
 
@@ -391,6 +396,10 @@ constexpr nokia_product_config make_3330_config()
 	result.keypad_wiring = KEYPAD_NHM6;
 	result.dsp_service_delay_us = 4'000;
 	result.dsp_peer_poll_ms = 4;
+	// NHM-6 independently publishes command 0x08 value 0x060b immediately
+	// after organic physical Answer and 0x040a during physical-End teardown.
+	// This establishes speech control, but not NHM-5's PCM or analogue wiring.
+	result.dsp_speech_control = DSP_SPEECH_CONTROL_NHM6;
 	result.ccont_board = ADC_STANDARD;
 	return result;
 }
