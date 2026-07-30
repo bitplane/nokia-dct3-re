@@ -260,7 +260,8 @@ class DspDeviceSplitTest(unittest.TestCase):
         for token in (
             "incoming_sms_cp_data", "incoming_smart_message_cp_data",
             "smart_message_multipart_part_capacity", "append(0xf5)",
-            "append(0x7a)",
+            "smart_message_profile::mismatched_reference",
+            "0x7b : 0x7a",
         ):
             self.assertIn(token, self.network)
         for token in (

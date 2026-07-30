@@ -210,7 +210,13 @@ from the ROM's fifteen-question-mark formatted identity. A delayed physical
 inventing an IMEI. This was used to disprove the UI lock as the reason the
 ordinary-text MT-SMS fixture does not emit a CP/RP tail. The separate
 port-addressed multipart fixture now emits and completely closes both CP/RP
-transactions.
+transactions. Its application continuation proves that the first part survives
+the intervening RR release and that the matched pair reaches the ringtone
+parser, yet flash and EEPROM remain bit-identical to the ordinary-SMS control.
+Only the ordinary control changes SIM NVRAM. Reassembly at this frontier is
+therefore ordinary firmware RAM state, not a hidden host cache or evidenced
+persistent PMM/flash/SIM record. Save/discard remains a separate storage
+frontier.
 
 That fixture makes the identity comparison succeed and removes the Security-code
 editor. It paints the idle frame (SHA-256 prefix `dbf2704cb945d56b`) without

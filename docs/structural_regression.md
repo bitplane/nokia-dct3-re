@@ -238,8 +238,27 @@ TP-UDHI, DCS `f5`, the port-`1581` UDH, reference `7a`, count `2`, indices
 and independently referenced RP-ACK, network CP-ACK and RR release before the
 next page. Exactly two pages occur and `EF_SMS` record 1 stays free. The
 separate state gate replays the first close, queued successor and second close
-boundaries exactly. These transport gates deliberately do not claim ringtone
-UI, playback, firmware reassembly or persistence.
+boundaries exactly.
+`make verify-radio-smart-message-application` continues from that boundary
+through physical security-code entry, firmware Options/Play, a stable named
+Playing-tone frame and note-varying PUP output. Its commandless twin must reach
+the untitled Play rejection frame without playback. `make
+verify-radio-smart-message-envelopes` fixes the observed per-part notification
+matrix for missing, mismatched-reference, incorrect-total, wrong-port,
+out-of-order, duplicate and truncated-UDH compositions while requiring
+`EF_SMS` to remain free. Its stale-then-valid composition requires no
+completion for the stale set or fresh part 1 and exactly one completion after
+fresh part 2. The duplicate case deliberately records NSE-8's evidenced
+acceptance of two independently transported UDH sequence-1 parts; it must not
+be confused with an idempotent LAPDm retransmission or normalized into a
+rejection. `make verify-3410-radio-smart-message-application`
+and the focused NHM-5 gate retain separate UI oracles. These gates prove
+temporary reassembly, dispatch and playback parsing, but not save/discard or
+cold-boot ringtone persistence. The application-state gate restores after
+part 1 and immediately before the completion notification, proving that
+firmware RAM—not a parallel host reconstruction cache—owns both boundaries.
+It also restores after terminal Play acceptance and commandless rejection,
+requiring the exact named/untitled UI and playback/no-playback result.
 `make verify-radio-operator` adds the unobscured firmware-rendered test-PLMN
 label. None alters either boot oracle.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical

@@ -691,6 +691,7 @@ public:
 		m_hw_config(*this, "HWCFG"),
 		m_diag_config(*this, "DIAGCFG"),
 		m_network_config(*this, "NETCFG"),
+		m_smart_message_config(*this, "SMARTCFG"),
 		m_cell_config(*this, "CELLCFG"),
 		m_assignment_config(*this, "ASSIGNCFG"),
 		m_page_config(*this, "PAGECFG"),
@@ -817,6 +818,7 @@ private:
 	optional_ioport m_hw_config;
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
+	optional_ioport m_smart_message_config;
 	optional_ioport m_cell_config;
 	optional_ioport m_assignment_config;
 	optional_ioport m_page_config;
@@ -1068,6 +1070,25 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
+	static constexpr std::array SMART_MESSAGE_PROFILES = {
+		nokia_gsm_network_device::smart_message_profile::valid,
+		nokia_gsm_network_device::smart_message_profile::missing_second_part,
+		nokia_gsm_network_device::smart_message_profile::mismatched_reference,
+		nokia_gsm_network_device::smart_message_profile::incorrect_total,
+		nokia_gsm_network_device::smart_message_profile::duplicate_first_part,
+		nokia_gsm_network_device::smart_message_profile::second_part_first,
+		nokia_gsm_network_device::smart_message_profile::wrong_destination_port,
+		nokia_gsm_network_device::smart_message_profile::truncated_udh,
+		nokia_gsm_network_device::smart_message_profile::invalid_rtpl_command,
+		nokia_gsm_network_device::smart_message_profile::missing_rtpl_terminator,
+		nokia_gsm_network_device::smart_message_profile::stale_then_valid
+	};
+	const unsigned smart_message_profile =
+			m_smart_message_config.read_safe(0x00) & 0x0f;
+	m_gsm_network->set_smart_message_profile(
+			SMART_MESSAGE_PROFILES[
+					std::min<unsigned>(smart_message_profile,
+							SMART_MESSAGE_PROFILES.size() - 1)]);
 	static constexpr std::array CELL_PROFILES = {
 		nokia_gsm_network_device::cell_profile::suitable,
 		nokia_gsm_network_device::cell_profile::barred,
@@ -1870,6 +1891,20 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x80, 0x00, "Four-burst uplink TCH fade per six multiframes")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x80, DEF_STR(On))
+
+	PORT_START("SMARTCFG")
+	PORT_CONFNAME(0x0f, 0x00, "Incoming Smart Message envelope")
+	PORT_CONFSETTING(0x00, "Valid two-part port-0x1581 RTPL")
+	PORT_CONFSETTING(0x01, "Missing second part")
+	PORT_CONFSETTING(0x02, "Mismatched concatenation reference")
+	PORT_CONFSETTING(0x03, "Incorrect total count")
+	PORT_CONFSETTING(0x04, "Duplicate first part")
+	PORT_CONFSETTING(0x05, "Segment two before segment one")
+	PORT_CONFSETTING(0x06, "Wrong destination port")
+	PORT_CONFSETTING(0x07, "Truncated UDH")
+	PORT_CONFSETTING(0x08, "Invalid RTPL command")
+	PORT_CONFSETTING(0x09, "Missing RTPL terminator")
+	PORT_CONFSETTING(0x0a, "Incomplete set followed by a fresh valid pair")
 
 	PORT_START("CELLCFG")
 	PORT_CONFNAME(0x03, 0x00, "Laboratory serving-cell profile")

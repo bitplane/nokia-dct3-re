@@ -46,9 +46,21 @@ class GsmSmsSessionInvariantTest(unittest.TestCase):
     def test_multipart_generation_is_bounded_and_rejects_invalid_index(self):
         self.assertIn("smart_message_maximum_parts = 3", NETWORK_H)
         self.assertIn(
-            "part_index >= part_count || "
-            "part_count > smart_message_maximum_parts",
+            "part_index >= delivered_part_count ||\n"
+            "\t\t\tdeclared_part_count > smart_message_maximum_parts",
             NETWORK_CPP)
+
+    def test_application_frontier_profiles_are_network_compositions(self):
+        driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        for profile in (
+                "missing_second_part", "mismatched_reference",
+                "incorrect_total", "duplicate_first_part",
+                "second_part_first", "wrong_destination_port",
+                "truncated_udh", "invalid_rtpl_command",
+                "missing_rtpl_terminator", "stale_then_valid"):
+            self.assertIn(f"smart_message_profile::{profile}", driver)
+            self.assertIn(f"smart_message_profile::{profile}", NETWORK_CPP)
+        self.assertIn('PORT_START("SMARTCFG")', driver)
 
 
 if __name__ == "__main__":

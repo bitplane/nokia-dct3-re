@@ -214,9 +214,14 @@ preserved as an investigation journal.
   LAC, paging, negative and save-state gates. The bounded long-ringtone gate
   proves both parts through independent paging, SAPI-3, CP/RP acknowledgement
   and RR release transactions on all four promoted products, with replay at
-  transaction and queue boundaries. MO SMS, firmware Smart Messaging
-  reassembly/ringtone UI or persistence, dedicated-mode handover and broader
-  inbound radio/L1 behavior remain unmapped.
+  transaction and queue boundaries. NSE-8 now additionally proves RAM-owned
+  concatenation across RR release, port dispatch, named ringtone receipt,
+  RTPL Play acceptance and physical PUP playback; NHM-2 and NHM-5 independently
+  corroborate receipt and playback. Negative compositions preserve its observed
+  out-of-order, missing-terminator and duplicate-sequence acceptance quirks
+  rather than imposing host-side normalization. Ringtone save/discard/persistence, MO SMS,
+  dedicated-mode handover and broader inbound radio/L1 behavior remain
+  unmapped.
 - The exact internal cold-boot UI selector remains unnamed, but its behavior is
   no longer a topology gap: provisioned boot reaches an interactive idle screen
   and opens the menu organically. Accepted-security, periodic-timer, conditional

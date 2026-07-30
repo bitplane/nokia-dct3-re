@@ -62,6 +62,21 @@ public:
 		two_cell_persistent_loss
 	};
 
+	enum class smart_message_profile : u8
+	{
+		valid,
+		missing_second_part,
+		mismatched_reference,
+		incorrect_total,
+		duplicate_first_part,
+		second_part_first,
+		wrong_destination_port,
+		truncated_udh,
+		invalid_rtpl_command,
+		missing_rtpl_terminator,
+		stale_then_valid
+	};
+
 	static constexpr unsigned maximum_layer3_length = 176;
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
@@ -115,6 +130,10 @@ public:
 	void neighbour_bcch_observed(u16 arfcn);
 	void downlink_signalling_failed(u16 serving_arfcn);
 	void set_paging_profile(paging_profile profile) { m_paging_profile = profile; }
+	void set_smart_message_profile(smart_message_profile profile)
+	{
+		m_smart_message_profile = profile;
+	}
 	void set_assignment_profile(assignment_profile profile)
 	{
 		m_assignment_profile = profile;
@@ -198,6 +217,8 @@ private:
 	gsm::mobility::periodic_update_timer m_periodic_update_timer;
 	gsm::mobility::topology m_cells;
 	mobility_profile m_mobility_profile = mobility_profile::single_cell;
+	smart_message_profile m_smart_message_profile =
+			smart_message_profile::valid;
 	bool m_stable_camp_seen = false;
 	bool m_neighbour_bcch_seen = false;
 	bool m_primary_cell_lost = false;

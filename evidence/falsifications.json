@@ -461,7 +461,7 @@
     {
       "id": "security_editor_blocks_mt_sms_cp_rp_close", "status": "disproven",
       "hypothesis": "The erased-identity security-code editor prevents the handset from emitting the MT-SMS CP-ACK/RP-ACK closing tail",
-      "conclusion": "An erased-identity fixture with a valid identity-derived verifier accepts a physical 12345 plus left-softkey sequence and leaves the security editor without inventing an IMEI. The handset reaches the interactive SDCCH diagnostic/menu lifecycle but still emits no CP-ACK/RP-ACK tail after the first Smart Message part. The missing close belongs below or beside the UI lifecycle, with the real cipher/L1 boundary remaining the leading unresolved dependency.",
+      "conclusion": "An erased-identity fixture with a valid identity-derived verifier accepts a physical 12345 plus left-softkey sequence and leaves the security editor without inventing an IMEI. That control originally showed that the then-missing CP/RP tail was independent of the editor. The subsequently corrected generic GSM 04.11/LAPDm closing exchange now completes both Smart Message parts with or without that UI, and physical unlock is used only to observe firmware reassembly, ringtone receipt and RTPL playback.",
       "evidence": ["docs/eeprom_analysis.md", "docs/network_scouting.md"]
     },
     {

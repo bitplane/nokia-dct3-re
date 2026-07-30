@@ -474,7 +474,49 @@ part 2 through a fresh page, SDCCH and SAPI-3 sequence. Part 2 uses independent
 RP reference `41`, completes the same closing exchange and returns to steady
 PCH. Exactly two pages are permitted. Firmware does not issue an `EF_SMS`
 update and record 1 remains free, so transport completion does not claim
-reassembly, ringtone-save/play UI or persistence.
+SIM storage. Application-layer gates now continue beyond that transport
+boundary. On NSE-8 v6.00, part 1 closes silently and survives the intervening
+RR release in firmware RAM. A matched part 2 produces the firmware-rendered
+`1 Ringing tone received` screen; changing only its concatenation reference or
+declared total suppresses that transition. Reversing the arrival order remains
+silent until both sequence numbers exist and then succeeds. Wrong destination
+port and a missing successor neither enter the ringtone service nor alter
+`EF_SMS`. Flash and EEPROM are bit-identical to the ordinary-SMS control, while
+the ordinary control alone changes its SIM record, excluding host-side,
+flash-, PMM- and SIM-owned reassembly for this run.
+
+A three-delivery contamination control closes an incomplete reference-`7a`
+part 1, then sends a complete reference-`7b` pair. Neither the stale part nor
+the fresh pair's first part causes completion; exactly one notification follows
+the fresh sequence-2 part. Firmware therefore keys retained state by the
+concatenation tuple rather than letting a stale payload satisfy the next
+transaction.
+
+`make verify-radio-smart-message-application` physically clears the security
+editor, selects Options and Play, requires the firmware's named
+`Playing tone / Test for bhiram / Quit` frame and a long note-varying PUP
+sequence. A commandless but correctly ported and concatenated control still
+reaches the ringtone notification and untitled Playing-tone frame, but emits no
+playback sequence. Port dispatch therefore precedes RTPL validation; actual
+acceptance is proved at the Play/parser boundary, not by the arrival buzzer.
+The observed stream remains playable when its final zero is replaced, so a
+terminal zero is not a required predicate for this bounded v6.00 parser path.
+Likewise, two independently closed SMS transactions both labelled sequence 1
+produce a named, playable tone from the duplicated bytes. This is an observed
+NSE-8 application behavior, not a duplicate LAPDm retransmission: Layer 2
+duplicates remain idempotent. The acceptance gate records the quirk instead of
+inventing host-side sequence rejection. The separately referenced
+stale-then-valid case proves it does not contaminate another tuple.
+The malformed-envelope suite separately preserves missing, mismatched,
+out-of-order, duplicate, wrong-port, truncated-UDH and stale-then-valid
+outcomes without normalizing them into one generic rejection.
+
+NHM-2 v5.46E independently renders `Ringing tone received`, and physical
+Options/Playback produces the same note-varying payload through its own UI and
+PUP path. NHM-5 v6.39 independently reaches its localized receive menu and
+plays the tone. Preserved-PMM NHM-6 produces its distinct completion tone, but
+its cold-boot time editor still obscures a reproducible physical Play oracle;
+that comparison is not promoted beyond application notification.
 
 The CP parser derives both its expected CP transaction and RP reference from
 the CP-DATA actually queued. Wrong references, malformed lengths and trailing
@@ -487,7 +529,15 @@ CP/RP timeout is installed: Layer 2 owns retransmission, while network expiry
 remains a future policy requiring an evidenced timer. `make
 verify-radio-incoming-smart-message-state` restores before the first close,
 while the successor is queued and during the second close, comparing the
-reference and restored LAPDm/radio records exactly.
+reference and restored LAPDm/radio records exactly. `make
+verify-radio-smart-message-application-state` additionally restores after part
+1 has closed and in the short post-part-2/pre-notification interval; the
+firmware-owned retained segment and pending dispatch survive in ordinary
+emulated RAM and still produce exactly one matched completion transition.
+The same target restores after named playback acceptance and after commandless
+rejection; both retain their exact UI and playback/no-playback outcome. There
+is no separately observable interval inside the parser call itself, so no
+synthetic parser state is serialized.
 
 The laboratory cell is GSM 900 ARFCN 1, BSIC `0x12`, reserved test PLMN
 001-01, LAC 1 and cell ID 1. The SIM IMSI and preferred-PLMN file use the same

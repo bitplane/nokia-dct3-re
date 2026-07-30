@@ -219,7 +219,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-radio-a5-1-host-release-restore
 .PHONY: verify-radio-a5-1-host-two-calls
 .PHONY: verify-radio-outgoing-call-host-physical-media
-.PHONY: verify-radio-incoming-smart-message-state
+.PHONY: verify-radio-incoming-smart-message-state verify-radio-smart-message-application verify-radio-smart-message-application-state verify-radio-smart-message-invalid-rtpl verify-radio-smart-message-parser-quirks verify-radio-smart-message-envelopes verify-3310-radio-smart-message-application verify-3410-radio-smart-message-application
 .PHONY: verify-3310-radio-incoming-smart-message
 .PHONY: verify-3330-radio-incoming-smart-message
 .PHONY: verify-3410-radio-incoming-smart-message
@@ -609,6 +609,8 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_nse3_v548_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_dct3_type_1f_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_gsm_authentication_split.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_outgoing_call_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_application_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_envelope_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3410_registration_negative_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_acceptance_run_isolation.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py
@@ -2693,6 +2695,131 @@ verify-radio-incoming-smart-message-state:
 			$(RUN_DIR)_$$boundary/error.log \
 			$(RUN_DIR)_$$boundary/nvram/noki3210/sim_card || exit; \
 	done
+
+verify-radio-smart-message-application:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=50 \
+		RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
+		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	$(PYTHON) tools/radio_smart_message_application_trace_check.py \
+		$(RUN_DIR)/error.log "$$frame" accepted
+
+verify-radio-smart-message-application-state:
+	@set -e; \
+	for boundary in retained predispatch; do \
+		case "$$boundary" in \
+			retained) at=19.0 ;; \
+			predispatch) at=21.75 ;; \
+		esac; \
+		out="$(RUN_DIR)_$$boundary"; \
+		$(MAKE) --no-print-directory run RUN_DIR="$$out" SECONDS=40 \
+			RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500" || exit; \
+		cp $(MAME_DIR)/error.log "$$out/error.log" || exit; \
+		$(PYTHON) tools/radio_incoming_smart_message_state_trace_check.py \
+			"$$out/error.log" "$$out/nvram/noki3210/sim_card" || exit; \
+		$(PYTHON) tools/radio_smart_message_envelope_trace_check.py \
+			"$$out/error.log" "$$out/nvram/noki3210/sim_card" valid || exit; \
+	done
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_accepted SECONDS=50 \
+		RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=35 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_accepted/error.log
+	@frame=$$(find $(RUN_DIR)_accepted -maxdepth 1 \
+		-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | \
+		sort -n | tail -1 | cut -d' ' -f2-); \
+	$(PYTHON) tools/radio_smart_message_application_trace_check.py \
+		$(RUN_DIR)_accepted/error.log "$$frame" accepted-state
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_rejected SECONDS=45 \
+		RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/smart_message_invalid_rtpl' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=30 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_rejected/error.log
+	@frame=$$(find $(RUN_DIR)_rejected -maxdepth 1 \
+		-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | \
+		sort -n | tail -1 | cut -d' ' -f2-); \
+	$(PYTHON) tools/radio_smart_message_application_trace_check.py \
+		$(RUN_DIR)_rejected/error.log "$$frame" rejected-state
+
+verify-radio-smart-message-invalid-rtpl:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 \
+		RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/smart_message_invalid_rtpl' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
+		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	$(PYTHON) tools/radio_smart_message_application_trace_check.py \
+		$(RUN_DIR)/error.log "$$frame" rejected
+
+verify-radio-smart-message-parser-quirks:
+	@set -e; \
+	for case in \
+		duplicate:smart_message_duplicate \
+		missing-terminator:smart_message_missing_terminator; do \
+		name=$${case%%:*}; fixture=$${case#*:}; out="$(RUN_DIR)_$$name"; \
+		$(MAKE) --no-print-directory run RUN_DIR="$$out" SECONDS=45 \
+			RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" \
+			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000' || exit; \
+		cp $(MAME_DIR)/error.log "$$out/error.log" || exit; \
+		frame=$$(find "$$out" -maxdepth 1 \
+			-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | \
+			sort -n | tail -1 | cut -d' ' -f2-); \
+		outcome=accepted-no-terminator; \
+		test "$$name" != duplicate || outcome=accepted-duplicate; \
+		$(PYTHON) tools/radio_smart_message_application_trace_check.py \
+			"$$out/error.log" "$$frame" "$$outcome" || exit; \
+	done
+
+verify-radio-smart-message-envelopes:
+	@set -e; \
+	for case in \
+		missing:smart_message_missing \
+		bad-reference:smart_message_bad_reference \
+		bad-total:smart_message_bad_total \
+		wrong-port:smart_message_wrong_port \
+		reversed:smart_message_reversed \
+		duplicate:smart_message_duplicate \
+		truncated-udh:smart_message_truncated_udh \
+		stale-then-valid:smart_message_stale_then_valid; do \
+		profile=$${case%%:*}; fixture=$${case#*:}; \
+		out="$(RUN_DIR)_$$profile"; \
+		$(MAKE) --no-print-directory run RUN_DIR="$$out" SECONDS=40 \
+			RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" || exit; \
+		cp $(MAME_DIR)/error.log "$$out/error.log" || exit; \
+		$(PYTHON) tools/radio_smart_message_envelope_trace_check.py \
+			"$$out/error.log" "$$out/nvram/noki3210/sim_card" \
+			"$$profile" || exit; \
+	done
+
+verify-3410-radio-smart-message-application: normalize-3410
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait5000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
+		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	$(PYTHON) tools/radio_smart_message_application_trace_check.py \
+		$(RUN_DIR)/error.log "$$frame" accepted-3410
+
+verify-3310-radio-smart-message-application:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
+		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	$(PYTHON) tools/radio_smart_message_application_trace_check.py \
+		$(RUN_DIR)/error.log "$$frame" accepted-3310
 
 verify-3310-radio-incoming-smart-message:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \

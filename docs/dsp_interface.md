@@ -187,7 +187,12 @@ With no DSP codec core, two low-fidelity MAME tone voices expose those
 firmware-owned commands. They are separate from the MAD2 PUP piezo. Organic
 navigation reaches the Ringing-tone selector but produces neither this
 shared-word sequence nor a PUP transaction, so the missing ringtone preview
-remains upstream in firmware/resource handling.
+remains upstream in that built-in-resource path. The independently delivered
+port-`1581` Smart Message follows a different evidenced path: physical
+Options/Play makes NSE-8, NHM-5 and NHM-2 drive the received RTPL melody
+through PUP. A commandless control reaches an untitled Playing-tone screen but
+drives no melody. That is firmware parser/output evidence, not a DSP shared-RAM
+tone or host-side audio injection.
 
 ### Cipher-control packet
 

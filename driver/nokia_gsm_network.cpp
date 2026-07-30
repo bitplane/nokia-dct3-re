@@ -694,6 +694,12 @@ std::array<u8, 36> nokia_gsm_network_device::incoming_sms_cp_data() const
 
 unsigned nokia_gsm_network_device::incoming_smart_message_part_count() const
 {
+	if (m_smart_message_profile ==
+			smart_message_profile::missing_second_part)
+		return 1;
+	if (m_smart_message_profile ==
+			smart_message_profile::stale_then_valid)
+		return 3;
 	return (smart_message_ringtone_payload_length +
 			smart_message_multipart_part_capacity - 1) /
 			smart_message_multipart_part_capacity;
@@ -728,9 +734,14 @@ nokia_gsm_network_device::incoming_smart_message_cp_data(
 	static constexpr unsigned PAYLOAD_LENGTH =
 			RINGTONE_COMMAND.size() * 2 + 1;
 	static_assert(PAYLOAD_LENGTH == smart_message_ringtone_payload_length);
-	const unsigned part_count = incoming_smart_message_part_count();
+	const unsigned delivered_part_count = incoming_smart_message_part_count();
+	const unsigned declared_part_count =
+			(smart_message_ringtone_payload_length +
+					smart_message_multipart_part_capacity - 1) /
+					smart_message_multipart_part_capacity;
 	layer3_message result;
-	if (part_index >= part_count || part_count > smart_message_maximum_parts)
+	if (part_index >= delivered_part_count ||
+			declared_part_count > smart_message_maximum_parts)
 		return result;
 
 	std::array<u8, PAYLOAD_LENGTH> ringtone{};
@@ -739,9 +750,30 @@ nokia_gsm_network_device::incoming_smart_message_cp_data(
 	std::copy(RINGTONE_COMMAND.begin(), RINGTONE_COMMAND.end(),
 			ringtone.begin() + RINGTONE_COMMAND.size());
 	ringtone.back() = 0x00;
+	if (m_smart_message_profile ==
+			smart_message_profile::invalid_rtpl_command)
+	{
+		// Retain the evidenced terminal zero but remove every valid top-level
+		// command, so parser rejection cannot be masked by the second command.
+		ringtone.fill(0xff);
+		ringtone.back() = 0x00;
+	}
+	if (m_smart_message_profile ==
+			smart_message_profile::missing_rtpl_terminator)
+		ringtone.back() = 0xff;
 
+	unsigned payload_part_index = part_index;
+	if (m_smart_message_profile ==
+			smart_message_profile::stale_then_valid)
+		payload_part_index = part_index == 0 ? 0 : part_index - 1;
+	if (m_smart_message_profile ==
+			smart_message_profile::duplicate_first_part)
+		payload_part_index = 0;
+	else if (m_smart_message_profile ==
+			smart_message_profile::second_part_first)
+		payload_part_index = declared_part_count - 1 - part_index;
 	const unsigned payload_offset =
-			part_index * smart_message_multipart_part_capacity;
+			payload_part_index * smart_message_multipart_part_capacity;
 	const unsigned payload_length = std::min<unsigned>(
 			smart_message_multipart_part_capacity,
 			ringtone.size() - payload_offset);
@@ -766,7 +798,12 @@ nokia_gsm_network_device::incoming_smart_message_cp_data(
 	append(0x09);
 	append(0x00);
 	append(tpdu_length);
-	append(part_index + 1 < part_count ? 0x40 : 0x44);
+	const unsigned transaction_part_index =
+			m_smart_message_profile ==
+					smart_message_profile::stale_then_valid &&
+					part_index != 0 ?
+			part_index - 1 : part_index;
+	append(transaction_part_index + 1 < declared_part_count ? 0x40 : 0x44);
 	append(0x07);
 	append(0x81);
 	append(0x55);
@@ -783,18 +820,47 @@ nokia_gsm_network_device::incoming_smart_message_cp_data(
 	append(0x00);
 	append(0x00);
 	append(user_data_length);
-	append(0x0b);
+	const bool truncated_udh =
+			m_smart_message_profile ==
+					smart_message_profile::truncated_udh;
+	append(truncated_udh ? 0x06 : 0x0b);
 	append(0x05);
 	append(0x04);
 	append(0x15);
-	append(0x81);
+	append(m_smart_message_profile ==
+					smart_message_profile::wrong_destination_port ?
+			0x82 : 0x81);
+	if (truncated_udh)
+	{
+		std::copy_n(ringtone.begin() + payload_offset, payload_length,
+				result.data.begin() + result.length);
+		result.length += payload_length;
+		return result;
+	}
 	append(0x00);
 	append(0x00);
 	append(0x00);
 	append(0x03);
-	append(0x7a);
-	append(part_count);
-	append(part_index + 1);
+	append(m_smart_message_profile ==
+					smart_message_profile::mismatched_reference &&
+			part_index == 1 ? 0x7b : 0x7a);
+	if (m_smart_message_profile ==
+			smart_message_profile::stale_then_valid)
+		result.data[result.length - 1] = part_index == 0 ? 0x7a : 0x7b;
+	append(m_smart_message_profile ==
+					smart_message_profile::incorrect_total &&
+			part_index == 1 ? declared_part_count + 1 :
+			declared_part_count);
+	append(m_smart_message_profile ==
+					smart_message_profile::duplicate_first_part ?
+			1 :
+			m_smart_message_profile ==
+					smart_message_profile::second_part_first ?
+				declared_part_count - part_index :
+			m_smart_message_profile ==
+					smart_message_profile::stale_then_valid ?
+				(part_index == 0 ? 1 : part_index) :
+				part_index + 1);
 	std::copy_n(ringtone.begin() + payload_offset, payload_length,
 			result.data.begin() + result.length);
 	result.length += payload_length;

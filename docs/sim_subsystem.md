@@ -204,7 +204,10 @@ writes record 1 with status `03` plus the exact SMSC/SMS-DELIVER representation
 of unread text `hello`; the verifier checks the resulting card NVRAM bytes.
 The port-addressed ringtone fixture instead leaves all `EF_SMS` records free,
 which is part of its application-routing oracle rather than a missing SIM
-write.
+write. Matched concatenation and physical RTPL playback occur while card NVRAM
+remains unchanged; wrong reference, total and destination port also leave it
+free. Thus the card owns neither temporary multipart retention nor the
+received-ringtone parser state at this frontier.
 
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
