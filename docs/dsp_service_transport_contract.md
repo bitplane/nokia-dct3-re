@@ -224,6 +224,16 @@ schedules one counter clear and one IRQ4 completion. Periodic zero-to-zero
 and the interactive menu oracle. Completion delay and peer packet polling are
 typed product configuration rather than runtime environment overrides.
 
+NHM-2 adds a finite code-block lifecycle.  Its HLE publishes selector
+`0x0e2=0x0001` once at the first service transaction.  Firmware routine
+`0x348a96..0x348b78` selects a descriptor, copies bounded chunks, decrements
+the remaining count and finally writes `0x0e2=0`, `0x0e4=4`.  The initial
+publication is saved HLE state and is reset only with the DSP domain.
+Reasserting selector one on every IRQ completion is invalid: it restarts the
+completed transfer, producing about 3,280 requests per second until a firmware
+counter wraps.  The NHM-2 long-idle gate requires one publication, exactly 151
+organic completions and the firmware-owned terminal values.
+
 A future lower-radio investigation succeeds only when a peer-owned state change
 or inbound packet correlates with a firmware consumer through the real hardware
 boundary. Type `0x1a` and service-5 `0x05e8` must not be assumed to be the two

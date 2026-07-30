@@ -207,7 +207,7 @@ preserved as an investigation journal.
 - The DSP/external-service peer contract is proved only for requests exercised by
   boot, authenticated registration, paging, answered MT call control and speech,
   and persistent ordinary MT SMS delivery. MO SMS, MT CP/RP closure, completed
-  multipart Smart Messaging/ringtone UI, mobility and broader inbound radio/L1
+  multipart Smart Messaging/ringtone UI, cell-change/reselection mobility and broader inbound radio/L1
   behavior remain unmapped. A bounded
   two-part long-ringtone codec and queue are present; part 1 is organically
   regression-tested through nine stop-and-wait SAPI-3 frames, while part 2

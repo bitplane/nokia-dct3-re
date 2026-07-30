@@ -181,6 +181,14 @@ Shared Make variables and standards-level trace vocabulary do not replace
 product acceptance. Packet grammar, correlation values, ordering and release
 transactions remain independently checked.
 
+NHM-2's bootstrap contract also owns one initial DSP code-block selector.
+Firmware analysis at `0x348a96..0x348b78` proves a finite transfer: the handset
+copies bounded chunks, decrements its remaining count, then clears selector
+`0x0e2` and publishes terminal state four at `0x0e4`.  The HLE therefore saves
+a one-shot publication flag rather than reasserting selector one on every
+generic IRQ4 completion.  This is product-owned bootstrap grammar, not a
+different DSPIF transport or a timing exception.
+
 The generic host-call/session/voice/radio sources contain no handset or product
 identifier dispatch. Direct WebSocket targets now enter the same fresh or
 explicitly preserved NVRAM preparation boundary as ordinary runs, so fixture

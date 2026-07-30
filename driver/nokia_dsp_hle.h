@@ -167,6 +167,7 @@ private:
 	unsigned m_service_delay_us = 5'000;
 	unsigned m_peer_poll_ms = 5;
 	bool m_service_control_completion_sent = false;
+	bool m_service_code_block_published = false;
 	unsigned m_bootstrap_exchange_count = 0;
 	bootstrap_contract m_bootstrap;
 	u16 m_mcu_control_word = 0;

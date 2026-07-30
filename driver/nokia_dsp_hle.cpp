@@ -34,6 +34,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_service_delay_us));
 	save_item(NAME(m_peer_poll_ms));
 	save_item(NAME(m_service_control_completion_sent));
+	save_item(NAME(m_service_code_block_published));
 	save_item(NAME(m_bootstrap_exchange_count));
 	save_item(NAME(m_mcu_control_word));
 	save_item(NAME(m_mcu_control_wire));
@@ -88,6 +89,7 @@ void nokia_dsp_hle_device::device_reset()
 	const attotime speech_period = m_mad2_pcm->block_period();
 	m_speech_timer->adjust(speech_period, 0, speech_period);
 	m_service_control_completion_sent = false;
+	m_service_code_block_published = false;
 	m_bootstrap_exchange_count = 0;
 	m_mcu_control_word = 0;
 	m_mcu_control_wire = 0;
@@ -306,9 +308,22 @@ void nokia_dsp_hle_device::handle_bootstrap_exchange_write(u16 offset)
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
 {
-	if (m_bootstrap.service_code_block_request != 0)
+	// NHM-2's DSP publishes the initial code-block selector. Firmware consumes
+	// bounded chunks and eventually clears 0x0e2 itself before publishing final
+	// state 4 at 0x0e4. Reasserting selector 1 on every IRQ completion restarts
+	// that finite transfer indefinitely.
+	if (!m_service_code_block_published &&
+			m_bootstrap.service_code_block_request != 0)
+	{
 		m_transport->peer_shared_w(
 				0x0e2 / 2, m_bootstrap.service_code_block_request);
+		m_service_code_block_published = true;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_DSP_HLE,
+					"dsp_hle: service code-block request=%04x event=initial t=%.6f\n",
+					m_bootstrap.service_code_block_request,
+					machine().time().as_double());
+	}
 	m_transport->complete_service();
 }
 

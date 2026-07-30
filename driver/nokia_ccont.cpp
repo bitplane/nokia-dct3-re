@@ -229,6 +229,10 @@ void nokia_ccont_device::serial_w(uint8_t data)
 				// non-zero write reloads it directly; watchdog disable is the
 				// separate board-level WDDISX input, not a register command.
 				m_watchdog = data;
+				if (m_adc_trace)
+					LOGMASKED(LOG_CCONT,
+						"ccont_watchdog: event=reload data=%02x t=%.9f\n",
+						data, machine().time().as_double());
 			}
 			break;
 		case RTC_SECOND:

@@ -611,6 +611,24 @@ PCH.  `make verify-gsm-mobility` independently checks the encoded timer
 contract.  The network setting is immutable configuration; the countdown and
 expiry remain entirely in saved handset firmware/MAD2 state.
 
+`make verify-radio-periodic-location-update-state` saves the running handset at
+398 seconds and replays twelve seconds across the observed expiry.  Reference
+and restored branches must carry identical TDMA frame numbers, broadcast and
+dedicated blocks, CHANNEL REQUEST, LAPDm payloads, acknowledgements and release.
+After discarding the intentionally speculative reference branch, the canonical
+timeline must still contain exactly one periodic update and return to PCH.  The
+comparison excludes empty DSP transport polls at the save-callback boundaries;
+they carry no radio payload or mutable GSM state.
+
+NHM-2 v5.46 independently passes the same standards-level lifecycle through
+`make verify-3410-radio-periodic-location-update`.  Its normal request occurs
+at 10.104 seconds and its periodic request at 372.175 seconds, a 362.071-second
+interval.  The gate additionally protects the product's finite DSP code-block
+bootstrap: one initial selector publication, 151 completions, firmware-owned
+terminal state, continued CCONT watchdog reloads and no invalid fetch.  This
+fixes a pre-existing long-idle failure at 111 seconds which reproduced with
+T3212 disabled; periodic mobility did not cause that divergence.
+
 Known extensions are cell-change and other mobility-driven Location Updating,
 MO SMS, MT SMS CP/RP closure, multipart Smart Messaging and ringtone
 UI/persistence, handover, measurement reporting, loss/reselection, rejected
