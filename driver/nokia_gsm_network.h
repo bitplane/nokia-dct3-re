@@ -6,6 +6,7 @@
 
 #include "gsm_a3a8.h"
 #include "gsm_a5.h"
+#include "gsm_mobility.h"
 
 #include <array>
 
@@ -78,6 +79,11 @@ public:
 	{
 		m_cipher_algorithm = selected;
 	}
+	void set_periodic_update_timer(
+			gsm::mobility::periodic_update_timer timer)
+	{
+		m_periodic_update_timer = timer;
+	}
 	gsm::a5::algorithm cipher_algorithm() const { return m_cipher_algorithm; }
 	outgoing_call_outcome configured_outgoing_call_outcome() const
 	{
@@ -138,6 +144,7 @@ private:
 	outgoing_call_outcome m_outgoing_call_outcome =
 			outgoing_call_outcome::connect;
 	gsm::a5::algorithm m_cipher_algorithm = gsm::a5::algorithm::a5_0;
+	gsm::mobility::periodic_update_timer m_periodic_update_timer;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device)

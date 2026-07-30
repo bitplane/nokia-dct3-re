@@ -97,6 +97,8 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 		else if (message_index == 3)
 			result[9] = (result[9] & 0xc0) | 0x3f;
 	}
+	if (message_index == 2)
+		result[12] = m_periodic_update_timer.encoded();
 	return result;
 }
 

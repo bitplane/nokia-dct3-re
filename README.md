@@ -80,7 +80,7 @@ The labels below have precise meanings:
 | Startup/service/radio peers | Prototype | Separate service, Nokia L1 and standards-shaped GSM devices compose through DSPIF; one laboratory cell supports camp, Location Updating, release and operator presentation. Wider peer contracts remain incomplete. |
 | Interactive startup | Mapped | Provisioned boot reaches the idle screen and opens `Phone book` through a protected physical-keypad oracle. Mode 4 is compatible with the UI; cross-ROM presentation parity remains open. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
-| Audio, RF, network | Partial HLE | The laboratory cell supports organic registration, paging, MT call/SMS control, bidirectional GSM-FR TCH/F media, FACCH/SACCH coexistence, degraded frames and teardown across both 3210 ROMs. Physical RF, mobility, MO calls, wider services and DSP-local COBBA mux/control decoding remain open. |
+| Audio, RF, network | Partial HLE | The laboratory cell supports organic registration, T3212-driven periodic Location Updating, paging, MT call/SMS control, bidirectional GSM-FR TCH/F media, FACCH/SACCH coexistence, degraded frames and teardown. Physical RF, cell-change mobility, wider services and DSP-local COBBA mux/control decoding remain open. |
 
 A component is considered boxed off only when firmware reaches it through its ordinary interface,
 it performs no firmware-state writes, timing is expressed as device behavior, save state is

@@ -685,6 +685,7 @@ public:
 		m_page_config(*this, "PAGECFG"),
 		m_authentication_config(*this, "AUTHCFG"),
 		m_cipher_config(*this, "CIPHERCFG"),
+		m_mobility_config(*this, "MOBILITYCFG"),
 		m_outgoing_call_config(*this, "CALLCFG"),
 		m_outgoing_call_delay_config(*this, "CALLDELAY"),
 		m_outgoing_call_host_config(*this, "CALLHOST")
@@ -808,6 +809,7 @@ private:
 	optional_ioport m_page_config;
 	optional_ioport m_authentication_config;
 	optional_ioport m_cipher_config;
+	optional_ioport m_mobility_config;
 	optional_ioport m_outgoing_call_config;
 	optional_ioport m_outgoing_call_delay_config;
 	optional_ioport m_outgoing_call_host_config;
@@ -1095,6 +1097,9 @@ void nokia_dct3_state::machine_reset()
 	};
 	m_gsm_network->set_cipher_algorithm(
 			CIPHER_ALGORITHMS[m_cipher_config.read_safe(0x00) & 0x01]);
+	m_gsm_network->set_periodic_update_timer(
+			gsm::mobility::periodic_update_timer(
+					BIT(m_mobility_config.read_safe(0x00), 0) ? 1 : 0));
 	m_gsm_session->set_authentication_required(
 			BIT(m_authentication_config.read_safe(0x00), 0) ||
 			m_gsm_network->cipher_algorithm() != gsm::a5::algorithm::a5_0);
@@ -1820,6 +1825,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x01, 0x00, "Laboratory GSM cipher policy")
 	PORT_CONFSETTING(0x00, "A5/0 (unciphered)")
 	PORT_CONFSETTING(0x01, "A5/1")
+
+	PORT_START("MOBILITYCFG")
+	PORT_CONFNAME(0x01, 0x00, "Periodic Location Updating (SI3 T3212)")
+	PORT_CONFSETTING(0x00, "Disabled (T3212=0)")
+	PORT_CONFSETTING(0x01, "Every 6 minutes (T3212=1)")
 
 	PORT_START("CALLCFG")
 	PORT_CONFNAME(0x03, 0x00, "Laboratory outgoing-call outcome")

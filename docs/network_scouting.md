@@ -594,8 +594,25 @@ be reintroduced as peer behavior:
 
 The checkpoint includes authenticated registration, bounded MT call control
 and bidirectional full-rate speech, but it is not a complete cellular network.
-Known extensions are periodic and mobility-driven Location Updating, MO SMS,
-MT SMS CP/RP closure, multipart Smart Messaging and ringtone
+Periodic Location Updating is now standards-shaped at the network boundary and
+firmware-owned at the handset boundary.  The laboratory network broadcasts the
+typed TS 44.018 `T3212` value in SI3; zero disables the procedure and one means
+six minutes.  With `T3212=1`, Nokia 3210 v6.00 first completes its ordinary
+fresh-SIM update (`0x70`), remains on PCH, and then organically originates a new
+CHANNEL REQUEST and periodic Location Updating Request (`0x71`) at 403.123 s,
+386.606 s after the first request.  The unchanged generic random-access,
+Immediate Assignment, LAPDm, MM acceptance and RR-release path returns it to
+PCH.  No emulator timer or forced firmware event initiates the update.
+
+`make verify-radio-periodic-location-update` requires the delivered SI3 value,
+normal-then-periodic update types, an interval consistent with the six-minute
+timer, a fresh random-access transaction, acceptance, clean release and steady
+PCH.  `make verify-gsm-mobility` independently checks the encoded timer
+contract.  The network setting is immutable configuration; the countdown and
+expiry remain entirely in saved handset firmware/MAD2 state.
+
+Known extensions are cell-change and other mobility-driven Location Updating,
+MO SMS, MT SMS CP/RP closure, multipart Smart Messaging and ringtone
 UI/persistence, handover, measurement reporting, loss/reselection, rejected
 registration and configurable multi-cell topology.
 Each extension must begin with an organic MCU request or a standards-defined
