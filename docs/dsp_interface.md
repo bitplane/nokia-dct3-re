@@ -189,10 +189,16 @@ navigation reaches the Ringing-tone selector but produces neither this
 shared-word sequence nor a PUP transaction, so the missing ringtone preview
 remains upstream in that built-in-resource path. The independently delivered
 port-`1581` Smart Message follows a different evidenced path: physical
-Options/Play makes NSE-8, NHM-5 and NHM-2 drive the received RTPL melody
-through PUP. A commandless control reaches an untitled Playing-tone screen but
-drives no melody. That is firmware parser/output evidence, not a DSP shared-RAM
-tone or host-side audio injection.
+Options/Play makes NSE-8 and NHM-2 drive the received RTPL melody through PUP;
+NHM-5's localized path instead reaches the DSP-tone HLE. A commandless control
+reaches an untitled Playing-tone screen but drives no melody. That is firmware
+parser/output evidence, not host-side audio injection. NSE-8's independently
+saved EEPROM object and NHM-2's independently saved PMM-backed flash object
+drive their same varied PUP paths from the ordinary post-cold-boot selectors;
+persistence does not add another audio route. NHM-5 likewise lists and drives
+its saved object after cold boot, but the current DSP-tone HLE collapses its
+pitch to a fixed 900-Hz carrier. That gate therefore proves physical non-silence
+and timing, not pitch-correlated playback.
 
 ### Cipher-control packet
 

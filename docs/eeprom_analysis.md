@@ -212,11 +212,45 @@ ordinary-text MT-SMS fixture does not emit a CP/RP tail. The separate
 port-addressed multipart fixture now emits and completely closes both CP/RP
 transactions. Its application continuation proves that the first part survives
 the intervening RR release and that the matched pair reaches the ringtone
-parser, yet flash and EEPROM remain bit-identical to the ordinary-SMS control.
-Only the ordinary control changes SIM NVRAM. Reassembly at this frontier is
-therefore ordinary firmware RAM state, not a hidden host cache or evidenced
-persistent PMM/flash/SIM record. Save/discard remains a separate storage
-frontier.
+parser, yet flash and EEPROM remain bit-identical until the user chooses Save.
+Only the ordinary control changes SIM NVRAM. Reassembly before that physical
+choice is therefore ordinary firmware RAM state, not a hidden host cache or
+persistent PMM/flash/SIM record.
+
+`make verify-radio-smart-message-persistence` continues through the NSE-8
+v6.00 storage boundary. Physical Options → Save has no name editor or
+confirmation prompt: firmware uses the RTPL title and displays `Ringing tone
+saved`. It writes one received-tone object to the fitted 24C128 range
+`0x0b24..0x0c5f`. The record begins `00 02 fc 09 00 0a 01 8a 1c 40 ...`,
+contains the complete playable command stream, and ends with
+`Test for Dhiram 00`. Flash and SIM NVRAM remain unchanged. A preserved-NVRAM
+cold boot exposes the object as `9-2-39 Test for Dhiram` in the ordinary
+Ringing tone selector and replays the same note-varying PUP melody. Physical
+Options → Discard instead returns directly to idle and leaves the entire slot
+erased. Save-state replay immediately before the physical Save transaction and
+after its terminal notification retains exactly one object. There is no
+separately observable name editor, confirmation phase or multi-write interval
+on this ROM. Leaving the physical Options menu through C leaves the slot
+erased. Receiving and saving the same named tone again after a preserved cold
+boot replaces the single received-tone slot and still leaves exactly one title;
+it does not create another list entry or ask about a duplicate name. This is an
+NSE-8 EEPROM-layout result, not a generic DCT3 offset.
+
+The comparison products independently disprove a shared received-tone storage
+topology. `make verify-3410-radio-smart-message-persistence` takes NHM-2
+v5.46E through its three-location chooser and explicit `Replace tone? (empty)`
+confirmation. The terminal `Ringing tone saved` operation changes only the
+PMM-backed portion of the fitted 32-Mbit flash; its 24C128 and SIM images remain
+identical to a delivered-but-unsaved control. A preserved-NVRAM cold boot then
+finds `Test for Dhiram` at option 36 through Profiles → General → Personalise →
+Ringing tone and replays varied PUP notes. `make
+verify-3310-radio-smart-message-persistence` independently proves that NHM-5
+v6.39 also changes only its product-local PMM-backed flash, retains the saved
+entry after cold boot and exposes it through Menu 5 → Ringing tone. Its
+localized title rendering and DSP-tone playback contract differ from NHM-2;
+the current DSP HLE emits a fixed 900-Hz carrier, so that comparison proves
+durable listing and physical non-silence but not note-pitch-correlated playback.
+Neither product inherits NSE-8's EEPROM offset or promptless one-slot policy.
 
 That fixture makes the identity comparison succeed and removes the Security-code
 editor. It paints the idle frame (SHA-256 prefix `dbf2704cb945d56b`) without

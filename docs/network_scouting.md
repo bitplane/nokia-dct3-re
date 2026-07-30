@@ -518,6 +518,46 @@ plays the tone. Preserved-PMM NHM-6 produces its distinct completion tone, but
 its cold-boot time editor still obscures a reproducible physical Play oracle;
 that comparison is not promoted beyond application notification.
 
+The NSE-8 persistence continuation is now independently gated by `make
+verify-radio-smart-message-persistence`. Physical Options → Save immediately
+uses the RTPL-carried title, emits `Ringing tone saved`, and stores the command
+stream plus `Test for Dhiram` in the fitted 24C128 at product-local range
+`0x0b24..0x0c5f`. It does not touch flash or SIM. After a preserved-NVRAM cold
+boot, physical Menu 9-2 and the short reverse list path render
+`9-2-39 Test for Dhiram` and automatically drive a varied PUP melody, proving
+ordinary listing and payload-correlated playback rather than byte retention
+alone. Options → Discard is terminal and promptless on this ROM; it returns to
+idle with that EEPROM slot still erased. There is consequently no NSE-8
+received-tone name-entry or Save/Discard confirmation state to emulate.
+`make verify-radio-smart-message-persistence-state` restores immediately before
+the promptless Save action and after completion; both paths produce one exact
+EEPROM object and the ordinary terminal screen without duplication.
+`make verify-radio-smart-message-persistence-negatives` proves that physical C
+from Options retains no object and that a second organically transported Save
+of the same title after cold boot replaces the one received-tone slot without
+creating a second title or list entry. These are observed NSE-8 policies, not a
+generic queue or filename policy.
+
+NHM-2 does not inherit that menu or storage contract. Its independently gated
+physical Save path renders three `(empty)` locations, waits for a selection,
+asks `Replace tone? (empty)`, and only then emits `Ringing tone saved`.
+Comparison with a delivered-but-unsaved run attributes the resulting changes
+to the PMM-backed part of NHM-2's flash; EEPROM and SIM remain unchanged.
+After preserved-NVRAM cold boot, the ordinary Profiles → General → Personalise
+→ Ringing tone path lists `Test for Dhiram` at option 36 and replays varied PUP
+notes. This is gated by
+`make verify-3410-radio-smart-message-persistence`.
+
+NHM-5 independently uses its localized three-position chooser and writes only
+its own PMM-backed flash. Preserved-NVRAM boot exposes the retained entry
+through Menu 5 → Ringing tone and selecting it drives sustained DSP audio.
+That comparison is gated by
+`make verify-3310-radio-smart-message-persistence`, but it is deliberately not
+called payload-pitch-correlated: the current NHM-5 DSP-tone HLE presents the
+firmware output as a fixed 900-Hz carrier. The durable object, menu grammar and
+audio limitation are therefore recorded without borrowing NHM-2 or NSE-8
+semantics.
+
 The CP parser derives both its expected CP transaction and RP reference from
 the CP-DATA actually queued. Wrong references, malformed lengths and trailing
 bytes cannot advance the session, and a terminal RP response is accepted only

@@ -219,8 +219,17 @@ preserved as an investigation journal.
   RTPL Play acceptance and physical PUP playback; NHM-2 and NHM-5 independently
   corroborate receipt and playback. Negative compositions preserve its observed
   out-of-order, missing-terminator and duplicate-sequence acceptance quirks
-  rather than imposing host-side normalization. Ringtone save/discard/persistence, MO SMS,
-  dedicated-mode handover and broader inbound radio/L1 behavior remain
+  rather than imposing host-side normalization. NSE-8 additionally proves
+  promptless physical Save into its product-local 24C128 slot, ordinary
+  Menu-9-2 listing/playback after a preserved-NVRAM cold boot, and terminal
+  Discard with the slot erased. NHM-2 independently proves its distinct
+  three-slot/Replace flow, PMM-backed flash ownership, preserved cold-boot
+  listing and payload-correlated PUP replay. NHM-5 independently proves its
+  localized chooser, PMM-backed flash ownership, cold-boot listing and
+  sustained DSP output; fixed-frequency DSP HLE prevents promotion of its
+  playback to pitch-correlated. NHM-6 remains at notification because its
+  preserved-PMM setup editor obscures a reproducible physical Save path.
+  MO SMS, dedicated-mode handover and broader inbound radio/L1 behavior remain
   unmapped.
 - The exact internal cold-boot UI selector remains unnamed, but its behavior is
   no longer a topology gap: provisioned boot reaches an interactive idle screen
