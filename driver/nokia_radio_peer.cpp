@@ -35,17 +35,38 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_reports_remaining));
 	save_item(NAME(m_phase));
 	save_item(NAME(m_search_round));
+	save_item(NAME(m_idle_measurement_sample));
 	save_item(NAME(m_wait_ticks));
 	save_item(NAME(m_search_mode));
+	save_item(NAME(m_search_arfcns));
+	save_item(NAME(m_search_arfcn_count));
+	save_item(NAME(m_neighbour_arfcns));
+	save_item(NAME(m_neighbour_arfcn_count));
+	save_item(NAME(m_neighbour_bcch_pending));
+	save_item(NAME(m_neighbour_bcch_arfcn));
+	save_item(NAME(m_neighbour_instruction_mode));
+	save_item(NAME(m_neighbour_instruction_bsic));
+	save_item(NAME(m_last_neighbour_instruction_arfcn));
+	save_item(NAME(m_last_neighbour_instruction_bsic));
+	save_item(NAME(m_neighbour_resume_wait_ticks));
 	save_item(NAME(m_access_ra));
 	save_item(NAME(m_access_frame));
 	save_item(NAME(m_search_has_serving_arfcn));
 	save_item(NAME(m_serving_arfcn));
+	save_item(NAME(m_receiver_arfcn));
+	save_item(NAME(m_receiver_bsic));
+	save_item(NAME(m_sch_observation_arfcn));
+	save_item(NAME(m_candidate_bcch_valid));
+	save_item(NAME(m_reselection_validation_pending));
+	save_item(NAME(m_downlink_signalling_count));
+	save_item(NAME(m_downlink_signalling_failed));
+	save_item(NAME(m_serving_loss_pending));
 	save_item(NAME(m_report_deferred));
 	save_item(NAME(m_search_requested));
 	save_item(NAME(m_selected_reports_remaining));
 	save_item(NAME(m_registered));
 	save_item(NAME(m_idle_common_control_active));
+	save_item(NAME(m_has_reselected));
 	save_item(NAME(m_pch_fill_delivered));
 	save_item(NAME(m_page_transmitted));
 	save_item(NAME(m_traffic_channel_active));
@@ -159,17 +180,39 @@ void nokia_radio_peer_device::device_reset()
 	m_reports_remaining = 0;
 	m_phase = phase::inactive;
 	m_search_round = 0;
+	m_idle_measurement_sample = 0;
 	m_wait_ticks = 0;
 	m_search_mode = 0;
+	m_search_arfcns.fill(0xffff);
+	m_search_arfcn_count = 0;
+	m_neighbour_arfcns.fill(0xffff);
+	m_neighbour_arfcn_count = 0;
+	m_neighbour_bcch_pending = false;
+	m_neighbour_bcch_arfcn = 0xffff;
+	m_neighbour_instruction_mode = 0;
+	m_neighbour_instruction_bsic = 0;
+	m_last_neighbour_instruction_arfcn = 0xffff;
+	m_last_neighbour_instruction_bsic = 0;
+	m_neighbour_resume_wait_ticks = 0;
 	m_access_ra = 0;
 	m_access_frame = 0;
 	m_search_has_serving_arfcn = false;
 	m_serving_arfcn = 1;
+	m_receiver_arfcn = 1;
+	m_receiver_bsic = 0x12;
+	m_sch_observation_arfcn = 0xffff;
+	m_candidate_bcch_valid = false;
+	m_reselection_validation_pending = false;
+	m_downlink_signalling_count =
+			gsm::mobility::downlink_signalling_counter().ceiling();
+	m_downlink_signalling_failed = false;
+	m_serving_loss_pending = false;
 	m_report_deferred = false;
 	m_search_requested = false;
 	m_selected_reports_remaining = 0;
 	m_registered = false;
 	m_idle_common_control_active = false;
+	m_has_reselected = false;
 	m_pch_fill_delivered = false;
 	m_page_transmitted = false;
 	m_traffic_channel_active = false;
@@ -712,7 +755,7 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"service_uplink_wait", "service_uplink_acknowledgement",
 		"traffic_channel_change", "traffic_lapdm_establish",
 		"traffic_contention_resolution", "traffic_release_acknowledgement",
-		"candidate_terminal_control"
+		"candidate_terminal_control", "serving_sch_observation"
 	};
 	const unsigned index = unsigned(value);
 	return index < std::size(NAMES) ? NAMES[index] : "invalid";
@@ -739,7 +782,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 		0x8c, 0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89,
 		0xff, 0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80,
 		0x86, 0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80,
-		0x89, 0x86, 0x80, 0x80, 0xff
+		0x89, 0x86, 0x80, 0x80, 0xff, 0xff
 	};
 
 	const u8 fixed = m_phase < FIXED_REPORT.size() ? FIXED_REPORT[m_phase] : 0x87;
@@ -767,11 +810,14 @@ u8 nokia_radio_peer_device::next_report_type() const
 				(((m_search_mode == 0x00 && m_search_has_serving_arfcn) ||
 					m_search_mode == 0x40 || m_search_mode == 0x50) ? 0x80 : 0x87);
 	case phase::selected_bcch:
-		return m_reports_remaining == 1 ? 0x87 :
+		return m_reports_remaining == 1 && !m_reselection_validation_pending ?
+				0x87 :
 				((m_reports_remaining & 1) == 0 ? 0x83 : 0x80);
 	case phase::random_access:
-		return m_reports_remaining == 3 ? 0x8c :
-				(m_reports_remaining == 2 ? 0x84 : 0x80);
+		return m_reports_remaining == 2 ? 0x84 : 0x80;
+	case phase::serving_sch_observation:
+		return m_gsm_network->cell_receivable(m_sch_observation_arfcn) ?
+				0x80 : (m_reports_remaining == 2 ? 0x8a : 0x8f);
 	default:
 		return 0x87;
 	}
@@ -787,6 +833,7 @@ bool nokia_radio_peer_device::serving_pch_report() const
 	if (m_phase != phase::serving_bcch)
 		return false;
 	return (m_registered || m_idle_common_control_active) &&
+			m_receiver_arfcn == m_serving_arfcn &&
 			(m_reports_remaining % 3) == 2;
 }
 
@@ -819,30 +866,72 @@ auto nokia_radio_peer_device::decode_search_request(
 		if (packet.type != 0x1a || packet.length == 0)
 			return search_request::none;
 		m_search_mode = packet.payload[0];
+		m_search_arfcns.fill(0xffff);
+		m_search_arfcn_count = 0;
 		// SEARCH_LIST carries a 512-bit ARFCN set after its four-byte control
 		// header. In the ROM-4 wire layout ARFCN 1 is bit 0 of byte 65.
 		m_serving_arfcn = 1;
 		m_search_has_serving_arfcn =
 				packet.length > 65 && BIT(packet.payload[65], 0);
+		// Topology is RF environment, while the bitmap remains firmware-owned
+		// search policy. Bitmap-multistage acquisition has an independently
+		// recovered ARFCN-1 laboratory contract. The has-serving flag describes
+		// this request bitmap; measurement history still reports that evidenced
+		// carrier during the preceding multistage scan. Do not infer the
+		// remaining Nokia bit ordering from the network's configured cells.
+		m_search_arfcns[m_search_arfcn_count++] = 1;
 		return search_request::bitmap_multistage;
 
 	case acquisition_strategy::candidate_window:
-		if (!decode_candidate_window(packet, false))
+		if (decode_candidate_window(packet, false))
+			return search_request::candidate_window;
+		if (packet.type != 0x55 || packet.length != 4 ||
+				packet.payload[0] != 0x03)
 			return search_request::none;
-		return search_request::candidate_window;
+		// ROM6 0x55 is the untargeted counterpart to the explicit 0x56
+		// candidate window. Populate its DSP measurement result from the
+		// receivable standards-level topology; the MCU still ranks and selects.
+		m_search_mode = packet.payload[1];
+		m_search_arfcns.fill(0xffff);
+		m_search_arfcn_count = 0;
+		for (unsigned index = 0;
+				index < m_gsm_network->cell_count() &&
+					m_search_arfcn_count < m_search_arfcns.size();
+				++index)
+		{
+			if (const auto *cell = m_gsm_network->cell_at(index);
+					cell && m_gsm_network->cell_receivable(cell->arfcn))
+				m_search_arfcns[m_search_arfcn_count++] = cell->arfcn;
+		}
+		m_search_has_serving_arfcn = m_search_arfcn_count != 0;
+		return search_request::autonomous_band_scan;
 
 	case acquisition_strategy::autonomous_band_scan:
 		if (decode_candidate_window(packet, true))
 			return search_request::candidate_window;
 		if (packet.type != 0x55 || packet.length != 2 ||
-				packet.payload[0] != 0x03 || packet.payload[1] != 0x05)
+				packet.payload[0] != 0x03 ||
+				(packet.payload[1] != 0x03 &&
+					packet.payload[1] != 0x05))
 			return search_request::none;
 		// NHM-2 asks the DSP to scan the supported bands rather than passing an
 		// MCU-built candidate list. The laboratory cell is a valid GSM 900
 		// carrier; its exact channel is network topology, not handset state.
 		m_search_mode = packet.payload[1];
-		m_serving_arfcn = 1;
-		m_search_has_serving_arfcn = true;
+		m_search_arfcns.fill(0xffff);
+		m_search_arfcn_count = 0;
+		for (unsigned index = 0;
+				index < m_gsm_network->cell_count() &&
+					m_search_arfcn_count < m_search_arfcns.size();
+				++index)
+		{
+			if (const auto *cell = m_gsm_network->cell_at(index);
+					cell && m_gsm_network->cell_receivable(cell->arfcn))
+				m_search_arfcns[m_search_arfcn_count++] = cell->arfcn;
+		}
+		m_search_has_serving_arfcn = m_search_arfcn_count != 0;
+		if (m_search_has_serving_arfcn)
+			m_serving_arfcn = m_search_arfcns[0];
 		return search_request::autonomous_band_scan;
 
 	case acquisition_strategy::none:
@@ -861,17 +950,269 @@ bool nokia_radio_peer_device::decode_candidate_window(
 	// the list with zeroes before its first real candidate.
 	m_search_mode = 0;
 	m_search_has_serving_arfcn = false;
+	m_search_arfcns.fill(0xffff);
+	m_search_arfcn_count = 0;
 	for (unsigned offset = 0; offset < packet.length; offset += 2)
 	{
 		const u16 candidate =
 				(packet.payload[offset] << 8) | packet.payload[offset + 1];
 		if (candidate != 0xffff && (!ignore_zero || candidate != 0x0000))
 		{
-			m_serving_arfcn = candidate;
+			if (m_search_arfcn_count < m_search_arfcns.size())
+				m_search_arfcns[m_search_arfcn_count++] = candidate;
+			if (!m_search_has_serving_arfcn)
+				m_serving_arfcn = candidate;
 			m_search_has_serving_arfcn = true;
-			break;
 		}
 	}
+	return true;
+}
+
+bool nokia_radio_peer_device::decode_neighbour_measurement_list(
+		const nokia_dspif_device::packet &packet)
+{
+	if (packet.type != 0x0f ||
+			(packet.length != 64 && packet.length != 66 &&
+				packet.length != 68))
+		return false;
+
+	m_neighbour_arfcns.fill(0xffff);
+	m_neighbour_arfcn_count = 0;
+	if (packet.length == 66 || packet.length == 68)
+	{
+		// The array has a two-byte controller prefix and a two-byte trailer;
+		// product publications differ only in the number of available slots.
+		u16 published_first = 0xffff;
+		for (unsigned offset = 2;
+				offset + 1 < packet.length - 2; offset += 2)
+		{
+			const u16 arfcn =
+					(packet.payload[offset] << 8) | packet.payload[offset + 1];
+			if (arfcn == 0xffff)
+				break;
+			if (published_first == 0xffff)
+				published_first = arfcn;
+			// Some 68-byte publications include the configured receiver
+			// alongside its measurement candidates. Keep per-cell serving
+			// state separate from the neighbour set used for ranking.
+			if (packet.length == 68 && arfcn == m_receiver_arfcn)
+				continue;
+			if (m_neighbour_arfcn_count < m_neighbour_arfcns.size())
+				m_neighbour_arfcns[m_neighbour_arfcn_count++] = arfcn;
+		}
+		if (packet.length == 68 &&
+				m_protocol.serving_list_commits_receiver &&
+				published_first == m_receiver_arfcn &&
+				m_receiver_arfcn != m_serving_arfcn)
+		{
+			const u16 old_serving = m_serving_arfcn;
+			m_serving_arfcn = m_receiver_arfcn;
+			m_has_reselected = true;
+			m_reselection_validation_pending = false;
+			m_downlink_signalling_count =
+					gsm::mobility::downlink_signalling_counter().ceiling();
+			m_downlink_signalling_failed = false;
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: serving cell selected old_arfcn=%u "
+						"new_arfcn=%u t=%.6f\n",
+						old_serving, m_serving_arfcn,
+						machine().time().as_double());
+		}
+	}
+	else
+	{
+		// NSE-8 independently publishes a reversed 512-bit neighbour bitmap.
+		// Its organic two-cell form ends in 0x02, naming ARFCN 2 exactly like
+		// the previously recovered bitmap SEARCH_LIST grammar.  Consult only
+		// cells present in the standards-owned topology rather than assigning
+		// meanings to unevidenced high-band/control bits.
+		for (unsigned index = 0; index < m_gsm_network->cell_count(); ++index)
+		{
+			const auto *cell = m_gsm_network->cell_at(index);
+			if (!cell || cell->arfcn == 0 || cell->arfcn > 512)
+				continue;
+			const unsigned bitmap_index = cell->arfcn - 1;
+			const unsigned byte = 63 - (bitmap_index / 8);
+			if (BIT(packet.payload[byte], bitmap_index & 7) &&
+					m_neighbour_arfcn_count < m_neighbour_arfcns.size())
+				m_neighbour_arfcns[m_neighbour_arfcn_count++] = cell->arfcn;
+		}
+		// NSE-8's post-validation bitmap is relative to the newly selected
+		// receiver: it contains the former serving ARFCN as the new neighbour.
+		// Combined with a successfully decoded candidate BCCH, that
+		// firmware-owned publication commits the receiver as serving.
+		bool former_serving_published = false;
+		for (unsigned index = 0; index < m_neighbour_arfcn_count; ++index)
+			former_serving_published |=
+					m_neighbour_arfcns[index] == m_serving_arfcn;
+		if (m_protocol.serving_list_commits_receiver &&
+				m_candidate_bcch_valid &&
+				m_receiver_arfcn != m_serving_arfcn &&
+				former_serving_published)
+		{
+			const u16 old_serving = m_serving_arfcn;
+			m_serving_arfcn = m_receiver_arfcn;
+			m_has_reselected = true;
+			m_candidate_bcch_valid = false;
+			m_reselection_validation_pending = false;
+			m_downlink_signalling_count =
+					gsm::mobility::downlink_signalling_counter().ceiling();
+			m_downlink_signalling_failed = false;
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: serving cell selected old_arfcn=%u "
+						"new_arfcn=%u t=%.6f\n",
+						old_serving, m_serving_arfcn,
+						machine().time().as_double());
+		}
+	}
+
+	if (m_trace_enabled)
+		LOGMASKED(LOG_RADIO,
+				"dsp_hle: neighbour measurement list grammar=%s "
+				"count=%u first=%04x t=%.6f\n",
+				packet.length >= 66 ? "array" : "bitmap",
+				m_neighbour_arfcn_count,
+				m_neighbour_arfcn_count ? m_neighbour_arfcns[0] : 0xffff,
+				machine().time().as_double());
+	if (m_neighbour_arfcn_count && packet.length != 68)
+		m_gsm_network->neighbour_list_observed();
+	return true;
+}
+
+bool nokia_radio_peer_device::decode_neighbour_measurement_instruction(
+		const nokia_dspif_device::packet &packet)
+{
+	if (packet.type != 0x11 || packet.length < 9)
+		return false;
+	const bool already_pending = m_neighbour_bcch_pending;
+
+	// Two independent public NHM-5 trace samples identify byte 1 as the expected
+	// BSIC and byte 7 as the ARFCN.  NHM-2 independently emits zero in byte 1
+	// while requesting synchronization of its SI2-derived carrier, so keep the
+	// independently evidenced validation rule in the typed product contract.
+	// In either grammar the target must be a member of the firmware-published
+	// neighbour list as well as a receivable cell in the generic topology.
+	const u8 expected_bsic = packet.payload[1];
+	u16 arfcn = packet.payload[7];
+	if (m_protocol.neighbour_instruction_arfcn ==
+			neighbour_arfcn_encoding::topology_low_octet)
+	{
+		for (unsigned index = 0; index < m_gsm_network->cell_count(); ++index)
+		{
+			const auto *cell = m_gsm_network->cell_at(index);
+			if (cell && cell->arfcn != m_serving_arfcn &&
+					u8(cell->arfcn) == packet.payload[7])
+			{
+				arfcn = cell->arfcn;
+				break;
+			}
+		}
+	}
+	const auto *candidate = m_gsm_network->cell_by_arfcn(arfcn);
+	const bool bsic_matches =
+			m_protocol.neighbour_instruction_bsic ==
+					neighbour_bsic_encoding::none ||
+			(m_protocol.neighbour_instruction_bsic ==
+						neighbour_bsic_encoding::direct &&
+					candidate && candidate->bsic == expected_bsic) ||
+			(m_protocol.neighbour_instruction_bsic ==
+						neighbour_bsic_encoding::low_six_bits &&
+					candidate && candidate->bsic == (expected_bsic & 0x3f));
+	bool listed = false;
+	for (unsigned index = 0; index < m_neighbour_arfcn_count; ++index)
+		listed |= m_neighbour_arfcns[index] == arfcn;
+	if (!listed && m_protocol.neighbour_instruction_establishes_candidate)
+		listed = m_gsm_network->configured_neighbour(
+				m_serving_arfcn, arfcn);
+	if (candidate && listed && bsic_matches)
+	{
+		if (m_neighbour_arfcn_count == 0)
+		{
+			m_neighbour_arfcns[0] = arfcn;
+			m_neighbour_arfcn_count = 1;
+		}
+		// The accepted instruction is the first boundary proving that the
+		// decoded candidate set has entered a real measurement cycle.
+		m_gsm_network->neighbour_list_observed();
+		m_last_neighbour_instruction_arfcn = arfcn;
+		m_last_neighbour_instruction_bsic = expected_bsic;
+	}
+	m_neighbour_bcch_pending = candidate &&
+			listed &&
+			bsic_matches &&
+			m_gsm_network->cell_receivable(arfcn);
+	m_neighbour_bcch_arfcn =
+			m_neighbour_bcch_pending ? arfcn : 0xffff;
+	m_neighbour_instruction_mode =
+			m_neighbour_bcch_pending ? packet.payload[0] : 0;
+	m_neighbour_instruction_bsic =
+			m_neighbour_bcch_pending ? expected_bsic : 0;
+	if (m_neighbour_bcch_pending && !already_pending &&
+			m_neighbour_instruction_mode == 0x02)
+	{
+		// Mode 2 requests an asynchronous RSSI observation at the supplied
+		// GSM-frame offset. The peer service tick is 4 ms while a TDMA frame is
+		// exactly 60/13 ms, so ceil(frames * 15/13) preserves that air-time
+		// request without coupling it to the 51-frame serving-report cadence.
+		const unsigned response_ticks =
+				std::max(1U, (unsigned(packet.payload[5]) * 15 + 12) / 13);
+		m_neighbour_resume_wait_ticks =
+				m_wait_ticks > response_ticks ?
+						m_wait_ticks - response_ticks : 0;
+		m_wait_ticks = response_ticks;
+	}
+
+	if (m_trace_enabled)
+		LOGMASKED(LOG_RADIO,
+				"dsp_hle: neighbour measurement instruction arfcn=%u "
+				"bsic=%u validated=%u accepted=%u t=%.6f\n",
+				arfcn, expected_bsic,
+				m_protocol.neighbour_instruction_bsic !=
+						neighbour_bsic_encoding::none,
+				m_neighbour_bcch_pending,
+				machine().time().as_double());
+	return true;
+}
+
+bool nokia_radio_peer_device::decode_serving_sch_request(
+		const nokia_dspif_device::packet &packet)
+{
+	if (!m_serving_loss_pending ||
+			m_protocol.serving_sch_request_type == 0 ||
+			packet.type != m_protocol.serving_sch_request_type ||
+			packet.length != 2 ||
+			m_phase != phase::serving_bcch)
+		return false;
+
+	// Nokia packet grammar owns the request, but its DSP-visible consequence is
+	// standards-level: observe one SCH opportunity on the configured receiver.
+	// The DSP observes the strongest currently receivable synchronization
+	// candidate and reports its real ARFCN/BSIC. A missing carrier yields
+	// NO_PSW_FOUND rather than a fabricated decoded block. This is an RF
+	// observation, not a serving-cell selection; firmware still owns that
+	// decision and every subsequent receiver configuration.
+	m_sch_observation_arfcn = 0xffff;
+	s8 strongest_rssi = -128;
+	for (unsigned index = 0; index < m_gsm_network->cell_count(); ++index)
+	{
+		const auto *cell = m_gsm_network->cell_at(index);
+		if (!cell || !m_gsm_network->cell_receivable(cell->arfcn))
+			continue;
+		const s8 rssi = m_gsm_network->cell_rssi(
+				cell->arfcn, m_idle_measurement_sample);
+		if (m_sch_observation_arfcn == 0xffff || rssi > strongest_rssi)
+		{
+			m_sch_observation_arfcn = cell->arfcn;
+			strongest_rssi = rssi;
+		}
+	}
+	m_phase = phase::serving_sch_observation;
+	m_reports_remaining =
+			m_sch_observation_arfcn != 0xffff ? 1 : 2;
+	m_wait_ticks = 0;
+	m_report_deferred = true;
 	return true;
 }
 
@@ -903,8 +1244,32 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 
 	if (request == search_request::autonomous_band_scan)
 	{
-		if (m_phase != phase::inactive || m_reports_remaining != 0)
+		const bool lost_serving_cell = m_serving_loss_pending;
+		const bool after_receiver_deactivation =
+				m_phase == phase::post_deactivate_search;
+		const bool after_candidate_window =
+				candidate_window_acquisition() &&
+				m_phase == phase::candidate_measurement &&
+				m_reports_remaining == 0;
+		if ((!lost_serving_cell && !after_receiver_deactivation &&
+					!after_candidate_window &&
+					m_phase != phase::inactive) ||
+				(!lost_serving_cell && m_reports_remaining != 0))
 			return false;
+		// NHM-2 uses the same autonomous band-scan request after organic
+		// DOWNLINK_SIGNALLING_FAIL as it does at initial acquisition.  Preserve
+		// the firmware-owned trigger while restarting only the bounded radio
+		// search transaction.
+		if (lost_serving_cell)
+		{
+			m_bcch_frame_valid = false;
+			m_neighbour_bcch_pending = false;
+			m_neighbour_bcch_arfcn = 0xffff;
+			m_neighbour_instruction_mode = 0;
+			m_neighbour_instruction_bsic = 0;
+			m_neighbour_resume_wait_ticks = 0;
+			m_serving_loss_pending = false;
+		}
 		m_phase = phase::candidate_measurement;
 		m_reports_remaining = 1;
 		return true;
@@ -1008,10 +1373,13 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 			m_phase == phase::candidate_measurement &&
 			m_reports_remaining == 0)
 	{
-		// The measurement terminal makes candidate-window firmware publish its
-		// separate terminal control. Successful acquisition receives SCH first
-		// and never reaches this fallback.
+		// Candidate-window firmware publishes a separate terminal-control
+		// transaction after consuming SCH and its final RSSI result. Complete
+		// that bounded DSP transaction with the ordinary no-more-candidates
+		// indication; firmware remains responsible for the next search step.
 		m_phase = phase::candidate_terminal_control;
+		m_reports_remaining = 1;
+		m_report_deferred = true;
 		return true;
 	}
 
@@ -1028,6 +1396,37 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 				m_phase == phase::candidate_measurement;
 		const bool selected_plmn_search =
 				m_phase == phase::selected_search && m_search_mode == 0x50;
+		const u16 requested_arfcn = packet.length >= 12 ?
+				(packet.payload[10] << 8) | packet.payload[11] :
+				m_receiver_arfcn;
+		if (packet.length >= 2)
+			m_receiver_bsic = packet.payload[1];
+		if (requested_arfcn != m_receiver_arfcn &&
+				m_gsm_network->cell_by_arfcn(requested_arfcn))
+		{
+			const u16 previous_receiver = m_receiver_arfcn;
+			m_receiver_arfcn = requested_arfcn;
+			m_bcch_frame_valid = false;
+			m_candidate_bcch_valid = false;
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: receiver tuned old_arfcn=%u new_arfcn=%u "
+						"t=%.6f\n",
+						previous_receiver, m_receiver_arfcn,
+						machine().time().as_double());
+		}
+		if (active_candidate_window &&
+				m_receiver_arfcn != m_serving_arfcn)
+		{
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: serving cell selected old_arfcn=%u "
+						"new_arfcn=%u t=%.6f\n",
+						m_serving_arfcn, m_receiver_arfcn,
+						machine().time().as_double());
+			m_serving_arfcn = m_receiver_arfcn;
+			m_has_reselected = true;
+		}
 		m_phase = selected_plmn_search ?
 				phase::selected_channel_change :
 				phase::candidate_channel_change;
@@ -1050,19 +1449,20 @@ void nokia_radio_peer_device::encode_measurement_report(u8 *payload) const
 	payload[1] = 0x10;
 	for (unsigned result = 0; result < 40; ++result)
 	{
-		const bool serving_result =
-				result == 0 &&
-				(!candidate_window_acquisition() ||
-					m_search_has_serving_arfcn);
+		const bool measured = result < m_search_arfcn_count;
+		const u16 measured_arfcn =
+				measured ? m_search_arfcns[result] : 0xffff;
 		payload[2 + result * 4] =
-				serving_result ? u8(m_serving_arfcn >> 8) : 0xff;
+				measured ? u8(measured_arfcn >> 8) : 0xff;
 		payload[3 + result * 4] =
-				serving_result ? u8(m_serving_arfcn) : 0xff;
-		payload[5 + result * 4] = serving_result ?
+				measured ? u8(measured_arfcn) : 0xff;
+		payload[5 + result * 4] = measured ?
 				(candidate_window_acquisition() ?
-					u8(m_gsm_network->serving_rssi(m_search_round)) :
+					u8(m_gsm_network->cell_rssi(
+							measured_arfcn, m_search_round)) :
 					(m_search_round < 2 ? u8(0x93) :
-						u8(m_gsm_network->serving_rssi(m_search_round - 2)))) :
+						u8(m_gsm_network->cell_rssi(
+								measured_arfcn, m_search_round - 2)))) :
 				0x81;
 	}
 }
@@ -1089,9 +1489,22 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		return;
 	if (handle_acquisition_packet(packet))
 		return;
+	if (decode_neighbour_measurement_list(packet))
+		return;
+	if (decode_neighbour_measurement_instruction(packet))
+		return;
+	if (decode_serving_sch_request(packet))
+		return;
 
-	if (packet.type == 0x03 && m_phase == phase::initial_search && m_reports_remaining == 0)
+	if (packet.type == 0x03 &&
+			(m_phase == phase::initial_search ||
+				(m_phase == phase::candidate_measurement &&
+					m_downlink_signalling_failed)) &&
+			m_reports_remaining == 0)
 	{
+		// After a loss-triggered autonomous RSSI pass NHM-2 deactivates the
+		// old receiver before continuing candidate selection.  This is the
+		// same bounded DSP deactivation transaction used by initial search.
 		m_phase = phase::post_deactivate_search;
 		m_reports_remaining = 2;
 	}
@@ -1099,14 +1512,19 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 	{
 		// IDLE_RA form 1 configures the serving-cell receiver. Form 0 carries a
 		// CHANNEL REQUEST random-access octet at byte 2 after organic 0x07d1.
-		// Complete the former normally; only the latter starts the network access
-		// exchange.
-		const bool channel_request = packet.length >= 3 &&
-				packet.payload[1] == 0 && packet.payload[2] != 0;
+		// IDLE_RA has no type-0x8c acknowledgement: recovered protocol
+		// vocabulary identifies 0x8c as DOWNLINK_SIGNALLING_FAIL.
+		// Byte 1 retains the configured receiver selector and therefore
+		// changes after reselection; byte 2 alone distinguishes the
+		// random-access form from the idle receiver configuration.
+		const bool channel_request =
+				packet.length >= 3 && packet.payload[2] != 0;
+		if (!channel_request)
+			return;
 		m_access_ra = channel_request ? packet.payload[2] : 0;
 		m_access_frame = 0;
-		m_phase = channel_request ? phase::random_access : phase::serving_idle_ra;
-		m_reports_remaining = channel_request ? 3 : 1;
+		m_phase = phase::random_access;
+		m_reports_remaining = 2;
 		m_report_deferred = true;
 	}
 	else if (packet.type == 0x02 && m_phase == phase::serving_bcch &&
@@ -1116,11 +1534,76 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// encoded as DSP receive channel 0x60. This transitions NHM-5 from
 		// acquisition BCCH to its idle common-control receiver; subsequent
 		// decoded blocks on that receiver are PCH/AGCH, not more SI payloads.
+		//
+		// NHM-2 places the tuned ARFCN in bytes 10/11.  A mode-0x02 transaction
+		// is also used for a temporary neighbour BCCH window, so keep receiver
+		// tuning distinct from serving-cell selection.  A later firmware
+		// reconfiguration commits the receiver only after at least one valid
+		// BCCH frame has established the selected-cell context; its opaque
+		// Nokia mode byte differs between products.  MM remains responsible for
+		// deciding whether it requires Location Updating.
+		const u16 requested_arfcn = packet.length >= 12 ?
+				(packet.payload[10] << 8) | packet.payload[11] :
+				m_receiver_arfcn;
+		// Nokia's channel configuration retains controller bits alongside the
+		// six-bit GSM BSIC. RECEIVED_BLOCK must echo that wire value for the
+		// configured receiver, while the generic topology continues to own only
+		// the standards BSIC used for suitability checks.
+		if (packet.length >= 2)
+			m_receiver_bsic = packet.payload[1];
+		if (requested_arfcn != m_receiver_arfcn &&
+				m_gsm_network->cell_by_arfcn(requested_arfcn))
+		{
+			const u16 previous_receiver = m_receiver_arfcn;
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: receiver tuned old_arfcn=%u "
+						"new_arfcn=%u t=%.6f\n",
+						m_receiver_arfcn, requested_arfcn,
+						machine().time().as_double());
+			m_receiver_arfcn = requested_arfcn;
+			m_bcch_frame_valid = false;
+			m_candidate_bcch_valid = false;
+			// Returning from a temporary neighbour window is the first
+			// firmware-owned boundary proving that the complete validation
+			// interval has closed.  Scenario-driven serving loss is armed only
+			// here, never by receipt of the first neighbour block.
+			if (requested_arfcn == m_serving_arfcn &&
+					previous_receiver != m_serving_arfcn)
+				m_gsm_network->neighbour_bcch_observed(previous_receiver);
+		}
+		if (m_receiver_arfcn != m_serving_arfcn &&
+				m_candidate_bcch_valid)
+		{
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: serving cell selected old_arfcn=%u "
+						"new_arfcn=%u t=%.6f\n",
+						m_serving_arfcn, m_receiver_arfcn,
+						machine().time().as_double());
+			m_serving_arfcn = m_receiver_arfcn;
+			m_has_reselected = true;
+			m_candidate_bcch_valid = false;
+			m_reselection_validation_pending = true;
+			m_downlink_signalling_count =
+					gsm::mobility::downlink_signalling_counter().ceiling();
+			m_downlink_signalling_failed = false;
+		}
 		const bool completes_candidate_validation =
 				!m_idle_common_control_active &&
 				candidate_window_acquisition();
 		m_idle_common_control_active =
 				candidate_window_acquisition();
+		if (m_downlink_signalling_failed)
+		{
+			// Firmware explicitly reconfigured the common-control receiver
+			// after the failure indication. The DSP begins a fresh TS 45.008
+			// downlink-signalling observation interval for that receiver; if
+			// the carrier is still absent, another organic failure follows.
+			m_downlink_signalling_count =
+					gsm::mobility::downlink_signalling_counter().ceiling();
+			m_downlink_signalling_failed = false;
+		}
 		m_phase = phase::serving_channel_change;
 		m_reports_remaining = 1;
 		if (completes_candidate_validation && m_bcch_frame_valid)
@@ -1241,7 +1724,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		if (result == nokia_lapdm_link_device::uplink_result::establish_indication &&
 				m_gsm_session->establish_layer3(
 					m_lapdm_link->layer3_information().data(),
-					m_lapdm_link->layer3_length()))
+					m_lapdm_link->layer3_length(), m_serving_arfcn))
 		{
 			if (m_trace_enabled)
 			{
@@ -1537,7 +2020,44 @@ void nokia_radio_peer_device::emit_report()
 	u8 payload[166] = { 0 };
 	bool transmitted_page = false;
 	bool off_group_page = false;
-	const u8 report_type = next_report_type();
+	u8 report_type = next_report_type();
+	const bool neighbour_measurement_report =
+			m_neighbour_bcch_pending && m_phase == phase::serving_bcch &&
+			(m_neighbour_instruction_mode == 0x02 ||
+					report_type == 0x83);
+	const bool neighbour_rssi_report =
+			neighbour_measurement_report &&
+			m_neighbour_instruction_mode == 0x02;
+	const bool asynchronous_neighbour_report = neighbour_rssi_report;
+	const bool neighbour_bcch_report =
+			neighbour_measurement_report && !neighbour_rssi_report;
+	if (neighbour_measurement_report)
+		report_type = neighbour_rssi_report ? 0x83 : 0x80;
+	if (report_type == 0x80 && serving_pch_report() &&
+			!m_downlink_signalling_failed)
+	{
+		gsm::mobility::downlink_signalling_counter counter;
+		counter.restore(m_downlink_signalling_count);
+		m_downlink_signalling_failed = counter.observe(
+				m_gsm_network->cell_receivable(m_serving_arfcn));
+		m_downlink_signalling_count = counter.value();
+		if (m_downlink_signalling_failed)
+		{
+			// MDI 0x8c is the bodyless DSP-to-MCU
+			// DOWNLINK_SIGNALLING_FAIL indication. Layer 1 owns the TS 45.008
+			// paging-block counter; the MCU remains responsible for deciding
+			// whether and how to search or reselect.
+			report_type = 0x8c;
+			m_serving_loss_pending = true;
+			m_gsm_network->downlink_signalling_failed(m_serving_arfcn);
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: DOWNLINK_SIGNALLING_FAIL arfcn=%u "
+						"fn=%u t=%.6f\n",
+						m_serving_arfcn, m_tdma_frame_number,
+						machine().time().as_double());
+		}
+	}
 	if (m_phase == phase::lapdm_establish ||
 			m_phase == phase::location_update_ack_request ||
 			m_phase == phase::channel_release_uplink_request ||
@@ -1549,7 +2069,8 @@ void nokia_radio_peer_device::emit_report()
 
 	if (report_type == 0x80)
 	{
-		const bool pch_report = serving_pch_report();
+		const bool pch_report =
+				!neighbour_bcch_report && serving_pch_report();
 		const bool dedicated_downlink =
 				(m_phase >= phase::contention_resolution &&
 					m_phase <= phase::rr_channel_release) ||
@@ -1561,13 +2082,54 @@ void nokia_radio_peer_device::emit_report()
 		// shift and then a 24-byte GSM L2 block.  Channel 0x40 is SCH; 0x50 is
 		// BCCH; 0x60 is the shared paging/access-grant common control channel;
 		// 0x80 is SDCCH and 0xb0 is the active TCH/F FACCH selector.
-		payload[0] = pch_report ? 0x60 :
+		payload[0] = m_phase == phase::serving_sch_observation ? 0x40 :
+				neighbour_bcch_report ? 0x50 :
+				pch_report ? 0x60 :
 				dedicated_downlink ?
 					(m_traffic_channel_active ? 0xb0 : 0x80) :
 				m_phase == phase::random_access ? 0x60 :
 				((m_phase < phase::candidate_channel_change ||
 					m_phase == phase::selected_search) ? 0x40 : 0x50);
-		payload[1] = 0x12; // BSIC of the laboratory cell, for SCH and BCCH.
+		const bool candidate_sch =
+				payload[0] == 0x40 &&
+				(m_phase == phase::candidate_measurement ||
+					m_phase == phase::candidate_sync) &&
+				m_search_arfcn_count != 0;
+		const u16 report_arfcn =
+				m_phase == phase::serving_sch_observation ?
+					m_sch_observation_arfcn :
+				neighbour_bcch_report ?
+					m_neighbour_bcch_arfcn :
+				candidate_sch ? m_search_arfcns[0] : m_receiver_arfcn;
+		// Public DCT3 traces correlate NMEAS_INSTRUCTIONS with the immediately
+		// following neighbour block through both its ARFCN and BSIC. Keep that
+		// asynchronous observation owned by the named RF carrier; it must not
+		// be presented as serving-cell SI merely to enter an unrelated parser.
+		const auto *report_cell =
+				m_gsm_network->cell_by_arfcn(report_arfcn);
+		payload[1] =
+				m_phase == phase::serving_sch_observation &&
+						report_arfcn == m_last_neighbour_instruction_arfcn ?
+					m_last_neighbour_instruction_bsic :
+				neighbour_bcch_report ?
+				m_neighbour_instruction_bsic :
+				report_arfcn == m_receiver_arfcn ?
+					m_receiver_bsic :
+					(report_cell ? report_cell->bsic : 0x12);
+		// RECEIVED_BLOCK byte 2 is the recovered decoded-block error flag.
+		// The independently inspected NSE-3 consumer treats zero as a decoded
+		// block and one as a failed block; it does not interpret a magnitude.
+		// A vanished carrier still reaches its scheduled receive opportunity,
+		// but it cannot yield a valid BCCH/PCH block. This is distinct from
+		// NO_BCCH_LEFT, which terminates a finite search transaction.
+		payload[2] =
+				m_gsm_network->cell_receivable(report_arfcn) ? 0 : 1;
+		if (payload[0] == 0x50 &&
+				!m_gsm_network->system_information_decodable(report_arfcn))
+			payload[2] = 1;
+		if (payload[0] == 0x40 &&
+				!m_gsm_network->synchronization_stable(report_arfcn))
+			payload[2] = 1;
 		// Frame numbering belongs to the radio Layer-1 clock, not the host
 		// scheduler instant at which the DSP happens to collect a report.
 		// m_tdma_frame_number is advanced by the GSM burst timer and is saved
@@ -1579,7 +2141,7 @@ void nokia_radio_peer_device::emit_report()
 		if (pch_report)
 			frame_number = paging_frame_number(
 					frame_number, paging_schedule::monitored);
-		else if (payload[0] == 0x50)
+		else if (payload[0] == 0x50 && !neighbour_bcch_report)
 		{
 			// Decoded BCCH blocks occupy successive 51-frame control
 			// multiframes. Firmware processing can defer a peer poll slightly;
@@ -1600,8 +2162,8 @@ void nokia_radio_peer_device::emit_report()
 		payload[3] = frame_number >> 16;
 		payload[4] = frame_number >> 8;
 		payload[5] = frame_number;
-		payload[6] = m_serving_arfcn >> 8;
-		payload[7] = m_serving_arfcn;
+		payload[6] = report_arfcn >> 8;
+		payload[7] = report_arfcn;
 
 		if (m_phase == phase::contention_resolution)
 		{
@@ -1676,6 +2238,7 @@ void nokia_radio_peer_device::emit_report()
 					nokia_gsm_session_device::incoming_service::none;
 			const bool transmit_page =
 					m_registered && m_page_after_registration && m_pch_fill_delivered &&
+					(!m_page_requires_reselection || m_has_reselected) &&
 					!m_page_transmitted &&
 					m_gsm_session->queue_incoming_page(service);
 			const auto &identity =
@@ -1708,24 +2271,50 @@ void nokia_radio_peer_device::emit_report()
 			static constexpr std::array<unsigned, 8> SI_BY_TC = { 0, 1, 2, 3, 1, 1, 2, 3 };
 			const unsigned tc = (frame_number / 51) & 7;
 			const auto system_information =
-					m_gsm_network->system_information(SI_BY_TC[tc], m_serving_arfcn);
+					m_gsm_network->system_information(
+							SI_BY_TC[tc], report_arfcn);
 			std::copy(system_information.begin(), system_information.end(), std::begin(payload) + 10);
 		}
-		else
+		else if (payload[0] == 0x40)
 		{
-			const auto system_information =
-					m_gsm_network->system_information(2, m_serving_arfcn);
-			std::copy(system_information.begin(), system_information.end(),
+			const auto *cell = m_gsm_network->cell_by_arfcn(report_arfcn);
+			const auto information =
+					gsm::mobility::synchronization_channel_information(
+							cell ?
+								m_gsm_network->synchronization_bsic(
+										report_arfcn, frame_number) :
+								0,
+							frame_number);
+			std::copy(information.begin(), information.end(),
 					std::begin(payload) + 10);
 		}
 	}
 
 	if (report_type == 0x83)
 	{
-		// RSSI_RESULTS is the serving-channel scalar report, distinct from the
-		// SEARCH_LIST result array in ALL_RSSI_RESULTS.  The ROM reads its signed
-		// measurement from payload byte 2 while controller state 3 is active.
-		payload[2] = u8(m_gsm_network->serving_rssi(m_search_round));
+		// RSSI_RESULTS carries the serving scalar and, once the MCU has
+		// published NEIGHBOUR_LIST, the current background neighbour sample.
+		// The scalar controller reads byte 2.  The independently captured DCT3
+		// trace and ROM consumer agree that bytes 4..5 carry the measured
+		// neighbour ARFCN; the adjacent signed values are radio measurements,
+		// not candidate-selection outcomes.
+		const s8 serving_rssi =
+				m_gsm_network->cell_rssi(
+						m_serving_arfcn, m_idle_measurement_sample);
+		payload[2] = u8(serving_rssi);
+		payload[3] = u8(serving_rssi);
+		if (m_neighbour_arfcn_count)
+		{
+			const u16 neighbour = m_neighbour_arfcns[
+					m_idle_measurement_sample % m_neighbour_arfcn_count];
+			const s8 neighbour_rssi =
+					m_gsm_network->cell_rssi(
+							neighbour, m_idle_measurement_sample);
+			payload[4] = neighbour >> 8;
+			payload[5] = neighbour;
+			payload[6] = u8(neighbour_rssi);
+			payload[7] = u8(neighbour_rssi);
+		}
 	}
 
 	if (report_type == 0x89)
@@ -1734,7 +2323,15 @@ void nokia_radio_peer_device::emit_report()
 	if (report_type == 0x84 && m_phase == phase::random_access)
 		encode_random_access_info(payload);
 
-	const unsigned payload_length = report_type == 0x8b ? 166 : report_type == 0x80 ? 34 : 8;
+	// Camped neighbour RSSI_RESULTS uses the 24-byte form observed on DCT3;
+	// the short eight-byte form remains sufficient before a BA list exists.
+	// Unused measurement slots are explicitly the signed no-signal value.
+	if (report_type == 0x83 && m_neighbour_arfcn_count)
+		std::fill(std::begin(payload) + 8, std::begin(payload) + 24, u8(0x80));
+	const unsigned payload_length = report_type == 0x8b ? 166 :
+			report_type == 0x80 && payload[0] == 0x40 ? 14 :
+			report_type == 0x80 ? 34 :
+			(report_type == 0x83 && m_neighbour_arfcn_count) ? 24 : 8;
 	if (report_type == 0x80 && payload[0] == 0xb0)
 	{
 		gsm::tch_f::packed_control_block control{};
@@ -1746,8 +2343,28 @@ void nokia_radio_peer_device::emit_report()
 	}
 	if (!m_transport->enqueue_rx_packet(report_type, payload, payload_length))
 		return;
+	if (report_type == 0x80 && payload[0] == 0x50 && payload[2] == 0 &&
+			m_receiver_arfcn != m_serving_arfcn)
+		m_candidate_bcch_valid = true;
+	if (neighbour_bcch_report && payload[2] == 0)
+	{
+		m_candidate_bcch_valid = true;
+		m_gsm_network->neighbour_bcch_observed(m_neighbour_bcch_arfcn);
+	}
+	if (report_type == 0x83)
+		++m_idle_measurement_sample;
+	if (neighbour_measurement_report)
+	{
+		m_neighbour_bcch_pending = false;
+		m_neighbour_bcch_arfcn = 0xffff;
+		m_neighbour_instruction_mode = 0;
+		m_neighbour_instruction_bsic = 0;
+		if (asynchronous_neighbour_report)
+			m_wait_ticks = m_neighbour_resume_wait_ticks;
+		m_neighbour_resume_wait_ticks = 0;
+	}
 
-	if (report_type == 0x80 && serving_pch_report())
+	if (report_type == 0x80 && payload[0] == 0x60)
 	{
 		const u32 frame_number =
 				(payload[3] << 16) | (payload[4] << 8) | payload[5];
@@ -1774,6 +2391,8 @@ void nokia_radio_peer_device::emit_report()
 		else if (!m_pch_fill_delivered)
 		{
 			m_pch_fill_delivered = true;
+			if (m_registered)
+				m_gsm_network->stable_camp_observed();
 			if (m_trace_enabled)
 				LOGMASKED(LOG_RADIO,
 						"dsp_hle: PCH no-identity fill channel=60 fn=%u t=%.6f\n",
@@ -1784,8 +2403,11 @@ void nokia_radio_peer_device::emit_report()
 	if (report_type == 0x8b && m_phase >= phase::candidate_measurement)
 		++m_search_round;
 	++m_reports_sent;
-	--m_reports_remaining;
-	advance_after_report(report_type);
+	if (!asynchronous_neighbour_report)
+	{
+		--m_reports_remaining;
+		advance_after_report(report_type);
+	}
 	m_transport->notify_rx();
 	if (m_trace_enabled)
 		LOGMASKED(LOG_RADIO, "dsp_hle: radio peer RX type=%02x sequence=%u t=%.6f\n",
@@ -1794,7 +2416,35 @@ void nokia_radio_peer_device::emit_report()
 
 void nokia_radio_peer_device::advance_after_report(u8 report_type)
 {
-	if (m_phase == phase::candidate_channel_change && report_type == 0x89)
+	if (m_phase == phase::serving_sch_observation &&
+			(report_type == 0x80 || report_type == 0x8a ||
+					report_type == 0x8f))
+	{
+		if (report_type == 0x80)
+		{
+			m_serving_loss_pending = false;
+			m_phase = phase::serving_bcch;
+			m_reports_remaining = serving_cycle_reports();
+			m_wait_ticks = 59;
+		}
+		else if (report_type == 0x8a)
+		{
+			// An unsuccessful power-synchronization observation precedes the
+			// finite-search terminal at the next SCH opportunity.
+			m_wait_ticks = 12;
+		}
+		else
+		{
+			// A finite synchronization search with no carrier cannot resume
+			// decoded blocks on the lost serving channel.  Wait for a new
+			// firmware-owned search or receiver configuration.
+			m_serving_loss_pending = false;
+			m_phase = phase::inactive;
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+		}
+	}
+	else if (m_phase == phase::candidate_channel_change && report_type == 0x89)
 	{
 		m_phase = phase::candidate_ra_info;
 		m_wait_ticks = 100;
@@ -1824,13 +2474,13 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		// A camped GSM cell broadcasts System Information continuously.
 		m_reports_remaining = serving_cycle_reports();
 	}
-	else if (m_phase == phase::selected_search && (report_type == 0x87 || report_type == 0x8f))
+	else if (m_phase == phase::serving_bcch && report_type == 0x8c)
 	{
-		m_phase = phase::serving_bcch;
-		m_reports_remaining = serving_cycle_reports();
+		// The indication replaces one scheduled PCH receive opportunity and
+		// therefore retains its ordinary control-multiframe pacing.
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::serving_idle_ra && report_type == 0x8c)
+	else if (m_phase == phase::selected_search && (report_type == 0x87 || report_type == 0x8f))
 	{
 		m_phase = phase::serving_bcch;
 		m_reports_remaining = serving_cycle_reports();
@@ -1838,8 +2488,19 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	}
 	else if (m_phase == phase::serving_channel_change && report_type == 0x89)
 	{
-		m_phase = phase::serving_bcch;
-		m_reports_remaining = serving_cycle_reports();
+		if (m_reselection_validation_pending)
+		{
+			// A newly committed serving cell must publish its own complete SI
+			// state before inherited registration can resume PCH. RR/MM, not
+			// the radio peer, decides whether the decoded LAI requires LU.
+			m_phase = phase::selected_bcch;
+			m_reports_remaining = 16;
+		}
+		else
+		{
+			m_phase = phase::serving_bcch;
+			m_reports_remaining = serving_cycle_reports();
+		}
 		m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::selected_channel_change && report_type == 0x89)
@@ -1860,6 +2521,12 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	}
 	else if (m_phase == phase::selected_bcch && report_type == 0x80)
 	{
+		if (m_reselection_validation_pending && m_reports_remaining == 0)
+		{
+			m_reselection_validation_pending = false;
+			m_phase = phase::serving_bcch;
+			m_reports_remaining = serving_cycle_reports();
+		}
 		m_wait_ticks = 59;
 	}
 	else if (m_phase == phase::selected_bcch && report_type == 0x83)
@@ -1868,6 +2535,7 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		// block remains paced by the multiframe delay set on that block.
 		if (m_reports_remaining == 0)
 		{
+			m_reselection_validation_pending = false;
 			m_phase = phase::serving_bcch;
 			m_reports_remaining = serving_cycle_reports();
 			m_wait_ticks = 59;
@@ -2054,6 +2722,7 @@ bool nokia_radio_peer_device::phase_waits() const
 	case phase::candidate_measurement:
 	case phase::candidate_sync:
 	case phase::serving_bcch:
+	case phase::serving_sch_observation:
 	case phase::selected_bcch:
 	case phase::serving_channel_change:
 	case phase::service_downlink:

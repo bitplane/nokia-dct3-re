@@ -137,6 +137,27 @@ NHM-2 paging adds no product field at all: page construction, DRX group
 selection, monitored/transmitted scheduling, session state and LAPDm release
 are the same generic components already exercised by NHM-5 and NHM-6.
 
+## Multi-cell mobility cleanup
+
+Idle reselection adds no handset-model outcome selector.  The network's typed
+cell table owns ARFCN/band, BSIC, PLMN/LAC/identity, SI content, restrictions
+and RF availability.  The radio peer owns per-cell measurements, decoded-BCCH
+validity, receiver context and saved downlink-loss state.  Firmware owns
+ranking, receiver publications, stable selection and the decision to start
+Location Updating.
+
+The existing atomic radio contracts continue to select only independently
+evidenced Nokia neighbour-list and acquisition grammar.  NSE-8's bitmap and
+the NHM product publications are not merged merely because all four ROMs reach
+the same standards-level result.  Paging groups, RR/MM, LAPDm, EF_LOCI
+handling and same-/different-LAC rules remain generic.
+
+The configuration ports used by mobility fixtures select network topology,
+RF/loss scenario and standards-level neighbour faults.  They are test inputs,
+not product defaults, and cannot name a desired serving cell in firmware.
+Named positive, negative, preserved-NVRAM and save-state targets are documented
+in `network_scouting.md`; dedicated-mode handover remains out of scope.
+
 ## Frozen post-NHM-2 frontier
 
 This cleanup starts from commit `6b30852` (`speech control`). Its named

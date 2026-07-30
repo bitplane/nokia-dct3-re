@@ -156,17 +156,23 @@ struct nokia_product_config
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NSE8 = {
 	nokia_radio_peer_device::acquisition_strategy::bitmap_multistage,
-	0x08, 0x00, 0, false
+	0x08, 0x00, 0, false, 0, false, true,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::low_six_bits
 };
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM5 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x14, 0x01, 1'000, true
+	0x14, 0x01, 1'000, true, 0, true, false,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::direct
 };
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x14, 0x01, 0, true
+	0x14, 0x01, 0, true, 0, true, true,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::topology_low_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
@@ -174,7 +180,12 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
 	// NHM-2 v5.46 organically publishes 0x14 in byte 15 of its TCH/F
 	// release CHANNEL_CONFIGURE transaction, matching the independently
 	// observed NHM-5/NHM-6 parameter without implying a bit meaning.
-	0x14, 0x01, 0, false
+	// NHM-2 v5.46 organically publishes 0x57 after a serving-cell
+	// DOWNLINK_SIGNALLING_FAIL and channel reconfiguration. Independent ROM6
+	// analysis identifies it as the request for a serving-cell SCH observation.
+	0x14, 0x01, 0, false, 0x57, false, false,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };
 
 constexpr nokia_dsp_hle_device::service_control_contract
@@ -686,6 +697,8 @@ public:
 		m_authentication_config(*this, "AUTHCFG"),
 		m_cipher_config(*this, "CIPHERCFG"),
 		m_mobility_config(*this, "MOBILITYCFG"),
+		m_neighbour_config(*this, "NEIGHBORCFG"),
+		m_neighbour_fault_config(*this, "NEIGHBORFAULT"),
 		m_outgoing_call_config(*this, "CALLCFG"),
 		m_outgoing_call_delay_config(*this, "CALLDELAY"),
 		m_outgoing_call_host_config(*this, "CALLHOST")
@@ -810,6 +823,8 @@ private:
 	optional_ioport m_authentication_config;
 	optional_ioport m_cipher_config;
 	optional_ioport m_mobility_config;
+	optional_ioport m_neighbour_config;
+	optional_ioport m_neighbour_fault_config;
 	optional_ioport m_outgoing_call_config;
 	optional_ioport m_outgoing_call_delay_config;
 	optional_ioport m_outgoing_call_host_config;
@@ -1057,7 +1072,7 @@ void nokia_dct3_state::machine_reset()
 		nokia_gsm_network_device::cell_profile::suitable,
 		nokia_gsm_network_device::cell_profile::barred,
 		nokia_gsm_network_device::cell_profile::unattainable_rxlev,
-		nokia_gsm_network_device::cell_profile::suitable
+		nokia_gsm_network_device::cell_profile::unavailable
 	};
 	static constexpr std::array PAGING_PROFILES = {
 		nokia_gsm_network_device::paging_profile::matched,
@@ -1065,8 +1080,6 @@ void nokia_dct3_state::machine_reset()
 		nokia_gsm_network_device::paging_profile::unmatched_identity,
 		nokia_gsm_network_device::paging_profile::malformed_request
 	};
-	m_gsm_network->set_cell_profile(
-			CELL_PROFILES[m_cell_config.read_safe(0x00) & 0x03]);
 	m_gsm_network->set_assignment_profile(
 			BIT(m_assignment_config.read_safe(0x00), 0) ?
 				nokia_gsm_network_device::assignment_profile::
@@ -1100,12 +1113,68 @@ void nokia_dct3_state::machine_reset()
 	m_gsm_network->set_periodic_update_timer(
 			gsm::mobility::periodic_update_timer(
 					BIT(m_mobility_config.read_safe(0x00), 0) ? 1 : 0));
+	static constexpr std::array MOBILITY_PROFILES = {
+		nokia_gsm_network_device::mobility_profile::single_cell,
+		nokia_gsm_network_device::mobility_profile::two_cell_same_lac,
+		nokia_gsm_network_device::mobility_profile::two_cell_different_lac,
+		nokia_gsm_network_device::mobility_profile::two_cell_loss_recovery,
+		nokia_gsm_network_device::mobility_profile::two_cell_persistent_loss,
+		nokia_gsm_network_device::mobility_profile::single_cell,
+		nokia_gsm_network_device::mobility_profile::single_cell,
+		nokia_gsm_network_device::mobility_profile::single_cell
+	};
+	m_gsm_network->set_mobility_profile(
+			MOBILITY_PROFILES[
+					(m_mobility_config.read_safe(0x00) >> 1) & 0x07]);
+	// The laboratory topology is independently configurable in GSM 900 or
+	// DCS 1800 terms. ARFCNs 823/824 are adjacent DCS carriers; this is network
+	// composition, not a product-specific acquisition outcome.
+	switch ((m_neighbour_config.read_safe(0x00) >> 2) & 0x03)
+	{
+	case 1:
+		m_gsm_network->set_cell_carriers(88, 89);
+		break;
+	case 2:
+		m_gsm_network->set_cell_carriers(823, 824);
+		break;
+	case 3:
+		m_gsm_network->set_cell_carriers(1, 823);
+		break;
+	default:
+		break;
+	}
+	if (BIT(m_neighbour_config.read_safe(0x00), 4))
+		m_gsm_network->set_neighbour_bsic(0);
+	static constexpr std::array NEIGHBOUR_FAULT_PROFILES = {
+		nokia_gsm_network_device::neighbour_fault_profile::none,
+		nokia_gsm_network_device::neighbour_fault_profile::
+				malformed_system_information,
+		nokia_gsm_network_device::neighbour_fault_profile::unstable_bsic,
+		nokia_gsm_network_device::neighbour_fault_profile::forbidden_plmn,
+		nokia_gsm_network_device::neighbour_fault_profile::
+				access_class_excluded,
+		nokia_gsm_network_device::neighbour_fault_profile::stale_measurement,
+		nokia_gsm_network_device::neighbour_fault_profile::none,
+		nokia_gsm_network_device::neighbour_fault_profile::none
+	};
+	const auto neighbour_fault = NEIGHBOUR_FAULT_PROFILES[
+			m_neighbour_fault_config.read_safe(0x00) & 0x07];
+	m_gsm_network->set_neighbour_fault_profile(neighbour_fault);
+	// Apply RF/suitability composition after topology construction so the
+	// single-cell and neighbour selectors address their intended cells rather
+	// than being overwritten by the mobility profile.
+	m_gsm_network->set_cell_profile(
+			CELL_PROFILES[m_cell_config.read_safe(0x00) & 0x03]);
+	m_gsm_network->set_neighbour_cell_profile(
+			CELL_PROFILES[m_neighbour_config.read_safe(0x00) & 0x03]);
 	m_gsm_session->set_authentication_required(
 			BIT(m_authentication_config.read_safe(0x00), 0) ||
 			m_gsm_network->cipher_algorithm() != gsm::a5::algorithm::a5_0);
 	m_radio_peer->set_page_after_registration(
 			BIT(network, 0) || BIT(network, 1) || BIT(network, 2) ||
 			BIT(network, 3));
+	m_radio_peer->set_page_requires_reselection(
+			BIT(m_page_config.read_safe(0x00), 2));
 	m_radio_peer->set_incoming_call_after_registration(BIT(network, 1));
 	m_radio_peer->set_incoming_sms_after_registration(BIT(network, 2));
 	m_radio_peer->set_incoming_smart_message_after_registration(BIT(network, 3));
@@ -1116,6 +1185,10 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_uplink_tch_burst_error_profile(
 			BIT(network, 7) ? 144 : 0, BIT(network, 7) ? 4 : 0);
 	m_sim_card->set_cphs_aoc(false);
+	m_sim_card->set_forbidden_test_plmn(
+			neighbour_fault ==
+					nokia_gsm_network_device::neighbour_fault_profile::
+							forbidden_plmn);
 	m_sim_card->set_cached_location(false);
 	// The removable laboratory subscriber explicitly selects 3GPP TS 55.205
 	// section 5's AES-based example A3/A8 profile.  A3/A8 is operator-owned;
@@ -1810,6 +1883,9 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x01, "Wrong paging group")
 	PORT_CONFSETTING(0x02, "Unmatched IMSI")
 	PORT_CONFSETTING(0x03, "Malformed Paging Request")
+	PORT_CONFNAME(0x04, 0x00, "Queued page delivery policy")
+	PORT_CONFSETTING(0x00, "After registration")
+	PORT_CONFSETTING(0x04, "After serving-cell reselection")
 
 	PORT_START("ASSIGNCFG")
 	PORT_CONFNAME(0x01, 0x00, "Immediate Assignment request reference")
@@ -1830,6 +1906,36 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x01, 0x00, "Periodic Location Updating (SI3 T3212)")
 	PORT_CONFSETTING(0x00, "Disabled (T3212=0)")
 	PORT_CONFSETTING(0x01, "Every 6 minutes (T3212=1)")
+	PORT_CONFNAME(0x0e, 0x00, "Idle mobility topology")
+	PORT_CONFSETTING(0x00, "Single stable cell")
+	PORT_CONFSETTING(0x02, "Two cells, same location area; serving cell loss")
+	PORT_CONFSETTING(0x04, "Two cells, different location areas; serving cell loss")
+	PORT_CONFSETTING(0x06, "All-cell loss followed by serving-cell RF recovery")
+	PORT_CONFSETTING(0x08, "Persistent all-cell loss")
+
+	PORT_START("NEIGHBORCFG")
+	PORT_CONFNAME(0x03, 0x00, "Neighbour-cell radio/suitability profile")
+	PORT_CONFSETTING(0x00, "Suitable and receivable")
+	PORT_CONFSETTING(0x01, "Cell barred")
+	PORT_CONFSETTING(0x02, "RXLEV_ACCESS_MIN unattainable")
+	PORT_CONFSETTING(0x03, "Carrier unavailable")
+	PORT_CONFNAME(0x0c, 0x00, "Laboratory multi-cell carriers")
+	PORT_CONFSETTING(0x00, "GSM 900 (ARFCN 1/2)")
+	PORT_CONFSETTING(0x04, "GSM 900 (ARFCN 88/89)")
+	PORT_CONFSETTING(0x08, "DCS 1800 (ARFCN 823/824)")
+	PORT_CONFSETTING(0x0c, "GSM 900 serving / DCS 1800 neighbour")
+	PORT_CONFNAME(0x10, 0x00, "Laboratory neighbour BSIC")
+	PORT_CONFSETTING(0x00, "BSIC 0x22")
+	PORT_CONFSETTING(0x10, "BSIC 0x00")
+
+	PORT_START("NEIGHBORFAULT")
+	PORT_CONFNAME(0x07, 0x00, "Neighbour validation fault")
+	PORT_CONFSETTING(0x00, "None")
+	PORT_CONFSETTING(0x01, "Malformed system information")
+	PORT_CONFSETTING(0x02, "Unstable BSIC")
+	PORT_CONFSETTING(0x03, "Forbidden PLMN")
+	PORT_CONFSETTING(0x04, "Subscriber access class barred")
+	PORT_CONFSETTING(0x05, "Candidate lost after measurement")
 
 	PORT_START("CALLCFG")
 	PORT_CONFNAME(0x03, 0x00, "Laboratory outgoing-call outcome")

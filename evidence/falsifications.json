@@ -393,6 +393,12 @@
       "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
     },
     {
+      "id": "post_camp_type88_starts_neighbour_bcch_measurement", "status": "disproven",
+      "hypothesis": "After the organic NHM-2 NEIGHBOUR_LIST publication, a type-0x88 observation derived from the neighbour ARFCN, shared GSM frame clock and zero relative timing is sufficient to make firmware publish NMEAS_INSTRUCTIONS",
+      "conclusion": "A two-cell NHM-2 run organically published NEIGHBOUR_LIST for ARFCN 2. One experiment placed the independently known BSIC in an unproved trailing control field; a stricter repeat instead sent success-zero in both recovered control fields, preceded each timing observation with the public-trace-shaped 24-byte RSSI_RESULTS prefix and used only radio-derived ARFCN, signal and timing values. Firmware consumed every report but emitted no NMEAS_INSTRUCTIONS, candidate receiver configuration or neighbour BCCH request before the standards-counter-driven DOWNLINK_SIGNALLING_FAIL indication. The timing reports were removed. Neighbour-list membership, structured power samples and plausible timing objects do not establish the missing controller correlation or candidate-record lifecycle.",
+      "evidence": ["docs/network_scouting.md", "docs/dsp_interface.md"]
+    },
+    {
       "id": "radio_channel_change_packet_is_state_independent", "status": "disproven",
       "hypothesis": "CHANNEL_CHANGED_CNF type 0x89 can be sent at any point after a candidate appears",
       "conclusion": "Handler 0x284f74 accepts type 0x89 only while controller acceptance byte 0x10dbd7 is 2. Earlier packets are discarded in state 1 and packets after the window closes cannot drive the same transition. The retained peer sends NO_PSW_LEFT before CHANNEL_CHANGED_CNF and the coherent trace observes task-10 0x1393 plus firmware-owned task-11 action 1.",
@@ -485,7 +491,7 @@
     {
       "id": "idle_ra_completion_before_si_causes_empty_selection", "status": "disproven",
       "hypothesis": "The radio peer completes IDLE_RA too early, so task 11 consumes the serving carrier before SI1-SI4 can promote it",
-      "conclusion": "A bounded peer experiment delayed the organic type-0x8c IDLE_RA completion until all four serving SI blocks had been accepted. Task 10 then constructed 0x13a5 after SI1-SI4, but task 11 still rebuilt one tag-0x3c carrier, selected index 0xff and returned result zero. The original request-driven ordering was restored; carrier promotion requires another firmware-owned lifecycle.",
+      "conclusion": "This experiment was based on an incorrect packet name. The public NHM-5 trace catalogue identifies DSP type 0x8c as DOWNLINK_SIGNALLING_FAIL, not an IDLE_RA completion. Injecting that failure indication after SI1-SI4 made task 10 construct 0x13a5, but task 11 still rebuilt one tag-0x3c carrier, selected index 0xff and returned result zero. The synthetic IDLE_RA reply has been removed; the retained peer emits type 0x8c only from its TS 45.008 paging-block failure counter.",
       "evidence": ["docs/network_scouting.md", "tools/radio_camp_trace_check.py"]
     },
     {
@@ -697,6 +703,36 @@
       "hypothesis": "NHM-5 can receive incoming SETUP immediately after it acknowledges MM Information at LAPDm because the acknowledgement proves the firmware application transaction is complete",
       "conclusion": "Immediate SETUP is decoded as CC event 0x0a57 but the handset completes only its visible date/time update and returns idle. Holding the already queued SETUP across the NHM-5 MM/UI settling interval, without changing firmware state or payloads, produces the incoming-caller UI. A physical Navi press then changes the firmware-authored softkey from Answer to End. LAPDm acknowledgement proves link receipt, not completion of the product's MM/UI consumer; NSE-8 retains acknowledgement-only pacing.",
       "evidence": ["driver/nokia_radio_peer.cpp", "docs/model_coverage.md", "Makefile"]
+    },
+    {
+      "id": "nhm2_downlink_signalling_fail_has_zero_length_mdi_envelope", "status": "disproven",
+      "hypothesis": "The catalogue's bodyless DOWNLINK_SIGNALLING_FAIL description means type 0x8c must use a zero-length DSPIF ring payload",
+      "conclusion": "NHM-2 consumes a zero-length 0x008c ring header in the FIQ walker but schedules no non-idle radio task. The recovered fixed eight-byte MDI envelope must remain even though the indication has no semantic fields. Bodyless describes the indication object, not a zero-length DSPIF transport packet.",
+      "evidence": ["driver/nokia_radio_peer.cpp", "docs/dsp_interface.md", "docs/network_scouting.md"]
+    },
+    {
+      "id": "nhm2_steady_idle_loss_uses_no_bcch_left", "status": "disproven",
+      "hypothesis": "NHM-2 steady-idle serving-cell loss is initiated by the catalogue's NO_BCCH_LEFT indication 0x87 rather than DOWNLINK_SIGNALLING_FAIL 0x8c",
+      "conclusion": "After organic registration, neighbour publication, a complete ARFCN-2 SI1--SI4 observation window and return to serving PCH, the semantic scenario removed ARFCN 1 and exhausted the standards downlink-signalling counter. A bounded diagnostic substitution delivered a correctly enveloped 0x87. Firmware consumed it but produced no scan request, receiver retune, RR transaction or MM transaction through 109 seconds. The substitution was removed. NO_BCCH_LEFT remains the evidenced finite-search terminal and must not be aliased to steady-idle serving loss.",
+      "evidence": ["driver/nokia_radio_peer.cpp", "docs/network_scouting.md"]
+    },
+    {
+      "id": "nhm2_dls_requires_failed_block_then_measurement_order", "status": "disproven",
+      "hypothesis": "NHM-2 ignores steady-idle DOWNLINK_SIGNALLING_FAIL only because the DSP indication replaces the final failed paging block instead of following that block and its scheduled RSSI report",
+      "conclusion": "A bounded ordering experiment delivered the final failed PCH block, then the ordinary structured RSSI report, then a correctly enveloped 0x8c. Firmware still produced no search, tuning or RR/MM transition. Repeating the latched indication on later PCH opportunities also had no effect and was removed. A read-only ROM-boundary probe established that the type-0x8c consumer's radio work pointer names a released object in this steady-idle phase; the missing prerequisite is the firmware-owned periodic measurement/work lifecycle, not permutation of unsolicited reports.",
+      "evidence": ["driver/nokia_radio_peer.cpp", "docs/network_scouting.md"]
+    },
+    {
+      "id": "nhm2_post_loss_type57_is_type55_scan_alias", "status": "disproven",
+      "hypothesis": "NHM-2's organic post-loss DSP publication 0x57/0305 is a packet-type variant of its initial 0x55/0305 autonomous band-scan request and therefore accepts the same ALL_RSSI_RESULTS response",
+      "conclusion": "After the standards downlink-signalling counter reached zero, NHM-2 organically reconfigured channel 0x60, accepted CHANNEL_CHANGED_CNF and published 0x57/0305 from the same generic task-54 DSP queue path used by 0x55. A bounded diagnostic treated it as a scan request and returned a standards-derived ALL_RSSI_RESULTS containing only the restored, strong ARFCN 2. Firmware emitted no candidate list, synchronization, receiver tune or RR/MM transition through 60 seconds. Packet payload and queue-path similarity do not establish response semantics; the diagnostic alias and its temporary firmware probes were removed.",
+      "evidence": ["driver/nokia_radio_peer.cpp", "docs/network_scouting.md"]
+    },
+    {
+      "id": "nhm2_neighbour_timing_24bit_field_is_zero_relative_offset", "status": "disproven",
+      "hypothesis": "The 24-bit field of correlated type-0x88 NEIGHBOUR_TIMING_OFFSET is a zero relative offset for synchronized laboratory cells rather than the shared GSM time",
+      "conclusion": "After organic stable camp, neighbour publication and mode-2 NMEAS_INSTRUCTIONS, zeroing the 24-bit field made the firmware request one-frame observations continuously, producing more than 500 correlated exchanges in under three seconds before reconfiguring the old serving ARFCN. Restoring the shared TDMA frame number yields a bounded measurement transaction. The separate 16-bit field remains the zero relative cell-timing value.",
+      "evidence": ["driver/nokia_radio_peer.cpp", "docs/6110_bringup.md", "docs/network_scouting.md"]
     }
   ]
 }

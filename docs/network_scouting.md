@@ -172,7 +172,7 @@ SEARCH_LIST (0x1a)
   -> SCH RECEIVED_BLOCK (0x80, channel 0x40)
   -> CHANNEL_CONFIGURE (0x02)
   -> NO_PSW_LEFT (0x8f) -> CHANNEL_CHANGED_CNF (0x89)
-  -> IDLE_RA (0x0c) -> IDLE_RA completion (0x8c)
+  -> IDLE_RA (0x0c)
   -> task-11 acquisition action 1
   -> paced BCCH SI1, SI2, SI3 and SI4
   -> random access and Immediate Assignment to SDCCH
@@ -501,7 +501,7 @@ activated the synthetic EEPROM's unmodeled network-lock policy and displayed
 | RX `0x84` | RA_INFO | timing input used by the access controller |
 | RX `0x87` | NO_BCCH_LEFT | finite search terminal only when no usable cell remains |
 | RX `0x89` | CHANNEL_CHANGED_CNF | response to an organic channel-configure request; NHM-5 correlates body bit 0 with its pending context: assigned SDCCH requires one and release requires zero |
-| RX `0x8c` | IDLE_RA completion | completes receiver/random-access configuration |
+| RX `0x8c` | DOWNLINK_SIGNALLING_FAIL | bodyless DSP indication after the TS 45.008 paging-block failure counter reaches zero; it is not an IDLE_RA acknowledgement |
 | RX `0x8f` | NO_PSW_LEFT | closes the initial power-scan work list |
 | MCU `0x0c` | IDLE_RA/random access | form 0 carries the CHANNEL REQUEST octet |
 | MCU `0x1b` | SEND_BLOCK | two-byte DSP channel header followed by LAPDm; TCH/F FACCH uses active selector `0xb0` and empty polling reports `0xf0` |
@@ -629,10 +629,63 @@ terminal state, continued CCONT watchdog reloads and no invalid fetch.  This
 fixes a pre-existing long-idle failure at 111 seconds which reproduced with
 T3212 disabled; periodic mobility did not cause that divergence.
 
-Known extensions are cell-change and other mobility-driven Location Updating,
-MO SMS, MT SMS CP/RP closure, multipart Smart Messaging and ringtone
-UI/persistence, handover, measurement reporting, loss/reselection, rejected
-registration and configurable multi-cell topology.
+### Multi-cell/reselection frontier
+
+Idle-mode two-cell mobility is now an acceptance boundary.  The generic
+topology stores each cell's ARFCN, band, BSIC, PLMN, LAC, identity, signal
+condition, access minimum, barred/access-class state and availability.
+SI1--SI4 and control-channel scheduling are generated for the addressed cell;
+GSM-900 bitmap-0 and DCS variable-bitmap frequency lists are standards-shaped.
+Decoded BCCH state, measurement history, receiver selection, paging and
+dedicated-channel state remain separate.
+
+Firmware still owns candidate ranking and selection.  The peer reports signed
+serving and neighbour measurements, applies the TS 45.008 downlink-signalling
+counter to lost PCH blocks, observes the handset's product-typed neighbour
+grammar, and supplies SCH/BCCH only for a receivable configured carrier with a
+stable matching BSIC.  NSE-8 uses its evidenced reversed bitmap publication;
+NHM-5, NHM-6 and NHM-2 retain their independently recovered packet contracts.
+Matching outcomes do not merge those Nokia grammars.
+
+`verify-radio-reselection-same-lac` and its 3310/3330/3410 counterparts prove
+organic loss of cell A, measurement and synchronization of cell B, SI1--SI4
+decode, selection and resumed PCH.  The same-LAC gate requires no second
+CHANNEL REQUEST or MM transaction and no EF_LOCI mutation.  The paging variants
+then schedule a page in the replacement cell's paging group, receive the
+organic Paging Response and release cleanly back to PCH.
+
+The corresponding `different-lac` gates require a second firmware-originated
+Location Updating transaction on cell B, ordinary Immediate Assignment and
+LAPDm, Location Updating Accept, the cell-B LAI write to EF_LOCI, RR release
+and stable PCH.  Preserved-NVRAM cold boots prove that the retained old LAI is
+carried into the first organic update.  NSE-8 retains cell A as the old LAI for
+the post-reselection request and does not rewrite an already-valid status byte.
+NHM-2 independently invalidates EF_LOCI before that request and consequently
+uses the GSM invalid-location value; its gate requires the preceding
+firmware-owned EF_LOCI write rather than normalizing it to NSE-8 behavior.
+
+Loss/recovery gates remove all usable carriers, require the firmware-owned
+loss/search lifecycle, then restore a valid cell and recover PCH without
+subscriber-state fabrication.  Persistent-loss gates require no false camp or
+location mutation while no carrier is usable.  Save-state gates compare exact
+reference/restored radio records while camped, during degradation/search,
+during candidate acquisition and across post-reselection Location Updating.
+Topology, decoded-cell state, measurement counters, TDMA context and pending
+RR/MM work are emulation-owned saved state; empty bodyless DSP polls are not
+radio events and sockets or other external transports are never serialized.
+
+Negative fixtures cover barred cells, unattainable `RXLEV_ACCESS_MIN`,
+malformed SI, unstable BSIC, forbidden PLMN, access-class exclusion, stale
+measurements and unsupported neighbour bands.  A receiver commit used to read
+candidate BCCH is not called stable camp: the RXLEV gate specifically requires
+that no PCH follows the decoded unsuitable threshold.  Access-class barring may
+permit cell selection but must block MM access.  No negative case may originate
+a second Location Updating transaction or mutate EF_LOCI.
+
+Dedicated-mode handover remains deliberately outside this boundary.
+Other known extensions are MO SMS, MT SMS CP/RP closure, multipart Smart
+Messaging and ringtone UI/persistence, rejected registration and broader RF
+propagation.
 Each extension must begin with an organic MCU request or a standards-defined
 network event and retain the same request-correlation rule.
 

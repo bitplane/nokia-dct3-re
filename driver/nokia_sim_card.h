@@ -17,6 +17,10 @@ public:
 
 	void set_cphs_aoc(bool enabled) { m_cphs_aoc = enabled; }
 	void set_cached_location(bool enabled) { m_cached_location = enabled; }
+	void set_forbidden_test_plmn(bool enabled)
+	{
+		m_forbidden_test_plmn = enabled;
+	}
 	void set_authentication(authentication_profile profile,
 			const gsm::a3a8::block &ki)
 	{
@@ -80,6 +84,7 @@ private:
 	devcb_write8 m_response_cb;
 	bool m_cphs_aoc = false;
 	bool m_cached_location = false;
+	bool m_forbidden_test_plmn = false;
 	authentication_profile m_authentication_profile =
 			authentication_profile::none;
 	gsm::a3a8::block m_ki{};

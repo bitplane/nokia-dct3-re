@@ -1004,6 +1004,12 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	if (fid == 0x6f30 && offset < std::size(plmn_selector)) return plmn_selector[offset];
 	if (fid == 0x6f46 && offset < std::size(service_provider_name)) return service_provider_name[offset];
 	if (fid == 0x6f78 && offset < std::size(access_control_class)) return access_control_class[offset];
+	if (fid == 0x6f7b && m_forbidden_test_plmn)
+	{
+		static constexpr u8 forbidden_plmn[] = { 0x13, 0x00, 0x62 };
+		return offset < std::size(forbidden_plmn) ?
+				forbidden_plmn[offset] : 0xff;
+	}
 	if (m_cphs_aoc && fid == 0x6f16 && offset < std::size(cphs_info)) return cphs_info[offset];
 	if (m_cphs_aoc && fid == 0x6f15 && offset < std::size(cphs_aoc)) return cphs_aoc[offset];
 	if (m_cphs_aoc && fid == 0x6f37 && offset < std::size(acm_max)) return acm_max[offset];

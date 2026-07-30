@@ -129,6 +129,10 @@ BOOT_ENV := NOKIA_DCT3_LUA_QUIET=1
 # at their ordinary boundaries. No firmware state is changed.
 CONTACT_SERVICE_ARGS := -cfg_directory ../fixtures/contact_service
 RADIO_PAGING_ARGS := -cfg_directory ../fixtures/radio_paging
+RADIO_RESELECTION_SAME_LAC_ARGS := -cfg_directory ../fixtures/radio_reselection_same_lac
+RADIO_RESELECTION_DIFFERENT_LAC_ARGS := -cfg_directory ../fixtures/radio_reselection_different_lac
+RADIO_RESELECTION_LOSS_RECOVERY_ARGS := -cfg_directory ../fixtures/radio_reselection_loss_recovery
+RADIO_RESELECTION_PAGING_ARGS := -cfg_directory ../fixtures/radio_reselection_paging
 RADIO_AUTHENTICATION_ARGS := -cfg_directory ../fixtures/radio_authentication
 RADIO_INCOMING_CALL_ARGS := -cfg_directory ../fixtures/radio_incoming_call
 RADIO_INCOMING_CALL_ANSWERED_ARGS := -cfg_directory ../fixtures/radio_incoming_call_answered
@@ -1088,6 +1092,352 @@ verify-radio-registration:
 		RUN_VERBOSE=1
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log
+
+.PHONY: verify-radio-reselection-same-lac verify-radio-reselection-different-lac \
+	verify-radio-reselection-state verify-radio-loss-recovery \
+	verify-radio-reselection-preserved \
+	verify-radio-loss-recovery-state verify-radio-all-cell-loss \
+	verify-radio-reselection-paging \
+	verify-3310-radio-reselection-same-lac \
+	verify-3310-radio-reselection-different-lac \
+	verify-3310-radio-reselection-state \
+	verify-3310-radio-reselection-preserved \
+	verify-3310-radio-reselection-paging \
+	verify-3330-radio-reselection-same-lac \
+	verify-3330-radio-reselection-different-lac \
+	verify-3330-radio-reselection-state \
+	verify-3330-radio-reselection-preserved \
+	verify-3330-radio-reselection-paging \
+	verify-3410-radio-reselection-same-lac \
+	verify-3410-radio-reselection-different-lac \
+	verify-3410-radio-reselection-state \
+	verify-3410-radio-reselection-preserved \
+	verify-3410-radio-reselection-paging \
+	verify-3410-radio-loss-recovery verify-3410-radio-loss-recovery-state \
+	verify-3410-radio-all-cell-loss \
+	verify-radio-reselection-unsuitable-neighbours
+
+verify-radio-reselection-same-lac:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 \
+		RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nse8
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac
+
+verify-radio-reselection-different-lac:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 \
+		RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile different-lac
+
+verify-radio-reselection-state:
+	@for boundary in camped candidate location-update; do \
+		if test "$$boundary" = camped; then at=18.00; replay=500; \
+		elif test "$$boundary" = candidate; then at=23.20; replay=1000; \
+		else at=24.20; replay=100; fi; \
+		$(MAKE) --no-print-directory run PHONE=noki3210 \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=70 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log --profile different-lac || exit; \
+	done
+
+verify-radio-reselection-preserved:
+	@$(MAKE) --no-print-directory verify-radio-reselection-different-lac \
+		RUN_DIR=$(RUN_DIR)_fresh
+	@$(MAKE) --no-print-directory run PHONE=noki3210 \
+		RUN_DIR=$(RUN_DIR)_cold SECONDS=70 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	$(PYTHON) tools/radio_reselection_preserved_trace_check.py \
+		$(RUN_DIR)_cold/error.log
+
+verify-radio-loss-recovery:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 \
+		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nse8
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile loss-recovery --radio-profile nse8
+
+verify-radio-loss-recovery-state:
+	@for boundary in degradation search; do \
+		if test "$$boundary" = degradation; then at=20.95; replay=500; \
+		else at=21.08; replay=150; fi; \
+		$(MAKE) --no-print-directory run PHONE=noki3210 \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log --profile loss-recovery \
+			--radio-profile nse8 || exit; \
+	done
+
+verify-radio-all-cell-loss:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 \
+		RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nse8
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nse8
+
+verify-radio-reselection-unsuitable-neighbours: normalize-3410
+	@for profile in barred rxlev malformed forbidden stale; do \
+		$(MAKE) --no-print-directory run PHONE=noki3210 \
+			RUN_DIR=$(RUN_DIR)_$$profile SECONDS=45 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_reselection_neighbour_$$profile" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_negative_trace_check.py \
+			$(RUN_DIR)_$$profile/error.log --profile $$profile || exit; \
+	done
+	@$(MAKE) --no-print-directory run PHONE=noki3210 \
+		RUN_DIR=$(RUN_DIR)_unsupported_band SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_neighbour_unsupported_band'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_unsupported_band/error.log
+	$(PYTHON) tools/radio_reselection_negative_trace_check.py \
+		$(RUN_DIR)_unsupported_band/error.log --profile unsupported-band \
+		--neighbour-arfcn 823
+	@for profile in bsic access_class; do \
+		check_profile=$$(echo $$profile | tr _ -); \
+		$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+			RUN_DIR=$(RUN_DIR)_3410_$$profile SECONDS=50 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_reselection_neighbour_$$profile" \
+			RUN_ENV='$(NOKI3410_RADIO_INPUT)' || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_3410_$$profile/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_negative_trace_check.py \
+			$(RUN_DIR)_3410_$$profile/error.log \
+			--profile $$check_profile || exit; \
+	done
+
+verify-radio-reselection-paging:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 \
+		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac --paging-after-reselection
+	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
+
+verify-3310-radio-reselection-same-lac:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nhm5
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac --radio-profile nhm5 \
+		--serving-arfcn 88 --neighbour-arfcn 89
+
+verify-3310-radio-reselection-different-lac:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile different-lac --radio-profile nhm5 \
+		--serving-arfcn 88 --neighbour-arfcn 89
+
+verify-3310-radio-reselection-state:
+	@for boundary in candidate location-update; do \
+		if test "$$boundary" = candidate; then at=17.25; replay=400; \
+		else at=52.85; replay=300; fi; \
+		$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=70 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log --profile different-lac \
+			--radio-profile nhm5 --serving-arfcn 88 \
+			--neighbour-arfcn 89 || exit; \
+	done
+
+verify-3310-radio-reselection-preserved:
+	@$(MAKE) --no-print-directory verify-3310-radio-reselection-different-lac \
+		RUN_DIR=$(RUN_DIR)_fresh
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR)_cold SECONDS=70 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	$(PYTHON) tools/radio_reselection_preserved_trace_check.py \
+		$(RUN_DIR)_cold/error.log --serving-arfcn 88 --neighbour-arfcn 89
+
+verify-3310-radio-reselection-paging:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac --radio-profile nhm5 \
+		--serving-arfcn 88 --neighbour-arfcn 89 \
+		--paging-after-reselection
+	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
+
+verify-3330-radio-reselection-same-lac: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nhm6
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac --radio-profile nhm6 \
+		--serving-arfcn 823 --neighbour-arfcn 824
+
+verify-3330-radio-reselection-different-lac: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile different-lac --radio-profile nhm6 \
+		--serving-arfcn 823 --neighbour-arfcn 824
+
+verify-3330-radio-reselection-state: normalize-3330
+	@for boundary in candidate location-update; do \
+		if test "$$boundary" = candidate; then at=19.10; replay=300; \
+		else at=20.95; replay=250; fi; \
+		$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=35 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log --profile different-lac \
+			--radio-profile nhm6 --serving-arfcn 823 \
+			--neighbour-arfcn 824 || exit; \
+	done
+
+verify-3330-radio-reselection-preserved: normalize-3330
+	@$(MAKE) --no-print-directory verify-3330-radio-reselection-different-lac \
+		RUN_DIR=$(RUN_DIR)_fresh
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_cold SECONDS=35 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	$(PYTHON) tools/radio_reselection_preserved_trace_check.py \
+		$(RUN_DIR)_cold/error.log --serving-arfcn 823 --neighbour-arfcn 824
+
+verify-3330-radio-reselection-paging: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac --radio-profile nhm6 \
+		--serving-arfcn 823 --neighbour-arfcn 824 \
+		--paging-after-reselection
+	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
+
+verify-3410-radio-reselection-same-lac: normalize-3410
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)' \
+	RUN_ENV='$(NOKI3410_RADIO_INPUT)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nhm2
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac
+
+verify-3410-radio-reselection-different-lac: normalize-3410
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=90 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
+	RUN_ENV='$(NOKI3410_RADIO_INPUT)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile different-lac --radio-profile nhm2
+
+verify-3410-radio-reselection-state: normalize-3410
+	@for boundary in camped candidate location-update; do \
+		if test "$$boundary" = camped; then at=11.50; replay=500; \
+		elif test "$$boundary" = candidate; then at=19.90; replay=1000; \
+		else at=54.62; replay=100; fi; \
+		$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=90 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log --profile different-lac \
+			--radio-profile nhm2 || exit; \
+	done
+
+verify-3410-radio-reselection-preserved: normalize-3410
+	@$(MAKE) --no-print-directory verify-3410-radio-reselection-different-lac \
+		RUN_DIR=$(RUN_DIR)_fresh
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR)_cold SECONDS=90 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
+		RUN_ENV='$(NOKI3410_RADIO_INPUT)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	$(PYTHON) tools/radio_reselection_preserved_trace_check.py \
+		$(RUN_DIR)_cold/error.log --allow-pre-update-invalidation
+
+verify-3410-radio-reselection-paging: normalize-3410
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=50 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)' \
+		RUN_ENV='$(NOKI3410_RADIO_INPUT)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile same-lac --radio-profile nhm2 \
+		--paging-after-reselection
+	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
+
+verify-3410-radio-loss-recovery: normalize-3410
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \
+		RUN_ENV='$(NOKI3410_RADIO_INPUT)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nhm2
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile loss-recovery --radio-profile nhm2
+
+verify-3410-radio-loss-recovery-state: normalize-3410
+	@for boundary in degradation sch; do \
+		if test "$$boundary" = degradation; then at=16.70; replay=700; \
+		else at=17.07; replay=150; fi; \
+		$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log --profile loss-recovery \
+			--radio-profile nhm2 || exit; \
+	done
+
+verify-3410-radio-all-cell-loss: normalize-3410
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss' \
+		RUN_ENV='$(NOKI3410_RADIO_INPUT)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_registration_trace_check.py \
+		$(RUN_DIR)/error.log --profile nhm2
+	$(PYTHON) tools/radio_reselection_trace_check.py \
+		$(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nhm2
 
 verify-radio-authentication-boundary:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=25 \

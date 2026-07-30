@@ -44,11 +44,223 @@ nokia_gsm_network_device::nokia_gsm_network_device(
 
 void nokia_gsm_network_device::device_start()
 {
+	save_item(NAME(m_stable_camp_seen));
+	save_item(NAME(m_neighbour_bcch_seen));
+	save_item(NAME(m_primary_cell_lost));
+	save_item(NAME(m_all_cells_lost));
+	save_item(NAME(m_recovery_cell_available));
+	save_item(NAME(m_stale_neighbour_lost));
+}
+
+void nokia_gsm_network_device::device_reset()
+{
+	m_stable_camp_seen = false;
+	m_neighbour_bcch_seen = false;
+	m_primary_cell_lost = false;
+	m_all_cells_lost = false;
+	m_recovery_cell_available = false;
+	m_stale_neighbour_lost = false;
+}
+
+void nokia_gsm_network_device::set_mobility_profile(mobility_profile profile)
+{
+	m_mobility_profile = profile;
+	m_stable_camp_seen = false;
+	m_neighbour_bcch_seen = false;
+	m_primary_cell_lost = false;
+	m_all_cells_lost = false;
+	m_recovery_cell_available = false;
+	m_stale_neighbour_lost = false;
+	if (profile == mobility_profile::single_cell)
+	{
+		m_cells.use_single_cell();
+		return;
+	}
+
+	gsm::mobility::cell primary;
+	gsm::mobility::cell neighbour = primary;
+	neighbour.arfcn = 2;
+	neighbour.bsic = 0x22;
+	neighbour.identity = 2;
+	neighbour.rxlev_dbm = -55;
+	if (profile == mobility_profile::two_cell_different_lac)
+		neighbour.location.lac = 2;
+	else if (profile == mobility_profile::two_cell_loss_recovery ||
+			profile == mobility_profile::two_cell_persistent_loss)
+		neighbour.rxlev_dbm = -70;
+	m_cells.set(0, primary);
+	m_cells.set(1, neighbour);
+}
+
+void nokia_gsm_network_device::set_cell_carriers(
+		u16 primary_arfcn, u16 neighbour_arfcn)
+{
+	if (auto *primary = m_cells.at(0))
+		primary->arfcn = primary_arfcn;
+	if (auto *neighbour = m_cells.at(1))
+		neighbour->arfcn = neighbour_arfcn;
+}
+
+void nokia_gsm_network_device::set_neighbour_bsic(u8 bsic)
+{
+	if (auto *neighbour = m_cells.at(1))
+		neighbour->bsic = bsic & 0x3f;
+}
+
+void nokia_gsm_network_device::set_neighbour_fault_profile(
+		neighbour_fault_profile profile)
+{
+	m_neighbour_fault = profile;
+	m_stale_neighbour_lost = false;
+	auto *cell = m_cells.at(1);
+	if (!cell)
+		return;
+	if (profile == neighbour_fault_profile::forbidden_plmn)
+		cell->location.plmn = { 0x13, 0x00, 0x62 };
+	if (profile == neighbour_fault_profile::access_class_excluded)
+		// Exclude every ordinary subscriber class (0..9). Emergency and
+		// privileged classes retain their separate standards semantics.
+		cell->access_class_barred = 0x03ff;
+}
+
+u8 nokia_gsm_network_device::synchronization_bsic(
+		u16 arfcn, u32 frame_number) const
+{
+	const auto *cell = m_cells.find(arfcn);
+	if (!cell)
+		return 0;
+	if (cell == m_cells.at(1) &&
+			m_neighbour_fault == neighbour_fault_profile::unstable_bsic)
+		return cell->bsic ^ ((frame_number / 10) & 1);
+	return cell->bsic;
+}
+
+bool nokia_gsm_network_device::synchronization_stable(u16 arfcn) const
+{
+	return !(m_neighbour_fault == neighbour_fault_profile::unstable_bsic &&
+			m_cells.at(1) && arfcn == m_cells.at(1)->arfcn);
+}
+
+bool nokia_gsm_network_device::system_information_decodable(u16 arfcn) const
+{
+	if (!m_cells.at(1) || arfcn != m_cells.at(1)->arfcn)
+		return true;
+	return m_neighbour_fault !=
+					neighbour_fault_profile::malformed_system_information &&
+			m_neighbour_fault != neighbour_fault_profile::unstable_bsic;
+}
+
+bool nokia_gsm_network_device::configured_neighbour(
+		u16 serving_arfcn, u16 candidate_arfcn) const
+{
+	return m_cells.find(serving_arfcn) &&
+			m_cells.find(candidate_arfcn) &&
+			serving_arfcn != candidate_arfcn;
+}
+
+void nokia_gsm_network_device::stable_camp_observed()
+{
+	if (m_mobility_profile == mobility_profile::single_cell)
+		return;
+	m_stable_camp_seen = true;
+}
+
+void nokia_gsm_network_device::neighbour_list_observed()
+{
+	if (m_mobility_profile == mobility_profile::single_cell)
+		return;
+	// The deterministic mobility scenario changes RF conditions only after
+	// firmware has demonstrated stable camp and published a neighbour set.
+	// BSIC/SI validation, suitability and selection remain handset-owned
+	// consequences of that standards-level signal degradation.
+	if (m_mobility_profile != mobility_profile::two_cell_loss_recovery)
+		m_primary_cell_lost = m_stable_camp_seen;
+}
+
+void nokia_gsm_network_device::neighbour_bcch_observed(u16 arfcn)
+{
+	if (m_mobility_profile == mobility_profile::single_cell ||
+			!m_cells.at(0) || arfcn == m_cells.at(0)->arfcn)
+		return;
+	m_neighbour_bcch_seen = true;
+	if (m_neighbour_fault == neighbour_fault_profile::stale_measurement)
+		m_stale_neighbour_lost = true;
+	if ((m_mobility_profile == mobility_profile::two_cell_loss_recovery ||
+				m_mobility_profile ==
+						mobility_profile::two_cell_persistent_loss) &&
+			m_stable_camp_seen)
+		m_all_cells_lost = true;
+}
+
+void nokia_gsm_network_device::downlink_signalling_failed(u16 serving_arfcn)
+{
+	if (m_mobility_profile != mobility_profile::two_cell_loss_recovery ||
+			!m_all_cells_lost || !m_cells.at(0) ||
+			serving_arfcn != m_cells.at(0)->arfcn)
+		return;
+	// The deterministic RF scenario restores the former serving carrier after
+	// the handset has organically exhausted the TS 45.008 downlink-signalling
+	// counter. This proves no-service recovery independently from replacement-
+	// cell reselection; search, suitability and selection remain firmware-owned.
+	m_all_cells_lost = false;
+	m_recovery_cell_available = true;
+}
+
+bool nokia_gsm_network_device::cell_receivable(u16 arfcn) const
+{
+	const auto *cell = m_cells.find(arfcn);
+	if (!cell)
+		return m_cells.size() == 1;
+	if (m_all_cells_lost)
+		return false;
+	if (m_stale_neighbour_lost && cell == m_cells.at(1))
+		return false;
+	if (m_mobility_profile == mobility_profile::two_cell_loss_recovery &&
+			m_recovery_cell_available)
+		return cell == m_cells.at(0) && cell->available;
+	return cell->available;
+}
+
+void nokia_gsm_network_device::set_cell_profile(cell_profile profile)
+{
+	m_cell_profile = profile;
+	auto *cell = m_cells.at(0);
+	if (!cell)
+		return;
+	cell->cell_barred = profile == cell_profile::barred;
+	cell->rxlev_access_min =
+			profile == cell_profile::unattainable_rxlev ? 63 : 0;
+	cell->available = profile != cell_profile::unavailable;
+}
+
+void nokia_gsm_network_device::set_neighbour_cell_profile(cell_profile profile)
+{
+	auto *cell = m_cells.at(1);
+	if (!cell)
+		return;
+	cell->cell_barred = profile == cell_profile::barred;
+	cell->rxlev_access_min =
+			profile == cell_profile::unattainable_rxlev ? 63 : 0;
+	cell->available = profile != cell_profile::unavailable;
+}
+
+gsm::mobility::cell nokia_gsm_network_device::resolved_cell(u16 arfcn) const
+{
+	if (const auto *configured = m_cells.find(arfcn))
+		return *configured;
+
+	// Existing product contracts select their evidenced carrier organically.
+	// Until a topology explicitly lists that carrier, preserve the historical
+	// single-cell behavior while giving its broadcast data a concrete identity.
+	gsm::mobility::cell legacy = *m_cells.at(0);
+	legacy.arfcn = arfcn;
+	return legacy;
 }
 
 std::array<u8, 24> nokia_gsm_network_device::system_information(
 		unsigned index, u16 serving_arfcn) const
 {
+	const gsm::mobility::cell cell = resolved_cell(serving_arfcn);
 	const unsigned message_index = index % SYSTEM_INFORMATION.size();
 	std::array<u8, 24> result =
 			SYSTEM_INFORMATION[message_index];
@@ -60,6 +272,24 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 		// sixteen-octet Cell Channel Description.
 		const unsigned bit = serving_arfcn - 1;
 		result[18 - bit / 8] |= 1U << (bit & 7);
+	}
+	else if (message_index == 1 &&
+			serving_arfcn >= 1 && serving_arfcn <= 124)
+	{
+		// TS 44.018 SI2 BCCH Frequency List, bitmap-0. Advertise every
+		// configured GSM-900 neighbour except the serving carrier. This is
+		// topology discovery data only; the handset remains responsible for
+		// measuring, ranking and selecting a candidate.
+		for (unsigned index = 0; index < m_cells.size(); ++index)
+		{
+			const auto *neighbour = m_cells.at(index);
+			if (!neighbour || !neighbour->available ||
+					neighbour->arfcn == serving_arfcn ||
+					neighbour->arfcn < 1 || neighbour->arfcn > 124)
+				continue;
+			const unsigned bit = neighbour->arfcn - 1;
+			result[18 - bit / 8] |= 1U << (bit & 7);
+		}
 	}
 	else if (message_index == 0 &&
 			serving_arfcn <= 1023)
@@ -76,8 +306,66 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 		result[5] = serving_arfcn << 7;
 		std::fill(result.begin() + 6, result.begin() + 19, 0);
 	}
+	else if (message_index == 1 && serving_arfcn <= 1023)
+	{
+		// TS 44.018 10.5.2.13 variable-bitmap Frequency List. The origin
+		// occupies ten bits; its following 111 bitmap positions represent
+		// origin+1 through origin+111 modulo 1024. This lets DCS cells
+		// advertise configured neighbours without any Nokia packet knowledge.
+		result[3] = 0x8e | BIT(serving_arfcn, 9);
+		result[4] = serving_arfcn >> 1;
+		result[5] = serving_arfcn << 7;
+		std::fill(result.begin() + 6, result.begin() + 19, 0);
+		for (unsigned index = 0; index < m_cells.size(); ++index)
+		{
+			const auto *neighbour = m_cells.at(index);
+			if (!neighbour || !neighbour->available ||
+					neighbour->arfcn == serving_arfcn)
+				continue;
+			const unsigned offset =
+					(neighbour->arfcn + 1024 - serving_arfcn) % 1024;
+			if (offset == 0 || offset > 111)
+				continue;
+			const unsigned bitmap_bit = offset - 1;
+			if (bitmap_bit < 7)
+				result[5] |= 1U << (6 - bitmap_bit);
+			else
+			{
+				const unsigned following_bit = bitmap_bit - 7;
+				result[6 + following_bit / 8] |=
+						1U << (7 - (following_bit & 7));
+			}
+		}
+	}
 
-	if (m_cell_profile == cell_profile::barred)
+	if (message_index == 2)
+	{
+		result[3] = cell.identity >> 8;
+		result[4] = cell.identity;
+		std::copy(cell.location.plmn.begin(), cell.location.plmn.end(),
+				result.begin() + 5);
+		result[8] = cell.location.lac >> 8;
+		result[9] = cell.location.lac;
+	}
+	else if (message_index == 3)
+	{
+		std::copy(cell.location.plmn.begin(), cell.location.plmn.end(),
+				result.begin() + 3);
+		result[6] = cell.location.lac >> 8;
+		result[7] = cell.location.lac;
+	}
+
+	if (m_neighbour_fault ==
+				neighbour_fault_profile::malformed_system_information &&
+			m_cells.at(1) && serving_arfcn == m_cells.at(1)->arfcn)
+	{
+		// A zero pseudo-length is not a complete RR System Information
+		// message. Keep its RF carrier and SCH valid so rejection belongs to
+		// the firmware's decoded-SI lifecycle rather than carrier discovery.
+		result[0] = 0;
+	}
+
+	if (cell.cell_barred)
 	{
 		// TS 44.018 10.5.2.29: CELL_BAR_ACCESS is bit 2 of the first
 		// RACH Control Parameters octet. SI3 and SI4 must describe the same
@@ -87,15 +375,32 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 		else if (message_index == 3)
 			result[10] |= 0x02;
 	}
-	else if (m_cell_profile == cell_profile::unattainable_rxlev)
+	if (cell.rxlev_access_min != 0)
 	{
 		// TS 44.018 10.5.2.34: RXLEV_ACCESS_MIN=63 requires approximately
 		// -48 dBm. The laboratory carrier's evidenced serving level is lower,
 		// so this remains a valid broadcast cell which is unsuitable here.
 		if (message_index == 2)
-			result[15] = (result[15] & 0xc0) | 0x3f;
+			result[15] = (result[15] & 0xc0) |
+					(cell.rxlev_access_min & 0x3f);
 		else if (message_index == 3)
-			result[9] = (result[9] & 0xc0) | 0x3f;
+			result[9] = (result[9] & 0xc0) |
+					(cell.rxlev_access_min & 0x3f);
+	}
+	if (cell.access_class_barred != 0)
+	{
+		// TS 44.018 10.5.2.29: the two Access Control Class octets occupy the
+		// end of the RACH Control Parameters in SI3 and SI4.
+		if (message_index == 2)
+		{
+			result[17] |= cell.access_class_barred >> 8;
+			result[18] |= cell.access_class_barred & 0xff;
+		}
+		else if (message_index == 3)
+		{
+			result[11] |= cell.access_class_barred >> 8;
+			result[12] |= cell.access_class_barred & 0xff;
+		}
 	}
 	if (message_index == 2)
 		result[12] = m_periodic_update_timer.encoded();
@@ -223,7 +528,8 @@ std::array<u8, 24> nokia_gsm_network_device::immediate_assignment(
 }
 
 std::array<u8, 17> nokia_gsm_network_device::location_update_accept(
-		const u8 *location_update_request, unsigned length) const
+		const u8 *location_update_request, unsigned length,
+		u16 serving_arfcn) const
 {
 	// GSM 04.08 9.2.13. The mandatory body is the MM header and Location
 	// Area Identification. With no allocated TMSI, the network includes the
@@ -233,6 +539,11 @@ std::array<u8, 17> nokia_gsm_network_device::location_update_accept(
 		0x05, 0x02, 0x00, 0xf1, 0x10, 0x00, 0x01,
 		0x17, 0x08, 0, 0, 0, 0, 0, 0, 0, 0
 	};
+	const auto serving = resolved_cell(serving_arfcn);
+	std::copy(serving.location.plmn.begin(), serving.location.plmn.end(),
+			message.begin() + 2);
+	message[5] = serving.location.lac >> 8;
+	message[6] = serving.location.lac;
 	// GSM 04.08 Location Updating Request places the mobile-identity length
 	// at octet 10. Preserve the received identity when it is the eight-octet
 	// IMSI form used by the laboratory subscriber.
@@ -522,10 +833,31 @@ std::array<u8, 3> nokia_gsm_network_device::channel_release() const
 
 s8 nokia_gsm_network_device::serving_rssi(unsigned sample) const
 {
+	return cell_rssi(m_cells.at(0)->arfcn, sample);
+}
+
+s8 nokia_gsm_network_device::cell_rssi(u16 arfcn, unsigned sample) const
+{
 	// A real receiver never returns an identical RSSI forever. The ROM retains
 	// the previous sample and requires a strict improvement before promoting a
-	// background measurement to a usable candidate. Keep the laboratory cell
+	// background measurement to a usable candidate. Keep each laboratory cell
 	// deterministic while representing that measured-signal variation.
-	static constexpr std::array<s8, 4> RSSI_PATTERN = { -60, -61, -59, -60 };
-	return RSSI_PATTERN[sample % RSSI_PATTERN.size()];
+	const auto *configured = m_cells.find(arfcn);
+	if (!configured && m_cells.size() > 1)
+		return -127;
+	const gsm::mobility::cell cell =
+			configured ? *configured : resolved_cell(arfcn);
+	if (!cell_receivable(arfcn))
+		return -127;
+	const s8 baseline =
+			m_primary_cell_lost && configured == m_cells.at(0) ?
+					-120 :
+			m_mobility_profile == mobility_profile::two_cell_loss_recovery &&
+					m_recovery_cell_available &&
+					configured == m_cells.at(1) ?
+					-55 : cell.rxlev_dbm;
+	static constexpr std::array<s8, 4> RSSI_VARIATION = { 0, -1, 1, 0 };
+	return std::clamp<int>(
+			int(baseline) + RSSI_VARIATION[sample % RSSI_VARIATION.size()],
+			-127, 127);
 }

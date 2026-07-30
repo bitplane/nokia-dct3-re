@@ -107,7 +107,7 @@ unresolved hardware or protocol boundary.
 | CCONT/GENSIO | `nokia_ccont_device` owns selected-device registers and outputs, a deterministic binary RTC, recovered periodic IRQ sources, the documented watchdog counter and its WDDISX pin, plus retained power state. Five ROMs share an identical 18-entry descriptor vocabulary and a 933-transaction organic census. NSE-8 board wiring is classified; 3330/3410 explicitly retain the 3310 raw tuple as boot calibration rather than asserted PCB identity. | Measure GENSIO/ADC latency, sibling board wiring, raw electrical units, rail timing, interrupt bit 6 and compatibility-register effects. |
 | EEPROM | Native MAME `I2C_24C128` on mapped GenIO pins plus a v6.00-oriented generated provisioning fixture; the parallel window is unproved. | Decode remaining fields, validate writes/timing and another product's storage placement, and make fallback-record extraction ROM-aware. |
 | Flash | Native Intel/ST flash parts plus an extracted transitional `nokia_b3_flash_device` owning the 3410's lock-command, partition-status, erase-suspend timer and save-state contract. | Move the adapter semantics into MAME's generic `intelfsh` core once partitioned read-while-write and independently observable erase status are supported. |
-| DSP/network/external-service | DSPIF, DSP HLE, Nokia L1 correlation, LAPDm, GSM session/network data and external service are separate owners. Generic A5/0/A5/1 now operates only on the 114-bit post-interleave normal-burst seam for SDCCH, SACCH and TCH/F/FACCH; the session saves Kc and activation while DSP key publications are redacted. NSE-8, NHM-5, NHM-6 and NHM-2 independently pass organic A5/1 activation and ciphered internal media; principal NSE-8 gates add outgoing calls, degradation, FACCH and exact active-call replay. Product DSP-control and PCM evidence remains independent. | Obtain NSE-3's physical final DSP-bootstrap publication or matching internal ROMs. Recover real COBBA mux/gain behavior and NHM-6/NHM-2 fitted analogue routes before physical-duplex promotion. Extend NHM-2 through encrypted degradation/save-state gates before claiming equal resilience coverage. Retain A5/2 as unsupported until algorithm and handset negotiation evidence exist. |
+| DSP/network/external-service | DSPIF, DSP HLE, Nokia L1 correlation, LAPDm, GSM session/network data and external service are separate owners. The generic network owns typed multi-cell topology, standards-shaped SI/control scheduling and RF conditions; the radio peer owns saved per-cell measurement/acquisition state while handset firmware owns selection and MM. Same-/different-LAC reselection, replacement-cell paging, loss/recovery, preserved location and save-state gates pass across NSE-8/NHM-5/NHM-6/NHM-2. Generic A5/0/A5/1 operates only on the 114-bit post-interleave burst seam; product DSP-control, Nokia neighbour grammar and PCM evidence remain independent. | Obtain NSE-3's physical final DSP-bootstrap publication or matching internal ROMs. Recover real COBBA mux/gain behavior and NHM-6/NHM-2 fitted analogue routes before physical-duplex promotion. Extend NHM-2 through encrypted degradation/save-state gates before claiming equal resilience coverage. Retain A5/2 and dedicated-mode handover as unsupported until independently evidenced. |
 | MAD2 | `nokia_mad2_device` owns the CTSI registers within `0x00..0x16`, timer-0/FIQ4, timer-1 current/terminal-count/FIQ5, reset request/cause, pending/masks, IRQ/FIQ aggregation, cross-ROM ninth-IRQ status/ack semantics, one-shot ARM clock-stop/routed wake and save-state restoration. PUP `0x15`, KBGPIO, SIMI, MBUS and GENSIO are separate devices. | Establish the ninth IRQ's physical owner, exact physical timer dividers and transition latency, remaining clock-gate consumers and rail timing. |
 | MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, 9,600-baud character timing and FIQ2/FIQ3 callbacks; ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing. | Recover FIQ3 phase/source and collision/error behavior; attach a counterparty only for organic frames. |
 | Display/input | Native PCD8544, a cross-ROM LCD transport check, and extracted `nokia_kbgpio_device` matrix/IRQ0 behavior; the Lua mirror, handset key layout and timing remain acceptance/board fixtures. The generated EEPROM supplies fields authored by equivalent v6.00/v5.01 descriptor-`0x0749` reset constructors through normal NV loading. | Obtain an authentic configured `0x0749` profile; recover keypad mask/debounce and display reset timing separately. |
@@ -115,8 +115,11 @@ unresolved hardware or protocol boundary.
 | Vibrator/backlight | PUP bit 4 drives a named MAME `vibration` output while `0x1b` stores its independent control byte; a mapped-MMIO fixture validates the gate. Enabling `Vibrating alert` through the firmware UI and ringing an organic RTC alarm leaves both registers inactive, constraining that setting to another alert lifecycle rather than proving an output defect. The 3210 service manual establishes that COBBA drives separate LCD/key-light signals into the UI-Switch. Paired-ROM MAD2 traces and a complete changed-write census of MCU-visible DSP shared RAM find no key/timeout-specific output command. | Exercise vibra organically from an incoming-call lifecycle and decode `0x1b`. Recover the lower DSP/COBBA light-control surface before exposing backlight outputs. |
 
 The headless LCD mirror and delayed-key fixture are acceptance tooling in
-`mame_nokia_dct3_input_exerciser.lua`. They do not add device state or firmware
-shortcuts to the phone driver.
+`mame_nokia_dct3_input_exerciser.lua`.  Physical-End sequencing may wait for
+either the session's diagnostic Alerting output or its already-connected-call
+output, avoiding a missed sub-poll transition without changing CC state.
+These outputs are observational and restored from saved generic session state;
+the tooling does not add firmware shortcuts to the phone driver.
 
 The synthetic EEPROM provisions the three display profiles' ROM-authored reset
 fields at descriptor `0x0749`; firmware loads and copies them organically.
@@ -206,9 +209,11 @@ preserved as an investigation journal.
   topology remains incomplete.
 - The DSP/external-service peer contract is proved only for requests exercised by
   boot, authenticated registration, paging, answered MT call control and speech,
-  and persistent ordinary MT SMS delivery. MO SMS, MT CP/RP closure, completed
-  multipart Smart Messaging/ringtone UI, cell-change/reselection mobility and broader inbound radio/L1
-  behavior remain unmapped. A bounded
+  and persistent ordinary MT SMS delivery. Idle cell loss/reselection now has
+  four-product same-/different-LAC, paging, negative and save-state gates.
+  MO SMS, MT CP/RP closure, completed multipart Smart Messaging/ringtone UI,
+  dedicated-mode handover and broader inbound radio/L1 behavior remain
+  unmapped. A bounded
   two-part long-ringtone codec and queue are present; part 1 is organically
   regression-tested through nine stop-and-wait SAPI-3 frames, while part 2
   correctly remains gated by the missing CP/RP close.

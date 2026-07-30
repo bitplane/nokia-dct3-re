@@ -25,6 +25,19 @@ public:
 		autonomous_band_scan
 	};
 
+	enum class neighbour_bsic_encoding : u8
+	{
+		none,
+		direct,
+		low_six_bits
+	};
+
+	enum class neighbour_arfcn_encoding : u8
+	{
+		direct_octet,
+		topology_low_octet
+	};
+
 	struct protocol_contract
 	{
 		acquisition_strategy acquisition = acquisition_strategy::none;
@@ -32,6 +45,13 @@ public:
 		u8 assigned_channel_confirmation = 0;
 		unsigned mm_information_settle_ticks = 0;
 		bool repeat_empty_assigned_uplink = false;
+		u8 serving_sch_request_type = 0;
+		bool neighbour_instruction_establishes_candidate = false;
+		bool serving_list_commits_receiver = false;
+		neighbour_arfcn_encoding neighbour_instruction_arfcn =
+				neighbour_arfcn_encoding::direct_octet;
+		neighbour_bsic_encoding neighbour_instruction_bsic =
+				neighbour_bsic_encoding::none;
 
 		constexpr bool enabled() const
 		{
@@ -61,6 +81,10 @@ public:
 	void set_page_after_registration(bool enabled)
 	{
 		m_page_after_registration = enabled;
+	}
+	void set_page_requires_reselection(bool enabled)
+	{
+		m_page_requires_reselection = enabled;
 	}
 	void set_incoming_call_after_registration(bool enabled)
 	{
@@ -151,6 +175,7 @@ private:
 		traffic_contention_resolution,
 		traffic_release_acknowledgement,
 		candidate_terminal_control,
+		serving_sch_observation,
 		count
 	};
 
@@ -171,6 +196,12 @@ private:
 			const nokia_dspif_device::packet &packet);
 	bool decode_candidate_window(
 			const nokia_dspif_device::packet &packet, bool ignore_zero);
+	bool decode_neighbour_measurement_list(
+			const nokia_dspif_device::packet &packet);
+	bool decode_neighbour_measurement_instruction(
+			const nokia_dspif_device::packet &packet);
+	bool decode_serving_sch_request(
+			const nokia_dspif_device::packet &packet);
 	bool candidate_window_acquisition() const;
 	bool handle_search_request(search_request request);
 	bool handle_acquisition_packet(
@@ -220,18 +251,40 @@ private:
 	unsigned m_reports_remaining = 0;
 	u8 m_phase = phase::inactive;
 	unsigned m_search_round = 0;
+	unsigned m_idle_measurement_sample = 0;
 	unsigned m_wait_ticks = 0;
 	u8 m_search_mode = 0;
+	std::array<u16, 40> m_search_arfcns{};
+	u8 m_search_arfcn_count = 0;
+	std::array<u16, 32> m_neighbour_arfcns{};
+	u8 m_neighbour_arfcn_count = 0;
+	bool m_neighbour_bcch_pending = false;
+	u16 m_neighbour_bcch_arfcn = 0xffff;
+	u8 m_neighbour_instruction_mode = 0;
+	u8 m_neighbour_instruction_bsic = 0;
+	u16 m_last_neighbour_instruction_arfcn = 0xffff;
+	u8 m_last_neighbour_instruction_bsic = 0;
+	unsigned m_neighbour_resume_wait_ticks = 0;
 	u8 m_access_ra = 0;
 	u32 m_access_frame = 0;
 	bool m_search_has_serving_arfcn = false;
 	u16 m_serving_arfcn = 1;
+	u16 m_receiver_arfcn = 1;
+	u8 m_receiver_bsic = 0x12;
+	u16 m_sch_observation_arfcn = 0xffff;
+	bool m_candidate_bcch_valid = false;
+	bool m_reselection_validation_pending = false;
+	s16 m_downlink_signalling_count = 45;
+	bool m_downlink_signalling_failed = false;
+	bool m_serving_loss_pending = false;
 	bool m_report_deferred = false;
 	bool m_search_requested = false;
 	unsigned m_selected_reports_remaining = 0;
 	bool m_registered = false;
 	bool m_idle_common_control_active = false;
 	bool m_page_after_registration = false;
+	bool m_page_requires_reselection = false;
+	bool m_has_reselected = false;
 	bool m_incoming_call_after_registration = false;
 	bool m_incoming_sms_after_registration = false;
 	bool m_incoming_smart_message_after_registration = false;

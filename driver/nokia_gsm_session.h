@@ -74,7 +74,8 @@ public:
 			u32 request_id,
 			nokia_gsm_network_device::outgoing_call_outcome outcome);
 	bool submit_outgoing_termination(u32 request_id, u8 cause = 0x10);
-	bool establish_layer3(const u8 *information, unsigned length);
+	bool establish_layer3(
+			const u8 *information, unsigned length, u16 serving_arfcn);
 	bool queue_incoming_page(incoming_service service = incoming_service::none);
 	downlink_kind contention_resolution_delivered();
 	downlink_kind downlink_acknowledged();
@@ -178,6 +179,7 @@ private:
 	downlink_kind apply_outgoing_decision();
 	downlink_kind apply_outgoing_termination();
 	void publish_call_alerting_output();
+	void publish_call_active_output();
 	void publish_release_waiting_output();
 	void clear_dedicated_cipher();
 	downlink_kind queue_downlink(
@@ -187,6 +189,7 @@ private:
 
 	required_device<nokia_gsm_network_device> m_network;
 	output_finder<> m_call_alerting_output;
+	output_finder<> m_call_active_output;
 	output_finder<> m_release_waiting_output;
 	bool m_authentication_required = false;
 	bool m_authentication_for_service = false;
@@ -198,6 +201,7 @@ private:
 	u8 m_state = u8(state::idle);
 	std::array<u8, maximum_layer3_length> m_established_layer3{};
 	unsigned m_established_layer3_length = 0;
+	u16 m_serving_arfcn = 1;
 	std::array<u8, 8> m_registered_mobile_identity{};
 	unsigned m_registered_mobile_identity_length = 0;
 	bool m_release_completes_registration = false;

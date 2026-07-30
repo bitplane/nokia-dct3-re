@@ -29,7 +29,7 @@ CHECKPOINTS = (
     ("page publication", re.compile(
         r"PCH IMSI page transmitted channel=60 fn=")),
     ("paged random access", re.compile(
-        r"TX packet type=0c .*data=0000[0-9a-f]{2}")),
+        r"TX packet type=0c .*data=00[0-9a-f]{4}")),
     ("correlated Immediate Assignment", re.compile(
         r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}2d063f")),
     ("Paging Response", PAGING_RESPONSE_RE),

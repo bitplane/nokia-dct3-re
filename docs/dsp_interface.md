@@ -371,9 +371,18 @@ has been checked against these ROM handlers: outbound `0x1a` is `SEARCH_LIST`;
 inbound `0x80` is `RECEIVED_BLOCK`, `0x83` is `RSSI_RESULTS`, `0x84` is
 `RA_INFO`, `0x87` is `NO_BCCH_LEFT`, `0x88` is
 `NEIGHBOUR_TIMING_OFFSET`, `0x89` is `CHANNEL_CHANGED_CNF`, `0x8a` is
-`NO_PSW_FOUND`, `0x8b` is `ALL_RSSI_RESULTS`, and `0x8f` is
-`NO_PSW_LEFT`. These names classify packets; they do not establish that an
-isolated packet is valid in every firmware controller state.
+`NO_PSW_FOUND`, `0x8b` is `ALL_RSSI_RESULTS`, `0x8c` is
+`DOWNLINK_SIGNALLING_FAIL`, and `0x8f` is `NO_PSW_LEFT`. Outbound `0x0f` is
+`NEIGHBOUR_LIST` and outbound `0x11` is `NMEAS_INSTRUCTIONS`. These names
+classify packets; they do not establish that an isolated packet is valid in
+every firmware controller state.
+
+Two public DCT3 traces further establish the type-`0x11` correlation used by
+the radio peer: payload byte 1 is the expected BSIC and byte 7 is the ARFCN of
+the immediately following neighbour type-`0x80` BCCH block.  The pending
+instruction is saved and validated against the generic topology.  It neither
+selects that cell nor changes the serving receiver; those decisions remain
+firmware-owned.
 
 The four remaining direct task-10 status types are closed through their first
 semantic consumer:

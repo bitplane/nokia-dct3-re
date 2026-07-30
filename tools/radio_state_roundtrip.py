@@ -14,6 +14,12 @@ def _records(
         tokens: tuple[str, ...]) -> list[str]:
     result = []
     for line in lines[begin + 1:end]:
+        # The bodyless type-0x03 DSP poll is an idle transport opportunity,
+        # not a radio event.  A host save callback may fall on either side of
+        # it without changing TDMA, decoded cell state or firmware-visible
+        # payload, so it is deliberately outside deterministic replay.
+        if "RX enqueue type=03 payload=0" in line:
+            continue
         for token in tokens:
             if token in line:
                 record = line[line.index(token):]
