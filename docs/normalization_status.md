@@ -209,14 +209,14 @@ preserved as an investigation journal.
   topology remains incomplete.
 - The DSP/external-service peer contract is proved only for requests exercised by
   boot, authenticated registration, paging, answered MT call control and speech,
-  and persistent ordinary MT SMS delivery. Idle cell loss/reselection now has
-  four-product same-/different-LAC, paging, negative and save-state gates.
-  MO SMS, MT CP/RP closure, completed multipart Smart Messaging/ringtone UI,
-  dedicated-mode handover and broader inbound radio/L1 behavior remain
-  unmapped. A bounded
-  two-part long-ringtone codec and queue are present; part 1 is organically
-  regression-tested through nine stop-and-wait SAPI-3 frames, while part 2
-  correctly remains gated by the missing CP/RP close.
+  persistent ordinary MT SMS delivery and closed sequential multipart MT SMS
+  transport. Idle cell loss/reselection now has four-product same-/different-
+  LAC, paging, negative and save-state gates. The bounded long-ringtone gate
+  proves both parts through independent paging, SAPI-3, CP/RP acknowledgement
+  and RR release transactions on all four promoted products, with replay at
+  transaction and queue boundaries. MO SMS, firmware Smart Messaging
+  reassembly/ringtone UI or persistence, dedicated-mode handover and broader
+  inbound radio/L1 behavior remain unmapped.
 - The exact internal cold-boot UI selector remains unnamed, but its behavior is
   no longer a topology gap: provisioned boot reaches an interactive idle screen
   and opens the menu organically. Accepted-security, periodic-timer, conditional

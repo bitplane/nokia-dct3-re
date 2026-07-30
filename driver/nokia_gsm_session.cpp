@@ -58,6 +58,11 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_outgoing_termination_cause));
 	save_item(NAME(m_incoming_service));
 	save_item(NAME(m_smart_message_part_index));
+	save_item(NAME(m_sms_cp_transaction));
+	save_item(NAME(m_sms_rp_reference));
+	save_item(NAME(m_sms_cp_data_acknowledged));
+	save_item(NAME(m_sms_rp_acknowledged));
+	save_item(NAME(m_incoming_service_completed));
 	save_item(NAME(m_pending_downlink.kind));
 	save_item(NAME(m_pending_downlink.sapi));
 	save_item(NAME(m_pending_downlink.length));
@@ -114,6 +119,11 @@ void nokia_gsm_session_device::device_reset()
 	publish_release_waiting_output();
 	m_incoming_service = u8(incoming_service::none);
 	m_smart_message_part_index = 0;
+	m_sms_cp_transaction = 0;
+	m_sms_rp_reference = 0;
+	m_sms_cp_data_acknowledged = false;
+	m_sms_rp_acknowledged = false;
+	m_incoming_service_completed = false;
 	clear_pending_downlink();
 }
 
@@ -171,6 +181,7 @@ bool nokia_gsm_session_device::establish_layer3(
 	clear_pending_downlink();
 	m_release_completes_registration = location_update_request;
 	m_mobile_originated_call = cm_service_request;
+	m_incoming_service_completed = false;
 	m_call_transaction = 0;
 	m_traffic_assignment_issued = false;
 	m_state = u8(paging_response ?
@@ -187,6 +198,7 @@ bool nokia_gsm_session_device::queue_incoming_page(incoming_service service)
 		return false;
 	m_incoming_service = u8(service);
 	m_traffic_assignment_issued = false;
+	m_incoming_service_completed = false;
 	if (service != incoming_service::smart_message)
 		m_smart_message_part_index = 0;
 	m_state = u8(state::awaiting_paging_response);
@@ -452,10 +464,24 @@ nokia_gsm_session_device::downlink_acknowledged()
 		{
 			const auto data = m_network->incoming_smart_message_cp_data(
 					m_smart_message_part_index);
+			if (data.length >= 5)
+			{
+				m_sms_cp_transaction = data.data[0];
+				m_sms_rp_reference = data.data[4];
+			}
+			m_sms_cp_data_acknowledged = false;
+			m_sms_rp_acknowledged = false;
 			return queue_downlink(downlink_kind::incoming_sms_cp_data,
 					data.data.data(), data.length, 3);
 		}
 		const auto data = m_network->incoming_sms_cp_data();
+		if (data.size() >= 5)
+		{
+			m_sms_cp_transaction = data[0];
+			m_sms_rp_reference = data[4];
+		}
+		m_sms_cp_data_acknowledged = false;
+		m_sms_rp_acknowledged = false;
 		return queue_downlink(downlink_kind::incoming_sms_cp_data,
 				data.data(), data.size(), 3);
 	}
@@ -512,8 +538,11 @@ nokia_gsm_session_device::downlink_acknowledged()
 					m_registered_mobile_identity.size();
 		}
 		clear_pending_downlink();
+		m_incoming_service_completed =
+				m_incoming_service != u8(incoming_service::none);
 		const bool more_smart_message_parts =
 				m_incoming_service == u8(incoming_service::smart_message) &&
+				m_sms_rp_acknowledged &&
 				m_smart_message_part_index + 1 <
 						m_network->incoming_smart_message_part_count();
 		if (more_smart_message_parts)
@@ -543,6 +572,10 @@ nokia_gsm_session_device::downlink_acknowledged()
 			m_incoming_service = u8(incoming_service::none);
 			m_smart_message_part_index = 0;
 		}
+		m_sms_cp_transaction = 0;
+		m_sms_rp_reference = 0;
+		m_sms_cp_data_acknowledged = false;
+		m_sms_rp_acknowledged = false;
 		m_state = u8(state::idle);
 		publish_call_active_output();
 		clear_dedicated_cipher();
@@ -814,6 +847,8 @@ nokia_gsm_session_device::receive_layer3(
 		m_outgoing_termination_cause = 0x10;
 		m_outgoing_decision_timer->adjust(attotime::never);
 		publish_call_alerting_output();
+		m_incoming_service_completed =
+				m_incoming_service != u8(incoming_service::none);
 		m_incoming_service = u8(incoming_service::none);
 		m_state = u8(state::idle);
 		publish_call_active_output();
@@ -824,15 +859,22 @@ nokia_gsm_session_device::receive_layer3(
 	if (sapi == 3 && m_state == u8(state::awaiting_sms_handset_response) &&
 			protocol_discriminator == 0x09)
 	{
+		const auto sms = gsm::sms::parse_uplink(
+				information, length,
+				m_sms_cp_transaction, m_sms_rp_reference);
 		// CP-ACK confirms CP-DATA delivery. The following CP-DATA carries the
-		// RP-ACK for the current multipart message reference.
-		if (message_type == 0x04)
-			return downlink_kind::none;
-		if (message_type == 0x01 && length >= 6 &&
-				information[2] == 0x01 && information[3] == 0x02 &&
-				information[4] == 0x02 &&
-				information[5] == 0x40 + m_smart_message_part_index)
+		// independently correlated RP response.
+		if (sms.kind == gsm::sms::uplink_kind::cp_ack)
 		{
+			m_sms_cp_data_acknowledged = true;
+			return downlink_kind::none;
+		}
+		if (m_sms_cp_data_acknowledged &&
+				(sms.kind == gsm::sms::uplink_kind::rp_ack ||
+					sms.kind == gsm::sms::uplink_kind::rp_error))
+		{
+			m_sms_rp_acknowledged =
+					sms.kind == gsm::sms::uplink_kind::rp_ack;
 			const auto acknowledge = m_network->sms_cp_ack(information[0]);
 			m_state = u8(state::awaiting_sms_cp_ack_acknowledgement);
 			return queue_downlink(downlink_kind::sms_cp_ack,

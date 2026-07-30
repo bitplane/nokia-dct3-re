@@ -207,8 +207,10 @@ variable preserves the erased-identity default used by the canonical oracle.
 the IMEI bytes erased, but writes the BCD code and the verifier record derived
 from the ROM's fifteen-question-mark formatted identity. A delayed physical
 `12345` plus left-softkey sequence then exits the security editor without
-inventing an IMEI. This was used to disprove the UI lock as the reason that the
-MT-SMS CP/RP tail is absent.
+inventing an IMEI. This was used to disprove the UI lock as the reason the
+ordinary-text MT-SMS fixture does not emit a CP/RP tail. The separate
+port-addressed multipart fixture now emits and completely closes both CP/RP
+transactions.
 
 That fixture makes the identity comparison succeed and removes the Security-code
 editor. It paints the idle frame (SHA-256 prefix `dbf2704cb945d56b`) without

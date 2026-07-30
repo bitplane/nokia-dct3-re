@@ -6,7 +6,8 @@ acceptance, SIM persistence, dedicated-channel release, return to serving-cell
 monitoring, PCH fill, one bounded paging/Paging Response lifecycle, one
 bounded mobile-terminated call lifecycle with physical Answer/End and
 bidirectional GSM-FR, one persistently delivered ordinary mobile-terminated
-SMS, plus one bounded port-addressed Nokia ringtone delivery. Media coverage
+SMS, plus a completely closed two-transaction port-addressed Nokia ringtone
+delivery. Media coverage
 includes FACCH substitution, degraded-frame handling, SACCH coexistence,
 save-state replay and isolated physical microphone/playback paths.
 
@@ -466,10 +467,27 @@ two 128-byte-capacity parts with shared concatenation reference `7a`. The
 first part carries TP-UDHI, 8-bit DCS `f5`, the 16-bit application-port UDH for
 destination `1581`, and concatenation IE `00 03 7a 02 01`. It crosses SAPI 3
 as eight 20-byte I frames plus an 11-byte tail; every frame waits for its
-matching handset N(R), including sequence wrap. Firmware does not issue an
-`EF_SMS` update and record 1 remains free. The second part is held behind the
-still-unobserved CP/RP close, so no reassembly or ringtone-save/play UI is
-claimed.
+matching handset N(R), including sequence wrap. Firmware then emits CP-ACK and
+a five-byte CP-DATA/RP-ACK (`89 01 02 02 40`). The network answers CP-ACK,
+acknowledges that I frame, releases RR and returns to PCH before admitting
+part 2 through a fresh page, SDCCH and SAPI-3 sequence. Part 2 uses independent
+RP reference `41`, completes the same closing exchange and returns to steady
+PCH. Exactly two pages are permitted. Firmware does not issue an `EF_SMS`
+update and record 1 remains free, so transport completion does not claim
+reassembly, ringtone-save/play UI or persistence.
+
+The CP parser derives both its expected CP transaction and RP reference from
+the CP-DATA actually queued. Wrong references, malformed lengths and trailing
+bytes cannot advance the session, and a terminal RP response is accepted only
+after CP-ACK. Duplicate or late responses are inert once the saved transaction
+phase moves forward. RP-ERROR receives its required network CP-ACK and clean
+release but does not admit a queued successor. Multipart capacity is bounded
+at three parts and invalid part indices produce no payload. No artificial
+CP/RP timeout is installed: Layer 2 owns retransmission, while network expiry
+remains a future policy requiring an evidenced timer. `make
+verify-radio-incoming-smart-message-state` restores before the first close,
+while the successor is queued and during the second close, comparing the
+reference and restored LAPDm/radio records exactly.
 
 The laboratory cell is GSM 900 ARFCN 1, BSIC `0x12`, reserved test PLMN
 001-01, LAC 1 and cell ID 1. The SIM IMSI and preferred-PLMN file use the same
@@ -683,9 +701,8 @@ permit cell selection but must block MM access.  No negative case may originate
 a second Location Updating transaction or mutate EF_LOCI.
 
 Dedicated-mode handover remains deliberately outside this boundary.
-Other known extensions are MO SMS, MT SMS CP/RP closure, multipart Smart
-Messaging and ringtone UI/persistence, rejected registration and broader RF
-propagation.
+Other known extensions are MO SMS, firmware Smart Messaging reassembly and
+ringtone UI/persistence, rejected registration and broader RF propagation.
 Each extension must begin with an organic MCU request or a standards-defined
 network event and retain the same request-correlation rule.
 
@@ -708,10 +725,10 @@ The checkpoint is accepted when:
    bidirectional speech, FACCH/BFI/SACCH coexistence and clean teardown;
 6. `make verify-radio-incoming-sms` proves segmented MT text delivery and the
    exact persistent unread SIM record;
-7. `make verify-radio-incoming-smart-message` proves the first part of a
-   two-part port-addressed Nokia ringtone across nine stop-and-wait LAPDm
-   segments, distinct from ordinary `EF_SMS` filing, while retaining the
-   second part until the handset organically closes CP/RP;
+7. `make verify-radio-incoming-smart-message` proves both independently paged
+   parts of a port-addressed Nokia ringtone across stop-and-wait LAPDm,
+   handset CP/RP responses, network CP acknowledgements and clean RR releases,
+   while remaining distinct from ordinary `EF_SMS` filing;
 8. `make verify-radio-operator` proves the unobscured operator frame;
 9. the default coherent frontier and tool/evidence suites remain green; and
 10. no diagnostic packet scenario or firmware-state force is retained.

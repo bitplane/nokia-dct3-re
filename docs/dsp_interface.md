@@ -196,9 +196,10 @@ real cipher-control boundary before each incoming laboratory service. The
 retained command is `06 35 00`: its SC bit is zero, so the connection explicitly
 remains unciphered. The v6.00 ROM publishes TX type `0x14`, payload
 `00 f4 ff ff ff ff ff ff ff ff 00 00`, requires no DSP-ring response, and then
-organically sends RR Cipher Mode Complete (`06 32`). Calls, ordinary SMS and the
-first multipart Smart Message part all continue through their existing
-checkpoints.
+organically sends RR Cipher Mode Complete (`06 32`). Calls, ordinary SMS and
+both independently closed multipart Smart Message transactions continue
+through their existing checkpoints. Separate A5/1 gates replace this
+historical SC=0 boundary with real burst ciphering where required.
 
 Two quarantined probes delimit the stronger interpretation. Command
 `06 35 01` (start A5/1) changed the type-`0x14` prefix to `02 00` and still

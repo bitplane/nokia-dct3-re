@@ -1961,7 +1961,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 							machine().time().as_double());
 				m_phase = phase::release_deconfigure;
 				m_reports_remaining = 0;
-				m_page_transmitted = false;
+				// Registration release arms the configured incoming page.  A
+				// completed one-shot service does not repeat; multipart SMS
+				// alone leaves a successor queued and therefore re-arms it.
+				m_page_transmitted =
+						m_gsm_session->incoming_service_completed() &&
+						!m_gsm_session->incoming_service_queued();
 				m_pch_fill_delivered = false;
 			}
 			else if (action != nokia_gsm_session_device::downlink_kind::none)

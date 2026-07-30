@@ -24,6 +24,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/gsm_a5.cpp driver/gsm_a5.h \
 	driver/gsm_mobility.h \
 	driver/gsm_mm_authentication.cpp driver/gsm_mm_authentication.h \
+	driver/gsm_sms_transport.cpp driver/gsm_sms_transport.h \
 	driver/gsm_tch_f_l1.cpp driver/gsm_tch_f_l1.h \
 	driver/gsm_xcch_l1.cpp driver/gsm_xcch_l1.h \
 	driver/nokia_gsm_fr_codec.cpp driver/nokia_gsm_fr_codec.h \
@@ -183,7 +184,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
 .PHONY: verify-radio-periodic-location-update-state verify-3410-radio-periodic-location-update
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
@@ -218,6 +219,10 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-radio-a5-1-host-release-restore
 .PHONY: verify-radio-a5-1-host-two-calls
 .PHONY: verify-radio-outgoing-call-host-physical-media
+.PHONY: verify-radio-incoming-smart-message-state
+.PHONY: verify-3310-radio-incoming-smart-message
+.PHONY: verify-3330-radio-incoming-smart-message
+.PHONY: verify-3410-radio-incoming-smart-message
 .PHONY: verify-3310-radio-outgoing-call-host-termination
 .PHONY: verify-3330-radio-outgoing-call-host-termination
 .PHONY: verify-3410-radio-outgoing-call-host-termination
@@ -426,6 +431,13 @@ verify-gsm-mobility:
 		-o scratchpad/test_gsm_mobility
 	scratchpad/test_gsm_mobility
 
+verify-gsm-sms-transport:
+	mkdir -p scratchpad
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic \
+		driver/gsm_sms_transport.cpp tools/test_gsm_sms_transport.cpp \
+		-o scratchpad/test_gsm_sms_transport
+	scratchpad/test_gsm_sms_transport
+
 verify-radio-periodic-location-update:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 \
 		RUN_DIR=$(RUN_DIR) SECONDS=450 RUN_VERBOSE=1 \
@@ -609,6 +621,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_3410_periodic_location_update_trace_check.py tools/test_dsp_code_block_lifecycle.py
 	$(VENV)/bin/python -m unittest tools/test_radio_physical_downlink_check.py
 	$(VENV)/bin/python -m unittest tools/test_pulse_route_mame.py
+	$(VENV)/bin/python -m unittest tools/test_gsm_sms_session_invariants.py
 
 ccont-static-census:
 	$(VENV)/bin/python tools/ccont_static_census.py --check --json docs/data/ccont_static_census.json
@@ -2663,6 +2676,55 @@ verify-radio-incoming-smart-message:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py \
 		$(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
+
+verify-radio-incoming-smart-message-state:
+	@for boundary in first_close queued second_close; do \
+		case "$$boundary" in \
+			first_close) at=18.285; replay=500 ;; \
+			queued) at=19.0; replay=500 ;; \
+			second_close) at=22.18; replay=300 ;; \
+		esac; \
+		$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_$$boundary \
+			SECONDS=40 RUN_VERBOSE=1 \
+			RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
+			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=1000" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		$(PYTHON) tools/radio_incoming_smart_message_state_trace_check.py \
+			$(RUN_DIR)_$$boundary/error.log \
+			$(RUN_DIR)_$$boundary/nvram/noki3210/sim_card || exit; \
+	done
+
+verify-3310-radio-incoming-smart-message:
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 \
+		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py \
+		$(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3310_3/sim_card
+
+verify-3330-radio-incoming-smart-message: normalize-3330
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(PYTHON) tools/check_model_frontier_summary.py \
+		$(RUN_DIR)_provision/boot_summary.txt --require-fiq0
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e \
+		RUN_DIR=$(RUN_DIR)_sms SECONDS=35 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_sms/error.log
+	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py \
+		$(RUN_DIR)_sms/error.log \
+		$(RUN_DIR)_provision/nvram/noki3330_1/sim_card
+
+verify-3410-radio-incoming-smart-message: normalize-3410
+	@$(MAKE) --no-print-directory run $(NOKI3410_RUN) \
+		RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
+		RUN_ENV='$(NOKI3410_RADIO_INPUT)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py \
+		$(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3410/sim_card
 
 verify-radio-operator:
 	@set -e; \

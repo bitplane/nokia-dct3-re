@@ -232,11 +232,14 @@ CP/RP closing tail, so that verifier makes no RR teardown or
 visible-notification claim.
 `make verify-radio-incoming-smart-message` replaces the text TPDU with one
 complete 251-byte Nokia RTPL ringtone queued as two concatenated parts. It
-requires all nine exact stop-and-wait SAPI-3 segments of part 1, including
-TP-UDHI, DCS `f5`, the port-`1581` UDH, reference `7a`, count `2`, index `1`
-and RTPL bytes, while also requiring `EF_SMS` record 1 to stay free. Part 2
-remains queued behind organic CP/RP closure; the gate deliberately does not
-claim ringtone UI, playback, reassembly or persistence.
+requires every exact stop-and-wait SAPI-3 segment of each part, including
+TP-UDHI, DCS `f5`, the port-`1581` UDH, reference `7a`, count `2`, indices
+`1`/`2` and RTPL bytes. Each transaction must receive the firmware's CP-ACK
+and independently referenced RP-ACK, network CP-ACK and RR release before the
+next page. Exactly two pages occur and `EF_SMS` record 1 stays free. The
+separate state gate replays the first close, queued successor and second close
+boundaries exactly. These transport gates deliberately do not claim ringtone
+UI, playback, firmware reassembly or persistence.
 `make verify-radio-operator` adds the unobscured firmware-rendered test-PLMN
 label. None alters either boot oracle.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical

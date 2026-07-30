@@ -113,10 +113,12 @@ matches the exact persisted status, SMSC, originator, timestamp and GSM-7 user
 data; no APDU or card contents are injected by the test.
 
 The Smart Messaging ringtone fixture deliberately has the opposite card
-result: after part 1 of its concatenated port-`1581` RTPL tone crosses SAPI 3,
-firmware does not issue `UPDATE RECORD` and record 1 remains free. Part 2 is
-queued behind the organic CP/RP close. This application-routing contract is
-owned by the GSM fixture, not by a special SIM file or card-side decoder.
+result: both parts of its concatenated port-`1581` RTPL tone cross independent
+SAPI-3/CP/RP/RR transactions while firmware does not issue `UPDATE RECORD` and
+record 1 remains free. This proves sequential transport and application
+routing, not firmware reassembly, ringtone persistence or UI behavior. The
+contract is owned by the GSM fixture, not by a special SIM file or card-side
+decoder.
 
 ## Remaining card work
 

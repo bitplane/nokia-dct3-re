@@ -4,6 +4,7 @@
 #ifndef MAME_NOKIA_NOKIA_GSM_SESSION_H
 #define MAME_NOKIA_NOKIA_GSM_SESSION_H
 
+#include "gsm_sms_transport.h"
 #include "nokia_gsm_network.h"
 
 #include <array>
@@ -108,6 +109,15 @@ public:
 		return m_outgoing_called_digits_length;
 	}
 	bool idle() const { return m_state == u8(state::idle); }
+	bool incoming_service_queued() const
+	{
+		return m_state == u8(state::idle) &&
+				m_incoming_service != u8(incoming_service::none);
+	}
+	bool incoming_service_completed() const
+	{
+		return m_incoming_service_completed;
+	}
 	bool awaiting_traffic_assignment() const
 	{
 		return m_state == u8(state::awaiting_traffic_assignment);
@@ -227,6 +237,11 @@ private:
 	emu_timer *m_outgoing_decision_timer = nullptr;
 	u8 m_incoming_service = u8(incoming_service::none);
 	u8 m_smart_message_part_index = 0;
+	u8 m_sms_cp_transaction = 0;
+	u8 m_sms_rp_reference = 0;
+	bool m_sms_cp_data_acknowledged = false;
+	bool m_sms_rp_acknowledged = false;
+	bool m_incoming_service_completed = false;
 	downlink_message m_pending_downlink;
 };
 
