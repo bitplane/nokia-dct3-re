@@ -22,10 +22,11 @@ class GsmSmsSessionInvariantTest(unittest.TestCase):
         self.assertIn(
             "sms.kind == gsm::sms::uplink_kind::rp_error",
             SESSION)
-        self.assertIn(
-            "m_sms_rp_acknowledged &&\n"
-            "\t\t\t\tm_smart_message_part_index + 1",
-            SESSION)
+        self.assertIn("const bool more_sms_deliveries", SESSION)
+        self.assertIn("m_sms_delivery_index + 1", SESSION)
+        self.assertIn("next.data[4] == m_sms_rp_reference", SESSION)
+        self.assertIn("std::equal(", SESSION)
+        self.assertIn("duplicate queued rp_reference=%02x", SESSION)
 
     def test_transaction_correlation_and_phase_are_saved(self):
         for field in (
@@ -34,6 +35,15 @@ class GsmSmsSessionInvariantTest(unittest.TestCase):
                 "m_sms_cp_data_acknowledged",
                 "m_sms_rp_acknowledged"):
             self.assertIn(f"save_item(NAME({field}));", SESSION)
+
+    def test_malformed_sms_is_rejected_before_paging(self):
+        radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
+        self.assertIn("incoming_sms_admissible", NETWORK_CPP)
+        self.assertIn("address_digits > 20", NETWORK_CPP)
+        self.assertIn("required_octets == message.length", NETWORK_CPP)
+        self.assertIn("incoming_service_admissible(service)", radio)
+        self.assertIn("GSM incoming service rejected before ", radio)
+        self.assertIn('"paging service=%u', radio)
 
     def test_release_distinguishes_registration_one_shot_and_queued_work(self):
         radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()

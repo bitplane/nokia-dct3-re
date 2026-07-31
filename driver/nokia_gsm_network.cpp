@@ -676,12 +676,21 @@ std::array<u8, 8> nokia_gsm_network_device::traffic_assignment() const
 	return { 0x06, 0x2e, 0x09, 0x40, 0x01, 0x00, 0x63, 0x01 };
 }
 
-std::array<u8, 36> nokia_gsm_network_device::incoming_sms_cp_data() const
+unsigned nokia_gsm_network_device::incoming_sms_message_count() const
+{
+	if (m_sms_profile == sms_profile::fill_capacity)
+		return 11;
+	return m_sms_profile == sms_profile::two_sequential ||
+			m_sms_profile == sms_profile::duplicate ? 2 : 1;
+}
+
+nokia_gsm_network_device::layer3_message
+nokia_gsm_network_device::incoming_sms_cp_data(unsigned message_index) const
 {
 	// GSM 04.11/03.40 mobile-terminated CP-DATA containing RP-DATA and one
 	// SMS-DELIVER. The deterministic fixture is text "hello" from 5551234,
 	// via service centre +1234567890, timestamped 2026-07-24 12:00:00 UTC.
-	return {
+	static constexpr std::array FIRST = {
 		0x09, 0x01, 0x21,
 		0x01, 0x40, 0x06, 0x91, 0x21, 0x43, 0x65, 0x87, 0x09,
 		0x00, 0x16,
@@ -690,6 +699,101 @@ std::array<u8, 36> nokia_gsm_network_device::incoming_sms_cp_data() const
 		0x62, 0x70, 0x42, 0x21, 0x00, 0x00, 0x00,
 		0x05, 0xe8, 0x32, 0x9b, 0xfd, 0x06
 	};
+	static constexpr std::array SECOND = {
+		0x09, 0x01, 0x21,
+		0x01, 0x41, 0x06, 0x91, 0x21, 0x43, 0x65, 0x87, 0x09,
+		0x00, 0x16,
+		0x04, 0x07, 0x81, 0x55, 0x95, 0x87, 0xf6,
+		0x00, 0x00,
+		0x62, 0x70, 0x42, 0x21, 0x10, 0x00, 0x00,
+		0x05, 0xf7, 0xb7, 0x9c, 0x4d, 0x06
+	};
+
+	layer3_message result;
+	if (message_index >= incoming_sms_message_count())
+		return result;
+	const auto &source =
+			message_index == 1 && m_sms_profile != sms_profile::duplicate ?
+			SECOND : FIRST;
+	std::copy(source.begin(), source.end(), result.data.begin());
+	result.length = source.size();
+	if (m_sms_profile == sms_profile::fill_capacity)
+	{
+		result.data[4] = 0x40 + message_index;
+		// Give each standards-shaped TPDU a separately observable sender
+		// suffix and timestamp while filling the card through ordinary
+		// firmware delivery rather than pre-populating SIM records.
+		result.data[19] = u8((message_index % 10) << 4) | 0x02;
+		result.data[27] =
+				u8((message_index % 10) << 4) | u8(message_index / 10);
+	}
+
+	switch (m_sms_profile)
+	{
+	case sms_profile::invalid_originating_address:
+		result.data[15] = 0x20;
+		break;
+	case sms_profile::unsupported_dcs:
+		result.data[22] = 0x80;
+		break;
+	case sms_profile::truncated_user_data:
+		result.length -= 2;
+		result.data[2] -= 2;
+		result.data[13] -= 2;
+		break;
+	case sms_profile::inconsistent_user_data_length:
+		result.data[30] = 0x20;
+		break;
+	default:
+		break;
+	}
+	return result;
+}
+
+bool nokia_gsm_network_device::incoming_sms_admissible(
+		unsigned message_index) const
+{
+	const auto message = incoming_sms_cp_data(message_index);
+	if (message.length < 15 ||
+			message.data[0] != 0x09 || message.data[1] != 0x01 ||
+			message.data[2] != message.length - 3 ||
+			message.data[3] != 0x01 ||
+			message.data[13] != message.length - 14 ||
+			(message.data[14] & 0x03) != 0x00)
+		return false;
+
+	// TS 23.040 SMS-DELIVER: derive every following field from the
+	// originating-address digit count. This prevents a malformed OA from
+	// shifting PID/DCS/SCTS/UDL into a superficially plausible envelope.
+	const unsigned address_digits = message.data[15];
+	if (address_digits > 20)
+		return false;
+	const unsigned address_octets = (address_digits + 1) / 2;
+	const unsigned pid_index = 17 + address_octets;
+	const unsigned dcs_index = pid_index + 1;
+	const unsigned udl_index = dcs_index + 1 + 7;
+	if (udl_index >= message.length)
+		return false;
+
+	const u8 dcs = message.data[dcs_index];
+	unsigned alphabet = 0;
+	if ((dcs & 0xc0) == 0x00)
+	{
+		// General Data Coding indication: compressed data and the reserved
+		// alphabet are outside this ordinary-text ingress contract.
+		if (BIT(dcs, 5) || ((dcs >> 2) & 0x03) == 0x03)
+			return false;
+		alphabet = (dcs >> 2) & 0x03;
+	}
+	else if ((dcs & 0xf0) == 0xf0)
+		alphabet = BIT(dcs, 2) ? 1 : 0;
+	else
+		return false;
+
+	const unsigned udl = message.data[udl_index];
+	const unsigned required_octets =
+			alphabet == 0 ? (udl * 7 + 7) / 8 : udl;
+	return udl_index + 1 + required_octets == message.length;
 }
 
 unsigned nokia_gsm_network_device::incoming_smart_message_part_count() const

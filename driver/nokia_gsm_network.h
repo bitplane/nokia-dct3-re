@@ -77,6 +77,18 @@ public:
 		stale_then_valid
 	};
 
+	enum class sms_profile : u8
+	{
+		valid,
+		two_sequential,
+		duplicate,
+		invalid_originating_address,
+		unsupported_dcs,
+		truncated_user_data,
+		inconsistent_user_data_length,
+		fill_capacity
+	};
+
 	static constexpr unsigned maximum_layer3_length = 176;
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
@@ -134,6 +146,7 @@ public:
 	{
 		m_smart_message_profile = profile;
 	}
+	void set_sms_profile(sms_profile profile) { m_sms_profile = profile; }
 	void set_assignment_profile(assignment_profile profile)
 	{
 		m_assignment_profile = profile;
@@ -191,7 +204,9 @@ public:
 	std::array<u8, 2> call_connect(u8 transaction) const;
 	std::array<u8, 5> call_disconnect(u8 transaction, u8 cause) const;
 	std::array<u8, 8> traffic_assignment() const;
-	std::array<u8, 36> incoming_sms_cp_data() const;
+	unsigned incoming_sms_message_count() const;
+	layer3_message incoming_sms_cp_data(unsigned message_index) const;
+	bool incoming_sms_admissible(unsigned message_index) const;
 	unsigned incoming_smart_message_part_count() const;
 	layer3_message incoming_smart_message_cp_data(unsigned part_index) const;
 	std::array<u8, 2> sms_cp_ack(u8 transaction) const;
@@ -219,6 +234,7 @@ private:
 	mobility_profile m_mobility_profile = mobility_profile::single_cell;
 	smart_message_profile m_smart_message_profile =
 			smart_message_profile::valid;
+	sms_profile m_sms_profile = sms_profile::valid;
 	bool m_stable_camp_seen = false;
 	bool m_neighbour_bcch_seen = false;
 	bool m_primary_cell_lost = false;

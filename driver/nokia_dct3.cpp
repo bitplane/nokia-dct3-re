@@ -691,6 +691,7 @@ public:
 		m_hw_config(*this, "HWCFG"),
 		m_diag_config(*this, "DIAGCFG"),
 		m_network_config(*this, "NETCFG"),
+		m_sms_config(*this, "SMSCFG"),
 		m_smart_message_config(*this, "SMARTCFG"),
 		m_cell_config(*this, "CELLCFG"),
 		m_assignment_config(*this, "ASSIGNCFG"),
@@ -818,6 +819,7 @@ private:
 	optional_ioport m_hw_config;
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
+	optional_ioport m_sms_config;
 	optional_ioport m_smart_message_config;
 	optional_ioport m_cell_config;
 	optional_ioport m_assignment_config;
@@ -1070,6 +1072,20 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
+	static constexpr std::array SMS_PROFILES = {
+		nokia_gsm_network_device::sms_profile::valid,
+		nokia_gsm_network_device::sms_profile::two_sequential,
+		nokia_gsm_network_device::sms_profile::duplicate,
+		nokia_gsm_network_device::sms_profile::invalid_originating_address,
+		nokia_gsm_network_device::sms_profile::unsupported_dcs,
+		nokia_gsm_network_device::sms_profile::truncated_user_data,
+		nokia_gsm_network_device::sms_profile::inconsistent_user_data_length,
+		nokia_gsm_network_device::sms_profile::fill_capacity
+	};
+	const unsigned sms_profile = m_sms_config.read_safe(0x00) & 0x07;
+	m_gsm_network->set_sms_profile(
+			SMS_PROFILES[std::min<unsigned>(
+					sms_profile, SMS_PROFILES.size() - 1)]);
 	static constexpr std::array SMART_MESSAGE_PROFILES = {
 		nokia_gsm_network_device::smart_message_profile::valid,
 		nokia_gsm_network_device::smart_message_profile::missing_second_part,
@@ -1891,6 +1907,17 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x80, 0x00, "Four-burst uplink TCH fade per six multiframes")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x80, DEF_STR(On))
+
+	PORT_START("SMSCFG")
+	PORT_CONFNAME(0x07, 0x00, "Incoming ordinary SMS profile")
+	PORT_CONFSETTING(0x00, "Valid hello from 5551234")
+	PORT_CONFSETTING(0x01, "Sequential hello/world messages")
+	PORT_CONFSETTING(0x02, "Duplicate hello delivery")
+	PORT_CONFSETTING(0x03, "Invalid originating-address length")
+	PORT_CONFSETTING(0x04, "Unsupported data-coding scheme")
+	PORT_CONFSETTING(0x05, "Truncated user data")
+	PORT_CONFSETTING(0x06, "Inconsistent user-data length")
+	PORT_CONFSETTING(0x07, "Eleven messages (capacity boundary)")
 
 	PORT_START("SMARTCFG")
 	PORT_CONFNAME(0x0f, 0x00, "Incoming Smart Message envelope")

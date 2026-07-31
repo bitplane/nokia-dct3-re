@@ -110,7 +110,13 @@ images.
 after paging and segmented SAPI-3 SMS-DELIVER traffic, firmware issues
 `A0 DC 01 04 B0` and stores an unread `hello` message in record 1. The verifier
 matches the exact persisted status, SMSC, originator, timestamp and GSM-7 user
-data; no APDU or card contents are injected by the test.
+data; no APDU or card contents are injected by the test. Physical reading
+changes status `03` to `01`, while confirmed deletion changes it to free
+status `00` without requiring the card to erase stale payload bytes.
+Preserved-NVRAM cold boot exposes the same record without redelivery.
+An organic capacity run fills all ten records through firmware APDUs and the
+eleventh delivery receives RP-ERROR cause `16`; no test pre-populates the card.
+The full lifecycle and cross-product evidence are in `ordinary_sms.md`.
 
 The Smart Messaging ringtone fixture deliberately has the opposite card
 result: both parts of its concatenated port-`1581` RTPL tone cross independent

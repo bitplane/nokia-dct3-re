@@ -57,7 +57,7 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_outgoing_termination_request_id));
 	save_item(NAME(m_outgoing_termination_cause));
 	save_item(NAME(m_incoming_service));
-	save_item(NAME(m_smart_message_part_index));
+	save_item(NAME(m_sms_delivery_index));
 	save_item(NAME(m_sms_cp_transaction));
 	save_item(NAME(m_sms_rp_reference));
 	save_item(NAME(m_sms_cp_data_acknowledged));
@@ -118,7 +118,7 @@ void nokia_gsm_session_device::device_reset()
 	publish_call_active_output();
 	publish_release_waiting_output();
 	m_incoming_service = u8(incoming_service::none);
-	m_smart_message_part_index = 0;
+	m_sms_delivery_index = 0;
 	m_sms_cp_transaction = 0;
 	m_sms_rp_reference = 0;
 	m_sms_cp_data_acknowledged = false;
@@ -196,13 +196,23 @@ bool nokia_gsm_session_device::queue_incoming_page(incoming_service service)
 		return true;
 	if (m_state != u8(state::idle) || m_registered_mobile_identity_length != 8)
 		return false;
+	const bool continuing_queued_service =
+			m_incoming_service_completed &&
+			m_incoming_service == u8(service);
 	m_incoming_service = u8(service);
 	m_traffic_assignment_issued = false;
 	m_incoming_service_completed = false;
-	if (service != incoming_service::smart_message)
-		m_smart_message_part_index = 0;
+	if (!continuing_queued_service)
+		m_sms_delivery_index = 0;
 	m_state = u8(state::awaiting_paging_response);
 	return true;
+}
+
+bool nokia_gsm_session_device::incoming_service_admissible(
+		incoming_service service) const
+{
+	return service != incoming_service::sms ||
+			m_network->incoming_sms_admissible(m_sms_delivery_index);
 }
 
 nokia_gsm_session_device::downlink_kind
@@ -463,7 +473,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 		if (m_incoming_service == u8(incoming_service::smart_message))
 		{
 			const auto data = m_network->incoming_smart_message_cp_data(
-					m_smart_message_part_index);
+					m_sms_delivery_index);
 			if (data.length >= 5)
 			{
 				m_sms_cp_transaction = data.data[0];
@@ -474,16 +484,17 @@ nokia_gsm_session_device::downlink_acknowledged()
 			return queue_downlink(downlink_kind::incoming_sms_cp_data,
 					data.data.data(), data.length, 3);
 		}
-		const auto data = m_network->incoming_sms_cp_data();
-		if (data.size() >= 5)
+		const auto data = m_network->incoming_sms_cp_data(
+				m_sms_delivery_index);
+		if (data.length >= 5)
 		{
-			m_sms_cp_transaction = data[0];
-			m_sms_rp_reference = data[4];
+			m_sms_cp_transaction = data.data[0];
+			m_sms_rp_reference = data.data[4];
 		}
 		m_sms_cp_data_acknowledged = false;
 		m_sms_rp_acknowledged = false;
 		return queue_downlink(downlink_kind::incoming_sms_cp_data,
-				data.data(), data.size(), 3);
+				data.data.data(), data.length, 3);
 	}
 
 	if (m_state == u8(state::awaiting_sms_cp_data_acknowledgement) &&
@@ -540,13 +551,44 @@ nokia_gsm_session_device::downlink_acknowledged()
 		clear_pending_downlink();
 		m_incoming_service_completed =
 				m_incoming_service != u8(incoming_service::none);
-		const bool more_smart_message_parts =
-				m_incoming_service == u8(incoming_service::smart_message) &&
+		bool more_ordinary_sms = false;
+		if (m_sms_rp_acknowledged &&
+				m_incoming_service == u8(incoming_service::sms) &&
+				m_sms_delivery_index + 1 <
+						m_network->incoming_sms_message_count())
+		{
+			const auto next = m_network->incoming_sms_cp_data(
+					m_sms_delivery_index + 1);
+			const auto current = m_network->incoming_sms_cp_data(
+					m_sms_delivery_index);
+			// GSM 04.11 RP-MR correlates an RP transaction. A queued replay
+			// must repeat both the reference and the complete CP/RP payload;
+			// RP-MR alone may be reused by a later distinct transaction.
+			const bool exact_replay =
+					next.length == current.length &&
+					next.length >= 5 &&
+					next.data[4] == m_sms_rp_reference &&
+					std::equal(
+							next.data.begin(), next.data.begin() + next.length,
+							current.data.begin());
+			more_ordinary_sms =
+					next.length >= 5 &&
+					!exact_replay;
+			if (!more_ordinary_sms)
+				LOGMASKED(LOG_GSM_SESSION,
+						"gsm_sms: duplicate queued rp_reference=%02x "
+						"suppressed t=%.6f\n",
+						m_sms_rp_reference,
+						machine().time().as_double());
+		}
+		const bool more_sms_deliveries =
 				m_sms_rp_acknowledged &&
-				m_smart_message_part_index + 1 <
-						m_network->incoming_smart_message_part_count();
-		if (more_smart_message_parts)
-			++m_smart_message_part_index;
+				((m_incoming_service == u8(incoming_service::smart_message) &&
+				m_sms_delivery_index + 1 <
+						m_network->incoming_smart_message_part_count()) ||
+				more_ordinary_sms);
+		if (more_sms_deliveries)
+			++m_sms_delivery_index;
 		if (m_incoming_service == u8(incoming_service::call))
 		{
 			m_state = u8(state::awaiting_release_complete);
@@ -567,10 +609,10 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_outgoing_termination_request_id = 0;
 		m_outgoing_termination_cause = 0x10;
 		m_outgoing_decision_timer->adjust(attotime::never);
-		if (!more_smart_message_parts)
+		if (!more_sms_deliveries)
 		{
 			m_incoming_service = u8(incoming_service::none);
-			m_smart_message_part_index = 0;
+			m_sms_delivery_index = 0;
 		}
 		m_sms_cp_transaction = 0;
 		m_sms_rp_reference = 0;

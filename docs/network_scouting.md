@@ -455,11 +455,11 @@ once, and delivers a standards-shaped SMS-DELIVER for `hello` in two I frames.
 The firmware acknowledges SAPI 3, selects `EF_SMS`, writes a complete 176-byte
 record through SIMI/FIQ6, and card NVRAM contains the exact unread record.
 That independently proves transport acceptance, firmware SMS parsing and
-persistent delivery. Neither the default run nor a separate physical
-security-code-unlock run emits the expected CP-ACK/RP-ACK tail after storage,
-so the fixture does not claim CP/RP closure, RR teardown or a user-visible
-message notification. The unlock control rules out the security editor as the
-cause of the missing tail.
+persistent delivery. The handset then emits CP-ACK and correlated RP-ACK,
+the network returns CP-ACK, LAPDm/RR release completes and the firmware
+publishes `1 message received`. Physical read, erase/cancel, preserved cold
+boot, save-state, malformed/duplicate, capacity and two-message isolation are
+gated separately and normalized in `ordinary_sms.md`.
 
 `make verify-radio-incoming-smart-message` substitutes a Nokia ringtone TPDU
 above that same transport. The codec builds a complete 251-byte RTPL tone as
@@ -578,6 +578,14 @@ The same target restores after named playback acceptance and after commandless
 rejection; both retain their exact UI and playback/no-playback outcome. There
 is no separately observable interval inside the parser call itself, so no
 synthetic parser state is serialized.
+
+Ordinary text uses the same generic CP/RP phase ownership but a distinct
+application outcome. Its network ingress validator rejects malformed OA/DCS/
+UDL envelopes before paging; a terminally consumed RP reference cannot enqueue
+a duplicate handset delivery. Ten normal firmware transactions fill all ten
+SIM records, while the eleventh produces handset RP-ERROR cause `16` and still
+closes through network CP-ACK and RR release. See `ordinary_sms.md` for the
+authoritative lifecycle and product matrix.
 
 The laboratory cell is GSM 900 ARFCN 1, BSIC `0x12`, reserved test PLMN
 001-01, LAC 1 and cell ID 1. The SIM IMSI and preferred-PLMN file use the same

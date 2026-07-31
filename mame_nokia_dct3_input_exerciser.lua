@@ -102,6 +102,13 @@ local state_roundtrip_end_delay = env_number(
 		"NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS", -1) / 1000
 local state_roundtrip_replay = env_number(
 		"NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS", 0) / 1000
+local state_roundtrip_keys = {}
+for name in string.gmatch(
+		os.getenv("NOKIA_DCT3_STATE_ROUNDTRIP_KEYS") or "", "[^,%s]+") do
+	state_roundtrip_keys[#state_roundtrip_keys + 1] = name
+end
+local state_roundtrip_key_delay = env_number(
+		"NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS", 250) / 1000
 local mbus_rx_fixture = tonumber(os.getenv("NOKIA_DCT3_MBUS_RX_FIXTURE") or "")
 local mbus_rx_fixture_at = env_number("NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS", 300) / 1000
 
@@ -840,6 +847,24 @@ if state_roundtrip_at >= 0 then
 			machine:logerror(string.format(
 				"state_replay: phase=restored event=end t=%.6f\n",
 				emulation_seconds()))
+		end
+		-- Lua coroutine timers are deliberately outside the machine image.
+		-- Start any continuation keys from the restored branch itself so a
+		-- save taken at a firmware UI boundary can be followed by ordinary
+		-- physical navigation without relying on a pre-save input timer.
+		if #state_roundtrip_keys > 0 then
+			emu.wait(state_roundtrip_key_delay)
+			for _, name in ipairs(state_roundtrip_keys) do
+				local wait_ms = string.match(name, "^wait(%d+)$")
+				if wait_ms then
+					emu.wait(tonumber(wait_ms) / 1000)
+				else
+					press(name)
+					emu.wait(post_duration)
+					release(name)
+					emu.wait(post_gap)
+				end
+			end
 		end
 		-- Optional acceptance orchestration: issue an ordinary physical End
 		-- only after the restored machine has run for the requested interval.

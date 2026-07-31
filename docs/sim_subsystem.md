@@ -202,6 +202,11 @@ contains the fixture service-centre address. In
 `make verify-radio-incoming-sms`, firmware organically selects these files and
 writes record 1 with status `03` plus the exact SMSC/SMS-DELIVER representation
 of unread text `hello`; the verifier checks the resulting card NVRAM bytes.
+The ordinary inbox gates additionally prove firmware-owned `03` → `01` read
+and `01` → `00` erase transitions, preserved-NVRAM discovery, selective
+two-message deletion and organic ten-record capacity exhaustion. The card
+does not decode GSM 7-bit text or maintain a parallel inbox; see
+`ordinary_sms.md`.
 The port-addressed ringtone fixture instead leaves all `EF_SMS` records free,
 which is part of its application-routing oracle rather than a missing SIM
 write. Matched concatenation and physical RTPL playback occur while card NVRAM

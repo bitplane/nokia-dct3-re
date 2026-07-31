@@ -210,7 +210,13 @@ preserved as an investigation journal.
 - The DSP/external-service peer contract is proved only for requests exercised by
   boot, authenticated registration, paging, answered MT call control and speech,
   persistent ordinary MT SMS delivery and closed sequential multipart MT SMS
-  transport. Idle cell loss/reselection now has four-product same-/different-
+  transport. Ordinary text additionally has complete NSE-8 notification,
+  preserved inbox, physical read/delete, save-state, malformed/duplicate,
+  organic capacity and selective two-message gates. NHM-5 and NHM-2
+  independently pass durable cold-boot read/delete; NHM-6 is deliberately
+  held at exact SIM storage plus CP/RP/RR closure because its preserved-PMM
+  security/time editor still blocks a reproducible inbox path. Idle cell
+  loss/reselection now has four-product same-/different-
   LAC, paging, negative and save-state gates. The bounded long-ringtone gate
   proves both parts through independent paging, SAPI-3, CP/RP acknowledgement
   and RR release transactions on all four promoted products, with replay at

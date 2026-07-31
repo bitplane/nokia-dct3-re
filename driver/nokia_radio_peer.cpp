@@ -2241,10 +2241,27 @@ void nokia_radio_peer_device::emit_report()
 					m_incoming_call_after_registration ?
 					nokia_gsm_session_device::incoming_service::call :
 					nokia_gsm_session_device::incoming_service::none;
+			const bool service_admissible =
+					m_gsm_session->incoming_service_admissible(service);
+			if (m_registered && m_page_after_registration &&
+					m_pch_fill_delivered && !m_page_transmitted &&
+					!service_admissible)
+			{
+				// Reject malformed network ingress before it can become a
+				// radio page or mutate handset/SIM state. The one-shot page
+				// latch also prevents an invalid queued item from being
+				// reconsidered on every monitored PCH block.
+				m_page_transmitted = true;
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: GSM incoming service rejected before "
+						"paging service=%u t=%.6f\n",
+						unsigned(service), machine().time().as_double());
+			}
 			const bool transmit_page =
 					m_registered && m_page_after_registration && m_pch_fill_delivered &&
 					(!m_page_requires_reselection || m_has_reselected) &&
 					!m_page_transmitted &&
+					service_admissible &&
 					m_gsm_session->queue_incoming_page(service);
 			const auto &identity =
 					m_gsm_session->registered_mobile_identity();

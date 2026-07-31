@@ -78,6 +78,7 @@ public:
 	bool establish_layer3(
 			const u8 *information, unsigned length, u16 serving_arfcn);
 	bool queue_incoming_page(incoming_service service = incoming_service::none);
+	bool incoming_service_admissible(incoming_service service) const;
 	downlink_kind contention_resolution_delivered();
 	downlink_kind downlink_acknowledged();
 	downlink_kind receive_layer3(
@@ -236,7 +237,7 @@ private:
 	bool m_outgoing_fallback_enabled = true;
 	emu_timer *m_outgoing_decision_timer = nullptr;
 	u8 m_incoming_service = u8(incoming_service::none);
-	u8 m_smart_message_part_index = 0;
+	u8 m_sms_delivery_index = 0;
 	u8 m_sms_cp_transaction = 0;
 	u8 m_sms_rp_reference = 0;
 	bool m_sms_cp_data_acknowledged = false;
