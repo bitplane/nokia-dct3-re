@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 class AcceptanceRunIsolationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.makefile = (ROOT / "Makefile").read_text()
+        cls.makefile = ((ROOT / "Makefile").read_text() + "\n"
+                     + (ROOT / "gates.mk").read_text())
 
     def test_common_run_preparation_owns_generated_artifacts(self):
         preparation = self.makefile.split("prepare-run-files:", 1)[1].split(

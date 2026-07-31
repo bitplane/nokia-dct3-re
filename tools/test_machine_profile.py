@@ -19,7 +19,8 @@ class MachineProfileTest(unittest.TestCase):
         cls.external_service_header = (
             ROOT / "driver/nokia_external_service.h"
         ).read_text()
-        cls.makefile = (ROOT / "Makefile").read_text()
+        cls.makefile = ((ROOT / "Makefile").read_text() + "\n"
+                     + (ROOT / "gates.mk").read_text())
 
     def function_body(self, signature, next_signature):
         return self.driver.split(signature, 1)[1].split(next_signature, 1)[0]
@@ -436,7 +437,8 @@ class MachineProfileTest(unittest.TestCase):
             self.assertIn(f'defvalue="{mask}" value="0"', fixture)
 
     def test_missing_pcm_oracle_removes_only_the_physical_link(self):
-        makefile = (ROOT / "Makefile").read_text()
+        makefile = ((ROOT / "Makefile").read_text() + "\n"
+                     + (ROOT / "gates.mk").read_text())
         fixture = (ROOT / "fixtures/radio_pcm_missing/noki3210.cfg").read_text()
         self.assertIn("fixtures/radio_pcm_missing", makefile)
         self.assertIn('tag=":HWCFG"', fixture)

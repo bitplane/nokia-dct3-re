@@ -115,7 +115,8 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn('["end"] = field_by_mask("COL.1", 0x02)', fixture)
 
     def test_3310_navigation_gate_uses_only_physical_key_sequences(self):
-        makefile = (ROOT / "Makefile").read_text()
+        makefile = ((ROOT / "Makefile").read_text() + "\n"
+                     + (ROOT / "gates.mk").read_text())
         target = makefile.split("verify-3310-navigation:", 1)[1].split("\n\n", 1)[0]
         self.assertIn("enter,wait1000,enter,wait700,enter,wait700,down", target)
         self.assertIn("down,wait700,c,wait700,c", target)
@@ -125,7 +126,8 @@ class KeypadInputTest(unittest.TestCase):
         self.assertNotIn("TRACE_", target)
 
     def test_3330_gates_use_only_physical_first_boot_and_navigation_inputs(self):
-        makefile = (ROOT / "Makefile").read_text()
+        makefile = ((ROOT / "Makefile").read_text() + "\n"
+                     + (ROOT / "gates.mk").read_text())
         self.assertIn("NOKI3330_FIRST_BOOT_KEYS := 1,2,3,4,5,enter", makefile)
         self.assertIn("0,1,0,1,2,0,0,2,wait600,enter", makefile)
         target = makefile.split("verify-3330-navigation:", 1)[1].split("\n\n", 1)[0]
@@ -137,7 +139,8 @@ class KeypadInputTest(unittest.TestCase):
         self.assertNotIn("TRACE_", target)
 
     def test_3410_gates_reject_blank_frames_and_use_only_physical_keys(self):
-        makefile = (ROOT / "Makefile").read_text()
+        makefile = ((ROOT / "Makefile").read_text() + "\n"
+                     + (ROOT / "gates.mk").read_text())
         self.assertIn("ORACLE_3410_IDLE_SHA ?= 14c1f25e", makefile)
         self.assertIn("ORACLE_3410_MESSAGES_SHA ?= a44445d8", makefile)
         self.assertIn("! -name '*_z918_*' ! -name '*_ff918_*'", makefile)
@@ -187,7 +190,8 @@ class KeypadInputTest(unittest.TestCase):
         self.assertNotIn("debug_ram", fixture)
 
     def test_interactive_target_uses_standard_mame_input(self):
-        makefile = (ROOT / "Makefile").read_text()
+        makefile = ((ROOT / "Makefile").read_text() + "\n"
+                     + (ROOT / "gates.mk").read_text())
         target = makefile.split("run-interactive:", 1)[1].split("\n\n", 1)[0]
         self.assertIn("INTERACTIVE_MAME_ARGS", target)
         self.assertIn("PRESERVE_NVRAM=1", target)
