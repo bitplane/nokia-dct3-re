@@ -50,6 +50,25 @@ private:
 		bool mutable_data;
 	};
 
+	// The structure a command requires of the EF it is addressed to. Named
+	// rather than tested inline so the five commands that begin with this
+	// lookup cannot disagree about the status a mismatch reports.
+	enum class access_shape : u8 { transparent, record, cyclic };
+
+	// Each of these queues the failure status itself and reports refusal, so a
+	// caller only has to return. Keep them in the order the original commands
+	// tested in: which status a malformed command receives depends on it.
+	const file_descriptor *selected_file_for(access_shape shape);
+	bool write_permitted(const file_descriptor &file);
+	u8 *writable_body(const file_descriptor &file);
+	bool resolve_record(const file_descriptor &file, unsigned &record);
+	bool chv_ready(unsigned index);
+	// Clear the per-session command and selection state. Reached both by reset
+	// and by card activation, so a field added here cannot be missed at one
+	// site. Reset additionally clears the command header, which activation
+	// deliberately leaves alone.
+	void reset_session_state();
+
 	void emit_response(const u8 *data, unsigned length);
 	void finish_header();
 	void finish_body();

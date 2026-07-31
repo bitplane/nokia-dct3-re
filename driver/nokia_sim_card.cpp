@@ -57,11 +57,9 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_chv_verified));
 }
 
-void nokia_sim_card_device::device_reset()
+void nokia_sim_card_device::reset_session_state()
 {
 	m_tx_len = m_tx_expected = 0;
-	m_ins = 0;
-	m_p1 = m_p2 = m_p3 = 0;
 	m_selected_file = 0x3f00;
 	m_selected_df = 0x3f00;
 	m_record_pointer = 0;
@@ -69,6 +67,16 @@ void nokia_sim_card_device::device_reset()
 	m_pending_response_len = 0;
 	m_fcp_pending = false;
 	m_chv_verified[0] = m_chv_verified[1] = false;
+}
+
+void nokia_sim_card_device::device_reset()
+{
+	reset_session_state();
+	// Reset additionally discards the command header. Activation does not: a
+	// card reactivated mid-command leaves the header for the transport to
+	// finish reading, so this stays outside the shared helper.
+	m_ins = 0;
+	m_p1 = m_p2 = m_p3 = 0;
 }
 
 void nokia_sim_card_device::nvram_default()
@@ -231,15 +239,91 @@ void nokia_sim_card_device::set_atr(const u8 *data, unsigned length)
 
 void nokia_sim_card_device::activate()
 {
-	m_tx_len = m_tx_expected = 0;
-	m_selected_file = 0x3f00;
-	m_selected_df = 0x3f00;
-	m_record_pointer = 0;
-	m_receiving_body = false;
-	m_pending_response_len = 0;
-	m_fcp_pending = false;
-	m_chv_verified[0] = m_chv_verified[1] = false;
+	reset_session_state();
 	emit_response(m_atr, m_atr_len);
+}
+
+const nokia_sim_card_device::file_descriptor *
+nokia_sim_card_device::selected_file_for(access_shape shape)
+{
+	const file_descriptor *const file = find_file(m_selected_file);
+	const bool matches = file && (
+			shape == access_shape::transparent ?
+				file->structure == file_structure::transparent :
+			shape == access_shape::cyclic ?
+				file->structure == file_structure::cyclic :
+				(file->structure == file_structure::linear_fixed ||
+					file->structure == file_structure::cyclic));
+	if (!matches)
+	{
+		queue_status(0x94, 0x08);
+		return nullptr;
+	}
+	return file;
+}
+
+bool nokia_sim_card_device::write_permitted(const file_descriptor &file)
+{
+	if (access_allowed(file))
+		return true;
+	queue_status(0x98, 0x04);
+	return false;
+}
+
+u8 *nokia_sim_card_device::writable_body(const file_descriptor &file)
+{
+	u8 *const data = mutable_file_data(file.fid);
+	if (!data)
+		queue_status(0x98, 0x04);
+	return data;
+}
+
+bool nokia_sim_card_device::resolve_record(
+		const file_descriptor &file, unsigned &record)
+{
+	// GSM 11.11 record addressing: absolute, next, previous, or the current
+	// pointer. Next and previous wrap, which is what makes cyclic files
+	// traversable without the handset tracking the record count itself.
+	const unsigned records = file.size / file.record_length;
+	const u8 mode = m_p2 & 0x07;
+	record = m_record_pointer;
+	if (mode == 0x04)
+		record = m_p1;
+	else if (mode == 0x02)
+		record = record == records ? 1 : record + 1;
+	else if (mode == 0x03)
+		record = record <= 1 ? records : record - 1;
+	else if (mode != 0x00)
+	{
+		queue_status(0x6b, 0x00);
+		return false;
+	}
+	if (record == 0 || record > records)
+	{
+		queue_status(0x94, 0x02);
+		return false;
+	}
+	// The caller advances m_record_pointer itself: a read commits it at once,
+	// while a write commits only once the body has proved writable.
+	return true;
+}
+
+bool nokia_sim_card_device::chv_ready(unsigned index)
+{
+	// A disabled CHV1 is reported as a condition-of-use failure rather than as
+	// a mismatch, so it must be tested before the comparison and must not
+	// consume a retry.
+	if (index == 0 && !m_chv1_enabled)
+	{
+		queue_status(0x98, 0x08);
+		return false;
+	}
+	if (!chv_matches(index, m_tx))
+	{
+		chv_failure(index);
+		return false;
+	}
+	return true;
 }
 
 void nokia_sim_card_device::emit_response(const u8 *data, unsigned length)
@@ -509,16 +593,8 @@ void nokia_sim_card_device::process_chv()
 
 	if (m_ins == 0x20)
 	{
-		if (index == 0 && !m_chv1_enabled)
-		{
-			queue_status(0x98, 0x08);
+		if (!chv_ready(index))
 			return;
-		}
-		if (!chv_matches(index, m_tx))
-		{
-			chv_failure(index);
-			return;
-		}
 		m_chv_attempts[index] = 3;
 		m_chv_verified[index] = true;
 		queue_status(0x90, 0x00);
@@ -527,16 +603,8 @@ void nokia_sim_card_device::process_chv()
 
 	if (m_ins == 0x24)
 	{
-		if (index == 0 && !m_chv1_enabled)
-		{
-			queue_status(0x98, 0x08);
+		if (!chv_ready(index))
 			return;
-		}
-		if (!chv_matches(index, m_tx))
-		{
-			chv_failure(index);
-			return;
-		}
 		std::copy_n(m_tx + 8, 8, std::begin(m_chv[index]));
 		m_chv_attempts[index] = 3;
 		m_chv_verified[index] = true;
@@ -660,12 +728,10 @@ void nokia_sim_card_device::queue_pending_response(unsigned requested)
 
 void nokia_sim_card_device::queue_read_binary(unsigned requested)
 {
-	const file_descriptor *file = find_file(m_selected_file);
-	if (!file || file->structure != file_structure::transparent)
-	{
-		queue_status(0x94, 0x08);
+	const file_descriptor *const file =
+			selected_file_for(access_shape::transparent);
+	if (!file)
 		return;
-	}
 	const unsigned start = (unsigned(m_p1 & 0x7f) << 8) | m_p2;
 	if (start + requested > file->size)
 	{
@@ -683,12 +749,10 @@ void nokia_sim_card_device::queue_read_binary(unsigned requested)
 
 void nokia_sim_card_device::queue_read_record(unsigned requested)
 {
-	const file_descriptor *file = find_file(m_selected_file);
-	if (!file || (file->structure != file_structure::linear_fixed && file->structure != file_structure::cyclic))
-	{
-		queue_status(0x94, 0x08);
+	const file_descriptor *const file =
+			selected_file_for(access_shape::record);
+	if (!file)
 		return;
-	}
 	if (file->fid == 0x6f39 && m_chv1_enabled && !m_chv_verified[0])
 	{
 		queue_status(0x98, 0x04);
@@ -699,25 +763,9 @@ void nokia_sim_card_device::queue_read_record(unsigned requested)
 		queue_status(0x67, 0x00);
 		return;
 	}
-	const unsigned records = file->size / file->record_length;
-	const u8 mode = m_p2 & 0x07;
-	unsigned record = m_record_pointer;
-	if (mode == 0x04)
-		record = m_p1;
-	else if (mode == 0x02)
-		record = record == records ? 1 : record + 1;
-	else if (mode == 0x03)
-		record = record <= 1 ? records : record - 1;
-	else if (mode != 0x00)
-	{
-		queue_status(0x6b, 0x00);
+	unsigned record;
+	if (!resolve_record(*file, record))
 		return;
-	}
-	if (record == 0 || record > records)
-	{
-		queue_status(0x94, 0x02);
-		return;
-	}
 	m_record_pointer = record;
 	u8 response[260];
 	unsigned n = 0;
@@ -731,29 +779,21 @@ void nokia_sim_card_device::queue_read_record(unsigned requested)
 
 void nokia_sim_card_device::update_binary()
 {
-	const file_descriptor *file = find_file(m_selected_file);
-	if (!file || file->structure != file_structure::transparent)
-	{
-		queue_status(0x94, 0x08);
+	const file_descriptor *const file =
+			selected_file_for(access_shape::transparent);
+	if (!file)
 		return;
-	}
-	if (!access_allowed(*file))
-	{
-		queue_status(0x98, 0x04);
+	if (!write_permitted(*file))
 		return;
-	}
 	const unsigned start = (unsigned(m_p1 & 0x7f) << 8) | m_p2;
 	if (start + m_tx_len > file->size)
 	{
 		queue_status(0x94, 0x02);
 		return;
 	}
-	u8 *const data = mutable_file_data(file->fid);
+	u8 *const data = writable_body(*file);
 	if (!data)
-	{
-		queue_status(0x98, 0x04);
 		return;
-	}
 	std::copy_n(m_tx, m_tx_len, data + start);
 	if (m_trace)
 		LOGMASKED(LOG_SIM, "sim_device: update-binary fid=%04x offset=%u length=%u t=%.8f\n",
@@ -763,47 +803,23 @@ void nokia_sim_card_device::update_binary()
 
 void nokia_sim_card_device::update_record()
 {
-	const file_descriptor *file = find_file(m_selected_file);
-	if (!file || (file->structure != file_structure::linear_fixed && file->structure != file_structure::cyclic))
-	{
-		queue_status(0x94, 0x08);
+	const file_descriptor *const file =
+			selected_file_for(access_shape::record);
+	if (!file)
 		return;
-	}
-	if (!access_allowed(*file))
-	{
-		queue_status(0x98, 0x04);
+	if (!write_permitted(*file))
 		return;
-	}
 	if (m_tx_len != file->record_length)
 	{
 		queue_status(0x67, 0x00);
 		return;
 	}
-	const unsigned records = file->size / file->record_length;
-	const u8 mode = m_p2 & 0x07;
-	unsigned record = m_record_pointer;
-	if (mode == 0x04)
-		record = m_p1;
-	else if (mode == 0x02)
-		record = record == records ? 1 : record + 1;
-	else if (mode == 0x03)
-		record = record <= 1 ? records : record - 1;
-	else if (mode != 0x00)
-	{
-		queue_status(0x6b, 0x00);
+	unsigned record;
+	if (!resolve_record(*file, record))
 		return;
-	}
-	if (record == 0 || record > records)
-	{
-		queue_status(0x94, 0x02);
-		return;
-	}
-	u8 *data = mutable_file_data(file->fid);
+	u8 *const data = writable_body(*file);
 	if (!data)
-	{
-		queue_status(0x98, 0x04);
 		return;
-	}
 	std::copy_n(m_tx, file->record_length, data + (record - 1) * file->record_length);
 	m_record_pointer = record;
 	if (m_trace)
@@ -814,12 +830,10 @@ void nokia_sim_card_device::update_record()
 
 void nokia_sim_card_device::increase_record()
 {
-	const file_descriptor *file = find_file(m_selected_file);
-	if (!file || file->structure != file_structure::cyclic)
-	{
-		queue_status(0x94, 0x08);
+	const file_descriptor *const file =
+			selected_file_for(access_shape::cyclic);
+	if (!file)
 		return;
-	}
 	if (m_p1 != 0 || m_p2 != 0)
 	{
 		queue_status(0x6b, 0x00);
@@ -830,17 +844,11 @@ void nokia_sim_card_device::increase_record()
 		queue_status(0x67, 0x00);
 		return;
 	}
-	if (!access_allowed(*file))
-	{
-		queue_status(0x98, 0x04);
+	if (!write_permitted(*file))
 		return;
-	}
-	u8 *const data = mutable_file_data(file->fid);
+	u8 *const data = writable_body(*file);
 	if (!data)
-	{
-		queue_status(0x98, 0x04);
 		return;
-	}
 
 	const u32 current = (u32(data[0]) << 16) | (u32(data[1]) << 8) | data[2];
 	const u32 addend = (u32(m_tx[0]) << 16) | (u32(m_tx[1]) << 8) | m_tx[2];

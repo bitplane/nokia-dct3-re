@@ -136,7 +136,10 @@ protected:
 	virtual void device_reset() override;
 
 private:
-	enum phase : u8
+	// Scoped so that neither a bare integer nor another enum can be written
+	// into the phase. Ordering is load-bearing: several tests ask whether the
+	// phase lies within a contiguous block, so entries must not be reordered.
+	enum class phase : u8
 	{
 		inactive,
 		initial_search,
@@ -146,7 +149,6 @@ private:
 		candidate_channel_change,
 		candidate_ra_info,
 		serving_bcch,
-		serving_idle_ra,
 		candidate_retry,
 		selected_search,
 		serving_channel_change,
@@ -180,6 +182,10 @@ private:
 	};
 
 	static const char *phase_name(u8 value);
+	// The phase is held as u8 because MAME's save system takes only fundamental
+	// types; these keep every use site typed regardless.
+	phase current_phase() const { return phase(m_phase); }
+	void set_phase(phase next) { m_phase = u8(next); }
 	enum class search_request : u8
 	{
 		none,
@@ -215,7 +221,7 @@ private:
 			const nokia_dspif_device::packet &packet);
 	bool decode_serving_sch_request(
 			const nokia_dspif_device::packet &packet);
-	bool candidate_window_acquisition() const;
+	bool uses_candidate_window() const;
 	bool handle_search_request(search_request request);
 	bool handle_acquisition_packet(
 			const nokia_dspif_device::packet &packet);
@@ -262,7 +268,7 @@ private:
 	bool m_trace_enabled = false;
 	unsigned m_reports_sent = 0;
 	unsigned m_reports_remaining = 0;
-	u8 m_phase = phase::inactive;
+	u8 m_phase = u8(phase::inactive);
 	unsigned m_search_round = 0;
 	unsigned m_idle_measurement_sample = 0;
 	unsigned m_wait_ticks = 0;

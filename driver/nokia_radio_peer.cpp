@@ -178,7 +178,7 @@ void nokia_radio_peer_device::device_reset()
 {
 	m_reports_sent = 0;
 	m_reports_remaining = 0;
-	m_phase = phase::inactive;
+	set_phase(phase::inactive);
 	m_search_round = 0;
 	m_idle_measurement_sample = 0;
 	m_wait_ticks = 0;
@@ -741,7 +741,7 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 	static constexpr const char *NAMES[] = {
 		"inactive", "initial_search", "post_deactivate_search",
 		"candidate_measurement", "candidate_sync", "candidate_channel_change",
-		"candidate_ra_info", "serving_bcch", "serving_idle_ra", "candidate_retry",
+		"candidate_ra_info", "serving_bcch", "candidate_retry",
 		"selected_search", "serving_channel_change", "selected_channel_change",
 		"selected_bcch", "selected_ra_info", "selected_bcch_channel_change",
 		"random_access", "assigned_channel_change", "lapdm_establish",
@@ -755,6 +755,11 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"traffic_contention_resolution", "traffic_release_acknowledgement",
 		"candidate_terminal_control", "serving_sch_observation"
 	};
+	// The table is positional, and the checkers match on the names it emits.
+	// Without this, adding or removing a phase renames every later phase in the
+	// traces and fails as a puzzling gate mismatch rather than a build error.
+	static_assert(std::size(NAMES) == std::size_t(phase::count),
+			"phase_name table does not cover every phase");
 	const unsigned index = unsigned(value);
 	return index < std::size(NAMES) ? NAMES[index] : "invalid";
 }
@@ -764,8 +769,14 @@ const char *nokia_radio_peer_device::phase_name() const
 	return phase_name(m_phase);
 }
 
-bool nokia_radio_peer_device::candidate_window_acquisition() const
+bool nokia_radio_peer_device::uses_candidate_window() const
 {
+	// Deliberately not an equality test against acquisition_strategy::
+	// candidate_window. The autonomous band scan also runs a candidate
+	// measurement window: it reports measured topology RSSI and holds the idle
+	// common-control receiver open, where bitmap-multistage acquisition does
+	// neither. Every call site below asks about that shared window, not about
+	// which of the two named strategies produced it.
 	return m_protocol.acquisition == acquisition_strategy::candidate_window ||
 			m_protocol.acquisition ==
 					acquisition_strategy::autonomous_band_scan;
@@ -775,22 +786,25 @@ u8 nokia_radio_peer_device::next_report_type() const
 {
 	// Fixed entries are declarative; 0xff marks phases whose report depends on
 	// request data or position within a correlated multi-report transaction.
-	static constexpr std::array<u8, phase::count> FIXED_REPORT = {
+	// Positional and index-aligned to the phase enum: the array size catches a
+	// phase added or removed, but nothing catches a reorder, so entries must
+	// move with their phase.
+	static constexpr std::array<u8, std::size_t(phase::count)> FIXED_REPORT = {
 		0x87, 0x87, 0x87, 0xff, 0xff, 0xff, 0x84, 0xff,
-		0x8c, 0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89,
-		0xff, 0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80,
-		0x86, 0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80,
-		0x89, 0x86, 0x80, 0x80, 0xff, 0xff
+		0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89, 0xff,
+		0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80, 0x86,
+		0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80, 0x89,
+		0x86, 0x80, 0x80, 0xff, 0xff
 	};
 
 	const u8 fixed = m_phase < FIXED_REPORT.size() ? FIXED_REPORT[m_phase] : 0x87;
 	if (fixed != 0xff)
 		return fixed;
 
-	switch (m_phase)
+	switch (current_phase())
 	{
 	case phase::candidate_measurement:
-		if (candidate_window_acquisition())
+		if (uses_candidate_window())
 			return m_reports_remaining == 2 ? 0x80 : 0x8b;
 		return 0x8b;
 	case phase::candidate_sync:
@@ -828,7 +842,7 @@ unsigned nokia_radio_peer_device::serving_cycle_reports() const
 
 bool nokia_radio_peer_device::serving_pch_report() const
 {
-	if (m_phase != phase::serving_bcch)
+	if (current_phase() != phase::serving_bcch)
 		return false;
 	return (m_registered || m_idle_common_control_active) &&
 			m_receiver_arfcn == m_serving_arfcn &&
@@ -948,7 +962,7 @@ void nokia_radio_peer_device::enter_release_deconfigure()
 				"dsp_hle: LAPDm service Channel Release acknowledged nr=%u t=%.6f\n",
 				m_lapdm_link->pending_receive_sequence(),
 				machine().time().as_double());
-	m_phase = phase::release_deconfigure;
+	set_phase(phase::release_deconfigure);
 	m_reports_remaining = 0;
 }
 
@@ -1234,7 +1248,7 @@ bool nokia_radio_peer_device::decode_serving_sch_request(
 			m_protocol.serving_sch_request_type == 0 ||
 			packet.type != m_protocol.serving_sch_request_type ||
 			packet.length != 2 ||
-			m_phase != phase::serving_bcch)
+			current_phase() != phase::serving_bcch)
 		return false;
 
 	// Nokia packet grammar owns the request, but its DSP-visible consequence is
@@ -1259,7 +1273,7 @@ bool nokia_radio_peer_device::decode_serving_sch_request(
 			strongest_rssi = rssi;
 		}
 	}
-	m_phase = phase::serving_sch_observation;
+	set_phase(phase::serving_sch_observation);
 	m_reports_remaining =
 			m_sch_observation_arfcn != 0xffff ? 1 : 2;
 	m_wait_ticks = 0;
@@ -1274,16 +1288,20 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 
 	if (request == search_request::candidate_window)
 	{
+		// This one is load-bearing, unlike the band-scan branch below: both
+		// candidate-window strategies decode this request, and only the
+		// autonomous scan may be followed by an explicit window while its own
+		// measurement is still the current phase.
 		const bool autonomous_scan_complete =
 				m_protocol.acquisition ==
 						acquisition_strategy::autonomous_band_scan &&
-				m_phase == phase::candidate_measurement;
-		if ((!autonomous_scan_complete && m_phase != phase::inactive) ||
+				current_phase() == phase::candidate_measurement;
+		if ((!autonomous_scan_complete && current_phase() != phase::inactive) ||
 				m_reports_remaining != 0)
 			return false;
 		// Candidate-window acquisition reports SCH before its alternative
 		// measurement terminal and preserves the full SI validation interval.
-		m_phase = phase::candidate_measurement;
+		set_phase(phase::candidate_measurement);
 		m_reports_remaining = 2;
 		// One 51-frame GSM control multiframe spans 59 peer polls at the
 		// calibrated four-millisecond service cadence used below for BCCH.
@@ -1297,14 +1315,16 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 	{
 		const bool lost_serving_cell = m_serving_loss_pending;
 		const bool after_receiver_deactivation =
-				m_phase == phase::post_deactivate_search;
+				current_phase() == phase::post_deactivate_search;
+		// No strategy test here: only the two candidate-window strategies can
+		// decode an autonomous band scan in the first place, so reaching this
+		// branch already establishes what uses_candidate_window() would ask.
 		const bool after_candidate_window =
-				candidate_window_acquisition() &&
-				m_phase == phase::candidate_measurement &&
+				current_phase() == phase::candidate_measurement &&
 				m_reports_remaining == 0;
 		if ((!lost_serving_cell && !after_receiver_deactivation &&
 					!after_candidate_window &&
-					m_phase != phase::inactive) ||
+					current_phase() != phase::inactive) ||
 				(!lost_serving_cell && m_reports_remaining != 0))
 			return false;
 		// NHM-2 uses the same autonomous band-scan request after organic
@@ -1321,17 +1341,17 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 			m_neighbour_resume_wait_ticks = 0;
 			m_serving_loss_pending = false;
 		}
-		m_phase = phase::candidate_measurement;
+		set_phase(phase::candidate_measurement);
 		m_reports_remaining = 1;
 		return true;
 	}
 
-	switch (m_phase)
+	switch (current_phase())
 	{
 	case phase::inactive:
 		if (m_reports_remaining == 0)
 		{
-			m_phase = phase::initial_search;
+			set_phase(phase::initial_search);
 			m_reports_remaining = 2;
 			return true;
 		}
@@ -1342,7 +1362,7 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 		{
 			// A cached EF_BCCH request takes the same bounded terminal path as
 			// the explicit deactivation transition.
-			m_phase = phase::post_deactivate_search;
+			set_phase(phase::post_deactivate_search);
 			m_reports_remaining = 2;
 			return true;
 		}
@@ -1351,7 +1371,7 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 	case phase::post_deactivate_search:
 		if (m_reports_remaining == 0)
 		{
-			m_phase = phase::candidate_measurement;
+			set_phase(phase::candidate_measurement);
 			m_reports_remaining = 1;
 			return true;
 		}
@@ -1362,7 +1382,7 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 		{
 			if (m_search_round >= 3)
 			{
-				m_phase = phase::candidate_sync;
+				set_phase(phase::candidate_sync);
 				m_reports_remaining = 2;
 				m_report_deferred = true;
 			}
@@ -1375,7 +1395,7 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 	case phase::candidate_sync:
 		if (m_reports_remaining == 0)
 		{
-			m_phase = phase::candidate_retry;
+			set_phase(phase::candidate_retry);
 			m_reports_remaining = 2;
 			m_report_deferred = true;
 			return true;
@@ -1385,7 +1405,7 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 	case phase::serving_bcch:
 		// An explicit measurement request preempts the periodic serving stream.
 		m_search_requested = false;
-		m_phase = phase::selected_search;
+		set_phase(phase::selected_search);
 		m_reports_remaining = 2;
 		m_wait_ticks = 0;
 		m_report_deferred = true;
@@ -1403,7 +1423,7 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 	case phase::candidate_retry:
 		if (m_reports_remaining == 0)
 		{
-			m_phase = phase::candidate_measurement;
+			set_phase(phase::candidate_measurement);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 			return true;
@@ -1419,34 +1439,34 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 bool nokia_radio_peer_device::handle_acquisition_packet(
 		const nokia_dspif_device::packet &packet)
 {
-	if (candidate_window_acquisition() &&
+	if (uses_candidate_window() &&
 			packet.type == 0x55 && packet.length == 4 &&
-			m_phase == phase::candidate_measurement &&
+			current_phase() == phase::candidate_measurement &&
 			m_reports_remaining == 0)
 	{
 		// Candidate-window firmware publishes a separate terminal-control
 		// transaction after consuming SCH and its final RSSI result. Complete
 		// that bounded DSP transaction with the ordinary no-more-candidates
 		// indication; firmware remains responsible for the next search step.
-		m_phase = phase::candidate_terminal_control;
+		set_phase(phase::candidate_terminal_control);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 		return true;
 	}
 
 	if (packet.type == 0x02 &&
-			(((m_phase == phase::candidate_sync ||
-					m_phase == phase::selected_search) &&
+			(((current_phase() == phase::candidate_sync ||
+					current_phase() == phase::selected_search) &&
 				m_reports_remaining == 0) ||
-			(candidate_window_acquisition() &&
-				m_phase == phase::candidate_measurement &&
+			(uses_candidate_window() &&
+				current_phase() == phase::candidate_measurement &&
 				m_reports_remaining == 1)))
 	{
 		const bool active_candidate_window =
-				candidate_window_acquisition() &&
-				m_phase == phase::candidate_measurement;
+				uses_candidate_window() &&
+				current_phase() == phase::candidate_measurement;
 		const bool selected_plmn_search =
-				m_phase == phase::selected_search && m_search_mode == 0x50;
+				current_phase() == phase::selected_search && m_search_mode == 0x50;
 		const u16 requested_arfcn = packet.length >= 12 ?
 				(packet.payload[10] << 8) | packet.payload[11] :
 				m_receiver_arfcn;
@@ -1458,9 +1478,9 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 		if (active_candidate_window &&
 				m_receiver_arfcn != m_serving_arfcn)
 			commit_receiver_as_serving();
-		m_phase = selected_plmn_search ?
+		set_phase(selected_plmn_search ?
 				phase::selected_channel_change :
-				phase::candidate_channel_change;
+				phase::candidate_channel_change);
 		m_reports_remaining = active_candidate_window ?
 				2 : (selected_plmn_search ? 1 : 2);
 		m_report_deferred = true;
@@ -1488,7 +1508,7 @@ void nokia_radio_peer_device::encode_measurement_report(u8 *payload) const
 		payload[3 + result * 4] =
 				measured ? u8(measured_arfcn) : 0xff;
 		payload[5 + result * 4] = measured ?
-				(candidate_window_acquisition() ?
+				(uses_candidate_window() ?
 					u8(m_gsm_network->cell_rssi(
 							measured_arfcn, m_search_round)) :
 					(m_search_round < 2 ? u8(0x93) :
@@ -1500,7 +1520,7 @@ void nokia_radio_peer_device::encode_measurement_report(u8 *payload) const
 
 void nokia_radio_peer_device::encode_channel_confirmation(u8 *payload) const
 {
-	payload[0] = m_phase == phase::assigned_channel_change ?
+	payload[0] = current_phase() == phase::assigned_channel_change ?
 			m_protocol.assigned_channel_confirmation : 0x00;
 }
 
@@ -1528,18 +1548,18 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		return;
 
 	if (packet.type == 0x03 &&
-			(m_phase == phase::initial_search ||
-				(m_phase == phase::candidate_measurement &&
+			(current_phase() == phase::initial_search ||
+				(current_phase() == phase::candidate_measurement &&
 					m_downlink_signalling_failed)) &&
 			m_reports_remaining == 0)
 	{
 		// After a loss-triggered autonomous RSSI pass NHM-2 deactivates the
 		// old receiver before continuing candidate selection.  This is the
 		// same bounded DSP deactivation transaction used by initial search.
-		m_phase = phase::post_deactivate_search;
+		set_phase(phase::post_deactivate_search);
 		m_reports_remaining = 2;
 	}
-	else if (packet.type == 0x0c && m_phase == phase::serving_bcch)
+	else if (packet.type == 0x0c && current_phase() == phase::serving_bcch)
 	{
 		// IDLE_RA form 1 configures the serving-cell receiver. Form 0 carries a
 		// CHANNEL REQUEST random-access octet at byte 2 after organic 0x07d1.
@@ -1554,11 +1574,11 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			return;
 		m_access_ra = channel_request ? packet.payload[2] : 0;
 		m_access_frame = 0;
-		m_phase = phase::random_access;
+		set_phase(phase::random_access);
 		m_reports_remaining = 2;
 		m_report_deferred = true;
 	}
-	else if (packet.type == 0x02 && m_phase == phase::serving_bcch &&
+	else if (packet.type == 0x02 && current_phase() == phase::serving_bcch &&
 			packet.length >= 9 && packet.payload[8] == 0x60)
 	{
 		// After serving-cell selection the ROM configures logical channel 0x12,
@@ -1604,9 +1624,9 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		}
 		const bool completes_candidate_validation =
 				!m_idle_common_control_active &&
-				candidate_window_acquisition();
+				uses_candidate_window();
 		m_idle_common_control_active =
-				candidate_window_acquisition();
+				uses_candidate_window();
 		if (m_downlink_signalling_failed)
 		{
 			// Firmware explicitly reconfigured the common-control receiver
@@ -1615,7 +1635,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			// the carrier is still absent, another organic failure follows.
 			restart_downlink_signalling_counter();
 		}
-		m_phase = phase::serving_channel_change;
+		set_phase(phase::serving_channel_change);
 		m_reports_remaining = 1;
 		if (completes_candidate_validation && m_bcch_frame_valid)
 		{
@@ -1631,29 +1651,29 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		else
 			m_report_deferred = true;
 	}
-	else if (packet.type == 0x02 && m_phase == phase::selected_bcch &&
+	else if (packet.type == 0x02 && current_phase() == phase::selected_bcch &&
 			packet.length >= 9 && packet.payload[8] == 0x60)
 	{
 		// The channel-change acceptance window closes before the selected search's
 		// finite terminal. Suspend that search, acknowledge the requested change,
 		// then resume its remaining measurement and terminal reports.
 		m_selected_reports_remaining = m_reports_remaining;
-		m_phase = phase::selected_bcch_channel_change;
+		set_phase(phase::selected_bcch_channel_change);
 		m_reports_remaining = 1;
 		m_wait_ticks = 0;
 		m_report_deferred = true;
 	}
-	else if (packet.type == 0x02 && m_phase == phase::random_access &&
+	else if (packet.type == 0x02 && current_phase() == phase::random_access &&
 			packet.length >= 9 && packet.payload[8] == 0x80)
 	{
 		// A matching Immediate Assignment makes RR configure the assigned SDCCH.
 		// Complete the same recovered channel-change transaction used for the
 		// serving receiver; the firmware owns the subsequent LAPDm establishment.
-		m_phase = phase::assigned_channel_change;
+		set_phase(phase::assigned_channel_change);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
-	else if (packet.type == 0x02 && m_phase == phase::release_deconfigure &&
+	else if (packet.type == 0x02 && current_phase() == phase::release_deconfigure &&
 			packet.length >= 16 && packet.payload[8] == 0x60 &&
 			(packet.payload[15] == 0x0f ||
 				(m_traffic_channel_active &&
@@ -1666,14 +1686,14 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// transactions carry 0x08 on NSE-8 and 0x14 on NHM-5; keep those exact
 		// product-profile contracts typed without assigning an unproved bit
 		// meaning. Confirm the transaction here; the firmware owns return to idle.
-		m_phase = phase::release_channel_change;
+		set_phase(phase::release_channel_change);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
 	else if (packet.type == 0x02 &&
-			(m_phase == phase::service_uplink_request ||
-				m_phase == phase::service_uplink_wait ||
-				m_phase == phase::service_uplink_acknowledgement) &&
+			(current_phase() == phase::service_uplink_request ||
+				current_phase() == phase::service_uplink_wait ||
+				current_phase() == phase::service_uplink_acknowledgement) &&
 			packet.length >= 9 && packet.payload[8] == 0xc1 &&
 			m_gsm_session->begin_traffic_assignment())
 	{
@@ -1681,13 +1701,13 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		// TCH/F as Nokia DSP channel 0xc1. Confirm that exact transaction before
 		// asking the ROM for signalling on the newly established main link.
 		m_lapdm_link->begin_mobile_establishment(0);
-		m_phase = phase::traffic_channel_change;
+		set_phase(phase::traffic_channel_change);
 		m_reports_remaining = 1;
 		m_wait_ticks = 0;
 		m_report_deferred = true;
 	}
 	else if (packet.type == 0x1b &&
-			m_phase == phase::traffic_lapdm_establish &&
+			current_phase() == phase::traffic_lapdm_establish &&
 			packet.length >= 5 && packet.payload[1] == 0xb0)
 	{
 		if (receive_lapdm_uplink(packet.payload.data() + 2,
@@ -1695,13 +1715,13 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				nokia_lapdm_link_device::uplink_result::establish_indication)
 		{
 			m_traffic_channel_active = true;
-			m_phase = phase::traffic_contention_resolution;
+			set_phase(phase::traffic_contention_resolution);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
 	}
 	else if (packet.type == 0x03 &&
-			(m_phase == phase::serving_bcch || m_phase == phase::selected_search))
+			(current_phase() == phase::serving_bcch || current_phase() == phase::selected_search))
 	{
 		// DEACTIVATE retires the old receiver.  If the MCU has already queued a
 		// newer SEARCH_LIST after completing selection, begin that request only
@@ -1710,7 +1730,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		if (m_search_requested)
 		{
 			m_search_requested = false;
-			m_phase = phase::selected_search;
+			set_phase(phase::selected_search);
 			m_reports_remaining = 2;
 			m_wait_ticks = 0;
 			m_report_deferred = true;
@@ -1722,7 +1742,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_report_deferred = false;
 		}
 	}
-	else if (packet.type == 0x1b && m_phase == phase::lapdm_establish &&
+	else if (packet.type == 0x1b && current_phase() == phase::lapdm_establish &&
 			packet.length >= 5 && packet.payload[1] == 0x80)
 	{
 		// SEND_BLOCK has a two-byte DSP channel header followed by LAPDm. A
@@ -1738,7 +1758,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					m_lapdm_link->layer3_length(), m_serving_arfcn))
 		{
 			trace_layer3_uplink("establish");
-			m_phase = phase::contention_resolution;
+			set_phase(phase::contention_resolution);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
@@ -1754,7 +1774,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		}
 	}
 	else if (packet.type == 0x1b &&
-			m_phase == phase::location_update_acknowledgement &&
+			current_phase() == phase::location_update_acknowledgement &&
 			packet.length >= 5 && packet.payload[1] == 0x80)
 	{
 		if (receive_lapdm_uplink(packet.payload.data() + 2,
@@ -1774,7 +1794,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			if (action ==
 					nokia_gsm_session_device::downlink_kind::channel_release)
 			{
-				m_phase = phase::rr_channel_release;
+				set_phase(phase::rr_channel_release);
 				m_reports_remaining = 1;
 				m_report_deferred = true;
 			}
@@ -1782,14 +1802,14 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					nokia_gsm_session_device::downlink_kind::
 							authentication_request)
 			{
-				m_phase = phase::service_uplink_request;
+				set_phase(phase::service_uplink_request);
 				m_reports_remaining = 1;
 				m_report_deferred = true;
 			}
 		}
 	}
 	else if (packet.type == 0x1b &&
-			m_phase == phase::channel_release_acknowledgement &&
+			current_phase() == phase::channel_release_acknowledgement &&
 			packet.length >= 5 && packet.payload[1] == 0x80)
 	{
 		const auto result = receive_lapdm_uplink(
@@ -1811,16 +1831,16 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				// Require one correctly phased idle PCH fill before queuing the
 				// bounded page requested by the laboratory network.
 				m_pch_fill_delivered = false;
-				m_phase = phase::release_deconfigure;
+				set_phase(phase::release_deconfigure);
 				m_reports_remaining = 0;
 			}
 		}
 	}
 	else if (packet.type == 0x1b &&
-			(m_phase == phase::service_uplink_wait ||
+			(current_phase() == phase::service_uplink_wait ||
 				(m_traffic_channel_active &&
-					m_phase >= phase::service_downlink &&
-					m_phase <= phase::service_uplink_acknowledgement)) &&
+					current_phase() >= phase::service_downlink &&
+					current_phase() <= phase::service_uplink_acknowledgement)) &&
 			packet.length >= 5 &&
 			(packet.payload[1] == 0x80 ||
 				(m_traffic_channel_active &&
@@ -1898,9 +1918,9 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					pending_kind !=
 							nokia_gsm_session_device::downlink_kind::
 									sapi3_establishment;
-			m_phase = queued_information ?
+			set_phase(queued_information ?
 					phase::service_downlink :
-					phase::service_uplink_acknowledgement;
+					phase::service_uplink_acknowledgement);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
@@ -1909,8 +1929,8 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		{
 			m_downlink_offset = 0;
 			const auto action = m_gsm_session->downlink_acknowledged();
-			m_phase = action != nokia_gsm_session_device::downlink_kind::none ?
-					phase::service_downlink : phase::service_uplink_request;
+			set_phase(action != nokia_gsm_session_device::downlink_kind::none ?
+					phase::service_downlink : phase::service_uplink_request);
 			m_reports_remaining = 1;
 			if (action != nokia_gsm_session_device::downlink_kind::none)
 				m_wait_ticks = 0;
@@ -1924,7 +1944,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			{
 				m_downlink_offset +=
 						nokia_lapdm_link_device::maximum_information_length;
-				m_phase = phase::service_downlink;
+				set_phase(phase::service_downlink);
 				m_reports_remaining = 1;
 				m_report_deferred = true;
 				return;
@@ -1947,7 +1967,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			}
 			else if (action != nokia_gsm_session_device::downlink_kind::none)
 			{
-				m_phase = phase::service_downlink;
+				set_phase(phase::service_downlink);
 				m_reports_remaining = 1;
 				m_wait_ticks = 0;
 				m_report_deferred = true;
@@ -1967,7 +1987,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 						acknowledged_kind ==
 								nokia_gsm_session_device::downlink_kind::
 										incoming_call_setup;
-				m_phase = phase::service_uplink_request;
+				set_phase(phase::service_uplink_request);
 				m_reports_remaining = 1;
 				m_report_deferred = true;
 			}
@@ -1975,7 +1995,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		else if (result ==
 				nokia_lapdm_link_device::uplink_result::release_indication)
 		{
-			m_phase = phase::traffic_release_acknowledgement;
+			set_phase(phase::traffic_release_acknowledgement);
 			m_reports_remaining = 1;
 			m_wait_ticks = 0;
 			m_report_deferred = true;
@@ -1988,7 +2008,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			// wait; alternate a decoded fill opportunity with the next uplink
 			// request instead of polling only the uplink direction forever.
 			m_followup_downlink_opportunity = true;
-			m_phase = phase::service_uplink_request;
+			set_phase(phase::service_uplink_request);
 			m_reports_remaining = 1;
 			m_wait_ticks = 100;
 			m_report_deferred = true;
@@ -2003,7 +2023,7 @@ void nokia_radio_peer_device::emit_report()
 	bool off_group_page = false;
 	u8 report_type = next_report_type();
 	const bool neighbour_measurement_report =
-			m_neighbour_bcch_pending && m_phase == phase::serving_bcch &&
+			m_neighbour_bcch_pending && current_phase() == phase::serving_bcch &&
 			(m_neighbour_instruction_mode == 0x02 ||
 					report_type == 0x83);
 	const bool neighbour_rssi_report =
@@ -2039,10 +2059,10 @@ void nokia_radio_peer_device::emit_report()
 						machine().time().as_double());
 		}
 	}
-	if (m_phase == phase::lapdm_establish ||
-			m_phase == phase::location_update_ack_request ||
-			m_phase == phase::channel_release_uplink_request ||
-			m_phase == phase::service_uplink_request)
+	if (current_phase() == phase::lapdm_establish ||
+			current_phase() == phase::location_update_ack_request ||
+			current_phase() == phase::channel_release_uplink_request ||
+			current_phase() == phase::service_uplink_request)
 		payload[0] = m_traffic_channel_active ? 0xb0 : 0x80;
 
 	if (report_type == 0x8b)
@@ -2053,31 +2073,31 @@ void nokia_radio_peer_device::emit_report()
 		const bool pch_report =
 				!neighbour_bcch_report && serving_pch_report();
 		const bool dedicated_downlink =
-				(m_phase >= phase::contention_resolution &&
-					m_phase <= phase::rr_channel_release) ||
-				m_phase == phase::service_downlink ||
-				m_phase == phase::service_uplink_acknowledgement ||
-				m_phase == phase::traffic_contention_resolution ||
-				m_phase == phase::traffic_release_acknowledgement;
+				(current_phase() >= phase::contention_resolution &&
+					current_phase() <= phase::rr_channel_release) ||
+				current_phase() == phase::service_downlink ||
+				current_phase() == phase::service_uplink_acknowledgement ||
+				current_phase() == phase::traffic_contention_resolution ||
+				current_phase() == phase::traffic_release_acknowledgement;
 		// RECEIVED_BLOCK carries channel, BSIC, error, frame number, ARFCN,
 		// shift and then a 24-byte GSM L2 block.  Channel 0x40 is SCH; 0x50 is
 		// BCCH; 0x60 is the shared paging/access-grant common control channel;
 		// 0x80 is SDCCH and 0xb0 is the active TCH/F FACCH selector.
-		payload[0] = m_phase == phase::serving_sch_observation ? 0x40 :
+		payload[0] = current_phase() == phase::serving_sch_observation ? 0x40 :
 				neighbour_bcch_report ? 0x50 :
 				pch_report ? 0x60 :
 				dedicated_downlink ?
 					(m_traffic_channel_active ? 0xb0 : 0x80) :
-				m_phase == phase::random_access ? 0x60 :
-				((m_phase < phase::candidate_channel_change ||
-					m_phase == phase::selected_search) ? 0x40 : 0x50);
+				current_phase() == phase::random_access ? 0x60 :
+				((current_phase() < phase::candidate_channel_change ||
+					current_phase() == phase::selected_search) ? 0x40 : 0x50);
 		const bool candidate_sch =
 				payload[0] == 0x40 &&
-				(m_phase == phase::candidate_measurement ||
-					m_phase == phase::candidate_sync) &&
+				(current_phase() == phase::candidate_measurement ||
+					current_phase() == phase::candidate_sync) &&
 				m_search_arfcn_count != 0;
 		const u16 report_arfcn =
-				m_phase == phase::serving_sch_observation ?
+				current_phase() == phase::serving_sch_observation ?
 					m_sch_observation_arfcn :
 				neighbour_bcch_report ?
 					m_neighbour_bcch_arfcn :
@@ -2089,7 +2109,7 @@ void nokia_radio_peer_device::emit_report()
 		const auto *report_cell =
 				m_gsm_network->cell_by_arfcn(report_arfcn);
 		payload[1] =
-				m_phase == phase::serving_sch_observation &&
+				current_phase() == phase::serving_sch_observation &&
 						report_arfcn == m_last_neighbour_instruction_arfcn ?
 					m_last_neighbour_instruction_bsic :
 				neighbour_bcch_report ?
@@ -2117,7 +2137,7 @@ void nokia_radio_peer_device::emit_report()
 		// with the rest of the L1 state, so SCH/BCCH metadata remains coherent
 		// across save/load instead of moving by a frame after a slightly
 		// different firmware poll latency.
-		u32 frame_number = m_phase == phase::random_access ? m_access_frame :
+		u32 frame_number = current_phase() == phase::random_access ? m_access_frame :
 				m_tdma_frame_number % 2'715'648;
 		if (pch_report)
 			frame_number = paging_frame_number(
@@ -2146,23 +2166,23 @@ void nokia_radio_peer_device::emit_report()
 		payload[6] = report_arfcn >> 8;
 		payload[7] = report_arfcn;
 
-		if (m_phase == phase::contention_resolution)
+		if (current_phase() == phase::contention_resolution)
 		{
 			const auto frame = m_lapdm_link->build_ua();
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
-		else if (m_phase == phase::traffic_contention_resolution)
+		else if (current_phase() == phase::traffic_contention_resolution)
 		{
 			const auto frame = m_lapdm_link->build_ua();
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
-		else if (m_phase == phase::traffic_release_acknowledgement)
+		else if (current_phase() == phase::traffic_release_acknowledgement)
 		{
 			const auto frame = m_lapdm_link->build_release_ua();
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
-		else if (m_phase == phase::location_update_accept ||
-				m_phase == phase::rr_channel_release)
+		else if (current_phase() == phase::location_update_accept ||
+				current_phase() == phase::rr_channel_release)
 		{
 			// Both carry the session's queued message unsegmented on SAPI 0;
 			// they differ only in which phase follows the acknowledgement.
@@ -2171,7 +2191,7 @@ void nokia_radio_peer_device::emit_report()
 					0, message.data.data(), message.length);
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
-		else if (m_phase == phase::service_downlink)
+		else if (current_phase() == phase::service_downlink)
 		{
 			const auto &message = m_gsm_session->pending_downlink();
 			if (m_trace_enabled && m_downlink_offset == 0 &&
@@ -2198,7 +2218,7 @@ void nokia_radio_peer_device::emit_report()
 			}
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
-		else if (m_phase == phase::service_uplink_acknowledgement)
+		else if (current_phase() == phase::service_uplink_acknowledgement)
 		{
 			const auto frame = m_lapdm_link->build_receive_ready(
 					m_lapdm_link->layer3_sapi());
@@ -2314,7 +2334,7 @@ void nokia_radio_peer_device::emit_report()
 	if (report_type == 0x89)
 		encode_channel_confirmation(payload);
 
-	if (report_type == 0x84 && m_phase == phase::random_access)
+	if (report_type == 0x84 && current_phase() == phase::random_access)
 		encode_random_access_info(payload);
 
 	// Camped neighbour RSSI_RESULTS uses the 24-byte form observed on DCT3;
@@ -2394,7 +2414,7 @@ void nokia_radio_peer_device::emit_report()
 		}
 	}
 
-	if (report_type == 0x8b && m_phase >= phase::candidate_measurement)
+	if (report_type == 0x8b && current_phase() >= phase::candidate_measurement)
 		++m_search_round;
 	++m_reports_sent;
 	if (!asynchronous_neighbour_report)
@@ -2410,14 +2430,14 @@ void nokia_radio_peer_device::emit_report()
 
 void nokia_radio_peer_device::advance_after_report(u8 report_type)
 {
-	if (m_phase == phase::serving_sch_observation &&
+	if (current_phase() == phase::serving_sch_observation &&
 			(report_type == 0x80 || report_type == 0x8a ||
 					report_type == 0x8f))
 	{
 		if (report_type == 0x80)
 		{
 			m_serving_loss_pending = false;
-			m_phase = phase::serving_bcch;
+			set_phase(phase::serving_bcch);
 			m_reports_remaining = serving_cycle_reports();
 			m_wait_ticks = 59;
 		}
@@ -2433,23 +2453,23 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 			// decoded blocks on the lost serving channel.  Wait for a new
 			// firmware-owned search or receiver configuration.
 			m_serving_loss_pending = false;
-			m_phase = phase::inactive;
+			set_phase(phase::inactive);
 			m_reports_remaining = 0;
 			m_wait_ticks = 0;
 		}
 	}
-	else if (m_phase == phase::candidate_channel_change && report_type == 0x89)
+	else if (current_phase() == phase::candidate_channel_change && report_type == 0x89)
 	{
-		m_phase = phase::candidate_ra_info;
+		set_phase(phase::candidate_ra_info);
 		m_wait_ticks = 100;
 	}
-	else if (m_phase == phase::candidate_ra_info && report_type == 0x84)
+	else if (current_phase() == phase::candidate_ra_info && report_type == 0x84)
 	{
-		m_phase = phase::serving_bcch;
+		set_phase(phase::serving_bcch);
 		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::serving_bcch && report_type == 0x80)
+	else if (current_phase() == phase::serving_bcch && report_type == 0x80)
 	{
 		// Space decoded BCCH blocks at a 51-frame-multiframe cadence.  A PCH
 		// indication is already delivered in advance for its subscriber paging
@@ -2462,49 +2482,49 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		if (!pch_report)
 			m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::serving_bcch && report_type == 0x83 &&
+	else if (current_phase() == phase::serving_bcch && report_type == 0x83 &&
 			m_reports_remaining == 0)
 	{
 		// A camped GSM cell broadcasts System Information continuously.
 		m_reports_remaining = serving_cycle_reports();
 	}
-	else if (m_phase == phase::serving_bcch && report_type == 0x8c)
+	else if (current_phase() == phase::serving_bcch && report_type == 0x8c)
 	{
 		// The indication replaces one scheduled PCH receive opportunity and
 		// therefore retains its ordinary control-multiframe pacing.
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::selected_search && (report_type == 0x87 || report_type == 0x8f))
+	else if (current_phase() == phase::selected_search && (report_type == 0x87 || report_type == 0x8f))
 	{
-		m_phase = phase::serving_bcch;
+		set_phase(phase::serving_bcch);
 		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::serving_channel_change && report_type == 0x89)
+	else if (current_phase() == phase::serving_channel_change && report_type == 0x89)
 	{
 		if (m_reselection_validation_pending)
 		{
 			// A newly committed serving cell must publish its own complete SI
 			// state before inherited registration can resume PCH. RR/MM, not
 			// the radio peer, decides whether the decoded LAI requires LU.
-			m_phase = phase::selected_bcch;
+			set_phase(phase::selected_bcch);
 			m_reports_remaining = 16;
 		}
 		else
 		{
-			m_phase = phase::serving_bcch;
+			set_phase(phase::serving_bcch);
 			m_reports_remaining = serving_cycle_reports();
 		}
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::selected_channel_change && report_type == 0x89)
+	else if (current_phase() == phase::selected_channel_change && report_type == 0x89)
 	{
-		m_phase = phase::selected_ra_info;
+		set_phase(phase::selected_ra_info);
 		m_wait_ticks = 100;
 	}
-	else if (m_phase == phase::selected_ra_info && report_type == 0x84)
+	else if (current_phase() == phase::selected_ra_info && report_type == 0x84)
 	{
-		m_phase = phase::selected_bcch;
+		set_phase(phase::selected_bcch);
 		// Validate the selected cell across one complete eight-multiframe BCCH
 		// schedule. Each block is followed by its serving-channel RSSI result.
 		// A usable cell does not also produce NO_BCCH_LEFT: that contradictory
@@ -2513,62 +2533,62 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		m_reports_remaining = 16;
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::selected_bcch && report_type == 0x80)
+	else if (current_phase() == phase::selected_bcch && report_type == 0x80)
 	{
 		if (m_reselection_validation_pending && m_reports_remaining == 0)
 		{
 			m_reselection_validation_pending = false;
-			m_phase = phase::serving_bcch;
+			set_phase(phase::serving_bcch);
 			m_reports_remaining = serving_cycle_reports();
 		}
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::selected_bcch && report_type == 0x83)
+	else if (current_phase() == phase::selected_bcch && report_type == 0x83)
 	{
 		// The measurement belongs to the preceding received block; the next BCCH
 		// block remains paced by the multiframe delay set on that block.
 		if (m_reports_remaining == 0)
 		{
 			m_reselection_validation_pending = false;
-			m_phase = phase::serving_bcch;
+			set_phase(phase::serving_bcch);
 			m_reports_remaining = serving_cycle_reports();
 			m_wait_ticks = 59;
 		}
 	}
-	else if (m_phase == phase::selected_bcch && report_type == 0x87)
+	else if (current_phase() == phase::selected_bcch && report_type == 0x87)
 	{
-		m_phase = phase::serving_bcch;
+		set_phase(phase::serving_bcch);
 		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::selected_bcch_channel_change && report_type == 0x89)
+	else if (current_phase() == phase::selected_bcch_channel_change && report_type == 0x89)
 	{
 		// The accepted logical-channel change retires the selected-cell scan.
 		// Firmware immediately issues its next SEARCH_LIST after consuming the RR
 		// completion; replaying the pre-change terminal makes that newer request
 		// lose ownership and restarts selection indefinitely.
-		m_phase = phase::serving_bcch;
+		set_phase(phase::serving_bcch);
 		m_reports_remaining = serving_cycle_reports();
 		m_selected_reports_remaining = 0;
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::random_access && report_type == 0x80)
+	else if (current_phase() == phase::random_access && report_type == 0x80)
 	{
 		// Further progress is firmware-owned: a matching assignment configures
 		// the dedicated channel and causes the MCU to transmit LAPDm SABM.
 		m_reports_remaining = 0;
 	}
-	else if (m_phase == phase::assigned_channel_change && report_type == 0x89)
+	else if (current_phase() == phase::assigned_channel_change && report_type == 0x89)
 	{
-		m_phase = phase::lapdm_establish;
+		set_phase(phase::lapdm_establish);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
-	else if (m_phase == phase::lapdm_establish && report_type == 0x86)
+	else if (current_phase() == phase::lapdm_establish && report_type == 0x86)
 	{
 		m_reports_remaining = 0;
 	}
-	else if (m_phase == phase::contention_resolution && report_type == 0x80)
+	else if (current_phase() == phase::contention_resolution && report_type == 0x80)
 	{
 		const auto action = m_gsm_session->contention_resolution_delivered();
 		if (action ==
@@ -2576,13 +2596,13 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 				action ==
 				nokia_gsm_session_device::downlink_kind::authentication_request)
 		{
-			m_phase = phase::location_update_accept;
+			set_phase(phase::location_update_accept);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
 		else if (action == nokia_gsm_session_device::downlink_kind::channel_release)
 		{
-			m_phase = phase::rr_channel_release;
+			set_phase(phase::rr_channel_release);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
@@ -2598,65 +2618,65 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 				nokia_gsm_session_device::downlink_kind::cipher_mode_command ||
 				action == nokia_gsm_session_device::downlink_kind::mm_information)
 		{
-			m_phase = phase::service_downlink;
+			set_phase(phase::service_downlink);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
 	}
-	else if (m_phase == phase::location_update_accept && report_type == 0x80)
+	else if (current_phase() == phase::location_update_accept && report_type == 0x80)
 	{
-		m_phase = phase::location_update_ack_request;
+		set_phase(phase::location_update_ack_request);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
-	else if (m_phase == phase::location_update_ack_request && report_type == 0x86)
+	else if (current_phase() == phase::location_update_ack_request && report_type == 0x86)
 	{
-		m_phase = phase::location_update_acknowledgement;
+		set_phase(phase::location_update_acknowledgement);
 		m_reports_remaining = 0;
 	}
-	else if (m_phase == phase::rr_channel_release && report_type == 0x80)
+	else if (current_phase() == phase::rr_channel_release && report_type == 0x80)
 	{
-		m_phase = phase::channel_release_uplink_request;
+		set_phase(phase::channel_release_uplink_request);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
-	else if (m_phase == phase::channel_release_uplink_request && report_type == 0x86)
+	else if (current_phase() == phase::channel_release_uplink_request && report_type == 0x86)
 	{
-		m_phase = phase::channel_release_acknowledgement;
+		set_phase(phase::channel_release_acknowledgement);
 		m_reports_remaining = 0;
 	}
-	else if (m_phase == phase::release_channel_change && report_type == 0x89)
+	else if (current_phase() == phase::release_channel_change && report_type == 0x89)
 	{
 		m_traffic_channel_active = false;
 		clear_speech_queues();
-		m_phase = phase::serving_bcch;
+		set_phase(phase::serving_bcch);
 		m_reports_remaining = serving_cycle_reports();
 		m_wait_ticks = 59;
 	}
-	else if (m_phase == phase::service_downlink && report_type == 0x80)
+	else if (current_phase() == phase::service_downlink && report_type == 0x80)
 	{
 		// LAPDm uses a one-frame transmit window here. Even when M=1, wait for
 		// the handset's N(R) before emitting the next Layer-3 segment.
-		m_phase = phase::service_uplink_request;
+		set_phase(phase::service_uplink_request);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
-	else if (m_phase == phase::service_uplink_request && report_type == 0x86)
+	else if (current_phase() == phase::service_uplink_request && report_type == 0x86)
 	{
 		if (m_followup_downlink_opportunity)
 		{
 			m_followup_downlink_opportunity = false;
-			m_phase = phase::service_uplink_acknowledgement;
+			set_phase(phase::service_uplink_acknowledgement);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
 		else
 		{
-			m_phase = phase::service_uplink_wait;
+			set_phase(phase::service_uplink_wait);
 			m_reports_remaining = 0;
 		}
 	}
-	else if (m_phase == phase::service_uplink_acknowledgement && report_type == 0x80)
+	else if (current_phase() == phase::service_uplink_acknowledgement && report_type == 0x80)
 	{
 		if (m_gsm_session->idle())
 		{
@@ -2673,31 +2693,31 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 							nokia_gsm_session_device::downlink_kind::
 									sapi3_establishment &&
 					m_lapdm_link->awaiting_establishment(3);
-			m_phase = m_gsm_session->pending_downlink_kind() !=
+			set_phase(m_gsm_session->pending_downlink_kind() !=
 							nokia_gsm_session_device::downlink_kind::none &&
 							!awaiting_sapi3 ?
-					phase::service_downlink : phase::service_uplink_request;
+					phase::service_downlink : phase::service_uplink_request);
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
 	}
-	else if (m_phase == phase::traffic_channel_change && report_type == 0x89)
+	else if (current_phase() == phase::traffic_channel_change && report_type == 0x89)
 	{
 		// The mobile initiates the new main link without a BLOCK_REQUEST.
-		m_phase = phase::traffic_lapdm_establish;
+		set_phase(phase::traffic_lapdm_establish);
 		m_reports_remaining = 0;
 	}
-	else if (m_phase == phase::traffic_contention_resolution &&
+	else if (current_phase() == phase::traffic_contention_resolution &&
 			report_type == 0x80)
 	{
-		m_phase = phase::service_uplink_request;
+		set_phase(phase::service_uplink_request);
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
-	else if (m_phase == phase::traffic_release_acknowledgement &&
+	else if (current_phase() == phase::traffic_release_acknowledgement &&
 			report_type == 0x80)
 	{
-		m_phase = phase::release_deconfigure;
+		set_phase(phase::release_deconfigure);
 		m_reports_remaining = 0;
 	}
 }
@@ -2705,7 +2725,7 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 
 bool nokia_radio_peer_device::phase_waits() const
 {
-	switch (m_phase)
+	switch (current_phase())
 	{
 	case phase::candidate_measurement:
 	case phase::candidate_sync:
@@ -2733,11 +2753,11 @@ void nokia_radio_peer_device::tick()
 	// saved session message into the ordinary decoded downlink/FACCH path;
 	// the producer never owns radio scheduling.
 	if (m_traffic_channel_active &&
-			m_phase == phase::service_uplink_request &&
+			current_phase() == phase::service_uplink_request &&
 			m_gsm_session->pending_downlink_kind() !=
 					nokia_gsm_session_device::downlink_kind::none)
 	{
-		m_phase = phase::service_downlink;
+		set_phase(phase::service_downlink);
 		m_reports_remaining = 1;
 		m_wait_ticks = 0;
 		m_report_deferred = true;
@@ -2745,7 +2765,7 @@ void nokia_radio_peer_device::tick()
 
 	if (m_reports_remaining != 0 && phase_waits())
 		--m_wait_ticks;
-	if ((m_phase == phase::candidate_ra_info || m_phase == phase::selected_ra_info) &&
+	if ((current_phase() == phase::candidate_ra_info || current_phase() == phase::selected_ra_info) &&
 			m_reports_remaining == 0 && m_wait_ticks != 0 && --m_wait_ticks == 0)
 		m_reports_remaining = 1;
 	if (m_report_deferred)
@@ -2756,5 +2776,5 @@ void nokia_radio_peer_device::tick()
 
 bool nokia_radio_peer_device::fast_completion_pending() const
 {
-	return m_enabled && m_phase == phase::candidate_sync && m_reports_remaining == 1;
+	return m_enabled && current_phase() == phase::candidate_sync && m_reports_remaining == 1;
 }
