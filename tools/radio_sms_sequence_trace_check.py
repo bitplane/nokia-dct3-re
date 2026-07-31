@@ -5,17 +5,18 @@ import pathlib
 import re
 import sys
 
-SMS_NVRAM_OFFSET = 50 * 32 + 11 + 9 + 16
-SMS_RECORD_SIZE = 176
-FIRST = bytes.fromhex(
-    "06912143658709040781551532f400006270422100000005e8329bfd06")
-SECOND = bytes.fromhex(
-    "06912143658709040781559587f600006270422110000005f7b79c4d06")
-
-
-def _record(data: bytes, number: int) -> bytes:
-    start = SMS_NVRAM_OFFSET + (number - 1) * SMS_RECORD_SIZE
-    return data[start:start + SMS_RECORD_SIZE]
+try:
+    from tools.radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        SECOND_SMS_DELIVER_BODY,
+        sms_record,
+    )
+except ModuleNotFoundError:
+    from radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        SECOND_SMS_DELIVER_BODY,
+        sms_record,
+    )
 
 
 def verify(log: str, sim_nvram: bytes, state: bool = False) -> None:
@@ -36,11 +37,11 @@ def verify(log: str, sim_nvram: bytes, state: bool = False) -> None:
             r"LAPDm service Channel Release acknowledged nr=3", log)) != 2:
         raise ValueError("both transactions did not close their RR connection")
 
-    first = _record(sim_nvram, 1)
-    second = _record(sim_nvram, 2)
-    if first[0] != 0x03 or not first[1:].startswith(FIRST):
+    first = sms_record(sim_nvram, 1)
+    second = sms_record(sim_nvram, 2)
+    if first[0] != 0x03 or not first[1:].startswith(FIRST_SMS_DELIVER_BODY):
         raise ValueError("record 1 is not the exact unread first message")
-    if second[0] != 0x03 or not second[1:].startswith(SECOND):
+    if second[0] != 0x03 or not second[1:].startswith(SECOND_SMS_DELIVER_BODY):
         raise ValueError("record 2 is not the exact unread second message")
 
 

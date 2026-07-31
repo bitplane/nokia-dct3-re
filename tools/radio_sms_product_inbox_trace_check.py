@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """Cross-product ordinary MT-SMS application and SIM-storage checks."""
 
-import hashlib
 import pathlib
 import re
 import sys
 
-SMS_NVRAM_OFFSET = 50 * 32 + 11 + 9 + 16
-SMS_RECORD_SIZE = 176
-SMS_DELIVER_BODY = bytes.fromhex(
-    "06912143658709"
-    "040781551532f4"
-    "0000"
-    "62704221000000"
-    "05e8329bfd06")
+try:
+    from tools.radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        TRANSPORT_CLOSURE,
+        frame_hashes,
+        require_ordered,
+        sms_record,
+    )
+except ModuleNotFoundError:
+    from radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        TRANSPORT_CLOSURE,
+        frame_hashes,
+        require_ordered,
+        sms_record,
+    )
 
 PRODUCT_HASHES = {
     # NHM-6 currently proves transport and SIM ownership only. Its preserved-
@@ -39,13 +46,6 @@ PRODUCT_HASHES = {
 }
 
 
-def _hashes(directory: pathlib.Path) -> set[str]:
-    return {
-        hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in directory.glob("nokia_dct3_lcdmirror_*.pgm")
-    }
-
-
 def verify(
         product: str,
         outcome: str,
@@ -56,13 +56,10 @@ def verify(
         expected_hashes = PRODUCT_HASHES[product][outcome]
     except KeyError:
         raise ValueError(f"unsupported product/outcome {product}/{outcome}") from None
-    if expected_hashes and expected_hashes.isdisjoint(_hashes(snapshots)):
+    if expected_hashes and expected_hashes.isdisjoint(frame_hashes(snapshots)):
         raise ValueError(f"{product} did not reach semantic UI state {outcome}")
 
-    end = SMS_NVRAM_OFFSET + SMS_RECORD_SIZE
-    if len(sim_nvram) < end:
-        raise ValueError("SIM NVRAM is too short for EF_SMS")
-    record = sim_nvram[SMS_NVRAM_OFFSET:end]
+    record = sms_record(sim_nvram)
     expected_status = {
         "transport": 0x03, "received": 0x03,
         "read": 0x01, "deleted": 0x00}[outcome]
@@ -70,25 +67,11 @@ def verify(
         raise ValueError(
             f"{product} EF_SMS status is {record[0]:02x}, "
             f"expected {expected_status:02x}")
-    if not record[1:].startswith(SMS_DELIVER_BODY):
+    if not record[1:].startswith(FIRST_SMS_DELIVER_BODY):
         raise ValueError(f"{product} unexpectedly rewrote the SMS payload")
 
     if outcome in ("transport", "received"):
-        checks = (
-            r"sim_device: update fid=6f3c record=1 length=176",
-            r"GSM service uplink sapi=3 pd=09 message=04 length=2 data=8904",
-            r"GSM service uplink sapi=3 pd=09 message=01 length=5 "
-            r"data=8901020240",
-            r"GSM service downlink kind=17 sapi=3 pd=09 message=04",
-            r"LAPDm service Channel Release acknowledged nr=3",
-        )
-        cursor = 0
-        for pattern in checks:
-            match = re.search(pattern, log[cursor:])
-            if not match:
-                raise ValueError(
-                    f"{product} missing ordinary-SMS closure {pattern}")
-            cursor += match.end()
+        require_ordered(log, TRANSPORT_CLOSURE)
     elif not re.search(
             r"sim_device: update fid=6f3c record=1 length=176", log):
         raise ValueError(f"{product} did not persist the {outcome} transition")

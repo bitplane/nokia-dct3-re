@@ -4,17 +4,19 @@
 import pathlib
 import re
 import sys
-import hashlib
 
-SMS_NVRAM_OFFSET = 50 * 32 + 11 + 9 + 16
-SMS_RECORD_SIZE = 176
-SMS_DELIVER_BODY = bytes.fromhex(
-    "06912143658709040781551532f400006270422100000005e8329bfd06")
-
-
-def _record(data: bytes, number: int) -> bytes:
-    start = SMS_NVRAM_OFFSET + (number - 1) * SMS_RECORD_SIZE
-    return data[start:start + SMS_RECORD_SIZE]
+try:
+    from tools.radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        frame_hashes,
+        sms_record,
+    )
+except ModuleNotFoundError:
+    from radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        frame_hashes,
+        sms_record,
+    )
 
 
 CAPACITY_UI_SHA256 = (
@@ -36,22 +38,22 @@ def verify(
         if pages or writes:
             raise ValueError("malformed SMS reached paging or SIM storage")
         for number in range(1, 11):
-            if _record(sim_nvram, number)[0] != 0x00:
+            if sms_record(sim_nvram, number)[0] != 0x00:
                 raise ValueError("malformed SMS mutated an EF_SMS record")
     elif outcome == "duplicate":
         if pages != 1 or writes != 1:
             raise ValueError("duplicate SMS was paged or stored more than once")
         if "duplicate queued rp_reference=40 suppressed" not in log:
             raise ValueError("missing correlated duplicate suppression")
-        first = _record(sim_nvram, 1)
-        if first[0] != 0x03 or not first[1:].startswith(SMS_DELIVER_BODY):
+        first = sms_record(sim_nvram, 1)
+        if first[0] != 0x03 or not first[1:].startswith(FIRST_SMS_DELIVER_BODY):
             raise ValueError("the original SMS was not retained exactly")
-        if _record(sim_nvram, 2)[0] != 0x00:
+        if sms_record(sim_nvram, 2)[0] != 0x00:
             raise ValueError("duplicate SMS occupied a second record")
     elif outcome == "capacity":
         if pages != 11 or writes != 10:
             raise ValueError("capacity run did not attempt 11 and store 10")
-        records = [_record(sim_nvram, number) for number in range(1, 11)]
+        records = [sms_record(sim_nvram, number) for number in range(1, 11)]
         if any(record[0] != 0x03 for record in records):
             raise ValueError("capacity run did not retain ten unread records")
         if len(set(records)) != 10:
@@ -73,10 +75,7 @@ def verify(
                 log)) != 11:
             raise ValueError("capacity transactions did not all release RR")
         if snapshots is not None:
-            hashes = {
-                hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in snapshots.glob("nokia_dct3_lcdmirror_*.pgm")
-            }
+            hashes = frame_hashes(snapshots)
             if CAPACITY_UI_SHA256 not in hashes:
                 raise ValueError("missing firmware storage-full notification")
     else:

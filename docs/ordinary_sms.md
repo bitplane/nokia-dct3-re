@@ -6,11 +6,12 @@ application and network contracts.
 
 ## Ownership and ordering
 
-`nokia_gsm_network_device` constructs and validates the TS 23.040 TPDU and
-TS 24.011 CP/RP envelope. Validation derives the PID, DCS, timestamp and UDL
-positions from the originating-address length and rejects inconsistent CP/RP
-lengths, unsupported or compressed alphabets and truncated user data before
-radio paging. `nokia_gsm_session_device` owns the saved CP transaction,
+`nokia_gsm_network_device` constructs laboratory TS 23.040 TPDUs and
+TS 24.011 CP/RP envelopes. The product-independent `gsm::sms` transport
+parser validates them before paging: it derives the PID, DCS, timestamp and
+UDL positions from the originating-address length and rejects inconsistent
+CP/RP lengths, unsupported or compressed alphabets and truncated user data.
+`nokia_gsm_session_device` owns the saved CP transaction,
 RP reference, acknowledgement phase and queued-message index.
 `nokia_lapdm_link_device` independently owns SAPI-3 establishment, I-frame
 sequence and release. The radio peer schedules ordinary PCH, SDCCH and RR
@@ -30,6 +31,10 @@ The SIM card owns ten 176-byte `EF_SMS` records. The firmware writes status
 `00` when erased while leaving the old payload bytes in the freed record.
 There is no host inbox, card-side SMS parser or synthetic storage
 acknowledgement.
+
+`SMSCFG` selects only a laboratory-network acceptance scenario: valid,
+sequential, duplicate, malformed or capacity-boundary delivery. It does not
+describe handset capability, storage policy or Nokia firmware behavior.
 
 ## Nokia 3210 application lifecycle
 
@@ -91,8 +96,10 @@ reference and record.
 | Nokia 3330 NHM-6 v4.50E | Paging, exact SIM storage, CP/RP closure and RR release pass after physical fresh-PMM provisioning. A preserved cold boot re-enters the firmware security/time editor, so physical inbox/read/delete promotion remains pending and is not bypassed. |
 
 The cross-product gates share only standards-level transport and record
-checks. Menu grammar, localized frames, PMM preparation and product storage
-paths remain separately evidenced.
+checks through `tools/radio_sms_acceptance_common.py`. Menu grammar, localized
+frames, PMM preparation and product storage paths remain separately evidenced.
+`run-captured` and `run-prebuilt-captured` preserve each run's log before the
+next invocation; they do not change the machine or its acceptance oracle.
 
 Exact top-level commands are:
 

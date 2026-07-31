@@ -6,6 +6,7 @@
 
 #include "gsm_a3a8.h"
 #include "gsm_a5.h"
+#include "gsm_sms_transport.h"
 #include "gsm_mobility.h"
 
 #include <array>

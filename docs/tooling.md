@@ -139,8 +139,10 @@ functions and export analysis. The naming list is also exported as a
   clock setup requires four time digits and all eight date digits before `OK`
   completes. Harness waits do not fill untouched fields or bypass validation.
   The `waitbuzzer` sequence token polls only the mapped MAD2 PUP buzzer gate
-  before delivering the next physical key; it does not inspect or change call
-  or firmware state.
+  before delivering the next physical key; incoming-call gates use it to wait
+  until firmware has presented the physical ringing UI. The token is
+  observational. It does not
+  change call/session state nor bypass the ordinary physical keypad matrix.
 - `make verify-alarm` uses that organic input path to set the clock/date and a
   12:02 alarm, then requires the firmware to program CCONT, consume its alarm
   IRQ, clear the software deadline, and drive the MAD2 buzzer. It is distinct

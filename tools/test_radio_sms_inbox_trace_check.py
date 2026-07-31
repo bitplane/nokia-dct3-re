@@ -8,10 +8,12 @@ from tools.radio_sms_inbox_trace_check import (
     ERASE_PROMPT_SHA256,
     NOTIFICATION_SHA256,
     SENDER_SHA256,
-    SMS_DELIVER_BODY,
-    SMS_NVRAM_OFFSET,
     TEXT_SHA256,
     verify,
+)
+from tools.radio_sms_acceptance_common import (
+    FIRST_SMS_DELIVER_BODY as SMS_DELIVER_BODY,
+    SMS_NVRAM_OFFSET,
 )
 
 
@@ -41,7 +43,7 @@ class SmsInboxTraceCheckTest(unittest.TestCase):
 
     def test_unread_delivery(self):
         with mock.patch(
-                "tools.radio_sms_inbox_trace_check._frame_hashes",
+                "tools.radio_sms_inbox_trace_check.frame_hashes",
                 return_value={NOTIFICATION_SHA256}):
             verify(TRANSPORT, self._dir(), self._sim(3), "delivered")
             verify(TRANSPORT, self._dir(), self._sim(3), "dismissed")
@@ -50,7 +52,7 @@ class SmsInboxTraceCheckTest(unittest.TestCase):
         log = TRANSPORT + (
             "\nsim_device: update fid=6f3c record=1 length=176")
         with mock.patch(
-                "tools.radio_sms_inbox_trace_check._frame_hashes",
+                "tools.radio_sms_inbox_trace_check.frame_hashes",
                 return_value={next(iter(SENDER_SHA256)), TEXT_SHA256}):
             verify(log, self._dir(), self._sim(1), "read")
             with self.assertRaisesRegex(ValueError, "read status"):
@@ -58,23 +60,23 @@ class SmsInboxTraceCheckTest(unittest.TestCase):
 
     def test_cold_read_needs_no_redelivery(self):
         with mock.patch(
-                "tools.radio_sms_inbox_trace_check._frame_hashes",
+                "tools.radio_sms_inbox_trace_check.frame_hashes",
                 return_value={next(iter(SENDER_SHA256)), TEXT_SHA256}):
             verify("", self._dir(), self._sim(1), "cold")
 
     def test_confirmed_and_cancelled_delete(self):
         with mock.patch(
-                "tools.radio_sms_inbox_trace_check._frame_hashes",
+                "tools.radio_sms_inbox_trace_check.frame_hashes",
                 return_value={ERASE_PROMPT_SHA256, EMPTY_INBOX_SHA256}):
             verify(TRANSPORT, self._dir(), self._sim(0), "deleted")
         with mock.patch(
-                "tools.radio_sms_inbox_trace_check._frame_hashes",
+                "tools.radio_sms_inbox_trace_check.frame_hashes",
                 return_value={ERASE_PROMPT_SHA256}):
             verify(TRANSPORT, self._dir(), self._sim(1), "cancelled")
 
     def test_state_suffix_requires_replay(self):
         with mock.patch(
-                "tools.radio_sms_inbox_trace_check._frame_hashes",
+                "tools.radio_sms_inbox_trace_check.frame_hashes",
                 return_value={NOTIFICATION_SHA256}):
             with self.assertRaisesRegex(ValueError, "state replay"):
                 verify(TRANSPORT, self._dir(), self._sim(3),

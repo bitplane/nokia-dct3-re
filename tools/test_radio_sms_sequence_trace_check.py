@@ -1,7 +1,12 @@
 import unittest
 
-from tools.radio_sms_sequence_trace_check import (
-    FIRST, SECOND, SMS_NVRAM_OFFSET, SMS_RECORD_SIZE, verify)
+from tools.radio_sms_sequence_trace_check import verify
+from tools.radio_sms_acceptance_common import (
+    FIRST_SMS_DELIVER_BODY as FIRST,
+    SECOND_SMS_DELIVER_BODY as SECOND,
+    SMS_NVRAM_OFFSET,
+    SMS_RECORD_SIZE,
+)
 
 
 class SequenceTraceCheckTest(unittest.TestCase):

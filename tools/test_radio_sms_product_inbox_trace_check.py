@@ -3,8 +3,11 @@ import tempfile
 import unittest
 from unittest import mock
 
-from tools.radio_sms_product_inbox_trace_check import (
-    PRODUCT_HASHES, SMS_DELIVER_BODY, SMS_NVRAM_OFFSET, verify)
+from tools.radio_sms_product_inbox_trace_check import PRODUCT_HASHES, verify
+from tools.radio_sms_acceptance_common import (
+    FIRST_SMS_DELIVER_BODY as SMS_DELIVER_BODY,
+    SMS_NVRAM_OFFSET,
+)
 
 
 class ProductInboxTraceCheckTest(unittest.TestCase):
@@ -15,7 +18,7 @@ class ProductInboxTraceCheckTest(unittest.TestCase):
             SMS_NVRAM_OFFSET + 1:
             SMS_NVRAM_OFFSET + 1 + len(SMS_DELIVER_BODY)] = SMS_DELIVER_BODY
         with tempfile.TemporaryDirectory() as directory, mock.patch(
-                "tools.radio_sms_product_inbox_trace_check._hashes",
+                "tools.radio_sms_product_inbox_trace_check.frame_hashes",
                 return_value=PRODUCT_HASHES["3410"]["read"]):
             verify(
                 "3410", "read",
@@ -25,7 +28,7 @@ class ProductInboxTraceCheckTest(unittest.TestCase):
     def test_rejects_wrong_status(self):
         nvram = bytearray(b"\xff" * 4096)
         with tempfile.TemporaryDirectory() as directory, mock.patch(
-                "tools.radio_sms_product_inbox_trace_check._hashes",
+                "tools.radio_sms_product_inbox_trace_check.frame_hashes",
                 return_value=PRODUCT_HASHES["3410"]["read"]):
             with self.assertRaisesRegex(ValueError, "status"):
                 verify(

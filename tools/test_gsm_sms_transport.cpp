@@ -10,7 +10,41 @@
 int main()
 {
 	using gsm::sms::parse_uplink;
+	using gsm::sms::parse_deliver;
+	using gsm::sms::alphabet;
 	using gsm::sms::uplink_kind;
+
+	constexpr std::array<std::uint8_t, 36> deliver = {
+		0x09, 0x01, 0x21,
+		0x01, 0x40, 0x06, 0x91, 0x21, 0x43, 0x65, 0x87, 0x09,
+		0x00, 0x16,
+		0x04, 0x07, 0x81, 0x55, 0x15, 0x32, 0xf4,
+		0x00, 0x00,
+		0x62, 0x70, 0x42, 0x21, 0x00, 0x00, 0x00,
+		0x05, 0xe8, 0x32, 0x9b, 0xfd, 0x06
+	};
+	const auto parsed_deliver = parse_deliver(deliver.data(), deliver.size());
+	assert(parsed_deliver.valid);
+	assert(parsed_deliver.cp_transaction == 0x09);
+	assert(parsed_deliver.rp_reference == 0x40);
+	assert(parsed_deliver.data_alphabet == alphabet::gsm_7bit);
+	assert(parsed_deliver.user_data_offset == 31);
+	assert(parsed_deliver.user_data_length == 5);
+
+	auto malformed_deliver = deliver;
+	malformed_deliver[15] = 0x20;
+	assert(!parse_deliver(
+			malformed_deliver.data(), malformed_deliver.size()).valid);
+	malformed_deliver = deliver;
+	malformed_deliver[22] = 0x80;
+	assert(!parse_deliver(
+			malformed_deliver.data(), malformed_deliver.size()).valid);
+	malformed_deliver = deliver;
+	malformed_deliver[30] = 0x20;
+	assert(!parse_deliver(
+			malformed_deliver.data(), malformed_deliver.size()).valid);
+	assert(!parse_deliver(deliver.data(), deliver.size() - 2).valid);
+	assert(!parse_deliver(deliver.data(), 15).valid);
 
 	constexpr std::array<std::uint8_t, 2> cp_ack = { 0x89, 0x04 };
 	assert(parse_uplink(cp_ack.data(), cp_ack.size(), 0x09, 0x40).kind ==

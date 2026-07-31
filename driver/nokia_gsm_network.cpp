@@ -754,46 +754,8 @@ bool nokia_gsm_network_device::incoming_sms_admissible(
 		unsigned message_index) const
 {
 	const auto message = incoming_sms_cp_data(message_index);
-	if (message.length < 15 ||
-			message.data[0] != 0x09 || message.data[1] != 0x01 ||
-			message.data[2] != message.length - 3 ||
-			message.data[3] != 0x01 ||
-			message.data[13] != message.length - 14 ||
-			(message.data[14] & 0x03) != 0x00)
-		return false;
-
-	// TS 23.040 SMS-DELIVER: derive every following field from the
-	// originating-address digit count. This prevents a malformed OA from
-	// shifting PID/DCS/SCTS/UDL into a superficially plausible envelope.
-	const unsigned address_digits = message.data[15];
-	if (address_digits > 20)
-		return false;
-	const unsigned address_octets = (address_digits + 1) / 2;
-	const unsigned pid_index = 17 + address_octets;
-	const unsigned dcs_index = pid_index + 1;
-	const unsigned udl_index = dcs_index + 1 + 7;
-	if (udl_index >= message.length)
-		return false;
-
-	const u8 dcs = message.data[dcs_index];
-	unsigned alphabet = 0;
-	if ((dcs & 0xc0) == 0x00)
-	{
-		// General Data Coding indication: compressed data and the reserved
-		// alphabet are outside this ordinary-text ingress contract.
-		if (BIT(dcs, 5) || ((dcs >> 2) & 0x03) == 0x03)
-			return false;
-		alphabet = (dcs >> 2) & 0x03;
-	}
-	else if ((dcs & 0xf0) == 0xf0)
-		alphabet = BIT(dcs, 2) ? 1 : 0;
-	else
-		return false;
-
-	const unsigned udl = message.data[udl_index];
-	const unsigned required_octets =
-			alphabet == 0 ? (udl * 7 + 7) / 8 : udl;
-	return udl_index + 1 + required_octets == message.length;
+	return gsm::sms::parse_deliver(
+			message.data.data(), message.length).valid;
 }
 
 unsigned nokia_gsm_network_device::incoming_smart_message_part_count() const

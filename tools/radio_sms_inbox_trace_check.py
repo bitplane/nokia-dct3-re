@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """Verify firmware-owned ordinary MT-SMS inbox persistence and UI outcomes."""
 
-import hashlib
 import pathlib
 import re
 import sys
 
-
-SMS_NVRAM_OFFSET = 50 * 32 + 11 + 9 + 16
-SMS_RECORD_SIZE = 176
-SMS_DELIVER_BODY = bytes.fromhex(
-    "06912143658709"
-    "040781551532f4"
-    "0000"
-    "62704221000000"
-    "05e8329bfd06")
+try:
+    from tools.radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        frame_hashes,
+        require_single_transport,
+        sms_record,
+    )
+except ModuleNotFoundError:
+    from radio_sms_acceptance_common import (
+        FIRST_SMS_DELIVER_BODY,
+        frame_hashes,
+        require_single_transport,
+        sms_record,
+    )
 
 NOTIFICATION_SHA256 = (
     "beb03cf014becb8ae9576269a405fa51f8063c9596486070a66570d767a06578")
@@ -30,47 +34,6 @@ ERASE_PROMPT_SHA256 = (
 EMPTY_INBOX_SHA256 = (
     "60077bf89c2f518e6a6c171ef64d7a8b8c50851aea3ea76d291497e8ef849a4d")
 
-TRANSPORT = (
-    ("EF_SMS write", re.compile(
-        r"sim_device: update fid=6f3c record=1 length=176")),
-    ("handset CP-ACK", re.compile(
-        r"GSM service uplink sapi=3 pd=09 message=04 length=2 data=8904")),
-    ("handset RP-ACK", re.compile(
-        r"GSM service uplink sapi=3 pd=09 message=01 length=5 "
-        r"data=8901020240")),
-    ("network CP-ACK", re.compile(
-        r"GSM service downlink kind=17 sapi=3 pd=09 message=04")),
-    ("RR release", re.compile(
-        r"LAPDm service Channel Release acknowledged nr=3")),
-)
-
-
-def _frame_hashes(snapshot_dir: pathlib.Path) -> set[str]:
-    return {
-        hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in snapshot_dir.glob("nokia_dct3_lcdmirror_*.pgm")
-    }
-
-
-def _record(sim_nvram: bytes) -> bytes:
-    end = SMS_NVRAM_OFFSET + SMS_RECORD_SIZE
-    if len(sim_nvram) < end:
-        raise ValueError("SIM NVRAM is too short for EF_SMS record 1")
-    return sim_nvram[SMS_NVRAM_OFFSET:end]
-
-
-def _require_transport(log: str) -> None:
-    cursor = 0
-    for label, pattern in TRANSPORT:
-        match = pattern.search(log, cursor)
-        if not match:
-            raise ValueError(
-                f"missing or out-of-order ordinary-SMS closure: {label}")
-        cursor = match.end()
-    if len(re.findall(r"PCH IMSI page transmitted channel=60", log)) != 1:
-        raise ValueError("ordinary SMS did not use exactly one IMSI page")
-
-
 def verify(
         log: str,
         snapshot_dir: pathlib.Path,
@@ -81,15 +44,15 @@ def verify(
     if state_outcome and "state_roundtrip: result=pass" not in log:
         raise ValueError("missing successful inbox-boundary state replay")
 
-    hashes = _frame_hashes(snapshot_dir)
-    record = _record(sim_nvram)
+    hashes = frame_hashes(snapshot_dir)
+    record = sms_record(sim_nvram)
     if base_outcome != "cold":
-        _require_transport(log)
+        require_single_transport(log)
 
     if base_outcome == "delivered":
         if not state_outcome and NOTIFICATION_SHA256 not in hashes:
             raise ValueError("missing firmware '1 message received' state")
-        if record[0] != 0x03 or not record[1:].startswith(SMS_DELIVER_BODY):
+        if record[0] != 0x03 or not record[1:].startswith(FIRST_SMS_DELIVER_BODY):
             raise ValueError("EF_SMS record 1 is not the exact unread message")
         state_writes = len(re.findall(
             r"sim_device: update fid=6f3c record=1 length=176", log))
@@ -102,7 +65,7 @@ def verify(
     elif base_outcome == "dismissed":
         if NOTIFICATION_SHA256 not in hashes:
             raise ValueError("dismiss path did not reach message notification")
-        if record[0] != 0x03 or not record[1:].startswith(SMS_DELIVER_BODY):
+        if record[0] != 0x03 or not record[1:].startswith(FIRST_SMS_DELIVER_BODY):
             raise ValueError("notification dismissal did not preserve unread SMS")
         if len(re.findall(
                 r"sim_device: update fid=6f3c record=1 length=176",
@@ -112,7 +75,7 @@ def verify(
         if SENDER_SHA256.isdisjoint(hashes) or TEXT_SHA256 not in hashes:
             raise ValueError(
                 "physical inbox path did not expose sender and text")
-        if record[0] != 0x01 or not record[1:].startswith(SMS_DELIVER_BODY):
+        if record[0] != 0x01 or not record[1:].startswith(FIRST_SMS_DELIVER_BODY):
             raise ValueError("physical read did not retain exact read EF_SMS")
         updates = len(re.findall(
             r"sim_device: update fid=6f3c record=1 length=176", log))
@@ -125,12 +88,12 @@ def verify(
             raise ValueError("confirmed delete did not reach empty inbox")
         if record[0] != 0x00:
             raise ValueError("confirmed delete did not free EF_SMS record 1")
-        if not record[1:].startswith(SMS_DELIVER_BODY):
+        if not record[1:].startswith(FIRST_SMS_DELIVER_BODY):
             raise ValueError("firmware deletion unexpectedly rewrote payload")
     elif base_outcome == "cancelled":
         if ERASE_PROMPT_SHA256 not in hashes:
             raise ValueError("cancel path did not reach delete confirmation")
-        if record[0] != 0x01 or not record[1:].startswith(SMS_DELIVER_BODY):
+        if record[0] != 0x01 or not record[1:].startswith(FIRST_SMS_DELIVER_BODY):
             raise ValueError("cancelled delete did not preserve read message")
     else:
         raise ValueError(f"unsupported inbox outcome {outcome!r}")

@@ -6,6 +6,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SESSION = (ROOT / "driver/nokia_gsm_session.cpp").read_text()
 NETWORK_H = (ROOT / "driver/nokia_gsm_network.h").read_text()
 NETWORK_CPP = (ROOT / "driver/nokia_gsm_network.cpp").read_text()
+SMS_TRANSPORT = (ROOT / "driver/gsm_sms_transport.cpp").read_text()
 
 
 class GsmSmsSessionInvariantTest(unittest.TestCase):
@@ -39,8 +40,11 @@ class GsmSmsSessionInvariantTest(unittest.TestCase):
     def test_malformed_sms_is_rejected_before_paging(self):
         radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
         self.assertIn("incoming_sms_admissible", NETWORK_CPP)
-        self.assertIn("address_digits > 20", NETWORK_CPP)
-        self.assertIn("required_octets == message.length", NETWORK_CPP)
+        self.assertIn("gsm::sms::parse_deliver(", NETWORK_CPP)
+        self.assertIn("address_digits > 20", SMS_TRANSPORT)
+        self.assertIn(
+            "udl_index + 1 + required_octets != length",
+            SMS_TRANSPORT)
         self.assertIn("incoming_service_admissible(service)", radio)
         self.assertIn("GSM incoming service rejected before ", radio)
         self.assertIn('"paging service=%u', radio)
