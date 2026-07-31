@@ -480,15 +480,16 @@ census:
 		--report run_census/noki3210_v600.md
 	@echo "census: run_census/noki3210_v600.json and run_census/noki3210_v600.md"
 
-# Reads the Makefile itself: extracts every acceptance gate as data, requires a
-# byte-exact round trip, and reports where sibling product gates assert
-# different things. Needs no emulator and changes no gate.
 # gates.json holds the authored gate records; gates.mk is generated from it and
 # is what make executes. Regenerate after editing gates.json.
 gates:
 	$(PYTHON) tools/gate_generate.py --from-data
 	$(PYTHON) tools/gate_render.py
 
+# Reads the generated rules: requires gates.mk to round trip exactly, every
+# structured gate to reproduce its commands from typed data, and gates.json to
+# regenerate gates.mk. Then reports where sibling product gates differ. Needs
+# no emulator and changes no gate.
 gate-parity:
 	@mkdir -p run_census
 	$(PYTHON) tools/gate_matrix.py --check --json run_census/gate_matrix.json
@@ -551,7 +552,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_physical_downlink_check.py
 	$(VENV)/bin/python -m unittest tools/test_pulse_route_mame.py
 	$(VENV)/bin/python -m unittest tools/test_gsm_sms_session_invariants.py
-	$(VENV)/bin/python -m unittest tools/test_gate_matrix.py tools/test_gate_parity_audit.py tools/test_gate_render.py tools/test_gate_generate.py
+	$(VENV)/bin/python -m unittest tools/test_gate_matrix.py tools/test_gate_parity_audit.py tools/test_gate_render.py tools/test_gate_generate.py tools/test_gate_database_diff.py
 
 ccont-static-census:
 	$(VENV)/bin/python tools/ccont_static_census.py --check --json docs/data/ccont_static_census.json
@@ -763,5 +764,11 @@ mad2-static-census:
 	$(VENV)/bin/python tools/mad2_static_census.py --check \
 		--json run_census/mad2_static_access.json --markdown docs/mad2_static_access.md
 
-# Acceptance gates are generated; see tools/gate_generate.py.
-include gates.mk
+# Acceptance gates are generated from gates.json; see tools/gate_generate.py.
+# The rule below lets make rebuild gates.mk and restart when it is missing or
+# stale. `-include` is required for that: a mandatory `include` fails during
+# parsing, before any rule could run.
+gates.mk: gates.json tools/gate_generate.py tools/gate_render.py tools/gate_matrix.py
+	$(PYTHON) tools/gate_generate.py --from-data
+
+-include gates.mk

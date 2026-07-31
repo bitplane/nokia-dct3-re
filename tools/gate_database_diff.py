@@ -111,10 +111,12 @@ def parse_variables(text: str) -> dict[str, str]:
 def expand(command: str, variables: dict[str, str], depth: int = 12) -> str:
     """Expand plain `$(NAME)` references using make's own variable values.
 
-    Only simple references are expanded. Function calls such as `$(call ...)`
-    and `$(if ...)` are left alone: they are identical on both sides of the
-    comparison, so resolving them would add risk without adding signal. An
-    unknown name is likewise left as written.
+    Only simple references are expanded. A function call such as `$(call ...)`
+    or `$(if ...)` is not evaluated, though plain references nested inside one
+    are. That is sufficient for comparison: both sides are treated the same
+    way, so an unevaluated function reads identically before and after.
+    Evaluating make's functions properly would add risk without adding signal.
+    An unknown name is likewise left as written.
     """
     for _ in range(depth):
         def substitute(match: re.Match) -> str:

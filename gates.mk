@@ -198,7 +198,6 @@ verify-radio-periodic-location-update-state:
 
 verify-3410-radio-periodic-location-update: normalize-3410
 	@$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=450 RUN_VERBOSE=1 RUN_ENV='$(NOKI3410_RADIO_INPUT)' RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_periodic_location_update'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3410_periodic_location_update_trace_check.py $(RUN_DIR)/error.log
 
 verify-dsp-speech-control-static:

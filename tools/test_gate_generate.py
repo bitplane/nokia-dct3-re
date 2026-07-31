@@ -303,3 +303,26 @@ class ShellGuardTest(unittest.TestCase):
             recipe = "\n".join(gate["verbatim"]["recipe"])
             if "DCT3_EEPROM_GUARD" in recipe:
                 self.assertIn("unstructured", gate, gate["name"])
+
+
+class CaptureRedundancyTest(unittest.TestCase):
+    """A `*-captured` run target already copies error.log."""
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        if not gate_generate.GATES_JSON.exists():
+            raise unittest.SkipTest("gates.json not emitted yet")
+        cls.data = json.loads(gate_generate.GATES_JSON.read_text())
+
+    def test_no_gate_captures_the_log_twice(self):
+        captured = ("run-captured", "run-prebuilt-captured")
+        for gate in self.data["gates"]:
+            steps = gate.get("steps", [])
+            for index, step in enumerate(steps[:-1]):
+                if step["step"] == "run" and step.get("run_target") in captured:
+                    following = steps[index + 1]
+                    self.assertNotEqual(
+                        following["step"], "capture_log",
+                        f"{gate['name']} copies error.log after "
+                        f"{step['run_target']}, which already does it")

@@ -327,11 +327,6 @@
           }
         },
         {
-          "step": "capture_log",
-          "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
-        },
-        {
           "step": "check",
           "silent": false,
           "interpreter": "$(PYTHON)",
