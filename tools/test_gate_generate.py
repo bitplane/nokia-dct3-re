@@ -77,8 +77,15 @@ class MakefileTrimTest(unittest.TestCase):
         self.assertIn("other-target:", self.trimmed)
         self.assertIn("PYTHON := python3", self.trimmed)
 
-    def test_include_is_appended(self):
-        self.assertTrue(self.trimmed.rstrip().endswith("include gates.mk"))
+    def test_generated_gate_recovery_is_appended(self):
+        self.assertIn(
+            "gates.mk: gates.json tools/gate_generate.py "
+            "tools/gate_render.py tools/gate_matrix.py",
+            self.trimmed)
+        self.assertIn(
+            "\t$(PYTHON) tools/gate_generate.py --from-data",
+            self.trimmed)
+        self.assertTrue(self.trimmed.rstrip().endswith("-include gates.mk"))
 
     def test_default_goal_is_unchanged(self):
         """The first target sets the default goal; it must remain `help`."""
@@ -88,7 +95,7 @@ class MakefileTrimTest(unittest.TestCase):
 
     def test_include_comes_after_the_first_target(self):
         lines = self.trimmed.split("\n")
-        include = lines.index("include gates.mk")
+        include = lines.index("-include gates.mk")
         first_target = next(i for i, line in enumerate(lines)
                             if re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*:", line))
         self.assertGreater(include, first_target)

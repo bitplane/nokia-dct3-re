@@ -63,7 +63,8 @@ none is an unintended consequence of the migration.
 | Gained `--radio-profile nhm2` | 1 | `verify-3410-radio-reselection-same-lac` relied on the checker's NSE-8 default while its sibling gates named their profile. Harmless today, because the checker treats `nhm2` and `nse8` alike on that path, but it would silently keep the wrong branch the moment an NHM-2 case is added. |
 | Absolute path to `libgsm.a` | 1 | Measurement artifact. `verify-gsm-fr-codec` uses `$(abspath ...)`, which resolves to the worktree directory in the parent measurement. Not a migration difference. |
 
-No gate lost a checker, changed a checker's arguments, or changed its run
+Apart from the explicitly adjudicated `--radio-profile nhm2` correction above,
+no gate lost a checker, changed a checker's arguments or changed its run
 parameters.
 
 ## Working on gates
@@ -75,6 +76,6 @@ parameters.
   any change intended to be behaviour-preserving. Compare expanded commands to
   confirm nothing changed, and unexpanded to confirm something did.
 
-The remaining 22 gates carry their recipes verbatim because their shell control
+The remaining 56 gates carry their recipes verbatim because their shell control
 flow is not modelled. They are marked `# shell:` in `gates.mk`, and they are why
 13 families in `docs/gate_parity_audit.md` report "not comparable".

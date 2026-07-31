@@ -222,10 +222,12 @@ def generate(matrix: dict) -> str:
 
 
 def makefile_without_gates(matrix: dict) -> str:
-    """The Makefile with every gate rule removed and `gates.mk` included.
+    """The Makefile with every gate rule removed and `gates.mk` generated.
 
-    The include goes last: the first target in a makefile sets the default
-    goal, and that must stay `help`.
+    The recovery rule and optional include go last: the first target in a
+    makefile sets the default goal, and that must stay `help`.  `-include`
+    allows make to parse far enough to build a missing generated file and then
+    restart with its acceptance rules loaded.
     """
     kept: list[str] = []
     for segment in matrix["segments"]:
@@ -249,8 +251,18 @@ def makefile_without_gates(matrix: dict) -> str:
     while collapsed and not collapsed[-1].strip():
         collapsed.pop()
 
-    collapsed += ["", "# Acceptance gates are generated; see tools/gate_generate.py.",
-                  "include gates.mk", ""]
+    collapsed += [
+        "",
+        "# Acceptance gates are generated from gates.json; see tools/gate_generate.py.",
+        "# The rule below lets make rebuild gates.mk and restart when it is missing or",
+        "# stale. `-include` is required for that: a mandatory `include` fails during",
+        "# parsing, before any rule could run.",
+        "gates.mk: gates.json tools/gate_generate.py tools/gate_render.py tools/gate_matrix.py",
+        "\t$(PYTHON) tools/gate_generate.py --from-data",
+        "",
+        "-include gates.mk",
+        "",
+    ]
     return "\n".join(collapsed)
 
 
