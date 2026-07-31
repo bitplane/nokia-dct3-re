@@ -203,9 +203,7 @@ void nokia_radio_peer_device::device_reset()
 	m_sch_observation_arfcn = 0xffff;
 	m_candidate_bcch_valid = false;
 	m_reselection_validation_pending = false;
-	m_downlink_signalling_count =
-			gsm::mobility::downlink_signalling_counter().ceiling();
-	m_downlink_signalling_failed = false;
+	restart_downlink_signalling_counter();
 	m_serving_loss_pending = false;
 	m_report_deferred = false;
 	m_search_requested = false;
@@ -857,6 +855,103 @@ u32 nokia_radio_peer_device::paging_frame_number(
 	return frame_number % FRAME_NUMBER_MODULUS;
 }
 
+void nokia_radio_peer_device::populate_search_from_receivable_cells(u8 mode)
+{
+	// Both untargeted search forms answer from the standards-level topology
+	// rather than from an MCU-supplied candidate list, so the receivability
+	// filter and the capacity bound are stated once for both.
+	m_search_mode = mode;
+	m_search_arfcns.fill(0xffff);
+	m_search_arfcn_count = 0;
+	for (unsigned index = 0;
+			index < m_gsm_network->cell_count() &&
+				m_search_arfcn_count < m_search_arfcns.size();
+			++index)
+	{
+		if (const auto *cell = m_gsm_network->cell_at(index);
+				cell && m_gsm_network->cell_receivable(cell->arfcn))
+			m_search_arfcns[m_search_arfcn_count++] = cell->arfcn;
+	}
+	m_search_has_serving_arfcn = m_search_arfcn_count != 0;
+}
+
+u16 nokia_radio_peer_device::retune_receiver(u16 arfcn)
+{
+	// Retuning always invalidates both decoded BCCH contexts: the frame
+	// belonged to the previous carrier. Returns the previous ARFCN so a caller
+	// can tell which carrier the receiver left.
+	const u16 previous_receiver = m_receiver_arfcn;
+	if (m_trace_enabled)
+		LOGMASKED(LOG_RADIO,
+				"dsp_hle: receiver tuned old_arfcn=%u new_arfcn=%u "
+				"t=%.6f\n",
+				previous_receiver, arfcn,
+				machine().time().as_double());
+	m_receiver_arfcn = arfcn;
+	m_bcch_frame_valid = false;
+	m_candidate_bcch_valid = false;
+	return previous_receiver;
+}
+
+void nokia_radio_peer_device::commit_receiver_as_serving()
+{
+	// Only the part every commit shares. What follows a commit differs by the
+	// evidence that produced it — whether validation is still pending, whether
+	// the candidate BCCH is consumed, whether the DSC counter restarts — and
+	// stays at the call sites so those differences remain visible.
+	if (m_trace_enabled)
+		LOGMASKED(LOG_RADIO,
+				"dsp_hle: serving cell selected old_arfcn=%u "
+				"new_arfcn=%u t=%.6f\n",
+				m_serving_arfcn, m_receiver_arfcn,
+				machine().time().as_double());
+	m_serving_arfcn = m_receiver_arfcn;
+	m_has_reselected = true;
+}
+
+void nokia_radio_peer_device::restart_downlink_signalling_counter()
+{
+	// Begin a fresh TS 45.008 downlink-signalling observation interval. The
+	// counter starts at its ceiling and the failure latch clears together:
+	// leaving the latch set against a restarted counter would report a failure
+	// the new interval has not yet observed.
+	m_downlink_signalling_count =
+			gsm::mobility::downlink_signalling_counter().ceiling();
+	m_downlink_signalling_failed = false;
+}
+
+void nokia_radio_peer_device::trace_layer3_uplink(const char *direction)
+{
+	// The checkers match on this line, so both the establish and the ordinary
+	// uplink case emit it from one place: a divergence in the wording would be
+	// a silent gate failure rather than a compile error.
+	if (!m_trace_enabled)
+		return;
+	const auto &information = m_lapdm_link->layer3_information();
+	std::string information_hex;
+	for (unsigned index = 0; index < m_lapdm_link->layer3_length(); ++index)
+		information_hex += util::string_format("%02x", information[index]);
+	LOGMASKED(LOG_RADIO,
+			"dsp_hle: GSM service %s sapi=%u pd=%02x message=%02x length=%u data=%s t=%.6f\n",
+			direction,
+			m_lapdm_link->layer3_sapi(),
+			information[0] & 0x0f, information[1] & 0x3f,
+			m_lapdm_link->layer3_length(),
+			information_hex.c_str(),
+			machine().time().as_double());
+}
+
+void nokia_radio_peer_device::enter_release_deconfigure()
+{
+	if (m_trace_enabled)
+		LOGMASKED(LOG_RADIO,
+				"dsp_hle: LAPDm service Channel Release acknowledged nr=%u t=%.6f\n",
+				m_lapdm_link->pending_receive_sequence(),
+				machine().time().as_double());
+	m_phase = phase::release_deconfigure;
+	m_reports_remaining = 0;
+}
+
 auto nokia_radio_peer_device::decode_search_request(
 		const nokia_dspif_device::packet &packet) -> search_request
 {
@@ -891,19 +986,7 @@ auto nokia_radio_peer_device::decode_search_request(
 		// ROM6 0x55 is the untargeted counterpart to the explicit 0x56
 		// candidate window. Populate its DSP measurement result from the
 		// receivable standards-level topology; the MCU still ranks and selects.
-		m_search_mode = packet.payload[1];
-		m_search_arfcns.fill(0xffff);
-		m_search_arfcn_count = 0;
-		for (unsigned index = 0;
-				index < m_gsm_network->cell_count() &&
-					m_search_arfcn_count < m_search_arfcns.size();
-				++index)
-		{
-			if (const auto *cell = m_gsm_network->cell_at(index);
-					cell && m_gsm_network->cell_receivable(cell->arfcn))
-				m_search_arfcns[m_search_arfcn_count++] = cell->arfcn;
-		}
-		m_search_has_serving_arfcn = m_search_arfcn_count != 0;
+		populate_search_from_receivable_cells(packet.payload[1]);
 		return search_request::autonomous_band_scan;
 
 	case acquisition_strategy::autonomous_band_scan:
@@ -917,19 +1000,7 @@ auto nokia_radio_peer_device::decode_search_request(
 		// NHM-2 asks the DSP to scan the supported bands rather than passing an
 		// MCU-built candidate list. The laboratory cell is a valid GSM 900
 		// carrier; its exact channel is network topology, not handset state.
-		m_search_mode = packet.payload[1];
-		m_search_arfcns.fill(0xffff);
-		m_search_arfcn_count = 0;
-		for (unsigned index = 0;
-				index < m_gsm_network->cell_count() &&
-					m_search_arfcn_count < m_search_arfcns.size();
-				++index)
-		{
-			if (const auto *cell = m_gsm_network->cell_at(index);
-					cell && m_gsm_network->cell_receivable(cell->arfcn))
-				m_search_arfcns[m_search_arfcn_count++] = cell->arfcn;
-		}
-		m_search_has_serving_arfcn = m_search_arfcn_count != 0;
+		populate_search_from_receivable_cells(packet.payload[1]);
 		if (m_search_has_serving_arfcn)
 			m_serving_arfcn = m_search_arfcns[0];
 		return search_request::autonomous_band_scan;
@@ -1005,19 +1076,9 @@ bool nokia_radio_peer_device::decode_neighbour_measurement_list(
 				published_first == m_receiver_arfcn &&
 				m_receiver_arfcn != m_serving_arfcn)
 		{
-			const u16 old_serving = m_serving_arfcn;
-			m_serving_arfcn = m_receiver_arfcn;
-			m_has_reselected = true;
+			commit_receiver_as_serving();
 			m_reselection_validation_pending = false;
-			m_downlink_signalling_count =
-					gsm::mobility::downlink_signalling_counter().ceiling();
-			m_downlink_signalling_failed = false;
-			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: serving cell selected old_arfcn=%u "
-						"new_arfcn=%u t=%.6f\n",
-						old_serving, m_serving_arfcn,
-						machine().time().as_double());
+			restart_downlink_signalling_counter();
 		}
 	}
 	else
@@ -1051,20 +1112,10 @@ bool nokia_radio_peer_device::decode_neighbour_measurement_list(
 				m_receiver_arfcn != m_serving_arfcn &&
 				former_serving_published)
 		{
-			const u16 old_serving = m_serving_arfcn;
-			m_serving_arfcn = m_receiver_arfcn;
-			m_has_reselected = true;
+			commit_receiver_as_serving();
 			m_candidate_bcch_valid = false;
 			m_reselection_validation_pending = false;
-			m_downlink_signalling_count =
-					gsm::mobility::downlink_signalling_counter().ceiling();
-			m_downlink_signalling_failed = false;
-			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: serving cell selected old_arfcn=%u "
-						"new_arfcn=%u t=%.6f\n",
-						old_serving, m_serving_arfcn,
-						machine().time().as_double());
+			restart_downlink_signalling_counter();
 		}
 	}
 
@@ -1403,30 +1454,10 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 			m_receiver_bsic = packet.payload[1];
 		if (requested_arfcn != m_receiver_arfcn &&
 				m_gsm_network->cell_by_arfcn(requested_arfcn))
-		{
-			const u16 previous_receiver = m_receiver_arfcn;
-			m_receiver_arfcn = requested_arfcn;
-			m_bcch_frame_valid = false;
-			m_candidate_bcch_valid = false;
-			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: receiver tuned old_arfcn=%u new_arfcn=%u "
-						"t=%.6f\n",
-						previous_receiver, m_receiver_arfcn,
-						machine().time().as_double());
-		}
+			retune_receiver(requested_arfcn);
 		if (active_candidate_window &&
 				m_receiver_arfcn != m_serving_arfcn)
-		{
-			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: serving cell selected old_arfcn=%u "
-						"new_arfcn=%u t=%.6f\n",
-						m_serving_arfcn, m_receiver_arfcn,
-						machine().time().as_double());
-			m_serving_arfcn = m_receiver_arfcn;
-			m_has_reselected = true;
-		}
+			commit_receiver_as_serving();
 		m_phase = selected_plmn_search ?
 				phase::selected_channel_change :
 				phase::candidate_channel_change;
@@ -1554,16 +1585,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		if (requested_arfcn != m_receiver_arfcn &&
 				m_gsm_network->cell_by_arfcn(requested_arfcn))
 		{
-			const u16 previous_receiver = m_receiver_arfcn;
-			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: receiver tuned old_arfcn=%u "
-						"new_arfcn=%u t=%.6f\n",
-						m_receiver_arfcn, requested_arfcn,
-						machine().time().as_double());
-			m_receiver_arfcn = requested_arfcn;
-			m_bcch_frame_valid = false;
-			m_candidate_bcch_valid = false;
+			const u16 previous_receiver = retune_receiver(requested_arfcn);
 			// Returning from a temporary neighbour window is the first
 			// firmware-owned boundary proving that the complete validation
 			// interval has closed.  Scenario-driven serving loss is armed only
@@ -1575,19 +1597,10 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		if (m_receiver_arfcn != m_serving_arfcn &&
 				m_candidate_bcch_valid)
 		{
-			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: serving cell selected old_arfcn=%u "
-						"new_arfcn=%u t=%.6f\n",
-						m_serving_arfcn, m_receiver_arfcn,
-						machine().time().as_double());
-			m_serving_arfcn = m_receiver_arfcn;
-			m_has_reselected = true;
+			commit_receiver_as_serving();
 			m_candidate_bcch_valid = false;
 			m_reselection_validation_pending = true;
-			m_downlink_signalling_count =
-					gsm::mobility::downlink_signalling_counter().ceiling();
-			m_downlink_signalling_failed = false;
+			restart_downlink_signalling_counter();
 		}
 		const bool completes_candidate_validation =
 				!m_idle_common_control_active &&
@@ -1600,9 +1613,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			// after the failure indication. The DSP begins a fresh TS 45.008
 			// downlink-signalling observation interval for that receiver; if
 			// the carrier is still absent, another organic failure follows.
-			m_downlink_signalling_count =
-					gsm::mobility::downlink_signalling_counter().ceiling();
-			m_downlink_signalling_failed = false;
+			restart_downlink_signalling_counter();
 		}
 		m_phase = phase::serving_channel_change;
 		m_reports_remaining = 1;
@@ -1726,22 +1737,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					m_lapdm_link->layer3_information().data(),
 					m_lapdm_link->layer3_length(), m_serving_arfcn))
 		{
-			if (m_trace_enabled)
-			{
-				const auto &information = m_lapdm_link->layer3_information();
-				std::string information_hex;
-				for (unsigned index = 0;
-						index < m_lapdm_link->layer3_length(); ++index)
-					information_hex += util::string_format(
-							"%02x", information[index]);
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: GSM service establish sapi=%u pd=%02x message=%02x length=%u data=%s t=%.6f\n",
-						m_lapdm_link->layer3_sapi(),
-						information[0] & 0x0f, information[1] & 0x3f,
-						m_lapdm_link->layer3_length(),
-						information_hex.c_str(),
-						machine().time().as_double());
-			}
+			trace_layer3_uplink("establish");
 			m_phase = phase::contention_resolution;
 			m_reports_remaining = 1;
 			m_report_deferred = true;
@@ -1863,21 +1859,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 					acknowledge_downlink();
 			}
 			const auto &information = m_lapdm_link->layer3_information();
-			if (m_trace_enabled)
-			{
-				std::string information_hex;
-				for (unsigned index = 0;
-						index < m_lapdm_link->layer3_length(); ++index)
-					information_hex += util::string_format(
-							"%02x", information[index]);
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: GSM service uplink sapi=%u pd=%02x message=%02x length=%u data=%s t=%.6f\n",
-						m_lapdm_link->layer3_sapi(),
-						information[0] & 0x0f, information[1] & 0x3f,
-						m_lapdm_link->layer3_length(),
-						information_hex.c_str(),
-						machine().time().as_double());
-			}
+			trace_layer3_uplink("uplink");
 			m_gsm_session->receive_layer3(
 					m_lapdm_link->layer3_sapi(),
 					information.data(), m_lapdm_link->layer3_length());
@@ -1954,13 +1936,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			{
 				m_registered =
 						m_gsm_session->registered_mobile_identity_length() == 8;
-				if (m_trace_enabled)
-					LOGMASKED(LOG_RADIO,
-							"dsp_hle: LAPDm service Channel Release acknowledged nr=%u t=%.6f\n",
-							m_lapdm_link->pending_receive_sequence(),
-							machine().time().as_double());
-				m_phase = phase::release_deconfigure;
-				m_reports_remaining = 0;
+				enter_release_deconfigure();
 				// Registration release arms the configured incoming page.  A
 				// completed one-shot service does not repeat; multipart SMS
 				// alone leaves a successor queued and therefore re-arms it.
@@ -2185,15 +2161,11 @@ void nokia_radio_peer_device::emit_report()
 			const auto frame = m_lapdm_link->build_release_ua();
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);
 		}
-		else if (m_phase == phase::location_update_accept)
+		else if (m_phase == phase::location_update_accept ||
+				m_phase == phase::rr_channel_release)
 		{
-			const auto &message = m_gsm_session->pending_downlink();
-			const auto frame = m_lapdm_link->build_information_frame(
-					0, message.data.data(), message.length);
-			deliver_lapdm_downlink(frame, payload + 10, frame_number);
-		}
-		else if (m_phase == phase::rr_channel_release)
-		{
+			// Both carry the session's queued message unsegmented on SAPI 0;
+			// they differ only in which phase follows the acknowledgement.
 			const auto &message = m_gsm_session->pending_downlink();
 			const auto frame = m_lapdm_link->build_information_frame(
 					0, message.data.data(), message.length);
@@ -2688,13 +2660,7 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	{
 		if (m_gsm_session->idle())
 		{
-			if (m_trace_enabled)
-				LOGMASKED(LOG_RADIO,
-						"dsp_hle: LAPDm service Channel Release acknowledged nr=%u t=%.6f\n",
-						m_lapdm_link->pending_receive_sequence(),
-						machine().time().as_double());
-			m_phase = phase::release_deconfigure;
-			m_reports_remaining = 0;
+			enter_release_deconfigure();
 		}
 		else
 		{

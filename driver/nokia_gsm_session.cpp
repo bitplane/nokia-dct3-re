@@ -103,17 +103,12 @@ void nokia_gsm_session_device::device_reset()
 	m_call_transaction = 0;
 	m_outgoing_request_pending = false;
 	m_outgoing_request_id = 0;
-	m_outgoing_called_digits.fill(0);
-	m_outgoing_called_digits_length = 0;
-	m_outgoing_decision_accepted = false;
+	clear_outgoing_call_state();
+	// Reset additionally restores the default decision. Clearing a call in
+	// flight deliberately leaves the last decision in place, so this stays
+	// outside the shared helper.
 	m_outgoing_decision =
 			u8(nokia_gsm_network_device::outgoing_call_outcome::connect);
-	m_outgoing_decision_request_id = 0;
-	m_outgoing_policy_request_id = 0;
-	m_outgoing_termination_accepted = false;
-	m_outgoing_termination_request_id = 0;
-	m_outgoing_termination_cause = 0x10;
-	m_outgoing_decision_timer->adjust(attotime::never);
 	publish_call_alerting_output();
 	publish_call_active_output();
 	publish_release_waiting_output();
@@ -245,10 +240,7 @@ nokia_gsm_session_device::contention_resolution_delivered()
 			return queue_downlink(downlink_kind::cipher_mode_command,
 					information.data(), information.size());
 		}
-		const auto release = m_network->channel_release();
-		m_state = u8(state::awaiting_channel_release_acknowledgement);
-		return queue_downlink(downlink_kind::channel_release,
-				release.data(), release.size());
+		return begin_channel_release();
 	}
 
 	if (m_state != u8(state::awaiting_contention_resolution))
@@ -331,10 +323,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 	if (m_state == u8(state::awaiting_cm_service_reject_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::cm_service_reject))
 	{
-		const auto release = m_network->channel_release();
-		m_state = u8(state::awaiting_channel_release_acknowledgement);
-		return queue_downlink(downlink_kind::channel_release,
-				release.data(), release.size());
+		return begin_channel_release();
 	}
 
 	if (m_state == u8(state::awaiting_call_proceeding_acknowledgement) &&
@@ -404,10 +393,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 	if (m_state == u8(state::awaiting_location_update_accept_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::location_update_accept))
 	{
-		const auto release = m_network->channel_release();
-		m_state = u8(state::awaiting_channel_release_acknowledgement);
-		return queue_downlink(downlink_kind::channel_release,
-				release.data(), release.size());
+		return begin_channel_release();
 	}
 
 	if (m_state == u8(state::awaiting_incoming_call_setup_acknowledgement) &&
@@ -508,10 +494,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 	if (m_state == u8(state::awaiting_sms_cp_ack_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::sms_cp_ack))
 	{
-		const auto release = m_network->channel_release();
-		m_state = u8(state::awaiting_channel_release_acknowledgement);
-		return queue_downlink(downlink_kind::channel_release,
-				release.data(), release.size());
+		return begin_channel_release();
 	}
 
 	if (m_state == u8(state::awaiting_connect_acknowledgement) &&
@@ -529,10 +512,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 	{
 		// Close the dedicated RR channel after RELEASE is acknowledged. The
 		// handset emits CC Release Complete while that release is in flight.
-		const auto release = m_network->channel_release();
-		m_state = u8(state::awaiting_channel_release_acknowledgement);
-		return queue_downlink(downlink_kind::channel_release,
-				release.data(), release.size());
+		return begin_channel_release();
 	}
 
 	if (m_state == u8(state::awaiting_channel_release_acknowledgement) &&
@@ -600,15 +580,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_mobile_originated_call = false;
 		m_call_transaction = 0;
 		m_outgoing_request_pending = false;
-		m_outgoing_called_digits.fill(0);
-		m_outgoing_called_digits_length = 0;
-		m_outgoing_decision_accepted = false;
-		m_outgoing_decision_request_id = 0;
-		m_outgoing_policy_request_id = 0;
-		m_outgoing_termination_accepted = false;
-		m_outgoing_termination_request_id = 0;
-		m_outgoing_termination_cause = 0x10;
-		m_outgoing_decision_timer->adjust(attotime::never);
+		clear_outgoing_call_state();
 		if (!more_sms_deliveries)
 		{
 			m_incoming_service = u8(incoming_service::none);
@@ -825,10 +797,7 @@ nokia_gsm_session_device::receive_layer3(
 		}
 		if (message_type == 0x2a)
 		{
-			const auto release = m_network->channel_release();
-			m_state = u8(state::awaiting_channel_release_acknowledgement);
-			return queue_downlink(downlink_kind::channel_release,
-					release.data(), release.size());
+			return begin_channel_release();
 		}
 	}
 
@@ -879,15 +848,7 @@ nokia_gsm_session_device::receive_layer3(
 		m_mobile_originated_call = false;
 		m_call_transaction = 0;
 		m_outgoing_request_pending = false;
-		m_outgoing_called_digits.fill(0);
-		m_outgoing_called_digits_length = 0;
-		m_outgoing_decision_accepted = false;
-		m_outgoing_decision_request_id = 0;
-		m_outgoing_policy_request_id = 0;
-		m_outgoing_termination_accepted = false;
-		m_outgoing_termination_request_id = 0;
-		m_outgoing_termination_cause = 0x10;
-		m_outgoing_decision_timer->adjust(attotime::never);
+		clear_outgoing_call_state();
 		publish_call_alerting_output();
 		m_incoming_service_completed =
 				m_incoming_service != u8(incoming_service::none);
@@ -1083,4 +1044,31 @@ void nokia_gsm_session_device::clear_pending_downlink()
 	m_pending_downlink.sapi = 0;
 	m_pending_downlink.length = 0;
 	m_pending_downlink.data.fill(0);
+}
+
+nokia_gsm_session_device::downlink_kind
+nokia_gsm_session_device::begin_channel_release()
+{
+	// The state moves before the release is queued so that an acknowledgement
+	// arriving for this downlink is attributed to the release, not to the
+	// transaction that ended.
+	const auto release = m_network->channel_release();
+	m_state = u8(state::awaiting_channel_release_acknowledgement);
+	return queue_downlink(downlink_kind::channel_release,
+			release.data(), release.size());
+}
+
+void nokia_gsm_session_device::clear_outgoing_call_state()
+{
+	// The decision itself is not cleared here: a call being torn down keeps
+	// the outcome that ended it, and only reset restores the default.
+	m_outgoing_called_digits.fill(0);
+	m_outgoing_called_digits_length = 0;
+	m_outgoing_decision_accepted = false;
+	m_outgoing_decision_request_id = 0;
+	m_outgoing_policy_request_id = 0;
+	m_outgoing_termination_accepted = false;
+	m_outgoing_termination_request_id = 0;
+	m_outgoing_termination_cause = 0x10;
+	m_outgoing_decision_timer->adjust(attotime::never);
 }

@@ -192,6 +192,19 @@ private:
 		monitored,
 		transmitted
 	};
+	// Answer an untargeted search from the receivable topology.
+	void populate_search_from_receivable_cells(u8 mode);
+	// Move the receiver to another carrier, returning the carrier it left.
+	// Invalidates both decoded BCCH contexts, which belonged to that carrier.
+	u16 retune_receiver(u16 arfcn);
+	// Adopt the configured receiver as the serving cell. Only the part every
+	// commit shares; what a particular commit implies about validation, the
+	// candidate BCCH and the DSC counter stays at the call site.
+	void commit_receiver_as_serving();
+	// Begin a fresh TS 45.008 downlink-signalling observation interval.
+	void restart_downlink_signalling_counter();
+	void trace_layer3_uplink(const char *direction);
+	void enter_release_deconfigure();
 	search_request decode_search_request(
 			const nokia_dspif_device::packet &packet);
 	bool decode_candidate_window(

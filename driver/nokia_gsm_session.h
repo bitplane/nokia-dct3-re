@@ -187,6 +187,13 @@ private:
 	};
 
 	void clear_pending_downlink();
+	// Close the dedicated channel: every transaction that finishes on a
+	// dedicated channel ends this way, so the ordering of the state change
+	// against the queued release lives in one place.
+	downlink_kind begin_channel_release();
+	// Discard mobile-originated call state. Reached both by reset and by the
+	// end of a call, so a field added here cannot be missed at one site.
+	void clear_outgoing_call_state();
 	downlink_kind apply_outgoing_decision();
 	downlink_kind apply_outgoing_termination();
 	void publish_call_alerting_output();
