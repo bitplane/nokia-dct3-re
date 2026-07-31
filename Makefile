@@ -192,7 +192,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census frontier-event-census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3410e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset run-manifest-default run-manifest-3330 clean
+.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
 .PHONY: verify-radio-periodic-location-update-state verify-3410-radio-periodic-location-update
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
@@ -364,7 +364,8 @@ help:
 	@echo "make audit-roms PHONE=noki3330  report missing/mismatched files for a local set"
 	@echo "make audit-dsp-roms classify local DSP regions and expose placeholder fill files"
 	@echo "make watch          live chafa preview of $(FRAME_PNG) (updated each run)"
-	@echo "make clean          remove build/run state (keeps the MAME clone)"
+	@echo "make clean          remove run state: gate output trees and stray MAME files"
+	@echo "make clean-build    additionally remove the MAME object tree (forces a full rebuild)"
 	@echo "Enable passive MAME log categories with RUN_VERBOSE=1; harness fixtures use RUN_ENV"
 
 venv:
@@ -582,14 +583,6 @@ census:
 		--report run_census/noki3210_v600.md
 	@echo "census: run_census/noki3210_v600.json and run_census/noki3210_v600.md"
 
-frontier-event-census:
-	@mkdir -p run_census
-	$(VENV)/bin/python tools/message_census.py \
-		$(FRONTIER_EVENT_INVENTORIES) \
-		--json run_census/frontier_events.json \
-		--report run_census/frontier_events.md
-	@echo "frontier-event-census: run_census/frontier_events.json and run_census/frontier_events.md"
-
 controller-census:
 	$(VENV)/bin/python tools/controller_dispatch_census.py --check
 
@@ -662,14 +655,6 @@ ccont-runtime-census:
 		--log 3310-v6.39 $(RUN_DIR)_3310/error.log --log 3330-v4.50 $(RUN_DIR)_3330/error.log \
 		--log 3410-v5.46 $(RUN_DIR)_3410/error.log
 
-run-manifest-default:
-	@$(MAKE) --no-print-directory verify RUN_DIR=run_manifest_default SECONDS=4
-	cp $(MAME_DIR)/error.log run_manifest_default/error.log
-
-run-manifest-3330:
-	@$(MAKE) --no-print-directory smoke-3330e RUN_DIR=run_manifest_3330 SECONDS=3
-	cp $(MAME_DIR)/error.log run_manifest_3330/error.log
-
 prepare-run-files:
 	@mkdir -p "$(RUN_DIR)"
 	@find "$(RUN_DIR)" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -delete
@@ -737,9 +722,6 @@ smoke-3310-639:
 
 smoke-3330e: normalize-3330
 	@$(MAKE) --no-print-directory smoke PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
-
-smoke-3410e: normalize-3410
-	@$(MAKE) --no-print-directory smoke PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
 
 smoke-3210-v501:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 \
@@ -3550,8 +3532,20 @@ verify-structure-subset:
 verify-structure:
 	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_STRUCT)
 
+# Run state is anything a gate regenerates: the per-gate output trees plus the
+# files MAME writes beside them when it is started from the repository root.
+# Both separators are covered; ad-hoc run directories have used either.
+CLEAN_RUN_STATE := $(sort $(RUN_DIR) run run_* run-* \
+	error.log progress_latest_frame.* nokia_dct3_lcdmirror_*.pgm \
+	cfg nvram snap)
+
 clean:
-	rm -rf $(RUN_DIR) run run_* $(MAME_DIR)/obj progress_latest_frame.*
+	rm -rf $(CLEAN_RUN_STATE)
+
+# Removing the object tree forces a full MAME rebuild, so keep it out of the
+# ordinary run-state clean.
+clean-build:
+	rm -rf $(MAME_DIR)/obj
 
 mad2-static-census:
 	@mkdir -p run_census
