@@ -9,8 +9,8 @@
     },
     {
       "id": "mad2_gensio_select_latches", "subsystem": "gensio", "status": "mapped", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share instruction-equivalent SELECT-latch initialization, 0xaf masking and 0x6f.bit0 assertion; saved latch behavior is extracted, while the attached board peripherals remain unidentified and unmodeled",
-      "evidence": ["docs/gensio_controller.md", "docs/cross_rom_confidence.md", "tools/gensio_trace_check.py"]
+      "boundary": "3210 v6.00 and v5.01 share direct read/write use of SELECT latches 0x6f and 0xaf; 3410 v5.46 directly writes the distinct 0xad/0xae/0xed/0xee set, while the conservative census resolves no SELECT accesses in 3310 v6.39 or 3330 v4.50. Saved latch behavior is extracted, but attached board peripherals remain unidentified and unmodeled",
+      "evidence": ["docs/gensio_controller.md", "docs/board_io_static_census.md", "tools/gensio_trace_check.py"]
     },
     {
       "id": "ccont_register_irq_contract", "subsystem": "ccont", "status": "partial", "confidence": "strong",
@@ -39,7 +39,7 @@
     },
     {
       "id": "mad2_kbgpio_matrix", "subsystem": "keypad", "status": "partial", "confidence": "strong",
-      "boundary": "3210 v6.00 and v5.01 share a 4-row by 5-column scan; physical key edges use MAD2 IRQ0 and decode through the firmware 0x41/0x42/0x43 sequence, while electrical debounce, mask corner cases and unexercised timing remain provisional",
+      "boundary": "3210 v6.00 and v5.01 share a 4-row by 5-column scan; any unmasked physical column transition latches MAD2 IRQ0, while firmware mask writes suppress row-drive scan transitions. Press and release decode through the firmware 0x41/0x42/0x43 sequence; electrical debounce and unexercised timing remain provisional",
       "evidence": ["docs/mmi_layer.md", "docs/mad2_fidelity.md"]
     },
     {
@@ -49,7 +49,7 @@
     },
     {
       "id": "mad2_ctsi_core", "subsystem": "system_controller", "status": "partial", "confidence": "strong",
-      "boundary": "The extracted nokia_mad2_device owns CTSI offsets 0x00..0x16, reset/clock/watchdog latches, timer state, interrupt pending/masks and ARM IRQ/FIQ routing; board wiring and less-established peripheral windows remain outside the device",
+      "boundary": "The extracted nokia_mad2_device owns CTSI offsets 0x00..0x16, reset/clock/watchdog latches, timer state, interrupt pending/masks, ARM IRQ/FIQ routing and read-only external-status input 0x0e. All five supported ROMs read 0x0e and contain zero direct writers; the 3210 tests bits 0..2 independently, but physical pin ownership remains unknown",
       "evidence": ["docs/mad2_fidelity.md", "docs/driver_structure.md", "docs/structural_regression.md"]
     },
     {
@@ -74,8 +74,8 @@
     },
     {
       "id": "mad2_uif_ctrl1_latch", "subsystem": "power", "status": "mapped", "confidence": "strong",
-      "boundary": "MAD2 offset 0x31 is a stored CTRL-I/O output latch; all six recovered accesses are bit-1 read-modify-writes owned by the power duty-cycle subsystem and no external-input or interrupt behavior is observed",
-      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md"]
+      "boundary": "The extracted neutral UIF device owns saved latch banks 0x30..0x33, 0x70..0x73, 0xb0..0xb3 and 0xf0..0xf3 without invented pin effects. On 3210, offset 0x31 is a CTRL-I/O output latch whose recovered accesses are bit-1 read-modify-writes owned by the power duty-cycle subsystem; no external-input or interrupt behavior is established",
+      "evidence": ["docs/mad2_fidelity.md", "docs/hardware_atlas.md", "docs/board_io_static_census.md"]
     },
     {
       "id": "mad2_simi_uart", "subsystem": "sim", "status": "partial", "confidence": "strong",

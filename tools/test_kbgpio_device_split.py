@@ -36,6 +36,13 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
         self.assertIn("clear_power_on_latch", self.header)
         self.assertIn("m_kbgpio->clear_power_on_latch()", self.phone)
 
+    def test_column_irq_is_masked_and_edge_symmetric(self):
+        self.assertIn(
+            "(m_columns ^ columns) & ~m_regs[COLUMN_IRQ_MASK] & 0x1f",
+            self.device,
+        )
+        self.assertNotIn("physical_edge", self.device + self.header)
+
     def test_unknown_neighbor_registers_are_only_latches(self):
         self.assertIn("offset >= 0x28 && offset <= 0x2b", self.device)
         self.assertIn("offset >= 0x68 && offset <= 0x6b", self.device)
@@ -43,7 +50,7 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
 
     def test_device_is_save_state_safe_and_firmware_agnostic(self):
         source = self.device + self.header
-        for token in ("save_item(NAME(m_regs))", "save_item(NAME(m_columns))", "save_item(NAME(m_irq_latched))"):
+        for token in ("save_item(NAME(m_regs))", "save_item(NAME(m_columns))", "save_item(NAME(m_irq_latched))", "save_item(NAME(m_power_on))"):
             self.assertIn(token, source)
         self.assertNotIn("pc()", source)
         self.assertNotRegex(source, r"0x2[0-9a-f]{5}")

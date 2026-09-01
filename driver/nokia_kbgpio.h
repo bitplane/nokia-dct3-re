@@ -43,7 +43,7 @@ protected:
 
 private:
 	u8 sample_columns(bool consume_power_on);
-	void update_columns(bool physical_edge);
+	void update_columns();
 	void update_irq();
 
 	devcb_read8::array<5> m_matrix_cb;

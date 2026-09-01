@@ -51,6 +51,7 @@ void nokia_mad2_device::device_start()
 	m_timer1 = timer_alloc(FUNC(nokia_mad2_device::timer1_tick), this);
 	m_fiq8 = timer_alloc(FUNC(nokia_mad2_device::fiq8_tick), this);
 	save_item(NAME(m_regs));
+	save_item(NAME(m_external_status));
 	save_item(NAME(m_fiq_status));
 	save_item(NAME(m_irq_status));
 	save_item(NAME(m_timer0_counter));
@@ -121,6 +122,11 @@ u8 nokia_mad2_device::read(offs_t offset)
 	case 0x08: return m_fiq_status;
 	case 0x09: return m_irq_status;
 	case 0x0c: return (m_regs[offset] & ~EXT_IRQ_STATUS) | ((m_irq_status & LINE_EXTENDED) ? EXT_IRQ_STATUS : 0);
+	case 0x0e:
+		// All five supported ROMs only read this register. The 3210 power-state
+		// machine independently tests bits 0, 1 and 2; no recovered firmware
+		// writes it. Exact external pin ownership remains unknown.
+		return m_external_status;
 	case 0x10: return m_timer0_counter >> 8;
 	case 0x11: return m_timer0_counter;
 	case 0x16:
@@ -140,7 +146,7 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 {
 	offset &= 0x1f;
 	const u8 old = m_regs[offset];
-	if (offset != 0x0c)
+	if (offset != 0x0c && offset != 0x0e)
 		m_regs[offset] = data;
 	switch (offset)
 	{
@@ -177,6 +183,9 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 		m_simi_clock_cb(BIT(m_regs[offset], 5));
 		if (BIT(data, 1))
 			enter_sleep();
+		break;
+	case 0x0e:
+		// Read-only external pins; software writes have no electrical effect.
 		break;
 	case 0x0f: m_timer0_divider = data; break;
 	case 0x12: m_timer0_compare_latched = false; break;

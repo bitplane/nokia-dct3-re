@@ -159,7 +159,7 @@ a latch.
 |---|---|---|
 | `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable, bit 4 optional vibra-pack enable; periodic FIQ8 routing and clock-stop wake are tested, source rate remains provisional ✓ |
 | `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | extracted controller with byte attachment, FIQ2 RX/TX lifecycle and 9,600-baud character timing; no bus peer ✓ |
-| `0x1b` | vibrator frequency/mode | stored independently of the `0x15.bit4` enable; MAME `vibration` output and mapped-MMIO gate test ✓ |
+| `0x1b` | vibrator mode/parameter | bits 6..5 select `00/20/40/60`; bits 4..0 are the mode parameter; stored independently of the `0x15.bit4` enable ✓ |
 | `0x1c/0x1d` | buzzer divider high/low | MZT-03C square-wave frequency = 13 MHz / divider |
 | `0x1e` | buzzer volume | stored; acoustic response unmodeled |
 | `0x20/0x22/0x24` | McuGenIO signal / ? / direction | partial: native EEPROM pins plus unknown stored bits ✓; paired-ROM physical-key traces do not corroborate the sibling emulator's proposed 3210 backlight bit 6 |
@@ -168,7 +168,10 @@ a latch.
 ROW `0x28` signal / `0xa8` direction, COL `0x2a` active-low input / `0x6b`
 interrupt mask. Firmware drives a 4-row by 5-column matrix; physical key edges
 latch MAD2 IRQ0, whose handler starts the firmware scan/decode sequence. CCONT
-uses the separate MAD2 IRQ2 source. Registers `0x29/0x68/0x69/0xa9` and
+uses the separate MAD2 IRQ2 source. Any unmasked column transition latches IRQ0.
+Firmware masks all five columns while changing row drive, so scan-induced
+transitions do not masquerade as physical edges. Registers
+`0x29/0x68/0x69/0xa9` and
 `0x2b/0x6a/0xaa/0xab` remain backing storage with no established keypad role.
 `nokia_kbgpio_device` owns the complete sparse families, scan state, IRQ latch
 and cold-boot power sample; handset ports and MAD2 routing remain board wiring.
@@ -179,7 +182,7 @@ and cold-boot power sample; handset ports and MAD2 routing remain board wiring.
 | `0x2c` / `0x6c` | **CCONT write / read** | extracted serial protocol; see CCONT below |
 | `0x2d` / `0x6d` | GENSIO endpoint control / status | extracted partial hardware: LCD=`0x21`, CCONT=`0x25`, synchronous ready state |
 | `0x2e` / `0x6e` | **LCD data / command write** (PCD8544) | extracted MSB-first pin serialization |
-| `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** latches | cross-ROM startup/RMW behavior mapped; attached peripherals remain unidentified |
+| `0x6f`, `0xad/0xae/0xaf`, `0xed/0xee/0xef` | GENSIO **SELECT1/2/3** latches | 3210 uses `6f/af`; 3410 writes `ad/ae/ed/ee`; no direct 3310/3330 accesses resolve; attached peripherals remain unidentified |
 
 ### SIMI — SIM UART (`0x36–0x3f`)
 `nokia_simi_device` owns the MAD2 UART/FIFO/IIR endpoint and FIQ6. The separate
@@ -189,7 +192,11 @@ TXD writes enter a 16-byte hardware FIFO, `0x3e=0x00` flushes a chunk to the
 T=0 parser, and `0x3f` reports its live fill. See `sim_subsystem.md` and
 `sim_emulator_scope.md`.
 
-### UIF — CTRL I/O pins (`0x32/0x33`, `0x70–0x73`, `0xb0–0xb3`, `0xf0–0xf3`)
+### UIF — CTRL I/O pins (`0x30–0x33`, `0x70–0x73`, `0xb0–0xb3`, `0xf0–0xf3`)
+
+`nokia_uif_device` owns these sparse banks as saved neutral latches. The five-ROM
+static census proves recurring direct use, but no pin direction, input, output,
+or interrupt semantics are assigned without board-level evidence.
 General control I/O + directions; partly emulated, touched ✓. Register `0x31`
 is CTRL-I/O signal register 1. Its six exhaustive firmware sites only
 read-modify-write bit 1 from the power duty-cycle subsystem, so the driver

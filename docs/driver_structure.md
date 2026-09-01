@@ -57,7 +57,9 @@ readback wiring. Attached devices signal it through
 callbacks. `nokia_kbgpio_device` owns the sparse keyboard register families,
 matrix scan, cold-boot latch, IRQ edge state and one validated product wiring
 contract for row topology and power-on column; product input ports and MAD2
-IRQ0 routing remain callbacks. `nokia_pup_device` owns output control, buzzer,
+IRQ0 routing remain callbacks. `nokia_uif_device` owns the four sparse UIF
+register banks as neutral saved latches; no board-pin side effects are inferred.
+`nokia_pup_device` owns output control, buzzer,
 vibrator and GenIO latches and drives the external EEPROM/audio/output devices
 through callbacks. `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, RX/TX holding
 state, byte callbacks and FIQ2/FIQ3 outputs without supplying a peer. The phone

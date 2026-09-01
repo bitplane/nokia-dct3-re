@@ -36,6 +36,7 @@ public:
 	void set_timer1_hz(u32 value) { m_timer1_hz = value; }
 	void set_fiq8_hz(u32 value) { m_fiq8_hz = value; }
 	void set_timer0_catchup(bool value) { m_timer0_catchup = value; }
+	void set_external_status(u8 value) { m_external_status = value & 0x07; }
 	void set_dsp_reset_wiring_contract(dsp_reset_wiring_contract contract);
 
 	u8 read(offs_t offset);
@@ -54,7 +55,7 @@ public:
 	u16 timer1_counter() const { return m_timer1_counter; }
 	u16 timer1_destination() const { return m_timer1_destination; }
 	bool sleeping() const { return m_sleeping; }
-	u8 reg(offs_t offset) const { return m_regs[offset & 0x1f]; }
+	u8 reg(offs_t offset) const { return (offset & 0x1f) == 0x0e ? m_external_status : m_regs[offset & 0x1f]; }
 
 protected:
 	virtual void device_start() override;
@@ -83,6 +84,7 @@ private:
 	emu_timer *m_timer1 = nullptr;
 	emu_timer *m_fiq8 = nullptr;
 	u8 m_regs[0x20] = { 0 };
+	u8 m_external_status = 0;
 	u16 m_fiq_status = 0;
 	u16 m_irq_status = 0;
 	u16 m_timer0_counter = 0;

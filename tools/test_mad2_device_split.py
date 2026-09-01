@@ -37,6 +37,14 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn("m_regs[0x20]", self.header)
         self.assertIn("offset & 0x1f", self.header)
 
+    def test_external_status_is_read_only_saved_input(self):
+        source = self.device + self.header
+        self.assertIn("set_external_status", self.header)
+        self.assertIn("save_item(NAME(m_external_status))", self.device)
+        self.assertIn("case 0x0e:", self.device)
+        self.assertIn("return m_external_status;", self.device)
+        self.assertIn("offset != 0x0c && offset != 0x0e", self.device)
+
     def test_timer1_wraps_at_terminal_count_and_interrupts_at_destination(self):
         callback = self.device.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)", 1)[1]
         callback = callback.split("TIMER_CALLBACK_MEMBER(nokia_mad2_device::fiq8_tick)", 1)[0]

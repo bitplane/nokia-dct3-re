@@ -41,6 +41,11 @@ class PupDeviceSplitTest(unittest.TestCase):
         for token in ("update_genio();", "update_buzzer();", "update_vibrator();"):
             self.assertIn(token, self.device)
 
+    def test_vibrator_control_fields_are_decoded(self):
+        self.assertIn("VIBRATOR_MODE_MASK = 0x60", self.device)
+        self.assertIn("VIBRATOR_PARAMETER_MASK = 0x1f", self.device)
+        self.assertIn("mode=%02x parameter=%02x", self.device)
+
     def test_unknown_genio_latch_has_no_side_effect(self):
         self.assertIn("GENIO_LATCH = 0x22", self.device)
         write = self.device.split("void nokia_pup_device::write", 1)[1]

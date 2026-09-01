@@ -47,6 +47,7 @@
 #include "nokia_radio_peer.h"
 #include "nokia_sim_card.h"
 #include "nokia_simi.h"
+#include "nokia_uif.h"
 
 #include "emupal.h"
 #include "screen.h"
@@ -671,6 +672,7 @@ public:
 		m_mad2(*this, "mad2"),
 		m_mad2_pcm(*this, "mad2_pcm"),
 		m_kbgpio(*this, "kbgpio"),
+		m_uif(*this, "uif"),
 		m_mbus(*this, "mbus"),
 		m_pup(*this, "pup"),
 		m_dspif(*this, "dspif"),
@@ -799,6 +801,7 @@ private:
 	required_device<nokia_mad2_device> m_mad2;
 	required_device<nokia_mad2_pcm_device> m_mad2_pcm;
 	required_device<nokia_kbgpio_device> m_kbgpio;
+	required_device<nokia_uif_device> m_uif;
 	required_device<nokia_mbus_device> m_mbus;
 	required_device<nokia_pup_device> m_pup;
 	required_device<nokia_dspif_device> m_dspif;
@@ -878,7 +881,7 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0x0B:  return "[CTSI] IRQ lines mask (rw)";
 	case 0x0C:  return "[CTSI] Interrupt control register (rw)";
 	case 0x0D:  return "[CTSI] Peripheral clock gates (bit 5 SIM clock) (rw)";
-	case 0x0E:  return "[CTSI] Interrupt trigger register (r)";
+	case 0x0E:  return "[CTSI] External three-bit status input (r)";
 	case 0x0F:  return "[CTSI] Programmable timer clock divider (rw)";
 	case 0x10:  return "[CTSI] Programmable timer counter (MSB) (r)";
 	case 0x11:  return "[CTSI] Programmable timer counter (LSB) (r)";
@@ -889,7 +892,7 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0x18:  return "[MBUS] control (rw)";
 	case 0x19:  return "[MBUS] status (rw)";
 	case 0x1A:  return "[MBUS] RX/TX (rw)";
-	case 0x1B:  return "[PUP] Vibrator (w)";
+	case 0x1B:  return "[PUP] Vibrator mode and parameter (w)";
 	case 0x1C:  return "[PUP] Buzzer clock divider high (w)";
 	case 0x1D:  return "[PUP] Buzzer clock divider low (w)";
 	case 0x1E:  return "[PUP] Buzzer volume (w)";
@@ -903,9 +906,10 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 	case 0x2C:  return "[UIF/GENSIO] CCont write (w)";
 	case 0x2D:  return "[UIF/GENSIO] GENSIO start transaction (w)";
 	case 0x2E:  return "[UIF/GENSIO] LCD data write (w)";
-	case 0x31:  return "[UIF] CTRL I/O 1 signal lines (rw)";
-	case 0x32:  return "[UIF] CTRL I/O 2 (rw)";
-	case 0x33:  return "[UIF] CTRL I/O 3 (rw)";
+	case 0x30:  return "[UIF] CTRL I/O 0 signal latch (rw)";
+	case 0x31:  return "[UIF] CTRL I/O 1 signal latch (rw)";
+	case 0x32:  return "[UIF] CTRL I/O 2 signal latch (rw)";
+	case 0x33:  return "[UIF] CTRL I/O 3 signal latch (rw)";
 	case 0x36:  return "[SIMI] SIM UART TxD (w)";
 	case 0x37:  return "[SIMI] SIM UART RxD (r)";
 	case 0x38:  return "[SIMI] SIM UART Interrupt Identification (r)";
@@ -1578,9 +1582,10 @@ uint8_t nokia_dct3_state::mad2_register_r(offs_t offset)
 {
 	uint8_t data = nokia_pup_device::owns(offset) ? m_pup->read(offset) :
 			(nokia_kbgpio_device::owns(offset) ? m_kbgpio->read(offset) :
+			(nokia_uif_device::owns(offset) ? m_uif->read(offset) :
 			(offset <= MAD2_FIQ8_CTRL ? m_mad2->read(offset) :
 			(offset >= MAD2_MBUS_CTRL && offset <= 0x1a ? m_mbus->read(offset - MAD2_MBUS_CTRL) :
-			(nokia_gensio_device::owns(offset) ? m_gensio->read(offset) : m_mad2_regs[offset]))));
+			(nokia_gensio_device::owns(offset) ? m_gensio->read(offset) : m_mad2_regs[offset])))));
 
 	switch(offset)
 	{
@@ -1659,17 +1664,19 @@ uint8_t nokia_dct3_state::mad2_register_peek(offs_t offset)
 	const bool mbus_register = offset >= MAD2_MBUS_CTRL && offset <= MAD2_MBUS_DATA;
 	const bool gensio_register = nokia_gensio_device::owns(offset);
 	return nokia_pup_device::owns(offset) ? m_pup->peek(offset) :
-			(nokia_kbgpio_device::owns(offset) ? m_kbgpio->peek(offset) : core_register ? m_mad2->read(offset) :
+			(nokia_kbgpio_device::owns(offset) ? m_kbgpio->peek(offset) :
+			(nokia_uif_device::owns(offset) ? m_uif->read(offset) : core_register ? m_mad2->read(offset) :
 			(mbus_register ? (offset == MAD2_MBUS_CTRL ? m_mbus->control() :
 				offset == MAD2_MBUS_STATUS ? m_mbus->status() : m_mbus->data()) : gensio_register ?
 				m_gensio->peek(offset) :
-				m_mad2_regs[offset]));
+				m_mad2_regs[offset])));
 }
 
 void nokia_dct3_state::mad2_register_w(offs_t offset, uint8_t data)
 {
 	const bool pup_register = nokia_pup_device::owns(offset);
 	const bool kbgpio_register = nokia_kbgpio_device::owns(offset);
+	const bool uif_register = nokia_uif_device::owns(offset);
 	const bool core_register = offset <= MAD2_FIQ8_CTRL && !pup_register;
 	const bool mbus_register = offset >= MAD2_MBUS_CTRL && offset <= MAD2_MBUS_DATA;
 	const bool gensio_register = nokia_gensio_device::owns(offset);
@@ -1677,6 +1684,8 @@ void nokia_dct3_state::mad2_register_w(offs_t offset, uint8_t data)
 		m_pup->write(offset, data);
 	else if (kbgpio_register)
 		m_kbgpio->write(offset, data);
+	else if (uif_register)
+		m_uif->write(offset, data);
 	else if (core_register)
 		m_mad2->write(offset, data);
 	else if (mbus_register)
@@ -2286,6 +2295,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_kbgpio->matrix_cb(4).set_ioport("COL.4");
 	m_kbgpio->power_cb().set_ioport("PWR");
 	m_kbgpio->irq_cb().set(FUNC(nokia_dct3_state::kbgpio_irq_w));
+	NOKIA_UIF(config, m_uif);
 	NOKIA_MBUS(config, m_mbus);
 	m_mbus->tx_cb().set(FUNC(nokia_dct3_state::mbus_tx_w));
 	m_mbus->fiq2_cb().set(FUNC(nokia_dct3_state::mbus_fiq2_w));

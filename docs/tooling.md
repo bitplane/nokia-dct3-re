@@ -105,6 +105,10 @@
     flag/value policies (`make verify-dct3-type-1f-static`).
   - `gensio_trace_check.py` — validates CCONT phase/status plus the shared
     v5.01/v6.00 SELECT-latch initialization and read-modify-write contract.
+  - `board_io_static_census.py` — classifies conservatively resolved direct
+    PUP, KBGPIO, UIF and SELECT accesses across the five supported ROMs.
+    `make board-io-static-census` regenerates the checked JSON and Markdown
+    artifacts; zeros exclude dynamic and table-driven accesses.
   - `test_message_census.py`, `test_find_thumb_signature.py`,
     `test_make_eeprom_profile.py`, and `test_mad2_access_census.py` cover byte
     lanes, signature relocation masks, runtime-manifest isolation, generated

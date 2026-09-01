@@ -12,7 +12,7 @@ recipes here.
 | LCD controller | Reused device, partial integration | Firmware-generated command/data transfers reach MAME's PCD8544 device and reproduce a byte-exact visible frame. | Reset/electrical timing remains unmeasured. |
 | MAD2 LCD serialization | Derived hardware contract | Both 3210 ROMs select GENSIO endpoint `0x21`, send command prefix `24 40 80`, and transfer at least one complete 504-byte LCD RAM image MSB-first. | The immediate bit-clock implementation is functional timing, not a measured serial waveform. |
 | Display profile | Recovered NV boundary, ROM-authored reset provisioning | Descriptor `0x0749` supplies three 12-byte profiles; record-0 byte 5 becomes active-profile slot 7 and the setup-message initializer tests it against `4`. Equivalent v6.00/v5.01 constructors explicitly author bytes 0..8 of all three variants. An erased-profile control leaves the panel blank. | Every collected EEPROM has the descriptor erased. Constructor-unassigned bytes remain erased pending an authentic configured record. |
-| MAD2 keypad matrix | Partial hardware, strong evidence | v6.00 and v5.01 agree on the 4x5 active-low scan, IRQ0 source, register sequence, ROM keymap and decoded-key path. Product row topology and power-on column are one validated KBGPIO wiring contract; later five-row products select independent contracts. | Electrical debounce, mask-edge corner cases and timing outside the exercised lifecycle remain unvalidated. |
+| MAD2 keypad matrix | Partial hardware, strong evidence | v6.00 and v5.01 agree on the 4x5 active-low scan, IRQ0 source, register sequence, ROM keymap and decoded-key path. Any unmasked column change latches IRQ0; firmware masks all five columns while changing row drive. Product row topology and power-on column are one validated KBGPIO wiring contract; later five-row products select independent contracts. | Electrical debounce and timing outside the exercised lifecycle remain unvalidated. |
 | Lua LCD mirror and key script | Acceptance tooling | The independent mirror makes headless frame hashes and the script supplies deterministic physical key edges. | Neither is emulated phone hardware; scripted delays are fixtures, not keypad debounce. |
 
 ## Current state
@@ -34,7 +34,7 @@ The same function first calls local key handlers `0x2979d8` and `0x2a27de`;
 A coherent trace drives the left softkey 250 ms after readiness and decodes
 keycode `0x19`. A scheduler-backed sequence can also drive `12345` plus the
 left softkey after the editor publishes `0x057c`.
-All physical press/release edges enter IRQ0, the digit path reaches the editor,
+All unmasked physical press/release edges enter IRQ0, the digit path reaches the editor,
 and submission completes the transaction through `0x0578`. Verifier `0x2ae704`
 returns one after transforming the entered bytes to the exact four bytes stored
 at RAM `0x112460`; the callback then publishes `0x05e1`. That status is reused

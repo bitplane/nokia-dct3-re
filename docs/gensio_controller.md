@@ -37,6 +37,13 @@ The owning routines relocate from v6.00 `0x2afbf2`, `0x2a31fa`, and
 and bit-operation behavior but does not identify the board devices attached to
 the SELECT lines. No RF, audio, or other peer is modeled from these values.
 
+The conservative five-ROM direct-access census bounds product variation:
+both 3210 ROMs read and write `0x6f` and `0xaf`; 3410 v5.46 writes
+`0xad/0xae/0xed/0xee`; no direct SELECT access resolves in 3310 v6.39 or
+3330 v4.50. Dynamic and table-driven accesses remain outside that absence
+claim. The full PCs and extraction coverage are in
+`board_io_static_census.md`.
+
 `ExportGensioAccesses.java` enumerates direct, literal-derived and scalar
 candidate uses for another ROM. `make verify-gensio` checks the two-ROM startup,
 read-back and bit-0 contract without committing raw traces.

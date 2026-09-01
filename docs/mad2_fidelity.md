@@ -16,7 +16,7 @@ Confidence labels:
 
 The extracted `nokia_mad2_device` owns the CTSI core at offsets `0x00..0x16`:
 reset/clock/watchdog latches, timer state, interrupt pending/masks and CPU-line
-routing. Keypad, GenIO and other board peripherals remain outside that core;
+routing. Keypad, PUP, UIF and other board peripherals remain outside that core;
 GENSIO, MBUS and SIMI are separate devices. Timer-1 terminal-count behavior,
 MCU-reset extent, the SIMI clock gate and the ARM clock-stop/wake contract are
 modeled. The timer divider tree, FIQ8 timing, clock-gate bits without an attached
@@ -48,7 +48,7 @@ Address-map coverage therefore must not be read as peripheral completeness.
 | `08..0b` FIQ/IRQ status and masks | latched bitfields | Focus-tested partial | Timer-0 FIQ4, simultaneous keypad IRQ0/CCONT IRQ2, masked-pending retention and acknowledgement have focused regressions. The overlap fixture briefly gates CPU delivery through MAD2 MMIO so two physical input callbacks compose deterministically. Other source assignments still need independent evidence. |
 | `0c` IRQ control | gates CPU lines; bit 5 projects the ninth IRQ pending state and write-only bit 6 acknowledges it | Cross-ROM partial | Both 3210 dispatchers implement the same bit-5/read and `0x40`/write contract. The ninth IRQ source and owner remain unidentified. |
 | `0d` clock control | stored gates; bit 1 is an auto-clearing ARM clock-stop request; bit 5 drives the extracted SIMI clock input | Cross-ROM partial | Both ROMs have instruction-equivalent RMW sites: boot sets bits 2--3 once, SIMI code exclusively manages bits 5--6, and the task-0/shutdown helper writes `(old | 0x02) & 0xfe`. Bit 6 is SIMI-owned but its hardware effect is not established; bit 4 has no recovered writer. |
-| `0e` interrupt trigger | backing-register read | Placeholder | Establish whether this is pending, trigger, or vector/status. |
+| `0e` external status | read-only three-bit input bank | Five-ROM mapped surface | The conservative census finds reads and zero writes in all five ROMs; the 3210 power/control state machine independently tests bits 0, 1 and 2. Exact PCB pin ownership remains unknown, so the device exposes inputs but synthesizes none. |
 | `0f..13` timer 0 | live source divider/counter/compare model with FIQ line 4 (`0x10`) | Focus-tested cross-ROM semantics, calibrated input clock | Both 3210 ROMs program `0xf9`, observe the live divider reach `0xea`, schedule compare=`counter+2`, and acknowledge status bit `0x10`. The register divides source ticks by `data+1`; paired timeout arithmetic proves the resulting Timer-0 interval is compared with `round(Timer1_remaining/8)`. Which documented MAD2 clock feeds the divider remains unproven. |
 
 ## PUP, GPIO and serial blocks
@@ -58,20 +58,19 @@ Address-map coverage therefore must not be read as peripheral completeness.
 | FIQ8 `16` | periodic timer when enabled; extended pending/status/mask routing; routed wake from ARM clock-stop | Partial routing/wake, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery, acknowledgement and wake. Identify the source clock and observe an organic countdown overlapping idle sleep. |
 | MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, physical character rate | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover FIQ3 phase/source, collision and error behavior. |
 | Buzzer `15/1c/1d/1e` | extracted PUP bit-5 enable and 13 MHz divider drive a MAME beeper; `make verify-buzzer` validates mapped MMIO and `make verify-alarm` validates the organic keypad-to-CCONT-to-ringtone path | Partial hardware | Recover volume/acoustic transfer; keypad tones are DSP/COBBA-owned and the MZT-03C acoustic response is not modeled. |
-| Vibrator `15/1b` | extracted PUP bit-4 enable drives the named MAME `vibration` output; `0x1b` remains the independent frequency/mode latch | Partial hardware | Exercise the optional vibra battery pack from an organic incoming-call lifecycle and recover `0x1b` semantics. |
+| Vibrator `15/1b` | extracted PUP bit-4 enable drives the named MAME `vibration` output; `0x1b.bits6..5` select modes `00/20/40/60` and bits `4..0` carry the mode parameter | Partial hardware | Exercise the optional vibra battery pack organically and determine the electrical waveform represented by each mode/parameter combination. |
 | GenIO `20/22/24` | extracted register family plus open-drain 24C128 SDA/SCL; `0x22` is an uninterpreted latch | Partial | EEPROM line mapping is firmware-proven. Neither v5.01 nor v6.00 corroborates the proposed backlight bit 6. |
-| Key GPIO `28..2b/68..6b/a8..ab` | extracted sparse block with 4x5/5x5 active-low matrices, row direction/drive, mask, cold-boot latch and physical press/release edges on IRQ0; unknown neighbors remain plain latches | Cross-ROM contract | Confirm column-mask and electrical debounce details on hardware. |
+| Key GPIO `28..2b/68..6b/a8..ab` | extracted sparse block with 4x5/5x5 active-low matrices, row direction/drive, mask, cold-boot latch and unmasked press/release transitions on IRQ0; firmware masks all five columns during row changes; unknown neighbors remain plain latches | Cross-ROM contract | Confirm electrical debounce and transition timing on hardware. |
 | GENSIO `2c..2e`, `6c..6f` | extracted CCONT/LCD controller; status `0x03` idle/TX-ready and `0x07` CCONT RX-ready; selecting CCONT starts command phase | Cross-ROM partial | Confirm physical busy timing and remaining control bits. |
-| SELECT2/3 aliases `ad..af`, `ed..ef` | extracted saved latches; cross-ROM startup and RMW behavior mapped | Mapped | Identify attached companion devices and alias/decode behavior. |
+| SELECT aliases `6f/ad..af/ed..ef` | extracted saved latches; direct static accesses are product-specific: 3210 uses `6f/af`, 3410 writes `ad/ae/ed/ee`, and none resolve in 3310/3330 | Mapped | Identify attached companion devices and alias/decode behavior. |
 | SIMI `36..3f` | stateful SIM UART, 16-byte TX FIFO, one-character RX holding state, IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and validated T=0 use the organic 9,600-bit/s path; larger card replies remain private serialization state. TX control `0x04`/`0x00`, live fill and multi-chunk TX-empty progression are modeled. All IIR causes are decoded; WWT and framing/error causes remain unexercised fault paths. |
-| UIF control pins `31..33`, `70..f3` | backing latches; `0x31.bit1` is power-duty-cycle owned | Partial | `0x31` has six exhaustive RMW sites and no external-input consumer; map physical pin nets and the remaining banks from schematics. |
+| UIF control pins `30..33/70..73/b0..b3/f0..f3` | extracted neutral saved-latch device; `0x31.bit1` is power-duty-cycle owned | Mapped | `0x31` has six exhaustive RMW sites and no external-input consumer; map physical pin nets before adding callbacks or side effects. |
 
 ## Interrupt ownership
 
 MAD2 owns aggregation and CPU-line assertion. Component devices expose level
 callbacks and do not write MAD2 pending registers directly. The extracted
-CCONT, DSP peer and MBUS devices follow this rule; keypad remains inside the
-phone state. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ2,
+CCONT, DSP peer, MBUS and KBGPIO devices follow this rule. Current line assignments are DSP service IRQ4, keypad IRQ0, CCONT IRQ2,
 DSP receive FIQ0, SIMI FIQ6, timer compare FIQ4, and MBUS FIQ2/FIQ3, with line
 8 represented by the extended pending bit. The keypad edge latch and CCONT
 level are independent sources; acknowledging IRQ0 cannot discard an active

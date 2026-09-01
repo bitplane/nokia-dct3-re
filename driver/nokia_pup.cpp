@@ -14,6 +14,8 @@ constexpr offs_t BUZZER_VOLUME = 0x1e;
 constexpr offs_t GENIO_SIGNAL = 0x20;
 constexpr offs_t GENIO_LATCH = 0x22;
 constexpr offs_t GENIO_DIRECTION = 0x24;
+constexpr u8 VIBRATOR_MODE_MASK = 0x60;
+constexpr u8 VIBRATOR_PARAMETER_MASK = 0x1f;
 }
 
 nokia_pup_device::nokia_pup_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
@@ -78,8 +80,11 @@ void nokia_pup_device::update_vibrator()
 	const bool enabled = BIT(m_regs[CONTROL], 4);
 	m_vibrator_enable_cb(enabled);
 	if (m_trace)
-		logerror("vibrator: enabled=%u control=%02x t=%.6f\n",
-				enabled, m_regs[VIBRATOR_CONTROL], machine().time().as_double());
+		logerror("vibrator: enabled=%u control=%02x mode=%02x parameter=%02x t=%.6f\n",
+				enabled, m_regs[VIBRATOR_CONTROL],
+				m_regs[VIBRATOR_CONTROL] & VIBRATOR_MODE_MASK,
+				m_regs[VIBRATOR_CONTROL] & VIBRATOR_PARAMETER_MASK,
+				machine().time().as_double());
 }
 
 u8 nokia_pup_device::peek(offs_t offset) const

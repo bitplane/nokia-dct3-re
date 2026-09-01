@@ -88,12 +88,16 @@ void nokia_kbgpio_device::update_irq()
 	m_irq_cb(m_irq_latched);
 }
 
-void nokia_kbgpio_device::update_columns(bool physical_edge)
+void nokia_kbgpio_device::update_columns()
 {
 	const u8 columns = sample_columns(false) & 0x1f;
-	const u8 falling = m_columns & ~columns & ~m_regs[COLUMN_IRQ_MASK] & 0x1f;
+	// Firmware masks all five columns while changing row drive, then restores
+	// the idle mask. Physical press and release both reach IRQ0, so this is a
+	// masked change detector rather than a falling-edge-only input. Host input
+	// callbacks must not bypass the hardware mask.
+	const u8 changed = (m_columns ^ columns) & ~m_regs[COLUMN_IRQ_MASK] & 0x1f;
 	m_columns = columns;
-	if (physical_edge || falling)
+	if (changed)
 	{
 		m_irq_latched = true;
 		update_irq();
@@ -118,12 +122,12 @@ void nokia_kbgpio_device::write(offs_t offset, u8 data)
 		return;
 	m_regs[offset] = data;
 	if (offset == ROW_SIGNAL || offset == COLUMN_IRQ_MASK || offset == ROW_DIRECTION)
-		update_columns(false);
+		update_columns();
 }
 
 void nokia_kbgpio_device::input_changed()
 {
-	update_columns(true);
+	update_columns();
 }
 
 void nokia_kbgpio_device::irq_acknowledge()
