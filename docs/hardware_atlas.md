@@ -74,8 +74,8 @@ structural oracles enforce that observation.
 | `0x100000–0x17ffff` | main RAM | `ram_r/w` | emulated |
 | `0x200000–0x5fffff` | flash (the firmware) | `flash_r/w` | emulated (BYO dump) |
 | `0x600000–0x9fffff` | ROM2 window/mirror | `rom2_mirror_r/w` | emulated |
-| `0xa00000–0xa03fff` | EEPROM parallel alias | `eeprom_r/w` | **unproven** read-only view of the input region; normal access uses serial I2C |
-| `0xa04000–0xffffff` | unmapped / reserved | — | — |
+| `0xa00000–0xdfffff` | EEPROMSelX | — | unmapped; five-ROM census finds no executable direct consumer of the removed immutable-input alias |
+| `0xe00000–0xffffff` | reserved | — | unmapped |
 
 ### Flash devices
 

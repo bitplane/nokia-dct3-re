@@ -747,8 +747,6 @@ private:
 
 	uint16_t ram_r(offs_t offset, uint16_t mem_mask = ~0);
 	void ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
-	uint16_t eeprom_r(offs_t offset, uint16_t mem_mask = ~0);
-	void eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t dsp_ram_r(offs_t offset);
 	void dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t flash_r(offs_t offset, uint16_t mem_mask = ~0);
@@ -794,7 +792,7 @@ private:
 			offs_t address, uint16_t old_data, uint16_t data);
 	required_device<cpu_device> m_maincpu;
 	required_device<nokia_b3_flash_device> m_b3_flash;
-	required_device<i2cmem_device> m_eeprom;
+	optional_device<i2cmem_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
 	required_device<nokia_cobba_device> m_cobba;
 	required_device<nokia_gensio_device> m_gensio;
@@ -1239,7 +1237,8 @@ void nokia_dct3_state::machine_reset()
 			nokia_gsm_network_device::laboratory_ki());
 	const u8 atr[] = { 0x3b, 0x10, 0x05 };
 	m_sim_card->set_atr(atr, std::size(atr));
-	m_eeprom->write_scl(1);
+	if (m_eeprom)
+		m_eeprom->write_scl(1);
 	m_ccont_irq_state = false;
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
 }
@@ -1471,21 +1470,6 @@ void nokia_dct3_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 	}
 }
 
-
-uint16_t nokia_dct3_state::eeprom_r(offs_t offset, uint16_t mem_mask)
-{
-	memory_region *eeprom = memregion("eeprom");
-	uint16_t data = 0xffff;
-
-	if (eeprom && offset < (eeprom->bytes() / 2))
-		data = eeprom->as_u16(offset);
-
-	return data & mem_mask;
-}
-
-void nokia_dct3_state::eeprom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
-{
-}
 
 uint16_t nokia_dct3_state::dsp_ram_r(offs_t offset)
 {
@@ -1841,8 +1825,9 @@ void nokia_dct3_state::dct3_map(address_map &map)
 	map(0x00100000, 0x0017ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));                                   // RAMSelX
 	map(0x00200000, 0x005fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));     // ROM1SelX
 	map(0x00600000, 0x009fffff).rw(FUNC(nokia_dct3_state::rom2_mirror_r), FUNC(nokia_dct3_state::rom2_mirror_w));   // ROM2SelX mirror/window
-	map(0x00a00000, 0x00a03fff).rw(FUNC(nokia_dct3_state::eeprom_r), FUNC(nokia_dct3_state::eeprom_w));           // EEPROMSelX
-	map(0x00a04000, 0x00dfffff).unmaprw();                                                                   // EEPROMSelX
+	// Supported boards have no parallel device attached to EEPROMSelX.
+	// Their permanent memory is either serial I2C or flash-backed.
+	map(0x00a00000, 0x00dfffff).unmaprw();                                                                   // EEPROMSelX
 	map(0x00e00000, 0x00ffffff).unmaprw();                                                                   // Reserved
 }
 
@@ -2273,7 +2258,6 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	INTEL_TE28F160(config, "flash");
 	NOKIA_B3_FLASH(config, m_b3_flash, 0);
 	m_b3_flash->set_status_csr((NOKIA_3410_FLASH_STATUS_CSR - NOKIA_FLASH1_BASE) >> 1);
-	I2C_24C128(config, m_eeprom);
 	NOKIA_MAD2(config, m_mad2);
 	NOKIA_MAD2_PCM(config, m_mad2_pcm);
 	NOKIA_GSM_VOICE_PEER(config, "gsm_voice_peer");
@@ -2301,9 +2285,6 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_mbus->fiq2_cb().set(FUNC(nokia_dct3_state::mbus_fiq2_w));
 	m_mbus->fiq3_cb().set(FUNC(nokia_dct3_state::mbus_fiq3_w));
 	NOKIA_PUP(config, m_pup);
-	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
-	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
-	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
 	m_pup->buzzer_clock_cb().set(FUNC(nokia_dct3_state::pup_buzzer_clock_w));
 	m_pup->buzzer_enable_cb().set(FUNC(nokia_dct3_state::pup_buzzer_enable_w));
 	m_pup->vibrator_enable_cb().set(FUNC(nokia_dct3_state::pup_vibrator_w));
@@ -2373,6 +2354,13 @@ void nokia_dct3_state::noki3330(machine_config &config)
 void nokia_dct3_state::noki3210(machine_config &config)
 {
 	dct3_base(config);
+	I2C_24C128(config, m_eeprom);
+	// AT24C128 page writes enter a self-timed cycle at STOP and NACK address
+	// polling until completion. Use the documented 5 ms maximum until measured.
+	m_eeprom->set_write_cycle_time(attotime::from_msec(5));
+	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
+	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
+	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
 	// NSE-8 board topology: the internal microphone is physically wired to
 	// COBBA MIC2 and the receiver to its differential EAR output. Keep these
 	// MAME sound routes out of the generic DCT3 base configuration.
@@ -2416,7 +2404,10 @@ void nokia_dct3_state::noki6110(machine_config &config)
 	dct3_base(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nse3_map);
 	INTEL_28F800B3T(config.replace(), "flash");
-	I2C_24C64(config.replace(), m_eeprom);
+	I2C_24C64(config, m_eeprom);
+	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
+	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
+	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
 	// NSE-3's internal differential receiver and microphone terminate at
 	// COBBA EAR and MIC2. Neutral routes declare wiring, not unproved gain.
 	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);

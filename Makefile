@@ -11,6 +11,7 @@ VENV   := .venv
 DRIVER := driver/nokia_dct3.cpp
 MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch \
+	patches/mame-i2cmem-write-cycle.patch \
 	patches/mame-pulseaudio-input.patch
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_cobba.cpp driver/nokia_cobba.h \
@@ -194,6 +195,8 @@ INTERACTIVE_EXTRA_ARGS ?=
 
 .PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census gates gate-parity controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census board-io-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
+.PHONY: storage-static-census
+.PHONY: verify-eeprom
 .PHONY: verify-radio-periodic-location-update-state verify-3410-radio-periodic-location-update
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
 .PHONY: verify-3330-radio-incoming-call-lifecycle
@@ -273,6 +276,8 @@ help:
 	@echo "make ccont-static-census check the five-ROM CCONT descriptor surface"
 	@echo "make ccont-runtime-census regenerate five-ROM organic register coverage"
 	@echo "make board-io-static-census classify five-ROM PUP/KBGPIO/UIF/SELECT use"
+	@echo "make storage-static-census classify five-ROM permanent-storage access"
+	@echo "make verify-eeprom  check 24C128 page wrap, busy polling and persistence"
 	@echo "make verify-ccont-watchdog check enabled watchdog service beyond 49 seconds"
 	@echo "make verify-ccont-rtc check CCONT alarm programming and MAD2 IRQ2 delivery"
 	@echo "make verify-ccont-mask check masked-pending delivery on CCONT IRQ2"
@@ -528,6 +533,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
+	$(VENV)/bin/python -m unittest tools/test_eeprom_trace_check.py tools/test_storage_static_census.py
 	$(VENV)/bin/python -m unittest tools/test_extract_dct3_wintesla.py
 	$(VENV)/bin/python -m unittest tools/test_nse3_v406_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_nse3_v548_static_check.py
@@ -753,6 +759,19 @@ CLEAN_RUN_STATE := $(sort $(RUN_DIR) run run_* run-* \
 	error.log progress_latest_frame.* nokia_dct3_lcdmirror_*.pgm \
 	cfg nvram snap)
 
+verify-eeprom:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_eeprom SECONDS=4 \
+		PRESERVE_NVRAM=0 \
+		RUN_ENV='NOKIA_DCT3_EEPROM_FIXTURE_AT=2.5 NOKIA_DCT3_EEPROM_FIXTURE_MODE=write'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_eeprom/write.log
+	$(PYTHON) tools/eeprom_trace_check.py $(RUN_DIR)_eeprom/write.log --mode write
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_eeprom SECONDS=4 \
+		PRESERVE_NVRAM=1 \
+		RUN_ENV='NOKIA_DCT3_EEPROM_FIXTURE_AT=2.5 NOKIA_DCT3_EEPROM_FIXTURE_MODE=read'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_eeprom/read.log
+	$(PYTHON) tools/eeprom_trace_check.py $(RUN_DIR)_eeprom/read.log --mode read
+	@echo "OK — 24C128 page wrap, busy ACK polling and cross-process persistence reproduced"
+
 clean:
 	rm -rf $(CLEAN_RUN_STATE)
 
@@ -770,6 +789,11 @@ board-io-static-census:
 	$(VENV)/bin/python tools/board_io_static_census.py --check \
 		--json docs/data/board_io_static_census.json \
 		--markdown docs/board_io_static_census.md
+
+storage-static-census:
+	$(VENV)/bin/python tools/storage_static_census.py --check \
+		--json docs/data/storage_static_census.json \
+		--markdown docs/storage_static_census.md
 
 # Acceptance gates are generated from gates.json; see tools/gate_generate.py.
 # The rule below lets make rebuild gates.mk and restart when it is missing or

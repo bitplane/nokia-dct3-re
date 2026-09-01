@@ -1,0 +1,142 @@
+diff --git a/src/devices/machine/i2cmem.cpp b/src/devices/machine/i2cmem.cpp
+index b856cd862a1..ac20ad5ecc7 100644
+--- a/src/devices/machine/i2cmem.cpp
++++ b/src/devices/machine/i2cmem.cpp
+@@ -109,6 +109,10 @@ i2cmem_device::i2cmem_device(
+ 	m_byteaddr(0),
+ 	m_page_offset(0),
+ 	m_page_written_size(0),
++	m_write_base(0),
++	m_write_cycle_time(attotime::zero),
++	m_write_cycle_timer(nullptr),
++	m_write_busy(false),
+ 	m_devsel_address_low(false)
+ {
+ 	// these memories work off the I2C clock only
+@@ -205,6 +209,7 @@ void i2cmem_device::device_start()
+ {
+ 	m_data = std::make_unique<uint8_t []>(m_data_size);
+ 	m_page.resize( m_write_page_size );
++	m_write_cycle_timer = timer_alloc(FUNC(i2cmem_device::write_cycle_complete), this);
+ 
+ 	save_item( NAME(m_scl) );
+ 	save_item( NAME(m_sdaw) );
+@@ -222,6 +227,8 @@ void i2cmem_device::device_start()
+ 	save_item( NAME(m_byteaddr) );
+ 	save_item( NAME(m_page_offset) );
+ 	save_item( NAME(m_page_written_size) );
++	save_item( NAME(m_write_base) );
++	save_item( NAME(m_write_busy) );
+ 	save_pointer( &m_data[0], "m_data", m_data_size );
+ 	if ( m_write_page_size > 0 )
+ 	{
+@@ -229,6 +236,33 @@ void i2cmem_device::device_start()
+ 	}
+ }
+ 
++void i2cmem_device::device_reset()
++{
++	m_write_cycle_timer->adjust(attotime::never);
++	m_write_busy = false;
++	m_page_written_size = 0;
++}
++
++void i2cmem_device::commit_page()
++{
++	if (!m_page_written_size)
++		return;
++
++	int const root = m_write_base & ~(m_write_page_size - 1);
++	for (int i = 0; i < m_page_written_size; i++)
++		m_data[root | ((m_write_base + i) & (m_write_page_size - 1))] = m_page[i];
++	LOGMASKED(LOG_STATE, "EEPROM data[ %04x to %04x ] = %x bytes\n",
++			m_write_base, root | ((m_write_base + m_page_written_size - 1) & (m_write_page_size - 1)),
++			m_page_written_size);
++	m_page_written_size = 0;
++}
++
++TIMER_CALLBACK_MEMBER(i2cmem_device::write_cycle_complete)
++{
++	commit_page();
++	m_write_busy = false;
++}
++
+ 
+ //-------------------------------------------------
+ //  nvram_default - called to initialize NVRAM to
+@@ -333,13 +367,14 @@ void i2cmem_device::write_sda(int state)
+ 			{
+ 				if( m_page_written_size > 0 )
+ 				{
+-					int base = data_offset();
+-					int root = base & ~( m_write_page_size - 1 );
+-					for( int i = 0; i < m_page_written_size; i++ )
+-						m_data[root | ((base + i) & (m_write_page_size - 1))] = m_page[i];
+-					LOGMASKED( LOG_STATE, "EEPROM data[ %04x to %04x ] = %x bytes\n", base, root | ((base + m_page_written_size - 1) & (m_write_page_size - 1)), m_page_written_size );
+-
+-					m_page_written_size = 0;
++					m_write_base = data_offset();
++					if (m_write_cycle_time.is_zero())
++						commit_page();
++					else
++					{
++						m_write_busy = true;
++						m_write_cycle_timer->adjust(m_write_cycle_time);
++					}
+ 				}
+ 				LOGMASKED( LOG_STATE, "%s: I2C stop\n", machine().describe_context() );
+ 				m_state = STATE_IDLE;
+@@ -390,7 +425,12 @@ void i2cmem_device::write_scl(int state)
+ 						case STATE_DEVSEL:
+ 							m_devsel = m_shift;
+ 
+-							if( m_devsel == 0 && !m_devsel_address_low )
++							if (m_write_busy)
++							{
++								LOGMASKED(LOG_STATE, "I2C devsel %02x: write cycle busy\n", m_devsel);
++								m_state = STATE_IDLE;
++							}
++							else if( m_devsel == 0 && !m_devsel_address_low )
+ 							{
+ 								// TODO: Atmel datasheets document 2-wire software reset, but doesn't mention it will lower sda only that it will release it.
+ 								// ltv_naru however requires it to be lowered, but we don't currently know the manufacturer of the chip used.
+diff --git a/src/devices/machine/i2cmem.h b/src/devices/machine/i2cmem.h
+index 9d9b6648f6e..f04f1d7a138 100644
+--- a/src/devices/machine/i2cmem.h
++++ b/src/devices/machine/i2cmem.h
+@@ -38,6 +38,7 @@ public:
+ 	i2cmem_device & set_e1(int e1) { m_e1 = e1; return *this; }
+ 	i2cmem_device & set_e2(int e2) { m_e2 = e2; return *this; }
+ 	i2cmem_device & set_wc(int wc) { m_wc = wc; return *this; }
++	i2cmem_device & set_write_cycle_time(attotime time) { m_write_cycle_time = time; return *this; }
+ 
+ 	// I/O operations
+ 	void write_e0(int state);
+@@ -54,6 +55,7 @@ protected:
+ 
+ 	// device-level overrides
+ 	virtual void device_start() override ATTR_COLD;
++	virtual void device_reset() override ATTR_COLD;
+ 
+ 	// device_nvram_interface overrides
+ 	virtual void nvram_default() override;
+@@ -68,6 +70,8 @@ protected:
+ 	int select_device();
+ 	int data_offset();
+ 	bool skip_addresshigh() const { return m_data_size <= 0x800; }
++	void commit_page();
++	TIMER_CALLBACK_MEMBER(write_cycle_complete);
+ 
+ 	optional_memory_region m_region;
+ 
+@@ -93,6 +97,10 @@ protected:
+ 	std::vector<uint8_t> m_page;
+ 	int m_page_offset;
+ 	int m_page_written_size;
++	int m_write_base;
++	attotime m_write_cycle_time;
++	emu_timer *m_write_cycle_timer;
++	bool m_write_busy;
+ 	bool m_devsel_address_low;
+ };
+ 

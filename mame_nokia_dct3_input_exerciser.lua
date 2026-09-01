@@ -59,6 +59,7 @@ local mad2_watchdog_fixture_at
 local ccont_watchdog_fixture_at
 local ccont_mask_fixture_at
 local mad2_sleep_fixture_at
+local eeprom_fixture_at
 
 local structural = {
 	gensio_controls = {}, ccont_commands = {}, startup_modes = {},
@@ -95,6 +96,8 @@ ccont_watchdog_fixture_at = env_number("NOKIA_DCT3_CCONT_WATCHDOG_FIXTURE_AT", -
 ccont_mask_fixture_at = env_number("NOKIA_DCT3_CCONT_MASK_FIXTURE_AT", -1)
 mad2_sleep_fixture_at = env_number("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT", -1)
 local mad2_sleep_fixture_source = os.getenv("NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE") or "timer1"
+eeprom_fixture_at = env_number("NOKIA_DCT3_EEPROM_FIXTURE_AT", -1)
+local eeprom_fixture_mode = os.getenv("NOKIA_DCT3_EEPROM_FIXTURE_MODE") or "write"
 local state_roundtrip_at = env_number("NOKIA_DCT3_STATE_ROUNDTRIP_AT", -1)
 local state_roundtrip_wait_release =
 		os.getenv("NOKIA_DCT3_STATE_ROUNDTRIP_WAIT_RELEASE") == "1"
@@ -730,6 +733,102 @@ if ccont_mask_fixture_at >= 0 then
 	assert(coroutine.resume(mask_timer))
 end
 
+
+if eeprom_fixture_at >= 0 then
+	local eeprom_timer = coroutine.create(function()
+		emu.wait(eeprom_fixture_at)
+		local signal_address, direction_address = 0x20020, 0x20024
+		local old_signal = space:read_u8(signal_address)
+		local old_direction = space:read_u8(direction_address)
+		local signal, direction = old_signal, old_direction
+
+		local function set_scl(scl)
+			signal = (signal & 0xf7) | ((scl & 1) << 3)
+			space:write_u8(signal_address, signal)
+		end
+		local function set_sda(sda)
+			if sda == nil then
+				direction = direction & 0xfe
+			else
+				signal = (signal & 0xfe) | (sda & 1)
+				space:write_u8(signal_address, signal)
+				direction = direction | 1
+			end
+			space:write_u8(direction_address, direction)
+		end
+		local function start()
+			set_scl(0); set_sda(nil); set_scl(1); set_sda(0); set_scl(0)
+		end
+		local function stop()
+			set_scl(0); set_sda(0); set_scl(1); set_sda(nil)
+		end
+		local function write_byte(value)
+			for bit = 7, 0, -1 do
+				set_scl(0); set_sda((value >> bit) & 1); set_scl(1)
+			end
+			set_scl(0); set_sda(nil); set_scl(1)
+			local ack = (space:read_u8(signal_address) & 1) == 0
+			set_scl(0)
+			return ack
+		end
+		local function read_byte(nack)
+			local value = 0
+			for _ = 1, 8 do
+				set_scl(0); set_sda(nil); set_scl(1)
+				value = (value << 1) | (space:read_u8(signal_address) & 1)
+			end
+			set_scl(0); set_sda(nack and 1 or 0); set_scl(1); set_scl(0); set_sda(nil)
+			return value
+		end
+		local function select_address(address)
+			start()
+			local ok = write_byte(0xa0)
+			ok = write_byte((address >> 8) & 0xff) and ok
+			ok = write_byte(address & 0xff) and ok
+			return ok
+		end
+		local function random_read(address)
+			local address_ack = select_address(address)
+			start()
+			local read_ack = write_byte(0xa1)
+			local value = read_byte(true)
+			stop()
+			return address_ack and read_ack, value
+		end
+
+		local addresses = { 0x3ffe, 0x3fff, 0x3fc0, 0x3fc1 }
+		local expected = { 0xa1, 0xb2, 0xc3, 0xd4 }
+		local initial_ack, busy_ack, ready_ack = true, false, true
+		if eeprom_fixture_mode == "write" then
+			initial_ack = select_address(0x3ffe)
+			for _, value in ipairs(expected) do
+				initial_ack = write_byte(value) and initial_ack
+			end
+			stop()
+			start(); busy_ack = write_byte(0xa0); stop()
+			emu.wait(0.006)
+			start(); ready_ack = write_byte(0xa0); stop()
+		end
+		local values, reads_ok = {}, true
+		for index, address in ipairs(addresses) do
+			local ack, value = random_read(address)
+			reads_ok = reads_ok and ack
+			values[index] = value
+		end
+		local data_ok = true
+		for index, value in ipairs(expected) do
+			data_ok = data_ok and values[index] == value
+		end
+		machine:logerror(string.format(
+			"eeprom_fixture: mode=%s initial_ack=%u busy_ack=%u ready_ack=%u reads_ok=%u data_ok=%u data=%02x,%02x,%02x,%02x t=%.6f\n",
+			eeprom_fixture_mode, initial_ack and 1 or 0, busy_ack and 1 or 0,
+			ready_ack and 1 or 0, reads_ok and 1 or 0, data_ok and 1 or 0,
+			values[1], values[2], values[3], values[4], emulation_seconds()))
+		space:write_u8(direction_address, old_direction)
+		space:write_u8(signal_address, old_signal)
+	end)
+	assert(coroutine.resume(eeprom_timer))
+end
 
 if mad2_sleep_fixture_at >= 0 then
 	local sleep_timer = coroutine.create(function()

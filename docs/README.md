@@ -54,6 +54,7 @@ distinction.
 | `service_firmware_map.md` | Concise lower-service and service-session firmware address map. |
 | `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |
 | `eeprom_analysis.md` | EEPROM usage map, checksum contracts and the generated provisioning fixture. |
+| `storage_static_census.md` | Five-ROM direct EEPROMSelX and PUP access absence/ownership census. |
 
 ## Active protocol and HLE boundaries
 

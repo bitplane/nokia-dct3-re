@@ -88,7 +88,7 @@ def apply_pointer_update(insn, pointers, data, image_base):
 	pointers[dst] = None if value is None else value & 0xffffffff
 
 
-def memory_access(insn, pointers):
+def memory_access(insn, pointers, window_base=MAD2_BASE, window_size=MAD2_SIZE):
 	if not insn.mnemonic.startswith(("ldr", "str")) or len(insn.operands) < 2:
 		return None
 	mem_op = insn.operands[-1]
@@ -99,7 +99,7 @@ def memory_access(insn, pointers):
 	if base is None or mem_op.mem.index:
 		return None
 	address = (base + mem_op.mem.disp) & 0xffffffff
-	if not MAD2_BASE <= address < MAD2_BASE + MAD2_SIZE:
+	if not window_base <= address < window_base + window_size:
 		return None
 	width = {"ldrb": 1, "strb": 1, "ldrh": 2, "strh": 2, "ldr": 4, "str": 4}.get(insn.mnemonic)
 	return {
@@ -107,20 +107,21 @@ def memory_access(insn, pointers):
 		"kind": "read" if insn.mnemonic.startswith("ldr") else "write",
 		"width": width,
 		"address": address,
-		"offset": address - MAD2_BASE,
+		"offset": address - window_base,
 		"instruction": f"{insn.mnemonic} {insn.op_str}",
 		"base_register": base_reg,
 	}
 
 
-def analyze_image(data, image_base=FLASH_BASE, max_seed_span=192):
+def analyze_image(data, image_base=FLASH_BASE, max_seed_span=192,
+		window_base=MAD2_BASE, window_size=MAD2_SIZE):
 	instructions = decode_image(data, image_base)
 	accesses = {}
 	seed_count = 0
 	seed_terminations = Counter()
 	for seed_index, seed in enumerate(instructions):
 		value = literal_effective_value(seed, data, image_base) if seed else None
-		if value is None or not MAD2_BASE <= value < MAD2_BASE + MAD2_SIZE:
+		if value is None or not window_base <= value < window_base + window_size:
 			continue
 		seed_reg = destination_register(seed)
 		if seed_reg is None:
@@ -132,7 +133,7 @@ def analyze_image(data, image_base=FLASH_BASE, max_seed_span=192):
 			if insn is None:
 				seed_terminations["decode_gap"] += 1
 				break
-			access = memory_access(insn, pointers)
+			access = memory_access(insn, pointers, window_base, window_size)
 			if access:
 				access["seed_pc"] = seed.address
 				access["seed_value"] = value

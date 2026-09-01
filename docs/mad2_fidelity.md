@@ -34,7 +34,7 @@ Address-map coverage therefore must not be read as peripheral completeness.
 | DSPIF `0x30000` | extracted four-byte transport register; command-4 doorbell callback | Cross-ROM partial | Focused v6.00/v5.01 runs cover doorbells, service-pending completion and IRQ4; v6.00 additionally covers complete TX consumption, RX publication and FIQ0. Controller fixtures cover wrap/full/partial handling; fault reporting remains open. |
 | MCUIF `0x40000` | retained four-byte configuration register | Mapped latch | Boot writes `6a 0f 61 20` once and never reads it in the coherent run. Decode fields before applying window side effects. |
 | ROM2 window | modulo mirror of flash | Inferred | Matches current reads; decode/mirroring needs boot-ROM or second-ROM confirmation. |
-| EEPROM parallel window | read-only alias of input region | Placeholder | Serial 24C128 is faithful at GenIO; relationship of the parallel window to EEPROM hardware is unproven. |
+| EEPROMSelX | unmapped | Mapped absence | Five supported ROMs contain no executable direct literal-derived consumer of the removed immutable-input alias. Dynamic accesses and future products remain outside coverage; serial EEPROMs attach through PUP. |
 
 ## CTSI registers
 

@@ -61,6 +61,14 @@ class MachineProfileTest(unittest.TestCase):
         )
         self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
         self.assertNotIn('"NOKIA_DCT3_TIMER0_CATCHUP"', profile)
+        self.assertIn("I2C_24C128(config, m_eeprom);", profile)
+        self.assertIn("eeprom_sda_read_cb().set(m_eeprom", profile)
+        base = self.function_body(
+            "void nokia_dct3_state::dct3_base",
+            "void nokia_dct3_state::dct3_32mbit_flash_base",
+        )
+        self.assertNotIn("I2C_24C128(config, m_eeprom)", base)
+        self.assertNotIn("eeprom_sda_read_cb().set", base)
         apply = self.function_body(
             "void nokia_dct3_state::apply_product_config",
             "void nokia_dct3_state::machine_reset",
@@ -141,7 +149,7 @@ class MachineProfileTest(unittest.TestCase):
         for declaration in (
             "dct3_nse3_map",
             'INTEL_28F800B3T(config.replace(), "flash");',
-            "I2C_24C64(config.replace(), m_eeprom);",
+            "I2C_24C64(config, m_eeprom);",
             "nokia_cobba_device::ear",
             "nokia_cobba_device::mic2",
             "apply_product_config(PRODUCT_6110);",

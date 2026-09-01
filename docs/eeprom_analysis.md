@@ -23,10 +23,10 @@ Transport, storage, and provisioning are classified separately:
 
 | Surface | Classification | Basis and limitation |
 | --- | --- | --- |
-| 24C128 storage device | Reused hardware model | MAME's native `I2C_24C128` owns serial address decoding, acknowledgement, reads, writes, and NVRAM persistence. This project does not independently validate its complete chip timing. |
+| 24C128 storage device | Reused hardware model plus timing extension | MAME's native `I2C_24C128` owns serial addressing, acknowledgements, page writes and persistence. The Nokia instance selects the documented 64-byte page and conservative 5 ms maximum self-timed write cycle; exact board latency and interrupted writes remain unvalidated. |
 | GenIO SDA/SCL wiring | Derived contract | Firmware bit-bangs `0x20.bit0` SDA, `0x20.bit3` SCL, and `0x24.bit0` SDA direction. Organic reads and acknowledgements work with open-drain release semantics. Other GenIO pins and electrical timing remain outside this contract. |
-| Firmware read protocol | Derived contract | START, STOP, ACK sampling, device address `0xa0/0xa1`, and 16-bit byte addresses are mapped and exercised. EEPROM write-cycle timing and power-loss behavior are not covered by a focused test. |
-| Parallel window `0xa00000..0xa03fff` | Placeholder | It reads the immutable ROM input region, not live 24C128 NVRAM, and ignores writes. No evidence establishes that this is a physical EEPROM alias. |
+| Firmware serial protocol | Derived contract | START, STOP, ACK sampling, device address `0xa0/0xa1`, 16-bit byte addresses, page wrap and busy-cycle ACK polling are exercised through mapped PUP pins. A two-process gate proves persistence. |
+| EEPROMSelX `0xa00000..0xdfffff` | Unmapped | The removed handler returned immutable input bytes and discarded writes. A five-ROM census finds no executable direct literal-derived access to its former 16 KiB slice; dynamic and table-derived accesses remain outside that absence proof. |
 | Checksummed startup blocks | Derived data contract | Both checksum algorithms and the firmware comparisons are mapped and generator-tested. This validates the format used by the ROM, not the provenance of the generated contents. |
 | Fallback NV record copied from flash | ROM-derived fixture | The v6.00 fallback bytes are copied with the required byte-lane transform. The hard-coded source addresses have not been validated for v5.01 or another product. |
 | Identity/security profile | Synthetic provisioning | IMEI prefix, security code, and derived state are coherent with mapped firmware transformations but do not represent a dumped handset. |
@@ -44,10 +44,11 @@ keeps bit 6 through EEPROM validation (`0xc8` -> `0xcc`). The later clear at
 `0x237b04` is the independent disabled service-channel/PM-read predicate described
 in `service_bootstrap.md`.
 
-The memory map also exposes a read-only region at `0xa00000..0xa03fff`. Its
-relationship to the physical serial EEPROM is not established; the current
-handler reads the input region directly and is classified as an unproven
-parallel alias in `mad2_fidelity.md`.
+The complete EEPROMSelX range is unmapped. `make storage-static-census`
+conservatively follows literal-derived pointers in both 3210 revisions and the
+3310/3330/3410 controls. It finds no executable direct consumer of the removed
+16 KiB alias. Apparent sibling accesses are classified separately from code.
+This does not exclude dynamic pointers or future products.
 
 ## Firmware transport
 
@@ -284,20 +285,17 @@ run as an unprovisioned security-editor result.
    documented data structures.
 3. Validate against a legitimately obtained provisioned EEPROM image without
    committing personal identifiers or calibration data.
-4. Determine whether the `0xa00000` parallel mapping is real MAD2 hardware,
-   boot-ROM behavior, or an incorrect legacy mapping.
-5. Define product-specific permanent-memory placement for phones that store it
-   in flash.
+4. Validate exact AT24C128 board timing and interrupted-write behavior.
+5. Decode flash-backed permanent-memory formats beyond their established
+   product placement and persistence boundary.
 6. Parameterize or signature-locate the fallback-record source before treating
    a v5.01-generated profile as a data-layout control; the current generator's
    source addresses are v6.00-specific.
 
 Generator unit tests cover both checksum algorithms and the synthetic
-identity/security derivation. Integration oracles exercise organic serial reads
-and deterministic NVRAM seeding, but raw I2C/EEPROM counters are diagnostic and
-there is no focused project test for open-drain transitions, page writes,
-write-cycle timing, persistence, the parallel window, or power interruption.
+identity/security derivation. Integration oracles exercise organic serial reads,
+deterministic NVRAM seeding, mapped-pin page wrap, busy polling and persistence.
+Open-drain electrical timing and power interruption remain untested.
 
-The EEPROM boundary is considered validated only after both the serial
-protocol and data placement work across a second product. The current v5.01
-run is a same-product structural control and does not satisfy that criterion.
+The external-storage boundary is independently configured for NSE-8's 24C128
+and NSE-3's 24C64. Flash-backed sibling storage remains a separate contract.

@@ -129,13 +129,13 @@
     },
     {
       "id": "external_eeprom_i2c", "subsystem": "eeprom", "status": "partial", "confidence": "strong",
-      "boundary": "A native MAME 24C128 owns serial storage while MAD2 GenIO bit-bangs SDA on 0x20.bit0, SCL on 0x20.bit3 and open-drain SDA direction on 0x24.bit0; organic reads work, but project-level write timing and second-product placement remain unvalidated",
-      "evidence": ["docs/eeprom_analysis.md", "docs/driver_structure.md"]
+      "boundary": "Product-owned native MAME I2C parts provide serial storage while MAD2 PUP bit-bangs SDA on 0x20.bit0, SCL on 0x20.bit3 and open-drain SDA direction on 0x24.bit0. NSE-8 uses a 24C128 with the documented page size and conservative 5 ms maximum write cycle; NSE-3 independently uses a 24C64",
+      "evidence": ["docs/eeprom_analysis.md", "docs/driver_structure.md", "patches/mame-i2cmem-write-cycle.patch"]
     },
     {
-      "id": "eeprom_parallel_window", "subsystem": "eeprom", "status": "prototype", "confidence": "moderate",
-      "boundary": "The 0xa00000..0xa03fff handler exposes a read-only view of the immutable EEPROM input region rather than live 24C128 NVRAM; its relationship to physical hardware is unknown",
-      "evidence": ["docs/eeprom_analysis.md", "docs/mad2_fidelity.md"]
+      "id": "eepromselx_direct_access", "subsystem": "eeprom", "status": "mapped", "confidence": "strong",
+      "boundary": "EEPROMSelX is unmapped after removal of an immutable-input alias with no hardware behavior. Five supported ROMs contain zero executable direct literal-derived accesses to the former 0xa00000..0xa03fff slice; dynamic pointers, the rest of the chip-select and future products remain outside the absence proof",
+      "evidence": ["docs/eeprom_analysis.md", "docs/storage_static_census.md", "docs/data/storage_static_census.json"]
     },
     {
       "id": "eeprom_synthetic_profile", "subsystem": "eeprom", "status": "prototype", "confidence": "moderate",

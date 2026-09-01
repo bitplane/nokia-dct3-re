@@ -11,6 +11,9 @@ class MamePatchHygieneTest(unittest.TestCase):
         cls.flash = (ROOT / "mame/src/devices/machine/intelfsh.cpp").read_text()
         cls.flash_h = (ROOT / "mame/src/devices/machine/intelfsh.h").read_text()
         cls.lcd = (ROOT / "mame/src/devices/video/pcd8544.cpp").read_text()
+        cls.i2cmem = (ROOT / "mame/src/devices/machine/i2cmem.cpp").read_text()
+        cls.i2cmem_h = (ROOT / "mame/src/devices/machine/i2cmem.h").read_text()
+        cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
     def test_flash_behavior_uses_part_attributes(self):
         self.assertIn("m_device_id_address", self.flash_h)
@@ -55,6 +58,15 @@ class MamePatchHygieneTest(unittest.TestCase):
         self.assertIn("m_visible_width(84)", self.lcd)
         self.assertIn("m_visible_height(48)", self.lcd)
         self.assertIn("m_controller_banks > 8 ? 0x0f : 0x07", self.lcd)
+
+    def test_i2c_write_cycle_is_opt_in_and_product_owned(self):
+        self.assertIn("m_write_cycle_time(attotime::zero)", self.i2cmem)
+        self.assertIn("if (m_write_busy)", self.i2cmem)
+        self.assertIn("set_write_cycle_time(attotime time)", self.i2cmem_h)
+        self.assertIn(
+            "m_eeprom->set_write_cycle_time(attotime::from_msec(5))",
+            self.driver,
+        )
 
 
 if __name__ == "__main__":
