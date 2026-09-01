@@ -66,7 +66,7 @@ structural oracles enforce that observation.
 
 | range | device | handler | status |
 |---|---|---|---|
-| `0x000000–0x00ffff` (mirror `+0x80000`) | boot ROM / low RAM | `ram_r/w` | emulated |
+| `0x000000–0x00ffff` (mirror `+0x80000`) | reset vector / low RAM | `ram_r/w` | RAM-backed after reset; undumped MAD2 mask-ROM exit is HLE'd as one ARM branch to flash |
 | `0x010000–0x010fff` (mirror `+0x8f000`) | **DSP shared RAM** | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | Extracted partial transport; peer-owned bootstrap state is published into backing RAM |
 | `0x020000–0x0200ff` (mirror `+0x8ff00`) | **MAD2 I/O** (all peripherals) | `mad2_io_r/w` | Mixed partial hardware, calibrated behavior and backing latches; see per-block ledger |
 | `0x030000–0x030003` | **DSPIF** (DSP API control reg) | `nokia_dspif_device::dspif_r/w` | stored command-4 doorbell; HLE scheduling still partly shared-write driven |

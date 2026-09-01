@@ -132,7 +132,7 @@ struct nokia_product_config
 	};
 
 	nokia_kbgpio_device::wiring_contract keypad_wiring;
-	bool boot_rom_bypass = true;
+	bool boot_rom_hle = true;
 	bool simi_controller = false;
 	bool synthetic_sim_card = false;
 	bool dsp_service = false;
@@ -502,7 +502,7 @@ constexpr nokia_product_config make_6110_config()
 {
 	nokia_product_config result;
 	result.keypad_wiring = KEYPAD_NSE3;
-	result.boot_rom_bypass = false;
+	result.boot_rom_hle = false;
 	result.simi_controller = true;
 	// NSE-3 v4.06 accepts direct/inverse convention ATRs, parses the T0/TDn
 	// interface-byte chain and maps the lab card's TA1=0x05 to PPS ff 00 ff.
@@ -597,6 +597,8 @@ constexpr offs_t NOKIA_RAM_END = 0x180000;
 constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
 constexpr offs_t NOKIA_3410_FLASH_STATUS_CSR = 0x003fff00;
 constexpr uint32_t NOKIA_FLASH_ENTRY = 0x200040;
+constexpr uint32_t NOKIA_BOOT_HLE_BRANCH =
+		0xea000000U | (((NOKIA_FLASH_ENTRY - 8U) >> 2) & 0x00ffffffU);
 constexpr unsigned GENSIO_TRACE_LIMIT = 20'000;
 
 enum mad2_reg : uint8_t
@@ -1028,13 +1030,16 @@ void nokia_dct3_state::machine_reset()
 {
 	std::fill_n(m_ram.get(), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1, 0);
 
-	// according to the boot rom disassembly here http://www.nokix.pasjagsm.pl/help/blacksphere/sub_100hardware/sub_arm/sub_bootrom.htm
-	// flash entry point is at 0x200040, we can probably reassemble the above code, but for now this should be enough.
-	// Existing executable profiles retain the historical boot-ROM bypass.
-	// Products whose boot ROM has not been identified must start at the ARM
-	// reset vector instead of inheriting a later firmware entry assumption.
-	if (m_product.boot_rom_bypass)
-		m_maincpu->set_state_int(arm7_cpu_device::ARM7_R15, NOKIA_FLASH_ENTRY);
+	// The MAD2 mask ROM is undumped. Its established exit contract branches to
+	// flash at 0x200040, so execute that branch through the normal ARM reset
+	// vector instead of forcing CPU state. Products with an unidentified MAD
+	// revision retain an erased reset-vector frontier rather than borrowing
+	// this HLE.
+	if (m_product.boot_rom_hle)
+	{
+		m_ram[0] = u16(NOKIA_BOOT_HLE_BRANCH >> 16);
+		m_ram[1] = u16(NOKIA_BOOT_HLE_BRANCH);
+	}
 
 	memset(m_mad2_regs, 0, 0x100);
 	update_dsp_tones();
@@ -2430,8 +2435,8 @@ void nokia_dct3_state::noki6210(machine_config &config)
 
 // MAD2 internal ROMS
 #define MAD2_INTERNAL_ROMS \
-	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASE00 )    \
-	ROM_LOAD("boot_rom", 0x00000, 0x10000, CRC(deab7e4e) SHA1(472a55b0ba289b0f4e538bb4c8b826dede3a40bb)) \
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF )    \
+	ROM_LOAD("mad2_mask_rom.bin", 0x00000, 0x10000, NO_DUMP)    \
 																\
 	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00 )         \
 	ROM_LOAD("dsp_prom" , 0x00000, 0xc000, CRC(485d974c) SHA1(eac8c1e0dbb6e17b60b2e7ef6685880d3fd85521)) \

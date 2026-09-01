@@ -425,7 +425,7 @@ normalize-3330:
 		--eeprom-output "roms/noki3330/3330 virgin eeprom 005f0000.fls" \
 		--expect-flash-sha1 7e88caa4963c57ebbd4d919023e38103ff8b528a \
 		--expect-eeprom-sha1 68481effb39d90a1639e8f261009c66e97d3e668
-	cp roms/noki3210/boot_rom roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3330/
+	cp roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3330/
 
 normalize-3410:
 	$(PYTHON) tools/extract_dct3_wintesla.py \
@@ -436,7 +436,7 @@ normalize-3410:
 		--eeprom-output "roms/noki3410/3410 virgin eeprom 005f0000.fls" \
 		--expect-flash-sha1 e650b8a289b434f2c8260c68e44e70e84e41b4cc \
 		--expect-eeprom-sha1 c1cb3a37efc11ea57b96969d2b01ca0f3b0f6bbe
-	cp roms/noki3210/boot_rom roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3410/
+	cp roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3410/
 
 NOKI6110_V406_DIR ?= /home/gaz/tmp/nokia6110_firmware/v4.06/NSE-3
 NOKI6110_V548_DIR ?= /home/gaz/tmp/nse3-v548-review/pkg_548

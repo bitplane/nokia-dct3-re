@@ -44,6 +44,14 @@ security, and user NV data. An all-`0xFF` image represents an erased chip, not a
 factory-provisioned handset. The project normally generates an explicit test
 profile; see `docs/eeprom_analysis.md`.
 
+## MAD2 mask-ROM caveat
+
+The MAD2 ARM boot ROM is on-chip and is not part of a `.fls` image. Local files
+named `boot_rom` are 64 KiB of uniform `0xff` placeholder fill, not executable
+dumps. The driver declares the mask ROM `NO_DUMP` and HLEs only its established
+exit contract: one ARM branch from reset vector zero to flash entry `0x200040`.
+It does not claim to model the real ROM's clock, power or flashing-mode setup.
+
 ## DSP region caveat
 
 The currently declared `dsp_prom`, `dsp_drom`, and `dsp_pdrom` files are

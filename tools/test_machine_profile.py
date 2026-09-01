@@ -104,7 +104,7 @@ class MachineProfileTest(unittest.TestCase):
             "make_6110_config",
             {
                 "keypad_wiring": "KEYPAD_NSE3",
-                "boot_rom_bypass": "false",
+                "boot_rom_hle": "false",
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
                 "dsp_bootstrap":
@@ -194,8 +194,15 @@ class MachineProfileTest(unittest.TestCase):
             "void nokia_dct3_state::machine_reset",
             "TIMER_CALLBACK_MEMBER",
         )
-        self.assertIn("if (m_product.boot_rom_bypass)", reset)
-        self.assertIn("NOKIA_FLASH_ENTRY", reset)
+        self.assertIn("if (m_product.boot_rom_hle)", reset)
+        self.assertIn("NOKIA_BOOT_HLE_BRANCH", reset)
+        self.assertNotIn("set_state_int", reset)
+
+        common_roms = self.driver.split("#define MAD2_INTERNAL_ROMS", 1)[1]
+        common_roms = common_roms.split("ROM_START( noki3210 )", 1)[0]
+        self.assertIn('ROM_LOAD("mad2_mask_rom.bin"', common_roms)
+        self.assertIn("NO_DUMP", common_roms)
+        self.assertNotIn("CRC(deab7e4e)", common_roms)
 
         rom = self.driver.split("ROM_START( noki6110 )", 1)[1].split(
             "ROM_END", 1

@@ -8,7 +8,7 @@ not compatibility mechanisms.
 
 | Subsystem | Current shape | Next architectural step |
 | --- | --- | --- |
-| ARM7, flash and RAM | MAME CPU/flash devices plus product-owned maps; reset and flash behavior are exercised across four products | Validate further address-decode and retention behavior when another product diverges. |
+| ARM7, flash and RAM | MAME CPU/flash devices plus product-owned maps. An explicit reset-vector HLE represents the undumped MAD2 mask ROM's branch to flash without forcing CPU state; reset and flash behavior are exercised across four products. | Obtain and identify real mask ROMs or recover their assumed exit state; validate further address-decode and retention behavior when another product diverges. |
 | PCD8544-family display | MAME device with one validated product contract applying controller geometry and viewport configuration atomically | Add a separate controller only when a recovered command set falls outside this family. |
 | External EEPROM | Product-owned MAME I2C parts on mapped MAD2 PUP pins, with opt-in self-timed write-cycle behavior and mapped-pin page/persistence coverage; no parallel EEPROMSelX alias | Validate exact board timing and legitimate provisioning, and make fallback extraction ROM-aware. |
 | CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression; deterministic binary RTC and enabled documented watchdog/WDDISX boundary. Physical short/long power-key gates distinguish retained frame-sampled RAM from CCONT's digital-baseband rail state and survive pre-key save/load. | Establish physical GENSIO/ADC latency, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |

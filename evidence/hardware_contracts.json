@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "mad2_arm_boot_rom_hle", "subsystem": "mad2", "status": "prototype", "confidence": "strong",
+      "boundary": "The MAD2 ARM mask ROM is undumped; every locally available shared boot_rom file is uniform erased fill. Supported profiles execute a single ARM reset-vector branch to the cross-product flash entry 0x200040 through normal CPU reset/pipeline behavior, without forcing PC. Clock, power and flashing-mode setup remain outside the HLE, and NSE-3 does not borrow a later MAD revision",
+      "evidence": ["docs/mad2_fidelity.md", "docs/driver_vision.md", "roms/README.md"]
+    },
+    {
       "id": "mad2_gensio_ccont", "subsystem": "gensio", "status": "partial", "confidence": "strong",
       "boundary": "The extracted GENSIO device owns endpoint selection and ready/data-available status at 0x2d/0x6d; selected CCONT command/data bytes cross callbacks at 0x2c/0x6c and endpoint 0x25 resets command phase",
       "evidence": ["docs/gensio_controller.md", "docs/ccont_subsystem.md", "docs/cross_rom_confidence.md"]
