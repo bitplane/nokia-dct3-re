@@ -33,36 +33,40 @@ LATE_MEDIA = re.compile(
     r"result=rejected")
 
 
-def check(text: str, frames: int = 8) -> None:
+def check(text: str, frames: int = 8, standalone: bool = False) -> None:
+    checkpoints = [
+        ("connected publication", CONNECTED),
+        ("FACCH/BFI erased uplink publication", ERASED_UPLINK),
+        ("decoded uplink GSM-FR publication", UPLINK),
+        ("first accepted host downlink GSM-FR frame", DOWNLINK),
+        ("host termination", TERMINATION),
+        ("network Disconnect", NETWORK_DISCONNECT),
+        ("RR Channel Release", RR_RELEASE),
+    ]
+    if not standalone:
+        checkpoints.append(("late media rejection", LATE_MEDIA))
+    checkpoints.append(("return to PCH", PCH))
     require_ordered(
         text,
-        (
-            ("connected publication", CONNECTED),
-            ("FACCH/BFI erased uplink publication", ERASED_UPLINK),
-            ("decoded uplink GSM-FR publication", UPLINK),
-            ("first accepted host downlink GSM-FR frame", DOWNLINK),
-            ("host termination", TERMINATION),
-            ("network Disconnect", NETWORK_DISCONNECT),
-            ("RR Channel Release", RR_RELEASE),
-            ("late media rejection", LATE_MEDIA),
-            ("return to PCH", PCH),
-        ),
+        checkpoints,
         "host GSM-FR media",
     )
     sequences = [int(match.group("seq")) for match in DOWNLINK.finditer(text)]
-    if sequences != list(range(frames)):
+    expected = list(range(len(sequences) if standalone else frames))
+    if sequences != expected or (standalone and len(sequences) < frames):
         raise ValueError(
             f"host downlink sequences were {sequences!r}, "
-            f"expected {list(range(frames))!r}")
+            f"expected {'at least ' if standalone else ''}{frames} contiguous frames")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("--frames", type=int, default=8)
+    parser.add_argument("--standalone", action="store_true")
     args = parser.parse_args()
     try:
-        check(args.log.read_text(errors="replace"), args.frames)
+        check(args.log.read_text(errors="replace"), args.frames, args.standalone)
     except ValueError as error:
         print(f"FAIL - {error}")
         return 1

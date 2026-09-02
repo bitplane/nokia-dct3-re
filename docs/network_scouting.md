@@ -336,6 +336,14 @@ places it in a bounded 16-entry queue; only a device timer on the emulation
 thread calls the session submission interface. MM service rejection is
 deliberately absent because it precedes the post-SETUP host request.
 
+The adapter publishes `outgoing_call_state` phase `ended` only after the
+firmware-owned CC/RR release has returned the generic session to idle. This
+lets an external endpoint distinguish physical End from media starvation; the
+endpoint does not infer handset state from host time. The standalone
+`tools/dct3_call_bridge.py` reference endpoint answers an organic request and
+loops valid GSM-FR frames without owning MAME's process or radio clock. Its
+operator contract is documented in `external_call_bridge.md`.
+
 After a decision has been accepted, the host may submit
 `{"type":"outgoing_call_terminate","request_id":1,"epoch":1,"cause":16}`. Cause is
 optional and defaults to GSM normal clearing (`0x10`); zero and values outside

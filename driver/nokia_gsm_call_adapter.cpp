@@ -376,6 +376,16 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		publish_state("connected");
 	else if (alerting && (!m_last_published_alerting || republish))
 		publish_state("alerting");
+	else if (m_last_published_request_id &&
+			!m_session->outgoing_request_pending() &&
+			!connected && !alerting)
+	{
+		// A host must not infer physical End or remote release from a gap in
+		// the 20 ms media stream.  Publish closure after the firmware-owned
+		// CC/RR lifecycle has actually returned the session to idle.
+		publish_state("ended");
+		m_last_published_request_id = 0;
+	}
 	m_last_published_connected = connected;
 	m_last_published_alerting = alerting;
 	u32 media_request_id;

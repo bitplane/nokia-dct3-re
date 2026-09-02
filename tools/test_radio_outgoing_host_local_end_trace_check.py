@@ -8,9 +8,10 @@ GSM service uplink sapi=0 pd=03 message=0f length=2
 GSM service uplink sapi=0 pd=03 message=25 length=4
 GSM service downlink kind=1 sapi=0 pd=03 message=2d length=2
 LAPDm service Channel Release acknowledged
-PCH no-identity fill
+gsm_call_adapter: state id=1 epoch=1 phase=ended
 gsm_call_adapter: media direction=downlink id=1 sequence=0 result=rejected
 gsm_call_adapter: termination id=1 cause=16 result=rejected
+PCH no-identity fill
 """
 
 

@@ -27,6 +27,9 @@ MEDIA_REJECTED = re.compile(
     r"gsm_call_adapter: media direction=downlink id=1 sequence=0 "
     r"result=rejected"
 )
+ENDED = re.compile(
+    r"gsm_call_adapter: state id=1 epoch=1 phase=ended"
+)
 
 
 def check(text: str) -> None:
@@ -37,9 +40,10 @@ def check(text: str) -> None:
             ("physical End / Disconnect", DISCONNECT),
             ("network Release", RELEASE),
             ("RR Channel Release", RR_RELEASE),
-            ("return to PCH", PCH),
+            ("host-visible ended state", ENDED),
             ("post-release media rejection", MEDIA_REJECTED),
             ("post-release termination rejection", TERMINATION_REJECTED),
+            ("return to PCH", PCH),
         ),
         "post-local-End host isolation",
     )

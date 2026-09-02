@@ -21,6 +21,11 @@ class HostMediaTraceCheckTest(unittest.TestCase):
     def test_accepts_contiguous_media(self):
         check(TRACE, 2)
 
+    def test_accepts_clean_standalone_release(self):
+        check(TRACE.replace(
+            "gsm_call_adapter: media direction=downlink id=1 sequence=200 "
+            "result=rejected\n", ""), 2, standalone=True)
+
     def test_rejects_sequence_gap(self):
         with self.assertRaises(ValueError):
             check(TRACE.replace("sequence=1", "sequence=2"), 2)

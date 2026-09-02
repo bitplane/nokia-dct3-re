@@ -25,6 +25,7 @@ output_module_id=
 source_pid=
 capture_pid=
 router_pid=
+mame_pid=
 default_sink=
 default_sink_changed=false
 default_source=
@@ -32,6 +33,10 @@ default_source_changed=false
 
 cleanup()
 {
+	if [[ -n "$mame_pid" ]]; then
+		kill "$mame_pid" >/dev/null 2>&1 || true
+		wait "$mame_pid" >/dev/null 2>&1 || true
+	fi
 	if [[ -n "$router_pid" ]]; then
 		kill "$router_pid" >/dev/null 2>&1 || true
 		wait "$router_pid" >/dev/null 2>&1 || true
@@ -113,7 +118,7 @@ if [[ -n "$host_media_port" ]]; then
 	if [[ -n "$bios" ]]; then
 		bios_args=(-bios "$bios")
 	fi
-	env PULSE_SOURCE="$input_sink_name.monitor" \
+	( cd mame && env PULSE_SOURCE="$input_sink_name.monitor" \
 		NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS="$post_ready_keys" \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS="$post_ready_delay_ms" \
@@ -121,10 +126,7 @@ if [[ -n "$host_media_port" ]]; then
 		NOKIA_DCT3_POST_READY_KEY_GAP_MS="$post_ready_gap_ms" \
 		NOKIA_DCT3_SNAPSHOT_DIR="$(realpath "$run_dir")" \
 		NOKIA_DCT3_BOOT_SUMMARY="$(realpath "$run_dir")/boot_summary.txt" \
-		python3 tools/run_host_call_adapter_gate.py \
-			--port "$host_media_port" --cwd mame \
-			--decision connect --media-frames 200 -- \
-			./mame "$phone" -rompath roms -log -video none -sound pulse \
+		./mame "$phone" -rompath roms -log -video none -sound pulse \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -throttle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -132,7 +134,13 @@ if [[ -n "$host_media_port" ]]; then
 			-cfg_directory ../fixtures/radio_outgoing_host_adapter \
 			-http -http_port "$host_media_port" \
 			-nvram_directory "$(realpath "$run_dir")/nvram" \
-			-seconds_to_run "$run_seconds"
+			-seconds_to_run "$run_seconds" ) &
+	mame_pid=$!
+	python3 tools/dct3_call_bridge.py \
+		--url "ws://127.0.0.1:$host_media_port/nokia/dct3/calls" \
+		--hangup-after 5 --once --require-frames 200 --report-every 100
+	wait "$mame_pid"
+	mame_pid=
 else
 	make --no-print-directory run JOBS=4 PHONE="$phone" BIOS="$bios" ROM="$rom" \
 		RUN_DIR="$run_dir" SECONDS="$run_seconds" \
@@ -152,7 +160,7 @@ wait "$capture_pid" >/dev/null 2>&1 || true
 capture_pid=
 if [[ -n "$host_media_port" ]]; then
 	python3 tools/radio_outgoing_host_media_trace_check.py \
-		"$run_dir/error.log" --frames 200
+		"$run_dir/error.log" --frames 200 --standalone
 	python3 tools/radio_physical_uplink_trace_check.py \
 		"$run_dir/error.log" --source silence
 	# Key and call-control tones can clip briefly outside the speech interval;

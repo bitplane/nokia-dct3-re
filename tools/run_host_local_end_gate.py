@@ -38,9 +38,15 @@ async def run(args):
                 raise RuntimeError(f"unexpected call state {state!r}")
 
             # The physical input script presses End five seconds after Send.
-            # Realtime throttling makes this delay a harness bound only; the
-            # acceptance trace still identifies firmware Disconnect/RR release.
-            await asyncio.sleep(8)
+            # Wait for firmware CC/RR closure rather than guessing from host
+            # time or a gap in the 20 ms media stream.
+            while True:
+                ended = await receive_type(
+                    websocket, "outgoing_call_state", timeout=20)
+                if (ended.get("request_id") == request["request_id"] and
+                        ended.get("epoch") == epoch and
+                        ended.get("phase") == "ended"):
+                    break
             stale_identity = {
                 "epoch": epoch,
                 "request_id": request["request_id"],
@@ -87,7 +93,7 @@ def main():
     except (RuntimeError, asyncio.TimeoutError) as error:
         print(f"FAIL - {error}")
         return 1
-    print("OK - stale host events were submitted after physical local End")
+    print("OK - physical local End published closure before stale host events")
     return 0
 
 

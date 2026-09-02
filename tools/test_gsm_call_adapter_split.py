@@ -97,6 +97,16 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         self.assertIn("m_host->republish = true", postload)
         self.assertIn('writer.Key("epoch")', self.source)
 
+    def test_completed_firmware_lifecycle_is_published_to_host(self):
+        poll = self.source.split(
+            "TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)", 1
+        )[1].split(
+            "void nokia_gsm_call_adapter_device::publish_state", 1
+        )[0]
+        self.assertIn('publish_state("ended")', poll)
+        self.assertIn("!m_session->outgoing_request_pending()", poll)
+        self.assertIn("m_last_published_request_id = 0", poll)
+
     def test_host_mode_explicitly_disables_fallback(self):
         self.assertIn(
             "m_gsm_session->set_outgoing_fallback_enabled(!host_call_adapter)",
