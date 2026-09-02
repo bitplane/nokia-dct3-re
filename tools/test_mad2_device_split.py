@@ -59,6 +59,10 @@ class Mad2DeviceSplitTest(unittest.TestCase):
         self.assertIn("m_timer1_destination = 0x7fff", self.header)
         self.assertNotIn("m_timer1_counter + 0x40", self.device)
 
+    def test_fiq8_is_the_centisecond_source(self):
+        self.assertIn("m_fiq8_hz = 100;", self.header)
+        self.assertIn("m_mad2->set_fiq8_hz(100);", self.phone)
+
     def test_clock_stop_is_saved_and_wakes_only_through_routed_interrupts(self):
         self.assertIn("save_item(NAME(m_sleeping))", self.device)
         self.assertIn("m_regs[offset] = data & ~0x02", self.device)

@@ -109,6 +109,10 @@
     PUP, KBGPIO, UIF and SELECT accesses across the five supported ROMs.
     `make board-io-static-census` regenerates the checked JSON and Markdown
     artifacts; zeros exclude dynamic and table-driven accesses.
+  - `mad2_residual_census.py` — checks the watchdog, clock-control,
+    external-status and FIQ8 access shapes across those five ROMs. `make
+    mad2-residual-census` regenerates its compact JSON and Markdown artifacts;
+    it deliberately stops at the boundary where physical evidence is needed.
   - `test_message_census.py`, `test_find_thumb_signature.py`,
     `test_make_eeprom_profile.py`, and `test_mad2_access_census.py` cover byte
     lanes, signature relocation masks, runtime-manifest isolation, generated

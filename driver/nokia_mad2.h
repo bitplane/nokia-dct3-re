@@ -99,7 +99,8 @@ private:
 	// Calibrated against Timer 0's divided output. The ROM proves an 8:1
 	// relationship; the exact CTSI divider tree remains to be recovered.
 	u32 m_timer1_hz = 1'057;
-	u32 m_fiq8_hz = 1000;
+	// FIQ8 advances the firmware's centisecond counters while enabled.
+	u32 m_fiq8_hz = 100;
 	bool m_timer0_catchup = false;
 	dsp_reset_wiring_contract m_dsp_reset_wiring;
 	bool m_timer_trace = false;

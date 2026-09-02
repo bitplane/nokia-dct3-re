@@ -376,7 +376,11 @@ the organic compact DSP completion through FIQ0, a save-state round trip and
 zero soft resets. `make verify-3410-menu` instead presses the physical
 Menu key and requires the exact `Messages` screen. `make
 verify-3410-navigation` proves both endpoints in isolated runs: Menu must open
-`Messages`, then End must return to the same idle hash. The fixtures operate
+`Messages`, then End must return to its expected idle phase. Correcting MAD2
+FIQ8 from a 1 kHz placeholder to the firmware's 100 Hz centisecond source
+changed the animation phase captured at unattended idle and in Messages;
+returning from Messages still reaches the prior idle phase. Repeated runs
+reproduce all three lifecycle-specific stable-pixel hashes. The fixtures operate
 only MAME matrix fields; they do not write firmware state or post messages.
 These exact historical UI oracles use the named `radio_disabled` hardware
 composition so registered signal/operator pixels cannot be mistaken for an

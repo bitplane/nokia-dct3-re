@@ -141,8 +141,9 @@ class KeypadInputTest(unittest.TestCase):
     def test_3410_gates_reject_blank_frames_and_use_only_physical_keys(self):
         makefile = ((ROOT / "Makefile").read_text() + "\n"
                      + (ROOT / "gates.mk").read_text())
-        self.assertIn("ORACLE_3410_IDLE_SHA ?= 14c1f25e", makefile)
-        self.assertIn("ORACLE_3410_MESSAGES_SHA ?= a44445d8", makefile)
+        self.assertIn("ORACLE_3410_IDLE_SHA ?= f8301b6c", makefile)
+        self.assertIn("ORACLE_3410_MESSAGES_SHA ?= d4500edd", makefile)
+        self.assertIn("ORACLE_3410_RETURN_IDLE_SHA ?= 14c1f25e", makefile)
         self.assertIn("! -name '*_z918_*' ! -name '*_ff918_*'", makefile)
 
         frontier = makefile.split("verify-3410-frontier:", 1)[1].split("\n\n", 1)[0]
@@ -153,7 +154,7 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn("POST_READY_KEYS=enter", target)
         self.assertIn("enter,wait1000,end", target)
         self.assertIn("ORACLE_3410_MESSAGES_SHA", target)
-        self.assertIn("ORACLE_3410_IDLE_SHA", target)
+        self.assertIn("ORACLE_3410_RETURN_IDLE_SHA", target)
         self.assertNotIn("debug_ram", target)
         self.assertNotIn("TRACE_", target)
 

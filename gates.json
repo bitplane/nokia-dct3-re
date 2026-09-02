@@ -2117,7 +2117,7 @@
         {
           "step": "shell",
           "silent": true,
-          "command": "frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 3410 return frame produced in $(RUN_DIR)_return\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_3410_IDLE_SHA)"
+          "command": "frame=$$(find $(RUN_DIR)_return -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 3410 return frame produced in $(RUN_DIR)_return\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_3410_RETURN_IDLE_SHA)"
         },
         {
           "step": "shell",

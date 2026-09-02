@@ -157,7 +157,7 @@ output remain callback-connected board components; `0x22` is retained only as
 a latch.
 | off | reg | status / touch |
 |---|---|---|
-| `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable, bit 4 optional vibra-pack enable; periodic FIQ8 routing and clock-stop wake are tested, source rate remains provisional ✓ |
+| `0x15/0x16` | PUP control / FIQ8 ctrl | bit 5 buzzer enable, bit 4 optional vibra-pack enable; FIQ8 is the firmware's 100 Hz centisecond source, with routing and clock-stop wake tested ✓ |
 | `0x18/0x19/0x1a` | **MBUS control / status / RX-TX** | extracted controller with byte attachment, FIQ2 RX/TX lifecycle and 9,600-baud character timing; no bus peer ✓ |
 | `0x1b` | vibrator mode/parameter | bits 6..5 select `00/20/40/60`; bits 4..0 are the mode parameter; stored independently of the `0x15.bit4` enable ✓ |
 | `0x1c/0x1d` | buzzer divider high/low | MZT-03C square-wave frequency = 13 MHz / divider |

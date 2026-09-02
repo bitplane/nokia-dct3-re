@@ -2274,7 +2274,8 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_GSM_VOICE_PEER(config, "gsm_voice_peer");
 	m_mad2->set_timer0_hz(33'055);
 	m_mad2->set_timer1_hz(1'057);
-	m_mad2->set_fiq8_hz(1'000);
+	// FIQ8 is the on-demand centisecond source used by firmware soft timers.
+	m_mad2->set_fiq8_hz(100);
 	m_mad2->set_timer0_catchup(false);
 	m_mad2->fiq_cb().set(FUNC(nokia_dct3_state::mad2_fiq_w));
 	m_mad2->irq_cb().set(FUNC(nokia_dct3_state::mad2_irq_w));

@@ -19,8 +19,9 @@ reset/clock/watchdog latches, timer state, interrupt pending/masks and CPU-line
 routing. Keypad, PUP, UIF and other board peripherals remain outside that core;
 GENSIO, MBUS and SIMI are separate devices. Timer-1 terminal-count behavior,
 MCU-reset extent, the SIMI clock gate and the ARM clock-stop/wake contract are
-modeled. The timer divider tree, FIQ8 timing, clock-gate bits without an attached
-consumer and several SELECT/UIF banks remain calibrated or mapped-only.
+modeled. FIQ8 is the firmware's 100 Hz centisecond source. The timer divider
+tree, clock-gate bits without an attached consumer and several SELECT/UIF banks
+remain calibrated or mapped-only.
 Address-map coverage therefore must not be read as peripheral completeness.
 
 ## Address-space boundary
@@ -55,7 +56,7 @@ Address-map coverage therefore must not be read as peripheral completeness.
 
 | Block | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
-| FIQ8 `16` | periodic timer when enabled; extended pending/status/mask routing; routed wake from ARM clock-stop | Partial routing/wake, placeholder clock | Register-level tests establish ninth-bit projection, local masking, global delivery, acknowledgement and wake. Identify the source clock and observe an organic countdown overlapping idle sleep. |
+| FIQ8 `16` | 100 Hz centisecond timer when enabled; extended pending/status/mask routing; routed wake from ARM clock-stop | Cross-ROM firmware contract; partial low-power validation | Register-level tests establish ninth-bit projection, local masking, global delivery, acknowledgement and wake. Observe an organic countdown overlapping idle sleep before claiming that its oscillator remains active in every low-power state. |
 | MBUS `18..1a` | extracted byte controller, status, RX/TX attachment and FIQ2/FIQ3 callbacks | Cross-ROM partial, physical character rate | Both 3210 ROMs share initialization and idle behavior; focused RX proves status-bit-5/control-bit-6/FIQ2 delivery. Recover FIQ3 phase/source, collision and error behavior. |
 | Buzzer `15/1c/1d/1e` | extracted PUP bit-5 enable and 13 MHz divider drive a MAME beeper; `make verify-buzzer` validates mapped MMIO and `make verify-alarm` validates the organic keypad-to-CCONT-to-ringtone path | Partial hardware | Recover volume/acoustic transfer; keypad tones are DSP/COBBA-owned and the MZT-03C acoustic response is not modeled. |
 | Vibrator `15/1b` | extracted PUP bit-4 enable drives the named MAME `vibration` output; `0x1b.bits6..5` select modes `00/20/40/60` and bits `4..0` carry the mode parameter | Partial hardware | Exercise the optional vibra battery pack organically and determine the electrical waveform represented by each mode/parameter combination. |
@@ -88,15 +89,15 @@ acknowledges it. `make verify-mad2-interrupts` exercises this routing while the
 periodic source is explicitly enabled through the mapped register. Firmware
 helper `0x2a1388` loads a 16-bit software countdown and enables the source;
 the FIQ dispatcher decrements it and calls expiry helper `0x2a13e0` at zero.
-The three callers supply either `0xffff` or application-owned countdown data,
-so they establish programmable-tick semantics but no seconds conversion. The
+The three callers supply either `0xffff` or application-owned countdown data.
+The interrupt handler advances the firmware's centisecond state, establishing
+a 100 Hz source rather than the former 1 kHz placeholder. The
 clock-stop helper does not mask or disable FIQ8. A phase-separated mapped-MMIO
 fixture enters sleep with FIQ8 enabled and unmasked, then observes extended
 pending bit `0x100` wake the ARM on the next tick. This validates the current
 routed-wake behavior, but ordinary boot does not organically overlap an active
 countdown with task-0 sleep, so it does not establish whether the physical
-source oscillator continues in every low-power state. The source clock remains
-calibrated.
+source oscillator continues in every low-power state.
 
 The separate ninth IRQ uses the same internal bit but a different register
 contract. Both v6.00 (`0x2af3f8..0x2af400`) and v5.01

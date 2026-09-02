@@ -96,8 +96,11 @@ ORACLE_3310_PHONEBOOK_NAV_SHA ?= 06ea6abd47a1c603fc60382a2ba7e78d7a1247de2a13079
 ORACLE_3310_ANSWERED_UI_SHA ?= a9330101aff6ef85f7bc8625794c707a3a7a45f9b426be0548b2af1a86dfb0f5
 ORACLE_3330_IDLE_SHA ?= f40de8661baf671706ad626bb89a7e2aece9c391597318248ffd592c7cfd867d
 ORACLE_3330_MESSAGES_SHA ?= 61d28951699e81a78dbafa8b094cc2690b53f41ec2f61bbb5599e0bb61d569a0
-ORACLE_3410_IDLE_SHA ?= 14c1f25e86f21ea7b52909b37fb624fcc9940668f9df19831a1f64b16913fd87
-ORACLE_3410_MESSAGES_SHA ?= a44445d8880ee46944e4692d3823ae25dd902882f1f38c51f64dcc27412a279e
+ORACLE_3410_IDLE_SHA ?= f8301b6c4314a28056c16234e2561fa6d48eeb2d13e946353eb7d3ccbc28f767
+ORACLE_3410_MESSAGES_SHA ?= d4500eddc39090d3604fd9c79a974242f484d16e8a490cb0d4cb0e91b2d4d89e
+# Returning from Messages reaches a different centisecond animation phase from
+# the unattended boot-idle capture. Keep the two lifecycle points explicit.
+ORACLE_3410_RETURN_IDLE_SHA ?= 14c1f25e86f21ea7b52909b37fb624fcc9940668f9df19831a1f64b16913fd87
 ORACLE_3330_DSP_MISSING_SHA ?= 7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d1024ab91c1e55c1f8e
 ORACLE_3410_DSP_MISSING_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 
@@ -196,7 +199,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 
 .PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 roms build swap16 census gates gate-parity controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census board-io-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive call-bridge smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
-.PHONY: storage-static-census
+.PHONY: storage-static-census mad2-residual-census
 .PHONY: verify-eeprom
 .PHONY: verify-radio-periodic-location-update-state verify-3410-radio-periodic-location-update
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
@@ -254,6 +257,7 @@ help:
 	@echo "make census         build the 3210 v6.00 message-topology JSON/report"
 	@echo "make controller-census exhaustively verify the 3210 controller dispatcher"
 	@echo "make mad2-static-census extract paired-ROM direct MAD2 MMIO accesses"
+	@echo "make mad2-residual-census check unresolved CTSI surfaces across five ROMs"
 	@echo "make dsp-census     refresh the paired-ROM DSP shared-memory and packet reports"
 	@echo "make census-docs    refresh the committed report; refuses missing scoped runtime"
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
@@ -540,6 +544,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_nse3_v406_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_nse3_v548_static_check.py
 	$(VENV)/bin/python -m unittest tools/test_dct3_type_1f_static_check.py
+	$(VENV)/bin/python -m unittest tools/test_mad2_residual_census.py
 	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_board_io_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_gsm_authentication_split.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_uif_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_outgoing_call_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_application_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_envelope_trace_check.py
@@ -789,6 +794,11 @@ mad2-static-census:
 	@mkdir -p run_census
 	$(VENV)/bin/python tools/mad2_static_census.py --check \
 		--json run_census/mad2_static_access.json --markdown docs/mad2_static_access.md
+
+mad2-residual-census:
+	$(VENV)/bin/python tools/mad2_residual_census.py --check \
+		--json docs/data/mad2_residual_census.json \
+		--markdown docs/mad2_residual_census.md
 
 board-io-static-census:
 	$(VENV)/bin/python tools/board_io_static_census.py --check \

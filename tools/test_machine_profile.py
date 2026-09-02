@@ -59,6 +59,7 @@ class MachineProfileTest(unittest.TestCase):
             "m_mad2->set_timer0_hz(33'055);",
             profile,
         )
+        self.assertIn("m_mad2->set_fiq8_hz(100);", self.driver)
         self.assertIn("m_mad2->set_timer0_catchup(false);", profile)
         self.assertNotIn('"NOKIA_DCT3_TIMER0_CATCHUP"', profile)
         self.assertIn("I2C_24C128(config, m_eeprom);", profile)
