@@ -33,6 +33,7 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         self.assertIn("m_host->decisions.push_back", callback)
         self.assertIn("m_host->terminations.push_back", callback)
         self.assertIn("m_host->media.push_back", callback)
+        self.assertIn("m_host->incoming.push_back", callback)
         self.assertIn("outgoing_call_terminate", callback)
         self.assertIn("outgoing_call_media_downlink", callback)
         self.assertNotIn("submit_outgoing_decision", callback)
@@ -46,6 +47,8 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         )[0]
         self.assertIn("m_session->submit_outgoing_decision", poll)
         self.assertIn("m_session->submit_outgoing_termination", poll)
+        self.assertIn("m_session->submit_incoming_termination", poll)
+        self.assertIn("m_radio_peer->queue_host_incoming_call", poll)
         self.assertIn("m_voice_peer->submit_host_downlink", poll)
         self.assertIn("m_voice_peer->take_host_uplink", poll)
         self.assertIn('"emulation_time_us"', self.source)
@@ -92,7 +95,7 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
             "void nokia_gsm_call_adapter_device::device_stop", 1
         )[0]
         self.assertIn("m_transport_epoch.fetch_add(1)", postload)
-        for queue in ("decisions", "terminations", "media"):
+        for queue in ("decisions", "terminations", "media", "incoming"):
             self.assertIn(f"m_host->{queue}.clear()", postload)
         self.assertIn("m_host->republish = true", postload)
         self.assertIn('writer.Key("epoch")', self.source)

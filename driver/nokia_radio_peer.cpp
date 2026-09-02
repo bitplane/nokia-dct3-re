@@ -11,6 +11,20 @@
 DEFINE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device,
 		"nokia_radio_peer", "Nokia DCT3 radio peer HLE")
 
+bool nokia_radio_peer_device::queue_host_incoming_call(
+		const u8 *digits, unsigned length)
+{
+	if (!m_enabled || !m_registered ||
+			m_host_incoming_call_pending || !m_gsm_session->idle() ||
+			!m_gsm_session->set_incoming_caller(digits, length))
+		return false;
+	// The fixture latch is one-shot; a fresh host transaction deliberately
+	// rearms paging only after the preceding firmware-owned call is idle.
+	m_page_transmitted = false;
+	m_host_incoming_call_pending = true;
+	return true;
+}
+
 nokia_radio_peer_device::nokia_radio_peer_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_RADIO_PEER, tag, owner, clock),
@@ -69,6 +83,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_has_reselected));
 	save_item(NAME(m_pch_fill_delivered));
 	save_item(NAME(m_page_transmitted));
+	save_item(NAME(m_host_incoming_call_pending));
 	save_item(NAME(m_traffic_channel_active));
 	save_item(NAME(m_downlink_offset));
 	save_item(NAME(m_followup_downlink_opportunity));
@@ -213,6 +228,7 @@ void nokia_radio_peer_device::device_reset()
 	m_has_reselected = false;
 	m_pch_fill_delivered = false;
 	m_page_transmitted = false;
+	m_host_incoming_call_pending = false;
 	m_traffic_channel_active = false;
 	m_downlink_offset = 0;
 	m_followup_downlink_opportunity = false;
@@ -2230,12 +2246,15 @@ void nokia_radio_peer_device::emit_report()
 					nokia_gsm_session_device::incoming_service::smart_message :
 					m_incoming_sms_after_registration ?
 					nokia_gsm_session_device::incoming_service::sms :
-					m_incoming_call_after_registration ?
+					(m_incoming_call_after_registration ||
+					 m_host_incoming_call_pending) ?
 					nokia_gsm_session_device::incoming_service::call :
 					nokia_gsm_session_device::incoming_service::none;
+			const bool page_requested =
+					m_page_after_registration || m_host_incoming_call_pending;
 			const bool service_admissible =
 					m_gsm_session->incoming_service_admissible(service);
-			if (m_registered && m_page_after_registration &&
+			if (m_registered && page_requested &&
 					m_pch_fill_delivered && !m_page_transmitted &&
 					!service_admissible)
 			{
@@ -2250,7 +2269,7 @@ void nokia_radio_peer_device::emit_report()
 						unsigned(service), machine().time().as_double());
 			}
 			const bool transmit_page =
-					m_registered && m_page_after_registration && m_pch_fill_delivered &&
+					m_registered && page_requested && m_pch_fill_delivered &&
 					(!m_page_requires_reselection || m_has_reselected) &&
 					!m_page_transmitted &&
 					service_admissible &&
@@ -2268,6 +2287,8 @@ void nokia_radio_peer_device::emit_report()
 					m_gsm_network->paging_fill();
 			std::copy(block.begin(), block.end(), std::begin(payload) + 10);
 			transmitted_page = monitored_page;
+			if (monitored_page)
+				m_host_incoming_call_pending = false;
 			off_group_page = transmit_page && !monitored_page;
 		}
 		else if (payload[0] == 0x60)
@@ -2647,6 +2668,9 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	}
 	else if (current_phase() == phase::release_channel_change && report_type == 0x89)
 	{
+		// CHANNEL_CONFIGURE completion is the final physical acknowledgement
+		// when CC Release Complete raced ahead of the LAPDm downlink ACK.
+		m_gsm_session->downlink_acknowledged();
 		m_traffic_channel_active = false;
 		clear_speech_queues();
 		set_phase(phase::serving_bcch);

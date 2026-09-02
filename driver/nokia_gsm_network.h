@@ -199,7 +199,8 @@ public:
 	std::array<u8, 2> cm_service_accept() const;
 	std::array<u8, 3> cm_service_reject() const;
 	std::array<u8, 10> mm_information() const;
-	std::array<u8, 17> incoming_call_setup() const;
+	layer3_message incoming_call_setup(
+			const u8 *digits, unsigned digit_count) const;
 	std::array<u8, 2> call_proceeding(u8 transaction) const;
 	std::array<u8, 2> call_alerting(u8 transaction) const;
 	std::array<u8, 2> call_connect(u8 transaction) const;

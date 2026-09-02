@@ -98,6 +98,8 @@ public:
 	{
 		m_incoming_smart_message_after_registration = enabled;
 	}
+	bool queue_host_incoming_call(const u8 *digits, unsigned length);
+	bool traffic_channel_active() const { return m_traffic_channel_active; }
 	void set_speech_loopback(bool enabled) { m_speech_loopback = enabled; }
 	void set_downlink_tch_burst_error_profile(
 			unsigned period, unsigned span)
@@ -307,6 +309,7 @@ private:
 	bool m_incoming_call_after_registration = false;
 	bool m_incoming_sms_after_registration = false;
 	bool m_incoming_smart_message_after_registration = false;
+	bool m_host_incoming_call_pending = false;
 	bool m_speech_loopback = false;
 	bool m_lab_voice_source = false;
 	bool m_host_voice_peer = false;

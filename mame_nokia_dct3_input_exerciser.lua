@@ -493,10 +493,8 @@ if #post_keys > 0 then
 					local deadline = emulation_seconds() + 20
 					repeat emu.wait(0.005) until
 							call_alerting_output:get() ~= 0 or
-							call_active_output:get() ~= 0 or
 							emulation_seconds() >= deadline
-					if call_alerting_output:get() == 0 and
-							call_active_output:get() == 0 then
+					if call_alerting_output:get() == 0 then
 						machine:logerror("input-wait: call alerting timeout\n")
 						return
 					end

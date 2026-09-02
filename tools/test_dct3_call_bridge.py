@@ -86,6 +86,29 @@ class Dct3CallBridgeTest(unittest.TestCase):
         self.assertEqual(self.protocol.next_downlink_sequence, 41)
         self.assertEqual(self.protocol.stats.calls, 1)
 
+    def test_incoming_call_uses_directional_state_media_and_termination(self):
+        protocol = LoopbackProtocol()
+        protocol.handle({"type": "call_adapter_ready", "epoch": 9})
+        self.assertEqual(protocol.incoming_request("447700900123"), {
+            "type": "incoming_call", "epoch": 9, "request_id": 1,
+            "caller": "447700900123",
+        })
+        protocol.handle({
+            "type": "incoming_call_state", "epoch": 9, "request_id": 1,
+            "phase": "connected", "media_downlink_sequence": 4,
+        })
+        replies = protocol.handle({
+            "type": "incoming_call_media_uplink", "epoch": 9,
+            "request_id": 1, "sequence": 0, "emulation_time_us": 20_000,
+            "good": True, "frame": "5a" * 33,
+        })
+        self.assertEqual(replies[0]["type"], "incoming_call_media_downlink")
+        self.assertEqual(replies[0]["sequence"], 4)
+        self.assertEqual(protocol.termination(), {
+            "type": "incoming_call_terminate", "epoch": 9,
+            "request_id": 1, "cause": 16,
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

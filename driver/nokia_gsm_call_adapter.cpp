@@ -5,6 +5,7 @@
 #include "http.h"
 #include "main.h"
 #include "nokia_gsm_call_adapter.h"
+#include "nokia_radio_peer.h"
 
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
@@ -55,6 +56,14 @@ struct nokia_gsm_call_adapter_device::host_state
 		u32 epoch = 0;
 		u32 request_id = 0;
 		u8 cause = 0x10;
+		bool incoming = false;
+	};
+	struct queued_incoming
+	{
+		u32 epoch = 0;
+		u32 request_id = 0;
+		std::array<u8, 20> digits{};
+		unsigned length = 0;
 	};
 	struct queued_media
 	{
@@ -63,6 +72,7 @@ struct nokia_gsm_call_adapter_device::host_state
 		u32 sequence = 0;
 		u64 source_time_us = 0;
 		nokia_gsm_voice_peer_device::speech_frame frame{};
+		bool incoming = false;
 	};
 
 	std::mutex mutex;
@@ -73,7 +83,9 @@ struct nokia_gsm_call_adapter_device::host_state
 	std::deque<queued_decision> decisions;
 	std::deque<queued_termination> terminations;
 	std::deque<queued_media> media;
+	std::deque<queued_incoming> incoming;
 	bool republish = false;
+	bool ready_pending = false;
 	unsigned dropped_events = 0;
 };
 
@@ -84,7 +96,8 @@ nokia_gsm_call_adapter_device::nokia_gsm_call_adapter_device(
 		device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_GSM_CALL_ADAPTER, tag, owner, clock),
 	m_session(*this, "^gsm_session"),
-	m_voice_peer(*this, "^gsm_voice_peer")
+	m_voice_peer(*this, "^gsm_voice_peer"),
+	m_radio_peer(*this, "^radio_peer")
 {
 }
 
@@ -98,6 +111,14 @@ void nokia_gsm_call_adapter_device::device_start()
 	save_item(NAME(m_last_published_request_id));
 	save_item(NAME(m_last_published_connected));
 	save_item(NAME(m_last_published_alerting));
+	save_item(NAME(m_incoming_request_id));
+	save_item(NAME(m_incoming_digits));
+	save_item(NAME(m_incoming_digits_length));
+	save_item(NAME(m_incoming_page_accepted));
+	save_item(NAME(m_last_incoming_connected));
+	save_item(NAME(m_last_incoming_alerting));
+	save_item(NAME(m_incoming_started));
+	save_item(NAME(m_incoming_connected_once));
 	machine().save().register_postload(
 			save_prepost_delegate(
 				FUNC(nokia_gsm_call_adapter_device::postload), this));
@@ -113,6 +134,7 @@ void nokia_gsm_call_adapter_device::device_start()
 				std::lock_guard<std::mutex> lock(m_host->mutex);
 				m_host->connections.insert(connection);
 				m_host->republish = true;
+				m_host->ready_pending = true;
 			},
 			[this](http_manager::websocket_connection_ptr,
 					const std::string &payload, int opcode)
@@ -133,7 +155,37 @@ void nokia_gsm_call_adapter_device::device_start()
 				const std::string_view type(
 						message["type"].GetString(),
 						message["type"].GetStringLength());
-				if (type == "outgoing_call_terminate")
+				if (type == "incoming_call")
+				{
+					if (!message.HasMember("caller") ||
+							!message["caller"].IsString())
+						return;
+					host_state::queued_incoming item;
+					item.epoch = message["epoch"].GetUint();
+					item.request_id = message["request_id"].GetUint();
+					const std::string_view caller(
+							message["caller"].GetString(),
+							message["caller"].GetStringLength());
+					if (item.request_id == 0 || caller.empty() ||
+							caller.size() > item.digits.size())
+						return;
+					for (char digit : caller)
+					{
+						if (digit < '0' || digit > '9')
+							return;
+						item.digits[item.length++] = u8(digit - '0');
+					}
+					std::lock_guard<std::mutex> lock(m_host->mutex);
+					if (m_host->incoming.size() + m_host->terminations.size() +
+							m_host->decisions.size() + m_host->media.size() <
+									MAXIMUM_QUEUED_EVENTS)
+						m_host->incoming.push_back(item);
+					else
+						++m_host->dropped_events;
+					return;
+				}
+				if (type == "outgoing_call_terminate" ||
+						type == "incoming_call_terminate")
 				{
 					if (message.HasMember("cause") &&
 							(!message["cause"].IsUint() ||
@@ -148,12 +200,14 @@ void nokia_gsm_call_adapter_device::device_start()
 									MAXIMUM_QUEUED_EVENTS)
 						m_host->terminations.push_back(
 								{ message["epoch"].GetUint(),
-									message["request_id"].GetUint(), cause });
+									message["request_id"].GetUint(), cause,
+									type == "incoming_call_terminate" });
 					else
 						++m_host->dropped_events;
 					return;
 				}
-				if (type == "outgoing_call_media_downlink")
+				if (type == "outgoing_call_media_downlink" ||
+						type == "incoming_call_media_downlink")
 				{
 					if (!message.HasMember("sequence") ||
 							!message["sequence"].IsUint() ||
@@ -171,6 +225,7 @@ void nokia_gsm_call_adapter_device::device_start()
 					media.sequence = message["sequence"].GetUint();
 					media.source_time_us =
 							message["source_time_us"].GetUint64();
+					media.incoming = type == "incoming_call_media_downlink";
 					const char *const encoded = message["frame"].GetString();
 					for (unsigned index = 0; index < media.frame.size(); ++index)
 					{
@@ -248,12 +303,22 @@ void nokia_gsm_call_adapter_device::device_reset()
 	m_last_published_request_id = 0;
 	m_last_published_connected = false;
 	m_last_published_alerting = false;
+	m_incoming_request_id = 0;
+	m_incoming_digits.fill(0);
+	m_incoming_digits_length = 0;
+	m_incoming_page_accepted = false;
+	m_last_incoming_connected = false;
+	m_last_incoming_alerting = false;
+	m_incoming_started = false;
+	m_incoming_connected_once = false;
 	m_transport_epoch.store(1);
 	std::lock_guard<std::mutex> lock(m_host->mutex);
 	m_host->decisions.clear();
 	m_host->terminations.clear();
 	m_host->media.clear();
+	m_host->incoming.clear();
 	m_host->republish = false;
+	m_host->ready_pending = false;
 	m_host->dropped_events = 0;
 }
 
@@ -263,11 +328,15 @@ void nokia_gsm_call_adapter_device::postload()
 	m_last_published_request_id = 0;
 	m_last_published_connected = false;
 	m_last_published_alerting = false;
+	m_last_incoming_connected = false;
+	m_last_incoming_alerting = false;
 	std::lock_guard<std::mutex> lock(m_host->mutex);
 	m_host->decisions.clear();
 	m_host->terminations.clear();
 	m_host->media.clear();
+	m_host->incoming.clear();
 	m_host->republish = true;
+	m_host->ready_pending = true;
 	m_host->dropped_events = 0;
 }
 
@@ -286,15 +355,20 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	std::deque<host_state::queued_decision> decisions;
 	std::deque<host_state::queued_termination> terminations;
 	std::deque<host_state::queued_media> media;
+	std::deque<host_state::queued_incoming> incoming;
 	bool republish;
+	bool ready_pending;
 	unsigned dropped_events;
 	{
 		std::lock_guard<std::mutex> lock(m_host->mutex);
 		decisions.swap(m_host->decisions);
 		terminations.swap(m_host->terminations);
 		media.swap(m_host->media);
+		incoming.swap(m_host->incoming);
 		republish = m_host->republish;
+		ready_pending = m_host->ready_pending;
 		m_host->republish = false;
+		m_host->ready_pending = false;
 		dropped_events = m_host->dropped_events;
 		m_host->dropped_events = 0;
 	}
@@ -302,6 +376,38 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		LOGMASKED(LOG_CALL_ADAPTER,
 				"gsm_call_adapter: queue overflow dropped=%u t=%.6f\n",
 				dropped_events, machine().time().as_double());
+	if (ready_pending)
+		publish_ready();
+	for (const auto &item : incoming)
+	{
+		const bool accepted = item.epoch == m_transport_epoch.load() &&
+				m_incoming_request_id == 0 &&
+				!m_session->outgoing_request_pending();
+		LOGMASKED(LOG_CALL_ADAPTER,
+				"gsm_call_adapter: incoming id=%u result=%s t=%.6f\n",
+				item.request_id, accepted ? "accepted" : "rejected",
+				machine().time().as_double());
+		if (accepted)
+		{
+			m_incoming_request_id = item.request_id;
+			m_incoming_digits = item.digits;
+			m_incoming_digits_length = item.length;
+			m_incoming_page_accepted = false;
+			m_incoming_started = false;
+			m_incoming_connected_once = false;
+			publish_incoming_state("queued");
+		}
+	}
+	if (m_incoming_request_id && !m_incoming_page_accepted &&
+			m_radio_peer->queue_host_incoming_call(
+					m_incoming_digits.data(), m_incoming_digits_length))
+	{
+		m_incoming_page_accepted = true;
+		publish_incoming_state("paging");
+	}
+	else if (republish && m_incoming_request_id && !m_incoming_started)
+		publish_incoming_state(
+				m_incoming_page_accepted ? "paging" : "queued");
 	for (const auto &decision : decisions)
 	{
 		if (decision.epoch != m_transport_epoch.load())
@@ -323,8 +429,18 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	}
 	const bool connected = m_session->outgoing_call_connected();
 	const bool alerting = m_session->outgoing_call_alerting();
-	if (connected)
-		m_voice_peer->begin_host_media(m_session->outgoing_request_id());
+	const bool incoming_connected =
+			m_incoming_request_id && m_session->incoming_call_connected();
+	const bool incoming_alerting =
+			m_incoming_request_id && m_session->incoming_call_alerting();
+	if (m_incoming_request_id && m_incoming_page_accepted &&
+			!m_session->idle())
+		m_incoming_started = true;
+	if (incoming_connected)
+		m_incoming_connected_once = true;
+	if (connected || incoming_connected)
+		m_voice_peer->begin_host_media(connected ?
+				m_session->outgoing_request_id() : m_incoming_request_id);
 	else
 		m_voice_peer->end_host_media();
 	for (const auto &item : media)
@@ -338,8 +454,12 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 					machine().time().as_double());
 			continue;
 		}
-		const bool accepted = m_voice_peer->submit_host_downlink(
-				item.request_id, item.sequence, item.frame);
+		const bool direction_matches = item.incoming ?
+				item.request_id == m_incoming_request_id :
+				item.request_id == m_session->outgoing_request_id();
+		const bool accepted = direction_matches &&
+				m_voice_peer->submit_host_downlink(
+						item.request_id, item.sequence, item.frame);
 		LOGMASKED(LOG_CALL_ADAPTER,
 				"gsm_call_adapter: media direction=downlink id=%u sequence=%u "
 				"result=%s source_time_us=%llu t=%.6f\n",
@@ -359,8 +479,11 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 					termination.request_id, machine().time().as_double());
 			continue;
 		}
-		const bool accepted = m_session->submit_outgoing_termination(
-				termination.request_id, termination.cause);
+		const bool accepted = termination.incoming ?
+				termination.request_id == m_incoming_request_id &&
+				m_session->submit_incoming_termination(termination.cause) :
+				m_session->submit_outgoing_termination(
+						termination.request_id, termination.cause);
 		LOGMASKED(LOG_CALL_ADAPTER,
 				"gsm_call_adapter: termination id=%u cause=%u result=%s t=%.6f\n",
 				termination.request_id, termination.cause,
@@ -388,6 +511,25 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	}
 	m_last_published_connected = connected;
 	m_last_published_alerting = alerting;
+	if (incoming_connected && (!m_last_incoming_connected || republish))
+		publish_incoming_state("connected");
+	else if (incoming_alerting && (!m_last_incoming_alerting || republish))
+		publish_incoming_state("alerting");
+	else if (m_incoming_request_id && m_incoming_started && !incoming_connected &&
+			!incoming_alerting &&
+			(m_session->idle() ||
+			 (m_incoming_connected_once &&
+			  !m_radio_peer->traffic_channel_active())))
+	{
+		publish_incoming_state("ended");
+		m_incoming_request_id = 0;
+		m_incoming_digits_length = 0;
+		m_incoming_page_accepted = false;
+		m_incoming_started = false;
+		m_incoming_connected_once = false;
+	}
+	m_last_incoming_connected = incoming_connected;
+	m_last_incoming_alerting = incoming_alerting;
 	u32 media_request_id;
 	u32 media_sequence;
 	u64 media_time_us;
@@ -434,6 +576,51 @@ void nokia_gsm_call_adapter_device::publish_state(const char *phase)
 			machine().time().as_double());
 }
 
+void nokia_gsm_call_adapter_device::publish_ready()
+{
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	writer.StartObject();
+	writer.Key("type");
+	writer.String("call_adapter_ready");
+	writer.Key("epoch");
+	writer.Uint(m_transport_epoch.load());
+	writer.EndObject();
+	std::lock_guard<std::mutex> lock(m_host->mutex);
+	for (const auto &connection : m_host->connections)
+		connection->send_message(buffer.GetString(), 1);
+}
+
+void nokia_gsm_call_adapter_device::publish_incoming_state(const char *phase)
+{
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	writer.StartObject();
+	writer.Key("type");
+	writer.String("incoming_call_state");
+	writer.Key("request_id");
+	writer.Uint(m_incoming_request_id);
+	writer.Key("epoch");
+	writer.Uint(m_transport_epoch.load());
+	writer.Key("phase");
+	writer.String(phase);
+	if (!strcmp(phase, "connected"))
+	{
+		writer.Key("media_uplink_sequence");
+		writer.Uint(m_voice_peer->host_next_uplink_sequence());
+		writer.Key("media_downlink_sequence");
+		writer.Uint(m_voice_peer->host_next_downlink_sequence());
+	}
+	writer.EndObject();
+	std::lock_guard<std::mutex> lock(m_host->mutex);
+	for (const auto &connection : m_host->connections)
+		connection->send_message(buffer.GetString(), 1);
+	LOGMASKED(LOG_CALL_ADAPTER,
+			"gsm_call_adapter: incoming state id=%u epoch=%u phase=%s t=%.6f\n",
+			m_incoming_request_id, m_transport_epoch.load(), phase,
+			machine().time().as_double());
+}
+
 void nokia_gsm_call_adapter_device::publish_uplink_media(
 		u32 request_id, u32 sequence, u64 time_us, bool good,
 		const nokia_gsm_voice_peer_device::speech_frame &frame)
@@ -450,7 +637,8 @@ void nokia_gsm_call_adapter_device::publish_uplink_media(
 	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 	writer.StartObject();
 	writer.Key("type");
-	writer.String("outgoing_call_media_uplink");
+	writer.String(request_id == m_incoming_request_id ?
+			"incoming_call_media_uplink" : "outgoing_call_media_uplink");
 	writer.Key("request_id");
 	writer.Uint(request_id);
 	writer.Key("epoch");

@@ -75,6 +75,8 @@ public:
 			u32 request_id,
 			nokia_gsm_network_device::outgoing_call_outcome outcome);
 	bool submit_outgoing_termination(u32 request_id, u8 cause = 0x10);
+	bool submit_incoming_termination(u8 cause = 0x10);
+	bool set_incoming_caller(const u8 *digits, unsigned length);
 	bool establish_layer3(
 			const u8 *information, unsigned length, u16 serving_arfcn);
 	bool queue_incoming_page(incoming_service service = incoming_service::none);
@@ -136,6 +138,15 @@ public:
 	{
 		return m_mobile_originated_call &&
 				m_state == u8(state::outgoing_call_alerting);
+	}
+	bool incoming_call_connected() const
+	{
+		return !m_mobile_originated_call && m_incoming_call_answered &&
+				m_state == u8(state::incoming_call_active);
+	}
+	bool incoming_call_alerting() const
+	{
+		return !m_mobile_originated_call && m_call_alerting;
 	}
 	gsm::a5::algorithm cipher_algorithm() const
 	{
@@ -225,13 +236,17 @@ private:
 	bool m_release_completes_registration = false;
 	bool m_call_alerting = false;
 	bool m_release_waiting = false;
+	bool m_release_complete_received = false;
 	bool m_traffic_assignment_issued = false;
 	bool m_mobile_originated_call = false;
+	bool m_incoming_call_answered = false;
 	u8 m_call_transaction = 0;
 	bool m_outgoing_request_pending = false;
 	u32 m_outgoing_request_id = 0;
 	std::array<u8, 32> m_outgoing_called_digits{};
 	unsigned m_outgoing_called_digits_length = 0;
+	std::array<u8, 20> m_incoming_call_digits{};
+	unsigned m_incoming_call_digits_length = 0;
 	bool m_outgoing_decision_accepted = false;
 	u8 m_outgoing_decision =
 			u8(nokia_gsm_network_device::outgoing_call_outcome::connect);

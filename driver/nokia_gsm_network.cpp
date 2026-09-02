@@ -622,17 +622,31 @@ std::array<u8, 10> nokia_gsm_network_device::mm_information() const
 	return { 0x05, 0x32, 0x47, 0x62, 0x70, 0x42, 0x21, 0x00, 0x00, 0x00 };
 }
 
-std::array<u8, 17> nokia_gsm_network_device::incoming_call_setup() const
+nokia_gsm_network_device::layer3_message
+nokia_gsm_network_device::incoming_call_setup(
+		const u8 *digits, unsigned digit_count) const
 {
 	// GSM 04.08 9.3.23. Transaction 0 is network-originated. The bearer
-	// capability is speech, the SIGNAL IE requests ordinary ringing, and the
-	// calling-party BCD digits are the deterministic fixture number 5551234.
-	return {
-		0x03, 0x05,
-		0x04, 0x04, 0x60, 0x02, 0x00, 0x81,
-		0x34, 0x01,
-		0x5c, 0x05, 0x81, 0x55, 0x15, 0x32, 0xf4
+	// capability is speech and the SIGNAL IE requests ordinary ringing.
+	layer3_message result;
+	digit_count = std::min<unsigned>(digit_count, 20);
+	const unsigned bcd_octets = (digit_count + 1) / 2;
+	const std::array<u8, 10> prefix = {
+		0x03, 0x05, 0x04, 0x04, 0x60, 0x02, 0x00, 0x81, 0x34, 0x01
 	};
+	std::copy(prefix.begin(), prefix.end(), result.data.begin());
+	result.data[10] = 0x5c;
+	result.data[11] = u8(1 + bcd_octets);
+	result.data[12] = 0x81;
+	for (unsigned index = 0; index < bcd_octets; ++index)
+	{
+		const u8 low = digits[2 * index];
+		const u8 high = 2 * index + 1 < digit_count ?
+				digits[2 * index + 1] : 0x0f;
+		result.data[13 + index] = low | (high << 4);
+	}
+	result.length = 13 + bcd_octets;
+	return result;
 }
 
 std::array<u8, 2> nokia_gsm_network_device::call_proceeding(

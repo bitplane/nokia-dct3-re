@@ -35,6 +35,7 @@ class LoopbackProtocol:
         self.next_uplink_sequence: int | None = None
         self.next_downlink_sequence = 0
         self.stats = BridgeStats()
+        self.direction = "outgoing"
 
     @property
     def active(self) -> bool:
@@ -44,7 +45,7 @@ class LoopbackProtocol:
         if not self.active or self.epoch is None or self.request_id is None:
             return None
         return {
-            "type": "outgoing_call_terminate",
+            "type": f"{self.direction}_call_terminate",
             "epoch": self.epoch,
             "request_id": self.request_id,
             "cause": cause,
@@ -52,6 +53,11 @@ class LoopbackProtocol:
 
     def handle(self, message: dict[str, Any]) -> list[dict[str, Any]]:
         kind = message.get("type")
+        if kind == "call_adapter_ready":
+            epoch = message.get("epoch")
+            if isinstance(epoch, int) and not isinstance(epoch, bool):
+                self.epoch = epoch
+            return []
         if kind == "outgoing_call":
             return self._request(message)
         if kind == "outgoing_call_state":
@@ -60,7 +66,32 @@ class LoopbackProtocol:
         if kind == "outgoing_call_media_uplink":
             downlink = self._media(message)
             return [] if downlink is None else [downlink]
+        if kind == "incoming_call_state":
+            self._state(message)
+            return []
+        if kind == "incoming_call_media_uplink":
+            downlink = self._media(message)
+            return [] if downlink is None else [downlink]
         return []
+
+    def incoming_request(
+            self, caller: str, request_id: int = 1
+    ) -> dict[str, Any] | None:
+        if self.epoch is None:
+            return None
+        self.direction = "incoming"
+        self.request_id = request_id
+        self.digits = caller
+        self.phase = "requested"
+        self.next_uplink_sequence = None
+        self.next_downlink_sequence = 0
+        self.stats.calls += 1
+        return {
+            "type": "incoming_call",
+            "epoch": self.epoch,
+            "request_id": request_id,
+            "caller": caller,
+        }
 
     @staticmethod
     def _identity(message: dict[str, Any]) -> tuple[int, int] | None:
@@ -102,7 +133,7 @@ class LoopbackProtocol:
         if not self._matches(message):
             return
         phase = message.get("phase")
-        if phase not in ("alerting", "connected", "ended"):
+        if phase not in ("queued", "paging", "alerting", "connected", "ended"):
             return
         self.phase = phase
         if phase == "connected":
@@ -135,7 +166,7 @@ class LoopbackProtocol:
             self.stats.bad_frames += 1
             return None
         downlink = {
-            "type": "outgoing_call_media_downlink",
+            "type": f"{self.direction}_call_media_downlink",
             "epoch": self.epoch,
             "request_id": self.request_id,
             "sequence": self.next_downlink_sequence,
@@ -173,6 +204,18 @@ async def connected_session(args: argparse.Namespace, websocket: Any,
             hangup_deadline = None
             continue
         message = json.loads(payload)
+        if (args.incoming_caller is not None and
+                message.get("type") == "call_adapter_ready" and
+                protocol.request_id is None):
+            protocol.handle(message)
+            request = protocol.incoming_request(args.incoming_caller)
+            if request is not None:
+                await websocket.send(json.dumps(request))
+                print(
+                    f"incoming call requested from {args.incoming_caller}",
+                    flush=True,
+                )
+            continue
         old_phase = protocol.phase
         for reply in protocol.handle(message):
             await websocket.send(json.dumps(reply))
@@ -204,7 +247,7 @@ async def run(args: argparse.Namespace) -> None:
     while True:
         try:
             async with websockets.connect(
-                    args.url, max_size=4096, ping_interval=20) as websocket:
+                    args.url, max_size=4096, ping_interval=None) as websocket:
                 print(f"connected to {args.url}", flush=True)
                 if await connected_session(args, websocket, protocol):
                     print(f"call complete: {status(protocol)}", flush=True)
@@ -221,6 +264,7 @@ def main() -> int:
     parser.add_argument(
         "--url", default="ws://127.0.0.1:18080/nokia/dct3/calls")
     parser.add_argument("--hangup-after", type=float)
+    parser.add_argument("--incoming-caller")
     parser.add_argument("--cause", type=int, default=16)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--retry-delay", type=float, default=0.5)
@@ -229,6 +273,10 @@ def main() -> int:
     args = parser.parse_args()
     if args.hangup_after is not None and args.hangup_after <= 0:
         parser.error("--hangup-after must be positive")
+    if (args.incoming_caller is not None and
+            (not args.incoming_caller.isdigit() or
+             not 1 <= len(args.incoming_caller) <= 20)):
+        parser.error("--incoming-caller must contain 1..20 decimal digits")
     if not 1 <= args.cause <= 0x7f:
         parser.error("--cause must be in the GSM range 1..127")
     if args.report_every <= 0:
