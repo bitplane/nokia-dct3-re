@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 194 gates: 138 generated from typed steps, 56 copied verbatim (shell).
+# 196 gates: 138 generated from typed steps, 58 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -98,6 +98,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-outgoing-call-no-answer-state \
 	verify-radio-outgoing-call-service-reject \
 	verify-radio-outgoing-call-delayed-decision-state \
+	verify-radio-incoming-call-host-adapter \
+	verify-radio-incoming-call-host-restore \
 	verify-radio-outgoing-call-host-adapter \
 	verify-radio-outgoing-call-host-hostile \
 	verify-radio-outgoing-call-host-local-end \
@@ -1013,6 +1015,63 @@ verify-radio-outgoing-call-delayed-decision-state:
 	$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \
 		$(RUN_DIR)/error.log --outcome busy --require-state-roundtrip \
 		--require-deferred-decision
+
+# shell: embedded shell control flow
+verify-radio-incoming-call-host-adapter:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(VENV)/bin/python tools/run_host_incoming_call_gate.py \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) --frames 40 -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
+			-http_port $(HOST_CALL_INCOMING_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_incoming_host_adapter_trace_check.py \
+		$(RUN_DIR)/error.log
+
+# shell: embedded shell control flow
+verify-radio-incoming-call-host-restore:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		ERASED_IDENTITY_SECURITY_CODE=12345; \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_AT=28.0 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(VENV)/bin/python tools/run_host_incoming_call_gate.py \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) \
+			--frames 80 --require-restore -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
+			-http_port $(HOST_CALL_INCOMING_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 52; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_incoming_host_adapter_trace_check.py \
+		$(RUN_DIR)/error.log --require-restore
 
 # shell: embedded shell control flow
 verify-radio-outgoing-call-host-adapter:

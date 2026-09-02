@@ -158,6 +158,7 @@ HOST_CALL_3410_PORT ?= 18086
 HOST_CALL_3310_PORT ?= 18087
 HOST_CALL_3330_PORT ?= 18088
 HOST_CALL_PHYSICAL_MEDIA_PORT ?= 18089
+HOST_CALL_INCOMING_PORT ?= 18090
 NOKI3210_UNLOCK_KEYS := 1,2,3,4,5,enter
 NOKI3210_DIAL_KEYS := c,wait500,c,wait1000,5,5,5,1,2,3,4,enter
 NOKI3210_INCOMING_READY_KEYS := $(NOKI3210_UNLOCK_KEYS),wait500,waitbuzzer
@@ -550,7 +551,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_sms_two_message_ui_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3410_registration_negative_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_dct3_call_bridge.py tools/test_acceptance_run_isolation.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_dct3_call_bridge.py tools/test_acceptance_run_isolation.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py tools/test_radio_incoming_host_adapter_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_cobba_control_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_a5_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_a5_state_trace_check.py

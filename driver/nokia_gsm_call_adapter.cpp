@@ -583,6 +583,8 @@ void nokia_gsm_call_adapter_device::publish_ready()
 	writer.StartObject();
 	writer.Key("type");
 	writer.String("call_adapter_ready");
+	writer.Key("protocol_version");
+	writer.Uint(1);
 	writer.Key("epoch");
 	writer.Uint(m_transport_epoch.load());
 	writer.EndObject();

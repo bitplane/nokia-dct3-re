@@ -88,7 +88,10 @@ class Dct3CallBridgeTest(unittest.TestCase):
 
     def test_incoming_call_uses_directional_state_media_and_termination(self):
         protocol = LoopbackProtocol()
-        protocol.handle({"type": "call_adapter_ready", "epoch": 9})
+        protocol.handle({
+            "type": "call_adapter_ready", "protocol_version": 1,
+            "epoch": 9,
+        })
         self.assertEqual(protocol.incoming_request("447700900123"), {
             "type": "incoming_call", "epoch": 9, "request_id": 1,
             "caller": "447700900123",
@@ -108,6 +111,14 @@ class Dct3CallBridgeTest(unittest.TestCase):
             "type": "incoming_call_terminate", "epoch": 9,
             "request_id": 1, "cause": 16,
         })
+
+    def test_incoming_request_requires_supported_protocol_version(self):
+        protocol = LoopbackProtocol()
+        protocol.handle({
+            "type": "call_adapter_ready", "protocol_version": 2,
+            "epoch": 9,
+        })
+        self.assertIsNone(protocol.incoming_request("447700900123"))
 
 
 if __name__ == "__main__":

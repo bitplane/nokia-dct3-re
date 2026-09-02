@@ -13,6 +13,7 @@ from typing import Any
 
 
 FRAME_HEX_LENGTH = 66
+PROTOCOL_VERSION = 1
 
 
 @dataclass
@@ -54,6 +55,8 @@ class LoopbackProtocol:
     def handle(self, message: dict[str, Any]) -> list[dict[str, Any]]:
         kind = message.get("type")
         if kind == "call_adapter_ready":
+            if message.get("protocol_version") != PROTOCOL_VERSION:
+                return []
             epoch = message.get("epoch")
             if isinstance(epoch, int) and not isinstance(epoch, bool):
                 self.epoch = epoch

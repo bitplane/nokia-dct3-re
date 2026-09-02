@@ -35,6 +35,41 @@ accepts the republished request and connected media cursors and rejects media
 from older identities.  Sequence numbers and timestamps are correlation data;
 they never schedule firmware or radio work.
 
+## Protocol contract
+
+The WebSocket endpoint speaks protocol version 1. On connection and after a
+save-state restore, MAME publishes:
+
+```json
+{"type":"call_adapter_ready","protocol_version":1,"epoch":1}
+```
+
+Every host-to-MAME message carries the current `epoch` and a positive
+`request_id`. A restore increments the epoch, invalidates queued host input and
+republishes emulator-owned call state. A host must discard the old identity;
+it must not resend an `incoming_call` that MAME has already accepted.
+
+| Direction | Message | Required payload |
+|---|---|---|
+| MAME to host | `outgoing_call` | `epoch`, `request_id`, decimal `digits` |
+| Host to MAME | `outgoing_call_decision` | identity plus `decision`: `connect`, `busy`, or `no_answer` |
+| Host to MAME | `incoming_call` | identity plus 1..20 decimal `caller` digits |
+| MAME to host | `*_call_state` | identity and `phase`; connected snapshots also carry both media cursors |
+| MAME to host | `*_call_media_uplink` | identity, sequence, emulation timestamp, good/BFI flag, 33-octet GSM-FR frame as 66 lowercase hex characters |
+| Host to MAME | `*_call_media_downlink` | identity, host sequence, source timestamp, and one encoded GSM-FR frame |
+| Host to MAME | `*_call_terminate` | identity and GSM cause in `1..127` |
+
+The `*` is direction-specific (`incoming` or `outgoing`) and must match the
+call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
+does not own paging, CC/RR state, radio timing, keypad decisions, codec routing
+or release completion. Queue overflow, stale epochs, duplicate decisions and
+wrong-direction media are rejected without changing emulated call state.
+
+`verify-radio-incoming-call-host-adapter` is the complete external-origin
+contract gate. `verify-radio-incoming-call-host-restore` repeats the connected
+call across save/load and proves epoch/cursor republication before remote
+release.
+
 To originate from the external endpoint instead, run MAME with
 `fixtures/radio_incoming_host_adapter` and attach:
 
