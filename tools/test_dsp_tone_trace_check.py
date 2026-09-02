@@ -4,9 +4,9 @@ from tools.dsp_tone_trace_check import check
 
 
 TRACE = """
-dsp_tone: oscillator=0e10/0000 frequency=900/0 amplitude=0000 active=0/0
-dsp_tone: oscillator=0e10/0000 frequency=900/0 amplitude=65ac active=1/0
-dsp_tone: oscillator=0000/0000 frequency=0/0 amplitude=65ac active=0/0
+dsp_tone: frequency=900/0 amplitude=0000 active=0/0
+dsp_tone: frequency=900/0 amplitude=65ac active=1/0
+dsp_tone: frequency=0/0 amplitude=65ac active=0/0
 """
 
 

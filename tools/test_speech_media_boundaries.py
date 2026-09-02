@@ -224,6 +224,22 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("m_hle_output", conformance)
         self.assertNotIn("gain", conformance)
 
+    def test_dsp_hle_owns_tone_mailbox_interpretation(self):
+        header = (ROOT / "driver/nokia_dsp_hle.h").read_text()
+        dsp = (ROOT / "driver/nokia_dsp_hle.cpp").read_text()
+        transport = (
+            (ROOT / "driver/nokia_dspif.cpp").read_text()
+            + (ROOT / "driver/nokia_dspif.h").read_text()
+        )
+        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        self.assertIn("struct tone_control_contract", header)
+        self.assertIn("void mcu_shared_write(u16 byte_offset)", header)
+        self.assertIn("m_tone_control.oscillator1_offset", dsp)
+        self.assertIn("m_tone_update_cb(1)", dsp)
+        self.assertNotIn("tone_control", transport)
+        self.assertNotIn("DSP_TONE_OSCILLATOR", phone)
+        self.assertIn("m_dsp_hle->mcu_shared_write(byte_offset)", phone)
+
     def test_remote_voice_source_stays_at_network_boundary(self):
         voice = (
             (ROOT / "driver/nokia_gsm_voice_peer.cpp").read_text()

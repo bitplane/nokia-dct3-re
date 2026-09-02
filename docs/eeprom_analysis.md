@@ -248,8 +248,9 @@ Ringing tone and replays varied PUP notes. `make
 verify-3310-radio-smart-message-persistence` independently proves that NHM-5
 v6.39 also changes only its product-local PMM-backed flash, retains the saved
 entry after cold boot and exposes it through Menu 5 → Ringing tone. Its
-localized title rendering and DSP-tone playback contract differ from NHM-2;
-the current DSP HLE emits a fixed 900-Hz carrier, so that comparison proves
+localized title rendering and DSP-tone playback contract differ from NHM-2.
+Its MCU-visible DSP mailbox repeatedly publishes a 900-Hz oscillator, while
+the saved melody's pitch remains DSP-local; the comparison therefore proves
 durable listing and physical non-silence but not note-pitch-correlated playback.
 Neither product inherits NSE-8's EEPROM offset or promptless one-slot policy.
 

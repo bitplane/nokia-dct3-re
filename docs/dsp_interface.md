@@ -196,9 +196,10 @@ parser/output evidence, not host-side audio injection. NSE-8's independently
 saved EEPROM object and NHM-2's independently saved PMM-backed flash object
 drive their same varied PUP paths from the ordinary post-cold-boot selectors;
 persistence does not add another audio route. NHM-5 likewise lists and drives
-its saved object after cold boot, but the current DSP-tone HLE collapses its
-pitch to a fixed 900-Hz carrier. That gate therefore proves physical non-silence
-and timing, not pitch-correlated playback.
+its saved object after cold boot, but its MCU-visible mailbox repeatedly
+publishes a 900-Hz oscillator and does not expose the DSP-local pitch sequence.
+That gate therefore proves physical non-silence and timing, not pitch-correlated
+playback.
 
 ### Cipher-control packet
 

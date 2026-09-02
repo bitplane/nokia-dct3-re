@@ -17,7 +17,8 @@ nokia_dsp_hle_device::nokia_dsp_hle_device(
 	m_external_peer(*this, "^external_service_peer"),
 	m_radio_peer(*this, "^radio_peer"),
 	m_mad2_pcm(*this, "^mad2_pcm"),
-	m_mcu_control_word_cb(*this)
+	m_mcu_control_word_cb(*this),
+	m_tone_update_cb(*this)
 {
 }
 
@@ -38,6 +39,9 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_bootstrap_exchange_count));
 	save_item(NAME(m_mcu_control_word));
 	save_item(NAME(m_mcu_control_wire));
+	save_item(NAME(m_tone_frequency1));
+	save_item(NAME(m_tone_frequency2));
+	save_item(NAME(m_tone_amplitude));
 	save_item(NAME(m_data_memory));
 	save_item(NAME(m_data_memory_loaded));
 	save_item(NAME(m_speech_active));
@@ -93,6 +97,9 @@ void nokia_dsp_hle_device::device_reset()
 	m_bootstrap_exchange_count = 0;
 	m_mcu_control_word = 0;
 	m_mcu_control_wire = 0;
+	m_tone_frequency1 = 0;
+	m_tone_frequency2 = 0;
+	m_tone_amplitude = 0;
 	std::fill(m_data_memory.begin(), m_data_memory.end(), 0);
 	std::fill(m_data_memory_loaded.begin(), m_data_memory_loaded.end(), 0);
 	m_speech_codec.reset();
@@ -106,6 +113,31 @@ void nokia_dsp_hle_device::device_reset()
 	m_speech_nonzero_microphone_blocks = 0;
 	m_speech_nonzero_earpiece_blocks = 0;
 	publish_bootstrap_state();
+	m_tone_update_cb(1);
+}
+
+void nokia_dsp_hle_device::mcu_shared_write(u16 byte_offset)
+{
+	if (!m_tone_control.enabled() ||
+			(byte_offset != m_tone_control.oscillator1_offset &&
+			 byte_offset != m_tone_control.oscillator2_offset &&
+			 byte_offset != m_tone_control.amplitude_offset))
+		return;
+
+	m_tone_frequency1 = m_transport->shared_word(
+			m_tone_control.oscillator1_offset >> 1) /
+			m_tone_control.frequency_divisor;
+	m_tone_frequency2 = m_transport->shared_word(
+			m_tone_control.oscillator2_offset >> 1) /
+			m_tone_control.frequency_divisor;
+	m_tone_amplitude = m_transport->shared_word(
+			m_tone_control.amplitude_offset >> 1);
+	LOGMASKED(LOG_DSP_HLE,
+			"dsp_hle: tone frequency=%u/%u amplitude=%04x active=%u/%u\n",
+			m_tone_frequency1, m_tone_frequency2, m_tone_amplitude,
+			m_tone_amplitude != 0 && m_tone_frequency1 != 0,
+			m_tone_amplitude != 0 && m_tone_frequency2 != 0);
+	m_tone_update_cb(1);
 }
 
 void nokia_dsp_hle_device::prepare_speech_codec_save()

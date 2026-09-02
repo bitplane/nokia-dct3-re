@@ -94,6 +94,20 @@ public:
 		}
 	};
 
+	struct tone_control_contract
+	{
+		u16 oscillator1_offset = 0;
+		u16 oscillator2_offset = 0;
+		u16 amplitude_offset = 0;
+		u16 frequency_divisor = 1;
+
+		constexpr bool enabled() const
+		{
+			return oscillator1_offset && oscillator2_offset &&
+					amplitude_offset && frequency_divisor;
+		}
+	};
+
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_control_contract(service_control_contract contract)
@@ -106,17 +120,25 @@ public:
 	{
 		m_speech_control = contract;
 	}
+	void set_tone_control_contract(tone_control_contract contract)
+	{
+		m_tone_control = contract;
+	}
 	void set_bootstrap_contract(bootstrap_contract contract)
 	{
 		m_bootstrap = contract;
 	}
 	auto mcu_control_word_cb() { return m_mcu_control_word_cb.bind(); }
+	auto tone_update_cb() { return m_tone_update_cb.bind(); }
 	u16 mcu_control_word() const { return m_mcu_control_word; }
 	u16 mcu_control_wire() const { return m_mcu_control_wire; }
 	u16 data_word(u16 address) const { return m_data_memory[address]; }
 	bool data_word_loaded(u16 address) const { return m_data_memory_loaded[address] != 0; }
 	u64 speech_uplink_frames() const { return m_speech_uplink_frames; }
 	u64 speech_downlink_frames() const { return m_speech_downlink_frames; }
+	u32 tone_frequency1() const { return m_tone_frequency1; }
+	u32 tone_frequency2() const { return m_tone_frequency2; }
+	u16 tone_amplitude() const { return m_tone_amplitude; }
 
 	void tx_commit_w(int state);
 	void service_pending_w(int state);
@@ -127,6 +149,7 @@ public:
 	void shared_0fe_write_w(int state);
 	void shared_100_read_w(int state);
 	void shared_100_write_w(int state);
+	void mcu_shared_write(u16 byte_offset);
 
 protected:
 	virtual void device_start() override;
@@ -155,6 +178,7 @@ private:
 	required_device<nokia_radio_peer_device> m_radio_peer;
 	required_device<nokia_mad2_pcm_device> m_mad2_pcm;
 	devcb_write16 m_mcu_control_word_cb;
+	devcb_write_line m_tone_update_cb;
 	emu_timer *m_service_timer = nullptr;
 	emu_timer *m_packet_timer = nullptr;
 	emu_timer *m_response_timer = nullptr;
@@ -173,6 +197,10 @@ private:
 	u16 m_mcu_control_word = 0;
 	u16 m_mcu_control_wire = 0;
 	speech_control_contract m_speech_control;
+	tone_control_contract m_tone_control;
+	u32 m_tone_frequency1 = 0;
+	u32 m_tone_frequency2 = 0;
+	u16 m_tone_amplitude = 0;
 	std::array<u16, 0x10000> m_data_memory = { 0 };
 	std::array<u8, 0x10000> m_data_memory_loaded = { 0 };
 	nokia_gsm_fr_codec m_speech_codec;

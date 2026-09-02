@@ -146,6 +146,7 @@ struct nokia_product_config
 	unsigned dsp_service_delay_us = 5'000;
 	unsigned dsp_peer_poll_ms = 5;
 	nokia_dsp_hle_device::speech_control_contract dsp_speech_control;
+	nokia_dsp_hle_device::tone_control_contract dsp_tone_control;
 	nokia_mad2_pcm_device::bus_profile cobba_pcm;
 	nokia_cobba_device::hle_voice_profile cobba_hle_voice;
 	bool flash_b3_block_lock = false;
@@ -222,6 +223,15 @@ constexpr nokia_dsp_hle_device::speech_control_contract
 
 constexpr nokia_dsp_hle_device::speech_control_contract
 		DSP_SPEECH_CONTROL_NHM2 = make_dct3_speech_control_contract();
+
+// NSE-8 and NHM-5 independently publish this ROM-family tone mailbox. The
+// oscillator words are quarter-Hz values; interpreting them belongs to the
+// DSP HLE rather than the shared-memory transport or handset driver. Other
+// ROM4 profiles retain the formerly global mapping as an explicit compatibility
+// projection until a product-local trace confirms or replaces it.
+constexpr nokia_dsp_hle_device::tone_control_contract DSP_TONE_ROM4 = {
+	0x0ae, 0x0b0, 0x0b6, 4
+};
 
 // NSE-3 proves selector 8's wire decoder, but no organic call has identified a
 // speech-request predicate. Keep command decoding without enabling speech.
@@ -345,6 +355,7 @@ constexpr nokia_product_config make_3210_config()
 	// Paired NSE-8 firmware independently constructs/removes this field around
 	// Answer while retaining the separate 0x0408 dedicated-channel field.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NSE8;
+	result.dsp_tone_control = DSP_TONE_ROM4;
 	result.cobba_pcm.data_clock = 520'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	// DCT3 MAD2/COBBA-GJ PCM timing diagrams show a 16-bit serial word
@@ -389,6 +400,7 @@ constexpr nokia_product_config make_3310_config()
 	// values satisfy and clear the same recovered speech-request field, but do
 	// not establish a PCM bus for this product.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NHM5;
+	result.dsp_tone_control = DSP_TONE_ROM4;
 	// Nokia's NHM-5/UB 4 V09 COBBA schematic (version 2.0, 04.05.2001)
 	// independently wires the built-in differential microphone pads through
 	// L402 to MIC2P/MIC2N and the receiver to EARP/EARN. Record that topology
@@ -437,6 +449,7 @@ constexpr nokia_product_config make_3330_config()
 	// after organic physical Answer and 0x040a during physical-End teardown.
 	// This establishes speech control independently of NHM-5.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NHM6;
+	result.dsp_tone_control = DSP_TONE_ROM4;
 	// Nokia's combined NHM-2/5/6 service material identifies the common
 	// COBBA-GJP N100 audio boundary. COBBA-GJP documentation fixes its codec
 	// SIO at RFIClk/13 = 1 MHz and PCMSClk at /125 = 8 kHz, with the same
@@ -479,6 +492,7 @@ constexpr nokia_product_config make_3410_config()
 	// teardown. This establishes the speech-request field without inheriting
 	// an NHM-5/NHM-6 firmware contract.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NHM2;
+	result.dsp_tone_control = DSP_TONE_ROM4;
 	// Nokia's combined NHM-2/5/6 repair material identifies COBBA-GJP N100.
 	// Its codec SIO derives 1 MHz PCMDClk from 13 MHz / 13 and 8 kHz PCMSClk
 	// by /125, with a one-clock sync and sign-extended 13-in-16 serial word.
@@ -555,6 +569,7 @@ constexpr nokia_product_config make_6110_config()
 	// Decode that proven wire command, but leave the speech-request predicate
 	// empty until an organic Answer/End transition identifies its semantics.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NSE3_COMMAND;
+	result.dsp_tone_control = DSP_TONE_ROM4;
 	result.cobba_pcm.data_clock = 1'000'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	result.cobba_pcm.sample_bits = 13;
@@ -639,10 +654,6 @@ enum mad2_reg : uint8_t
 	MAD2_SIM_TX_FLAGS = 0x3e,
 	MAD2_SIM_TX_FILL = 0x3f
 };
-
-constexpr offs_t DSP_TONE_OSCILLATOR_1 = 0x0ae;
-constexpr offs_t DSP_TONE_OSCILLATOR_2 = 0x0b0;
-constexpr offs_t DSP_TONE_AMPLITUDE = 0x0b6;
 
 // CCONT serial command/status bits + fixed wiring (hardware constants, not configurable).
 // PWRONX is latched as CCONT status bit 1 on a cold power-key boot. It is a
@@ -783,7 +794,7 @@ private:
 	void dsp_tx_commit_w(int state);
 	void dsp_service_pending_w(int state);
 	void dsp_doorbell_w(int state);
-	void update_dsp_tones();
+	void dsp_tone_update_w(int state);
 	// Observation-only helpers implemented in nokia_dct3_trace.inc.
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
@@ -984,7 +995,7 @@ void nokia_dct3_state::machine_start()
 
 void nokia_dct3_state::post_load()
 {
-	update_dsp_tones();
+	dsp_tone_update_w(1);
 }
 
 void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
@@ -1013,6 +1024,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
 	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
 	m_dsp_hle->set_speech_control_contract(product.dsp_speech_control);
+	m_dsp_hle->set_tone_control_contract(product.dsp_tone_control);
 	m_mad2_pcm->set_bus_profile(product.cobba_pcm);
 	m_cobba->set_pcm_sample_bits(product.cobba_pcm.sample_bits);
 	// This explicitly configures the HLE's internal-handset path. A future
@@ -1042,7 +1054,7 @@ void nokia_dct3_state::machine_reset()
 	}
 
 	memset(m_mad2_regs, 0, 0x100);
-	update_dsp_tones();
+	dsp_tone_update_w(1);
 	std::fill(std::begin(m_mad2_trace_read), std::end(m_mad2_trace_read), false);
 	std::fill(std::begin(m_mad2_trace_write), std::end(m_mad2_trace_write), false);
 	std::fill(std::begin(m_dspif_trace_read), std::end(m_dspif_trace_read), false);
@@ -1522,8 +1534,7 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 				"dsp_shared_write: off=%03x old=%04x data=%04x pc=%08x t=%.6f\n",
 				byte_offset, old_data, new_data, m_maincpu->pc(),
 				machine().time().as_double());
-	if (byte_offset == DSP_TONE_OSCILLATOR_1 || byte_offset == DSP_TONE_OSCILLATOR_2 || byte_offset == DSP_TONE_AMPLITUDE)
-		update_dsp_tones();
+	m_dsp_hle->mcu_shared_write(byte_offset);
 }
 
 #include "nokia_dct3_trace.inc"
@@ -1744,16 +1755,11 @@ void nokia_dct3_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old
 			data, m_maincpu->pc(), machine().time().as_double());
 }
 
-void nokia_dct3_state::update_dsp_tones()
+void nokia_dct3_state::dsp_tone_update_w(int state)
 {
-	// The ROM-4 MCU programs the COBBA tone oscillators in quarter-Hz units.
-	// A real DSP renders them through the codec; this HLE voice exposes the same
-	// firmware-owned command while no DSP core or codec PCM backend is present.
-	const u16 oscillator1 = m_dspif->shared_r(DSP_TONE_OSCILLATOR_1 >> 1);
-	const u16 oscillator2 = m_dspif->shared_r(DSP_TONE_OSCILLATOR_2 >> 1);
-	const u16 amplitude = m_dspif->shared_r(DSP_TONE_AMPLITUDE >> 1);
-	const unsigned frequency1 = oscillator1 >> 2;
-	const unsigned frequency2 = oscillator2 >> 2;
+	const unsigned frequency1 = m_dsp_hle->tone_frequency1();
+	const unsigned frequency2 = m_dsp_hle->tone_frequency2();
+	const u16 amplitude = m_dsp_hle->tone_amplitude();
 	if (frequency1 != 0)
 		m_dsp_tone1->set_clock(frequency1);
 	if (frequency2 != 0)
@@ -1761,8 +1767,8 @@ void nokia_dct3_state::update_dsp_tones()
 	m_dsp_tone1->set_state(amplitude != 0 && frequency1 != 0);
 	m_dsp_tone2->set_state(amplitude != 0 && frequency2 != 0);
 	if (m_trace_enabled)
-		LOGMASKED(LOG_DSP_BOUNDARY, "dsp_tone: oscillator=%04x/%04x frequency=%u/%u amplitude=%04x active=%u/%u t=%.6f\n",
-				oscillator1, oscillator2, frequency1, frequency2, amplitude,
+		LOGMASKED(LOG_DSP_BOUNDARY, "dsp_tone: frequency=%u/%u amplitude=%04x active=%u/%u t=%.6f\n",
+				frequency1, frequency2, amplitude,
 				amplitude != 0 && frequency1 != 0, amplitude != 0 && frequency2 != 0,
 				machine().time().as_double());
 }
@@ -2308,6 +2314,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_gensio->lcd_sclk_cb().set(m_lcd, FUNC(pcd8544_device::sclk_w));
 	NOKIA_DSPIF(config, m_dspif);
 	NOKIA_DSP_HLE(config, m_dsp_hle);
+	m_dsp_hle->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
 	NOKIA_GSM_SESSION(config, m_gsm_session);

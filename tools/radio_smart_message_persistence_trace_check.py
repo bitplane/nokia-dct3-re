@@ -43,7 +43,7 @@ PUP_NOTE = re.compile(
     r"buzzer: enabled=1 divider=(\d+) frequency=(\d+) volume=(\d+) "
     r"t=([0-9.]+)")
 DSP_TONE_NOTE = re.compile(
-    r"dsp_tone: oscillator=[0-9a-f]+/[0-9a-f]+ frequency=(\d+)/\d+ "
+    r"dsp_tone: frequency=(\d+)/\d+ "
     r"amplitude=[0-9a-f]+ active=1/0 t=([0-9.]+)")
 
 
@@ -189,14 +189,18 @@ def verify_pmm_product(
 
 def main() -> int:
     if len(sys.argv) == 11 and sys.argv[1] in ("nhm2", "nhm5"):
+        def optional_bytes(path: str) -> bytes:
+            candidate = pathlib.Path(path)
+            return candidate.read_bytes() if candidate.exists() else b""
+
         try:
             verify_pmm_product(
                 pathlib.Path(sys.argv[2]).read_text(),
                 pathlib.Path(sys.argv[3]),
                 pathlib.Path(sys.argv[4]).read_bytes(),
                 pathlib.Path(sys.argv[5]).read_bytes(),
-                pathlib.Path(sys.argv[6]).read_bytes(),
-                pathlib.Path(sys.argv[7]).read_bytes(),
+                optional_bytes(sys.argv[6]),
+                optional_bytes(sys.argv[7]),
                 pathlib.Path(sys.argv[8]).read_bytes(),
                 pathlib.Path(sys.argv[9]).read_bytes(),
                 sys.argv[1],

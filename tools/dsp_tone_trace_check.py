@@ -4,19 +4,19 @@ import sys
 
 
 EVENT = re.compile(
-    r"dsp_tone: oscillator=(?P<osc1>[0-9a-f]{4})/(?P<osc2>[0-9a-f]{4}) "
-    r"frequency=(?P<freq1>\d+)/(?P<freq2>\d+) amplitude=(?P<amplitude>[0-9a-f]{4}) "
+    r"dsp_tone: frequency=(?P<freq1>\d+)/(?P<freq2>\d+) "
+    r"amplitude=(?P<amplitude>[0-9a-f]{4}) "
     r"active=(?P<active1>[01])/(?P<active2>[01])"
 )
 
 
 def check(text: str) -> list[dict[str, str]]:
     events = [match.groupdict() for match in EVENT.finditer(text)]
-    if not any(event["osc1"] == "0e10" and event["freq1"] == "900"
+    if not any(event["freq1"] == "900"
                and event["amplitude"] == "65ac" and event["active1"] == "1"
                for event in events):
         raise ValueError("missing organic 900 Hz DSP tone start")
-    if not any(event["osc1"] == "0000" and event["active1"] == "0"
+    if not any(event["freq1"] == "0" and event["active1"] == "0"
                for event in events):
         raise ValueError("missing organic DSP tone stop")
     return events

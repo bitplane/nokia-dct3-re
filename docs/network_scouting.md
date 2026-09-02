@@ -561,10 +561,12 @@ its own PMM-backed flash. Preserved-NVRAM boot exposes the retained entry
 through Menu 5 → Ringing tone and selecting it drives sustained DSP audio.
 That comparison is gated by
 `make verify-3310-radio-smart-message-persistence`, but it is deliberately not
-called payload-pitch-correlated: the current NHM-5 DSP-tone HLE presents the
-firmware output as a fixed 900-Hz carrier. The durable object, menu grammar and
-audio limitation are therefore recorded without borrowing NHM-2 or NSE-8
-semantics.
+called payload-pitch-correlated. The MCU repeatedly publishes oscillator word
+`0x0e10` through the independently recovered ROM4 mailbox, which the typed DSP
+HLE correctly renders as 900 Hz. The saved payload's pitch sequence is therefore
+DSP-owned and absent from the MCU-visible trace, rather than a driver-side fixed
+frequency. The durable object, menu grammar and audio limitation are recorded
+without borrowing NHM-2 or NSE-8 semantics.
 
 The CP parser derives both its expected CP transaction and RP reference from
 the CP-DATA actually queued. Wrong references, malformed lengths and trailing
