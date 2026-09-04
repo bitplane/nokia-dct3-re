@@ -109,11 +109,13 @@ does not yet claim that the preceding transform routines execute.
 the ignored transform-entry program/data snapshots into MAME's ROM path,
 verifies their declared hashes through ordinary ROM loading, restores the
 captured architectural registers, and executes from `0x4b73`. The current core
-constructs challenge header `3532 0000` organically and stops after fetching
-unsupported extended opcode `6f92` at `0x7f7f` (`PC=0x7f80`). Reaching it executes
+constructs challenge header `3532 0000` organically, proceeds through the
+transform that subsequently mutates that workspace, and stops after fetching
+unsupported conditional branch `f820` at `0x3810` (`PC=0x3811`). Reaching it executes
 the complete `0x4b82` block-repeat copy, its `0x3900` status helper, and the
 `0x7f2d` transform helper through its indirect/direct transfers, mixing stages,
-and nested CRC-style carry loops.
+and nested CRC-style carry loops. It also executes the delayed `0x37ce` call
+through its measurement setup and first DSP port write.
 That address is now
 the measured implementation frontier; expanding the core must move it forward
 while preserving the synthetic and transform-tail gates.

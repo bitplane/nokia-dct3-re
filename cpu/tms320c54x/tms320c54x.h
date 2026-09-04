@@ -90,6 +90,8 @@ private:
 	u16 m_rea = 0;
 	u16 m_rptc = 0;
 	u16 m_rpt_address = 0;
+	u16 m_delayed_target = 0;
+	u8 m_delayed_words = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
 	bool m_block_repeat_active = false;

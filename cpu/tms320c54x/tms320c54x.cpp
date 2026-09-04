@@ -88,6 +88,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_rea));
 	save_item(NAME(m_rptc));
 	save_item(NAME(m_rpt_address));
+	save_item(NAME(m_delayed_target));
+	save_item(NAME(m_delayed_words));
 	save_item(NAME(m_ifr));
 	save_item(NAME(m_imr));
 	save_item(NAME(m_block_repeat_active));
@@ -112,6 +114,8 @@ void tms320c54x_device::device_reset()
 	m_rea = 0;
 	m_rptc = 0;
 	m_rpt_address = 0;
+	m_delayed_target = 0;
+	m_delayed_words = 0;
 	m_ifr = 0;
 	m_imr = 0;
 	m_block_repeat_active = false;
@@ -125,6 +129,18 @@ u16 tms320c54x_device::fetch()
 
 u16 tms320c54x_device::data_read(u16 address)
 {
+	if (address == 0x08)
+		return u16(m_a);
+	if (address == 0x09)
+		return u16(m_a >> 16);
+	if (address == 0x0a)
+		return u16(m_a >> 32);
+	if (address == 0x0b)
+		return u16(m_b);
+	if (address == 0x0c)
+		return u16(m_b >> 16);
+	if (address == 0x0d)
+		return u16(m_b >> 32);
 	if (address >= 0x10 && address <= 0x17)
 		return m_ar[address - 0x10];
 	if (address == 0x18)
@@ -138,7 +154,19 @@ u16 tms320c54x_device::data_read(u16 address)
 
 void tms320c54x_device::data_write(u16 address, u16 value)
 {
-	if (address >= 0x10 && address <= 0x17)
+	if (address == 0x08)
+		m_a = (m_a & ~u64(0xffff)) | value;
+	else if (address == 0x09)
+		m_a = (m_a & ~u64(0xffff0000)) | (u64(value) << 16);
+	else if (address == 0x0a)
+		m_a = (m_a & ~u64(0xff00000000)) | (u64(value & 0xff) << 32);
+	else if (address == 0x0b)
+		m_b = (m_b & ~u64(0xffff)) | value;
+	else if (address == 0x0c)
+		m_b = (m_b & ~u64(0xffff0000)) | (u64(value) << 16);
+	else if (address == 0x0d)
+		m_b = (m_b & ~u64(0xff00000000)) | (u64(value & 0xff) << 32);
+	else if (address >= 0x10 && address <= 0x17)
 		m_ar[address - 0x10] = value;
 	else if (address == 0x18)
 		m_sp = value;
@@ -185,6 +213,8 @@ void tms320c54x_device::indirect_modify(u8 mode)
 	case 0x10: ++m_ar[ar]; break;
 	case 0x30: m_ar[ar] += m_ar[0]; break;
 	case 0x38: m_ar[ar] -= m_ar[0]; break;
+	case 0x48: circular_modify(ar, -1); break;
+	case 0x50: circular_modify(ar, 1); break;
 	default: break;
 	}
 }
@@ -208,16 +238,23 @@ void tms320c54x_device::circular_modify(unsigned ar, s16 step)
 
 u16 tms320c54x_device::indirect_read(u8 mode)
 {
+	if (mode == 0xf8)
+		return data_read(fetch());
 	const unsigned ar = mode & 7;
-	const u16 value = m_data.read_word(m_ar[ar]);
+	const u16 value = data_read(m_ar[ar]);
 	indirect_modify(mode);
 	return value;
 }
 
 void tms320c54x_device::indirect_write(u8 mode, u16 value)
 {
+	if (mode == 0xf8)
+	{
+		data_write(fetch(), value);
+		return;
+	}
 	const unsigned ar = mode & 7;
-	m_data.write_word(m_ar[ar], value);
+	data_write(m_ar[ar], value);
 	indirect_modify(mode);
 }
 
@@ -246,6 +283,26 @@ void tms320c54x_device::finish_repeats()
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	if (op == 0x6ff8 && m_cache.read_word(m_pc + 1) == 0x0e20)
+	{
+		const u16 address = fetch();
+		fetch();
+		m_a = (m_b - data_operand(data_read(address))) & ACC_MASK;
+		return;
+	}
+	if ((op == 0x6f92 || op == 0x6f8a || op == 0x6f93 || op == 0x6f8b) &&
+			(m_cache.read_word(m_pc) == 0x0d96 || m_cache.read_word(m_pc) == 0x0c96 ||
+			 m_cache.read_word(m_pc) == 0x0d91 || m_cache.read_word(m_pc) == 0x0c91))
+	{
+		const u16 extension = fetch();
+		const int shift = s8((extension & 0x1f) << 3) >> 3;
+		const u64 value = BIT(extension, 8) ? m_b : m_a;
+		const u16 result = shift < 0
+				? u16(arithmetic_shift_right(value, -shift))
+				: u16((value << shift) & ACC_MASK);
+		indirect_write(low, result);
+		return;
+	}
 	if (op == 0x70f8) // MVKD dmad, Smem (absolute destination form)
 	{
 		const u16 destination = fetch();
@@ -285,13 +342,33 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4500: // LD Smem, 16, B
 		m_b = u64(indirect_read(low)) << 16;
 		return;
+	case 0x4800: // LDM MMR, A
+		m_a = data_operand(data_read(low & 0x1f));
+		return;
+	case 0x4900: // LDM MMR, B
+		m_b = data_operand(data_read(low & 0x1f));
+		return;
+	case 0x6800: // AND #lk, Smem
+	case 0x6900: // OR #lk, Smem
+	{
+		const unsigned ar = low & 7;
+		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
+		const u16 immediate = fetch();
+		const u16 value = data_read(address);
+		data_write(address, (op & 0xff00) == 0x6800
+				? value & immediate : value | immediate);
+		if (low != 0xf8)
+			indirect_modify(low);
+		return;
+	}
 	case 0x6b00: // ADD #lk, Smem
 	{
 		const unsigned ar = low & 7;
-		const u16 address = m_ar[ar];
+		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
 		const u16 immediate = fetch();
 		data_write(address, data_read(address) + immediate);
-		indirect_modify(low);
+		if (low != 0xf8)
+			indirect_modify(low);
 		return;
 	}
 	case 0x6c00: // BANZ pmad, *ARx modification
@@ -316,10 +393,31 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x8300: // STH B, Smem
 		indirect_write(low, u16(m_b >> 16));
 		return;
+	case 0xe800: // LD #k, A
+		m_a = data_operand(low);
+		return;
+	case 0xe900: // LD #k, B
+		m_b = data_operand(low);
+		return;
+	case 0x8800: // STLM A, MMR
+		data_write(low & 0x1f, u16(m_a));
+		return;
+	case 0x8900: // STLM B, MMR
+		data_write(low & 0x1f, u16(m_b));
+		return;
 	case 0x7100: // MVDM Smem, dmad
 	{
 		const u16 value = indirect_read(low);
 		data_write(fetch(), value);
+		return;
+	}
+	case 0x7300: // MVDM MMR, dmad
+		data_write(fetch(), data_read(low & 0x1f));
+		return;
+	case 0x7500: // PORTR Smem, port
+	{
+		const u16 value = indirect_read(low);
+		m_io.write_word(fetch(), value);
 		return;
 	}
 	case 0x7000: // MVKD dmad, Smem
@@ -382,9 +480,6 @@ void tms320c54x_device::execute_one(u16 op)
 
 	switch (op)
 	{
-	case 0xe800: // LD #0, A
-		m_a = 0;
-		return;
 	case 0x61f8: // BITF dmad, #lk
 	{
 		const u16 address = fetch();
@@ -418,12 +513,48 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 3;
 		return;
 	}
+	case 0xf274: // CALLD pmad
+	{
+		const u16 destination = fetch();
+		push(u16(m_pc + 2));
+		m_delayed_target = destination;
+		m_delayed_words = 2;
+		m_icount -= 3;
+		return;
+	}
 	case 0xf493: // NOT A
 		m_a = ~m_a & ACC_MASK;
+		return;
+	case 0xf495: // NOP
 		return;
 	case 0xf1c0: // XOR A, B
 		m_b = (m_b ^ m_a) & ACC_MASK;
 		return;
+	case 0xf2a0: // OR B, A
+		m_a = (m_a | m_b) & ACC_MASK;
+		return;
+	case 0xff45: // XC 2, AEQ
+		if ((m_a & ACC_MASK) != 0)
+			m_pc += 2;
+		return;
+	case 0xff20: // XC 2, NTC
+		if (m_st0 & 0x1000)
+			m_pc += 2;
+		return;
+	case 0xf846: // BC pmad, AGT
+	{
+		const u16 destination = fetch();
+		if ((s64(m_a << 24) >> 24) > 0)
+			m_pc = destination;
+		return;
+	}
+	case 0xf843: // BC pmad, ALT
+	{
+		const u16 destination = fetch();
+		if ((s64(m_a << 24) >> 24) < 0)
+			m_pc = destination;
+		return;
+	}
 	case 0xf0c8: // XOR A << 8, A
 		m_a = (m_a ^ (m_a << 8)) & ACC_MASK;
 		return;
@@ -448,11 +579,35 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf3f8: // ROR B, 8
 		m_b = ((m_b >> 8) | (m_b << 32)) & ACC_MASK;
 		return;
+	case 0xf0ff: // ROR A, 1
+		m_a = ((m_a >> 1) | (m_a << 39)) & ACC_MASK;
+		return;
+	case 0xf3ff: // ROR B, 1
+		m_b = ((m_b >> 1) | (m_b << 39)) & ACC_MASK;
+		return;
 	case 0xf0b0: // OR A >> 16, A
 		m_a |= arithmetic_shift_right(m_a, 16);
 		return;
 	case 0xf3b0: // OR B >> 16, B
 		m_b |= arithmetic_shift_right(m_b, 16);
+		return;
+	case 0xf000: // ADD #lk, A
+		m_a = (m_a + data_operand(fetch())) & ACC_MASK;
+		return;
+	case 0xf300: // ADD #lk, B
+		m_b = (m_b + data_operand(fetch())) & ACC_MASK;
+		return;
+	case 0xf620: // SUB B, A
+		m_a = (m_a - m_b) & ACC_MASK;
+		return;
+	case 0xf508: // ADD A << 8, B
+		m_b = (m_b + (m_a << 8)) & ACC_MASK;
+		return;
+	case 0xf010: // SUB #lk, A
+		m_a = (m_a - data_operand(fetch())) & ACC_MASK;
+		return;
+	case 0xf310: // SUB #lk, B
+		m_b = (m_b - data_operand(fetch())) & ACC_MASK;
 		return;
 	case 0xf490: // ROL A through carry
 	case 0xf590: // ROL B through carry
@@ -515,10 +670,21 @@ void tms320c54x_device::execute_run()
 			break;
 		}
 
+		const bool delayed = m_delayed_words != 0;
+		const u16 instruction_pc = m_pc;
 		m_op = fetch();
 		execute_one(m_op);
 		if (!m_illegal)
+		{
 			finish_repeats();
+			if (delayed)
+			{
+				const unsigned words = u16(m_pc - instruction_pc);
+				m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;
+				if (!m_delayed_words)
+					m_pc = m_delayed_target;
+			}
+		}
 		--m_icount;
 	}
 }

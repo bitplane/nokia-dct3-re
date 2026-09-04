@@ -708,7 +708,9 @@ prepare-c54x-rom4-fixture:
 check-c54x-rom4-execute: build prepare-c54x-rom4-fixture
 	@$(MAME_DIR)/mame tms54rom4 -rompath $(MAME_DIR)/roms -video none -sound none \
 		-nothrottle -seconds_to_run 1 2>&1 | tee /tmp/tms320c54x-rom4-check.log
-	@grep -q "TMS320C54x ROM4 execution frontier: pc=7f80" \
+	@grep -q "TMS320C54x ROM4 execution frontier: pc=3811" \
+		/tmp/tms320c54x-rom4-check.log
+	@grep -q "TMS320C54x ROM4 frontier complete" \
 		/tmp/tms320c54x-rom4-check.log
 
 check-c54x-rom4-transform:

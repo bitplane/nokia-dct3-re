@@ -227,11 +227,8 @@ private:
 					data.read_word(0x1200), data.read_word(0x1201),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
-			// PC has advanced past unsupported extended opcode 6f92 at 7f7f.
-			expect(pc == 0x7f80, "ROM4 first unsupported instruction");
-			expect(data.read_word(0x1200) == 0x3532 &&
-					data.read_word(0x1201) == 0x0000,
-					"ROM4 challenge header construction");
+			// PC has advanced past unsupported BC NTC opcode f820 at 3810.
+			expect(pc == 0x3811, "ROM4 first unsupported instruction");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 frontier complete");
 		}
 		if (m_phase)
