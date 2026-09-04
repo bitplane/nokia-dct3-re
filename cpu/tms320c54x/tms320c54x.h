@@ -51,6 +51,8 @@ private:
 	static constexpr u64 ACC_MASK = (u64(1) << 40) - 1;
 
 	u16 fetch();
+	u16 data_read(u16 address);
+	void data_write(u16 address, u16 value);
 	u16 indirect_read(u8 mode);
 	void indirect_write(u8 mode, u16 value);
 	void indirect_modify(u8 mode);

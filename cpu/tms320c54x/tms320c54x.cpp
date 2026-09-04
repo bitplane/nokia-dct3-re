@@ -123,6 +123,33 @@ u16 tms320c54x_device::fetch()
 	return m_cache.read_word(m_pc++);
 }
 
+u16 tms320c54x_device::data_read(u16 address)
+{
+	if (address >= 0x10 && address <= 0x17)
+		return m_ar[address - 0x10];
+	if (address == 0x18)
+		return m_sp;
+	if (address == 0x19)
+		return m_bk;
+	if (address == 0x1a)
+		return m_brc;
+	return m_data.read_word(address);
+}
+
+void tms320c54x_device::data_write(u16 address, u16 value)
+{
+	if (address >= 0x10 && address <= 0x17)
+		m_ar[address - 0x10] = value;
+	else if (address == 0x18)
+		m_sp = value;
+	else if (address == 0x19)
+		m_bk = value;
+	else if (address == 0x1a)
+		m_brc = value;
+	else
+		m_data.write_word(address, value);
+}
+
 void tms320c54x_device::push(u16 value)
 {
 	// The C54x system stack grows downward; SP always names its top word.
@@ -211,6 +238,13 @@ void tms320c54x_device::finish_repeats()
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	if (op == 0x70f8) // MVKD dmad, Smem (absolute destination form)
+	{
+		const u16 destination = fetch();
+		const u16 source = fetch();
+		data_write(destination, data_read(source));
+		return;
+	}
 	switch (op & 0xff00)
 	{
 	case 0x1000: // LD Smem, A
@@ -218,6 +252,12 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x1100: // LD Smem, B
 		m_b = data_operand(indirect_read(low));
+		return;
+	case 0x1200: // LD uns(Smem), A
+		m_a = indirect_read(low);
+		return;
+	case 0x1300: // LD uns(Smem), B
+		m_b = indirect_read(low);
 		return;
 	case 0x1a00: // OR Smem, A
 		m_a = (m_a | indirect_read(low)) & ACC_MASK;
@@ -248,6 +288,15 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x8300: // STH B, Smem
 		indirect_write(low, u16(m_b >> 16));
+		return;
+	case 0x7100: // MVDM Smem, dmad
+	{
+		const u16 value = indirect_read(low);
+		data_write(fetch(), value);
+		return;
+	}
+	case 0x7000: // MVKD dmad, Smem
+		indirect_write(low, data_read(fetch()));
 		return;
 	case 0x7600: // STM #lk, Smem
 		indirect_write(low, fetch());
@@ -314,14 +363,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 address = fetch();
 		const u16 mask = fetch();
 		m_st0 = (m_st0 & ~0x1000) |
-			((m_data.read_word(address) & mask) ? 0x1000 : 0);
-		return;
-	}
-	case 0x70f8: // MVKD dmad, Smem (absolute destination form)
-	{
-		const u16 destination = fetch();
-		const u16 source = fetch();
-		m_data.write_word(destination, m_data.read_word(source));
+			((data_read(address) & mask) ? 0x1000 : 0);
 		return;
 	}
 	case 0xfc00: // RET

@@ -89,11 +89,24 @@ private:
 		program.write_word(0x0115, 0x0003);
 		program.write_word(0x0116, 0xec02);
 		program.write_word(0x0117, 0xe5c9);
-		program.write_word(0x0118, 0xf074);
-		program.write_word(0x0119, 0x0220);
-		program.write_word(0x011a, 0x70f8);
-		program.write_word(0x011b, 0x0904);
-		program.write_word(0x011c, 0x0801);
+		program.write_word(0x0118, 0xe726);
+		program.write_word(0x0119, 0xf074);
+		program.write_word(0x011a, 0x0220);
+		program.write_word(0x011b, 0x70f8);
+		program.write_word(0x011c, 0x0904);
+		program.write_word(0x011d, 0x0801);
+		program.write_word(0x011e, 0x7714);
+		program.write_word(0x011f, 0x0a00);
+		program.write_word(0x0120, 0x70f8);
+		program.write_word(0x0121, 0x0905);
+		program.write_word(0x0122, 0x0014);
+		program.write_word(0x0123, 0x7712);
+		program.write_word(0x0124, 0x0800);
+		program.write_word(0x0125, 0x7192);
+		program.write_word(0x0126, 0x0014);
+		program.write_word(0x0127, 0x7713);
+		program.write_word(0x0128, 0x0800);
+		program.write_word(0x0129, 0x1293);
 
 		program.write_word(0x0200, 0x7680);
 		program.write_word(0x0201, 0xbeef);
@@ -205,8 +218,8 @@ private:
 					data.read_word(0x1200), data.read_word(0x1201),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
-			// PC has advanced past unsupported MVDM opcode 7192 at 7f8e.
-			expect(pc == 0x7f8f, "ROM4 first unsupported instruction");
+			// PC has advanced past unsupported XOR opcode f0c8 at 7fb4.
+			expect(pc == 0x7fb5, "ROM4 first unsupported instruction");
 			expect(data.read_word(0x1200) == 0x3532 &&
 					data.read_word(0x1201) == 0x0000,
 					"ROM4 challenge header construction");
@@ -252,12 +265,18 @@ private:
 				data.read_word(0x0901) == 0xaaaa &&
 				data.read_word(0x0902) == 0xbbbb,
 				"circular addressing wrap order");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0802,
+		expect(m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0802,
 				"circular addressing final pointer");
 		expect(data.read_word(0x0903) == 0x0000,
 				"BITF and conditional return");
 		expect(data.read_word(0x0904) == 0xbbbb,
 				"absolute data-memory copy");
+		expect(data.read_word(0x0905) == 0x0a00,
+				"memory-mapped auxiliary-register read");
+		expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xaaaa,
+				"memory-mapped auxiliary-register write");
+		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xaaaa,
+				"unsigned data operand load");
 
 		m_phase = 1;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
