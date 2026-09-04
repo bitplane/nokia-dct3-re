@@ -79,8 +79,8 @@ def check_trace(log: str, block_map: str) -> list[str]:
             errors.append(f"missing upload reply 0x{value:04x}")
     if "pc=0x0D80" not in log:
         errors.append("loader2 entry 0x0d80 was not observed")
-    if "SEEDDARAM:" not in log:
-        errors.append("trace does not expose the current flat-snapshot assist")
+    if "SEEDDARAM:" in log:
+        errors.append("trace still uses the retired DARAM reseed assist")
     return errors
 
 

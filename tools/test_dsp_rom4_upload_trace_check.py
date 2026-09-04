@@ -20,7 +20,6 @@ HDRLOG #1 hdr7F=0x0078 @934k hdr[7B..7F]=FD00 FF80 0244 0500 0078
 HDRLOG #2 hdr7F=0x01F4 @938k hdr[7B..7F]=0D80 1000 0122 0580 01F4
 HDRLOG #3 reply=0x0004 @938k
 [reqwatch] pc=0x0D80 REQ[0x871]=0x0000
-SEEDDARAM: current compatibility assist
 [reqwatch] pc=0x3855 REQ[0x871]=0x0001
 HDRLOG #4 hdr7F=0x044C @938k hdr[7B..7F]=25B4 1F80 034E 0130 044C
 HDRLOG #5 reply=0x0002 @944k
@@ -45,6 +44,10 @@ class UploadTraceCheckTests(unittest.TestCase):
     def test_rejects_missing_descriptor(self):
         errors = check_trace(TRACE.replace("25B4 1F80", "25B5 1F80"), BLOCKS)
         self.assertTrue(any("missing upload descriptor" in error for error in errors))
+
+    def test_rejects_retired_daram_assist(self):
+        errors = check_trace(TRACE + "SEEDDARAM: reloaded resident words\n", BLOCKS)
+        self.assertIn("trace still uses the retired DARAM reseed assist", errors)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ hashes and provenance are recorded in `roms/README.md`.
 | ROM4 serial-control routines are labelled at DSP addresses `0x4604` (write), `0x465c` (read) and `0x4610` (single/multi-register wrapper). The self-test path at `0x4ae1` selects registers 0, 5 and 6. | public annotations derived from the private 5110 image; protocol shape agrees with the locally admitted opaque device | retain as address-level reproduction guidance. Registers 5/6 are measurement inputs, not evidence for audio mux/gain fields. |
 | The parallel MFI control path writes `0xCxxx` frames through DSP MMR `0x22` or an interrupt-masked `0x32` variant: bits 15..12 select one of 16 registers and bits 11..0 carry data. A reset/run-mode path reportedly emits `0xc008` at DSP PC `0x301f`. | public C54x trace annotation; locally unexecuted | a real backend needs a separate callback into an opaque parallel-control bank. Do not feed these frames into the serial register file or PCM endpoint. |
 | The native co-sim uses serial-register defaults 5=`0x160`, 6=`0x010`, parallel AGC=`0x160`, ready status D=`0x00c`, and zero I/Q. | explicitly synthetic no-signal/self-test inputs, not physical measurements | never promote these values as COBBA reset constants. They are only labelled compatibility-fixture candidates. |
-| The available image lacks an acquisition overlay expected behind DSP routine `0x250b`; one self-test report is therefore still staged by the analysis harness. | explicit upstream limitation | a ROM4 run is evidence for executed resident/loaded code and observed port traffic, not automatically a complete DSP or RF implementation. |
+| The boot self-test builder calls resident slot `0x250b`, which is a no-op in the recovered image, before copying its input object. | upstream observation, now reproduced against the staged image | Do not infer a missing acquisition overlay from the no-op alone. The live builder enters with `AR2=0x0825`, pointing at the MCU-written command-ring payload; isolate the remaining defect in the copy/transform path. |
 | Exact audio interrupt vector, activation cells, and a roughly 18.6 kHz tone cadence | explicitly experimental/tuned in upstream comments and potentially product-specific | not admitted; DCT3 voice PCM documentation currently supports an 8 kHz frame boundary, so rate/vector remain configuration/evidence questions |
 | Host-side PCM sinks, resampling, injected samples, and environment gates | implementation conveniences | do not adopt as hardware behavior; host audio is a consumer/producer beyond the emulated COBBA analogue pins |
 | NSE-8 and NHM-5 MCU firmware independently publish tone oscillator words at shared byte offsets `0x0ae`/`0x0b0`, amplitude at `0x0b6`, with oscillator values in quarter-Hz units | local paired-ROM traces; the common `0x0e10` value produces 900 Hz | `nokia_dsp_hle_device` owns this typed mailbox contract and drives the temporary MAME tone sinks; `nokia_dspif_device` remains transport-only |
@@ -176,12 +176,14 @@ The earlier failed promotion runs remain useful negative controls. The
 corrected backend now meets the required 74 acknowledgements and stable-UI gate
 without `SEEDDARAM`. A backend without `SELFTEST_MEAS` still reaches the MCU
 validator and requests an organic reason-4 reboot. Serial COBBA registers 5
-and 6 already supply the smaller subcommand
-`0x13` measurement, but the boot-gating subcommand `0x16` calls DSP hook
-`0x250b`, which remains a no-op in the resident image, and then packages stale
-command-ring data. The next input-fidelity step is to recover the producer that
-replaces that hook; changing the accepted output tuple or tuning COBBA ADC
-constants cannot establish it.
+and 6 already supply the smaller subcommand `0x13` measurement. The
+boot-gating subcommand `0x16` calls slot `0x250b`, but a halt at builder
+`0x4b73` establishes that the no-op returns with `AR2=0x0825` inside the live
+MDISND ring. The twelve source words exactly match the MCU's preceding
+`0x70/0x16` request at ring words `0x25..0x30`; the source is neither stale nor
+an absent acquisition buffer. The next fidelity step is to audit the builder's
+circular copy and transforms at `0x3900` and `0x7f2d`; changing the accepted
+output tuple or tuning COBBA ADC constants cannot establish them.
 
 The recovered catalogue is independently auditable with:
 
