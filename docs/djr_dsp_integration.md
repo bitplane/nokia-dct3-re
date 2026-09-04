@@ -152,13 +152,41 @@ instructions came from immutable mask ROM. More precise provenance requires a
 map-aware coverage export rather than inference from this coarse partition.
 
 This run is not promotable as an unassisted DSP implementation. Its log proves
-three active compatibility mechanisms: `SEEDDARAM` restores resident content
-after the boot clear, the COBBA model loops serial samples, and
+three active compatibility mechanisms: `SEEDDARAM` replays captured DARAM
+content after the boot clear, the COBBA model loops serial samples, and
 `SELFTEST_MEAS` writes validator-compatible report fields after the DSP's own
-transform because the acquisition overlay behind `0x250b` is absent. Run
+transform. Run
 `make check-dsp-rom4-cosim LOG=<captured-log>` to reproduce this classification;
 the checker deliberately reports promotion as blocked while any such assist is
 observed.
+
+### Compatibility-assist audit
+
+Paired 30-million-MCU-instruction runs disabled each assist independently. The
+results classify the missing contracts without treating the native harness as
+a hardware specification:
+
+| Disabled assist | Observed result | Classification and replacement condition |
+|---|---|---|
+| `SEEDDARAM` | warm boot reaches run mode with `0x0d80=0xfc00`, `0x0d00=0xfc00`, `0x0926=0`, then produces 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | non-hardware snapshot replay. The recovered block catalogue targets 1,189 of the 2,048 replayed words in `0x2000..0x27ff`, so this range cannot be described as immutable ROM automatically reloading DARAM. Replace it only after the firmware-driven upload, DSP demand-load and warm-reset preservation/clear sequence accounts for the required contents. |
+| `SELFTEST_MEAS` | the DSP reaches the validator without the patch, then the MCU requests an organic reason-4 warm reboot at caller `0x258d35`/resume `0x258d3d` | direct output synthesis. The native harness writes `0x1202..0x1206 = {0010,0000,0000,0000,0160}` after the DSP transform. These are accepted fixture values, not recovered COBBA readings. Replace them with the DSP routine's real acquisition inputs and COBBA response; do not promote the accepted output tuple as a reset value. |
+| COBBA BSP loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The observed boot test selects COBBA digital loopback and transmits `0x0aaa`; a real COBBA must return the serial sample through its receive register. Move this behavior into a COBBA serial/BSP model driven by its control mode and clocks, with no PC, step-count or boot-phase condition. |
+
+The recovered catalogue is independently auditable with:
+
+```sh
+python3 tools/dsp_rom_audit.py \
+  --block-map roms/research/nse1-rom4/working/dsp_blocks.txt
+```
+
+The parser intentionally calls the four undecoded descriptor fields
+`auxiliary`, `staging`, `chunk_length` and `flags`. Destination and word count
+are supported by the catalogue's own block extents and the independently
+decoded v5.01 upload at `0x2286..0x2376`; stronger field names require decoding
+the ROM4 loader. Duplicate and overlapping catalogue entries are unioned when
+coverage is reported. The flat `dsp_full.bin` is consequently treated as a
+mapped execution snapshot containing ROM and overlaid runtime memory, not as a
+literal chip-ROM declaration.
 
 An 80-million-instruction follow-up used only the native harness's physical-key
 replay to enter the handset security code. It reached stable NSE-1 standby with
@@ -172,7 +200,7 @@ The captured interface evidence is bounded as follows:
   are present;
 - the host-command ISR, timer ISR, DSP receive enqueue/dequeue paths and
   overlaid DARAM execute;
-- COBBA BSP loopback and codec-frame interrupts are present; and
+- host-assisted COBBA BSP loopback and codec-frame interrupts are present; and
 - no complete parallel-MFI transaction, bidirectional speech PCM call, or
   call setup/release lifecycle was produced by this run.
 

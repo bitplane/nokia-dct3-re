@@ -93,6 +93,9 @@
     leaving existing host streams unmoved; the harness restores the original
     default endpoints on every exit path.
   - `dsp_rom_audit.py` — distinguishes real nonuniform DSP regions from
+    placeholder fills and optionally parses AlexD's recovered ROM4 block
+    catalogue to quantify DSP-address coverage without assigning semantics to
+    its undecoded descriptor fields;
     checksum-valid uniform fill placeholders (`make audit-dsp-roms`).
   - `dsp_upload_extract.py` — reconstructs contiguous type-`0x51`
     DSP-addressed images or bounded shared-RAM staging snapshots from passive
