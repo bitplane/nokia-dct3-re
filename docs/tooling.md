@@ -97,6 +97,9 @@
     catalogue to quantify DSP-address coverage without assigning semantics to
     its undecoded descriptor fields;
     checksum-valid uniform fill placeholders (`make audit-dsp-roms`).
+  - `dsp_rom4_upload_trace_check.py` — checks a sibling-harness trace for the
+    ordered ROM4 cold upload, reset-preserved warm entry, loader2 request and
+    catalogue-backed run-mode demand uploads. Raw traces remain local.
   - `dsp_upload_extract.py` — reconstructs contiguous type-`0x51`
     DSP-addressed images or bounded shared-RAM staging snapshots from passive
     traces, with explicit word byte order.
