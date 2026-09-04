@@ -1,0 +1,132 @@
+# Upstream architecture target
+
+This document defines the intended MAME-facing architecture. It is a source
+ownership contract, not a claim that every device below is complete.
+
+## Machine composition
+
+`nokia_dct3_state` owns handset composition and board wiring. Product
+differences belong in typed product contracts and machine configurations. The
+driver must not select behavior from firmware PCs, filenames, driver names or
+environment variables.
+
+| Layer | Intended owner | Current implementation |
+| --- | --- | --- |
+| ARM execution | generic MAME ARM7 core | present |
+| MAD2 system logic | Nokia MAD2 devices: CTSI, PUP, KBGPIO, UIF, GENSIO, MBUS, SIMI and DSPIF | extracted partial hardware |
+| power management | `nokia_ccont_device` | extracted partial hardware |
+| audio/RF codec | `nokia_cobba_device` | serial-control capture seam and partial PCM/audio model |
+| persistent storage | generic flash and I2C EEPROM devices, with a temporary B3 adapter where the generic flash core lacks partition behavior | present, partly transitional |
+| display | geometry-configured PCD8544-family device | present |
+| SIM | SIMI controller plus replaceable card-side protocol device | present |
+| DSP execution | a future generic TMS320C54x core and product-correct internal ROMs | absent |
+| DSP compatibility backend | `nokia_dsp_hle_device` | present and explicitly provisional |
+| laboratory cellular network | radio/link/session/network peer devices beyond the DSP boundary | present; deterministic test infrastructure rather than RF hardware |
+
+Device boundaries follow independently stateful hardware interfaces, not
+package count. MAD2 is one physical ASIC, but retaining its internal peripheral
+blocks as devices keeps their contracts independently testable and reusable.
+
+## DSP substitution seam
+
+`nokia_dspif_device` is the MCU-visible transport and is the fixed boundary for
+both DSP implementations. It owns only:
+
+- the shared-RAM backing store;
+- DSPIF command/doorbell registers;
+- transmit and receive ring storage and cursor mechanics;
+- MCU-facing FIQ0 and service-interrupt delivery; and
+- callbacks that report MCU accesses to an attached backend.
+
+It must not manufacture bootstrap values, interpret GSM messages, decode audio
+commands or choose product behavior. Those rules are enforced by keeping all
+such behavior in `nokia_dsp_hle_device` today.
+
+The real backend must attach at the same boundary and supply:
+
+1. TMS320C54x program, data and I/O address spaces;
+2. MAD2 reset, release and interrupt wiring;
+3. host-port/shared-memory visibility and arbitration;
+4. MCU-to-DSP doorbells and DSP-to-MCU FIQ/IRQ signaling;
+5. firmware-uploaded code/data overlays through ordinary MCU writes;
+6. DSP serial control of COBBA;
+7. the parallel MFI/control plane used for radio and codec control; and
+8. bidirectional PCM clocks, framing and sample data.
+
+The HLE and real core are alternatives. A real core must not run concurrently
+with HLE code that writes the same shared words, advances the same ring cursors
+or drives the same COBBA interface.
+
+## DSP ROM policy
+
+Keep the following storage domains distinct in MAME ROM declarations:
+
+- MAD2 ARM mask ROM;
+- DSP program ROM;
+- DSP data ROM;
+- DSP peripheral/data ROM, where the silicon exposes a separate domain; and
+- overlays that the MCU uploads from handset flash at runtime.
+
+An unidentified or unavailable internal ROM is `NO_DUMP`. A compatibility HLE
+does not turn an undumped ROM into a dumped one and must not be represented by a
+placeholder ROM file. Images are promoted only with provenance, exact size,
+byte order and cryptographic hashes. A ROM from another MAD2/DSP generation is
+not a substitute merely because its bootstrap words look similar.
+
+The repository may keep private, ignored research copies under `roms/research`
+as described by `roms/README.md`; distributable MAME sources contain only ROM
+metadata.
+
+## COBBA boundary
+
+COBBA remains a separate mixed-signal device. Its eventual contract has three
+independent planes:
+
+- serial register selection and 12-bit data transfer;
+- parallel MFI/RF control frames; and
+- PCM audio input/output with product-specific board routes.
+
+Unknown register meanings remain opaque stored state until documentation,
+paired firmware behavior or a capture establishes their effects. The present
+HLE voice profile is a declared fallback and must disappear from real-DSP
+machine compositions.
+
+## Network boundary
+
+The handset model ends at an explicit DSP/radio attachment. The deterministic
+GSM network is useful for regression and interactive emulation, but it is not a
+simulation of the analogue RF board. A future external GSM or SIP bridge should
+attach beyond the network/call adapter and must not add telephony policy to
+MAD2, DSPIF or COBBA.
+
+## Upstream series
+
+The likely reviewable sequence is:
+
+1. generic flash and PCD8544-family corrections;
+2. independently useful Nokia hardware devices;
+3. the Nokia DCT3 family driver with explicit HLE status;
+4. a clean-room, MAME-compatible TMS320C54x CPU core;
+5. real-DSP machine configurations as ROM provenance permits; and
+6. further handset profiles promoted by product-specific gates.
+
+Research traces, firmware-address symbol maps, raw captures and exploratory
+checkers remain in this repository. Upstream source keeps concise hardware
+comments, citations, ROM metadata, save-state support and user-visible
+limitations.
+
+## DSP promotion gates
+
+A real DSP backend is not promoted because it executes instructions. At
+minimum it must reproduce, without HLE writes on the same boundary:
+
+- reset and bootstrap exchange;
+- MCU-uploaded memory blocks and completion signaling;
+- shared-ring traffic and interrupt delivery;
+- COBBA control traffic;
+- stable idle operation;
+- call setup and teardown; and
+- bidirectional speech PCM under save/load.
+
+Until those gates pass, the HLE remains the supported compatibility backend and
+the real core remains experimental.

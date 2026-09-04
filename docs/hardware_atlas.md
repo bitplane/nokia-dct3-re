@@ -52,8 +52,10 @@ MAD2WD1; shared behavior must be established per block rather than inferred
 from the family name. The MCU
 runs the application/UI/control firmware; the DSP owns GSM Layer 1 and audio.
 `nokia_dspif_device` models firmware-visible shared memory, DSPIF and packet
-rings. Separate DSP-HLE and external-service devices attach the two semantic
-peers without executing DSP instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
+rings. It is deliberately transport-only so either the current compatibility
+HLE or a future TMS320C54x core can attach without changing the MCU-visible
+device. Separate DSP-HLE and external-service devices currently attach the
+semantic peers without executing DSP instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
 **PCD8544 LCD**, **24C128 EEPROM** (I2C), and the SIM card behind MAD2 SIMI.
 
 ## CPU memory map (the emulated regions)

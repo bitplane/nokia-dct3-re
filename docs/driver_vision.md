@@ -4,6 +4,10 @@ The project aims to turn the Nokia phone driver into a composition of reusable
 hardware devices. Firmware-specific research hooks are temporary instruments,
 not compatibility mechanisms.
 
+The target upstream composition and the non-negotiable DSP transport/backend
+boundary are defined in `upstream_architecture.md`. In particular, the current
+DSP HLE is a compatibility backend, not the permanent owner of DSP silicon.
+
 ## Current architecture
 
 | Subsystem | Current shape | Next architectural step |

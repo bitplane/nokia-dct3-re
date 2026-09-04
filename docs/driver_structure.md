@@ -4,6 +4,10 @@ Goal: the Nokia driver should describe machine composition while reusable hardwa
 in explicit MAME devices. Firmware-research execution tracing remains quarantined so it can be
 deleted incrementally as observed contracts become components.
 
+`upstream_architecture.md` is authoritative for the intended MAME device graph,
+the real-DSP/HLE substitution seam and internal-ROM ownership. This document
+describes the current source layout within that target.
+
 ## Entry points vs. quarantine
 
 The memory-map-registered handlers are thin. Diagnostic execution observations

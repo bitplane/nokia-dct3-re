@@ -199,8 +199,8 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("NOKIA_BOOT_HLE_BRANCH", reset)
         self.assertNotIn("set_state_int", reset)
 
-        common_roms = self.driver.split("#define MAD2_INTERNAL_ROMS", 1)[1]
-        common_roms = common_roms.split("ROM_START( noki3210 )", 1)[0]
+        # Test the declaration's ROM contract, not its local macro spelling.
+        common_roms = self.driver.split("ROM_START( noki3210 )", 1)[0]
         self.assertIn('ROM_LOAD("mad2_mask_rom.bin"', common_roms)
         self.assertIn("NO_DUMP", common_roms)
         self.assertNotIn("CRC(deab7e4e)", common_roms)

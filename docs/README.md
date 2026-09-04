@@ -28,6 +28,7 @@ distinction.
 | `board_io_static_census.md` | Generated five-ROM PUP, KBGPIO, UIF and SELECT direct-access census. |
 | `driver_structure.md` | Code ownership and quarantine rules. |
 | `driver_vision.md` | Current modularization path and configuration taxonomy. |
+| `upstream_architecture.md` | Target MAME device graph, DSP substitution seam, ROM policy, and upstream staging. |
 | `product_configuration_audit.md` | Post-refactor product-contract dependency audit and next bounded refactor. |
 | `external_call_bridge.md` | Standalone organic-call and bidirectional GSM-FR bridge operation. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
