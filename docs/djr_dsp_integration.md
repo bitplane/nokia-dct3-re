@@ -331,19 +331,18 @@ It is a `device_interface`, so both an ordinary device and a future
 existing `nokia_dsp_hle_device` implements it without behavioral changes;
 only HLE-specific product contracts retain an optional concrete finder.
 
-This is deliberately not a C54x core or an importer for the GPL analysis
-backend. A future clean-room, MAME-compatible C54x device can occupy the same
-machine-config tag and implement the endpoint while using the existing DSPIF,
-MAD2 interrupt, COBBA and PCM devices. Promotion still requires product-correct
-ROM declarations and removal of every active compatibility assist.
+No GPL analysis implementation is imported. A clean-room, MAME-compatible C54x
+device occupies the backend seam while using the existing DSPIF, MAD2 interrupt,
+COBBA and PCM devices. Promotion still requires product-correct ROM declarations
+and complete peripheral validation.
 
-That future device now exists as an unselected integration scaffold:
 `nokia_dsp_c54x_device` contains the clean-room C54x CPU, maps the recovered
 HPI DARAM alias through `nokia_dspif_device`, implements the ROM4 OVLY program
-view, and terminates DSPINT at HPINT. It deliberately remains absent from all
-shipping handset configurations until reset/release, staged upload and DSP
-peripheral I/O have executable gates. The HLE remains the only selected backend
-and therefore the established behavioral reference.
+view, and terminates DSPINT at HPINT. The NSE-1 research configuration now
+selects this backend and executes reset/release, staged upload, host-command
+INT2 dispatch, the complete MCU transmit ring and the challenge response
+without either historical compatibility assist. Other handsets retain the HLE
+as the established behavioral reference.
 
 ## Acquisition and reproduction status
 

@@ -26,7 +26,7 @@ public:
 	virtual void shared_0fe_write_w(int state) override { }
 	virtual void shared_100_read_w(int state) override { }
 	virtual void shared_100_write_w(int state) override { }
-	virtual void mcu_shared_write(u16 byte_offset) override { }
+	virtual void mcu_shared_write(u16 byte_offset) override;
 
 	virtual u32 tone_frequency1() const override { return 0; }
 	virtual u32 tone_frequency2() const override { return 0; }
@@ -48,6 +48,9 @@ private:
 	u16 io_r(offs_t offset);
 	void io_w(offs_t offset, u16 data);
 	bool overlay_address(u16 address) const;
+	u16 host_request() const;
+	void acknowledge_host_command(u16 mask);
+	void update_host_command_line();
 
 	required_device<tms320c54x_device> m_cpu;
 	required_device<nokia_dspif_device> m_transport;
@@ -56,6 +59,7 @@ private:
 	std::array<u16, 0x10000> m_program{};
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x100> m_io{};
+	bool m_host_command_line = false;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_DSP_C54X, nokia_dsp_c54x_device)

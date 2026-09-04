@@ -35,11 +35,13 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_program));
 	save_item(NAME(m_data));
 	save_item(NAME(m_io));
+	save_item(NAME(m_host_command_line));
 }
 
 void nokia_dsp_c54x_device::device_reset()
 {
 	std::fill(m_io.begin(), m_io.end(), 0);
+	m_host_command_line = false;
 	m_cpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
 }
 
@@ -47,8 +49,12 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 {
 	// MAD2 holds the DSP core in reset while leaving its shared/on-chip DARAM
 	// intact. Releasing the line restarts at the mask-ROM reset vector.
+	if (!released)
+		m_host_command_line = false;
 	m_cpu->set_input_line(INPUT_LINE_RESET,
 			released ? CLEAR_LINE : ASSERT_LINE);
+	if (released)
+		update_host_command_line();
 }
 
 bool nokia_dsp_c54x_device::overlay_address(u16 address) const
@@ -90,16 +96,80 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 		m_transport->dsp_data_w(address, data);
 	else
 		m_data[address] = data;
+	if (address >= 0x0852 && address <= 0x0855)
+		update_host_command_line();
+}
+
+void nokia_dsp_c54x_device::mcu_shared_write(u16 byte_offset)
+{
+	if (byte_offset >= 0x0a4 && byte_offset <= 0x0aa)
+		update_host_command_line();
+}
+
+u16 nokia_dsp_c54x_device::host_request() const
+{
+	const u16 tx_producer = m_transport->shared_word(0x0a4 / 2);
+	const u16 tx_consumer = m_transport->shared_word(0x0a6 / 2);
+	const u16 command = m_transport->shared_word(0x0a8 / 2);
+	// Host-command bit 1 is a live comparator over the MDISND pointers.  It is
+	// not part of the writable command latch.
+	return (command & ~u16(0x0002)) |
+			(tx_producer != tx_consumer ? 0x0002 : 0x0000);
+}
+
+void nokia_dsp_c54x_device::acknowledge_host_command(u16 mask)
+{
+	const u16 command = m_transport->shared_word(0x0a8 / 2);
+	const u16 acknowledged = mask & ~u16(0x0002);
+	if (command & acknowledged)
+		m_transport->peer_shared_w(0x0a8 / 2, command & ~acknowledged);
+}
+
+void nokia_dsp_c54x_device::update_host_command_line()
+{
+	const u16 acknowledgement = m_transport->shared_word(0x0aa / 2);
+	// MAD2 presents the firmware's command latch and MDISND ring state as one
+	// level-sensitive request to the DSP's edge-sampled INT2 input. Bit 1 is
+	// the live ring-not-empty condition rather than persistent RAM state.
+	const bool level = (host_request() & ~acknowledgement) != 0;
+	if (level && !m_host_command_line)
+		m_cpu->set_input_line(2, HOLD_LINE);
+	m_host_command_line = level;
 }
 
 u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 {
-	return m_io[offset & 0xff];
+	switch (offset & 0xff)
+	{
+	case 0x01:
+		return host_request();
+	case 0x02:
+		return m_transport->shared_word(0x0aa / 2);
+	default:
+		return m_io[offset & 0xff];
+	}
 }
 
 void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 {
-	m_io[offset & 0xff] = data;
+	const u8 port = offset & 0xff;
+	m_io[port] = data;
+	if (port == 0x02)
+	{
+		// Port 2 is the DSP's in-service/accept mask.  A set bit also retires
+		// the corresponding latched MCU command; the ring comparator is
+		// retired only by advancing its consumer pointer.
+		m_transport->peer_shared_w(0x0aa / 2, data);
+		acknowledge_host_command(data);
+		update_host_command_line();
+	}
+	else if (port == 0x01)
+	{
+		// Port 1 writes are DSP status/completion strobes, not writes back to
+		// the port-1 request latch read above.
+		acknowledge_host_command(data);
+		update_host_command_line();
+	}
 }
 
 void nokia_dsp_c54x_device::doorbell_w(int state)

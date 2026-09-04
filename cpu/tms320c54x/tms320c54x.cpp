@@ -430,6 +430,16 @@ void tms320c54x_device::execute_one(u16 op)
 		destination = (destination - value) & ACC_MASK;
 		return;
 	}
+	if ((op & 0xfce0) == 0xf400) // ADD source accumulator, shift, destination accumulator
+	{
+		const int shift = s8((op & 0x1f) << 3) >> 3;
+		const u64 source = accumulator(BIT(op, 9));
+		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
+				(source << shift) & ACC_MASK;
+		u64 &destination = accumulator(BIT(op, 8));
+		destination = (destination + value) & ACC_MASK;
+		return;
+	}
 	if ((op & 0xfce0) == 0xf080) // AND source accumulator, shift, destination accumulator
 	{
 		const int shift = s8((op & 0x1f) << 3) >> 3;
@@ -437,6 +447,23 @@ void tms320c54x_device::execute_one(u16 op)
 		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
 				(source << shift) & ACC_MASK;
 		accumulator(BIT(op, 8)) &= value;
+		return;
+	}
+	if ((op & 0xfce0) == 0xf0a0) // OR source accumulator, shift, destination accumulator
+	{
+		const int shift = s8((op & 0x1f) << 3) >> 3;
+		const u64 source = accumulator(BIT(op, 9));
+		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
+				(source << shift) & ACC_MASK;
+		accumulator(BIT(op, 8)) |= value;
+		return;
+	}
+	if ((op & 0xfce0) == 0xf0e0) // SFTL source accumulator, shift, destination accumulator
+	{
+		const int shift = s8((op & 0x1f) << 3) >> 3;
+		const u64 source = accumulator(BIT(op, 9));
+		accumulator(BIT(op, 8)) = shift < 0 ? source >> -shift :
+				(source << shift) & ACC_MASK;
 		return;
 	}
 	if ((op & 0xfcff) == 0xf482) // LD source accumulator, ASM, destination accumulator
@@ -447,9 +474,10 @@ void tms320c54x_device::execute_one(u16 op)
 				(source << shift) & ACC_MASK;
 		return;
 	}
-	if (op == 0x6ff8)
+	if ((op & 0xff00) == 0x6f00)
 	{
-		const u16 address = fetch();
+		const bool absolute = low == 0xf8;
+		const u16 address = absolute ? fetch() : 0;
 		const u16 extension = fetch();
 		const int shift = s8((extension & 0x1f) << 3) >> 3;
 		auto shifted = [this, shift](u64 value)
@@ -457,18 +485,29 @@ void tms320c54x_device::execute_one(u16 op)
 			return shift < 0 ? arithmetic_shift_right(value, -shift) :
 					(value << shift) & ACC_MASK;
 		};
+		auto read_operand = [this, absolute, address, low]()
+		{
+			return absolute ? data_read(address) : indirect_read(low);
+		};
+		auto write_operand = [this, absolute, address, low](u16 value)
+		{
+			if (absolute)
+				data_write(address, value);
+			else
+				indirect_write(low, value);
+		};
 		if ((extension & 0xfee0) == 0x0c40) // LD Smem, shift, dst
-			accumulator(BIT(extension, 8)) = shifted(data_operand(data_read(address)));
+			accumulator(BIT(extension, 8)) = shifted(data_operand(read_operand()));
 		else if ((extension & 0xfee0) == 0x0c60) // STH src, shift, Smem
-			data_write(address, u16(shifted(accumulator(BIT(extension, 8))) >> 16));
+			write_operand(u16(shifted(accumulator(BIT(extension, 8))) >> 16));
 		else if ((extension & 0xfee0) == 0x0c80) // STL src, shift, Smem
-			data_write(address, u16(shifted(accumulator(BIT(extension, 8)))));
+			write_operand(u16(shifted(accumulator(BIT(extension, 8)))));
 		else if ((extension & 0xfce0) == 0x0c00) // ADD Smem, shift, src, dst
 			accumulator(BIT(extension, 8)) =
-					(accumulator(BIT(extension, 9)) + shifted(data_operand(data_read(address)))) & ACC_MASK;
+					(accumulator(BIT(extension, 9)) + shifted(data_operand(read_operand()))) & ACC_MASK;
 		else if ((extension & 0xfce0) == 0x0c20) // SUB Smem, shift, src, dst
 			accumulator(BIT(extension, 8)) =
-					(accumulator(BIT(extension, 9)) - shifted(data_operand(data_read(address)))) & ACC_MASK;
+					(accumulator(BIT(extension, 9)) - shifted(data_operand(read_operand()))) & ACC_MASK;
 		else
 		{
 			logerror("%s: unimplemented C54x extended opcode %04x/%04x at %04x\n",
@@ -478,17 +517,27 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		return;
 	}
-	if ((op == 0x6f92 || op == 0x6f8a || op == 0x6f93 || op == 0x6f8b) &&
-			(m_cache.read_word(m_pc) == 0x0d96 || m_cache.read_word(m_pc) == 0x0c96 ||
-			 m_cache.read_word(m_pc) == 0x0d91 || m_cache.read_word(m_pc) == 0x0c91))
+	if ((op & 0xfc00) == 0xf000 && ((op >> 4) & 0x0f) <= 5)
 	{
-		const u16 extension = fetch();
-		const int shift = s8((extension & 0x1f) << 3) >> 3;
-		const u64 value = BIT(extension, 8) ? m_b : m_a;
-		const u16 result = shift < 0
-				? u16(arithmetic_shift_right(value, -shift))
-				: u16((value << shift) & ACC_MASK);
-		indirect_write(low, result);
+		// Immediate accumulator ALU family.  Bit 9 selects the source,
+		// bit 8 the destination, and the low nibble is the shift count.
+		const unsigned operation = (op >> 4) & 0x0f;
+		const unsigned shift = op & 0x0f;
+		const u16 immediate = fetch();
+		const u64 source = accumulator(BIT(op, 9));
+		u64 &destination = accumulator(BIT(op, 8));
+		const u64 operand = operation <= 2 ?
+				((u64(s64(s16(immediate))) << shift) & ACC_MASK) :
+				(u64(immediate) << shift);
+		switch (operation)
+		{
+		case 0: destination = (source + operand) & ACC_MASK; break;
+		case 1: destination = (source - operand) & ACC_MASK; break;
+		case 2: destination = operand; break;
+		case 3: destination = source & operand; break;
+		case 4: destination = source | operand; break;
+		case 5: destination = source ^ operand; break;
+		}
 		return;
 	}
 	if (op == 0x70f8) // MVKD dmad, Smem (absolute destination form)
@@ -542,6 +591,12 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0b00: // SUBS Smem, B
 		m_b = (m_b - indirect_read(low)) & ACC_MASK;
 		return;
+	case 0x1800: // AND Smem, A
+		m_a &= indirect_read(low);
+		return;
+	case 0x1900: // AND Smem, B
+		m_b &= indirect_read(low);
+		return;
 	case 0x1a00: // OR Smem, A
 		m_a = (m_a | indirect_read(low)) & ACC_MASK;
 		return;
@@ -569,6 +624,12 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x4b00: // PSHD Smem
 		push(indirect_read(low));
+		return;
+	case 0x8c00: // ST T, Smem
+		indirect_write(low, m_t);
+		return;
+	case 0x8b00: // POPD Smem
+		indirect_write(low, pop());
 		return;
 	case 0x7f00: // WRITA Smem
 	{
@@ -678,6 +739,9 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xe900: // LD #k, B
 		m_b = data_operand(low);
+		return;
+	case 0xee00: // FRAME #k8
+		m_sp = u16(m_sp + s8(low));
 		return;
 	case 0x8800: // STLM A, MMR
 		data_write(low & 0x1f, u16(m_a));
@@ -791,6 +855,16 @@ void tms320c54x_device::execute_one(u16 op)
 		m_data.write_word(m_ar[5]++, m_data.read_word(m_ar[2]++));
 		return;
 	}
+	if (op == 0xe589) // MVDD *AR2+, *AR3+
+	{
+		m_data.write_word(m_ar[3]++, m_data.read_word(m_ar[2]++));
+		return;
+	}
+	if (op == 0xe59c) // MVDD *AR3+, *AR6+
+	{
+		m_data.write_word(m_ar[6]++, m_data.read_word(m_ar[3]++));
+		return;
+	}
 
 	switch (op)
 	{
@@ -819,6 +893,13 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xfc45: // RETC AEQ
 		if ((m_a & ACC_MASK) == 0)
+		{
+			m_pc = pop();
+			m_icount -= 4;
+		}
+		return;
+	case 0xfc47: // RETC ALEQ
+		if ((s64(m_a << 24) >> 24) <= 0)
 		{
 			m_pc = pop();
 			m_icount -= 4;
@@ -1022,6 +1103,13 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const u16 destination = fetch();
 		if ((m_b & ACC_MASK) == 0)
+			m_pc = destination;
+		return;
+	}
+	case 0xf84e: // BC pmad, BGT
+	{
+		const u16 destination = fetch();
+		if ((s64(m_b << 24) >> 24) > 0)
 			m_pc = destination;
 		return;
 	}

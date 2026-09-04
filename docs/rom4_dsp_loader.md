@@ -79,9 +79,20 @@ data source and the encoded program destination on each repetition. Modeling
 that architectural repeat behavior removes the last flat-image/`SEEDDARAM`
 dependency from the MAME backend. The installed program subsequently requests
 and receives another block (`0x044c` input words) and executes into the
-operational ROM. The current frontier is ordinary C54x instruction coverage in
-that code, not loader reconstruction or missing shared memory. COBBA serial and
-PCM I/O remain unconnected.
+operational ROM. The DSP's INT2 input is the level comparison between the
+port-1 command latch plus live MDISND ring state and the port-2 accept mask.
+The operational ISR now consumes the complete MCU ring (`0x0033/0x0033`) and
+returns to its ordinary idle at `0x31a5` without an illegal instruction.
+
+The coherent run also executes the challenge transform, publishes its accepted
+`0x3532` response header and proceeds to the next transaction. This independently
+confirms the earlier no-assist result: resident slot `0x250b` is an intentional
+no-op, not a missing COBBA measurement acquisition hook. `SELFTEST_MEAS` has no
+equivalent in the MAME backend. `make check-c54x-rom4-coherent` guards the
+resulting `0x1074` transaction completion, complete transmit-ring drain and
+clean return to DSP idle; the isolated transform gate separately checks the
+response header.
+COBBA serial and PCM I/O remain unconnected.
 
 The core corrections required to reach this point are generic C54x semantics:
 absolute `STM` extension order, `MVDM`, `DLD`/`DST`, `CMPL`, immediate `XOR`,
@@ -91,8 +102,9 @@ destination update, delayed and conditional control flow, interrupt return,
 extended absolute arithmetic/load/store, and accumulator-indirect branch.
 Operational ROM execution has additionally established signed/unsigned
 accumulator arithmetic, accumulator-shift-mode loads, memory compare,
-accumulator-addressed program writes, stack data pushes, and conditional
-branch/call/return families. Each family has focused core conformance coverage;
+accumulator-addressed program writes, stack data pushes, conditional
+branch/call/return families, signed `FRAME`, immediate cross-accumulator ALU,
+and dual-memory moves. Each family has focused core conformance coverage;
 none recognizes a Nokia address or loader byte pattern.
 
 The retained NSE-1 trace fixes reset polarity and edge behavior without an

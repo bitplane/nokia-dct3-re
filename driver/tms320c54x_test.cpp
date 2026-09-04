@@ -247,6 +247,9 @@ private:
 		program.write_word(0x03d7, 0xf5e1);
 		program.write_word(0x03d8, 0x3292);
 		program.write_word(0x03d9, 0xf5e1);
+		program.write_word(0x03da, 0xeeff);
+		program.write_word(0x03db, 0xee02);
+		program.write_word(0x03dc, 0xf5e1);
 		data.write_word(0x0918, 1);
 		data.write_word(0x091a, 0);
 		data.write_word(0x0920, 0xaaaa);
@@ -523,6 +526,17 @@ private:
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 4,
 					"data-memory load shifted by ST1.ASM");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03da);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 21;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 21)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301,
+					"signed stack-frame adjustment");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
