@@ -235,10 +235,10 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("struct tone_control_contract", header)
         self.assertIn("void mcu_shared_write(u16 byte_offset)", header)
         self.assertIn("m_tone_control.oscillator1_offset", dsp)
-        self.assertIn("m_tone_update_cb(1)", dsp)
+        self.assertIn("notify_tone_update()", dsp)
         self.assertNotIn("tone_control", transport)
         self.assertNotIn("DSP_TONE_OSCILLATOR", phone)
-        self.assertIn("m_dsp_hle->mcu_shared_write(byte_offset)", phone)
+        self.assertIn("m_dsp_backend->mcu_shared_write(byte_offset)", phone)
 
     def test_remote_voice_source_stays_at_network_boundary(self):
         voice = (

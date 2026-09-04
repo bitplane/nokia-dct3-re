@@ -4,6 +4,7 @@
 #ifndef MAME_NOKIA_NOKIA_DSP_HLE_H
 #define MAME_NOKIA_NOKIA_DSP_HLE_H
 
+#include "nokia_dsp_backend.h"
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
 #include "nokia_gsm_fr_codec.h"
@@ -13,7 +14,7 @@
 #include <array>
 #include <optional>
 
-class nokia_dsp_hle_device : public device_t
+class nokia_dsp_hle_device : public nokia_dsp_backend_device
 {
 public:
 	nokia_dsp_hle_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
@@ -129,27 +130,26 @@ public:
 		m_bootstrap = contract;
 	}
 	auto mcu_control_word_cb() { return m_mcu_control_word_cb.bind(); }
-	auto tone_update_cb() { return m_tone_update_cb.bind(); }
 	u16 mcu_control_word() const { return m_mcu_control_word; }
 	u16 mcu_control_wire() const { return m_mcu_control_wire; }
 	u16 data_word(u16 address) const { return m_data_memory[address]; }
 	bool data_word_loaded(u16 address) const { return m_data_memory_loaded[address] != 0; }
 	u64 speech_uplink_frames() const { return m_speech_uplink_frames; }
 	u64 speech_downlink_frames() const { return m_speech_downlink_frames; }
-	u32 tone_frequency1() const { return m_tone_frequency1; }
-	u32 tone_frequency2() const { return m_tone_frequency2; }
-	u16 tone_amplitude() const { return m_tone_amplitude; }
+	virtual u32 tone_frequency1() const override { return m_tone_frequency1; }
+	virtual u32 tone_frequency2() const override { return m_tone_frequency2; }
+	virtual u16 tone_amplitude() const override { return m_tone_amplitude; }
 
-	void tx_commit_w(int state);
-	void service_pending_w(int state);
-	void doorbell_w(int state);
-	void shared_002_write_w(int state);
-	void shared_006_write_w(int state);
-	void shared_0fe_read_w(int state);
-	void shared_0fe_write_w(int state);
-	void shared_100_read_w(int state);
-	void shared_100_write_w(int state);
-	void mcu_shared_write(u16 byte_offset);
+	virtual void tx_commit_w(int state) override;
+	virtual void service_pending_w(int state) override;
+	virtual void doorbell_w(int state) override;
+	virtual void shared_002_write_w(int state) override;
+	virtual void shared_006_write_w(int state) override;
+	virtual void shared_0fe_read_w(int state) override;
+	virtual void shared_0fe_write_w(int state) override;
+	virtual void shared_100_read_w(int state) override;
+	virtual void shared_100_write_w(int state) override;
+	virtual void mcu_shared_write(u16 byte_offset) override;
 
 protected:
 	virtual void device_start() override;
@@ -178,7 +178,6 @@ private:
 	required_device<nokia_radio_peer_device> m_radio_peer;
 	required_device<nokia_mad2_pcm_device> m_mad2_pcm;
 	devcb_write16 m_mcu_control_word_cb;
-	devcb_write_line m_tone_update_cb;
 	emu_timer *m_service_timer = nullptr;
 	emu_timer *m_packet_timer = nullptr;
 	emu_timer *m_response_timer = nullptr;

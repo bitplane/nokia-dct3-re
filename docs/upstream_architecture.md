@@ -20,7 +20,8 @@ environment variables.
 | display | geometry-configured PCD8544-family device | present |
 | SIM | SIMI controller plus replaceable card-side protocol device | present |
 | DSP execution | a future generic TMS320C54x core and product-correct internal ROMs | absent |
-| DSP compatibility backend | `nokia_dsp_hle_device` | present and explicitly provisional |
+| DSP backend contract | `nokia_dsp_backend_device` | present; transport-facing substitution seam |
+| DSP compatibility backend | `nokia_dsp_hle_device` | present and explicitly provisional implementation of that seam |
 | laboratory cellular network | radio/link/session/network peer devices beyond the DSP boundary | present; deterministic test infrastructure rather than RF hardware |
 
 Device boundaries follow independently stateful hardware interfaces, not
@@ -39,10 +40,16 @@ both DSP implementations. It owns only:
 - callbacks that report MCU accesses to an attached backend.
 
 It must not manufacture bootstrap values, interpret GSM messages, decode audio
-commands or choose product behavior. Those rules are enforced by keeping all
-such behavior in `nokia_dsp_hle_device` today.
+commands or choose product behavior. `nokia_dsp_backend_device` is the narrow
+abstract endpoint for DSP-originated semantics: DSPIF notifications and shared
+cell accesses enter through it, while tone state is exposed to the handset's
+audio sinks. It contains no bootstrap, service, speech, radio or product
+contract. `nokia_dsp_hle_device` implements that endpoint today; the driver
+retains a separately typed optional finder only while applying HLE-specific
+product contracts. Runtime transport, reset and tone paths use the abstract
+backend.
 
-The real backend must attach at the same boundary and supply:
+The real backend must implement that same endpoint and supply:
 
 1. TMS320C54x program, data and I/O address spaces;
 2. MAD2 reset, release and interrupt wiring;

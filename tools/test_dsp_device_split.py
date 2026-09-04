@@ -9,6 +9,7 @@ class DspDeviceSplitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.transport = (ROOT / "driver/nokia_dspif.cpp").read_text() + (ROOT / "driver/nokia_dspif.h").read_text()
+        cls.backend = (ROOT / "driver/nokia_dsp_backend.h").read_text()
         cls.hle = (ROOT / "driver/nokia_dsp_hle.cpp").read_text() + (ROOT / "driver/nokia_dsp_hle.h").read_text()
         cls.external = (ROOT / "driver/nokia_external_service.cpp").read_text() + (ROOT / "driver/nokia_external_service.h").read_text()
         cls.network = (ROOT / "driver/nokia_gsm_network.cpp").read_text() + (ROOT / "driver/nokia_gsm_network.h").read_text()
@@ -139,9 +140,38 @@ class DspDeviceSplitTest(unittest.TestCase):
             self.assertNotIn(product, self.hle.lower())
         self.assertIn(
             "shared_006_write_cb().set(m_dsp_hle, "
-            "FUNC(nokia_dsp_hle_device::shared_006_write_w))",
+            "FUNC(nokia_dsp_backend_device::shared_006_write_w))",
             self.phone,
         )
+
+    def test_backend_is_a_swappable_semantic_endpoint(self):
+        self.assertIn(
+            "class nokia_dsp_backend_device : public device_t", self.backend
+        )
+        self.assertIn(
+            "class nokia_dsp_hle_device : public nokia_dsp_backend_device",
+            self.hle,
+        )
+        for entry in (
+            "virtual void tx_commit_w(int state) = 0",
+            "virtual void service_pending_w(int state) = 0",
+            "virtual void doorbell_w(int state) = 0",
+            "virtual void mcu_shared_write(u16 byte_offset) = 0",
+            "virtual u32 tone_frequency1() const = 0",
+        ):
+            self.assertIn(entry, self.backend)
+        for semantic in (
+            "bootstrap_contract", "service_control_contract",
+            "speech_control_contract", "radio_peer", "gsm",
+        ):
+            self.assertNotIn(semantic, self.backend)
+        self.assertIn(
+            "required_device<nokia_dsp_backend_device> m_dsp_backend", self.phone
+        )
+        self.assertIn(
+            "optional_device<nokia_dsp_hle_device> m_dsp_hle", self.phone
+        )
+        self.assertIn("if (m_dsp_hle)", self.phone)
 
     def test_external_peer_uses_acknowledged_startup_phases(self):
         self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)
@@ -151,7 +181,8 @@ class DspDeviceSplitTest(unittest.TestCase):
     def test_phone_composes_peer_devices(self):
         for token in (
             "required_device<nokia_dspif_device> m_dspif",
-            "required_device<nokia_dsp_hle_device> m_dsp_hle",
+            "required_device<nokia_dsp_backend_device> m_dsp_backend",
+            "optional_device<nokia_dsp_hle_device> m_dsp_hle",
             "required_device<nokia_external_service_peer_device> m_external_service_peer",
             "required_device<nokia_gsm_network_device> m_gsm_network",
             "required_device<nokia_gsm_session_device> m_gsm_session",

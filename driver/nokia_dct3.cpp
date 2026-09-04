@@ -689,6 +689,7 @@ public:
 		m_mbus(*this, "mbus"),
 		m_pup(*this, "pup"),
 		m_dspif(*this, "dspif"),
+		m_dsp_backend(*this, "dsp_hle"),
 		m_dsp_hle(*this, "dsp_hle"),
 		m_external_service_peer(*this, "external_service_peer"),
 		m_gsm_call_adapter(*this, "gsm_call_adapter"),
@@ -816,7 +817,8 @@ private:
 	required_device<nokia_mbus_device> m_mbus;
 	required_device<nokia_pup_device> m_pup;
 	required_device<nokia_dspif_device> m_dspif;
-	required_device<nokia_dsp_hle_device> m_dsp_hle;
+	required_device<nokia_dsp_backend_device> m_dsp_backend;
+	optional_device<nokia_dsp_hle_device> m_dsp_hle;
 	required_device<nokia_external_service_peer_device> m_external_service_peer;
 	required_device<nokia_gsm_call_adapter_device> m_gsm_call_adapter;
 	required_device<nokia_gsm_network_device> m_gsm_network;
@@ -978,7 +980,7 @@ void nokia_dct3_state::machine_start()
 	// A BIOS-specific override replaces the whole bootstrap contract rather
 	// than mutating one phase. Products without a matching evidenced variant
 	// retain their base contract and cannot inherit another image's tokens.
-	if (m_product.dsp_bootstrap_override &&
+	if (m_dsp_hle && m_product.dsp_bootstrap_override &&
 			system_bios() == m_product.dsp_bootstrap_override->bios)
 		m_dsp_hle->set_bootstrap_contract(
 				m_product.dsp_bootstrap_override->contract);
@@ -1001,7 +1003,8 @@ void nokia_dct3_state::post_load()
 void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 {
 	m_product = product;
-	m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
+	if (m_dsp_hle)
+		m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
 	m_kbgpio->set_wiring_contract(product.keypad_wiring);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
@@ -1018,13 +1021,16 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	screen->set_size(product.display.visible_width, product.display.visible_height);
 	screen->set_visarea(0, product.display.visible_width - 1,
 			0, product.display.visible_height - 1);
-	m_dsp_hle->set_service_enabled(product.dsp_service);
-	m_dsp_hle->set_external_service_enabled(product.external_service_transport);
-	m_dsp_hle->set_service_control_contract(product.dsp_service_control);
-	m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
-	m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
-	m_dsp_hle->set_speech_control_contract(product.dsp_speech_control);
-	m_dsp_hle->set_tone_control_contract(product.dsp_tone_control);
+	if (m_dsp_hle)
+	{
+		m_dsp_hle->set_service_enabled(product.dsp_service);
+		m_dsp_hle->set_external_service_enabled(product.external_service_transport);
+		m_dsp_hle->set_service_control_contract(product.dsp_service_control);
+		m_dsp_hle->set_service_delay_us(product.dsp_service_delay_us);
+		m_dsp_hle->set_peer_poll_ms(product.dsp_peer_poll_ms);
+		m_dsp_hle->set_speech_control_contract(product.dsp_speech_control);
+		m_dsp_hle->set_tone_control_contract(product.dsp_tone_control);
+	}
 	m_mad2_pcm->set_bus_profile(product.cobba_pcm);
 	m_cobba->set_pcm_sample_bits(product.cobba_pcm.sample_bits);
 	// This explicitly configures the HLE's internal-handset path. A future
@@ -1083,9 +1089,12 @@ void nokia_dct3_state::machine_reset()
 	m_ccont->set_ready(BIT(hardware, 0));
 	m_simi->set_enabled(m_product.simi_controller && BIT(hardware, 1));
 	m_simi->set_card_present(m_product.synthetic_sim_card && BIT(hardware, 1));
-	m_dsp_hle->set_service_enabled(m_product.dsp_service && BIT(hardware, 2));
-	m_dsp_hle->set_external_service_enabled(
-			m_product.external_service_transport && BIT(hardware, 3));
+	if (m_dsp_hle)
+	{
+		m_dsp_hle->set_service_enabled(m_product.dsp_service && BIT(hardware, 2));
+		m_dsp_hle->set_external_service_enabled(
+				m_product.external_service_transport && BIT(hardware, 3));
+	}
 	m_external_service_peer->set_enabled(
 			m_product.external_service_transport && BIT(hardware, 3));
 	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
@@ -1368,7 +1377,7 @@ void nokia_dct3_state::reset_digital_baseband()
 	m_gensio->reset();
 	m_mbus->reset();
 	m_dspif->reset();
-	m_dsp_hle->reset();
+	m_dsp_backend->reset();
 	m_external_service_peer->reset();
 	m_gsm_session->reset();
 	m_lapdm_link->reset();
@@ -1401,17 +1410,17 @@ void nokia_dct3_state::dsp_service_irq_w(int state)
 
 void nokia_dct3_state::dsp_tx_commit_w(int state)
 {
-	m_dsp_hle->tx_commit_w(state);
+	m_dsp_backend->tx_commit_w(state);
 }
 
 void nokia_dct3_state::dsp_service_pending_w(int state)
 {
-	m_dsp_hle->service_pending_w(state);
+	m_dsp_backend->service_pending_w(state);
 }
 
 void nokia_dct3_state::dsp_doorbell_w(int state)
 {
-	m_dsp_hle->doorbell_w(state);
+	m_dsp_backend->doorbell_w(state);
 }
 
 void nokia_dct3_state::mbus_fiq2_w(int state)
@@ -1534,7 +1543,7 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 				"dsp_shared_write: off=%03x old=%04x data=%04x pc=%08x t=%.6f\n",
 				byte_offset, old_data, new_data, m_maincpu->pc(),
 				machine().time().as_double());
-	m_dsp_hle->mcu_shared_write(byte_offset);
+	m_dsp_backend->mcu_shared_write(byte_offset);
 }
 
 #include "nokia_dct3_trace.inc"
@@ -1757,9 +1766,9 @@ void nokia_dct3_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old
 
 void nokia_dct3_state::dsp_tone_update_w(int state)
 {
-	const unsigned frequency1 = m_dsp_hle->tone_frequency1();
-	const unsigned frequency2 = m_dsp_hle->tone_frequency2();
-	const u16 amplitude = m_dsp_hle->tone_amplitude();
+	const unsigned frequency1 = m_dsp_backend->tone_frequency1();
+	const unsigned frequency2 = m_dsp_backend->tone_frequency2();
+	const u16 amplitude = m_dsp_backend->tone_amplitude();
 	if (frequency1 != 0)
 		m_dsp_tone1->set_clock(frequency1);
 	if (frequency2 != 0)
@@ -2325,12 +2334,12 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_dspif->tx_commit_cb().set(FUNC(nokia_dct3_state::dsp_tx_commit_w));
 	m_dspif->service_pending_cb().set(FUNC(nokia_dct3_state::dsp_service_pending_w));
 	m_dspif->doorbell_cb().set(FUNC(nokia_dct3_state::dsp_doorbell_w));
-	m_dspif->shared_002_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_002_write_w));
-	m_dspif->shared_006_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_006_write_w));
-	m_dspif->shared_0fe_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_read_w));
-	m_dspif->shared_0fe_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_write_w));
-	m_dspif->shared_100_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_read_w));
-	m_dspif->shared_100_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_write_w));
+	m_dspif->shared_002_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_002_write_w));
+	m_dspif->shared_006_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_006_write_w));
+	m_dspif->shared_0fe_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_0fe_read_w));
+	m_dspif->shared_0fe_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_0fe_write_w));
+	m_dspif->shared_100_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_100_read_w));
+	m_dspif->shared_100_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_100_write_w));
 	m_dspif->fiq0_cb().set(FUNC(nokia_dct3_state::dsp_fiq0_w));
 	m_dspif->service_irq_cb().set(FUNC(nokia_dct3_state::dsp_service_irq_w));
 	NOKIA_SIMI(config, m_simi);

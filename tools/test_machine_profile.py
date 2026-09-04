@@ -496,7 +496,7 @@ class MachineProfileTest(unittest.TestCase):
         power_body = power_body.split("void nokia_dct3_state::sim_irq_w", 1)[0]
         for device in (
             "m_maincpu", "m_mad2", "m_gensio", "m_mbus", "m_dspif",
-            "m_dsp_hle", "m_external_service_peer", "m_simi", "m_sim_card",
+            "m_dsp_backend", "m_external_service_peer", "m_simi", "m_sim_card",
             "m_lcd", "m_radio_peer",
         ):
             self.assertIn(f"{device}->reset()", power_body)

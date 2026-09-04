@@ -75,9 +75,18 @@ these placeholders in a test baseline.
 A complete 5110 ROM4 DSP mask image was historically published by AlexD in
 2003 and is now used by an independent native C54x co-simulation. It is not
 part of the handset `.fls`, is absent from that project's public Git tree, and
-is not redistributable here. The surviving thread is:
+is not redistributable here. The surviving discussions are:
 
 - `https://nokiafree.org/forums/archive/index.php/t-39175.html`
+- `https://forum.gsmhosting.com/vbb/f83/alexd-made-nokia-5110-rom4-dump-288554/`
+
+The GSMHosting mirror describes its archive as AlexD's Nokia 5110 DSP-ROM
+memory dump and says it includes an annotated IDA project. The recovered
+four-volume `sss.part01.rar` through `sss.part04.rar` package matches that
+description exactly: it contains `dsp_full.bin`, a complete `dsp_drom.txt`,
+`dsp_full.idb`, two disassembly listings, DSP-block notes, and task notes. This
+is substantially stronger provenance than the historical filename alone,
+although no author-published canonical digest is available.
 
 Keep a lawfully obtained candidate under an ignored research path:
 
@@ -88,10 +97,31 @@ roms/research/nse1-rom4/working/dsp_drom.txt
 roms/research/nse1-rom4/SHA256SUMS
 ```
 
-Hash the untouched source before conversion. Do not rename a 3210 MCU-uploaded
+Hash the untouched volumes before extraction. Do not rename a 3210 MCU-uploaded
 DSP block, the uniform-fill `dsp_*` placeholders, or an unrelated Calypso ROM
-as this image. No canonical digest was published in the sources reviewed here,
-so a filename or successful boot alone is insufficient identity evidence.
+as this image. The locally recovered package is inventoried as follows:
+
+| source volume | bytes | SHA-256 |
+|---|---:|---|
+| `sss.part01.rar` | 286,720 | `850bca9c0a78b5ad7989356c44beb8911ed02dc0dc82b2106d2f654826359549` |
+| `sss.part02.rar` | 286,720 | `fc97d944c5412ca9b5fdf0a64ae5e58e82b4f122965c912848df314ba692e770` |
+| `sss.part03.rar` | 286,720 | `3af1031f97ccbb638d1b39a827fb1f468429b9728fe3e2dd3a157bb5bc7dfc2c` |
+| `sss.part04.rar` | 202,812 | `4a37e8cf5baad0bdb4fd9bc0d93b233d3d362325c38a1970d13b1ce4776e49ae` |
+
+The working `dsp_full.bin` is 131,070 bytes (65,535 big-endian words), SHA-256
+`4a7a9ba9b3b90c732dce8b2f36522ea49249a7b0d1ecbb4538f7fdbb9c51504f`.
+It omits DSP program word `0xffff`; the archive's disassembly also supplies no
+word at that address. Keep this historical export unchanged. A backend may
+leave the final word at its initialized value, as the independent loader does,
+but must not present an invented padding word as dumped data. The complete
+16,384-word `dsp_drom.txt` has SHA-256
+`998f006dd06c3d73adb1ac7401e50dc42496a95dc3e3a396cf8f0bfad38f5055`.
+
+After placing the private working pair at the paths above, run
+`make audit-dsp-rom4`. The gate recognizes the untouched 131,070-byte historical
+program export as well as an explicitly represented 128 KiB address space, and
+requires a complete, unique, nonuniform 16,384-word `B000:EFFF` DROM map. It
+validates transport shape, not authorship or correctness.
 
 The input matters because the native 5110 backend can log DSP-to-COBBA serial,
 parallel-control and PCM traffic without physical probing. It remains a 5110

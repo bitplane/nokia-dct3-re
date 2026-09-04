@@ -12,13 +12,12 @@ DEFINE_DEVICE_TYPE(NOKIA_DSP_HLE, nokia_dsp_hle_device, "nokia_dsp_hle", "Nokia 
 
 nokia_dsp_hle_device::nokia_dsp_hle_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
-	device_t(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
+	nokia_dsp_backend_device(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
 	m_transport(*this, "^dspif"),
 	m_external_peer(*this, "^external_service_peer"),
 	m_radio_peer(*this, "^radio_peer"),
 	m_mad2_pcm(*this, "^mad2_pcm"),
-	m_mcu_control_word_cb(*this),
-	m_tone_update_cb(*this)
+	m_mcu_control_word_cb(*this)
 {
 }
 
@@ -113,7 +112,7 @@ void nokia_dsp_hle_device::device_reset()
 	m_speech_nonzero_microphone_blocks = 0;
 	m_speech_nonzero_earpiece_blocks = 0;
 	publish_bootstrap_state();
-	m_tone_update_cb(1);
+	notify_tone_update();
 }
 
 void nokia_dsp_hle_device::mcu_shared_write(u16 byte_offset)
@@ -137,7 +136,7 @@ void nokia_dsp_hle_device::mcu_shared_write(u16 byte_offset)
 			m_tone_frequency1, m_tone_frequency2, m_tone_amplitude,
 			m_tone_amplitude != 0 && m_tone_frequency1 != 0,
 			m_tone_amplitude != 0 && m_tone_frequency2 != 0);
-	m_tone_update_cb(1);
+	notify_tone_update();
 }
 
 void nokia_dsp_hle_device::prepare_speech_codec_save()

@@ -10,12 +10,11 @@ C54x/COBBA analysis path.
 The upstream native analysis backend combines a modified C54x core with a
 bring-your-own Nokia 5110 DSP ROM4 dump. That dump is git-ignored and was not
 present in the reviewed repository. Consequently, upstream address annotations
-are useful leads and reproducible claims about its private input, but are not
-local primary evidence until checked against a legally obtained, hashed dump or
-physical traces. No source is copied into this BSD-licensed driver. The public
-repository still excludes the Nokia mask-ROM image. Its native backend expects
-a private `dsp_full.bin` plus separately recovered DROM data; neither is copied
-or hashed by this repository.
+were initially useful leads rather than local primary evidence. The historical
+archive has since been recovered, retained outside Git, hashed, and structurally
+validated. No dump or third-party source is copied into this BSD-licensed
+driver. The public repository still excludes the Nokia mask-ROM image; local
+hashes and provenance are recorded in `roms/README.md`.
 
 ## Findings and admission status
 
@@ -107,6 +106,106 @@ come from a license-compatible source or remain an optional analysis tool; its
 traces should be converted into independent protocol tests rather than copied
 implementation.
 
+## Current execution target
+
+ROM acquisition is closed for the 5110 experiment. The next bounded milestone
+is to reproduce the independent native backend with the untouched 65,535-word
+program export and complete DROM map, recording the exact backend commit and
+runtime options. Success requires more than reaching a screen:
+
+1. record resident-program, DROM and uploaded-overlay execution coverage;
+2. distinguish genuine DSP output from any host-staged self-test or bootstrap
+   response;
+3. capture ordered DSPIF, serial COBBA, parallel MFI and PCM activity through
+   boot, idle and one call lifecycle; and
+4. convert corroborated bus transactions into independent local fixtures before
+   assigning semantics to COBBA registers or DSP mailbox words.
+
+The recovered archive does not close the product-correct DSP-ROM problem. It is
+an NSE-1/5110 ROM4 input. The Nokia 3210 still needs its own internal DSP images
+or physical traces before the HLE backend can be replaced faithfully for NSE-8.
+
+### First reproduced run
+
+The native backend at upstream commit
+`b93a7f7143ea8d6d636ae920ac29258d3f6666f6` accepts the untouched historical
+131,070-byte program export and complete DROM through `DSP54_IMAGE` and
+`DSP54_DROM`. A 30-million-MCU-instruction NSE-1 v5.30 run reached the Security
+code framebuffer with 74 MCU-observed DSP acknowledgements. The DSP executed
+the firmware-driven staged upload, host-command ISR, timer dispatcher, MDIRCV
+enqueue path and COBBA serial routines.
+
+The backend's per-instruction histogram classified 30,176,666 credited DSP
+instructions at 25 million DSP steps:
+
+| backend region | instructions | share |
+|---|---:|---:|
+| PROM `0x0900..0x0cff` superloop label | 0 | 0.0000% |
+| PROM idle `0x4070..0x4097` | 345,578 | 1.1452% |
+| BIST `0xd800..0xf200` | 0 | 0.0000% |
+| overlaid DARAM `0x0080..0x27ff` | 627,055 | 2.0779% |
+| low return pad | 0 | 0.0000% |
+| other program regions | 29,204,033 | 96.7769% |
+
+`other` is the backend's residual address bucket, not proof that all those
+instructions came from immutable mask ROM. More precise provenance requires a
+map-aware coverage export rather than inference from this coarse partition.
+
+This run is not promotable as an unassisted DSP implementation. Its log proves
+three active compatibility mechanisms: `SEEDDARAM` restores resident content
+after the boot clear, the COBBA model loops serial samples, and
+`SELFTEST_MEAS` writes validator-compatible report fields after the DSP's own
+transform because the acquisition overlay behind `0x250b` is absent. Run
+`make check-dsp-rom4-cosim LOG=<captured-log>` to reproduce this classification;
+the checker deliberately reports promotion as blocked while any such assist is
+observed.
+
+An 80-million-instruction follow-up used only the native harness's physical-key
+replay to enter the handset security code. It reached stable NSE-1 standby with
+the operator `Radiolinja` and `Menu` visible, while retaining the same 74 DSP
+acknowledgements. This extends the execution result from boot presentation to
+interactive idle; it does not remove any of the assists above.
+
+The captured interface evidence is bounded as follows:
+
+- DSP release, warm reset, staged MCU upload and DSP acknowledgement traffic
+  are present;
+- the host-command ISR, timer ISR, DSP receive enqueue/dequeue paths and
+  overlaid DARAM execute;
+- COBBA BSP loopback and codec-frame interrupts are present; and
+- no complete parallel-MFI transaction, bidirectional speech PCM call, or
+  call setup/release lifecycle was produced by this run.
+
+The unlocked run records 74 MCU-observed DSP acknowledgements, 19 ring-cursor
+transitions, 16 DSP-to-MCU host doorbells and eight explicitly logged codec
+frame interrupts. Its raw DSP-port trace contains 235 writes to serial-select
+port `0x2c`, plus 147 writes and 322 reads on serial-data port `0x2d`. Port
+`0x21` has five writes and two reads and port `0x20` one write; these counts
+establish activity only and do not assign product-port semantics beyond the
+qualified findings above. `dsp_rom4_cosim_check.py` extracts these counters so
+later runs can be compared without preserving an interpretation in code.
+
+The last item is an acquisition-harness boundary, not negative evidence about
+the ROM: the native 5110 composition has no GSM network/call peer that can drive
+a complete call. A call-lifecycle capture therefore requires the real backend
+to attach to this repository's existing call-capable GSM composition, or a new
+equivalent native peer. Replaying guessed call traffic would not close the
+gate.
+
+## Local backend prototype
+
+The distributable driver now has a source-level substitution seam:
+`nokia_dsp_backend_device`. DSPIF commit, service, doorbell and shared-cell
+notifications target that abstract endpoint, as do reset and tone observation.
+The existing `nokia_dsp_hle_device` implements it without behavioral changes;
+only HLE-specific product contracts retain an optional concrete finder.
+
+This is deliberately not a C54x core or an importer for the GPL analysis
+backend. A future clean-room, MAME-compatible C54x device can occupy the same
+machine-config tag and implement the endpoint while using the existing DSPIF,
+MAD2 interrupt, COBBA and PCM devices. Promotion still requires product-correct
+ROM declarations and removal of every active compatibility assist.
+
 ## Acquisition and reproduction status
 
 The historical
@@ -118,16 +217,25 @@ access could not read the protected ROM: external instructions receive
 `0xffff`, while code executing from on-chip ROM can read it. It does not
 publish a reproducible extraction program.
 
+The later
+[`GSMHosting mirror`](https://forum.gsmhosting.com/vbb/f83/alexd-made-nokia-5110-rom4-dump-288554/)
+describes its archive as AlexD's Nokia 5110 DSP-ROM memory dump with an annotated
+IDA project. The recovered four-volume `sss.part*.rar` package matches that
+description exactly and also contains the program and DROM inputs expected by
+the native backend. The untouched program export contains 65,535 words rather
+than a fabricated final word at DSP address `0xffff`; see `roms/README.md` for
+the volume and extracted-input hashes. No author-published canonical digest is
+known, so this establishes a strong provenance chain rather than cryptographic
+identity with AlexD's original upload.
+
 The practical software-only route is therefore:
 
-1. obtain the historical 5110 ROM4 image lawfully and record the untouched
-   filename, length and hashes before conversion;
-2. keep it outside Git and inventory it as described in `roms/README.md`;
-3. reproduce the native 5110 co-sim before treating DSP addresses as local
+1. preserve the recovered historical volumes and extracted inputs outside Git;
+2. reproduce the native 5110 co-sim before treating DSP addresses as local
    evidence;
-4. capture serial `0x2c/0x2d`, parallel MFI and PCM-port activity across boot,
+3. capture serial `0x2c/0x2d`, parallel MFI and PCM-port activity across boot,
    call setup, volume changes and release; and
-5. translate only corroborated transactions into independent BSD-licensed
+4. translate only corroborated transactions into independent BSD-licensed
    tests against the local COBBA and MAD2 PCM devices.
 
 The official TI

@@ -35,8 +35,10 @@ shared RAM, DSPIF, packet rings and FIQ0/IRQ4 signaling;
 state and service timing through one atomic product bootstrap contract with
 private exchange helpers. Its DSP parameter-command decoder and optional
 speech-request predicate are likewise one atomic product contract; DSPIF
-carries no DSP-behavior configuration, making
-the HLE a replaceable backend seam;
+carries no DSP-behavior configuration. Both sides meet through the semantic-free
+`nokia_dsp_backend_device` contract, so runtime driver wiring does not depend on
+the HLE implementation. HLE-only product setup remains conditional and can be
+omitted by a future real-DSP machine composition;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service
 session; `nokia_radio_peer_device` owns Nokia L1 transaction correlation
 behind one typed protocol contract and private acquisition strategies; and
