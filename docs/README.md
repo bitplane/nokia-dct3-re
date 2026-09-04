@@ -71,6 +71,7 @@ distinction.
 | `dsp_packet_semantics.md` | Generated two-ROM inventory of DSP packet vocabulary and current HLE disposition. |
 | `dsp_service_transport_contract.md` | DSP/generic-service ownership and acceptance contract. |
 | `cobba_control_boundary.md` | Opaque DSP-to-COBBA control ownership, capture seam, and promotion requirements. |
+| `rom4_dsp_loader.md` | Recovered ROM4 DSP block descriptor, reset and demand-load contract. |
 
 ## Address-level reverse-engineering references
 
