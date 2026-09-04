@@ -12,6 +12,10 @@ public:
 	{
 		u8 rows = 4;
 		u8 power_on_column_mask = 0x04;
+		u8 row_signal = 0x28;
+		u8 column_input = 0x2a;
+		u8 column_irq_mask = 0x6b;
+		u8 row_direction = 0xa8;
 
 		constexpr bool valid() const
 		{
@@ -29,7 +33,7 @@ public:
 
 	void set_wiring_contract(wiring_contract contract);
 
-	static bool owns(offs_t offset);
+	bool owns(offs_t offset) const;
 	u8 read(offs_t offset);
 	u8 peek(offs_t offset) const;
 	void write(offs_t offset, u8 data);

@@ -134,6 +134,7 @@ struct nokia_product_config
 	};
 
 	nokia_kbgpio_device::wiring_contract keypad_wiring;
+	nokia_gensio_device::wiring_contract gensio_wiring;
 	bool boot_rom_hle = true;
 	bool simi_controller = false;
 	bool synthetic_sim_card = false;
@@ -256,11 +257,18 @@ static_assert(nokia_mad2_device::dsp_reset_wiring_contract{}.valid());
 static_assert(DSP_RESET_WIRING_3410.valid());
 
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE8 = { 4, 0x01 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE1 = {
+	5, 0x02, 0x31, 0x30, 0x33, 0x2f
+};
+constexpr nokia_gensio_device::wiring_contract GENSIO_NSE1 = {
+	0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true
+};
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE3 = { 5, 0x01 };
 static_assert(KEYPAD_NSE8.valid());
+static_assert(KEYPAD_NSE1.valid());
 static_assert(KEYPAD_NHM5.valid());
 static_assert(KEYPAD_NHM6.valid());
 static_assert(KEYPAD_NHM2.valid());
@@ -587,6 +595,15 @@ constexpr nokia_product_config make_6110_config()
 	return result;
 }
 
+constexpr nokia_product_config make_5110_config()
+{
+	nokia_product_config result;
+	result.keypad_wiring = KEYPAD_NSE1;
+	result.gensio_wiring = GENSIO_NSE1;
+	result.boot_rom_hle = true;
+	return result;
+}
+
 // Preserve the previous 64-exchange behavior for unvalidated products. This is
 // an explicit compatibility calibration, not a recovered cross-DCT3 constant.
 constexpr nokia_product_config make_conservative_config(
@@ -602,6 +619,7 @@ constexpr nokia_product_config PRODUCT_3210 = make_3210_config();
 constexpr nokia_product_config PRODUCT_3310 = make_3310_config();
 constexpr nokia_product_config PRODUCT_3330 = make_3330_config();
 constexpr nokia_product_config PRODUCT_3410 = make_3410_config();
+constexpr nokia_product_config PRODUCT_5110 = make_5110_config();
 constexpr nokia_product_config PRODUCT_6110 = make_6110_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
 constexpr nokia_product_config PRODUCT_5X10 =
@@ -726,6 +744,7 @@ public:
 
 	void noki3330(machine_config &config);
 	void noki3410(machine_config &config);
+	void noki5110(machine_config &config);
 	void noki6110(machine_config &config);
 	void noki7110(machine_config &config);
 	void noki6210(machine_config &config);
@@ -1025,6 +1044,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 		m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
 	m_kbgpio->set_wiring_contract(product.keypad_wiring);
+	m_gensio->set_wiring_contract(product.gensio_wiring);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
 	if (!product.display.valid())
 		fatalerror("DCT3: invalid product display geometry %ux%u/%ux%u",
@@ -1643,11 +1663,11 @@ uint8_t nokia_dct3_state::mad2_io_r(offs_t offset)
 uint8_t nokia_dct3_state::mad2_register_r(offs_t offset)
 {
 	uint8_t data = nokia_pup_device::owns(offset) ? m_pup->read(offset) :
-			(nokia_kbgpio_device::owns(offset) ? m_kbgpio->read(offset) :
+			(m_kbgpio->owns(offset) ? m_kbgpio->read(offset) :
 			(nokia_uif_device::owns(offset) ? m_uif->read(offset) :
 			(offset <= MAD2_FIQ8_CTRL ? m_mad2->read(offset) :
 			(offset >= MAD2_MBUS_CTRL && offset <= 0x1a ? m_mbus->read(offset - MAD2_MBUS_CTRL) :
-			(nokia_gensio_device::owns(offset) ? m_gensio->read(offset) : m_mad2_regs[offset])))));
+			(m_gensio->owns(offset) ? m_gensio->read(offset) : m_mad2_regs[offset])))));
 
 	switch(offset)
 	{
@@ -1679,7 +1699,7 @@ uint8_t nokia_dct3_state::mad2_register_r(offs_t offset)
 void nokia_dct3_state::trace_mad2_read(offs_t offset, uint8_t data)
 {
 	if (m_trace_enabled &&
-			nokia_gensio_device::owns(offset) &&
+			m_gensio->owns(offset) &&
 			m_gensio_trace_count++ < GENSIO_TRACE_LIMIT)
 		LOGMASKED(LOG_GENSIO, "gensio: R off=%02x data=%02x pc=%08x t=%.9f\n", offset, data,
 				m_maincpu->pc(), machine().time().as_double());
@@ -1724,9 +1744,9 @@ uint8_t nokia_dct3_state::mad2_register_peek(offs_t offset)
 {
 	const bool core_register = offset <= MAD2_FIQ8_CTRL && !nokia_pup_device::owns(offset);
 	const bool mbus_register = offset >= MAD2_MBUS_CTRL && offset <= MAD2_MBUS_DATA;
-	const bool gensio_register = nokia_gensio_device::owns(offset);
+	const bool gensio_register = m_gensio->owns(offset);
 	return nokia_pup_device::owns(offset) ? m_pup->peek(offset) :
-			(nokia_kbgpio_device::owns(offset) ? m_kbgpio->peek(offset) :
+			(m_kbgpio->owns(offset) ? m_kbgpio->peek(offset) :
 			(nokia_uif_device::owns(offset) ? m_uif->read(offset) : core_register ? m_mad2->read(offset) :
 			(mbus_register ? (offset == MAD2_MBUS_CTRL ? m_mbus->control() :
 				offset == MAD2_MBUS_STATUS ? m_mbus->status() : m_mbus->data()) : gensio_register ?
@@ -1737,11 +1757,11 @@ uint8_t nokia_dct3_state::mad2_register_peek(offs_t offset)
 void nokia_dct3_state::mad2_register_w(offs_t offset, uint8_t data)
 {
 	const bool pup_register = nokia_pup_device::owns(offset);
-	const bool kbgpio_register = nokia_kbgpio_device::owns(offset);
+	const bool kbgpio_register = m_kbgpio->owns(offset);
 	const bool uif_register = nokia_uif_device::owns(offset);
 	const bool core_register = offset <= MAD2_FIQ8_CTRL && !pup_register;
 	const bool mbus_register = offset >= MAD2_MBUS_CTRL && offset <= MAD2_MBUS_DATA;
-	const bool gensio_register = nokia_gensio_device::owns(offset);
+	const bool gensio_register = m_gensio->owns(offset);
 	if (pup_register)
 		m_pup->write(offset, data);
 	else if (kbgpio_register)
@@ -1771,7 +1791,7 @@ void nokia_dct3_state::mad2_register_w(offs_t offset, uint8_t data)
 
 void nokia_dct3_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old_data)
 {
-	const bool gensio_register = nokia_gensio_device::owns(offset);
+	const bool gensio_register = m_gensio->owns(offset);
 	if (m_trace_enabled &&
 			(offset >= 0x08 && offset <= 0x13) &&
 			m_mad2_timer_trace_count++ < 4096)
@@ -2475,6 +2495,19 @@ void nokia_dct3_state::noki3410(machine_config &config)
 	apply_product_config(PRODUCT_3410);
 }
 
+void nokia_dct3_state::noki5110(machine_config &config)
+{
+	dct3_base(config);
+	INTEL_28F800B3T(config.replace(), "flash");
+	config.device_remove("dsp_hle");
+	// The independently reproduced co-simulation advances four DSP cycles per
+	// 13 MHz MCU hardware cycle. Keep this as an explicit ROM4 pacing result
+	// until the MAD2 clock tree is recovered from primary hardware material.
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+	apply_product_config(PRODUCT_5110);
+}
+
 void nokia_dct3_state::noki6110(machine_config &config)
 {
 	dct3_base(config);
@@ -2528,6 +2561,24 @@ ROM_START( noki3210 )
 	ROM_REGION(0x04000, "eeprom", ROMREGION_ERASEFF)
 	ROMX_LOAD("3210 v600 eeprom.bin", 0x00000, 0x04000, CRC(e236395f) SHA1(14f207b6b6e04945d26049df404723830bc765e7), ROM_BIOS(0))
 	ROMX_LOAD("3210 v501 eeprom.bin", 0x00000, 0x04000, CRC(82dc441c) SHA1(4cbc156da79d49610dd0018d3eaf8f8cbcbc05bf), ROM_BIOS(1))
+ROM_END
+
+ROM_START( noki5110 )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nse1_rom4_boot.bin", 0x00000, 0x10000, NO_DUMP)
+
+	// Private research inputs. The historical program export contains every
+	// word except address ffff; leave that undumped cell at region erase zero.
+	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_program.bin", 0x00000, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_data.bin", 0x00000, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
+
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("5110f530.fls", 0x000000, 0x100000,
+			CRC(2200580f) SHA1(5aa0692c57bb726187c6686dff5789b928f8a26a))
 ROM_END
 
 ROM_START( noki6110 )
@@ -2683,6 +2734,7 @@ ROM_END
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
 SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empty_init, "Nokia", "Nokia 3210", 0 )
+SYST( 1998, noki5110, 0,      0,      noki5110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

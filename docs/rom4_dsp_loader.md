@@ -48,20 +48,21 @@ core at the mask-ROM reset vector with only the recovered program image and
 complete `0xb000..0xefff` DROM populated. Reset reaches PC `0x0f00`, where the
 program word is still zero, and stops at PC `0x0f01`. This is the expected MCU
 upload boundary: loader1 is not resident in the mask image and isolated DSP
-execution cannot proceed by pre-seeding it. The next gate must connect the CPU
-to the handset's ordinary staged-upload writes.
+execution cannot proceed by pre-seeding it.
 
 `tools/dsp_rom4_upload_trace_check.py` verifies this ordering and rejects an
 observed input length absent from the recovered catalogue.
 
-The local MAME tree now also contains an unselected
-`nokia_dsp_c54x_device` backend. It maps DSP data addresses `0x0800..0x0fff`
+The local MAME tree contains a selectable `nokia_dsp_c54x_device` backend. It
+maps DSP data addresses `0x0800..0x0fff`
 directly onto DSPIF's existing MCU-visible shared store and resolves program
 accesses in `0x0080..0x27ff` through the same data store while `PMST.OVLY` is
 set. The host doorbell latches C54x `HPINT` (maskable source 9, vector 25).
-This establishes the execution boundary but is not yet a handset result: MAD2
-reset/release wiring, loader upload execution, and COBBA/PCM I/O remain to be
-connected before the backend may replace the HLE in a product configuration.
+The `noki5110` research configuration selects it instead of the HLE. NSE-1
+firmware now uploads loader1 through ordinary HPI writes, drives the recovered
+hold/release sequence, and executes the uploaded code. The current handset
+frontier is the first still-unimplemented instruction at DSP PC `0x0f71`;
+COBBA serial and PCM I/O remain unconnected.
 
 The retained NSE-1 trace fixes reset polarity and edge behavior without an
 inference: MCU writes to MAD2 byte `0x20002` are `1` (cold release), `0`

@@ -15,7 +15,7 @@ class GensioDeviceSplitTest(unittest.TestCase):
     def test_device_owns_transport_state(self):
         source = self.device + self.header
         for token in (
-            "m_status", "STATUS_IDLE_TX_READY", "STATUS_RX_READY",
+            "m_status", "STATUS_RX_READY", "ccont_rx_ready_on_write",
             "write_lcd", "m_ccont_read_cb", "m_ccont_write_cb",
         ):
             self.assertIn(token, source)
@@ -25,13 +25,15 @@ class GensioDeviceSplitTest(unittest.TestCase):
 
     def test_phone_delegates_sparse_window(self):
         self.assertIn("required_device<nokia_gensio_device> m_gensio", self.phone)
-        self.assertIn("nokia_gensio_device::owns(offset)", self.phone)
+        self.assertIn("m_gensio->owns(offset)", self.phone)
         self.assertIn("m_gensio->read(offset)", self.phone)
         self.assertIn("m_gensio->write(offset, data)", self.phone)
 
     def test_select_banks_are_latches_not_guessed_peers(self):
-        self.assertRegex(self.device, r"offset >= 0xad && offset <= 0xaf")
-        self.assertRegex(self.device, r"offset >= 0xed && offset <= 0xef")
+        # Uninterpreted neighboring/select-bank offsets remain in the phone's
+        # generic MAD2 backing store; GENSIO claims only product-wired ports.
+        self.assertNotIn("offset >= 0xad", self.device)
+        self.assertIn("m_mad2_regs[offset] = data", self.phone)
         source = (self.device + self.header).lower()
         for guess in ("rf synth", "audio codec", "cobba", "hagar"):
             self.assertNotIn(guess, source)

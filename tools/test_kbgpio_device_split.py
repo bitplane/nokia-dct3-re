@@ -15,7 +15,7 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
     def test_device_owns_matrix_and_irq_state(self):
         source = self.device + self.header
         for token in (
-            "ROW_SIGNAL", "COLUMN_INPUT", "COLUMN_IRQ_MASK", "ROW_DIRECTION",
+            "row_signal", "column_input", "column_irq_mask", "row_direction",
             "m_columns", "m_irq_latched", "sample_columns", "irq_acknowledge",
         ):
             self.assertIn(token, source)
@@ -38,15 +38,16 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
 
     def test_column_irq_is_masked_and_edge_symmetric(self):
         self.assertIn(
-            "(m_columns ^ columns) & ~m_regs[COLUMN_IRQ_MASK] & 0x1f",
+            "~m_regs[m_wiring.column_irq_mask] & 0x1f",
             self.device,
         )
         self.assertNotIn("physical_edge", self.device + self.header)
 
-    def test_unknown_neighbor_registers_are_only_latches(self):
-        self.assertIn("offset >= 0x28 && offset <= 0x2b", self.device)
-        self.assertIn("offset >= 0x68 && offset <= 0x6b", self.device)
-        self.assertIn("offset >= 0xa8 && offset <= 0xab", self.device)
+    def test_register_locations_are_product_wiring(self):
+        for field in ("row_signal", "column_input", "column_irq_mask", "row_direction"):
+            self.assertIn(f"offset == m_wiring.{field}", self.device)
+        self.assertIn("KEYPAD_NSE1", self.phone)
+        self.assertIn("5, 0x02, 0x31, 0x30, 0x33, 0x2f", self.phone)
 
     def test_device_is_save_state_safe_and_firmware_agnostic(self):
         source = self.device + self.header
@@ -63,6 +64,7 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
             "const unsigned row_count = m_wiring.rows",
             "if (!contract.valid())",
             "KEYPAD_NSE8",
+            "KEYPAD_NSE1",
             "KEYPAD_NHM5",
             "KEYPAD_NHM6",
             "KEYPAD_NHM2",

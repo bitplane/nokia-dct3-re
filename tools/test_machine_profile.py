@@ -470,6 +470,18 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("13'000'000 / divider", self.pup)
         self.assertIn('logerror("buzzer:', self.pup)
 
+    def test_5110_selects_real_dsp_and_early_board_wiring(self):
+        profile = self.driver.split(
+            "void nokia_dct3_state::noki5110(machine_config &config)", 1
+        )[1].split("void nokia_dct3_state::noki6110", 1)[0]
+        self.assertIn('config.device_remove("dsp_hle")', profile)
+        self.assertIn("NOKIA_DSP_C54X(config, m_dsp_c54x", profile)
+        self.assertIn("apply_product_config(PRODUCT_5110);", profile)
+        self.assertIn("result.keypad_wiring = KEYPAD_NSE1", self.driver)
+        self.assertIn("result.gensio_wiring = GENSIO_NSE1", self.driver)
+        self.assertIn("0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true",
+                      self.driver)
+
     def test_charger_input_updates_vchar_and_latches_both_edges(self):
         body = self.driver.split("INPUT_CHANGED_MEMBER( nokia_dct3_state::charger_irq )", 1)[1]
         body = body.split("static INPUT_PORTS_START", 1)[0]

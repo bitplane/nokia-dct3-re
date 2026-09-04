@@ -504,6 +504,21 @@ void tms320c54x_device::execute_one(u16 op)
 		data_write(reg, value);
 		return;
 	}
+	case 0x7d00: // MVDP Smem, pmad
+	{
+		const u16 value = indirect_read(low);
+		m_program.write_word(fetch(), value);
+		return;
+	}
+	case 0x7c00: // MVPD pmad, Smem
+	{
+		const u16 destination = low == 0xf8 ? fetch() : m_ar[low & 7];
+		const u16 value = m_program.read_word(fetch());
+		data_write(destination, value);
+		if (low != 0xf8)
+			indirect_modify(low);
+		return;
+	}
 	case 0xe700: // MVDK source auxiliary register to destination MMR
 	{
 		const unsigned source = (low >> 4) & 7;
@@ -729,6 +744,12 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf020: // LD #lk, A
 		m_a = data_operand(fetch());
 		return;
+	case 0xf062: // LD #lk, 16, A
+		m_a = u64(fetch()) << 16;
+		return;
+	case 0xf362: // LD #lk, 16, B
+		m_b = u64(fetch()) << 16;
+		return;
 	case 0xf330: // AND #lk, B
 		m_b &= fetch();
 		return;
@@ -817,6 +838,12 @@ void tms320c54x_device::execute_one(u16 op)
 		if ((op & 0xff00) == 0xec00) // RPT #k
 		{
 			m_rptc = low;
+			m_rpt_address = m_pc;
+			return;
+		}
+		if (op == 0xf070) // RPT #lk
+		{
+			m_rptc = fetch();
 			m_rpt_address = m_pc;
 			return;
 		}

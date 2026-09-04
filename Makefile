@@ -478,13 +478,23 @@ normalize-6110-v548:
 		--expect-flash-sha1 3bcc5c93ec247c63490e134196aab98a4e60c184
 
 
-roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile)
+roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile) $(if $(filter noki5110,$(PHONE)),rom4-dsp-inputs)
 	@for src in roms/noki*/; do \
 		[ -d "$$src" ] || continue; \
 		dst="$(MAME_DIR)/roms/$$(basename "$$src")"; \
 		mkdir -p "$$dst"; \
 		cp -a "$$src". "$$dst"/; \
 	done
+
+.PHONY: rom4-dsp-inputs
+rom4-dsp-inputs:
+	@test -f roms/research/nse1-rom4/working/dsp_full.bin || { echo "Missing private NSE-1 ROM4 DSP program input"; exit 1; }
+	@test -f roms/research/nse1-rom4/working/dsp_drom.txt || { echo "Missing private NSE-1 ROM4 DSP DROM input"; exit 1; }
+	@mkdir -p roms/noki5110
+	cp roms/research/nse1-rom4/working/dsp_full.bin roms/noki5110/nse1_rom4_dsp_program.bin
+	$(PYTHON) tools/make_c54x_rom4_cold_data.py \
+		roms/research/nse1-rom4/working/dsp_drom.txt \
+		roms/noki5110/nse1_rom4_dsp_data.bin
 
 build: overlay roms $(LIBGSM_ARCHIVE)
 	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/tms320c54x_test.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_fr_codec.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 LDFLAGS="-Wl,--whole-archive $(LIBGSM_ARCHIVE) -Wl,--no-whole-archive" -j$(JOBS)

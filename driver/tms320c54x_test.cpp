@@ -124,6 +124,12 @@ private:
 		program.write_word(0x0130, 0xf330);
 		program.write_word(0x0131, 0x00ff);
 		program.write_word(0x0132, 0xf3e8);
+		program.write_word(0x0133, 0x7df8);
+		program.write_word(0x0134, 0x0800);
+		program.write_word(0x0135, 0x0907);
+		program.write_word(0x0136, 0x7cf8);
+		program.write_word(0x0137, 0x0908);
+		program.write_word(0x0138, 0x0907);
 
 		program.write_word(0x0200, 0x7680);
 		program.write_word(0x0201, 0xbeef);
@@ -160,6 +166,19 @@ private:
 		program.write_word(0x0324, 0x1c84);
 		program.write_word(0x0325, 0x8084);
 		program.write_word(0x0326, 0xfc00);
+		// Long-immediate repeat executes the following two-word instruction
+		// exactly lk + 1 times.
+		program.write_word(0x0350, 0xf062);
+		program.write_word(0x0351, 0x1234);
+		program.write_word(0x0352, 0x82f8);
+		program.write_word(0x0353, 0x0909);
+		program.write_word(0x0354, 0x80f8);
+		program.write_word(0x0355, 0x090a);
+		program.write_word(0x0356, 0xe800);
+		program.write_word(0x0357, 0xf070);
+		program.write_word(0x0358, 0x0002);
+		program.write_word(0x0359, 0x6d10);
+		program.write_word(0x035a, 0xf5e1);
 
 		data.write_word(0x0500, 0x1111);
 		data.write_word(0x0501, 0x2222);
@@ -220,6 +239,18 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		if (m_phase == 5)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+					"long-immediate RPT terminal IDLE3");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == 3,
+					"long-immediate RPT iteration count");
+			expect(data.read_word(0x0909) == 0x1234 &&
+					data.read_word(0x090a) == 0,
+					"long-immediate load shifted by 16");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+		}
 		if (m_phase == 4)
 		{
 			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
@@ -306,8 +337,13 @@ private:
 						"ROM4 challenge transform terminal loop");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
 					"ROM4 challenge transform repeat count");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			m_phase = 5;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0350);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
 		}
 
 		osd_printf_info("TMS320C54x test state: pc=%04x sp=%04x brc=%04x "
@@ -346,6 +382,10 @@ private:
 				"unsigned data operand load and accumulator XOR shift");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xaa00,
 				"immediate accumulator mask and rotate");
+		expect(m_cpu->space(AS_PROGRAM).read_word(0x0907) == 0xaaaa,
+				"data-to-program memory transfer");
+		expect(data.read_word(0x0908) == 0xaaaa,
+				"program-to-data memory transfer");
 
 		// IDLE3 must retain its continuation PC, then an enabled source must
 		// vector through PMST.IPTR and preserve the return address on stack.

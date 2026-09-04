@@ -5,13 +5,6 @@
 
 DEFINE_DEVICE_TYPE(NOKIA_KBGPIO, nokia_kbgpio_device, "nokia_kbgpio", "Nokia MAD2 keyboard GPIO controller")
 
-namespace {
-constexpr offs_t ROW_SIGNAL = 0x28;
-constexpr offs_t COLUMN_INPUT = 0x2a;
-constexpr offs_t COLUMN_IRQ_MASK = 0x6b;
-constexpr offs_t ROW_DIRECTION = 0xa8;
-}
-
 nokia_kbgpio_device::nokia_kbgpio_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_KBGPIO, tag, owner, clock),
 	m_matrix_cb(*this, 0xff),
@@ -28,11 +21,12 @@ void nokia_kbgpio_device::set_wiring_contract(wiring_contract contract)
 	m_wiring = contract;
 }
 
-bool nokia_kbgpio_device::owns(offs_t offset)
+bool nokia_kbgpio_device::owns(offs_t offset) const
 {
-	return (offset >= 0x28 && offset <= 0x2b) ||
-		(offset >= 0x68 && offset <= 0x6b) ||
-		(offset >= 0xa8 && offset <= 0xab);
+	return offset == m_wiring.row_signal ||
+			offset == m_wiring.column_input ||
+			offset == m_wiring.column_irq_mask ||
+			offset == m_wiring.row_direction;
 }
 
 void nokia_kbgpio_device::device_start()
@@ -58,7 +52,8 @@ u8 nokia_kbgpio_device::sample_columns(bool consume_power_on)
 	u8 data = 0x1f;
 	const bool five_rows = m_wiring.rows == 5;
 	const u8 row_mask = five_rows ? 0x1f : 0x0f;
-	const u8 rows_low = m_regs[ROW_DIRECTION] & ~m_regs[ROW_SIGNAL] & row_mask;
+	const u8 rows_low = m_regs[m_wiring.row_direction] &
+			~m_regs[m_wiring.row_signal] & row_mask;
 	const unsigned row_count = m_wiring.rows;
 
 	for (unsigned column = 0; column < 5; column++)
@@ -95,7 +90,8 @@ void nokia_kbgpio_device::update_columns()
 	// the idle mask. Physical press and release both reach IRQ0, so this is a
 	// masked change detector rather than a falling-edge-only input. Host input
 	// callbacks must not bypass the hardware mask.
-	const u8 changed = (m_columns ^ columns) & ~m_regs[COLUMN_IRQ_MASK] & 0x1f;
+	const u8 changed = (m_columns ^ columns) &
+			~m_regs[m_wiring.column_irq_mask] & 0x1f;
 	m_columns = columns;
 	if (changed)
 	{
@@ -111,7 +107,7 @@ u8 nokia_kbgpio_device::peek(offs_t offset) const
 
 u8 nokia_kbgpio_device::read(offs_t offset)
 {
-	if (offset == COLUMN_INPUT)
+	if (offset == m_wiring.column_input)
 		return sample_columns(true);
 	return peek(offset);
 }
@@ -121,7 +117,9 @@ void nokia_kbgpio_device::write(offs_t offset, u8 data)
 	if (!owns(offset))
 		return;
 	m_regs[offset] = data;
-	if (offset == ROW_SIGNAL || offset == COLUMN_IRQ_MASK || offset == ROW_DIRECTION)
+	if (offset == m_wiring.row_signal ||
+			offset == m_wiring.column_irq_mask ||
+			offset == m_wiring.row_direction)
 		update_columns();
 }
 
