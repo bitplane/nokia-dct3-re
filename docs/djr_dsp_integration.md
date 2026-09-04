@@ -168,9 +168,20 @@ a hardware specification:
 
 | Disabled assist | Observed result | Classification and replacement condition |
 |---|---|---|
-| `SEEDDARAM` | warm boot reaches run mode with `0x0d80=0xfc00`, `0x0d00=0xfc00`, `0x0926=0`, then produces 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | non-hardware snapshot replay. The recovered block catalogue targets 1,189 of the 2,048 replayed words in `0x2000..0x27ff`, so this range cannot be described as immutable ROM automatically reloading DARAM. Replace it only after the firmware-driven upload, DSP demand-load and warm-reset preservation/clear sequence accounts for the required contents. |
+| `SEEDDARAM` | warm boot reaches run mode, then produces 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | non-hardware snapshot replay. Corrected tracing proves warm reset preserves DARAM and loader2 clears only `0x0400..0x0677`, not `0x1000..0x2fff`. Immediately before the assist, sampled `0x2000..0x27ff` homes are zero. Later demand loads cover 1,189 of its 2,048 words, leaving live code such as the return table at `0x2470` outside every destination. Replace the assist only after the transform/banking rule that supplies this baseline is recovered. |
 | `SELFTEST_MEAS` | the DSP reaches the validator without the patch, then the MCU requests an organic reason-4 warm reboot at caller `0x258d35`/resume `0x258d3d` | direct output synthesis. The native harness writes `0x1202..0x1206 = {0010,0000,0000,0000,0160}` after the DSP transform. These are accepted fixture values, not recovered COBBA readings. Replace them with the DSP routine's real acquisition inputs and COBBA response; do not promote the accepted output tuple as a reset value. |
 | COBBA codec-serial loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The DSP sets COBBA register 8 bits `0x0610`, enables the C54x BSP with `0xc008 -> 0xc0c8`, sends BDXR `0x0aaa`, polls BDRR, then clears the COBBA bits. TI's BSPC map proves the transition sets RRST/XRST while DLB remains clear, so COBBA externally returns the word. `nokia_cobba_device` now owns the evidenced register predicate and completed-word echo; a future C54x backend must drive it through real BSP timing and ready state instead of host polling. |
+
+The two failed promotion runs are deliberate acceptance results. A backend
+without `SEEDDARAM` does not meet the required 74 acknowledgements or stable-UI
+gate, so no flat-image-free composition is claimed. A backend without
+`SELFTEST_MEAS` reaches the MCU validator and requests an organic reason-4
+reboot. Serial COBBA registers 5 and 6 already supply the smaller subcommand
+`0x13` measurement, but the boot-gating subcommand `0x16` calls DSP hook
+`0x250b`, which remains a no-op in the resident image, and then packages stale
+command-ring data. The next input-fidelity step is to recover the producer that
+replaces that hook; changing the accepted output tuple or tuning COBBA ADC
+constants cannot establish it.
 
 The recovered catalogue is independently auditable with:
 

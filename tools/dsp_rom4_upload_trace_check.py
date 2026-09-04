@@ -14,6 +14,8 @@ from dsp_rom_audit import parse_block_map
 HEADER_RE = re.compile(r"HDRLOG #\d+ hdr7F=0x([0-9A-Fa-f]{4}) @([0-9]+)k")
 REPLY_RE = re.compile(r"HDRLOG #\d+ reply=0x([0-9A-Fa-f]{4}) @([0-9]+)k")
 REQUEST_RE = re.compile(r"REQ\[0x871\]=0x([0-9A-Fa-f]{4})")
+DESCRIPTOR_RE = re.compile(
+    r"hdr\[7B\.\.7F\]=((?:[0-9A-Fa-f]{4} ){4}[0-9A-Fa-f]{4})")
 
 
 def check_trace(log: str, block_map: str) -> list[str]:
@@ -33,6 +35,21 @@ def check_trace(log: str, block_map: str) -> list[str]:
         errors.append("missing loader request 0x0012")
     if 0x01 not in requests:
         errors.append("missing run-mode request 0x0001")
+
+    descriptors = {
+        tuple(int(value, 16) for value in match.group(1).split())
+        for match in DESCRIPTOR_RE.finditer(log)
+    }
+    for descriptor in (
+        (0xFD00, 0xFF80, 0x0244, 0x0500, 0x0078),
+        (0x0D80, 0x1000, 0x0122, 0x0580, 0x01F4),
+        (0x25B4, 0x1F80, 0x034E, 0x0130, 0x044C),
+    ):
+        if descriptor not in descriptors:
+            errors.append(
+                "missing upload descriptor "
+                + " ".join(f"{value:04x}" for value in descriptor)
+            )
 
     headers = [(int(value, 16), int(step)) for value, step in HEADER_RE.findall(log)]
     significant = [(value, step) for value, step in headers if value not in (0, 1)]
