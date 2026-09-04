@@ -110,7 +110,9 @@ the ignored transform-entry program/data snapshots into MAME's ROM path,
 verifies their declared hashes through ordinary ROM loading, restores the
 captured architectural registers, and executes from `0x4b73`. The current core
 constructs challenge header `3532 0000` organically and stops after fetching
-unsupported MVDD opcode `e50b` at `0x4b84` (`PC=0x4b85`). That address is now
+unsupported MVDM opcode `7192` at `0x7f8e` (`PC=0x7f8f`). Reaching it executes
+the complete `0x4b82` block-repeat copy, its `0x3900` status helper, and the
+`0x7f2d` transform helper through the first six-word copy. That address is now
 the measured implementation frontier; expanding the core must move it forward
 while preserving the synthetic and transform-tail gates.
 

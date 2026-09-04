@@ -31,6 +31,7 @@ private:
 	{
 		if (!strcmp(machine().system().name, "tms54rom4"))
 		{
+			m_rom4_checks = 0;
 			auto &data = m_cpu->space(AS_DATA);
 			u16 const *const initial = &memregion("dspdata")->as_u16();
 			for (unsigned address = 0; address != 0x10000; ++address)
@@ -41,6 +42,7 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x201f);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x2103);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0x0052);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0000004b73);
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfffffffffe);
 			static constexpr u16 ar[] = {
@@ -75,12 +77,37 @@ private:
 		program.write_word(0x010c, 0xf074);
 		program.write_word(0x010d, 0x0210);
 
+		// Three circular moves starting at the final element must wrap through
+		// the first two elements and return to the final element.
+		program.write_word(0x010e, 0x7710);
+		program.write_word(0x010f, 0x0001);
+		program.write_word(0x0110, 0x7712);
+		program.write_word(0x0111, 0x0802);
+		program.write_word(0x0112, 0x7713);
+		program.write_word(0x0113, 0x0900);
+		program.write_word(0x0114, 0x7719);
+		program.write_word(0x0115, 0x0003);
+		program.write_word(0x0116, 0xec02);
+		program.write_word(0x0117, 0xe5c9);
+		program.write_word(0x0118, 0xf074);
+		program.write_word(0x0119, 0x0220);
+		program.write_word(0x011a, 0x70f8);
+		program.write_word(0x011b, 0x0904);
+		program.write_word(0x011c, 0x0801);
+
 		program.write_word(0x0200, 0x7680);
 		program.write_word(0x0201, 0xbeef);
 		program.write_word(0x0202, 0xfc00);
 		program.write_word(0x0210, 0x1092);
 		program.write_word(0x0211, 0x8094);
 		program.write_word(0x0212, 0xfc00);
+		program.write_word(0x0220, 0x61f8);
+		program.write_word(0x0221, 0x0800);
+		program.write_word(0x0222, 0x8000);
+		program.write_word(0x0223, 0xfc30);
+		program.write_word(0x0224, 0x7680);
+		program.write_word(0x0225, 0xdead);
+		program.write_word(0x0226, 0xfc00);
 
 		// Final ROM4 challenge-transform loop. These are observed operands and
 		// generic instruction encodings, not firmware code or a canned result.
@@ -107,6 +134,9 @@ private:
 		data.write_word(0x0500, 0x1111);
 		data.write_word(0x0501, 0x2222);
 		data.write_word(0x0502, 0x3333);
+		data.write_word(0x0800, 0xaaaa);
+		data.write_word(0x0801, 0xbbbb);
+		data.write_word(0x0802, 0xcccc);
 		data.write_word(0x13d2, 0x6d4d);
 		data.write_word(0x13d3, 0xc431);
 		data.write_word(0x13d4, 0xbfe4);
@@ -162,14 +192,21 @@ private:
 		auto &data = m_cpu->space(AS_DATA);
 		if (m_phase == 2)
 		{
+			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+			{
+				expect(++m_rom4_checks < 10000,
+						"ROM4 execution frontier timeout");
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			const u16 pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
 			osd_printf_info("TMS320C54x ROM4 execution frontier: pc=%04x "
 					"header=%04x,%04x ar2=%04x ar3=%04x\n", pc,
 					data.read_word(0x1200), data.read_word(0x1201),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
-			// PC has advanced past unsupported MVDD opcode e50b at 4b84.
-			expect(pc == 0x4b85, "ROM4 first unsupported instruction");
+			// PC has advanced past unsupported MVDM opcode 7192 at 7f8e.
+			expect(pc == 0x7f8f, "ROM4 first unsupported instruction");
 			expect(data.read_word(0x1200) == 0x3532 &&
 					data.read_word(0x1201) == 0x0000,
 					"ROM4 challenge header construction");
@@ -211,6 +248,16 @@ private:
 				data.read_word(0x0602) == 0x3333, "RPTB multiword CALL");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
 				"RPTB terminal count");
+		expect(data.read_word(0x0900) == 0xcccc &&
+				data.read_word(0x0901) == 0xaaaa &&
+				data.read_word(0x0902) == 0xbbbb,
+				"circular addressing wrap order");
+		expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0802,
+				"circular addressing final pointer");
+		expect(data.read_word(0x0903) == 0x0000,
+				"BITF and conditional return");
+		expect(data.read_word(0x0904) == 0xbbbb,
+				"absolute data-memory copy");
 
 		m_phase = 1;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
@@ -223,6 +270,7 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	emu_timer *m_check_timer = nullptr;
 	unsigned m_phase = 0;
+	unsigned m_rom4_checks = 0;
 };
 
 void tms320c54x_test_state::test(machine_config &config)

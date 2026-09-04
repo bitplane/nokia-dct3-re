@@ -67,6 +67,7 @@ void tms320c54x_device::device_start()
 	for (unsigned i = 0; i != std::size(m_ar); ++i)
 		state_add(STATE_AR0 + i, string_format("AR%u", i).c_str(), m_ar[i]).formatstr("%04X");
 	state_add(STATE_BRC, "BRC", m_brc).formatstr("%04X");
+	state_add(STATE_BK, "BK", m_bk).formatstr("%04X");
 	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
 	state_add(STATE_GENPC, "GENPC", m_pc).noshow();
 	state_add(STATE_GENPCBASE, "CURPC", m_pc).noshow();
@@ -82,6 +83,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pmst));
 	save_item(NAME(m_ar));
 	save_item(NAME(m_brc));
+	save_item(NAME(m_bk));
 	save_item(NAME(m_rsa));
 	save_item(NAME(m_rea));
 	save_item(NAME(m_rptc));
@@ -105,6 +107,7 @@ void tms320c54x_device::device_reset()
 	m_pmst = 0xffa0;
 	std::fill(std::begin(m_ar), std::end(m_ar), 0);
 	m_brc = 0;
+	m_bk = 0;
 	m_rsa = 0;
 	m_rea = 0;
 	m_rptc = 0;
@@ -149,6 +152,23 @@ void tms320c54x_device::indirect_modify(u8 mode)
 	case 0x10: ++m_ar[ar]; break;
 	default: break;
 	}
+}
+
+void tms320c54x_device::circular_modify(unsigned ar, s16 step)
+{
+	if (!m_bk)
+		return;
+	unsigned address_bits = 0;
+	while ((1U << address_bits) <= m_bk && address_bits != 16)
+		++address_bits;
+	const u32 mask = address_bits == 16 ? 0xffff : (1U << address_bits) - 1;
+	const u16 base = m_ar[ar] & ~mask;
+	s32 index = (m_ar[ar] & mask) + step;
+	while (index >= m_bk)
+		index -= m_bk;
+	while (index < 0)
+		index += m_bk;
+	m_ar[ar] = base | u16(index);
 }
 
 u16 tms320c54x_device::indirect_read(u8 mode)
@@ -223,6 +243,12 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x8100: // STL B, Smem
 		indirect_write(low, u16(m_b));
 		return;
+	case 0x8200: // STH A, Smem
+		indirect_write(low, u16(m_a >> 16));
+		return;
+	case 0x8300: // STH B, Smem
+		indirect_write(low, u16(m_b >> 16));
+		return;
 	case 0x7600: // STM #lk, Smem
 		indirect_write(low, fetch());
 		return;
@@ -232,6 +258,8 @@ void tms320c54x_device::execute_one(u16 op)
 		const unsigned reg = low & 0x1f;
 		if (reg >= 0x10 && reg <= 0x17)
 			m_ar[reg - 0x10] = value;
+		else if (reg == 0x19)
+			m_bk = value;
 		else if (reg == 0x1a)
 			m_brc = value;
 		else
@@ -259,15 +287,53 @@ void tms320c54x_device::execute_one(u16 op)
 		m_data.write_word(m_ar[2]++, m_data.read_word(m_ar[4]++));
 		return;
 	}
+	if (op == 0xe50b) // MVDD *AR2, *AR5+
+	{
+		m_data.write_word(m_ar[5]++, m_data.read_word(m_ar[2]));
+		return;
+	}
+	if (op == 0xe5c9) // MVDD *AR2+0%, *AR3+
+	{
+		m_data.write_word(m_ar[3]++, m_data.read_word(m_ar[2]));
+		circular_modify(2, s16(m_ar[0]));
+		return;
+	}
+	if (op == 0xe58b) // MVDD *AR2+, *AR5+
+	{
+		m_data.write_word(m_ar[5]++, m_data.read_word(m_ar[2]++));
+		return;
+	}
 
 	switch (op)
 	{
 	case 0xe800: // LD #0, A
 		m_a = 0;
 		return;
+	case 0x61f8: // BITF dmad, #lk
+	{
+		const u16 address = fetch();
+		const u16 mask = fetch();
+		m_st0 = (m_st0 & ~0x1000) |
+			((m_data.read_word(address) & mask) ? 0x1000 : 0);
+		return;
+	}
+	case 0x70f8: // MVKD dmad, Smem (absolute destination form)
+	{
+		const u16 destination = fetch();
+		const u16 source = fetch();
+		m_data.write_word(destination, m_data.read_word(source));
+		return;
+	}
 	case 0xfc00: // RET
 		m_pc = pop();
 		m_icount -= 4;
+		return;
+	case 0xfc30: // RETC TC
+		if (m_st0 & 0x1000)
+		{
+			m_pc = pop();
+			m_icount -= 4;
+		}
 		return;
 	case 0xf072: // RPTB pmad
 		m_rsa = u16(m_pc + 1);
@@ -286,7 +352,20 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf493: // NOT A
 		m_a = ~m_a & ACC_MASK;
 		return;
+	case 0xf1c0: // XOR A, B
+		m_b = (m_b ^ m_a) & ACC_MASK;
+		return;
 	default:
+		if ((op & 0xfff8) == 0x4a10) // PSHM ARx
+		{
+			push(m_ar[low & 7]);
+			return;
+		}
+		if ((op & 0xfff8) == 0x8a10) // POPM ARx
+		{
+			m_ar[low & 7] = pop();
+			return;
+		}
 		if ((op & 0xff00) == 0xec00) // RPT #k
 		{
 			m_rptc = low;
@@ -319,7 +398,8 @@ void tms320c54x_device::execute_run()
 
 		m_op = fetch();
 		execute_one(m_op);
-		finish_repeats();
+		if (!m_illegal)
+			finish_repeats();
 		--m_icount;
 	}
 }

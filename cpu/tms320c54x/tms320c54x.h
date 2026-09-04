@@ -31,6 +31,7 @@ public:
 		STATE_AR6,
 		STATE_AR7,
 		STATE_BRC,
+		STATE_BK,
 		STATE_ILLEGAL
 	};
 
@@ -53,6 +54,7 @@ private:
 	u16 indirect_read(u8 mode);
 	void indirect_write(u8 mode, u16 value);
 	void indirect_modify(u8 mode);
+	void circular_modify(unsigned ar, s16 step);
 	void execute_one(u16 op);
 	void finish_repeats();
 	void push(u16 value);
@@ -80,6 +82,7 @@ private:
 	u16 m_pmst = 0;
 	u16 m_ar[8] = {};
 	u16 m_brc = 0;
+	u16 m_bk = 0;
 	u16 m_rsa = 0;
 	u16 m_rea = 0;
 	u16 m_rptc = 0;
