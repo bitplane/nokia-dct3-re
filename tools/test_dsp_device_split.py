@@ -169,8 +169,8 @@ class DspDeviceSplitTest(unittest.TestCase):
         for product in ("nse3", "nse8", "nhm5"):
             self.assertNotIn(product, self.hle.lower())
         self.assertIn(
-            "shared_006_write_cb().set(m_dsp_hle, "
-            "FUNC(nokia_dsp_hle_device::shared_006_write_w))",
+            "shared_006_write_cb().set("
+            "FUNC(nokia_dct3_state::dsp_shared_006_write_w))",
             self.phone,
         )
 
@@ -202,6 +202,8 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertIn(
             "optional_device<nokia_dsp_hle_device> m_dsp_hle", self.phone
         )
+        self.assertIn("optional_device<nokia_dsp_c54x_device> m_dsp_c54x", self.phone)
+        self.assertIn("bool(m_dsp_hle) == bool(m_dsp_c54x)", self.phone)
         self.assertIn("if (m_dsp_hle)", self.phone)
 
     def test_c54x_backend_uses_transport_owned_hpi_daram(self):
@@ -237,6 +239,7 @@ class DspDeviceSplitTest(unittest.TestCase):
         for token in (
             "required_device<nokia_dspif_device> m_dspif",
             "nokia_dsp_backend_interface *m_dsp_backend = nullptr",
+            "optional_device<nokia_dsp_c54x_device> m_dsp_c54x",
             "optional_device<nokia_dsp_hle_device> m_dsp_hle",
             "required_device<nokia_external_service_peer_device> m_external_service_peer",
             "required_device<nokia_gsm_network_device> m_gsm_network",

@@ -31,6 +31,7 @@
 #include "nokia_ccont.h"
 #include "nokia_b3_flash.h"
 #include "nokia_cobba.h"
+#include "nokia_dsp_c54x.h"
 #include "nokia_dsp_hle.h"
 #include "nokia_dspif.h"
 #include "nokia_external_service.h"
@@ -690,6 +691,7 @@ public:
 		m_mbus(*this, "mbus"),
 		m_pup(*this, "pup"),
 		m_dspif(*this, "dspif"),
+		m_dsp_c54x(*this, "dsp_c54x"),
 		m_dsp_hle(*this, "dsp_hle"),
 		m_external_service_peer(*this, "external_service_peer"),
 		m_gsm_call_adapter(*this, "gsm_call_adapter"),
@@ -796,6 +798,12 @@ private:
 	void dsp_service_pending_w(int state);
 	void dsp_doorbell_w(int state);
 	void dsp_reset_w(int state);
+	void dsp_shared_002_write_w(int state);
+	void dsp_shared_006_write_w(int state);
+	void dsp_shared_0fe_read_w(int state);
+	void dsp_shared_0fe_write_w(int state);
+	void dsp_shared_100_read_w(int state);
+	void dsp_shared_100_write_w(int state);
 	void dsp_tone_update_w(int state);
 	// Observation-only helpers implemented in nokia_dct3_trace.inc.
 	uint16_t fw_word(offs_t address) const;
@@ -819,6 +827,7 @@ private:
 	required_device<nokia_pup_device> m_pup;
 	required_device<nokia_dspif_device> m_dspif;
 	nokia_dsp_backend_interface *m_dsp_backend = nullptr;
+	optional_device<nokia_dsp_c54x_device> m_dsp_c54x;
 	optional_device<nokia_dsp_hle_device> m_dsp_hle;
 	required_device<nokia_external_service_peer_device> m_external_service_peer;
 	required_device<nokia_gsm_call_adapter_device> m_gsm_call_adapter;
@@ -976,9 +985,11 @@ void nokia_dct3_state::machine_start()
 {
 	// Keep the semantic seam as a device_interface so a future cpu_device can
 	// implement it without inheriting device_t twice.
-	m_dsp_backend = m_dsp_hle ? static_cast<nokia_dsp_backend_interface *>(&*m_dsp_hle) : nullptr;
-	if (!m_dsp_backend)
-		throw emu_fatalerror("Nokia DCT3 configuration has no DSP backend");
+	if (bool(m_dsp_hle) == bool(m_dsp_c54x))
+		throw emu_fatalerror("Nokia DCT3 configuration requires exactly one DSP backend");
+	m_dsp_backend = m_dsp_c54x ?
+			static_cast<nokia_dsp_backend_interface *>(&*m_dsp_c54x) :
+			static_cast<nokia_dsp_backend_interface *>(&*m_dsp_hle);
 
 	// Passive research logging uses MAME's standard -verbose switch.  Product
 	// composition and hardware timing are configured by machine_config.
@@ -1433,6 +1444,36 @@ void nokia_dct3_state::dsp_doorbell_w(int state)
 void nokia_dct3_state::dsp_reset_w(int state)
 {
 	m_dsp_backend->reset_line_w(state);
+}
+
+void nokia_dct3_state::dsp_shared_002_write_w(int state)
+{
+	m_dsp_backend->shared_002_write_w(state);
+}
+
+void nokia_dct3_state::dsp_shared_006_write_w(int state)
+{
+	m_dsp_backend->shared_006_write_w(state);
+}
+
+void nokia_dct3_state::dsp_shared_0fe_read_w(int state)
+{
+	m_dsp_backend->shared_0fe_read_w(state);
+}
+
+void nokia_dct3_state::dsp_shared_0fe_write_w(int state)
+{
+	m_dsp_backend->shared_0fe_write_w(state);
+}
+
+void nokia_dct3_state::dsp_shared_100_read_w(int state)
+{
+	m_dsp_backend->shared_100_read_w(state);
+}
+
+void nokia_dct3_state::dsp_shared_100_write_w(int state)
+{
+	m_dsp_backend->shared_100_write_w(state);
 }
 
 void nokia_dct3_state::mbus_fiq2_w(int state)
@@ -2347,12 +2388,12 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_dspif->tx_commit_cb().set(FUNC(nokia_dct3_state::dsp_tx_commit_w));
 	m_dspif->service_pending_cb().set(FUNC(nokia_dct3_state::dsp_service_pending_w));
 	m_dspif->doorbell_cb().set(FUNC(nokia_dct3_state::dsp_doorbell_w));
-	m_dspif->shared_002_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_002_write_w));
-	m_dspif->shared_006_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_006_write_w));
-	m_dspif->shared_0fe_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_read_w));
-	m_dspif->shared_0fe_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_write_w));
-	m_dspif->shared_100_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_read_w));
-	m_dspif->shared_100_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_write_w));
+	m_dspif->shared_002_write_cb().set(FUNC(nokia_dct3_state::dsp_shared_002_write_w));
+	m_dspif->shared_006_write_cb().set(FUNC(nokia_dct3_state::dsp_shared_006_write_w));
+	m_dspif->shared_0fe_read_cb().set(FUNC(nokia_dct3_state::dsp_shared_0fe_read_w));
+	m_dspif->shared_0fe_write_cb().set(FUNC(nokia_dct3_state::dsp_shared_0fe_write_w));
+	m_dspif->shared_100_read_cb().set(FUNC(nokia_dct3_state::dsp_shared_100_read_w));
+	m_dspif->shared_100_write_cb().set(FUNC(nokia_dct3_state::dsp_shared_100_write_w));
 	m_dspif->fiq0_cb().set(FUNC(nokia_dct3_state::dsp_fiq0_w));
 	m_dspif->service_irq_cb().set(FUNC(nokia_dct3_state::dsp_service_irq_w));
 	NOKIA_SIMI(config, m_simi);
