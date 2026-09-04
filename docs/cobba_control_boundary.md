@@ -58,6 +58,25 @@ PCM ports. These are separate buses and must remain separate local device
 interfaces. See `djr_dsp_integration.md` for provenance, addresses and the
 missing-overlay limitation.
 
+The ROM4 boot self-test separates the two owners. It first reads COBBA control
+register 8, sets `0x0610`, and writes it back. It then writes C54x BSPC
+`0xc008` followed by `0xc0c8`, transmits `0x0aaa` through BDXR and polls BDRR
+for the same word. Finally it clears the `0x0610` bits in COBBA register 8.
+Texas Instruments' BSPC definition shows that the changed `0x00c0` bits are
+RRST and XRST, enabling the DSP receiver and transmitter; DLB bit 1 remains
+clear. The echo is therefore externally returned by COBBA under its register-8
+test mode, not the C54x's internal digital loopback. See the
+[TMS320C54x DSP CPU Reference Guide](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
+section 9, for the DSP-side register contract.
+
+`codec_serial_transmit`, `codec_serial_receive` and
+`codec_serial_receive_ack` now model COBBA's side of that word boundary. The
+only decoded register-8 behavior is the complete evidenced predicate
+`(value & 0x0610) == 0x0610`; individual bit names remain unknown. The methods
+operate on completed serial words, so a future C54x backend must still own
+BSPC, BDXR/BDRR ready flags, interrupts and bit timing. The production HLE does
+not call this test path.
+
 ## Physical capture option
 
 The Nokia 5110 NSE-1 service material names factory test points for `DSPXF`,

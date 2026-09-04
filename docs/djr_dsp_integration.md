@@ -170,7 +170,7 @@ a hardware specification:
 |---|---|---|
 | `SEEDDARAM` | warm boot reaches run mode with `0x0d80=0xfc00`, `0x0d00=0xfc00`, `0x0926=0`, then produces 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | non-hardware snapshot replay. The recovered block catalogue targets 1,189 of the 2,048 replayed words in `0x2000..0x27ff`, so this range cannot be described as immutable ROM automatically reloading DARAM. Replace it only after the firmware-driven upload, DSP demand-load and warm-reset preservation/clear sequence accounts for the required contents. |
 | `SELFTEST_MEAS` | the DSP reaches the validator without the patch, then the MCU requests an organic reason-4 warm reboot at caller `0x258d35`/resume `0x258d3d` | direct output synthesis. The native harness writes `0x1202..0x1206 = {0010,0000,0000,0000,0160}` after the DSP transform. These are accepted fixture values, not recovered COBBA readings. Replace them with the DSP routine's real acquisition inputs and COBBA response; do not promote the accepted output tuple as a reset value. |
-| COBBA BSP loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The observed boot test selects COBBA digital loopback and transmits `0x0aaa`; a real COBBA must return the serial sample through its receive register. Move this behavior into a COBBA serial/BSP model driven by its control mode and clocks, with no PC, step-count or boot-phase condition. |
+| COBBA codec-serial loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The DSP sets COBBA register 8 bits `0x0610`, enables the C54x BSP with `0xc008 -> 0xc0c8`, sends BDXR `0x0aaa`, polls BDRR, then clears the COBBA bits. TI's BSPC map proves the transition sets RRST/XRST while DLB remains clear, so COBBA externally returns the word. `nokia_cobba_device` now owns the evidenced register predicate and completed-word echo; a future C54x backend must drive it through real BSP timing and ready state instead of host polling. |
 
 The recovered catalogue is independently auditable with:
 
@@ -200,7 +200,8 @@ The captured interface evidence is bounded as follows:
   are present;
 - the host-command ISR, timer ISR, DSP receive enqueue/dequeue paths and
   overlaid DARAM execute;
-- host-assisted COBBA BSP loopback and codec-frame interrupts are present; and
+- host-assisted COBBA codec-serial loopback and codec-frame interrupts are
+  present; and
 - no complete parallel-MFI transaction, bidirectional speech PCM call, or
   call setup/release lifecycle was produced by this run.
 

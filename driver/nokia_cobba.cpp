@@ -47,6 +47,9 @@ void nokia_cobba_device::device_start()
 	save_item(NAME(m_control_transactions));
 	save_item(NAME(m_control_reads));
 	save_item(NAME(m_control_writes));
+	save_item(NAME(m_codec_serial_receive_latch));
+	save_item(NAME(m_codec_serial_receive_ready));
+	save_item(NAME(m_codec_serial_loopbacks));
 }
 
 void nokia_cobba_device::device_reset()
@@ -71,6 +74,9 @@ void nokia_cobba_device::device_reset()
 	m_control_transactions = 0;
 	m_control_reads = 0;
 	m_control_writes = 0;
+	m_codec_serial_receive_latch = 0;
+	m_codec_serial_receive_ready = false;
+	m_codec_serial_loopbacks = 0;
 }
 
 void nokia_cobba_device::control_data_w(u16 data)
@@ -109,6 +115,29 @@ u16 nokia_cobba_device::control_data_r() const
 	return m_control_registers[m_control_address] & 0x0fff;
 }
 
+bool nokia_cobba_device::codec_serial_loopback() const
+{
+	// ROM4 self-test reads register 8, sets 0x0610, then enables the C54x
+	// buffered serial-port receiver/transmitter and expects each transmitted
+	// word at the receive pin. It clears the same three bits afterwards.
+	// Individual field meanings are not inferred from this one transaction.
+	return (m_control_registers[0x08] & 0x0610) == 0x0610;
+}
+
+void nokia_cobba_device::codec_serial_transmit(u16 data)
+{
+	if (!codec_serial_loopback())
+		return;
+
+	m_codec_serial_receive_latch = data;
+	m_codec_serial_receive_ready = true;
+	++m_codec_serial_loopbacks;
+	if (m_trace_enabled)
+		machine().logerror(
+				"cobba: codec serial loopback data=%04x count=%llu t=%.6f\n",
+				data, m_codec_serial_loopbacks, machine().time().as_double());
+}
+
 u8 nokia_cobba_device::run_control_conformance_checks()
 {
 	const auto saved_registers = m_control_registers;
@@ -118,6 +147,9 @@ u8 nokia_cobba_device::run_control_conformance_checks()
 	const u64 saved_transactions = m_control_transactions;
 	const u64 saved_reads = m_control_reads;
 	const u64 saved_writes = m_control_writes;
+	const u16 saved_codec_receive = m_codec_serial_receive_latch;
+	const bool saved_codec_ready = m_codec_serial_receive_ready;
+	const u64 saved_codec_loopbacks = m_codec_serial_loopbacks;
 	u8 result = 0;
 
 	// Reset exposes only the recovered ROM4 idle handshake in register D.
@@ -156,6 +188,21 @@ u8 nokia_cobba_device::run_control_conformance_checks()
 	if (masked_write && m_control_read && control_data_r() == 0x0fed)
 		result |= 0x08;
 
+	// The recovered ROM4 sequence brackets its codec serial echo with these
+	// exact register-8 bits. A disabled transfer must not manufacture input.
+	control_data_w(0x0610);
+	control_select_w(0x08);
+	codec_serial_transmit(0x0aaa);
+	const bool loopback_enabled = codec_serial_receive_ready() &&
+			codec_serial_receive() == 0x0aaa && m_codec_serial_loopbacks == 1;
+	codec_serial_receive_ack();
+	control_data_w(control_register(0x08) & 0x09ef);
+	control_select_w(0x08);
+	codec_serial_transmit(0x0555);
+	if (loopback_enabled && !codec_serial_loopback() &&
+			!codec_serial_receive_ready() && m_codec_serial_loopbacks == 1)
+		result |= 0x10;
+
 	m_control_registers = saved_registers;
 	m_control_data_latch = saved_latch;
 	m_control_address = saved_address;
@@ -163,6 +210,9 @@ u8 nokia_cobba_device::run_control_conformance_checks()
 	m_control_transactions = saved_transactions;
 	m_control_reads = saved_reads;
 	m_control_writes = saved_writes;
+	m_codec_serial_receive_latch = saved_codec_receive;
+	m_codec_serial_receive_ready = saved_codec_ready;
+	m_codec_serial_loopbacks = saved_codec_loopbacks;
 	return result;
 }
 

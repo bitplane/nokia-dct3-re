@@ -209,8 +209,9 @@ composition proof that an unknown product profile cannot manufacture handset
 speech.
 `make verify-cobba-control` is a separate mapped-device diagnostic for the
 opaque DSP serial-control plane. It checks the recovered latch/select/read
-grammar and reset handshake, restores all touched register state, and assigns
-no mux, gain or call-state meaning to any register. The ordinary paired-ROM
+grammar, reset handshake and ROM4 register-8 codec-serial loopback predicate,
+restores all touched register state, and assigns no mux, gain or call-state
+meaning to any other register bits. The ordinary paired-ROM
 call gates run without this diagnostic bit, keeping controller conformance
 distinct from firmware behavior.
 `make verify-radio-degraded-speech` likewise runs both ROMs through the

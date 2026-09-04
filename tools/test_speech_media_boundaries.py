@@ -203,6 +203,9 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
             "control_data_w(u16 data)",
             "control_select_w(u16 select)",
             "control_data_r() const",
+            "codec_serial_transmit(u16 data)",
+            "codec_serial_receive() const",
+            "codec_serial_loopback() const",
             "std::array<u16, 16> m_control_registers",
         ):
             self.assertIn(token, header)
@@ -210,6 +213,9 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_control_address = select & 0x0f", cobba)
         self.assertIn("m_control_read = BIT(select, 4)", cobba)
         self.assertIn("m_control_registers[0x0d] = 0x000c", cobba)
+        self.assertIn("(m_control_registers[0x08] & 0x0610) == 0x0610", cobba)
+        self.assertIn("m_codec_serial_receive_latch = data", cobba)
+        self.assertIn("m_codec_serial_receive_ready = true", cobba)
         self.assertNotIn("control_select_w", dsp)
         control_write = cobba.split(
             "void nokia_cobba_device::control_select_w", 1

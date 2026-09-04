@@ -54,6 +54,14 @@ public:
 	u64 control_transactions() const { return m_control_transactions; }
 	u64 control_reads() const { return m_control_reads; }
 	u64 control_writes() const { return m_control_writes; }
+	// Completed words at the DSP-facing codec serial pins. C54x BDXR/BDRR,
+	// clocks and ready flags remain properties of the DSP's BSP peripheral.
+	void codec_serial_transmit(u16 data);
+	u16 codec_serial_receive() const { return m_codec_serial_receive_latch; }
+	bool codec_serial_receive_ready() const { return m_codec_serial_receive_ready; }
+	void codec_serial_receive_ack() { m_codec_serial_receive_ready = false; }
+	bool codec_serial_loopback() const;
+	u64 codec_serial_loopbacks() const { return m_codec_serial_loopbacks; }
 	u8 run_control_conformance_checks();
 	bool write_earpiece_pcm(const pcm_block &block);
 	void read_microphone_pcm(pcm_block &block);
@@ -99,6 +107,9 @@ private:
 	u64 m_control_transactions = 0;
 	u64 m_control_reads = 0;
 	u64 m_control_writes = 0;
+	u16 m_codec_serial_receive_latch = 0;
+	bool m_codec_serial_receive_ready = false;
+	u64 m_codec_serial_loopbacks = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_COBBA, nokia_cobba_device)
