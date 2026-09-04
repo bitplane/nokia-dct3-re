@@ -34,8 +34,8 @@ def check_bootstrap_completion(text: str, expected_exchanges: int) -> dict[str, 
 def check(text: str, full_session: bool, conformance: bool = False,
           expected_bootstrap_exchanges: int | None = None) -> dict[str, int]:
     if conformance:
-        require(text, r"dspif_fixture: conformance=07", "wrap/full/partial conformance")
-        return {"conformance": 0x07}
+        require(text, r"dspif_fixture: conformance=0f", "wrap/full/partial/HPI conformance")
+        return {"conformance": 0x0f}
     counts = {
         "bootstrap_requests": require(
             text,

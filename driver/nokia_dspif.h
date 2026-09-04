@@ -9,6 +9,9 @@
 class nokia_dspif_device : public device_t
 {
 public:
+	static constexpr u16 hpi_daram_base = 0x0800;
+	static constexpr u16 hpi_daram_words = 0x0800;
+
 	struct packet
 	{
 		u8 type = 0;
@@ -36,6 +39,8 @@ public:
 	void shared_w(offs_t offset, u16 data, u16 mem_mask = ~0);
 	u16 shared_word(offs_t offset) const { return m_ram[offset & 0x7ff]; }
 	void peer_shared_w(offs_t offset, u16 data);
+	u16 dsp_data_r(u16 address) const;
+	void dsp_data_w(u16 address, u16 data);
 	u8 dspif_r(offs_t offset) const;
 	void dspif_w(offs_t offset, u8 data);
 

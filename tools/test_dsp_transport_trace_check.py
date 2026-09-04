@@ -61,7 +61,7 @@ class DspTransportTraceCheckTest(unittest.TestCase):
             check(FULL.replace("dspif_transport: TX consume", "missing"), True)
 
     def test_conformance_contract(self):
-        self.assertEqual(check("dspif_fixture: conformance=07", False, True), {"conformance": 7})
+        self.assertEqual(check("dspif_fixture: conformance=0f", False, True), {"conformance": 15})
 
 
 if __name__ == "__main__":

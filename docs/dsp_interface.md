@@ -21,7 +21,7 @@ unimplemented mobility, handover, MO SMS or broader services are implied.
 
 | MMIO | region | driver | boot usage |
 |---|---|---|---|
-| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords) | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | extracted partial transport; DSP HLE publishes bootstrap state into the same backing RAM |
+| `0x10000–0x10fff` | **DSP shared RAM** (0x800 halfwords; DSP DARAM `0x0800–0x0fff`) | `nokia_dspif_device::shared_r/w` through `dsp_ram_r/w` | extracted partial transport; DSP HLE publishes bootstrap state into the same backing RAM |
 | `0x30000–0x30003` | **DSPIF** control register | retained by `nokia_dspif_device::dspif_r/w` | early initialization plus repeated command-4 doorbells from shared-control and L1 send paths |
 | `0x40000–0x40003` | MCUIF (memory-range config) | retained by `mad2_mcuif_r/w` | early config value `6a 0f 61 20` |
 
@@ -33,6 +33,14 @@ doorbell byte 2 at `0x20008`. DSPIF is therefore a live boundary, not a
 static-only future path. Those service commands remain useful lower-radio
 evidence; the distinct boot-critical service-session completion is mapped as
 type `0x70` TX / type `0x74` RX.
+
+The MCU byte window is offset by DSP DARAM word `0x0800`: MCU `0x10000`
+addresses DSP word `0x0800`, and MCU `0x10e00` addresses DSP word `0x0f00`.
+This is load-bearing for ROM4 cold boot because the firmware's ordinary block
+copy stages loader1 through the latter address before releasing the DSP. DSPIF
+therefore exposes both MCU-offset accessors and explicit DSP-data-address
+accessors over one backing store; a C54x backend must not maintain a second
+copy of this range.
 
 The widened MAD2 access ledger records 27 DSPIF command writes in the coherent
 boot: one zero-valued initialization and 26 command-4 writes, chiefly from

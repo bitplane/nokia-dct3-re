@@ -142,6 +142,22 @@ void nokia_dspif_device::peer_shared_w(offs_t offset, u16 data)
 				offset << 1, old_data, data, machine().time().as_double());
 }
 
+u16 nokia_dspif_device::dsp_data_r(u16 address) const
+{
+	if (address < hpi_daram_base ||
+			address >= hpi_daram_base + hpi_daram_words)
+		fatalerror("DSPIF: DSP data address %04x is outside the HPI DARAM window", address);
+	return m_ram[address - hpi_daram_base];
+}
+
+void nokia_dspif_device::dsp_data_w(u16 address, u16 data)
+{
+	if (address < hpi_daram_base ||
+			address >= hpi_daram_base + hpi_daram_words)
+		fatalerror("DSPIF: DSP data address %04x is outside the HPI DARAM window", address);
+	peer_shared_w(address - hpi_daram_base, data);
+}
+
 u8 nokia_dspif_device::dspif_r(offs_t offset) const
 {
 	return m_dspif[offset & 3];
@@ -284,6 +300,15 @@ u8 nokia_dspif_device::run_conformance_checks()
 	packet partial;
 	if (!peek_tx_packet(partial) && m_ram[TX_CONSUMER] == 0)
 		result |= 0x04;
+
+	// The MCU's final halfword at byte offset 0x0e00 is DSP DARAM 0x0f00.
+	m_ram[0x700] = 0x1234;
+	if (dsp_data_r(0x0f00) == 0x1234)
+	{
+		dsp_data_w(0x0f00, 0x5678);
+		if (m_ram[0x700] == 0x5678)
+			result |= 0x08;
+	}
 
 	std::copy(saved.begin(), saved.end(), std::begin(m_ram));
 	return result;
