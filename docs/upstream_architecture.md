@@ -98,6 +98,13 @@ AR-index interpretation of MMR code `0x12`; the corrected decoder treats
 `0x10..0x17` as AR0..AR7. This executable gate, not source-token inspection,
 is the acceptance boundary for subsequent opcode families.
 
+The gate also executes the final six-iteration ROM4 challenge-transform loop
+from independently observed workspace operands. Its six output words reproduce
+`1cee 7cb6 d2a3 b986 4c57 e65e` exactly. This validates SXM-controlled
+16-to-40-bit operand extension, NOT/OR/XOR behavior, descending auxiliary
+pointers, low-word stores and the RPTB/CALL interaction in the MAME core; it
+does not yet claim that the preceding transform routines execute.
+
 ## DSP ROM policy
 
 Keep the following storage domains distinct in MAME ROM declarations:

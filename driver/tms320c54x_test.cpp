@@ -57,9 +57,46 @@ private:
 		program.write_word(0x0211, 0x8094);
 		program.write_word(0x0212, 0xfc00);
 
+		// Final ROM4 challenge-transform loop. These are observed operands and
+		// generic instruction encodings, not firmware code or a canned result.
+		program.write_word(0x0300, 0x7712);
+		program.write_word(0x0301, 0x13d9);
+		program.write_word(0x0302, 0x7713);
+		program.write_word(0x0303, 0x13d7);
+		program.write_word(0x0304, 0x7714);
+		program.write_word(0x0305, 0x1208);
+		program.write_word(0x0306, 0x771a);
+		program.write_word(0x0307, 0x0005);
+		program.write_word(0x0308, 0xf072);
+		program.write_word(0x0309, 0x030b);
+		program.write_word(0x030a, 0xf074);
+		program.write_word(0x030b, 0x0320);
+		program.write_word(0x0320, 0x108a);
+		program.write_word(0x0321, 0xf493);
+		program.write_word(0x0322, 0x1a8b);
+		program.write_word(0x0323, 0x6d8c);
+		program.write_word(0x0324, 0x1c84);
+		program.write_word(0x0325, 0x8084);
+		program.write_word(0x0326, 0xfc00);
+
 		data.write_word(0x0500, 0x1111);
 		data.write_word(0x0501, 0x2222);
 		data.write_word(0x0502, 0x3333);
+		data.write_word(0x13d2, 0x6d4d);
+		data.write_word(0x13d3, 0xc431);
+		data.write_word(0x13d4, 0xbfe4);
+		data.write_word(0x13d5, 0x5d91);
+		data.write_word(0x13d6, 0x71b1);
+		data.write_word(0x13d7, 0x9ac9);
+		data.write_word(0x13d8, 0x6d4d);
+		data.write_word(0x13d9, 0xc431);
+		data.write_word(0x1202, 0x71b1);
+		data.write_word(0x1203, 0x9ac9);
+		data.write_word(0x1204, 0x6d4d);
+		data.write_word(0x1205, 0xc431);
+		data.write_word(0x1206, 0xbfe4);
+		data.write_word(0x1207, 0x5d91);
+		m_phase = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0100);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0700);
@@ -88,6 +125,24 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		if (m_phase)
+		{
+			static constexpr u16 expected[] = {
+				0x1cee, 0x7cb6, 0xd2a3, 0xb986, 0x4c57, 0xe65e
+			};
+			osd_printf_info("TMS320C54x transform result: %04x,%04x,%04x,%04x,%04x,%04x\n",
+					data.read_word(0x1202), data.read_word(0x1203),
+					data.read_word(0x1204), data.read_word(0x1205),
+					data.read_word(0x1206), data.read_word(0x1207));
+			for (unsigned i = 0; i != std::size(expected); ++i)
+				expect(data.read_word(0x1202 + i) == expected[i],
+						"ROM4 challenge transform terminal loop");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
+					"ROM4 challenge transform repeat count");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+		}
+
 		osd_printf_info("TMS320C54x test state: pc=%04x sp=%04x brc=%04x "
 				"rpt=%04x,%04x,%04x block=%04x,%04x,%04x\n",
 				u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
@@ -107,12 +162,17 @@ private:
 		expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
 				"RPTB terminal count");
 
-		osd_printf_info("TMS320C54x core conformance: PASS\n");
-		throw emu_fatalerror(0, "TMS320C54x core tests complete");
+		m_phase = 1;
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
 	required_device<tms320c54x_device> m_cpu;
 	emu_timer *m_check_timer = nullptr;
+	unsigned m_phase = 0;
 };
 
 void tms320c54x_test_state::test(machine_config &config)

@@ -44,6 +44,7 @@ class DspDeviceSplitTest(unittest.TestCase):
         for contract in (
             "CALL/RET continuation", "RPT memory transfer",
             "RPTB multiword CALL", "balanced system stack",
+            "ROM4 challenge transform terminal loop",
         ):
             self.assertIn(contract, self.c54x_test)
 

@@ -133,6 +133,13 @@ u16 tms320c54x_device::pop()
 	return value;
 }
 
+u64 tms320c54x_device::data_operand(u16 value) const
+{
+	if (BIT(m_st1, 8) && BIT(value, 15))
+		return u64(s64(s16(value))) & ACC_MASK;
+	return value;
+}
+
 void tms320c54x_device::indirect_modify(u8 mode)
 {
 	const unsigned ar = mode & 7;
@@ -187,10 +194,10 @@ void tms320c54x_device::execute_one(u16 op)
 	switch (op & 0xff00)
 	{
 	case 0x1000: // LD Smem, A
-		m_a = indirect_read(low);
+		m_a = data_operand(indirect_read(low));
 		return;
 	case 0x1100: // LD Smem, B
-		m_b = indirect_read(low);
+		m_b = data_operand(indirect_read(low));
 		return;
 	case 0x1a00: // OR Smem, A
 		m_a = (m_a | indirect_read(low)) & ACC_MASK;
@@ -276,6 +283,9 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 3;
 		return;
 	}
+	case 0xf493: // NOT A
+		m_a = ~m_a & ACC_MASK;
+		return;
 	default:
 		if ((op & 0xff00) == 0xec00) // RPT #k
 		{

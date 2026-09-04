@@ -57,6 +57,7 @@ private:
 	void finish_repeats();
 	void push(u16 value);
 	u16 pop();
+	u64 data_operand(u16 value) const;
 	u64 &accumulator(bool b) { return b ? m_b : m_a; }
 
 	address_space_config m_program_config;
