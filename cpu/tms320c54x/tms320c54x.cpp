@@ -82,6 +82,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_brc));
 	save_item(NAME(m_rsa));
 	save_item(NAME(m_rea));
+	save_item(NAME(m_rptc));
+	save_item(NAME(m_rpt_address));
 	save_item(NAME(m_ifr));
 	save_item(NAME(m_imr));
 	save_item(NAME(m_block_repeat_active));
@@ -103,10 +105,193 @@ void tms320c54x_device::device_reset()
 	m_brc = 0;
 	m_rsa = 0;
 	m_rea = 0;
+	m_rptc = 0;
+	m_rpt_address = 0;
 	m_ifr = 0;
 	m_imr = 0;
 	m_block_repeat_active = false;
 	m_illegal = false;
+}
+
+u16 tms320c54x_device::fetch()
+{
+	return m_cache.read_word(m_pc++);
+}
+
+void tms320c54x_device::push(u16 value)
+{
+	// The C54x system stack grows downward; SP always names its top word.
+	m_data.write_word(--m_sp, value);
+}
+
+u16 tms320c54x_device::pop()
+{
+	const u16 value = m_data.read_word(m_sp);
+	++m_sp;
+	return value;
+}
+
+void tms320c54x_device::indirect_modify(u8 mode)
+{
+	const unsigned ar = mode & 7;
+	switch (mode & 0x78)
+	{
+	case 0x08: --m_ar[ar]; break;
+	case 0x10: ++m_ar[ar]; break;
+	default: break;
+	}
+}
+
+u16 tms320c54x_device::indirect_read(u8 mode)
+{
+	const unsigned ar = mode & 7;
+	const u16 value = m_data.read_word(m_ar[ar]);
+	indirect_modify(mode);
+	return value;
+}
+
+void tms320c54x_device::indirect_write(u8 mode, u16 value)
+{
+	const unsigned ar = mode & 7;
+	m_data.write_word(m_ar[ar], value);
+	indirect_modify(mode);
+}
+
+void tms320c54x_device::finish_repeats()
+{
+	if (m_rptc && m_pc == u16(m_rpt_address + 1))
+	{
+		--m_rptc;
+		m_pc = m_rpt_address;
+	}
+
+	// REA names the last program word in the block. This also covers a
+	// multiword CALL at the end of the block after its RET restores REA+1.
+	if (m_block_repeat_active && m_pc == u16(m_rea + 1))
+	{
+		if (m_brc)
+		{
+			--m_brc;
+			m_pc = m_rsa;
+		}
+		else
+			m_block_repeat_active = false;
+	}
+}
+
+void tms320c54x_device::execute_one(u16 op)
+{
+	const u8 low = op;
+	switch (op & 0xff00)
+	{
+	case 0x1000: // LD Smem, A
+		m_a = indirect_read(low);
+		return;
+	case 0x1100: // LD Smem, B
+		m_b = indirect_read(low);
+		return;
+	case 0x1a00: // OR Smem, A
+		m_a = (m_a | indirect_read(low)) & ACC_MASK;
+		return;
+	case 0x1b00: // OR Smem, B
+		m_b = (m_b | indirect_read(low)) & ACC_MASK;
+		return;
+	case 0x1c00: // XOR Smem, A
+		m_a = (m_a ^ indirect_read(low)) & ACC_MASK;
+		return;
+	case 0x1d00: // XOR Smem, B
+		m_b = (m_b ^ indirect_read(low)) & ACC_MASK;
+		return;
+	case 0x4400: // LD Smem, 16, A
+		m_a = u64(indirect_read(low)) << 16;
+		return;
+	case 0x4500: // LD Smem, 16, B
+		m_b = u64(indirect_read(low)) << 16;
+		return;
+	case 0x8000: // STL A, Smem
+		indirect_write(low, u16(m_a));
+		return;
+	case 0x8100: // STL B, Smem
+		indirect_write(low, u16(m_b));
+		return;
+	case 0x7600: // STM #lk, Smem
+		indirect_write(low, fetch());
+		return;
+	case 0x7700: // STM #lk, MMR
+	{
+		const u16 value = fetch();
+		const unsigned reg = low & 0x1f;
+		if (reg < 8)
+			m_ar[reg] = value;
+		else if (reg == 0x1a)
+			m_brc = value;
+		else
+			m_illegal = true;
+		return;
+	}
+	case 0xe700: // MVDK source auxiliary register to destination MMR
+	{
+		const unsigned source = (low >> 4) & 7;
+		const unsigned destination = low & 7;
+		m_ar[destination] = m_ar[source];
+		return;
+	}
+	default:
+		break;
+	}
+
+	if (op == 0xe598) // MVDD *AR3+, *AR2+
+	{
+		m_data.write_word(m_ar[2]++, m_data.read_word(m_ar[3]++));
+		return;
+	}
+	if (op == 0xe5a8) // MVDD *AR4+, *AR2+
+	{
+		m_data.write_word(m_ar[2]++, m_data.read_word(m_ar[4]++));
+		return;
+	}
+
+	switch (op)
+	{
+	case 0xe800: // LD #0, A
+		m_a = 0;
+		return;
+	case 0xfc00: // RET
+		m_pc = pop();
+		m_icount -= 4;
+		return;
+	case 0xf072: // RPTB pmad
+		m_rsa = u16(m_pc + 1);
+		m_rea = fetch();
+		m_block_repeat_active = true;
+		m_icount -= 3;
+		return;
+	case 0xf074: // CALL pmad
+	{
+		const u16 destination = fetch();
+		push(m_pc);
+		m_pc = destination;
+		m_icount -= 3;
+		return;
+	}
+	default:
+		if ((op & 0xff00) == 0xec00) // RPT #k
+		{
+			m_rptc = low;
+			m_rpt_address = m_pc;
+			return;
+		}
+		if ((op & 0xfff8) == 0x6d88) // MAR *ARx-
+		{
+			indirect_modify(low);
+			return;
+		}
+		break;
+	}
+
+	logerror("%s: unimplemented C54x opcode %04x at %04x\n",
+			machine().describe_context(), op, u16(m_pc - 1));
+	m_illegal = true;
 }
 
 void tms320c54x_device::execute_run()
@@ -120,10 +305,9 @@ void tms320c54x_device::execute_run()
 			break;
 		}
 
-		m_op = m_cache.read_word(m_pc++);
-		logerror("%s: unimplemented C54x opcode %04x at %04x\n",
-				machine().describe_context(), m_op, u16(m_pc - 1));
-		m_illegal = true;
+		m_op = fetch();
+		execute_one(m_op);
+		finish_repeats();
 		--m_icount;
 	}
 }

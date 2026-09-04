@@ -17,7 +17,7 @@ protected:
 	virtual void device_reset() override ATTR_COLD;
 
 	virtual u32 execute_min_cycles() const noexcept override { return 1; }
-	virtual u32 execute_max_cycles() const noexcept override { return 1; }
+	virtual u32 execute_max_cycles() const noexcept override { return 5; }
 	virtual void execute_run() override;
 	virtual void execute_set_input(int inputnum, int state) override;
 
@@ -47,6 +47,16 @@ private:
 
 	static constexpr u64 ACC_MASK = (u64(1) << 40) - 1;
 
+	u16 fetch();
+	u16 indirect_read(u8 mode);
+	void indirect_write(u8 mode, u16 value);
+	void indirect_modify(u8 mode);
+	void execute_one(u16 op);
+	void finish_repeats();
+	void push(u16 value);
+	u16 pop();
+	u64 &accumulator(bool b) { return b ? m_b : m_a; }
+
 	address_space_config m_program_config;
 	address_space_config m_data_config;
 	address_space_config m_io_config;
@@ -69,6 +79,8 @@ private:
 	u16 m_brc = 0;
 	u16 m_rsa = 0;
 	u16 m_rea = 0;
+	u16 m_rptc = 0;
+	u16 m_rpt_address = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
 	bool m_block_repeat_active = false;

@@ -83,6 +83,13 @@ This makes unsupported semantics visible while the independently captured ROM4
 transform fixture grows the generic instruction implementation. Nokia mailbox,
 COBBA and product-profile behavior remain outside this CPU directory.
 
+The first semantic tranche covers the generic encodings exercised at the
+transform boundary for CALL/RET, RPT/RPTB, immediate auxiliary-register loads,
+auxiliary-register moves, ordinary indirect pre/post addressing, accumulator
+loads/logical operations and low-word stores. Stack growth and block-repeat
+termination follow the TI CPU guide. This is still below the 628-opcode ROM4
+boot surface and is not yet selected by any handset configuration.
+
 ## DSP ROM policy
 
 Keep the following storage domains distinct in MAME ROM declarations:
