@@ -130,6 +130,7 @@ private:
 		program.write_word(0x0136, 0x7cf8);
 		program.write_word(0x0137, 0x0908);
 		program.write_word(0x0138, 0x0907);
+		program.write_word(0x0139, 0xf5e1);
 
 		program.write_word(0x0200, 0x7680);
 		program.write_word(0x0201, 0xbeef);
@@ -212,7 +213,7 @@ private:
 		program.write_word(0x0381, 0x0390);
 		program.write_word(0x0382, 0xf495);
 		program.write_word(0x0383, 0xf495);
-		program.write_word(0x0384, 0x0000);
+		program.write_word(0x0384, 0xf5e1);
 		program.write_word(0x0390, 0xf5e1);
 		program.write_word(0x0392, 0xf4eb);
 		program.write_word(0x0398, 0xf5e1);
@@ -220,7 +221,7 @@ private:
 		program.write_word(0x039b, 0x03a0);
 		program.write_word(0x039c, 0xf495);
 		program.write_word(0x039d, 0xf495);
-		program.write_word(0x039e, 0x0000);
+		program.write_word(0x039e, 0xf5e1);
 		program.write_word(0x03a0, 0xf5e1);
 		program.write_word(0x03a2, 0x6ff8);
 		program.write_word(0x03a3, 0x0920);
@@ -232,12 +233,20 @@ private:
 		program.write_word(0x03b3, 0x0918);
 		program.write_word(0x03b4, 0xf5e1);
 		program.write_word(0x03b6, 0xfc4b);
-		program.write_word(0x03b7, 0x0000);
+		program.write_word(0x03b7, 0xf5e1);
 		program.write_word(0x03c0, 0xf5e1);
 		program.write_word(0x03c2, 0xf947);
 		program.write_word(0x03c3, 0x03d0);
 		program.write_word(0x03c4, 0xf5e1);
 		program.write_word(0x03d0, 0xf5e1);
+		program.write_word(0x03d2, 0xf520);
+		program.write_word(0x03d3, 0xf5e1);
+		program.write_word(0x03d4, 0xf070);
+		program.write_word(0x03d5, 0x0001);
+		program.write_word(0x03d6, 0x7f92);
+		program.write_word(0x03d7, 0xf5e1);
+		program.write_word(0x03d8, 0x3292);
+		program.write_word(0x03d9, 0xf5e1);
 		data.write_word(0x0918, 1);
 		data.write_word(0x091a, 0);
 		data.write_word(0x0920, 0xaaaa);
@@ -477,6 +486,43 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
 					data.read_word(0x02ff) == 0x03c4,
 					"conditional call on non-positive accumulator A");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03d2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 9);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 18;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 18)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 6,
+					"accumulator subtract with independent destination");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03d4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0940);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0920);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 19;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 19)
+		{
+			expect(m_cpu->space(AS_PROGRAM).read_word(0x0940) == 0xaaaa &&
+					m_cpu->space(AS_PROGRAM).read_word(0x0941) == 0xbbbb,
+					"repeated accumulator-addressed program write");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03d8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0918);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 20;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 20)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 4,
+					"data-memory load shifted by ST1.ASM");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -630,6 +676,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x0004);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0a10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 

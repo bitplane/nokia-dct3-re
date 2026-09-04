@@ -89,8 +89,11 @@ compound `XC`, all `IDLE` and ST0/ST1 bit-set/reset variants, `RPTZ`, and
 memory-counted repeat of multiword instructions, repeated `MVDP` program
 destination update, delayed and conditional control flow, interrupt return,
 extended absolute arithmetic/load/store, and accumulator-indirect branch.
-Each has focused core conformance coverage; none recognizes a Nokia address or
-loader byte pattern.
+Operational ROM execution has additionally established signed/unsigned
+accumulator arithmetic, accumulator-shift-mode loads, memory compare,
+accumulator-addressed program writes, stack data pushes, and conditional
+branch/call/return families. Each family has focused core conformance coverage;
+none recognizes a Nokia address or loader byte pattern.
 
 The retained NSE-1 trace fixes reset polarity and edge behavior without an
 inference: MCU writes to MAD2 byte `0x20002` are `1` (cold release), `0`
