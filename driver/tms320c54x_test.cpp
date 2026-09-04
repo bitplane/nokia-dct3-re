@@ -107,6 +107,15 @@ private:
 		program.write_word(0x0127, 0x7713);
 		program.write_word(0x0128, 0x0800);
 		program.write_word(0x0129, 0x1293);
+		program.write_word(0x012a, 0xf0c8);
+		program.write_word(0x012b, 0xf0e8);
+		program.write_word(0x012c, 0xf0f8);
+		program.write_word(0x012d, 0x7713);
+		program.write_word(0x012e, 0x0800);
+		program.write_word(0x012f, 0x1393);
+		program.write_word(0x0130, 0xf330);
+		program.write_word(0x0131, 0x00ff);
+		program.write_word(0x0132, 0xf3e8);
 
 		program.write_word(0x0200, 0x7680);
 		program.write_word(0x0201, 0xbeef);
@@ -218,8 +227,8 @@ private:
 					data.read_word(0x1200), data.read_word(0x1201),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
-			// PC has advanced past unsupported XOR opcode f0c8 at 7fb4.
-			expect(pc == 0x7fb5, "ROM4 first unsupported instruction");
+			// PC has advanced past unsupported extended opcode 6f92 at 7f7f.
+			expect(pc == 0x7f80, "ROM4 first unsupported instruction");
 			expect(data.read_word(0x1200) == 0x3532 &&
 					data.read_word(0x1201) == 0x0000,
 					"ROM4 challenge header construction");
@@ -275,8 +284,10 @@ private:
 				"memory-mapped auxiliary-register read");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xaaaa,
 				"memory-mapped auxiliary-register write");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xaaaa,
-				"unsigned data operand load");
+		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00aa00aa,
+				"unsigned data operand load and accumulator XOR shift");
+		expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xaa00,
+				"immediate accumulator mask and rotate");
 
 		m_phase = 1;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);

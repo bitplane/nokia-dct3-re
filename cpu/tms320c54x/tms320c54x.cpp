@@ -170,6 +170,12 @@ u64 tms320c54x_device::data_operand(u16 value) const
 	return value;
 }
 
+u64 tms320c54x_device::arithmetic_shift_right(u64 value, unsigned shift) const
+{
+	const s64 signed_value = s64(value << 24) >> 24;
+	return u64(signed_value >> shift) & ACC_MASK;
+}
+
 void tms320c54x_device::indirect_modify(u8 mode)
 {
 	const unsigned ar = mode & 7;
@@ -177,6 +183,8 @@ void tms320c54x_device::indirect_modify(u8 mode)
 	{
 	case 0x08: --m_ar[ar]; break;
 	case 0x10: ++m_ar[ar]; break;
+	case 0x30: m_ar[ar] += m_ar[0]; break;
+	case 0x38: m_ar[ar] -= m_ar[0]; break;
 	default: break;
 	}
 }
@@ -277,6 +285,25 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4500: // LD Smem, 16, B
 		m_b = u64(indirect_read(low)) << 16;
 		return;
+	case 0x6b00: // ADD #lk, Smem
+	{
+		const unsigned ar = low & 7;
+		const u16 address = m_ar[ar];
+		const u16 immediate = fetch();
+		data_write(address, data_read(address) + immediate);
+		indirect_modify(low);
+		return;
+	}
+	case 0x6c00: // BANZ pmad, *ARx modification
+	{
+		const unsigned ar = low & 7;
+		const bool branch = m_ar[ar] != 0;
+		indirect_modify(low);
+		const u16 destination = fetch();
+		if (branch)
+			m_pc = destination;
+		return;
+	}
 	case 0x8000: // STL A, Smem
 		indirect_write(low, u16(m_a));
 		return;
@@ -397,6 +424,56 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf1c0: // XOR A, B
 		m_b = (m_b ^ m_a) & ACC_MASK;
 		return;
+	case 0xf0c8: // XOR A << 8, A
+		m_a = (m_a ^ (m_a << 8)) & ACC_MASK;
+		return;
+	case 0xf3c8: // XOR B << 8, B
+		m_b = (m_b ^ (m_b << 8)) & ACC_MASK;
+		return;
+	case 0xf030: // AND #lk, A
+		m_a &= fetch();
+		return;
+	case 0xf330: // AND #lk, B
+		m_b &= fetch();
+		return;
+	case 0xf0e8: // ROL A, 8
+		m_a = ((m_a << 8) | (m_a >> 32)) & ACC_MASK;
+		return;
+	case 0xf3e8: // ROL B, 8
+		m_b = ((m_b << 8) | (m_b >> 32)) & ACC_MASK;
+		return;
+	case 0xf0f8: // ROR A, 8
+		m_a = ((m_a >> 8) | (m_a << 32)) & ACC_MASK;
+		return;
+	case 0xf3f8: // ROR B, 8
+		m_b = ((m_b >> 8) | (m_b << 32)) & ACC_MASK;
+		return;
+	case 0xf0b0: // OR A >> 16, A
+		m_a |= arithmetic_shift_right(m_a, 16);
+		return;
+	case 0xf3b0: // OR B >> 16, B
+		m_b |= arithmetic_shift_right(m_b, 16);
+		return;
+	case 0xf490: // ROL A through carry
+	case 0xf590: // ROL B through carry
+	{
+		u64 &acc = accumulator(BIT(op, 8));
+		const u32 value = u32(acc);
+		const u32 carry = BIT(m_st0, 11);
+		m_st0 = (m_st0 & ~0x0800) | (BIT(value, 31) ? 0x0800 : 0);
+		acc = u32((value << 1) | carry);
+		return;
+	}
+	case 0xf491: // ROR A through carry
+	case 0xf591: // ROR B through carry
+	{
+		u64 &acc = accumulator(BIT(op, 8));
+		const u32 value = u32(acc);
+		const u32 carry = BIT(m_st0, 11);
+		m_st0 = (m_st0 & ~0x0800) | (BIT(value, 0) ? 0x0800 : 0);
+		acc = (value >> 1) | (carry << 31);
+		return;
+	}
 	default:
 		if ((op & 0xfff8) == 0x4a10) // PSHM ARx
 		{
@@ -414,7 +491,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_rpt_address = m_pc;
 			return;
 		}
-		if ((op & 0xfff8) == 0x6d88) // MAR *ARx-
+		if ((op & 0xff00) == 0x6d00) // MAR indirect auxiliary-register modification
 		{
 			indirect_modify(low);
 			return;

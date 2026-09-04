@@ -110,9 +110,10 @@ the ignored transform-entry program/data snapshots into MAME's ROM path,
 verifies their declared hashes through ordinary ROM loading, restores the
 captured architectural registers, and executes from `0x4b73`. The current core
 constructs challenge header `3532 0000` organically and stops after fetching
-unsupported accumulator XOR opcode `f0c8` at `0x7fb4` (`PC=0x7fb5`). Reaching it executes
+unsupported extended opcode `6f92` at `0x7f7f` (`PC=0x7f80`). Reaching it executes
 the complete `0x4b82` block-repeat copy, its `0x3900` status helper, and the
-`0x7f2d` transform helper through its indirect/direct memory-transfer setup.
+`0x7f2d` transform helper through its indirect/direct transfers, mixing stages,
+and nested CRC-style carry loops.
 That address is now
 the measured implementation frontier; expanding the core must move it forward
 while preserving the synthetic and transform-tail gates.
