@@ -21,6 +21,7 @@
 #include <unordered_map>
 
 #include "cpu/arm7/arm7.h"
+#include "cpu/tms320c54x/tms320c54x.h"
 #include "machine/i2cmem.h"
 #include "machine/intelfsh.h"
 #include "sound/beep.h"

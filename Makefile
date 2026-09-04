@@ -12,7 +12,10 @@ DRIVER := driver/nokia_dct3.cpp
 MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch \
 	patches/mame-i2cmem-write-cycle.patch \
-	patches/mame-pulseaudio-input.patch
+	patches/mame-pulseaudio-input.patch \
+	patches/mame-tms320c54x-build.patch
+CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
+	cpu/tms320c54x/tms320c54x.h
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_cobba.cpp driver/nokia_cobba.h \
 	driver/nokia_b3_flash.cpp driver/nokia_b3_flash.h \
@@ -402,6 +405,7 @@ overlay: download-mame
 	done
 	install -C -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp
 	@for src in $(DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
+	@for src in $(CPU_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/devices/$$src"; done
 
 $(LIBGSM_TARBALL):
 	mkdir -p third_party

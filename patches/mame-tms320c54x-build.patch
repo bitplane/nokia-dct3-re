@@ -1,0 +1,23 @@
+diff --git a/scripts/src/cpu.lua b/scripts/src/cpu.lua
+index 3280a44f7d1..f96ea9ce9c8 100644
+--- a/scripts/src/cpu.lua
++++ b/scripts/src/cpu.lua
+@@ -2915,6 +2915,18 @@ if opt_tool(CPUS, "TMS320C5X") then
+ 	table.insert(disasm_files , MAME_DIR .. "src/devices/cpu/tms320c5x/tms320c5x_dasm.h")
+ end
+ 
++--------------------------------------------------
++-- Texas Instruments TMS320C54x DSP
++--@src/devices/cpu/tms320c54x/tms320c54x.h,CPUS["TMS320C54X"] = true
++--------------------------------------------------
++
++if CPUS["TMS320C54X"] then
++	files {
++		MAME_DIR .. "src/devices/cpu/tms320c54x/tms320c54x.cpp",
++		MAME_DIR .. "src/devices/cpu/tms320c54x/tms320c54x.h",
++	}
++end
++
+ --------------------------------------------------
+ -- Texas Instruments TMS320C82 DSP
+ --@src/devices/cpu/tms320c82/tms320c82.h,CPUS["TMS320C82"] = true

@@ -75,6 +75,14 @@ The HLE and real core are alternatives. A real core must not run concurrently
 with HLE code that writes the same shared words, advances the same ring cursors
 or drives the same COBBA interface.
 
+The clean-room core has now started under `cpu/tms320c54x`. Its first checkpoint
+is intentionally an execution scaffold, not a claimed emulator: it registers
+the three word-addressed spaces, 40-bit accumulators, auxiliary/status/repeat
+state, debugger state and save-state data, but stops on every undecoded opcode.
+This makes unsupported semantics visible while the independently captured ROM4
+transform fixture grows the generic instruction implementation. Nokia mailbox,
+COBBA and product-profile behavior remain outside this CPU directory.
+
 ## DSP ROM policy
 
 Keep the following storage domains distinct in MAME ROM declarations:

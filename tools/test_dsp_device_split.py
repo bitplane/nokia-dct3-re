@@ -17,10 +17,19 @@ class DspDeviceSplitTest(unittest.TestCase):
         cls.lapdm = (ROOT / "driver/nokia_lapdm_link.cpp").read_text() + (ROOT / "driver/nokia_lapdm_link.h").read_text()
         cls.radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text() + (ROOT / "driver/nokia_radio_peer.h").read_text()
         cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.c54x = ((ROOT / "cpu/tms320c54x/tms320c54x.cpp").read_text() +
+                    (ROOT / "cpu/tms320c54x/tms320c54x.h").read_text())
 
     def test_transport_has_no_service_protocol(self):
         for token in ("DISCOVERY_NODE", "registration_sent", "channel_map", "0x64, 0x01"):
             self.assertNotIn(token, self.transport)
+
+    def test_c54x_core_is_generic_and_fails_closed(self):
+        for token in ("nokia", "cobba", "dspif", "radio_peer"):
+            self.assertNotIn(token, self.c54x.lower())
+        self.assertIn("unimplemented C54x opcode", self.c54x)
+        self.assertIn("m_illegal = true", self.c54x)
+        self.assertIn("ACC_MASK", self.c54x)
 
     def test_external_peer_has_no_hardware_ownership(self):
         for token in ("shared_r", "shared_w", "dspif", "fiq0", "service_irq", "TX_PRODUCER"):
