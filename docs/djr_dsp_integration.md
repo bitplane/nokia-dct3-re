@@ -255,6 +255,15 @@ recorded in the checker, which also requires PC `0x4b73`, SP `0x1ec3`, PMST
 and output contracts for the clean-room executor without importing code from
 the external backend.
 
+`make check-c54x-rom4-execute` loads that private snapshot into the local
+clean-room CPU and currently executes from `0x4b73` through the transform,
+memory-mapped-register save/restore, DSP control setup, and serial-port polling
+to the ROM's `IDLE 3` at `0x7ec9`. The saved frontier is PC `0x7eca` with the
+CPU explicitly idle, not an unsupported-opcode stop. Advancing beyond it now
+requires an evidenced DSP wake source and COBBA port behavior. Unmapped I/O in
+the isolated fixture happens to read as zero; that is harness behavior and is
+not accepted as a recovered codec response.
+
 The recovered catalogue is independently auditable with:
 
 ```sh

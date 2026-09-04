@@ -68,6 +68,7 @@ void tms320c54x_device::device_start()
 		state_add(STATE_AR0 + i, string_format("AR%u", i).c_str(), m_ar[i]).formatstr("%04X");
 	state_add(STATE_BRC, "BRC", m_brc).formatstr("%04X");
 	state_add(STATE_BK, "BK", m_bk).formatstr("%04X");
+	state_add(STATE_IDLE, "IDLE", m_idle).formatstr("%1u");
 	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
 	state_add(STATE_GENPC, "GENPC", m_pc).noshow();
 	state_add(STATE_GENPCBASE, "CURPC", m_pc).noshow();
@@ -93,6 +94,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_ifr));
 	save_item(NAME(m_imr));
 	save_item(NAME(m_block_repeat_active));
+	save_item(NAME(m_idle));
 	save_item(NAME(m_illegal));
 }
 
@@ -119,6 +121,7 @@ void tms320c54x_device::device_reset()
 	m_ifr = 0;
 	m_imr = 0;
 	m_block_repeat_active = false;
+	m_idle = false;
 	m_illegal = false;
 }
 
@@ -129,6 +132,14 @@ u16 tms320c54x_device::fetch()
 
 u16 tms320c54x_device::data_read(u16 address)
 {
+	if (address == 0x00)
+		return m_imr;
+	if (address == 0x01)
+		return m_ifr;
+	if (address == 0x06)
+		return m_st0;
+	if (address == 0x07)
+		return m_st1;
 	if (address == 0x08)
 		return u16(m_a);
 	if (address == 0x09)
@@ -141,6 +152,8 @@ u16 tms320c54x_device::data_read(u16 address)
 		return u16(m_b >> 16);
 	if (address == 0x0d)
 		return u16(m_b >> 32);
+	if (address == 0x0e)
+		return m_t;
 	if (address >= 0x10 && address <= 0x17)
 		return m_ar[address - 0x10];
 	if (address == 0x18)
@@ -149,12 +162,22 @@ u16 tms320c54x_device::data_read(u16 address)
 		return m_bk;
 	if (address == 0x1a)
 		return m_brc;
+	if (address == 0x1d)
+		return m_pmst;
 	return m_data.read_word(address);
 }
 
 void tms320c54x_device::data_write(u16 address, u16 value)
 {
-	if (address == 0x08)
+	if (address == 0x00)
+		m_imr = value;
+	else if (address == 0x01)
+		m_ifr &= ~value;
+	else if (address == 0x06)
+		m_st0 = value;
+	else if (address == 0x07)
+		m_st1 = value;
+	else if (address == 0x08)
 		m_a = (m_a & ~u64(0xffff)) | value;
 	else if (address == 0x09)
 		m_a = (m_a & ~u64(0xffff0000)) | (u64(value) << 16);
@@ -166,6 +189,8 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		m_b = (m_b & ~u64(0xffff0000)) | (u64(value) << 16);
 	else if (address == 0x0d)
 		m_b = (m_b & ~u64(0xff00000000)) | (u64(value & 0xff) << 32);
+	else if (address == 0x0e)
+		m_t = value;
 	else if (address >= 0x10 && address <= 0x17)
 		m_ar[address - 0x10] = value;
 	else if (address == 0x18)
@@ -174,6 +199,8 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		m_bk = value;
 	else if (address == 0x1a)
 		m_brc = value;
+	else if (address == 0x1d)
+		m_pmst = value;
 	else
 		m_data.write_word(address, value);
 }
@@ -324,6 +351,12 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x1300: // LD uns(Smem), B
 		m_b = indirect_read(low);
 		return;
+	case 0x0200: // ADD uns(Smem), A
+		m_a = (m_a + indirect_read(low)) & ACC_MASK;
+		return;
+	case 0x0800: // SUB Smem, A
+		m_a = (m_a - data_operand(indirect_read(low))) & ACC_MASK;
+		return;
 	case 0x1a00: // OR Smem, A
 		m_a = (m_a | indirect_read(low)) & ACC_MASK;
 		return;
@@ -342,6 +375,13 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4500: // LD Smem, 16, B
 		m_b = u64(indirect_read(low)) << 16;
 		return;
+	case 0x6100: // BITF Smem, #lk
+	{
+		const u16 value = indirect_read(low);
+		const u16 mask = fetch();
+		m_st0 = (m_st0 & ~0x1000) | ((value & mask) ? 0x1000 : 0);
+		return;
+	}
 	case 0x4800: // LDM MMR, A
 		m_a = data_operand(data_read(low & 0x1f));
 		return;
@@ -414,7 +454,16 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x7300: // MVDM MMR, dmad
 		data_write(fetch(), data_read(low & 0x1f));
 		return;
-	case 0x7500: // PORTR Smem, port
+	case 0x7400: // PORTR port, Smem
+		if (low == 0xf8)
+		{
+			const u16 destination = fetch();
+			data_write(destination, m_io.read_word(fetch()));
+		}
+		else
+			indirect_write(low, m_io.read_word(fetch()));
+		return;
+	case 0x7500: // PORTW Smem, port
 	{
 		const u16 value = indirect_read(low);
 		m_io.write_word(fetch(), value);
@@ -430,14 +479,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const u16 value = fetch();
 		const unsigned reg = low & 0x1f;
-		if (reg >= 0x10 && reg <= 0x17)
-			m_ar[reg - 0x10] = value;
-		else if (reg == 0x19)
-			m_bk = value;
-		else if (reg == 0x1a)
-			m_brc = value;
-		else
-			m_illegal = true;
+		data_write(reg, value);
 		return;
 	}
 	case 0xe700: // MVDK source auxiliary register to destination MMR
@@ -480,12 +522,11 @@ void tms320c54x_device::execute_one(u16 op)
 
 	switch (op)
 	{
-	case 0x61f8: // BITF dmad, #lk
+	case 0x34f8: // BITT dmad
 	{
-		const u16 address = fetch();
-		const u16 mask = fetch();
+		const u16 value = data_read(fetch());
 		m_st0 = (m_st0 & ~0x1000) |
-			((data_read(address) & mask) ? 0x1000 : 0);
+			(BIT(value, m_t & 0x0f) ? 0x1000 : 0);
 		return;
 	}
 	case 0xfc00: // RET
@@ -494,6 +535,20 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xfc30: // RETC TC
 		if (m_st0 & 0x1000)
+		{
+			m_pc = pop();
+			m_icount -= 4;
+		}
+		return;
+	case 0xfc45: // RETC AEQ
+		if ((m_a & ACC_MASK) == 0)
+		{
+			m_pc = pop();
+			m_icount -= 4;
+		}
+		return;
+	case 0xfc20: // RETC NTC
+		if (!(m_st0 & 0x1000))
 		{
 			m_pc = pop();
 			m_icount -= 4;
@@ -513,6 +568,10 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 3;
 		return;
 	}
+	case 0xf073: // B pmad
+		m_pc = fetch();
+		m_icount -= 3;
+		return;
 	case 0xf274: // CALLD pmad
 	{
 		const u16 destination = fetch();
@@ -522,10 +581,30 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 3;
 		return;
 	}
+	case 0xfe00: // RETD
+		m_delayed_target = pop();
+		m_delayed_words = 2;
+		m_icount -= 3;
+		return;
 	case 0xf493: // NOT A
 		m_a = ~m_a & ACC_MASK;
 		return;
 	case 0xf495: // NOP
+		return;
+	case 0xf5e1: // IDLE 3
+		m_idle = true;
+		return;
+	case 0xf7bb: // SSBX INTM
+		m_st1 |= 0x0800;
+		return;
+	case 0xf6bb: // RSBX INTM
+		m_st1 &= ~0x0800;
+		return;
+	case 0xf7bd: // SSBX XF
+		m_st1 |= 0x2000;
+		return;
+	case 0xf6bd: // RSBX XF
+		m_st1 &= ~0x2000;
 		return;
 	case 0xf1c0: // XOR A, B
 		m_b = (m_b ^ m_a) & ACC_MASK;
@@ -555,6 +634,55 @@ void tms320c54x_device::execute_one(u16 op)
 			m_pc = destination;
 		return;
 	}
+	case 0xf820: // BC pmad, NTC
+	{
+		const u16 destination = fetch();
+		if (!(m_st0 & 0x1000))
+			m_pc = destination;
+		return;
+	}
+	case 0xf830: // BC pmad, TC
+	{
+		const u16 destination = fetch();
+		if (m_st0 & 0x1000)
+			m_pc = destination;
+		return;
+	}
+	case 0xf847: // BC pmad, ALEQ
+	{
+		const u16 destination = fetch();
+		if ((s64(m_a << 24) >> 24) <= 0)
+			m_pc = destination;
+		return;
+	}
+	case 0xf845: // BC pmad, AEQ
+	{
+		const u16 destination = fetch();
+		if ((m_a & ACC_MASK) == 0)
+			m_pc = destination;
+		return;
+	}
+	case 0xf844: // BC pmad, ANEQ
+	{
+		const u16 destination = fetch();
+		if ((m_a & ACC_MASK) != 0)
+			m_pc = destination;
+		return;
+	}
+	case 0xf84c: // BC pmad, BNEQ
+	{
+		const u16 destination = fetch();
+		if ((m_b & ACC_MASK) != 0)
+			m_pc = destination;
+		return;
+	}
+	case 0xf84d: // BC pmad, BEQ
+	{
+		const u16 destination = fetch();
+		if ((m_b & ACC_MASK) == 0)
+			m_pc = destination;
+		return;
+	}
 	case 0xf0c8: // XOR A << 8, A
 		m_a = (m_a ^ (m_a << 8)) & ACC_MASK;
 		return;
@@ -564,8 +692,26 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf030: // AND #lk, A
 		m_a &= fetch();
 		return;
+	case 0xf130: // AND #lk, A, B
+		m_b = m_a & fetch();
+		return;
+	case 0xf040: // OR #lk, A
+		m_a = (m_a | fetch()) & ACC_MASK;
+		return;
+	case 0xf063: // AND #lk << 16, A
+		m_a &= u64(fetch()) << 16;
+		return;
+	case 0xf340: // OR #lk, B
+		m_b = (m_b | fetch()) & ACC_MASK;
+		return;
+	case 0xf020: // LD #lk, A
+		m_a = data_operand(fetch());
+		return;
 	case 0xf330: // AND #lk, B
 		m_b &= fetch();
+		return;
+	case 0xf230: // AND #lk, B, A
+		m_a = m_b & fetch();
 		return;
 	case 0xf0e8: // ROL A, 8
 		m_a = ((m_a << 8) | (m_a >> 32)) & ACC_MASK;
@@ -603,11 +749,17 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf508: // ADD A << 8, B
 		m_b = (m_b + (m_a << 8)) & ACC_MASK;
 		return;
+	case 0xf517: // ADD A >> 9, B
+		m_b = (m_b + arithmetic_shift_right(m_a, 9)) & ACC_MASK;
+		return;
 	case 0xf010: // SUB #lk, A
 		m_a = (m_a - data_operand(fetch())) & ACC_MASK;
 		return;
 	case 0xf310: // SUB #lk, B
 		m_b = (m_b - data_operand(fetch())) & ACC_MASK;
+		return;
+	case 0xf210: // SUB #lk, B, A
+		m_a = (m_b - data_operand(fetch())) & ACC_MASK;
 		return;
 	case 0xf490: // ROL A through carry
 	case 0xf590: // ROL B through carry
@@ -630,14 +782,14 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	default:
-		if ((op & 0xfff8) == 0x4a10) // PSHM ARx
+		if ((op & 0xffe0) == 0x4a00) // PSHM MMR
 		{
-			push(m_ar[low & 7]);
+			push(data_read(low & 0x1f));
 			return;
 		}
-		if ((op & 0xfff8) == 0x8a10) // POPM ARx
+		if ((op & 0xffe0) == 0x8a00) // POPM MMR
 		{
-			m_ar[low & 7] = pop();
+			data_write(low & 0x1f, pop());
 			return;
 		}
 		if ((op & 0xff00) == 0xec00) // RPT #k
@@ -663,6 +815,11 @@ void tms320c54x_device::execute_run()
 {
 	while (m_icount > 0)
 	{
+		if (m_idle)
+		{
+			m_icount = 0;
+			break;
+		}
 		debugger_instruction_hook(m_pc);
 		if (m_illegal)
 		{
@@ -694,7 +851,10 @@ void tms320c54x_device::execute_set_input(int inputnum, int state)
 	if (inputnum >= 0 && inputnum < 16)
 	{
 		if (state == ASSERT_LINE)
+		{
 			m_ifr |= u16(1U << inputnum);
+			m_idle = false;
+		}
 		else if (state == CLEAR_LINE)
 			m_ifr &= u16(~(1U << inputnum));
 	}

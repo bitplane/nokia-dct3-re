@@ -214,7 +214,8 @@ private:
 		auto &data = m_cpu->space(AS_DATA);
 		if (m_phase == 2)
 		{
-			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+					!m_cpu->state_int(tms320c54x_device::STATE_IDLE))
 			{
 				expect(++m_rom4_checks < 10000,
 						"ROM4 execution frontier timeout");
@@ -227,8 +228,10 @@ private:
 					data.read_word(0x1200), data.read_word(0x1201),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
-			// PC has advanced past unsupported BC NTC opcode f820 at 3810.
-			expect(pc == 0x3811, "ROM4 first unsupported instruction");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+					"ROM4 DSP sleep boundary");
+			// IDLE3 at 0x7ec9 advances PC before waiting for a wake source.
+			expect(pc == 0x7eca, "ROM4 DSP sleep PC");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 frontier complete");
 		}
 		if (m_phase)

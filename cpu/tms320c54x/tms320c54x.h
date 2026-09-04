@@ -32,6 +32,7 @@ public:
 		STATE_AR7,
 		STATE_BRC,
 		STATE_BK,
+		STATE_IDLE,
 		STATE_ILLEGAL
 	};
 
@@ -95,6 +96,7 @@ private:
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
 	bool m_block_repeat_active = false;
+	bool m_idle = false;
 	bool m_illegal = false;
 	int m_icount = 0;
 };
