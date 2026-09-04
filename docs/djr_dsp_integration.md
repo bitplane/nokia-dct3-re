@@ -241,6 +241,20 @@ response alone while the repeat-block control flow is wrong. The native `.api`
 capture begins at DSP data word `0x0800`; use `--data-base` for another capture
 layout rather than treating a DSP word address as a file offset.
 
+A second gate validates the deterministic transform-entry snapshot produced by
+halting immediately before DSP PC `0x4b73`:
+
+```sh
+make check-c54x-rom4-snapshot PREFIX=/path/to/rom4-transform-entry
+```
+
+The private four-file snapshot is not distributed. Its SHA-256 digests are
+recorded in the checker, which also requires PC `0x4b73`, SP `0x1ec3`, PMST
+`0xffac`, AR2 `0x0825`, and the unprocessed identity object at data word
+`0x1200`. Together the entry and completion gates provide deterministic input
+and output contracts for the clean-room executor without importing code from
+the external backend.
+
 The recovered catalogue is independently auditable with:
 
 ```sh
