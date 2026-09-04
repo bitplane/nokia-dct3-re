@@ -29,7 +29,8 @@ nokia_mad2_device::nokia_mad2_device(
 	m_irq_ack_cb(*this),
 	m_reset_cb(*this),
 	m_sleep_cb(*this),
-	m_simi_clock_cb(*this)
+	m_simi_clock_cb(*this),
+	m_dsp_reset_cb(*this)
 {
 }
 
@@ -88,6 +89,7 @@ void nokia_mad2_device::device_reset()
 	m_irq_cb(0);
 	m_sleep_cb(0);
 	m_simi_clock_cb(0);
+	m_dsp_reset_cb(0);
 	m_timer0->adjust(attotime::from_hz(m_timer0_hz), 0, attotime::from_hz(m_timer0_hz));
 	m_timer1->adjust(attotime::from_hz(m_timer1_hz), 0, attotime::from_hz(m_timer1_hz));
 	m_fiq8->adjust(attotime::from_hz(m_fiq8_hz), 0, attotime::from_hz(m_fiq8_hz));
@@ -150,6 +152,10 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 		m_regs[offset] = data;
 	switch (offset)
 	{
+	case 0x02:
+		m_dsp_reset_cb(m_dsp_reset_wiring.enabled() ?
+				bool(data & m_dsp_reset_wiring.release_mask) : BIT(data, 0));
+		break;
 	case 0x01:
 		// Both 3210 ROMs set bit 2 and then spin without a software exit.
 		// MAD2 therefore owns the reset request; the board callback applies the

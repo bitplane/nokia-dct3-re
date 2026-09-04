@@ -31,6 +31,7 @@ public:
 	auto reset_cb() { return m_reset_cb.bind(); }
 	auto sleep_cb() { return m_sleep_cb.bind(); }
 	auto simi_clock_cb() { return m_simi_clock_cb.bind(); }
+	auto dsp_reset_cb() { return m_dsp_reset_cb.bind(); }
 
 	void set_timer0_hz(u32 value) { m_timer0_hz = value; }
 	void set_timer1_hz(u32 value) { m_timer1_hz = value; }
@@ -80,6 +81,7 @@ private:
 	devcb_write_line m_reset_cb;
 	devcb_write_line m_sleep_cb;
 	devcb_write_line m_simi_clock_cb;
+	devcb_write_line m_dsp_reset_cb;
 	emu_timer *m_timer0 = nullptr;
 	emu_timer *m_timer1 = nullptr;
 	emu_timer *m_fiq8 = nullptr;

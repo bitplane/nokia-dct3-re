@@ -19,6 +19,8 @@ class DspDeviceSplitTest(unittest.TestCase):
         cls.lapdm = (ROOT / "driver/nokia_lapdm_link.cpp").read_text() + (ROOT / "driver/nokia_lapdm_link.h").read_text()
         cls.radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text() + (ROOT / "driver/nokia_radio_peer.h").read_text()
         cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.mad2 = ((ROOT / "driver/nokia_mad2.cpp").read_text() +
+                    (ROOT / "driver/nokia_mad2.h").read_text())
         cls.c54x = ((ROOT / "cpu/tms320c54x/tms320c54x.cpp").read_text() +
                     (ROOT / "cpu/tms320c54x/tms320c54x.h").read_text())
         cls.c54x_test = (ROOT / "driver/tms320c54x_test.cpp").read_text()
@@ -184,6 +186,7 @@ class DspDeviceSplitTest(unittest.TestCase):
             "virtual void tx_commit_w(int state) = 0",
             "virtual void service_pending_w(int state) = 0",
             "virtual void doorbell_w(int state) = 0",
+            "virtual void reset_line_w(int released) = 0",
             "virtual void mcu_shared_write(u16 byte_offset) = 0",
             "virtual u32 tone_frequency1() const = 0",
         ):
@@ -211,11 +214,19 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertIn("m_transport->dsp_data_w(address, data)", self.c54x_backend)
         self.assertIn("address >= 0x0080 && address < 0x2800", self.c54x_backend)
         self.assertIn("set_input_line(9, HOLD_LINE)", self.c54x_backend)
+        self.assertIn("set_input_line(INPUT_LINE_RESET", self.c54x_backend)
         for semantic in (
             "bootstrap_contract", "service_control_contract", "speech_control_contract",
             "radio_peer", "gsm_network",
         ):
             self.assertNotIn(semantic, self.c54x_backend)
+
+    def test_mad2_drives_product_reset_level_into_backend(self):
+        self.assertIn("auto dsp_reset_cb()", self.mad2)
+        self.assertIn("case 0x02:", self.mad2)
+        self.assertIn("data & m_dsp_reset_wiring.release_mask", self.mad2)
+        self.assertIn("m_mad2->dsp_reset_cb().set", self.phone)
+        self.assertIn("m_dsp_backend->reset_line_w(state)", self.phone)
 
     def test_external_peer_uses_acknowledged_startup_phases(self):
         self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)

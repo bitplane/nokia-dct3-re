@@ -63,6 +63,13 @@ This establishes the execution boundary but is not yet a handset result: MAD2
 reset/release wiring, loader upload execution, and COBBA/PCM I/O remain to be
 connected before the backend may replace the HLE in a product configuration.
 
+The retained NSE-1 trace fixes reset polarity and edge behavior without an
+inference: MCU writes to MAD2 byte `0x20002` are `1` (cold release), `0`
+(hold), `0`, then `1` (warm release). A later value `3` leaves the DSP running.
+MAD2 now exports this product-mask-derived level to the backend; the C54x
+implementation drives the CPU reset input so CPU state restarts while the
+external DSPIF/on-chip DARAM stores survive the warm transition.
+
 ## Resolved flat-image dependency
 
 Before the decoder correction, sampled words at

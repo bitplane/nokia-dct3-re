@@ -143,6 +143,7 @@ public:
 	virtual void tx_commit_w(int state) override;
 	virtual void service_pending_w(int state) override;
 	virtual void doorbell_w(int state) override;
+	virtual void reset_line_w(int released) override { }
 	virtual void shared_002_write_w(int state) override;
 	virtual void shared_006_write_w(int state) override;
 	virtual void shared_0fe_read_w(int state) override;

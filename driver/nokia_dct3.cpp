@@ -795,6 +795,7 @@ private:
 	void dsp_tx_commit_w(int state);
 	void dsp_service_pending_w(int state);
 	void dsp_doorbell_w(int state);
+	void dsp_reset_w(int state);
 	void dsp_tone_update_w(int state);
 	// Observation-only helpers implemented in nokia_dct3_trace.inc.
 	uint16_t fw_word(offs_t address) const;
@@ -1427,6 +1428,11 @@ void nokia_dct3_state::dsp_service_pending_w(int state)
 void nokia_dct3_state::dsp_doorbell_w(int state)
 {
 	m_dsp_backend->doorbell_w(state);
+}
+
+void nokia_dct3_state::dsp_reset_w(int state)
+{
+	m_dsp_backend->reset_line_w(state);
 }
 
 void nokia_dct3_state::mbus_fiq2_w(int state)
@@ -2298,6 +2304,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_mad2->reset_cb().set(FUNC(nokia_dct3_state::mad2_reset_w));
 	m_mad2->sleep_cb().set(FUNC(nokia_dct3_state::mad2_sleep_w));
 	m_mad2->simi_clock_cb().set(m_simi, FUNC(nokia_simi_device::set_clock_enabled));
+	m_mad2->dsp_reset_cb().set(FUNC(nokia_dct3_state::dsp_reset_w));
 	NOKIA_KBGPIO(config, m_kbgpio);
 	m_kbgpio->matrix_cb(0).set_ioport("COL.0");
 	m_kbgpio->matrix_cb(1).set_ioport("COL.1");

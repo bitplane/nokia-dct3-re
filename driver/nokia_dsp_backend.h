@@ -18,6 +18,7 @@ public:
 	virtual void tx_commit_w(int state) = 0;
 	virtual void service_pending_w(int state) = 0;
 	virtual void doorbell_w(int state) = 0;
+	virtual void reset_line_w(int released) = 0;
 	virtual void shared_002_write_w(int state) = 0;
 	virtual void shared_006_write_w(int state) = 0;
 	virtual void shared_0fe_read_w(int state) = 0;

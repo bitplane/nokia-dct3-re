@@ -40,6 +40,15 @@ void nokia_dsp_c54x_device::device_start()
 void nokia_dsp_c54x_device::device_reset()
 {
 	std::fill(m_io.begin(), m_io.end(), 0);
+	m_cpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
+}
+
+void nokia_dsp_c54x_device::reset_line_w(int released)
+{
+	// MAD2 holds the DSP core in reset while leaving its shared/on-chip DARAM
+	// intact. Releasing the line restarts at the mask-ROM reset vector.
+	m_cpu->set_input_line(INPUT_LINE_RESET,
+			released ? CLEAR_LINE : ASSERT_LINE);
 }
 
 bool nokia_dsp_c54x_device::overlay_address(u16 address) const
