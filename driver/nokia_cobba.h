@@ -51,6 +51,9 @@ public:
 	{
 		return m_control_registers[address & 0x0f];
 	}
+	u64 control_transactions() const { return m_control_transactions; }
+	u64 control_reads() const { return m_control_reads; }
+	u64 control_writes() const { return m_control_writes; }
 	u8 run_control_conformance_checks();
 	bool write_earpiece_pcm(const pcm_block &block);
 	void read_microphone_pcm(pcm_block &block);
@@ -92,6 +95,10 @@ private:
 	u16 m_control_data_latch = 0;
 	u8 m_control_address = 0;
 	bool m_control_read = false;
+	bool m_trace_enabled = false;
+	u64 m_control_transactions = 0;
+	u64 m_control_reads = 0;
+	u64 m_control_writes = 0;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_COBBA, nokia_cobba_device)

@@ -70,6 +70,35 @@ classify the actual local regions before using them as evidence. A future real
 DSP dump must be identified by product and hash and must not silently replace
 these placeholders in a test baseline.
 
+### Nokia 5110 DSP ROM4 research input
+
+A complete 5110 ROM4 DSP mask image was historically published by AlexD in
+2003 and is now used by an independent native C54x co-simulation. It is not
+part of the handset `.fls`, is absent from that project's public Git tree, and
+is not redistributable here. The surviving thread is:
+
+- `https://nokiafree.org/forums/archive/index.php/t-39175.html`
+
+Keep a lawfully obtained candidate under an ignored research path:
+
+```text
+roms/research/nse1-rom4/original/<original filename>
+roms/research/nse1-rom4/working/dsp_full.bin
+roms/research/nse1-rom4/working/dsp_drom.txt
+roms/research/nse1-rom4/SHA256SUMS
+```
+
+Hash the untouched source before conversion. Do not rename a 3210 MCU-uploaded
+DSP block, the uniform-fill `dsp_*` placeholders, or an unrelated Calypso ROM
+as this image. No canonical digest was published in the sources reviewed here,
+so a filename or successful boot alone is insufficient identity evidence.
+
+The input matters because the native 5110 backend can log DSP-to-COBBA serial,
+parallel-control and PCM traffic without physical probing. It remains a 5110
+input: applying values to a 3210 needs cross-product corroboration, and a known
+missing acquisition overlay limits what a completed boot proves. See
+`docs/djr_dsp_integration.md` and `docs/cobba_control_boundary.md`.
+
 ## Portability ROMs
 
 Additional firmware is used only as local validation material. Put each complete MAME set in its

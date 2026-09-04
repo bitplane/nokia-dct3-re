@@ -69,6 +69,7 @@ distinction.
 | `dsp_shared_memory_transitions.md` | Generated two-ROM transaction census for DSP-owned shared-RAM scalar state. |
 | `dsp_packet_semantics.md` | Generated two-ROM inventory of DSP packet vocabulary and current HLE disposition. |
 | `dsp_service_transport_contract.md` | DSP/generic-service ownership and acceptance contract. |
+| `cobba_control_boundary.md` | Opaque DSP-to-COBBA control ownership, capture seam, and promotion requirements. |
 
 ## Address-level reverse-engineering references
 

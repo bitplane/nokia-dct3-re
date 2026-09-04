@@ -2,17 +2,20 @@
 
 This catalogue records architectural knowledge reviewed from
 [`djr-747/nokia-dct3-emulator`](https://github.com/djr-747/nokia-dct3-emulator)
-without importing its GPL implementation. The reviewed checkout was commit
-`c50f7e272bf10c37a40c57174dbde84d9717b7e3` dated 25 July 2026.
+without importing its GPL implementation. The initial reviewed checkout was
+commit `c50f7e272bf10c37a40c57174dbde84d9717b7e3` dated 25 July 2026. A second
+review on 4 September 2026 covered public commit `b93a7f7` and its native ROM4
+C54x/COBBA analysis path.
 
 The upstream native analysis backend combines a modified C54x core with a
 bring-your-own Nokia 5110 DSP ROM4 dump. That dump is git-ignored and was not
 present in the reviewed repository. Consequently, upstream address annotations
 are useful leads and reproducible claims about its private input, but are not
 local primary evidence until checked against a legally obtained, hashed dump or
-physical traces. No source is copied into this BSD-licensed driver.
-A second fetch on 25 July 2026 confirmed that `origin/main` still ends at
-`c50f7e2`; there is no newer public register trace to catalogue.
+physical traces. No source is copied into this BSD-licensed driver. The public
+repository still excludes the Nokia mask-ROM image. Its native backend expects
+a private `dsp_full.bin` plus separately recovered DROM data; neither is copied
+or hashed by this repository.
 
 ## Findings and admission status
 
@@ -22,6 +25,10 @@ A second fetch on 25 July 2026 confirmed that `origin/main` still ends at
 | Shared cell `0x85D` (MCU byte offset `0x0BA`) is a distinct audio/tone command | upstream ROM4 annotation only | retain as a tracing lead; do not conflate it with host request cell `0x854` or implement its command meanings yet |
 | COBBA serial control uses DSP I/O port `0x2D` as a 12-bit data latch/readback and `0x2C` as `{read,register}` select: low nibble is one of 16 registers, bit 4 distinguishes read from write, and a write-select commits the previously latched data | upstream ROM4 disassembly and port-level co-simulation; consistent with Nokia's documented serial control bus, but individual register meanings remain unverified locally | `nokia_cobba_device` now owns this opaque control transport. Nothing drives it from MCU command `0x08`, and no audio-mux meaning is assigned until paired/local evidence supplies one |
 | The reviewed ROM4 co-simulation later corrected its codec-sample finding: DSP port `0x21` is bidirectional (read microphone ADC, write earpiece DAC) and is serviced per codec-frame interrupt; port `0x20` is a second channel. MMR `0x22` carries `0xCxxx` parallel COBBA control frames rather than PCM | upstream private-ROM disassembly/trace, not yet reproducible with the local 3210 DSP image | retain as a strong backend design lead: a future C54x backend should terminate per-sample I/O at `nokia_mad2_pcm_device`; do not collapse control, PCM and RF/MFI surfaces or claim local port numbers yet |
+| ROM4 serial-control routines are labelled at DSP addresses `0x4604` (write), `0x465c` (read) and `0x4610` (single/multi-register wrapper). The self-test path at `0x4ae1` selects registers 0, 5 and 6. | public annotations derived from the private 5110 image; protocol shape agrees with the locally admitted opaque device | retain as address-level reproduction guidance. Registers 5/6 are measurement inputs, not evidence for audio mux/gain fields. |
+| The parallel MFI control path writes `0xCxxx` frames through DSP MMR `0x22` or an interrupt-masked `0x32` variant: bits 15..12 select one of 16 registers and bits 11..0 carry data. A reset/run-mode path reportedly emits `0xc008` at DSP PC `0x301f`. | public C54x trace annotation; locally unexecuted | a real backend needs a separate callback into an opaque parallel-control bank. Do not feed these frames into the serial register file or PCM endpoint. |
+| The native co-sim uses serial-register defaults 5=`0x160`, 6=`0x010`, parallel AGC=`0x160`, ready status D=`0x00c`, and zero I/Q. | explicitly synthetic no-signal/self-test inputs, not physical measurements | never promote these values as COBBA reset constants. They are only labelled compatibility-fixture candidates. |
+| The available image lacks an acquisition overlay expected behind DSP routine `0x250b`; one self-test report is therefore still staged by the analysis harness. | explicit upstream limitation | a ROM4 run is evidence for executed resident/loaded code and observed port traffic, not automatically a complete DSP or RF implementation. |
 | Exact audio interrupt vector, activation cells, and a roughly 18.6 kHz tone cadence | explicitly experimental/tuned in upstream comments and potentially product-specific | not admitted; DCT3 voice PCM documentation currently supports an 8 kHz frame boundary, so rate/vector remain configuration/evidence questions |
 | Host-side PCM sinks, resampling, injected samples, and environment gates | implementation conveniences | do not adopt as hardware behavior; host audio is a consumer/producer beyond the emulated COBBA analogue pins |
 | NSE-8 and NHM-5 MCU firmware independently publish tone oscillator words at shared byte offsets `0x0ae`/`0x0b0`, amplitude at `0x0b6`, with oscillator values in quarter-Hz units | local paired-ROM traces; the common `0x0e10` value produces 900 Hz | `nokia_dsp_hle_device` owns this typed mailbox contract and drives the temporary MAME tone sinks; `nokia_dspif_device` remains transport-only |
@@ -99,3 +106,37 @@ backend seam to the distributable emulator. If adopted locally, the core must
 come from a license-compatible source or remain an optional analysis tool; its
 traces should be converted into independent protocol tests rather than copied
 implementation.
+
+## Acquisition and reproduction status
+
+The historical
+[`5110 DSP ROM v4`](https://nokiafree.org/forums/archive/index.php/t-39175.html)
+thread records that AlexD published a complete dump in August 2003 using a
+protection weakness. The attachment later disappeared and was privately
+re-shared in 2006. The surviving discussion says ordinary ICE/Code Composer
+access could not read the protected ROM: external instructions receive
+`0xffff`, while code executing from on-chip ROM can read it. It does not
+publish a reproducible extraction program.
+
+The practical software-only route is therefore:
+
+1. obtain the historical 5110 ROM4 image lawfully and record the untouched
+   filename, length and hashes before conversion;
+2. keep it outside Git and inventory it as described in `roms/README.md`;
+3. reproduce the native 5110 co-sim before treating DSP addresses as local
+   evidence;
+4. capture serial `0x2c/0x2d`, parallel MFI and PCM-port activity across boot,
+   call setup, volume changes and release; and
+5. translate only corroborated transactions into independent BSD-licensed
+   tests against the local COBBA and MAD2 PCM devices.
+
+The official TI
+[`TMS320C54x CPU Reference Guide`](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+documents the processor and on-chip ROM protection model. It is a backend
+implementation reference, not a Nokia ROM source.
+
+If the private ROM cannot be obtained, the
+[NSE-1 service manual](https://www.eserviceinfo.com/downloadsm/26879/Nokia_5110.html)
+lists factory `COBBAWRX`, `COBBARDX`, `COBBACLK`, `COBBARSTX`, `VCOBBA` and
+`DSPXF` test points. That is the lowest-risk known physical capture target;
+the corresponding NSE-8 data/strobe pad identities have not been established.

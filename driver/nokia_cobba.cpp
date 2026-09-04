@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_cobba.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_COBBA, nokia_cobba_device,
@@ -17,6 +18,7 @@ nokia_cobba_device::nokia_cobba_device(
 
 void nokia_cobba_device::device_start()
 {
+	m_trace_enabled = machine().options().verbose();
 	// The three differential microphone inputs and two audio outputs are
 	// separate physical COBBA pins. PCM conversion and route selection remain
 	// inside COBBA.
@@ -42,6 +44,9 @@ void nokia_cobba_device::device_start()
 	save_item(NAME(m_control_data_latch));
 	save_item(NAME(m_control_address));
 	save_item(NAME(m_control_read));
+	save_item(NAME(m_control_transactions));
+	save_item(NAME(m_control_reads));
+	save_item(NAME(m_control_writes));
 }
 
 void nokia_cobba_device::device_reset()
@@ -63,6 +68,9 @@ void nokia_cobba_device::device_reset()
 	m_control_data_latch = 0;
 	m_control_address = 0;
 	m_control_read = false;
+	m_control_transactions = 0;
+	m_control_reads = 0;
+	m_control_writes = 0;
 }
 
 void nokia_cobba_device::control_data_w(u16 data)
@@ -74,8 +82,24 @@ void nokia_cobba_device::control_select_w(u16 select)
 {
 	m_control_address = select & 0x0f;
 	m_control_read = BIT(select, 4);
+	++m_control_transactions;
 	if (!m_control_read)
+	{
 		m_control_registers[m_control_address] = m_control_data_latch;
+		++m_control_writes;
+	}
+	else
+	{
+		++m_control_reads;
+	}
+	if (m_trace_enabled)
+		machine().logerror(
+				"cobba: control sequence=%llu direction=%s address=%x data=%03x t=%.6f\n",
+				m_control_transactions, m_control_read ? "read" : "write",
+				m_control_address,
+				m_control_read ? m_control_registers[m_control_address] :
+						m_control_data_latch,
+				machine().time().as_double());
 }
 
 u16 nokia_cobba_device::control_data_r() const
@@ -91,6 +115,9 @@ u8 nokia_cobba_device::run_control_conformance_checks()
 	const u16 saved_latch = m_control_data_latch;
 	const u8 saved_address = m_control_address;
 	const bool saved_read = m_control_read;
+	const u64 saved_transactions = m_control_transactions;
+	const u64 saved_reads = m_control_reads;
+	const u64 saved_writes = m_control_writes;
 	u8 result = 0;
 
 	// Reset exposes only the recovered ROM4 idle handshake in register D.
@@ -133,6 +160,9 @@ u8 nokia_cobba_device::run_control_conformance_checks()
 	m_control_data_latch = saved_latch;
 	m_control_address = saved_address;
 	m_control_read = saved_read;
+	m_control_transactions = saved_transactions;
+	m_control_reads = saved_reads;
+	m_control_writes = saved_writes;
 	return result;
 }
 

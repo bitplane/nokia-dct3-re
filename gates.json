@@ -1096,11 +1096,13 @@
           "run_target": "run",
           "tokens": [
             "RUN_DIR=$(RUN_DIR)_cobba_conformance",
+            "RUN_VERBOSE=1",
             "SECONDS=1",
             "RUN_EXTRA_ARGS='-cfg_directory ../fixtures/cobba_conformance'"
           ],
           "parameters": {
             "RUN_DIR": "$(RUN_DIR)_cobba_conformance",
+            "RUN_VERBOSE": "1",
             "SECONDS": "1",
             "RUN_EXTRA_ARGS": "'-cfg_directory ../fixtures/cobba_conformance'"
           }
