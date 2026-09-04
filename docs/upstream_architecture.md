@@ -105,6 +105,15 @@ from independently observed workspace operands. Its six output words reproduce
 pointers, low-word stores and the RPTB/CALL interaction in the MAME core; it
 does not yet claim that the preceding transform routines execute.
 
+`make check-c54x-rom4-execute` is the private-input companion gate. It copies
+the ignored transform-entry program/data snapshots into MAME's ROM path,
+verifies their declared hashes through ordinary ROM loading, restores the
+captured architectural registers, and executes from `0x4b73`. The current core
+constructs challenge header `3532 0000` organically and stops after fetching
+unsupported MVDD opcode `e50b` at `0x4b84` (`PC=0x4b85`). That address is now
+the measured implementation frontier; expanding the core must move it forward
+while preserving the synthetic and transform-tail gates.
+
 ## DSP ROM policy
 
 Keep the following storage domains distinct in MAME ROM declarations:
