@@ -90,6 +90,14 @@ loads/logical operations and low-word stores. Stack growth and block-repeat
 termination follow the TI CPU guide. This is still below the 628-opcode ROM4
 boot surface and is not yet selected by any handset configuration.
 
+`make check-c54x-core` executes distributable synthetic programs on the MAME
+CPU device itself. It currently checks the downward-growing CALL/RET stack,
+`RPT`'s `k+1` count, immediate MMR decoding, and an `RPTB` whose final
+instruction is a two-word CALL. The first run rejected an incorrect compact
+AR-index interpretation of MMR code `0x12`; the corrected decoder treats
+`0x10..0x17` as AR0..AR7. This executable gate, not source-token inspection,
+is the acceptance boundary for subsequent opcode families.
+
 ## DSP ROM policy
 
 Keep the following storage domains distinct in MAME ROM declarations:

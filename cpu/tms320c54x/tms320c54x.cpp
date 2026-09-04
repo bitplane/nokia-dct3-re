@@ -66,6 +66,8 @@ void tms320c54x_device::device_start()
 	state_add(STATE_PMST, "PMST", m_pmst).formatstr("%04X");
 	for (unsigned i = 0; i != std::size(m_ar); ++i)
 		state_add(STATE_AR0 + i, string_format("AR%u", i).c_str(), m_ar[i]).formatstr("%04X");
+	state_add(STATE_BRC, "BRC", m_brc).formatstr("%04X");
+	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
 	state_add(STATE_GENPC, "GENPC", m_pc).noshow();
 	state_add(STATE_GENPCBASE, "CURPC", m_pc).noshow();
 
@@ -221,8 +223,8 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const u16 value = fetch();
 		const unsigned reg = low & 0x1f;
-		if (reg < 8)
-			m_ar[reg] = value;
+		if (reg >= 0x10 && reg <= 0x17)
+			m_ar[reg - 0x10] = value;
 		else if (reg == 0x1a)
 			m_brc = value;
 		else

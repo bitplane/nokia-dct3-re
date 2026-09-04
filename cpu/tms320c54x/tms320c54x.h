@@ -12,19 +12,6 @@ public:
 	tms320c54x_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock);
 
-protected:
-	virtual void device_start() override ATTR_COLD;
-	virtual void device_reset() override ATTR_COLD;
-
-	virtual u32 execute_min_cycles() const noexcept override { return 1; }
-	virtual u32 execute_max_cycles() const noexcept override { return 5; }
-	virtual void execute_run() override;
-	virtual void execute_set_input(int inputnum, int state) override;
-
-	virtual space_config_vector memory_space_config() const override;
-	virtual std::unique_ptr<util::disasm_interface> create_disassembler() override;
-
-private:
 	enum : unsigned
 	{
 		STATE_PC = 1,
@@ -42,9 +29,24 @@ private:
 		STATE_AR4,
 		STATE_AR5,
 		STATE_AR6,
-		STATE_AR7
+		STATE_AR7,
+		STATE_BRC,
+		STATE_ILLEGAL
 	};
 
+protected:
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
+
+	virtual u32 execute_min_cycles() const noexcept override { return 1; }
+	virtual u32 execute_max_cycles() const noexcept override { return 5; }
+	virtual void execute_run() override;
+	virtual void execute_set_input(int inputnum, int state) override;
+
+	virtual space_config_vector memory_space_config() const override;
+	virtual std::unique_ptr<util::disasm_interface> create_disassembler() override;
+
+private:
 	static constexpr u64 ACC_MASK = (u64(1) << 40) - 1;
 
 	u16 fetch();
