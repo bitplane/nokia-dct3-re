@@ -610,10 +610,10 @@ void tms320c54x_device::execute_one(u16 op)
 		m_b = (m_b ^ indirect_read(low)) & ACC_MASK;
 		return;
 	case 0x4400: // LD Smem, 16, A
-		m_a = u64(indirect_read(low)) << 16;
+		m_a = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
 		return;
 	case 0x4500: // LD Smem, 16, B
-		m_b = u64(indirect_read(low)) << 16;
+		m_b = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
 		return;
 	case 0x4700: // RPT Smem
 		m_rptc = indirect_read(low);
@@ -751,8 +751,11 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x7100: // MVDM Smem, dmad
 	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
 		const u16 value = indirect_read(low);
-		data_write(fetch(), value);
+		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		data_write(destination, value);
 		return;
 	}
 	case 0x7300: // MVDM MMR, dmad
@@ -1152,10 +1155,10 @@ void tms320c54x_device::execute_one(u16 op)
 		m_a = data_operand(fetch());
 		return;
 	case 0xf062: // LD #lk, 16, A
-		m_a = u64(fetch()) << 16;
+		m_a = (data_operand(fetch()) << 16) & ACC_MASK;
 		return;
 	case 0xf362: // LD #lk, 16, B
-		m_b = u64(fetch()) << 16;
+		m_b = (data_operand(fetch()) << 16) & ACC_MASK;
 		return;
 	case 0xf330: // AND #lk, B
 		m_b &= fetch();
@@ -1208,8 +1211,8 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf210: // SUB #lk, B, A
 		m_a = (m_b - data_operand(fetch())) & ACC_MASK;
 		return;
-	case 0xf490: // ROL A through carry
-	case 0xf590: // ROL B through carry
+	case 0xf491: // ROL A through carry
+	case 0xf591: // ROL B through carry
 	{
 		u64 &acc = accumulator(BIT(op, 8));
 		const u32 value = u32(acc);
@@ -1218,8 +1221,8 @@ void tms320c54x_device::execute_one(u16 op)
 		acc = u32((value << 1) | carry);
 		return;
 	}
-	case 0xf491: // ROR A through carry
-	case 0xf591: // ROR B through carry
+	case 0xf490: // ROR A through carry
+	case 0xf590: // ROR B through carry
 	{
 		u64 &acc = accumulator(BIT(op, 8));
 		const u32 value = u32(acc);

@@ -13,6 +13,7 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 	nokia_dsp_backend_interface(mconfig, *this),
 	m_cpu(*this, "cpu"),
 	m_transport(*this, "^dspif"),
+	m_cobba(*this, "^cobba"),
 	m_program_rom(*this, "^dsp_program"),
 	m_data_rom(*this, "^dsp_data")
 {
@@ -145,6 +146,15 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 		return host_request();
 	case 0x02:
 		return m_transport->shared_word(0x0aa / 2);
+	case 0x21:
+	{
+		const u16 value = m_cobba->codec_serial_receive();
+		if (m_cobba->codec_serial_receive_ready())
+			m_cobba->codec_serial_receive_ack();
+		return value;
+	}
+	case 0x2d:
+		return m_cobba->control_data_r();
 	default:
 		return m_io[offset & 0xff];
 	}
@@ -166,9 +176,24 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	else if (port == 0x01)
 	{
 		// Port 1 writes are DSP status/completion strobes, not writes back to
-		// the port-1 request latch read above.
+		// the port-1 request latch read above. The same physical strobe is the
+		// DSP-to-MCU doorbell; the MCU's FIQ0 handler decides whether the receive
+		// ring contains work.
 		acknowledge_host_command(data);
 		update_host_command_line();
+		m_transport->notify_rx();
+	}
+	else if (port == 0x21)
+	{
+		m_cobba->codec_serial_transmit(data);
+	}
+	else if (port == 0x2c)
+	{
+		m_cobba->control_select_w(data);
+	}
+	else if (port == 0x2d)
+	{
+		m_cobba->control_data_w(data);
 	}
 }
 

@@ -12,15 +12,18 @@ emu.register_periodic(function()
 	local producer = data:read_u16(0x0852)
 	local consumer = data:read_u16(0x0853)
 	local completion = data:read_u16(0x0880)
+	local rx_producer = data:read_u16(0x08e4)
+	local rx_consumer = data:read_u16(0x08e5)
 	local idle = dsp.state["IDLE"].value
 	local illegal = dsp.state["ILLEGAL"].value
-	if completion ~= 0x1074 or producer ~= consumer or idle == 0 or illegal ~= 0 then
+	if completion ~= 0x1074 or producer ~= consumer or
+			rx_producer ~= rx_consumer or idle == 0 or illegal ~= 0 then
 		error(string.format(
-			"ROM4 DSP gate failed: completion=%04x tx=%04x/%04x idle=%d illegal=%d",
-			completion, producer, consumer, idle, illegal))
+			"ROM4 DSP gate failed: completion=%04x tx=%04x/%04x rx=%04x/%04x idle=%d illegal=%d",
+			completion, producer, consumer, rx_producer, rx_consumer, idle, illegal))
 	end
 
 	print(string.format(
-		"ROM4 DSP coherent execution: PASS completion=1074 tx=%04x/%04x pc=%04x",
-		producer, consumer, dsp.state["PC"].value))
+		"ROM4 DSP coherent execution: PASS completion=1074 tx=%04x/%04x rx=%04x/%04x pc=%04x",
+		producer, consumer, rx_producer, rx_consumer, dsp.state["PC"].value))
 end)

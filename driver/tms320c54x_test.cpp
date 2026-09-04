@@ -26,6 +26,29 @@ private:
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
+		if (!strcmp(machine().system().name, "tms54rom4"))
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			m_response_tap = data.install_write_tap(0x1200, 0x1207,
+					"rom4_response", [this, &data] (offs_t address, u16 &value, u16)
+					{
+						static constexpr u16 prefix[] = {
+							0x3532, 0x0000, 0xffff, 0xffff,
+							0xff0f, 0x0000, 0x0078, 0x54c2
+						};
+						for (unsigned i = 0; i != std::size(prefix); ++i)
+						{
+							const u16 observed = address == 0x1200 + i ? value : data.read_word(0x1200 + i);
+							if (observed != prefix[i])
+								return;
+						}
+						if (m_response_captured)
+							return;
+						for (unsigned i = 0; i != m_response.size(); ++i)
+							m_response[i] = address == 0x1200 + i ? value : data.read_word(0x1200 + i);
+						m_response_captured = true;
+					});
+		}
 	}
 
 	virtual void machine_reset() override
@@ -45,6 +68,19 @@ private:
 			u16 const *const initial = &memregion("dspdata")->as_u16();
 			for (unsigned address = 0; address != 0x10000; ++address)
 				data.write_word(address, initial[address]);
+			u16 const *const drom = &memregion("dspdrom")->as_u16();
+			for (unsigned address = 0xb000; address != 0xf000; ++address)
+				data.write_word(address, drom[address]);
+			// The sparse entry snapshot predates the firmware-provided challenge.
+			// Supply the observed input words while retaining the deterministic
+			// peripheral-free state used by this isolated transform fixture.
+			static constexpr u16 challenge[] = {
+				0xd6fb, 0x4394, 0xe437, 0xda16, 0x9668, 0x964f, 0x5cd4,
+				0x32fe, 0x5be2, 0xdba6, 0x9643, 0x82d7, 0x0000, 0x0000
+			};
+			for (unsigned i = 0; i != std::size(challenge); ++i)
+				data.write_word(0x0825 + i, challenge[i]);
+			m_response_captured = false;
 			m_phase = 2;
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x4b73);
 			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
@@ -52,6 +88,7 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x2103);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
 			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0x0052);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x000b);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0000004b73);
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfffffffffe);
 			static constexpr u16 ar[] = {
@@ -601,11 +638,24 @@ private:
 				return;
 			}
 			const u16 pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
+			static constexpr u16 expected_response[] = {
+				0x3532, 0x0000, 0xffff, 0xffff, 0xff0f, 0x0000, 0x0078,
+				0x54c2, 0x5cd4, 0x32fe, 0x5be2, 0xdba6, 0x9643, 0x82d7
+			};
 			osd_printf_info("TMS320C54x ROM4 execution frontier: pc=%04x "
 					"header=%04x,%04x ar2=%04x ar3=%04x\n", pc,
 					data.read_word(0x1200), data.read_word(0x1201),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
+			expect(m_response_captured, "complete ROM4 challenge response capture");
+			for (unsigned i = 0; i != std::size(expected_response); ++i)
+			{
+				if (m_response[i] != expected_response[i])
+					osd_printf_info("TMS320C54x ROM4 response mismatch word=%u actual=%04x expected=%04x\n",
+							i, m_response[i], expected_response[i]);
+				expect(m_response[i] == expected_response[i],
+						"complete ROM4 challenge response");
+			}
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 					"ROM4 DSP sleep boundary");
 			// IDLE3 at 0x7ec9 advances PC before waiting for a wake source.
@@ -696,6 +746,9 @@ private:
 
 	required_device<tms320c54x_device> m_cpu;
 	emu_timer *m_check_timer = nullptr;
+	memory_passthrough_handler m_response_tap;
+	std::array<u16, 14> m_response{};
+	bool m_response_captured = false;
 	unsigned m_phase = 0;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
@@ -735,6 +788,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(1))
+	ROM_REGION16_LE(0x20000, "dspdrom", 0)
+	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
 ROM_END
 
 } // anonymous namespace

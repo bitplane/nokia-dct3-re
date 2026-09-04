@@ -83,22 +83,28 @@ operational ROM. The DSP's INT2 input is the level comparison between the
 port-1 command latch plus live MDISND ring state and the port-2 accept mask.
 The operational ISR now consumes the complete MCU ring (`0x0033/0x0033`) and
 returns to its ordinary idle at `0x31a5` without an illegal instruction.
+DSP port-1 completion strobes also ring the MCU doorbell. The ordinary FIQ0
+handler drains the DSP receive ring to `0x0083/0x0083`; this is transport
+delivery, not a synthesized MCU message.
 
 The coherent run also executes the challenge transform, publishes its accepted
 `0x3532` response header and proceeds to the next transaction. This independently
 confirms the earlier no-assist result: resident slot `0x250b` is an intentional
 no-op, not a missing COBBA measurement acquisition hook. `SELFTEST_MEAS` has no
 equivalent in the MAME backend. `make check-c54x-rom4-coherent` guards the
-resulting `0x1074` transaction completion, complete transmit-ring drain and
-clean return to DSP idle; the isolated transform gate separately checks the
-response header.
-COBBA serial and PCM I/O remain unconnected.
+resulting `0x1074` transaction completion, complete transmit- and receive-ring
+drain and clean return to DSP idle. The isolated transform gate captures the
+complete 14-word accepted response at its intermediate publication boundary;
+the DSP subsequently reuses that buffer before returning to idle.
+COBBA control ports `0x2c`/`0x2d` and codec serial port `0x21` now terminate in
+the COBBA device. PCM sample timing remains open.
 
 The core corrections required to reach this point are generic C54x semantics:
 absolute `STM` extension order, `MVDM`, `DLD`/`DST`, `CMPL`, immediate `XOR`,
 compound `XC`, all `IDLE` and ST0/ST1 bit-set/reset variants, `RPTZ`, and
-memory-counted repeat of multiword instructions, repeated `MVDP` program
-destination update, delayed and conditional control flow, interrupt return,
+memory-counted repeat of multiword instructions, repeated `MVDP` and `MVDM`
+destination update, sign-extended shifted loads, carry rotations, delayed and
+conditional control flow, interrupt return,
 extended absolute arithmetic/load/store, and accumulator-indirect branch.
 Operational ROM execution has additionally established signed/unsigned
 accumulator arithmetic, accumulator-shift-mode loads, memory compare,

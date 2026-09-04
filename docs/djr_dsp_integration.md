@@ -221,8 +221,9 @@ DSP response begins at word `0x1200` with:
 
 This is an external behavioral oracle, not code available for import. The
 backend is GPL-licensed, while this driver is intended for MAME under a
-compatible clean-room implementation. Full local promotion therefore remains
-open even though the native no-assist boot is now proven.
+compatible clean-room implementation. The local MAME backend now reproduces
+this response from the recovered program/DROM and firmware-provided challenge,
+without importing the external implementation.
 
 The instruction-level boundary can be checked independently of the native
 backend's implementation:
@@ -237,7 +238,9 @@ The checker requires the `0x7ff5` RPTB setup once, six complete executions of
 the enclosed two-word CALL at `0x7ff7`, the descending destination walk
 `0x1208..0x1203`, and the accepted response above. This is the first executable
 conformance gate for a clean-room MAME C54x core; it does not accept a final
-response alone while the repeat-block control flow is wrong. The native `.api`
+response alone while the repeat-block control flow is wrong. The in-MAME gate
+captures the response when it is published because the operational DSP later
+reuses the same buffer. The native `.api`
 capture begins at DSP data word `0x0800`; use `--data-base` for another capture
 layout rather than treating a DSP word address as a file offset.
 

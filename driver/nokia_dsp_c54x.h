@@ -5,6 +5,7 @@
 #define MAME_NOKIA_NOKIA_DSP_C54X_H
 
 #include "cpu/tms320c54x/tms320c54x.h"
+#include "nokia_cobba.h"
 #include "nokia_dsp_backend.h"
 #include "nokia_dspif.h"
 
@@ -54,6 +55,7 @@ private:
 
 	required_device<tms320c54x_device> m_cpu;
 	required_device<nokia_dspif_device> m_transport;
+	required_device<nokia_cobba_device> m_cobba;
 	required_region_ptr<u16> m_program_rom;
 	required_region_ptr<u16> m_data_rom;
 	std::array<u16, 0x10000> m_program{};
