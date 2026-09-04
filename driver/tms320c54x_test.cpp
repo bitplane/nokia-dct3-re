@@ -212,6 +212,33 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		if (m_phase == 3)
+		{
+			if (!m_irq_raised)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+						"IDLE3 entry");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0401,
+						"IDLE3 continuation PC");
+				m_cpu->set_input_line(2, ASSERT_LINE);
+				m_irq_raised = true;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			expect(data.read_word(0x0a10) == 0xcafe,
+					"maskable interrupt vector execution");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+					"interrupt-vector terminal IDLE3");
+			m_cpu->set_input_line(2, CLEAR_LINE);
+			m_phase = 1;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
 		if (m_phase == 2)
 		{
 			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
@@ -289,10 +316,20 @@ private:
 		expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xaa00,
 				"immediate accumulator mask and rotate");
 
-		m_phase = 1;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
+		// IDLE3 must retain its continuation PC, then an enabled source must
+		// vector through PMST.IPTR and preserve the return address on stack.
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0048, 0x7680);
+		program.write_word(0x0049, 0xcafe);
+		program.write_word(0x004a, 0xf5e1);
+		program.write_word(0x0400, 0xf5e1);
+		m_phase = 3;
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0400);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x0004);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0a10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
@@ -301,6 +338,7 @@ private:
 	emu_timer *m_check_timer = nullptr;
 	unsigned m_phase = 0;
 	unsigned m_rom4_checks = 0;
+	bool m_irq_raised = false;
 };
 
 void tms320c54x_test_state::test(machine_config &config)

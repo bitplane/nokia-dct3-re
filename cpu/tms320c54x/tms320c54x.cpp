@@ -68,6 +68,8 @@ void tms320c54x_device::device_start()
 		state_add(STATE_AR0 + i, string_format("AR%u", i).c_str(), m_ar[i]).formatstr("%04X");
 	state_add(STATE_BRC, "BRC", m_brc).formatstr("%04X");
 	state_add(STATE_BK, "BK", m_bk).formatstr("%04X");
+	state_add(STATE_IFR, "IFR", m_ifr).formatstr("%04X");
+	state_add(STATE_IMR, "IMR", m_imr).formatstr("%04X");
 	state_add(STATE_IDLE, "IDLE", m_idle).formatstr("%1u");
 	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
 	state_add(STATE_GENPC, "GENPC", m_pc).noshow();
@@ -305,6 +307,26 @@ void tms320c54x_device::finish_repeats()
 		else
 			m_block_repeat_active = false;
 	}
+}
+
+bool tms320c54x_device::service_interrupt()
+{
+	// Maskable hardware sources occupy vectors 16..31 and map directly to
+	// IMR/IFR bits 0..15. PMST.IPTR selects their 128-word vector page.
+	const u16 pending = m_ifr & m_imr;
+	if (BIT(m_st1, 11) || !pending)
+		return false;
+
+	unsigned source = 0;
+	while (!BIT(pending, source))
+		++source;
+	m_ifr &= ~(u16(1) << source);
+	push(m_pc);
+	m_st1 |= 0x0800;
+	m_pc = (m_pmst & 0xff80) | ((source + 16) << 2);
+	m_idle = false;
+	m_icount -= 5;
+	return true;
 }
 
 void tms320c54x_device::execute_one(u16 op)
@@ -815,6 +837,8 @@ void tms320c54x_device::execute_run()
 {
 	while (m_icount > 0)
 	{
+		if (service_interrupt())
+			continue;
 		if (m_idle)
 		{
 			m_icount = 0;

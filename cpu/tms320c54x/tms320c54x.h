@@ -32,6 +32,8 @@ public:
 		STATE_AR7,
 		STATE_BRC,
 		STATE_BK,
+		STATE_IFR,
+		STATE_IMR,
 		STATE_IDLE,
 		STATE_ILLEGAL
 	};
@@ -59,6 +61,7 @@ private:
 	void indirect_modify(u8 mode);
 	void circular_modify(unsigned ar, s16 step);
 	void execute_one(u16 op);
+	bool service_interrupt();
 	void finish_repeats();
 	void push(u16 value);
 	u16 pop();
