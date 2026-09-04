@@ -4,6 +4,7 @@
 /* Development-only execution tests for the clean-room TMS320C54x core. */
 
 #include "emu.h"
+#include "emuopts.h"
 #include "cpu/tms320c54x/tms320c54x.h"
 
 namespace {
@@ -29,6 +30,14 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "cold"))
+		{
+			m_phase = 4;
+			m_rom4_checks = 0;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
 		if (!strcmp(machine().system().name, "tms54rom4"))
 		{
 			m_rom4_checks = 0;
@@ -57,7 +66,6 @@ private:
 
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
-
 		// CALL/RET, then a three-word RPT copy.
 		program.write_word(0x0100, 0xf074);
 		program.write_word(0x0101, 0x0200);
@@ -212,6 +220,29 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
 		auto &data = m_cpu->space(AS_DATA);
+		if (m_phase == 4)
+		{
+			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+					!m_cpu->state_int(tms320c54x_device::STATE_IDLE))
+			{
+				expect(++m_rom4_checks < 10000, "ROM4 cold execution timeout");
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			osd_printf_info("TMS320C54x ROM4 cold frontier: pc=%04x sp=%04x "
+					"pmst=%04x idle=%u\n",
+					u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+					u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+					"ROM4 cold loader-upload boundary");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01,
+					"ROM4 cold loader entry PC");
+			expect(m_cpu->space(AS_PROGRAM).read_word(0x0f00) == 0,
+					"ROM4 loader1 must be MCU-uploaded");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 cold frontier complete");
+		}
 		if (m_phase == 3)
 		{
 			if (!m_irq_raised)
@@ -359,12 +390,22 @@ ROM_START(tms54test)
 ROM_END
 
 ROM_START(tms54rom4)
+	ROM_SYSTEM_BIOS(0, "entry", "Transform-entry snapshot")
+	ROM_SYSTEM_BIOS(1, "cold", "Cold reset from mask ROM and DROM")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
-	ROM_LOAD16_WORD_SWAP("transform_entry_prog.bin", 0, 0x80000,
-			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f))
+	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
+			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(0))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(1))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
-	ROM_LOAD16_WORD_SWAP("transform_entry_data.bin", 0, 0x20000,
-			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e))
+	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
+			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(0))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(1))
 ROM_END
 
 } // anonymous namespace

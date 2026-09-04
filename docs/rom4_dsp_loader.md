@@ -43,6 +43,14 @@ The normalized ordered trace is:
 6. run mode requests block 1, then block families with input lengths `0x0078`,
    `0x0118`, and `0x04ec`.
 
+`make check-c54x-rom4-cold-execute` independently starts the local clean-room
+core at the mask-ROM reset vector with only the recovered program image and
+complete `0xb000..0xefff` DROM populated. Reset reaches PC `0x0f00`, where the
+program word is still zero, and stops at PC `0x0f01`. This is the expected MCU
+upload boundary: loader1 is not resident in the mask image and isolated DSP
+execution cannot proceed by pre-seeding it. The next gate must connect the CPU
+to the handset's ordinary staged-upload writes.
+
 `tools/dsp_rom4_upload_trace_check.py` verifies this ordering and rejects an
 observed input length absent from the recovered catalogue.
 
