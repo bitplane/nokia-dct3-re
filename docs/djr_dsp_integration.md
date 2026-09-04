@@ -176,7 +176,8 @@ The recovered catalogue is independently auditable with:
 
 ```sh
 python3 tools/dsp_rom_audit.py \
-  --block-map roms/research/nse1-rom4/working/dsp_blocks.txt
+  --block-map roms/research/nse1-rom4/working/dsp_blocks.txt \
+  --flash roms/noki5110/5110f530.fls
 ```
 
 The parser intentionally calls the four undecoded descriptor fields
@@ -187,6 +188,13 @@ the ROM4 loader. Duplicate and overlapping catalogue entries are unioned when
 coverage is reported. The flat `dsp_full.bin` is consequently treated as a
 mapped execution snapshot containing ROM and overlaid runtime memory, not as a
 literal chip-ROM declaration.
+
+The untouched v5.30 flash contains all 27 six-word descriptor signatures at a
+consistent raw-file displacement of `+0x840` from the recovered logical
+`DAT_*` labels. The audit requires that canonical location for every record;
+additional matches from duplicate descriptors are reported but do not weaken
+the invariant. This establishes the catalogue's ROM provenance without using
+the IDA database as executable input.
 
 An 80-million-instruction follow-up used only the native harness's physical-key
 replay to enter the handset security code. It reached stable NSE-1 standby with

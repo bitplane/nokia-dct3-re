@@ -2,7 +2,10 @@ import pathlib
 import tempfile
 import unittest
 
-from tools.dsp_rom_audit import audit, classify, covered_words, parse_block_map
+from tools.dsp_rom_audit import (
+    audit, classify, covered_words, descriptor_locations,
+    descriptor_signature, parse_block_map,
+)
 
 
 class DspRomAuditTest(unittest.TestCase):
@@ -42,6 +45,17 @@ class DspRomAuditTest(unittest.TestCase):
             " 3: DAT_100200 27F0 0000 0030 0000 0000 0000\n"
         )
         self.assertEqual(covered_words(blocks, 0x2000, 0x2800), 0x40)
+
+    def test_descriptor_signature_and_locations_use_raw_big_endian_words(self):
+        block = parse_block_map(
+            " 1: DAT_294540 25B4 1F80 034E 0130 044C 0000\n"
+        )[0]
+        signature = bytes.fromhex("25b41f80034e0130044c0000")
+        self.assertEqual(descriptor_signature(block), signature)
+        self.assertEqual(
+            descriptor_locations(b"xx" + signature + b"yy" + signature, block, 0x200000),
+            [0x200002, 0x200010],
+        )
 
 
 if __name__ == "__main__":
