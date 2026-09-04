@@ -170,15 +170,44 @@ private:
 		// exactly lk + 1 times.
 		program.write_word(0x0350, 0xf062);
 		program.write_word(0x0351, 0x1234);
-		program.write_word(0x0352, 0x82f8);
-		program.write_word(0x0353, 0x0909);
-		program.write_word(0x0354, 0x80f8);
-		program.write_word(0x0355, 0x090a);
-		program.write_word(0x0356, 0xe800);
-		program.write_word(0x0357, 0xf070);
-		program.write_word(0x0358, 0x0002);
-		program.write_word(0x0359, 0x6d10);
-		program.write_word(0x035a, 0xf5e1);
+		program.write_word(0x0352, 0x4ef8);
+		program.write_word(0x0353, 0x090c);
+		program.write_word(0x0354, 0xe800);
+		program.write_word(0x0355, 0xf070);
+		program.write_word(0x0356, 0x0002);
+		program.write_word(0x0357, 0x6d10);
+		program.write_word(0x0358, 0xf5e1);
+		program.write_word(0x0360, 0x76f8);
+		program.write_word(0x0361, 0x0910);
+		program.write_word(0x0362, 0x5678);
+		program.write_word(0x0363, 0x7214);
+		program.write_word(0x0364, 0x0912);
+		program.write_word(0x0365, 0x57f8);
+		program.write_word(0x0366, 0x0914);
+		program.write_word(0x0367, 0xf793);
+		program.write_word(0x0368, 0xff0c);
+		program.write_word(0x0369, 0xf495);
+		program.write_word(0x036a, 0xf793);
+		program.write_word(0x036b, 0xf065);
+		program.write_word(0x036c, 0x00ff);
+		program.write_word(0x036d, 0xf054);
+		program.write_word(0x036e, 0x00f0);
+		program.write_word(0x036f, 0xf5e1);
+		program.write_word(0x0370, 0xf171);
+		program.write_word(0x0371, 0x0001);
+		program.write_word(0x0372, 0x6d10);
+		program.write_word(0x0373, 0xf5e1);
+		program.write_word(0x0374, 0x47f8);
+		program.write_word(0x0375, 0x0918);
+		program.write_word(0x0376, 0x6bf8);
+		program.write_word(0x0377, 0x091a);
+		program.write_word(0x0378, 0x0001);
+		program.write_word(0x0379, 0xf5e1);
+		data.write_word(0x0918, 1);
+		data.write_word(0x091a, 0);
+		data.write_word(0x0912, 0xabcd);
+		data.write_word(0x0914, 0x1234);
+		data.write_word(0x0915, 0x5678);
 
 		data.write_word(0x0500, 0x1111);
 		data.write_word(0x0501, 0x2222);
@@ -245,9 +274,53 @@ private:
 					"long-immediate RPT terminal IDLE3");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == 3,
 					"long-immediate RPT iteration count");
-			expect(data.read_word(0x0909) == 0x1234 &&
-					data.read_word(0x090a) == 0,
-					"long-immediate load shifted by 16");
+			 expect(data.read_word(0x090c) == 0x1234 &&
+					data.read_word(0x090d) == 0,
+					"long-immediate load and long-memory store");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0360);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_phase = 6;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6)
+		{
+			expect(data.read_word(0x0910) == 0x5678,
+					"absolute STM extension order");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xabcd,
+					"data-memory to MMR move");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(0x12345678 ^ ((u64(1) << 40) - 1)),
+					"absolute double-word load and accumulator complement");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00ff0f00,
+					"shifted long-immediate accumulator XOR");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0370);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_phase = 7;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 7)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0,
+					"repeat-with-zero clears its accumulator");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == 2,
+					"repeat-with-zero iteration count");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0374);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_phase = 8;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 8)
+		{
+			expect(data.read_word(0x091a) == 2,
+					"memory-counted multiword repeat iteration count");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

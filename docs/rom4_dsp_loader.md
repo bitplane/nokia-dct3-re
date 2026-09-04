@@ -60,9 +60,26 @@ accesses in `0x0080..0x27ff` through the same data store while `PMST.OVLY` is
 set. The host doorbell latches C54x `HPINT` (maskable source 9, vector 25).
 The `noki5110` research configuration selects it instead of the HLE. NSE-1
 firmware now uploads loader1 through ordinary HPI writes, drives the recovered
-hold/release sequence, and executes the uploaded code. The current handset
-frontier is the first still-unimplemented instruction at DSP PC `0x0f71`;
-COBBA serial and PCM I/O remain unconnected.
+hold/release sequence, and executes the uploaded code. Runtime interleave is
+boosted only at DSP reset release and the two mailbox ownership writes; no DSP
+reply or shared word is synthesized.
+
+The first cold exchange is now complete in MAME. Loader1 publishes matching
+header words `0x0802=0x0803=0x0004`, the MCU enters its 64-block streaming
+loop, and the core executes the uploaded loader and mask-ROM transform helper
+without an illegal opcode. After the warm release it transforms descriptor 0
+and reaches loader1's `0x0d80` handoff. At that point `0x0d80` still contains
+the mask-image RET/NOP pattern and shared flag `0x0872` remains zero. MAME
+therefore has not yet reproduced the block-`0x12` request and loader2 install
+that the external co-sim trace proves. This missing request/install transition,
+not an unidentified instruction, is the current handset frontier. COBBA serial
+and PCM I/O remain unconnected.
+
+The core corrections required to reach this point are generic C54x semantics:
+absolute `STM` extension order, `MVDM`, `DLD`/`DST`, `CMPL`, immediate `XOR`,
+compound `XC`, all `IDLE` and ST0/ST1 bit-set/reset variants, `RPTZ`, and
+memory-counted repeat of multiword instructions. Each has a focused core
+conformance fixture; none recognizes a Nokia address or loader byte pattern.
 
 The retained NSE-1 trace fixes reset polarity and edge behavior without an
 inference: MCU writes to MAD2 byte `0x20002` are `1` (cold release), `0`

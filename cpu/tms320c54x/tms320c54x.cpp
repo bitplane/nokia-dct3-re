@@ -91,6 +91,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_rea));
 	save_item(NAME(m_rptc));
 	save_item(NAME(m_rpt_address));
+	save_item(NAME(m_rpt_end));
+	save_item(NAME(m_rpt_armed));
 	save_item(NAME(m_delayed_target));
 	save_item(NAME(m_delayed_words));
 	save_item(NAME(m_ifr));
@@ -118,6 +120,8 @@ void tms320c54x_device::device_reset()
 	m_rea = 0;
 	m_rptc = 0;
 	m_rpt_address = 0;
+	m_rpt_end = 0xffff;
+	m_rpt_armed = false;
 	m_delayed_target = 0;
 	m_delayed_words = 0;
 	m_ifr = 0;
@@ -289,10 +293,17 @@ void tms320c54x_device::indirect_write(u8 mode, u16 value)
 
 void tms320c54x_device::finish_repeats()
 {
-	if (m_rptc && m_pc == u16(m_rpt_address + 1))
+	if (m_rptc)
 	{
-		--m_rptc;
-		m_pc = m_rpt_address;
+		if (m_rpt_armed)
+			m_rpt_armed = false;
+		else if (m_rpt_end == 0xffff)
+			m_rpt_end = m_pc;
+		if (!m_rpt_armed && m_rpt_end != 0xffff && m_pc == m_rpt_end)
+		{
+			--m_rptc;
+			m_pc = m_rpt_address;
+		}
 	}
 
 	// REA names the last program word in the block. This also covers a
@@ -332,6 +343,75 @@ bool tms320c54x_device::service_interrupt()
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	if ((op & 0xfcff) == 0xf4e1) // IDLE 1/2/3
+	{
+		m_idle = true;
+		return;
+	}
+	if ((op & 0xfdf0) == 0xf5b0) // SSBX bit, ST0/ST1
+	{
+		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
+		status |= u16(1) << (low & 0x0f);
+		return;
+	}
+	if ((op & 0xfdf0) == 0xf4b0) // RSBX bit, ST0/ST1
+	{
+		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
+		status &= ~(u16(1) << (low & 0x0f));
+		return;
+	}
+	if ((op & 0xfd00) == 0xfd00) // XC n, condition
+	{
+		const unsigned words = BIT(op, 9) ? 2 : 1;
+		bool execute = false;
+		if (BIT(low, 6))
+		{
+			const bool b = BIT(low, 3);
+			const u64 value = accumulator(b);
+			const s64 signed_value = s64(value << 24) >> 24;
+			execute = true;
+			switch (low & 7)
+			{
+			case 0: break;
+			case 2: execute = signed_value >= 0; break;
+			case 3: execute = signed_value < 0; break;
+			case 4: execute = value != 0; break;
+			case 5: execute = value == 0; break;
+			case 6: execute = signed_value > 0; break;
+			case 7: execute = signed_value <= 0; break;
+			default: execute = false; break;
+			}
+			if (BIT(low, 5))
+			{
+				const bool overflow = BIT(m_st0, b ? 9 : 10);
+				execute = execute && (BIT(low, 4) ? overflow : !overflow);
+			}
+		}
+		else
+		{
+			execute = true;
+			if (low & 0x30)
+				execute = execute && ((low & 0x30) == 0x30
+						? BIT(m_st0, 12) : !BIT(m_st0, 12));
+			if (low & 0x0c)
+				execute = execute && ((low & 0x0c) == 0x0c
+						? BIT(m_st0, 11) : !BIT(m_st0, 11));
+			if (low & 0x03)
+			{
+				// BIO is not connected on the current Nokia backend.
+				execute = execute && ((low & 0x03) == 0x02);
+			}
+		}
+		if (!execute)
+			m_pc += words;
+		return;
+	}
+	if ((op & 0xfcf0) == 0xf050) // XOR #lk, shift, source, destination
+	{
+		const u64 value = u64(fetch()) << (low & 0x0f);
+		accumulator(BIT(op, 8)) = (accumulator(BIT(op, 9)) ^ value) & ACC_MASK;
+		return;
+	}
 	if (op == 0x6ff8 && m_cache.read_word(m_pc + 1) == 0x0e20)
 	{
 		const u16 address = fetch();
@@ -397,6 +477,12 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4500: // LD Smem, 16, B
 		m_b = u64(indirect_read(low)) << 16;
 		return;
+	case 0x4700: // RPT Smem
+		m_rptc = indirect_read(low);
+		m_rpt_address = m_pc;
+		m_rpt_end = 0xffff;
+		m_rpt_armed = true;
+		return;
 	case 0x6100: // BITF Smem, #lk
 	{
 		const u16 value = indirect_read(low);
@@ -410,6 +496,36 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4900: // LDM MMR, B
 		m_b = data_operand(data_read(low & 0x1f));
 		return;
+	case 0x4e00: // DST A, Lmem
+	case 0x4f00: // DST B, Lmem
+	{
+		const unsigned ar = low & 7;
+		const u16 address = (low == 0xf8 ? fetch() : m_ar[ar]) & 0xfffe;
+		const u64 value = accumulator(BIT(op, 8));
+		data_write(address, u16(value >> 16));
+		data_write(address + 1, u16(value));
+		if (low != 0xf8)
+			indirect_modify(low);
+		return;
+	}
+	case 0x5600: // DLD Lmem, A
+	case 0x5700: // DLD Lmem, B
+	{
+		const unsigned ar = low & 7;
+		const u16 address = (low == 0xf8 ? fetch() : m_ar[ar]) & 0xfffe;
+		const u16 high = data_read(address);
+		const u16 low_word = data_read(address + 1);
+		u64 value = (u64(high) << 16) | low_word;
+		// C16 dual mode and ordinary double-precision mode have the same
+		// 32-bit payload layout here. SXM extends the high halfword into the
+		// accumulator guard byte in either mode.
+		if (BIT(m_st1, 8) && BIT(high, 15))
+			value |= u64(0xff) << 32;
+		accumulator(BIT(op, 8)) = value;
+		if (low != 0xf8)
+			indirect_modify(low);
+		return;
+	}
 	case 0x6800: // AND #lk, Smem
 	case 0x6900: // OR #lk, Smem
 	{
@@ -494,8 +610,22 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x7000: // MVKD dmad, Smem
 		indirect_write(low, data_read(fetch()));
 		return;
+	case 0x7200: // MVDM dmad, MMR
+		data_write(low & 0x7f, data_read(fetch()));
+		return;
 	case 0x7600: // STM #lk, Smem
-		indirect_write(low, fetch());
+		if (low == 0xf8)
+		{
+			// The absolute Smem extension precedes the immediate extension.
+			// Keep the fetch order explicit; passing fetch() as the helper
+			// argument reverses these words before indirect_write fetches the
+			// address.
+			const u16 address = fetch();
+			const u16 value = fetch();
+			data_write(address, value);
+		}
+		else
+			indirect_write(low, fetch());
 		return;
 	case 0x7700: // STM #lk, MMR
 	{
@@ -597,6 +727,14 @@ void tms320c54x_device::execute_one(u16 op)
 		m_block_repeat_active = true;
 		m_icount -= 3;
 		return;
+	case 0xf071: // RPTZ A, #lk
+	case 0xf171: // RPTZ B, #lk
+		accumulator(BIT(op, 8)) = 0;
+		m_rptc = fetch();
+		m_rpt_address = m_pc;
+		m_rpt_end = 0xffff;
+		m_rpt_armed = true;
+		return;
 	case 0xf074: // CALL pmad
 	{
 		const u16 destination = fetch();
@@ -608,6 +746,19 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf073: // B pmad
 		m_pc = fetch();
 		m_icount -= 3;
+		return;
+	case 0xf493: // CMPL source accumulator, destination accumulator
+	case 0xf593:
+	case 0xf693:
+	case 0xf793:
+		accumulator(BIT(op, 8)) = ~accumulator(BIT(op, 9)) & ACC_MASK;
+		return;
+	case 0xf065: // XOR #lk, 16, source accumulator, destination accumulator
+	case 0xf165:
+	case 0xf265:
+	case 0xf365:
+		accumulator(BIT(op, 8)) =
+				(accumulator(BIT(op, 9)) ^ (u64(fetch()) << 16)) & ACC_MASK;
 		return;
 	case 0xf274: // CALLD pmad
 	{
@@ -623,25 +774,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_delayed_words = 2;
 		m_icount -= 3;
 		return;
-	case 0xf493: // NOT A
-		m_a = ~m_a & ACC_MASK;
-		return;
 	case 0xf495: // NOP
-		return;
-	case 0xf5e1: // IDLE 3
-		m_idle = true;
-		return;
-	case 0xf7bb: // SSBX INTM
-		m_st1 |= 0x0800;
-		return;
-	case 0xf6bb: // RSBX INTM
-		m_st1 &= ~0x0800;
-		return;
-	case 0xf7bd: // SSBX XF
-		m_st1 |= 0x2000;
-		return;
-	case 0xf6bd: // RSBX XF
-		m_st1 &= ~0x2000;
 		return;
 	case 0xf1c0: // XOR A, B
 		m_b = (m_b ^ m_a) & ACC_MASK;
@@ -839,12 +972,16 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 			m_rptc = low;
 			m_rpt_address = m_pc;
+			m_rpt_end = 0xffff;
+			m_rpt_armed = true;
 			return;
 		}
 		if (op == 0xf070) // RPT #lk
 		{
 			m_rptc = fetch();
 			m_rpt_address = m_pc;
+			m_rpt_end = 0xffff;
+			m_rpt_armed = true;
 			return;
 		}
 		if ((op & 0xff00) == 0x6d00) // MAR indirect auxiliary-register modification

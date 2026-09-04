@@ -1464,6 +1464,15 @@ void nokia_dct3_state::dsp_doorbell_w(int state)
 void nokia_dct3_state::dsp_reset_w(int state)
 {
 	m_dsp_backend->reset_line_w(state);
+	if (state && m_dsp_c54x)
+	{
+		// The ROM4 loader polls a DSP-owned header immediately after releasing
+		// reset. End the current ARM slice and tightly interleave both processors
+		// for the bootstrap exchange; this models concurrent silicon without
+		// manufacturing the DSP's response.
+		machine().scheduler().perfect_quantum(attotime::from_usec(100));
+		machine().scheduler().abort_timeslice();
+	}
 }
 
 void nokia_dct3_state::dsp_shared_002_write_w(int state)
@@ -1617,6 +1626,14 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 				byte_offset, old_data, new_data, m_maincpu->pc(),
 				machine().time().as_double());
 	m_dsp_backend->mcu_shared_write(byte_offset);
+	if (m_dsp_c54x && (byte_offset == 0x0fe || byte_offset == 0x100))
+	{
+		// These are the alternating ownership mailboxes used by the ROM4
+		// upload protocol. Let the peer observe each handoff before the ARM can
+		// exhaust its bounded acknowledgement poll.
+		machine().scheduler().perfect_quantum(attotime::from_usec(100));
+		machine().scheduler().abort_timeslice();
+	}
 }
 
 #include "nokia_dct3_trace.inc"

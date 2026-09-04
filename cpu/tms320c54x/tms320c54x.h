@@ -94,6 +94,8 @@ private:
 	u16 m_rea = 0;
 	u16 m_rptc = 0;
 	u16 m_rpt_address = 0;
+	u16 m_rpt_end = 0xffff;
+	bool m_rpt_armed = false;
 	u16 m_delayed_target = 0;
 	u8 m_delayed_words = 0;
 	u16 m_ifr = 0;
