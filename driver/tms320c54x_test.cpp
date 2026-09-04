@@ -203,8 +203,45 @@ private:
 		program.write_word(0x0377, 0x091a);
 		program.write_word(0x0378, 0x0001);
 		program.write_word(0x0379, 0xf5e1);
+		program.write_word(0x037a, 0xf070);
+		program.write_word(0x037b, 0x0001);
+		program.write_word(0x037c, 0x7d92);
+		program.write_word(0x037d, 0x0924);
+		program.write_word(0x037e, 0xf5e1);
+		program.write_word(0x0380, 0xf273);
+		program.write_word(0x0381, 0x0390);
+		program.write_word(0x0382, 0xf495);
+		program.write_word(0x0383, 0xf495);
+		program.write_word(0x0384, 0x0000);
+		program.write_word(0x0390, 0xf5e1);
+		program.write_word(0x0392, 0xf4eb);
+		program.write_word(0x0398, 0xf5e1);
+		program.write_word(0x039a, 0xfa45);
+		program.write_word(0x039b, 0x03a0);
+		program.write_word(0x039c, 0xf495);
+		program.write_word(0x039d, 0xf495);
+		program.write_word(0x039e, 0x0000);
+		program.write_word(0x03a0, 0xf5e1);
+		program.write_word(0x03a2, 0x6ff8);
+		program.write_word(0x03a3, 0x0920);
+		program.write_word(0x03a4, 0x0c48);
+		program.write_word(0x03a5, 0xf5e1);
+		program.write_word(0x03a6, 0xf5e2);
+		program.write_word(0x03b0, 0xf5e1);
+		program.write_word(0x03b2, 0x09f8);
+		program.write_word(0x03b3, 0x0918);
+		program.write_word(0x03b4, 0xf5e1);
+		program.write_word(0x03b6, 0xfc4b);
+		program.write_word(0x03b7, 0x0000);
+		program.write_word(0x03c0, 0xf5e1);
+		program.write_word(0x03c2, 0xf947);
+		program.write_word(0x03c3, 0x03d0);
+		program.write_word(0x03c4, 0xf5e1);
+		program.write_word(0x03d0, 0xf5e1);
 		data.write_word(0x0918, 1);
 		data.write_word(0x091a, 0);
+		data.write_word(0x0920, 0xaaaa);
+		data.write_word(0x0921, 0xbbbb);
 		data.write_word(0x0912, 0xabcd);
 		data.write_word(0x0914, 0x1234);
 		data.write_word(0x0915, 0x5678);
@@ -267,6 +304,7 @@ private:
 
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
+		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		if (m_phase == 5)
 		{
@@ -321,6 +359,124 @@ private:
 		{
 			expect(data.read_word(0x091a) == 2,
 					"memory-counted multiword repeat iteration count");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x037a);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0920);
+			m_phase = 9;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 9)
+		{
+			osd_printf_info("TMS320C54x repeated MVDP result: %04x,%04x\n",
+					m_cpu->space(AS_PROGRAM).read_word(0x0924),
+					m_cpu->space(AS_PROGRAM).read_word(0x0925));
+			expect(m_cpu->space(AS_PROGRAM).read_word(0x0924) == 0xaaaa &&
+					m_cpu->space(AS_PROGRAM).read_word(0x0925) == 0xbbbb,
+					"repeated MVDP advances its program destination");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0380);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 10;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 10)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0391,
+					"delayed branch executes both delay-slot words");
+			data.write_word(0x02ff, 0x0398);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0392);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x02ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 11;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 11)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0399 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
+					"interrupt return restores PC/SP and enables interrupts");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x039a);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 12;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 12)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x03a1,
+					"delayed accumulator-equal branch");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03a2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 13;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 13)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xaaaa00,
+					"extended absolute load with positive shift");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03a6);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x03b0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 14;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 14)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x03b1,
+					"accumulator-indirect branch");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03b2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 15;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 15)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 4,
+					"data-memory subtract from accumulator B");
+			data.write_word(0x02ff, 0x03c0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03b6);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x02ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, (u64(1) << 40) - 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 16;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 16)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x03c1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
+					"conditional return on negative accumulator B");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03c2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 17;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 17)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x03d1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
+					data.read_word(0x02ff) == 0x03c4,
+					"conditional call on non-positive accumulator A");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -462,7 +618,6 @@ private:
 
 		// IDLE3 must retain its continuation PC, then an enabled source must
 		// vector through PMST.IPTR and preserve the return address on stack.
-		auto &program = m_cpu->space(AS_PROGRAM);
 		program.write_word(0x0048, 0x7680);
 		program.write_word(0x0049, 0xcafe);
 		program.write_word(0x004a, 0xf5e1);

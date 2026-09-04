@@ -64,22 +64,33 @@ hold/release sequence, and executes the uploaded code. Runtime interleave is
 boosted only at DSP reset release and the two mailbox ownership writes; no DSP
 reply or shared word is synthesized.
 
-The first cold exchange is now complete in MAME. Loader1 publishes matching
-header words `0x0802=0x0803=0x0004`, the MCU enters its 64-block streaming
-loop, and the core executes the uploaded loader and mask-ROM transform helper
-without an illegal opcode. After the warm release it transforms descriptor 0
-and reaches loader1's `0x0d80` handoff. At that point `0x0d80` still contains
-the mask-image RET/NOP pattern and shared flag `0x0872` remains zero. MAME
-therefore has not yet reproduced the block-`0x12` request and loader2 install
-that the external co-sim trace proves. This missing request/install transition,
-not an unidentified instruction, is the current handset frontier. COBBA serial
-and PCM I/O remain unconnected.
+The cold exchange, block-`0x12` request, and loader2 install now complete in
+MAME. Loader1 publishes matching header words `0x0802=0x0803=0x0004`, the MCU
+enters its 64-block streaming loop, and the core executes the uploaded loader
+and mask-ROM transform helper. After the warm release it transforms descriptor
+0, writes request selector `0x0012` to DSP word `0x0871`, and raises the
+DSP-to-MCU service interrupt. The MCU's ordinary IRQ4 path consumes that
+selector, streams descriptor 18 (`0x01f4` input words), and installs loader2 at
+`0x0d80`; no shared word or acknowledgement is synthesized.
+
+Loader1 also fills the otherwise undeclared resident range beginning at
+`0x23c4`. Its `RPT`/`MVDP *AR2+, pmad` sequence increments both the indirect
+data source and the encoded program destination on each repetition. Modeling
+that architectural repeat behavior removes the last flat-image/`SEEDDARAM`
+dependency from the MAME backend. The installed program subsequently requests
+and receives another block (`0x044c` input words) and executes into the
+operational ROM. The current frontier is ordinary C54x instruction coverage in
+that code, not loader reconstruction or missing shared memory. COBBA serial and
+PCM I/O remain unconnected.
 
 The core corrections required to reach this point are generic C54x semantics:
 absolute `STM` extension order, `MVDM`, `DLD`/`DST`, `CMPL`, immediate `XOR`,
 compound `XC`, all `IDLE` and ST0/ST1 bit-set/reset variants, `RPTZ`, and
-memory-counted repeat of multiword instructions. Each has a focused core
-conformance fixture; none recognizes a Nokia address or loader byte pattern.
+memory-counted repeat of multiword instructions, repeated `MVDP` program
+destination update, delayed and conditional control flow, interrupt return,
+extended absolute arithmetic/load/store, and accumulator-indirect branch.
+Each has focused core conformance coverage; none recognizes a Nokia address or
+loader byte pattern.
 
 The retained NSE-1 trace fixes reset polarity and edge behavior without an
 inference: MCU writes to MAD2 byte `0x20002` are `1` (cold release), `0`
@@ -108,10 +119,12 @@ The producer is loader1 at `0x0f1f..0x0f28`. It computes a count from the
 program destination `0x23c4`. With `PMST.OVLY=1`, those program stores must
 resolve to the same DARAM cells used by program fetches.
 
-The experimental C54x core instead wrote MVDP directly to its immutable
-`prog[]` store, bypassing the existing `prog_write()` helper and leaving the
-overlay cells zero. Routing MVDP through `prog_write()` removes `SEEDDARAM`:
-the unassisted 30-million-instruction run returns to 74 acknowledgements, 19
-DSP ring transitions, 16 host doorbells, eight codec-frame interrupts, and a
-stable interactive framebuffer. This is an instruction-semantics correction,
-not a reconstructed image or timing adjustment.
+The external experimental core originally wrote MVDP directly to an immutable
+program store, bypassing its overlay helper. MAME's backend already routes
+program writes through the DSPIF overlay, but initially repeated the encoded
+program destination without the C54x's repeat-mode address update. Advancing
+that destination per repetition populates the resident range organically. The
+external unassisted run's 74 acknowledgements and stable UI remain the complete
+ROM4 reference; MAME has now independently crossed the same loader boundary.
+This is an instruction-semantics correction, not a reconstructed image or
+timing adjustment.

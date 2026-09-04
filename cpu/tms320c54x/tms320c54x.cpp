@@ -92,6 +92,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_rptc));
 	save_item(NAME(m_rpt_address));
 	save_item(NAME(m_rpt_end));
+	save_item(NAME(m_rpt_iteration));
 	save_item(NAME(m_rpt_armed));
 	save_item(NAME(m_delayed_target));
 	save_item(NAME(m_delayed_words));
@@ -121,6 +122,7 @@ void tms320c54x_device::device_reset()
 	m_rptc = 0;
 	m_rpt_address = 0;
 	m_rpt_end = 0xffff;
+	m_rpt_iteration = 0;
 	m_rpt_armed = false;
 	m_delayed_target = 0;
 	m_delayed_words = 0;
@@ -302,8 +304,14 @@ void tms320c54x_device::finish_repeats()
 		if (!m_rpt_armed && m_rpt_end != 0xffff && m_pc == m_rpt_end)
 		{
 			--m_rptc;
+			++m_rpt_iteration;
 			m_pc = m_rpt_address;
 		}
+	}
+	else if (m_rpt_end != 0xffff && m_pc == m_rpt_end)
+	{
+		m_rpt_end = 0xffff;
+		m_rpt_iteration = 0;
 	}
 
 	// REA names the last program word in the block. This also covers a
@@ -412,11 +420,35 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = (accumulator(BIT(op, 9)) ^ value) & ACC_MASK;
 		return;
 	}
-	if (op == 0x6ff8 && m_cache.read_word(m_pc + 1) == 0x0e20)
+	if (op == 0x6ff8)
 	{
 		const u16 address = fetch();
-		fetch();
-		m_a = (m_b - data_operand(data_read(address))) & ACC_MASK;
+		const u16 extension = fetch();
+		const int shift = s8((extension & 0x1f) << 3) >> 3;
+		auto shifted = [this, shift](u64 value)
+		{
+			return shift < 0 ? arithmetic_shift_right(value, -shift) :
+					(value << shift) & ACC_MASK;
+		};
+		if ((extension & 0xfee0) == 0x0c40) // LD Smem, shift, dst
+			accumulator(BIT(extension, 8)) = shifted(data_operand(data_read(address)));
+		else if ((extension & 0xfee0) == 0x0c60) // STH src, shift, Smem
+			data_write(address, u16(shifted(accumulator(BIT(extension, 8))) >> 16));
+		else if ((extension & 0xfee0) == 0x0c80) // STL src, shift, Smem
+			data_write(address, u16(shifted(accumulator(BIT(extension, 8)))));
+		else if ((extension & 0xfce0) == 0x0c00) // ADD Smem, shift, src, dst
+			accumulator(BIT(extension, 8)) =
+					(accumulator(BIT(extension, 9)) + shifted(data_operand(data_read(address)))) & ACC_MASK;
+		else if ((extension & 0xfce0) == 0x0c20) // SUB Smem, shift, src, dst
+			accumulator(BIT(extension, 8)) =
+					(accumulator(BIT(extension, 9)) - shifted(data_operand(data_read(address)))) & ACC_MASK;
+		else
+		{
+			logerror("%s: unimplemented C54x extended opcode %04x/%04x at %04x\n",
+					machine().describe_context(), op, extension, u16(m_pc - 3));
+			m_illegal = true;
+			return;
+		}
 		return;
 	}
 	if ((op == 0x6f92 || op == 0x6f8a || op == 0x6f93 || op == 0x6f8b) &&
@@ -459,6 +491,15 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0800: // SUB Smem, A
 		m_a = (m_a - data_operand(indirect_read(low))) & ACC_MASK;
 		return;
+	case 0x0900: // SUB Smem, B
+		m_b = (m_b - data_operand(indirect_read(low))) & ACC_MASK;
+		return;
+	case 0x0a00: // SUBS Smem, A
+		m_a = (m_a - indirect_read(low)) & ACC_MASK;
+		return;
+	case 0x0b00: // SUBS Smem, B
+		m_b = (m_b - indirect_read(low)) & ACC_MASK;
+		return;
 	case 0x1a00: // OR Smem, A
 		m_a = (m_a | indirect_read(low)) & ACC_MASK;
 		return;
@@ -481,6 +522,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_rptc = indirect_read(low);
 		m_rpt_address = m_pc;
 		m_rpt_end = 0xffff;
+		m_rpt_iteration = 0;
 		m_rpt_armed = true;
 		return;
 	case 0x6100: // BITF Smem, #lk
@@ -636,8 +678,11 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7d00: // MVDP Smem, pmad
 	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
 		const u16 value = indirect_read(low);
-		m_program.write_word(fetch(), value);
+		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		m_program.write_word(destination, value);
 		return;
 	}
 	case 0x7c00: // MVPD pmad, Smem
@@ -700,6 +745,11 @@ void tms320c54x_device::execute_one(u16 op)
 		m_pc = pop();
 		m_icount -= 4;
 		return;
+	case 0xf4eb: // RETE
+		m_pc = pop();
+		m_st1 &= ~0x0800;
+		m_icount -= 4;
+		return;
 	case 0xfc30: // RETC TC
 		if (m_st0 & 0x1000)
 		{
@@ -721,6 +771,20 @@ void tms320c54x_device::execute_one(u16 op)
 			m_icount -= 4;
 		}
 		return;
+	case 0xfc4b: // RC BLT
+		if ((s64(m_b << 24) >> 24) < 0)
+		{
+			m_pc = pop();
+			m_icount -= 4;
+		}
+		return;
+	case 0xfc4d: // RC BEQ
+		if ((m_b & ACC_MASK) == 0)
+		{
+			m_pc = pop();
+			m_icount -= 4;
+		}
+		return;
 	case 0xf072: // RPTB pmad
 		m_rsa = u16(m_pc + 1);
 		m_rea = fetch();
@@ -733,6 +797,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_rptc = fetch();
 		m_rpt_address = m_pc;
 		m_rpt_end = 0xffff;
+		m_rpt_iteration = 0;
 		m_rpt_armed = true;
 		return;
 	case 0xf074: // CALL pmad
@@ -743,9 +808,25 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 3;
 		return;
 	}
+	case 0xf947: // CC pmad, ALEQ
+	{
+		const u16 destination = fetch();
+		if ((s64(m_a << 24) >> 24) <= 0)
+		{
+			push(m_pc);
+			m_pc = destination;
+			m_icount -= 3;
+		}
+		return;
+	}
 	case 0xf073: // B pmad
 		m_pc = fetch();
 		m_icount -= 3;
+		return;
+	case 0xf4e2: // BACC A
+	case 0xf5e2: // BACC B
+		m_pc = u16(accumulator(BIT(op, 8)));
+		m_icount -= 5;
 		return;
 	case 0xf493: // CMPL source accumulator, destination accumulator
 	case 0xf593:
@@ -767,6 +848,26 @@ void tms320c54x_device::execute_one(u16 op)
 		m_delayed_target = destination;
 		m_delayed_words = 2;
 		m_icount -= 3;
+		return;
+	}
+	case 0xf273: // BD pmad
+		m_delayed_target = fetch();
+		m_delayed_words = 2;
+		m_icount -= 3;
+		return;
+	case 0xfa45: // BCD pmad, AEQ
+	case 0xfa20: // BCD pmad, NTC
+	case 0xfa4d: // BCD pmad, BEQ
+	{
+		const u16 destination = fetch();
+		const bool condition = op == 0xfa45 ? (m_a & ACC_MASK) == 0 :
+				op == 0xfa4d ? (m_b & ACC_MASK) == 0 : !(m_st0 & 0x1000);
+		if (condition)
+		{
+			m_delayed_target = destination;
+			m_delayed_words = 2;
+			m_icount -= 2;
+		}
 		return;
 	}
 	case 0xfe00: // RETD
@@ -973,6 +1074,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_rptc = low;
 			m_rpt_address = m_pc;
 			m_rpt_end = 0xffff;
+			m_rpt_iteration = 0;
 			m_rpt_armed = true;
 			return;
 		}
@@ -981,6 +1083,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_rptc = fetch();
 			m_rpt_address = m_pc;
 			m_rpt_end = 0xffff;
+			m_rpt_iteration = 0;
 			m_rpt_armed = true;
 			return;
 		}

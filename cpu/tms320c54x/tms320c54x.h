@@ -95,6 +95,7 @@ private:
 	u16 m_rptc = 0;
 	u16 m_rpt_address = 0;
 	u16 m_rpt_end = 0xffff;
+	u16 m_rpt_iteration = 0;
 	bool m_rpt_armed = false;
 	u16 m_delayed_target = 0;
 	u8 m_delayed_words = 0;
