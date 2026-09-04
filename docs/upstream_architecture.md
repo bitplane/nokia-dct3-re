@@ -156,3 +156,13 @@ immediate-address updates, 40-bit shifts/rotates and shifted cross-accumulator
 logical operations. These tests should be derived from TI semantics and small
 instruction fixtures; the external no-assist phone run supplies expected
 boundary results but no implementation source.
+
+An observation-only 30-million-MCU-instruction run through interactive ROM4
+idle executed 628 distinct 16-bit opcode words spanning 112 high-byte groups;
+the sorted opcode-set SHA-256 is
+`63ae45c872ccea39112898bfde7f5926acd675701675a860d765a66a35815d34`.
+This is broad functional coverage, not evidence that a transform-only decoder
+can boot the phone. `tools/c54x_opcode_coverage.py` preserves that baseline and
+will measure the clean-room core's implemented/executed surface. Development
+should still begin with the deterministic loader and challenge fixtures, then
+expand against the 628-word boot set before claiming full ROM4 execution.
