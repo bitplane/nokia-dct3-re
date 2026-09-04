@@ -8,10 +8,10 @@ preserves DARAM. Loader1 then requests block `0x12`; the matching descriptor
 installs loader2 at `0x0d80`. Loader2 enters the run-mode dispatcher, which
 requests further blocks by catalogue index.
 
-This result is independent of the compatibility path that copies words from a
-flat DSP image into `0x2000..0x27ff`. The copy remains necessary in the sibling
-co-sim today, but its old explanation was wrong: loader2 does not clear that
-range.
+This result no longer requires the compatibility path that copied words from a
+flat DSP image into `0x2000..0x27ff`. Its old explanation was wrong: loader2
+does not clear that range. Loader1 itself populates the resident branch table
+with a repeated MVDP data-to-program transfer.
 
 ## Descriptor fields
 
@@ -46,9 +46,9 @@ The normalized ordered trace is:
 `tools/dsp_rom4_upload_trace_check.py` verifies this ordering and rejects an
 observed input length absent from the recovered catalogue.
 
-## Flat-image dependency
+## Resolved flat-image dependency
 
-Immediately before the current flat-image assist runs, sampled words at
+Before the decoder correction, sampled words at
 `0x2000`, `0x216a`, `0x2286`, `0x23c3`, `0x2470`, `0x25b4`, and `0x27ff` are all
 zero. Subsequent demand loads populate catalogue-owned ranges, but the gap
 `0x23c3..0x25b3` is outside every declared destination. Without the assist the
@@ -61,8 +61,15 @@ descriptor 0, whose declared output destination is `0xfd00`. They may be
 encoded input, shared source material, or an artefact of how the recovered flat
 image combined address spaces.
 
-The remaining bounded question is whether the absent words are produced by an
-unimplemented transform, selected through a DSP memory-map/bank rule, or are
-state from the historical capture rather than boot content. Do not replace the
-full-range copy with a smaller magic copy until one of those mechanisms is
-proved.
+The producer is loader1 at `0x0f1f..0x0f28`. It computes a count from the
+`0x23c4..0x252a` bounds, selects source `0x0d00`, and executes repeated MVDP to
+program destination `0x23c4`. With `PMST.OVLY=1`, those program stores must
+resolve to the same DARAM cells used by program fetches.
+
+The experimental C54x core instead wrote MVDP directly to its immutable
+`prog[]` store, bypassing the existing `prog_write()` helper and leaving the
+overlay cells zero. Routing MVDP through `prog_write()` removes `SEEDDARAM`:
+the unassisted 30-million-instruction run returns to 74 acknowledgements, 19
+DSP ring transitions, 16 host doorbells, eight codec-frame interrupts, and a
+stable interactive framebuffer. This is an instruction-semantics correction,
+not a reconstructed image or timing adjustment.

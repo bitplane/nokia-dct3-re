@@ -151,11 +151,11 @@ instructions at 25 million DSP steps:
 instructions came from immutable mask ROM. More precise provenance requires a
 map-aware coverage export rather than inference from this coarse partition.
 
-This run is not promotable as an unassisted DSP implementation. Its log proves
-three active compatibility mechanisms: `SEEDDARAM` replays captured DARAM
-content after the boot clear, the COBBA model loops serial samples, and
-`SELFTEST_MEAS` writes validator-compatible report fields after the DSP's own
-transform. Run
+This run is not yet promotable as an unassisted DSP implementation. The
+`SEEDDARAM` compatibility mechanism has been eliminated by correcting MVDP
+program writes under `PMST.OVLY`; the COBBA model still loops serial samples,
+and `SELFTEST_MEAS` still writes validator-compatible report fields after the
+DSP's own transform. Run
 `make check-dsp-rom4-cosim LOG=<captured-log>` to reproduce this classification;
 the checker deliberately reports promotion as blocked while any such assist is
 observed.
@@ -168,15 +168,15 @@ a hardware specification:
 
 | Disabled assist | Observed result | Classification and replacement condition |
 |---|---|---|
-| `SEEDDARAM` | warm boot reaches run mode, then produces 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | non-hardware snapshot replay. Corrected tracing proves warm reset preserves DARAM and loader2 clears only `0x0400..0x0677`, not `0x1000..0x2fff`. Immediately before the assist, sampled `0x2000..0x27ff` homes are zero. Later demand loads cover 1,189 of its 2,048 words, leaving live code such as the return table at `0x2470` outside every destination. Replace the assist only after the transform/banking rule that supplies this baseline is recovered. |
+| `SEEDDARAM` | without the assist, the old core produced 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | **Resolved.** Loader1 repeatedly executes MVDP from data source `0x0d00` to program destination `0x23c4`. The core bypassed its OVLY-aware `prog_write()` helper, so it wrote an inert program backing store instead of executable DARAM. Correct MVDP routing restores 74 acknowledgements and stable UI with `SEEDDARAM=0`. |
 | `SELFTEST_MEAS` | the DSP reaches the validator without the patch, then the MCU requests an organic reason-4 warm reboot at caller `0x258d35`/resume `0x258d3d` | direct output synthesis. The native harness writes `0x1202..0x1206 = {0010,0000,0000,0000,0160}` after the DSP transform. These are accepted fixture values, not recovered COBBA readings. Replace them with the DSP routine's real acquisition inputs and COBBA response; do not promote the accepted output tuple as a reset value. |
 | COBBA codec-serial loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The DSP sets COBBA register 8 bits `0x0610`, enables the C54x BSP with `0xc008 -> 0xc0c8`, sends BDXR `0x0aaa`, polls BDRR, then clears the COBBA bits. TI's BSPC map proves the transition sets RRST/XRST while DLB remains clear, so COBBA externally returns the word. `nokia_cobba_device` now owns the evidenced register predicate and completed-word echo; a future C54x backend must drive it through real BSP timing and ready state instead of host polling. |
 
-The two failed promotion runs are deliberate acceptance results. A backend
-without `SEEDDARAM` does not meet the required 74 acknowledgements or stable-UI
-gate, so no flat-image-free composition is claimed. A backend without
-`SELFTEST_MEAS` reaches the MCU validator and requests an organic reason-4
-reboot. Serial COBBA registers 5 and 6 already supply the smaller subcommand
+The earlier failed promotion runs remain useful negative controls. The
+corrected backend now meets the required 74 acknowledgements and stable-UI gate
+without `SEEDDARAM`. A backend without `SELFTEST_MEAS` still reaches the MCU
+validator and requests an organic reason-4 reboot. Serial COBBA registers 5
+and 6 already supply the smaller subcommand
 `0x13` measurement, but the boot-gating subcommand `0x16` calls DSP hook
 `0x250b`, which remains a no-op in the resident image, and then packages stale
 command-ring data. The next input-fidelity step is to recover the producer that
