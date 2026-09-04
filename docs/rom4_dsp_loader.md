@@ -54,6 +54,15 @@ to the handset's ordinary staged-upload writes.
 `tools/dsp_rom4_upload_trace_check.py` verifies this ordering and rejects an
 observed input length absent from the recovered catalogue.
 
+The local MAME tree now also contains an unselected
+`nokia_dsp_c54x_device` backend. It maps DSP data addresses `0x0800..0x0fff`
+directly onto DSPIF's existing MCU-visible shared store and resolves program
+accesses in `0x0080..0x27ff` through the same data store while `PMST.OVLY` is
+set. The host doorbell latches C54x `HPINT` (maskable source 9, vector 25).
+This establishes the execution boundary but is not yet a handset result: MAD2
+reset/release wiring, loader upload execution, and COBBA/PCM I/O remain to be
+connected before the backend may replace the HLE in a product configuration.
+
 ## Resolved flat-image dependency
 
 Before the decoder correction, sampled words at

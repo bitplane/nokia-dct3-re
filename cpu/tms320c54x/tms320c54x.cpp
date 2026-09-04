@@ -874,12 +874,10 @@ void tms320c54x_device::execute_set_input(int inputnum, int state)
 {
 	if (inputnum >= 0 && inputnum < 16)
 	{
-		if (state == ASSERT_LINE)
+		if (state != CLEAR_LINE)
 		{
 			m_ifr |= u16(1U << inputnum);
 			m_idle = false;
 		}
-		else if (state == CLEAR_LINE)
-			m_ifr &= u16(~(1U << inputnum));
 	}
 }

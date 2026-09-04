@@ -337,6 +337,14 @@ machine-config tag and implement the endpoint while using the existing DSPIF,
 MAD2 interrupt, COBBA and PCM devices. Promotion still requires product-correct
 ROM declarations and removal of every active compatibility assist.
 
+That future device now exists as an unselected integration scaffold:
+`nokia_dsp_c54x_device` contains the clean-room C54x CPU, maps the recovered
+HPI DARAM alias through `nokia_dspif_device`, implements the ROM4 OVLY program
+view, and terminates DSPINT at HPINT. It deliberately remains absent from all
+shipping handset configurations until reset/release, staged upload and DSP
+peripheral I/O have executable gates. The HLE remains the only selected backend
+and therefore the established behavioral reference.
+
 ## Acquisition and reproduction status
 
 The historical

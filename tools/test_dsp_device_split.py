@@ -10,6 +10,8 @@ class DspDeviceSplitTest(unittest.TestCase):
     def setUpClass(cls):
         cls.transport = (ROOT / "driver/nokia_dspif.cpp").read_text() + (ROOT / "driver/nokia_dspif.h").read_text()
         cls.backend = (ROOT / "driver/nokia_dsp_backend.h").read_text()
+        cls.c54x_backend = ((ROOT / "driver/nokia_dsp_c54x.cpp").read_text() +
+                            (ROOT / "driver/nokia_dsp_c54x.h").read_text())
         cls.hle = (ROOT / "driver/nokia_dsp_hle.cpp").read_text() + (ROOT / "driver/nokia_dsp_hle.h").read_text()
         cls.external = (ROOT / "driver/nokia_external_service.cpp").read_text() + (ROOT / "driver/nokia_external_service.h").read_text()
         cls.network = (ROOT / "driver/nokia_gsm_network.cpp").read_text() + (ROOT / "driver/nokia_gsm_network.h").read_text()
@@ -198,6 +200,22 @@ class DspDeviceSplitTest(unittest.TestCase):
             "optional_device<nokia_dsp_hle_device> m_dsp_hle", self.phone
         )
         self.assertIn("if (m_dsp_hle)", self.phone)
+
+    def test_c54x_backend_uses_transport_owned_hpi_daram(self):
+        self.assertIn(
+            "class nokia_dsp_c54x_device : public device_t, public nokia_dsp_backend_interface",
+            self.c54x_backend,
+        )
+        self.assertIn("required_device<nokia_dspif_device> m_transport", self.c54x_backend)
+        self.assertIn("m_transport->dsp_data_r(address)", self.c54x_backend)
+        self.assertIn("m_transport->dsp_data_w(address, data)", self.c54x_backend)
+        self.assertIn("address >= 0x0080 && address < 0x2800", self.c54x_backend)
+        self.assertIn("set_input_line(9, HOLD_LINE)", self.c54x_backend)
+        for semantic in (
+            "bootstrap_contract", "service_control_contract", "speech_control_contract",
+            "radio_peer", "gsm_network",
+        ):
+            self.assertNotIn(semantic, self.c54x_backend)
 
     def test_external_peer_uses_acknowledged_startup_phases(self):
         self.assertIn("m_registration_acknowledged && !m_channel_map_sent", self.external)
