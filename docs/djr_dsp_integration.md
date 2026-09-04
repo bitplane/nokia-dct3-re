@@ -151,14 +151,13 @@ instructions at 25 million DSP steps:
 instructions came from immutable mask ROM. More precise provenance requires a
 map-aware coverage export rather than inference from this coarse partition.
 
-This run is not yet promotable as an unassisted DSP implementation. The
-`SEEDDARAM` compatibility mechanism has been eliminated by correcting MVDP
-program writes under `PMST.OVLY`; the COBBA model still loops serial samples,
-and `SELFTEST_MEAS` still writes validator-compatible report fields after the
-DSP's own transform. Run
+The first reproduced run was not promotable as an unassisted DSP
+implementation. The `SEEDDARAM` compatibility mechanism was eliminated by
+correcting MVDP program writes under `PMST.OVLY`; the COBBA model still loops
+serial samples, and that revision's `SELFTEST_MEAS` overwrote the DSP's computed
+challenge response with validator-compatible fields. Run
 `make check-dsp-rom4-cosim LOG=<captured-log>` to reproduce this classification;
-the checker deliberately reports promotion as blocked while any such assist is
-observed.
+the checker reports promotion as blocked whenever an assist is observed.
 
 ### Compatibility-assist audit
 
@@ -169,21 +168,78 @@ a hardware specification:
 | Disabled assist | Observed result | Classification and replacement condition |
 |---|---|---|
 | `SEEDDARAM` | without the assist, the old core produced 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | **Resolved.** Loader1 repeatedly executes MVDP from data source `0x0d00` to program destination `0x23c4`. The core bypassed its OVLY-aware `prog_write()` helper, so it wrote an inert program backing store instead of executable DARAM. Correct MVDP routing restores 74 acknowledgements and stable UI with `SEEDDARAM=0`. |
-| `SELFTEST_MEAS` | the DSP reaches the validator without the patch, then the MCU requests an organic reason-4 warm reboot at caller `0x258d35`/resume `0x258d3d` | direct output synthesis. The native harness writes `0x1202..0x1206 = {0010,0000,0000,0000,0160}` after the DSP transform. These are accepted fixture values, not recovered COBBA readings. Replace them with the DSP routine's real acquisition inputs and COBBA response; do not promote the accepted output tuple as a reset value. |
+| `SELFTEST_MEAS` | the DSP reaches the validator without the patch, then the MCU requests an organic reason-4 warm reboot at caller `0x258d35`/resume `0x258d3d` | direct output synthesis. The native harness writes `0x1202..0x1206 = {0010,0000,0000,0000,0160}` after the DSP transform. These are accepted fixture values, not recovered COBBA readings. Replace this assist by correcting execution of the C54x challenge transform; do not promote the accepted output tuple as a reset value. |
 | COBBA codec-serial loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The DSP sets COBBA register 8 bits `0x0610`, enables the C54x BSP with `0xc008 -> 0xc0c8`, sends BDXR `0x0aaa`, polls BDRR, then clears the COBBA bits. TI's BSPC map proves the transition sets RRST/XRST while DLB remains clear, so COBBA externally returns the word. `nokia_cobba_device` now owns the evidenced register predicate and completed-word echo; a future C54x backend must drive it through real BSP timing and ready state instead of host polling. |
 
-The earlier failed promotion runs remain useful negative controls. The
-corrected backend now meets the required 74 acknowledgements and stable-UI gate
-without `SEEDDARAM`. A backend without `SELFTEST_MEAS` still reaches the MCU
-validator and requests an organic reason-4 reboot. Serial COBBA registers 5
-and 6 already supply the smaller subcommand `0x13` measurement. The
-boot-gating subcommand `0x16` calls slot `0x250b`, but a halt at builder
-`0x4b73` establishes that the no-op returns with `AR2=0x0825` inside the live
-MDISND ring. The twelve source words exactly match the MCU's preceding
-`0x70/0x16` request at ring words `0x25..0x30`; the source is neither stale nor
-an absent acquisition buffer. The next fidelity step is to audit the builder's
-circular copy and transforms at `0x3900` and `0x7f2d`; changing the accepted
-output tuple or tuning COBBA ADC constants cannot establish them.
+The earlier failed promotion runs remain useful negative controls. The old
+backend met the required 74 acknowledgements and stable-UI gate without
+`SEEDDARAM`, but without `SELFTEST_MEAS` it still reached the MCU validator and
+requested an organic reason-4 reboot. Serial COBBA registers 5 and 6 already
+supplied the smaller subcommand `0x13` measurement. Subcommand
+`0x16` is a different contract. MCU routine `0x25864c` allocates a 30-byte
+type-2 object, identifies it as `0x70/0x16`, and asks `0x28c496` to generate 24
+bytes with selector `0x20`. When marker `[0x10fdde] == 0x5a`, MCU routine
+`0x2578fc` transforms those bytes before the object is sent. The observed
+pre-transform bytes are
+`e6 a6 02 24 ea f2 6c 9e 42 0f 03 32 c1 26 b1 d8 7c 5e 56 cf b0 e8 b3 b2`;
+the transmitted challenge is
+`c9 f4 cd 44 19 2c 0f fe 37 96 d0 f5 ee 74 7e b8 8f 80 35 af c5 71 60 75`.
+
+The DSP builder at `0x4b73` receives that exact object at `AR2=0x0825`, calls
+the resident transform at `0x7f2d` twice, and returns a structured response
+which MCU routine `0x258b60` range- and packed-decimal-checks. Slot `0x250b` is
+an organically uploaded no-op; there is no evidence that it represents a
+missing ADC acquisition step. One confirmed interpreter error was the old
+RPTB completion test: `RPTB` at `0x7ff5` encloses a two-word `CALL` ending at
+`0x7ff8`, but comparing its branch target numerically with REA skipped five of
+the six calls. Waiting for the sequential return to `REA+1` materially changes
+the response. The later public backend also corrected status-opcode decoding,
+repeat-mode immediate-address updates and shifted cross-accumulator logical
+operations. These are C54x execution semantics, not COBBA measurements.
+
+### Unassisted external closure
+
+A clean checkout of public commit `2b4c10f` was independently run with the
+same recovered ROM4 program and DROM inputs and both compatibility assists
+disabled:
+
+```text
+DSP54_SEEDDARAM=0
+DSP54_SELFTEST_MEAS=0
+```
+
+At 5 million MCU instructions the run completed all 74 DSP acknowledgements
+without the earlier reason-4 reset. At 30 million instructions it remained
+stable and rendered an interactive `Menu` frame. This closes the external
+ROM4 loader and challenge-response question: slot `0x250b` is an intentional
+uploaded no-op, and no synthetic measurement tuple is required. The accepted
+DSP response begins at word `0x1200` with:
+
+```text
+3532 0000 ffff ffff ff0f 0000 0078 54c2 5cd4 32fe 5be2 dba6 9643 82d7
+```
+
+This is an external behavioral oracle, not code available for import. The
+backend is GPL-licensed, while this driver is intended for MAME under a
+compatible clean-room implementation. Full local promotion therefore remains
+open even though the native no-assist boot is now proven.
+
+The instruction-level boundary can be checked independently of the native
+backend's implementation:
+
+```sh
+make check-c54x-rom4-transform \
+  TRACE=/path/to/instruction.log \
+  DATA_MEMORY=/path/to/data-memory.bin
+```
+
+The checker requires the `0x7ff5` RPTB setup once, six complete executions of
+the enclosed two-word CALL at `0x7ff7`, the descending destination walk
+`0x1208..0x1203`, and the accepted response above. This is the first executable
+conformance gate for a clean-room MAME C54x core; it does not accept a final
+response alone while the repeat-block control flow is wrong. The native `.api`
+capture begins at DSP data word `0x0800`; use `--data-base` for another capture
+layout rather than treating a DSP word address as a file offset.
 
 The recovered catalogue is independently auditable with:
 
@@ -245,9 +301,11 @@ gate.
 ## Local backend prototype
 
 The distributable driver now has a source-level substitution seam:
-`nokia_dsp_backend_device`. DSPIF commit, service, doorbell and shared-cell
+`nokia_dsp_backend_interface`. DSPIF commit, service, doorbell and shared-cell
 notifications target that abstract endpoint, as do reset and tone observation.
-The existing `nokia_dsp_hle_device` implements it without behavioral changes;
+It is a `device_interface`, so both an ordinary device and a future
+`cpu_device` can implement it without duplicate `device_t` inheritance. The
+existing `nokia_dsp_hle_device` implements it without behavioral changes;
 only HLE-specific product contracts retain an optional concrete finder.
 
 This is deliberately not a C54x core or an importer for the GPL analysis

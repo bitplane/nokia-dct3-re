@@ -14,7 +14,7 @@
 #include <array>
 #include <optional>
 
-class nokia_dsp_hle_device : public nokia_dsp_backend_device
+class nokia_dsp_hle_device : public device_t, public nokia_dsp_backend_interface
 {
 public:
 	nokia_dsp_hle_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);

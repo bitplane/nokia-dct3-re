@@ -689,7 +689,6 @@ public:
 		m_mbus(*this, "mbus"),
 		m_pup(*this, "pup"),
 		m_dspif(*this, "dspif"),
-		m_dsp_backend(*this, "dsp_hle"),
 		m_dsp_hle(*this, "dsp_hle"),
 		m_external_service_peer(*this, "external_service_peer"),
 		m_gsm_call_adapter(*this, "gsm_call_adapter"),
@@ -817,7 +816,7 @@ private:
 	required_device<nokia_mbus_device> m_mbus;
 	required_device<nokia_pup_device> m_pup;
 	required_device<nokia_dspif_device> m_dspif;
-	required_device<nokia_dsp_backend_device> m_dsp_backend;
+	nokia_dsp_backend_interface *m_dsp_backend = nullptr;
 	optional_device<nokia_dsp_hle_device> m_dsp_hle;
 	required_device<nokia_external_service_peer_device> m_external_service_peer;
 	required_device<nokia_gsm_call_adapter_device> m_gsm_call_adapter;
@@ -973,6 +972,12 @@ static const char * nokia_mad2_reg_desc(uint8_t offset)
 // ============================================================================
 void nokia_dct3_state::machine_start()
 {
+	// Keep the semantic seam as a device_interface so a future cpu_device can
+	// implement it without inheriting device_t twice.
+	m_dsp_backend = m_dsp_hle ? static_cast<nokia_dsp_backend_interface *>(&*m_dsp_hle) : nullptr;
+	if (!m_dsp_backend)
+		throw emu_fatalerror("Nokia DCT3 configuration has no DSP backend");
+
 	// Passive research logging uses MAME's standard -verbose switch.  Product
 	// composition and hardware timing are configured by machine_config.
 	m_trace_enabled = machine().options().verbose();
@@ -1377,7 +1382,7 @@ void nokia_dct3_state::reset_digital_baseband()
 	m_gensio->reset();
 	m_mbus->reset();
 	m_dspif->reset();
-	m_dsp_backend->reset();
+	m_dsp_backend->reset_backend();
 	m_external_service_peer->reset();
 	m_gsm_session->reset();
 	m_lapdm_link->reset();
@@ -2334,12 +2339,12 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_dspif->tx_commit_cb().set(FUNC(nokia_dct3_state::dsp_tx_commit_w));
 	m_dspif->service_pending_cb().set(FUNC(nokia_dct3_state::dsp_service_pending_w));
 	m_dspif->doorbell_cb().set(FUNC(nokia_dct3_state::dsp_doorbell_w));
-	m_dspif->shared_002_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_002_write_w));
-	m_dspif->shared_006_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_006_write_w));
-	m_dspif->shared_0fe_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_0fe_read_w));
-	m_dspif->shared_0fe_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_0fe_write_w));
-	m_dspif->shared_100_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_100_read_w));
-	m_dspif->shared_100_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_backend_device::shared_100_write_w));
+	m_dspif->shared_002_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_002_write_w));
+	m_dspif->shared_006_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_006_write_w));
+	m_dspif->shared_0fe_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_read_w));
+	m_dspif->shared_0fe_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_0fe_write_w));
+	m_dspif->shared_100_read_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_read_w));
+	m_dspif->shared_100_write_cb().set(m_dsp_hle, FUNC(nokia_dsp_hle_device::shared_100_write_w));
 	m_dspif->fiq0_cb().set(FUNC(nokia_dct3_state::dsp_fiq0_w));
 	m_dspif->service_irq_cb().set(FUNC(nokia_dct3_state::dsp_service_irq_w));
 	NOKIA_SIMI(config, m_simi);

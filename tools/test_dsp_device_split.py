@@ -140,16 +140,16 @@ class DspDeviceSplitTest(unittest.TestCase):
             self.assertNotIn(product, self.hle.lower())
         self.assertIn(
             "shared_006_write_cb().set(m_dsp_hle, "
-            "FUNC(nokia_dsp_backend_device::shared_006_write_w))",
+            "FUNC(nokia_dsp_hle_device::shared_006_write_w))",
             self.phone,
         )
 
     def test_backend_is_a_swappable_semantic_endpoint(self):
         self.assertIn(
-            "class nokia_dsp_backend_device : public device_t", self.backend
+            "class nokia_dsp_backend_interface : public device_interface", self.backend
         )
         self.assertIn(
-            "class nokia_dsp_hle_device : public nokia_dsp_backend_device",
+            "class nokia_dsp_hle_device : public device_t, public nokia_dsp_backend_interface",
             self.hle,
         )
         for entry in (
@@ -166,7 +166,7 @@ class DspDeviceSplitTest(unittest.TestCase):
         ):
             self.assertNotIn(semantic, self.backend)
         self.assertIn(
-            "required_device<nokia_dsp_backend_device> m_dsp_backend", self.phone
+            "nokia_dsp_backend_interface *m_dsp_backend = nullptr", self.phone
         )
         self.assertIn(
             "optional_device<nokia_dsp_hle_device> m_dsp_hle", self.phone
@@ -181,7 +181,7 @@ class DspDeviceSplitTest(unittest.TestCase):
     def test_phone_composes_peer_devices(self):
         for token in (
             "required_device<nokia_dspif_device> m_dspif",
-            "required_device<nokia_dsp_backend_device> m_dsp_backend",
+            "nokia_dsp_backend_interface *m_dsp_backend = nullptr",
             "optional_device<nokia_dsp_hle_device> m_dsp_hle",
             "required_device<nokia_external_service_peer_device> m_external_service_peer",
             "required_device<nokia_gsm_network_device> m_gsm_network",

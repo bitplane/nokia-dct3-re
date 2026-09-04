@@ -12,7 +12,8 @@ DEFINE_DEVICE_TYPE(NOKIA_DSP_HLE, nokia_dsp_hle_device, "nokia_dsp_hle", "Nokia 
 
 nokia_dsp_hle_device::nokia_dsp_hle_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
-	nokia_dsp_backend_device(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
+	device_t(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
+	nokia_dsp_backend_interface(mconfig, *this),
 	m_transport(*this, "^dspif"),
 	m_external_peer(*this, "^external_service_peer"),
 	m_radio_peer(*this, "^radio_peer"),

@@ -7,10 +7,13 @@
 // Swappable semantic endpoint behind the MAD2 DSP transport.  The current
 // implementation is an HLE peer; a C54x implementation can replace it without
 // changing DSPIF, MAD2 interrupt routing, or the phone driver.
-class nokia_dsp_backend_device : public device_t
+class nokia_dsp_backend_interface : public device_interface
 {
 public:
+	virtual ~nokia_dsp_backend_interface() = default;
+
 	auto tone_update_cb() { return m_tone_update_cb.bind(); }
+	void reset_backend() { device().reset(); }
 
 	virtual void tx_commit_w(int state) = 0;
 	virtual void service_pending_w(int state) = 0;
@@ -28,11 +31,9 @@ public:
 	virtual u16 tone_amplitude() const = 0;
 
 protected:
-	nokia_dsp_backend_device(
-			const machine_config &mconfig, device_type type, const char *tag,
-			device_t *owner, u32 clock) :
-		device_t(mconfig, type, tag, owner, clock),
-		m_tone_update_cb(*this)
+	nokia_dsp_backend_interface(const machine_config &mconfig, device_t &device) :
+		device_interface(device, "nokia_dsp_backend"),
+		m_tone_update_cb(device)
 	{
 	}
 

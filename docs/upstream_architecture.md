@@ -20,7 +20,7 @@ environment variables.
 | display | geometry-configured PCD8544-family device | present |
 | SIM | SIMI controller plus replaceable card-side protocol device | present |
 | DSP execution | a future generic TMS320C54x core and product-correct internal ROMs | absent |
-| DSP backend contract | `nokia_dsp_backend_device` | present; transport-facing substitution seam |
+| DSP backend contract | `nokia_dsp_backend_interface` | present; transport-facing substitution seam |
 | DSP compatibility backend | `nokia_dsp_hle_device` | present and explicitly provisional implementation of that seam |
 | laboratory cellular network | radio/link/session/network peer devices beyond the DSP boundary | present; deterministic test infrastructure rather than RF hardware |
 
@@ -40,11 +40,13 @@ both DSP implementations. It owns only:
 - callbacks that report MCU accesses to an attached backend.
 
 It must not manufacture bootstrap values, interpret GSM messages, decode audio
-commands or choose product behavior. `nokia_dsp_backend_device` is the narrow
+commands or choose product behavior. `nokia_dsp_backend_interface` is the narrow
 abstract endpoint for DSP-originated semantics: DSPIF notifications and shared
 cell accesses enter through it, while tone state is exposed to the handset's
 audio sinks. It contains no bootstrap, service, speech, radio or product
-contract. `nokia_dsp_hle_device` implements that endpoint today; the driver
+contract. As a MAME `device_interface`, it can be implemented by an ordinary
+device or a future `cpu_device` without duplicate `device_t` inheritance.
+`nokia_dsp_hle_device` implements that endpoint today; the driver
 retains a separately typed optional finder only while applying HLE-specific
 product contracts. Runtime transport, reset and tone paths use the abstract
 backend.
@@ -59,6 +61,15 @@ The real backend must implement that same endpoint and supply:
 6. DSP serial control of COBBA;
 7. the parallel MFI/control plane used for radio and codec control; and
 8. bidirectional PCM clocks, framing and sample data.
+
+The pinned MAME tree contains a `tms320c5x` core but no TMS320C54x core. The
+C54x is not a device variant that can be enabled by adding a type alias: its
+instruction encoding, 40-bit accumulator behavior, repeat-block machinery,
+memory overlay rules and on-chip peripherals differ materially. The real
+backend therefore requires a new clean-room MAME CPU device based on TI's
+public architecture manuals. The related C5x core is useful as a MAME CPU
+device-API reference only, not as an execution base whose results can be
+treated as C54x behavior.
 
 The HLE and real core are alternatives. A real core must not run concurrently
 with HLE code that writes the same shared words, advances the same ring cursors
@@ -137,3 +148,11 @@ minimum it must reproduce, without HLE writes on the same boundary:
 
 Until those gates pass, the HLE remains the supported compatibility backend and
 the real core remains experimental.
+
+Before full-phone promotion, the new CPU core must pass smaller deterministic
+ROM4 gates for the instructions already known to be load-bearing: OVLY-aware
+MVDP, RPT/RPTB over multiword CALL, F0B0 status operations, repeat-mode
+immediate-address updates, 40-bit shifts/rotates and shifted cross-accumulator
+logical operations. These tests should be derived from TI semantics and small
+instruction fixtures; the external no-assist phone run supplies expected
+boundary results but no implementation source.
