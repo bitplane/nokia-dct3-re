@@ -26,7 +26,9 @@ def verify(text: str, frame_directory: pathlib.Path | None = None) -> None:
                 f"missing or out-of-order timed-out-SMS checkpoint: {label}")
         cursor = match.end()
 
-    submit = re.search(r"gsm_sms_submit: .* outcome=2 t=([0-9.]+)", text)
+    submit = re.search(
+        r"gsm_sms_submit: .* outcome=2 status_report=[01] t=([0-9.]+)",
+        text)
     if not submit:
         raise ValueError("CP-silence submit outcome was not selected")
     submit_time = float(submit.group(1))

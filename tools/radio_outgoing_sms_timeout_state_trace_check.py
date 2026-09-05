@@ -13,7 +13,9 @@ except ModuleNotFoundError:  # Direct execution from tools/.
 
 def verify(text: str, frame_directory: pathlib.Path | None = None) -> None:
     verify_timeout(text, frame_directory)
-    submit = re.search(r"gsm_sms_submit: .* outcome=2 t=([0-9.]+)", text)
+    submit = re.search(
+        r"gsm_sms_submit: .* outcome=2 status_report=[01] t=([0-9.]+)",
+        text)
     restored = re.search(
         r"state_roundtrip: result=(\w+) .*?requested_at=([0-9.]+) "
         r"t=([0-9.]+)", text)
