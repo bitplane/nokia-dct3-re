@@ -368,6 +368,18 @@ by the core test. The substitution is not present in the driver: it proves that
 the mask is sufficient to activate the receiver, but remains inadmissible as a
 power-on value because its source snapshot is not ROM4/MAD2 reset evidence.
 
+Using that same disposable reachability condition as an ISA coverage probe
+exposed additional generic instruction contracts in order: delayed block
+repeat (`RPTBD`), dual-memory multiply and MAC, parallel store/MAC, square
+distance, delayed ANEQ branch, and accumulator negate. Each is now implemented
+from the TI instruction definition with an isolated conformance fixture. After
+the final correction, a four-second diagnostic run completed the normal
+MCU/DSP handshake without an illegal opcode and performed 26,944 RF sample-port
+reads before returning to `0x31a5`; it emitted no synthesizer pair. The mask
+substitution was removed before the normal gates. This proves the newly
+reachable receive/FIR instruction surface, not RF acquisition or a power-on
+mask value.
+
 ## Local backend prototype
 
 The distributable driver now has a source-level substitution seam:

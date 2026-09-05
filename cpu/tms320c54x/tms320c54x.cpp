@@ -1254,6 +1254,92 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xfe00) == 0xa400) // MPY Xmem, Ymem, A/B
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 yvalue = data_read(m_ar[yar]);
+		s64 product = s64(s16(xvalue)) * s64(s16(yvalue));
+		if (BIT(m_st1, 6))
+			product <<= 1;
+		accumulator(BIT(op, 8)) = u64(product) & ACC_MASK;
+		m_t = xvalue;
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
+	if ((op & 0xf000) == 0xb000) // MAC[R] Xmem, Ymem, src, dst
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 yvalue = data_read(m_ar[yar]);
+		s64 product = s64(s16(xvalue)) * s64(s16(yvalue));
+		if (BIT(m_st1, 6))
+			product <<= 1;
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		s64 result = (s64(source << 24) >> 24) + product;
+		if (BIT(op, 10))
+			result = (result + 0x8000) & ~s64(0xffff);
+		accumulator(BIT(op, 8)) = u64(result) & ACC_MASK;
+		m_t = xvalue;
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
+	if ((op & 0xf800) == 0xd000) // ST src, Ymem || MAC[R] Xmem, dst
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 destination_address = m_ar[yar];
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		const int asm_shift = s8((m_st1 & 0x001f) << 3) >> 3;
+		data_write(destination_address,
+			u16(arithmetic_shift_right(source, 16 - asm_shift)));
+
+		s64 product = s64(s16(m_t)) * s64(s16(xvalue));
+		if (BIT(m_st1, 6))
+			product <<= 1;
+		const u64 old_destination = accumulator(BIT(op, 8)) & ACC_MASK;
+		s64 result = (s64(old_destination << 24) >> 24) + product;
+		if (BIT(op, 10))
+			result = (result + 0x8000) & ~s64(0xffff);
+		accumulator(BIT(op, 8)) = u64(result) & ACC_MASK;
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
+	if ((op & 0xff00) == 0xe200) // SQDST Xmem, Ymem
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const s32 xvalue = s16(data_read(m_ar[xar]));
+		const s32 yvalue = s16(data_read(m_ar[yar]));
+		const s64 old_a_high = s16(m_a >> 16);
+		s64 square = old_a_high * old_a_high;
+		if (BIT(m_st1, 6))
+			square <<= 1;
+		const u64 old_b = m_b & ACC_MASK;
+		m_b = u64((s64(old_b << 24) >> 24) + square) & ACC_MASK;
+		m_a = u64(s64(xvalue - yvalue) << 16) & ACC_MASK;
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
 	if ((op & 0xff80) == 0xf900) // CC pmad, condition
 	{
 		const u8 condition = op;
@@ -1372,6 +1458,15 @@ void tms320c54x_device::execute_one(u16 op)
 		m_st1 |= ST1_BRAF;
 		m_icount -= 3;
 		return;
+	case 0xf272: // RPTBD pmad
+		m_rea = fetch();
+		// The two words after the two-word instruction are delay slots.  The
+		// repeated block begins immediately after them.
+		m_rsa = u16(m_pc + 2);
+		m_block_repeat_active = true;
+		m_st1 |= ST1_BRAF;
+		m_icount -= 3;
+		return;
 	case 0xf071: // RPTZ A, #lk
 	case 0xf171: // RPTZ B, #lk
 		accumulator(BIT(op, 8)) = 0;
@@ -1426,12 +1521,14 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 3;
 		return;
 	case 0xfa45: // BCD pmad, AEQ
+	case 0xfa44: // BCD pmad, ANEQ
 	case 0xfa20: // BCD pmad, NTC
 	case 0xfa30: // BCD pmad, TC
 	case 0xfa4d: // BCD pmad, BEQ
 	{
 		const u16 destination = fetch();
 		const bool condition = op == 0xfa45 ? (m_a & ACC_MASK) == 0 :
+				op == 0xfa44 ? (m_a & ACC_MASK) != 0 :
 				op == 0xfa4d ? (m_b & ACC_MASK) == 0 :
 				op == 0xfa30 ? bool(m_st0 & 0x1000) : !(m_st0 & 0x1000);
 		if (condition)
@@ -1656,6 +1753,21 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	default:
+		if ((op & 0xfcff) == 0xf484) // NEG source accumulator, destination
+		{
+			const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+			const bool overflow = source == 0xff80000000ULL;
+			u64 result = u64(-(s64(source << 24) >> 24)) & ACC_MASK;
+			m_st0 = (m_st0 & ~u16(0x0800)) | (source ? 0 : 0x0800);
+			if (overflow)
+			{
+				m_st0 |= BIT(op, 8) ? 0x0200 : 0x0400;
+				if (BIT(m_st1, 9))
+					result = 0x007fffffff;
+			}
+			accumulator(BIT(op, 8)) = result;
+			return;
+		}
 		if ((op & 0xffe0) == 0xed00) // LD #k5, ASM
 		{
 			m_st1 = (m_st1 & ~u16(0x001f)) | (op & 0x001f);

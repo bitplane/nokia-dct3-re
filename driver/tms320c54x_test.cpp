@@ -784,6 +784,159 @@ private:
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0xa5b8,
 					"short-immediate load into ST1.ASM");
+			program.write_word(0x0420, 0x771a); // STM #1, BRC
+			program.write_word(0x0421, 0x0001);
+			program.write_word(0x0422, 0xf272); // RPTBD 0428h
+			program.write_word(0x0423, 0x0428);
+			program.write_word(0x0424, 0xe801); // delay slot 1
+			program.write_word(0x0425, 0xe902); // delay slot 2
+			program.write_word(0x0426, 0x6d10); // MAR *AR0+
+			program.write_word(0x0427, 0xf495);
+			program.write_word(0x0428, 0xf495);
+			program.write_word(0x0429, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0420);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 35;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 35)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
+					"RPTBD executes both delay slots once");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+					"RPTBD repeats its body and retires BRAF");
+			program.write_word(0x042c, 0xa43a); // MPY *AR5, *AR4+, A
+			program.write_word(0x042d, 0xf5e1);
+			data.write_word(0x0940, 3);
+			data.write_word(0x0950, 0xfffe);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x042c);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0940);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0950);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 36;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 36)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					((u64(1) << 40) - 6) &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe,
+					"dual-memory multiply result and T load");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0941 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0950,
+					"dual-memory multiply address updates");
+			program.write_word(0x0430, 0xb336); // MAC *AR5, *AR4-, B, B
+			program.write_word(0x0431, 0xf5e1);
+			data.write_word(0x0941, 4);
+			data.write_word(0x0950, 0xfffd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0430);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0941);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0950);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 37;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 37)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd,
+					"dual-memory signed multiply-accumulate");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0940 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0950,
+					"dual-memory MAC address updates");
+			program.write_word(0x0434, 0xd631); // ST B,*AR3 || MACR *AR5,A
+			program.write_word(0x0435, 0xf5e1);
+			data.write_word(0x0950, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0434);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0960);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0950);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10001);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 38;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 38)
+		{
+			expect(data.read_word(0x0960) == 0x1234,
+					"parallel store uses the pre-accumulate source");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000,
+					"parallel rounded multiply-accumulate");
+			program.write_word(0x0438, 0xe210); // SQDST *AR3,*AR2
+			program.write_word(0x0439, 0xf5e1);
+			data.write_word(0x0960, 5);
+			data.write_word(0x0970, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0438);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0970);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0960);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A,
+					(u64(0xff) << 32) | (u64(0xfffe) << 16));
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 39;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 39)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					((u64(1) << 40) - 0x30000),
+					"square-distance signed vector difference");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 14,
+					"square-distance accumulation of old A high half");
+			program.write_word(0x043c, 0xfa44); // BCD 0442h, ANEQ
+			program.write_word(0x043d, 0x0442);
+			program.write_word(0x043e, 0xe802);
+			program.write_word(0x043f, 0xe903);
+			program.write_word(0x0440, 0xf5e1);
+			program.write_word(0x0442, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x043c);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 40;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 40)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0443 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 3,
+					"delayed accumulator-not-equal branch and delay slots");
+			program.write_word(0x0444, 0xf484); // NEG A
+			program.write_word(0x0445, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0444);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 41;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 41)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					((u64(1) << 40) - 5) &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
+					"accumulator negate result and carry");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

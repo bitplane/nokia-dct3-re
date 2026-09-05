@@ -239,3 +239,10 @@ A disposable mask-substitution run confirms causality rather than provenance:
 (`LD #k5, ASM`) as the next instruction family. That generic family is now
 implemented and unit-tested. No mask substitution remains in source; the run
 does not establish a ROM4 power-on value.
+
+That diagnostic reachability was also used to close the newly exposed generic
+CPU surface. `RPTBD`, class-7 MPY/MAC, class-14 parallel store/MAC, `SQDST`,
+delayed ANEQ and `NEG` now have focused conformance fixtures. With those
+instructions present, the disposable run executes 26,944 RF sample reads and
+returns to the scheduler without an illegal opcode, but produces no RF tuning
+pair. The unassisted composition remains the authority for supported behavior.
