@@ -45,7 +45,8 @@ message service, establishes SAPI 3, and emits a two-frame CP-DATA/RP-DATA/
 SMS-SUBMIT. The generic parser derives rather than assumes:
 
 - CP transaction `0x29` and RP reference `0x01`;
-- service centre `+1234567890`;
+- service centre `+1234567890`, or the value organically edited and persisted
+  in `EF_SMSP` by `make verify-radio-outgoing-sms-smsc`;
 - destination `5551234`;
 - GSM default-alphabet user-data length two, whose packed bytes are `c8 24`.
 

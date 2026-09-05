@@ -104,7 +104,9 @@ The base profile also allocates and activates GSM 11.11 services 4 and 12.
 `EF_SMSP (6F42)` has two 44-byte records and supplies the deterministic
 service-centre address in record 1. Both are mutable card NVRAM appended after
 the pre-existing ADN/location fields, with compatibility for older card
-images.
+images. The outgoing-SMS SMSC gate edits record 1 through the physical handset
+UI, checks the exact GSM 11.11 record persisted by `UPDATE RECORD`, and then
+requires the next acknowledged `SMS-SUBMIT` to carry that edited address.
 
 `make verify-radio-incoming-sms` drives those files from the radio boundary:
 after paging and segmented SAPI-3 SMS-DELIVER traffic, firmware issues

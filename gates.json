@@ -4,6 +4,7 @@
     "DCT3_PRESS_70_180": "NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=180",
     "DCT3_PRESS_70_200": "NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200",
     "DCT3_PRESS_120_240": "NOKIA_DCT3_POST_READY_KEY_DURATION_MS=120 NOKIA_DCT3_POST_READY_KEY_GAP_MS=240",
+    "DCT3_PRESS_180_250": "NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=250",
     "DCT3_PRESS_180_300": "NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300",
     "DCT3_PRESS_200_200": "NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=200",
     "DCT3_PRESS_200_280": "NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280",
@@ -6739,6 +6740,22 @@
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait800,down,wait800,enter,wait800,down,wait800,down,wait800,enter,wait800,4,4,wait1500,4,4,4,wait1500,enter,wait1000,enter,wait1000,5,5,5,1,2,3,4,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_180_300) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \\",
         "\t$(PYTHON) tools/radio_outgoing_sms_reject_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)",
         "\t@echo \"OK - physical 3210 mobile-originated SMS rejection completed\""
+      ]
+    },
+    {
+      "name": "verify-radio-outgoing-sms-smsc",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "embedded EEPROM restoration guard",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=92 \\",
+        "\t\tPROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait700,down,wait700,enter,wait700,down,wait500,down,wait500,down,wait500,down,wait700,enter,wait800,enter,wait800,enter,wait800,c,wait250,c,wait250,c,wait250,c,wait250,c,wait250,c,wait250,c,wait250,c,wait250,c,wait250,c,wait250,c,wait250,9,8,7,6,5,4,3,2,1,0,wait800,enter,wait1200,c,wait600,c,wait600,c,wait600,c,wait1000,enter,wait800,down,wait800,enter,wait800,down,wait800,down,wait800,enter,wait800,4,4,wait1500,4,4,4,wait1500,enter,wait1000,enter,wait1000,5,5,5,1,2,3,4,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_180_250) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \\",
+        "\t$(PYTHON) tools/radio_outgoing_sms_smsc_trace_check.py $(RUN_DIR)/error.log \\",
+        "\t\t$(RUN_DIR)/nvram/noki3210/sim_card",
+        "\t@echo \"OK - physical 3210 EF_SMSP edit controlled mobile-originated SMS\""
       ]
     },
     {

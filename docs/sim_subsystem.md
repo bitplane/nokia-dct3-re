@@ -198,7 +198,10 @@ card after restart.
 
 The card also declares ten free 176-byte `EF_SMS (6F3C)` records and two
 44-byte `EF_SMSP (6F42)` records under `DF_TELECOM`. The first SMSP record
-contains the fixture service-centre address. In
+contains the fixture service-centre address. `make verify-radio-outgoing-sms-smsc`
+navigates the physical settings UI, replaces that number, observes firmware
+write the complete record through `UPDATE RECORD`, and proves the following
+`SMS-SUBMIT` uses the persisted value. In
 `make verify-radio-incoming-sms`, firmware organically selects these files and
 writes record 1 with status `03` plus the exact SMSC/SMS-DELIVER representation
 of unread text `hello`; the verifier checks the resulting card NVRAM bytes.
