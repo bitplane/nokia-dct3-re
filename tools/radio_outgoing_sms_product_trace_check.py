@@ -17,21 +17,33 @@ CHECKPOINTS = (
         r"GSM service establish sapi=0 pd=05 message=24 length=16")),
     ("SAPI 3 SABM", re.compile(r"TX packet type=1b .*data=00800d3f01")),
     ("decoded SMS-SUBMIT", re.compile(
-        r"gsm_sms_submit: cp=29 rp=01 smsc=1234567890 "
-        r"destination=5551234 alphabet=0 user_length=[1-9][0-9]* outcome=0 "
-        r"status_report=0")),
+        r"gsm_sms_submit: cp=[0-9a-f]{2} rp=01 smsc=1234567890 "
+        r"destination=5551234 alphabet=[0-2] user_length=[1-9][0-9]* "
+        r"outcome=0 status_report=[01]")),
     ("network CP-ACK", re.compile(
         r"GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2")),
     ("network RP-ACK", re.compile(
         r"GSM service downlink kind=18 sapi=3 pd=09 message=01 length=5")),
     ("handset final CP-ACK", re.compile(
-        r"GSM service uplink sapi=3 pd=09 message=04 length=2 data=2904")),
+        r"GSM service uplink sapi=3 pd=09 message=04 length=2 "
+        r"data=[0-9a-f]{2}04")),
     ("RR Channel Release", re.compile(
         r"LAPDm service Channel Release acknowledged nr=2")),
 )
 
 
-def verify(text: str, frame_directory: pathlib.Path) -> None:
+NHM5_MESSAGE_SENT_HASHES = {
+    "44dbccdc9aebdb60998a7d7491d1ed2974a0ea37ff24f51e743a87c3e2286a75",
+    "48afd7a5f3103a99e20f54f0a8066ece3683d0a478bf8074b0f30a84ade98e72",
+    "3ee877904724bc41cd0b9133ce53e4797a029cae31e01b9a43a57845771273f0",
+    "c2268ce0d9affb0b05c74c4db85220ea87e783652fdedf87b3a3608ccf0919d4",
+    "bfe89d2440646302ccd54cce39bffbbc3aede4d57746e34eab48c0f540392c68",
+    "046e6ae27d660146a7ac144356252df4dae1b01d8f9980ded87478646e7aa927",
+}
+
+
+def verify(text: str, frame_directory: pathlib.Path,
+           product: str = "nse8") -> None:
     cursor = 0
     for label, pattern in CHECKPOINTS:
         match = pattern.search(text, cursor)
@@ -43,16 +55,19 @@ def verify(text: str, frame_directory: pathlib.Path) -> None:
         hashlib.sha256(frame.read_bytes()).hexdigest()
         for frame in frame_directory.glob("nokia_dct3_lcdmirror_*.pgm")
     }
-    if not hashes.intersection(MESSAGE_SENT_HASHES):
+    expected_hashes = (NHM5_MESSAGE_SENT_HASHES if product == "nhm5"
+                       else MESSAGE_SENT_HASHES)
+    if not hashes.intersection(expected_hashes):
         raise ValueError("firmware Message sent frame was not observed")
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         raise SystemExit(
             "usage: radio_outgoing_sms_product_trace_check.py LOG FRAME_DIR")
     try:
-        verify(pathlib.Path(sys.argv[1]).read_text(), pathlib.Path(sys.argv[2]))
+        verify(pathlib.Path(sys.argv[1]).read_text(), pathlib.Path(sys.argv[2]),
+               sys.argv[3] if len(sys.argv) == 4 else "nse8")
     except ValueError as error:
         raise SystemExit(str(error)) from None
     print("OK - sibling ROM completed physical mobile-originated SMS")

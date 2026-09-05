@@ -78,6 +78,11 @@ SAPI-3, CP/RP and RR-release lifecycle from physical composition. Its editor
 cadence produces a different valid text payload under the shared key schedule,
 so the product gate requires a non-empty parsed user payload and the common
 `Message sent` frame rather than inheriting v6.00's exact `HI` octets.
+Nokia 3310 v6.39 independently submits a non-empty UCS-2 message through its
+localized composer, renders its Russian success notice, and requests a status
+report by default. The ensuing report repeats the same generic second paging,
+SAPI-3, CP/RP, SIM-write and RR-release contract; only its UI oracle and
+Nokia-facing packet geometry remain product-specific.
 
 `make verify-radio-outgoing-sms-delivery-report` enables the firmware's
 EEPROM-backed Delivery reports setting before composition. The resulting

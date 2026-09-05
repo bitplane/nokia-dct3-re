@@ -32,8 +32,13 @@ class OutgoingSmsDeliveryReportTraceCheckTest(unittest.TestCase):
     def test_complete_report(self):
         verify(GOOD, card_with())
 
-    def test_rejects_wrong_reference(self):
-        with self.assertRaisesRegex(ValueError, "correlated status report"):
+    def test_accepts_nonzero_correlated_reference(self):
+        prefix = bytearray(EXPECTED_RECORD_PREFIX)
+        prefix[9] = 1
+        verify(GOOD.replace("mr=00", "mr=01"), card_with(bytes(prefix)))
+
+    def test_rejects_mismatched_persisted_reference(self):
+        with self.assertRaisesRegex(ValueError, "prefix mismatch"):
             verify(GOOD.replace("mr=00", "mr=01"), card_with())
 
     def test_rejects_missing_second_write(self):

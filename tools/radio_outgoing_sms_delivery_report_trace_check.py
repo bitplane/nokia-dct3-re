@@ -8,8 +8,8 @@ import sys
 
 CHECKPOINTS = (
     ("status-report-requested submit", re.compile(
-        r"gsm_sms_submit: cp=29 rp=01 smsc=1234567890 "
-        r"destination=5551234 alphabet=0 user_length=2 outcome=0 "
+        r"gsm_sms_submit: cp=[0-9a-f]{2} rp=01 smsc=1234567890 "
+        r"destination=5551234 alphabet=[0-2] user_length=[1-9][0-9]* outcome=0 "
         r"status_report=1")),
     ("submit RP-ACK", re.compile(
         r"GSM service downlink kind=18 sapi=3 pd=09 message=01 length=5")),
@@ -18,7 +18,8 @@ CHECKPOINTS = (
     ("delivery-report page response", re.compile(
         r"GSM service establish sapi=0 pd=06 message=27 length=16")),
     ("correlated status report", re.compile(
-        r"gsm_sms_status_report: mr=00 recipient=5551234 status=00 length=37")),
+        r"gsm_sms_status_report: mr=(?P<message_reference>[0-9a-f]{2}) "
+        r"recipient=5551234 status=00 length=37")),
     ("status-report CP-DATA", re.compile(
         r"GSM service downlink kind=16 sapi=3 pd=09 message=01 length=37")),
     ("handset status-report CP-ACK", re.compile(
@@ -36,22 +37,28 @@ SMS_OFFSET = 50 * 32 + 11 + 9 + 16
 EXPECTED_RECORD_PREFIX = bytes.fromhex(
     "03 06 91 21 43 65 87 09 02 00 07 81 55 15 32 f4 "
     "62 90 50 10 00 00 00 62 90 50 10 10 00 00 00")
+MESSAGE_REFERENCE_OFFSET = 9
 
 
 def verify(text: str, card: bytes) -> None:
     cursor = 0
+    message_reference = None
     for label, pattern in CHECKPOINTS:
         match = pattern.search(text, cursor)
         if not match:
             raise ValueError(
                 f"missing or out-of-order delivery-report checkpoint: {label}")
         cursor = match.end()
+        if label == "correlated status report":
+            message_reference = int(match.group("message_reference"), 16)
     updates = re.findall(r"sim_device: update fid=6f3c record=1 length=176", text)
     if len(updates) != 2:
         raise ValueError(
             f"expected submit and status-report EF_SMS writes, got {len(updates)}")
     record = card[SMS_OFFSET:SMS_OFFSET + 176]
-    if not record.startswith(EXPECTED_RECORD_PREFIX):
+    expected_prefix = bytearray(EXPECTED_RECORD_PREFIX)
+    expected_prefix[MESSAGE_REFERENCE_OFFSET] = message_reference
+    if not record.startswith(expected_prefix):
         raise ValueError("persisted SMS-STATUS-REPORT prefix mismatch")
     if record[len(EXPECTED_RECORD_PREFIX):] != bytes([0xff]) * (
             176 - len(EXPECTED_RECORD_PREFIX)):

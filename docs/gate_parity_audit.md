@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 33
-Differences found: 54
+Families with more than one product: 34
+Differences found: 56
 
 ## ROM normalisation reachability
 
@@ -36,6 +36,7 @@ absent product is a coverage question, not a drifted gate.
 | `radio-outgoing-call-host-media` | yes | — | — | yes | — |
 | `radio-outgoing-call-host-termination` | yes | yes | yes | yes | — |
 | `radio-outgoing-call-lifecycle` | yes | yes | yes | yes | — |
+| `radio-outgoing-sms` | yes | yes | — | — | — |
 | `radio-paging` | yes | yes | yes | yes | — |
 | `radio-paging-negatives` | — | — | yes | yes | — |
 | `radio-paging-preserved` | — | — | yes | yes | — |
@@ -121,6 +122,11 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `tools/check_model_frontier_summary.py`
 - **3410**: _(none)_
 - shared: `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+
+### `radio-outgoing-sms`
+
+- **3210**: `tools/radio_outgoing_sms_trace_check.py`
+- **3310**: `tools/radio_outgoing_sms_delivery_report_trace_check.py`, `tools/radio_outgoing_sms_product_trace_check.py`
 
 ### `radio-paging`
 
@@ -382,6 +388,11 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `structured`
 - **3330**: `structured`
 - **3410**: `structured`
+
+### `radio-outgoing-sms`
+
+- **3210**: `shell`
+- **3310**: `shell`
 
 ### `radio-paging-negatives`
 

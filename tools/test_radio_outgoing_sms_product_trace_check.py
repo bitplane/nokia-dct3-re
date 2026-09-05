@@ -30,6 +30,17 @@ class OutgoingSmsProductTraceCheckTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "SMS CM Service Request"):
                 verify(GOOD.replace("message=24", "message=24x"), pathlib.Path(directory))
 
+    def test_accepts_nhm5_transaction_shape(self):
+        nhm5 = (GOOD.replace("cp=29", "cp=39")
+                .replace("alphabet=0", "alphabet=2")
+                .replace("status_report=0", "status_report=1")
+                .replace("data=2904", "data=3904"))
+        with tempfile.TemporaryDirectory() as directory, mock.patch(
+                "tools.radio_outgoing_sms_product_trace_check.NHM5_MESSAGE_SENT_HASHES",
+                {"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}):
+            pathlib.Path(directory, "nokia_dct3_lcdmirror_test.pgm").write_bytes(b"")
+            verify(nhm5, pathlib.Path(directory), "nhm5")
+
 
 if __name__ == "__main__":
     unittest.main()
