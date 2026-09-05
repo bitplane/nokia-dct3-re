@@ -271,6 +271,9 @@ No task message, firmware state or prebuilt SMS object is injected.
 `make verify-radio-outgoing-sms-reject` takes the identical physical route,
 returns a correlated GSM 04.11 RP-ERROR cause 21, and requires the handset's
 final CP-ACK, RR release and exact `Message not sent this time` frame.
+`make verify-radio-outgoing-sms-timeout` withholds CP-ACK and requires one
+firmware CP retry, the LAPDm P/F exchange that terminates its single T200
+retry, and the exact `Message sending failed` frame after the second CP wait.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon

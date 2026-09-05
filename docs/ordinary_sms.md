@@ -59,9 +59,12 @@ one 28-byte Layer-3 object; accepting only the first LAPDm frame cannot pass.
 mobile RP-ERROR with the submitted RP reference and cause 21 (short message
 transfer rejected). Firmware acknowledges its CP-DATA, releases RR, renders
 `Message not sent this time`, and returns to the composer without a success
-RP-ACK. Withholding CP or RP responses reaches the firmware timeout, but the
-current HLE then repeats the segmented submit at assigned-channel cadence;
-that retry storm is a known transport defect and is not an accepted oracle.
+RP-ACK. `verify-radio-outgoing-sms-timeout` withholds CP-ACK. Firmware waits
+about 22.9 seconds, retransmits the segmented CP-DATA once, then uses an
+LAPDm poll after T200. The network RR response mirrors F=1 and stops the link-
+layer retry. After the second CP wait firmware renders `Message sending
+failed` and returns to the composer. Withholding RP after CP acknowledgement
+remains separately observed but is not yet an accepted oracle.
 
 This is not yet a complete originated-SMS product contract. CP/RP timeout and
 standards-timed retry, delivery reports, sent-message/SIM status policy,
@@ -139,6 +142,7 @@ Exact top-level commands are:
 JOBS=4 make verify-radio-sms-inbox
 JOBS=4 make verify-radio-outgoing-sms
 JOBS=4 make verify-radio-outgoing-sms-reject
+JOBS=4 make verify-radio-outgoing-sms-timeout
 JOBS=4 make verify-radio-sms-inbox-state
 JOBS=4 make verify-radio-sms-inbox-negatives
 JOBS=4 make verify-radio-sms-sequential

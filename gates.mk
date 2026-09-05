@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 198 gates: 138 generated from typed steps, 60 copied verbatim (shell).
+# 199 gates: 138 generated from typed steps, 61 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -128,7 +128,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-outgoing-call-host-physical-media \
 	verify-3310-radio-physical-duplex verify-radio-physical-uplink-one \
 	verify-radio-outgoing-sms verify-radio-outgoing-sms-reject \
-	verify-radio-incoming-sms verify-radio-sms-inbox verify-radio-sms-inbox-state \
+	verify-radio-outgoing-sms-timeout verify-radio-incoming-sms \
+	verify-radio-sms-inbox verify-radio-sms-inbox-state \
 	verify-radio-sms-inbox-negatives verify-radio-sms-sequential \
 	verify-3410-radio-sms-inbox verify-3310-radio-sms-inbox \
 	verify-3330-radio-sms-transport verify-radio-incoming-smart-message \
@@ -1707,6 +1708,17 @@ verify-radio-outgoing-sms-reject:
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait800,down,wait800,enter,wait800,down,wait800,down,wait800,enter,wait800,4,4,wait1500,4,4,4,wait1500,enter,wait1000,enter,wait1000,5,5,5,1,2,3,4,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_180_300) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \
 	$(PYTHON) tools/radio_outgoing_sms_reject_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
 	@echo "OK - physical 3210 mobile-originated SMS rejection completed"
+
+# shell: embedded EEPROM restoration guard
+verify-radio-outgoing-sms-timeout:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=88 \
+		PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_sms_cp_silence' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait800,down,wait800,enter,wait800,down,wait800,down,wait800,enter,wait800,4,4,wait1500,4,4,4,wait1500,enter,wait1000,enter,wait1000,5,5,5,1,2,3,4,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_180_300) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \
+	$(PYTHON) tools/radio_outgoing_sms_timeout_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+	@echo "OK - physical 3210 mobile-originated SMS timeout completed"
 
 verify-radio-incoming-sms:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'

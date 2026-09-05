@@ -89,6 +89,7 @@ private:
 	std::array<bool, link_count> m_awaiting_establishment{};
 	std::array<bool, link_count> m_downlink_segmentation_pending{};
 	std::array<bool, link_count> m_downlink_acknowledgement_pending{};
+	std::array<bool, link_count> m_uplink_final_response_pending{};
 	bool m_last_downlink_acknowledged = false;
 };
 
