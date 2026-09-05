@@ -179,6 +179,24 @@ takes that path with zero-valued samples, proving that the RF model supplies
 sample contents rather than activation. It does not prove that `0x52fd` is the
 NSE-1 power-on value. No register seed is admitted without ROM4/MAD2 evidence.
 
+An aligned-word census closes the literal variant of that question. Neither
+the recovered `dsp_full.bin` nor the transform-entry program snapshot contains
+an aligned big-endian word `0x52fd` or `0x53ff`. The program image contains four
+aligned `0x0204` words and no aligned `0x035a`; runtime attribution identifies
+the relevant OR-mask operations rather than assigning semantics to every
+literal match. The transform-entry data snapshot likewise contains no aligned
+`0x52fd`; its two aligned `0x53ff` words are captured data, not register
+provenance. The reference implementation's own source describes `0x52fd` as a
+post-bootloader Osmocom/Calypso register snapshot. It is therefore cross-silicon
+differential evidence, not a Nokia MAD2 reset contract.
+
+The remaining acquisition boundary is explicit: obtain a MAD2 ROM4 DSP
+register capture before the operational firmware OR-mask sequence, recover an
+earlier MAD2 mask-ROM write that establishes the missing bits, or observe an
+organic Nokia hardware transition that does so. Until one of those exists,
+zero is the deterministic unknown power-on value and receiver activation is
+not promoted.
+
 `make check-c54x-rom4-coherent` now treats that absence as a quantified
 boundary. Its recipe is fail-fast and enables the trace category required by
 its validator assertions; a failed intermediate assertion cannot be hidden by

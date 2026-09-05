@@ -380,6 +380,12 @@ substitution was removed before the normal gates. This proves the newly
 reachable receive/FIR instruction surface, not RF acquisition or a power-on
 mask value.
 
+A word-aligned census of the recovered and transform-entry program images
+finds no `0x52fd` or `0x53ff` literal. The reference source identifies its
+`0x52fd` as an Osmocom/Calypso post-bootloader snapshot, so it cannot be
+promoted to MAD2 state without an independent Nokia capture or mask-ROM
+derivation.
+
 ## Local backend prototype
 
 The distributable driver now has a source-level substitution seam:
