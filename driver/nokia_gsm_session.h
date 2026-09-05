@@ -44,6 +44,7 @@ public:
 		incoming_sms_cp_data,
 		sms_cp_ack,
 		outgoing_sms_rp_ack,
+		outgoing_sms_rp_error,
 		connect_acknowledge,
 		call_release,
 		release_complete
@@ -204,7 +205,8 @@ private:
 		awaiting_mobile_sms_sapi3_establishment,
 		awaiting_mobile_sms_submit,
 		awaiting_mobile_sms_cp_ack_acknowledgement,
-		awaiting_mobile_sms_final_cp_ack
+		awaiting_mobile_sms_final_cp_ack,
+		awaiting_mobile_sms_timeout
 	};
 
 	void clear_pending_downlink();

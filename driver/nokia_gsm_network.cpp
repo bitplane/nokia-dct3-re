@@ -960,6 +960,15 @@ std::array<u8, 5> nokia_gsm_network_device::sms_rp_ack(
 	return { u8(mobile_transaction ^ 0x80), 0x01, 0x02, 0x03, rp_reference };
 }
 
+std::array<u8, 7> nokia_gsm_network_device::sms_rp_error(
+		u8 mobile_transaction, u8 rp_reference, u8 cause) const
+{
+	// GSM 04.11 sections 7.3.4 and 8.2.5.4: network-to-mobile
+	// RP-ERROR (MTI 5) with the mandatory one-octet LV cause.
+	return { u8(mobile_transaction ^ 0x80), 0x01, 0x04,
+			0x05, rp_reference, 0x01, u8(cause & 0x7f) };
+}
+
 std::array<u8, 2> nokia_gsm_network_device::connect_acknowledge(
 		u8 transaction) const
 {

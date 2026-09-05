@@ -31,8 +31,9 @@ The SIM card owns ten 176-byte `EF_SMS` records. The firmware writes status
 There is no host inbox, card-side SMS parser or synthetic storage
 acknowledgement.
 
-`SMSCFG` selects only a laboratory-network acceptance scenario: valid,
-sequential, duplicate, malformed or capacity-boundary delivery. It does not
+`SMSCFG` selects a laboratory-network incoming delivery profile and an
+independent outgoing outcome: acceptance, permanent RP rejection, no CP
+response or CP acknowledgement followed by no RP response. It does not
 describe handset capability, storage policy or Nokia firmware behavior.
 
 ## Nokia 3210 mobile-originated lifecycle
@@ -54,9 +55,17 @@ renders `Message sent`, and the ordinary SAPI-0 RR release returns the radio
 to idle scheduling. The gate requires both 20-byte uplink segments to become
 one 28-byte Layer-3 object; accepting only the first LAPDm frame cannot pass.
 
-This is a successful submission fixture, not yet a complete originated-SMS
-product contract. Network rejection, CP/RP timeout and retry, delivery
-reports, sent-message/SIM status policy, service-centre editing, save-state
+`verify-radio-outgoing-sms-reject` returns the standards-defined network-to-
+mobile RP-ERROR with the submitted RP reference and cause 21 (short message
+transfer rejected). Firmware acknowledges its CP-DATA, releases RR, renders
+`Message not sent this time`, and returns to the composer without a success
+RP-ACK. Withholding CP or RP responses reaches the firmware timeout, but the
+current HLE then repeats the segmented submit at assigned-channel cadence;
+that retry storm is a known transport defect and is not an accepted oracle.
+
+This is not yet a complete originated-SMS product contract. CP/RP timeout and
+standards-timed retry, delivery reports, sent-message/SIM status policy,
+service-centre editing, save-state
 continuation and sibling-product corroboration remain open.
 
 ## Nokia 3210 application lifecycle
@@ -129,6 +138,7 @@ Exact top-level commands are:
 ```text
 JOBS=4 make verify-radio-sms-inbox
 JOBS=4 make verify-radio-outgoing-sms
+JOBS=4 make verify-radio-outgoing-sms-reject
 JOBS=4 make verify-radio-sms-inbox-state
 JOBS=4 make verify-radio-sms-inbox-negatives
 JOBS=4 make verify-radio-sms-sequential

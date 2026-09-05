@@ -778,12 +778,14 @@ public:
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
 	DECLARE_INPUT_CHANGED_MEMBER(charger_irq);
 	DECLARE_INPUT_CHANGED_MEMBER(mbus_rx_byte);
+	DECLARE_INPUT_CHANGED_MEMBER(sms_config_changed);
 
 private:
 	virtual void machine_start() override ATTR_COLD;
 	virtual void machine_reset() override ATTR_COLD;
 	void post_load();
 	void apply_product_config(nokia_product_config const &product);
+	void apply_sms_config();
 
 
 	uint8_t mad2_io_r(offs_t offset);
@@ -1106,6 +1108,29 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_b3_flash->set_enabled(product.flash_b3_block_lock);
 }
 
+void nokia_dct3_state::apply_sms_config()
+{
+	static constexpr std::array PROFILES = {
+		nokia_gsm_network_device::sms_profile::valid,
+		nokia_gsm_network_device::sms_profile::two_sequential,
+		nokia_gsm_network_device::sms_profile::duplicate,
+		nokia_gsm_network_device::sms_profile::invalid_originating_address,
+		nokia_gsm_network_device::sms_profile::unsupported_dcs,
+		nokia_gsm_network_device::sms_profile::truncated_user_data,
+		nokia_gsm_network_device::sms_profile::inconsistent_user_data_length,
+		nokia_gsm_network_device::sms_profile::fill_capacity
+	};
+	static constexpr std::array OUTCOMES = {
+		nokia_gsm_network_device::outgoing_sms_outcome::accept,
+		nokia_gsm_network_device::outgoing_sms_outcome::rp_error,
+		nokia_gsm_network_device::outgoing_sms_outcome::cp_silence,
+		nokia_gsm_network_device::outgoing_sms_outcome::rp_silence
+	};
+	const u8 config = m_sms_config.read_safe(0x00);
+	m_gsm_network->set_sms_profile(PROFILES[config & 0x07]);
+	m_gsm_network->set_outgoing_sms_outcome(OUTCOMES[(config >> 3) & 3]);
+}
+
 void nokia_dct3_state::machine_reset()
 {
 	std::fill_n(m_ram.get(), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1, 0);
@@ -1162,20 +1187,7 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
-	static constexpr std::array SMS_PROFILES = {
-		nokia_gsm_network_device::sms_profile::valid,
-		nokia_gsm_network_device::sms_profile::two_sequential,
-		nokia_gsm_network_device::sms_profile::duplicate,
-		nokia_gsm_network_device::sms_profile::invalid_originating_address,
-		nokia_gsm_network_device::sms_profile::unsupported_dcs,
-		nokia_gsm_network_device::sms_profile::truncated_user_data,
-		nokia_gsm_network_device::sms_profile::inconsistent_user_data_length,
-		nokia_gsm_network_device::sms_profile::fill_capacity
-	};
-	const unsigned sms_profile = m_sms_config.read_safe(0x00) & 0x07;
-	m_gsm_network->set_sms_profile(
-			SMS_PROFILES[std::min<unsigned>(
-					sms_profile, SMS_PROFILES.size() - 1)]);
+	apply_sms_config();
 	static constexpr std::array SMART_MESSAGE_PROFILES = {
 		nokia_gsm_network_device::smart_message_profile::valid,
 		nokia_gsm_network_device::smart_message_profile::missing_second_part,
@@ -2033,6 +2045,11 @@ INPUT_CHANGED_MEMBER( nokia_dct3_state::mbus_rx_byte )
 	}
 }
 
+INPUT_CHANGED_MEMBER( nokia_dct3_state::sms_config_changed )
+{
+	apply_sms_config();
+}
+
 static INPUT_PORTS_START( dct3_network_config )
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.
@@ -2063,7 +2080,7 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x80, DEF_STR(On))
 
 	PORT_START("SMSCFG")
-	PORT_CONFNAME(0x07, 0x00, "Incoming ordinary SMS profile")
+	PORT_CONFNAME(0x07, 0x00, "Incoming ordinary SMS profile") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sms_config_changed), 0)
 	PORT_CONFSETTING(0x00, "Valid hello from 5551234")
 	PORT_CONFSETTING(0x01, "Sequential hello/world messages")
 	PORT_CONFSETTING(0x02, "Duplicate hello delivery")
@@ -2072,6 +2089,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x05, "Truncated user data")
 	PORT_CONFSETTING(0x06, "Inconsistent user-data length")
 	PORT_CONFSETTING(0x07, "Eleven messages (capacity boundary)")
+	PORT_CONFNAME(0x18, 0x00, "Outgoing SMS network outcome") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sms_config_changed), 0)
+	PORT_CONFSETTING(0x00, "Accepted")
+	PORT_CONFSETTING(0x08, "RP-ERROR: short message transfer rejected")
+	PORT_CONFSETTING(0x10, "No CP response")
+	PORT_CONFSETTING(0x18, "CP-ACK then no RP response")
 
 	PORT_START("SMARTCFG")
 	PORT_CONFNAME(0x0f, 0x00, "Incoming Smart Message envelope")

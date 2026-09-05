@@ -54,6 +54,14 @@ public:
 		service_reject
 	};
 
+	enum class outgoing_sms_outcome : u8
+	{
+		accept,
+		rp_error,
+		cp_silence,
+		rp_silence
+	};
+
 	enum class mobility_profile : u8
 	{
 		single_cell,
@@ -148,6 +156,10 @@ public:
 		m_smart_message_profile = profile;
 	}
 	void set_sms_profile(sms_profile profile) { m_sms_profile = profile; }
+	void set_outgoing_sms_outcome(outgoing_sms_outcome outcome)
+	{
+		m_outgoing_sms_outcome = outcome;
+	}
 	void set_assignment_profile(assignment_profile profile)
 	{
 		m_assignment_profile = profile;
@@ -169,6 +181,10 @@ public:
 	outgoing_call_outcome configured_outgoing_call_outcome() const
 	{
 		return m_outgoing_call_outcome;
+	}
+	outgoing_sms_outcome configured_outgoing_sms_outcome() const
+	{
+		return m_outgoing_sms_outcome;
 	}
 	std::array<u8, 24> system_information(unsigned index, u16 serving_arfcn) const;
 	std::array<u8, 24> paging_fill() const;
@@ -214,6 +230,8 @@ public:
 	std::array<u8, 2> sms_cp_ack(u8 transaction) const;
 	std::array<u8, 5> sms_rp_ack(
 			u8 mobile_transaction, u8 rp_reference) const;
+	std::array<u8, 7> sms_rp_error(
+			u8 mobile_transaction, u8 rp_reference, u8 cause) const;
 	std::array<u8, 2> connect_acknowledge(u8 transaction) const;
 	std::array<u8, 2> call_release(u8 transaction) const;
 	std::array<u8, 2> call_release_complete(u8 transaction) const;
@@ -232,6 +250,8 @@ private:
 			assignment_profile::matched_request;
 	outgoing_call_outcome m_outgoing_call_outcome =
 			outgoing_call_outcome::connect;
+	outgoing_sms_outcome m_outgoing_sms_outcome =
+			outgoing_sms_outcome::accept;
 	gsm::a5::algorithm m_cipher_algorithm = gsm::a5::algorithm::a5_0;
 	gsm::mobility::periodic_update_timer m_periodic_update_timer;
 	gsm::mobility::topology m_cells;

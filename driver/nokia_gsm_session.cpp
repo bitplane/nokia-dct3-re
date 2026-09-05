@@ -275,7 +275,8 @@ nokia_gsm_session_device::contention_resolution_delivered()
 	if ((m_established_layer3[0] & 0x0f) == 0x05 &&
 			(m_established_layer3[1] & 0x3f) == 0x24)
 	{
-		if (m_network->configured_outgoing_call_outcome() ==
+		if (m_mobile_originated_call &&
+				m_network->configured_outgoing_call_outcome() ==
 				nokia_gsm_network_device::outgoing_call_outcome::
 						service_reject)
 		{
@@ -535,9 +536,25 @@ nokia_gsm_session_device::downlink_acknowledged()
 	if (m_state == u8(state::awaiting_mobile_sms_cp_ack_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::sms_cp_ack))
 	{
+		const auto outcome = m_network->configured_outgoing_sms_outcome();
+		if (outcome ==
+				nokia_gsm_network_device::outgoing_sms_outcome::rp_silence)
+		{
+			clear_pending_downlink();
+			m_state = u8(state::awaiting_mobile_sms_timeout);
+			return downlink_kind::none;
+		}
+		m_state = u8(state::awaiting_mobile_sms_final_cp_ack);
+		if (outcome ==
+				nokia_gsm_network_device::outgoing_sms_outcome::rp_error)
+		{
+			const auto error = m_network->sms_rp_error(
+					m_sms_cp_transaction, m_sms_rp_reference, 21);
+			return queue_downlink(downlink_kind::outgoing_sms_rp_error,
+					error.data(), error.size(), 3);
+		}
 		const auto acknowledge = m_network->sms_rp_ack(
 				m_sms_cp_transaction, m_sms_rp_reference);
-		m_state = u8(state::awaiting_mobile_sms_final_cp_ack);
 		return queue_downlink(downlink_kind::outgoing_sms_rp_ack,
 				acknowledge.data(), acknowledge.size(), 3);
 	}
@@ -972,10 +989,18 @@ nokia_gsm_session_device::receive_layer3(
 				destination += char('0' + submit.destination_digits[index]);
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_sms_submit: cp=%02x rp=%02x smsc=%s destination=%s "
-					"alphabet=%u user_length=%u t=%.6f\n",
+					"alphabet=%u user_length=%u outcome=%u t=%.6f\n",
 					submit.cp_transaction, submit.rp_reference, smsc.c_str(),
 					destination.c_str(), unsigned(submit.data_alphabet),
-					submit.user_data_length, machine().time().as_double());
+					submit.user_data_length,
+					unsigned(m_network->configured_outgoing_sms_outcome()),
+					machine().time().as_double());
+		}
+		if (m_network->configured_outgoing_sms_outcome() ==
+				nokia_gsm_network_device::outgoing_sms_outcome::cp_silence)
+		{
+			m_state = u8(state::awaiting_mobile_sms_timeout);
+			return downlink_kind::none;
 		}
 		const auto acknowledge = m_network->sms_cp_ack(information[0]);
 		m_state = u8(state::awaiting_mobile_sms_cp_ack_acknowledgement);
