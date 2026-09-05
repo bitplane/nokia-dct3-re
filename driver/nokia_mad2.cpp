@@ -187,7 +187,7 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 		// clock-selection state. Other bits remain ordinary peripheral gates.
 		m_regs[offset] = data & ~0x02;
 		m_simi_clock_cb(BIT(m_regs[offset], 5));
-		if (BIT(data, 1))
+		if (BIT(data, 1) && m_clock_stop_enabled)
 			enter_sleep();
 		break;
 	case 0x0e:
@@ -214,6 +214,20 @@ void nokia_mad2_device::assert_fiq(unsigned line)
 	if (m_interrupt_trace && m_interrupt_trace_count++ < 4096)
 		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=assert domain=FIQ line=%u pending_before=%03x pending_after=%03x t=%.9f\n",
 				line, before, m_fiq_status, machine().time().as_double());
+	update_fiq_line();
+}
+
+void nokia_mad2_device::set_fiq_line(unsigned line, bool state)
+{
+	const u16 mask = line < 8 ? u16(1) << line : LINE_EXTENDED;
+	const u16 before = m_fiq_status;
+	if (state)
+		m_fiq_status |= mask;
+	else
+		m_fiq_status &= ~mask;
+	if (before != m_fiq_status && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
+		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=levels domain=FIQ line=%u active=%u pending_before=%03x pending_after=%03x t=%.9f\n",
+				line, state, before, m_fiq_status, machine().time().as_double());
 	update_fiq_line();
 }
 

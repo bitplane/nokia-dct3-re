@@ -100,8 +100,16 @@ void nokia_dspif_device::shared_w(offs_t offset, u16 data, u16 mem_mask)
 	if (offset == TX_PRODUCER)
 	{
 		if (m_trace_enabled)
+		{
 			LOGMASKED(LOG_DSPIF, "dspif_transport: TX commit producer=%03x context=%s t=%.6f\n",
 					m_ram[offset], machine().describe_context(), machine().time().as_double());
+			packet pending;
+			if (peek_tx_packet(pending))
+				LOGMASKED(LOG_DSPIF, "dspif_transport: TX pending type=%02x payload=%u data=%s t=%.6f\n",
+						pending.type, pending.length,
+						packet_hex(pending.payload.data(), pending.length).c_str(),
+						machine().time().as_double());
+		}
 		m_tx_commit_cb(1);
 		m_tx_commit_cb(0);
 	}
@@ -155,7 +163,23 @@ void nokia_dspif_device::dsp_data_w(u16 address, u16 data)
 	if (address < hpi_daram_base ||
 			address >= hpi_daram_base + hpi_daram_words)
 		fatalerror("DSPIF: DSP data address %04x is outside the HPI DARAM window", address);
-	peer_shared_w(address - hpi_daram_base, data);
+	const offs_t offset = address - hpi_daram_base;
+	if (m_trace_enabled && offset == TX_CONSUMER && data != m_ram[offset])
+	{
+		packet consumed;
+		if (peek_tx_packet(consumed))
+			LOGMASKED(LOG_DSPIF, "dspif_transport: DSP consume type=%02x payload=%u data=%s next=%03x t=%.6f\n",
+					consumed.type, consumed.length,
+					packet_hex(consumed.payload.data(), consumed.length).c_str(), data,
+					machine().time().as_double());
+	}
+	if (m_trace_enabled && offset == RX_PRODUCER && data != m_ram[offset])
+	{
+		const u16 header = m_ram[m_ram[offset]];
+		LOGMASKED(LOG_DSPIF, "dspif_transport: DSP publish type=%02x payload=%u producer=%03x t=%.6f\n",
+				header & 0xff, header >> 8, data, machine().time().as_double());
+	}
+	peer_shared_w(offset, data);
 	// ROM4 loader1 publishes its next code-block selector in DSP word 0x0871
 	// (MCU byte offset 0x0e2). This is DSP-owned service state consumed by the
 	// MCU's IRQ4 handler; unlike HLE completion, the running core must raise

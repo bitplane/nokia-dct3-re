@@ -29,6 +29,9 @@ public:
 
 	nokia_cobba_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
+	auto rf_receive_cb() { return m_rf_receive_cb.bind(); }
+	u16 rf_receive_sample();
+	u64 rf_receive_samples() const { return m_rf_receive_samples; }
 
 	void set_pcm_sample_bits(u8 bits) { m_pcm_sample_bits = bits; }
 	// Temporary HLE selection used only until a DSP backend drives the opaque
@@ -54,6 +57,14 @@ public:
 	u64 control_transactions() const { return m_control_transactions; }
 	u64 control_reads() const { return m_control_reads; }
 	u64 control_writes() const { return m_control_writes; }
+	// Parallel MFI control frame: high nibble selects one of 16 opaque
+	// registers and the remaining 12 bits carry its value.
+	void parallel_control_w(u16 frame);
+	u16 parallel_register(u8 address) const
+	{
+		return m_parallel_registers[address & 0x0f];
+	}
+	u64 parallel_writes() const { return m_parallel_writes; }
 	// Completed words at the DSP-facing codec serial pins. C54x BDXR/BDRR,
 	// clocks and ready flags remain properties of the DSP's BSP peripheral.
 	void codec_serial_transmit(u16 data);
@@ -81,6 +92,8 @@ private:
 	static constexpr unsigned queue_samples = queue_blocks * pcm_block_samples;
 
 	sound_stream *m_stream = nullptr;
+	devcb_read16 m_rf_receive_cb;
+	u64 m_rf_receive_samples = 0;
 	std::array<s16, queue_samples> m_earpiece_queue{};
 	std::array<s16, queue_samples> m_microphone_queue{};
 	u16 m_earpiece_head = 0;
@@ -107,6 +120,8 @@ private:
 	u64 m_control_transactions = 0;
 	u64 m_control_reads = 0;
 	u64 m_control_writes = 0;
+	std::array<u16, 16> m_parallel_registers{};
+	u64 m_parallel_writes = 0;
 	u16 m_codec_serial_receive_latch = 0;
 	bool m_codec_serial_receive_ready = false;
 	u64 m_codec_serial_loopbacks = 0;

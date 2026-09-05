@@ -26,8 +26,8 @@ hashes and provenance are recorded in `roms/README.md`.
 | The reviewed ROM4 co-simulation later corrected its codec-sample finding: DSP port `0x21` is bidirectional (read microphone ADC, write earpiece DAC) and is serviced per codec-frame interrupt; port `0x20` is a second channel. MMR `0x22` carries `0xCxxx` parallel COBBA control frames rather than PCM | upstream private-ROM disassembly/trace, not yet reproducible with the local 3210 DSP image | retain as a strong backend design lead: a future C54x backend should terminate per-sample I/O at `nokia_mad2_pcm_device`; do not collapse control, PCM and RF/MFI surfaces or claim local port numbers yet |
 | ROM4 serial-control routines are labelled at DSP addresses `0x4604` (write), `0x465c` (read) and `0x4610` (single/multi-register wrapper). The self-test path at `0x4ae1` selects registers 0, 5 and 6. | public annotations derived from the private 5110 image; protocol shape agrees with the locally admitted opaque device | retain as address-level reproduction guidance. Registers 5/6 are measurement inputs, not evidence for audio mux/gain fields. |
 | The parallel MFI control path writes `0xCxxx` frames through DSP MMR `0x22` or an interrupt-masked `0x32` variant: bits 15..12 select one of 16 registers and bits 11..0 carry data. A reset/run-mode path reportedly emits `0xc008` at DSP PC `0x301f`. | public C54x trace annotation; locally unexecuted | a real backend needs a separate callback into an opaque parallel-control bank. Do not feed these frames into the serial register file or PCM endpoint. |
-| The native co-sim uses serial-register defaults 5=`0x160`, 6=`0x010`, parallel AGC=`0x160`, ready status D=`0x00c`, and zero I/Q. | explicitly synthetic no-signal/self-test inputs, not physical measurements | never promote these values as COBBA reset constants. They are only labelled compatibility-fixture candidates. |
-| The boot self-test builder calls resident slot `0x250b`, which is a no-op in the recovered image, before copying its input object. | upstream observation, now reproduced against the staged image | Do not infer a missing acquisition overlay from the no-op alone. The live builder enters with `AR2=0x0825`, pointing at the MCU-written command-ring payload; isolate the remaining defect in the copy/transform path. |
+| The native co-sim uses serial-register defaults 5=`0x160`, 6=`0x010`, parallel AGC=`0x160`, ready status D=`0x00c`, and zero I/Q. Local instruction and register-access traces now reproduce reader `0x4610`: selectors 5/6 organically read `0x160`/`0x010`, and the caller stores `0x0016`/`0x0010` in its self-test input object. | calibrated nominal no-signal inputs, not measured reset contents | `nokia_cobba_device` owns the serial input values and ready status. They are hardware inputs to the unmodified DSP calculation, not synthesized report output; retain that distinction until physical measurements are available. |
+| The boot self-test builder calls resident slot `0x250b`, which is a no-op in the recovered image. The actual analog acquisition is the later serial-register sequence at `0x4ae1..0x4afb`, through reader `0x4610`. | local program decode plus successful mapped-device trace | `0x250b` needs no replacement. COBBA supplies the register inputs and the DSP owns the response transform. |
 | Exact audio interrupt vector, activation cells, and a roughly 18.6 kHz tone cadence | explicitly experimental/tuned in upstream comments and potentially product-specific | not admitted; DCT3 voice PCM documentation currently supports an 8 kHz frame boundary, so rate/vector remain configuration/evidence questions |
 | Host-side PCM sinks, resampling, injected samples, and environment gates | implementation conveniences | do not adopt as hardware behavior; host audio is a consumer/producer beyond the emulated COBBA analogue pins |
 | NSE-8 and NHM-5 MCU firmware independently publish tone oscillator words at shared byte offsets `0x0ae`/`0x0b0`, amplitude at `0x0b6`, with oscillator values in quarter-Hz units | local paired-ROM traces; the common `0x0e10` value produces 900 Hz | `nokia_dsp_hle_device` owns this typed mailbox contract and drives the temporary MAME tone sinks; `nokia_dspif_device` remains transport-only |
@@ -168,14 +168,13 @@ a hardware specification:
 | Disabled assist | Observed result | Classification and replacement condition |
 |---|---|---|
 | `SEEDDARAM` | without the assist, the old core produced 70 rather than 74 DSP acknowledgements, runaway execution and a blank framebuffer | **Resolved.** Loader1 repeatedly executes MVDP from data source `0x0d00` to program destination `0x23c4`. The core bypassed its OVLY-aware `prog_write()` helper, so it wrote an inert program backing store instead of executable DARAM. Correct MVDP routing restores 74 acknowledgements and stable UI with `SEEDDARAM=0`. |
-| `SELFTEST_MEAS` | the DSP reaches the validator without the patch, then the MCU requests an organic reason-4 warm reboot at caller `0x258d35`/resume `0x258d3d` | direct output synthesis. The native harness writes `0x1202..0x1206 = {0010,0000,0000,0000,0160}` after the DSP transform. These are accepted fixture values, not recovered COBBA readings. Replace this assist by correcting execution of the C54x challenge transform; do not promote the accepted output tuple as a reset value. |
+| `SELFTEST_MEAS` | the old donor EEPROM made the DSP reach the validator with a record that triggered an organic reason-4 warm reboot | **Resolved without the assist.** The generated 24C16 profile supplies records encoded for COBBA serial `00160010`; the real C54x transform decodes them and the MCU validator continues with `r6=1`. The native harness's direct overwrite remains classified as output synthesis and is not part of the MAME path. |
 | COBBA codec-serial loopback | upload and self-test measurement proceed with 74 acknowledgements, but the phone presents `CONTACT SERVICE` | faithful-in-intent peripheral behavior at an exploratory host boundary. The DSP sets COBBA register 8 bits `0x0610`, enables the C54x BSP with `0xc008 -> 0xc0c8`, sends BDXR `0x0aaa`, polls BDRR, then clears the COBBA bits. TI's BSPC map proves the transition sets RRST/XRST while DLB remains clear, so COBBA externally returns the word. `nokia_cobba_device` now owns the evidenced register predicate and completed-word echo; a future C54x backend must drive it through real BSP timing and ready state instead of host polling. |
 
-The earlier failed promotion runs remain useful negative controls. The old
-backend met the required 74 acknowledgements and stable-UI gate without
-`SEEDDARAM`, but without `SELFTEST_MEAS` it still reached the MCU validator and
-requested an organic reason-4 reboot. Serial COBBA registers 5 and 6 already
-supplied the smaller subcommand `0x13` measurement. Subcommand
+The earlier failed promotion runs remain useful negative controls. With donor
+EEPROM contents the backend still reaches the MCU validator and requests an
+organic reason-4 reboot. Serial COBBA registers 5 and 6 supply the smaller
+subcommand `0x13` measurement. Subcommand
 `0x16` is a different contract. MCU routine `0x25864c` allocates a 30-byte
 type-2 object, identifies it as `0x70/0x16`, and asks `0x28c496` to generate 24
 bytes with selector `0x20`. When marker `[0x10fdde] == 0x5a`, MCU routine
@@ -196,6 +195,17 @@ the six calls. Waiting for the sequential return to `REA+1` materially changes
 the response. The later public backend also corrected status-opcode decoding,
 repeat-mode immediate-address updates and shifted cross-accumulator logical
 operations. These are C54x execution semantics, not COBBA measurements.
+
+The local coherent boot uses a freshly generated external-EEPROM profile. Its
+two transform inputs are `d6fb 4394 e437 da16 9668 964f` and `5cd4 32fe 5be2
+dba6 9643 82d7`; the C54x returns the decoded wildcard record and the MCU
+validator continues with `r6=1`. Persisted donor EEPROM state instead supplies
+`c9f4 cd44 ... 6075`, producing `3532 0000 312b ... 88b2 0000`; the MCU rejects
+that record and requests a reason-4 warm reboot. The earlier coherent gate did
+not isolate NVRAM and therefore mistook DSP transport completion for semantic
+acceptance. The corrected gate regenerates the profile, starts with an empty
+NVRAM root, and checks the validator continuation as well as the DSP-side
+completion.
 
 ### Unassisted external closure
 
@@ -221,9 +231,10 @@ DSP response begins at word `0x1200` with:
 
 This is an external behavioral oracle, not code available for import. The
 backend is GPL-licensed, while this driver is intended for MAME under a
-compatible clean-room implementation. The local MAME backend now reproduces
-this response from the recovered program/DROM and firmware-provided challenge,
-without importing the external implementation.
+compatible clean-room implementation. The local MAME backend reproduces a
+different response to the different MCU-provided challenge described above.
+Both observations are retained without asserting that one response validates
+the other's input.
 
 The instruction-level boundary can be checked independently of the native
 backend's implementation:
@@ -291,11 +302,21 @@ additional matches from duplicate descriptors are reported but do not weaken
 the invariant. This establishes the catalogue's ROM provenance without using
 the IDA database as executable input.
 
-An 80-million-instruction follow-up used only the native harness's physical-key
-replay to enter the handset security code. It reached stable NSE-1 standby with
-the operator `Radiolinja` and `Menu` visible, while retaining the same 74 DSP
-acknowledgements. This extends the execution result from boot presentation to
-interactive idle; it does not remove any of the assists above.
+An 80-million-instruction native-harness follow-up used physical-key replay to
+enter the handset security code. It reached stable NSE-1 standby with the
+operator `Radiolinja` and `Menu` visible, while retaining the same 74 DSP
+acknowledgements. That is a useful independent reference, not this repository's
+acceptance result.
+
+The local MAME backend now independently eliminates both historical assists.
+With a generated EEPROM profile the real C54x transform produces the accepted
+COBBA security record, the operational ROM consumes the MCU ring and returns
+to its ordinary idle, and a physical Menu-key transition renders the Phone
+book menu. `make check-c54x-rom4-coherent` guards loader, measurement,
+validator, and ring behavior; `make verify-5110-menu` guards the unassisted
+keypad-to-UI path and its deterministic rendered frame, and
+`make verify-5110-save-state` repeats that path after restoring the real-DSP
+composition.
 
 The captured interface evidence is bounded as follows:
 
@@ -317,12 +338,13 @@ establish activity only and do not assign product-port semantics beyond the
 qualified findings above. `dsp_rom4_cosim_check.py` extracts these counters so
 later runs can be compared without preserving an interpretation in code.
 
-The last item is an acquisition-harness boundary, not negative evidence about
-the ROM: the native 5110 composition has no GSM network/call peer that can drive
-a complete call. A call-lifecycle capture therefore requires the real backend
-to attach to this repository's existing call-capable GSM composition, or a new
-equivalent native peer. Replaying guessed call traffic would not close the
-gate.
+The local real-DSP composition still has no demonstrated network or call
+scenario. More specifically, a 30-second unassisted NSE-1 run delivers 6,497
+DSP frame interrupts but the DSP performs no RF sample-port read and commits no
+`0x31`/`0x32` synthesizer pair. The next recoverable boundary is therefore the
+MCU command or DSP state transition that activates receiver work. Attaching the
+existing decoded-block GSM peer, or generating air-interface samples, before
+that transition would bypass rather than explain the inactive receiver.
 
 ## Local backend prototype
 

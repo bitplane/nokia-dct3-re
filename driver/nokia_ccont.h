@@ -17,6 +17,7 @@ public:
 	void set_charger_input(unsigned channel, bool connected, uint16_t vchar = 0x03ff);
 	void set_ready(bool ready) { m_ready = ready; }
 	void set_wddisx_grounded(bool grounded) { m_wddisx_grounded = grounded; }
+	bool dsp_frame_clock_enabled() const { return (m_regs[6] & 0x02) != 0; }
 	bool watchdog_tick();
 
 protected:

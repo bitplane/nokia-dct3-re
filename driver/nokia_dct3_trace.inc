@@ -65,6 +65,35 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 {
 	if (!m_trace_enabled)
 		return;
+	// NSE-1 reset-reason boundary. This is a temporary ROM4 bring-up probe;
+	// the reset itself remains entirely firmware-owned.
+	if (pc == addr && addr == 0x002927a6)
+		machine().logerror(
+				"rom4_reset_request: reason=%08x lr=%08x t=%.6f\n",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R0),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14),
+				machine().time().as_double());
+
+	// NSE-1 ROM4 self-test response validation. Keep this at the consumer
+	// boundary: the C54x owns construction and the MCU owns acceptance.
+	if (pc == addr && addr == 0x00258b60)
+	{
+		const u32 object = m_maincpu->state_int(arm7_cpu_device::ARM7_R0);
+		LOGMASKED(LOG_DSP_BOUNDARY, "rom4_validator: event=entry object=%08x data=", object);
+		for (unsigned index = 0;
+				object >= NOKIA_RAM_BASE && object + index < NOKIA_RAM_END && index < 64;
+				++index)
+			LOGMASKED(LOG_DSP_BOUNDARY, "%02x", fw_byte(object + index));
+		LOGMASKED(LOG_DSP_BOUNDARY, " task=%02x t=%.6f\n",
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
+	if (pc == addr && (addr == 0x00258cea || addr == 0x00258d3c))
+		LOGMASKED(LOG_DSP_BOUNDARY,
+				"rom4_validator: event=%s r6=%08x r8=%08x task=%02x t=%.6f\n",
+				addr == 0x00258cea ? "reject" : "continue",
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R6),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R8),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
 
 	// NSE-8 v6.00 and NHM-5 v6.39 share the same independently typed
 	// authentication completion: RUN GSM ALGORITHM returns 2, GET RESPONSE

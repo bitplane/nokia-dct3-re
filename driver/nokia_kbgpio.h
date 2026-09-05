@@ -32,6 +32,7 @@ public:
 	auto irq_cb() { return m_irq_cb.bind(); }
 
 	void set_wiring_contract(wiring_contract contract);
+	void set_trace(bool enabled) { m_trace = enabled; }
 
 	bool owns(offs_t offset) const;
 	u8 read(offs_t offset);
@@ -39,13 +40,14 @@ public:
 	void write(offs_t offset, u8 data);
 	void input_changed();
 	void irq_acknowledge();
-	void clear_power_on_latch() { m_power_on = 0xff; }
+	void clear_power_on_latch();
 
 protected:
 	virtual void device_start() override ATTR_COLD;
 	virtual void device_reset() override ATTR_COLD;
 
 private:
+	TIMER_CALLBACK_MEMBER(sample_tick);
 	u8 sample_columns(bool consume_power_on);
 	void update_columns();
 	void update_irq();
@@ -53,11 +55,13 @@ private:
 	devcb_read8::array<5> m_matrix_cb;
 	devcb_read8 m_power_cb;
 	devcb_write_line m_irq_cb;
+	emu_timer *m_sample_timer = nullptr;
 	u8 m_regs[0x100] = {0};
 	u8 m_columns = 0x1f;
 	u8 m_power_on = 0xff;
 	wiring_contract m_wiring;
 	bool m_irq_latched = false;
+	bool m_trace = false;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_KBGPIO, nokia_kbgpio_device)

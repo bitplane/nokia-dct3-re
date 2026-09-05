@@ -16,6 +16,7 @@ public:
 
 	u8 read(offs_t offset);
 	void write(offs_t offset, u8 data);
+	void fiq_mask_w(u8 old_mask, u8 new_mask);
 	bool receive_byte(u8 data);
 
 	u8 control() const { return m_control; }

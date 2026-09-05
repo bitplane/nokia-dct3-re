@@ -76,9 +76,10 @@ class KeypadInputTest(unittest.TestCase):
 
     def test_matrix_drive_contract_uses_direction_and_active_low_signal(self):
         self.assertIn(
-            "m_regs[ROW_DIRECTION] & ~m_regs[ROW_SIGNAL]",
+            "m_regs[m_wiring.row_direction] &",
             self.kbgpio,
         )
+        self.assertIn("~m_regs[m_wiring.row_signal]", self.kbgpio)
 
     def test_3310_fixture_uses_boot_relative_timing(self):
         self.assertIn('machine.system.name == "noki3310"', self.harness)

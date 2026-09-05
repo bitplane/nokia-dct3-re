@@ -40,14 +40,15 @@ def decode_thumb1(image: bytes, start: int, end: int):
 def literal_value(image: bytes, instruction):
 	if instruction.mnemonic != "ldr" or "[pc" not in instruction.op_str:
 		return None
-	match = re.search(r"#(0x[0-9a-f]+)", instruction.op_str)
+	match = re.search(r"#(0x[0-9a-f]+|[0-9]+)", instruction.op_str)
 	if not match:
 		return None
-	address = ((instruction.address + 4) & ~3) + int(match.group(1), 16)
+	address = ((instruction.address + 4) & ~3) + int(match.group(1), 0)
 	offset = address - FLASH_BASE
 	if not 0 <= offset <= len(image) - 4:
 		return None
-	return address, int.from_bytes(image[offset:offset + 4], "little")
+	raw = int.from_bytes(image[offset:offset + 4], "little")
+	return address, ((raw & 0xffff) << 16) | (raw >> 16)
 
 
 def main() -> None:

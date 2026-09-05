@@ -161,6 +161,15 @@ physical inputs; they do not write firmware RAM or messages. The current
 normalized boot does not naturally execute task 0's stop request, so this gate
 proves controller semantics rather than claiming an observed idle duty cycle.
 
+ROM4 NSE-1 is outside that projection for now. Its v5.30 firmware issues
+clock-control `0x0e` at roughly 8.54 seconds, while the recovered interrupt
+state does not establish a safe wake rule. Broad experiments that woke on any
+pending source or routed sources while stopped admitted unrelated FIQ state
+and did not advance the handset. The NSE-1 product profile therefore leaves
+ARM clock stop disabled until its wake protocol is recovered. The focused
+5110 menu gate applies its physical key before this request and must not be
+cited as idle-wake validation.
+
 `make verify-mad2-timer1` proves destination `0x7fff`, FIQ5/status `0x020` and
 firmware acknowledgement. `make verify-mad2-reset` runs two mapped-MMIO
 fixtures. Reset-control bit 2 causes a complete digital-baseband restart and

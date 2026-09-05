@@ -41,6 +41,7 @@ public:
 protected:
 	virtual void device_start() override ATTR_COLD;
 	virtual void device_reset() override ATTR_COLD;
+	virtual void device_stop() override ATTR_COLD;
 
 	virtual u32 execute_min_cycles() const noexcept override { return 1; }
 	virtual u32 execute_max_cycles() const noexcept override { return 5; }
@@ -52,13 +53,21 @@ protected:
 
 private:
 	static constexpr u64 ACC_MASK = (u64(1) << 40) - 1;
+	static constexpr u16 TIMER_TDDR_MASK = 0x000f;
+	static constexpr u16 TIMER_TSS = 0x0010;
+	static constexpr u16 TIMER_TRB = 0x0020;
+	static constexpr u16 TIMER_PSC_MASK = 0x03c0;
 
+	TIMER_CALLBACK_MEMBER(timer_expired);
+	void update_timer_counter();
+	void arm_timer();
 	u16 fetch();
 	u16 data_read(u16 address);
 	void data_write(u16 address, u16 value);
 	u16 indirect_read(u8 mode);
 	void indirect_write(u8 mode, u16 value);
 	void indirect_modify(u8 mode);
+	void dual_modify(u8 operand);
 	void circular_modify(unsigned ar, s16 step);
 	void execute_one(u16 op);
 	bool service_interrupt();
@@ -99,11 +108,18 @@ private:
 	bool m_rpt_armed = false;
 	u16 m_delayed_target = 0;
 	u8 m_delayed_words = 0;
+	u8 m_xc_guard = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
+	u16 m_clkmd = 0;
+	u16 m_tim = 0xffff;
+	u16 m_prd = 0xffff;
+	u16 m_tcr = 0;
+	emu_timer *m_timer = nullptr;
 	bool m_block_repeat_active = false;
 	bool m_idle = false;
 	bool m_illegal = false;
+	std::array<u16, 0x10000> m_opcode_first_pc;
 	int m_icount = 0;
 };
 

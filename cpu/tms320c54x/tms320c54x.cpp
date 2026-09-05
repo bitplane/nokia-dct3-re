@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "tms320c54x.h"
 
 namespace {
@@ -49,6 +50,8 @@ std::unique_ptr<util::disasm_interface> tms320c54x_device::create_disassembler()
 
 void tms320c54x_device::device_start()
 {
+	m_opcode_first_pc.fill(0xffff);
+	m_timer = timer_alloc(FUNC(tms320c54x_device::timer_expired), this);
 	space(AS_PROGRAM).cache(m_cache);
 	space(AS_PROGRAM).specific(m_program);
 	space(AS_DATA).specific(m_data);
@@ -96,11 +99,27 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_rpt_armed));
 	save_item(NAME(m_delayed_target));
 	save_item(NAME(m_delayed_words));
+	save_item(NAME(m_xc_guard));
 	save_item(NAME(m_ifr));
 	save_item(NAME(m_imr));
+	save_item(NAME(m_clkmd));
+	save_item(NAME(m_tim));
+	save_item(NAME(m_prd));
+	save_item(NAME(m_tcr));
 	save_item(NAME(m_block_repeat_active));
 	save_item(NAME(m_idle));
 	save_item(NAME(m_illegal));
+}
+
+void tms320c54x_device::device_stop()
+{
+	if (!machine().options().verbose())
+		return;
+
+	for (unsigned opcode = 0; opcode != m_opcode_first_pc.size(); ++opcode)
+		if (m_opcode_first_pc[opcode] != 0xffff)
+			machine().logerror("[opcov] op=%04x first_pc=%04x\n",
+					opcode, m_opcode_first_pc[opcode]);
 }
 
 void tms320c54x_device::device_reset()
@@ -111,7 +130,9 @@ void tms320c54x_device::device_reset()
 	m_b = 0;
 	m_t = 0;
 	m_sp = 0;
-	m_st0 = 0;
+	// C54x silicon resets DP to page 0x1f with ARP/CNF set.  ROM4's
+	// resident dispatcher relies on this state surviving loader startup.
+	m_st0 = 0x181f;
 	m_st1 = 0x2900;
 	m_pmst = 0xffa0;
 	std::fill(std::begin(m_ar), std::end(m_ar), 0);
@@ -126,11 +147,45 @@ void tms320c54x_device::device_reset()
 	m_rpt_armed = false;
 	m_delayed_target = 0;
 	m_delayed_words = 0;
+	m_xc_guard = 0;
 	m_ifr = 0;
 	m_imr = 0;
+	m_clkmd = 0;
+	m_tim = 0xffff;
+	m_prd = 0xffff;
+	m_tcr = 0;
+	arm_timer();
 	m_block_repeat_active = false;
 	m_idle = false;
 	m_illegal = false;
+}
+
+void tms320c54x_device::update_timer_counter()
+{
+	if ((m_tcr & TIMER_TSS) || !m_timer->enabled())
+		return;
+	const u64 remaining = m_timer->remaining().as_ticks(clock());
+	const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
+	m_tim = remaining ? u16((remaining - 1) / divider) : 0;
+}
+
+void tms320c54x_device::arm_timer()
+{
+	if (m_tcr & TIMER_TSS)
+	{
+		m_timer->adjust(attotime::never);
+		return;
+	}
+	const u64 cycles = u64(m_tim + 1) * ((m_tcr & TIMER_TDDR_MASK) + 1);
+	m_timer->adjust(attotime::from_ticks(cycles, clock()));
+}
+
+TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
+{
+	m_tim = m_prd;
+	m_ifr |= 0x0008; // TINT, vector 19
+	m_idle = false;
+	arm_timer();
 }
 
 u16 tms320c54x_device::fetch()
@@ -170,8 +225,32 @@ u16 tms320c54x_device::data_read(u16 address)
 		return m_bk;
 	if (address == 0x1a)
 		return m_brc;
+	if (address == 0x1b)
+		return m_rsa;
+	if (address == 0x1c)
+		return m_rea;
 	if (address == 0x1d)
 		return m_pmst;
+	if (address == 0x24)
+	{
+		update_timer_counter();
+		return m_tim;
+	}
+	if (address == 0x25)
+		return m_prd;
+	if (address == 0x26)
+	{
+		if (!(m_tcr & TIMER_TSS) && m_timer->enabled())
+		{
+			const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
+			const u64 remaining = m_timer->remaining().as_ticks(clock());
+			const u16 psc = remaining ? u16((remaining - 1) % divider) : 0;
+			return (m_tcr & ~TIMER_PSC_MASK) | (psc << 6);
+		}
+		return m_tcr & ~TIMER_PSC_MASK;
+	}
+	if (address == 0x58)
+		return m_clkmd;
 	return m_data.read_word(address);
 }
 
@@ -207,8 +286,33 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		m_bk = value;
 	else if (address == 0x1a)
 		m_brc = value;
+	else if (address == 0x1b)
+		m_rsa = value;
+	else if (address == 0x1c)
+		m_rea = value;
 	else if (address == 0x1d)
 		m_pmst = value;
+	else if (address == 0x24)
+	{
+		m_tim = value;
+		arm_timer();
+	}
+	else if (address == 0x25)
+		m_prd = value;
+	else if (address == 0x26)
+	{
+		update_timer_counter();
+		m_tcr = value & ~(TIMER_TRB | TIMER_PSC_MASK);
+		if (value & TIMER_TRB)
+			m_tim = m_prd;
+		arm_timer();
+	}
+	else if (address == 0x58)
+	{
+		// CLKMD bit 0 is read-only PLLSTATUS. Model the mode transition as
+		// immediate until the input-clock-derived PLL lock timer is exposed.
+		m_clkmd = (value & ~u16(1)) | BIT(value, 1);
+	}
 	else
 		m_data.write_word(address, value);
 }
@@ -246,11 +350,33 @@ void tms320c54x_device::indirect_modify(u8 mode)
 	{
 	case 0x08: --m_ar[ar]; break;
 	case 0x10: ++m_ar[ar]; break;
+	case 0x18: ++m_ar[ar]; break;
+	case 0x20: m_ar[ar] -= m_ar[0]; break;
+	case 0x28: m_ar[ar] -= m_ar[0]; break;
 	case 0x30: m_ar[ar] += m_ar[0]; break;
-	case 0x38: m_ar[ar] -= m_ar[0]; break;
-	case 0x48: circular_modify(ar, -1); break;
+	case 0x38: m_ar[ar] += m_ar[0]; break;
+	case 0x40: circular_modify(ar, -1); break;
+	case 0x48: circular_modify(ar, -s16(m_ar[0])); break;
 	case 0x50: circular_modify(ar, 1); break;
+	case 0x58: circular_modify(ar, s16(m_ar[0])); break;
 	default: break;
+	}
+	// In compatibility mode, a nonzero ARF both selects the auxiliary register
+	// and publishes it into ST0.ARP.  Standard mode addresses ARF directly and
+	// must leave ARP cleared/unchanged (TMS320C54x CPU Reference Guide 5.5.1).
+	if (BIT(m_st1, 5) && ar)
+		m_st0 = (m_st0 & ~u16(0xe000)) | u16(ar << 13);
+}
+
+void tms320c54x_device::dual_modify(u8 operand)
+{
+	const unsigned ar = 2 + (operand & 3);
+	switch ((operand >> 2) & 3)
+	{
+	case 0: break;
+	case 1: --m_ar[ar]; break;
+	case 2: ++m_ar[ar]; break;
+	case 3: circular_modify(ar, s16(m_ar[0])); break;
 	}
 }
 
@@ -276,8 +402,12 @@ u16 tms320c54x_device::indirect_read(u8 mode)
 	if (mode == 0xf8)
 		return data_read(fetch());
 	const unsigned ar = mode & 7;
+	const bool preincrement = (mode & 0x78) == 0x18;
+	if (preincrement)
+		indirect_modify(mode);
 	const u16 value = data_read(m_ar[ar]);
-	indirect_modify(mode);
+	if (!preincrement)
+		indirect_modify(mode);
 	return value;
 }
 
@@ -289,19 +419,41 @@ void tms320c54x_device::indirect_write(u8 mode, u16 value)
 		return;
 	}
 	const unsigned ar = mode & 7;
+	const bool preincrement = (mode & 0x78) == 0x18;
+	if (preincrement)
+		indirect_modify(mode);
 	data_write(m_ar[ar], value);
-	indirect_modify(mode);
+	if (!preincrement)
+		indirect_modify(mode);
 }
 
 void tms320c54x_device::finish_repeats()
 {
+	// This is the first retirement of the repeated body.  Capture its extent
+	// now that its instruction length is known; #n executes the body n+1 times.
+	if (m_rpt_armed)
+	{
+		m_rpt_armed = false;
+		m_rpt_end = m_pc;
+		if (m_rptc)
+		{
+			--m_rptc;
+			++m_rpt_iteration;
+			m_pc = m_rpt_address;
+		}
+		else
+		{
+			m_rpt_end = 0xffff;
+			m_rpt_iteration = 0;
+		}
+		return;
+	}
+
 	if (m_rptc)
 	{
-		if (m_rpt_armed)
-			m_rpt_armed = false;
-		else if (m_rpt_end == 0xffff)
+		if (m_rpt_end == 0xffff)
 			m_rpt_end = m_pc;
-		if (!m_rpt_armed && m_rpt_end != 0xffff && m_pc == m_rpt_end)
+		if (m_pc == m_rpt_end)
 		{
 			--m_rptc;
 			++m_rpt_iteration;
@@ -333,7 +485,14 @@ bool tms320c54x_device::service_interrupt()
 	// Maskable hardware sources occupy vectors 16..31 and map directly to
 	// IMR/IFR bits 0..15. PMST.IPTR selects their 128-word vector page.
 	const u16 pending = m_ifr & m_imr;
-	if (BIT(m_st1, 11) || !pending)
+	// The C54x does not recognize an interrupt between a delayed control
+	// transfer and its two delay words, nor between RPT/RPTZ and the repeated
+	// instruction. IFR remains set and is reconsidered at the next legal
+	// instruction boundary. Taking it inside either atomic sequence can skip a
+	// vector prologue's context-save slots and corrupt the return stack.
+	const bool single_repeat_active = m_rpt_armed || m_rptc || m_rpt_end != 0xffff;
+	if (BIT(m_st1, 11) || !pending || m_delayed_words || m_xc_guard ||
+			single_repeat_active)
 		return false;
 
 	unsigned source = 0;
@@ -366,6 +525,21 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
 		status &= ~(u16(1) << (low & 0x0f));
+		return;
+	}
+	if ((op & 0xfcff) == 0xf485) // ABS src, dst
+	{
+		const bool source_b = BIT(op, 9);
+		const bool destination_b = BIT(op, 8);
+		const u64 raw = accumulator(source_b) & ACC_MASK;
+		const s64 value = s64(raw << 24) >> 24;
+		const bool overflow = raw == (u64(1) << 39);
+		u64 result = value < 0 ? (-value & ACC_MASK) : raw;
+		if (overflow && BIT(m_st1, 9)) // OVM
+			result = (u64(1) << 39) - 1;
+		accumulator(destination_b) = result;
+		const u16 overflow_mask = u16(1) << (destination_b ? 9 : 10);
+		m_st0 = (m_st0 & ~overflow_mask) | (overflow ? overflow_mask : 0);
 		return;
 	}
 	if ((op & 0xfd00) == 0xfd00) // XC n, condition
@@ -406,12 +580,14 @@ void tms320c54x_device::execute_one(u16 op)
 						? BIT(m_st0, 11) : !BIT(m_st0, 11));
 			if (low & 0x03)
 			{
-				// BIO is not connected on the current Nokia backend.
+				// BIO defaults deasserted until a board supplies the input line.
 				execute = execute && ((low & 0x03) == 0x02);
 			}
 		}
 		if (!execute)
 			m_pc += words;
+		else
+			m_xc_guard = words;
 		return;
 	}
 	if ((op & 0xfcf0) == 0xf050) // XOR #lk, shift, source, destination
@@ -444,7 +620,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const int shift = s8((op & 0x1f) << 3) >> 3;
 		const u64 source = accumulator(BIT(op, 9));
-		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
+		const u64 value = shift < 0 ? source >> -shift :
 				(source << shift) & ACC_MASK;
 		accumulator(BIT(op, 8)) &= value;
 		return;
@@ -453,7 +629,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const int shift = s8((op & 0x1f) << 3) >> 3;
 		const u64 source = accumulator(BIT(op, 9));
-		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
+		const u64 value = shift < 0 ? source >> -shift :
 				(source << shift) & ACC_MASK;
 		accumulator(BIT(op, 8)) |= value;
 		return;
@@ -547,6 +723,43 @@ void tms320c54x_device::execute_one(u16 op)
 		data_write(destination, data_read(source));
 		return;
 	}
+	if ((op & 0xfce0) == 0xf400 || (op & 0xfce0) == 0xf420 ||
+			(op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf460)
+	{
+		// Accumulator arithmetic with a signed five-bit shift.  Bit 9 selects
+		// the source and bit 8 the destination.
+		const unsigned operation = (op >> 5) & 3;
+		const int shift = s8(u8(op << 3)) >> 3;
+		u64 source = accumulator(BIT(op, 9));
+		if (shift >= 0)
+			source = (source << shift) & ACC_MASK;
+		else if (operation == 3)
+			source = arithmetic_shift_right(source, -shift);
+		else
+			source >>= -shift;
+		u64 &destination = accumulator(BIT(op, 8));
+		switch (operation)
+		{
+		case 0: destination = (destination + source) & ACC_MASK; break;
+		case 1: destination = (destination - source) & ACC_MASK; break;
+		case 2: destination = source; break;
+		case 3: destination = source; break; // SFTA differs only in flag effects.
+		}
+		return;
+	}
+	if ((op & 0xfce0) == 0xf0c0) // XOR source accumulator, shift, destination accumulator
+	{
+		const int shift = s8(u8(op << 3)) >> 3;
+		u64 source = accumulator(BIT(op, 9));
+		if (shift >= 0)
+			source = (source << shift) & ACC_MASK;
+		else
+			source >>= -shift;
+		u64 &destination = accumulator(BIT(op, 8));
+		destination ^= source;
+		destination &= ACC_MASK;
+		return;
+	}
 	switch (op & 0xff00)
 	{
 	case 0x1000: // LD Smem, A
@@ -561,13 +774,67 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x1300: // LD uns(Smem), B
 		m_b = indirect_read(low);
 		return;
-	case 0x3200: // LD Smem, ASM, A
-	case 0x3300: // LD Smem, ASM, B
+	case 0x3000: case 0x3100: case 0x3200: case 0x3300:
+	case 0x3400: case 0x3500: case 0x3600: case 0x3700:
+	case 0x3800: case 0x3900: case 0x3a00: case 0x3b00:
+	case 0x3c00: case 0x3d00: case 0x3e00: case 0x3f00:
 	{
-		const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
-		const u64 value = data_operand(indirect_read(low));
-		accumulator(BIT(op, 8)) = shift < 0 ? arithmetic_shift_right(value, -shift) :
-				(value << shift) & ACC_MASK;
+		const unsigned family = (op >> 8) & 0x0f;
+		const u16 memory = indirect_read(low);
+		if (family == 0)
+		{
+			m_t = memory;
+			return;
+		}
+		if (family == 2)
+		{
+			m_st1 = (m_st1 & ~u16(0x001f)) | (memory & 0x001f);
+			return;
+		}
+		if (family == 4)
+		{
+			const bool bit = BIT(memory, 15 - (m_t & 0x0f));
+			m_st0 = (m_st0 & ~u16(0x1000)) | (bit ? 0x1000 : 0);
+			return;
+		}
+		if (family == 1 || family == 3 || family == 5 || family == 7)
+		{
+			s64 product = s64(s16(m_a >> 16)) * s64(s16(memory));
+			if (BIT(m_st1, 6))
+				product <<= 1;
+			s64 result = family == 1 ? product :
+					family == 3 ? (s64(m_b << 24) >> 24) - product :
+					(s64(m_b << 24) >> 24) + product;
+			if (family == 7)
+				result = (result + 0x8000) & ~s64(0xffff);
+			m_b = u64(result) & ACC_MASK;
+			m_t = memory;
+			return;
+		}
+		if (family == 6)
+		{
+			s64 product = s64(s16(m_a >> 16)) * s64(s16(m_t));
+			if (BIT(m_st1, 6))
+				product <<= 1;
+			m_a = u64((product + (s64(m_b << 24) >> 24) + 0x8000) & ~s64(0xffff)) & ACC_MASK;
+			const s64 value = BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory);
+			m_b = u64(value << 16) & ACC_MASK;
+			return;
+		}
+		if (family >= 8 && family <= 0x0b)
+		{
+			s64 product = s64(s16(memory)) * s64(s16(memory));
+			if (BIT(m_st1, 6))
+				product <<= 1;
+			m_t = memory;
+			u64 &destination = accumulator(BIT(family, 0));
+			const s64 current = s64(destination << 24) >> 24;
+			destination = u64(BIT(family, 1) ? current - product : current + product) & ACC_MASK;
+			return;
+		}
+		const s64 value = (BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory)) << 16;
+		const u64 source = accumulator(BIT(family, 1));
+		accumulator(BIT(family, 0)) = (source + u64(value)) & ACC_MASK;
 		return;
 	}
 	case 0x0000: // ADD Smem, A
@@ -579,6 +846,21 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0200: // ADD uns(Smem), A
 		m_a = (m_a + indirect_read(low)) & ACC_MASK;
 		return;
+	case 0x0600: // ADDC Smem, A
+	case 0x0700: // ADDC Smem, B
+	{
+		// ADDC zero-extends Smem and consumes ST0.C. Carry is defined at
+		// the 32-bit accumulator boundary, independently of the guard byte.
+		u64 &destination = accumulator(BIT(op, 8));
+		const u64 operand = u64(indirect_read(low)) + (BIT(m_st0, 11) ? 1 : 0);
+		const u64 low_result = u64(u32(destination)) + operand;
+		destination = (destination + operand) & ACC_MASK;
+		if (low_result > 0xffffffffU)
+			m_st0 |= 0x0800;
+		else
+			m_st0 &= ~u16(0x0800);
+		return;
+	}
 	case 0x0800: // SUB Smem, A
 		m_a = (m_a - data_operand(indirect_read(low))) & ACC_MASK;
 		return;
@@ -609,6 +891,53 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x1d00: // XOR Smem, B
 		m_b = (m_b ^ indirect_read(low)) & ACC_MASK;
 		return;
+	case 0x1e00: // SUBC Smem, A
+	case 0x5e00: // SUBC Smem, B
+	{
+		u64 &source = accumulator(BIT(op, 14));
+		const u64 divisor = data_operand(indirect_read(low));
+		const s64 difference = (s64(source << 24) >> 24) -
+				(s64(divisor << 24) >> 24) * 0x8000;
+		const bool subtract = difference >= 0;
+		source = (subtract ? (u64(difference) << 1) | 1 : source << 1) &
+				ACC_MASK;
+		m_st0 = (m_st0 & ~u16(0x0800)) | (subtract ? 0x0800 : 0);
+		return;
+	}
+	case 0x2000: case 0x2100: // MPY Smem, A/B
+	case 0x2200: case 0x2300: // MPYR Smem, A/B
+	case 0x2400: case 0x2500: // MPYU Smem, A/B
+	case 0x2600: case 0x2700: // SQUR Smem, A/B
+	case 0x2800: case 0x2900: // MAC Smem, A/B
+	case 0x2a00: case 0x2b00: // MACR Smem, A/B
+	case 0x2c00: case 0x2d00: // MAS Smem, A/B
+	case 0x2e00: case 0x2f00: // MASR Smem, A/B
+	{
+		const unsigned family = (op >> 8) & 0x0e;
+		const u16 memory = indirect_read(low);
+		s64 product;
+		if (family == 0x04)
+			product = s64(u16(m_t)) * s64(memory);
+		else if (family == 0x06)
+			product = s64(s16(memory)) * s64(s16(memory));
+		else
+			product = s64(s16(m_t)) * s64(s16(memory));
+		if (BIT(m_st1, 6)) // FRCT
+			product <<= 1;
+
+		u64 &destination = accumulator(BIT(op, 8));
+		s64 result;
+		if (family <= 0x06)
+			result = product;
+		else if (family >= 0x0c)
+			result = (s64(destination << 24) >> 24) - product;
+		else
+			result = (s64(destination << 24) >> 24) + product;
+		if (family == 0x02 || family == 0x0a || family == 0x0e)
+			result = (result + 0x8000) & ~s64(0xffff);
+		destination = u64(result) & ACC_MASK;
+		return;
+	}
 	case 0x4400: // LD Smem, 16, A
 		m_a = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
 		return;
@@ -653,11 +982,59 @@ void tms320c54x_device::execute_one(u16 op)
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
 		return;
 	}
+	case 0x6f00: // Extended ALU/load/store Smem, shift, accumulator
+	{
+		const u16 address = low == 0xf8 ? fetch() : m_ar[low & 7];
+		const u16 extension = fetch();
+		const unsigned operation = (extension >> 5) & 7;
+		const int shift = s8(u8(extension << 3)) >> 3;
+		const bool destination_b = BIT(extension, 8);
+		const bool source_b = BIT(extension, 9);
+		auto shifted_memory = [this, address, shift] () -> u64
+		{
+			s64 value = BIT(m_st1, 8) ? s16(data_read(address)) : data_read(address);
+			return shift >= 0 ? u64(value << shift) & ACC_MASK :
+					u64(value >> -shift) & ACC_MASK;
+		};
+		u64 &destination = accumulator(destination_b);
+		switch (operation)
+		{
+		case 0:
+			destination = (accumulator(source_b) + shifted_memory()) & ACC_MASK;
+			break;
+		case 1:
+			destination = (accumulator(source_b) - shifted_memory()) & ACC_MASK;
+			break;
+		case 2:
+			destination = shifted_memory();
+			break;
+		case 3:
+		{
+			const s64 high = s16(accumulator(destination_b) >> 16);
+			data_write(address, u16(shift >= 0 ? high << shift : high >> -shift));
+			break;
+		}
+		case 4:
+		{
+			const s64 value = s64(accumulator(destination_b) << 24) >> 24;
+			data_write(address, u16(shift >= 0 ? value << shift : value >> -shift));
+			break;
+		}
+		default:
+			logerror("%s: unimplemented C54x 6f extension %04x at %04x\n",
+					machine().describe_context(), extension, u16(m_pc - 3));
+			m_illegal = true;
+			break;
+		}
+		if (low != 0xf8)
+			indirect_modify(low);
+		return;
+	}
 	case 0x4800: // LDM MMR, A
-		m_a = data_operand(data_read(low & 0x1f));
+		m_a = data_operand(data_read(low & 0x7f));
 		return;
 	case 0x4900: // LDM MMR, B
-		m_b = data_operand(data_read(low & 0x1f));
+		m_b = data_operand(data_read(low & 0x7f));
 		return;
 	case 0x4e00: // DST A, Lmem
 	case 0x4f00: // DST B, Lmem
@@ -722,6 +1099,19 @@ void tms320c54x_device::execute_one(u16 op)
 			m_pc = destination;
 		return;
 	}
+	case 0x6e00: // BANZD pmad, *ARx modification
+	{
+		const unsigned ar = low & 7;
+		const bool branch = m_ar[ar] != 0;
+		indirect_modify(low);
+		const u16 destination = fetch();
+		if (branch)
+		{
+			m_delayed_target = destination;
+			m_delayed_words = 2;
+		}
+		return;
+	}
 	case 0x8000: // STL A, Smem
 		indirect_write(low, u16(m_a));
 		return;
@@ -744,10 +1134,10 @@ void tms320c54x_device::execute_one(u16 op)
 		m_sp = u16(m_sp + s8(low));
 		return;
 	case 0x8800: // STLM A, MMR
-		data_write(low & 0x1f, u16(m_a));
+		data_write(low & 0x7f, u16(m_a));
 		return;
 	case 0x8900: // STLM B, MMR
-		data_write(low & 0x1f, u16(m_b));
+		data_write(low & 0x7f, u16(m_b));
 		return;
 	case 0x7100: // MVDM Smem, dmad
 	{
@@ -759,7 +1149,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x7300: // MVDM MMR, dmad
-		data_write(fetch(), data_read(low & 0x1f));
+		data_write(fetch(), data_read(low & 0x7f));
 		return;
 	case 0x7400: // PORTR port, Smem
 		if (low == 0xf8)
@@ -799,7 +1189,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x7700: // STM #lk, MMR
 	{
 		const u16 value = fetch();
-		const unsigned reg = low & 0x1f;
+		const unsigned reg = low & 0x7f;
 		data_write(reg, value);
 		return;
 	}
@@ -821,6 +1211,15 @@ void tms320c54x_device::execute_one(u16 op)
 			indirect_modify(low);
 		return;
 	}
+	case 0x7e00: // READA Smem
+	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
+		const u16 value = m_program.read_word(u16(m_a) +
+				(repeated ? m_rpt_iteration : 0));
+		indirect_write(low, value);
+		return;
+	}
 	case 0xe700: // MVDK source auxiliary register to destination MMR
 	{
 		const unsigned source = (low >> 4) & 7;
@@ -832,40 +1231,64 @@ void tms320c54x_device::execute_one(u16 op)
 		break;
 	}
 
-	if (op == 0xe598) // MVDD *AR3+, *AR2+
+	if ((op & 0xff00) == 0xe500) // MVDD Xmem, Ymem
 	{
-		m_data.write_word(m_ar[2]++, m_data.read_word(m_ar[3]++));
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 source_address = m_ar[xar];
+		const u16 destination_address = m_ar[yar];
+		const u16 value = data_read(source_address);
+		data_write(destination_address, value);
+		dual_modify(x);
+		// When both operands select the same AR with different modifiers, the
+		// X operand's modifier owns the address update (SPRU131G section 5.5.4).
+		if (xar != yar)
+			dual_modify(y);
 		return;
 	}
-	if (op == 0xe5a8) // MVDD *AR4+, *AR2+
+	if ((op & 0xff80) == 0xf900) // CC pmad, condition
 	{
-		m_data.write_word(m_ar[2]++, m_data.read_word(m_ar[4]++));
-		return;
-	}
-	if (op == 0xe50b) // MVDD *AR2, *AR5+
-	{
-		m_data.write_word(m_ar[5]++, m_data.read_word(m_ar[2]));
-		return;
-	}
-	if (op == 0xe5c9) // MVDD *AR2+0%, *AR3+
-	{
-		m_data.write_word(m_ar[3]++, m_data.read_word(m_ar[2]));
-		circular_modify(2, s16(m_ar[0]));
-		return;
-	}
-	if (op == 0xe58b) // MVDD *AR2+, *AR5+
-	{
-		m_data.write_word(m_ar[5]++, m_data.read_word(m_ar[2]++));
-		return;
-	}
-	if (op == 0xe589) // MVDD *AR2+, *AR3+
-	{
-		m_data.write_word(m_ar[3]++, m_data.read_word(m_ar[2]++));
-		return;
-	}
-	if (op == 0xe59c) // MVDD *AR3+, *AR6+
-	{
-		m_data.write_word(m_ar[6]++, m_data.read_word(m_ar[3]++));
+		const u8 condition = op;
+		const u16 destination = fetch();
+		bool take = false;
+		if (BIT(condition, 6))
+		{
+			const bool b = BIT(condition, 3);
+			const u64 raw = accumulator(b) & ACC_MASK;
+			const s64 value = s64(raw << 24) >> 24;
+			switch (condition & 7)
+			{
+			case 2: take = value >= 0; break;
+			case 3: take = value < 0; break;
+			case 4: take = raw != 0; break;
+			case 5: take = raw == 0; break;
+			case 6: take = value > 0; break;
+			case 7: take = value <= 0; break;
+			default: take = true; break;
+			}
+			if ((condition & 0x70) == 0x70)
+				take = BIT(m_st0, b ? 9 : 10);
+			else if ((condition & 0x70) == 0x60)
+				take = !BIT(m_st0, b ? 9 : 10);
+		}
+		else if ((condition & 0x30) == 0x30)
+			take = BIT(m_st0, 12);
+		else if ((condition & 0x30) == 0x20)
+			take = !BIT(m_st0, 12);
+		else if ((condition & 0x0c) == 0x0c)
+			take = BIT(m_st0, 11);
+		else if ((condition & 0x0c) == 0x08)
+			take = !BIT(m_st0, 11);
+		else
+			take = true;
+		if (take)
+		{
+			push(m_pc);
+			m_pc = destination;
+			m_icount -= 3;
+		}
 		return;
 	}
 
@@ -957,19 +1380,6 @@ void tms320c54x_device::execute_one(u16 op)
 		push(m_pc);
 		m_pc = destination;
 		m_icount -= 3;
-		return;
-	}
-	case 0xf945: // CC pmad, AEQ
-	case 0xf947: // CC pmad, ALEQ
-	{
-		const u16 destination = fetch();
-		const s64 value = s64(m_a << 24) >> 24;
-		if (op == 0xf945 ? value == 0 : value <= 0)
-		{
-			push(m_pc);
-			m_pc = destination;
-			m_icount -= 3;
-		}
 		return;
 	}
 	case 0xf073: // B pmad
@@ -1123,6 +1533,13 @@ void tms320c54x_device::execute_one(u16 op)
 			m_pc = destination;
 		return;
 	}
+	case 0xf84b: // BC pmad, BLT
+	{
+		const u16 destination = fetch();
+		if ((s64(m_b << 24) >> 24) < 0)
+			m_pc = destination;
+		return;
+	}
 	case 0xf842: // BC pmad, AGEQ
 	{
 		const u16 destination = fetch();
@@ -1178,11 +1595,11 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf3f8: // ROR B, 8
 		m_b = ((m_b >> 8) | (m_b << 32)) & ACC_MASK;
 		return;
-	case 0xf0ff: // ROR A, 1
-		m_a = ((m_a >> 1) | (m_a << 39)) & ACC_MASK;
+	case 0xf0ff: // SFTA A, -1
+		m_a = arithmetic_shift_right(m_a, 1);
 		return;
-	case 0xf3ff: // ROR B, 1
-		m_b = ((m_b >> 1) | (m_b << 39)) & ACC_MASK;
+	case 0xf3ff: // SFTA B, -1
+		m_b = arithmetic_shift_right(m_b, 1);
 		return;
 	case 0xf0b0: // OR A >> 16, A
 		m_a |= arithmetic_shift_right(m_a, 16);
@@ -1234,12 +1651,12 @@ void tms320c54x_device::execute_one(u16 op)
 	default:
 		if ((op & 0xffe0) == 0x4a00) // PSHM MMR
 		{
-			push(data_read(low & 0x1f));
+			push(data_read(low & 0x7f));
 			return;
 		}
 		if ((op & 0xffe0) == 0x8a00) // POPM MMR
 		{
-			data_write(low & 0x1f, pop());
+			data_write(low & 0x7f, pop());
 			return;
 		}
 		if ((op & 0xff00) == 0xec00) // RPT #k
@@ -1292,12 +1709,19 @@ void tms320c54x_device::execute_run()
 		}
 
 		const bool delayed = m_delayed_words != 0;
+		const bool xc_guarded = m_xc_guard != 0;
 		const u16 instruction_pc = m_pc;
+		const bool repeat_was_armed = m_rpt_armed;
 		m_op = fetch();
+		if (m_opcode_first_pc[m_op] == 0xffff)
+			m_opcode_first_pc[m_op] = instruction_pc;
 		execute_one(m_op);
 		if (!m_illegal)
 		{
-			finish_repeats();
+			// RPT/RPTZ arms the next instruction; its own retirement must not
+			// consume one of the requested body executions.
+			if (repeat_was_armed || !m_rpt_armed)
+				finish_repeats();
 			if (delayed)
 			{
 				const unsigned words = u16(m_pc - instruction_pc);
@@ -1305,6 +1729,8 @@ void tms320c54x_device::execute_run()
 				if (!m_delayed_words)
 					m_pc = m_delayed_target;
 			}
+			if (xc_guarded)
+				--m_xc_guard;
 		}
 		--m_icount;
 	}

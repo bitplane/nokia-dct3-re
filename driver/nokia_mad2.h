@@ -37,12 +37,14 @@ public:
 	void set_timer1_hz(u32 value) { m_timer1_hz = value; }
 	void set_fiq8_hz(u32 value) { m_fiq8_hz = value; }
 	void set_timer0_catchup(bool value) { m_timer0_catchup = value; }
+	void set_clock_stop_enabled(bool value) { m_clock_stop_enabled = value; }
 	void set_external_status(u8 value) { m_external_status = value & 0x07; }
 	void set_dsp_reset_wiring_contract(dsp_reset_wiring_contract contract);
 
 	u8 read(offs_t offset);
 	void write(offs_t offset, u8 data);
 	void assert_fiq(unsigned line);
+	void set_fiq_line(unsigned line, bool state);
 	void assert_irq(unsigned line);
 	void set_irq_line(unsigned line, bool state);
 	void ack_fiq(u16 mask);
@@ -104,6 +106,7 @@ private:
 	// FIQ8 advances the firmware's centisecond counters while enabled.
 	u32 m_fiq8_hz = 100;
 	bool m_timer0_catchup = false;
+	bool m_clock_stop_enabled = true;
 	dsp_reset_wiring_contract m_dsp_reset_wiring;
 	bool m_timer_trace = false;
 	bool m_interrupt_trace = false;

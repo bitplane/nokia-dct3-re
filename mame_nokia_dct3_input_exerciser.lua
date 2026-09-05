@@ -19,10 +19,15 @@ local quiet = os.getenv("NOKIA_DCT3_LUA_QUIET") == "1"
 local bios = machine.options.entries.bios:value()
 local v501 = bios == "501"
 local is_3410 = machine.system.name == "noki3410"
+local is_early_serial = machine.system.name == "noki5110" or
+		machine.system.name == "noki6110"
+local dsp_cpu = machine.devices[":dsp_c54x:cpu"]
 local lcd_controller_width = is_3410 and 102 or 84
 local lcd_controller_banks = is_3410 and 9 or 6
 local lcd_visible_width = is_3410 and 96 or 84
 local lcd_visible_height = is_3410 and 65 or 48
+local lcd_data_port = is_early_serial and 0x2b or 0x2e
+local lcd_command_port = is_early_serial and 0x2c or 0x6e
 
 local function info(message)
 	if not quiet then emu.print_info(message) end
@@ -68,6 +73,7 @@ local structural = {
 	final_irq_status = 0,
 	final_fiq_status = 0, state_roundtrip = "not-run",
 	final_pc = 0,
+	final_lr = 0,
 	final_current_task = 0, final_startup_mode = 0, final_startup_event = 0,
 	final_startup_flags = 0, final_contact_status = 0,
 	final_no_sim = 0, final_sim_enable = 0,
@@ -138,12 +144,48 @@ end
 
 local function field_by_mask(tag, mask)
 	local port = machine.ioport.ports[":" .. tag] or machine.ioport.ports[tag]
-	return port and port:field(mask) or nil
+	if not port then return nil end
+	local field = port:field(mask)
+	if field then return field end
+	-- Some MAME builds do not index split active-low fields by mask even though
+	-- the fields are exposed through the port iterator.
+	for _, candidate in pairs(port.fields) do
+		if string.format("%x", candidate.mask) == string.format("%x", mask) then
+			return candidate
+		end
+	end
+	return nil
+end
+
+local function field_by_name(tag, name)
+	local port = machine.ioport.ports[":" .. tag] or machine.ioport.ports[tag]
+	return port and port.fields[name] or nil
 end
 
 local is_five_row_product = machine.system.name == "noki3310" or machine.system.name == "noki3330" or is_3410
 local key_fields
-if is_3410 then
+if machine.system.name == "noki5110" then
+	key_fields = {
+		enter = field_by_name("COL.1", "Menu"),
+		up = field_by_name("COL.1", "Scroll Up"),
+		down = field_by_name("COL.0", "Scroll Down"),
+		["0"] = field_by_name("COL.3", "Keypad 0"),
+		["1"] = field_by_name("COL.2", "Keypad 1"),
+		["2"] = field_by_name("COL.3", "Keypad 2"),
+		["3"] = field_by_name("COL.4", "Keypad 3"),
+		["4"] = field_by_name("COL.2", "Keypad 4"),
+		["5"] = field_by_name("COL.3", "Keypad 5"),
+		["6"] = field_by_name("COL.4", "Keypad 6"),
+		["7"] = field_by_name("COL.2", "Keypad 7"),
+		["8"] = field_by_name("COL.3", "Keypad 8"),
+		["9"] = field_by_name("COL.4", "Keypad 9"),
+		del = field_by_name("COL.1", "Names / C"),
+		c = field_by_name("COL.1", "Names / C"),
+		minus = field_by_name("COL.4", "Keypad #"),
+		star = field_by_name("COL.2", "Keypad *"),
+		power = field_by_name("PWR", "Power"),
+	}
+elseif is_3410 then
 	key_fields = {
 		enter = field_by_mask("COL.4", 0x01), up = field_by_mask("COL.3", 0x10),
 		down = field_by_mask("COL.3", 0x01), ["0"] = field_by_mask("COL.2", 0x01),
@@ -182,6 +224,7 @@ else
 	}
 end
 key_fields.navi = key_fields.enter
+key_fields.menu = key_fields.enter
 key_fields.select = key_fields.enter
 key_fields.left = key_fields.enter
 key_fields.soft1 = key_fields.enter
@@ -196,9 +239,16 @@ if charger_initial and charger_field then charger_field:set_value(1) end
 
 local function press(name)
 	local field = key_fields[name]
+	if not field then
+		machine:logerror(string.format("input-error: unmapped key name=%s system=%s\n",
+				name, machine.system.name))
+		return
+	end
 	if field and not active_fields[name] then
 		field:set_value(1)
 		active_fields[name] = field
+		machine:logerror(string.format("input-press: t=%.6f name=%s port=%02x\n",
+				emulation_seconds(), name, field.port:read()))
 		info(string.format("input-press:frame=%d name=%s", frames, name))
 	end
 end
@@ -206,8 +256,11 @@ end
 local function release(name)
 	local field = active_fields[name]
 	if field then
+		local port_value = field.port:read()
 		field:clear_value()
 		active_fields[name] = nil
+		machine:logerror(string.format("input-release: t=%.6f name=%s port=%02x\n",
+				emulation_seconds(), name, port_value))
 		info(string.format("input-release:frame=%d name=%s", frames, name))
 	end
 end
@@ -275,7 +328,7 @@ taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "nokia_dct3_oracle_m
 	local address, value = bus_byte(offset, data, mask)
 	record_mmio(address, value)
 	local reg = address & 0xff
-	if reg == 0x2e then
+	if reg == lcd_data_port then
 		lcd_dirty = true
 		lcd_data_writes = lcd_data_writes + 1
 		if value ~= 0 then nonzero_lcd_data_writes = nonzero_lcd_data_writes + 1 end
@@ -289,7 +342,7 @@ taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "nokia_dct3_oracle_m
 			if lcd_x >= lcd_controller_width then lcd_x = 0; lcd_y = (lcd_y + 1) % lcd_controller_banks end
 		end
 		if old_x == lcd_controller_width - 1 and old_y == lcd_controller_banks - 1 and lcd_x == 0 and lcd_y == 0 then queue_lcd_dump() end
-	elseif reg == 0x6e then
+	elseif reg == lcd_command_port then
 		lcd_dirty = true
 		lcd_cmd_writes = lcd_cmd_writes + 1
 		if (lcd_mode & 0x01) ~= 0 then
@@ -367,6 +420,7 @@ local function write_boot_summary()
 		string.format("eeprom_signal_writes=%d", structural.eeprom_signal_writes),
 		string.format("startup_modes=%s", hex_set(structural.startup_modes, 4)),
 		string.format("final_pc=%08X", structural.final_pc),
+		string.format("final_lr=%08X", structural.final_lr),
 		string.format("final_current_task=%02X", structural.final_current_task),
 		string.format("final_startup_mode=%04X", structural.final_startup_mode),
 		string.format("final_startup_event=%04X", structural.final_startup_event),
@@ -395,6 +449,13 @@ local post_period = env_number("NOKIA_DCT3_POST_READY_KEY_PERIOD_MS", 0) / 1000
 local post_capture_delay = env_number("NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS", -1) / 1000
 local post_sequence_driven = #post_keys > 0 and post_period == 0
 
+if #post_keys > 0 then
+	machine:logerror(string.format(
+			"input-plan: keys=%s delay=%.3f duration=%.3f gap=%.3f capture=%.3f\n",
+			table.concat(post_keys, ","), post_delay, post_duration, post_gap,
+			post_capture_delay))
+end
+
 local function update_post_ready_key()
 	if #post_keys > 0 and not startup_ready_time and (structural.final_startup_flags & 0x0f) == 0x0f then
 		startup_ready_time = emulation_seconds()
@@ -422,6 +483,7 @@ end
 
 local function sample_structural_state()
 	structural.final_pc = cpu.state["PC"].value
+	structural.final_lr = cpu.state["R14"].value
 	structural.irq_seen = structural.irq_seen | space:read_u8(0x20009)
 	structural.final_irq_status = space:read_u8(0x20009)
 	structural.fiq_seen = structural.fiq_seen | space:read_u8(0x20008)
@@ -455,11 +517,11 @@ end)
 if #post_keys > 0 then
 	local input_timer = coroutine.create(function()
 		if post_sequence_driven then
-			if is_five_row_product then
+			if machine.system.name ~= "noki3210" then
 				-- The structural addresses above belong to the 3210 ROMs.  A
 				-- product-spanning input fixture uses an explicit boot-relative
-				-- delay for five-row products rather than treating unrelated RAM
-				-- as ready.
+				-- delay for other products rather than treating unrelated RAM as
+				-- a 3210 readiness predicate.
 				startup_ready_time = emulation_seconds()
 			else
 				repeat
@@ -468,7 +530,11 @@ if #post_keys > 0 then
 				until (structural.final_startup_flags & 0x0f) == 0x0f
 				startup_ready_time = emulation_seconds()
 			end
+			machine:logerror(string.format("input-wait: t=%.6f delay=%.3f\n",
+					emulation_seconds(), post_delay))
 			emu.wait(post_delay)
+			machine:logerror(string.format("input-wake: t=%.6f\n",
+					emulation_seconds()))
 			for _, name in ipairs(post_keys) do
 				local wait_ms = string.match(name, "^wait(%d+)$")
 				if wait_ms then
@@ -889,13 +955,16 @@ if state_roundtrip_at >= 0 then
 			end
 		end
 		local state_roundtrip_requested_at = emulation_seconds()
+		local mode_address = is_early_serial and nil or
+				(v501 and 0x11224c or 0x1123f0)
 		local snapshot = {
-			mode = space:read_u16(v501 and 0x11224c or 0x1123f0),
+			mode = mode_address and space:read_u16(mode_address) or 0xffff,
 			counter = space:read_u16(0x20010),
 			fiq_mask = space:read_u8(0x2000a),
 			irq_mask = space:read_u8(0x2000b),
 			irq_ctrl = space:read_u8(0x2000c),
 			gensio = space:read_u8(0x2006d),
+			dsp_idle = dsp_cpu and dsp_cpu.state["IDLE"].value or 0,
 		}
 		if state_roundtrip_replay > 0 then
 			machine:logerror(string.format(
@@ -927,12 +996,15 @@ if state_roundtrip_at >= 0 then
 		local counter = space:read_u16(0x20010)
 		local counter_delta = (counter - snapshot.counter) & 0xffff
 		local passed =
-			space:read_u16(v501 and 0x11224c or 0x1123f0) == snapshot.mode and
+			(not mode_address or space:read_u16(mode_address) == snapshot.mode) and
 			space:read_u8(0x2000a) == snapshot.fiq_mask and
 			space:read_u8(0x2000b) == snapshot.irq_mask and
 			space:read_u8(0x2000c) == snapshot.irq_ctrl and
 			space:read_u8(0x2006d) == snapshot.gensio and
-			counter_delta < 0x1000
+			counter_delta < 0x1000 and
+			(not dsp_cpu or
+				(dsp_cpu.state["IDLE"].value == snapshot.dsp_idle and
+				 dsp_cpu.state["ILLEGAL"].value == 0))
 		structural.state_roundtrip = passed and "pass" or "fail"
 		machine:logerror(string.format(
 			"state_roundtrip: result=%s timer_delta=%04x mode=%04x "

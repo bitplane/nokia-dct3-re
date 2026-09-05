@@ -26,29 +26,6 @@ private:
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
-		if (!strcmp(machine().system().name, "tms54rom4"))
-		{
-			auto &data = m_cpu->space(AS_DATA);
-			m_response_tap = data.install_write_tap(0x1200, 0x1207,
-					"rom4_response", [this, &data] (offs_t address, u16 &value, u16)
-					{
-						static constexpr u16 prefix[] = {
-							0x3532, 0x0000, 0xffff, 0xffff,
-							0xff0f, 0x0000, 0x0078, 0x54c2
-						};
-						for (unsigned i = 0; i != std::size(prefix); ++i)
-						{
-							const u16 observed = address == 0x1200 + i ? value : data.read_word(0x1200 + i);
-							if (observed != prefix[i])
-								return;
-						}
-						if (m_response_captured)
-							return;
-						for (unsigned i = 0; i != m_response.size(); ++i)
-							m_response[i] = address == 0x1200 + i ? value : data.read_word(0x1200 + i);
-						m_response_captured = true;
-					});
-		}
 	}
 
 	virtual void machine_reset() override
@@ -72,23 +49,22 @@ private:
 			for (unsigned address = 0xb000; address != 0xf000; ++address)
 				data.write_word(address, drom[address]);
 			// The sparse entry snapshot predates the firmware-provided challenge.
-			// Supply the observed input words while retaining the deterministic
-			// peripheral-free state used by this isolated transform fixture.
+			// Supply the factory-profile record encoded for COBBA 00160010 while
+			// retaining the deterministic peripheral-free entry state.
 			static constexpr u16 challenge[] = {
 				0xd6fb, 0x4394, 0xe437, 0xda16, 0x9668, 0x964f, 0x5cd4,
 				0x32fe, 0x5be2, 0xdba6, 0x9643, 0x82d7, 0x0000, 0x0000
 			};
 			for (unsigned i = 0; i != std::size(challenge); ++i)
 				data.write_word(0x0825 + i, challenge[i]);
-			m_response_captured = false;
 			m_phase = 2;
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x4b73);
 			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x201f);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x2103);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x281f);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
 			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0x0052);
-			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x000b);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x000e);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0000004b73);
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfffffffffe);
 			static constexpr u16 ar[] = {
@@ -137,6 +113,7 @@ private:
 		program.write_word(0x0118, 0xe726);
 		program.write_word(0x0119, 0xf074);
 		program.write_word(0x011a, 0x0220);
+
 		program.write_word(0x011b, 0x70f8);
 		program.write_word(0x011c, 0x0904);
 		program.write_word(0x011d, 0x0801);
@@ -167,7 +144,19 @@ private:
 		program.write_word(0x0136, 0x7cf8);
 		program.write_word(0x0137, 0x0908);
 		program.write_word(0x0138, 0x0907);
-		program.write_word(0x0139, 0xf5e1);
+		// ROM4 receive enqueue: copy 26 words from *AR3+ into the circular
+		// MDIRCV ring at *AR2+0%.  E59C's Y operand is AR2, not AR6.
+		program.write_word(0x0139, 0x7710);
+		program.write_word(0x013a, 0x0001);
+		program.write_word(0x013b, 0x7712);
+		program.write_word(0x013c, 0x0882);
+		program.write_word(0x013d, 0x7713);
+		program.write_word(0x013e, 0x1300);
+		program.write_word(0x013f, 0x7719);
+		program.write_word(0x0140, 0x0052);
+		program.write_word(0x0141, 0xec19);
+		program.write_word(0x0142, 0xe59c);
+		program.write_word(0x0143, 0xf5e1);
 
 		program.write_word(0x0200, 0x7680);
 		program.write_word(0x0201, 0xbeef);
@@ -287,6 +276,8 @@ private:
 		program.write_word(0x03da, 0xeeff);
 		program.write_word(0x03db, 0xee02);
 		program.write_word(0x03dc, 0xf5e1);
+		program.write_word(0x03e0, 0xf0ff);
+		program.write_word(0x03e1, 0xf5e1);
 		data.write_word(0x0918, 1);
 		data.write_word(0x091a, 0);
 		data.write_word(0x0920, 0xaaaa);
@@ -315,6 +306,8 @@ private:
 		data.write_word(0x1205, 0xc431);
 		data.write_word(0x1206, 0xbfe4);
 		data.write_word(0x1207, 0x5d91);
+		for (unsigned i = 0; i != 26; ++i)
+			data.write_word(0x1300 + i, 0x6000 + i);
 		m_phase = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0100);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
@@ -561,8 +554,8 @@ private:
 		}
 		if (m_phase == 20)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 4,
-					"data-memory load shifted by ST1.ASM");
+			expect((m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x1f) == 1,
+					"data-memory load into ST1.ASM");
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03da);
 			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
@@ -574,6 +567,210 @@ private:
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301,
 					"signed stack-frame adjustment");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x35);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 22;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 22)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1a,
+					"arithmetic accumulator shift right");
+			program.write_word(0x03e4, 0x07f8); // ADDC *(absolute), B
+			program.write_word(0x03e5, 0x0920);
+			program.write_word(0x03e6, 0xf5e1);
+			data.write_word(0x0920, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03e4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 23;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 23)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xbe02,
+					"ADDC absolute operand and carry input");
+			expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
+					"ADDC 32-bit carry output");
+			program.write_word(0x03e8, 0x6e8f); // BANZD 03efh, *AR7-
+			program.write_word(0x03e9, 0x03ef);
+			program.write_word(0x03ea, 0xe801);
+			program.write_word(0x03eb, 0xe902);
+			program.write_word(0x03ec, 0xe803);
+			program.write_word(0x03ef, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03e8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 24;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 24)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
+					"BANZD executes two delay words");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0,
+					"BANZD address-register modification");
+			program.write_word(0x03f0, 0x24f8); // MPYU *(absolute), A
+			program.write_word(0x03f1, 0x0922);
+			program.write_word(0x03f2, 0xf5e1);
+			data.write_word(0x0922, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03f0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 25;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 25)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1fffe,
+					"MPYU unsigned operands");
+			program.write_word(0x03f4, 0x31f8); // MPYA *(absolute)
+			program.write_word(0x03f5, 0x0924);
+			program.write_word(0x03f6, 0xf5e1);
+			data.write_word(0x0924, 0xfffe);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03f4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 3U << 16);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 26;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 26)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					((u64(1) << 40) - 6), "MPYA signed product");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe,
+					"MPYA loads T");
+			program.write_word(0x03f8, 0xf944); // CC 0400h, ANEQ
+			program.write_word(0x03f9, 0x0400);
+			program.write_word(0x03fa, 0xf5e1);
+			program.write_word(0x0400, 0xe85a);
+			program.write_word(0x0401, 0xfc00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03f8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 27;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 27)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x5a,
+					"conditional call ANEQ");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
+					"conditional call return stack");
+			program.write_word(0x0404, 0x7ef8); // READA *(absolute)
+			program.write_word(0x0405, 0x0926);
+			program.write_word(0x0406, 0x7ff8); // WRITA *(absolute)
+			program.write_word(0x0407, 0x0927);
+			program.write_word(0x0408, 0xf5e1);
+			program.write_word(0x0925, 0xcafe);
+			data.write_word(0x0927, 0xbeef);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0404);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0925);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 28;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 28)
+		{
+			expect(data.read_word(0x0926) == 0xcafe,
+					"READA accumulator-addressed data read");
+			expect(program.read_word(0x0925) == 0xbeef,
+					"WRITA accumulator-addressed data write");
+			program.write_word(0x040c, 0xf485); // ABS A, A
+			program.write_word(0x040d, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x040c);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A,
+					(u64(1) << 40) - 7);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 29;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 29)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 7,
+					"ABS signed accumulator magnitude");
+			program.write_word(0x0410, 0x1ef8); // SUBC *(absolute), A
+			program.write_word(0x0411, 0x0928);
+			program.write_word(0x0412, 0xf5e1);
+			data.write_word(0x0928, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0410);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 30;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 30)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10001,
+					"SUBC conditional subtract and quotient bit");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800,
+					"SUBC successful subtraction carry");
+			program.write_word(0x0414, 0x1092); // LD *AR2+, A
+			program.write_word(0x0415, 0xf5e1);
+			data.write_word(0x0930, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0414);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0930);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 31;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 31)
+		{
+			expect((m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe000) == 0xa000,
+					"standard-mode indirect operand preserves ST0.ARP");
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0414);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0930);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 32;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 32)
+		{
+			expect((m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe000) == 0x4000,
+					"compatibility-mode indirect operand updates ST0.ARP");
+			program.write_word(0x0418, 0xf0b0); // OR A, -16, A
+			program.write_word(0x0419, 0xf5e1);
+			constexpr u64 negative = (u64(0xff) << 32) | 0x80000000U;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0418);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, negative);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 33;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 33)
+		{
+			constexpr u64 negative = (u64(0xff) << 32) | 0x80000000U;
+			osd_printf_info("TMS320C54x logical shift: actual=%010llx expected=%010llx\n",
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
+					(unsigned long long)((negative | (negative >> 16)) & ((u64(1) << 40) - 1)));
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					((negative | (negative >> 16)) & ((u64(1) << 40) - 1)),
+					"logical accumulator right shift zero-fills guard bits");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -640,20 +837,20 @@ private:
 			const u16 pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
 			static constexpr u16 expected_response[] = {
 				0x3532, 0x0000, 0xffff, 0xffff, 0xff0f, 0x0000, 0x0078,
-				0x54c2, 0x5cd4, 0x32fe, 0x5be2, 0xdba6, 0x9643, 0x82d7
+				0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x087c, 0x0000
 			};
 			osd_printf_info("TMS320C54x ROM4 execution frontier: pc=%04x "
 					"header=%04x,%04x ar2=%04x ar3=%04x\n", pc,
 					data.read_word(0x1200), data.read_word(0x1201),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_AR3)));
-			expect(m_response_captured, "complete ROM4 challenge response capture");
 			for (unsigned i = 0; i != std::size(expected_response); ++i)
 			{
-				if (m_response[i] != expected_response[i])
+				const u16 observed = data.read_word(0x1200 + i);
+				if (observed != expected_response[i])
 					osd_printf_info("TMS320C54x ROM4 response mismatch word=%u actual=%04x expected=%04x\n",
-							i, m_response[i], expected_response[i]);
-				expect(m_response[i] == expected_response[i],
+							i, observed, expected_response[i]);
+				expect(observed == expected_response[i],
 						"complete ROM4 challenge response");
 			}
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
@@ -725,6 +922,12 @@ private:
 				"data-to-program memory transfer");
 		expect(data.read_word(0x0908) == 0xaaaa,
 				"program-to-data memory transfer");
+		for (unsigned i = 0; i != 26; ++i)
+			expect(data.read_word(0x0882 + i) == 0x6000 + i,
+					"MVDD dual-operand circular transfer");
+		expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x089c &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x131a,
+				"MVDD dual-operand address updates");
 
 		// IDLE3 must retain its continuation PC, then an enabled source must
 		// vector through PMST.IPTR and preserve the return address on stack.
@@ -746,9 +949,6 @@ private:
 
 	required_device<tms320c54x_device> m_cpu;
 	emu_timer *m_check_timer = nullptr;
-	memory_passthrough_handler m_response_tap;
-	std::array<u16, 14> m_response{};
-	bool m_response_captured = false;
 	unsigned m_phase = 0;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;

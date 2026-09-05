@@ -59,7 +59,10 @@ void nokia_mbus_device::device_reset()
 
 u8 nokia_mbus_device::status() const
 {
-	return STATUS_LINE_IDLE | (m_status_latch & 0x0f) |
+	// The low three bits are the live serial bit counter. Firmware writes 7
+	// while acknowledging the ISR, but an idle controller reads the counter as
+	// zero; echoing the write makes the ROM4 ISR re-enter its partial-byte path.
+	return STATUS_LINE_IDLE |
 			(m_tx_ready ? STATUS_TX_READY : 0) |
 			(m_rx_ready ? STATUS_RX_READY : 0);
 }
@@ -76,6 +79,7 @@ u8 nokia_mbus_device::read(offs_t offset)
 	{
 		const u8 result = m_data;
 		m_rx_ready = false;
+		m_fiq2_cb(0);
 		trace_event("rx_read", result);
 		return result;
 	}
@@ -99,10 +103,13 @@ void nokia_mbus_device::write(offs_t offset, u8 data)
 			m_tx_ready = false;
 			m_tx_pending = false;
 			m_byte_timer->adjust(attotime::never);
+			m_fiq2_cb(0);
 		}
 		else
 		{
 			m_control = data;
+			if (!(data & CTRL_TX_ENABLE) && !m_rx_ready)
+				m_fiq2_cb(0);
 			if ((data & CTRL_TX_ENABLE) && !(old & CTRL_TX_ENABLE))
 				schedule_byte();
 			else if ((old & CTRL_RX_ENABLE) && !(data & CTRL_RX_ENABLE))
@@ -124,6 +131,7 @@ void nokia_mbus_device::write(offs_t offset, u8 data)
 		m_tx_data = data;
 		m_tx_pending = true;
 		m_tx_ready = false;
+		m_fiq2_cb(0);
 		schedule_byte();
 		trace_event("tx_load", data);
 		break;
@@ -139,6 +147,15 @@ bool nokia_mbus_device::receive_byte(u8 data)
 	trace_event("rx_ready", data);
 	m_fiq2_cb(1);
 	return true;
+}
+
+void nokia_mbus_device::fiq_mask_w(u8 old_mask, u8 new_mask)
+{
+	// ROM4 and later firmware starts an outbound frame by unmasking the MBUS
+	// timer FIQ while the transmitter is idle. Once the first byte is loaded,
+	// TX_ENABLE guards the per-byte mask changes from restarting the frame.
+	if (BIT(old_mask, 3) && !BIT(new_mask, 3) && !(m_control & CTRL_TX_ENABLE))
+		m_fiq3_timer->adjust(m_byte_delay);
 }
 
 void nokia_mbus_device::schedule_byte()
@@ -164,6 +181,14 @@ TIMER_CALLBACK_MEMBER(nokia_mbus_device::byte_complete)
 
 TIMER_CALLBACK_MEMBER(nokia_mbus_device::fiq3_event)
 {
+	// The calibrated source event is delayed.  Firmware can enable the
+	// transmitter before it expires, in which case the pending idle/start edge
+	// is stale and must not interrupt the active per-byte FIQ2 sequence.
+	if (m_control & CTRL_TX_ENABLE)
+	{
+		trace_event("fiq3_suppressed_tx_active");
+		return;
+	}
 	trace_event("fiq3");
 	m_fiq3_cb(1);
 }

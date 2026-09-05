@@ -87,15 +87,124 @@ DSP port-1 completion strobes also ring the MCU doorbell. The ordinary FIQ0
 handler drains the DSP receive ring to `0x0083/0x0083`; this is transport
 delivery, not a synthesized MCU message.
 
-The coherent run also executes the challenge transform, publishes its accepted
-`0x3532` response header and proceeds to the next transaction. This independently
-confirms the earlier no-assist result: resident slot `0x250b` is an intentional
-no-op, not a missing COBBA measurement acquisition hook. `SELFTEST_MEAS` has no
-equivalent in the MAME backend. `make check-c54x-rom4-coherent` guards the
-resulting `0x1074` transaction completion, complete transmit- and receive-ring
-drain and clean return to DSP idle. The isolated transform gate captures the
-complete 14-word accepted response at its intermediate publication boundary;
-the DSP subsequently reuses that buffer before returning to idle.
+The coherent run also executes the challenge transform on the MCU-supplied
+security records. With the generated factory profile and a fresh NVRAM root,
+the input halves are `d6fb 4394 e437 da16 9668 964f` and
+`5cd4 32fe 5be2 dba6 9643 82d7`. The C54x decodes them to the wildcard profile
+and publishes its response through FIQ0. At the validator boundary the MCU
+object contains `3532 0000 ffff ffff ff0f 0000 0078 54c2 0000 0000 0000 0000
+087c 0000`, and validation continues with `r6=1`. No reason-4
+warm reset occurs. The input acquisition is also organic: DSP reader `0x4610` selects
+COBBA serial registers 5 and 6, reads the modeled nominal values `0x160` and
+`0x010`, and the caller stores `0x0016`/`0x0010` in its input object. The
+coherent gate checks these values after the transaction. The old rejection
+conclusion used stale ROM addresses and mistook the
+DSPIF backing array for the mapped HPI view. It is retired.
+
+`make verify-5110-menu` extends that result through the handset UI. It creates
+a fresh NSE-1 EEPROM profile, boots v5.30 with the C54x backend, and applies a
+physical Menu-key transition before the firmware's unresolved idle clock-stop
+request. The key reaches MAD2 IRQ0 and the ROM4 five-by-five matrix scanner;
+firmware renders the Phone book menu with deterministic frame SHA-256
+`d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5`.
+The gate rejects baseband resets and illegal DSP instructions. It uses no HLE
+DSP reply, firmware-state write, or injected firmware input event.
+
+NSE-1 uses KBGPIO data/command ports `0x2b`/`0x2c` and a five-row matrix.
+Firmware temporarily masks all columns while changing row drive and consumes
+the cold-start power indication as a one-shot. MAD2 IRQ0 acknowledgement must
+therefore clear that latch and adopt the released matrix as its new baseline;
+retaining it as a held key makes column 1 permanently low and hides subsequent
+physical input transitions.
+
+Cold-start and operational power-button ownership are not interchangeable on
+this ROM. The NSE-1 board contract places the power indication on special
+column mask `0x02`; both the reset latch and live input sampling use that mask.
+A physical post-boot press consequently reaches IRQ0 and the scanner at
+`0x290c2c`, which records raw special value `0x81` at `0x10b6c8`. The active
+firmware key-map variant remains zero, however, and its table at `0x2ab518`
+maps that value to `0x3e` (no key), not semantic key `0x0d`. A one- and
+four-second hold therefore produces no shutdown transaction. The neighboring
+variant does contain `0x0d`, but no observed or statically direct writer selects
+it; forcing that selector would not establish the operational power circuit.
+NSE-1 shutdown input ownership remains unresolved rather than being assigned
+to KBGPIO from the cold-start evidence alone.
+
+At about 8.54 seconds this ROM writes clock-control value `0x0e` from
+`0x292868`. The ROM4 wake protocol after that request remains unresolved, so
+the later-ROM ARM-suspension rule is not projected onto NSE-1. The menu gate
+deliberately presses at 8 seconds and is keypad/UI evidence, not ROM4 idle-wake
+evidence.
+
+The backend also terminates the distinct C54x memory-mapped `0x22`/`0x32`
+parallel control path at COBBA. Frames retain their recovered opaque form:
+bits 15--12 select one of 16 registers and bits 11--0 carry data. The coherent
+ROM organically emits register-C transitions `0x008 -> 0x0c8` during codec
+bring-up and writes codec serial port `0x21`. A corrected twelve-second
+interface census records zero reads from RF sample port `0x27` and zero
+synthesizer pairs on ports `0x31`/`0x32`. An earlier gate appeared to require
+an RF read but lacked shell fail-fast behavior, so that observation is retired.
+These results establish audio-interface initialization only; receiver
+activation, tuning, decoded analog register meanings and a completed speech
+call remain outside the demonstrated lifecycle.
+
+The absence persists across a 30-second unassisted run: the backend delivers
+6,497 enabled GSM frame interrupts while recording `rf_reads=0` and
+`rf_tune_pairs=0`. Thus the immediate missing contract is the command or DSP
+state transition that enables the ROM4 receiver, not an I/Q waveform. Ports
+`0x31` and `0x32` are retained as a saved, passive low/high-pair census and
+port `0x27` remains connected to deterministic unattached RF input. Supplying
+FCCH/SCH/BCCH samples before the DSP reads that port would be unobservable and
+is not an admissible registration fix.
+
+The SIM transaction ending near 8.51 seconds is not a stalled initialization
+sequence: the firmware has read all ten configured ADN records. At 31.002
+seconds it organically issues `A0 F2` STATUS as its periodic card-presence
+monitor while the UI also refreshes the LCD. The long quiet interval is a
+healthy maintenance cadence and does not explain the absent receiver
+activation. A 40-second run still records zero RF reads and zero completed
+synthesizer pairs.
+
+`make check-c54x-rom4-coherent` now treats that absence as a quantified
+boundary. Its recipe is fail-fast and enables the trace category required by
+its validator assertions; a failed intermediate assertion cannot be hidden by
+a later PASS line.
+
+`make verify-5110-save-state` saves the running real-DSP composition at seven
+seconds, restores it, verifies MAD2 and C54x idle state, and then opens the same
+Phone book menu through a physical key transition. This guards the C54x core,
+uploaded program/data overlays, DSPIF, COBBA, timers, and keypad composition
+against state-registration regressions.
+
+The historical harness's headline `74 acknowledgements` counter is not a count
+of DSP port-1 completion strobes. A four-second local run observes 72 MCU
+writes across shared mailbox words `0x0fe`/`0x100` and 29 port-1 strobes while
+still reaching the accepted validator result and interactive UI. The external
+counter was attached to intercepted MCU mailbox writes with different
+boot-phase lifetime rules. Keep these as separately named measurements; do
+not tune the local transport merely to make the integers equal.
+
+An older persisted donor EEPROM produces the distinct `c9f4 cd44 ... 6075`
+challenge and the structurally valid but rejected `3532 0000 312b ... 88b2
+0000` response. That run repeatedly requests a reason-4 reset and is a negative
+control, not a coherent-boot result. The coherent gate therefore regenerates
+the external 24C16 profile and uses a fresh NVRAM directory before requiring
+both the C54x completion and the MCU validator's `r6=1` continuation. Resident
+slot `0x250b` is still an organically uploaded no-op; the recovered acquisition
+path is the later COBBA serial-register read rather than a missing overlay at
+that slot. No response field is synthesized.
+
+The NSE-1 external EEPROM participates in this transaction. Firmware organically reads
+its board-level 24C16 through PUP GenIO (SDA bit 0, SCL bit 2). A virgin repair
+image generates a different challenge; a provisioned image generates the exact
+known-good challenge. Runs must use a fresh NVRAM directory when changing the
+ROM seed because MAME correctly persists the device contents.
+
+The ROM4 data map also contains read-only dispatcher entries at offsets ending
+in `0x07` across `0x9000..0xdfff`. A live run proved code at `0x37fc` otherwise
+attempts to overwrite `0xb707` immediately before the challenge. The backend now treats
+those mask-ROM writes as no-ops. This prevents later dispatcher corruption but
+does not by itself correct the first challenge's task selection.
 COBBA control ports `0x2c`/`0x2d` and codec serial port `0x21` now terminate in
 the COBBA device. PCM sample timing remains open.
 

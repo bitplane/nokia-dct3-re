@@ -109,6 +109,14 @@ constexpr nokia_ccont_board_profile ADC_STANDARD = {
 	{ 2, 0 }, 1, 3, 4, 5
 };
 
+// NSE-1 uses the standard CCONT channel placement with a BMC-3-class pack.
+// These nominal raw inputs are calibration values, not synthesized firmware
+// state; the firmware retains all pack, temperature and voltage decisions.
+constexpr nokia_ccont_board_profile ADC_5110 = {
+	{ 0x000, 0x3ff, 0x2c0, 0x150, 0x140, 0x000, 0x200, 0x000 },
+	{ 2, 0 }, 1, 3, 4, 5
+};
+
 struct display_geometry_contract
 {
 	u8 controller_width = 84;
@@ -156,6 +164,8 @@ struct nokia_product_config
 	nokia_mad2_device::dsp_reset_wiring_contract dsp_reset_wiring;
 	display_geometry_contract display;
 	u8 pup_eeprom_scl_bit = 3;
+	bool mbus_kick_on_unmask = false;
+	bool mad2_clock_stop = true;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
 
@@ -600,6 +610,16 @@ constexpr nokia_product_config make_5110_config()
 	nokia_product_config result;
 	result.keypad_wiring = KEYPAD_NSE1;
 	result.gensio_wiring = GENSIO_NSE1;
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
+	// NSE-1 bit-bangs its external 24C16 through PUP GenIO: signal
+	// bit 0 is SDA, signal bit 2 is SCL, and direction bit 0 releases SDA.
+	result.pup_eeprom_scl_bit = 2;
+	result.mbus_kick_on_unmask = true;
+	// ROM4's clock-gate write is mapped, but its wake protocol is not yet
+	// recovered. Do not project the later ROM6 CPU-suspend contract onto NSE-1.
+	result.mad2_clock_stop = false;
+	result.ccont_board = ADC_5110;
 	result.boot_rom_hle = true;
 	return result;
 }
@@ -799,6 +819,7 @@ private:
 	void mad2_sleep_w(int state);
 	void mad2_irq_ack_w(u16 mask);
 	void kbgpio_irq_w(int state);
+	template <unsigned Column> u8 keypad_matrix_r();
 	void pup_buzzer_clock_w(u32 frequency);
 	void pup_buzzer_enable_w(int state);
 	void pup_vibrator_w(int state);
@@ -883,6 +904,7 @@ private:
 	nokia_product_config m_product = PRODUCT_DEFAULT;
 	bool          m_ccont_irq_state;
 	bool          m_baseband_powered = true;
+	bool          m_keypad_port_refresh = false;
 
 	emu_timer * m_timer_watchdog;
 
@@ -1014,6 +1036,7 @@ void nokia_dct3_state::machine_start()
 	// composition and hardware timing are configured by machine_config.
 	m_trace_enabled = machine().options().verbose();
 	m_pup->set_trace(m_trace_enabled);
+	m_kbgpio->set_trace(m_trace_enabled);
 	// A BIOS-specific override replaces the whole bootstrap contract rather
 	// than mutating one phase. Products without a matching evidenced variant
 	// retain their base contract and cannot inherit another image's tokens.
@@ -1043,6 +1066,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	if (m_dsp_hle)
 		m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
+	m_mad2->set_clock_stop_enabled(product.mad2_clock_stop);
 	m_kbgpio->set_wiring_contract(product.keypad_wiring);
 	m_gensio->set_wiring_contract(product.gensio_wiring);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
@@ -1351,9 +1375,34 @@ void nokia_dct3_state::kbgpio_irq_w(int state)
 	const u16 before = m_mad2->irq_status();
 	m_mad2->set_irq_line(KEYPAD_IRQ_LINE_NUM, state);
 	const u16 after = m_mad2->irq_status();
+	if (m_trace_enabled)
+		LOGMASKED(LOG_MAD2_INTERRUPTS,
+				"keypad_route: state=%u before=%03x after=%03x mask=%02x ctrl=%02x pc=%08x t=%.9f\n",
+				state, before, after, m_mad2->reg(MAD2_IRQ_MASK),
+				m_mad2->reg(MAD2_IRQ_CTRL), m_maincpu->pc(),
+				machine().time().as_double());
 	if (before != after && m_trace_enabled && m_mad2_interrupt_trace_count++ < 4096)
 		LOGMASKED(LOG_MAD2_INTERRUPTS, "mad2_interrupt: event=levels domain=IRQ keypad=%u ccont=%u pending_before=%03x pending_after=%03x t=%.9f\n",
 				state, m_ccont_irq_state, before, after, machine().time().as_double());
+}
+
+template <unsigned Column>
+u8 nokia_dct3_state::keypad_matrix_r()
+{
+	static_assert(Column < 5);
+	static constexpr const char *tags[] = {
+		"COL.0", "COL.1", "COL.2", "COL.3", "COL.4"
+	};
+	ioport_port *const port = ioport(tags[Column]);
+	// KBGPIO remains awake while video is quiescent. Refresh this board input
+	// locally before sampling it; changed callbacks may re-enter this function.
+	if (!m_keypad_port_refresh)
+	{
+		m_keypad_port_refresh = true;
+		port->frame_update();
+		m_keypad_port_refresh = false;
+	}
+	return port->read();
 }
 
 void nokia_dct3_state::pup_vibrator_w(int state)
@@ -1507,8 +1556,7 @@ void nokia_dct3_state::dsp_shared_100_write_w(int state)
 
 void nokia_dct3_state::mbus_fiq2_w(int state)
 {
-	if (state)
-		m_mad2->assert_fiq(2);
+	m_mad2->set_fiq_line(2, state);
 }
 
 void nokia_dct3_state::mbus_fiq3_w(int state)
@@ -1754,6 +1802,8 @@ void nokia_dct3_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	const uint8_t old_data = mad2_register_peek(offset);
 	mad2_register_w(offset, data);
+	if (offset == MAD2_FIQ_MASK && m_product.mbus_kick_on_unmask)
+		m_mbus->fiq_mask_w(old_data, data);
 	trace_mad2_write(offset, data, old_data);
 }
 
@@ -2248,6 +2298,53 @@ static INPUT_PORTS_START( noki3310 )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki5110 )
+	PORT_INCLUDE(dct3_network_config)
+
+	// NSE-1 v5.30 serial-keypad scan: raw key = row * 5 + column.
+	// Row zero is unused except for the separate power scan. Down is the
+	// product-specific raw-key 15 cell (row 3, column 0).
+	PORT_START("COL.0")
+	PORT_BIT( 0x07, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Scroll Down") PORT_CODE(KEYCODE_DOWN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("COL.1")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Names / C") PORT_CODE(KEYCODE_BACKSPACE) PORT_CODE(KEYCODE_DEL) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Menu") PORT_CODE(KEYCODE_ENTER) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Scroll Up") PORT_CODE(KEYCODE_UP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.2")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 1") PORT_CODE(KEYCODE_1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 4") PORT_CODE(KEYCODE_4) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 7") PORT_CODE(KEYCODE_7) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad *") PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.3")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 2") PORT_CODE(KEYCODE_2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 5") PORT_CODE(KEYCODE_5) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 8") PORT_CODE(KEYCODE_8) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 0") PORT_CODE(KEYCODE_0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.4")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 3") PORT_CODE(KEYCODE_3) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 6") PORT_CODE(KEYCODE_6) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 9") PORT_CODE(KEYCODE_9) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad #") PORT_CODE(KEYCODE_MINUS) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("PWR")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Power") PORT_CODE(KEYCODE_SPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x1e, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki6110 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -2349,6 +2446,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	/* video hardware */
 	screen_device &screen(SCREEN(config, "screen", SCREEN_TYPE_LCD, rgb_t::white()));
 	screen.set_refresh_hz(60);
+	screen.set_video_attributes(VIDEO_ALWAYS_UPDATE);
 	screen.set_vblank_time(ATTOSECONDS_IN_USEC(2500) /* not accurate */);
 	screen.set_size(84, 48);
 	screen.set_visarea(0, 84-1, 0, 48-1);
@@ -2384,11 +2482,11 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_mad2->simi_clock_cb().set(m_simi, FUNC(nokia_simi_device::set_clock_enabled));
 	m_mad2->dsp_reset_cb().set(FUNC(nokia_dct3_state::dsp_reset_w));
 	NOKIA_KBGPIO(config, m_kbgpio);
-	m_kbgpio->matrix_cb(0).set_ioport("COL.0");
-	m_kbgpio->matrix_cb(1).set_ioport("COL.1");
-	m_kbgpio->matrix_cb(2).set_ioport("COL.2");
-	m_kbgpio->matrix_cb(3).set_ioport("COL.3");
-	m_kbgpio->matrix_cb(4).set_ioport("COL.4");
+	m_kbgpio->matrix_cb(0).set(FUNC(nokia_dct3_state::keypad_matrix_r<0>));
+	m_kbgpio->matrix_cb(1).set(FUNC(nokia_dct3_state::keypad_matrix_r<1>));
+	m_kbgpio->matrix_cb(2).set(FUNC(nokia_dct3_state::keypad_matrix_r<2>));
+	m_kbgpio->matrix_cb(3).set(FUNC(nokia_dct3_state::keypad_matrix_r<3>));
+	m_kbgpio->matrix_cb(4).set(FUNC(nokia_dct3_state::keypad_matrix_r<4>));
 	m_kbgpio->power_cb().set_ioport("PWR");
 	m_kbgpio->irq_cb().set(FUNC(nokia_dct3_state::kbgpio_irq_w));
 	NOKIA_UIF(config, m_uif);
@@ -2516,6 +2614,11 @@ void nokia_dct3_state::noki5110(machine_config &config)
 {
 	dct3_base(config);
 	INTEL_28F800B3T(config.replace(), "flash");
+	I2C_24C16(config, m_eeprom);
+	m_eeprom->set_write_cycle_time(attotime::from_msec(5));
+	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
+	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
+	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
 	config.device_remove("dsp_hle");
 	// The independently reproduced co-simulation advances four DSP cycles per
 	// 13 MHz MCU hardware cycle. Keep this as an explicit ROM4 pacing result
@@ -2596,6 +2699,12 @@ ROM_START( noki5110 )
 	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
 	ROM_LOAD("5110f530.fls", 0x000000, 0x100000,
 			CRC(2200580f) SHA1(5aa0692c57bb726187c6686dff5789b928f8a26a))
+
+	// NokiX NSE-1 virgin external-EEPROM repair image. This product uses a
+	// board-level 24C16 rather than the later in-flash EEPROM partition.
+	ROM_REGION(0x00800, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("nse-1.bin", 0x00000, 0x00800,
+			CRC(3afc0f61) SHA1(756bcf317d88aa6574b00ec93082d24053151711))
 ROM_END
 
 ROM_START( noki6110 )
@@ -2751,7 +2860,7 @@ ROM_END
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
 SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empty_init, "Nokia", "Nokia 3210", 0 )
-SYST( 1998, noki5110, 0,      0,      noki5110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
+SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

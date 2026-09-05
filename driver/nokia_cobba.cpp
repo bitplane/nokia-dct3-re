@@ -12,7 +12,8 @@ nokia_cobba_device::nokia_cobba_device(
 		const machine_config &mconfig, const char *tag,
 		device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_COBBA, tag, owner, clock),
-	device_sound_interface(mconfig, *this)
+	device_sound_interface(mconfig, *this),
+	m_rf_receive_cb(*this, 0)
 {
 }
 
@@ -47,9 +48,12 @@ void nokia_cobba_device::device_start()
 	save_item(NAME(m_control_transactions));
 	save_item(NAME(m_control_reads));
 	save_item(NAME(m_control_writes));
+	save_item(NAME(m_parallel_registers));
+	save_item(NAME(m_parallel_writes));
 	save_item(NAME(m_codec_serial_receive_latch));
 	save_item(NAME(m_codec_serial_receive_ready));
 	save_item(NAME(m_codec_serial_loopbacks));
+	save_item(NAME(m_rf_receive_samples));
 }
 
 void nokia_cobba_device::device_reset()
@@ -65,6 +69,12 @@ void nokia_cobba_device::device_reset()
 	m_microphone_overruns = 0;
 	m_microphone_underruns = 0;
 	std::fill(m_control_registers.begin(), m_control_registers.end(), 0);
+	// ROM4's self-test reads COBBA analog measurement registers 5 and 6.
+	// These are input measurements supplied by the codec, not synthesized test
+	// results; the nominal no-signal values keep both readings in their accepted
+	// hardware ranges.
+	m_control_registers[0x05] = 0x0160;
+	m_control_registers[0x06] = 0x0010;
 	// Recovered ROM4 multi-register transactions wait for status register D
 	// bits 1:0 clear and bits 3:2 set between transfers.
 	m_control_registers[0x0d] = 0x000c;
@@ -74,9 +84,33 @@ void nokia_cobba_device::device_reset()
 	m_control_transactions = 0;
 	m_control_reads = 0;
 	m_control_writes = 0;
+	std::fill(m_parallel_registers.begin(), m_parallel_registers.end(), 0);
+	m_parallel_writes = 0;
 	m_codec_serial_receive_latch = 0;
 	m_codec_serial_receive_ready = false;
 	m_codec_serial_loopbacks = 0;
+	m_rf_receive_samples = 0;
+}
+
+u16 nokia_cobba_device::rf_receive_sample()
+{
+	// ROM4 consumes interleaved signed I/Q components, one per port read.
+	// An unattached RF front end is deterministic silence; all filtering and
+	// measurement decisions remain inside the emulated DSP.
+	++m_rf_receive_samples;
+	return m_rf_receive_cb();
+}
+
+void nokia_cobba_device::parallel_control_w(u16 frame)
+{
+	const u8 address = frame >> 12;
+	const u16 data = frame & 0x0fff;
+	m_parallel_registers[address] = data;
+	++m_parallel_writes;
+	if (m_trace_enabled || m_parallel_writes <= 16)
+		machine().logerror("cobba: parallel sequence=%llu address=%x data=%03x t=%.6f\n",
+				m_parallel_writes, address, data,
+				machine().time().as_double());
 }
 
 void nokia_cobba_device::control_data_w(u16 data)
@@ -152,10 +186,13 @@ u8 nokia_cobba_device::run_control_conformance_checks()
 	const u64 saved_codec_loopbacks = m_codec_serial_loopbacks;
 	u8 result = 0;
 
-	// Reset exposes only the recovered ROM4 idle handshake in register D.
-	bool reset_state = m_control_registers[0x0d] == 0x000c;
+	// Reset exposes the nominal analog inputs and recovered idle handshake.
+	bool reset_state = m_control_registers[0x05] == 0x0160 &&
+			m_control_registers[0x06] == 0x0010 &&
+			m_control_registers[0x0d] == 0x000c;
 	for (u8 address = 0; address != m_control_registers.size(); ++address)
-		if (address != 0x0d && m_control_registers[address] != 0)
+		if (address != 0x05 && address != 0x06 && address != 0x0d &&
+				m_control_registers[address] != 0)
 			reset_state = false;
 	if (reset_state)
 		result |= 0x01;
