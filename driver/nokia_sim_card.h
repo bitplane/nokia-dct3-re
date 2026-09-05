@@ -29,6 +29,7 @@ public:
 	}
 	void set_atr(const u8 *data, unsigned length);
 	void activate();
+	void deactivate();
 	void rx_w(u8 data);
 
 protected:

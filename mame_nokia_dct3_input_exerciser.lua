@@ -90,6 +90,8 @@ end
 charger_pulse_at = env_number("NOKIA_DCT3_CCONT_CHARGER_PULSE_AT", -1)
 local charger_pulse_duration = env_number("NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION", 0.05)
 local charger_initial = env_number("NOKIA_DCT3_CCONT_CHARGER_INITIAL", 0) ~= 0
+local sim_remove_at = env_number("NOKIA_DCT3_SIM_REMOVE_AT", -1)
+local sim_reinsert_after = env_number("NOKIA_DCT3_SIM_REINSERT_AFTER", -1)
 irq_overlap_at = env_number("NOKIA_DCT3_MAD2_IRQ_OVERLAP_AT", -1)
 irq_mask_fixture_at = env_number("NOKIA_DCT3_MAD2_IRQ_MASK_FIXTURE_AT", -1)
 fiq8_fixture_at = env_number("NOKIA_DCT3_MAD2_FIQ8_FIXTURE_AT", -1)
@@ -235,6 +237,7 @@ key_fields.soft2 = key_fields.c
 key_fields.hash = key_fields.minus
 local charger_field = field_by_mask("CHARGER", 0x01)
 local mbus_rx_field = field_by_mask("MBUS_RX", 0xff)
+local sim_removed_field = field_by_mask("SIM_REMOVED", 0x01)
 if charger_initial and charger_field then charger_field:set_value(1) end
 
 local function press(name)
@@ -596,6 +599,22 @@ if charger_pulse_at >= 0 and charger_field then
 		charger_field:clear_value()
 	end)
 	assert(coroutine.resume(charger_timer))
+end
+
+if sim_remove_at >= 0 and sim_removed_field then
+	local sim_presence_timer = coroutine.create(function()
+		emu.wait(sim_remove_at)
+		sim_removed_field:set_value(1)
+		machine:logerror(string.format("sim_presence_fixture: present=0 t=%.6f\n",
+				emulation_seconds()))
+		if sim_reinsert_after >= 0 then
+			emu.wait(sim_reinsert_after)
+			sim_removed_field:set_value(0)
+			machine:logerror(string.format("sim_presence_fixture: present=1 t=%.6f\n",
+					emulation_seconds()))
+		end
+	end)
+	assert(coroutine.resume(sim_presence_timer))
 end
 
 if mbus_rx_fixture and mbus_rx_field then

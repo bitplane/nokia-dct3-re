@@ -48,16 +48,36 @@ void nokia_simi_device::device_start()
 
 void nokia_simi_device::device_reset()
 {
-	m_rx_timer->adjust(attotime::never);
+	clear_transfer_state();
 	m_clock_enabled = false;
 	m_control = 0;
+	m_rx_fifo_control = 0;
+	m_tx_fifo_control = 0;
+}
+
+void nokia_simi_device::clear_transfer_state()
+{
+	m_rx_timer->adjust(attotime::never);
 	m_rx_head = m_rx_tail = m_rx_count = 0;
 	m_rx_ready = false;
 	m_iir = 0;
 	m_tx_ready_pending = false;
 	m_uart_tx_count = 0;
-	m_rx_fifo_control = 0;
-	m_tx_fifo_control = 0;
+}
+
+void nokia_simi_device::set_card_present(bool present)
+{
+	if (m_card_present == present)
+		return;
+	m_card_present = present;
+	if (!present)
+	{
+		// Removal is an electrical disconnect. Discard bytes already in flight
+		// and reset volatile card protocol state, but do not synthesize the
+		// still-unmapped SIMI 0x80 interrupt cause.
+		clear_transfer_state();
+		m_card->deactivate();
+	}
 }
 
 void nokia_simi_device::set_clock_enabled(int state)

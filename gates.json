@@ -10188,6 +10188,120 @@
       ]
     },
     {
+      "name": "verify-sim-pin",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "persistent card provisioning fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)/nvram\" \"$(RUN_DIR)/cfg\"",
+        "\t@mkdir -p \"$(RUN_DIR)/nvram/noki3210\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)/nvram/noki3210/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/3210f600a.fls --output \"$(RUN_DIR)/nvram/noki3210/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=12 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=220'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py verify \"$(RUN_DIR)/error.log\" \"$(RUN_DIR)/nvram/noki3210/sim_card\" --expected-pin 1234"
+      ]
+    },
+    {
+      "name": "verify-sim-pin-unblock",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "persistent card provisioning fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)/nvram\" \"$(RUN_DIR)/cfg\"",
+        "\t@mkdir -p \"$(RUN_DIR)/nvram/noki3210\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)/nvram/noki3210/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/3210f600a.fls --output \"$(RUN_DIR)/nvram/noki3210/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=42 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=0,0,0,0,enter,wait3000,0,0,0,0,enter,wait3000,0,0,0,0,enter,wait3000,1,2,3,4,5,6,7,8,enter,wait2500,4,3,2,1,enter,wait2500,4,3,2,1,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=220'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py block-unblock \"$(RUN_DIR)/error.log\" \"$(RUN_DIR)/nvram/noki3210/sim_card\" --expected-pin 4321"
+      ]
+    },
+    {
+      "name": "verify-sim-pin-state-roundtrip",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "persistent card provisioning and machine-state fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)/nvram\" \"$(RUN_DIR)/cfg\"",
+        "\t@mkdir -p \"$(RUN_DIR)/nvram/noki3210\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)/nvram/noki3210/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/3210f600a.fls --output \"$(RUN_DIR)/nvram/noki3210/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=22 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=0,0,0,0,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=220 NOKIA_DCT3_STATE_ROUNDTRIP_AT=10 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=1,2,3,4,enter NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py retry-restore \"$(RUN_DIR)/error.log\" \"$(RUN_DIR)/nvram/noki3210/sim_card\" --expected-pin 1234"
+      ]
+    },
+    {
+      "name": "verify-sim-pin-removal",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "physical card-removal fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)/nvram\" \"$(RUN_DIR)/cfg\"",
+        "\t@mkdir -p \"$(RUN_DIR)/nvram/noki3210\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)/nvram/noki3210/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/3210f600a.fls --output \"$(RUN_DIR)/nvram/noki3210/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=14 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=220 NOKIA_DCT3_SIM_REMOVE_AT=10'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py removal \"$(RUN_DIR)/error.log\" \"$(RUN_DIR)/nvram/noki3210/sim_card\" --expected-pin 1234"
+      ]
+    },
+    {
+      "name": "verify-sim-pin-toggle",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "persistent card settings fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)_disable\" \"$(RUN_DIR)_enable\"",
+        "\t@mkdir -p \"$(RUN_DIR)_disable/nvram/noki3210\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)_disable/nvram/noki3210/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/3210f600a.fls --provisioned-imei-prefix 49015420323751 --output \"$(RUN_DIR)_disable/nvram/noki3210/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR)_disable SECONDS=31 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_disable)/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR)_disable)/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,enter,wait3000,enter,wait800,enter,wait1200,4,wait1200,3,wait1200,1,wait1200,enter,wait1200,1,2,3,4,enter,wait1200,down,wait500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300'",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR)_enable SECONDS=27 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_disable)/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR)_enable)/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1200,4,wait1200,3,wait1200,1,wait1200,1,2,3,4,enter,wait1200,down,wait500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py toggle \"$(RUN_DIR)_enable/error.log\" \"$(RUN_DIR)_disable/nvram/noki3210/sim_card\" --previous-trace \"$(RUN_DIR)_disable/error.log\""
+      ]
+    },
+    {
+      "name": "verify-sim-pin-change",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "persistent card settings fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)_change\" \"$(RUN_DIR)_verify\"",
+        "\t@mkdir -p \"$(RUN_DIR)_change/nvram/noki3210\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)_change/nvram/noki3210/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/3210f600a.fls --provisioned-imei-prefix 49015420323751 --output \"$(RUN_DIR)_change/nvram/noki3210/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR)_change SECONDS=34 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_change)/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR)_change)/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,enter,wait3000,enter,wait800,enter,wait1200,4,wait1200,3,wait1200,5,wait1200,down,wait600,enter,wait1200,1,2,3,4,enter,wait1200,4,3,2,1,enter,wait1200,4,3,2,1,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300'",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR)_verify SECONDS=12 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_change)/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR)_verify)/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=4,3,2,1,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=220'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py change \"$(RUN_DIR)_verify/error.log\" \"$(RUN_DIR)_change/nvram/noki3210/sim_card\" --expected-pin 4321 --previous-trace \"$(RUN_DIR)_change/error.log\""
+      ]
+    },
+    {
+      "name": "verify-sim-pin-change-reject",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "persistent card negative settings fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)/nvram\" \"$(RUN_DIR)/cfg\"",
+        "\t@mkdir -p \"$(RUN_DIR)/nvram/noki3210\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)/nvram/noki3210/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/3210f600a.fls --provisioned-imei-prefix 49015420323751 --output \"$(RUN_DIR)/nvram/noki3210/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=34 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,enter,wait3000,enter,wait800,enter,wait1200,4,wait1200,3,wait1200,5,wait1200,down,wait600,enter,wait1200,0,0,0,0,enter,wait1200,4,3,2,1,enter,wait1200,4,3,2,1,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=70 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py change-reject \"$(RUN_DIR)/error.log\" \"$(RUN_DIR)/nvram/noki3210/sim_card\" --expected-pin 1234"
+      ]
+    },
+    {
+      "name": "verify-sim-pin-v501",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "persistent card provisioning fixture",
+      "recipe": [
+        "\t@$(RM) -r \"$(RUN_DIR)/nvram\" \"$(RUN_DIR)/cfg\"",
+        "\t@mkdir -p \"$(RUN_DIR)/nvram/noki3210_1\"",
+        "\t$(PYTHON) tools/make_sim_card_profile.py --pin-enabled --output \"$(RUN_DIR)/nvram/noki3210_1/sim_card\"",
+        "\t$(PYTHON) tools/make_eeprom_profile.py --flash roms/nokia_3210_nse-8_v05_01_full_hu.fls --output \"$(RUN_DIR)/nvram/noki3210_1/eeprom\"",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3210_V501) ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=20 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR))/nvram RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=5000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=300 NOKIA_DCT3_POST_READY_KEY_GAP_MS=700'",
+        "\t$(PYTHON) tools/sim_security_trace_check.py verify \"$(RUN_DIR)/error.log\" \"$(RUN_DIR)/nvram/noki3210_1/sim_card\" --expected-pin 1234"
+      ]
+    },
+    {
       "name": "verify-frontier-stability",
       "prerequisites": [],
       "variables": {},

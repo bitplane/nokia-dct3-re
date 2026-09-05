@@ -240,7 +240,18 @@ void nokia_sim_card_device::set_atr(const u8 *data, unsigned length)
 void nokia_sim_card_device::activate()
 {
 	reset_session_state();
+	LOGMASKED(LOG_SIM, "SIM lifecycle event=activate verified=%u/%u\n",
+			m_chv_verified[0], m_chv_verified[1]);
 	emit_response(m_atr, m_atr_len);
+}
+
+void nokia_sim_card_device::deactivate()
+{
+	LOGMASKED(LOG_SIM, "SIM lifecycle event=deactivate verified_before=%u/%u\n",
+			m_chv_verified[0], m_chv_verified[1]);
+	reset_session_state();
+	LOGMASKED(LOG_SIM, "SIM lifecycle event=inactive verified=%u/%u\n",
+			m_chv_verified[0], m_chv_verified[1]);
 }
 
 const nokia_sim_card_device::file_descriptor *
@@ -637,6 +648,9 @@ void nokia_sim_card_device::process_chv()
 
 void nokia_sim_card_device::queue_status(u8 sw1, u8 sw2)
 {
+	LOGMASKED(LOG_SIM, "SIM status ins=%02x sw=%02x%02x chv=%u/%u puk=%u/%u enabled=%u\n",
+			m_ins, sw1, sw2, m_chv_attempts[0], m_chv_attempts[1],
+			m_unblock_attempts[0], m_unblock_attempts[1], m_chv1_enabled);
 	const u8 response[] = { sw1, sw2 };
 	emit_response(response, std::size(response));
 }
@@ -952,11 +966,12 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// GSM 11.11 EF_ACC: allocate one ordinary subscriber class (class 0).
 	// Erased bytes would allocate every class and set reserved byte-1 bit 3.
 	static constexpr u8 access_control_class[] = { 0x00, 0x01 };
-	// The base card advertises no optional SIM services.  The opt-in CPHS AoC
-	// profile also advertises GSM 11.11 service 5, keeping EF_CSP and EF_SST
-	// consistent and causing the ME to read ACM, ACMmax and PUCT normally.
+	// The base card advertises only services backed by this profile.  The
+	// opt-in CPHS AoC profile additionally advertises GSM 11.11 service 5,
+	// keeping EF_CSP and EF_SST consistent and causing the ME to read ACM,
+	// ACMmax and PUCT normally.
 	static constexpr u8 service_table[15] = {
-		0xcc, // Services 2 (ADN) and 4 (SMS) allocated and activated.
+		0xcf, // Services 1 (CHV1 disable), 2 (ADN) and 4 (SMS) are active.
 		0x30, // Service 7: PLMN selector allocated and activated.
 		0xc0  // Service 12: SMS parameters allocated and activated.
 	};

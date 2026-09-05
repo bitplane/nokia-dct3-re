@@ -49,8 +49,19 @@ The card currently supports:
 - READ BINARY and linear-fixed/cyclic READ/UPDATE RECORD with a declared GSM
   filesystem;
 - persistent 50-record `EF_ADN`, ten-record `EF_SMS` and two-record `EF_SMSP`
-  synthetic files, plus the three-byte cyclic `EF_ACM`; and
+  synthetic files, plus the three-byte cyclic `EF_ACM`;
+- persistent CHV credentials, enable state and retry counters, with
+  reset-scoped verification; and
 - save-state coverage for transport, selection and mutable card contents.
+
+With a PIN-enabled card, both 3210 v6.00 and v5.01 organically issue VERIFY
+through SIMI. On v6.00, three wrong entries exhaust CHV1 retries and the
+firmware proceeds to its PUK editor; the correct PUK plus a replacement PIN
+issues UNBLOCK and persists the new credential. A separate gate saves after
+one failed VERIFY and completes a successful VERIFY after restoring the
+machine image. The v6.00 security-settings UI also organically issues CHANGE,
+DISABLE and ENABLE. Two-launch gates prove enable-state and replacement-PIN
+persistence; a rejected CHANGE proves retry consumption without mutation.
 
 The organic 3210 conversation currently reaches:
 
@@ -96,6 +107,10 @@ are MAME device NVRAM, separate from the handset's 24C128. The card stores the
 `make verify-sim-phonebook` saves `ADA`/`123` through physical keypad input,
 checks the resulting GSM 11.11 record, restarts with the same card NVRAM and
 requires firmware Search to render the saved name.
+
+Service 1 is also allocated and active. This advertises the CHV1-disable
+function that backs the firmware's `PIN code request` setting; without it the
+phone correctly presents `Not allowed` and emits no ENABLE/DISABLE command.
 
 ## Persistent SMS contract
 
@@ -145,14 +160,11 @@ Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
 
 - SEEK, invalidation and additional access-condition/error semantics;
-- integrating the now-profiled RUN GSM ALGORITHM response with a matching
-  handset MM Authentication Response. The matching network challenge,
-  expected SRES and reject path are typed, and both 3210 and 3310 organically
-  run A3/A8 and fetch the result, but neither currently publishes the response.
-  The default network remains authentication-disabled;
 - supplying coherent FPLMN and optional EFs beyond the current matched
   IMSI/SST/PLMN-selector/SPN profile;
-- testing card removal, reset, timeout, parity/error, and proactive-SIM status;
+- mapping card-detect notification and testing timeout, parity/error, and
+  proactive-SIM status (physical removal already aborts in-flight controller
+  and card state, but does not yet notify this firmware coherently);
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 
@@ -201,6 +213,12 @@ A SIM increment is accepted only when:
 3. no firmware-owned message, callback, return value, or RAM state is forced;
 4. the resulting APDU/state transition is reproducible in one coherent boot;
 5. both 3210 regression oracles and the 3330-E smoke baseline remain healthy.
+
+The present stop boundary is the SIMI fault source, not an unfinished CHV
+command. Firmware decodes IIR causes `0x02`, `0x20`, and `0x80`, but current
+evidence does not identify their electrical conditions or a card-detect cause.
+Those events, and hot reinsertion, must not be synthesized merely to exercise
+the already-mapped handlers.
 
 Primary references:
 

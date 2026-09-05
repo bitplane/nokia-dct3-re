@@ -15,7 +15,7 @@ public:
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
 	bool enabled() const { return m_enabled; }
-	void set_card_present(bool present) { m_card_present = present; }
+	void set_card_present(bool present);
 	bool card_present() const { return m_card_present; }
 	void set_clock_enabled(int state);
 	bool clock_enabled() const { return m_clock_enabled; }
@@ -39,6 +39,7 @@ protected:
 
 private:
 	TIMER_CALLBACK_MEMBER(rx_ready);
+	void clear_transfer_state();
 	void schedule_card_bytes(bool tx_complete, bool response_added);
 
 	required_device<nokia_sim_card_device> m_card;

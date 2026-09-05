@@ -295,6 +295,26 @@ firmware to issue an absolute 32-byte `UPDATE RECORD` for `EF_ADN`, validates
 that only record 1 changed, then restarts with the same SIM NVRAM and matches
 the stable pixels of the firmware-rendered `ADA` search result. It does not
 inject an APDU or conflate card storage with the handset EEPROM.
+`make verify-sim-pin`, `make verify-sim-pin-unblock`, and
+`make verify-sim-pin-state-roundtrip` cover the card-security lifecycle through
+physical keypad input and firmware-issued APDUs. They require successful PIN
+verification, the exact two-warning/blocked retry sequence, PUK recovery with
+a replacement PIN, persistent counters and a live retry surviving MAME
+save/load. `make verify-sim-pin-v501` independently requires successful VERIFY
+under the alternate 3210 firmware. These gates isolate both MAME configuration
+and NVRAM so a previous hot-removal experiment cannot silently leave the SIM
+absent.
+`make verify-sim-pin-removal` authenticates first, then toggles the physical
+card-detect input and requires card deactivation to discard volatile CHV
+authorization. It does not claim that the still-unmapped SIMI card-detect cause
+notifies firmware or supports hot reinsertion.
+`make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
+reboots with the same card NVRAM, proves startup VERIFY is absent while
+disabled, then re-enables CHV1 and requires the persistent bit to return.
+`make verify-sim-pin-change` changes the credential through the same UI and
+requires the new PIN to VERIFY after a second boot. The negative companion
+`make verify-sim-pin-change-reject` requires `98 04`, exactly one consumed
+retry and an unchanged credential after a wrong old PIN.
 The task running at the final emulation tick is deliberately excluded:
 final-tick sampling is timing-sensitive, and a harmless schedule shift can
 sample scheduler idle `0xff` instead of task 1 without any change in durable

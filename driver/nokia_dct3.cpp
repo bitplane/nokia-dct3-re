@@ -759,7 +759,8 @@ public:
 		m_neighbour_fault_config(*this, "NEIGHBORFAULT"),
 		m_outgoing_call_config(*this, "CALLCFG"),
 		m_outgoing_call_delay_config(*this, "CALLDELAY"),
-		m_outgoing_call_host_config(*this, "CALLHOST")
+		m_outgoing_call_host_config(*this, "CALLHOST"),
+		m_sim_removed(*this, "SIM_REMOVED")
 	{ }
 
 	void noki3330(machine_config &config);
@@ -779,6 +780,7 @@ public:
 	DECLARE_INPUT_CHANGED_MEMBER(charger_irq);
 	DECLARE_INPUT_CHANGED_MEMBER(mbus_rx_byte);
 	DECLARE_INPUT_CHANGED_MEMBER(sms_config_changed);
+	DECLARE_INPUT_CHANGED_MEMBER(sim_removed_changed);
 
 private:
 	virtual void machine_start() override ATTR_COLD;
@@ -900,6 +902,7 @@ private:
 	optional_ioport m_outgoing_call_config;
 	optional_ioport m_outgoing_call_delay_config;
 	optional_ioport m_outgoing_call_host_config;
+	optional_ioport m_sim_removed;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
 
@@ -1175,7 +1178,8 @@ void nokia_dct3_state::machine_reset()
 	m_ccont->set_wddisx_grounded(m_product.ccont_wddisx_grounded);
 	m_ccont->set_ready(BIT(hardware, 0));
 	m_simi->set_enabled(m_product.simi_controller && BIT(hardware, 1));
-	m_simi->set_card_present(m_product.synthetic_sim_card && BIT(hardware, 1));
+	m_simi->set_card_present(m_product.synthetic_sim_card && BIT(hardware, 1) &&
+			!BIT(m_sim_removed.read_safe(0x00), 0));
 	if (m_dsp_hle)
 	{
 		m_dsp_hle->set_service_enabled(m_product.dsp_service && BIT(hardware, 2));
@@ -2050,7 +2054,17 @@ INPUT_CHANGED_MEMBER( nokia_dct3_state::sms_config_changed )
 	apply_sms_config();
 }
 
+INPUT_CHANGED_MEMBER( nokia_dct3_state::sim_removed_changed )
+{
+	if (machine().phase() == machine_phase::RUNNING)
+		m_simi->set_card_present(m_product.synthetic_sim_card && newval == 0);
+}
+
 static INPUT_PORTS_START( dct3_network_config )
+	PORT_START("SIM_REMOVED")
+	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_OTHER) PORT_NAME("Remove SIM card") PORT_TOGGLE
+	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
+
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.
 	PORT_START("NETCFG")

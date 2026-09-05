@@ -120,18 +120,21 @@ The implemented surface is classified by ownership and evidence:
 | --- | --- | --- |
 | SIMI register window and FIQ6 route | Extracted partial hardware | `nokia_simi_device` owns offsets `0x36..0x3f`, the decoded IIR cascade, timing and FIQ6; firmware traffic executes through it in both mapped 3210 ROMs. |
 | TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics remain inferred. |
-| IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error/removal causes `0x02`, `0x20`, and `0x80` are decoded but not modeled. |
+| IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Physical removal now aborts the controller/card transaction and clears volatile card authorization, but the card-detect notification cause is not mapped; timeout/error causes `0x02`, `0x20`, and `0x80` remain unmodeled. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
 | SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. Invalidation, broader errors and removal remain incomplete. |
 | UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
 | Cyclic EF_ACM and INCREASE | Standards-derived dormant contract | The descriptor, CHV1 access conditions, checked 24-bit addition, `98 50` overflow result, six-byte delayed response and append-only persistence follow GSM 11.11. NSE-3 constructs the exact `A0 32 00 00 03` APDU, but no product firmware acceptance trace currently exercises it. |
 | RUN GSM ALGORITHM | Organic authenticated registration | The card accepts only `A0 88 00 00 10`, consumes the 16-byte RAND and exposes `SRES || Kc` through the immediately following twelve-byte GET RESPONSE. A3/A8 remains explicitly operator-selectable: the card defaults to no algorithm, while the synthetic laboratory subscriber selects TS 55.205 section 5's AES example and a separately provisioned test key. The AES projection has an independent FIPS-derived vector gate. With authentication explicitly enabled, both 3210 v6.00 and 3310 v6.39 organically execute the command, fetch all twelve bytes, require typed result `0x0066`, copy Kc, publish SRES and emit MM Authentication Response. Both then accept Location Updating Accept, persist EF_LOCI, release the dedicated channel and return to camp. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
-| CHV support | Standards-derived dormant contract | VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK have persistent credentials/counters and reset-scoped verification. Ordinary boot does not exercise the complete lifecycle, so it is not a product-runtime promotion. |
+| CHV support | Validated card contract | PIN-enabled 3210 startup organically issues VERIFY. Three wrong PINs produce `98 04`, `98 04`, then blocked `98 40`; the firmware presents its PUK editor and organically issues UNBLOCK with a replacement PIN. The security-settings UI organically issues DISABLE, ENABLE and CHANGE, including a rejected CHANGE that consumes one retry without modifying the credential. Credentials, enable state and retry counters persist in card NVRAM, authorization is reset/card-removal scoped, and a live retry survives MAME save/load. A second boot verifies both toggle persistence and the replacement PIN. The same startup VERIFY path is reproduced by v5.01. |
 
 The model does not force firmware state or inject RTOS messages. Controller and
 card ownership are separate; remaining fidelity debt is ATR start/turnaround timing,
-unmodeled errors/removal, and card protocol mixed with subscriber provisioning.
+unmodeled controller error/card-detect signaling, and card protocol mixed with
+subscriber provisioning. Physical removal already aborts transport and clears
+card-session authorization; coherent firmware notification and hot reinsertion
+stop at the unmapped hardware boundary.
 
 The authentication profile follows
 [3GPP TS 55.205](https://www.etsi.org/deliver/etsi_TS/155200_155299/155205/18.00.00_60/ts_155205v180000p.pdf):
@@ -165,7 +168,10 @@ prevents the validated preliminary lifecycle from composing. MF/DF STATUS data u
 directory layout, including a `0x15` GSM-specific-data length and CHV status fields; a shifted
 layout causes the preliminary pass to repeat.
 
-The base `EF_SST` allocates and activates services 2, 4, 7, 12 and 17.
+The base `EF_SST` allocates and activates services 1, 2, 4, 7, 12 and 17.
+Service 1 advertises the CHV1-disable function implemented by the card; omitting
+it makes the firmware correctly reject `PIN code request` as unavailable before
+issuing an APDU.
 `EF_SPN` contains
 a standards-shaped laboratory provider name; v6.00 reads it organically but
 uses its PLMN resource for the idle operator label. `EF_ADN (6F3A)` is
@@ -255,18 +261,16 @@ The mapped session descriptor and callback chains remain
 in `sim_registration.md`, `mmi_layer.md`, and normalized evidence;
 they are intentionally not repeated in this concise hardware/card contract.
 
-## Deferred CHV transaction: reply code 2
+## CHV transaction boundary
 
-This is a mapped later card contract, not an outstanding ordinary-SIM-init
-gate. The non-CPHS initialization pass raises SIM enable without traversing
-this path. Retain it for the first organic PIN/CHV lifecycle that requests it.
-
-The downstream card contract is already mapped. Organic `0x1196` enters `0x207234`, which calls
-`0x293f30`. That function constructs `A0 24` CHANGE CHV with a 16-byte body, posts it to task 21 and
-waits for the result. Success is return code `2`; only that branch reaches its ENABLE setter at
-`0x20733c`. The stateful card implements the required header -> TX-ready -> procedure -> body ->
-TX-ready -> `9000` sequence. The full path remains unvalidated because current
-ordinary boot does not organically request `0x1196`.
+PIN-required startup, PUK recovery and the settings lifecycle are
+runtime-validated. `Menu 4-3-1` drives DISABLE (`A0 26`) and ENABLE (`A0 28`)
+through the firmware's PIN editor and On/Off selector. `Menu 4-3-5` drives
+CHANGE (`A0 24`) with the old and replacement PINs. The gates restart with the
+same card NVRAM and prove that disabled cards omit startup VERIFY, re-enabled
+cards require it again, and changed credentials are used by the next boot.
+A wrong old PIN returns `98 04`, persists one consumed retry and leaves the
+credential unchanged.
 
 ## Current acceptance gates
 
@@ -274,6 +278,21 @@ ordinary boot does not organically request `0x1196`.
 - `make run-frontier`: current external-service/SIM research profile.
 - `make verify-sim-phonebook`: organic two-launch ADN update and persistence
   oracle.
+- `make verify-sim-pin`: PIN-required boot and successful VERIFY on v6.00.
+- `make verify-sim-pin-unblock`: wrong-PIN retry exhaustion followed by
+  firmware-driven PUK recovery and replacement-PIN persistence.
+- `make verify-sim-pin-state-roundtrip`: retry decrement, MAME save/load and
+  successful VERIFY from the restored branch.
+- `make verify-sim-pin-removal`: authenticate, remove the card through its
+  physical input and require reset-scoped authorization to clear.
+- `make verify-sim-pin-toggle`: disable CHV1 through the settings UI, restart
+  with the same card, then re-enable it and require persistent state at each
+  boundary.
+- `make verify-sim-pin-change`: change CHV1 through the settings UI and verify
+  the replacement credential on the following boot.
+- `make verify-sim-pin-change-reject`: reject a wrong old PIN, consume exactly
+  one retry and preserve the stored credential.
+- `make verify-sim-pin-v501`: same-product v5.01 VERIFY corroboration.
 - `make verify-radio-incoming-sms`: organic 176-byte `EF_SMS` update and exact
   persisted unread SMS record.
 - `make smoke-3330e RUN_DIR=<dir> SECONDS=3`: bounded second-ROM confidence run.
@@ -281,11 +300,13 @@ ordinary boot does not organically request `0x1196`.
   SIM enable rising and the timed presence monitor starting without injected
   messages or SIM-state RAM writes.
 
-The frontier predicate protects the final organic SIM-enabled state, but there
-is no focused device test for FIFO reset/fill behavior, IIR acknowledgement,
-multi-chunk ordering, T=0 procedure sequencing, file metadata, timeout/error
-causes, removal, or save-state resumption. Add that coverage before materially
-changing the controller/card contract.
+The frontier and focused gates protect organic SIM-enabled state, persistent
+security state and save-state resumption. FIFO reset/fill behavior, timeout and
+parity/error causes, and the card-detect notification side of removal still
+need focused coverage before materially changing the controller contract.
+
+CHV command/status semantics follow ETSI GSM 11.11 v5.1.0, sections 9.4 and
+9.5: <https://www.etsi.org/deliver/etsi_gts/11/1111/05.01.00_60/gsmts_1111v050100p.pdf>.
 
 The controller currently locates the card through the sibling tag
 `^sim_card`. Replace this with a configurable finder or transmit callback before
