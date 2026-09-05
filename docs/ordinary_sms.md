@@ -67,11 +67,12 @@ layer retry. After the second CP wait firmware renders `Message sending
 failed` and returns to the composer. Withholding RP after CP acknowledgement
 remains separately observed but is not yet an accepted oracle.
 
-This is not yet a complete originated-SMS product contract. Delivery reports,
-sent-message/SIM status policy and sibling-product corroboration remain open.
-CP timeout and its standards-timed retry, service-centre editing, and
-save-state continuation during the CP wait are covered by dedicated physical
-gates.
+The originated-SMS contract covers accepted and rejected submits, CP silence
+with the firmware's bounded retry, service-centre editing, requested delivery
+reports, and save-state continuation during the CP wait. Firmware-owned
+`EF_SMS`/`EF_SMSP` writes are observed rather than synthesized by the network.
+RP silence after CP acknowledgement remains an observed, unpromoted outcome;
+it is outside this accepted contract.
 
 Nokia 3210 v5.01 independently reaches the same MM service-type-4, mobile
 SAPI-3, CP/RP and RR-release lifecycle from physical composition. Its editor
@@ -175,7 +176,14 @@ Exact top-level commands are:
 JOBS=4 make verify-radio-sms-inbox
 JOBS=4 make verify-radio-outgoing-sms
 JOBS=4 make verify-radio-outgoing-sms-reject
+JOBS=4 make verify-radio-outgoing-sms-smsc
 JOBS=4 make verify-radio-outgoing-sms-timeout
+JOBS=4 make verify-radio-outgoing-sms-timeout-state
+JOBS=4 make verify-radio-outgoing-sms-delivery-report
+JOBS=4 make verify-radio-outgoing-sms-v501
+JOBS=4 make verify-3310-radio-outgoing-sms
+JOBS=4 make verify-3330-radio-outgoing-sms
+JOBS=4 make verify-3410-radio-outgoing-sms
 JOBS=4 make verify-radio-sms-inbox-state
 JOBS=4 make verify-radio-sms-inbox-negatives
 JOBS=4 make verify-radio-sms-sequential
@@ -184,5 +192,5 @@ JOBS=4 make verify-3330-radio-sms-transport
 JOBS=4 make verify-3410-radio-sms-inbox
 ```
 
-Mobile-originated failure/retry policy, service-centre editing, delivery
-reports, cell broadcast and EMS remain future independently evidenced work.
+Cell broadcast and EMS remain future independently evidenced work; they are
+different application and transport contracts from ordinary SMS-SUBMIT.
