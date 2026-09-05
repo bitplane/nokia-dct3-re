@@ -274,6 +274,10 @@ final CP-ACK, RR release and exact `Message not sent this time` frame.
 `make verify-radio-outgoing-sms-timeout` withholds CP-ACK and requires one
 firmware CP retry, the LAPDm P/F exchange that terminates its single T200
 retry, and the exact `Message sending failed` frame after the second CP wait.
+`make verify-radio-outgoing-sms-timeout-state` saves after `SMS-SUBMIT` while
+that CP timer is armed, restores it, and requires the same bounded retry,
+final-bit response, failure UI and channel release. The state boundary is
+strictly between the initial submit and the retry.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon

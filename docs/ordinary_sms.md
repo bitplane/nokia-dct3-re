@@ -67,10 +67,11 @@ layer retry. After the second CP wait firmware renders `Message sending
 failed` and returns to the composer. Withholding RP after CP acknowledgement
 remains separately observed but is not yet an accepted oracle.
 
-This is not yet a complete originated-SMS product contract. CP/RP timeout and
-standards-timed retry, delivery reports, sent-message/SIM status policy,
-service-centre editing, save-state
-continuation and sibling-product corroboration remain open.
+This is not yet a complete originated-SMS product contract. Delivery reports,
+sent-message/SIM status policy and sibling-product corroboration remain open.
+CP timeout and its standards-timed retry, service-centre editing, and
+save-state continuation during the CP wait are covered by dedicated physical
+gates.
 
 ## Nokia 3210 application lifecycle
 
