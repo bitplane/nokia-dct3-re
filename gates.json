@@ -6837,6 +6837,21 @@
       ]
     },
     {
+      "name": "verify-3330-radio-outgoing-sms",
+      "prerequisites": [
+        "normalize-3330"
+      ],
+      "variables": {},
+      "unstructured": "virgin-PMM setup plus physical predictive-text composer",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=85 RUN_VERBOSE=1 \\",
+        "\t\tRUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait800,down,wait800,enter,wait800,enter,wait800,2,wait1500,enter,wait1200,enter,wait1500,5,5,5,1,2,3,4,wait1000,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \\",
+        "\t$(PYTHON) tools/radio_outgoing_sms_product_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR) nhm6",
+        "\t@echo \"OK - physical 3330 outgoing SMS completed\""
+      ]
+    },
+    {
       "name": "verify-radio-incoming-sms",
       "prerequisites": [],
       "variables": {},

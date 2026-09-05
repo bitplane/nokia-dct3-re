@@ -40,6 +40,9 @@ NHM5_MESSAGE_SENT_HASHES = {
     "bfe89d2440646302ccd54cce39bffbbc3aede4d57746e34eab48c0f540392c68",
     "046e6ae27d660146a7ac144356252df4dae1b01d8f9980ded87478646e7aa927",
 }
+NHM6_MESSAGE_SENT_HASHES = {
+    "71641c2f9548e5425eb827bf5a59cd2e7a2fc4fd402c4c4e958f5579ac04a498",
+}
 
 
 def verify(text: str, frame_directory: pathlib.Path,
@@ -55,8 +58,10 @@ def verify(text: str, frame_directory: pathlib.Path,
         hashlib.sha256(frame.read_bytes()).hexdigest()
         for frame in frame_directory.glob("nokia_dct3_lcdmirror_*.pgm")
     }
-    expected_hashes = (NHM5_MESSAGE_SENT_HASHES if product == "nhm5"
-                       else MESSAGE_SENT_HASHES)
+    expected_hashes = {
+        "nhm5": NHM5_MESSAGE_SENT_HASHES,
+        "nhm6": NHM6_MESSAGE_SENT_HASHES,
+    }.get(product, MESSAGE_SENT_HASHES)
     if not hashes.intersection(expected_hashes):
         raise ValueError("firmware Message sent frame was not observed")
 

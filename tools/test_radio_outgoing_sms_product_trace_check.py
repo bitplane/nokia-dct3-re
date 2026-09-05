@@ -41,6 +41,13 @@ class OutgoingSmsProductTraceCheckTest(unittest.TestCase):
             pathlib.Path(directory, "nokia_dct3_lcdmirror_test.pgm").write_bytes(b"")
             verify(nhm5, pathlib.Path(directory), "nhm5")
 
+    def test_accepts_nhm6_frame(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch(
+                "tools.radio_outgoing_sms_product_trace_check.NHM6_MESSAGE_SENT_HASHES",
+                {"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}):
+            pathlib.Path(directory, "nokia_dct3_lcdmirror_test.pgm").write_bytes(b"")
+            verify(GOOD, pathlib.Path(directory), "nhm6")
+
 
 if __name__ == "__main__":
     unittest.main()

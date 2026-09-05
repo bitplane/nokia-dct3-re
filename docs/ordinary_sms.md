@@ -83,6 +83,10 @@ localized composer, renders its Russian success notice, and requests a status
 report by default. The ensuing report repeats the same generic second paging,
 SAPI-3, CP/RP, SIM-write and RR-release contract; only its UI oracle and
 Nokia-facing packet geometry remain product-specific.
+Nokia 3330 v4.50E independently completes its virgin-PMM security/time setup,
+enters the predictive-text composer through physical keys, and sends a
+non-empty GSM 7-bit SMS. Its explicit Send submenu and success frame are
+product-local; the decoded SMS-SUBMIT and CP/RP/RR lifecycle are shared.
 
 `make verify-radio-outgoing-sms-delivery-report` enables the firmware's
 EEPROM-backed Delivery reports setting before composition. The resulting
