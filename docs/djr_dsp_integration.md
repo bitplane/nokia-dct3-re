@@ -451,3 +451,56 @@ If the private ROM cannot be obtained, the
 lists factory `COBBAWRX`, `COBBARDX`, `COBBACLK`, `COBBARSTX`, `VCOBBA` and
 `DSPXF` test points. That is the lowest-risk known physical capture target;
 the corresponding NSE-8 data/strobe pad identities have not been established.
+
+## MAD2 hardware-acquisition routes
+
+A September 2026 public-source census found no complete, reproducible MAD2 DSP
+proxy build. The current external emulator contains a remote-DSP transport and
+describes a work-in-progress bridge to a custom MADos handset image, but its
+public tree contains neither that phone-side image nor DSP-proxy wiring or
+firmware. Its published ESP32 design is a SIM-card reader and is unrelated to
+DSP register capture.
+
+The preserved
+[`Nok-MADos`](https://github.com/fandigunawan/Nok-MADos) tree nevertheless
+contains the useful historical foundation. `hw/dsp.c` includes AlexD-attributed
+C54x bootstrap words, uploads code through the ordinary MAD2 HPI window, and
+contains a `dsp_readmem()` path that copies DSP-visible results into phone
+flash. `apps/dspread.c` repeatedly releases and resets the DSP with cycle-offset
+timing to recover protected program-ROM contents into MCU-visible RAM. This is
+the documented security-hole family behind the ROM4 dump, not an operational
+register capture. The existing payload initializes its own architectural state
+and does not report the pre-operational `IMR` value required here.
+
+That code makes a future no-solder experiment plausible: flash a custom MADos
+image through an ordinary DCT3 flash/service cable, upload a small DSP payload,
+and return captured words over MBUS. It does not eliminate the need for a real
+ROM4 handset. Capturing the load-bearing boundary also requires arranging the
+payload before the operational ROM performs its `IMR` OR-mask sequence; dumping
+registers after a separately reset diagnostic payload would answer a different
+question.
+
+Two lower-level alternatives are documented but weaker:
+
+- A published 5110 forensic experiment identifies MAD2 `JTRST`, `JTCLK`,
+  `JTDI`, `JTMS` and `JTDO` test pads and uses fine-wire soldering for ARM-side
+  JTAG access. That can observe MCU memory and the HPI window, but does not by
+  itself expose the embedded C54x architectural registers.
+- The NSE-1 service manual identifies `DSPXF` at test point J222 and documents
+  phase transitions for DSP initialization, synchronization and registration.
+  A logic analyser can validate phase timing, but the one-bit flag cannot
+  recover `IMR`.
+
+The historical
+[`5110 DSP ROM v4` discussion](https://nokiafree.org/forums/archive/index.php/t-39175.html)
+also rules out a generic ICE or Code Composer Studio recipe: the authors state
+that the on-chip protection blocks ordinary external reads and that the dump
+used a ROM-code security hole. No public service-tool command, NokiX script,
+JTAG recipe, ESP32 design or archived binary was found that captures MAD2 DSP
+MMRs at the required boundary.
+
+The smallest credible future hardware task is therefore not a new electrical
+bridge. It is a MADos-derived ROM4 capture image plus an MBUS result protocol,
+run on a real 5110 with a conventional flash/service cable. Before attempting
+it, obtain or reconstruct the unpublished proxy details and verify that the
+capture executes before operational receiver initialization.
