@@ -6852,6 +6852,21 @@
       ]
     },
     {
+      "name": "verify-3410-radio-outgoing-sms",
+      "prerequisites": [
+        "normalize-3410"
+      ],
+      "variables": {},
+      "unstructured": "three-softkey physical composer route",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=75 RUN_VERBOSE=1 \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait4000,enter,wait1500,enter,wait1500,enter,wait3000,2,wait2000,enter,wait2000,enter,wait2000,5,5,5,1,2,3,4,wait1200,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \\",
+        "\t$(PYTHON) tools/radio_outgoing_sms_product_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR) nhm2",
+        "\t@echo \"OK - physical 3410 outgoing SMS completed\""
+      ]
+    },
+    {
       "name": "verify-radio-incoming-sms",
       "prerequisites": [],
       "variables": {},

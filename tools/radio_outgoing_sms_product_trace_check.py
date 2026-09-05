@@ -43,6 +43,15 @@ NHM5_MESSAGE_SENT_HASHES = {
 NHM6_MESSAGE_SENT_HASHES = {
     "71641c2f9548e5425eb827bf5a59cd2e7a2fc4fd402c4c4e958f5579ac04a498",
 }
+NHM2_MESSAGE_SENT_HASHES = {
+    "4c413fdb7b8e49a48f02f6e1ef3365c0182de793d1de7de420867f4dba8fa43c",
+    "9ea23fd0a123dd22f2c140aaeb6b87722c95737be1547eb2838cc49631250adf",
+    "f4589d7ee3234a7d78ce2ac97f9d92263580b73379bbc118f342250545f85984",
+    "057226cf79db8001bf36edcd010e52dff1ad1e90c3bc775bbb9b78012022da4f",
+    "8382b1f43d27a2717dae8f3d997affa98de04b5eda3a03c0ae16ab9a7440046c",
+    "674e4d939668ad9689b11ef6617d88faa1bf6d400e4b3f627cdea98ee278f2d3",
+    "7a95df684452191db95aeab6bc291a225280d9e7013315b0ec770b5b365c78f0",
+}
 
 
 def verify(text: str, frame_directory: pathlib.Path,
@@ -61,6 +70,7 @@ def verify(text: str, frame_directory: pathlib.Path,
     expected_hashes = {
         "nhm5": NHM5_MESSAGE_SENT_HASHES,
         "nhm6": NHM6_MESSAGE_SENT_HASHES,
+        "nhm2": NHM2_MESSAGE_SENT_HASHES,
     }.get(product, MESSAGE_SENT_HASHES)
     if not hashes.intersection(expected_hashes):
         raise ValueError("firmware Message sent frame was not observed")

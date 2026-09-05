@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 205 gates: 138 generated from typed steps, 67 copied verbatim (shell).
+# 206 gates: 138 generated from typed steps, 68 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -133,7 +133,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-outgoing-sms-timeout-state \
 	verify-radio-outgoing-sms-delivery-report verify-radio-outgoing-sms-v501 \
 	verify-3310-radio-outgoing-sms verify-3330-radio-outgoing-sms \
-	verify-radio-incoming-sms verify-radio-sms-inbox verify-radio-sms-inbox-state \
+	verify-3410-radio-outgoing-sms verify-radio-incoming-sms \
+	verify-radio-sms-inbox verify-radio-sms-inbox-state \
 	verify-radio-sms-inbox-negatives verify-radio-sms-sequential \
 	verify-3410-radio-sms-inbox verify-3310-radio-sms-inbox \
 	verify-3330-radio-sms-transport verify-radio-incoming-smart-message \
@@ -1784,6 +1785,14 @@ verify-3330-radio-outgoing-sms: normalize-3330
 		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait800,down,wait800,enter,wait800,enter,wait800,2,wait1500,enter,wait1200,enter,wait1500,5,5,5,1,2,3,4,wait1000,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \
 	$(PYTHON) tools/radio_outgoing_sms_product_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR) nhm6
 	@echo "OK - physical 3330 outgoing SMS completed"
+
+# shell: three-softkey physical composer route
+verify-3410-radio-outgoing-sms: normalize-3410
+	@set -e; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=75 RUN_VERBOSE=1 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait4000,enter,wait1500,enter,wait1500,enter,wait3000,2,wait2000,enter,wait2000,enter,wait2000,5,5,5,1,2,3,4,wait1200,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \
+	$(PYTHON) tools/radio_outgoing_sms_product_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR) nhm2
+	@echo "OK - physical 3410 outgoing SMS completed"
 
 verify-radio-incoming-sms:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'

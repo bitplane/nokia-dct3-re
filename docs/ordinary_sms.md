@@ -87,6 +87,11 @@ Nokia 3330 v4.50E independently completes its virgin-PMM security/time setup,
 enters the predictive-text composer through physical keys, and sends a
 non-empty GSM 7-bit SMS. Its explicit Send submenu and success frame are
 product-local; the decoded SMS-SUBMIT and CP/RP/RR lifecycle are shared.
+Nokia 3410 v5.46E independently follows its three-softkey
+Menu/Messages/Write-message route and completes the same GSM 7-bit transport.
+Its Profile 1 editor also reads and writes the 44-byte EF_SMSP record through
+ordinary SIM APDUs; the shipped profile's `+1234567890` centre is sufficient
+for the acceptance run.
 
 `make verify-radio-outgoing-sms-delivery-report` enables the firmware's
 EEPROM-backed Delivery reports setting before composition. The resulting

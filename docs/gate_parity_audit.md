@@ -36,7 +36,7 @@ absent product is a coverage question, not a drifted gate.
 | `radio-outgoing-call-host-media` | yes | — | — | yes | — |
 | `radio-outgoing-call-host-termination` | yes | yes | yes | yes | — |
 | `radio-outgoing-call-lifecycle` | yes | yes | yes | yes | — |
-| `radio-outgoing-sms` | yes | yes | yes | — | — |
+| `radio-outgoing-sms` | yes | yes | yes | yes | — |
 | `radio-paging` | yes | yes | yes | yes | — |
 | `radio-paging-negatives` | — | — | yes | yes | — |
 | `radio-paging-preserved` | — | — | yes | yes | — |
@@ -128,6 +128,7 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `tools/radio_outgoing_sms_trace_check.py`
 - **3310**: `tools/radio_outgoing_sms_delivery_report_trace_check.py`, `tools/radio_outgoing_sms_product_trace_check.py`
 - **3330**: `tools/radio_outgoing_sms_product_trace_check.py`
+- **3410**: `tools/radio_outgoing_sms_product_trace_check.py`
 
 ### `radio-paging`
 
@@ -395,6 +396,7 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `shell`
 - **3310**: `shell`
 - **3330**: `shell`
+- **3410**: `shell`
 
 ### `radio-paging-negatives`
 
