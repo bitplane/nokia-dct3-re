@@ -591,7 +591,7 @@
     {
       "id": "deep_gsm_sim_registration_notification_dormant", "manifest": "deep-gsm", "subsystem": "generic_service",
       "classification": "reviewed_runtime", "source": "docs/sim_registration.md",
-      "statement": "Ordinary task-21 SIM traffic executes, while the EF_PHASE=2 card correctly produces no TERMINAL PROFILE, 0x120c, FETCH A0/12, or proactive D0 command. A phase-3 isolation card still does not reach the later profile-download lifecycle."
+      "statement": "Ordinary task-21 SIM traffic executes, while the default EF_PHASE=2 card correctly produces no TERMINAL PROFILE, 0x120c, FETCH A0/12, or proactive D0 command. The separately gated Phase-2+ profile exercises that SAT lifecycle and is not part of this default manifest."
     }
   ],
   "runtime_patterns": [

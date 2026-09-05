@@ -156,15 +156,22 @@ card NVRAM. The CPHS AoC fixture advertises the service, but no handset has yet
 organically issued INCREASE, so this is standards-conformance coverage rather
 than a promoted product-runtime claim.
 
+The opt-in Phase-2+ profile admits one proactive DISPLAY TEXT transaction.
+FETCH without a pending command returns `9300`, a malformed or out-of-sequence
+TERMINAL RESPONSE returns `6a80`, and ENVELOPE remains explicitly unsupported
+through the generic `6d00` instruction response.
+
 Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
 
 - SEEK, invalidation and additional access-condition/error semantics;
 - supplying coherent FPLMN and optional EFs beyond the current matched
   IMSI/SST/PLMN-selector/SPN profile;
-- mapping card-detect notification and testing timeout, parity/error, and
-  proactive-SIM status (physical removal already aborts in-flight controller
-  and card state, but does not yet notify this firmware coherently);
+- testing timeout and parity/error behavior. Physical removal and reinsertion
+  now use the recovered SIMI status-bit-3/FIQ7 socket-detect contract and are
+  covered across both 3210 ROMs, including Phase-2+ and save/load variants;
+- extending the validated Phase-2+ TERMINAL PROFILE/FETCH/TERMINAL RESPONSE
+  lifecycle beyond one DISPLAY TEXT command, including ENVELOPE;
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 
@@ -214,11 +221,11 @@ A SIM increment is accepted only when:
 4. the resulting APDU/state transition is reproducible in one coherent boot;
 5. both 3210 regression oracles and the 3330-E smoke baseline remain healthy.
 
-The present stop boundary is the SIMI fault source, not an unfinished CHV
-command. Firmware decodes IIR causes `0x02`, `0x20`, and `0x80`, but current
-evidence does not identify their electrical conditions or a card-detect cause.
-Those events, and hot reinsertion, must not be synthesized merely to exercise
-the already-mapped handlers.
+The present stop boundary is the SIMI fault source, not an unfinished CHV or
+socket-detect command. Firmware decodes IIR causes `0x02`, `0x20`, and `0x80`,
+but current evidence does not identify all of their electrical conditions.
+Timeout and parity/error events must not be synthesized merely to exercise the
+already-mapped handlers.
 
 Primary references:
 

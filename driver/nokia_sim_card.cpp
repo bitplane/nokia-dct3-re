@@ -24,6 +24,8 @@ nokia_sim_card_device::nokia_sim_card_device(
 void nokia_sim_card_device::device_start()
 {
 	m_trace = machine().options().verbose();
+	m_toolkit_timer = timer_alloc(
+			FUNC(nokia_sim_card_device::toolkit_command_ready), this);
 	save_item(NAME(m_cphs_aoc));
 	save_item(NAME(m_cached_location));
 	save_item(NAME(m_atr));
@@ -42,6 +44,9 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_pending_response));
 	save_item(NAME(m_pending_response_len));
 	save_item(NAME(m_fcp_pending));
+	save_item(NAME(m_terminal_profile_received));
+	save_item(NAME(m_proactive_pending));
+	save_item(NAME(m_proactive_fetched));
 	save_item(NAME(m_adn));
 	save_item(NAME(m_loci));
 	save_item(NAME(m_kc));
@@ -66,6 +71,11 @@ void nokia_sim_card_device::reset_session_state()
 	m_receiving_body = false;
 	m_pending_response_len = 0;
 	m_fcp_pending = false;
+	m_terminal_profile_received = false;
+	m_proactive_pending = false;
+	m_proactive_fetched = false;
+	if (m_toolkit_timer)
+		m_toolkit_timer->adjust(attotime::never);
 	m_chv_verified[0] = m_chv_verified[1] = false;
 }
 
@@ -384,7 +394,8 @@ void nokia_sim_card_device::finish_header()
 		LOGMASKED(LOG_SIM, "sim_device: header cla=%02x ins=%02x p1=%02x p2=%02x p3=%02x selected=%04x t=%.8f\n",
 				m_tx[0], m_ins, m_p1, m_p2, m_p3, m_selected_file,
 				machine().time().as_double());
-	if (m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
+	if (m_ins == 0x10 || m_ins == 0x14 ||
+			m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
 			m_ins == 0x28 || m_ins == 0x2c || m_ins == 0x88 || m_ins == 0xa4 ||
 			m_ins == 0x32 || m_ins == 0xd6 || m_ins == 0xdc)
 	{
@@ -396,7 +407,9 @@ void nokia_sim_card_device::finish_header()
 		return;
 	}
 
-	if (m_ins == 0xc0 && m_pending_response_len != 0)
+	if (m_ins == 0x12)
+		queue_proactive_command(m_p3 ? m_p3 : 256);
+	else if (m_ins == 0xc0 && m_pending_response_len != 0)
 		queue_pending_response(m_p3 ? m_p3 : 256);
 	else if (m_ins == 0xc0 && m_fcp_pending)
 	{
@@ -439,10 +452,31 @@ void nokia_sim_card_device::finish_body()
 		else
 			LOGMASKED(LOG_SIM, "sim_device: body ins=%02x length=%u selected=%04x t=%.8f\n",
 					m_ins, m_tx_len, m_selected_file, machine().time().as_double());
+		if (m_ins == 0x14)
+		{
+			LOGMASKED(LOG_SIM, "sim_device: terminal-response data=");
+			for (unsigned index = 0; index < m_tx_len; ++index)
+				LOGMASKED(LOG_SIM, "%02x", m_tx[index]);
+			LOGMASKED(LOG_SIM, "\n");
+		}
 	}
 	if (m_ins == 0xdc)
 	{
 		update_record();
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		return;
+	}
+	if (m_ins == 0x10)
+	{
+		accept_terminal_profile();
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		return;
+	}
+	if (m_ins == 0x14)
+	{
+		accept_terminal_response();
 		m_tx_len = m_tx_expected = 0;
 		m_receiving_body = false;
 		return;
@@ -491,6 +525,84 @@ void nokia_sim_card_device::finish_body()
 	}
 	else
 		queue_status(0x90, 0x00);
+}
+
+void nokia_sim_card_device::accept_terminal_profile()
+{
+	if (!m_toolkit_profile || m_p1 != 0 || m_p2 != 0 || m_tx_len == 0)
+	{
+		queue_status(0x6d, 0x00);
+		return;
+	}
+
+	m_terminal_profile_received = true;
+	m_proactive_pending = false;
+	m_proactive_fetched = false;
+	// This laboratory SIM application issues its one command after startup,
+	// rather than racing the handset's boot-time UI construction. Application
+	// policy owns this delay; the ME still discovers it only through a later
+	// GSM 11.14 status word on the ordinary SIM transport.
+	m_toolkit_timer->adjust(attotime::from_seconds(8));
+	// TERMINAL PROFILE itself completes normally. Once the ME has accepted
+	// that completion and armed its SAT latch, a subsequent command response
+	// advertises the pending proactive command with 91xx.
+	queue_status(0x90, 0x00);
+}
+
+TIMER_CALLBACK_MEMBER(nokia_sim_card_device::toolkit_command_ready)
+{
+	if (!m_toolkit_profile || !m_terminal_profile_received ||
+			m_proactive_fetched)
+		return;
+	m_proactive_pending = true;
+	LOGMASKED(LOG_SIM, "sim_device: proactive DISPLAY TEXT ready t=%.8f\n",
+			machine().time().as_double());
+}
+
+void nokia_sim_card_device::queue_proactive_command(unsigned requested)
+{
+	// GSM 11.14 proactive DISPLAY TEXT: command details, SIM-to-display
+	// identities, then an 8-bit text string. Qualifier bit 7 asks the ME to
+	// wait for user clearance, making dismissal observable through its normal
+	// keypad and TERMINAL RESPONSE paths.
+	static constexpr u8 display_text[] = {
+		0xd0, 0x14,
+		0x81, 0x03, 0x01, 0x21, 0x80,
+		0x82, 0x02, 0x81, 0x02,
+		0x8d, 0x09, 0x04, 'D', 'C', 'T', '3', ' ', 'S', 'A', 'T'
+	};
+	if (!m_toolkit_profile || !m_terminal_profile_received ||
+			!m_proactive_pending || requested != std::size(display_text))
+	{
+		queue_status(0x93, 0x00);
+		return;
+	}
+
+	u8 response[std::size(display_text) + 3];
+	response[0] = m_ins;
+	std::copy(std::begin(display_text), std::end(display_text), response + 1);
+	response[std::size(display_text) + 1] = 0x90;
+	response[std::size(display_text) + 2] = 0x00;
+	m_proactive_pending = false;
+	m_proactive_fetched = true;
+	emit_response(response, std::size(response));
+}
+
+void nokia_sim_card_device::accept_terminal_response()
+{
+	// Command-details TLV must identify the command fetched above. The ME owns
+	// the result and any optional TLVs; accepting them without interpreting UI
+	// policy keeps that policy out of the card model.
+	if (!m_toolkit_profile || !m_terminal_profile_received ||
+			!m_proactive_fetched || m_p1 != 0 || m_p2 != 0 ||
+			m_tx_len < 5 || (m_tx[0] & 0x7f) != 0x01 ||
+			m_tx[1] != 0x03 || m_tx[2] != 0x01 || m_tx[3] != 0x21)
+	{
+		queue_status(0x6a, 0x80);
+		return;
+	}
+	m_proactive_fetched = false;
+	queue_status(0x90, 0x00);
 }
 
 void nokia_sim_card_device::run_gsm_algorithm()
@@ -648,11 +760,34 @@ void nokia_sim_card_device::process_chv()
 
 void nokia_sim_card_device::queue_status(u8 sw1, u8 sw2)
 {
+	if (sw1 == 0x90 && sw2 == 0x00 && m_toolkit_profile &&
+			m_terminal_profile_received && m_proactive_pending &&
+			m_ins != 0x10 && m_ins != 0x12 && m_ins != 0x14)
+	{
+		sw1 = 0x91;
+		sw2 = 22;
+	}
 	LOGMASKED(LOG_SIM, "SIM status ins=%02x sw=%02x%02x chv=%u/%u puk=%u/%u enabled=%u\n",
 			m_ins, sw1, sw2, m_chv_attempts[0], m_chv_attempts[1],
 			m_unblock_attempts[0], m_unblock_attempts[1], m_chv1_enabled);
 	const u8 response[] = { sw1, sw2 };
 	emit_response(response, std::size(response));
+}
+
+void nokia_sim_card_device::append_completion_status(
+		u8 *response, unsigned &length)
+{
+	if (m_toolkit_profile && m_terminal_profile_received &&
+			m_proactive_pending && m_ins != 0x10)
+	{
+		response[length++] = 0x91;
+		response[length++] = 22;
+	}
+	else
+	{
+		response[length++] = 0x90;
+		response[length++] = 0x00;
+	}
 }
 
 void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
@@ -712,7 +847,7 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 			std::copy_n(fcp, count, response + n); n += count;
 		}
 	}
-	response[n++] = 0x90; response[n++] = 0x00;
+	append_completion_status(response, n);
 	emit_response(response, n);
 }
 
@@ -730,8 +865,7 @@ void nokia_sim_card_device::queue_pending_response(unsigned requested)
 	response[n++] = m_ins;
 	std::copy_n(m_pending_response, m_pending_response_len, response + n);
 	n += m_pending_response_len;
-	response[n++] = 0x90;
-	response[n++] = 0x00;
+	append_completion_status(response, n);
 	if (m_trace)
 		LOGMASKED(LOG_SIM,
 				"sim_device: pending response ins=%02x length=%u status=9000 t=%.8f\n",
@@ -757,7 +891,12 @@ void nokia_sim_card_device::queue_read_binary(unsigned requested)
 	response[n++] = m_ins;
 	for (unsigned offset = 0; offset < requested && n < std::size(response) - 2; offset++)
 		response[n++] = ef_byte(m_selected_file, start + offset);
-	response[n++] = 0x90; response[n++] = 0x00;
+	if (m_trace)
+		LOGMASKED(LOG_SIM,
+				"sim_device: read-binary fid=%04x offset=%u length=%u first=%02x t=%.8f\n",
+				m_selected_file, start, requested,
+				requested ? response[1] : 0, machine().time().as_double());
+	append_completion_status(response, n);
 	emit_response(response, n);
 }
 
@@ -787,7 +926,7 @@ void nokia_sim_card_device::queue_read_record(unsigned requested)
 	const unsigned start = (record - 1) * file->record_length;
 	for (unsigned offset = 0; offset < file->record_length; offset++)
 		response[n++] = ef_byte(m_selected_file, start + offset);
-	response[n++] = 0x90; response[n++] = 0x00;
+	append_completion_status(response, n);
 	emit_response(response, n);
 }
 
@@ -1045,7 +1184,7 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// GSM 11.11 EF_HPLMN is measured in six-minute units.  Five is an ordinary
 	// finite search period; erased 0xff is reserved and not a neutral profile.
 	if (fid == 0x6f31) return 0x05;
-	if (fid == 0x6fae) return 0x02;
+	if (fid == 0x6fae) return m_toolkit_profile ? 0x03 : 0x02;
 	return 0xff;
 }
 

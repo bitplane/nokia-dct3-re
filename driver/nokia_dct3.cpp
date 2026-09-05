@@ -749,6 +749,7 @@ public:
 		m_network_config(*this, "NETCFG"),
 		m_sms_config(*this, "SMSCFG"),
 		m_smart_message_config(*this, "SMARTCFG"),
+		m_sim_toolkit_config(*this, "SATCFG"),
 		m_cell_config(*this, "CELLCFG"),
 		m_assignment_config(*this, "ASSIGNCFG"),
 		m_page_config(*this, "PAGECFG"),
@@ -833,6 +834,7 @@ private:
 	void ccont_power_w(int state);
 	void reset_digital_baseband();
 	void sim_irq_w(int state);
+	void sim_detect_w(int state);
 	void mbus_fiq2_w(int state);
 	void mbus_fiq3_w(int state);
 	void mbus_tx_w(u8 data);
@@ -891,6 +893,7 @@ private:
 	optional_ioport m_network_config;
 	optional_ioport m_sms_config;
 	optional_ioport m_smart_message_config;
+	optional_ioport m_sim_toolkit_config;
 	optional_ioport m_cell_config;
 	optional_ioport m_assignment_config;
 	optional_ioport m_page_config;
@@ -1333,6 +1336,7 @@ void nokia_dct3_state::machine_reset()
 					nokia_gsm_network_device::neighbour_fault_profile::
 							forbidden_plmn);
 	m_sim_card->set_cached_location(false);
+	m_sim_card->set_toolkit_profile(BIT(m_sim_toolkit_config.read_safe(0x00), 0));
 	// The removable laboratory subscriber explicitly selects 3GPP TS 55.205
 	// section 5's AES-based example A3/A8 profile.  A3/A8 is operator-owned;
 	// this key is synthetic fixture provisioning, not handset identity.
@@ -1497,6 +1501,19 @@ void nokia_dct3_state::sim_irq_w(int state)
 {
 	if (state)
 		m_mad2->assert_fiq(6);
+}
+
+void nokia_dct3_state::sim_detect_w(int state)
+{
+	if (state)
+	{
+		if (m_trace_enabled)
+			LOGMASKED(LOG_MAD2_INTERRUPTS,
+					"sim_detect: present=%u control=%02x fiq_before=%03x t=%.9f\n",
+					m_simi->card_present(), m_simi->control_r(),
+					m_mad2->fiq_status(), machine().time().as_double());
+		m_mad2->assert_fiq(7);
+	}
 }
 
 void nokia_dct3_state::dsp_fiq0_w(int state)
@@ -2065,6 +2082,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_OTHER) PORT_NAME("Remove SIM card") PORT_TOGGLE
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 
+	PORT_START("SATCFG")
+	PORT_CONFNAME(0x01, 0x00, "SIM Application Toolkit card profile")
+	PORT_CONFSETTING(0x00, "Phase 2 (no toolkit)")
+	PORT_CONFSETTING(0x01, "Phase 2+ with one DISPLAY TEXT command")
+
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.
 	PORT_START("NETCFG")
@@ -2570,6 +2592,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_SIMI(config, m_simi);
 	NOKIA_SIM_CARD(config, m_sim_card);
 	m_simi->irq_cb().set(FUNC(nokia_dct3_state::sim_irq_w));
+	m_simi->card_detect_cb().set(FUNC(nokia_dct3_state::sim_detect_w));
 	m_sim_card->response_cb().set(m_simi, FUNC(nokia_simi_device::card_rx_w));
 }
 

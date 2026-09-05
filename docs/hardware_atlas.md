@@ -192,7 +192,10 @@ and cold-boot power sample; handset ports and MAD2 routing remain board wiring.
 return through the organic SIMI register and FIQ6 path.
 TXD writes enter a 16-byte hardware FIFO, `0x3e=0x00` flushes a chunk to the
 T=0 parser, and `0x3f` reports its live fill. See `sim_subsystem.md` and
-`sim_emulator_scope.md`.
+`sim_emulator_scope.md`. SIMI control/status bit 3 reports active-high socket
+absence. A live presence transition raises MAD2 FIQ7; both mapped 3210 ROMs
+acknowledge it and firmware either posts removal or schedules ordinary card
+reactivation.
 
 ### UIF — CTRL I/O pins (`0x30–0x33`, `0x70–0x73`, `0xb0–0xb3`, `0xf0–0xf3`)
 

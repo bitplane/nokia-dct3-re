@@ -237,12 +237,13 @@ ordinary SIM initialization or GSM Location Updating. Their recovered
 constructors remain useful maps for later SAT, resource and call/session work,
 but absence during boot is expected and is not a registration frontier.
 
-The SIM Toolkit path is independently dormant for the current card profile.
-The card reports EF_PHASE `0x02`; firmware therefore performs no TERMINAL
-PROFILE/FETCH lifecycle and receives no proactive-command `91xx` status.
-The card must not manufacture a proactive D0 object, task-21 `0x120c`, or any
-task-5 callback event. A future SAT profile must begin with standards-shaped
-card behavior through SIMI/FIQ6.
+The SIM Toolkit path is independently dormant for the default card profile,
+which reports EF_PHASE `0x02`. An explicit Phase-2+ profile now validates the
+separate lifecycle through standards-shaped card behavior: firmware-owned
+TERMINAL PROFILE, card `91xx`, task-21 `0x120c`, FETCH, D0 parsing, DISPLAY
+TEXT rendering and a successful TERMINAL RESPONSE all cross SIMI/FIQ6. The
+card does not manufacture RTOS messages, callback events, or the firmware's
+internal D0 object.
 
 ## Current conclusion
 

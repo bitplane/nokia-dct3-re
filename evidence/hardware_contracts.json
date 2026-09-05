@@ -84,12 +84,12 @@
     },
     {
       "id": "mad2_simi_uart", "subsystem": "sim", "status": "partial", "confidence": "strong",
-      "boundary": "The extracted nokia_simi_device owns MAD2 offsets 0x36..0x3f, 16-byte TX FIFO, RX queue, IIR causes 0x10/0x40, response cadence and FIQ6; it exchanges only activation and bytes with the separate card device",
+      "boundary": "The extracted nokia_simi_device owns MAD2 offsets 0x36..0x3f, 16-byte TX FIFO, RX queue, IIR causes 0x10/0x40, response cadence and FIQ6; control/status bit 3 reports active-high socket absence and live card-presence edges assert MAD2 FIQ7; it exchanges only activation and bytes with the separate card device",
       "evidence": ["docs/sim_subsystem.md", "tools/test_sim_device_split.py"]
     },
     {
       "id": "sim_t0_card_transport", "subsystem": "sim", "status": "partial", "confidence": "strong",
-      "boundary": "ATR, PPS and the organically requested T=0 initialization exchange compose through SIMI and task 21 without firmware messages or RAM forcing; fixed response delays and unexercised timeout/error/card-removal behavior remain provisional",
+      "boundary": "ATR, PPS and organically requested T=0 exchanges compose through SIMI and task 21 without firmware messages or RAM forcing; physical removal and reinsertion follow the recovered status-bit-3/FIQ7 contract across both 3210 ROMs, while fixed response delays and unexercised timeout/parity behavior remain provisional",
       "evidence": ["docs/sim_subsystem.md", "docs/sim_emulator_scope.md"]
     },
     {

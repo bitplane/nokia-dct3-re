@@ -107,7 +107,7 @@
     {
       "id": "sat_fetch_is_registration_predecessor", "status": "disproven",
       "hypothesis": "The task-21 0x120c -> A0/12 -> D0 path is the missing ordinary SIM-registration predecessor",
-      "conclusion": "A0/12 and D0 are the GSM 11.14 FETCH/proactive-command protocol. Firmware arms it only after TERMINAL PROFILE for phase >=3, and the profile-download function belongs to a later session lifecycle",
+      "conclusion": "A0/12 and D0 are the GSM 11.14 FETCH/proactive-command protocol, not registration. The opt-in EF_PHASE=3 profile proves firmware sends TERMINAL PROFILE during ordinary SIM initialization, then later consumes card 91xx, FETCHes D0 and renders DISPLAY TEXT; the earlier claim that profile download belonged only to an unreachable later lifecycle was false.",
       "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
     },
     {

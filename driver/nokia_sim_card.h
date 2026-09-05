@@ -17,6 +17,7 @@ public:
 
 	void set_cphs_aoc(bool enabled) { m_cphs_aoc = enabled; }
 	void set_cached_location(bool enabled) { m_cached_location = enabled; }
+	void set_toolkit_profile(bool enabled) { m_toolkit_profile = enabled; }
 	void set_forbidden_test_plmn(bool enabled)
 	{
 		m_forbidden_test_plmn = enabled;
@@ -40,6 +41,7 @@ protected:
 	virtual bool nvram_write(util::write_stream &file) override;
 
 private:
+	TIMER_CALLBACK_MEMBER(toolkit_command_ready);
 	enum class file_structure : u8 { directory, transparent, linear_fixed, cyclic };
 	struct file_descriptor
 	{
@@ -74,6 +76,7 @@ private:
 	void finish_header();
 	void finish_body();
 	void queue_status(u8 sw1, u8 sw2);
+	void append_completion_status(u8 *response, unsigned &length);
 	void queue_fcp(u16 fid, unsigned requested);
 	void queue_pending_response(unsigned requested);
 	void queue_read_binary(unsigned requested);
@@ -82,6 +85,9 @@ private:
 	void update_record();
 	void increase_record();
 	void run_gsm_algorithm();
+	void accept_terminal_profile();
+	void queue_proactive_command(unsigned requested);
+	void accept_terminal_response();
 	void process_chv();
 	void initialize_chv();
 	bool chv_matches(unsigned index, const u8 *value) const;
@@ -104,6 +110,7 @@ private:
 	devcb_write8 m_response_cb;
 	bool m_cphs_aoc = false;
 	bool m_cached_location = false;
+	bool m_toolkit_profile = false;
 	bool m_forbidden_test_plmn = false;
 	authentication_profile m_authentication_profile =
 			authentication_profile::none;
@@ -125,6 +132,10 @@ private:
 	u8 m_pending_response[256] = { 0 };
 	u16 m_pending_response_len = 0;
 	bool m_fcp_pending = false;
+	bool m_terminal_profile_received = false;
+	bool m_proactive_pending = false;
+	bool m_proactive_fetched = false;
+	emu_timer *m_toolkit_timer = nullptr;
 	u8 m_adn[50 * 32] = { 0 };
 	u8 m_loci[11] = { 0 };
 	u8 m_kc[9] = { 0 };

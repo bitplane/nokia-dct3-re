@@ -63,8 +63,14 @@
     {
       "id": "sim_toolkit_proactive_notification", "owner": "sim_task", "status": "satisfied",
       "predicate": "A Phase-2+ SAT card completes TERMINAL PROFILE, advertises a proactive command with 91xx, and task 21 organically posts 0x120c before FETCH A0/12",
-      "current": "The current card advertises EF_PHASE=2, so firmware correctly performs no TERMINAL PROFILE and no 0x120c; a phase-3 isolation profile still does not reach the later profile-download lifecycle",
-      "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md"]
+      "current": "The default EF_PHASE=2 card remains dormant. With the opt-in Phase-2+ profile, both 3210 v5.01 and v6.00 organically send TERMINAL PROFILE through SIMI/FIQ6, accept 9000, later consume 9116, post the firmware-owned 0x120c, FETCH a D0 DISPLAY TEXT command, render DCT3 SAT, and return result 00 after a physical Left Softkey dismissal. Save/load preserves the pending application timer and card removal cancels it.",
+      "evidence": ["docs/sim_registration.md", "docs/sim_subsystem.md", "tools/sim_toolkit_trace_check.py"]
+    },
+    {
+      "id": "sim_physical_hotplug", "owner": "simi_socket", "status": "satisfied",
+      "predicate": "Physical card removal and reinsertion reach the firmware through SIMI socket status and MAD2 interrupt routing, then restart the normal card lifecycle",
+      "current": "Both 3210 v6.00 and v5.01 observe active-high SIMI control/status bit 3 and acknowledge MAD2 FIQ7 on each edge. Removal deactivates the transport and card session; reinsertion schedules firmware-owned activation, ATR and EF_PHASE/file initialization. Phase-2+ repeats TERMINAL PROFILE, and a save/load while absent preserves the lifecycle.",
+      "evidence": ["docs/sim_subsystem.md", "docs/sim_emulator_scope.md", "tools/sim_hotplug_trace_check.py"]
     },
     {
       "id": "mad2_sleep_clock_contract", "owner": "mad2_ctsi", "status": "satisfied",

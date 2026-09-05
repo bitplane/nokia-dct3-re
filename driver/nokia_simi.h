@@ -12,6 +12,7 @@ public:
 	nokia_simi_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
 	auto irq_cb() { return m_irq_cb.bind(); }
+	auto card_detect_cb() { return m_card_detect_cb.bind(); }
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
 	bool enabled() const { return m_enabled; }
@@ -44,9 +45,11 @@ private:
 
 	required_device<nokia_sim_card_device> m_card;
 	devcb_write_line m_irq_cb;
+	devcb_write_line m_card_detect_cb;
 	emu_timer *m_rx_timer = nullptr;
 	bool m_enabled = false;
 	bool m_card_present = false;
+	bool m_card_presence_initialized = false;
 	bool m_clock_enabled = false;
 	u8 m_control = 0;
 	// Card-response serialization queue, not firmware-visible FIFO capacity.

@@ -22,7 +22,8 @@ nokia_simi_device::nokia_simi_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_SIMI, tag, owner, clock),
 	m_card(*this, "^sim_card"),
-	m_irq_cb(*this)
+	m_irq_cb(*this),
+	m_card_detect_cb(*this)
 {
 }
 
@@ -31,6 +32,7 @@ void nokia_simi_device::device_start()
 	m_rx_timer = timer_alloc(FUNC(nokia_simi_device::rx_ready), this);
 	save_item(NAME(m_enabled));
 	save_item(NAME(m_card_present));
+	save_item(NAME(m_card_presence_initialized));
 	save_item(NAME(m_clock_enabled));
 	save_item(NAME(m_control));
 	save_item(NAME(m_rx_fifo));
@@ -67,6 +69,15 @@ void nokia_simi_device::clear_transfer_state()
 
 void nokia_simi_device::set_card_present(bool present)
 {
+	// Initial machine configuration establishes the socket level without
+	// manufacturing a hot-plug edge. Cold-boot firmware samples and activates
+	// an already-inserted card through the ordinary control-register path.
+	if (!m_card_presence_initialized)
+	{
+		m_card_present = present;
+		m_card_presence_initialized = true;
+		return;
+	}
 	if (m_card_present == present)
 		return;
 	m_card_present = present;
@@ -78,6 +89,11 @@ void nokia_simi_device::set_card_present(bool present)
 		clear_transfer_state();
 		m_card->deactivate();
 	}
+	// MAD2 exposes socket insertion/removal separately from SIMI UART traffic.
+	// Both mapped NSE-8 ROMs service that edge on FIQ7 and sample status bit 3
+	// below to distinguish an absent card from a newly inserted one.
+	m_card_detect_cb(1);
+	m_card_detect_cb(0);
 }
 
 void nokia_simi_device::set_clock_enabled(int state)
@@ -100,7 +116,9 @@ void nokia_simi_device::set_clock_enabled(int state)
 
 u8 nokia_simi_device::control_r() const
 {
-	return m_control | ((m_enabled && m_clock_enabled && BIT(m_control, 7)) ? 0x40 : 0x00);
+	return (m_control & ~0x48) |
+			((m_enabled && m_clock_enabled && m_card_present && BIT(m_control, 7)) ? 0x40 : 0x00) |
+			(m_card_present ? 0x00 : 0x08);
 }
 
 void nokia_simi_device::control_w(u8 data)

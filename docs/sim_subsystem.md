@@ -25,7 +25,7 @@ and the current synthetic filesystem.
 | `0x3e` | TX FIFO control | `0x04` opens/fills a transmit chunk; `0x00` flushes it to the serial/card boundary and produces TX-empty progression. |
 | `0x3f` | TX fill | Live number of bytes waiting in the 16-byte SIMI TX FIFO. |
 
-FIQ line 6 is the SIMI interrupt. The firmware route is:
+FIQ line 6 is the SIMI UART interrupt. The firmware route is:
 
 ```text
 FIQ dispatcher 0x2af49c
@@ -56,7 +56,16 @@ and RX-ready. A T=0 work-waiting timeout would legitimately generate `0x20`
 only while a requested character is outstanding. The modeled card responds
 before that condition, so a periodic idle `0x20` source would be a recovery
 shim and is intentionally not implemented. Bits `0x02` and `0x80` remain
-fault-path contracts awaiting parity/framing or card-removal evidence.
+fault-path contracts awaiting parity/framing evidence.
+
+Socket presence is a separate MAD2 input. Both mapped ROMs route FIQ7 to the
+same handler (`0x2a06f0` in v6.00, `0x29dc30` in v5.01). The handler samples
+SIMI control/status bit 3: set means absent and posts the static task-21 removal
+result; clear means inserted and puts the SIM transport in state 5 before
+arming its ordinary retry timer. The controller therefore overlays bit 3 from
+the physical socket level and pulses FIQ7 on live insertion/removal edges.
+Cold configuration establishes the initial level without manufacturing a
+hot-plug edge.
 
 ## Firmware transaction contract
 
@@ -120,7 +129,8 @@ The implemented surface is classified by ownership and evidence:
 | --- | --- | --- |
 | SIMI register window and FIQ6 route | Extracted partial hardware | `nokia_simi_device` owns offsets `0x36..0x3f`, the decoded IIR cascade, timing and FIQ6; firmware traffic executes through it in both mapped 3210 ROMs. |
 | TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics remain inferred. |
-| IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Physical removal now aborts the controller/card transaction and clears volatile card authorization, but the card-detect notification cause is not mapped; timeout/error causes `0x02`, `0x20`, and `0x80` remain unmodeled. |
+| IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error causes `0x02`, `0x20`, and `0x80` remain unmodeled. |
+| Socket detect status bit 3 and FIQ7 | Validated hardware contract | Physical removal deactivates transport/card state and posts the firmware removal result; reinsertion organically reactivates SIMI, ATR and file initialization in v6.00 and v5.01. Phase 2+, removal and save/load variants are independently gated. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
 | SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. Invalidation, broader errors and removal remain incomplete. |
 | UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
@@ -130,11 +140,11 @@ The implemented surface is classified by ownership and evidence:
 | CHV support | Validated card contract | PIN-enabled 3210 startup organically issues VERIFY. Three wrong PINs produce `98 04`, `98 04`, then blocked `98 40`; the firmware presents its PUK editor and organically issues UNBLOCK with a replacement PIN. The security-settings UI organically issues DISABLE, ENABLE and CHANGE, including a rejected CHANGE that consumes one retry without modifying the credential. Credentials, enable state and retry counters persist in card NVRAM, authorization is reset/card-removal scoped, and a live retry survives MAME save/load. A second boot verifies both toggle persistence and the replacement PIN. The same startup VERIFY path is reproduced by v5.01. |
 
 The model does not force firmware state or inject RTOS messages. Controller and
-card ownership are separate; remaining fidelity debt is ATR start/turnaround timing,
-unmodeled controller error/card-detect signaling, and card protocol mixed with
-subscriber provisioning. Physical removal already aborts transport and clears
-card-session authorization; coherent firmware notification and hot reinsertion
-stop at the unmapped hardware boundary.
+card ownership are separate; remaining fidelity debt is ATR start/turnaround
+timing, unmodeled controller timeout/parity signaling, and card protocol mixed
+with subscriber provisioning. Physical socket edges use SIMI status bit 3 and
+MAD2 FIQ7; firmware owns removal handling, reactivation and the repeated file
+initialization after reinsertion.
 
 The authentication profile follows
 [3GPP TS 55.205](https://www.etsi.org/deliver/etsi_TS/155200_155299/155205/18.00.00_60/ts_155205v180000p.pdf):
@@ -245,11 +255,16 @@ BINARY` commands through SIMI/FIQ6. It does not require callback 7 or the
 contracts in `sim_registration.md` and must not be forced.
 
 The mapped task-21 `0x120c -> A0/12 -> D0 -> 0x177x` route is GSM
-11.14 SIM Toolkit: TERMINAL PROFILE arms latch `0x10dcb7`, `91xx` advertises a
-proactive command, and `A0/12` FETCH retrieves it. The current EF_PHASE=2 card
-correctly leaves this path dormant, and firmware's profile-download function is
-part of a later session lifecycle even with a phase-3 isolation card.
-This route is therefore separate from ordinary registration.
+11.14 SIM Toolkit. The default EF_PHASE=2 card correctly leaves it dormant.
+The opt-in Phase-2+ profile returns EF_PHASE `03`; task 20 then organically
+sends TERMINAL PROFILE (`A0 10`) and accepts `90 00`. The card application
+later marks one DISPLAY TEXT command ready. A subsequent ordinary command
+completion returns `91 16`, task 21 posts `0x120c`, task 20 sends FETCH
+(`A0 12`), and the returned D0 BER-TLV reaches the firmware's `0x177x`
+router. The MMI renders `DCT3 SAT`; Left Softkey dismissal produces TERMINAL
+RESPONSE (`A0 14`) with general result `00`. v5.01 and v6.00 both complete the
+same transaction through SIMI/FIQ6. This route remains separate from ordinary
+registration.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract
@@ -301,9 +316,9 @@ credential unchanged.
   messages or SIM-state RAM writes.
 
 The frontier and focused gates protect organic SIM-enabled state, persistent
-security state and save-state resumption. FIFO reset/fill behavior, timeout and
-parity/error causes, and the card-detect notification side of removal still
-need focused coverage before materially changing the controller contract.
+security state, save-state resumption, and physical removal/reinsertion through
+FIQ7. FIFO reset/fill behavior plus timeout and parity/error causes remain the
+controller fidelity frontier.
 
 CHV command/status semantics follow ETSI GSM 11.11 v5.1.0, sections 9.4 and
 9.5: <https://www.etsi.org/deliver/etsi_gts/11/1111/05.01.00_60/gsmts_1111v050100p.pdf>.

@@ -18,7 +18,7 @@ class SimDeviceSplitTest(unittest.TestCase):
     def test_card_has_no_mad2_controller_state(self):
         for token in (
             "m_iir", "m_rx_timer", "m_uart_tx_fifo", "tx_fifo_control_w",
-            "rx_fifo_control_w", "attotime", "irq_cb",
+            "rx_fifo_control_w", "irq_cb",
         ):
             self.assertNotIn(token, self.card + self.card_header)
 
@@ -49,6 +49,16 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn(
             "m_simi->set_card_present(m_product.synthetic_sim_card &&", self.phone
         )
+
+    def test_hotplug_uses_the_mad2_fiq7_and_status_bit_contract(self):
+        self.assertIn("auto card_detect_cb()", self.simi_header)
+        self.assertIn("m_card_detect_cb(1)", self.simi)
+        self.assertIn("m_card_detect_cb(0)", self.simi)
+        self.assertIn("m_card_present ? 0x00 : 0x08", self.simi)
+        self.assertIn("m_card_presence_initialized", self.simi + self.simi_header)
+        self.assertIn("void sim_detect_w(int state)", self.phone)
+        self.assertIn("m_mad2->assert_fiq(7)", self.phone)
+        self.assertIn("m_simi->card_detect_cb().set", self.phone)
 
     def test_character_timing_matches_observed_default_pps(self):
         self.assertIn("TA1=0x05", self.simi)
@@ -166,6 +176,43 @@ class SimDeviceSplitTest(unittest.TestCase):
             "authentication_profile::gsm_aes_example", self.phone
         )
         self.assertNotIn("noki6110", self.card + self.card_header)
+
+    def test_toolkit_profile_is_card_owned_and_opt_in(self):
+        for token in (
+            "void set_toolkit_profile(bool enabled)",
+            "m_toolkit_profile ? 0x03 : 0x02",
+            "void nokia_sim_card_device::accept_terminal_profile()",
+            "void nokia_sim_card_device::queue_proactive_command",
+            "void nokia_sim_card_device::accept_terminal_response()",
+            "m_toolkit_timer->adjust(attotime::from_seconds(8))",
+            "response[length++] = 0x91",
+            "0xd0, 0x14",
+            "0x81, 0x03, 0x01, 0x21, 0x80",
+        ):
+            self.assertIn(token, self.card + self.card_header)
+        self.assertIn('m_sim_toolkit_config(*this, "SATCFG")', self.phone)
+        self.assertIn("m_sim_card->set_toolkit_profile", self.phone)
+        self.assertNotIn("0x120c", self.card + self.card_header)
+
+    def test_toolkit_rejects_unsupported_or_out_of_sequence_commands(self):
+        proactive = self.card.split(
+            "void nokia_sim_card_device::queue_proactive_command", 1
+        )[1].split(
+            "void nokia_sim_card_device::accept_terminal_response", 1
+        )[0]
+        terminal_response = self.card.split(
+            "void nokia_sim_card_device::accept_terminal_response", 1
+        )[1].split(
+            "void nokia_sim_card_device::run_gsm_algorithm", 1
+        )[0]
+        self.assertIn("queue_status(0x93, 0x00)", proactive)
+        self.assertIn("requested != std::size(display_text)", proactive)
+        self.assertIn("queue_status(0x6a, 0x80)", terminal_response)
+        self.assertIn("!m_proactive_fetched", terminal_response)
+        # ENVELOPE is outside the admitted one-command profile and therefore
+        # falls through the generic instruction-not-supported response.
+        self.assertNotIn("m_ins == 0xc2", self.card)
+        self.assertIn("queue_status(0x6d, 0x00)", self.card)
 
 
 if __name__ == "__main__":

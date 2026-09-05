@@ -224,7 +224,7 @@ unique instructions are:
 
 | Instruction | Firmware constructor meaning |
 | --- | --- |
-| `10`, `12`, `14`, `c2` | TERMINAL RESPONSE, FETCH, TERMINAL PROFILE, ENVELOPE |
+| `10`, `12`, `14`, `c2` | TERMINAL PROFILE, FETCH, TERMINAL RESPONSE, ENVELOPE |
 | `20`, `24`, `26`, `28`, `2c` | VERIFY, CHANGE, DISABLE, ENABLE and UNBLOCK CHV |
 | `32`, `88` | INCREASE and RUN GSM ALGORITHM |
 | `a4`, `b0`, `b2`, `c0` | SELECT, READ BINARY, READ RECORD and GET RESPONSE |
@@ -277,12 +277,12 @@ persist EF_LOCI, release the channel and resume camp. That cross-product
 completion does not establish
 NSE-3 command ordering and does not promote 6110 runtime coverage.
 
-The four SIM Toolkit constructors remain unsupported and return `6d 00`.
-This is not permission to pre-implement an assumed 6110 boot script: an
-organic trace must establish which commands are actually issued, their
-parameters and status progression. Toolkit additionally needs a
-proactive-service profile. Missing commands should be implemented generically
-from the applicable GSM SIM contract rather than special-cased for NSE-3.
+The generic card implements TERMINAL PROFILE, FETCH and TERMINAL RESPONSE for
+its opt-in Phase-2+ DISPLAY TEXT profile; ENVELOPE remains unsupported and
+returns `6d 00`. This does not promote NSE-3 runtime coverage: an organic 6110
+trace must still establish which commands it issues, their parameters and
+status progression. Missing commands belong in the generic GSM SIM contract,
+not an NSE-3 special case.
 
 The same exact-image gate now establishes the firmware side of the generic
 DSPIF transport. The MCU-to-DSP ring occupies shared byte offsets

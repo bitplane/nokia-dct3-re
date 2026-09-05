@@ -607,11 +607,15 @@ if sim_remove_at >= 0 and sim_removed_field then
 		sim_removed_field:set_value(1)
 		machine:logerror(string.format("sim_presence_fixture: present=0 t=%.6f\n",
 				emulation_seconds()))
+		emu.wait(0.05)
+		sim_removed_field:clear_value()
 		if sim_reinsert_after >= 0 then
 			emu.wait(sim_reinsert_after)
-			sim_removed_field:set_value(0)
+			sim_removed_field:set_value(1)
 			machine:logerror(string.format("sim_presence_fixture: present=1 t=%.6f\n",
 					emulation_seconds()))
+			emu.wait(0.05)
+			sim_removed_field:clear_value()
 		end
 	end)
 	assert(coroutine.resume(sim_presence_timer))

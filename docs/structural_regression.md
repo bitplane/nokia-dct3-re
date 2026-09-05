@@ -306,8 +306,13 @@ and NVRAM so a previous hot-removal experiment cannot silently leave the SIM
 absent.
 `make verify-sim-pin-removal` authenticates first, then toggles the physical
 card-detect input and requires card deactivation to discard volatile CHV
-authorization. It does not claim that the still-unmapped SIMI card-detect cause
-notifies firmware or supports hot reinsertion.
+authorization. The separate `make verify-sim-hotplug` and
+`make verify-sim-hotplug-v501` gates require the recovered SIMI status-bit-3
+and FIQ7 path to notify firmware, acknowledge both edges, reactivate the card,
+and repeat the ordinary EF-phase initialization after reinsertion.
+`make verify-sim-hotplug-toolkit` repeats the lifecycle with a Phase-2+ card
+and requires a new TERMINAL PROFILE exchange. The save-state variant snapshots
+the absent-card interval before completing the same reinsertion sequence.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

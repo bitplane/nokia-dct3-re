@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 214 gates: 138 generated from typed steps, 76 copied verbatim (shell).
+# 222 gates: 138 generated from typed steps, 84 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -158,11 +158,14 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-vibrator verify-dsp-tone verify-ccont-rtc verify-ccont-mask \
 	verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 \
 	verify-charger-lifecycle verify-charger-wake verify-frontier verify-mmi-menu \
-	verify-mmi-menu-501 verify-sim-phonebook verify-sim-pin \
-	verify-sim-pin-unblock verify-sim-pin-state-roundtrip verify-sim-pin-removal \
-	verify-sim-pin-toggle verify-sim-pin-change verify-sim-pin-change-reject \
-	verify-sim-pin-v501 verify-frontier-stability verify-structure-subset \
-	verify-structure
+	verify-mmi-menu-501 verify-sim-toolkit verify-sim-hotplug \
+	verify-sim-hotplug-v501 verify-sim-hotplug-toolkit \
+	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
+	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
+	verify-sim-phonebook verify-sim-pin verify-sim-pin-unblock \
+	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
+	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
+	verify-frontier-stability verify-structure-subset verify-structure
 
 verify-gsm-fr-codec: $(LIBGSM_ARCHIVE)
 	$(CXX) -std=c++17 -O2 driver/nokia_gsm_fr_codec.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o $(LIBGSM_DIR)/lib/test_gsm_fr_codec
@@ -2314,6 +2317,66 @@ verify-mmi-menu-501:
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --mask 23,23,20,12 \
 		--sha256 $(ORACLE_MMI_MENU_STABLE_SHA)
 	@echo "OK — v5.01 interactive Phone book menu reproduced"
+
+# shell: provisioned card application and physical-key fixture
+verify-sim-toolkit:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=24 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	$(PYTHON) tools/sim_toolkit_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+
+# shell: physical Phase-2 card removal and reinsertion fixture
+verify-sim-hotplug:
+	@set -e; \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_hotplug/default.cfg fixtures/sim_hotplug/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_SIM_REMOVE_AT=8 NOKIA_DCT3_SIM_REINSERT_AFTER=2'; \
+	$(PYTHON) tools/sim_hotplug_trace_check.py $(RUN_DIR)/error.log --phase 2
+
+# shell: cross-ROM physical Phase-2 card hot-plug fixture
+verify-sim-hotplug-v501:
+	@set -e; \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_hotplug/default.cfg fixtures/sim_hotplug/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210_V501) ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_SIM_REMOVE_AT=8 NOKIA_DCT3_SIM_REINSERT_AFTER=2'; \
+	$(PYTHON) tools/sim_hotplug_trace_check.py $(RUN_DIR)/error.log --phase 2
+
+# shell: physical Phase-2+ card hot-plug fixture
+verify-sim-hotplug-toolkit:
+	@set -e; \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=24 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_SIM_REMOVE_AT=8 NOKIA_DCT3_SIM_REINSERT_AFTER=2'; \
+	$(PYTHON) tools/sim_hotplug_trace_check.py $(RUN_DIR)/error.log --phase 3
+
+# shell: physical card hot-plug and machine-state fixture
+verify-sim-hotplug-state-roundtrip:
+	@set -e; \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_hotplug/default.cfg fixtures/sim_hotplug/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_SIM_REMOVE_AT=8 NOKIA_DCT3_SIM_REINSERT_AFTER=2 NOKIA_DCT3_STATE_ROUNDTRIP_AT=9 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=500'; \
+	$(PYTHON) tools/sim_hotplug_trace_check.py $(RUN_DIR)/error.log --phase 2 --require-state
+
+# shell: cross-ROM provisioned card application fixture
+verify-sim-toolkit-v501:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD_V501) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210_V501) ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=24 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	$(PYTHON) tools/sim_toolkit_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+
+# shell: provisioned card application and machine-state fixture
+verify-sim-toolkit-state-roundtrip:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=24 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=13 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=500 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=enter NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=3500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220'; \
+	$(PYTHON) tools/sim_toolkit_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR) --require-state
+
+# shell: physical card-removal fixture
+verify-sim-toolkit-removal:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=18 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_SIM_REMOVE_AT=13'; \
+	$(PYTHON) tools/sim_toolkit_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR) --removal
 
 # shell: embedded shell control flow
 verify-sim-phonebook:
