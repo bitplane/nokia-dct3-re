@@ -7,6 +7,8 @@
 
 namespace {
 
+constexpr u16 ST1_BRAF = 0x4000;
+
 class tms320c54x_disassembler : public util::disasm_interface
 {
 public:
@@ -477,7 +479,10 @@ void tms320c54x_device::finish_repeats()
 			m_pc = m_rsa;
 		}
 		else
+		{
 			m_block_repeat_active = false;
+			m_st1 &= ~ST1_BRAF;
+		}
 	}
 }
 
@@ -1364,6 +1369,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_rsa = u16(m_pc + 1);
 		m_rea = fetch();
 		m_block_repeat_active = true;
+		m_st1 |= ST1_BRAF;
 		m_icount -= 3;
 		return;
 	case 0xf071: // RPTZ A, #lk

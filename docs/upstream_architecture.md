@@ -226,3 +226,10 @@ seeded with `IMR=0x52fd` from a non-ROM4 post-handshake snapshot. MAME derives
 masked. Keep the fingerprints distinct until the MAD2 DSP power-on register
 state is captured or independently derived; the reference set is not an
 admissible reset-state oracle.
+
+Differential execution did identify one independent core defect in this path:
+the block-repeat engine failed to publish and retire `ST1.BRAF`. Synchronising
+that architectural flag makes the post-loader scheduler status agree with the
+reference and is covered by the core conformance gate. It does not activate
+INT0, so it narrows but does not replace the reset-state/organic-transition
+boundary above.

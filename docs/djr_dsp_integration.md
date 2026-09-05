@@ -349,6 +349,16 @@ an organic DSP state transition that activates receiver work. Attaching the
 existing decoded-block GSM peer, or generating air-interface samples, before
 that transition would bypass rather than explain the inactive receiver.
 
+A post-loader differential also found and removed one local CPU artifact:
+`RPTB` was tracked only in private core state, leaving architectural
+`ST1.BRAF` set after the block terminated. The ROM4 scheduler consequently
+reached its second task scan with `ST1=0x6101` rather than the reference's
+`0x2101`. The core now asserts BRAF on `RPTB`, clears it on the terminal
+retirement and tests that contract directly. Menu, save-state and coherent DSP
+gates remain unchanged, and the corrected run still leaves INT0 masked with
+zero RF reads. BRAF was therefore a real CPU defect but not the receiver-enable
+boundary.
+
 ## Local backend prototype
 
 The distributable driver now has a source-level substitution seam:

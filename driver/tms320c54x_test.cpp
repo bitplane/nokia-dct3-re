@@ -900,6 +900,8 @@ private:
 				data.read_word(0x0602) == 0x3333, "RPTB multiword CALL");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
 				"RPTB terminal count");
+		expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+				"RPTB terminal state clears ST1.BRAF");
 		expect(data.read_word(0x0900) == 0xcccc &&
 				data.read_word(0x0901) == 0xaaaa &&
 				data.read_word(0x0902) == 0xbbbb,
