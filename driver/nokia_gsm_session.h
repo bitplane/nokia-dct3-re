@@ -20,7 +20,8 @@ public:
 		none,
 		call,
 		sms,
-		smart_message
+		smart_message,
+		status_report
 	};
 
 	enum class downlink_kind : u8
@@ -122,6 +123,11 @@ public:
 	bool incoming_service_completed() const
 	{
 		return m_incoming_service_completed;
+	}
+	bool delivery_report_pending() const
+	{
+		return m_state == u8(state::idle) &&
+				m_incoming_service == u8(incoming_service::status_report);
 	}
 	bool awaiting_traffic_assignment() const
 	{
@@ -277,6 +283,10 @@ private:
 	u8 m_sms_rp_reference = 0;
 	bool m_sms_cp_data_acknowledged = false;
 	bool m_sms_rp_acknowledged = false;
+	bool m_sms_status_report_requested = false;
+	u8 m_sms_submit_message_reference = 0;
+	std::array<u8, 20> m_sms_submit_recipient{};
+	u8 m_sms_submit_recipient_length = 0;
 	bool m_incoming_service_completed = false;
 	downlink_message m_pending_downlink;
 };

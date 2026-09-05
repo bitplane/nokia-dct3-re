@@ -2270,7 +2270,9 @@ void nokia_radio_peer_device::emit_report()
 		}
 		else if (pch_report)
 		{
-			const auto service = m_incoming_smart_message_after_registration ?
+			const auto service = m_gsm_session->delivery_report_pending() ?
+					nokia_gsm_session_device::incoming_service::status_report :
+				m_incoming_smart_message_after_registration ?
 					nokia_gsm_session_device::incoming_service::smart_message :
 					m_incoming_sms_after_registration ?
 					nokia_gsm_session_device::incoming_service::sms :
@@ -2279,7 +2281,8 @@ void nokia_radio_peer_device::emit_report()
 					nokia_gsm_session_device::incoming_service::call :
 					nokia_gsm_session_device::incoming_service::none;
 			const bool page_requested =
-					m_page_after_registration || m_host_incoming_call_pending;
+					m_page_after_registration || m_host_incoming_call_pending ||
+					m_gsm_session->delivery_report_pending();
 			const bool service_admissible =
 					m_gsm_session->incoming_service_admissible(service);
 			if (m_registered && page_requested &&

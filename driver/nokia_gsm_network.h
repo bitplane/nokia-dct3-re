@@ -224,6 +224,8 @@ public:
 	std::array<u8, 8> traffic_assignment() const;
 	unsigned incoming_sms_message_count() const;
 	layer3_message incoming_sms_cp_data(unsigned message_index) const;
+	layer3_message sms_status_report_cp_data(u8 message_reference,
+			const u8 *recipient_digits, unsigned recipient_digit_count) const;
 	bool incoming_sms_admissible(unsigned message_index) const;
 	unsigned incoming_smart_message_part_count() const;
 	layer3_message incoming_smart_message_cp_data(unsigned part_index) const;

@@ -73,6 +73,17 @@ CP timeout and its standards-timed retry, service-centre editing, and
 save-state continuation during the CP wait are covered by dedicated physical
 gates.
 
+`make verify-radio-outgoing-sms-delivery-report` enables the firmware's
+EEPROM-backed Delivery reports setting before composition. The resulting
+SMS-SUBMIT sets TP-SRR, and the laboratory network retains the submitted
+TP-MR and recipient rather than using fixture-side correlation. After the
+successful submit releases RR, a second ordinary page carries a GSM 03.40
+SMS-STATUS-REPORT over SAPI 3. Firmware answers CP-ACK and RP-ACK, accepts the
+network's closing CP-ACK, releases RR again and persists the report in
+`EF_SMS`. The gate checks exact TP-MR `00`, recipient `5551234`, service and
+delivery timestamps, successful TP-ST `00`, and erased padding through the
+end of the 176-byte record.
+
 ## Nokia 3210 application lifecycle
 
 `verify-radio-sms-inbox` proves the complete NSE-8 v6.00 lifecycle for

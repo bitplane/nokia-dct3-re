@@ -55,6 +55,8 @@ int main()
 	};
 	const auto parsed_submit = parse_submit(submit.data(), submit.size());
 	assert(parsed_submit.valid);
+	assert(parsed_submit.message_reference == 0x00);
+	assert(!parsed_submit.status_report_requested);
 	assert(parsed_submit.cp_transaction == 0x29);
 	assert(parsed_submit.rp_reference == 0x01);
 	assert(parsed_submit.service_center_digit_count == 10);
@@ -77,6 +79,13 @@ int main()
 	malformed_submit[21] = 0x04;
 	assert(!parse_submit(malformed_submit.data(), malformed_submit.size()).valid);
 	assert(!parse_submit(submit.data(), submit.size() - 1).valid);
+
+	auto report_submit = submit;
+	report_submit[15] |= 0x20;
+	const auto parsed_report_submit =
+			parse_submit(report_submit.data(), report_submit.size());
+	assert(parsed_report_submit.valid);
+	assert(parsed_report_submit.status_report_requested);
 
 	constexpr std::array<std::uint8_t, 2> cp_ack = { 0x89, 0x04 };
 	assert(parse_uplink(cp_ack.data(), cp_ack.size(), 0x09, 0x40).kind ==

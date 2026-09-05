@@ -6791,6 +6791,22 @@
       ]
     },
     {
+      "name": "verify-radio-outgoing-sms-delivery-report",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "embedded EEPROM restoration guard",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=75 \\",
+        "\t\tPROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait700,down,wait700,enter,wait700,down,wait500,down,wait500,down,wait500,down,wait700,enter,wait800,down,wait500,down,wait700,enter,wait800,enter,wait600,down,wait600,enter,wait1200,c,wait600,c,wait600,c,wait600,c,wait600,c,wait600,c,wait600,c,wait600,enter,wait800,down,wait800,enter,wait800,down,wait800,down,wait800,enter,wait800,4,4,wait1500,4,4,4,wait1500,enter,wait1000,enter,wait1000,5,5,5,1,2,3,4,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_180_250) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \\",
+        "\t$(PYTHON) tools/radio_outgoing_sms_delivery_report_trace_check.py \\",
+        "\t\t$(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card",
+        "\t@echo \"OK - requested SMS delivery report completed organically\""
+      ]
+    },
+    {
       "name": "verify-radio-incoming-sms",
       "prerequisites": [],
       "variables": {},

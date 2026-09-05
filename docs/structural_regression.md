@@ -278,6 +278,11 @@ retry, and the exact `Message sending failed` frame after the second CP wait.
 that CP timer is armed, restores it, and requires the same bounded retry,
 final-bit response, failure UI and channel release. The state boundary is
 strictly between the initial submit and the retry.
+`make verify-radio-outgoing-sms-delivery-report` physically enables the
+firmware's Delivery reports setting and requires TP-SRR in the subsequent
+submit. It then protects a second paging/SAPI-3/CP/RP/RR lifecycle carrying a
+TP-MR/recipient-correlated successful SMS-STATUS-REPORT and the exact record
+firmware writes to `EF_SMS`.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon

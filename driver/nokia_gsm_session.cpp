@@ -67,6 +67,10 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_sms_rp_reference));
 	save_item(NAME(m_sms_cp_data_acknowledged));
 	save_item(NAME(m_sms_rp_acknowledged));
+	save_item(NAME(m_sms_status_report_requested));
+	save_item(NAME(m_sms_submit_message_reference));
+	save_item(NAME(m_sms_submit_recipient));
+	save_item(NAME(m_sms_submit_recipient_length));
 	save_item(NAME(m_incoming_service_completed));
 	save_item(NAME(m_pending_downlink.kind));
 	save_item(NAME(m_pending_downlink.sapi));
@@ -128,6 +132,10 @@ void nokia_gsm_session_device::device_reset()
 	m_sms_rp_reference = 0;
 	m_sms_cp_data_acknowledged = false;
 	m_sms_rp_acknowledged = false;
+	m_sms_status_report_requested = false;
+	m_sms_submit_message_reference = 0;
+	m_sms_submit_recipient.fill(0);
+	m_sms_submit_recipient_length = 0;
 	m_incoming_service_completed = false;
 	clear_pending_downlink();
 }
@@ -472,6 +480,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 					setup.data.data(), setup.length);
 		}
 		if (m_incoming_service == u8(incoming_service::sms) ||
+				m_incoming_service == u8(incoming_service::status_report) ||
 				m_incoming_service == u8(incoming_service::smart_message))
 		{
 			clear_pending_downlink();
@@ -506,8 +515,12 @@ nokia_gsm_session_device::downlink_acknowledged()
 			return queue_downlink(downlink_kind::incoming_sms_cp_data,
 					data.data.data(), data.length, 3);
 		}
-		const auto data = m_network->incoming_sms_cp_data(
-				m_sms_delivery_index);
+		const auto data = m_incoming_service == u8(incoming_service::status_report) ?
+				m_network->sms_status_report_cp_data(
+						m_sms_submit_message_reference,
+						m_sms_submit_recipient.data(),
+						m_sms_submit_recipient_length) :
+				m_network->incoming_sms_cp_data(m_sms_delivery_index);
 		if (data.length >= 5)
 		{
 			m_sms_cp_transaction = data.data[0];
@@ -555,6 +568,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 		}
 		const auto acknowledge = m_network->sms_rp_ack(
 				m_sms_cp_transaction, m_sms_rp_reference);
+		m_sms_rp_acknowledged = true;
 		return queue_downlink(downlink_kind::outgoing_sms_rp_ack,
 				acknowledge.data(), acknowledge.size(), 3);
 	}
@@ -644,11 +658,18 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_established_layer3_length = 0;
 		m_release_completes_registration = false;
 		m_mobile_originated_call = false;
+		const bool queue_status_report = m_mobile_originated_sms &&
+				m_sms_status_report_requested && m_sms_rp_acknowledged;
 		m_mobile_originated_sms = false;
 		m_call_transaction = 0;
 		m_outgoing_request_pending = false;
 		clear_outgoing_call_state();
-		if (!more_sms_deliveries)
+		if (queue_status_report)
+		{
+			m_incoming_service = u8(incoming_service::status_report);
+			m_incoming_service_completed = false;
+		}
+		else if (!more_sms_deliveries)
 		{
 			m_incoming_service = u8(incoming_service::none);
 			m_incoming_call_digits_length = 0;
@@ -658,6 +679,12 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_sms_rp_reference = 0;
 		m_sms_cp_data_acknowledged = false;
 		m_sms_rp_acknowledged = false;
+		if (!queue_status_report &&
+				m_incoming_service != u8(incoming_service::status_report))
+		{
+			m_sms_status_report_requested = false;
+			m_sms_submit_recipient_length = 0;
+		}
 		m_state = u8(state::idle);
 		publish_call_active_output();
 		clear_dedicated_cipher();
@@ -977,6 +1004,10 @@ nokia_gsm_session_device::receive_layer3(
 			return downlink_kind::none;
 		m_sms_cp_transaction = submit.cp_transaction;
 		m_sms_rp_reference = submit.rp_reference;
+		m_sms_status_report_requested = submit.status_report_requested;
+		m_sms_submit_message_reference = submit.message_reference;
+		m_sms_submit_recipient = submit.destination_digits;
+		m_sms_submit_recipient_length = submit.destination_digit_count;
 		if (machine().options().verbose())
 		{
 			std::string smsc;
@@ -989,11 +1020,13 @@ nokia_gsm_session_device::receive_layer3(
 				destination += char('0' + submit.destination_digits[index]);
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_sms_submit: cp=%02x rp=%02x smsc=%s destination=%s "
-					"alphabet=%u user_length=%u outcome=%u t=%.6f\n",
+					"alphabet=%u user_length=%u outcome=%u status_report=%u "
+					"t=%.6f\n",
 					submit.cp_transaction, submit.rp_reference, smsc.c_str(),
 					destination.c_str(), unsigned(submit.data_alphabet),
 					submit.user_data_length,
 					unsigned(m_network->configured_outgoing_sms_outcome()),
+					submit.status_report_requested ? 1 : 0,
 					machine().time().as_double());
 		}
 		if (m_network->configured_outgoing_sms_outcome() ==

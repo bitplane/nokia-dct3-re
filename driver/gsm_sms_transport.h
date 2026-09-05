@@ -50,6 +50,8 @@ struct submit_message
 	unsigned service_center_digit_count = 0;
 	std::array<std::uint8_t, 20> destination_digits{};
 	unsigned destination_digit_count = 0;
+	std::uint8_t message_reference = 0;
+	bool status_report_requested = false;
 	alphabet data_alphabet = alphabet::gsm_7bit;
 	unsigned user_data_offset = 0;
 	unsigned user_data_length = 0;

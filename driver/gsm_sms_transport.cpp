@@ -123,7 +123,8 @@ submit_message parse_submit(const std::uint8_t *information, unsigned length)
 	const std::uint8_t first_octet = information[offset++];
 	if ((first_octet & 0x03) != 0x01)
 		return {};
-	++offset; // TP-MR
+	result.message_reference = information[offset++];
+	result.status_report_requested = (first_octet & 0x20) != 0;
 	const unsigned destination_digits = information[offset++];
 	if (destination_digits > result.destination_digits.size() || offset >= length)
 		return {};

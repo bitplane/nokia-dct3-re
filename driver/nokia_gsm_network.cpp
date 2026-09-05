@@ -2,8 +2,13 @@
 // copyright-holders:Sandro Ronco, Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_gsm_network.h"
 #include "gsm_mm_authentication.h"
+
+#define LOG_GSM_NETWORK (1U << 0)
+#define VERBOSE (LOG_GSM_NETWORK)
+#include "logmacro.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_GSM_NETWORK, nokia_gsm_network_device,
 		"nokia_gsm_network", "Nokia DCT3 laboratory GSM network")
@@ -770,6 +775,70 @@ bool nokia_gsm_network_device::incoming_sms_admissible(
 	const auto message = incoming_sms_cp_data(message_index);
 	return gsm::sms::parse_deliver(
 			message.data.data(), message.length).valid;
+}
+
+nokia_gsm_network_device::layer3_message
+nokia_gsm_network_device::sms_status_report_cp_data(
+		u8 message_reference, const u8 *recipient_digits,
+		unsigned recipient_digit_count) const
+{
+	// GSM 04.11 RP-DATA carrying a GSM 03.40 SMS-STATUS-REPORT. The report
+	// echoes TP-MR and TP-RA from the accepted SMS-SUBMIT and records successful
+	// delivery (TP-ST 00). The fixed timestamps are laboratory network time.
+	layer3_message result;
+	if (!recipient_digits || recipient_digit_count == 0 ||
+			recipient_digit_count > 20)
+		return result;
+	std::array<u8, 20> tpdu{};
+	unsigned n = 0;
+	tpdu[n++] = 0x02;
+	tpdu[n++] = message_reference;
+	tpdu[n++] = recipient_digit_count;
+	tpdu[n++] = 0x81;
+	for (unsigned digit = 0; digit < recipient_digit_count; digit += 2)
+	{
+		const u8 high = digit + 1 < recipient_digit_count ?
+				recipient_digits[digit + 1] : 0x0f;
+		tpdu[n++] = recipient_digits[digit] | (high << 4);
+	}
+	static constexpr std::array<u8, 7> SERVICE_TIME =
+			{ 0x62, 0x90, 0x50, 0x10, 0x00, 0x00, 0x00 };
+	static constexpr std::array<u8, 7> DELIVERY_TIME =
+			{ 0x62, 0x90, 0x50, 0x10, 0x10, 0x00, 0x00 };
+	std::copy(SERVICE_TIME.begin(), SERVICE_TIME.end(), tpdu.begin() + n);
+	n += SERVICE_TIME.size();
+	std::copy(DELIVERY_TIME.begin(), DELIVERY_TIME.end(), tpdu.begin() + n);
+	n += DELIVERY_TIME.size();
+	tpdu[n++] = 0x00;
+
+	unsigned out = 0;
+	result.data[out++] = 0x09;
+	result.data[out++] = 0x01;
+	const unsigned cp_length = out++;
+	result.data[out++] = 0x01;
+	result.data[out++] = 0x42;
+	static constexpr std::array<u8, 7> SMSC =
+			{ 0x06, 0x91, 0x21, 0x43, 0x65, 0x87, 0x09 };
+	std::copy(SMSC.begin(), SMSC.end(), result.data.begin() + out);
+	out += SMSC.size();
+	result.data[out++] = 0x00;
+	result.data[out++] = n;
+	std::copy_n(tpdu.begin(), n, result.data.begin() + out);
+	out += n;
+	result.data[cp_length] = out - 3;
+	result.length = out;
+	if (machine().options().verbose())
+	{
+		std::string recipient;
+		for (unsigned index = 0; index < recipient_digit_count; ++index)
+			recipient += char('0' + recipient_digits[index]);
+		LOGMASKED(LOG_GSM_NETWORK,
+				"gsm_sms_status_report: mr=%02x recipient=%s status=00 "
+				"length=%u t=%.6f\n",
+				message_reference, recipient.c_str(), result.length,
+				machine().time().as_double());
+	}
+	return result;
 }
 
 unsigned nokia_gsm_network_device::incoming_smart_message_part_count() const
