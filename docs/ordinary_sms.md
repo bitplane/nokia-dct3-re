@@ -73,6 +73,12 @@ CP timeout and its standards-timed retry, service-centre editing, and
 save-state continuation during the CP wait are covered by dedicated physical
 gates.
 
+Nokia 3210 v5.01 independently reaches the same MM service-type-4, mobile
+SAPI-3, CP/RP and RR-release lifecycle from physical composition. Its editor
+cadence produces a different valid text payload under the shared key schedule,
+so the product gate requires a non-empty parsed user payload and the common
+`Message sent` frame rather than inheriting v6.00's exact `HI` octets.
+
 `make verify-radio-outgoing-sms-delivery-report` enables the firmware's
 EEPROM-backed Delivery reports setting before composition. The resulting
 SMS-SUBMIT sets TP-SRR, and the laboratory network retains the submitted
