@@ -216,9 +216,13 @@ The clean MAME NSE-1 composition currently reaches 437 distinct opcode words
 across 80 high-byte groups in twelve seconds (sorted-set SHA-256
 `523cd6019736d1fb7bb09cae8a0f96124a97a768f00e40df7c3933be6ba7c7bd`).
 The 191-word count difference is a reachability delta, not by itself a CPU
-correctness failure: the earlier 628-word reference exercised DSP paths that
+correctness failure. The earlier 628-word reference exercised DSP paths that
 the current unassisted receiver never activates. In particular, its first-PC
 records include the COBBA receive loop at `0x3238`, while the clean MAME run
-performs no RF-port reads. Keep the reference fingerprint distinct from the
-clean-run fingerprint until the external stimulus behind that extra coverage
-is classified.
+performs no RF-port reads. A controlled reference run establishes that its
+optional RF model is not required for this reachability, but its processor is
+seeded with `IMR=0x52fd` from a non-ROM4 post-handshake snapshot. MAME derives
+`0x035e` from a deterministic zero power-on value and therefore leaves INT0
+masked. Keep the fingerprints distinct until the MAD2 DSP power-on register
+state is captured or independently derived; the reference set is not an
+admissible reset-state oracle.

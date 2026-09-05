@@ -339,10 +339,13 @@ qualified findings above. `dsp_rom4_cosim_check.py` extracts these counters so
 later runs can be compared without preserving an interpretation in code.
 
 The local real-DSP composition still has no demonstrated network or call
-scenario. More specifically, a 30-second unassisted NSE-1 run delivers 6,497
-DSP frame interrupts but the DSP performs no RF sample-port read and commits no
-`0x31`/`0x32` synthesizer pair. The next recoverable boundary is therefore the
-MCU command or DSP state transition that activates receiver work. Attaching the
+scenario. More specifically, a 30-second unassisted NSE-1 run schedules 6,497
+CTSI frame edges but the DSP leaves INT0 masked, performs no RF sample-port read
+and commits no `0x31`/`0x32` synthesizer pair. The external co-sim services the
+same ISR without its optional RF sample model, but begins from an imported
+`IMR=0x52fd` register snapshot that is not ROM4 reset evidence. The next
+recoverable boundary is therefore the ROM4/MAD2 power-on register contract or
+an organic DSP state transition that activates receiver work. Attaching the
 existing decoded-block GSM peer, or generating air-interface samples, before
 that transition would bypass rather than explain the inactive receiver.
 

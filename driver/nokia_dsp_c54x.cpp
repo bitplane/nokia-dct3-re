@@ -80,10 +80,16 @@ void nokia_dsp_c54x_device::device_reset()
 void nokia_dsp_c54x_device::device_stop()
 {
 	machine().logerror("rom4_interface_summary: completion_strobes=%u mailbox_writes=%u "
-			"slot_expiries=%llu frame_expiries=%llu rf_reads=%u rf_tune_pairs=%u\n",
+			"slot_expiries=%llu frame_expiries=%llu rf_reads=%u rf_tune_pairs=%u "
+			"pc=%04x pmst=%04x ifr=%04x imr=%04x mode_aa=%04x mode_ac=%04x\n",
 			m_completion_strobes, m_boot_mailbox_writes,
 			m_slot_timer_expiries, m_frame_timer_expiries,
-			m_rf_trace_count, m_rf_synth_pairs);
+			m_rf_trace_count, m_rf_synth_pairs,
+			u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+			u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
+			u16(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
+			u16(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
+			m_data[0x00aa], m_data[0x00ac]);
 }
 
 void nokia_dsp_c54x_device::arm_frame_timer()
@@ -103,9 +109,10 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 	++m_frame_timer_expiries;
 	const bool enabled = m_ccont->dsp_frame_clock_enabled();
 	if (m_frame_timer_expiries <= 64)
-		machine().logerror("rom4_frame_timer: expiry=%llu enabled=%u length=%u pc=%04x ifr=%04x imr=%04x t=%.6f\n",
+		machine().logerror("rom4_frame_timer: expiry=%llu enabled=%u length=%u pc=%04x pmst=%04x ifr=%04x imr=%04x t=%.6f\n",
 				m_frame_timer_expiries, enabled, m_slot_frame_length ? m_slot_frame_length : 4999,
 				u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+				u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				machine().time().as_double());

@@ -149,7 +149,8 @@ void tms320c54x_device::device_reset()
 	m_delayed_words = 0;
 	m_xc_guard = 0;
 	m_ifr = 0;
-	m_imr = 0;
+	// Hardware reset sets INTM and clears IFR, but does not initialise IMR.
+	// Preserve the mask written by the ROM loader across MAD2 DSP reset pulses.
 	m_clkmd = 0;
 	m_tim = 0xffff;
 	m_prd = 0xffff;

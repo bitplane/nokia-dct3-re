@@ -148,9 +148,10 @@ These results establish audio-interface initialization only; receiver
 activation, tuning, decoded analog register meanings and a completed speech
 call remain outside the demonstrated lifecycle.
 
-The absence persists across a 30-second unassisted run: the backend delivers
-6,497 enabled GSM frame interrupts while recording `rf_reads=0` and
-`rf_tune_pairs=0`. Thus the immediate missing contract is the command or DSP
+The absence persists across a 30-second unassisted run: the backend schedules
+6,497 CTSI frame edges while recording `rf_reads=0` and `rf_tune_pairs=0`.
+The DSP has `IMR=0x035e`, so INT0 is pending but masked; these are clock
+expiries, not serviced frame ISRs. Thus the immediate missing contract is the
 state transition that enables the ROM4 receiver, not an I/Q waveform. Ports
 `0x31` and `0x32` are retained as a saved, passive low/high-pair census and
 port `0x27` remains connected to deterministic unattached RF input. Supplying
@@ -165,6 +166,19 @@ healthy maintenance cadence and does not explain the absent receiver
 activation. A 40-second run still records zero RF reads and zero completed
 synthesizer pairs.
 
+TI's C54x CPU guide places an important limit on this result: hardware reset
+clears IFR and sets INTM, but does not initialise IMR or SP. The clean core now
+preserves IMR across MAD2 reset pulses instead of inventing zero on every
+reset. Its deterministic power-on value remains zero until ROM code writes it;
+the observed firmware writes produce `0x0204` and then `0x035e`. The available
+external co-sim instead starts from `IMR=0x52fd`, an imported post-handshake
+processor snapshot rather than a ROM4 power-on capture, and consequently
+reaches `0x53ff`, executes `0x3065` (`IMR |= 1`), services INT0 at `0x3204`,
+and reads port `0x27`. An A/B run with its optional RF model disabled still
+takes that path with zero-valued samples, proving that the RF model supplies
+sample contents rather than activation. It does not prove that `0x52fd` is the
+NSE-1 power-on value. No register seed is admitted without ROM4/MAD2 evidence.
+
 `make check-c54x-rom4-coherent` now treats that absence as a quantified
 boundary. Its recipe is fail-fast and enables the trace category required by
 its validator assertions; a failed intermediate assertion cannot be hidden by
@@ -177,12 +191,12 @@ uploaded program/data overlays, DSPIF, COBBA, timers, and keypad composition
 against state-registration regressions.
 
 The historical harness's headline `74 acknowledgements` counter is not a count
-of DSP port-1 completion strobes. A four-second local run observes 72 MCU
-writes across shared mailbox words `0x0fe`/`0x100` and 29 port-1 strobes while
-still reaching the accepted validator result and interactive UI. The external
-counter was attached to intercepted MCU mailbox writes with different
-boot-phase lifetime rules. Keep these as separately named measurements; do
-not tune the local transport merely to make the integers equal.
+of DSP port-1 completion strobes. The local gate separately records shared
+mailbox writes and completion strobes; their counts depend on the observation
+window and repeated firmware polling. The external counter was attached to
+intercepted MCU mailbox writes with different boot-phase lifetime rules. Keep
+these as separately named measurements; do not tune the local transport merely
+to make the integers equal.
 
 An older persisted donor EEPROM produces the distinct `c9f4 cd44 ... 6075`
 challenge and the structurally valid but rejected `3532 0000 312b ... 88b2
