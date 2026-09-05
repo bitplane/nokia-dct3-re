@@ -19,6 +19,7 @@ void nokia_lapdm_link_device::device_start()
 	save_item(NAME(m_layer3_length));
 	save_item(NAME(m_sapi));
 	save_item(NAME(m_layer3_more_data));
+	save_item(NAME(m_uplink_segmentation_active));
 	save_item(NAME(m_downlink_send_sequence));
 	save_item(NAME(m_next_uplink_receive_sequence));
 	save_item(NAME(m_pending_receive_sequence));
@@ -35,6 +36,7 @@ void nokia_lapdm_link_device::device_reset()
 	m_layer3_length = 0;
 	m_sapi = 0;
 	m_layer3_more_data = false;
+	m_uplink_segmentation_active = false;
 	m_downlink_send_sequence.fill(0);
 	m_next_uplink_receive_sequence.fill(0);
 	m_pending_receive_sequence.fill(0);
@@ -68,15 +70,16 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 				length < 3 + information_length)
 			return uplink_result::ignored;
 
-		// Registration has organically established only the RR/MM link on SAPI 0.
-		// SAPI 3 becomes admissible when an SMS transaction reaches this boundary.
-		if (sapi != 0)
+		// A non-zero SAPI is admitted only after its upper-layer session has
+		// explicitly armed mobile establishment.
+		if (sapi != 0 && !m_mobile_establishment_expected[sapi])
 			return uplink_result::ignored;
 		m_sapi = sapi;
 		m_layer3_information.fill(0);
 		std::copy_n(frame + 3, information_length, m_layer3_information.begin());
 		m_layer3_length = information_length;
 		m_layer3_more_data = false;
+		m_uplink_segmentation_active = false;
 		m_downlink_send_sequence[sapi] = 0;
 		m_next_uplink_receive_sequence[sapi] = 0;
 		m_pending_receive_sequence[sapi] = 0;
@@ -104,6 +107,7 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 		m_layer3_information.fill(0);
 		m_layer3_length = 0;
 		m_layer3_more_data = false;
+		m_uplink_segmentation_active = false;
 		m_established[sapi] = false;
 		m_downlink_segmentation_pending[sapi] = false;
 		m_downlink_acknowledgement_pending[sapi] = false;
@@ -116,7 +120,6 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 	const bool receive_ready = (control & 0x0f) == 0x01 &&
 			frame[2] == 0x01;
 	const bool information_frame = !(control & 0x01) &&
-			!(frame[2] & 0x02) &&
 			information_length <= maximum_information_length &&
 			length >= 3 + information_length;
 	if (!receive_ready && !information_frame)
@@ -128,17 +131,31 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 			receive_sequence == m_pending_receive_sequence[sapi];
 
 	bool accepted_information = false;
+	bool completed_information = false;
 	if (information_frame)
 	{
 		const u8 send_sequence = (control >> 1) & 0x07;
 		if (send_sequence == m_next_uplink_receive_sequence[sapi])
 		{
 			m_sapi = sapi;
-			m_layer3_information.fill(0);
+			if (!m_uplink_segmentation_active)
+			{
+				m_layer3_information.fill(0);
+				m_layer3_length = 0;
+			}
+			if (m_layer3_length + information_length >
+					maximum_layer3_length)
+			{
+				m_layer3_length = 0;
+				m_uplink_segmentation_active = false;
+				return uplink_result::ignored;
+			}
 			std::copy_n(frame + 3, information_length,
-					m_layer3_information.begin());
-			m_layer3_length = information_length;
+					m_layer3_information.begin() + m_layer3_length);
+			m_layer3_length += information_length;
 			m_layer3_more_data = bool(frame[2] & 0x02);
+			m_uplink_segmentation_active = m_layer3_more_data;
+			completed_information = !m_layer3_more_data;
 			m_next_uplink_receive_sequence[sapi] =
 					(m_next_uplink_receive_sequence[sapi] + 1) & 0x07;
 			accepted_information = true;
@@ -153,7 +170,8 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 	}
 
 	if (accepted_information)
-		return uplink_result::information_indication;
+		return completed_information ? uplink_result::information_indication :
+				uplink_result::information_segment;
 	return acknowledges_downlink ?
 			uplink_result::downlink_acknowledgement :
 			uplink_result::ignored;

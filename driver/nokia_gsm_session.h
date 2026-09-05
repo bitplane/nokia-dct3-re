@@ -43,6 +43,7 @@ public:
 		sapi3_establishment,
 		incoming_sms_cp_data,
 		sms_cp_ack,
+		outgoing_sms_rp_ack,
 		connect_acknowledge,
 		call_release,
 		release_complete
@@ -125,6 +126,11 @@ public:
 	{
 		return m_state == u8(state::awaiting_traffic_assignment);
 	}
+	bool awaiting_mobile_sms_sapi3() const
+	{
+		return m_state == u8(state::awaiting_mobile_sms_sapi3_establishment);
+	}
+	void mobile_sms_sapi3_established();
 	bool call_connected() const
 	{
 		return m_state == u8(state::incoming_call_active);
@@ -194,7 +200,11 @@ private:
 		awaiting_sms_sapi3_establishment,
 		awaiting_sms_cp_data_acknowledgement,
 		awaiting_sms_handset_response,
-		awaiting_sms_cp_ack_acknowledgement
+		awaiting_sms_cp_ack_acknowledgement,
+		awaiting_mobile_sms_sapi3_establishment,
+		awaiting_mobile_sms_submit,
+		awaiting_mobile_sms_cp_ack_acknowledgement,
+		awaiting_mobile_sms_final_cp_ack
 	};
 
 	void clear_pending_downlink();
@@ -239,6 +249,7 @@ private:
 	bool m_release_complete_received = false;
 	bool m_traffic_assignment_issued = false;
 	bool m_mobile_originated_call = false;
+	bool m_mobile_originated_sms = false;
 	bool m_incoming_call_answered = false;
 	u8 m_call_transaction = 0;
 	bool m_outgoing_request_pending = false;

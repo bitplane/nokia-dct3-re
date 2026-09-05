@@ -769,7 +769,8 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"service_uplink_wait", "service_uplink_acknowledgement",
 		"traffic_channel_change", "traffic_lapdm_establish",
 		"traffic_contention_resolution", "traffic_release_acknowledgement",
-		"candidate_terminal_control", "serving_sch_observation"
+		"candidate_terminal_control", "serving_sch_observation",
+		"service_sapi3_contention_resolution"
 	};
 	// The table is positional, and the checkers match on the names it emits.
 	// Without this, adding or removing a phase renames every later phase in the
@@ -810,7 +811,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 		0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89, 0xff,
 		0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80, 0x86,
 		0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80, 0x89,
-		0x86, 0x80, 0x80, 0xff, 0xff
+		0x86, 0x80, 0x80, 0xff, 0xff, 0x80
 	};
 
 	const u8 fixed = m_phase < FIXED_REPORT.size() ? FIXED_REPORT[m_phase] : 0x87;
@@ -1941,6 +1942,14 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_report_deferred = true;
 		}
 		else if (result ==
+				nokia_lapdm_link_device::uplink_result::information_segment)
+		{
+			set_phase(phase::service_uplink_acknowledgement);
+			m_reports_remaining = 1;
+			m_wait_ticks = 0;
+			m_report_deferred = true;
+		}
+		else if (result ==
 				nokia_lapdm_link_device::uplink_result::establish_confirmation)
 		{
 			m_downlink_offset = 0;
@@ -1950,6 +1959,17 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_reports_remaining = 1;
 			if (action != nokia_gsm_session_device::downlink_kind::none)
 				m_wait_ticks = 0;
+			m_report_deferred = true;
+		}
+		else if (result ==
+				nokia_lapdm_link_device::uplink_result::establish_indication &&
+				m_lapdm_link->layer3_sapi() == 3 &&
+				m_gsm_session->awaiting_mobile_sms_sapi3())
+		{
+			m_gsm_session->mobile_sms_sapi3_established();
+			set_phase(phase::service_sapi3_contention_resolution);
+			m_reports_remaining = 1;
+			m_wait_ticks = 0;
 			m_report_deferred = true;
 		}
 		else if (result ==
@@ -2003,6 +2023,8 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 						acknowledged_kind ==
 								nokia_gsm_session_device::downlink_kind::
 										incoming_call_setup;
+				if (m_gsm_session->awaiting_mobile_sms_sapi3())
+					m_lapdm_link->begin_mobile_establishment(3);
 				set_phase(phase::service_uplink_request);
 				m_reports_remaining = 1;
 				m_report_deferred = true;
@@ -2093,6 +2115,7 @@ void nokia_radio_peer_device::emit_report()
 					current_phase() <= phase::rr_channel_release) ||
 				current_phase() == phase::service_downlink ||
 				current_phase() == phase::service_uplink_acknowledgement ||
+				current_phase() == phase::service_sapi3_contention_resolution ||
 				current_phase() == phase::traffic_contention_resolution ||
 				current_phase() == phase::traffic_release_acknowledgement;
 		// RECEIVED_BLOCK carries channel, BSIC, error, frame number, ARFCN,
@@ -2183,6 +2206,11 @@ void nokia_radio_peer_device::emit_report()
 		payload[7] = report_arfcn;
 
 		if (current_phase() == phase::contention_resolution)
+		{
+			const auto frame = m_lapdm_link->build_ua();
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
+		}
+		else if (current_phase() == phase::service_sapi3_contention_resolution)
 		{
 			const auto frame = m_lapdm_link->build_ua();
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);
@@ -2724,6 +2752,13 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 			m_reports_remaining = 1;
 			m_report_deferred = true;
 		}
+	}
+	else if (current_phase() == phase::service_sapi3_contention_resolution &&
+			report_type == 0x80)
+	{
+		set_phase(phase::service_uplink_request);
+		m_reports_remaining = 1;
+		m_report_deferred = true;
 	}
 	else if (current_phase() == phase::traffic_channel_change && report_type == 0x89)
 	{

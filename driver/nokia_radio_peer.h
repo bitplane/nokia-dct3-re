@@ -180,6 +180,7 @@ private:
 		traffic_release_acknowledgement,
 		candidate_terminal_control,
 		serving_sch_observation,
+		service_sapi3_contention_resolution,
 		count
 	};
 

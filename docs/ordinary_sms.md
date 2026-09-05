@@ -1,8 +1,7 @@
-# Ordinary mobile-terminated SMS
+# Ordinary SMS
 
-This document is the authoritative boundary for ordinary text
-`SMS-DELIVER`. Smart Messaging and mobile-originated SMS are separate
-application and network contracts.
+This document is the authoritative boundary for ordinary text `SMS-DELIVER`
+and `SMS-SUBMIT`. Smart Messaging remains a separate application contract.
 
 ## Ownership and ordering
 
@@ -14,7 +13,7 @@ CP/RP lengths, unsupported or compressed alphabets and truncated user data.
 `nokia_gsm_session_device` owns the saved CP transaction,
 RP reference, acknowledgement phase and queued-message index.
 `nokia_lapdm_link_device` independently owns SAPI-3 establishment, I-frame
-sequence and release. The radio peer schedules ordinary PCH, SDCCH and RR
+sequence, uplink/downlink segmentation and release. The radio peer schedules ordinary PCH, SDCCH and RR
 transport; it does not parse or store messages.
 
 For an admitted message the required order is:
@@ -35,6 +34,30 @@ acknowledgement.
 `SMSCFG` selects only a laboratory-network acceptance scenario: valid,
 sequential, duplicate, malformed or capacity-boundary delivery. It does not
 describe handset capability, storage policy or Nokia firmware behavior.
+
+## Nokia 3210 mobile-originated lifecycle
+
+`verify-radio-outgoing-sms` drives only physical keypad switches through
+Menu -> Messages -> Write messages, composes `HI`, selects Send and enters
+recipient `5551234`. The unmodified v6.00 firmware then requests MM short-
+message service, establishes SAPI 3, and emits a two-frame CP-DATA/RP-DATA/
+SMS-SUBMIT. The generic parser derives rather than assumes:
+
+- CP transaction `0x29` and RP reference `0x01`;
+- service centre `+1234567890`;
+- destination `5551234`;
+- GSM default-alphabet user-data length two, whose packed bytes are `c8 24`.
+
+The laboratory network returns CP-ACK followed by RP-ACK in CP-DATA using
+those observed transaction identifiers. Firmware sends the final CP-ACK,
+renders `Message sent`, and the ordinary SAPI-0 RR release returns the radio
+to idle scheduling. The gate requires both 20-byte uplink segments to become
+one 28-byte Layer-3 object; accepting only the first LAPDm frame cannot pass.
+
+This is a successful submission fixture, not yet a complete originated-SMS
+product contract. Network rejection, CP/RP timeout and retry, delivery
+reports, sent-message/SIM status policy, service-centre editing, save-state
+continuation and sibling-product corroboration remain open.
 
 ## Nokia 3210 application lifecycle
 
@@ -105,6 +128,7 @@ Exact top-level commands are:
 
 ```text
 JOBS=4 make verify-radio-sms-inbox
+JOBS=4 make verify-radio-outgoing-sms
 JOBS=4 make verify-radio-sms-inbox-state
 JOBS=4 make verify-radio-sms-inbox-negatives
 JOBS=4 make verify-radio-sms-sequential
@@ -113,5 +137,5 @@ JOBS=4 make verify-3330-radio-sms-transport
 JOBS=4 make verify-3410-radio-sms-inbox
 ```
 
-Mobile-originated SMS composition/sending, service-centre editing, delivery
+Mobile-originated failure/retry policy, service-centre editing, delivery
 reports, cell broadcast and EMS remain future independently evidenced work.

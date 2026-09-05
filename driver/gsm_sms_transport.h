@@ -5,6 +5,7 @@
 #define MAME_NOKIA_GSM_SMS_TRANSPORT_H
 
 #include <cstdint>
+#include <array>
 
 namespace gsm::sms
 {
@@ -40,11 +41,32 @@ struct deliver_message
 	unsigned user_data_length = 0;
 };
 
+struct submit_message
+{
+	bool valid = false;
+	std::uint8_t cp_transaction = 0;
+	std::uint8_t rp_reference = 0;
+	std::array<std::uint8_t, 20> service_center_digits{};
+	unsigned service_center_digit_count = 0;
+	std::array<std::uint8_t, 20> destination_digits{};
+	unsigned destination_digit_count = 0;
+	alphabet data_alphabet = alphabet::gsm_7bit;
+	unsigned user_data_offset = 0;
+	unsigned user_data_length = 0;
+};
+
 // Validate a complete GSM 04.11 CP-DATA/RP-DATA carrying one GSM 03.40
 // SMS-DELIVER. All TPDU offsets are derived from the originating-address
 // length; malformed fixture data cannot shift later fields into plausible
 // positions.
 deliver_message parse_deliver(
+		const std::uint8_t *information,
+		unsigned length);
+
+// Validate a complete mobile-originated CP-DATA/RP-DATA carrying one
+// SMS-SUBMIT. RP and TPDU address lengths are followed rather than assuming
+// the Nokia fixture's service-centre or destination sizes.
+submit_message parse_submit(
 		const std::uint8_t *information,
 		unsigned length);
 

@@ -952,6 +952,14 @@ std::array<u8, 2> nokia_gsm_network_device::sms_cp_ack(u8 transaction) const
 	return { u8(transaction ^ 0x80), 0x04 };
 }
 
+std::array<u8, 5> nokia_gsm_network_device::sms_rp_ack(
+		u8 mobile_transaction, u8 rp_reference) const
+{
+	// GSM 04.11: acknowledge the mobile's CP transaction with network-to-
+	// mobile CP-DATA carrying RP-ACK for the submitted RP message reference.
+	return { u8(mobile_transaction ^ 0x80), 0x01, 0x02, 0x03, rp_reference };
+}
+
 std::array<u8, 2> nokia_gsm_network_device::connect_acknowledge(
 		u8 transaction) const
 {

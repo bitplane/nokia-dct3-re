@@ -11,6 +11,7 @@ class nokia_lapdm_link_device : public device_t
 public:
 	static constexpr unsigned frame_length = 24;
 	static constexpr unsigned maximum_information_length = 20;
+	static constexpr unsigned maximum_layer3_length = 251;
 
 	enum class uplink_result : u8
 	{
@@ -19,6 +20,7 @@ public:
 		establish_confirmation,
 		release_indication,
 		downlink_acknowledgement,
+		information_segment,
 		information_indication
 	};
 
@@ -35,7 +37,7 @@ public:
 			bool more_data = false);
 	std::array<u8, frame_length> build_receive_ready(u8 sapi);
 
-	const std::array<u8, maximum_information_length> &layer3_information() const
+	const std::array<u8, maximum_layer3_length> &layer3_information() const
 	{
 		return m_layer3_information;
 	}
@@ -74,10 +76,11 @@ protected:
 private:
 	static constexpr unsigned link_count = 4;
 
-	std::array<u8, maximum_information_length> m_layer3_information{};
+	std::array<u8, maximum_layer3_length> m_layer3_information{};
 	unsigned m_layer3_length = 0;
 	u8 m_sapi = 0;
 	bool m_layer3_more_data = false;
+	bool m_uplink_segmentation_active = false;
 	std::array<u8, link_count> m_downlink_send_sequence{};
 	std::array<u8, link_count> m_next_uplink_receive_sequence{};
 	std::array<u8, link_count> m_pending_receive_sequence{};

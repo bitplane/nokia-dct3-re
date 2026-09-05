@@ -262,6 +262,12 @@ It also restores after terminal Play acceptance and commandless rejection,
 requiring the exact named/untitled UI and playback/no-playback result.
 `make verify-radio-operator` adds the unobscured firmware-rendered test-PLMN
 label. None alters either boot oracle.
+`make verify-radio-outgoing-sms` drives the v6.00 firmware through physical
+Messages-menu composition and recipient entry. It requires the mobile MM
+service-type-4 request, mobile-established SAPI 3, two-frame uplink
+reassembly, decoded `+1234567890`/`5551234` SMS-SUBMIT, CP/RP acknowledgement,
+the firmware `Message sent` frame and ordinary dedicated-channel release.
+No task message, firmware state or prebuilt SMS object is injected.
 `make verify-mmi-menu` adds provisioned identity data and one delayed physical
 left-softkey press. It requires the same coherent structural predicates and an
 exact hash of the stable post-input `Phone book` pixels. The animated 20x12 icon

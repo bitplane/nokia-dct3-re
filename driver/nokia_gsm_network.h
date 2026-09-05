@@ -212,6 +212,8 @@ public:
 	unsigned incoming_smart_message_part_count() const;
 	layer3_message incoming_smart_message_cp_data(unsigned part_index) const;
 	std::array<u8, 2> sms_cp_ack(u8 transaction) const;
+	std::array<u8, 5> sms_rp_ack(
+			u8 mobile_transaction, u8 rp_reference) const;
 	std::array<u8, 2> connect_acknowledge(u8 transaction) const;
 	std::array<u8, 2> call_release(u8 transaction) const;
 	std::array<u8, 2> call_release_complete(u8 transaction) const;

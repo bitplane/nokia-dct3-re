@@ -11,6 +11,7 @@ int main()
 {
 	using gsm::sms::parse_uplink;
 	using gsm::sms::parse_deliver;
+	using gsm::sms::parse_submit;
 	using gsm::sms::alphabet;
 	using gsm::sms::uplink_kind;
 
@@ -45,6 +46,37 @@ int main()
 			malformed_deliver.data(), malformed_deliver.size()).valid);
 	assert(!parse_deliver(deliver.data(), deliver.size() - 2).valid);
 	assert(!parse_deliver(deliver.data(), 15).valid);
+
+	constexpr std::array<std::uint8_t, 28> submit = {
+		0x29, 0x01, 0x19,
+		0x00, 0x01, 0x00, 0x06, 0x91, 0x21, 0x43, 0x65, 0x87, 0x09,
+		0x0e, 0x11, 0x00, 0x07, 0x81, 0x55, 0x15, 0x32, 0xf4,
+		0x00, 0x00, 0xa7, 0x02, 0xc8, 0x24
+	};
+	const auto parsed_submit = parse_submit(submit.data(), submit.size());
+	assert(parsed_submit.valid);
+	assert(parsed_submit.cp_transaction == 0x29);
+	assert(parsed_submit.rp_reference == 0x01);
+	assert(parsed_submit.service_center_digit_count == 10);
+	assert(parsed_submit.service_center_digits[0] == 1);
+	assert(parsed_submit.service_center_digits[9] == 0);
+	assert(parsed_submit.destination_digit_count == 7);
+	assert(parsed_submit.destination_digits[0] == 5);
+	assert(parsed_submit.destination_digits[6] == 4);
+	assert(parsed_submit.data_alphabet == alphabet::gsm_7bit);
+	assert(parsed_submit.user_data_offset == 26);
+	assert(parsed_submit.user_data_length == 2);
+
+	auto malformed_submit = submit;
+	malformed_submit[13] = 0x0d;
+	assert(!parse_submit(malformed_submit.data(), malformed_submit.size()).valid);
+	malformed_submit = submit;
+	malformed_submit[16] = 0x21;
+	assert(!parse_submit(malformed_submit.data(), malformed_submit.size()).valid);
+	malformed_submit = submit;
+	malformed_submit[21] = 0x04;
+	assert(!parse_submit(malformed_submit.data(), malformed_submit.size()).valid);
+	assert(!parse_submit(submit.data(), submit.size() - 1).valid);
 
 	constexpr std::array<std::uint8_t, 2> cp_ack = { 0x89, 0x04 };
 	assert(parse_uplink(cp_ack.data(), cp_ack.size(), 0x09, 0x40).kind ==
