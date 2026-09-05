@@ -771,6 +771,19 @@ private:
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
 					((negative | (negative >> 16)) & ((u64(1) << 40) - 1)),
 					"logical accumulator right shift zero-fills guard bits");
+			program.write_word(0x041c, 0xed18); // LD #-8, ASM
+			program.write_word(0x041d, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x041c);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0xa5a5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 34;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 34)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0xa5b8,
+					"short-immediate load into ST1.ASM");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

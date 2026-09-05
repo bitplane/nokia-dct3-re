@@ -359,6 +359,15 @@ gates remain unchanged, and the corrected run still leaves INT0 masked with
 zero RF reads. BRAF was therefore a real CPU defect but not the receiver-enable
 boundary.
 
+One diagnostic-only causality run substituted `0x52fd` when ROM4 wrote its
+local `0x0204` mask. With BRAF corrected, that run organically scheduled task
+2, executed the `0x3000` initialization family, changed IMR to `0x53ff` and
+entered the RF loop at `0x323b`. It then exposed the previously unreachable
+one-word `EDxx` load-immediate-to-ASM instruction, now implemented and covered
+by the core test. The substitution is not present in the driver: it proves that
+the mask is sufficient to activate the receiver, but remains inadmissible as a
+power-on value because its source snapshot is not ROM4/MAD2 reset evidence.
+
 ## Local backend prototype
 
 The distributable driver now has a source-level substitution seam:

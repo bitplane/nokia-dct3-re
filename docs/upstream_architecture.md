@@ -233,3 +233,9 @@ that architectural flag makes the post-loader scheduler status agree with the
 reference and is covered by the core conformance gate. It does not activate
 INT0, so it narrows but does not replace the reset-state/organic-transition
 boundary above.
+
+A disposable mask-substitution run confirms causality rather than provenance:
+`0x52fd` lets the corrected core reach the RF receive loop and exposes `EDxx`
+(`LD #k5, ASM`) as the next instruction family. That generic family is now
+implemented and unit-tested. No mask substitution remains in source; the run
+does not establish a ROM4 power-on value.

@@ -1656,6 +1656,11 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	default:
+		if ((op & 0xffe0) == 0xed00) // LD #k5, ASM
+		{
+			m_st1 = (m_st1 & ~u16(0x001f)) | (op & 0x001f);
+			return;
+		}
 		if ((op & 0xffe0) == 0x4a00) // PSHM MMR
 		{
 			push(data_read(low & 0x7f));
