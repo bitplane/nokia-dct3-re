@@ -45,6 +45,7 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_release_complete_received));
 	save_item(NAME(m_traffic_assignment_issued));
 	save_item(NAME(m_mobile_originated_call));
+	save_item(NAME(m_second_mobile_originated_call));
 	save_item(NAME(m_mobile_originated_sms));
 	save_item(NAME(m_incoming_call_answered));
 	save_item(NAME(m_dtmf_active));
@@ -121,6 +122,7 @@ void nokia_gsm_session_device::device_reset()
 	m_release_complete_received = false;
 	m_traffic_assignment_issued = false;
 	m_mobile_originated_call = false;
+	m_second_mobile_originated_call = false;
 	m_mobile_originated_sms = false;
 	m_incoming_call_answered = false;
 	m_dtmf_active = false;
@@ -403,6 +405,14 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_state = u8(m_mobile_originated_sms ?
 				state::awaiting_mobile_sms_sapi3_establishment :
 				state::awaiting_outgoing_call_setup);
+		return downlink_kind::none;
+	}
+
+	if (m_state == u8(state::awaiting_second_cm_service_accept_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::cm_service_accept))
+	{
+		clear_pending_downlink();
+		m_state = u8(state::awaiting_second_outgoing_call_setup);
 		return downlink_kind::none;
 	}
 
@@ -787,6 +797,24 @@ nokia_gsm_session_device::receive_layer3(
 
 	const u8 protocol_discriminator = information[0] & 0x0f;
 	const u8 message_type = information[1] & 0x3f;
+	if (sapi == 0 && m_state == u8(state::incoming_call_active) &&
+			protocol_discriminator == 0x05 && message_type == 0x24 &&
+			live_call_leg_count() == 1)
+	{
+		// GSM 04.08 permits a new CM service transaction on an existing
+		// dedicated connection. A handset can use it after HOLD when the user
+		// starts another call; no paging, RACH or second RR assignment occurs.
+		m_second_mobile_originated_call = true;
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: second outgoing CM service request transaction=%02x "
+				"live_legs=%u t=%.6f\n",
+				information[0], live_call_leg_count(),
+				machine().time().as_double());
+		const auto accept = m_network->cm_service_accept();
+		m_state = u8(state::awaiting_second_cm_service_accept_acknowledgement);
+		return queue_downlink(downlink_kind::cm_service_accept,
+				accept.data(), accept.size());
+	}
 	if (sapi == 0 && protocol_discriminator == 0x06 &&
 			message_type == 0x32)
 	{
@@ -803,9 +831,13 @@ nokia_gsm_session_device::receive_layer3(
 		}
 		return downlink_kind::none;
 	}
-	if (sapi == 0 && m_state == u8(state::awaiting_outgoing_call_setup) &&
+	if (sapi == 0 &&
+			(m_state == u8(state::awaiting_outgoing_call_setup) ||
+			 m_state == u8(state::awaiting_second_outgoing_call_setup)) &&
 			protocol_discriminator == 0x03 && message_type == 0x05)
 	{
+		const bool second_call =
+				m_state == u8(state::awaiting_second_outgoing_call_setup);
 		bool speech_bearer = false;
 		bool called_party = false;
 		for (unsigned offset = 2; offset < length;)
@@ -853,8 +885,17 @@ nokia_gsm_session_device::receive_layer3(
 				BIT(information[0], 7))
 			return downlink_kind::none;
 		m_call_transaction = information[0];
-		m_call_leg_transactions[0] = information[0];
-		set_call_leg_state(0, call_leg_state::alerting);
+		const unsigned leg = second_call ? 1 : 0;
+		m_call_leg_transactions[leg] = information[0];
+		set_call_leg_state(leg, call_leg_state::alerting);
+		if (second_call)
+		{
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_session: second outgoing SETUP transaction=%02x leg=%u "
+					"digits=%u t=%.6f\n",
+					information[0], leg, m_outgoing_called_digits_length,
+					machine().time().as_double());
+		}
 		++m_outgoing_request_id;
 		if (m_outgoing_request_id == 0)
 			++m_outgoing_request_id;
@@ -1095,7 +1136,9 @@ nokia_gsm_session_device::receive_layer3(
 		publish_call_alerting_output();
 		publish_release_waiting_output();
 		m_state = u8(state::incoming_call_active);
-		set_call_leg_state(0, call_leg_state::active);
+		const int leg = call_leg_index(m_call_transaction);
+		if (leg >= 0)
+			set_call_leg_state(unsigned(leg), call_leg_state::active);
 		publish_call_active_output();
 		if (m_outgoing_termination_accepted)
 			return apply_outgoing_termination();
@@ -1117,6 +1160,7 @@ nokia_gsm_session_device::receive_layer3(
 		m_release_complete_received = false;
 		m_call_transaction = 0;
 		m_waiting_call_queued = false;
+		m_second_mobile_originated_call = false;
 		m_call_leg_transactions.fill(0);
 		m_call_leg_states.fill(u8(call_leg_state::inactive));
 		m_releasing_call_leg = 0xff;
@@ -1339,6 +1383,15 @@ nokia_gsm_session_device::apply_outgoing_decision()
 		m_state = u8(state::awaiting_network_disconnect_acknowledgement);
 		return queue_downlink(downlink_kind::call_disconnect,
 				disconnect.data(), disconnect.size());
+	}
+	if (m_second_mobile_originated_call)
+	{
+		// The original call already owns the TCH. Continue the second CC
+		// transaction directly from CALL PROCEEDING to ALERTING/CONNECT.
+		const auto alerting = m_network->call_alerting(m_call_transaction);
+		m_state = u8(state::awaiting_call_alerting_acknowledgement);
+		return queue_downlink(downlink_kind::call_alerting,
+				alerting.data(), alerting.size());
 	}
 	m_traffic_assignment_issued = true;
 	const auto assignment = m_network->traffic_assignment();

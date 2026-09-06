@@ -205,8 +205,10 @@ private:
 		awaiting_location_update_accept_acknowledgement,
 		awaiting_channel_release_acknowledgement,
 		awaiting_cm_service_accept_acknowledgement,
+		awaiting_second_cm_service_accept_acknowledgement,
 		awaiting_cm_service_reject_acknowledgement,
 		awaiting_outgoing_call_setup,
+		awaiting_second_outgoing_call_setup,
 		awaiting_call_proceeding_acknowledgement,
 		awaiting_outgoing_decision,
 		awaiting_call_alerting_acknowledgement,
@@ -276,6 +278,7 @@ private:
 	bool m_release_complete_received = false;
 	bool m_traffic_assignment_issued = false;
 	bool m_mobile_originated_call = false;
+	bool m_second_mobile_originated_call = false;
 	bool m_mobile_originated_sms = false;
 	bool m_incoming_call_answered = false;
 	bool m_dtmf_active = false;

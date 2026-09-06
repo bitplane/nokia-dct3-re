@@ -93,6 +93,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
 	verify-radio-incoming-call-lifecycle verify-radio-supplementary-call \
 	verify-radio-two-call verify-radio-two-call-negatives \
+	verify-radio-second-outgoing-call \
 	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
 	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
 	verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state \
@@ -936,6 +937,16 @@ verify-radio-two-call: build
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_call_waiting' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait2500,enter,wait1000,down,wait1000,enter,wait2000,enter,wait1000,down,wait1000,enter,wait2000,enter,wait1000,enter,wait2500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=30.5 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'; \
 	$(PYTHON) tools/radio_two_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+# shell: organic second mobile-originated call and exhaustive NSE-8 menu
+verify-radio-second-outgoing-call: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-second-outgoing-call: build
+	@set -e; \
+	$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=49 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,5,wait1000,enter,wait1000,down,wait1000,down,wait1000,enter,wait1000,5,5,5,1,2,3,4,wait1000,enter,wait4000,5,wait1000,enter,wait1000,down,wait1000,down,wait1000,down,wait1000,down,wait1000,down NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
+	$(PYTHON) tools/radio_second_outgoing_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
 # shell: duplicate and malformed call-waiting compositions
