@@ -5,6 +5,7 @@
 #define MAME_NOKIA_NOKIA_GSM_SESSION_H
 
 #include "gsm_sms_transport.h"
+#include "gsm_supplementary.h"
 #include "nokia_gsm_network.h"
 
 #include <array>
@@ -52,7 +53,8 @@ public:
 		call_hold_acknowledge,
 		call_retrieve_acknowledge,
 		call_release,
-		release_complete
+		release_complete,
+		supplementary_release_complete
 	};
 
 	struct downlink_message
@@ -209,6 +211,8 @@ private:
 		awaiting_cm_service_reject_acknowledgement,
 		awaiting_outgoing_call_setup,
 		awaiting_second_outgoing_call_setup,
+		awaiting_supplementary_request,
+		awaiting_supplementary_release_acknowledgement,
 		awaiting_call_proceeding_acknowledgement,
 		awaiting_outgoing_decision,
 		awaiting_call_alerting_acknowledgement,
@@ -280,6 +284,7 @@ private:
 	bool m_mobile_originated_call = false;
 	bool m_second_mobile_originated_call = false;
 	bool m_mobile_originated_sms = false;
+	bool m_mobile_originated_supplementary = false;
 	bool m_incoming_call_answered = false;
 	bool m_dtmf_active = false;
 	u8 m_dtmf_digit = 0;

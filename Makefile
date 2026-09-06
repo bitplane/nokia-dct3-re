@@ -34,6 +34,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/gsm_mobility.h \
 	driver/gsm_mm_authentication.cpp driver/gsm_mm_authentication.h \
 	driver/gsm_sms_transport.cpp driver/gsm_sms_transport.h \
+	driver/gsm_supplementary.cpp driver/gsm_supplementary.h \
 	driver/gsm_tch_f_l1.cpp driver/gsm_tch_f_l1.h \
 	driver/gsm_xcch_l1.cpp driver/gsm_xcch_l1.h \
 	driver/nokia_gsm_fr_codec.cpp driver/nokia_gsm_fr_codec.h \
@@ -346,6 +347,7 @@ help:
 	@echo "make verify-radio-incoming-call-answered check physical Answer, ringing and post-answer DSP traffic"
 	@echo "make verify-radio-incoming-call-lifecycle check physical Answer-to-End CC and DSP-control teardown"
 	@echo "make verify-radio-second-outgoing-call check New call on the existing TCH and the complete two-call menu"
+	@echo "make verify-radio-call-divert check organic GSM 04.80 *#21# interrogation"
 	@echo "make verify-radio-outgoing-call-lifecycle check physical dial-to-End MO call and media"
 	@echo "make verify-radio-outgoing-sms send a physical 3210 SMS through CP/RP acknowledgement"
 	@echo "make verify-radio-outgoing-call-state check exact active MO-call save-state replay"
@@ -588,6 +590,8 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_application_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_ems_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_supplementary_call_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_gsm_supplementary.py
+	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_two_call_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_two_call_negative_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_second_outgoing_call_trace_check.py

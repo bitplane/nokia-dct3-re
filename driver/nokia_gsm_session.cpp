@@ -47,6 +47,7 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_mobile_originated_call));
 	save_item(NAME(m_second_mobile_originated_call));
 	save_item(NAME(m_mobile_originated_sms));
+	save_item(NAME(m_mobile_originated_supplementary));
 	save_item(NAME(m_incoming_call_answered));
 	save_item(NAME(m_dtmf_active));
 	save_item(NAME(m_dtmf_digit));
@@ -124,6 +125,7 @@ void nokia_gsm_session_device::device_reset()
 	m_mobile_originated_call = false;
 	m_second_mobile_originated_call = false;
 	m_mobile_originated_sms = false;
+	m_mobile_originated_supplementary = false;
 	m_incoming_call_answered = false;
 	m_dtmf_active = false;
 	m_dtmf_digit = 0;
@@ -194,7 +196,8 @@ bool nokia_gsm_session_device::establish_layer3(
 			(information[1] & 0x3f) == 0x24 &&
 			length >= 6 &&
 			((information[2] & 0x0f) == 0x01 ||
-				(information[2] & 0x0f) == 0x04);
+				(information[2] & 0x0f) == 0x04 ||
+				(information[2] & 0x0f) == 0x08);
 	if (!location_update_request && !paging_response && !cm_service_request)
 		return false;
 	if (cm_service_request)
@@ -222,6 +225,8 @@ bool nokia_gsm_session_device::establish_layer3(
 			(information[2] & 0x0f) == 0x01;
 	m_mobile_originated_sms = cm_service_request &&
 			(information[2] & 0x0f) == 0x04;
+	m_mobile_originated_supplementary = cm_service_request &&
+			(information[2] & 0x0f) == 0x08;
 	m_incoming_service_completed = false;
 	m_call_transaction = 0;
 	m_traffic_assignment_issued = false;
@@ -404,6 +409,8 @@ nokia_gsm_session_device::downlink_acknowledged()
 		clear_pending_downlink();
 		m_state = u8(m_mobile_originated_sms ?
 				state::awaiting_mobile_sms_sapi3_establishment :
+				m_mobile_originated_supplementary ?
+				state::awaiting_supplementary_request :
 				state::awaiting_outgoing_call_setup);
 		return downlink_kind::none;
 	}
@@ -418,6 +425,13 @@ nokia_gsm_session_device::downlink_acknowledged()
 
 	if (m_state == u8(state::awaiting_cm_service_reject_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::cm_service_reject))
+	{
+		return begin_channel_release();
+	}
+
+	if (m_state == u8(state::awaiting_supplementary_release_acknowledgement) &&
+			m_pending_downlink.kind ==
+					u8(downlink_kind::supplementary_release_complete))
 	{
 		return begin_channel_release();
 	}
@@ -755,6 +769,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 		const bool queue_status_report = m_mobile_originated_sms &&
 				m_sms_status_report_requested && m_sms_rp_acknowledged;
 		m_mobile_originated_sms = false;
+		m_mobile_originated_supplementary = false;
 		m_call_transaction = 0;
 		m_outgoing_request_pending = false;
 		clear_outgoing_call_state();
@@ -797,6 +812,25 @@ nokia_gsm_session_device::receive_layer3(
 
 	const u8 protocol_discriminator = information[0] & 0x0f;
 	const u8 message_type = information[1] & 0x3f;
+	if (sapi == 0 && m_state == u8(state::awaiting_supplementary_request) &&
+			protocol_discriminator == 0x0b && message_type == 0x3b)
+	{
+		const gsm::ss::request request =
+				gsm::ss::parse_register(information, length);
+		if (!request.valid ||
+				request.operation_code != gsm::ss::operation::interrogate_ss)
+			return downlink_kind::none;
+		const gsm::ss::message response =
+				gsm::ss::interrogate_result(request, false);
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_ss: request=interrogate transaction=%02x invoke=%u "
+				"service=%02x active=0 t=%.6f\n",
+				request.transaction, request.invoke_id, request.service_code,
+				machine().time().as_double());
+		m_state = u8(state::awaiting_supplementary_release_acknowledgement);
+		return queue_downlink(downlink_kind::supplementary_release_complete,
+				response.data.data(), response.length);
+	}
 	if (sapi == 0 && m_state == u8(state::incoming_call_active) &&
 			protocol_discriminator == 0x05 && message_type == 0x24 &&
 			live_call_leg_count() == 1)
@@ -1156,6 +1190,7 @@ nokia_gsm_session_device::receive_layer3(
 		m_traffic_assignment_issued = false;
 		m_mobile_originated_call = false;
 		m_mobile_originated_sms = false;
+		m_mobile_originated_supplementary = false;
 		m_incoming_call_answered = false;
 		m_release_complete_received = false;
 		m_call_transaction = 0;
