@@ -111,6 +111,7 @@ request parse_register(const std::uint8_t *data, unsigned length)
 			{
 				if (!read_tlv(data, sequence_offset + sequence_length,
 						parameter, 0x84, value, value_length) ||
+						value_length == 0 ||
 						value_length > result.forwarded_number.size())
 					return request{};
 				result.forwarded_number_length = value_length;
@@ -127,22 +128,76 @@ request parse_register(const std::uint8_t *data, unsigned length)
 	return result;
 }
 
-message operation_result(const request &request)
+message forwarding_info_result(const request &request, bool registered,
+		bool active, const std::uint8_t *forwarded_number,
+		unsigned number_length)
 {
 	message result;
 	if (!request.valid ||
 			(request.operation_code != operation::register_ss &&
 			 request.operation_code != operation::erase_ss &&
 			 request.operation_code != operation::activate_ss &&
-			 request.operation_code != operation::deactivate_ss))
+			 request.operation_code != operation::deactivate_ss) ||
+			number_length > maximum_forwarded_number_length ||
+			(number_length && !forwarded_number))
+		return result;
+	const unsigned feature_length = 3 + (number_length ? 2 + number_length : 0);
+	const unsigned feature_list_length = 2 + feature_length;
+	const unsigned forwarding_info_length = 3 + 2 + feature_list_length;
+	const unsigned result_sequence_length = 3 + 2 + forwarding_info_length;
+	const unsigned component_length = 3 + 2 + result_sequence_length;
+	const unsigned facility_length = 2 + component_length;
+	if (2 + 2 + facility_length > result.data.size())
+		return message{};
+
+	unsigned offset = 0;
+	result.data[offset++] = request.transaction ^ 0x80;
+	result.data[offset++] = 0x2a;
+	result.data[offset++] = 0x1c;
+	result.data[offset++] = facility_length;
+	result.data[offset++] = 0xa2;
+	result.data[offset++] = component_length;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = request.invoke_id;
+	result.data[offset++] = 0x30;
+	result.data[offset++] = result_sequence_length;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = std::uint8_t(request.operation_code);
+	result.data[offset++] = 0xa0;
+	result.data[offset++] = forwarding_info_length;
+	result.data[offset++] = 0x04;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = request.service_code;
+	result.data[offset++] = 0x30;
+	result.data[offset++] = feature_list_length;
+	result.data[offset++] = 0x30;
+	result.data[offset++] = feature_length;
+	result.data[offset++] = 0x84;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = registered ? (active ? 0x05 : 0x04) : 0x00;
+	if (number_length)
+	{
+		result.data[offset++] = 0x85;
+		result.data[offset++] = number_length;
+		for (unsigned index = 0; index < number_length; ++index)
+			result.data[offset++] = forwarded_number[index];
+	}
+	result.length = offset;
+	return result;
+}
+
+message error_result(const request &request, std::uint8_t error_code)
+{
+	message result;
+	if (!request.valid)
 		return result;
 	const std::uint8_t encoded[] = {
 		std::uint8_t(request.transaction ^ 0x80), 0x2a,
-		0x1c, 0x0a,
-		0xa2, 0x08,
+		0x1c, 0x08, 0xa3, 0x06,
 		0x02, 0x01, request.invoke_id,
-		0x30, 0x03,
-		0x02, 0x01, std::uint8_t(request.operation_code)
+		0x02, 0x01, error_code
 	};
 	result.length = sizeof(encoded);
 	for (unsigned index = 0; index < result.length; ++index)
@@ -201,13 +256,49 @@ message process_uss_request_result(const request &request, const char *response)
 
 message interrogate_result(const request &request, bool active)
 {
+	return interrogate_result(request, active, active, nullptr, 0);
+}
+
+message interrogate_result(const request &request, bool registered, bool active,
+		const std::uint8_t *forwarded_number, unsigned number_length)
+{
 	message result;
-	if (!request.valid || request.operation_code != operation::interrogate_ss)
+	if (!request.valid || request.operation_code != operation::interrogate_ss ||
+			number_length > maximum_forwarded_number_length ||
+			(number_length && !forwarded_number))
 		return result;
 
-	// GSM 04.80 ReturnResult carries the reflected invoke id, operation code,
-	// and an InterrogateSS-Res SS-Status.  Bit 0 is active, bit 2 registered.
-	const std::uint8_t status = active ? 0x05 : 0x00;
+	if (active && number_length)
+	{
+		const unsigned result_sequence_length = 5 + number_length;
+		const unsigned component_length = 3 + 2 + result_sequence_length;
+		const unsigned facility_length = 2 + component_length;
+		unsigned offset = 0;
+		result.data[offset++] = request.transaction ^ 0x80;
+		result.data[offset++] = 0x2a;
+		result.data[offset++] = 0x1c;
+		result.data[offset++] = facility_length;
+		result.data[offset++] = 0xa2;
+		result.data[offset++] = component_length;
+		result.data[offset++] = 0x02;
+		result.data[offset++] = 0x01;
+		result.data[offset++] = request.invoke_id;
+		result.data[offset++] = 0x30;
+		result.data[offset++] = result_sequence_length;
+		result.data[offset++] = 0x02;
+		result.data[offset++] = 0x01;
+		result.data[offset++] = std::uint8_t(operation::interrogate_ss);
+		result.data[offset++] = 0x81;
+		result.data[offset++] = number_length;
+		for (unsigned index = 0; index < number_length; ++index)
+			result.data[offset++] = forwarded_number[index];
+		result.length = offset;
+		return result;
+	}
+
+	// InterrogateSS-Res selects the SS-Status choice when no active destination
+	// is available. Bit 0 is active and bit 2 is registered.
+	const std::uint8_t status = registered ? (active ? 0x05 : 0x04) : 0x00;
 	const std::uint8_t encoded[] = {
 		std::uint8_t(request.transaction ^ 0x80), 0x2a,
 		0x1c, 0x0d,

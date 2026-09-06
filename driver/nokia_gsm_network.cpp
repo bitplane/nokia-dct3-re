@@ -56,6 +56,7 @@ void nokia_gsm_network_device::device_start()
 	save_item(NAME(m_recovery_cell_available));
 	save_item(NAME(m_stale_neighbour_lost));
 	save_item(NAME(m_unconditional_forwarding_active));
+	save_item(NAME(m_unconditional_forwarding_registered));
 	save_item(NAME(m_unconditional_forwarding_number_length));
 	save_item(NAME(m_unconditional_forwarding_number));
 }
@@ -69,16 +70,33 @@ void nokia_gsm_network_device::register_unconditional_forwarding(
 			index < m_unconditional_forwarding_number_length; ++index)
 		m_unconditional_forwarding_number[index] = number[index];
 	m_unconditional_forwarding_active = true;
+	m_unconditional_forwarding_registered = true;
 }
 
-void nokia_gsm_network_device::clear_unconditional_forwarding()
+bool nokia_gsm_network_device::activate_unconditional_forwarding()
+{
+	if (!m_unconditional_forwarding_registered)
+		return false;
+	m_unconditional_forwarding_active = true;
+	return true;
+}
+
+void nokia_gsm_network_device::deactivate_unconditional_forwarding()
 {
 	m_unconditional_forwarding_active = false;
+}
+
+void nokia_gsm_network_device::erase_unconditional_forwarding()
+{
+	m_unconditional_forwarding_active = false;
+	m_unconditional_forwarding_registered = false;
 	m_unconditional_forwarding_number_length = 0;
+	m_unconditional_forwarding_number.fill(0);
 }
 
 void nokia_gsm_network_device::device_reset()
 {
+	// A baseband reset does not erase a subscription owned by the network.
 	m_stable_camp_seen = false;
 	m_neighbour_bcch_seen = false;
 	m_primary_cell_lost = false;

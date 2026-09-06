@@ -93,6 +93,7 @@ public:
 			const u8 *information, unsigned length, u16 serving_arfcn);
 	bool queue_incoming_page(incoming_service service = incoming_service::none);
 	bool incoming_service_admissible(incoming_service service) const;
+	bool incoming_service_diverted(incoming_service service) const;
 	downlink_kind contention_resolution_delivered();
 	downlink_kind downlink_acknowledged();
 	downlink_kind receive_layer3(

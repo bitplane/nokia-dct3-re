@@ -296,8 +296,16 @@ bool nokia_gsm_session_device::queue_waiting_call(
 bool nokia_gsm_session_device::incoming_service_admissible(
 		incoming_service service) const
 {
-	return service != incoming_service::sms ||
-			m_network->incoming_sms_admissible(m_sms_delivery_index);
+	return !incoming_service_diverted(service) &&
+			(service != incoming_service::sms ||
+			 m_network->incoming_sms_admissible(m_sms_delivery_index));
+}
+
+bool nokia_gsm_session_device::incoming_service_diverted(
+		incoming_service service) const
+{
+	return service == incoming_service::call &&
+			m_network->unconditional_forwarding_active();
 }
 
 nokia_gsm_session_device::downlink_kind
@@ -820,12 +828,15 @@ nokia_gsm_session_device::receive_layer3(
 		if (!request.valid)
 			return downlink_kind::none;
 		gsm::ss::message response;
-		if (request.operation_code == gsm::ss::operation::interrogate_ss)
+		if (request.service_code == 0x21 &&
+				request.operation_code == gsm::ss::operation::interrogate_ss)
 		{
 			const bool active =
 					m_network->unconditional_forwarding_active();
 			response = gsm::ss::interrogate_result(request,
-					active);
+					m_network->unconditional_forwarding_registered(), active,
+					m_network->unconditional_forwarding_number().data(),
+					m_network->unconditional_forwarding_number_length());
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=interrogate transaction=%02x invoke=%u "
 					"service=%02x active=%u t=%.6f\n",
@@ -851,7 +862,9 @@ nokia_gsm_session_device::receive_layer3(
 			m_network->register_unconditional_forwarding(
 					request.forwarded_number.data(),
 					request.forwarded_number_length);
-			response = gsm::ss::operation_result(request);
+			response = gsm::ss::forwarding_info_result(request, true, true,
+					m_network->unconditional_forwarding_number().data(),
+					m_network->unconditional_forwarding_number_length());
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=register transaction=%02x invoke=%u "
 					"service=%02x number_length=%u active=1 t=%.6f\n",
@@ -862,12 +875,55 @@ nokia_gsm_session_device::receive_layer3(
 		else if (request.service_code == 0x21 &&
 				request.operation_code == gsm::ss::operation::deactivate_ss)
 		{
-			m_network->clear_unconditional_forwarding();
-			response = gsm::ss::operation_result(request);
+			m_network->deactivate_unconditional_forwarding();
+			response = gsm::ss::forwarding_info_result(request,
+					m_network->unconditional_forwarding_registered(), false,
+					m_network->unconditional_forwarding_number().data(),
+					m_network->unconditional_forwarding_number_length());
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=deactivate transaction=%02x invoke=%u "
 					"service=%02x active=0 t=%.6f\n",
 					request.transaction, request.invoke_id, request.service_code,
+					machine().time().as_double());
+		}
+		else if (request.service_code == 0x21 &&
+				request.operation_code == gsm::ss::operation::activate_ss)
+		{
+			if (m_network->activate_unconditional_forwarding())
+				response = gsm::ss::forwarding_info_result(request, true, true,
+						m_network->unconditional_forwarding_number().data(),
+						m_network->unconditional_forwarding_number_length());
+			else
+				response = gsm::ss::error_result(request, 0x11);
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_ss: request=activate transaction=%02x invoke=%u "
+					"service=%02x registered=%u active=%u t=%.6f\n",
+					request.transaction, request.invoke_id, request.service_code,
+					m_network->unconditional_forwarding_registered() ? 1 : 0,
+					m_network->unconditional_forwarding_active() ? 1 : 0,
+					machine().time().as_double());
+		}
+		else if (request.service_code == 0x21 &&
+				request.operation_code == gsm::ss::operation::erase_ss)
+		{
+			m_network->erase_unconditional_forwarding();
+			response = gsm::ss::forwarding_info_result(request, false, false,
+					nullptr, 0);
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_ss: request=erase transaction=%02x invoke=%u "
+					"service=%02x registered=0 active=0 t=%.6f\n",
+					request.transaction, request.invoke_id, request.service_code,
+					machine().time().as_double());
+		}
+		else if (request.operation_code !=
+				gsm::ss::operation::process_uss_request)
+		{
+			response = gsm::ss::error_result(request, 0x10);
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_ss: request=unsupported transaction=%02x invoke=%u "
+					"operation=%02x service=%02x error=10 t=%.6f\n",
+					request.transaction, request.invoke_id,
+					unsigned(request.operation_code), request.service_code,
 					machine().time().as_double());
 		}
 		else

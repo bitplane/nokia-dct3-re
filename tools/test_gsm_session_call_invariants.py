@@ -152,6 +152,27 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
             establishment,
         )
 
+    def test_unconditional_forwarding_is_network_owned_and_saved(self):
+        network_header = (ROOT / "driver/nokia_gsm_network.h").read_text()
+        network_source = (ROOT / "driver/nokia_gsm_network.cpp").read_text()
+        radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
+        for field in (
+            "m_unconditional_forwarding_registered",
+            "m_unconditional_forwarding_active",
+            "m_unconditional_forwarding_number_length",
+            "m_unconditional_forwarding_number",
+        ):
+            self.assertIn(f"save_item(NAME({field}));", network_source)
+        self.assertIn("unconditional_forwarding_active()", network_header)
+        self.assertIn("host_incoming_result::forwarded", radio)
+        forwarding = radio.split(
+            "queue_host_incoming_call", 1)[1].split(
+                "nokia_radio_peer_device::nokia_radio_peer_device", 1)[0]
+        self.assertLess(
+            forwarding.index("unconditional_forwarding_active()"),
+            forwarding.index("set_incoming_caller"),
+        )
+
     def test_outgoing_setup_requires_speech_and_called_party(self):
         setup = self.source.split(
             "m_state == u8(state::awaiting_outgoing_call_setup)", 1)[1]

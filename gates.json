@@ -5114,6 +5114,190 @@
       ]
     },
     {
+      "name": "verify-radio-second-outgoing-call",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "embedded shell control flow",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=49 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
+        "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,5,wait1000,enter,wait1000,down,wait1000,down,wait1000,enter,wait1000,5,5,5,1,2,3,4,wait1000,enter,wait4000,5,wait1000,enter,wait1000,down,wait1000,down,wait1000,down,wait1000,down,wait1000,down NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
+        "\t$(PYTHON) tools/radio_second_outgoing_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \\",
+        "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
+      "name": "verify-radio-call-divert",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "steps": [
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": [
+            "--no-print-directory"
+          ],
+          "run_target": "run-prebuilt-captured",
+          "tokens": [
+            "RUN_DIR=$(RUN_DIR)",
+            "SECONDS=38",
+            "RUN_VERBOSE=1",
+            "ERASED_IDENTITY_SECURITY_CODE=12345",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)",
+            "SECONDS": "38",
+            "RUN_VERBOSE": "1",
+            "ERASED_IDENTITY_SECURITY_CODE": "12345",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_call_divert_trace_check.py",
+          "arguments": [
+            "$(RUN_DIR)/error.log",
+            "$(RUN_DIR)"
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
+      "name": "verify-radio-call-divert-lifecycle",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "steps": [
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": [
+            "--no-print-directory"
+          ],
+          "run_target": "run-prebuilt-captured",
+          "tokens": [
+            "RUN_DIR=$(RUN_DIR)",
+            "SECONDS=80",
+            "RUN_VERBOSE=1",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,2,1,star,5,5,5,1,2,3,4,hash,wait800,enter,wait4000,c,wait1000,star,hash,2,1,hash,wait800,enter,wait4000,c,wait1000,hash,2,1,hash,wait800,enter,wait4000,c,wait1000,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=30 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)",
+            "SECONDS": "80",
+            "RUN_VERBOSE": "1",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,2,1,star,5,5,5,1,2,3,4,hash,wait800,enter,wait4000,c,wait1000,star,hash,2,1,hash,wait800,enter,wait4000,c,wait1000,hash,2,1,hash,wait800,enter,wait4000,c,wait1000,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=30 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_call_divert_lifecycle_trace_check.py",
+          "arguments": [
+            "$(RUN_DIR)/error.log",
+            "$(RUN_DIR)"
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
+      "name": "verify-radio-call-divert-incoming",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "embedded shell control flow",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\t$(call prepare_host_run,$(RUN_DIR),noki3210,); \\",
+        "\tenv NOKIA_DCT3_LUA_QUIET=1 \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,2,1,star,5,5,5,1,2,3,4,hash,wait800,enter \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \\",
+        "\t\tNOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \\",
+        "\t\tNOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \\",
+        "\t\t$(VENV)/bin/python tools/run_host_diverted_call_gate.py \\",
+        "\t\t\t--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) -- \\",
+        "\t\t\t./mame noki3210 -rompath roms -log -video none -sound none \\",
+        "\t\t\t-keyboardprovider none -mouseprovider none -lightgunprovider none \\",
+        "\t\t\t-joystickprovider none -midiprovider none -skip_gameinfo \\",
+        "\t\t\t-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \\",
+        "\t\t\t-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \\",
+        "\t\t\t-http_port $(HOST_CALL_INCOMING_PORT) \\",
+        "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_call_divert_incoming_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
+      "name": "verify-radio-ussd",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "steps": [
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": [
+            "--no-print-directory"
+          ],
+          "run_target": "run-prebuilt-captured",
+          "tokens": [
+            "RUN_DIR=$(RUN_DIR)",
+            "SECONDS=38",
+            "RUN_VERBOSE=1",
+            "ERASED_IDENTITY_SECURITY_CODE=12345",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)",
+            "SECONDS": "38",
+            "RUN_VERBOSE": "1",
+            "ERASED_IDENTITY_SECURITY_CODE": "12345",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_ussd_trace_check.py",
+          "arguments": [
+            "$(RUN_DIR)/error.log",
+            "$(RUN_DIR)"
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
       "name": "verify-radio-two-call-negatives",
       "prerequisites": [
         "build"
@@ -10374,7 +10558,9 @@
     },
     {
       "name": "verify-sim-pin",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "persistent card provisioning fixture",
       "recipe": [
@@ -10388,7 +10574,9 @@
     },
     {
       "name": "verify-sim-pin-unblock",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "persistent card provisioning fixture",
       "recipe": [
@@ -10402,7 +10590,9 @@
     },
     {
       "name": "verify-sim-pin-state-roundtrip",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "persistent card provisioning and machine-state fixture",
       "recipe": [
@@ -10416,7 +10606,9 @@
     },
     {
       "name": "verify-sim-pin-removal",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "physical card-removal fixture",
       "recipe": [
@@ -10430,7 +10622,9 @@
     },
     {
       "name": "verify-sim-pin-toggle",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "persistent card settings fixture",
       "recipe": [
@@ -10445,7 +10639,9 @@
     },
     {
       "name": "verify-sim-pin-change",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "persistent card settings fixture",
       "recipe": [
@@ -10460,7 +10656,9 @@
     },
     {
       "name": "verify-sim-pin-change-reject",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "persistent card negative settings fixture",
       "recipe": [
@@ -10474,7 +10672,9 @@
     },
     {
       "name": "verify-sim-pin-v501",
-      "prerequisites": ["build"],
+      "prerequisites": [
+        "build"
+      ],
       "variables": {},
       "unstructured": "persistent card provisioning fixture",
       "recipe": [

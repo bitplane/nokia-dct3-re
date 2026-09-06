@@ -109,7 +109,14 @@ public:
 	{
 		m_call_waiting_profile = u8(profile);
 	}
-	bool queue_host_incoming_call(const u8 *digits, unsigned length);
+	enum class host_incoming_result : u8
+	{
+		rejected,
+		paging,
+		forwarded
+	};
+	host_incoming_result queue_host_incoming_call(
+			const u8 *digits, unsigned length);
 	bool traffic_channel_active() const { return m_traffic_channel_active; }
 	void set_speech_loopback(bool enabled) { m_speech_loopback = enabled; }
 	void set_downlink_tch_burst_error_profile(

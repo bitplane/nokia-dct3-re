@@ -11,18 +11,29 @@
 DEFINE_DEVICE_TYPE(NOKIA_RADIO_PEER, nokia_radio_peer_device,
 		"nokia_radio_peer", "Nokia DCT3 radio peer HLE")
 
-bool nokia_radio_peer_device::queue_host_incoming_call(
+nokia_radio_peer_device::host_incoming_result
+nokia_radio_peer_device::queue_host_incoming_call(
 		const u8 *digits, unsigned length)
 {
 	if (!m_enabled || !m_registered ||
-			m_host_incoming_call_pending || !m_gsm_session->idle() ||
-			!m_gsm_session->set_incoming_caller(digits, length))
-		return false;
+			m_host_incoming_call_pending || !m_gsm_session->idle())
+		return host_incoming_result::rejected;
+	if (m_gsm_network->unconditional_forwarding_active())
+	{
+		LOGMASKED(LOG_RADIO,
+				"dsp_hle: GSM incoming call forwarded before paging "
+				"destination_length=%u t=%.6f\n",
+				m_gsm_network->unconditional_forwarding_number_length(),
+				machine().time().as_double());
+		return host_incoming_result::forwarded;
+	}
+	if (!m_gsm_session->set_incoming_caller(digits, length))
+		return host_incoming_result::rejected;
 	// The fixture latch is one-shot; a fresh host transaction deliberately
 	// rearms paging only after the preceding firmware-owned call is idle.
 	m_page_transmitted = false;
 	m_host_incoming_call_pending = true;
-	return true;
+	return host_incoming_result::paging;
 }
 
 nokia_radio_peer_device::nokia_radio_peer_device(
@@ -2297,9 +2308,22 @@ void nokia_radio_peer_device::emit_report()
 					m_gsm_session->delivery_report_pending();
 			const bool service_admissible =
 					m_gsm_session->incoming_service_admissible(service);
+			const bool service_diverted =
+					m_gsm_session->incoming_service_diverted(service);
+			if (m_registered && page_requested && m_pch_fill_delivered &&
+					!m_page_transmitted && service_diverted)
+			{
+				m_page_transmitted = true;
+				m_host_incoming_call_pending = false;
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: GSM incoming call forwarded before paging "
+						"destination_length=%u t=%.6f\n",
+						m_gsm_network->unconditional_forwarding_number_length(),
+						machine().time().as_double());
+			}
 			if (m_registered && page_requested &&
 					m_pch_fill_delivered && !m_page_transmitted &&
-					!service_admissible)
+					!service_admissible && !service_diverted)
 			{
 				// Reject malformed network ingress before it can become a
 				// radio page or mutate handset/SIM state. The one-shot page

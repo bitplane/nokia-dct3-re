@@ -398,14 +398,26 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 			publish_incoming_state("queued");
 		}
 	}
-	if (m_incoming_request_id && !m_incoming_page_accepted &&
-			m_radio_peer->queue_host_incoming_call(
-					m_incoming_digits.data(), m_incoming_digits_length))
+	if (m_incoming_request_id && !m_incoming_page_accepted)
 	{
-		m_incoming_page_accepted = true;
-		publish_incoming_state("paging");
+		const auto result = m_radio_peer->queue_host_incoming_call(
+				m_incoming_digits.data(), m_incoming_digits_length);
+		if (result == nokia_radio_peer_device::host_incoming_result::paging)
+		{
+			m_incoming_page_accepted = true;
+			publish_incoming_state("paging");
+		}
+		else if (result ==
+				nokia_radio_peer_device::host_incoming_result::forwarded)
+		{
+			publish_incoming_state("forwarded");
+			m_incoming_request_id = 0;
+			m_incoming_digits_length = 0;
+			m_incoming_started = false;
+			m_incoming_connected_once = false;
+		}
 	}
-	else if (republish && m_incoming_request_id && !m_incoming_started)
+	if (republish && m_incoming_request_id && !m_incoming_started)
 		publish_incoming_state(
 				m_incoming_page_accepted ? "paging" : "queued");
 	for (const auto &decision : decisions)

@@ -58,10 +58,51 @@ int main()
 	if (!request.valid || request.operation_code != gsm::ss::operation::register_ss ||
 			request.service_code != 0x21 || request.forwarded_number_length != 5)
 		return 4;
-	response = gsm::ss::operation_result(request);
+	response = gsm::ss::forwarding_info_result(request, true, true,
+			request.forwarded_number.data(), request.forwarded_number_length);
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");
+
+	const auto destination = request.forwarded_number;
+	const unsigned destination_length = request.forwarded_number_length;
+	request = gsm::ss::parse_register(query, sizeof(query));
+	response = gsm::ss::interrogate_result(request, true, true,
+			destination.data(), destination_length);
+	if (response.length != 21 || response.data[14] != 0x81 ||
+			response.data[15] != destination_length)
+		return 5;
+	for (unsigned i = 0; i < destination_length; ++i)
+		if (response.data[16 + i] != destination[i]) return 6;
+	response = gsm::ss::interrogate_result(request, true, false, nullptr, 0);
+	if (response.length != 17 || response.data[16] != 0x04) return 11;
+
+	std::uint8_t control[sizeof(query)];
+	for (unsigned i = 0; i < sizeof(query); ++i) control[i] = query[i];
+	for (std::uint8_t operation : {std::uint8_t(0x0b), std::uint8_t(0x0c),
+			std::uint8_t(0x0d)}) {
+		control[11] = operation;
+		request = gsm::ss::parse_register(control, sizeof(control));
+		if (!request.valid || std::uint8_t(request.operation_code) != operation)
+			return 7;
+		const bool erased = operation == 0x0b;
+		response = gsm::ss::forwarding_info_result(request, !erased,
+				operation == 0x0c, erased ? nullptr : destination.data(),
+				erased ? 0 : destination_length);
+		if (response.length != (erased ? 26U : 33U) ||
+				response.data[13] != operation || response.data[23] != 0x84)
+			return 8;
+	}
+
+	control[11] = 0x55;
+	request = gsm::ss::parse_register(control, sizeof(control));
+	response = gsm::ss::error_result(request, 0x10);
+	if (!request.valid || response.length != 12 || response.data[4] != 0xa3 ||
+			response.data[11] != 0x10)
+		return 9;
+	if (gsm::ss::forwarding_info_result(request, false, false,
+			destination.data(), destination.size() + 1).length)
+		return 10;
 	return 0;
 }
 '''
@@ -84,7 +125,7 @@ class GsmSupplementaryTest(unittest.TestCase):
         self.assertEqual(
             "9b2a1c0da20b020101300602010e800100\n"
             "9b2a1c13a211020101300c02013b300704010f0402cf25\n"
-            "9b2a1c0aa208020101300302010a\n",
+            "9b2a1c1da21b020101301602010aa011040121300c300a840105850581551532f4\n",
             result.stdout)
 
 

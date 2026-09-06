@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 226 gates: 138 generated from typed steps, 88 copied verbatim (shell).
+# 231 gates: 141 generated from typed steps, 90 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -92,15 +92,14 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-media-resilience verify-radio-incoming-call \
 	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
 	verify-radio-incoming-call-lifecycle verify-radio-supplementary-call \
-	verify-radio-two-call verify-radio-two-call-negatives \
-	verify-radio-second-outgoing-call \
-	verify-radio-call-divert \
-	verify-radio-call-divert-controls \
-	verify-radio-ussd \
-	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
-	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
-	verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state \
-	verify-radio-outgoing-call-busy verify-radio-outgoing-call-no-answer \
+	verify-radio-two-call verify-radio-second-outgoing-call \
+	verify-radio-call-divert verify-radio-call-divert-lifecycle \
+	verify-radio-call-divert-incoming verify-radio-ussd \
+	verify-radio-two-call-negatives verify-radio-a5-1-incoming-call \
+	verify-radio-a5-1-state verify-radio-a5-1-sdcch-state \
+	verify-radio-a5-1-outgoing-call verify-radio-outgoing-call-lifecycle \
+	verify-radio-outgoing-call-state verify-radio-outgoing-call-busy \
+	verify-radio-outgoing-call-no-answer \
 	verify-radio-outgoing-call-no-answer-state \
 	verify-radio-outgoing-call-service-reject \
 	verify-radio-outgoing-call-delayed-decision-state \
@@ -942,7 +941,7 @@ verify-radio-two-call: build
 	$(PYTHON) tools/radio_two_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
-# shell: organic second mobile-originated call and exhaustive NSE-8 menu
+# shell: embedded shell control flow
 verify-radio-second-outgoing-call: ERASED_IDENTITY_SECURITY_CODE=12345
 verify-radio-second-outgoing-call: build
 	@set -e; \
@@ -952,28 +951,44 @@ verify-radio-second-outgoing-call: build
 	$(PYTHON) tools/radio_second_outgoing_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
-# shell: organic GSM 04.80 unconditional-forwarding interrogation
 verify-radio-call-divert: ERASED_IDENTITY_SECURITY_CODE=12345
 verify-radio-call-divert: build
-	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
 	$(PYTHON) tools/radio_call_divert_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
 
-# shell: organic unconditional-forwarding registration and deactivation
-verify-radio-call-divert-controls: ERASED_IDENTITY_SECURITY_CODE=12345
-verify-radio-call-divert-controls: build
-	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR)/register SECONDS=44 RUN_VERBOSE=1 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,2,1,star,5,5,5,1,2,3,4,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
-	$(PYTHON) tools/radio_call_divert_control_trace_check.py register $(RUN_DIR)/register/error.log $(RUN_DIR)/register
-	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR)/deactivate SECONDS=40 RUN_VERBOSE=1 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
-	$(PYTHON) tools/radio_call_divert_control_trace_check.py deactivate $(RUN_DIR)/deactivate/error.log $(RUN_DIR)/deactivate
+verify-radio-call-divert-lifecycle: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-call-divert-lifecycle: build
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=80 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,2,1,star,5,5,5,1,2,3,4,hash,wait800,enter,wait4000,c,wait1000,star,hash,2,1,hash,wait800,enter,wait4000,c,wait1000,hash,2,1,hash,wait800,enter,wait4000,c,wait1000,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=30 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'
+	$(PYTHON) tools/radio_call_divert_lifecycle_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
 
-# shell: organic GSM 04.80 processUnstructuredSS-Request
+# shell: embedded shell control flow
+verify-radio-call-divert-incoming: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-call-divert-incoming: build
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,2,1,star,5,5,5,1,2,3,4,hash,wait800,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(VENV)/bin/python tools/run_host_diverted_call_gate.py \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
+			-http_port $(HOST_CALL_INCOMING_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_call_divert_incoming_trace_check.py $(RUN_DIR)/error.log
+
 verify-radio-ussd: ERASED_IDENTITY_SECURITY_CODE=12345
 verify-radio-ussd: build
-	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
 	$(PYTHON) tools/radio_ussd_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
 
 # shell: duplicate and malformed call-waiting compositions

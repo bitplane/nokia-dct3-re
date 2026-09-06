@@ -64,6 +64,5 @@ message is tolerated: NSE-8 responds once with its bounded capability set and
 continues presenting the waiting call. Neither case releases the original call
 or the shared RR channel.
 
-Multiparty calls, explicit call transfer, call forwarding control and USSD are
-not modeled. They require separate firmware and network evidence rather than
-being inferred from resource strings or the validated two-leg lifecycle.
+Multiparty calls and explicit call transfer remain unmodeled. Call forwarding
+and USSD are documented separately in `gsm_supplementary_services.md`.

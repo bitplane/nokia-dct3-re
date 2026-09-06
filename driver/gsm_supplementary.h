@@ -47,7 +47,12 @@ struct message
 
 request parse_register(const std::uint8_t *data, unsigned length);
 message interrogate_result(const request &request, bool active);
-message operation_result(const request &request);
+message interrogate_result(const request &request, bool registered, bool active,
+		const std::uint8_t *forwarded_number, unsigned number_length);
+message forwarding_info_result(const request &request, bool registered,
+		bool active, const std::uint8_t *forwarded_number,
+		unsigned number_length);
+message error_result(const request &request, std::uint8_t error_code);
 message process_uss_request_result(const request &request,
 		const char *response);
 
