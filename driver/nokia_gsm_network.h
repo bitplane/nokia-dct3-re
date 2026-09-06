@@ -6,6 +6,8 @@
 
 #include "gsm_a3a8.h"
 #include "gsm_a5.h"
+#include "gsm_cell_broadcast.h"
+#include "gsm_ems.h"
 #include "gsm_sms_transport.h"
 #include "gsm_mobility.h"
 
@@ -156,6 +158,7 @@ public:
 		m_smart_message_profile = profile;
 	}
 	void set_sms_profile(sms_profile profile) { m_sms_profile = profile; }
+	void set_ems_formatted_text(bool enabled) { m_ems_formatted_text = enabled; }
 	void set_outgoing_sms_outcome(outgoing_sms_outcome outcome)
 	{
 		m_outgoing_sms_outcome = outcome;
@@ -238,6 +241,7 @@ public:
 	std::array<u8, 2> call_release(u8 transaction) const;
 	std::array<u8, 2> call_release_complete(u8 transaction) const;
 	std::array<u8, 3> channel_release() const;
+	gsm::cell_broadcast::page cell_broadcast_page() const;
 	s8 serving_rssi(unsigned sample) const;
 	s8 cell_rssi(u16 arfcn, unsigned sample) const;
 
@@ -261,6 +265,7 @@ private:
 	smart_message_profile m_smart_message_profile =
 			smart_message_profile::valid;
 	sms_profile m_sms_profile = sms_profile::valid;
+	bool m_ems_formatted_text = false;
 	bool m_stable_camp_seen = false;
 	bool m_neighbour_bcch_seen = false;
 	bool m_primary_cell_lost = false;

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 222 gates: 138 generated from typed steps, 84 copied verbatim (shell).
+# 223 gates: 139 generated from typed steps, 84 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -134,7 +134,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-outgoing-sms-delivery-report verify-radio-outgoing-sms-v501 \
 	verify-3310-radio-outgoing-sms verify-3330-radio-outgoing-sms \
 	verify-3410-radio-outgoing-sms verify-radio-incoming-sms \
-	verify-radio-sms-inbox verify-radio-sms-inbox-state \
+	verify-radio-incoming-ems verify-radio-sms-inbox verify-radio-sms-inbox-state \
 	verify-radio-sms-inbox-negatives verify-radio-sms-sequential \
 	verify-3410-radio-sms-inbox verify-3310-radio-sms-inbox \
 	verify-3330-radio-sms-transport verify-radio-incoming-smart-message \
@@ -1804,6 +1804,11 @@ verify-radio-incoming-sms:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
+
+verify-radio-incoming-ems:
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_EMS_ARGS)'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_ems_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
 
 verify-radio-sms-inbox: ERASED_IDENTITY_SECURITY_CODE=12345
 verify-radio-sms-inbox: build

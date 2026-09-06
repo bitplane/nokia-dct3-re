@@ -192,5 +192,6 @@ JOBS=4 make verify-3330-radio-sms-transport
 JOBS=4 make verify-3410-radio-sms-inbox
 ```
 
-Cell broadcast and EMS remain future independently evidenced work; they are
-different application and transport contracts from ordinary SMS-SUBMIT.
+EMS transport and persistence and the Cell Broadcast page/CBCH block layer are
+covered by `cell_broadcast_and_ems.md`.  EMS reuses ordinary SMS transport;
+Cell Broadcast is a separate unacknowledged idle-mode radio contract.

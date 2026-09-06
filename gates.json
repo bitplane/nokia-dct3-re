@@ -6911,6 +6911,50 @@
       ]
     },
     {
+      "name": "verify-radio-incoming-ems",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": [
+            "--no-print-directory"
+          ],
+          "run_target": "run",
+          "tokens": [
+            "RUN_DIR=$(RUN_DIR)",
+            "SECONDS=40",
+            "RUN_VERBOSE=1",
+            "RUN_EXTRA_ARGS='$(RADIO_INCOMING_EMS_ARGS)'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)",
+            "SECONDS": "40",
+            "RUN_VERBOSE": "1",
+            "RUN_EXTRA_ARGS": "'$(RADIO_INCOMING_EMS_ARGS)'"
+          }
+        },
+        {
+          "step": "capture_log",
+          "silent": false,
+          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_ems_trace_check.py",
+          "arguments": [
+            "$(RUN_DIR)/error.log",
+            "$(RUN_DIR)/nvram/noki3210/sim_card"
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
       "name": "verify-radio-sms-inbox",
       "prerequisites": [
         "build"

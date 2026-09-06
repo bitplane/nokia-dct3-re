@@ -748,6 +748,7 @@ public:
 		m_diag_config(*this, "DIAGCFG"),
 		m_network_config(*this, "NETCFG"),
 		m_sms_config(*this, "SMSCFG"),
+		m_ems_config(*this, "EMSCFG"),
 		m_smart_message_config(*this, "SMARTCFG"),
 		m_sim_toolkit_config(*this, "SATCFG"),
 		m_cell_config(*this, "CELLCFG"),
@@ -892,6 +893,7 @@ private:
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
 	optional_ioport m_sms_config;
+	optional_ioport m_ems_config;
 	optional_ioport m_smart_message_config;
 	optional_ioport m_sim_toolkit_config;
 	optional_ioport m_cell_config;
@@ -1134,6 +1136,7 @@ void nokia_dct3_state::apply_sms_config()
 	};
 	const u8 config = m_sms_config.read_safe(0x00);
 	m_gsm_network->set_sms_profile(PROFILES[config & 0x07]);
+	m_gsm_network->set_ems_formatted_text(BIT(m_ems_config.read_safe(0x00), 0));
 	m_gsm_network->set_outgoing_sms_outcome(OUTCOMES[(config >> 3) & 3]);
 }
 
@@ -2130,6 +2133,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x08, "RP-ERROR: short message transfer rejected")
 	PORT_CONFSETTING(0x10, "No CP response")
 	PORT_CONFSETTING(0x18, "CP-ACK then no RP response")
+
+	PORT_START("EMSCFG")
+	PORT_CONFNAME(0x01, 0x00, "Incoming SMS content") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sms_config_changed), 0)
+	PORT_CONFSETTING(0x00, "Ordinary text")
+	PORT_CONFSETTING(0x01, "EMS formatted UCS-2 text")
 
 	PORT_START("SMARTCFG")
 	PORT_CONFNAME(0x0f, 0x00, "Incoming Smart Message envelope")

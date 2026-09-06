@@ -695,6 +695,20 @@ std::array<u8, 8> nokia_gsm_network_device::traffic_assignment() const
 	return { 0x06, 0x2e, 0x09, 0x40, 0x01, 0x00, 0x63, 0x01 };
 }
 
+gsm::cell_broadcast::page nokia_gsm_network_device::cell_broadcast_page() const
+{
+	// GSM 03.41 page geometry is independent of Nokia's still-unmapped DSP
+	// CBCH delivery primitive. Keep construction at the network boundary until
+	// that handset-facing transport is established by firmware evidence.
+	std::array<u8, gsm::cell_broadcast::content_octets> content;
+	content.fill(0x2b);
+	static constexpr std::array TEXT = {
+		u8(0xc8), u8(0x32), u8(0x9b), u8(0xfd), u8(0x06)
+	}; // GSM 7-bit packed "hello"
+	std::copy(TEXT.begin(), TEXT.end(), content.begin());
+	return gsm::cell_broadcast::make_page(0x0000, 0x1000, 0x00, 1, 1, content);
+}
+
 unsigned nokia_gsm_network_device::incoming_sms_message_count() const
 {
 	if (m_sms_profile == sms_profile::fill_capacity)
@@ -736,6 +750,21 @@ nokia_gsm_network_device::incoming_sms_cp_data(unsigned message_index) const
 			SECOND : FIRST;
 	std::copy(source.begin(), source.end(), result.data.begin());
 	result.length = source.size();
+	if (m_ems_formatted_text)
+	{
+		// TS 23.040 EMS: an ordinary SMS-DELIVER with TP-UDHI, UCS-2 DCS
+		// and a Text Formatting information element. The handset remains
+		// responsible for deciding whether it understands or ignores the IE.
+		const auto user_data = gsm::ems::formatted_ucs2("hello", 0x10);
+		result.data[2] = 28 + user_data.length;
+		result.data[13] = 17 + user_data.length;
+		result.data[14] = 0x44;
+		result.data[22] = 0x08;
+		result.data[30] = user_data.length;
+		std::copy_n(user_data.data.begin(), user_data.length,
+				result.data.begin() + 31);
+		result.length = 31 + user_data.length;
+	}
 	if (m_sms_profile == sms_profile::fill_capacity)
 	{
 		result.data[4] = 0x40 + message_index;
@@ -773,8 +802,14 @@ bool nokia_gsm_network_device::incoming_sms_admissible(
 		unsigned message_index) const
 {
 	const auto message = incoming_sms_cp_data(message_index);
-	return gsm::sms::parse_deliver(
-			message.data.data(), message.length).valid;
+	const auto parsed = gsm::sms::parse_deliver(
+			message.data.data(), message.length);
+	if (!parsed.valid)
+		return false;
+	return !m_ems_formatted_text ||
+			gsm::ems::parse_text_formatting(
+					message.data.data() + parsed.user_data_offset,
+					parsed.user_data_length).valid;
 }
 
 nokia_gsm_network_device::layer3_message
