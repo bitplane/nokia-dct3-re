@@ -730,14 +730,16 @@ Primitive table (payload = byte fields at fixed offsets, big-endian 16-bit lengt
 | `0x1c` | `{b[1]!=0, b[2]==3, …}` parsed | `0x2a24f2` | structured element |
 | `0x22` | `{b[1]}` validate 1..3 | err `0x23cd96` | validation |
 | `0x25` | **null-terminated string** at `msg+5` (`strlen 0x2b6680`) | `0x23c664` parse | **text element (operator name?)** |
-| `0x30` | `{4 bytes, BE16 len, blob ≤0xaa}` | `0x2b2ec8` | data block |
+| `0x30` | `{serial number, message id, BE16 len, blob ≤0xaa}` | `0x2b2ec8` | **Cell Broadcast page** |
 | `0x33` | `{b[1]}` | `0x2b2ed4` | short command |
 | `0x36` | `{type, count≤0xc, items, BE16 len, blob ≤0x12c}` | `0x2b2ebc` | list/data block |
 | `0x70` | — | `0x2b3ea2` | notification |
 
 So the primitives split into **display-update** (`0x10–0x1c`, `0x25` → `0x2a2xxx` render) and
 **L1 data-block** (`0x30/0x33/0x36` → `0x2b2exx`, carrying big-endian length-prefixed blobs
-up to 300 bytes — measurement/frame data). Big-endian multi-byte fields (`b[n]<<8|b[n+1]`)
+up to 300 bytes). Primitive `0x30` is the Cell Broadcast page path: its four leading
+bytes and 84-byte ordinary payload align exactly with the TS 03.41 serial-number,
+message-identifier, DCS, page-parameter and 82-byte content layout. Big-endian multi-byte fields (`b[n]<<8|b[n+1]`)
 confirm GSM network-byte-order framing. The content is produced by these DSP primitives
 arriving and being rendered, not by assigning one registration byte. In the measured coherent
 boot no such primitive arrives; dispatch `0x23d62c` runs zero times.
@@ -777,12 +779,14 @@ task 5, via the `0x2a2xxx` functions), the **entire** class-5/7/0xa handler `0x2
 uniform *parse-and-forward-to-MMI* layer — there is no separate "L1 data processing", the MMI
 VM (task 5) is the universal consumer. (2) These data-block events are **not** in the MMI-VM
 rewrite table (`0x2cb218`, max key `0x1b5d`) and have **no other producers** in the image, so
-they fall through to the VM's general action pipeline. Their blobs' exact semantics (what the
-≤300-byte payloads *are* — cell-broadcast text? measurement lists?) cannot be pinned
-statically without a spec or a live trace; the code never runs on our boot.
+they fall through to the VM's general action pipeline. Primitive `0x30` is identified by
+its exact standards-shaped Cell Broadcast layout; primitives `0x33` and `0x36` remain
+semantically unnamed without an organic packet or trace.
 
-The data path terminates in a dormant MMI-VM event rather than a statically decodable
-processor. Further semantic claims require an organic packet or an external protocol source.
+The Cell Broadcast data path terminates in dormant MMI-VM event `0x1859`.  The
+firmware consumer is closed, but neither modeled DSP ingress reaches task 22 with
+class 7, so presentation still requires a captured DSP publication contract rather
+than a scheduler injection.
 
 ## Speech media boundary
 

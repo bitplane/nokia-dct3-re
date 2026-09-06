@@ -128,6 +128,11 @@
       "evidence": ["docs/dsp_packet_semantics.md", "evidence/runtime/dsp_packets.json", "tools/dsp_packet_semantics_census.py"]
     },
     {
+      "id": "nse8_cell_broadcast_consumer", "subsystem": "dsp", "status": "mapped", "confidence": "strong",
+      "boundary": "NSE-8 v6.00 task 22 class 7 primitive 0x30 copies a four-byte serial-number/message-identifier header, a big-endian length and up to 0xaa bytes into a descriptor before posting task-5 MMI event 0x1859. An ordinary TS 03.41 page supplies exactly four header bytes plus an 84-byte DCS/page/content blob. The in-ROM producer census is empty and neither the closed MDIRCV packet switch nor the separate framed-session translator can publish class 7 primitive 0x30; the DSP-side publication mechanism remains capture-blocked and no scheduler injection is used",
+      "evidence": ["docs/cell_broadcast_and_ems.md", "docs/dsp_interface.md", "tools/cell_broadcast_static_check.py"]
+    },
+    {
       "id": "mad2_dspif_command4", "subsystem": "dsp", "status": "partial", "confidence": "strong",
       "boundary": "MAD2 DSPIF is a retained four-byte peer register; command halfword 0x0004 marks shared-control and L1 DSP work, while independent service-transport/shared-service timers and the observed ring-producer and service-pending triggers are required because command 4 does not accompany every ring commit",
       "evidence": ["docs/dsp_interface.md", "docs/dsp_service_transport_contract.md", "docs/mad2_fidelity.md"]
