@@ -4728,14 +4728,14 @@
             "SECONDS=40",
             "RUN_VERBOSE=1",
             "RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)'",
-            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_200_300)'"
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'"
           ],
           "parameters": {
             "RUN_DIR": "$(RUN_DIR)",
             "SECONDS": "40",
             "RUN_VERBOSE": "1",
             "RUN_EXTRA_ARGS": "'$(RADIO_INCOMING_CALL_ANSWERED_ARGS)'",
-            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_200_300)'"
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'"
           }
         },
         {
@@ -4793,14 +4793,14 @@
             "SECONDS=40",
             "RUN_VERBOSE=1",
             "RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered'",
-            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_200_300)'"
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'"
           ],
           "parameters": {
             "RUN_DIR": "$(RUN_DIR)",
             "SECONDS": "40",
             "RUN_VERBOSE": "1",
             "RUN_EXTRA_ARGS": "'-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered'",
-            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_200_300)'"
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'"
           }
         },
         {
@@ -5173,6 +5173,36 @@
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=12.45 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \\",
         "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome failure --require-state --serving-arfcn 823 --target-arfcn 824"
+      ]
+    },
+    {
+      "name": "verify-3410-radio-handover",
+      "prerequisites": ["normalize-3410"],
+      "variables": {},
+      "unstructured": "NHM-2 dedicated-mode handover success lifecycle",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \\",
+        "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --serving-arfcn 1 --target-arfcn 2; \\",
+        "\t$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)"
+      ]
+    },
+    {
+      "name": "verify-3410-radio-handover-failure-state",
+      "prerequisites": ["normalize-3410"],
+      "variables": {},
+      "unstructured": "NHM-2 handover rollback with mid-procedure save/load",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=18 RUN_VERBOSE=1 \\",
+        "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=14.60 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 1 --target-arfcn 2"
       ]
     },
     {

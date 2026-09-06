@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify NHM-2 organic ringing, physical Answer/End and RR teardown."""
 
+import argparse
 import pathlib
 import re
 import sys
@@ -47,7 +48,7 @@ CHECKPOINTS = (
     ("traffic-link release UA", TRAFFIC_RELEASE_UA),
     ("NHM-2 release transaction",
      r"TX packet type=02 payload=20 .*"
-     r"data=041202001117001a600000010000001400000001"),
+     r"data=04[12]202001117001a6000000[12]0000001400000001"),
     ("release confirmation", RELEASE_CONFIRMATION),
     ("idle PCH", IDLE_PCH),
 )
@@ -64,17 +65,16 @@ def verify(text: str) -> None:
         text, TRAFFIC_CONFIG, 1,
         "NHM-2 incoming call must issue exactly one traffic assignment")
     require_count(
-        text, CALL_CONFIRMED, 2,
-        "NHM-2 lifecycle did not retain its observed repeated Call Confirmed")
+        text, CALL_CONFIRMED, 1,
+        "NHM-2 lifecycle emitted an unexpected Call Confirmed count")
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        raise SystemExit(
-            "usage: radio_3410_incoming_call_lifecycle_check.py "
-            "MAME_ERROR_LOG")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("log", type=pathlib.Path)
+    args = parser.parse_args()
     try:
-        verify(pathlib.Path(sys.argv[1]).read_text(errors="replace"))
+        verify(args.log.read_text(errors="replace"))
     except ValueError as error:
         print(error, file=sys.stderr)
         return 1

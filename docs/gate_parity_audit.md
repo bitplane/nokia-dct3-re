@@ -28,8 +28,8 @@ absent product is a coverage question, not a drifted gate.
 | `radio-all-cell-loss` | yes | — | — | yes | — |
 | `radio-authentication-boundary` | yes | yes | — | — | — |
 | `radio-boundary` | — | yes | yes | — | — |
-| `radio-handover` | yes | yes | yes | — | — |
-| `radio-handover-failure-state` | yes | yes | yes | — | — |
+| `radio-handover` | yes | yes | yes | yes | — |
+| `radio-handover-failure-state` | yes | yes | yes | yes | — |
 | `radio-incoming-call-lifecycle` | yes | yes | yes | yes | — |
 | `radio-incoming-smart-message` | yes | yes | yes | yes | — |
 | `radio-loss-recovery` | yes | — | — | yes | — |
@@ -92,6 +92,7 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`
 - **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
 - **3330**: `tools/radio_3330_incoming_call_boundary_check.py`
+- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
 - shared: `tools/radio_handover_trace_check.py`, `tools/radio_speech_media_trace_check.py`
 
 ### `radio-incoming-call-lifecycle`
@@ -369,12 +370,14 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `shell`
 - **3310**: `shell`
 - **3330**: `shell`
+- **3410**: `shell`
 
 ### `radio-handover-failure-state`
 
 - **3210**: `shell`
 - **3310**: `shell`
 - **3330**: `shell`
+- **3410**: `shell`
 
 ### `radio-incoming-call-lifecycle`
 

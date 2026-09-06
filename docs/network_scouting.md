@@ -268,10 +268,8 @@ no host microphone or receiver route is enabled.
 
 `make verify-3410-radio-incoming-call-lifecycle` applies the same standards-
 level session and LAPDm owners to NHM-2 while retaining its packet grammar and
-ordering. NHM-2 publishes Call Confirmed twice around its first completed
-assignment. The generic session records a saved per-call
-`traffic_assignment_issued` invariant, so the repeated CC message cannot start
-a second RR assignment. Firmware then drives the MAD2 buzzer, physical Send
+ordering. With the virgin-PMM editor dismissed before paging, NHM-2 publishes
+one Call Confirmed and completes one RR assignment. Firmware then drives the MAD2 buzzer, physical Send
 produces Connect, and physical End produces Disconnect. NHM-2 confirms its
 independently observed `0x14` release transaction and returns to PCH.
 
@@ -810,7 +808,7 @@ a second Location Updating transaction or mutate EF_LOCI.
 
 ### Dedicated-mode handover
 
-NSE-8, NHM-5 and NHM-6 cross the two-cell dedicated-mode boundary without firmware-
+NSE-8, NHM-5, NHM-6 and NHM-2 cross the two-cell dedicated-mode boundary without firmware-
 state injection.  During an organic active call on cell A, the laboratory network
 sends a GSM 04.08 Handover Command over FACCH naming cell B, its channel and a
 handover reference.  Firmware acknowledges that frame at LAPDm, issues its own
@@ -834,9 +832,10 @@ the pending procedure, receiver ownership and timer outcome.
 
 The standards-level procedure is shared, while the recovered Nokia L1 contract
 remains product-specific.  NSE-8 accepts `0x00` in the handover channel-change
-confirmation; NHM-5 and NHM-6 require `0x01`, matching their assigned-channel
-confirmation. NHM-5 uses the already-validated ARFCN 88/89 candidate-window
-grammar, NHM-6 uses DCS 1800 ARFCN 823/824, and NSE-8 uses ARFCN 1/2. The stable two-cell fixture keeps the target
+confirmation; NHM-5, NHM-6 and NHM-2 require `0x01`, matching their
+assigned-channel confirmation. NHM-5 uses the already-validated ARFCN 88/89
+candidate-window grammar, NHM-6 uses DCS 1800 ARFCN 823/824, and NSE-8 and
+NHM-2 use ARFCN 1/2. The stable two-cell fixture keeps the target
 weaker than the serving carrier so idle reselection does not pre-empt handover.
 
 `make verify-radio-handover` protects command, retune, Physical Information,
@@ -848,6 +847,9 @@ The corresponding NHM-5 gates are `make verify-3310-radio-handover` and
 `make verify-3310-radio-handover-failure-state`.
 NHM-6 is protected by `make verify-3330-radio-handover` and
 `make verify-3330-radio-handover-failure-state`.
+NHM-2 is protected by `make verify-3410-radio-handover` and
+`make verify-3410-radio-handover-failure-state`; its positive gate additionally
+requires physical Answer/End and sustained COBBA-GJP media across the retune.
 
 Other known extensions include rejected registration and broader RF
 propagation.

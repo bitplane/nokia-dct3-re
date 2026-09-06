@@ -198,7 +198,7 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
 	// NHM-2 v5.46 organically publishes 0x57 after a serving-cell
 	// DOWNLINK_SIGNALLING_FAIL and channel reconfiguration. Independent ROM6
 	// analysis identifies it as the request for a serving-cell SCH observation.
-	0x14, 0x01, 0x00, 0, false, 0x57, false, false,
+	0x14, 0x01, 0x01, 0, false, 0x57, false, false,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };
