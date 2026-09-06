@@ -68,6 +68,7 @@ public:
 	enum class mobility_profile : u8
 	{
 		single_cell,
+		two_cell_stable,
 		two_cell_same_lac,
 		two_cell_different_lac,
 		two_cell_loss_recovery,
@@ -234,7 +235,7 @@ public:
 	std::array<u8, 2> call_alerting(u8 transaction) const;
 	std::array<u8, 2> call_connect(u8 transaction) const;
 	std::array<u8, 5> call_disconnect(u8 transaction, u8 cause) const;
-	std::array<u8, 8> traffic_assignment() const;
+	std::array<u8, 8> traffic_assignment(u16 serving_arfcn) const;
 	std::array<u8, 9> handover_command(
 			u16 target_arfcn, u8 target_bsic, u8 reference) const;
 	std::array<u8, 3> physical_information(u8 timing_advance) const;

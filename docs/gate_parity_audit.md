@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 34
-Differences found: 56
+Families with more than one product: 36
+Differences found: 59
 
 ## ROM normalisation reachability
 
@@ -28,6 +28,8 @@ absent product is a coverage question, not a drifted gate.
 | `radio-all-cell-loss` | yes | — | — | yes | — |
 | `radio-authentication-boundary` | yes | yes | — | — | — |
 | `radio-boundary` | — | yes | yes | — | — |
+| `radio-handover` | yes | yes | — | — | — |
+| `radio-handover-failure-state` | yes | yes | — | — | — |
 | `radio-incoming-call-lifecycle` | yes | yes | yes | yes | — |
 | `radio-incoming-smart-message` | yes | yes | yes | yes | — |
 | `radio-loss-recovery` | yes | — | — | yes | — |
@@ -84,6 +86,12 @@ absent product is a coverage question, not a drifted gate.
 
 - **3310**: `tools/dsp_radio_profile_trace_check.py`
 - **3330**: `tools/radio_3330_boundary_trace_check.py`
+
+### `radio-handover`
+
+- **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`
+- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
+- shared: `tools/radio_handover_trace_check.py`, `tools/radio_speech_media_trace_check.py`
 
 ### `radio-incoming-call-lifecycle`
 
@@ -354,6 +362,16 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `structured`
 - **3330**: `structured`
 - **3410**: `structured`
+
+### `radio-handover`
+
+- **3210**: `shell`
+- **3310**: `shell`
+
+### `radio-handover-failure-state`
+
+- **3210**: `shell`
+- **3310**: `shell`
 
 ### `radio-incoming-call-lifecycle`
 

@@ -5111,6 +5111,37 @@
       ]
     },
     {
+      "name": "verify-3310-radio-handover",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "NHM-5 dedicated-mode handover success lifecycle",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \\",
+        "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait9000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --serving-arfcn 88 --target-arfcn 89; \\",
+        "\t$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered; \\",
+        "\t$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)"
+      ]
+    },
+    {
+      "name": "verify-3310-radio-handover-failure-state",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "NHM-5 handover rollback with mid-procedure save/load",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \\",
+        "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=16.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 88 --target-arfcn 89"
+      ]
+    },
+    {
       "name": "verify-radio-supplementary-call",
       "prerequisites": [
         "build"

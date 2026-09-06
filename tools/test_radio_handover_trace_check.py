@@ -35,6 +35,17 @@ class RadioHandoverTraceCheckTest(unittest.TestCase):
     def test_accepts_failure_rollback(self):
         self.assertIn("ARFCN 1", self.run_check(FAILURE, "failure"))
 
+    def test_accepts_product_specific_carriers(self):
+        nhm5 = SUCCESS.replace("target=2", "target=89") \
+            .replace("old_arfcn=1 new_arfcn=2",
+                     "old_arfcn=88 new_arfcn=89") \
+            .replace("serving=2", "serving=89")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "error.log"
+            path.write_text(nhm5)
+            self.assertIn("ARFCN 89", check(
+                path, "success", serving=88, target=89))
+
     def test_rejects_reordered_success(self):
         reordered = SUCCESS.replace(
             "dsp_hle: receiver tuned old_arfcn=1 new_arfcn=2 t=18.78",

@@ -171,21 +171,21 @@ struct nokia_product_config
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NSE8 = {
 	nokia_radio_peer_device::acquisition_strategy::bitmap_multistage,
-	0x08, 0x00, 0, false, 0, false, true,
+	0x08, 0x00, 0x00, 0, false, 0, false, true,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::low_six_bits
 };
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM5 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x14, 0x01, 1'000, true, 0, true, false,
+	0x14, 0x01, 0x01, 1'000, true, 0, true, false,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::direct
 };
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x14, 0x01, 0, true, 0, true, true,
+	0x14, 0x01, 0x00, 0, true, 0, true, true,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::topology_low_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };
@@ -198,7 +198,7 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
 	// NHM-2 v5.46 organically publishes 0x57 after a serving-cell
 	// DOWNLINK_SIGNALLING_FAIL and channel reconfiguration. Independent ROM6
 	// analysis identifies it as the request for a serving-cell SCH observation.
-	0x14, 0x01, 0, false, 0x57, false, false,
+	0x14, 0x01, 0x00, 0, false, 0x57, false, false,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };
@@ -1277,7 +1277,7 @@ void nokia_dct3_state::machine_reset()
 		nokia_gsm_network_device::mobility_profile::two_cell_different_lac,
 		nokia_gsm_network_device::mobility_profile::two_cell_loss_recovery,
 		nokia_gsm_network_device::mobility_profile::two_cell_persistent_loss,
-		nokia_gsm_network_device::mobility_profile::single_cell,
+		nokia_gsm_network_device::mobility_profile::two_cell_stable,
 		nokia_gsm_network_device::mobility_profile::single_cell,
 		nokia_gsm_network_device::mobility_profile::single_cell
 	};
@@ -2212,6 +2212,7 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x04, "Two cells, different location areas; serving cell loss")
 	PORT_CONFSETTING(0x06, "All-cell loss followed by serving-cell RF recovery")
 	PORT_CONFSETTING(0x08, "Persistent all-cell loss")
+	PORT_CONFSETTING(0x0a, "Two stable cells (dedicated-mode handover)")
 
 	PORT_START("NEIGHBORCFG")
 	PORT_CONFNAME(0x03, 0x00, "Neighbour-cell radio/suitability profile")

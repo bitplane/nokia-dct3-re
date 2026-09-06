@@ -810,8 +810,8 @@ a second Location Updating transaction or mutate EF_LOCI.
 
 ### Dedicated-mode handover
 
-NSE-8 now crosses the two-cell dedicated-mode boundary without firmware-state
-injection.  During an organic active call on cell A, the laboratory network
+NSE-8 and NHM-5 cross the two-cell dedicated-mode boundary without firmware-
+state injection.  During an organic active call on cell A, the laboratory network
 sends a GSM 04.08 Handover Command over FACCH naming cell B, its channel and a
 handover reference.  Firmware acknowledges that frame at LAPDm, issues its own
 Nokia `CHANNEL_CONFIGURE` transaction containing cell B's ARFCN and reference,
@@ -832,11 +832,20 @@ window, although the standards-shaped message remains accepted if another ROM
 does.  A save/load taken after the target retune and before rollback preserves
 the pending procedure, receiver ownership and timer outcome.
 
+The standards-level procedure is shared, while the recovered Nokia L1 contract
+remains product-specific.  NSE-8 accepts `0x00` in the handover channel-change
+confirmation; NHM-5 requires `0x01`, matching its assigned-channel confirmation.
+NHM-5 also uses the already-validated ARFCN 88/89 candidate-window grammar,
+whereas NSE-8 uses ARFCN 1/2.  The stable two-cell fixture keeps the target
+weaker than the serving carrier so idle reselection does not pre-empt handover.
+
 `make verify-radio-handover` protects command, retune, Physical Information,
 SABM/UA, organic Handover Complete, continued media and call teardown.
 `make verify-radio-handover-failure-state` protects the timed cell-B-to-cell-A
 rollback and a mid-procedure machine-state round trip.  These fixtures are a
 bounded laboratory-network composition, not a general RF propagation model.
+The corresponding NHM-5 gates are `make verify-3310-radio-handover` and
+`make verify-3310-radio-handover-failure-state`.
 
 Other known extensions include rejected registration and broader RF
 propagation.

@@ -50,6 +50,7 @@ public:
 		acquisition_strategy acquisition = acquisition_strategy::none;
 		u8 traffic_release_parameter = 0;
 		u8 assigned_channel_confirmation = 0;
+		u8 handover_channel_confirmation = 0;
 		unsigned mm_information_settle_ticks = 0;
 		bool repeat_empty_assigned_uplink = false;
 		u8 serving_sch_request_type = 0;

@@ -125,7 +125,8 @@ void nokia_gsm_network_device::set_mobility_profile(mobility_profile profile)
 	neighbour.arfcn = 2;
 	neighbour.bsic = 0x22;
 	neighbour.identity = 2;
-	neighbour.rxlev_dbm = -55;
+	neighbour.rxlev_dbm =
+			profile == mobility_profile::two_cell_stable ? -70 : -55;
 	if (profile == mobility_profile::two_cell_different_lac)
 		neighbour.location.lac = 2;
 	else if (profile == mobility_profile::two_cell_loss_recovery ||
@@ -210,7 +211,8 @@ void nokia_gsm_network_device::stable_camp_observed()
 
 void nokia_gsm_network_device::neighbour_list_observed()
 {
-	if (m_mobility_profile == mobility_profile::single_cell)
+	if (m_mobility_profile == mobility_profile::single_cell ||
+			m_mobility_profile == mobility_profile::two_cell_stable)
 		return;
 	// The deterministic mobility scenario changes RF conditions only after
 	// firmware has demonstrated stable camp and published a neighbour set.
@@ -728,13 +730,19 @@ std::array<u8, 5> nokia_gsm_network_device::call_disconnect(
 	};
 }
 
-std::array<u8, 8> nokia_gsm_network_device::traffic_assignment() const
+std::array<u8, 8> nokia_gsm_network_device::traffic_assignment(
+		u16 serving_arfcn) const
 {
 	// GSM 04.08 9.1.2 and 10.5.2.5. Move the call from its temporary SDCCH
-	// onto TCH/F timeslot 1 on non-hopping ARFCN 1. TSC 2 is the BCC carried
-	// by the laboratory cell's BSIC 0x12; power level 0 is the mandatory
-	// initial Power Command. Channel Mode selects GSM full-rate speech v1.
-	return { 0x06, 0x2e, 0x09, 0x40, 0x01, 0x00, 0x63, 0x01 };
+	// onto TCH/F timeslot 1 on the currently serving non-hopping carrier.
+	// TSC 2 is the BCC carried by the laboratory cell's BSIC 0x12; power level
+	// 0 is the mandatory initial Power Command. Channel Mode selects GSM
+	// full-rate speech v1.
+	return {
+		0x06, 0x2e, 0x09,
+		u8(0x40 | ((serving_arfcn >> 8) & 0x03)), u8(serving_arfcn),
+		0x00, 0x63, 0x01
+	};
 }
 
 std::array<u8, 9> nokia_gsm_network_device::handover_command(

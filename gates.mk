@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 233 gates: 141 generated from typed steps, 92 copied verbatim (shell).
+# 235 gates: 141 generated from typed steps, 94 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -92,7 +92,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-media-resilience verify-radio-incoming-call \
 	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
 	verify-radio-incoming-call-lifecycle verify-radio-handover \
-	verify-radio-handover-failure-state verify-radio-supplementary-call \
+	verify-radio-handover-failure-state verify-3310-radio-handover \
+	verify-3310-radio-handover-failure-state verify-radio-supplementary-call \
 	verify-radio-two-call verify-radio-second-outgoing-call \
 	verify-radio-call-divert verify-radio-call-divert-lifecycle \
 	verify-radio-call-divert-incoming verify-radio-ussd \
@@ -944,6 +945,27 @@ verify-radio-handover-failure-state:
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state
+
+# shell: NHM-5 dedicated-mode handover success lifecycle
+verify-3310-radio-handover:
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait9000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --serving-arfcn 88 --target-arfcn 89; \
+	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered; \
+	$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+# shell: NHM-5 handover rollback with mid-procedure save/load
+verify-3310-radio-handover-failure-state:
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=16.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 88 --target-arfcn 89
 
 # shell: physical DTMF and hold/retrieve lifecycle
 verify-radio-supplementary-call: ERASED_IDENTITY_SECURITY_CODE=12345

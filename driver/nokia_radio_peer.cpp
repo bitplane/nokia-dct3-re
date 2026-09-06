@@ -1563,7 +1563,9 @@ void nokia_radio_peer_device::encode_measurement_report(u8 *payload) const
 void nokia_radio_peer_device::encode_channel_confirmation(u8 *payload) const
 {
 	payload[0] = current_phase() == phase::assigned_channel_change ?
-			m_protocol.assigned_channel_confirmation : 0x00;
+			m_protocol.assigned_channel_confirmation :
+			current_phase() == phase::handover_channel_change ?
+				m_protocol.handover_channel_confirmation : 0x00;
 }
 
 void nokia_radio_peer_device::encode_random_access_info(u8 *payload)

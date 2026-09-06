@@ -1138,7 +1138,8 @@ nokia_gsm_session_device::receive_layer3(
 					m_traffic_assignment_issued)
 				return downlink_kind::none;
 			m_traffic_assignment_issued = true;
-			const auto assignment = m_network->traffic_assignment();
+			const auto assignment =
+					m_network->traffic_assignment(m_serving_arfcn);
 			m_state = u8(state::awaiting_traffic_assignment);
 			return queue_downlink(downlink_kind::traffic_assignment,
 					assignment.data(), assignment.size());
@@ -1561,7 +1562,7 @@ nokia_gsm_session_device::apply_outgoing_decision()
 				alerting.data(), alerting.size());
 	}
 	m_traffic_assignment_issued = true;
-	const auto assignment = m_network->traffic_assignment();
+	const auto assignment = m_network->traffic_assignment(m_serving_arfcn);
 	m_state = u8(state::awaiting_traffic_assignment);
 	return queue_downlink(downlink_kind::traffic_assignment,
 			assignment.data(), assignment.size());
