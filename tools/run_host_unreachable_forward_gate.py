@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register CFNRy organically, then leave one host-side call unanswered."""
+"""Register CFNRc organically, wait for cell loss, then submit a host call."""
 
 import argparse
 import asyncio
@@ -10,31 +10,34 @@ import sys
 if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-REGISTERED = "gsm_ss: request=register transaction=1b invoke=1 service=2a"
+from tools.run_host_call_adapter_gate import connect
 
 
-async def wait_for_registration(path, process):
-    for _ in range(8000):
-        if path.exists() and REGISTERED in path.read_text(errors="replace"):
+MARKERS = (
+    "gsm_ss: request=register transaction=1b invoke=1 service=2b",
+    "DOWNLINK_SIGNALLING_FAIL arfcn=1",
+)
+
+
+async def wait_for_markers(path, process):
+    for _ in range(12000):
+        text = path.read_text(errors="replace") if path.exists() else ""
+        if all(marker in text for marker in MARKERS):
             return
         if process.returncode is not None:
-            raise RuntimeError("MAME exited before no-reply forwarding registered")
+            raise RuntimeError("MAME exited before registration and cell loss")
         await asyncio.sleep(0.005)
-    raise RuntimeError("timed out waiting for no-reply forwarding registration")
+    raise RuntimeError("timed out waiting for registration and cell loss")
 
 
 async def run(args):
-    from tools.run_host_call_adapter_gate import connect
-
     process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd)
     try:
         websocket = await connect(args.port, process)
         async with websocket:
             ready = json.loads(await asyncio.wait_for(websocket.recv(), 30))
-            if ready.get("type") != "call_adapter_ready":
-                raise RuntimeError(f"expected adapter ready, got {ready!r}")
             epoch = ready.get("epoch")
-            await wait_for_registration(pathlib.Path(args.cwd) / "error.log", process)
+            await wait_for_markers(pathlib.Path(args.cwd) / "error.log", process)
             await websocket.send(json.dumps({
                 "type": "incoming_call",
                 "epoch": epoch,
@@ -43,7 +46,7 @@ async def run(args):
             }))
             phases = []
             while phases[-1:] != ["forwarded"]:
-                message = json.loads(await asyncio.wait_for(websocket.recv(), 45))
+                message = json.loads(await asyncio.wait_for(websocket.recv(), 30))
                 if (message.get("type") != "incoming_call_state" or
                         message.get("request_id") != 1 or
                         message.get("epoch") != epoch):
@@ -52,15 +55,12 @@ async def run(args):
                 if not phases or phase != phases[-1]:
                     phases.append(phase)
                 if phase == "forwarded" and (
-                        message.get("forwarding_reason") != "no-reply" or
+                        message.get("forwarding_reason") != "not-reachable" or
                         message.get("forwarding_destination") != "5551234"):
                     raise RuntimeError(
-                        f"forwarded state omitted routing metadata {message!r}")
-                if phase in ("connected", "ended"):
-                    raise RuntimeError(f"unanswered call reached terminal phase {phase}")
-            if phases != ["queued", "paging", "alerting", "forwarded"]:
-                raise RuntimeError(f"unexpected no-reply phases {phases!r}")
-
+                        f"not-reachable forwarding metadata mismatch {message!r}")
+            if phases != ["queued", "forwarded"]:
+                raise RuntimeError(f"unreachable call reached handset {phases!r}")
         result = await asyncio.wait_for(process.wait(), 90)
         if result:
             raise RuntimeError(f"MAME exited with status {result}")
@@ -90,7 +90,7 @@ def main():
     except (RuntimeError, ValueError, asyncio.TimeoutError) as error:
         print(f"FAIL - {error}")
         return 1
-    print("OK - no-reply forwarding followed organic alerting and timer expiry")
+    print("OK - active speech CFNRc diverted after organic cell loss")
     return 0
 
 

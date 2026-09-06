@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register CFNRy organically, then leave one host-side call unanswered."""
+"""Register CFB organically, connect one call, then divert an incoming call."""
 
 import argparse
 import asyncio
@@ -10,7 +10,10 @@ import sys
 if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-REGISTERED = "gsm_ss: request=register transaction=1b invoke=1 service=2a"
+from tools.run_host_call_adapter_gate import connect
+
+
+REGISTERED = "gsm_ss: request=register transaction=1b invoke=1 service=29"
 
 
 async def wait_for_registration(path, process):
@@ -18,49 +21,59 @@ async def wait_for_registration(path, process):
         if path.exists() and REGISTERED in path.read_text(errors="replace"):
             return
         if process.returncode is not None:
-            raise RuntimeError("MAME exited before no-reply forwarding registered")
+            raise RuntimeError("MAME exited before busy forwarding registered")
         await asyncio.sleep(0.005)
-    raise RuntimeError("timed out waiting for no-reply forwarding registration")
+    raise RuntimeError("timed out waiting for busy forwarding registration")
+
+
+async def next_message(websocket, kind, timeout=45):
+    while True:
+        message = json.loads(await asyncio.wait_for(websocket.recv(), timeout))
+        if message.get("type") == kind:
+            return message
 
 
 async def run(args):
-    from tools.run_host_call_adapter_gate import connect
-
     process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd)
     try:
         websocket = await connect(args.port, process)
         async with websocket:
-            ready = json.loads(await asyncio.wait_for(websocket.recv(), 30))
-            if ready.get("type") != "call_adapter_ready":
-                raise RuntimeError(f"expected adapter ready, got {ready!r}")
+            ready = await next_message(websocket, "call_adapter_ready")
             epoch = ready.get("epoch")
             await wait_for_registration(pathlib.Path(args.cwd) / "error.log", process)
+            outgoing = await next_message(websocket, "outgoing_call")
+            if outgoing.get("epoch") != epoch or outgoing.get("request_id") != 1:
+                raise RuntimeError(f"unexpected outgoing request {outgoing!r}")
+            await websocket.send(json.dumps({
+                "type": "outgoing_call_decision",
+                "epoch": epoch,
+                "request_id": 1,
+                "decision": "connect",
+            }))
+            while True:
+                state = await next_message(websocket, "outgoing_call_state")
+                if state.get("phase") == "connected":
+                    break
             await websocket.send(json.dumps({
                 "type": "incoming_call",
                 "epoch": epoch,
-                "request_id": 1,
+                "request_id": 2,
                 "caller": args.caller,
             }))
             phases = []
             while phases[-1:] != ["forwarded"]:
-                message = json.loads(await asyncio.wait_for(websocket.recv(), 45))
-                if (message.get("type") != "incoming_call_state" or
-                        message.get("request_id") != 1 or
-                        message.get("epoch") != epoch):
+                state = await next_message(websocket, "incoming_call_state")
+                if state.get("request_id") != 2 or state.get("epoch") != epoch:
                     continue
-                phase = message.get("phase")
+                phase = state.get("phase")
                 if not phases or phase != phases[-1]:
                     phases.append(phase)
                 if phase == "forwarded" and (
-                        message.get("forwarding_reason") != "no-reply" or
-                        message.get("forwarding_destination") != "5551234"):
-                    raise RuntimeError(
-                        f"forwarded state omitted routing metadata {message!r}")
-                if phase in ("connected", "ended"):
-                    raise RuntimeError(f"unanswered call reached terminal phase {phase}")
-            if phases != ["queued", "paging", "alerting", "forwarded"]:
-                raise RuntimeError(f"unexpected no-reply phases {phases!r}")
-
+                        state.get("forwarding_reason") != "busy" or
+                        state.get("forwarding_destination") != "5551234"):
+                    raise RuntimeError(f"busy forwarding metadata mismatch {state!r}")
+            if phases != ["queued", "forwarded"]:
+                raise RuntimeError(f"busy call reached handset phases {phases!r}")
         result = await asyncio.wait_for(process.wait(), 90)
         if result:
             raise RuntimeError(f"MAME exited with status {result}")
@@ -90,7 +103,7 @@ def main():
     except (RuntimeError, ValueError, asyncio.TimeoutError) as error:
         print(f"FAIL - {error}")
         return 1
-    print("OK - no-reply forwarding followed organic alerting and timer expiry")
+    print("OK - active speech CFB diverted a second call before paging")
     return 0
 
 

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 248 gates: 141 generated from typed steps, 107 copied verbatim (shell).
+# 250 gates: 141 generated from typed steps, 109 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -102,7 +102,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-a5-1-handover-failure-state verify-radio-supplementary-call \
 	verify-radio-two-call verify-radio-second-outgoing-call \
 	verify-radio-call-divert verify-radio-call-divert-lifecycle \
-	verify-radio-call-divert-incoming verify-radio-call-divert-no-reply \
+	verify-radio-call-divert-incoming verify-radio-call-divert-busy \
+	verify-radio-call-divert-unreachable verify-radio-call-divert-no-reply \
 	verify-radio-ussd verify-radio-two-call-negatives \
 	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
 	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
@@ -1177,6 +1178,56 @@ verify-radio-call-divert-incoming: build
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_divert_incoming_trace_check.py $(RUN_DIR)/error.log
+
+# shell: host adapter plus organic CFB registration and active outgoing call
+verify-radio-call-divert-busy: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-call-divert-busy: build
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,6,7,star,5,5,5,1,2,3,4,star,1,1,hash,wait800,enter,wait4000,c,wait1000,5,5,5,1,2,3,4,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(VENV)/bin/python tools/run_host_busy_forward_gate.py \
+			--port $(HOST_CALL_BUSY_FORWARD_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
+			-http_port $(HOST_CALL_BUSY_FORWARD_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 65; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_busy_forward_trace_check.py $(RUN_DIR)/error.log
+
+# shell: host adapter plus organic CFNRc registration and persistent cell loss
+verify-radio-call-divert-unreachable: PROVISIONED_IMEI_PREFIX=49015420323751
+verify-radio-call-divert-unreachable: build
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=star,6,2,star,5,5,5,1,2,3,4,star,1,1,hash,wait800,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(VENV)/bin/python tools/run_host_unreachable_forward_gate.py \
+			--port $(HOST_CALL_UNREACHABLE_FORWARD_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_unreachable_host_adapter -http \
+			-http_port $(HOST_CALL_UNREACHABLE_FORWARD_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 70; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_unreachable_forward_trace_check.py $(RUN_DIR)/error.log
 
 # shell: host adapter plus organic CFNRy registration and timeout
 verify-radio-call-divert-no-reply: ERASED_IDENTITY_SECURITY_CODE=12345

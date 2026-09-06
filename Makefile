@@ -172,6 +172,8 @@ HOST_CALL_3310_PORT ?= 18087
 HOST_CALL_3330_PORT ?= 18088
 HOST_CALL_PHYSICAL_MEDIA_PORT ?= 18089
 HOST_CALL_INCOMING_PORT ?= 18090
+HOST_CALL_BUSY_FORWARD_PORT ?= 18091
+HOST_CALL_UNREACHABLE_FORWARD_PORT ?= 18092
 NOKI3210_UNLOCK_KEYS := 1,2,3,4,5,enter
 NOKI3210_DIAL_KEYS := c,wait500,c,wait1000,5,5,5,1,2,3,4,enter
 NOKI3210_INCOMING_READY_KEYS := $(NOKI3210_UNLOCK_KEYS),wait500,waitbuzzer
@@ -350,6 +352,8 @@ help:
 	@echo "make verify-radio-call-divert check organic GSM 04.80 *#21# interrogation"
 	@echo "make verify-radio-call-divert-lifecycle check one coherent active/inactive cycle"
 	@echo "make verify-radio-call-divert-incoming check active diversion before handset paging"
+	@echo "make verify-radio-call-divert-busy check conditional diversion during an active call"
+	@echo "make verify-radio-call-divert-unreachable check conditional diversion after cell loss"
 	@echo "make verify-radio-call-divert-no-reply check organic timed diversion after alerting"
 	@echo "make verify-radio-ussd check organic GSM 04.80 *123# request and display"
 	@echo "make verify-radio-outgoing-call-lifecycle check physical dial-to-End MO call and media"
@@ -599,6 +603,8 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_lifecycle_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_incoming.py
+	$(VENV)/bin/python -m unittest tools/test_radio_busy_forward_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_unreachable_forward_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_no_reply_forward_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_ussd_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_two_call_trace_check.py

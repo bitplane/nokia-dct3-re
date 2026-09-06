@@ -54,7 +54,7 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | MAME to host | `outgoing_call` | `epoch`, `request_id`, decimal `digits` |
 | Host to MAME | `outgoing_call_decision` | identity plus `decision`: `connect`, `busy`, or `no_answer` |
 | Host to MAME | `incoming_call` | identity plus 1..20 decimal `caller` digits |
-| MAME to host | `*_call_state` | identity and `phase`; connected snapshots also carry both media cursors |
+| MAME to host | `*_call_state` | identity and `phase`; connected snapshots also carry both media cursors; a `forwarded` incoming state carries `forwarding_reason` and the decoded decimal `forwarding_destination` |
 | MAME to host | `*_call_media_uplink` | identity, sequence, emulation timestamp, good/BFI flag, 33-octet GSM-FR frame as 66 lowercase hex characters |
 | Host to MAME | `*_call_media_downlink` | identity, host sequence, source timestamp, and one encoded GSM-FR frame |
 | Host to MAME | `*_call_terminate` | identity and GSM cause in `1..127` |
@@ -64,6 +64,11 @@ call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
 does not own paging, CC/RR state, radio timing, keypad decisions, codec routing
 or release completion. Queue overflow, stale epochs, duplicate decisions and
 wrong-direction media are rejected without changing emulated call state.
+
+The forwarding reason is one of `unconditional`, `busy`, `no-reply` or
+`not-reachable`. It records the network subscription which made the routing
+decision; it is not inferred from the last UI frame. The destination is the
+number registered organically by the handset's supplementary-service request.
 
 `verify-radio-incoming-call-host-adapter` is the complete external-origin
 contract gate. `verify-radio-incoming-call-host-restore` repeats the connected

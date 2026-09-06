@@ -59,6 +59,7 @@ struct message
 	std::array<std::uint8_t, maximum_message_length> data{};
 };
 
+bool basic_service_matches_speech(basic_service_kind kind, std::uint8_t code);
 request parse_register(const std::uint8_t *data, unsigned length);
 request parse_call_related_facility(const std::uint8_t *data, unsigned length);
 message call_related_result(const request &request);

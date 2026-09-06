@@ -14,6 +14,17 @@ HARNESS = r'''
 
 int main()
 {
+	if (!gsm::ss::basic_service_matches_speech(
+			gsm::ss::basic_service_kind::none, 0) ||
+			!gsm::ss::basic_service_matches_speech(
+				gsm::ss::basic_service_kind::teleservice, 0x10) ||
+			!gsm::ss::basic_service_matches_speech(
+				gsm::ss::basic_service_kind::teleservice, 0x11) ||
+			gsm::ss::basic_service_matches_speech(
+				gsm::ss::basic_service_kind::teleservice, 0x12) ||
+			gsm::ss::basic_service_matches_speech(
+				gsm::ss::basic_service_kind::bearer, 0x10))
+		return 17;
 	const std::uint8_t query[] = {
 		0x1b, 0x7b, 0x1c, 0x0d, 0xa1, 0x0b, 0x02, 0x01, 0x01,
 		0x02, 0x01, 0x0e, 0x30, 0x03, 0x04, 0x01, 0x21, 0x7f, 0x01, 0x00
@@ -63,7 +74,20 @@ int main()
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");
+	for (std::uint8_t service : {std::uint8_t(0x21), std::uint8_t(0x29),
+			std::uint8_t(0x2a), std::uint8_t(0x2b)}) {
+		std::uint8_t service_registration[sizeof(registration)];
+		for (unsigned i = 0; i < sizeof(registration); ++i)
+			service_registration[i] = registration[i];
+		service_registration[16] = service;
+		request = gsm::ss::parse_register(
+				service_registration, sizeof(service_registration));
+		if (!request.valid || request.service_code != service ||
+				request.operation_code != gsm::ss::operation::register_ss)
+			return 20;
+	}
 
+	request = gsm::ss::parse_register(registration, sizeof(registration));
 	const auto destination = request.forwarded_number;
 	const unsigned destination_length = request.forwarded_number_length;
 	request = gsm::ss::parse_register(query, sizeof(query));
@@ -93,6 +117,19 @@ int main()
 				response.data[13] != operation || response.data[23] != 0x84)
 			return 8;
 	}
+	for (std::uint8_t service : {std::uint8_t(0x21), std::uint8_t(0x29),
+			std::uint8_t(0x2a), std::uint8_t(0x2b)}) {
+		control[16] = service;
+		for (std::uint8_t operation : {std::uint8_t(0x0b), std::uint8_t(0x0c),
+				std::uint8_t(0x0d), std::uint8_t(0x0e)}) {
+			control[11] = operation;
+			request = gsm::ss::parse_register(control, sizeof(control));
+			if (!request.valid || request.service_code != service ||
+					std::uint8_t(request.operation_code) != operation)
+				return 18;
+		}
+	}
+	control[16] = 0x21;
 
 	control[11] = 0x55;
 	request = gsm::ss::parse_register(control, sizeof(control));
@@ -141,6 +178,17 @@ int main()
 	if (response.length != 12 || response.data[4] != 0xa3 ||
 			response.data[11] != 0x14)
 		return 16;
+	for (std::uint8_t operation : {std::uint8_t(0x79), std::uint8_t(0x7a),
+			std::uint8_t(0x7b), std::uint8_t(0x7c)}) {
+		std::uint8_t facility[sizeof(build_mpty)];
+		for (unsigned i = 0; i < sizeof(build_mpty); ++i)
+			facility[i] = build_mpty[i];
+		facility[11] = operation;
+		request = gsm::ss::parse_call_related_facility(
+				facility, sizeof(facility));
+		if (!request.valid || std::uint8_t(request.operation_code) != operation)
+			return 19;
+	}
 	return 0;
 }
 '''

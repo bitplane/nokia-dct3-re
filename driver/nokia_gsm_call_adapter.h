@@ -35,12 +35,15 @@ private:
 	void publish_request();
 	void publish_ready();
 	void publish_state(const char *phase);
-	void publish_incoming_state(const char *phase);
+	void publish_incoming_state(const char *phase,
+			nokia_gsm_network_device::forwarding_condition condition =
+				nokia_gsm_network_device::forwarding_condition::count);
 	void publish_uplink_media(
 			u32 request_id, u32 sequence, u64 time_us, bool good,
 			const nokia_gsm_voice_peer_device::speech_frame &frame);
 
 	required_device<nokia_gsm_session_device> m_session;
+	required_device<nokia_gsm_network_device> m_network;
 	required_device<nokia_gsm_voice_peer_device> m_voice_peer;
 	required_device<nokia_radio_peer_device> m_radio_peer;
 	std::unique_ptr<host_state> m_host;

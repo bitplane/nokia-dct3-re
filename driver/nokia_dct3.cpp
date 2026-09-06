@@ -1278,7 +1278,7 @@ void nokia_dct3_state::machine_reset()
 		nokia_gsm_network_device::mobility_profile::two_cell_loss_recovery,
 		nokia_gsm_network_device::mobility_profile::two_cell_persistent_loss,
 		nokia_gsm_network_device::mobility_profile::two_cell_stable,
-		nokia_gsm_network_device::mobility_profile::single_cell,
+		nokia_gsm_network_device::mobility_profile::two_cell_delayed_persistent_loss,
 		nokia_gsm_network_device::mobility_profile::single_cell
 	};
 	m_gsm_network->set_mobility_profile(

@@ -15,12 +15,17 @@ nokia_radio_peer_device::host_incoming_result
 nokia_radio_peer_device::queue_host_incoming_call(
 		const u8 *digits, unsigned length)
 {
+	m_last_host_forwarding_condition = u8(
+			nokia_gsm_network_device::forwarding_condition::count);
 	if (!m_enabled || !m_registered || m_host_incoming_call_pending)
 		return host_incoming_result::rejected;
-	if (m_gsm_session->idle() && current_phase() != phase::serving_bcch &&
+	if (m_gsm_session->idle() &&
+			!m_gsm_network->cell_receivable(m_serving_arfcn) &&
 			m_gsm_network->speech_forwarding_active(
 				nokia_gsm_network_device::forwarding_condition::not_reachable))
 	{
+		m_last_host_forwarding_condition = u8(
+				nokia_gsm_network_device::forwarding_condition::not_reachable);
 		LOGMASKED(LOG_RADIO,
 				"dsp_hle: GSM incoming call forwarded before paging "
 				"destination_length=%u condition=not-reachable t=%.6f\n",
@@ -36,6 +41,7 @@ nokia_radio_peer_device::queue_host_incoming_call(
 		const auto condition = busy ?
 				nokia_gsm_network_device::forwarding_condition::busy :
 				nokia_gsm_network_device::forwarding_condition::unconditional;
+		m_last_host_forwarding_condition = u8(condition);
 		LOGMASKED(LOG_RADIO,
 				"dsp_hle: GSM incoming call forwarded before paging "
 				"destination_length=%u condition=%s t=%.6f\n",
@@ -114,6 +120,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_pch_fill_delivered));
 	save_item(NAME(m_page_transmitted));
 	save_item(NAME(m_host_incoming_call_pending));
+	save_item(NAME(m_last_host_forwarding_condition));
 	save_item(NAME(m_call_waiting_profile));
 	save_item(NAME(m_call_waiting_sent));
 	save_item(NAME(m_call_waiting_duplicate_sent));
@@ -266,6 +273,8 @@ void nokia_radio_peer_device::device_reset()
 	m_pch_fill_delivered = false;
 	m_page_transmitted = false;
 	m_host_incoming_call_pending = false;
+	m_last_host_forwarding_condition = u8(
+			nokia_gsm_network_device::forwarding_condition::count);
 	m_call_waiting_sent = false;
 	m_call_waiting_duplicate_sent = false;
 	m_call_waiting_ticks = 0;

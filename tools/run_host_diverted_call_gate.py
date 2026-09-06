@@ -58,6 +58,11 @@ async def run(args):
                 phase = message.get("phase")
                 if not phases or phase != phases[-1]:
                     phases.append(phase)
+                if phase == "forwarded" and (
+                        message.get("forwarding_reason") != "unconditional" or
+                        message.get("forwarding_destination") != "5551234"):
+                    raise RuntimeError(
+                        f"forwarded state omitted routing metadata {message!r}")
                 if phase in ("paging", "alerting", "connected", "ended"):
                     raise RuntimeError(f"diverted call reached handset phase {phase}")
             validate_phases(phases)

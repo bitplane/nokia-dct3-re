@@ -49,6 +49,8 @@ nokia_gsm_network_device::nokia_gsm_network_device(
 
 void nokia_gsm_network_device::device_start()
 {
+	m_delayed_loss_timer = timer_alloc(
+			FUNC(nokia_gsm_network_device::delayed_persistent_loss), this);
 	save_item(NAME(m_stable_camp_seen));
 	save_item(NAME(m_neighbour_bcch_seen));
 	save_item(NAME(m_primary_cell_lost));
@@ -164,11 +166,9 @@ bool nokia_gsm_network_device::speech_forwarding_active(
 {
 	if (!forwarding_active(condition))
 		return false;
-	const auto service = forwarding_basic_service(condition);
-	return service == gsm::ss::basic_service_kind::none ||
-			(service == gsm::ss::basic_service_kind::teleservice &&
-			 (forwarding_basic_service_code(condition) == 0x10 ||
-			  forwarding_basic_service_code(condition) == 0x11));
+	return gsm::ss::basic_service_matches_speech(
+			forwarding_basic_service(condition),
+			forwarding_basic_service_code(condition));
 }
 
 void nokia_gsm_network_device::register_unconditional_forwarding(
@@ -202,6 +202,9 @@ void nokia_gsm_network_device::device_reset()
 	m_all_cells_lost = false;
 	m_recovery_cell_available = false;
 	m_stale_neighbour_lost = false;
+	m_delayed_loss_timer->adjust(
+			m_mobility_profile == mobility_profile::two_cell_delayed_persistent_loss ?
+					attotime::from_seconds(32) : attotime::never);
 }
 
 void nokia_gsm_network_device::set_mobility_profile(mobility_profile profile)
@@ -213,6 +216,9 @@ void nokia_gsm_network_device::set_mobility_profile(mobility_profile profile)
 	m_all_cells_lost = false;
 	m_recovery_cell_available = false;
 	m_stale_neighbour_lost = false;
+	m_delayed_loss_timer->adjust(
+			profile == mobility_profile::two_cell_delayed_persistent_loss ?
+					attotime::from_seconds(32) : attotime::never);
 	if (profile == mobility_profile::single_cell)
 	{
 		m_cells.use_single_cell();
@@ -229,10 +235,23 @@ void nokia_gsm_network_device::set_mobility_profile(mobility_profile profile)
 	if (profile == mobility_profile::two_cell_different_lac)
 		neighbour.location.lac = 2;
 	else if (profile == mobility_profile::two_cell_loss_recovery ||
-			profile == mobility_profile::two_cell_persistent_loss)
+			profile == mobility_profile::two_cell_persistent_loss ||
+			profile == mobility_profile::two_cell_delayed_persistent_loss)
 		neighbour.rxlev_dbm = -70;
 	m_cells.set(0, primary);
 	m_cells.set(1, neighbour);
+}
+
+TIMER_CALLBACK_MEMBER(nokia_gsm_network_device::delayed_persistent_loss)
+{
+	// This laboratory profile changes the RF environment at a deterministic
+	// emulated time. The handset still detects loss through ordinary serving-
+	// and neighbour-cell measurements; no firmware-visible state is forced.
+	if (m_stable_camp_seen)
+	{
+		m_primary_cell_lost = true;
+		m_all_cells_lost = true;
+	}
 }
 
 void nokia_gsm_network_device::set_cell_carriers(
@@ -317,6 +336,9 @@ void nokia_gsm_network_device::neighbour_list_observed()
 	// firmware has demonstrated stable camp and published a neighbour set.
 	// BSIC/SI validation, suitability and selection remain handset-owned
 	// consequences of that standards-level signal degradation.
+	if (m_mobility_profile == mobility_profile::two_cell_delayed_persistent_loss &&
+			machine().time() < attotime::from_seconds(32))
+		return;
 	if (m_mobility_profile != mobility_profile::two_cell_loss_recovery)
 		m_primary_cell_lost = m_stable_camp_seen;
 }
@@ -331,9 +353,17 @@ void nokia_gsm_network_device::neighbour_bcch_observed(u16 arfcn)
 		m_stale_neighbour_lost = true;
 	if ((m_mobility_profile == mobility_profile::two_cell_loss_recovery ||
 				m_mobility_profile ==
-						mobility_profile::two_cell_persistent_loss) &&
+						mobility_profile::two_cell_persistent_loss ||
+				m_mobility_profile ==
+						mobility_profile::two_cell_delayed_persistent_loss) &&
 			m_stable_camp_seen)
+	{
+		if (m_mobility_profile ==
+					mobility_profile::two_cell_delayed_persistent_loss &&
+				machine().time() < attotime::from_seconds(32))
+			return;
 		m_all_cells_lost = true;
+	}
 }
 
 void nokia_gsm_network_device::downlink_signalling_failed(u16 serving_arfcn)

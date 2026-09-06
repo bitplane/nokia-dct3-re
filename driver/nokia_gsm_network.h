@@ -72,7 +72,8 @@ public:
 		two_cell_same_lac,
 		two_cell_different_lac,
 		two_cell_loss_recovery,
-		two_cell_persistent_loss
+		two_cell_persistent_loss,
+		two_cell_delayed_persistent_loss
 	};
 
 	enum class smart_message_profile : u8
@@ -314,6 +315,8 @@ protected:
 	virtual void device_reset() override;
 
 private:
+	TIMER_CALLBACK_MEMBER(delayed_persistent_loss);
+
 	cell_profile m_cell_profile = cell_profile::suitable;
 	paging_profile m_paging_profile = paging_profile::matched;
 	assignment_profile m_assignment_profile =
@@ -338,6 +341,7 @@ private:
 	neighbour_fault_profile m_neighbour_fault =
 			neighbour_fault_profile::none;
 	bool m_stale_neighbour_lost = false;
+	emu_timer *m_delayed_loss_timer = nullptr;
 	static constexpr unsigned forwarding_condition_count =
 			unsigned(forwarding_condition::count);
 	std::array<bool, forwarding_condition_count> m_forwarding_registered{};

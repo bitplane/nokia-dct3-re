@@ -12,7 +12,8 @@ EVENTS = (
     re.compile(r"gsm_call_adapter: incoming state id=1 .* phase=paging "),
     re.compile(r"gsm_call_adapter: incoming state id=1 .* phase=alerting "),
     re.compile(r"gsm_ss: incoming call forwarded condition=no-reply destination_length=5 "),
-    re.compile(r"gsm_call_adapter: incoming state id=1 .* phase=forwarded "),
+    re.compile(r"gsm_call_adapter: incoming state id=1 .* phase=forwarded "
+               r"reason=no-reply destination_length=5 "),
 )
 
 

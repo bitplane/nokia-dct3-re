@@ -6,6 +6,15 @@
 namespace gsm::ss
 {
 
+bool basic_service_matches_speech(basic_service_kind kind, std::uint8_t code)
+{
+	// An omitted BasicService selects all services. GSM 02.30 uses teleservice
+	// groups 0x10 (all speech transmission services) and 0x11 (telephony).
+	return kind == basic_service_kind::none ||
+			(kind == basic_service_kind::teleservice &&
+			 (code == 0x10 || code == 0x11));
+}
+
 namespace
 {
 

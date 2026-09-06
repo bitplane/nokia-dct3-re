@@ -168,6 +168,15 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
             self.assertIn(f"save_item(NAME({field}));", network_source)
         for condition in ("unconditional", "busy", "no_reply", "not_reachable"):
             self.assertIn(condition, network_header)
+        reset = network_source.split(
+            "void nokia_gsm_network_device::device_reset()", 1)[1].split(
+                "void nokia_gsm_network_device::set_mobility_profile", 1)[0]
+        for field in (
+            "m_forwarding_registered",
+            "m_forwarding_active",
+            "m_forwarding_number",
+        ):
+            self.assertNotIn(field, reset)
         self.assertIn("host_incoming_result::forwarded", radio)
         forwarding = radio.split(
             "queue_host_incoming_call", 1)[1].split(
@@ -190,6 +199,19 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
             self.assertIn(f"operation::{operation}", self.source)
         self.assertIn("TIMER_CALLBACK_MEMBER(nokia_gsm_session_device::no_reply_timer)",
                       self.source)
+
+    def test_host_forwarding_reports_condition_and_destination(self):
+        adapter_header = (ROOT / "driver/nokia_gsm_call_adapter.h").read_text()
+        adapter_source = (ROOT / "driver/nokia_gsm_call_adapter.cpp").read_text()
+        radio_header = (ROOT / "driver/nokia_radio_peer.h").read_text()
+        radio_source = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
+        self.assertIn("last_host_forwarding_condition()", radio_header)
+        self.assertIn(
+            "save_item(NAME(m_last_host_forwarding_condition));", radio_source)
+        self.assertIn('writer.Key("forwarding_reason");', adapter_source)
+        self.assertIn('writer.Key("forwarding_destination");', adapter_source)
+        self.assertIn("required_device<nokia_gsm_network_device> m_network;",
+                      adapter_header)
 
     def test_outgoing_setup_requires_speech_and_called_party(self):
         setup = self.source.split(

@@ -96,6 +96,7 @@ nokia_gsm_call_adapter_device::nokia_gsm_call_adapter_device(
 		device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_GSM_CALL_ADAPTER, tag, owner, clock),
 	m_session(*this, "^gsm_session"),
+	m_network(*this, "^gsm_network"),
 	m_voice_peer(*this, "^gsm_voice_peer"),
 	m_radio_peer(*this, "^radio_peer")
 {
@@ -380,9 +381,13 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		publish_ready();
 	for (const auto &item : incoming)
 	{
+		const bool busy_forwarding =
+				m_session->outgoing_request_pending() &&
+				m_network->speech_forwarding_active(
+					nokia_gsm_network_device::forwarding_condition::busy);
 		const bool accepted = item.epoch == m_transport_epoch.load() &&
 				m_incoming_request_id == 0 &&
-				!m_session->outgoing_request_pending();
+				(!m_session->outgoing_request_pending() || busy_forwarding);
 		LOGMASKED(LOG_CALL_ADAPTER,
 				"gsm_call_adapter: incoming id=%u result=%s t=%.6f\n",
 				item.request_id, accepted ? "accepted" : "rejected",
@@ -410,7 +415,8 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		else if (result ==
 				nokia_radio_peer_device::host_incoming_result::forwarded)
 		{
-			publish_incoming_state("forwarded");
+			publish_incoming_state("forwarded",
+					m_radio_peer->last_host_forwarding_condition());
 			m_incoming_request_id = 0;
 			m_incoming_digits_length = 0;
 			m_incoming_started = false;
@@ -531,7 +537,8 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		publish_incoming_state("alerting");
 	else if (incoming_forwarded)
 	{
-		publish_incoming_state("forwarded");
+		publish_incoming_state("forwarded",
+				nokia_gsm_network_device::forwarding_condition::no_reply);
 		m_incoming_request_id = 0;
 		m_incoming_digits_length = 0;
 		m_incoming_page_accepted = false;
@@ -616,7 +623,8 @@ void nokia_gsm_call_adapter_device::publish_ready()
 		connection->send_message(buffer.GetString(), 1);
 }
 
-void nokia_gsm_call_adapter_device::publish_incoming_state(const char *phase)
+void nokia_gsm_call_adapter_device::publish_incoming_state(const char *phase,
+		nokia_gsm_network_device::forwarding_condition condition)
 {
 	rapidjson::StringBuffer buffer;
 	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -629,6 +637,30 @@ void nokia_gsm_call_adapter_device::publish_incoming_state(const char *phase)
 	writer.Uint(m_transport_epoch.load());
 	writer.Key("phase");
 	writer.String(phase);
+	if (!strcmp(phase, "forwarded") &&
+			condition != nokia_gsm_network_device::forwarding_condition::count)
+	{
+		static constexpr const char *reason[] = {
+			"unconditional", "busy", "no-reply", "not-reachable"
+		};
+		writer.Key("forwarding_reason");
+		writer.String(reason[unsigned(condition)]);
+		std::string destination;
+		const auto &number = m_network->forwarding_number(condition);
+		const unsigned length = m_network->forwarding_number_length(condition);
+		for (unsigned index = 1; index < length; ++index)
+		{
+			const u8 octet = number[index];
+			for (unsigned shift : { 0U, 4U })
+			{
+				const u8 digit = (octet >> shift) & 0x0f;
+				if (digit <= 9)
+					destination.push_back(char('0' + digit));
+			}
+		}
+		writer.Key("forwarding_destination");
+		writer.String(destination.data(), destination.size());
+	}
 	if (!strcmp(phase, "connected"))
 	{
 		writer.Key("media_uplink_sequence");
@@ -640,10 +672,25 @@ void nokia_gsm_call_adapter_device::publish_incoming_state(const char *phase)
 	std::lock_guard<std::mutex> lock(m_host->mutex);
 	for (const auto &connection : m_host->connections)
 		connection->send_message(buffer.GetString(), 1);
-	LOGMASKED(LOG_CALL_ADAPTER,
-			"gsm_call_adapter: incoming state id=%u epoch=%u phase=%s t=%.6f\n",
-			m_incoming_request_id, m_transport_epoch.load(), phase,
-			machine().time().as_double());
+	if (!strcmp(phase, "forwarded") &&
+			condition != nokia_gsm_network_device::forwarding_condition::count)
+	{
+		static constexpr const char *reason[] = {
+			"unconditional", "busy", "no-reply", "not-reachable"
+		};
+		LOGMASKED(LOG_CALL_ADAPTER,
+				"gsm_call_adapter: incoming state id=%u epoch=%u phase=%s "
+				"reason=%s destination_length=%u t=%.6f\n",
+				m_incoming_request_id, m_transport_epoch.load(), phase,
+				reason[unsigned(condition)],
+				m_network->forwarding_number_length(condition),
+				machine().time().as_double());
+	}
+	else
+		LOGMASKED(LOG_CALL_ADAPTER,
+				"gsm_call_adapter: incoming state id=%u epoch=%u phase=%s t=%.6f\n",
+				m_incoming_request_id, m_transport_epoch.load(), phase,
+				machine().time().as_double());
 }
 
 void nokia_gsm_call_adapter_device::publish_uplink_media(

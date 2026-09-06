@@ -11,7 +11,7 @@ gsm_call_adapter: incoming state id=1 epoch=2 phase=paging t=4
 gsm_call_adapter: incoming state id=1 epoch=2 phase=alerting t=5
 gsm_ss: incoming call forwarded condition=no-reply destination_length=5 t=10
 GSM service downlink kind=15 sapi=0 pd=03 message=25 length=5 t=11
-gsm_call_adapter: incoming state id=1 epoch=2 phase=forwarded t=12
+gsm_call_adapter: incoming state id=1 epoch=2 phase=forwarded reason=no-reply destination_length=5 t=12
 """
 
 

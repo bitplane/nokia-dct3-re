@@ -77,9 +77,12 @@ dissolves the conference state without releasing the surviving CC leg.
 This is a standards-conformance boundary, covered by the isolated
 `gsm_supplementary` codec and session-invariant tests. It is not an organic
 NSE-8 feature claim: the v6.00 two-call menu exposes no Conference or Private
-action and emits no call-related FACILITY request. A runtime gate requires a
-product/firmware combination which actually originates one of these
-operations. Explicit call transfer remains unmodeled.
+action and emits no call-related FACILITY request across all six menu
+positions. The bounded product census therefore closes the organic v6.00
+surface at DTMF, hold/retrieve, two call legs, swap and independent release.
+A runtime multiparty gate requires a product/firmware combination which
+actually originates one of these operations. Explicit call transfer remains
+unmodeled because no organic control or decoded request has been observed.
 
 The operation values and result/error shape follow
 [ETSI GSM 04.80](https://www.etsi.org/deliver/etsi_gts/04/0480/05.00.00_60/gsmts_0480v050000p.pdf).

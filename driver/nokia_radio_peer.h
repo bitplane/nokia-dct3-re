@@ -118,6 +118,12 @@ public:
 	};
 	host_incoming_result queue_host_incoming_call(
 			const u8 *digits, unsigned length);
+	nokia_gsm_network_device::forwarding_condition
+			last_host_forwarding_condition() const
+	{
+		return nokia_gsm_network_device::forwarding_condition(
+				m_last_host_forwarding_condition);
+	}
 	bool traffic_channel_active() const { return m_traffic_channel_active; }
 	void set_speech_loopback(bool enabled) { m_speech_loopback = enabled; }
 	void set_downlink_tch_burst_error_profile(
@@ -334,6 +340,8 @@ private:
 	bool m_incoming_sms_after_registration = false;
 	bool m_incoming_smart_message_after_registration = false;
 	bool m_host_incoming_call_pending = false;
+	u8 m_last_host_forwarding_condition = u8(
+			nokia_gsm_network_device::forwarding_condition::count);
 	u8 m_call_waiting_profile = u8(call_waiting_profile::none);
 	bool m_call_waiting_sent = false;
 	bool m_call_waiting_duplicate_sent = false;

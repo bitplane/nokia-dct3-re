@@ -53,7 +53,8 @@ rejects an incoming speech page before caller state is installed in the handset.
 `make verify-radio-call-divert-incoming` registers organically, originates a
 call through the host adapter, requires its external state to be exactly
 `queued -> forwarded`, and rejects any handset page, alerting, connection or
-buzzer activation.
+buzzer activation. The terminal host event identifies the routing reason as
+`unconditional` and carries the decoded forwarding destination.
 
 The ROM's dial editor converts a second Star to `+` even after a two-second
 physical-key pause, and the tested double-Hash sequence produces no SS
@@ -62,12 +63,21 @@ The parser and unit tests still cover standardized `ActivateSS` and `EraseSS`
 requests and their success/error encodings without claiming this firmware UI
 can originate `**` or `##`.
 
-The network subscription is now indexed independently for unconditional,
-busy, no-reply and not-reachable forwarding. Each condition saves registration
-and activation state, the destination, optional bearer/teleservice scope and
-the optional no-reply duration. Speech routing honors an absent scope or the
-firmware-observed telephony group; unrelated basic-service groups do not
-divert a speech call.
+The network subscription is indexed independently for unconditional, busy,
+no-reply and not-reachable forwarding. Each condition saves registration and
+activation state, the destination, optional bearer/teleservice scope and the
+optional no-reply duration. The shared lifecycle implementation accepts
+RegisterSS, InterrogateSS, DeactivateSS, ActivateSS and EraseSS for every one
+of those service codes. NSE-8 organically exposes the single-Star registration
+forms used by the routing gates; the other operation/condition combinations
+remain protocol-conformance support unless an organic product route is named.
+
+Speech routing honors an omitted BasicService, all-speech teleservice `0x10`
+and telephony `0x11`. Other teleservices and all bearer-service selectors do
+not divert a speech call. This applicability rule is an isolated, exhaustively
+tested GSM contract; NSE-8 did not emit a supplementary transaction for the
+attempted `*13` dial-editor selector, so that failed UI probe is not promoted
+to product behavior.
 
 `make verify-radio-call-divert-no-reply` is the first organic conditional
 acceptance gate. Physical MMI input `*61*5551234*11*5#` makes NSE-8 emit
@@ -77,12 +87,25 @@ alerting. The saved session timer starts at the firmware's ALERTING message;
 expiry sends ordinary CC disconnect/release traffic and the host lifecycle
 ends as `forwarded`, never `connected`. This follows the GSM requirement that
 CFNRy is invoked only after the served subscriber fails to answer, rather than
-turning it into a pre-paging decision.
+turning it into a pre-paging decision. Its host event identifies `no-reply`
+and the registered destination, so an eventual external telephony bridge can
+route the forwarded leg without reconstructing state from emulator logs.
 
-Busy diversion is evaluated when a second external call arrives during an
-existing call. Not-reachable diversion is evaluated while a registered
-subscriber has left its serving-BCCH phase. These branches and basic-service
-filtering are modeled but do not yet have organic product gates. Collective
+`make verify-radio-call-divert-busy` registers speech CFB with physical
+`*67*5551234*11#`, connects an outgoing host-adapter call, then requires a
+second incoming host call to finish as `queued -> forwarded` without paging.
+The host event identifies `busy` and carries the registered destination.
+
+`make verify-radio-call-divert-unreachable` registers speech CFNRc with
+physical `*62*5551234*11#`, then uses a deterministic laboratory RF profile
+which removes both configured cells at 32 seconds. The firmware detects the
+loss through its normal measurements and publishes `DOWNLINK_SIGNALLING_FAIL`;
+only then is the host call submitted. It must finish as `queued -> forwarded`
+with reason `not-reachable` and destination `5551234`, without handset paging.
+The timed topology change sequences provisioning before loss; it does not
+write firmware state or declare a physical network's loss timing.
+
+Collective
 service codes (`0x20`/`0x28`), multiple basic-service records in one result,
 and a backend which actually originates a new call to the stored destination
 remain unsupported. The stage-1 behavior and no-reply semantics follow

@@ -19,6 +19,9 @@ def verify(text):
     present = [entry for entry in forbidden if entry in after]
     if present:
         raise ValueError(f"diverted call reached handset: {present!r}")
+    if ("phase=forwarded reason=unconditional destination_length=5" not in
+            after):
+        raise ValueError("host forwarding outcome omitted routing metadata")
 
 
 def main():
