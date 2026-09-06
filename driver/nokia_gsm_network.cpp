@@ -629,7 +629,8 @@ std::array<u8, 10> nokia_gsm_network_device::mm_information() const
 
 nokia_gsm_network_device::layer3_message
 nokia_gsm_network_device::incoming_call_setup(
-		const u8 *digits, unsigned digit_count) const
+		const u8 *digits, unsigned digit_count, u8 transaction,
+		bool malformed_bearer) const
 {
 	// GSM 04.08 9.3.23. Transaction 0 is network-originated. The bearer
 	// capability is speech and the SIGNAL IE requests ordinary ringing.
@@ -637,9 +638,12 @@ nokia_gsm_network_device::incoming_call_setup(
 	digit_count = std::min<unsigned>(digit_count, 20);
 	const unsigned bcd_octets = (digit_count + 1) / 2;
 	const std::array<u8, 10> prefix = {
-		0x03, 0x05, 0x04, 0x04, 0x60, 0x02, 0x00, 0x81, 0x34, 0x01
+		u8((transaction & 0x70) | 0x03), 0x05,
+		0x04, 0x04, 0x60, 0x02, 0x00, 0x81, 0x34, 0x01
 	};
 	std::copy(prefix.begin(), prefix.end(), result.data.begin());
+	if (malformed_bearer)
+		result.data[3] = 0x20;
 	result.data[10] = 0x5c;
 	result.data[11] = u8(1 + bcd_octets);
 	result.data[12] = 0x81;

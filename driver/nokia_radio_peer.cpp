@@ -84,6 +84,11 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_pch_fill_delivered));
 	save_item(NAME(m_page_transmitted));
 	save_item(NAME(m_host_incoming_call_pending));
+	save_item(NAME(m_call_waiting_profile));
+	save_item(NAME(m_call_waiting_sent));
+	save_item(NAME(m_call_waiting_duplicate_sent));
+	save_item(NAME(m_call_waiting_ticks));
+	save_item(NAME(m_call_waiting_page_delay));
 	save_item(NAME(m_traffic_channel_active));
 	save_item(NAME(m_downlink_offset));
 	save_item(NAME(m_followup_downlink_opportunity));
@@ -229,6 +234,10 @@ void nokia_radio_peer_device::device_reset()
 	m_pch_fill_delivered = false;
 	m_page_transmitted = false;
 	m_host_incoming_call_pending = false;
+	m_call_waiting_sent = false;
+	m_call_waiting_duplicate_sent = false;
+	m_call_waiting_ticks = 0;
+	m_call_waiting_page_delay = 0;
 	m_traffic_channel_active = false;
 	m_downlink_offset = 0;
 	m_followup_downlink_opportunity = false;
@@ -2270,6 +2279,9 @@ void nokia_radio_peer_device::emit_report()
 		}
 		else if (pch_report)
 		{
+			if (m_call_waiting_profile != u8(call_waiting_profile::none) &&
+					m_call_waiting_page_delay != 0xff)
+				++m_call_waiting_page_delay;
 			const auto service = m_gsm_session->delivery_report_pending() ?
 					nokia_gsm_session_device::incoming_service::status_report :
 				m_incoming_smart_message_after_registration ?
@@ -2301,6 +2313,8 @@ void nokia_radio_peer_device::emit_report()
 			}
 			const bool transmit_page =
 					m_registered && page_requested && m_pch_fill_delivered &&
+					(m_call_waiting_profile == u8(call_waiting_profile::none) ||
+						m_call_waiting_page_delay >= 3) &&
 					(!m_page_requires_reselection || m_has_reselected) &&
 					!m_page_transmitted &&
 					service_admissible &&
@@ -2809,6 +2823,31 @@ void nokia_radio_peer_device::tick()
 {
 	if (!m_enabled)
 		return;
+
+	if (m_call_waiting_profile != u8(call_waiting_profile::none) &&
+			m_traffic_channel_active &&
+			m_gsm_session->call_connected() && !m_call_waiting_sent &&
+			++m_call_waiting_ticks >= 220)
+	{
+		static constexpr std::array<u8, 7> WAITING_CALL_DIGITS =
+				{ 5, 5, 5, 7, 6, 5, 4 };
+		if (m_gsm_session->queue_waiting_call(
+					WAITING_CALL_DIGITS.data(), WAITING_CALL_DIGITS.size(),
+					m_call_waiting_profile ==
+						u8(call_waiting_profile::malformed)))
+			m_call_waiting_sent = true;
+	}
+	else if (m_call_waiting_profile == u8(call_waiting_profile::duplicate) &&
+			m_call_waiting_sent && !m_call_waiting_duplicate_sent &&
+			m_traffic_channel_active && ++m_call_waiting_ticks >= 440)
+	{
+		static constexpr std::array<u8, 7> WAITING_CALL_DIGITS =
+				{ 5, 5, 5, 7, 6, 5, 4 };
+		if (m_gsm_session->queue_waiting_call(
+					WAITING_CALL_DIGITS.data(), WAITING_CALL_DIGITS.size(),
+					false, true))
+			m_call_waiting_duplicate_sent = true;
+	}
 
 	// A host or other network policy may enqueue Layer 3 while the assigned
 	// link is waiting for the mobile's next uplink opportunity. Promote that

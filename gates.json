@@ -5096,6 +5096,44 @@
       ]
     },
     {
+      "name": "verify-radio-two-call",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "physical call waiting, swap, and independent release",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=60 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
+        "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_call_waiting' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait2500,enter,wait1000,down,wait1000,enter,wait2000,enter,wait1000,down,wait1000,enter,wait2000,enter,wait1000,enter,wait2500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=30.5 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'; \\",
+        "\t$(PYTHON) tools/radio_two_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \\",
+        "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
+      "name": "verify-radio-two-call-negatives",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "duplicate and malformed call-waiting compositions",
+      "recipe": [
+        "\t@set -e; \\",
+        "\tfor profile in duplicate malformed; do \\",
+        "\t\tout=\"$(RUN_DIR)_$$profile\"; \\",
+        "\t\t$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=\"$$out\" SECONDS=45 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
+        "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/radio_call_waiting_$$profile\" \\",
+        "\t\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000' || exit; \\",
+        "\t\t$(PYTHON) tools/radio_two_call_negative_check.py \"$$out/error.log\" \"$$out\" \"$$profile\" || exit; \\",
+        "\tdone"
+      ]
+    },
+    {
       "name": "verify-radio-a5-1-incoming-call",
       "prerequisites": [],
       "variables": {},

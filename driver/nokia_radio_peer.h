@@ -17,6 +17,13 @@
 class nokia_radio_peer_device : public device_t
 {
 public:
+	enum class call_waiting_profile : u8
+	{
+		none,
+		valid,
+		duplicate,
+		malformed
+	};
 	enum class acquisition_strategy : u8
 	{
 		none,
@@ -97,6 +104,10 @@ public:
 	void set_incoming_smart_message_after_registration(bool enabled)
 	{
 		m_incoming_smart_message_after_registration = enabled;
+	}
+	void set_call_waiting_profile(call_waiting_profile profile)
+	{
+		m_call_waiting_profile = u8(profile);
 	}
 	bool queue_host_incoming_call(const u8 *digits, unsigned length);
 	bool traffic_channel_active() const { return m_traffic_channel_active; }
@@ -311,6 +322,11 @@ private:
 	bool m_incoming_sms_after_registration = false;
 	bool m_incoming_smart_message_after_registration = false;
 	bool m_host_incoming_call_pending = false;
+	u8 m_call_waiting_profile = u8(call_waiting_profile::none);
+	bool m_call_waiting_sent = false;
+	bool m_call_waiting_duplicate_sent = false;
+	u16 m_call_waiting_ticks = 0;
+	u8 m_call_waiting_page_delay = 0;
 	bool m_speech_loopback = false;
 	bool m_lab_voice_source = false;
 	bool m_host_voice_peer = false;

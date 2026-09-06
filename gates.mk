@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 224 gates: 138 generated from typed steps, 86 copied verbatim (shell).
+# 226 gates: 138 generated from typed steps, 88 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -92,6 +92,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-media-resilience verify-radio-incoming-call \
 	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
 	verify-radio-incoming-call-lifecycle verify-radio-supplementary-call \
+	verify-radio-two-call verify-radio-two-call-negatives \
 	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
 	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
 	verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state \
@@ -926,6 +927,28 @@ verify-radio-supplementary-call: build
 	$(PYTHON) tools/radio_supplementary_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+# shell: physical call waiting, swap, and independent release
+verify-radio-two-call: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-two-call: build
+	@set -e; \
+	$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=60 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_call_waiting' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait2500,enter,wait1000,down,wait1000,enter,wait2000,enter,wait1000,down,wait1000,enter,wait2000,enter,wait1000,enter,wait2500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=30.5 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'; \
+	$(PYTHON) tools/radio_two_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+# shell: duplicate and malformed call-waiting compositions
+verify-radio-two-call-negatives: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-two-call-negatives: build
+	@set -e; \
+	for profile in duplicate malformed; do \
+		out="$(RUN_DIR)_$$profile"; \
+		$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR="$$out" SECONDS=45 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_call_waiting_$$profile" \
+			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000' || exit; \
+		$(PYTHON) tools/radio_two_call_negative_check.py "$$out/error.log" "$$out" "$$profile" || exit; \
+	done
 
 # shell: embedded shell control flow
 verify-radio-a5-1-incoming-call:

@@ -24,9 +24,28 @@ save/load boundary while the call is held, and the exact firmware-rendered
 active-call menu containing **Unhold**. Its checker rejects malformed DTMF IE
 and reordered hold/retrieve evidence.
 
-## Unsupported boundary
+## Validated two-call boundary
 
-Call waiting, a second simultaneous call, swap, multiparty calls, explicit call
-transfer, call forwarding control and USSD are not modeled. Their firmware
-consumers and network-side transactions require separate evidence; this
-milestone does not infer them from the single-call hold lifecycle.
+NSE-8 also accepts a second network-originated `SETUP` on the existing TCH as
+transaction 1. The firmware presents **End this call / Answer / Reject**, and
+answering organically holds transaction 0 before connecting transaction 1.
+Its two-call menu presents **End this call / Swap / End all calls**. Swap emits
+HOLD for the active transaction followed by RETRIEVE for the held transaction.
+Ending one transaction retains RR and retrieves the survivor; only ending the
+last transaction releases the traffic channel. The session therefore owns two
+saved CC legs while LAPDm, RR and the physical TCH remain shared.
+
+`make verify-radio-two-call` checks both transaction identities, exact answer
+and swap menu frames, save/load after Swap, transaction-local release, speech
+traffic, and the absence of premature RR teardown.
+
+The negative gate records consumer behavior rather than imposing a stricter
+network policy. Repeating the transaction-1 SETUP produces no second CALL
+CONFIRMED or third UI leg. A SETUP whose Bearer Capability length exceeds the
+message is tolerated: NSE-8 responds once with its bounded capability set and
+continues presenting the waiting call. Neither case releases the original call
+or the shared RR channel.
+
+Multiparty calls, explicit call transfer, call forwarding control and USSD are
+not modeled. They require separate firmware and network evidence rather than
+being inferred from the validated two-leg lifecycle.

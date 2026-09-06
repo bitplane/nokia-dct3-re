@@ -227,7 +227,8 @@ public:
 	std::array<u8, 3> cm_service_reject() const;
 	std::array<u8, 10> mm_information() const;
 	layer3_message incoming_call_setup(
-			const u8 *digits, unsigned digit_count) const;
+			const u8 *digits, unsigned digit_count, u8 transaction = 0,
+			bool malformed_bearer = false) const;
 	std::array<u8, 2> call_proceeding(u8 transaction) const;
 	std::array<u8, 2> call_alerting(u8 transaction) const;
 	std::array<u8, 2> call_connect(u8 transaction) const;

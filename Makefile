@@ -587,6 +587,8 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_application_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_ems_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_supplementary_call_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_two_call_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_two_call_negative_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_envelope_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_persistence_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_sms_inbox_trace_check.py

@@ -54,6 +54,10 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_call_held));
 	save_item(NAME(m_call_hold_count));
 	save_item(NAME(m_call_retrieve_count));
+	save_item(NAME(m_waiting_call_queued));
+	save_item(NAME(m_call_leg_transactions));
+	save_item(NAME(m_call_leg_states));
+	save_item(NAME(m_releasing_call_leg));
 	save_item(NAME(m_call_transaction));
 	save_item(NAME(m_outgoing_request_pending));
 	save_item(NAME(m_outgoing_request_id));
@@ -126,6 +130,10 @@ void nokia_gsm_session_device::device_reset()
 	m_call_held = false;
 	m_call_hold_count = 0;
 	m_call_retrieve_count = 0;
+	m_waiting_call_queued = false;
+	m_call_leg_transactions.fill(0);
+	m_call_leg_states.fill(u8(call_leg_state::inactive));
+	m_releasing_call_leg = 0xff;
 	m_call_transaction = 0;
 	m_outgoing_request_pending = false;
 	m_outgoing_request_id = 0;
@@ -249,6 +257,33 @@ bool nokia_gsm_session_device::set_incoming_caller(
 	std::copy_n(digits, length, m_incoming_call_digits.begin());
 	m_incoming_call_digits_length = length;
 	return true;
+}
+
+bool nokia_gsm_session_device::queue_waiting_call(
+		const u8 *digits, unsigned length,
+		bool malformed_bearer, bool duplicate)
+{
+	if (m_state != u8(state::incoming_call_active) ||
+			(duplicate ? !m_waiting_call_queued : m_waiting_call_queued) ||
+			m_pending_downlink.kind != u8(downlink_kind::none) ||
+			length == 0 || length > 20)
+		return false;
+	// A waiting call is a second network-originated CC transaction on the
+	// existing main link. It does not page or establish another RR connection.
+	const auto setup = m_network->incoming_call_setup(
+			digits, length, 0x10, malformed_bearer);
+	if (!duplicate)
+	{
+		m_waiting_call_queued = true;
+		m_call_leg_transactions[1] = setup.data[0];
+		set_call_leg_state(1, call_leg_state::alerting);
+	}
+	LOGMASKED(LOG_GSM_SESSION,
+			"gsm_session: waiting call SETUP transaction=%02x malformed=%u duplicate=%u t=%.6f\n",
+			setup.data[0], malformed_bearer, duplicate,
+			machine().time().as_double());
+	return queue_downlink(downlink_kind::incoming_call_setup,
+			setup.data.data(), setup.length) != downlink_kind::none;
 }
 
 bool nokia_gsm_session_device::incoming_service_admissible(
@@ -456,6 +491,13 @@ nokia_gsm_session_device::downlink_acknowledged()
 		return downlink_kind::none;
 	}
 
+	if (m_state == u8(state::incoming_call_active) && m_waiting_call_queued &&
+			m_pending_downlink.kind == u8(downlink_kind::incoming_call_setup))
+	{
+		clear_pending_downlink();
+		return downlink_kind::none;
+	}
+
 	if (m_state == u8(state::awaiting_traffic_assignment) &&
 			m_pending_downlink.kind == u8(downlink_kind::traffic_assignment))
 	{
@@ -489,6 +531,8 @@ nokia_gsm_session_device::downlink_acknowledged()
 					m_incoming_call_digits_length : fixture_digits.size();
 			const auto setup = m_network->incoming_call_setup(digits, digit_count);
 			m_call_transaction = setup.data[0];
+			m_call_leg_transactions[0] = setup.data[0];
+			set_call_leg_state(0, call_leg_state::alerting);
 			m_state = u8(state::awaiting_incoming_call_setup_acknowledgement);
 			return queue_downlink(downlink_kind::incoming_call_setup,
 					setup.data.data(), setup.length);
@@ -614,6 +658,18 @@ nokia_gsm_session_device::downlink_acknowledged()
 			(m_pending_downlink.kind == u8(downlink_kind::call_release) ||
 				m_pending_downlink.kind == u8(downlink_kind::release_complete)))
 	{
+		if (m_releasing_call_leg < maximum_call_legs)
+		{
+			set_call_leg_state(m_releasing_call_leg, call_leg_state::inactive);
+			m_releasing_call_leg = 0xff;
+			if (live_call_leg_count() != 0)
+			{
+				clear_pending_downlink();
+				m_state = u8(state::incoming_call_active);
+				publish_call_active_output();
+				return downlink_kind::none;
+			}
+		}
 		// Close the dedicated RR channel after RELEASE is acknowledged. The
 		// handset emits CC Release Complete while that release is in flight.
 		return begin_channel_release();
@@ -797,6 +853,8 @@ nokia_gsm_session_device::receive_layer3(
 				BIT(information[0], 7))
 			return downlink_kind::none;
 		m_call_transaction = information[0];
+		m_call_leg_transactions[0] = information[0];
+		set_call_leg_state(0, call_leg_state::alerting);
 		++m_outgoing_request_id;
 		if (m_outgoing_request_id == 0)
 			++m_outgoing_request_id;
@@ -886,6 +944,9 @@ nokia_gsm_session_device::receive_layer3(
 		}
 		if (message_type == 0x07)
 		{
+			const int leg = call_leg_index(information[0]);
+			if (leg >= 0)
+				set_call_leg_state(unsigned(leg), call_leg_state::active);
 			m_incoming_call_answered = true;
 			m_call_alerting = false;
 			publish_call_alerting_output();
@@ -897,6 +958,10 @@ nokia_gsm_session_device::receive_layer3(
 		}
 		if (message_type == 0x25)
 		{
+			const int leg = call_leg_index(information[0]);
+			if (leg < 0)
+				return downlink_kind::none;
+			m_releasing_call_leg = u8(leg);
 			m_call_alerting = false;
 			publish_call_alerting_output();
 			const auto release = m_network->call_release(information[0]);
@@ -935,26 +1000,34 @@ nokia_gsm_session_device::receive_layer3(
 					acknowledge.data(), acknowledge.size());
 		}
 		if (m_state == u8(state::incoming_call_active) &&
-				message_type == 0x18 && length == 2 && !m_call_held)
+				message_type == 0x18 && length == 2)
 		{
-			m_call_held = true;
+			const int leg = call_leg_index(information[0]);
+			if (leg < 0 || m_call_leg_states[leg] != u8(call_leg_state::active))
+				return downlink_kind::none;
+			set_call_leg_state(unsigned(leg), call_leg_state::held);
 			++m_call_hold_count;
 			LOGMASKED(LOG_GSM_SESSION,
-					"gsm_session: call held count=%u t=%.6f\n",
-					m_call_hold_count, machine().time().as_double());
+					"gsm_session: call held count=%u transaction=%02x leg=%d t=%.6f\n",
+					m_call_hold_count, information[0], leg,
+					machine().time().as_double());
 			const auto acknowledge =
 					m_network->call_hold_acknowledge(information[0]);
 			return queue_downlink(downlink_kind::call_hold_acknowledge,
 					acknowledge.data(), acknowledge.size());
 		}
 		if (m_state == u8(state::incoming_call_active) &&
-				message_type == 0x1c && length == 2 && m_call_held)
+				message_type == 0x1c && length == 2)
 		{
-			m_call_held = false;
+			const int leg = call_leg_index(information[0]);
+			if (leg < 0 || m_call_leg_states[leg] != u8(call_leg_state::held))
+				return downlink_kind::none;
+			set_call_leg_state(unsigned(leg), call_leg_state::active);
 			++m_call_retrieve_count;
 			LOGMASKED(LOG_GSM_SESSION,
-					"gsm_session: call retrieved count=%u t=%.6f\n",
-					m_call_retrieve_count, machine().time().as_double());
+					"gsm_session: call retrieved count=%u transaction=%02x leg=%d t=%.6f\n",
+					m_call_retrieve_count, information[0], leg,
+					machine().time().as_double());
 			const auto acknowledge =
 					m_network->call_retrieve_acknowledge(information[0]);
 			return queue_downlink(downlink_kind::call_retrieve_acknowledge,
@@ -1022,6 +1095,7 @@ nokia_gsm_session_device::receive_layer3(
 		publish_call_alerting_output();
 		publish_release_waiting_output();
 		m_state = u8(state::incoming_call_active);
+		set_call_leg_state(0, call_leg_state::active);
 		publish_call_active_output();
 		if (m_outgoing_termination_accepted)
 			return apply_outgoing_termination();
@@ -1042,6 +1116,11 @@ nokia_gsm_session_device::receive_layer3(
 		m_incoming_call_answered = false;
 		m_release_complete_received = false;
 		m_call_transaction = 0;
+		m_waiting_call_queued = false;
+		m_call_leg_transactions.fill(0);
+		m_call_leg_states.fill(u8(call_leg_state::inactive));
+		m_releasing_call_leg = 0xff;
+		m_call_held = false;
 		m_outgoing_request_pending = false;
 		clear_outgoing_call_state();
 		publish_call_alerting_output();
@@ -1321,6 +1400,33 @@ void nokia_gsm_session_device::clear_pending_downlink()
 	m_pending_downlink.sapi = 0;
 	m_pending_downlink.length = 0;
 	m_pending_downlink.data.fill(0);
+}
+
+int nokia_gsm_session_device::call_leg_index(u8 transaction) const
+{
+	const u8 identity = transaction & 0x70;
+	for (unsigned index = 0; index < maximum_call_legs; ++index)
+		if (m_call_leg_states[index] != u8(call_leg_state::inactive) &&
+				(m_call_leg_transactions[index] & 0x70) == identity)
+			return int(index);
+	return -1;
+}
+
+unsigned nokia_gsm_session_device::live_call_leg_count() const
+{
+	return unsigned(std::count_if(
+			m_call_leg_states.begin(), m_call_leg_states.end(),
+			[](u8 value) { return value != u8(call_leg_state::inactive); }));
+}
+
+void nokia_gsm_session_device::set_call_leg_state(
+		unsigned index, call_leg_state state)
+{
+	if (index < maximum_call_legs)
+		m_call_leg_states[index] = u8(state);
+	m_call_held = std::any_of(
+			m_call_leg_states.begin(), m_call_leg_states.end(),
+			[](u8 value) { return value == u8(call_leg_state::held); });
 }
 
 nokia_gsm_session_device::downlink_kind

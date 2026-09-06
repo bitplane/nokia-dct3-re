@@ -1334,6 +1334,9 @@ void nokia_dct3_state::machine_reset()
 	m_radio_peer->set_incoming_call_after_registration(BIT(network, 1));
 	m_radio_peer->set_incoming_sms_after_registration(BIT(network, 2));
 	m_radio_peer->set_incoming_smart_message_after_registration(BIT(network, 3));
+	m_radio_peer->set_call_waiting_profile(
+			nokia_radio_peer_device::call_waiting_profile(
+					(m_outgoing_call_config.read_safe(0x00) >> 2) & 0x03));
 	m_radio_peer->set_speech_loopback(BIT(network, 4));
 	m_radio_peer->set_lab_voice_source(BIT(network, 5));
 	m_radio_peer->set_downlink_tch_burst_error_profile(
@@ -2234,6 +2237,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x01, "Remote user busy")
 	PORT_CONFSETTING(0x02, "Remote user does not answer")
 	PORT_CONFSETTING(0x03, "MM service rejected")
+	PORT_CONFNAME(0x0c, 0x00, "Incoming call-waiting composition")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x04, "Valid second SETUP")
+	PORT_CONFSETTING(0x08, "Duplicate second SETUP")
+	PORT_CONFSETTING(0x0c, "Malformed bearer capability")
 
 	PORT_START("CALLDELAY")
 	PORT_CONFNAME(0x01, 0x00, "Laboratory outgoing-call decision delivery")

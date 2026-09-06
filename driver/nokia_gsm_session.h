@@ -84,6 +84,9 @@ public:
 	bool submit_outgoing_termination(u32 request_id, u8 cause = 0x10);
 	bool submit_incoming_termination(u8 cause = 0x10);
 	bool set_incoming_caller(const u8 *digits, unsigned length);
+	bool queue_waiting_call(
+			const u8 *digits, unsigned length,
+			bool malformed_bearer = false, bool duplicate = false);
 	bool establish_layer3(
 			const u8 *information, unsigned length, u16 serving_arfcn);
 	bool queue_incoming_page(incoming_service service = incoming_service::none);
@@ -178,6 +181,18 @@ protected:
 	virtual void device_reset() override;
 
 private:
+	static constexpr unsigned maximum_call_legs = 2;
+	enum class call_leg_state : u8
+	{
+		inactive,
+		alerting,
+		active,
+		held
+	};
+	int call_leg_index(u8 transaction) const;
+	unsigned live_call_leg_count() const;
+	void set_call_leg_state(unsigned index, call_leg_state state);
+
 	enum class state : u8
 	{
 		idle,
@@ -270,6 +285,10 @@ private:
 	bool m_call_held = false;
 	u32 m_call_hold_count = 0;
 	u32 m_call_retrieve_count = 0;
+	bool m_waiting_call_queued = false;
+	std::array<u8, maximum_call_legs> m_call_leg_transactions{};
+	std::array<u8, maximum_call_legs> m_call_leg_states{};
+	u8 m_releasing_call_leg = 0xff;
 	u8 m_call_transaction = 0;
 	bool m_outgoing_request_pending = false;
 	u32 m_outgoing_request_id = 0;
