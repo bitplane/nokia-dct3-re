@@ -60,7 +60,6 @@ CHECKPOINTS = (
     ("physical End", DISCONNECT),
     ("network Release", NETWORK_RELEASE),
     ("Release Complete", RELEASE_COMPLETE),
-    ("RR Channel Release", RR_CHANNEL_RELEASE),
     ("traffic release UA", TRAFFIC_RELEASE_UA),
     ("NHM-6 release transaction",
      r"TX packet type=02 payload=20 .*"
@@ -73,6 +72,17 @@ CHECKPOINTS = (
 
 def verify(text: str) -> None:
     require_ordered(text, CHECKPOINTS, "NHM-6")
+    # CC Release Complete and the independent RR Channel Release can cross by
+    # one scheduler delivery. Both must occur after network release and before
+    # the traffic link is acknowledged down, but neither owns the other.
+    network_release = NETWORK_RELEASE.search(text)
+    rr_release = RR_CHANNEL_RELEASE.search(
+        text, network_release.end() if network_release else 0)
+    traffic_release = TRAFFIC_RELEASE_UA.search(
+        text, network_release.end() if network_release else 0)
+    if not network_release or not rr_release or not traffic_release or not (
+            rr_release.start() < traffic_release.start()):
+        raise ValueError("NHM-6 RR release did not precede traffic teardown")
     require_count(text, CONNECT, 1, "NHM-6 must emit exactly one Connect")
 
 

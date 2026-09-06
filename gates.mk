@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 239 gates: 141 generated from typed steps, 98 copied verbatim (shell).
+# 247 gates: 141 generated from typed steps, 106 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -95,7 +95,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-handover-failure-state verify-3310-radio-handover \
 	verify-3310-radio-handover-failure-state verify-3330-radio-handover \
 	verify-3330-radio-handover-failure-state verify-3410-radio-handover \
-	verify-3410-radio-handover-failure-state verify-radio-supplementary-call \
+	verify-3410-radio-handover-failure-state verify-radio-a5-1-handover \
+	verify-radio-a5-1-handover-failure-state verify-3310-radio-a5-1-handover \
+	verify-3310-radio-a5-1-handover-failure-state verify-3330-radio-a5-1-handover \
+	verify-3330-radio-a5-1-handover-failure-state verify-3410-radio-a5-1-handover \
+	verify-3410-radio-a5-1-handover-failure-state verify-radio-supplementary-call \
 	verify-radio-two-call verify-radio-second-outgoing-call \
 	verify-radio-call-divert verify-radio-call-divert-lifecycle \
 	verify-radio-call-divert-incoming verify-radio-ussd \
@@ -1012,6 +1016,101 @@ verify-3410-radio-handover-failure-state: normalize-3410
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=14.60 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 1 --target-arfcn 2
+
+# shell: NSE-8 A5/1 dedicated-mode handover success
+verify-radio-a5-1-handover:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1; \
+	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+# shell: NSE-8 A5/1 handover rollback and save/load
+verify-radio-a5-1-handover-failure-state:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=19.55 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1
+
+# shell: NHM-5 A5/1 dedicated-mode handover success
+verify-3310-radio-a5-1-handover:
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait9000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1 --serving-arfcn 88 --target-arfcn 89; \
+	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered; \
+	$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+# shell: NHM-5 A5/1 handover rollback and save/load
+verify-3310-radio-a5-1-handover-failure-state:
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=17.25 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 88 --target-arfcn 89
+
+# shell: NHM-6 A5/1 dedicated-mode handover success
+verify-3330-radio-a5-1-handover: normalize-3330
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=22 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome success --require-a5-1 --serving-arfcn 823 --target-arfcn 824; \
+	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+# shell: NHM-6 A5/1 handover rollback and save/load
+verify-3330-radio-a5-1-handover-failure-state: normalize-3330
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \
+		RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=18 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
+		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=12.90 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 823 --target-arfcn 824
+
+# shell: NHM-2 A5/1 dedicated-mode handover success
+verify-3410-radio-a5-1-handover: normalize-3410
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1 --serving-arfcn 1 --target-arfcn 2; \
+	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+# shell: NHM-2 A5/1 handover rollback and save/load
+verify-3410-radio-a5-1-handover-failure-state: normalize-3410
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=19 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=15.18 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 1 --target-arfcn 2
 
 # shell: physical DTMF and hold/retrieve lifecycle
 verify-radio-supplementary-call: ERASED_IDENTITY_SECURITY_CODE=12345

@@ -20,6 +20,11 @@ dsp_hle: receiver tuned old_arfcn=2 new_arfcn=1 t=19.09
 gsm_session: handover rollback serving=1 t=19.10
 dsp_hle: speech tick uplink=60 downlink=50 t=20.0
 """
+A5 = """
+gsm_session: gsm_cipher: event=activated algorithm=1 t=18.0
+radio_l1: direction=uplink kind=facch good=1 count=5 fn=4217 t=19.1
+radio_l1: direction=downlink kind=facch good=1 count=5 fn=4217 t=19.1
+"""
 
 
 class RadioHandoverTraceCheckTest(unittest.TestCase):
@@ -45,6 +50,21 @@ class RadioHandoverTraceCheckTest(unittest.TestCase):
             path.write_text(nhm5)
             self.assertIn("ARFCN 89", check(
                 path, "success", serving=88, target=89))
+
+    def test_accepts_a5_1_continuity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "error.log"
+            path.write_text(A5.splitlines()[1] + "\n" + SUCCESS +
+                            "\n".join(A5.splitlines()[2:]) + "\n")
+            self.assertIn("ARFCN 2", check(
+                path, "success", require_a5_1=True))
+
+    def test_rejects_a5_1_without_post_handover_facch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "error.log"
+            path.write_text(A5.splitlines()[1] + "\n" + SUCCESS)
+            with self.assertRaisesRegex(ValueError, "handover-lifecycle uplink"):
+                check(path, "success", require_a5_1=True)
 
     def test_rejects_reordered_success(self):
         reordered = SUCCESS.replace(

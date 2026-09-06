@@ -851,6 +851,15 @@ NHM-2 is protected by `make verify-3410-radio-handover` and
 `make verify-3410-radio-handover-failure-state`; its positive gate additionally
 requires physical Answer/End and sustained COBBA-GJP media across the retune.
 
+The parallel `radio_a5_1_handover` fixtures prove that cipher ownership
+survives the same procedure on all four products. A5/1 activates before the
+Handover Command, both directions carry FACCH during the transition, and
+speech continues after success or rollback. The negative gates save and load
+while the receiver is waiting on the silent target cell, then require the
+firmware-owned return to the original carrier without losing cipher state.
+These are composition tests of the existing A5, RR and radio boundaries; they
+add no product-specific cipher or handover behavior.
+
 Other known extensions include rejected registration and broader RF
 propagation.
 Each extension must begin with an organic MCU request or a standards-defined

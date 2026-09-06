@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 36
-Differences found: 59
+Families with more than one product: 38
+Differences found: 62
 
 ## ROM normalisation reachability
 
@@ -23,6 +23,8 @@ absent product is a coverage question, not a drifted gate.
 | `frontier` | yes | yes | yes | yes | — |
 | `menu` | — | yes | — | yes | — |
 | `navigation` | — | yes | yes | yes | — |
+| `radio-a5-1-handover` | yes | yes | yes | yes | — |
+| `radio-a5-1-handover-failure-state` | yes | yes | yes | yes | — |
 | `radio-a5-1-incoming-call` | yes | yes | yes | yes | — |
 | `radio-a5-1-outgoing-call` | yes | yes | yes | yes | — |
 | `radio-all-cell-loss` | yes | — | — | yes | — |
@@ -65,6 +67,14 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `tools/check_lcd_frame.py`
 - **3330**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **3410**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
+
+### `radio-a5-1-handover`
+
+- **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`
+- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
+- **3330**: `tools/radio_3330_incoming_call_boundary_check.py`
+- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
+- shared: `tools/radio_a5_trace_check.py`, `tools/radio_handover_trace_check.py`, `tools/radio_speech_media_trace_check.py`
 
 ### `radio-a5-1-incoming-call`
 
@@ -350,6 +360,20 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `35`, `40`, `45`
 
 ## Not comparable — a member hides its steps in shell
+
+### `radio-a5-1-handover`
+
+- **3210**: `shell`
+- **3310**: `shell`
+- **3330**: `shell`
+- **3410**: `shell`
+
+### `radio-a5-1-handover-failure-state`
+
+- **3210**: `shell`
+- **3310**: `shell`
+- **3330**: `shell`
+- **3410**: `shell`
 
 ### `radio-a5-1-incoming-call`
 

@@ -26,6 +26,12 @@ SPEECH = re.compile(
     r"dsp_hle: speech tick uplink=(\d+) downlink=(\d+) .*?t=([0-9.]+)")
 ROUNDTRIP = re.compile(
     r"state_roundtrip: result=(\w+) .*?requested_at=([0-9.]+) t=([0-9.]+)")
+A5_ACTIVATED = re.compile(r"gsm_cipher: event=activated algorithm=1")
+FACCH = {
+    direction: re.compile(
+        rf"radio_l1: direction={direction} kind=facch good=1")
+    for direction in ("uplink", "downlink")
+}
 
 
 def _positions(text: str, events: dict[str, re.Pattern[str]],
@@ -51,7 +57,8 @@ def _event_time(text: str, position: int) -> float:
 
 
 def check(path: Path, outcome: str, require_state: bool = False,
-          serving: int = 1, target: int = 2) -> str:
+          serving: int = 1, target: int = 2,
+          require_a5_1: bool = False) -> str:
     text = path.read_text(errors="replace")
     events = _events(serving, target)
     if outcome == "success":
@@ -83,6 +90,18 @@ def check(path: Path, outcome: str, require_state: bool = False,
             raise ValueError("save/load did not occur during handover")
 
     assert terminal is not None
+    if require_a5_1:
+        activation = A5_ACTIVATED.search(text)
+        command = events["command"].search(text)
+        if not activation or not command or activation.start() >= command.start():
+            raise ValueError("A5/1 was not active before handover")
+        facch_start = terminal.end() if outcome == "success" else command.end()
+        facch_end = len(text) if outcome == "success" else terminal.start()
+        for direction, pattern in FACCH.items():
+            if not pattern.search(text, facch_start, facch_end):
+                raise ValueError(
+                    f"missing handover-lifecycle {direction} FACCH under A5/1")
+
     speech_after = [
         (int(match.group(1)), int(match.group(2)))
         for match in SPEECH.finditer(text, terminal.end())
@@ -101,10 +120,12 @@ def main() -> None:
     parser.add_argument("--require-state", action="store_true")
     parser.add_argument("--serving-arfcn", type=int, default=1)
     parser.add_argument("--target-arfcn", type=int, default=2)
+    parser.add_argument("--require-a5-1", action="store_true")
     args = parser.parse_args()
     try:
         print(check(args.log, args.outcome, args.require_state,
-                    args.serving_arfcn, args.target_arfcn))
+                    args.serving_arfcn, args.target_arfcn,
+                    args.require_a5_1))
     except ValueError as error:
         raise SystemExit(f"FAIL - {error}") from error
 

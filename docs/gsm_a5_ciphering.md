@@ -79,6 +79,10 @@ products; the 3330 gate starts from separately provisioned, preserved PMM.
 The host release gate replays encrypted CC/RR release exactly without
 serializing its socket, and the two-call host gate requires two separate
 command/completion/activation sequences with an intervening PCH return.
+Dedicated-mode success and target-silence gates on all four products prove
+that A5/1 remains active across Handover Command, bidirectional FACCH,
+Handover Complete or timed rollback, continued speech and mid-procedure
+save/load.
 
 Relevant commands are:
 
@@ -96,6 +100,11 @@ make verify-3310-radio-a5-1-incoming-call RUN_DIR=run-a5-3310
 make verify-3310-radio-a5-1-outgoing-call RUN_DIR=run-a5-3310-outgoing
 make verify-3330-radio-a5-1-incoming-call RUN_DIR=run-a5-3330
 make verify-3330-radio-a5-1-outgoing-call RUN_DIR=run-a5-3330-outgoing
+make verify-radio-a5-1-handover RUN_DIR=run-a5-handover
+make verify-radio-a5-1-handover-failure-state RUN_DIR=run-a5-handover-failure
+make verify-3310-radio-a5-1-handover RUN_DIR=run-a5-handover-3310
+make verify-3330-radio-a5-1-handover RUN_DIR=run-a5-handover-3330
+make verify-3410-radio-a5-1-handover RUN_DIR=run-a5-handover-3410
 make verify-radio-a5-1-host-release-restore RUN_DIR=run-a5-release
 make verify-radio-a5-1-host-two-calls RUN_DIR=run-a5-two-calls
 ```
