@@ -511,7 +511,7 @@ verify-radio-loss-recovery:
 verify-radio-loss-recovery-state:
 	@for boundary in degradation search; do \
 		if test "$$boundary" = degradation; then at=20.95; replay=500; \
-		else at=21.08; replay=150; fi; \
+		else at=21.08; replay=500; fi; \
 		$(MAKE) --no-print-directory run $(DCT3_RUN_3210) \
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \

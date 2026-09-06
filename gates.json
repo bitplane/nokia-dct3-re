@@ -2654,7 +2654,7 @@
       "recipe": [
         "\t@for boundary in degradation search; do \\",
         "\t\tif test \"$$boundary\" = degradation; then at=20.95; replay=500; \\",
-        "\t\telse at=21.08; replay=150; fi; \\",
+        "\t\telse at=21.08; replay=500; fi; \\",
         "\t\t$(MAKE) --no-print-directory run $(DCT3_RUN_3210) \\",
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \\",
