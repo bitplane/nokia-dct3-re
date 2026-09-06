@@ -5142,6 +5142,40 @@
       ]
     },
     {
+      "name": "verify-3330-radio-handover",
+      "prerequisites": ["normalize-3330"],
+      "variables": {},
+      "unstructured": "NHM-6 dedicated-mode handover success lifecycle",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \\",
+        "\t\tRUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=22 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \\",
+        "\t\tRUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome success --serving-arfcn 823 --target-arfcn 824; \\",
+        "\t$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log; \\",
+        "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)"
+      ]
+    },
+    {
+      "name": "verify-3330-radio-handover-failure-state",
+      "prerequisites": ["normalize-3330"],
+      "variables": {},
+      "unstructured": "NHM-6 handover rollback with mid-procedure save/load",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 \\",
+        "\t\tRUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=18 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \\",
+        "\t\tRUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=12.45 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome failure --require-state --serving-arfcn 823 --target-arfcn 824"
+      ]
+    },
+    {
       "name": "verify-radio-supplementary-call",
       "prerequisites": [
         "build"

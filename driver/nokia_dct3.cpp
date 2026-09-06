@@ -185,7 +185,7 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM5 = {
 
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x14, 0x01, 0x00, 0, true, 0, true, true,
+	0x14, 0x01, 0x01, 0, true, 0, true, true,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::topology_low_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };

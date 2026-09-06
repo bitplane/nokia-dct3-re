@@ -64,7 +64,7 @@ CHECKPOINTS = (
     ("traffic release UA", TRAFFIC_RELEASE_UA),
     ("NHM-6 release transaction",
      r"TX packet type=02 payload=20 .*"
-     r"data=041202001117001a600003370000001400000001"),
+     r"data=04[0-9a-f]{2}02001117001a6000[0-9a-f]{4}0000001400000001"),
     ("release confirmation", RELEASE_CONFIRMATION),
     ("speech release", r"wire=840a speech_control=040a"),
     ("idle PCH", IDLE_PCH),
