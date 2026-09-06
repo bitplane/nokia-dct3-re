@@ -259,26 +259,51 @@ public:
 	std::array<u8, 2> call_release(u8 transaction) const;
 	std::array<u8, 2> call_release_complete(u8 transaction) const;
 	std::array<u8, 3> channel_release() const;
+	enum class forwarding_condition : u8
+	{
+		unconditional,
+		busy,
+		no_reply,
+		not_reachable,
+		count
+	};
+	void register_forwarding(forwarding_condition condition,
+			const u8 *number, unsigned length,
+			gsm::ss::basic_service_kind basic_service,
+			u8 basic_service_code, u8 no_reply_condition_time);
+	bool activate_forwarding(forwarding_condition condition);
+	void deactivate_forwarding(forwarding_condition condition);
+	void erase_forwarding(forwarding_condition condition);
+	bool forwarding_registered(forwarding_condition condition) const;
+	bool forwarding_active(forwarding_condition condition) const;
+	const std::array<u8, gsm::ss::maximum_forwarded_number_length> &
+			forwarding_number(forwarding_condition condition) const;
+	unsigned forwarding_number_length(forwarding_condition condition) const;
+	gsm::ss::basic_service_kind forwarding_basic_service(
+			forwarding_condition condition) const;
+	u8 forwarding_basic_service_code(forwarding_condition condition) const;
+	u8 forwarding_no_reply_time(forwarding_condition condition) const;
+	bool speech_forwarding_active(forwarding_condition condition) const;
 	void register_unconditional_forwarding(const u8 *number, unsigned length);
 	bool activate_unconditional_forwarding();
 	void deactivate_unconditional_forwarding();
 	void erase_unconditional_forwarding();
 	bool unconditional_forwarding_registered() const
 	{
-		return m_unconditional_forwarding_registered;
+		return forwarding_registered(forwarding_condition::unconditional);
 	}
 	bool unconditional_forwarding_active() const
 	{
-		return m_unconditional_forwarding_active;
+		return forwarding_active(forwarding_condition::unconditional);
 	}
 	const std::array<u8, gsm::ss::maximum_forwarded_number_length> &
 			unconditional_forwarding_number() const
 	{
-		return m_unconditional_forwarding_number;
+		return forwarding_number(forwarding_condition::unconditional);
 	}
 	unsigned unconditional_forwarding_number_length() const
 	{
-		return m_unconditional_forwarding_number_length;
+		return forwarding_number_length(forwarding_condition::unconditional);
 	}
 	gsm::cell_broadcast::page cell_broadcast_page() const;
 	s8 serving_rssi(unsigned sample) const;
@@ -313,11 +338,16 @@ private:
 	neighbour_fault_profile m_neighbour_fault =
 			neighbour_fault_profile::none;
 	bool m_stale_neighbour_lost = false;
-	bool m_unconditional_forwarding_registered = false;
-	bool m_unconditional_forwarding_active = false;
-	unsigned m_unconditional_forwarding_number_length = 0;
-	std::array<u8, gsm::ss::maximum_forwarded_number_length>
-			m_unconditional_forwarding_number{};
+	static constexpr unsigned forwarding_condition_count =
+			unsigned(forwarding_condition::count);
+	std::array<bool, forwarding_condition_count> m_forwarding_registered{};
+	std::array<bool, forwarding_condition_count> m_forwarding_active{};
+	std::array<unsigned, forwarding_condition_count> m_forwarding_number_length{};
+	std::array<std::array<u8, gsm::ss::maximum_forwarded_number_length>,
+			forwarding_condition_count> m_forwarding_number{};
+	std::array<u8, forwarding_condition_count> m_forwarding_basic_service{};
+	std::array<u8, forwarding_condition_count> m_forwarding_basic_service_code{};
+	std::array<u8, forwarding_condition_count> m_forwarding_no_reply_time{};
 
 	gsm::mobility::cell resolved_cell(u16 arfcn) const;
 };

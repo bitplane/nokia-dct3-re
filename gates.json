@@ -5517,6 +5517,39 @@
       ]
     },
     {
+      "name": "verify-radio-call-divert-no-reply",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "host adapter plus organic CFNRy registration and timeout",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\t$(call prepare_host_run,$(RUN_DIR),noki3210,); \\",
+        "\tenv NOKIA_DCT3_LUA_QUIET=1 \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,6,1,star,5,5,5,1,2,3,4,star,1,1,star,5,hash,wait800,enter \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \\",
+        "\t\tNOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \\",
+        "\t\tNOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \\",
+        "\t\t$(VENV)/bin/python tools/run_host_no_reply_forward_gate.py \\",
+        "\t\t\t--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) -- \\",
+        "\t\t\t./mame noki3210 -rompath roms -log -video none -sound none \\",
+        "\t\t\t-keyboardprovider none -mouseprovider none -lightgunprovider none \\",
+        "\t\t\t-joystickprovider none -midiprovider none -skip_gameinfo \\",
+        "\t\t\t-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \\",
+        "\t\t\t-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \\",
+        "\t\t\t-http_port $(HOST_CALL_INCOMING_PORT) \\",
+        "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_no_reply_forward_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
       "name": "verify-radio-ussd",
       "prerequisites": [
         "build"

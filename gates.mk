@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 247 gates: 141 generated from typed steps, 106 copied verbatim (shell).
+# 248 gates: 141 generated from typed steps, 107 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -102,12 +102,12 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-a5-1-handover-failure-state verify-radio-supplementary-call \
 	verify-radio-two-call verify-radio-second-outgoing-call \
 	verify-radio-call-divert verify-radio-call-divert-lifecycle \
-	verify-radio-call-divert-incoming verify-radio-ussd \
-	verify-radio-two-call-negatives verify-radio-a5-1-incoming-call \
-	verify-radio-a5-1-state verify-radio-a5-1-sdcch-state \
-	verify-radio-a5-1-outgoing-call verify-radio-outgoing-call-lifecycle \
-	verify-radio-outgoing-call-state verify-radio-outgoing-call-busy \
-	verify-radio-outgoing-call-no-answer \
+	verify-radio-call-divert-incoming verify-radio-call-divert-no-reply \
+	verify-radio-ussd verify-radio-two-call-negatives \
+	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
+	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
+	verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state \
+	verify-radio-outgoing-call-busy verify-radio-outgoing-call-no-answer \
 	verify-radio-outgoing-call-no-answer-state \
 	verify-radio-outgoing-call-service-reject \
 	verify-radio-outgoing-call-delayed-decision-state \
@@ -1177,6 +1177,31 @@ verify-radio-call-divert-incoming: build
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_divert_incoming_trace_check.py $(RUN_DIR)/error.log
+
+# shell: host adapter plus organic CFNRy registration and timeout
+verify-radio-call-divert-no-reply: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-call-divert-no-reply: build
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,6,1,star,5,5,5,1,2,3,4,star,1,1,star,5,hash,wait800,enter \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
+		$(VENV)/bin/python tools/run_host_no_reply_forward_gate.py \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo \
+			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
+			-http_port $(HOST_CALL_INCOMING_PORT) \
+			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_no_reply_forward_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-ussd: ERASED_IDENTITY_SECURITY_CODE=12345
 verify-radio-ussd: build

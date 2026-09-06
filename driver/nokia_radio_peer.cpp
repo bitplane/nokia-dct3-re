@@ -15,18 +15,37 @@ nokia_radio_peer_device::host_incoming_result
 nokia_radio_peer_device::queue_host_incoming_call(
 		const u8 *digits, unsigned length)
 {
-	if (!m_enabled || !m_registered ||
-			m_host_incoming_call_pending || !m_gsm_session->idle())
+	if (!m_enabled || !m_registered || m_host_incoming_call_pending)
 		return host_incoming_result::rejected;
-	if (m_gsm_network->unconditional_forwarding_active())
+	if (m_gsm_session->idle() && current_phase() != phase::serving_bcch &&
+			m_gsm_network->speech_forwarding_active(
+				nokia_gsm_network_device::forwarding_condition::not_reachable))
 	{
 		LOGMASKED(LOG_RADIO,
 				"dsp_hle: GSM incoming call forwarded before paging "
-				"destination_length=%u t=%.6f\n",
-				m_gsm_network->unconditional_forwarding_number_length(),
+				"destination_length=%u condition=not-reachable t=%.6f\n",
+				m_gsm_network->forwarding_number_length(
+					nokia_gsm_network_device::forwarding_condition::not_reachable),
 				machine().time().as_double());
 		return host_incoming_result::forwarded;
 	}
+	if (m_gsm_session->incoming_service_diverted(
+			nokia_gsm_session_device::incoming_service::call))
+	{
+		const bool busy = !m_gsm_session->idle();
+		const auto condition = busy ?
+				nokia_gsm_network_device::forwarding_condition::busy :
+				nokia_gsm_network_device::forwarding_condition::unconditional;
+		LOGMASKED(LOG_RADIO,
+				"dsp_hle: GSM incoming call forwarded before paging "
+				"destination_length=%u condition=%s t=%.6f\n",
+				m_gsm_network->forwarding_number_length(condition),
+				busy ? "busy" : "unconditional",
+				machine().time().as_double());
+		return host_incoming_result::forwarded;
+	}
+	if (!m_gsm_session->idle())
+		return host_incoming_result::rejected;
 	if (!m_gsm_session->set_incoming_caller(digits, length))
 		return host_incoming_result::rejected;
 	// The fixture latch is one-shot; a fresh host transaction deliberately

@@ -152,26 +152,44 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
             establishment,
         )
 
-    def test_unconditional_forwarding_is_network_owned_and_saved(self):
+    def test_conditional_forwarding_is_network_owned_and_saved(self):
         network_header = (ROOT / "driver/nokia_gsm_network.h").read_text()
         network_source = (ROOT / "driver/nokia_gsm_network.cpp").read_text()
         radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
         for field in (
-            "m_unconditional_forwarding_registered",
-            "m_unconditional_forwarding_active",
-            "m_unconditional_forwarding_number_length",
-            "m_unconditional_forwarding_number",
+            "m_forwarding_registered",
+            "m_forwarding_active",
+            "m_forwarding_number_length",
+            "m_forwarding_number",
+            "m_forwarding_basic_service",
+            "m_forwarding_basic_service_code",
+            "m_forwarding_no_reply_time",
         ):
             self.assertIn(f"save_item(NAME({field}));", network_source)
-        self.assertIn("unconditional_forwarding_active()", network_header)
+        for condition in ("unconditional", "busy", "no_reply", "not_reachable"):
+            self.assertIn(condition, network_header)
         self.assertIn("host_incoming_result::forwarded", radio)
         forwarding = radio.split(
             "queue_host_incoming_call", 1)[1].split(
                 "nokia_radio_peer_device::nokia_radio_peer_device", 1)[0]
         self.assertLess(
-            forwarding.index("unconditional_forwarding_active()"),
+            forwarding.index("incoming_service_diverted"),
             forwarding.index("set_incoming_caller"),
         )
+
+    def test_multiparty_state_and_no_reply_timer_are_saved(self):
+        for field in (
+            "m_multiparty_active",
+            "m_multiparty_held",
+            "m_multiparty_operation_count",
+            "m_incoming_call_forwarded",
+        ):
+            self.assertIn(f"save_item(NAME({field}));", self.source)
+        for operation in ("build_mpty", "hold_mpty", "retrieve_mpty",
+                          "split_mpty"):
+            self.assertIn(f"operation::{operation}", self.source)
+        self.assertIn("TIMER_CALLBACK_MEMBER(nokia_gsm_session_device::no_reply_timer)",
+                      self.source)
 
     def test_outgoing_setup_requires_speech_and_called_party(self):
         setup = self.source.split(

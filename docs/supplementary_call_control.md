@@ -64,5 +64,24 @@ message is tolerated: NSE-8 responds once with its bounded capability set and
 continues presenting the waiting call. Neither case releases the original call
 or the shared RR channel.
 
-Multiparty calls and explicit call transfer remain unmodeled. Call forwarding
-and USSD are documented separately in `gsm_supplementary_services.md`.
+## Multiparty protocol boundary
+
+The generic session now accepts the GSM 04.80 call-related operations
+BuildMPTY (`0x7c`), HoldMPTY (`0x7b`), RetrieveMPTY (`0x7a`) and SplitMPTY
+(`0x79`) in a CC FACILITY message. Build requires exactly one active and one
+held leg; the other operations require the corresponding saved multiparty
+state. Success returns a correlated ReturnResult and an incompatible request
+returns `SS-Incompatibility`. Releasing either of the two represented legs
+dissolves the conference state without releasing the surviving CC leg.
+
+This is a standards-conformance boundary, covered by the isolated
+`gsm_supplementary` codec and session-invariant tests. It is not an organic
+NSE-8 feature claim: the v6.00 two-call menu exposes no Conference or Private
+action and emits no call-related FACILITY request. A runtime gate requires a
+product/firmware combination which actually originates one of these
+operations. Explicit call transfer remains unmodeled.
+
+The operation values and result/error shape follow
+[ETSI GSM 04.80](https://www.etsi.org/deliver/etsi_gts/04/0480/05.00.00_60/gsmts_0480v050000p.pdf).
+Call forwarding and USSD are documented separately in
+`gsm_supplementary_services.md`.

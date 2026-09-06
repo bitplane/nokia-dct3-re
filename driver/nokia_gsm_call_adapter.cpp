@@ -445,6 +445,8 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 			m_incoming_request_id && m_session->incoming_call_connected();
 	const bool incoming_alerting =
 			m_incoming_request_id && m_session->incoming_call_alerting();
+	const bool incoming_forwarded =
+			m_incoming_request_id && m_session->take_incoming_forwarded();
 	if (m_incoming_request_id && m_incoming_page_accepted &&
 			!m_session->idle())
 		m_incoming_started = true;
@@ -527,6 +529,15 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		publish_incoming_state("connected");
 	else if (incoming_alerting && (!m_last_incoming_alerting || republish))
 		publish_incoming_state("alerting");
+	else if (incoming_forwarded)
+	{
+		publish_incoming_state("forwarded");
+		m_incoming_request_id = 0;
+		m_incoming_digits_length = 0;
+		m_incoming_page_accepted = false;
+		m_incoming_started = false;
+		m_incoming_connected_once = false;
+	}
 	else if (m_incoming_request_id && m_incoming_started && !incoming_connected &&
 			!incoming_alerting &&
 			(m_session->idle() ||

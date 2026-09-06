@@ -103,6 +103,44 @@ int main()
 	if (gsm::ss::forwarding_info_result(request, false, false,
 			destination.data(), destination.size() + 1).length)
 		return 10;
+
+	const std::uint8_t conditional[] = {
+		0x1b, 0x7b, 0x1c, 0x1a, 0xa1, 0x18, 0x02, 0x01, 0x02,
+		0x02, 0x01, 0x0a, 0x30, 0x10, 0x04, 0x01, 0x2a,
+		0x83, 0x01, 0x11, 0x84, 0x05, 0x81, 0x55, 0x15, 0x32, 0xf4,
+		0x85, 0x01, 0x14, 0x7f, 0x01, 0x00
+	};
+	request = gsm::ss::parse_register(conditional, sizeof(conditional));
+	if (!request.valid || request.service_code != 0x2a ||
+			request.basic_service != gsm::ss::basic_service_kind::teleservice ||
+			request.basic_service_code != 0x11 ||
+			request.no_reply_condition_time != 20)
+		return 12;
+	response = gsm::ss::forwarding_info_result(request, true, true,
+			request.forwarded_number.data(), request.forwarded_number_length,
+			request.basic_service, request.basic_service_code,
+			request.no_reply_condition_time);
+	if (response.length != 39 || response.data[23] != 0x83 ||
+			response.data[36] != 0x87 || response.data[38] != 20)
+		return 13;
+
+	const std::uint8_t build_mpty[] = {
+		0x83, 0x3a, 0x1c, 0x08, 0xa1, 0x06,
+		0x02, 0x01, 0x03, 0x02, 0x01, 0x7c, 0x7f, 0x01, 0x00
+	};
+	request = gsm::ss::parse_call_related_facility(
+			build_mpty, sizeof(build_mpty));
+	if (!request.valid || request.transaction != 0x83 || request.invoke_id != 3 ||
+			request.operation_code != gsm::ss::operation::build_mpty)
+		return 14;
+	response = gsm::ss::call_related_result(request);
+	if (response.length != 14 || response.data[1] != 0x3a ||
+			response.data[4] != 0xa2 || response.data[13] != 0x7c)
+		return 15;
+	response = gsm::ss::call_related_error(request, 0x14);
+	if (response.length != 12 || response.data[4] != 0xa3 ||
+			response.data[11] != 0x14)
+		return 16;
 	return 0;
 }
 '''

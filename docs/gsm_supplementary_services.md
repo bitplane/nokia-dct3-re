@@ -60,8 +60,35 @@ physical-key pause, and the tested double-Hash sequence produces no SS
 transaction. The organic gates therefore use the Nokia single-symbol aliases.
 The parser and unit tests still cover standardized `ActivateSS` and `EraseSS`
 requests and their success/error encodings without claiming this firmware UI
-can originate `**` or `##`. Conditional forwarding, basic-service groups,
-no-reply timers and a real external forwarding destination remain unsupported.
+can originate `**` or `##`.
+
+The network subscription is now indexed independently for unconditional,
+busy, no-reply and not-reachable forwarding. Each condition saves registration
+and activation state, the destination, optional bearer/teleservice scope and
+the optional no-reply duration. Speech routing honors an absent scope or the
+firmware-observed telephony group; unrelated basic-service groups do not
+divert a speech call.
+
+`make verify-radio-call-divert-no-reply` is the first organic conditional
+acceptance gate. Physical MMI input `*61*5551234*11*5#` makes NSE-8 emit
+RegisterSS for service `0x2a`, teleservice selector `0x10`, and a five-second
+timer. An external incoming call then progresses through paging and handset
+alerting. The saved session timer starts at the firmware's ALERTING message;
+expiry sends ordinary CC disconnect/release traffic and the host lifecycle
+ends as `forwarded`, never `connected`. This follows the GSM requirement that
+CFNRy is invoked only after the served subscriber fails to answer, rather than
+turning it into a pre-paging decision.
+
+Busy diversion is evaluated when a second external call arrives during an
+existing call. Not-reachable diversion is evaluated while a registered
+subscriber has left its serving-BCCH phase. These branches and basic-service
+filtering are modeled but do not yet have organic product gates. Collective
+service codes (`0x20`/`0x28`), multiple basic-service records in one result,
+and a backend which actually originates a new call to the stored destination
+remain unsupported. The stage-1 behavior and no-reply semantics follow
+[ETSI GSM 02.82](https://www.etsi.org/deliver/etsi_gts/02/0282/05.00.00_60/gsmts_0282v050000p.pdf);
+the BER fields follow
+[ETSI GSM 04.80](https://www.etsi.org/deliver/etsi_gts/04/0480/05.00.00_60/gsmts_0480v050000p.pdf).
 
 ## Validated USSD boundary
 

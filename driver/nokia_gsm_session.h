@@ -56,7 +56,8 @@ public:
 		release_complete,
 		supplementary_release_complete,
 		handover_command,
-		physical_information
+		physical_information,
+		multiparty_facility_result
 	};
 
 	struct downlink_message
@@ -177,6 +178,12 @@ public:
 	{
 		return !m_mobile_originated_call && m_call_alerting;
 	}
+	bool take_incoming_forwarded()
+	{
+		const bool forwarded = m_incoming_call_forwarded;
+		m_incoming_call_forwarded = false;
+		return forwarded;
+	}
 	gsm::a5::algorithm cipher_algorithm() const
 	{
 		return gsm::a5::algorithm(m_cipher_algorithm);
@@ -188,6 +195,7 @@ public:
 	{
 		return m_state == u8(state::awaiting_handover_result);
 	}
+	bool multiparty_active() const { return m_multiparty_active; }
 
 protected:
 	virtual void device_start() override;
@@ -270,6 +278,7 @@ private:
 			downlink_kind kind, const u8 *information, unsigned length,
 			u8 sapi = 0);
 	TIMER_CALLBACK_MEMBER(outgoing_decision_timer);
+	TIMER_CALLBACK_MEMBER(no_reply_timer);
 
 	required_device<nokia_gsm_network_device> m_network;
 	output_finder<> m_call_alerting_output;
@@ -305,6 +314,9 @@ private:
 	bool m_call_held = false;
 	u32 m_call_hold_count = 0;
 	u32 m_call_retrieve_count = 0;
+	bool m_multiparty_active = false;
+	bool m_multiparty_held = false;
+	u32 m_multiparty_operation_count = 0;
 	bool m_waiting_call_queued = false;
 	std::array<u8, maximum_call_legs> m_call_leg_transactions{};
 	std::array<u8, maximum_call_legs> m_call_leg_states{};
@@ -327,6 +339,8 @@ private:
 	unsigned m_outgoing_decision_delay_ms = 0;
 	bool m_outgoing_fallback_enabled = true;
 	emu_timer *m_outgoing_decision_timer = nullptr;
+	emu_timer *m_no_reply_timer = nullptr;
+	bool m_incoming_call_forwarded = false;
 	u8 m_incoming_service = u8(incoming_service::none);
 	u8 m_sms_delivery_index = 0;
 	u8 m_sms_cp_transaction = 0;

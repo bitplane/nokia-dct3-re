@@ -22,7 +22,18 @@ enum class operation : std::uint8_t
 	activate_ss = 0x0c,
 	deactivate_ss = 0x0d,
 	interrogate_ss = 0x0e,
-	process_uss_request = 0x3b
+	process_uss_request = 0x3b,
+	split_mpty = 0x79,
+	retrieve_mpty = 0x7a,
+	hold_mpty = 0x7b,
+	build_mpty = 0x7c
+};
+
+enum class basic_service_kind : std::uint8_t
+{
+	none,
+	bearer,
+	teleservice
 };
 
 struct request
@@ -32,6 +43,9 @@ struct request
 	std::uint8_t invoke_id = 0;
 	operation operation_code = operation::unknown;
 	std::uint8_t service_code = 0;
+	basic_service_kind basic_service = basic_service_kind::none;
+	std::uint8_t basic_service_code = 0;
+	std::uint8_t no_reply_condition_time = 0;
 	std::uint8_t data_coding_scheme = 0;
 	unsigned ussd_length = 0;
 	std::array<std::uint8_t, maximum_ussd_length> ussd{};
@@ -46,12 +60,21 @@ struct message
 };
 
 request parse_register(const std::uint8_t *data, unsigned length);
+request parse_call_related_facility(const std::uint8_t *data, unsigned length);
+message call_related_result(const request &request);
+message call_related_error(const request &request, std::uint8_t error_code);
 message interrogate_result(const request &request, bool active);
 message interrogate_result(const request &request, bool registered, bool active,
-		const std::uint8_t *forwarded_number, unsigned number_length);
+		const std::uint8_t *forwarded_number, unsigned number_length,
+		basic_service_kind basic_service = basic_service_kind::none,
+		std::uint8_t basic_service_code = 0,
+		std::uint8_t no_reply_condition_time = 0);
 message forwarding_info_result(const request &request, bool registered,
 		bool active, const std::uint8_t *forwarded_number,
-		unsigned number_length);
+		unsigned number_length,
+		basic_service_kind basic_service = basic_service_kind::none,
+		std::uint8_t basic_service_code = 0,
+		std::uint8_t no_reply_condition_time = 0);
 message error_result(const request &request, std::uint8_t error_code);
 message process_uss_request_result(const request &request,
 		const char *response);

@@ -27,6 +27,8 @@ void nokia_gsm_session_device::device_start()
 	m_outgoing_decision_timer =
 			timer_alloc(FUNC(nokia_gsm_session_device::outgoing_decision_timer),
 					this);
+	m_no_reply_timer = timer_alloc(
+			FUNC(nokia_gsm_session_device::no_reply_timer), this);
 	save_item(NAME(m_state));
 	save_item(NAME(m_cipher_algorithm));
 	save_item(NAME(m_cipher_key));
@@ -56,6 +58,9 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_call_held));
 	save_item(NAME(m_call_hold_count));
 	save_item(NAME(m_call_retrieve_count));
+	save_item(NAME(m_multiparty_active));
+	save_item(NAME(m_multiparty_held));
+	save_item(NAME(m_multiparty_operation_count));
 	save_item(NAME(m_waiting_call_queued));
 	save_item(NAME(m_call_leg_transactions));
 	save_item(NAME(m_call_leg_states));
@@ -85,6 +90,7 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_sms_submit_recipient));
 	save_item(NAME(m_sms_submit_recipient_length));
 	save_item(NAME(m_incoming_service_completed));
+	save_item(NAME(m_incoming_call_forwarded));
 	save_item(NAME(m_handover_target_arfcn));
 	save_item(NAME(m_handover_reference));
 	save_item(NAME(m_pending_downlink.kind));
@@ -136,6 +142,9 @@ void nokia_gsm_session_device::device_reset()
 	m_call_held = false;
 	m_call_hold_count = 0;
 	m_call_retrieve_count = 0;
+	m_multiparty_active = false;
+	m_multiparty_held = false;
+	m_multiparty_operation_count = 0;
 	m_waiting_call_queued = false;
 	m_call_leg_transactions.fill(0);
 	m_call_leg_states.fill(u8(call_leg_state::inactive));
@@ -165,6 +174,8 @@ void nokia_gsm_session_device::device_reset()
 	m_sms_submit_recipient.fill(0);
 	m_sms_submit_recipient_length = 0;
 	m_incoming_service_completed = false;
+	m_incoming_call_forwarded = false;
+	m_no_reply_timer->adjust(attotime::never);
 	m_handover_target_arfcn = 0;
 	m_handover_reference = 0;
 	clear_pending_downlink();
@@ -309,7 +320,10 @@ bool nokia_gsm_session_device::incoming_service_diverted(
 		incoming_service service) const
 {
 	return service == incoming_service::call &&
-			m_network->unconditional_forwarding_active();
+			(m_network->speech_forwarding_active(
+				nokia_gsm_network_device::forwarding_condition::unconditional) ||
+			 (live_call_leg_count() != 0 && m_network->speech_forwarding_active(
+				nokia_gsm_network_device::forwarding_condition::busy)));
 }
 
 nokia_gsm_session_device::downlink_kind
@@ -684,7 +698,9 @@ nokia_gsm_session_device::downlink_acknowledged()
 			 m_pending_downlink.kind ==
 					u8(downlink_kind::call_hold_acknowledge) ||
 			 m_pending_downlink.kind ==
-					u8(downlink_kind::call_retrieve_acknowledge)))
+					u8(downlink_kind::call_retrieve_acknowledge) ||
+			 m_pending_downlink.kind ==
+					u8(downlink_kind::multiparty_facility_result)))
 	{
 		clear_pending_downlink();
 		return downlink_kind::none;
@@ -697,6 +713,11 @@ nokia_gsm_session_device::downlink_acknowledged()
 		if (m_releasing_call_leg < maximum_call_legs)
 		{
 			set_call_leg_state(m_releasing_call_leg, call_leg_state::inactive);
+			if (live_call_leg_count() < 2)
+			{
+				m_multiparty_active = false;
+				m_multiparty_held = false;
+			}
 			m_releasing_call_leg = 0xff;
 			if (live_call_leg_count() != 0)
 			{
@@ -857,15 +878,41 @@ nokia_gsm_session_device::receive_layer3(
 		if (!request.valid)
 			return downlink_kind::none;
 		gsm::ss::message response;
-		if (request.service_code == 0x21 &&
+		nokia_gsm_network_device::forwarding_condition forwarding_condition;
+		const bool forwarding_service = [&]() {
+			switch (request.service_code)
+			{
+			case 0x21:
+				forwarding_condition = nokia_gsm_network_device::
+						forwarding_condition::unconditional;
+				return true;
+			case 0x29:
+				forwarding_condition = nokia_gsm_network_device::
+						forwarding_condition::busy;
+				return true;
+			case 0x2a:
+				forwarding_condition = nokia_gsm_network_device::
+						forwarding_condition::no_reply;
+				return true;
+			case 0x2b:
+				forwarding_condition = nokia_gsm_network_device::
+						forwarding_condition::not_reachable;
+				return true;
+			default:
+				return false;
+			}
+		}();
+		if (forwarding_service &&
 				request.operation_code == gsm::ss::operation::interrogate_ss)
 		{
-			const bool active =
-					m_network->unconditional_forwarding_active();
+			const bool active = m_network->forwarding_active(forwarding_condition);
 			response = gsm::ss::interrogate_result(request,
-					m_network->unconditional_forwarding_registered(), active,
-					m_network->unconditional_forwarding_number().data(),
-					m_network->unconditional_forwarding_number_length());
+					m_network->forwarding_registered(forwarding_condition), active,
+					m_network->forwarding_number(forwarding_condition).data(),
+					m_network->forwarding_number_length(forwarding_condition),
+					m_network->forwarding_basic_service(forwarding_condition),
+					m_network->forwarding_basic_service_code(forwarding_condition),
+					m_network->forwarding_no_reply_time(forwarding_condition));
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=interrogate transaction=%02x invoke=%u "
 					"service=%02x active=%u t=%.6f\n",
@@ -885,15 +932,19 @@ nokia_gsm_session_device::receive_layer3(
 					request.data_coding_scheme, request.ussd_length,
 					machine().time().as_double());
 		}
-		else if (request.service_code == 0x21 &&
+		else if (forwarding_service &&
 				request.operation_code == gsm::ss::operation::register_ss)
 		{
-			m_network->register_unconditional_forwarding(
+			m_network->register_forwarding(forwarding_condition,
 					request.forwarded_number.data(),
-					request.forwarded_number_length);
+					request.forwarded_number_length, request.basic_service,
+					request.basic_service_code, request.no_reply_condition_time);
 			response = gsm::ss::forwarding_info_result(request, true, true,
-					m_network->unconditional_forwarding_number().data(),
-					m_network->unconditional_forwarding_number_length());
+					m_network->forwarding_number(forwarding_condition).data(),
+					m_network->forwarding_number_length(forwarding_condition),
+					m_network->forwarding_basic_service(forwarding_condition),
+					m_network->forwarding_basic_service_code(forwarding_condition),
+					m_network->forwarding_no_reply_time(forwarding_condition));
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=register transaction=%02x invoke=%u "
 					"service=%02x number_length=%u active=1 t=%.6f\n",
@@ -901,41 +952,47 @@ nokia_gsm_session_device::receive_layer3(
 					request.forwarded_number_length,
 					machine().time().as_double());
 		}
-		else if (request.service_code == 0x21 &&
+		else if (forwarding_service &&
 				request.operation_code == gsm::ss::operation::deactivate_ss)
 		{
-			m_network->deactivate_unconditional_forwarding();
+			m_network->deactivate_forwarding(forwarding_condition);
 			response = gsm::ss::forwarding_info_result(request,
-					m_network->unconditional_forwarding_registered(), false,
-					m_network->unconditional_forwarding_number().data(),
-					m_network->unconditional_forwarding_number_length());
+					m_network->forwarding_registered(forwarding_condition), false,
+					m_network->forwarding_number(forwarding_condition).data(),
+					m_network->forwarding_number_length(forwarding_condition),
+					m_network->forwarding_basic_service(forwarding_condition),
+					m_network->forwarding_basic_service_code(forwarding_condition),
+					m_network->forwarding_no_reply_time(forwarding_condition));
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=deactivate transaction=%02x invoke=%u "
 					"service=%02x active=0 t=%.6f\n",
 					request.transaction, request.invoke_id, request.service_code,
 					machine().time().as_double());
 		}
-		else if (request.service_code == 0x21 &&
+		else if (forwarding_service &&
 				request.operation_code == gsm::ss::operation::activate_ss)
 		{
-			if (m_network->activate_unconditional_forwarding())
+			if (m_network->activate_forwarding(forwarding_condition))
 				response = gsm::ss::forwarding_info_result(request, true, true,
-						m_network->unconditional_forwarding_number().data(),
-						m_network->unconditional_forwarding_number_length());
+						m_network->forwarding_number(forwarding_condition).data(),
+						m_network->forwarding_number_length(forwarding_condition),
+						m_network->forwarding_basic_service(forwarding_condition),
+						m_network->forwarding_basic_service_code(forwarding_condition),
+						m_network->forwarding_no_reply_time(forwarding_condition));
 			else
 				response = gsm::ss::error_result(request, 0x11);
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=activate transaction=%02x invoke=%u "
 					"service=%02x registered=%u active=%u t=%.6f\n",
 					request.transaction, request.invoke_id, request.service_code,
-					m_network->unconditional_forwarding_registered() ? 1 : 0,
-					m_network->unconditional_forwarding_active() ? 1 : 0,
+					m_network->forwarding_registered(forwarding_condition) ? 1 : 0,
+					m_network->forwarding_active(forwarding_condition) ? 1 : 0,
 					machine().time().as_double());
 		}
-		else if (request.service_code == 0x21 &&
+		else if (forwarding_service &&
 				request.operation_code == gsm::ss::operation::erase_ss)
 		{
-			m_network->erase_unconditional_forwarding();
+			m_network->erase_forwarding(forwarding_condition);
 			response = gsm::ss::forwarding_info_result(request, false, false,
 					nullptr, 0);
 			LOGMASKED(LOG_GSM_SESSION,
@@ -980,6 +1037,79 @@ nokia_gsm_session_device::receive_layer3(
 		m_state = u8(state::awaiting_second_cm_service_accept_acknowledgement);
 		return queue_downlink(downlink_kind::cm_service_accept,
 				accept.data(), accept.size());
+	}
+	if (sapi == 0 && m_state == u8(state::incoming_call_active) &&
+			protocol_discriminator == 0x03 && message_type == 0x3a)
+	{
+		const gsm::ss::request request =
+				gsm::ss::parse_call_related_facility(information, length);
+		if (!request.valid)
+			return downlink_kind::none;
+		const int selected_leg = call_leg_index(request.transaction);
+		bool accepted = false;
+		switch (request.operation_code)
+		{
+		case gsm::ss::operation::build_mpty:
+			accepted = !m_multiparty_active && live_call_leg_count() == 2 &&
+					std::count(m_call_leg_states.begin(), m_call_leg_states.end(),
+						u8(call_leg_state::active)) == 1 &&
+					std::count(m_call_leg_states.begin(), m_call_leg_states.end(),
+						u8(call_leg_state::held)) == 1;
+			if (accepted)
+			{
+				for (unsigned leg = 0; leg < maximum_call_legs; ++leg)
+					set_call_leg_state(leg, call_leg_state::active);
+				m_multiparty_active = true;
+				m_multiparty_held = false;
+			}
+			break;
+		case gsm::ss::operation::hold_mpty:
+			accepted = m_multiparty_active && !m_multiparty_held;
+			if (accepted)
+			{
+				for (unsigned leg = 0; leg < maximum_call_legs; ++leg)
+					set_call_leg_state(leg, call_leg_state::held);
+				m_multiparty_held = true;
+			}
+			break;
+		case gsm::ss::operation::retrieve_mpty:
+			accepted = m_multiparty_active && m_multiparty_held;
+			if (accepted)
+			{
+				for (unsigned leg = 0; leg < maximum_call_legs; ++leg)
+					set_call_leg_state(leg, call_leg_state::active);
+				m_multiparty_held = false;
+			}
+			break;
+		case gsm::ss::operation::split_mpty:
+			accepted = m_multiparty_active && selected_leg >= 0;
+			if (accepted)
+			{
+				for (unsigned leg = 0; leg < maximum_call_legs; ++leg)
+					set_call_leg_state(leg,
+							int(leg) == selected_leg ? call_leg_state::active :
+							call_leg_state::held);
+				m_multiparty_active = false;
+				m_multiparty_held = false;
+			}
+			break;
+		default:
+			break;
+		}
+		if (accepted)
+			++m_multiparty_operation_count;
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: multiparty operation=%02x transaction=%02x "
+				"accepted=%u active=%u held=%u count=%u t=%.6f\n",
+				unsigned(request.operation_code), request.transaction,
+				accepted ? 1 : 0, m_multiparty_active ? 1 : 0,
+				m_multiparty_held ? 1 : 0, m_multiparty_operation_count,
+				machine().time().as_double());
+		const gsm::ss::message response = accepted ?
+				gsm::ss::call_related_result(request) :
+				gsm::ss::call_related_error(request, 0x14);
+		return queue_downlink(downlink_kind::multiparty_facility_result,
+				response.data.data(), response.length);
 	}
 	if (sapi == 0 && protocol_discriminator == 0x06 &&
 			message_type == 0x32)
@@ -1148,10 +1278,19 @@ nokia_gsm_session_device::receive_layer3(
 		{
 			m_call_alerting = true;
 			publish_call_alerting_output();
+			if (!m_mobile_originated_call && m_network->speech_forwarding_active(
+					nokia_gsm_network_device::forwarding_condition::no_reply))
+			{
+				const u8 configured = m_network->forwarding_no_reply_time(
+						nokia_gsm_network_device::forwarding_condition::no_reply);
+				m_no_reply_timer->adjust(attotime::from_seconds(
+						configured ? configured : 20));
+			}
 			return downlink_kind::none;
 		}
 		if (message_type == 0x07)
 		{
+			m_no_reply_timer->adjust(attotime::never);
 			const int leg = call_leg_index(information[0]);
 			if (leg >= 0)
 				set_call_leg_state(unsigned(leg), call_leg_state::active);
@@ -1333,6 +1472,8 @@ nokia_gsm_session_device::receive_layer3(
 		m_call_leg_states.fill(u8(call_leg_state::inactive));
 		m_releasing_call_leg = 0xff;
 		m_call_held = false;
+		m_multiparty_active = false;
+		m_multiparty_held = false;
 		m_outgoing_request_pending = false;
 		clear_outgoing_call_state();
 		publish_call_alerting_output();
@@ -1502,6 +1643,7 @@ bool nokia_gsm_session_device::submit_incoming_termination(u8 cause)
 				machine().time().as_double());
 		return false;
 	}
+	m_no_reply_timer->adjust(attotime::never);
 	m_call_alerting = false;
 	publish_call_alerting_output();
 	const auto disconnect = m_network->call_disconnect(m_call_transaction, cause);
@@ -1574,6 +1716,23 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_session_device::outgoing_decision_timer)
 		submit_outgoing_decision(
 				m_outgoing_policy_request_id,
 				m_network->configured_outgoing_call_outcome());
+}
+
+TIMER_CALLBACK_MEMBER(nokia_gsm_session_device::no_reply_timer)
+{
+	if (!m_mobile_originated_call && m_call_alerting &&
+			m_network->speech_forwarding_active(
+				nokia_gsm_network_device::forwarding_condition::no_reply) &&
+			submit_incoming_termination(0x10))
+	{
+		m_incoming_call_forwarded = true;
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_ss: incoming call forwarded condition=no-reply "
+				"destination_length=%u t=%.6f\n",
+				m_network->forwarding_number_length(
+					nokia_gsm_network_device::forwarding_condition::no_reply),
+				machine().time().as_double());
+	}
 }
 
 void nokia_gsm_session_device::publish_call_alerting_output()

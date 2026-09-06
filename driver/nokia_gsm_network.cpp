@@ -55,43 +55,142 @@ void nokia_gsm_network_device::device_start()
 	save_item(NAME(m_all_cells_lost));
 	save_item(NAME(m_recovery_cell_available));
 	save_item(NAME(m_stale_neighbour_lost));
-	save_item(NAME(m_unconditional_forwarding_active));
-	save_item(NAME(m_unconditional_forwarding_registered));
-	save_item(NAME(m_unconditional_forwarding_number_length));
-	save_item(NAME(m_unconditional_forwarding_number));
+	save_item(NAME(m_forwarding_active));
+	save_item(NAME(m_forwarding_registered));
+	save_item(NAME(m_forwarding_number_length));
+	save_item(NAME(m_forwarding_number));
+	save_item(NAME(m_forwarding_basic_service));
+	save_item(NAME(m_forwarding_basic_service_code));
+	save_item(NAME(m_forwarding_no_reply_time));
+}
+
+void nokia_gsm_network_device::register_forwarding(
+		forwarding_condition condition, const u8 *number, unsigned length,
+		gsm::ss::basic_service_kind basic_service, u8 basic_service_code,
+		u8 no_reply_condition_time)
+{
+	const unsigned index = unsigned(condition);
+	if (index >= forwarding_condition_count)
+		return;
+	m_forwarding_number[index].fill(0);
+	m_forwarding_number_length[index] = std::min<unsigned>(
+			length, m_forwarding_number[index].size());
+	std::copy_n(number, m_forwarding_number_length[index],
+			m_forwarding_number[index].begin());
+	m_forwarding_basic_service[index] = u8(basic_service);
+	m_forwarding_basic_service_code[index] = basic_service_code;
+	m_forwarding_no_reply_time[index] = no_reply_condition_time;
+	m_forwarding_active[index] = true;
+	m_forwarding_registered[index] = true;
+}
+
+bool nokia_gsm_network_device::activate_forwarding(forwarding_condition condition)
+{
+	const unsigned index = unsigned(condition);
+	if (index >= forwarding_condition_count || !m_forwarding_registered[index])
+		return false;
+	m_forwarding_active[index] = true;
+	return true;
+}
+
+void nokia_gsm_network_device::deactivate_forwarding(forwarding_condition condition)
+{
+	const unsigned index = unsigned(condition);
+	if (index < forwarding_condition_count)
+		m_forwarding_active[index] = false;
+}
+
+void nokia_gsm_network_device::erase_forwarding(forwarding_condition condition)
+{
+	const unsigned index = unsigned(condition);
+	if (index >= forwarding_condition_count)
+		return;
+	m_forwarding_active[index] = false;
+	m_forwarding_registered[index] = false;
+	m_forwarding_number_length[index] = 0;
+	m_forwarding_number[index].fill(0);
+	m_forwarding_basic_service[index] = u8(gsm::ss::basic_service_kind::none);
+	m_forwarding_basic_service_code[index] = 0;
+	m_forwarding_no_reply_time[index] = 0;
+}
+
+bool nokia_gsm_network_device::forwarding_registered(
+		forwarding_condition condition) const
+{
+	return unsigned(condition) < forwarding_condition_count &&
+			m_forwarding_registered[unsigned(condition)];
+}
+
+bool nokia_gsm_network_device::forwarding_active(
+		forwarding_condition condition) const
+{
+	return unsigned(condition) < forwarding_condition_count &&
+			m_forwarding_active[unsigned(condition)];
+}
+
+const std::array<u8, gsm::ss::maximum_forwarded_number_length> &
+nokia_gsm_network_device::forwarding_number(forwarding_condition condition) const
+{
+	return m_forwarding_number[unsigned(condition)];
+}
+
+unsigned nokia_gsm_network_device::forwarding_number_length(
+		forwarding_condition condition) const
+{
+	return m_forwarding_number_length[unsigned(condition)];
+}
+
+gsm::ss::basic_service_kind nokia_gsm_network_device::forwarding_basic_service(
+		forwarding_condition condition) const
+{
+	return gsm::ss::basic_service_kind(
+			m_forwarding_basic_service[unsigned(condition)]);
+}
+
+u8 nokia_gsm_network_device::forwarding_basic_service_code(
+		forwarding_condition condition) const
+{
+	return m_forwarding_basic_service_code[unsigned(condition)];
+}
+
+u8 nokia_gsm_network_device::forwarding_no_reply_time(
+		forwarding_condition condition) const
+{
+	return m_forwarding_no_reply_time[unsigned(condition)];
+}
+
+bool nokia_gsm_network_device::speech_forwarding_active(
+		forwarding_condition condition) const
+{
+	if (!forwarding_active(condition))
+		return false;
+	const auto service = forwarding_basic_service(condition);
+	return service == gsm::ss::basic_service_kind::none ||
+			(service == gsm::ss::basic_service_kind::teleservice &&
+			 (forwarding_basic_service_code(condition) == 0x10 ||
+			  forwarding_basic_service_code(condition) == 0x11));
 }
 
 void nokia_gsm_network_device::register_unconditional_forwarding(
 		const u8 *number, unsigned length)
 {
-	m_unconditional_forwarding_number_length =
-			std::min<unsigned>(length, m_unconditional_forwarding_number.size());
-	for (unsigned index = 0;
-			index < m_unconditional_forwarding_number_length; ++index)
-		m_unconditional_forwarding_number[index] = number[index];
-	m_unconditional_forwarding_active = true;
-	m_unconditional_forwarding_registered = true;
+	register_forwarding(forwarding_condition::unconditional, number, length,
+			gsm::ss::basic_service_kind::none, 0, 0);
 }
 
 bool nokia_gsm_network_device::activate_unconditional_forwarding()
 {
-	if (!m_unconditional_forwarding_registered)
-		return false;
-	m_unconditional_forwarding_active = true;
-	return true;
+	return activate_forwarding(forwarding_condition::unconditional);
 }
 
 void nokia_gsm_network_device::deactivate_unconditional_forwarding()
 {
-	m_unconditional_forwarding_active = false;
+	deactivate_forwarding(forwarding_condition::unconditional);
 }
 
 void nokia_gsm_network_device::erase_unconditional_forwarding()
 {
-	m_unconditional_forwarding_active = false;
-	m_unconditional_forwarding_registered = false;
-	m_unconditional_forwarding_number_length = 0;
-	m_unconditional_forwarding_number.fill(0);
+	erase_forwarding(forwarding_condition::unconditional);
 }
 
 void nokia_gsm_network_device::device_reset()
