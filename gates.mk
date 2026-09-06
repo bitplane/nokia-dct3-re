@@ -95,6 +95,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-two-call verify-radio-two-call-negatives \
 	verify-radio-second-outgoing-call \
 	verify-radio-call-divert \
+	verify-radio-call-divert-controls \
 	verify-radio-ussd \
 	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
 	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
@@ -957,6 +958,16 @@ verify-radio-call-divert: build
 	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
 	$(PYTHON) tools/radio_call_divert_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+
+# shell: organic unconditional-forwarding registration and deactivation
+verify-radio-call-divert-controls: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-call-divert-controls: build
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR)/register SECONDS=44 RUN_VERBOSE=1 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,2,1,star,5,5,5,1,2,3,4,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
+	$(PYTHON) tools/radio_call_divert_control_trace_check.py register $(RUN_DIR)/register/error.log $(RUN_DIR)/register
+	@$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR)/deactivate SECONDS=40 RUN_VERBOSE=1 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,hash,2,1,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'
+	$(PYTHON) tools/radio_call_divert_control_trace_check.py deactivate $(RUN_DIR)/deactivate/error.log $(RUN_DIR)/deactivate
 
 # shell: organic GSM 04.80 processUnstructuredSS-Request
 verify-radio-ussd: ERASED_IDENTITY_SECURITY_CODE=12345

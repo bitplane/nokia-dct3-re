@@ -105,13 +105,48 @@ request parse_register(const std::uint8_t *data, unsigned length)
 				result.ussd[index] = data[value + index];
 		}
 		else
+		{
 			result.service_code = data[value];
+			if (result.operation_code == operation::register_ss)
+			{
+				if (!read_tlv(data, sequence_offset + sequence_length,
+						parameter, 0x84, value, value_length) ||
+						value_length > result.forwarded_number.size())
+					return request{};
+				result.forwarded_number_length = value_length;
+				for (unsigned index = 0; index < value_length; ++index)
+					result.forwarded_number[index] = data[value + index];
+			}
+		}
 		if (parameter != sequence_offset + sequence_length)
 			return request{};
 	}
 
 	result.transaction = data[0];
 	result.valid = true;
+	return result;
+}
+
+message operation_result(const request &request)
+{
+	message result;
+	if (!request.valid ||
+			(request.operation_code != operation::register_ss &&
+			 request.operation_code != operation::erase_ss &&
+			 request.operation_code != operation::activate_ss &&
+			 request.operation_code != operation::deactivate_ss))
+		return result;
+	const std::uint8_t encoded[] = {
+		std::uint8_t(request.transaction ^ 0x80), 0x2a,
+		0x1c, 0x0a,
+		0xa2, 0x08,
+		0x02, 0x01, request.invoke_id,
+		0x30, 0x03,
+		0x02, 0x01, std::uint8_t(request.operation_code)
+	};
+	result.length = sizeof(encoded);
+	for (unsigned index = 0; index < result.length; ++index)
+		result.data[index] = encoded[index];
 	return result;
 }
 

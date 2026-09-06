@@ -22,8 +22,20 @@ returns to the serving BCCH. No UI event or firmware state is synthesized.
 operation and identifiers, response boundary, subsequent RR release and exact
 firmware-rendered result frame. Codec unit tests reject malformed BER lengths.
 
-Activation, registration of a forwarding number, erasure and failure outcomes
-are not yet modeled. They must be driven by their own organic handset requests.
+The single-Star registration form `*21*5551234#` produces `RegisterSS` (`0x0a`)
+for service `0x21` with a tagged BCD forwarded-to number. The network retains
+that subscription across baseband resets, the firmware renders its decoded
+destination, and later interrogation reports the active/registered status.
+`#21#` produces `DeactivateSS` (`0x0d`) and clears the subscription. Both use
+transaction-correlated operation results and the normal RR release path.
+
+`make verify-radio-call-divert-controls` runs registration and deactivation as
+separate organic handset fixtures and requires their exact requests, decoded
+operations, responses, releases and result frames. The two-Star registration
+syntax cannot yet be entered by the key harness because the ROM's Star-key
+multi-tap turns the second Star into `+`; this is a harness limitation, not a
+network shortcut. Erasure, failure outcomes, basic-service groups and forwarded
+call delivery remain separate contracts.
 
 ## Validated USSD boundary
 

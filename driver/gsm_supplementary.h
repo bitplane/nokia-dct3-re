@@ -12,6 +12,7 @@ namespace gsm::ss
 
 constexpr unsigned maximum_message_length = 64;
 constexpr unsigned maximum_ussd_length = 40;
+constexpr unsigned maximum_forwarded_number_length = 16;
 
 enum class operation : std::uint8_t
 {
@@ -34,6 +35,8 @@ struct request
 	std::uint8_t data_coding_scheme = 0;
 	unsigned ussd_length = 0;
 	std::array<std::uint8_t, maximum_ussd_length> ussd{};
+	unsigned forwarded_number_length = 0;
+	std::array<std::uint8_t, maximum_forwarded_number_length> forwarded_number{};
 };
 
 struct message
@@ -44,6 +47,7 @@ struct message
 
 request parse_register(const std::uint8_t *data, unsigned length);
 message interrogate_result(const request &request, bool active);
+message operation_result(const request &request);
 message process_uss_request_result(const request &request,
 		const char *response);
 

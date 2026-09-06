@@ -48,6 +48,20 @@ int main()
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");
+
+	const std::uint8_t registration[] = {
+		0x1b, 0x7b, 0x1c, 0x14, 0xa1, 0x12, 0x02, 0x01, 0x01,
+		0x02, 0x01, 0x0a, 0x30, 0x0a, 0x04, 0x01, 0x21,
+		0x84, 0x05, 0x81, 0x55, 0x15, 0x32, 0xf4, 0x7f, 0x01, 0x00
+	};
+	request = gsm::ss::parse_register(registration, sizeof(registration));
+	if (!request.valid || request.operation_code != gsm::ss::operation::register_ss ||
+			request.service_code != 0x21 || request.forwarded_number_length != 5)
+		return 4;
+	response = gsm::ss::operation_result(request);
+	for (unsigned i = 0; i < response.length; ++i)
+		std::printf("%02x", response.data[i]);
+	std::puts("");
 	return 0;
 }
 '''
@@ -69,7 +83,8 @@ class GsmSupplementaryTest(unittest.TestCase):
                 stdout=subprocess.PIPE)
         self.assertEqual(
             "9b2a1c0da20b020101300602010e800100\n"
-            "9b2a1c13a211020101300c02013b300704010f0402cf25\n",
+            "9b2a1c13a211020101300c02013b300704010f0402cf25\n"
+            "9b2a1c0aa208020101300302010a\n",
             result.stdout)
 
 

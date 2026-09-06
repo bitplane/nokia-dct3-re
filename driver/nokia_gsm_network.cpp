@@ -55,6 +55,26 @@ void nokia_gsm_network_device::device_start()
 	save_item(NAME(m_all_cells_lost));
 	save_item(NAME(m_recovery_cell_available));
 	save_item(NAME(m_stale_neighbour_lost));
+	save_item(NAME(m_unconditional_forwarding_active));
+	save_item(NAME(m_unconditional_forwarding_number_length));
+	save_item(NAME(m_unconditional_forwarding_number));
+}
+
+void nokia_gsm_network_device::register_unconditional_forwarding(
+		const u8 *number, unsigned length)
+{
+	m_unconditional_forwarding_number_length =
+			std::min<unsigned>(length, m_unconditional_forwarding_number.size());
+	for (unsigned index = 0;
+			index < m_unconditional_forwarding_number_length; ++index)
+		m_unconditional_forwarding_number[index] = number[index];
+	m_unconditional_forwarding_active = true;
+}
+
+void nokia_gsm_network_device::clear_unconditional_forwarding()
+{
+	m_unconditional_forwarding_active = false;
+	m_unconditional_forwarding_number_length = 0;
 }
 
 void nokia_gsm_network_device::device_reset()

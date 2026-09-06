@@ -348,6 +348,7 @@ help:
 	@echo "make verify-radio-incoming-call-lifecycle check physical Answer-to-End CC and DSP-control teardown"
 	@echo "make verify-radio-second-outgoing-call check New call on the existing TCH and the complete two-call menu"
 	@echo "make verify-radio-call-divert check organic GSM 04.80 *#21# interrogation"
+	@echo "make verify-radio-call-divert-controls check organic registration and deactivation"
 	@echo "make verify-radio-ussd check organic GSM 04.80 *123# request and display"
 	@echo "make verify-radio-outgoing-call-lifecycle check physical dial-to-End MO call and media"
 	@echo "make verify-radio-outgoing-sms send a physical 3210 SMS through CP/RP acknowledgement"
@@ -593,6 +594,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_supplementary_call_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_gsm_supplementary.py
 	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_control_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_ussd_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_two_call_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_two_call_negative_check.py

@@ -10,6 +10,7 @@
 #include "gsm_ems.h"
 #include "gsm_sms_transport.h"
 #include "gsm_mobility.h"
+#include "gsm_supplementary.h"
 
 #include <array>
 
@@ -254,6 +255,12 @@ public:
 	std::array<u8, 2> call_release(u8 transaction) const;
 	std::array<u8, 2> call_release_complete(u8 transaction) const;
 	std::array<u8, 3> channel_release() const;
+	void register_unconditional_forwarding(const u8 *number, unsigned length);
+	void clear_unconditional_forwarding();
+	bool unconditional_forwarding_active() const
+	{
+		return m_unconditional_forwarding_active;
+	}
 	gsm::cell_broadcast::page cell_broadcast_page() const;
 	s8 serving_rssi(unsigned sample) const;
 	s8 cell_rssi(u16 arfcn, unsigned sample) const;
@@ -287,6 +294,10 @@ private:
 	neighbour_fault_profile m_neighbour_fault =
 			neighbour_fault_profile::none;
 	bool m_stale_neighbour_lost = false;
+	bool m_unconditional_forwarding_active = false;
+	unsigned m_unconditional_forwarding_number_length = 0;
+	std::array<u8, gsm::ss::maximum_forwarded_number_length>
+			m_unconditional_forwarding_number{};
 
 	gsm::mobility::cell resolved_cell(u16 arfcn) const;
 };
