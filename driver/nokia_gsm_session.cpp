@@ -85,6 +85,8 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_sms_submit_recipient));
 	save_item(NAME(m_sms_submit_recipient_length));
 	save_item(NAME(m_incoming_service_completed));
+	save_item(NAME(m_handover_target_arfcn));
+	save_item(NAME(m_handover_reference));
 	save_item(NAME(m_pending_downlink.kind));
 	save_item(NAME(m_pending_downlink.sapi));
 	save_item(NAME(m_pending_downlink.length));
@@ -163,6 +165,8 @@ void nokia_gsm_session_device::device_reset()
 	m_sms_submit_recipient.fill(0);
 	m_sms_submit_recipient_length = 0;
 	m_incoming_service_completed = false;
+	m_handover_target_arfcn = 0;
+	m_handover_reference = 0;
 	clear_pending_downlink();
 }
 
@@ -820,6 +824,31 @@ nokia_gsm_session_device::receive_layer3(
 
 	const u8 protocol_discriminator = information[0] & 0x0f;
 	const u8 message_type = information[1] & 0x3f;
+	if (sapi == 0 && m_state == u8(state::awaiting_handover_result) &&
+			protocol_discriminator == 0x06 && message_type == 0x2c)
+	{
+		clear_pending_downlink();
+		m_serving_arfcn = m_handover_target_arfcn;
+		m_handover_target_arfcn = 0;
+		m_handover_reference = 0;
+		m_state = u8(state::incoming_call_active);
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: handover complete serving=%u t=%.6f\n",
+				m_serving_arfcn, machine().time().as_double());
+		return downlink_kind::none;
+	}
+	if (sapi == 0 && m_state == u8(state::awaiting_handover_result) &&
+			protocol_discriminator == 0x06 && message_type == 0x28)
+	{
+		clear_pending_downlink();
+		m_handover_target_arfcn = 0;
+		m_handover_reference = 0;
+		m_state = u8(state::incoming_call_active);
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_session: handover failure serving=%u t=%.6f\n",
+				m_serving_arfcn, machine().time().as_double());
+		return downlink_kind::none;
+	}
 	if (sapi == 0 && m_state == u8(state::awaiting_supplementary_request) &&
 			protocol_discriminator == 0x0b && message_type == 0x3b)
 	{
@@ -1568,6 +1597,71 @@ bool nokia_gsm_session_device::begin_traffic_assignment()
 	clear_pending_downlink();
 	m_state = u8(state::awaiting_assignment_complete);
 	return true;
+}
+
+bool nokia_gsm_session_device::begin_handover(
+		u16 target_arfcn, u8 target_bsic, u8 reference)
+{
+	if (m_state != u8(state::incoming_call_active) ||
+			m_pending_downlink.kind != u8(downlink_kind::none) ||
+			target_arfcn == m_serving_arfcn)
+		return false;
+
+	const auto command =
+			m_network->handover_command(target_arfcn, target_bsic, reference);
+	m_handover_target_arfcn = target_arfcn;
+	m_handover_reference = reference;
+	m_state = u8(state::awaiting_handover_result);
+	queue_downlink(downlink_kind::handover_command,
+			command.data(), command.size());
+	LOGMASKED(LOG_GSM_SESSION,
+			"gsm_session: handover command target=%u reference=%02x t=%.6f\n",
+			target_arfcn, reference, machine().time().as_double());
+	return true;
+}
+
+bool nokia_gsm_session_device::handover_channel_configured(
+		u16 target_arfcn, u8 reference)
+{
+	if (m_state != u8(state::awaiting_handover_result) ||
+			m_pending_downlink.kind != u8(downlink_kind::handover_command) ||
+			target_arfcn != m_handover_target_arfcn ||
+			reference != m_handover_reference)
+		return false;
+
+	// The old LAPDm link acknowledges Handover Command, but that link-layer ACK
+	// does not complete the RR procedure. Channel configuration is the first
+	// observable handset acceptance; completion still belongs to the target.
+	clear_pending_downlink();
+	return true;
+}
+
+bool nokia_gsm_session_device::handover_rollback_completed(
+		u16 restored_arfcn)
+{
+	if (m_state != u8(state::awaiting_handover_result) ||
+			restored_arfcn != m_serving_arfcn)
+		return false;
+
+	clear_pending_downlink();
+	m_handover_target_arfcn = 0;
+	m_handover_reference = 0;
+	m_state = u8(state::incoming_call_active);
+	LOGMASKED(LOG_GSM_SESSION,
+			"gsm_session: handover rollback serving=%u t=%.6f\n",
+			m_serving_arfcn, machine().time().as_double());
+	return true;
+}
+
+nokia_gsm_session_device::downlink_kind
+nokia_gsm_session_device::handover_access_received()
+{
+	if (m_state != u8(state::awaiting_handover_result) ||
+			m_pending_downlink.kind != u8(downlink_kind::none))
+		return downlink_kind::none;
+	const auto information = m_network->physical_information(0);
+	return queue_downlink(downlink_kind::physical_information,
+			information.data(), information.size());
 }
 
 nokia_gsm_session_device::downlink_kind

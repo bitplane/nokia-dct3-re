@@ -54,7 +54,9 @@ public:
 		call_retrieve_acknowledge,
 		call_release,
 		release_complete,
-		supplementary_release_complete
+		supplementary_release_complete,
+		handover_command,
+		physical_information
 	};
 
 	struct downlink_message
@@ -99,6 +101,10 @@ public:
 	downlink_kind receive_layer3(
 			u8 sapi, const u8 *information, unsigned length);
 	bool begin_traffic_assignment();
+	bool begin_handover(u16 target_arfcn, u8 target_bsic, u8 reference);
+	bool handover_channel_configured(u16 target_arfcn, u8 reference);
+	bool handover_rollback_completed(u16 restored_arfcn);
+	downlink_kind handover_access_received();
 
 	const downlink_message &pending_downlink() const { return m_pending_downlink; }
 	downlink_kind pending_downlink_kind() const
@@ -178,6 +184,10 @@ public:
 	const gsm::a5::key &cipher_key() const { return m_cipher_key; }
 	bool cipher_active() const { return m_cipher_active; }
 	bool cipher_command_pending() const { return m_cipher_command_pending; }
+	bool handover_pending() const
+	{
+		return m_state == u8(state::awaiting_handover_result);
+	}
 
 protected:
 	virtual void device_start() override;
@@ -238,7 +248,8 @@ private:
 		awaiting_mobile_sms_submit,
 		awaiting_mobile_sms_cp_ack_acknowledgement,
 		awaiting_mobile_sms_final_cp_ack,
-		awaiting_mobile_sms_timeout
+		awaiting_mobile_sms_timeout,
+		awaiting_handover_result
 	};
 
 	void clear_pending_downlink();
@@ -327,6 +338,8 @@ private:
 	std::array<u8, 20> m_sms_submit_recipient{};
 	u8 m_sms_submit_recipient_length = 0;
 	bool m_incoming_service_completed = false;
+	u16 m_handover_target_arfcn = 0;
+	u8 m_handover_reference = 0;
 	downlink_message m_pending_downlink;
 };
 

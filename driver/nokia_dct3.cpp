@@ -762,6 +762,7 @@ public:
 		m_outgoing_call_config(*this, "CALLCFG"),
 		m_outgoing_call_delay_config(*this, "CALLDELAY"),
 		m_outgoing_call_host_config(*this, "CALLHOST"),
+		m_handover_config(*this, "HANDOVERCFG"),
 		m_sim_removed(*this, "SIM_REMOVED")
 	{ }
 
@@ -907,6 +908,7 @@ private:
 	optional_ioport m_outgoing_call_config;
 	optional_ioport m_outgoing_call_delay_config;
 	optional_ioport m_outgoing_call_host_config;
+	optional_ioport m_handover_config;
 	optional_ioport m_sim_removed;
 
 	std::unique_ptr<uint16_t[]>   m_ram;
@@ -1339,6 +1341,10 @@ void nokia_dct3_state::machine_reset()
 					(m_outgoing_call_config.read_safe(0x00) >> 2) & 0x03));
 	m_radio_peer->set_speech_loopback(BIT(network, 4));
 	m_radio_peer->set_lab_voice_source(BIT(network, 5));
+	m_radio_peer->set_handover_enabled(
+			BIT(m_handover_config.read_safe(0x00), 0));
+	m_radio_peer->set_handover_failure(
+			BIT(m_handover_config.read_safe(0x00), 1));
 	m_radio_peer->set_downlink_tch_burst_error_profile(
 			BIT(network, 6) ? 144 : 0, BIT(network, 6) ? 4 : 0);
 	m_radio_peer->set_uplink_tch_burst_error_profile(
@@ -2252,6 +2258,14 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x01, 0x00, "Host outgoing-call adapter")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
+
+	PORT_START("HANDOVERCFG")
+	PORT_CONFNAME(0x01, 0x00, "Dedicated-mode handover to neighbour cell")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x01, DEF_STR(On))
+	PORT_CONFNAME(0x02, 0x00, "Target cell handover response")
+	PORT_CONFSETTING(0x00, "Physical Information")
+	PORT_CONFSETTING(0x02, "No response")
 
 	// Standard MAME configuration inputs keep negative-composition tests out of
 	// process-global environment state. These are shared hardware boundaries,

@@ -282,3 +282,18 @@ nokia_lapdm_link_device::build_information_frame(
 	m_downlink_acknowledgement_pending[sapi] = true;
 	return frame;
 }
+
+std::array<u8, nokia_lapdm_link_device::frame_length>
+nokia_lapdm_link_device::build_ui_frame(
+		u8 sapi, const u8 *information, unsigned length)
+{
+	std::array<u8, frame_length> frame;
+	frame.fill(0x2b);
+	if (sapi >= link_count || length > maximum_information_length)
+		return frame;
+	frame[0] = (sapi << 2) | 0x03;
+	frame[1] = 0x03;
+	frame[2] = (length << 2) | 0x01;
+	std::copy_n(information, length, frame.begin() + 3);
+	return frame;
+}

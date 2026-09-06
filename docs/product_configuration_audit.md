@@ -156,7 +156,8 @@ The configuration ports used by mobility fixtures select network topology,
 RF/loss scenario and standards-level neighbour faults.  They are test inputs,
 not product defaults, and cannot name a desired serving cell in firmware.
 Named positive, negative, preserved-NVRAM and save-state targets are documented
-in `network_scouting.md`; dedicated-mode handover remains out of scope.
+in `network_scouting.md`. Dedicated-mode handover is currently an NSE-8
+laboratory-network contract and is not yet a cross-product default.
 
 ## Frozen post-NHM-2 frontier
 

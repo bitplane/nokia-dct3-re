@@ -35,6 +35,8 @@ public:
 	std::array<u8, frame_length> build_information_frame(
 			u8 sapi, const u8 *information, unsigned length,
 			bool more_data = false);
+	std::array<u8, frame_length> build_ui_frame(
+			u8 sapi, const u8 *information, unsigned length);
 	std::array<u8, frame_length> build_receive_ready(u8 sapi);
 
 	const std::array<u8, maximum_layer3_length> &layer3_information() const

@@ -737,6 +737,28 @@ std::array<u8, 8> nokia_gsm_network_device::traffic_assignment() const
 	return { 0x06, 0x2e, 0x09, 0x40, 0x01, 0x00, 0x63, 0x01 };
 }
 
+std::array<u8, 9> nokia_gsm_network_device::handover_command(
+		u16 target_arfcn, u8 target_bsic, u8 reference) const
+{
+	// GSM 04.08 9.1.15: Cell Description, a non-hopping TCH/F timeslot-1
+	// Channel Description, Handover Reference and initial power/access type.
+	return {
+		0x06, 0x2b,
+		u8(((target_arfcn >> 8) & 0x03) << 6 | (target_bsic & 0x3f)),
+		u8(target_arfcn),
+		0x09, u8((target_arfcn >> 8) & 0x03), u8(target_arfcn),
+		reference, 0x00
+	};
+}
+
+std::array<u8, 3> nokia_gsm_network_device::physical_information(
+		u8 timing_advance) const
+{
+	// GSM 04.08 9.1.25. The target BTS answers Handover Access with the timing
+	// advance the mobile shall use on its new main signalling link.
+	return { 0x06, 0x2d, u8(timing_advance & 0x3f) };
+}
+
 gsm::cell_broadcast::page nokia_gsm_network_device::cell_broadcast_page() const
 {
 	// GSM 03.41 page geometry is independent of Nokia's still-unmapped DSP

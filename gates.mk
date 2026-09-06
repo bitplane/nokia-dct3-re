@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 231 gates: 141 generated from typed steps, 90 copied verbatim (shell).
+# 233 gates: 141 generated from typed steps, 92 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -91,7 +91,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-a5-1-incoming-call verify-3330-radio-media-resilience \
 	verify-3310-radio-media-resilience verify-radio-incoming-call \
 	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
-	verify-radio-incoming-call-lifecycle verify-radio-supplementary-call \
+	verify-radio-incoming-call-lifecycle verify-radio-handover \
+	verify-radio-handover-failure-state verify-radio-supplementary-call \
 	verify-radio-two-call verify-radio-second-outgoing-call \
 	verify-radio-call-divert verify-radio-call-divert-lifecycle \
 	verify-radio-call-divert-incoming verify-radio-ussd \
@@ -919,6 +920,30 @@ verify-radio-incoming-call-lifecycle:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+# shell: dedicated-mode handover success lifecycle
+verify-radio-handover:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success; \
+	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+# shell: handover rollback with mid-procedure save/load
+verify-radio-handover-failure-state:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 \
+		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state
 
 # shell: physical DTMF and hold/retrieve lifecycle
 verify-radio-supplementary-call: ERASED_IDENTITY_SECURITY_CODE=12345

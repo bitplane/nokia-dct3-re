@@ -235,6 +235,9 @@ public:
 	std::array<u8, 2> call_connect(u8 transaction) const;
 	std::array<u8, 5> call_disconnect(u8 transaction, u8 cause) const;
 	std::array<u8, 8> traffic_assignment() const;
+	std::array<u8, 9> handover_command(
+			u16 target_arfcn, u8 target_bsic, u8 reference) const;
+	std::array<u8, 3> physical_information(u8 timing_advance) const;
 	unsigned incoming_sms_message_count() const;
 	layer3_message incoming_sms_cp_data(unsigned message_index) const;
 	layer3_message sms_status_report_cp_data(u8 message_reference,

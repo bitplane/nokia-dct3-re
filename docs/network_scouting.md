@@ -808,9 +808,38 @@ that no PCH follows the decoded unsuitable threshold.  Access-class barring may
 permit cell selection but must block MM access.  No negative case may originate
 a second Location Updating transaction or mutate EF_LOCI.
 
-Dedicated-mode handover remains deliberately outside this boundary.
-Other known extensions are MO SMS, firmware Smart Messaging reassembly and
-ringtone UI/persistence, rejected registration and broader RF propagation.
+### Dedicated-mode handover
+
+NSE-8 now crosses the two-cell dedicated-mode boundary without firmware-state
+injection.  During an organic active call on cell A, the laboratory network
+sends a GSM 04.08 Handover Command over FACCH naming cell B, its channel and a
+handover reference.  Firmware acknowledges that frame at LAPDm, issues its own
+Nokia `CHANNEL_CONFIGURE` transaction containing cell B's ARFCN and reference,
+and consumes the DSP `CHANNEL_CHANGED_CNF`.  The DSP HLE owns only behavior
+that does not cross the MCU mailbox: target-channel retuning and repeated
+Handover Access bursts.  The target network answers those bursts with an
+unacknowledged-mode Physical Information message.  Firmware then establishes
+the target main DCCH with SABM/UA and organically sends RR Handover Complete;
+only that completion commits cell B as the serving carrier.  Bidirectional
+GSM-FR and subsequent physical call teardown continue on the new cell.
+
+The negative composition withholds Physical Information.  The ROM's own
+roughly 315 ms timer emits a type-`0x1f` lower-control transaction and a second
+`CHANNEL_CONFIGURE` returning from cell B to cell A.  The session records
+failure only after the corresponding `CHANNEL_CHANGED_CNF`; speech continues
+after that rollback.  This ROM did not emit RR Handover Failure in the observed
+window, although the standards-shaped message remains accepted if another ROM
+does.  A save/load taken after the target retune and before rollback preserves
+the pending procedure, receiver ownership and timer outcome.
+
+`make verify-radio-handover` protects command, retune, Physical Information,
+SABM/UA, organic Handover Complete, continued media and call teardown.
+`make verify-radio-handover-failure-state` protects the timed cell-B-to-cell-A
+rollback and a mid-procedure machine-state round trip.  These fixtures are a
+bounded laboratory-network composition, not a general RF propagation model.
+
+Other known extensions include rejected registration and broader RF
+propagation.
 Each extension must begin with an organic MCU request or a standards-defined
 network event and retain the same request-correlation rule.
 

@@ -99,6 +99,8 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_call_waiting_sent));
 	save_item(NAME(m_call_waiting_duplicate_sent));
 	save_item(NAME(m_call_waiting_ticks));
+	save_item(NAME(m_handover_started));
+	save_item(NAME(m_handover_ticks));
 	save_item(NAME(m_call_waiting_page_delay));
 	save_item(NAME(m_traffic_channel_active));
 	save_item(NAME(m_downlink_offset));
@@ -248,6 +250,8 @@ void nokia_radio_peer_device::device_reset()
 	m_call_waiting_sent = false;
 	m_call_waiting_duplicate_sent = false;
 	m_call_waiting_ticks = 0;
+	m_handover_started = false;
+	m_handover_ticks = 0;
 	m_call_waiting_page_delay = 0;
 	m_traffic_channel_active = false;
 	m_downlink_offset = 0;
@@ -788,7 +792,8 @@ const char *nokia_radio_peer_device::phase_name(u8 value)
 		"release_channel_change", "service_downlink", "service_uplink_request",
 		"service_uplink_wait", "service_uplink_acknowledgement",
 		"traffic_channel_change", "traffic_lapdm_establish",
-		"traffic_contention_resolution", "traffic_release_acknowledgement",
+		"traffic_contention_resolution", "handover_channel_change",
+		"handover_activation_change", "traffic_release_acknowledgement",
 		"candidate_terminal_control", "serving_sch_observation",
 		"service_sapi3_contention_resolution"
 	};
@@ -831,7 +836,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 		0xff, 0xff, 0x89, 0x89, 0xff, 0x84, 0x89, 0xff,
 		0x89, 0x86, 0x80, 0x80, 0x86, 0x87, 0x80, 0x86,
 		0x87, 0x87, 0x89, 0x80, 0x86, 0x87, 0x80, 0x89,
-		0x86, 0x80, 0x80, 0xff, 0xff, 0x80
+		0x86, 0x80, 0x89, 0x89, 0x80, 0xff, 0xff, 0x80
 	};
 
 	const u8 fixed = m_phase < FIXED_REPORT.size() ? FIXED_REPORT[m_phase] : 0x87;
@@ -1728,6 +1733,41 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 		m_report_deferred = true;
 	}
 	else if (packet.type == 0x02 &&
+			current_phase() == phase::handover_channel_change &&
+			packet.length >= 12 && packet.payload[0] == 0x00 &&
+			packet.payload[8] == 0xc1)
+	{
+		const u16 requested_arfcn =
+				(packet.payload[10] << 8) | packet.payload[11];
+		if (requested_arfcn != m_receiver_arfcn &&
+				m_gsm_network->cell_by_arfcn(requested_arfcn))
+			retune_receiver(requested_arfcn);
+		// After the first retune completion the ROM emits a type-0x1f control
+		// transaction and reconfigures the same target TCH with mode zero. Keep
+		// the two independently observed channel changes distinct; the next
+		// firmware action establishes what this activation means on air.
+		set_phase(phase::handover_activation_change);
+		m_reports_remaining = 1;
+		m_wait_ticks = 0;
+		m_report_deferred = true;
+	}
+	else if (packet.type == 0x02 && m_gsm_session->handover_pending() &&
+			packet.length >= 12 && packet.payload[8] == 0xc1)
+	{
+		const u16 requested_arfcn =
+				(packet.payload[10] << 8) | packet.payload[11];
+		const u8 reference = packet.payload[9];
+		if (m_gsm_session->handover_channel_configured(
+				requested_arfcn, reference))
+		{
+			retune_receiver(requested_arfcn);
+			set_phase(phase::handover_channel_change);
+			m_reports_remaining = 1;
+			m_wait_ticks = 0;
+			m_report_deferred = true;
+		}
+	}
+	else if (packet.type == 0x02 &&
 			(current_phase() == phase::service_uplink_request ||
 				current_phase() == phase::service_uplink_wait ||
 				current_phase() == phase::service_uplink_acknowledgement) &&
@@ -1877,7 +1917,10 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			(current_phase() == phase::service_uplink_wait ||
 				(m_traffic_channel_active &&
 					current_phase() >= phase::service_downlink &&
-					current_phase() <= phase::service_uplink_acknowledgement)) &&
+					current_phase() <= phase::service_uplink_acknowledgement) ||
+				(m_gsm_session->handover_pending() &&
+					(current_phase() == phase::handover_channel_change ||
+						current_phase() == phase::handover_activation_change))) &&
 			packet.length >= 5 &&
 			(packet.payload[1] == 0x80 ||
 				(m_traffic_channel_active &&
@@ -1917,9 +1960,16 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			}
 			const auto &information = m_lapdm_link->layer3_information();
 			trace_layer3_uplink("uplink");
+			const bool handover_was_pending = m_gsm_session->handover_pending();
 			m_gsm_session->receive_layer3(
 					m_lapdm_link->layer3_sapi(),
 					information.data(), m_lapdm_link->layer3_length());
+			if (handover_was_pending && !m_gsm_session->handover_pending() &&
+					m_receiver_arfcn != m_serving_arfcn)
+			{
+				commit_receiver_as_serving();
+				restart_downlink_signalling_counter();
+			}
 			if (m_trace_enabled &&
 					m_lapdm_link->layer3_sapi() == 0 &&
 					(information[0] & 0x0f) == 0x03 &&
@@ -1979,6 +2029,16 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_reports_remaining = 1;
 			if (action != nokia_gsm_session_device::downlink_kind::none)
 				m_wait_ticks = 0;
+			m_report_deferred = true;
+		}
+		else if (result ==
+				nokia_lapdm_link_device::uplink_result::establish_indication &&
+				m_lapdm_link->layer3_sapi() == 0 &&
+				m_gsm_session->handover_pending())
+		{
+			set_phase(phase::traffic_contention_resolution);
+			m_reports_remaining = 1;
+			m_wait_ticks = 0;
 			m_report_deferred = true;
 		}
 		else if (result ==
@@ -2057,6 +2117,16 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_reports_remaining = 1;
 			m_wait_ticks = 0;
 			m_report_deferred = true;
+		}
+		else if (m_gsm_session->handover_pending() &&
+				current_phase() == phase::handover_activation_change)
+		{
+			// Empty/fill blocks continue while RR restores the old dedicated
+			// channel. They do not transfer ownership to the generic service
+			// scheduler; the ROM's next non-fill block reports the outcome.
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+			m_report_deferred = false;
 		}
 		else
 		{
@@ -2269,6 +2339,10 @@ void nokia_radio_peer_device::emit_report()
 			if (message.kind == u8(
 					nokia_gsm_session_device::downlink_kind::sapi3_establishment))
 				frame = m_lapdm_link->build_sabm_command(message.sapi);
+			else if (message.kind == u8(
+					nokia_gsm_session_device::downlink_kind::physical_information))
+				frame = m_lapdm_link->build_ui_frame(
+						message.sapi, message.data.data(), message.length);
 			else
 			{
 				const unsigned count = std::min<unsigned>(
@@ -2674,6 +2748,38 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		m_reports_remaining = 1;
 		m_report_deferred = true;
 	}
+	else if (current_phase() == phase::handover_channel_change &&
+			report_type == 0x89)
+	{
+		// The configured DSP owns repeated Handover Access bursts. Their
+		// contents do not cross the MCU mailbox; model their receipt at this
+		// boundary and let the target BTS answer with Physical Information.
+		const auto action = m_handover_failure ?
+				nokia_gsm_session_device::downlink_kind::none :
+				m_gsm_session->handover_access_received();
+		if (action ==
+				nokia_gsm_session_device::downlink_kind::physical_information)
+			m_lapdm_link->begin_mobile_establishment(0);
+		set_phase(action ==
+				nokia_gsm_session_device::downlink_kind::physical_information ?
+				phase::service_downlink : phase::handover_channel_change);
+		m_reports_remaining = action ==
+				nokia_gsm_session_device::downlink_kind::physical_information ? 1 : 0;
+		m_wait_ticks = 0;
+		m_report_deferred = true;
+	}
+	else if (current_phase() == phase::handover_activation_change &&
+			report_type == 0x89)
+	{
+		// The old dedicated channel has been restored after target access timed
+		// out. The completed lower-layer rollback is the 3210's observed failure
+		// boundary; other ROMs may additionally publish RR Handover Failure.
+		m_gsm_session->handover_rollback_completed(m_receiver_arfcn);
+		set_phase(phase::service_uplink_request);
+		m_reports_remaining = 1;
+		m_wait_ticks = 0;
+		m_report_deferred = true;
+	}
 	else if (current_phase() == phase::lapdm_establish && report_type == 0x86)
 	{
 		m_reports_remaining = 0;
@@ -2847,6 +2953,16 @@ void nokia_radio_peer_device::tick()
 {
 	if (!m_enabled)
 		return;
+
+	if (m_handover_enabled && !m_handover_started &&
+			m_traffic_channel_active && m_gsm_session->call_connected() &&
+			++m_handover_ticks >= 220)
+	{
+		const auto *target = m_gsm_network->cell_at(1);
+		if (target && m_gsm_session->begin_handover(
+				target->arfcn, target->bsic, 0x5a))
+			m_handover_started = true;
+	}
 
 	if (m_call_waiting_profile != u8(call_waiting_profile::none) &&
 			m_traffic_channel_active &&

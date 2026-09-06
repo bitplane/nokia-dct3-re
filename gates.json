@@ -5077,6 +5077,40 @@
       ]
     },
     {
+      "name": "verify-radio-handover",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "dedicated-mode handover success lifecycle",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\t$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 \\",
+        "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
+        "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success; \\",
+        "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
+      "name": "verify-radio-handover-failure-state",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "handover rollback with mid-procedure save/load",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\t$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 \\",
+        "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
+        "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state"
+      ]
+    },
+    {
       "name": "verify-radio-supplementary-call",
       "prerequisites": [
         "build"

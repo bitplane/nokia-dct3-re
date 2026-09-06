@@ -135,6 +135,8 @@ public:
 		m_voice_peer->set_lab_test_source(enabled);
 		m_lab_voice_source = enabled;
 	}
+	void set_handover_enabled(bool enabled) { m_handover_enabled = enabled; }
+	void set_handover_failure(bool failure) { m_handover_failure = failure; }
 	void set_host_voice_peer(bool enabled) { m_host_voice_peer = enabled; }
 	bool enabled() const { return m_enabled; }
 	void receive_packet(const nokia_dspif_device::packet &packet);
@@ -195,6 +197,8 @@ private:
 		traffic_channel_change,
 		traffic_lapdm_establish,
 		traffic_contention_resolution,
+		handover_channel_change,
+		handover_activation_change,
 		traffic_release_acknowledgement,
 		candidate_terminal_control,
 		serving_sch_observation,
@@ -333,6 +337,10 @@ private:
 	bool m_call_waiting_sent = false;
 	bool m_call_waiting_duplicate_sent = false;
 	u16 m_call_waiting_ticks = 0;
+	bool m_handover_enabled = false;
+	bool m_handover_failure = false;
+	bool m_handover_started = false;
+	u16 m_handover_ticks = 0;
 	u8 m_call_waiting_page_delay = 0;
 	bool m_speech_loopback = false;
 	bool m_lab_voice_source = false;
