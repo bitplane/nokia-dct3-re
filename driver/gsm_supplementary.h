@@ -11,6 +11,7 @@ namespace gsm::ss
 {
 
 constexpr unsigned maximum_message_length = 64;
+constexpr unsigned maximum_ussd_length = 40;
 
 enum class operation : std::uint8_t
 {
@@ -30,6 +31,9 @@ struct request
 	std::uint8_t invoke_id = 0;
 	operation operation_code = operation::unknown;
 	std::uint8_t service_code = 0;
+	std::uint8_t data_coding_scheme = 0;
+	unsigned ussd_length = 0;
+	std::array<std::uint8_t, maximum_ussd_length> ussd{};
 };
 
 struct message
@@ -40,6 +44,8 @@ struct message
 
 request parse_register(const std::uint8_t *data, unsigned length);
 message interrogate_result(const request &request, bool active);
+message process_uss_request_result(const request &request,
+		const char *response);
 
 } // namespace gsm::ss
 

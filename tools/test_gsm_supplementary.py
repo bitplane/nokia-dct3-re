@@ -33,6 +33,21 @@ int main()
 	malformed[5] = 0x20;
 	if (gsm::ss::parse_register(malformed, sizeof(malformed)).valid)
 		return 2;
+
+	const std::uint8_t ussd[] = {
+		0x1b, 0x7b, 0x1c, 0x14, 0xa1, 0x12, 0x02, 0x01, 0x01,
+		0x02, 0x01, 0x3b, 0x30, 0x0a, 0x04, 0x01, 0x0f,
+		0x04, 0x05, 0xaa, 0x98, 0x6c, 0x36, 0x02, 0x7f, 0x01, 0x00
+	};
+	request = gsm::ss::parse_register(ussd, sizeof(ussd));
+	if (!request.valid ||
+			request.operation_code != gsm::ss::operation::process_uss_request ||
+			request.data_coding_scheme != 0x0f || request.ussd_length != 5)
+		return 3;
+	response = gsm::ss::process_uss_request_result(request, "OK");
+	for (unsigned i = 0; i < response.length; ++i)
+		std::printf("%02x", response.data[i]);
+	std::puts("");
 	return 0;
 }
 '''
@@ -53,7 +68,9 @@ class GsmSupplementaryTest(unittest.TestCase):
                 [str(binary)], cwd=ROOT, check=True, text=True,
                 stdout=subprocess.PIPE)
         self.assertEqual(
-            "9b2a1c0da20b020101300602010e800100\n", result.stdout)
+            "9b2a1c0da20b020101300602010e800100\n"
+            "9b2a1c13a211020101300c02013b300704010f0402cf25\n",
+            result.stdout)
 
 
 if __name__ == "__main__":

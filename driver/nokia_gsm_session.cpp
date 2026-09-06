@@ -817,16 +817,34 @@ nokia_gsm_session_device::receive_layer3(
 	{
 		const gsm::ss::request request =
 				gsm::ss::parse_register(information, length);
-		if (!request.valid ||
-				request.operation_code != gsm::ss::operation::interrogate_ss)
+		if (!request.valid)
 			return downlink_kind::none;
-		const gsm::ss::message response =
-				gsm::ss::interrogate_result(request, false);
-		LOGMASKED(LOG_GSM_SESSION,
-				"gsm_ss: request=interrogate transaction=%02x invoke=%u "
-				"service=%02x active=0 t=%.6f\n",
-				request.transaction, request.invoke_id, request.service_code,
-				machine().time().as_double());
+		gsm::ss::message response;
+		if (request.operation_code == gsm::ss::operation::interrogate_ss)
+		{
+			response = gsm::ss::interrogate_result(request, false);
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_ss: request=interrogate transaction=%02x invoke=%u "
+					"service=%02x active=0 t=%.6f\n",
+					request.transaction, request.invoke_id, request.service_code,
+					machine().time().as_double());
+		}
+		else if (request.operation_code ==
+				gsm::ss::operation::process_uss_request)
+		{
+			response = gsm::ss::process_uss_request_result(
+					request, "Nokia test network");
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_ss: request=ussd transaction=%02x invoke=%u "
+					"dcs=%02x packed_length=%u t=%.6f\n",
+					request.transaction, request.invoke_id,
+					request.data_coding_scheme, request.ussd_length,
+					machine().time().as_double());
+		}
+		else
+			return downlink_kind::none;
+		if (!response.length)
+			return downlink_kind::none;
 		m_state = u8(state::awaiting_supplementary_release_acknowledgement);
 		return queue_downlink(downlink_kind::supplementary_release_complete,
 				response.data.data(), response.length);

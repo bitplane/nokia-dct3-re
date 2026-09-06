@@ -24,5 +24,25 @@ firmware-rendered result frame. Codec unit tests reject malformed BER lengths.
 
 Activation, registration of a forwarding number, erasure and failure outcomes
 are not yet modeled. They must be driven by their own organic handset requests.
-USSD shares the GSM 04.80 component layer but has a distinct operation payload
-and remains the next contract.
+
+## Validated USSD boundary
+
+The physical MMI sequence `*123#` opens the same call-independent connection
+and sends `processUnstructuredSS-Request` (`0x3b`):
+
+```
+1b 7b 1c 14 a1 12 02 01 01 02 01 3b 30 0a 04 01 0f
+04 05 aa 98 6c 36 02 7f 01 00
+```
+
+The parameter sequence contains DCS `0x0f` and the GSM-7 packed `*123#` text.
+The laboratory network returns a correlated `ReturnResult` containing DCS
+`0x0f` and GSM-7 packed `Nokia test network`. Firmware renders that text with a
+Back softkey, acknowledges the release and returns to the serving BCCH. The
+codec bounds both the Layer-3 and USSD payloads and rejects malformed or trailing
+BER parameter data.
+
+`make verify-radio-ussd` requires the exact organic request, semantic decode,
+response, RR release, and exact firmware-rendered response frame. Continued
+USSD sessions, network-initiated USSD, reject/error outcomes and other data
+coding schemes remain separate contracts.

@@ -22,6 +22,29 @@ bool read_tlv(const std::uint8_t *data, unsigned limit, unsigned &offset,
 	return true;
 }
 
+unsigned pack_gsm7(const char *text, std::uint8_t *packed, unsigned capacity)
+{
+	if (!text)
+		return 0;
+	unsigned septets = 0;
+	while (text[septets] && septets < maximum_ussd_length)
+		++septets;
+	const unsigned bytes = (septets * 7 + 7) / 8;
+	if (bytes > capacity)
+		return 0;
+	for (unsigned index = 0; index < bytes; ++index)
+		packed[index] = 0;
+	for (unsigned index = 0; index < septets; ++index)
+	{
+		const unsigned bit = index * 7;
+		const std::uint8_t value = std::uint8_t(text[index]) & 0x7f;
+		packed[bit / 8] |= value << (bit & 7);
+		if ((bit & 7) > 1 && bit / 8 + 1 < bytes)
+			packed[bit / 8 + 1] |= value >> (8 - (bit & 7));
+	}
+	return bytes;
+}
+
 } // anonymous namespace
 
 request parse_register(const std::uint8_t *data, unsigned length)
@@ -70,11 +93,74 @@ request parse_register(const std::uint8_t *data, unsigned length)
 		if (!read_tlv(data, sequence_offset + sequence_length, parameter, 0x04,
 				value, value_length) || value_length != 1)
 			return request{};
-		result.service_code = data[value];
+		if (result.operation_code == operation::process_uss_request)
+		{
+			result.data_coding_scheme = data[value];
+			if (!read_tlv(data, sequence_offset + sequence_length, parameter, 0x04,
+					value, value_length) ||
+					value_length > result.ussd.size())
+				return request{};
+			result.ussd_length = value_length;
+			for (unsigned index = 0; index < value_length; ++index)
+				result.ussd[index] = data[value + index];
+		}
+		else
+			result.service_code = data[value];
+		if (parameter != sequence_offset + sequence_length)
+			return request{};
 	}
 
 	result.transaction = data[0];
 	result.valid = true;
+	return result;
+}
+
+message process_uss_request_result(const request &request, const char *response)
+{
+	message result;
+	if (!request.valid ||
+			request.operation_code != operation::process_uss_request)
+		return result;
+
+	std::array<std::uint8_t, maximum_ussd_length> packed{};
+	const unsigned packed_length = pack_gsm7(
+			response, packed.data(), packed.size());
+	if (!packed_length)
+		return result;
+
+	const unsigned result_sequence_length = 3 + 2 + packed_length;
+	const unsigned operation_sequence_length = 3 + 2 + result_sequence_length;
+	const unsigned component_length = 3 + 2 + operation_sequence_length;
+	const unsigned facility_length = 2 + component_length;
+	const unsigned total_length = 2 + 2 + facility_length;
+	if (total_length > result.data.size())
+		return message{};
+
+	unsigned offset = 0;
+	result.data[offset++] = request.transaction ^ 0x80;
+	result.data[offset++] = 0x2a;
+	result.data[offset++] = 0x1c;
+	result.data[offset++] = facility_length;
+	result.data[offset++] = 0xa2;
+	result.data[offset++] = component_length;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = request.invoke_id;
+	result.data[offset++] = 0x30;
+	result.data[offset++] = operation_sequence_length;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = std::uint8_t(operation::process_uss_request);
+	result.data[offset++] = 0x30;
+	result.data[offset++] = result_sequence_length;
+	result.data[offset++] = 0x04;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = request.data_coding_scheme;
+	result.data[offset++] = 0x04;
+	result.data[offset++] = packed_length;
+	for (unsigned index = 0; index < packed_length; ++index)
+		result.data[offset++] = packed[index];
+	result.length = offset;
 	return result;
 }
 
