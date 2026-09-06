@@ -5077,6 +5077,25 @@
       ]
     },
     {
+      "name": "verify-radio-supplementary-call",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "physical DTMF and hold/retrieve lifecycle",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=60 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
+        "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,5,wait1000,enter,wait1500,down,wait1500,enter,wait1500,5,wait1000,enter,wait1500,down,wait1500,enter,wait1500,c,c,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=27.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'; \\",
+        "\t$(PYTHON) tools/radio_supplementary_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \\",
+        "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
       "name": "verify-radio-a5-1-incoming-call",
       "prerequisites": [],
       "variables": {},
@@ -6912,46 +6931,30 @@
     },
     {
       "name": "verify-radio-incoming-ems",
-      "prerequisites": [],
-      "variables": {},
-      "steps": [
-        {
-          "step": "run",
-          "silent": true,
-          "make_flags": [
-            "--no-print-directory"
-          ],
-          "run_target": "run",
-          "tokens": [
-            "RUN_DIR=$(RUN_DIR)",
-            "SECONDS=40",
-            "RUN_VERBOSE=1",
-            "RUN_EXTRA_ARGS='$(RADIO_INCOMING_EMS_ARGS)'"
-          ],
-          "parameters": {
-            "RUN_DIR": "$(RUN_DIR)",
-            "SECONDS": "40",
-            "RUN_VERBOSE": "1",
-            "RUN_EXTRA_ARGS": "'$(RADIO_INCOMING_EMS_ARGS)'"
-          }
-        },
-        {
-          "step": "capture_log",
-          "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
-        },
-        {
-          "step": "check",
-          "silent": false,
-          "interpreter": "$(PYTHON)",
-          "before_script": [],
-          "script": "tools/radio_ems_trace_check.py",
-          "arguments": [
-            "$(RUN_DIR)/error.log",
-            "$(RUN_DIR)/nvram/noki3210/sim_card"
-          ],
-          "options": []
-        }
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "three exact application-boundary compositions",
+      "recipe": [
+        "\t@set -e; \\",
+        "\tfor case_name in formatted plain malformed deleted; do \\",
+        "\t\tprofile=$$case_name; outcome=read; keys='$(NSE8_SMS_READ_KEYS)'; \\",
+        "\t\tcase \"$$case_name\" in \\",
+        "\t\t\tformatted) fixture=radio_incoming_ems; state='NOKIA_DCT3_STATE_ROUNDTRIP_AT=36 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'; outcome=read-state ;; \\",
+        "\t\t\tplain) fixture=radio_incoming_ems_plain; state='' ;; \\",
+        "\t\t\tmalformed) fixture=radio_incoming_ems_malformed; state='' ;; \\",
+        "\t\t\tdeleted) fixture=radio_incoming_ems; state=''; profile=formatted; outcome=deleted; keys='$(NSE8_SMS_DELETE_KEYS)' ;; \\",
+        "\t\tesac; \\",
+        "\t\tout=\"$(RUN_DIR)_$$case_name\"; seconds=55; test \"$$outcome\" = deleted && seconds=65; \\",
+        "\t\t$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=\"$$out\" SECONDS=$$seconds RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
+        "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/$$fixture\" \\",
+        "\t\t\tRUN_ENV=\"NOKIA_DCT3_POST_READY_KEYS=$$keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=20000 $(DCT3_PRESS_220_300) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 $$state\" || exit; \\",
+        "\t\t$(PYTHON) tools/radio_ems_trace_check.py \"$$out/error.log\" \\",
+        "\t\t\t\"$$out/nvram/noki3210/sim_card\" \"$$profile\" \"$$out\" \"$$outcome\" || exit; \\",
+        "\tdone"
       ]
     },
     {

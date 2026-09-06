@@ -100,6 +100,14 @@ public:
 		fill_capacity
 	};
 
+	enum class ems_profile : u8
+	{
+		none,
+		formatted_ucs2,
+		plain_ucs2,
+		malformed_formatting
+	};
+
 	static constexpr unsigned maximum_layer3_length = 176;
 	static constexpr unsigned smart_message_single_part_capacity = 133;
 	static constexpr unsigned smart_message_multipart_part_capacity = 128;
@@ -158,7 +166,7 @@ public:
 		m_smart_message_profile = profile;
 	}
 	void set_sms_profile(sms_profile profile) { m_sms_profile = profile; }
-	void set_ems_formatted_text(bool enabled) { m_ems_formatted_text = enabled; }
+	void set_ems_profile(ems_profile profile) { m_ems_profile = profile; }
 	void set_outgoing_sms_outcome(outgoing_sms_outcome outcome)
 	{
 		m_outgoing_sms_outcome = outcome;
@@ -238,6 +246,10 @@ public:
 	std::array<u8, 7> sms_rp_error(
 			u8 mobile_transaction, u8 rp_reference, u8 cause) const;
 	std::array<u8, 2> connect_acknowledge(u8 transaction) const;
+	std::array<u8, 4> start_dtmf_acknowledge(u8 transaction, u8 digit) const;
+	std::array<u8, 2> stop_dtmf_acknowledge(u8 transaction) const;
+	std::array<u8, 2> call_hold_acknowledge(u8 transaction) const;
+	std::array<u8, 2> call_retrieve_acknowledge(u8 transaction) const;
 	std::array<u8, 2> call_release(u8 transaction) const;
 	std::array<u8, 2> call_release_complete(u8 transaction) const;
 	std::array<u8, 3> channel_release() const;
@@ -265,7 +277,7 @@ private:
 	smart_message_profile m_smart_message_profile =
 			smart_message_profile::valid;
 	sms_profile m_sms_profile = sms_profile::valid;
-	bool m_ems_formatted_text = false;
+	ems_profile m_ems_profile = ems_profile::none;
 	bool m_stable_camp_seen = false;
 	bool m_neighbour_bcch_seen = false;
 	bool m_primary_cell_lost = false;

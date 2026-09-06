@@ -750,15 +750,19 @@ nokia_gsm_network_device::incoming_sms_cp_data(unsigned message_index) const
 			SECOND : FIRST;
 	std::copy(source.begin(), source.end(), result.data.begin());
 	result.length = source.size();
-	if (m_ems_formatted_text)
+	if (m_ems_profile != ems_profile::none)
 	{
 		// TS 23.040 EMS: an ordinary SMS-DELIVER with TP-UDHI, UCS-2 DCS
 		// and a Text Formatting information element. The handset remains
 		// responsible for deciding whether it understands or ignores the IE.
-		const auto user_data = gsm::ems::formatted_ucs2("hello", 0x10);
+		const auto user_data = m_ems_profile == ems_profile::plain_ucs2 ?
+				gsm::ems::plain_ucs2("hello") :
+				m_ems_profile == ems_profile::malformed_formatting ?
+				gsm::ems::malformed_formatting_ucs2("hello") :
+				gsm::ems::formatted_ucs2("hello", 0x10);
 		result.data[2] = 28 + user_data.length;
 		result.data[13] = 17 + user_data.length;
-		result.data[14] = 0x44;
+		result.data[14] = m_ems_profile == ems_profile::plain_ucs2 ? 0x04 : 0x44;
 		result.data[22] = 0x08;
 		result.data[30] = user_data.length;
 		std::copy_n(user_data.data.begin(), user_data.length,
@@ -806,10 +810,9 @@ bool nokia_gsm_network_device::incoming_sms_admissible(
 			message.data.data(), message.length);
 	if (!parsed.valid)
 		return false;
-	return !m_ems_formatted_text ||
-			gsm::ems::parse_text_formatting(
-					message.data.data() + parsed.user_data_offset,
-					parsed.user_data_length).valid;
+	// UDH interpretation belongs to the handset. Transport malformed EMS too,
+	// so its application behavior can be observed without pre-filtering it.
+	return true;
 }
 
 nokia_gsm_network_device::layer3_message
@@ -1077,6 +1080,35 @@ std::array<u8, 2> nokia_gsm_network_device::connect_acknowledge(
 		u8 transaction) const
 {
 	return { u8(transaction ^ 0x80), 0x0f };
+}
+
+std::array<u8, 4> nokia_gsm_network_device::start_dtmf_acknowledge(
+		u8 transaction, u8 digit) const
+{
+	// GSM 04.08 9.3.25: acknowledge the same CC transaction and echo the
+	// Keypad Facility IE supplied by the handset.
+	return { u8(transaction ^ 0x80), 0x36, 0x2c, digit };
+}
+
+std::array<u8, 2> nokia_gsm_network_device::stop_dtmf_acknowledge(
+		u8 transaction) const
+{
+	// GSM 04.08 9.3.28.
+	return { u8(transaction ^ 0x80), 0x32 };
+}
+
+std::array<u8, 2> nokia_gsm_network_device::call_hold_acknowledge(
+		u8 transaction) const
+{
+	// GSM 04.08 9.3.10.
+	return { u8(transaction ^ 0x80), 0x19 };
+}
+
+std::array<u8, 2> nokia_gsm_network_device::call_retrieve_acknowledge(
+		u8 transaction) const
+{
+	// GSM 04.08 9.3.21.
+	return { u8(transaction ^ 0x80), 0x1d };
 }
 
 std::array<u8, 2> nokia_gsm_network_device::call_release(u8 transaction) const

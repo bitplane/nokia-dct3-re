@@ -47,6 +47,10 @@ public:
 		outgoing_sms_rp_ack,
 		outgoing_sms_rp_error,
 		connect_acknowledge,
+		start_dtmf_acknowledge,
+		stop_dtmf_acknowledge,
+		call_hold_acknowledge,
+		call_retrieve_acknowledge,
 		call_release,
 		release_complete
 	};
@@ -259,6 +263,13 @@ private:
 	bool m_mobile_originated_call = false;
 	bool m_mobile_originated_sms = false;
 	bool m_incoming_call_answered = false;
+	bool m_dtmf_active = false;
+	u8 m_dtmf_digit = 0;
+	u32 m_dtmf_start_count = 0;
+	u32 m_dtmf_stop_count = 0;
+	bool m_call_held = false;
+	u32 m_call_hold_count = 0;
+	u32 m_call_retrieve_count = 0;
 	u8 m_call_transaction = 0;
 	bool m_outgoing_request_pending = false;
 	u32 m_outgoing_request_id = 0;

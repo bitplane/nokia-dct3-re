@@ -28,6 +28,8 @@ struct text_formatting
 
 // TS 23.040 9.2.3.24.10: a TP-UDH Text Formatting IE followed by UCS-2 text.
 user_data formatted_ucs2(const char *ascii, std::uint8_t mode);
+user_data plain_ucs2(const char *ascii);
+user_data malformed_formatting_ucs2(const char *ascii);
 text_formatting parse_text_formatting(
 		const std::uint8_t *data, unsigned length);
 

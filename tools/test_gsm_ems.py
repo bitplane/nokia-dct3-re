@@ -48,6 +48,29 @@ int main() {
             ], cwd=ROOT, check=True)
             subprocess.run([str(binary)], check=True)
 
+    def test_builds_plain_and_malformed_controls(self):
+        source = r'''
+#include "gsm_ems.h"
+int main() {
+    const auto plain = gsm::ems::plain_ucs2("hello");
+    const auto bad = gsm::ems::malformed_formatting_ucs2("hello");
+    if (plain.length != 10 || plain.data[1] != 'h') return 1;
+    if (bad.length != 16 || bad.data[0] != 5 || bad.data[2] != 4) return 2;
+    if (gsm::ems::parse_text_formatting(bad.data.data(), bad.length).valid) return 3;
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            directory = pathlib.Path(directory)
+            test = directory / "test.cpp"
+            binary = directory / "test"
+            test.write_text(source)
+            subprocess.run([
+                "c++", "-std=c++17", "-Idriver", str(test),
+                "driver/gsm_ems.cpp", "-o", str(binary)
+            ], cwd=ROOT, check=True)
+            subprocess.run([str(binary)], check=True)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,6 +33,30 @@ user_data formatted_ucs2(const char *ascii, std::uint8_t mode)
 	return result;
 }
 
+user_data plain_ucs2(const char *ascii)
+{
+	user_data result;
+	if (!ascii)
+		return result;
+	const unsigned characters = std::strlen(ascii);
+	if (characters > maximum_user_data_octets / 2)
+		return result;
+	for (unsigned index = 0; index < characters; ++index)
+	{
+		result.data[result.length++] = 0;
+		result.data[result.length++] = std::uint8_t(ascii[index]);
+	}
+	return result;
+}
+
+user_data malformed_formatting_ucs2(const char *ascii)
+{
+	auto result = formatted_ucs2(ascii, 0x10);
+	if (result.length)
+		result.data[2] = 4; // IEDL exceeds the bytes covered by UDHL.
+	return result;
+}
+
 text_formatting parse_text_formatting(
 		const std::uint8_t *data, unsigned length)
 {

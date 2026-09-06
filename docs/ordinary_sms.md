@@ -192,6 +192,7 @@ JOBS=4 make verify-3330-radio-sms-transport
 JOBS=4 make verify-3410-radio-sms-inbox
 ```
 
-EMS transport and persistence and the Cell Broadcast page/CBCH block layer are
-covered by `cell_broadcast_and_ems.md`.  EMS reuses ordinary SMS transport;
+EMS application handling and the Cell Broadcast page/CBCH block layer are
+covered by `cell_broadcast_and_ems.md`.  NSE-8 proves EMS transport, durable
+read/delete and UCS-2 presentation while ignoring Text Formatting semantics;
 Cell Broadcast is a separate unacknowledged idle-mode radio contract.

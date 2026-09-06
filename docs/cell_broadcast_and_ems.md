@@ -7,18 +7,25 @@ text-SMS acceptance contract.
 ## Enhanced Messaging Service
 
 `gsm::ems` constructs and validates the TS 23.040 user-data-header Text
-Formatting information element.  The laboratory fixture sends `hello` as
-UCS-2 with TP-UDHI set and a formatting IE covering all five characters.
-It uses the existing paging, SAPI-3, CP/RP and `SMS-DELIVER` machinery; EMS
-does not define a second radio transport.
+Formatting information element.  The laboratory case sends `hello` as UCS-2
+with TP-UDHI set and an IE covering all five characters.  EMS reuses ordinary
+paging, SAPI-3, CP/RP, `SMS-DELIVER` and `EF_SMS`; it has no second radio
+transport.
 
-The Nokia 3210 v6.00 firmware accepts that standards-shaped TPDU and writes it
-unchanged to `EF_SMS`.  The exact unread record, including TP-UDHI, DCS,
-UDHL, formatting IE and UCS-2 text, is checked by
-`tools/radio_ems_trace_check.py`.  This proves transport and persistence.  It
-does not yet claim that this firmware interprets EMS formatting in its MMI;
-Nokia Smart Messaging remains the separately proved contemporary application
-format.
+Nokia 3210 NSE-8 v6.00 accepts the exact TPDU, stores it unchanged, opens it
+through the physical inbox path, renders `hello`, marks the record read and
+deletes it through the ordinary Options -> Erase lifecycle.  Save/load at the
+open-message boundary preserves the same result.  `verify-radio-incoming-ems`
+checks exact sender/text, SIM record, erase prompt and empty-inbox frames.
+
+The same gate sends two controls: plain UCS-2 without TP-UDHI, and a TP-UDH
+whose Text Formatting IEDL exceeds its UDHL boundary.  All three render the
+same text frame byte-for-byte and become read.  The firmware therefore honors
+the user-data offset well enough to expose the UCS-2 payload but does not
+interpret or reject Text Formatting IE semantics in this application path.
+This is a quantified NSE-8 application boundary, not missing network or SIM
+behavior.  Nokia Smart Messaging remains the separately proved contemporary
+application format.
 
 ## Cell Broadcast
 

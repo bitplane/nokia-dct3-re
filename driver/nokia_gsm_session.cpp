@@ -47,6 +47,13 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_mobile_originated_call));
 	save_item(NAME(m_mobile_originated_sms));
 	save_item(NAME(m_incoming_call_answered));
+	save_item(NAME(m_dtmf_active));
+	save_item(NAME(m_dtmf_digit));
+	save_item(NAME(m_dtmf_start_count));
+	save_item(NAME(m_dtmf_stop_count));
+	save_item(NAME(m_call_held));
+	save_item(NAME(m_call_hold_count));
+	save_item(NAME(m_call_retrieve_count));
 	save_item(NAME(m_call_transaction));
 	save_item(NAME(m_outgoing_request_pending));
 	save_item(NAME(m_outgoing_request_id));
@@ -112,6 +119,13 @@ void nokia_gsm_session_device::device_reset()
 	m_mobile_originated_call = false;
 	m_mobile_originated_sms = false;
 	m_incoming_call_answered = false;
+	m_dtmf_active = false;
+	m_dtmf_digit = 0;
+	m_dtmf_start_count = 0;
+	m_dtmf_stop_count = 0;
+	m_call_held = false;
+	m_call_hold_count = 0;
+	m_call_retrieve_count = 0;
 	m_call_transaction = 0;
 	m_outgoing_request_pending = false;
 	m_outgoing_request_id = 0;
@@ -582,6 +596,20 @@ nokia_gsm_session_device::downlink_acknowledged()
 		return downlink_kind::none;
 	}
 
+	if (m_state == u8(state::incoming_call_active) &&
+			(m_pending_downlink.kind ==
+					u8(downlink_kind::start_dtmf_acknowledge) ||
+			 m_pending_downlink.kind ==
+					u8(downlink_kind::stop_dtmf_acknowledge) ||
+			 m_pending_downlink.kind ==
+					u8(downlink_kind::call_hold_acknowledge) ||
+			 m_pending_downlink.kind ==
+					u8(downlink_kind::call_retrieve_acknowledge)))
+	{
+		clear_pending_downlink();
+		return downlink_kind::none;
+	}
+
 	if (m_state == u8(state::awaiting_call_release_acknowledgement) &&
 			(m_pending_downlink.kind == u8(downlink_kind::call_release) ||
 				m_pending_downlink.kind == u8(downlink_kind::release_complete)))
@@ -875,6 +903,62 @@ nokia_gsm_session_device::receive_layer3(
 			m_state = u8(state::awaiting_call_release_acknowledgement);
 			return queue_downlink(downlink_kind::call_release,
 					release.data(), release.size());
+		}
+		if (m_state == u8(state::incoming_call_active) &&
+				message_type == 0x35 && length == 4 &&
+				information[2] == 0x2c)
+		{
+			m_dtmf_active = true;
+			m_dtmf_digit = information[3];
+			++m_dtmf_start_count;
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_session: DTMF start digit=%02x count=%u t=%.6f\n",
+					m_dtmf_digit, m_dtmf_start_count,
+					machine().time().as_double());
+			const auto acknowledge = m_network->start_dtmf_acknowledge(
+					information[0], m_dtmf_digit);
+			return queue_downlink(downlink_kind::start_dtmf_acknowledge,
+					acknowledge.data(), acknowledge.size());
+		}
+		if (m_state == u8(state::incoming_call_active) &&
+				message_type == 0x31 && length == 2)
+		{
+			m_dtmf_active = false;
+			++m_dtmf_stop_count;
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_session: DTMF stop digit=%02x count=%u t=%.6f\n",
+					m_dtmf_digit, m_dtmf_stop_count,
+					machine().time().as_double());
+			const auto acknowledge =
+					m_network->stop_dtmf_acknowledge(information[0]);
+			return queue_downlink(downlink_kind::stop_dtmf_acknowledge,
+					acknowledge.data(), acknowledge.size());
+		}
+		if (m_state == u8(state::incoming_call_active) &&
+				message_type == 0x18 && length == 2 && !m_call_held)
+		{
+			m_call_held = true;
+			++m_call_hold_count;
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_session: call held count=%u t=%.6f\n",
+					m_call_hold_count, machine().time().as_double());
+			const auto acknowledge =
+					m_network->call_hold_acknowledge(information[0]);
+			return queue_downlink(downlink_kind::call_hold_acknowledge,
+					acknowledge.data(), acknowledge.size());
+		}
+		if (m_state == u8(state::incoming_call_active) &&
+				message_type == 0x1c && length == 2 && m_call_held)
+		{
+			m_call_held = false;
+			++m_call_retrieve_count;
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_session: call retrieved count=%u t=%.6f\n",
+					m_call_retrieve_count, machine().time().as_double());
+			const auto acknowledge =
+					m_network->call_retrieve_acknowledge(information[0]);
+			return queue_downlink(downlink_kind::call_retrieve_acknowledge,
+					acknowledge.data(), acknowledge.size());
 		}
 	}
 

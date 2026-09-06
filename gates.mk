@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 223 gates: 139 generated from typed steps, 84 copied verbatim (shell).
+# 224 gates: 138 generated from typed steps, 86 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -91,11 +91,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-a5-1-incoming-call verify-3330-radio-media-resilience \
 	verify-3310-radio-media-resilience verify-radio-incoming-call \
 	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
-	verify-radio-incoming-call-lifecycle verify-radio-a5-1-incoming-call \
-	verify-radio-a5-1-state verify-radio-a5-1-sdcch-state \
-	verify-radio-a5-1-outgoing-call verify-radio-outgoing-call-lifecycle \
-	verify-radio-outgoing-call-state verify-radio-outgoing-call-busy \
-	verify-radio-outgoing-call-no-answer \
+	verify-radio-incoming-call-lifecycle verify-radio-supplementary-call \
+	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
+	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
+	verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state \
+	verify-radio-outgoing-call-busy verify-radio-outgoing-call-no-answer \
 	verify-radio-outgoing-call-no-answer-state \
 	verify-radio-outgoing-call-service-reject \
 	verify-radio-outgoing-call-delayed-decision-state \
@@ -913,6 +913,17 @@ verify-radio-incoming-call-lifecycle:
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
+
+# shell: physical DTMF and hold/retrieve lifecycle
+verify-radio-supplementary-call: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-supplementary-call: build
+	@set -e; \
+	$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=$(RUN_DIR) SECONDS=60 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,5,wait1000,enter,wait1500,down,wait1500,enter,wait1500,5,wait1000,enter,wait1500,down,wait1500,enter,wait1500,c,c,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=27.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'; \
+	$(PYTHON) tools/radio_supplementary_call_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR); \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
@@ -1805,10 +1816,25 @@ verify-radio-incoming-sms:
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
 
-verify-radio-incoming-ems:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_EMS_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
-	$(PYTHON) tools/radio_ems_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
+# shell: three exact application-boundary compositions
+verify-radio-incoming-ems: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-incoming-ems: build
+	@set -e; \
+	for case_name in formatted plain malformed deleted; do \
+		profile=$$case_name; outcome=read; keys='$(NSE8_SMS_READ_KEYS)'; \
+		case "$$case_name" in \
+			formatted) fixture=radio_incoming_ems; state='NOKIA_DCT3_STATE_ROUNDTRIP_AT=36 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'; outcome=read-state ;; \
+			plain) fixture=radio_incoming_ems_plain; state='' ;; \
+			malformed) fixture=radio_incoming_ems_malformed; state='' ;; \
+			deleted) fixture=radio_incoming_ems; state=''; profile=formatted; outcome=deleted; keys='$(NSE8_SMS_DELETE_KEYS)' ;; \
+		esac; \
+		out="$(RUN_DIR)_$$case_name"; seconds=55; test "$$outcome" = deleted && seconds=65; \
+		$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR="$$out" SECONDS=$$seconds RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" \
+			RUN_ENV="NOKIA_DCT3_POST_READY_KEYS=$$keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=20000 $(DCT3_PRESS_220_300) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 $$state" || exit; \
+		$(PYTHON) tools/radio_ems_trace_check.py "$$out/error.log" \
+			"$$out/nvram/noki3210/sim_card" "$$profile" "$$out" "$$outcome" || exit; \
+	done
 
 verify-radio-sms-inbox: ERASED_IDENTITY_SECURITY_CODE=12345
 verify-radio-sms-inbox: build

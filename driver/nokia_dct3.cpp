@@ -1134,9 +1134,16 @@ void nokia_dct3_state::apply_sms_config()
 		nokia_gsm_network_device::outgoing_sms_outcome::cp_silence,
 		nokia_gsm_network_device::outgoing_sms_outcome::rp_silence
 	};
+	static constexpr std::array EMS_PROFILES = {
+		nokia_gsm_network_device::ems_profile::none,
+		nokia_gsm_network_device::ems_profile::formatted_ucs2,
+		nokia_gsm_network_device::ems_profile::plain_ucs2,
+		nokia_gsm_network_device::ems_profile::malformed_formatting
+	};
 	const u8 config = m_sms_config.read_safe(0x00);
 	m_gsm_network->set_sms_profile(PROFILES[config & 0x07]);
-	m_gsm_network->set_ems_formatted_text(BIT(m_ems_config.read_safe(0x00), 0));
+	m_gsm_network->set_ems_profile(
+			EMS_PROFILES[m_ems_config.read_safe(0x00) & 0x03]);
 	m_gsm_network->set_outgoing_sms_outcome(OUTCOMES[(config >> 3) & 3]);
 }
 
@@ -2135,9 +2142,11 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x18, "CP-ACK then no RP response")
 
 	PORT_START("EMSCFG")
-	PORT_CONFNAME(0x01, 0x00, "Incoming SMS content") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sms_config_changed), 0)
+	PORT_CONFNAME(0x03, 0x00, "Incoming SMS content") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sms_config_changed), 0)
 	PORT_CONFSETTING(0x00, "Ordinary text")
 	PORT_CONFSETTING(0x01, "EMS formatted UCS-2 text")
+	PORT_CONFSETTING(0x02, "Plain UCS-2 text control")
+	PORT_CONFSETTING(0x03, "Malformed EMS formatting IE")
 
 	PORT_START("SMARTCFG")
 	PORT_CONFNAME(0x0f, 0x00, "Incoming Smart Message envelope")

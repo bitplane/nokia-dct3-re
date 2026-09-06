@@ -64,7 +64,8 @@ distinction.
 | Document | Purpose |
 | --- | --- |
 | `network_scouting.md` | Validated camp, Location Updating, channel-release and operator-presentation contract. |
-| `cell_broadcast_and_ems.md` | EMS transport/persistence and Cell Broadcast page/CBCH contract. |
+| `cell_broadcast_and_ems.md` | NSE-8 EMS application boundary and Cell Broadcast page/CBCH contract. |
+| `supplementary_call_control.md` | Validated NSE-8 DTMF and hold/retrieve call-control lifecycle. |
 | `grey_salamander_integration.md` | Knowledge-integration catalogue and dependency order for LAPDm, paging, calls, SMS and SIM extensions. |
 | `dsp_interface.md` | Detailed MCU/DSP transport and later lower-radio maps. |
 | `dsp_shared_memory_inventory.md` | Generated two-ROM inventory of reachable firmware reads from DSP shared RAM. |
