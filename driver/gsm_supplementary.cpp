@@ -411,6 +411,50 @@ message process_uss_request_result(const request &request, const char *response)
 	return result;
 }
 
+message unstructured_uss_request(const request &request,
+		std::uint8_t invoke_id, const char *text)
+{
+	message result;
+	if (!request.valid ||
+			request.operation_code != operation::process_uss_request)
+		return result;
+
+	std::array<std::uint8_t, maximum_ussd_length> packed{};
+	const unsigned packed_length = pack_gsm7(text, packed.data(), packed.size());
+	if (!packed_length)
+		return result;
+	const unsigned parameter_length = 3 + 2 + packed_length;
+	const unsigned component_length = 3 + 3 + 2 + parameter_length;
+	const unsigned facility_length = 2 + component_length;
+	if (4 + facility_length > result.data.size())
+		return message{};
+
+	unsigned offset = 0;
+	result.data[offset++] = request.transaction ^ 0x80;
+	result.data[offset++] = 0x3a;
+	result.data[offset++] = 0x1c;
+	result.data[offset++] = facility_length;
+	result.data[offset++] = 0xa1;
+	result.data[offset++] = component_length;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = invoke_id;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = std::uint8_t(operation::unstructured_uss_request);
+	result.data[offset++] = 0x30;
+	result.data[offset++] = parameter_length;
+	result.data[offset++] = 0x04;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = request.data_coding_scheme;
+	result.data[offset++] = 0x04;
+	result.data[offset++] = packed_length;
+	for (unsigned index = 0; index < packed_length; ++index)
+		result.data[offset++] = packed[index];
+	result.length = offset;
+	return result;
+}
+
 message interrogate_result(const request &request, bool active)
 {
 	return interrogate_result(request, active, active, nullptr, 0);

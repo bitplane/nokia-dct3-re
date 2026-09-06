@@ -131,9 +131,8 @@ codec bounds both the Layer-3 and USSD payloads and rejects malformed or trailin
 BER parameter data.
 
 `make verify-radio-ussd` requires the exact organic request, semantic decode,
-response, RR release, and exact firmware-rendered response frame. Continued
-USSD sessions, network-initiated USSD and other data coding schemes remain
-separate contracts.
+response, RR release, and exact firmware-rendered response frame.
+Network-initiated USSD and other data coding schemes remain separate contracts.
 
 The laboratory network also exposes three deterministic terminal outcomes for
 the same organic request. It can return a correlated `ReturnError` with GSM
@@ -145,9 +144,20 @@ supplementary session remains pending for at least the 38-second acceptance
 window. No emulator timeout is invented where the firmware has not yet shown
 one.
 
+The network can also issue the phase-2 continuation shape specified by
+[ETSI TS 124 090](https://www.etsi.org/deliver/etsi_ts/124000_124099/124090/10.00.00_60/ts_124090v100000p.pdf):
+a FACILITY message containing an `UnstructuredSS-Request` (`0x3c`) Invoke in
+the still-active mobile-originated transaction. NSE-8 v6.00 does not
+accept the standards-shaped request tested here. It replies with RELEASE
+COMPLETE and cause `0x60` (invalid mandatory information), for both short and
+segmented text and with either tested Invoke identifier. The emulator therefore
+records this as a product-capability negative; it does not synthesize an
+interactive continuation that the firmware has not demonstrated.
+
 `make verify-radio-ussd-outcomes` validates the exact ReturnError and Reject
-components and their releases, then saves and reloads MAME in the silent active
-dialogue and requires that neither a response nor a release appears after
-restore. These are terminal-response and no-response contracts only. A
-continued dialogue requires a network `UnstructuredSS-Request` Invoke and an
-organic handset response; it must not be inferred from the one-shot flow.
+components and their releases, the exact continued-request rejection and its
+release, then saves and reloads MAME in the silent active dialogue and requires
+that neither a response nor a release appears after restore. These remain
+terminal-response, conformance-negative, and no-response contracts. A working
+continued dialogue requires an organic handset FACILITY response and remains
+unclaimed.

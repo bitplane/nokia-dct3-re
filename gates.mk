@@ -1270,6 +1270,11 @@ verify-radio-ussd-outcomes: build
 			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)' || exit; \
 		$(PYTHON) tools/radio_ussd_trace_check.py "$$out/error.log" "$$out" --outcome "$$outcome" || exit; \
 	done; \
+	out="$(RUN_DIR)_continued_rejected"; \
+	$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR="$$out" SECONDS=38 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_ussd_continued' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)' || exit; \
+	$(PYTHON) tools/radio_ussd_trace_check.py "$$out/error.log" "$$out" --outcome continued-rejected || exit; \
 	out="$(RUN_DIR)_silence"; \
 	$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR="$$out" SECONDS=38 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_ussd_silence' \

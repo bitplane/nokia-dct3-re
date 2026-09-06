@@ -22,6 +22,15 @@ REJECT = GOOD.replace(
 RX enqueue type=80 payload=34 data=80120000132c000100000342319b2a1c08a406020101800100
 """
 SILENCE = "\n".join(GOOD.replace("outcome=0", "outcome=3").splitlines()[:3])
+CONTINUED_REJECTED = GOOD.replace(
+    "outcome=0", "outcome=4").replace(
+    "GSM service downlink kind=27 sapi=0 pd=0b message=2a length=37",
+    "GSM service downlink kind=28 sapi=0 pd=0b message=3a length=29").replace(
+    "radio_phase=release_channel_change", ""\
+) + """
+gsm_ss: continued handset_response message=2a length=6 data=1b2a0802e0e0 t=2
+radio_phase=release_channel_change
+"""
 
 
 class RadioUssdTraceCheckTest(unittest.TestCase):
@@ -44,6 +53,12 @@ class RadioUssdTraceCheckTest(unittest.TestCase):
             self.assertEqual({"frames": 0}, verify(
                 SILENCE, pathlib.Path(directory), "silence",
                 require_frame=False))
+
+    def test_accepts_exact_continued_request_rejection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual({"frames": 0}, verify(
+                CONTINUED_REJECTED, pathlib.Path(directory),
+                "continued-rejected", require_frame=False))
 
     def test_accepts_silent_dialogue_state_roundtrip(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -23,6 +23,7 @@ enum class operation : std::uint8_t
 	deactivate_ss = 0x0d,
 	interrogate_ss = 0x0e,
 	process_uss_request = 0x3b,
+	unstructured_uss_request = 0x3c,
 	split_mpty = 0x79,
 	retrieve_mpty = 0x7a,
 	hold_mpty = 0x7b,
@@ -80,6 +81,8 @@ message error_result(const request &request, std::uint8_t error_code);
 message reject_result(const request &request, std::uint8_t problem_code);
 message process_uss_request_result(const request &request,
 		const char *response);
+message unstructured_uss_request(const request &request,
+		std::uint8_t invoke_id, const char *text);
 
 } // namespace gsm::ss
 

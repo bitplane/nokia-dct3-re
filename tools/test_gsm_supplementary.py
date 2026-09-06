@@ -59,6 +59,14 @@ int main()
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");
+	response = gsm::ss::unstructured_uss_request(request, 2, "Enter reply");
+	if (response.length != 29 || response.data[1] != 0x3a ||
+			response.data[4] != 0xa1 || response.data[8] != 2 ||
+			response.data[11] != 0x3c)
+		return 22;
+	for (unsigned i = 0; i < response.length; ++i)
+		std::printf("%02x", response.data[i]);
+	std::puts("");
 
 	const std::uint8_t registration[] = {
 		0x1b, 0x7b, 0x1c, 0x14, 0xa1, 0x12, 0x02, 0x01, 0x01,
@@ -215,6 +223,7 @@ class GsmSupplementaryTest(unittest.TestCase):
         self.assertEqual(
             "9b2a1c0da20b020101300602010e800100\n"
             "9b2a1c13a211020101300c02013b300704010f0402cf25\n"
+            "9b3a1c19a11702010202013c300f04010f040a4537bd2c07c9cb70761e\n"
             "9b2a1c1da21b020101301602010aa011040121300c300a840105850581551532f4\n",
             result.stdout)
 

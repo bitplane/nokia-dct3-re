@@ -461,6 +461,13 @@ nokia_gsm_session_device::downlink_acknowledged()
 	{
 		return begin_channel_release();
 	}
+	if (m_state == u8(state::awaiting_supplementary_facility_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::supplementary_facility))
+	{
+		clear_pending_downlink();
+		m_state = u8(state::awaiting_supplementary_response);
+		return downlink_kind::none;
+	}
 
 	if (m_state == u8(state::awaiting_call_proceeding_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::call_proceeding))
@@ -938,6 +945,10 @@ nokia_gsm_session_device::receive_layer3(
 				break;
 			case nokia_gsm_network_device::ussd_outcome::silence:
 				break;
+			case nokia_gsm_network_device::ussd_outcome::continuation_request:
+				response = gsm::ss::unstructured_uss_request(
+						request, request.invoke_id + 1, "Enter reply");
+				break;
 			}
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=ussd transaction=%02x invoke=%u "
@@ -1031,9 +1042,30 @@ nokia_gsm_session_device::receive_layer3(
 			return downlink_kind::none;
 		if (!response.length)
 			return downlink_kind::none;
-		m_state = u8(state::awaiting_supplementary_release_acknowledgement);
-		return queue_downlink(downlink_kind::supplementary_release_complete,
+		const bool continued = m_network->configured_ussd_outcome() ==
+				nokia_gsm_network_device::ussd_outcome::continuation_request &&
+				request.operation_code == gsm::ss::operation::process_uss_request;
+		m_state = u8(continued ?
+				state::awaiting_supplementary_facility_acknowledgement :
+				state::awaiting_supplementary_release_acknowledgement);
+		return queue_downlink(continued ? downlink_kind::supplementary_facility :
+				downlink_kind::supplementary_release_complete,
 				response.data.data(), response.length);
+	}
+	if (sapi == 0 && m_state == u8(state::awaiting_supplementary_response) &&
+			protocol_discriminator == 0x0b)
+	{
+		std::string information_hex;
+		for (unsigned index = 0; index < length; ++index)
+			information_hex += util::string_format("%02x", information[index]);
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_ss: continued handset_response message=%02x length=%u "
+				"data=%s t=%.6f\n", message_type, length,
+				information_hex.c_str(),
+				machine().time().as_double());
+		if (message_type == 0x2a)
+			return begin_channel_release();
+		return downlink_kind::none;
 	}
 	if (sapi == 0 && m_state == u8(state::incoming_call_active) &&
 			protocol_discriminator == 0x05 && message_type == 0x24 &&

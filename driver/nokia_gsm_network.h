@@ -69,7 +69,8 @@ public:
 		success,
 		return_error,
 		reject,
-		silence
+		silence,
+		continuation_request
 	};
 
 	enum class mobility_profile : u8

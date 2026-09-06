@@ -57,7 +57,8 @@ public:
 		supplementary_release_complete,
 		handover_command,
 		physical_information,
-		multiparty_facility_result
+		multiparty_facility_result,
+		supplementary_facility
 	};
 
 	struct downlink_message
@@ -257,7 +258,9 @@ private:
 		awaiting_mobile_sms_cp_ack_acknowledgement,
 		awaiting_mobile_sms_final_cp_ack,
 		awaiting_mobile_sms_timeout,
-		awaiting_handover_result
+		awaiting_handover_result,
+		awaiting_supplementary_facility_acknowledgement,
+		awaiting_supplementary_response
 	};
 
 	void clear_pending_downlink();

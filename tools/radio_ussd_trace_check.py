@@ -12,7 +12,7 @@ REQUEST = re.compile(
     r"data=1b7b1c14a11202010102013b300a04010f0405aa986c36027f0100 ")
 DECODED = re.compile(
     r"gsm_ss: request=ussd transaction=1b invoke=1 dcs=0f packed_length=5 "
-    r"outcome=(?P<outcome>[0-3]) ")
+    r"outcome=(?P<outcome>[0-4]) ")
 RESPONSE = re.compile(
     r"GSM service downlink kind=27 sapi=0 pd=0b message=2a length=(?P<length>\d+) ")
 RETURN_ERROR = re.compile(
@@ -22,6 +22,11 @@ REJECT = re.compile(
     r"RX enqueue type=80 .*data="
     r"80120000132c000100000342319b2a1c08a406020101800100")
 RR_RELEASE = re.compile(r"radio_phase=release_channel_change")
+CONTINUED_FACILITY = re.compile(
+    r"GSM service downlink kind=\d+ sapi=0 pd=0b message=3a length=29 ")
+CONTINUED_REJECTION = re.compile(
+    r"gsm_ss: continued handset_response message=2a length=6 "
+    r"data=1b2a0802e0e0 ")
 RESULT_FRAME = "cf2e4a3461da27d5c49c2077810f57cc2caf6e295b089021c25157000b6324b7"
 
 
@@ -34,7 +39,8 @@ def verify(text: str, frame_dir: pathlib.Path, outcome: str = "success",
     if not decoded:
         raise ValueError("missing correlated USSD DCS/payload decode")
     expected_outcome = {
-        "success": "0", "error": "1", "reject": "2", "silence": "3"
+        "success": "0", "error": "1", "reject": "2", "silence": "3",
+        "continued-rejected": "4"
     }[outcome]
     if decoded.group("outcome") != expected_outcome:
         raise ValueError(f"wrong configured USSD outcome for {outcome}")
@@ -48,6 +54,17 @@ def verify(text: str, frame_dir: pathlib.Path, outcome: str = "success",
             summary = frame_dir / "boot_summary.txt"
             if not summary.is_file() or "state_roundtrip=pass" not in summary.read_text():
                 raise ValueError("missing active USSD state save/load round trip")
+        return {"frames": len(list(frame_dir.glob("*.pgm")))}
+
+    if outcome == "continued-rejected":
+        facility = CONTINUED_FACILITY.search(text, decoded.end())
+        if not facility:
+            raise ValueError("missing network continued-USSD FACILITY")
+        rejection = CONTINUED_REJECTION.search(text, facility.end())
+        if not rejection:
+            raise ValueError("missing exact handset continued-USSD rejection")
+        if not RR_RELEASE.search(text, rejection.end()):
+            raise ValueError("missing RR release after continued-USSD rejection")
         return {"frames": len(list(frame_dir.glob("*.pgm")))}
 
     response = RESPONSE.search(text, decoded.end())
@@ -76,7 +93,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("frame_dir", type=pathlib.Path)
-    parser.add_argument("--outcome", choices=("success", "error", "reject", "silence"),
+    parser.add_argument("--outcome", choices=(
+        "success", "error", "reject", "silence", "continued-rejected"),
                         default="success")
     parser.add_argument("--require-state-roundtrip", action="store_true")
     args = parser.parse_args()

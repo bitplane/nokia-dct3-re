@@ -1211,7 +1211,7 @@ void nokia_dct3_state::machine_reset()
 	apply_sms_config();
 	m_gsm_network->set_ussd_outcome(
 			nokia_gsm_network_device::ussd_outcome(
-					m_ussd_config.read_safe(0x00) & 0x03));
+					m_ussd_config.read_safe(0x00) & 0x07));
 	static constexpr std::array SMART_MESSAGE_PROFILES = {
 		nokia_gsm_network_device::smart_message_profile::valid,
 		nokia_gsm_network_device::smart_message_profile::missing_second_part,
@@ -2163,11 +2163,12 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x03, "Malformed EMS formatting IE")
 
 	PORT_START("USSDCFG")
-	PORT_CONFNAME(0x03, 0x00, "Laboratory USSD outcome")
+	PORT_CONFNAME(0x07, 0x00, "Laboratory USSD outcome")
 	PORT_CONFSETTING(0x00, "ReturnResult")
 	PORT_CONFSETTING(0x01, "ReturnError: system failure")
 	PORT_CONFSETTING(0x02, "Reject: general problem")
 	PORT_CONFSETTING(0x03, "No network response")
+	PORT_CONFSETTING(0x04, "Continued request conformance")
 
 	PORT_START("SMARTCFG")
 	PORT_CONFNAME(0x0f, 0x00, "Incoming Smart Message envelope")
