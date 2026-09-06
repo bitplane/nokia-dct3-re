@@ -748,6 +748,7 @@ public:
 		m_diag_config(*this, "DIAGCFG"),
 		m_network_config(*this, "NETCFG"),
 		m_sms_config(*this, "SMSCFG"),
+		m_ussd_config(*this, "USSDCFG"),
 		m_ems_config(*this, "EMSCFG"),
 		m_smart_message_config(*this, "SMARTCFG"),
 		m_sim_toolkit_config(*this, "SATCFG"),
@@ -894,6 +895,7 @@ private:
 	optional_ioport m_diag_config;
 	optional_ioport m_network_config;
 	optional_ioport m_sms_config;
+	optional_ioport m_ussd_config;
 	optional_ioport m_ems_config;
 	optional_ioport m_smart_message_config;
 	optional_ioport m_sim_toolkit_config;
@@ -1207,6 +1209,9 @@ void nokia_dct3_state::machine_reset()
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
 	const u8 network = m_network_config.read_safe(0x00);
 	apply_sms_config();
+	m_gsm_network->set_ussd_outcome(
+			nokia_gsm_network_device::ussd_outcome(
+					m_ussd_config.read_safe(0x00) & 0x03));
 	static constexpr std::array SMART_MESSAGE_PROFILES = {
 		nokia_gsm_network_device::smart_message_profile::valid,
 		nokia_gsm_network_device::smart_message_profile::missing_second_part,
@@ -2156,6 +2161,13 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x01, "EMS formatted UCS-2 text")
 	PORT_CONFSETTING(0x02, "Plain UCS-2 text control")
 	PORT_CONFSETTING(0x03, "Malformed EMS formatting IE")
+
+	PORT_START("USSDCFG")
+	PORT_CONFNAME(0x03, 0x00, "Laboratory USSD outcome")
+	PORT_CONFSETTING(0x00, "ReturnResult")
+	PORT_CONFSETTING(0x01, "ReturnError: system failure")
+	PORT_CONFSETTING(0x02, "Reject: general problem")
+	PORT_CONFSETTING(0x03, "No network response")
 
 	PORT_START("SMARTCFG")
 	PORT_CONFNAME(0x0f, 0x00, "Incoming Smart Message envelope")

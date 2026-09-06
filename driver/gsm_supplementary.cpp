@@ -345,6 +345,23 @@ message error_result(const request &request, std::uint8_t error_code)
 	return result;
 }
 
+message reject_result(const request &request, std::uint8_t problem_code)
+{
+	message result;
+	if (!request.valid)
+		return result;
+	const std::uint8_t encoded[] = {
+		std::uint8_t(request.transaction ^ 0x80), 0x2a,
+		0x1c, 0x08, 0xa4, 0x06,
+		0x02, 0x01, request.invoke_id,
+		0x80, 0x01, problem_code
+	};
+	result.length = sizeof(encoded);
+	for (unsigned index = 0; index < result.length; ++index)
+		result.data[index] = encoded[index];
+	return result;
+}
+
 message process_uss_request_result(const request &request, const char *response)
 {
 	message result;

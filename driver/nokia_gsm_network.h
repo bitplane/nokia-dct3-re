@@ -64,6 +64,13 @@ public:
 		cp_silence,
 		rp_silence
 	};
+	enum class ussd_outcome : u8
+	{
+		success,
+		return_error,
+		reject,
+		silence
+	};
 
 	enum class mobility_profile : u8
 	{
@@ -170,6 +177,8 @@ public:
 	}
 	void set_sms_profile(sms_profile profile) { m_sms_profile = profile; }
 	void set_ems_profile(ems_profile profile) { m_ems_profile = profile; }
+	void set_ussd_outcome(ussd_outcome outcome) { m_ussd_outcome = outcome; }
+	ussd_outcome configured_ussd_outcome() const { return m_ussd_outcome; }
 	void set_outgoing_sms_outcome(outgoing_sms_outcome outcome)
 	{
 		m_outgoing_sms_outcome = outcome;
@@ -333,6 +342,7 @@ private:
 			smart_message_profile::valid;
 	sms_profile m_sms_profile = sms_profile::valid;
 	ems_profile m_ems_profile = ems_profile::none;
+	ussd_outcome m_ussd_outcome = ussd_outcome::success;
 	bool m_stable_camp_seen = false;
 	bool m_neighbour_bcch_seen = false;
 	bool m_primary_cell_lost = false;

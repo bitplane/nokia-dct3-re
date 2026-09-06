@@ -178,6 +178,10 @@ int main()
 	if (response.length != 12 || response.data[4] != 0xa3 ||
 			response.data[11] != 0x14)
 		return 16;
+	response = gsm::ss::reject_result(request, 0x00);
+	if (response.length != 12 || response.data[4] != 0xa4 ||
+			response.data[9] != 0x80 || response.data[11] != 0x00)
+		return 21;
 	for (std::uint8_t operation : {std::uint8_t(0x79), std::uint8_t(0x7a),
 			std::uint8_t(0x7b), std::uint8_t(0x7c)}) {
 		std::uint8_t facility[sizeof(build_mpty)];

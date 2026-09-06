@@ -923,13 +923,28 @@ nokia_gsm_session_device::receive_layer3(
 		else if (request.operation_code ==
 				gsm::ss::operation::process_uss_request)
 		{
-			response = gsm::ss::process_uss_request_result(
-					request, "Nokia test network");
+			const auto outcome = m_network->configured_ussd_outcome();
+			switch (outcome)
+			{
+			case nokia_gsm_network_device::ussd_outcome::success:
+				response = gsm::ss::process_uss_request_result(
+						request, "Nokia test network");
+				break;
+			case nokia_gsm_network_device::ussd_outcome::return_error:
+				response = gsm::ss::error_result(request, 0x22);
+				break;
+			case nokia_gsm_network_device::ussd_outcome::reject:
+				response = gsm::ss::reject_result(request, 0x00);
+				break;
+			case nokia_gsm_network_device::ussd_outcome::silence:
+				break;
+			}
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_ss: request=ussd transaction=%02x invoke=%u "
-					"dcs=%02x packed_length=%u t=%.6f\n",
+					"dcs=%02x packed_length=%u outcome=%u t=%.6f\n",
 					request.transaction, request.invoke_id,
 					request.data_coding_scheme, request.ussd_length,
+					unsigned(outcome),
 					machine().time().as_double());
 		}
 		else if (forwarding_service &&

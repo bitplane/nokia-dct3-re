@@ -132,5 +132,22 @@ BER parameter data.
 
 `make verify-radio-ussd` requires the exact organic request, semantic decode,
 response, RR release, and exact firmware-rendered response frame. Continued
-USSD sessions, network-initiated USSD, reject/error outcomes and other data
-coding schemes remain separate contracts.
+USSD sessions, network-initiated USSD and other data coding schemes remain
+separate contracts.
+
+The laboratory network also exposes three deterministic terminal outcomes for
+the same organic request. It can return a correlated `ReturnError` with GSM
+error `0x22` (system failure), return a BER `Reject` with general-problem code
+`0x00`, or remain silent. Error and Reject are carried in RELEASE COMPLETE and
+the handset performs the ordinary RR release. Silence deliberately sends no
+Layer-3 response: the handset retains the dedicated connection and the
+supplementary session remains pending for at least the 38-second acceptance
+window. No emulator timeout is invented where the firmware has not yet shown
+one.
+
+`make verify-radio-ussd-outcomes` validates the exact ReturnError and Reject
+components and their releases, then saves and reloads MAME in the silent active
+dialogue and requires that neither a response nor a release appears after
+restore. These are terminal-response and no-response contracts only. A
+continued dialogue requires a network `UnstructuredSS-Request` Invoke and an
+organic handset response; it must not be inferred from the one-shot flow.

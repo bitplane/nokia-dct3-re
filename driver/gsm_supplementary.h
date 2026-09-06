@@ -77,6 +77,7 @@ message forwarding_info_result(const request &request, bool registered,
 		std::uint8_t basic_service_code = 0,
 		std::uint8_t no_reply_condition_time = 0);
 message error_result(const request &request, std::uint8_t error_code);
+message reject_result(const request &request, std::uint8_t problem_code);
 message process_uss_request_result(const request &request,
 		const char *response);
 

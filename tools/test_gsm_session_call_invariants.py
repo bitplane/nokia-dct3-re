@@ -213,6 +213,19 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
         self.assertIn("required_device<nokia_gsm_network_device> m_network;",
                       adapter_header)
 
+    def test_ussd_outcomes_are_network_owned_and_fail_closed(self):
+        network_header = (ROOT / "driver/nokia_gsm_network.h").read_text()
+        driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        for outcome in ("success", "return_error", "reject", "silence"):
+            self.assertIn(outcome, network_header)
+        self.assertIn('m_ussd_config(*this, "USSDCFG")', driver)
+        ussd = self.source.split(
+            "operation::process_uss_request", 1)[1].split(
+                "request.operation_code == gsm::ss::operation::register_ss", 1)[0]
+        self.assertIn("configured_ussd_outcome", ussd)
+        self.assertIn("gsm::ss::error_result(request, 0x22)", ussd)
+        self.assertIn("gsm::ss::reject_result(request, 0x00)", ussd)
+
     def test_outgoing_setup_requires_speech_and_called_party(self):
         setup = self.source.split(
             "m_state == u8(state::awaiting_outgoing_call_setup)", 1)[1]
