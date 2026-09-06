@@ -61,11 +61,26 @@ class.  The separate type-`0x8e` framed-session translator accepts classes
 `0x30`.  Neither path can publish the CBS object without inventing a new
 translation.
 
+The public NHM-5 trace-name catalogue adds `0x1804 MDI:m2d/CBCH` and
+`0x1904 MDI:d2m/CBCH`, plus `0x1841/0x1941 IGNORE_CBCH_MESSAGE` and
+`0x1842/0x1942 CBCH_BITMAP`.  These identify a DSP-side MDI command family,
+not the NSE-8 MCU ring envelope.  A disposable run delivered raw packet type
+`0x04` through the ordinary MDIRCV ring and FIQ0 at 20.000 seconds; firmware
+consumed the packet without reaching task 22, `0x23ceba`, or MMI event
+`0x1859`.  Interpreting `0x1904` as direction/type `0x19` plus command `0x04`
+also fails statically: the low-packet dispatcher maps entry `0x19` to
+`0x290f12`, which only updates a two-bit shared-control field at `0x100be`.
+The probe was removed.  `make verify-cell-broadcast-static` now protects both
+negative routes as well as the positive consumer contract.
+
 Cell Broadcast must not be routed through point-to-point SMS CP/RP, SIM
 `EF_SMS`, or a direct scheduler injection.  The next required evidence is a
-ROM4 DSP or real-phone capture showing the DSP-side publication mechanism
-between four CBCH blocks and task 22.  Until then, the network page and CBCH
-implementation is complete but firmware presentation is evidence-blocked.
+product-correct DSP trace or real-phone capture showing the translation from
+DSP-side MDI CBCH command `0x1904` to the class-7/primitive-`0x30` task-22
+publication.  The recovered NSE-1 ROM4 DSP image can inform the command-family
+shape but cannot establish NSE-8 product behavior.  Until then, the network
+page and CBCH implementation is complete but firmware presentation is
+evidence-blocked.
 
 ## Standards references
 

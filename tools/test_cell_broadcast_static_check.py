@@ -18,6 +18,8 @@ class CellBroadcastStaticCheckTests(unittest.TestCase):
 		self.assertEqual(0x30, result["primitive"])
 		self.assertEqual(4, result["header_octets"])
 		self.assertEqual(0xAA, result["maximum_blob_octets"])
+		self.assertEqual(0x04, result["rejected_raw_packet_type"])
+		self.assertEqual(0x19, result["rejected_mdi_direction_type"])
 
 	def test_rejects_changed_blob_bound(self):
 		image = bytearray(self.image)

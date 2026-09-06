@@ -733,6 +733,12 @@
       "hypothesis": "The 24-bit field of correlated type-0x88 NEIGHBOUR_TIMING_OFFSET is a zero relative offset for synchronized laboratory cells rather than the shared GSM time",
       "conclusion": "After organic stable camp, neighbour publication and mode-2 NMEAS_INSTRUCTIONS, zeroing the 24-bit field made the firmware request one-frame observations continuously, producing more than 500 correlated exchanges in under three seconds before reconfiguring the old serving ARFCN. Restoring the shared TDMA frame number yields a bounded measurement transaction. The separate 16-bit field remains the zero relative cell-timing value.",
       "evidence": ["driver/nokia_radio_peer.cpp", "docs/6110_bringup.md", "docs/network_scouting.md"]
+    },
+    {
+      "id": "cell_broadcast_trace_id_is_direct_mdircv_type", "status": "disproven",
+      "hypothesis": "The public MDI:d2m/CBCH trace id 0x1904 can be delivered to NSE-8 as raw MDIRCV packet type 0x04, or as packet type 0x19 with command 0x04, to reach the mapped task-22 Cell Broadcast consumer",
+      "conclusion": "A disposable physical-ring probe delivered type 0x04 with an 88-octet standards-shaped page at 20.000 seconds; firmware consumed it without reaching task 22, primitive handler 0x23ceba or MMI event 0x1859. Static decode maps low-packet entry 0x19 to 0x290f12, which only updates a two-bit shared-control field at 0x100be. The trace id names a DSP-internal MDI command family, not either NSE-8 MCU ring envelope. The probe was removed.",
+      "evidence": ["docs/cell_broadcast_and_ems.md", "tools/cell_broadcast_static_check.py"]
     }
   ]
 }

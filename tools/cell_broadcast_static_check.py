@@ -46,6 +46,16 @@ ANCHORS = {
 	0x2908D6: ("movs", "r1, #0x18"),
 	0x2908DE: ("strb", "r1, [r0, #1]"),
 	0x2908E2: ("strb", "r7, [r0, #2]"),
+	# Low-numbered MDIRCV packets enter a separate 0x00..0x33 control
+	# dispatcher.  Entries 0x04 and 0x19 terminate at shared-control
+	# updates, not the task-22 message router.
+	0x290D18: ("adds", "r0, r4, #0"),
+	0x290D1A: ("cmp", "r0, #0x33"),
+	0x290FF0: ("movs", "r0, #1"),
+	0x290FF2: ("lsls", "r0, r0, #0xe"),
+	0x291010: ("ldr", "r2, [pc, #0x1dc]"),
+	0x290F12: ("lsls", "r0, r6, #0x1e"),
+	0x290F3E: ("strh", "r0, [r6, #2]"),
 	# The separate framed-session task does not accept class 7: its lower
 	# branch admits 3, 5, 17, 19 and 20 before the class-0x40 cases.
 	0x237BDE: ("ldrb", "r0, [r4, #3]"),
@@ -103,6 +113,8 @@ def verify_contract(data: bytes) -> dict[str, int]:
 		"header_octets": 4,
 		"maximum_blob_octets": 0xAA,
 		"mmi_event_literal": 0x5978,
+		"rejected_raw_packet_type": 0x04,
+		"rejected_mdi_direction_type": 0x19,
 	}
 
 
