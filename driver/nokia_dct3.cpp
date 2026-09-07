@@ -273,6 +273,9 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE1 = {
 constexpr nokia_gensio_device::wiring_contract GENSIO_NSE1 = {
 	0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true
 };
+constexpr nokia_gensio_device::wiring_contract GENSIO_NSM5 = {
+	0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true
+};
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
@@ -635,15 +638,24 @@ constexpr nokia_product_config make_conservative_config(
 	return result;
 }
 
+constexpr nokia_product_config make_5210_config()
+{
+	nokia_product_config result = make_conservative_config({ 4, 0x10 });
+	// NSM-5 selects CCONT with control 0x22 (bit 2 clear), writes a command,
+	// and then polls receive-ready. The reply therefore cannot be conditional
+	// on the NSE-8 control-bit convention.
+	result.gensio_wiring = GENSIO_NSM5;
+	return result;
+}
+
 constexpr nokia_product_config PRODUCT_3210 = make_3210_config();
 constexpr nokia_product_config PRODUCT_3310 = make_3310_config();
 constexpr nokia_product_config PRODUCT_3330 = make_3330_config();
 constexpr nokia_product_config PRODUCT_3410 = make_3410_config();
 constexpr nokia_product_config PRODUCT_5110 = make_5110_config();
 constexpr nokia_product_config PRODUCT_6110 = make_6110_config();
+constexpr nokia_product_config PRODUCT_5210 = make_5210_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
-constexpr nokia_product_config PRODUCT_5X10 =
-		make_conservative_config({ 4, 0x10 });
 constexpr nokia_product_config PRODUCT_8XXX =
 		make_conservative_config({ 4, 0x10 });
 
@@ -2726,7 +2738,7 @@ void nokia_dct3_state::noki3210(machine_config &config)
 void nokia_dct3_state::noki5210(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
-	apply_product_config(PRODUCT_5X10);
+	apply_product_config(PRODUCT_5210);
 }
 
 void nokia_dct3_state::noki8xxx(machine_config &config)
@@ -2920,9 +2932,12 @@ ROM_START( noki5210 )
 	ROM_SYSTEM_BIOS(0, "540", "v5.40")  // C 11-10-2003
 	ROM_SYSTEM_BIOS(1, "525", "v5.25")  // C 26-02-2003
 	ROM_SYSTEM_BIOS(2, "520", "v5.20")  // C 12-08-2002
+	ROM_SYSTEM_BIOS(3, "540e", "v5.40 PPM E local spike")
 	ROMX_LOAD("5210_5.40_ppm_c.fls", 0x000000, 0x380000, CRC(e37d5beb) SHA1(726f000780dd67750b7d2859687f846ce17a1bf7), ROM_BIOS(0))
 	ROMX_LOAD("5210_5.25_ppm_c.fls", 0x000000, 0x380000, CRC(13bba458) SHA1(3b5244244743fba48f9061e158f95fc46b86446e), ROM_BIOS(1))
 	ROMX_LOAD("5210_520_c.fls", 0x000000, 0x380000, CRC(38648cd3) SHA1(9210e15e6bd780f86c467bec33ef54d6393abe5a), ROM_BIOS(2))
+	ROMX_LOAD("5210_5.40_ppm_e.fls", 0x000000, 0x380000, CRC(0f17ef38) SHA1(f6c11cb013468c1d5e8550a2903f58ffa467a001), ROM_BIOS(3))
+	ROMX_LOAD("5210 virgin eeprom 007f0000.fls", 0x3f0000, 0x010000, CRC(da4f00e7) SHA1(6c1ac58c2b7d80301beec1df4a43616cf381d5a5), ROM_BIOS(3))
 ROM_END
 
 ROM_START( noki6210 )

@@ -170,6 +170,20 @@ regions, verifies their pinned hashes, and prepares the `noki3410` ROM set.
 The v5.46 set is the default 3410 BIOS; the older local v5.06 MCU/PPM image is
 retained as a separate, unprovisioned comparison BIOS.
 
+### Nokia 5210 NSM-5 v5.40
+
+Firmware.center's `NSM-5 v.05.40 5210.rar` contains Wintesla members
+`nsm5_5.400`, `nsm5_5.40e`, and `5210 virgin eeprom.pmm`. The untouched archive
+has SHA-256 `65fee7acd30bdb37f48d7e1be71a9126d9fbe6e91d478c08fce163e1c373d03e`.
+The member SHA-256 values are respectively
+`f4dd4cbaf5df59d0205fdda58fdba6296c96924b90a711bb99b06604c67635f5`,
+`9927b72cc020e219d2e316f98060f50dfc803b89d8d281d9ce23f5d4bd7457b8`,
+and `bbdee216e92011966681dc148daa144d0a8939bb518df5f2bb40d60459aceb84`.
+
+Place them in `roms/5210-nsm5-v540/` and run `make normalize-5210`. The resulting
+PPM E flash and PMM are exposed as BIOS `540e`; this is a labelled portability
+input, not evidence that the existing compatibility profile matches NSM-5.
+
 ### Nokia 3310 NHM-5 v6.39 local spike
 
 The bounded 3310 portability spike uses a local, already-combined 2 MiB flash

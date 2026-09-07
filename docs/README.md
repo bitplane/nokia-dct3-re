@@ -37,6 +37,7 @@ distinction.
 | `cross_rom_confidence.md` | Cross-product and cross-ROM boot, idle, and input evidence. |
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
+| `5210_bringup.md` | Bounded NSM-5 v5.40 portability frontier and resumption contract. |
 | `6110_bootstrap_capture.md` | Physical NSE-3 DSP-bootstrap capture format and acceptance contract. |
 | `structural_regression.md` | Acceptance profiles, semantic predicates, and frame oracles. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
