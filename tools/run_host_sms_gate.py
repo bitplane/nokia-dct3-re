@@ -17,10 +17,24 @@ async def run(args: argparse.Namespace) -> None:
         websocket = await connect(args.port, process)
         async with websocket:
             request = None
+            current_epoch = None
+            initial_request_epoch = None
             while request is None:
                 event = json.loads(await asyncio.wait_for(websocket.recv(), 60))
-                if event.get("type") == "outgoing_sms":
-                    request = event
+                if event.get("type") == "call_adapter_ready":
+                    current_epoch = event.get("epoch")
+                    continue
+                if event.get("type") != "outgoing_sms":
+                    continue
+                if event.get("epoch") != current_epoch:
+                    raise RuntimeError(f"uncorrelated outgoing SMS {event!r}")
+                if initial_request_epoch is None:
+                    initial_request_epoch = current_epoch
+                    if args.require_restore:
+                        continue
+                if args.require_restore and current_epoch == initial_request_epoch:
+                    continue
+                request = event
             expected = {
                 "type": "outgoing_sms",
                 "request_id": 1,
@@ -34,6 +48,13 @@ async def run(args: argparse.Namespace) -> None:
                 raise RuntimeError(
                     f"unexpected outgoing SMS {request!r}, expected {expected!r}")
             epoch = request["epoch"]
+            if args.require_restore:
+                await websocket.send(json.dumps({
+                    "type": "outgoing_sms_decision",
+                    "epoch": initial_request_epoch,
+                    "request_id": 1,
+                    "decision": "rp_error",
+                }))
             await websocket.send(json.dumps({
                 "type": "outgoing_sms_decision",
                 "epoch": epoch,
@@ -77,6 +98,7 @@ def main() -> int:
     parser.add_argument(
         "--decision", choices=("accept", "rp_error", "rp_silence"),
         default="accept")
+    parser.add_argument("--require-restore", action="store_true")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:

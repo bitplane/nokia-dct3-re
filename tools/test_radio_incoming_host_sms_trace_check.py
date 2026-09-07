@@ -18,6 +18,17 @@ GSM service uplink sapi=3 pd=09 message=01
 gsm_call_adapter: incoming sms state id=1 epoch=1 phase=delivered
 """
 
+RESTORED = """
+gsm_call_adapter: network registered=1 arfcn=1
+gsm_call_adapter: incoming sms id=1 result=accepted
+gsm_call_adapter: incoming sms state id=1 epoch=1 phase=queued
+state_roundtrip: result=pass
+gsm_call_adapter: incoming sms state id=1 epoch=2 phase=queued
+GSM service downlink kind=16 sapi=3 pd=09 message=01
+GSM service uplink sapi=3 pd=09 message=01
+gsm_call_adapter: incoming sms state id=1 epoch=2 phase=delivered
+"""
+
 
 class IncomingHostSmsTraceCheckTest(unittest.TestCase):
     def test_accepts_complete_ordered_lifecycle(self) -> None:
@@ -32,6 +43,13 @@ class IncomingHostSmsTraceCheckTest(unittest.TestCase):
         lines[3], lines[4] = lines[4], lines[3]
         with self.assertRaises(ValueError):
             verify("\n".join(lines))
+
+    def test_accepts_republished_restore_lifecycle(self) -> None:
+        verify(RESTORED, require_restore=True)
+
+    def test_restore_requires_new_epoch(self) -> None:
+        with self.assertRaises(ValueError):
+            verify(GOOD, require_restore=True)
 
 
 if __name__ == "__main__":

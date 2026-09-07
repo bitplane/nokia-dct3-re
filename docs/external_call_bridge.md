@@ -92,6 +92,9 @@ in `user_data_length` and carries the packed octets in `user_data`; `8bit` and
 alphabet information. `verify-radio-outgoing-sms-host-adapter` proves an
 organic composer-to-host request and the correlated RP result through the
 ordinary SAPI-3 transaction.
+`verify-radio-outgoing-sms-host-restore` saves while that host decision is
+pending, requires republication under a new epoch, and rejects the stale
+pre-restore decision before completing normally.
 
 For a text-only command-line ingress test, the standalone endpoint packs GSM
 7-bit text and submits it after the handset has registered:
@@ -105,6 +108,9 @@ already encoded TP user data and its alphabet-specific logical length. The
 network constructs SMS-DELIVER and owns only the external network side.
 `verify-radio-incoming-sms-host-adapter` requires paging, firmware CP/RP
 acknowledgement and SIM-backed storage before reporting `delivered`.
+`verify-radio-incoming-sms-host-restore` saves during that admitted delivery;
+the adapter republishes `queued` under the new epoch and reports exactly one
+post-restore completion.
 
 The USSD host contract preserves the BER-decoded DCS and packed payload. A
 `success` response carries `dcs` and hexadecimal `data`; `return_error` and
