@@ -337,6 +337,14 @@ items. Selecting `Continue` organically sends ENVELOPE (`A0 C2`) body
 `d3 07 02 02 01 81 10 01 01`; the card validates the menu-selection BER-TLV,
 records item 1 and returns `90 00`. Invalid, unknown, or out-of-sequence menu
 selections return `6a 80`.
+
+The NSE-8 v6.00 capability boundary is also measured for later proactive
+commands. During an established call, SEND DTMF (`0x14`) receives terminal
+result `31`; LAUNCH BROWSER (`0x15`) with an alpha identifier and URL receives
+the same result. Both commands travel through `91xx`, FETCH and TERMINAL
+RESPONSE normally. Result `31` is therefore firmware capability rejection,
+not a missing card transaction and not a reason to synthesize DTMF or browser
+behavior for this product.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract

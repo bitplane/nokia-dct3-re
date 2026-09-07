@@ -2123,6 +2123,7 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x0a, "Phase 2+ menu changing the polling interval")
 	PORT_CONFSETTING(0x0b, "Phase 2+ menu playing one tone")
 	PORT_CONFSETTING(0x0c, "Phase 2+ menu calling and sending DTMF")
+	PORT_CONFSETTING(0x0d, "Phase 2+ menu launching a browser")
 
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.

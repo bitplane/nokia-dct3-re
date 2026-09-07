@@ -343,6 +343,10 @@ of this cancellation-focused gate.
 Acknowledge before issuing `SEND DTMF`. NSE-8 v6.00 must return result `31`,
 then the physically ended call must complete CC release. This is an active-call
 capability negative, not an out-of-context command probe.
+`make verify-sim-toolkit-browser` selects an organic SAT menu item, delivers a
+LAUNCH BROWSER command containing alpha and URL TLVs through SIMI/FIQ6, and
+requires the exact result-`31` terminal response. This guards the NSE-8
+capability boundary without supplying a browser outside firmware.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.
