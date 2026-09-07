@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 267 gates: 141 generated from typed steps, 126 copied verbatim (shell).
+# 269 gates: 141 generated from typed steps, 128 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -181,6 +181,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-toolkit-malformed verify-sim-toolkit-timeout verify-sim-hotplug \
 	verify-sim-hotplug-v501 verify-sim-hotplug-toolkit \
 	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
+	verify-sim-toolkit-3310 verify-sim-toolkit-3330 \
 	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
 	verify-sim-phonebook verify-sim-pin verify-sim-pin-unblock \
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
@@ -2898,6 +2899,20 @@ verify-sim-toolkit-v501:
 	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
 	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210_V501) ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR) SECONDS=24 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
 	$(PYTHON) tools/sim_toolkit_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+
+# shell: NHM-5 Phase-2+ DISPLAY TEXT corroboration
+verify-sim-toolkit-3310:
+	@set -e; \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_3310/noki3310.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait33000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=0 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300'; \
+	$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome success
+
+# shell: NHM-6 Phase-2+ screen-busy corroboration
+verify-sim-toolkit-3330:
+	@set -e; \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_3330/noki3330.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg'; \
+	$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome screen-busy
 
 # shell: provisioned card application and machine-state fixture
 verify-sim-toolkit-state-roundtrip:

@@ -358,6 +358,10 @@ result `32`, keeping malformed-data rejection distinct from capability result
 FETCH. It requires result `12` and bounds the firmware-owned response delay to
 55-65 seconds, proving that unattended cancellation is neither card-generated
 nor an injected UI event.
+`make verify-sim-toolkit-3310` corroborates the complete Phase-2+ transaction
+on NHM-5 v6.39, including physical Navi acknowledgement and result `00`.
+`make verify-sim-toolkit-3330` corroborates EF_PHASE, TERMINAL PROFILE and
+FETCH on NHM-6 v4.50 while requiring its observed `20 01` screen-busy result.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

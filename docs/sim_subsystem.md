@@ -316,6 +316,14 @@ router. The MMI renders `DCT3 SAT`; Left Softkey dismissal produces TERMINAL
 RESPONSE (`A0 14`) with general result `00`. v5.01 and v6.00 both complete the
 same transaction through SIMI/FIQ6.
 
+The same card contract is corroborated across later DCT3 products. NHM-5
+v6.39 (3310) reads EF_PHASE 3, submits TERMINAL PROFILE, FETCHes the same
+DISPLAY TEXT command and returns result `00` after a physical Navi press.
+NHM-6 v4.50 (3330) reaches the same FETCH boundary but returns `20 01`
+(terminal currently unable, screen busy) in its current presentation
+lifecycle. That result is preserved as a product limitation, not rewritten as
+card or transport failure.
+
 A second opt-in card application proves that proactive commands can be
 sequenced rather than merely demonstrated in isolation. The successful DISPLAY
 TEXT response returns `91 15`, the firmware immediately FETCHes a GET INKEY

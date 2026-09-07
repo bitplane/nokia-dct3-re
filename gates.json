@@ -11112,6 +11112,30 @@
       ]
     },
     {
+      "name": "verify-sim-toolkit-3310",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "NHM-5 Phase-2+ DISPLAY TEXT corroboration",
+      "recipe": [
+        "\t@set -e; \\",
+        "\tmkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_3310/noki3310.cfg $(RUN_DIR)/cfg/; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait33000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=0 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=300'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome success"
+      ]
+    },
+    {
+      "name": "verify-sim-toolkit-3330",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "NHM-6 Phase-2+ screen-busy corroboration",
+      "recipe": [
+        "\t@set -e; \\",
+        "\tmkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_3330/noki3330.cfg $(RUN_DIR)/cfg/; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome screen-busy"
+      ]
+    },
+    {
       "name": "verify-sim-toolkit-state-roundtrip",
       "prerequisites": [],
       "variables": {},
