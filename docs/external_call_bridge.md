@@ -63,12 +63,19 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | MAME to host | `outgoing_sms_state` | identity and `phase`: `accepted`, `rejected`, or `ended` |
 | Host to MAME | `incoming_sms` | identity, decimal `sender`, `alphabet`, user-data length and packed user data |
 | MAME to host | `incoming_sms_state` | identity and `phase`: `queued` or `delivered` |
+| MAME to host | `network_state` | `epoch`, registration status and, while registered, serving-cell identity and signal level |
 
 The `*` is direction-specific (`incoming` or `outgoing`) and must match the
 call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
 does not own paging, CC/RR state, radio timing, keypad decisions, codec routing
 or release completion. Queue overflow, stale epochs, duplicate decisions and
 wrong-direction media are rejected without changing emulated call state.
+
+`network_state` is published on connection, save-state restoration,
+registration changes and serving-cell changes. A host should wait for
+`registered: true` before submitting incoming calls or SMS. Its registered
+snapshot includes MCC, MNC, ARFCN, BSIC, LAC, cell ID and RX level. These are
+the configured network facts, not values inferred from the LCD.
 
 The SMS payload stays in its GSM representation. `gsm7` reports septet count
 in `user_data_length` and carries the packed octets in `user_data`; `8bit` and

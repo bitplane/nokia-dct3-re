@@ -16,13 +16,20 @@ async def run(args: argparse.Namespace) -> None:
     try:
         websocket = await connect(args.port, process)
         async with websocket:
-            # The adapter deliberately rejects ingress before the handset has
-            # registered. With unthrottled emulation, three host seconds is
-            # comfortably beyond the observed 15-second emulated registration.
-            await asyncio.sleep(3)
+            epoch = None
+            while epoch is None:
+                event = json.loads(await asyncio.wait_for(websocket.recv(), 30))
+                if event.get("type") == "call_adapter_ready":
+                    epoch = event.get("epoch")
+            while True:
+                event = json.loads(await asyncio.wait_for(websocket.recv(), 30))
+                if (event.get("type") == "network_state" and
+                        event.get("epoch") == epoch and
+                        event.get("registered") is True):
+                    break
             await websocket.send(json.dumps({
                 "type": "incoming_sms",
-                "epoch": 1,
+                "epoch": epoch,
                 "request_id": 1,
                 "sender": "5551234",
                 "alphabet": "gsm7",
@@ -33,7 +40,7 @@ async def run(args: argparse.Namespace) -> None:
             while "delivered" not in phases:
                 event = json.loads(await asyncio.wait_for(websocket.recv(), 30))
                 if event.get("type") == "incoming_sms_state":
-                    if event.get("request_id") != 1 or event.get("epoch") != 1:
+                    if event.get("request_id") != 1 or event.get("epoch") != epoch:
                         raise RuntimeError(f"uncorrelated SMS state {event!r}")
                     phases.append(event.get("phase"))
             if phases != ["queued", "delivered"]:

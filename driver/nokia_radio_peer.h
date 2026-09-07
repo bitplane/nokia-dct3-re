@@ -129,6 +129,8 @@ public:
 	{
 		return m_host_incoming_sms_pending || m_host_incoming_sms_active;
 	}
+	bool registered() const { return m_registered; }
+	u16 serving_arfcn() const { return m_serving_arfcn; }
 	nokia_gsm_network_device::forwarding_condition
 			last_host_forwarding_condition() const
 	{

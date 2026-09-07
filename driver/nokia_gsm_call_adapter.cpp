@@ -133,6 +133,8 @@ void nokia_gsm_call_adapter_device::device_start()
 	save_item(NAME(m_last_published_request_id));
 	save_item(NAME(m_last_published_sms_request_id));
 	save_item(NAME(m_incoming_sms_request_id));
+	save_item(NAME(m_last_network_registered));
+	save_item(NAME(m_last_network_arfcn));
 	save_item(NAME(m_last_published_connected));
 	save_item(NAME(m_last_published_alerting));
 	save_item(NAME(m_incoming_request_id));
@@ -399,8 +401,12 @@ void nokia_gsm_call_adapter_device::device_reset()
 	m_last_published_request_id = 0;
 	m_last_published_sms_request_id = 0;
 	m_incoming_sms_request_id = 0;
+	m_last_network_registered = false;
+	m_last_network_arfcn = 0xffff;
 	m_last_published_connected = false;
 	m_last_published_alerting = false;
+	m_last_network_registered = false;
+	m_last_network_arfcn = 0xffff;
 	m_incoming_request_id = 0;
 	m_incoming_digits.fill(0);
 	m_incoming_digits_length = 0;
@@ -485,6 +491,11 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 				dropped_events, machine().time().as_double());
 	if (ready_pending)
 		publish_ready();
+	const bool network_registered = m_radio_peer->registered();
+	const u16 network_arfcn = m_radio_peer->serving_arfcn();
+	if (republish || network_registered != m_last_network_registered ||
+			(network_registered && network_arfcn != m_last_network_arfcn))
+		publish_network_state();
 	if (republish && m_incoming_sms_request_id)
 		publish_incoming_sms_state("queued");
 	for (const auto &item : incoming_sms)
@@ -820,6 +831,65 @@ void nokia_gsm_call_adapter_device::publish_incoming_sms_state(const char *phase
 	LOGMASKED(LOG_CALL_ADAPTER,
 			"gsm_call_adapter: incoming sms state id=%u epoch=%u phase=%s t=%.6f\n",
 			m_incoming_sms_request_id, m_transport_epoch.load(), phase,
+			machine().time().as_double());
+}
+
+void nokia_gsm_call_adapter_device::publish_network_state()
+{
+	const bool registered = m_radio_peer->registered();
+	const u16 arfcn = m_radio_peer->serving_arfcn();
+	const gsm::mobility::cell *const cell = registered ?
+			m_network->cell_by_arfcn(arfcn) : nullptr;
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	writer.StartObject();
+	writer.Key("type");
+	writer.String("network_state");
+	writer.Key("epoch");
+	writer.Uint(m_transport_epoch.load());
+	writer.Key("registered");
+	writer.Bool(registered);
+	if (cell)
+	{
+		const auto &plmn = cell->location.plmn;
+		const std::array<char, 4> mcc = {
+				char('0' + (plmn[0] & 0x0f)),
+				char('0' + (plmn[0] >> 4)),
+				char('0' + (plmn[1] & 0x0f)), 0 };
+		std::array<char, 4> mnc = {
+				char('0' + (plmn[2] & 0x0f)),
+				char('0' + (plmn[2] >> 4)), 0, 0 };
+		if ((plmn[1] >> 4) != 0x0f)
+		{
+			mnc[2] = char('0' + (plmn[1] >> 4));
+			mnc[3] = 0;
+		}
+		writer.Key("mcc");
+		writer.String(mcc.data());
+		writer.Key("mnc");
+		writer.String(mnc.data());
+		writer.Key("arfcn");
+		writer.Uint(cell->arfcn);
+		writer.Key("bsic");
+		writer.Uint(cell->bsic);
+		writer.Key("lac");
+		writer.Uint(cell->location.lac);
+		writer.Key("cell_id");
+		writer.Uint(cell->identity);
+		writer.Key("rxlev_dbm");
+		writer.Int(cell->rxlev_dbm);
+	}
+	writer.EndObject();
+	{
+		std::lock_guard<std::mutex> lock(m_host->mutex);
+		for (const auto &connection : m_host->connections)
+			connection->send_message(buffer.GetString(), 1);
+	}
+	m_last_network_registered = registered;
+	m_last_network_arfcn = registered ? arfcn : 0xffff;
+	LOGMASKED(LOG_CALL_ADAPTER,
+			"gsm_call_adapter: network registered=%u arfcn=%u t=%.6f\n",
+			registered, registered ? arfcn : 0xffff,
 			machine().time().as_double());
 }
 

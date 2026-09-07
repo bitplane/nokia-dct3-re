@@ -145,6 +145,22 @@ class Dct3CallBridgeTest(unittest.TestCase):
             "user_data_length": 5, "user_data": "e8329bfd06",
         })
 
+    def test_network_state_tracks_only_the_current_epoch(self):
+        protocol = LoopbackProtocol()
+        protocol.handle({
+            "type": "call_adapter_ready", "protocol_version": 1,
+            "epoch": 9,
+        })
+        protocol.handle({
+            "type": "network_state", "epoch": 8, "registered": True,
+        })
+        self.assertFalse(protocol.network_registered)
+        protocol.handle({
+            "type": "network_state", "epoch": 9, "registered": True,
+            "mcc": "001", "mnc": "01", "arfcn": 1,
+        })
+        self.assertTrue(protocol.network_registered)
+
 
 if __name__ == "__main__":
     unittest.main()

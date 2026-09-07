@@ -10,6 +10,7 @@ except ModuleNotFoundError:
 
 
 GOOD = """
+gsm_call_adapter: network registered=1 arfcn=1
 gsm_call_adapter: incoming sms id=1 result=accepted
 gsm_call_adapter: incoming sms state id=1 epoch=1 phase=queued
 GSM service downlink kind=16 sapi=3 pd=09 message=01
@@ -28,7 +29,7 @@ class IncomingHostSmsTraceCheckTest(unittest.TestCase):
 
     def test_rejects_reordered_lifecycle(self) -> None:
         lines = GOOD.strip().splitlines()
-        lines[2], lines[3] = lines[3], lines[2]
+        lines[3], lines[4] = lines[4], lines[3]
         with self.assertRaises(ValueError):
             verify("\n".join(lines))
 

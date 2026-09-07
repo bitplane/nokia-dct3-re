@@ -39,6 +39,7 @@ class LoopbackProtocol:
         self.stats = BridgeStats()
         self.direction = "outgoing"
         self.sms_request_id: int | None = None
+        self.network_registered = False
 
     @property
     def active(self) -> bool:
@@ -62,6 +63,10 @@ class LoopbackProtocol:
             epoch = message.get("epoch")
             if isinstance(epoch, int) and not isinstance(epoch, bool):
                 self.epoch = epoch
+            return []
+        if kind == "network_state":
+            if message.get("epoch") == self.epoch:
+                self.network_registered = message.get("registered") is True
             return []
         if kind == "outgoing_call":
             return self._request(message)
@@ -239,6 +244,7 @@ def status(protocol: LoopbackProtocol) -> str:
 async def connected_session(args: argparse.Namespace, websocket: Any,
                             protocol: LoopbackProtocol) -> bool:
     hangup_deadline: float | None = None
+    ingress_sent = False
     while True:
         timeout = None
         if hangup_deadline is not None:
@@ -253,10 +259,11 @@ async def connected_session(args: argparse.Namespace, websocket: Any,
             hangup_deadline = None
             continue
         message = json.loads(payload)
+        old_phase = protocol.phase
+        for reply in protocol.handle(message):
+            await websocket.send(json.dumps(reply))
         if ((args.incoming_caller is not None or args.incoming_sms is not None) and
-                message.get("type") == "call_adapter_ready" and
-                protocol.request_id is None):
-            protocol.handle(message)
+                protocol.network_registered and not ingress_sent):
             request = (protocol.incoming_request(args.incoming_caller)
                        if args.incoming_caller is not None else
                        protocol.incoming_sms_request(
@@ -264,15 +271,13 @@ async def connected_session(args: argparse.Namespace, websocket: Any,
             if request is not None:
                 await websocket.send(json.dumps(request))
                 print(f"{request['type']} requested", flush=True)
+                ingress_sent = True
             continue
         if (message.get("type") == "incoming_sms_state" and
                 message.get("phase") == "delivered"):
             protocol.stats.sms += 1
             print("incoming SMS delivered", flush=True)
             return args.once
-        old_phase = protocol.phase
-        for reply in protocol.handle(message):
-            await websocket.send(json.dumps(reply))
         if protocol.phase != old_phase:
             print(f"call {protocol.request_id} {protocol.phase}: {status(protocol)}",
                   flush=True)
