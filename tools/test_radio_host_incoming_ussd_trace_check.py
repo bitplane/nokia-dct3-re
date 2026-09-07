@@ -15,6 +15,13 @@ dsp_hle: LAPDm service Channel Release acknowledged nr=6
 gsm_call_adapter: incoming ussd state id=1 epoch=1 phase=delivered
 """
 
+RESTORED = GOOD.replace(
+    "gsm_ss: network_initiated",
+    "state_roundtrip: result=pass\n"
+    "gsm_call_adapter: incoming ussd state id=1 epoch=2 phase=queued\n"
+    "gsm_ss: network_initiated",
+).replace("epoch=1 phase=delivered", "epoch=2 phase=delivered")
+
 
 class HostIncomingUssdTraceCheckTest(unittest.TestCase):
     def test_accepts_complete_transaction(self) -> None:
@@ -23,6 +30,13 @@ class HostIncomingUssdTraceCheckTest(unittest.TestCase):
     def test_rejects_missing_firmware_notification(self) -> None:
         with self.assertRaises(ValueError):
             verify(GOOD.replace("network_initiated", "missing"))
+
+    def test_accepts_republished_restore_lifecycle(self) -> None:
+        verify(RESTORED, require_restore=True)
+
+    def test_restore_requires_new_epoch(self) -> None:
+        with self.assertRaises(ValueError):
+            verify(GOOD, require_restore=True)
 
 
 if __name__ == "__main__":

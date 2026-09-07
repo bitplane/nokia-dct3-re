@@ -35,14 +35,29 @@ async def run(args: argparse.Namespace) -> None:
                 "data": pack_gsm7("Host notice"),
             }))
             phases = []
+            initial_epoch = epoch
+            restored = False
             while "delivered" not in phases:
                 event = json.loads(await asyncio.wait_for(websocket.recv(), 40))
+                if event.get("type") == "call_adapter_ready":
+                    new_epoch = event.get("epoch")
+                    if (args.require_restore and isinstance(new_epoch, int) and
+                            new_epoch != initial_epoch):
+                        epoch = new_epoch
+                        phases = []
+                        restored = True
+                    continue
                 if event.get("type") == "incoming_ussd_state":
                     if event.get("epoch") != epoch or event.get("request_id") != 1:
+                        if (args.require_restore and not restored and
+                                event.get("epoch") == initial_epoch):
+                            continue
                         raise RuntimeError(f"uncorrelated incoming USSD state {event!r}")
                     phases.append(event.get("phase"))
             if phases != ["queued", "delivered"]:
                 raise RuntimeError(f"unexpected incoming USSD phases {phases!r}")
+            if args.require_restore and not restored:
+                raise RuntimeError("incoming USSD completed without an epoch change")
         result = await asyncio.wait_for(process.wait(), 90)
         if result:
             raise RuntimeError(f"MAME exited with status {result}")
@@ -56,6 +71,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cwd")
+    parser.add_argument("--require-restore", action="store_true")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:

@@ -7560,6 +7560,33 @@
       ]
     },
     {
+      "name": "verify-radio-incoming-ussd-host-restore",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "embedded host transport runner",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\t$(MAKE) --no-print-directory build JOBS=$(JOBS) \\",
+        "\t\tPROVISIONED_IMEI_PREFIX=49015420323751; \\",
+        "\t$(call prepare_host_run,$(RUN_DIR),noki3210,); \\",
+        "\tenv NOKIA_DCT3_LUA_QUIET=1 NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \\",
+        "\t\tNOKIA_DCT3_STATE_ROUNDTRIP_AT=16.5 \\",
+        "\t\tNOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \\",
+        "\t\t$(VENV)/bin/python tools/run_host_incoming_ussd_gate.py --require-restore \\",
+        "\t\t\t--port $(HOST_INCOMING_USSD_RESTORE_PORT) --cwd $(MAME_DIR) -- \\",
+        "\t\t\t./mame noki3210 -rompath roms -log -video none -sound none \\",
+        "\t\t\t-keyboardprovider none -mouseprovider none -lightgunprovider none \\",
+        "\t\t\t-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \\",
+        "\t\t\t-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \\",
+        "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
+        "\t\t\t-http_port $(HOST_INCOMING_USSD_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
+        "\t\t\t-seconds_to_run 48; \\",
+        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\t$(PYTHON) tools/radio_host_incoming_ussd_trace_check.py $(RUN_DIR)/error.log --require-restore"
+      ]
+    },
+    {
       "name": "verify-radio-outgoing-sms",
       "prerequisites": [],
       "variables": {},

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 276 gates: 141 generated from typed steps, 135 copied verbatim (shell).
+# 277 gates: 141 generated from typed steps, 136 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -145,7 +145,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-incoming-sms-host-adapter verify-radio-incoming-sms-host-restore \
 	verify-radio-outgoing-sms-host-adapter verify-radio-outgoing-sms-host-restore \
 	verify-radio-ussd-host-adapter verify-radio-ussd-host-restore \
-	verify-radio-incoming-ussd-host-adapter verify-radio-outgoing-sms \
+	verify-radio-incoming-ussd-host-adapter \
+	verify-radio-incoming-ussd-host-restore verify-radio-outgoing-sms \
 	verify-radio-outgoing-sms-reject verify-radio-outgoing-sms-smsc \
 	verify-radio-outgoing-sms-timeout verify-radio-outgoing-sms-timeout-state \
 	verify-radio-outgoing-sms-delivery-report verify-radio-outgoing-sms-v501 \
@@ -2257,6 +2258,28 @@ verify-radio-incoming-ussd-host-adapter:
 			-seconds_to_run 45; \
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_host_incoming_ussd_trace_check.py $(RUN_DIR)/error.log
+
+# shell: embedded host transport runner
+verify-radio-incoming-ussd-host-restore:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		PROVISIONED_IMEI_PREFIX=49015420323751; \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		NOKIA_DCT3_STATE_ROUNDTRIP_AT=16.5 \
+		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
+		$(VENV)/bin/python tools/run_host_incoming_ussd_gate.py --require-restore \
+			--port $(HOST_INCOMING_USSD_RESTORE_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
+			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
+			-http_port $(HOST_INCOMING_USSD_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
+			-seconds_to_run 48; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_host_incoming_ussd_trace_check.py $(RUN_DIR)/error.log --require-restore
 
 # shell: embedded EEPROM restoration guard
 verify-radio-outgoing-sms:

@@ -87,6 +87,32 @@ bool nokia_radio_peer_device::queue_host_incoming_ussd(
 	return true;
 }
 
+void nokia_radio_peer_device::cancel_host_incoming_call()
+{
+	if (!m_host_incoming_call_pending)
+		return;
+	m_host_incoming_call_pending = false;
+	m_gsm_session->cancel_queued_incoming_service();
+}
+
+void nokia_radio_peer_device::cancel_host_incoming_sms()
+{
+	if (!m_host_incoming_sms_pending)
+		return;
+	m_host_incoming_sms_pending = false;
+	m_gsm_network->clear_host_incoming_sms();
+	m_gsm_session->cancel_queued_incoming_service();
+}
+
+void nokia_radio_peer_device::cancel_host_incoming_ussd()
+{
+	if (!m_host_incoming_ussd_pending)
+		return;
+	m_host_incoming_ussd_pending = false;
+	m_gsm_network->clear_host_incoming_ussd();
+	m_gsm_session->cancel_queued_incoming_service();
+}
+
 nokia_radio_peer_device::nokia_radio_peer_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_RADIO_PEER, tag, owner, clock),

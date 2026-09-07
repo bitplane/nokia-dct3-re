@@ -129,6 +129,13 @@ struct nokia_gsm_call_adapter_device::host_state
 	bool republish = false;
 	bool ready_pending = false;
 	unsigned dropped_events = 0;
+
+	unsigned queued_events() const
+	{
+		return decisions.size() + sms_decisions.size() +
+				ussd_responses.size() + terminations.size() + media.size() +
+				incoming.size() + incoming_sms.size() + incoming_ussd.size();
+	}
 };
 
 nokia_gsm_call_adapter_device::~nokia_gsm_call_adapter_device() = default;
@@ -156,6 +163,9 @@ void nokia_gsm_call_adapter_device::device_start()
 	save_item(NAME(m_last_published_ussd_request_id));
 	save_item(NAME(m_incoming_sms_request_id));
 	save_item(NAME(m_incoming_ussd_request_id));
+	save_item(NAME(m_incoming_call_queue_ticks));
+	save_item(NAME(m_incoming_sms_queue_ticks));
+	save_item(NAME(m_incoming_ussd_queue_ticks));
 	save_item(NAME(m_last_network_registered));
 	save_item(NAME(m_last_network_arfcn));
 	save_item(NAME(m_last_published_connected));
@@ -225,9 +235,7 @@ void nokia_gsm_call_adapter_device::device_start()
 						item.digits[item.length++] = u8(digit - '0');
 					}
 					std::lock_guard<std::mutex> lock(m_host->mutex);
-					if (m_host->incoming.size() + m_host->terminations.size() +
-							m_host->decisions.size() + m_host->media.size() <
-									MAXIMUM_QUEUED_EVENTS)
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->incoming.push_back(item);
 					else
 						++m_host->dropped_events;
@@ -275,8 +283,7 @@ void nokia_gsm_call_adapter_device::device_start()
 					}
 					item.data_length = u8(message["user_data_length"].GetUint());
 					std::lock_guard<std::mutex> lock(m_host->mutex);
-					if (m_host->incoming_sms.size() + m_host->incoming.size() +
-							m_host->decisions.size() < MAXIMUM_QUEUED_EVENTS)
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->incoming_sms.push_back(item);
 					else
 						++m_host->dropped_events;
@@ -326,7 +333,7 @@ void nokia_gsm_call_adapter_device::device_start()
 					}
 					else return;
 					std::lock_guard<std::mutex> lock(m_host->mutex);
-					if (m_host->ussd_responses.size() < MAXIMUM_QUEUED_EVENTS)
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->ussd_responses.push_back(item);
 					else
 						++m_host->dropped_events;
@@ -355,7 +362,7 @@ void nokia_gsm_call_adapter_device::device_start()
 						item.data[item.length++] = u8((high << 4) | low);
 					}
 					std::lock_guard<std::mutex> lock(m_host->mutex);
-					if (m_host->incoming_ussd.size() < MAXIMUM_QUEUED_EVENTS)
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->incoming_ussd.push_back(item);
 					else
 						++m_host->dropped_events;
@@ -372,9 +379,7 @@ void nokia_gsm_call_adapter_device::device_start()
 					const u8 cause = message.HasMember("cause") ?
 							u8(message["cause"].GetUint()) : u8(0x10);
 					std::lock_guard<std::mutex> lock(m_host->mutex);
-					if (m_host->terminations.size() +
-							m_host->decisions.size() + m_host->media.size() <
-									MAXIMUM_QUEUED_EVENTS)
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->terminations.push_back(
 								{ message["epoch"].GetUint(),
 									message["request_id"].GetUint(), cause,
@@ -413,8 +418,7 @@ void nokia_gsm_call_adapter_device::device_start()
 						media.frame[index] = u8((high << 4) | low);
 					}
 					std::lock_guard<std::mutex> lock(m_host->mutex);
-					if (m_host->media.size() + m_host->terminations.size() +
-							m_host->decisions.size() < MAXIMUM_QUEUED_EVENTS)
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->media.push_back(media);
 					else
 						++m_host->dropped_events;
@@ -440,9 +444,7 @@ void nokia_gsm_call_adapter_device::device_start()
 					else
 						return;
 					std::lock_guard<std::mutex> lock(m_host->mutex);
-					if (m_host->sms_decisions.size() + m_host->decisions.size() +
-							m_host->terminations.size() + m_host->media.size() <
-									MAXIMUM_QUEUED_EVENTS)
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->sms_decisions.push_back({
 								message["epoch"].GetUint(),
 								message["request_id"].GetUint(), outcome });
@@ -466,9 +468,7 @@ void nokia_gsm_call_adapter_device::device_start()
 				else
 					return;
 				std::lock_guard<std::mutex> lock(m_host->mutex);
-				if (m_host->decisions.size() +
-						m_host->terminations.size() + m_host->media.size() <
-								MAXIMUM_QUEUED_EVENTS)
+				if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 					m_host->decisions.push_back(
 							{ message["epoch"].GetUint(),
 								message["request_id"].GetUint(), outcome });
@@ -505,6 +505,9 @@ void nokia_gsm_call_adapter_device::device_reset()
 	m_last_published_ussd_request_id = 0;
 	m_incoming_sms_request_id = 0;
 	m_incoming_ussd_request_id = 0;
+	m_incoming_call_queue_ticks = 0;
+	m_incoming_sms_queue_ticks = 0;
+	m_incoming_ussd_queue_ticks = 0;
 	m_last_network_registered = false;
 	m_last_network_arfcn = 0xffff;
 	m_last_published_connected = false;
@@ -626,6 +629,7 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		if (accepted)
 		{
 			m_incoming_ussd_request_id = item.request_id;
+			m_incoming_ussd_queue_ticks = 0;
 			publish_incoming_ussd_state("queued");
 		}
 	}
@@ -634,6 +638,16 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	{
 		publish_incoming_ussd_state("delivered");
 		m_incoming_ussd_request_id = 0;
+		m_incoming_ussd_queue_ticks = 0;
+	}
+	else if (m_incoming_ussd_request_id &&
+			m_radio_peer->host_incoming_ussd_queued() &&
+			++m_incoming_ussd_queue_ticks >= host_queue_deadline_ticks)
+	{
+		m_radio_peer->cancel_host_incoming_ussd();
+		publish_incoming_ussd_state("expired");
+		m_incoming_ussd_request_id = 0;
+		m_incoming_ussd_queue_ticks = 0;
 	}
 	for (const auto &item : incoming_sms)
 	{
@@ -649,6 +663,7 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		if (accepted)
 		{
 			m_incoming_sms_request_id = item.request_id;
+			m_incoming_sms_queue_ticks = 0;
 			publish_incoming_sms_state("queued");
 		}
 	}
@@ -656,6 +671,16 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	{
 		publish_incoming_sms_state("delivered");
 		m_incoming_sms_request_id = 0;
+		m_incoming_sms_queue_ticks = 0;
+	}
+	else if (m_incoming_sms_request_id &&
+			m_radio_peer->host_incoming_sms_queued() &&
+			++m_incoming_sms_queue_ticks >= host_queue_deadline_ticks)
+	{
+		m_radio_peer->cancel_host_incoming_sms();
+		publish_incoming_sms_state("expired");
+		m_incoming_sms_request_id = 0;
+		m_incoming_sms_queue_ticks = 0;
 	}
 	for (const auto &item : incoming)
 	{
@@ -678,27 +703,41 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 			m_incoming_page_accepted = false;
 			m_incoming_started = false;
 			m_incoming_connected_once = false;
+			m_incoming_call_queue_ticks = 0;
 			publish_incoming_state("queued");
 		}
 	}
 	if (m_incoming_request_id && !m_incoming_page_accepted)
 	{
-		const auto result = m_radio_peer->queue_host_incoming_call(
-				m_incoming_digits.data(), m_incoming_digits_length);
-		if (result == nokia_radio_peer_device::host_incoming_result::paging)
+		if (++m_incoming_call_queue_ticks >= host_queue_deadline_ticks)
 		{
-			m_incoming_page_accepted = true;
-			publish_incoming_state("paging");
-		}
-		else if (result ==
-				nokia_radio_peer_device::host_incoming_result::forwarded)
-		{
-			publish_incoming_state("forwarded",
-					m_radio_peer->last_host_forwarding_condition());
+			m_radio_peer->cancel_host_incoming_call();
+			publish_incoming_state("expired");
 			m_incoming_request_id = 0;
 			m_incoming_digits_length = 0;
-			m_incoming_started = false;
-			m_incoming_connected_once = false;
+			m_incoming_call_queue_ticks = 0;
+		}
+		else
+		{
+			const auto result = m_radio_peer->queue_host_incoming_call(
+					m_incoming_digits.data(), m_incoming_digits_length);
+			if (result == nokia_radio_peer_device::host_incoming_result::paging)
+			{
+				m_incoming_page_accepted = true;
+				m_incoming_call_queue_ticks = 0;
+				publish_incoming_state("paging");
+			}
+			else if (result ==
+					nokia_radio_peer_device::host_incoming_result::forwarded)
+			{
+				publish_incoming_state("forwarded",
+						m_radio_peer->last_host_forwarding_condition());
+				m_incoming_request_id = 0;
+				m_incoming_digits_length = 0;
+				m_incoming_started = false;
+				m_incoming_connected_once = false;
+				m_incoming_call_queue_ticks = 0;
+			}
 		}
 	}
 	if (republish && m_incoming_request_id && !m_incoming_started)

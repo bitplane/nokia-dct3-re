@@ -40,6 +40,23 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         self.assertIn("outgoing_call_media_downlink", callback)
         self.assertNotIn("submit_outgoing_decision", callback)
         self.assertNotIn("submit_outgoing_termination", callback)
+        self.assertEqual(callback.count("m_host->queued_events() <"), 8)
+        self.assertIn("unsigned queued_events() const", self.source)
+
+    def test_admitted_host_services_have_saved_emulation_time_deadlines(self):
+        for field in (
+            "m_incoming_call_queue_ticks",
+            "m_incoming_sms_queue_ticks",
+            "m_incoming_ussd_queue_ticks",
+        ):
+            self.assertIn(f"save_item(NAME({field}))", self.source)
+        self.assertIn("host_queue_deadline_ticks = 6'000", self.header)
+        for phase in (
+            'publish_incoming_state("expired")',
+            'publish_incoming_sms_state("expired")',
+            'publish_incoming_ussd_state("expired")',
+        ):
+            self.assertIn(phase, self.source)
 
     def test_emulation_timer_owns_session_submission(self):
         poll = self.source.split(

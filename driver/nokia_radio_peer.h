@@ -129,12 +129,17 @@ public:
 	{
 		return m_host_incoming_sms_pending || m_host_incoming_sms_active;
 	}
+	bool host_incoming_sms_queued() const { return m_host_incoming_sms_pending; }
+	void cancel_host_incoming_sms();
 	bool queue_host_incoming_ussd(u8 data_coding_scheme,
 			const u8 *data, unsigned length);
 	bool host_incoming_ussd_pending() const
 	{
 		return m_host_incoming_ussd_pending || m_host_incoming_ussd_active;
 	}
+	bool host_incoming_ussd_queued() const { return m_host_incoming_ussd_pending; }
+	void cancel_host_incoming_ussd();
+	void cancel_host_incoming_call();
 	bool registered() const { return m_registered; }
 	u16 serving_arfcn() const { return m_serving_arfcn; }
 	nokia_gsm_network_device::forwarding_condition

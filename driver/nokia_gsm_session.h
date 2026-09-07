@@ -121,6 +121,7 @@ public:
 	u8 ussd_data_length() const { return m_ussd_data_length; }
 	bool submit_incoming_termination(u8 cause = 0x10);
 	bool set_incoming_caller(const u8 *digits, unsigned length);
+	void cancel_queued_incoming_service();
 	bool queue_waiting_call(
 			const u8 *digits, unsigned length,
 			bool malformed_bearer = false, bool duplicate = false);

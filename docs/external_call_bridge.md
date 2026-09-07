@@ -58,7 +58,7 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | MAME to host | `outgoing_call` | `epoch`, `request_id`, decimal `digits` |
 | Host to MAME | `outgoing_call_decision` | identity plus `decision`: `connect`, `busy`, or `no_answer` |
 | Host to MAME | `incoming_call` | identity plus 1..20 decimal `caller` digits |
-| MAME to host | `*_call_state` | identity and `phase`; connected snapshots also carry both media cursors; a `forwarded` incoming state carries `forwarding_reason` and the decoded decimal `forwarding_destination` |
+| MAME to host | `*_call_state` | identity and `phase`; an incoming request may terminate as `expired` before paging; connected snapshots also carry both media cursors; a `forwarded` incoming state carries `forwarding_reason` and the decoded decimal `forwarding_destination` |
 | MAME to host | `*_call_media_uplink` | identity, sequence, emulation timestamp, good/BFI flag, 33-octet GSM-FR frame as 66 lowercase hex characters |
 | Host to MAME | `*_call_media_downlink` | identity, host sequence, source timestamp, and one encoded GSM-FR frame |
 | Host to MAME | `*_call_terminate` | identity and GSM cause in `1..127` |
@@ -66,19 +66,24 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | Host to MAME | `outgoing_sms_decision` | identity plus `decision`: `accept`, `rp_error`, or `rp_silence` |
 | MAME to host | `outgoing_sms_state` | identity and `phase`: `accepted`, `rejected`, or `ended` |
 | Host to MAME | `incoming_sms` | identity, decimal `sender`, `alphabet`, user-data length and packed user data |
-| MAME to host | `incoming_sms_state` | identity and `phase`: `queued` or `delivered` |
+| MAME to host | `incoming_sms_state` | identity and `phase`: `queued`, `delivered` or `expired` |
 | MAME to host | `network_state` | `epoch`, registration status and, while registered, serving-cell identity and signal level |
 | MAME to host | `outgoing_ussd` | identity, DCS and packed USSD request data |
 | Host to MAME | `outgoing_ussd_response` | identity, outcome and either DCS plus packed response data or an error/problem code |
 | MAME to host | `outgoing_ussd_state` | identity and `phase`: `accepted` or `ended` |
 | Host to MAME | `incoming_ussd` | identity, DCS and packed notification data |
-| MAME to host | `incoming_ussd_state` | identity and `phase`: `queued` or `delivered` |
+| MAME to host | `incoming_ussd_state` | identity and `phase`: `queued`, `delivered` or `expired` |
 
 The `*` is direction-specific (`incoming` or `outgoing`) and must match the
 call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
 does not own paging, CC/RR state, radio timing, keypad decisions, codec routing
 or release completion. Queue overflow, stale epochs, duplicate decisions and
-wrong-direction media are rejected without changing emulated call state.
+wrong-direction media are rejected without changing emulated call state. The
+sixteen-event ingress limit is aggregate across all message classes, so mixed
+media and control traffic cannot evade it. An admitted incoming service which
+cannot obtain its paging entrance within sixty seconds of emulation time is
+cancelled and reports `expired`; active firmware-owned transactions are not
+timed out by the host adapter.
 
 `network_state` is published on connection, save-state restoration,
 registration changes and serving-cell changes. A host should wait for
@@ -125,6 +130,9 @@ paging and is reported `delivered` only after the handset ReturnResult and
 channel release. The standalone bridge can exercise it with
 `--incoming-ussd 'Host notice' --once`; the generic wire contract accepts
 already packed data rather than assuming a text alphabet.
+`verify-radio-incoming-ussd-host-restore` saves after admission and requires
+the queued state to be republished under a new epoch before the one organic
+firmware completion is reported.
 
 The forwarding reason is one of `unconditional`, `busy`, `no-reply` or
 `not-reachable`. It records the network subscription which made the routing

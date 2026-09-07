@@ -61,6 +61,10 @@ private:
 	u32 m_last_published_ussd_request_id = 0;
 	u32 m_incoming_sms_request_id = 0;
 	u32 m_incoming_ussd_request_id = 0;
+	static constexpr u16 host_queue_deadline_ticks = 6'000;
+	u16 m_incoming_call_queue_ticks = 0;
+	u16 m_incoming_sms_queue_ticks = 0;
+	u16 m_incoming_ussd_queue_ticks = 0;
 	bool m_last_network_registered = false;
 	u16 m_last_network_arfcn = 0xffff;
 	bool m_last_published_connected = false;

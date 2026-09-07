@@ -314,6 +314,19 @@ bool nokia_gsm_session_device::queue_incoming_page(incoming_service service)
 	return true;
 }
 
+void nokia_gsm_session_device::cancel_queued_incoming_service()
+{
+	if (m_state != u8(state::idle) &&
+			m_state != u8(state::awaiting_paging_response))
+		return;
+	m_state = u8(state::idle);
+	m_incoming_service = u8(incoming_service::none);
+	m_incoming_service_completed = false;
+	m_incoming_call_digits.fill(0);
+	m_incoming_call_digits_length = 0;
+	clear_pending_downlink();
+}
+
 bool nokia_gsm_session_device::set_incoming_caller(
 		const u8 *digits, unsigned length)
 {
