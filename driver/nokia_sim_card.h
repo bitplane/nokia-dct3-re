@@ -25,7 +25,8 @@ public:
 		interactive_menu_polling,
 		interactive_menu_play_tone,
 		interactive_menu_call_dtmf,
-		interactive_menu_launch_browser
+		interactive_menu_launch_browser,
+		interactive_menu_timer_management
 	};
 
 	nokia_sim_card_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);

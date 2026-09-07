@@ -343,8 +343,11 @@ commands. During an established call, SEND DTMF (`0x14`) receives terminal
 result `31`; LAUNCH BROWSER (`0x15`) with an alpha identifier and URL receives
 the same result. Both commands travel through `91xx`, FETCH and TERMINAL
 RESPONSE normally. Result `31` is therefore firmware capability rejection,
-not a missing card transaction and not a reason to synthesize DTMF or browser
-behavior for this product.
+TIMER MANAGEMENT (`0x27`, start timer 1) receives the same result. All three
+commands travel through `91xx`, FETCH and TERMINAL RESPONSE normally. Result
+`31` is therefore firmware capability rejection, not a missing card
+transaction and not a reason to synthesize DTMF, browser, or SAT-timer behavior
+for this product.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract

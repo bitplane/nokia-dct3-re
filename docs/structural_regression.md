@@ -347,6 +347,9 @@ capability negative, not an out-of-context command probe.
 LAUNCH BROWSER command containing alpha and URL TLVs through SIMI/FIQ6, and
 requires the exact result-`31` terminal response. This guards the NSE-8
 capability boundary without supplying a browser outside firmware.
+`make verify-sim-toolkit-timer` delivers TIMER MANAGEMENT start with timer-id
+and timer-value TLVs. The exact result-`31` response proves the old terminal
+rejects the command family rather than silently starting a timer.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.
