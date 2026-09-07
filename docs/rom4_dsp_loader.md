@@ -197,10 +197,13 @@ organic Nokia hardware transition that does so. Until one of those exists,
 zero is the deterministic unknown power-on value and receiver activation is
 not promoted.
 
-`make check-c54x-rom4-coherent` now treats that absence as a quantified
-boundary. Its recipe is fail-fast and enables the trace category required by
-its validator assertions; a failed intermediate assertion cannot be hidden by
-a later PASS line.
+`make check-c54x-rom4-coherent` protects the short coherent boot and interface
+initialization. `make check-c54x-rom4-rf-boundary` separately runs for 30
+emulated seconds and treats the receiver absence as a quantified boundary: it
+requires at least 6,000 CTSI frame expiries, terminal `IMR=0x035e`, pending but
+masked INT0, and zero RF reads or synthesizer pairs. A receiver transition now
+fails that boundary gate deliberately so the new behavior must be investigated
+and re-banked rather than silently passing an obsolete absence assertion.
 
 `make verify-5110-save-state` saves the running real-DSP composition at seven
 seconds, restores it, verifies MAD2 and C54x idle state, and then opens the same
