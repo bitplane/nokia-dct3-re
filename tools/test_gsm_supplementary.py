@@ -67,6 +67,22 @@ int main()
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");
+	response = gsm::ss::network_unstructured_uss_request(0x0b, 1, "Enter reply");
+	if (response.length != 32 || response.data[0] != 0x0b ||
+			response.data[1] != 0x3b || response.data[11] != 0x3c ||
+			response.data[29] != 0x7f)
+		return 23;
+	for (unsigned i = 0; i < response.length; ++i)
+		std::printf("%02x", response.data[i]);
+	std::puts("");
+	response = gsm::ss::network_unstructured_uss_notify(
+			0x0b, 1, "Nokia test network");
+	if (response.length != 35 || response.data[0] != 0x0b ||
+			response.data[1] != 0x3b || response.data[11] != 0x3d)
+		return 24;
+	for (unsigned i = 0; i < response.length; ++i)
+		std::printf("%02x", response.data[i]);
+	std::puts("");
 
 	const std::uint8_t registration[] = {
 		0x1b, 0x7b, 0x1c, 0x14, 0xa1, 0x12, 0x02, 0x01, 0x01,
@@ -224,6 +240,8 @@ class GsmSupplementaryTest(unittest.TestCase):
             "9b2a1c0da20b020101300602010e800100\n"
             "9b2a1c13a211020101300c02013b300704010f0402cf25\n"
             "9b3a1c19a11702010202013c300f04010f040a4537bd2c07c9cb70761e\n"
+            "0b3b1c19a11702010102013c300f04010f040a4537bd2c07c9cb70761e7f0100\n"
+            "0b3b1c1fa11d02010102013d301504010f0410cef73a1d06d1cb733ac85da6dfdff235\n"
             "9b2a1c1da21b020101301602010aa011040121300c300a840105850581551532f4\n",
             result.stdout)
 

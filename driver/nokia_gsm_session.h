@@ -22,7 +22,9 @@ public:
 		call,
 		sms,
 		smart_message,
-		status_report
+		status_report,
+		ussd_request,
+		ussd_notification
 	};
 
 	enum class downlink_kind : u8
@@ -58,7 +60,8 @@ public:
 		handover_command,
 		physical_information,
 		multiparty_facility_result,
-		supplementary_facility
+		supplementary_facility,
+		supplementary_register
 	};
 
 	struct downlink_message
@@ -260,7 +263,10 @@ private:
 		awaiting_mobile_sms_timeout,
 		awaiting_handover_result,
 		awaiting_supplementary_facility_acknowledgement,
-		awaiting_supplementary_response
+		awaiting_supplementary_response,
+		awaiting_network_ussd_register_acknowledgement,
+		awaiting_network_ussd_response,
+		awaiting_network_ussd_release_acknowledgement
 	};
 
 	void clear_pending_downlink();

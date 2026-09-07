@@ -24,6 +24,7 @@ enum class operation : std::uint8_t
 	interrogate_ss = 0x0e,
 	process_uss_request = 0x3b,
 	unstructured_uss_request = 0x3c,
+	unstructured_uss_notify = 0x3d,
 	split_mpty = 0x79,
 	retrieve_mpty = 0x7a,
 	hold_mpty = 0x7b,
@@ -83,6 +84,11 @@ message process_uss_request_result(const request &request,
 		const char *response);
 message unstructured_uss_request(const request &request,
 		std::uint8_t invoke_id, const char *text);
+message network_unstructured_uss_request(
+		std::uint8_t transaction, std::uint8_t invoke_id, const char *text);
+message network_unstructured_uss_notify(
+		std::uint8_t transaction, std::uint8_t invoke_id, const char *text);
+message network_release_complete(std::uint8_t transaction);
 
 } // namespace gsm::ss
 

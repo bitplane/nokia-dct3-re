@@ -131,8 +131,8 @@ codec bounds both the Layer-3 and USSD payloads and rejects malformed or trailin
 BER parameter data.
 
 `make verify-radio-ussd` requires the exact organic request, semantic decode,
-response, RR release, and exact firmware-rendered response frame.
-Network-initiated USSD and other data coding schemes remain separate contracts.
+response, RR release, and exact firmware-rendered response frame. Other data
+coding schemes remain separate contracts.
 
 The laboratory network also exposes three deterministic terminal outcomes for
 the same organic request. It can return a correlated `ReturnError` with GSM
@@ -161,3 +161,24 @@ that neither a response nor a release appears after restore. These remain
 terminal-response, conformance-negative, and no-response contracts. A working
 continued dialogue requires an organic handset FACILITY response and remains
 unclaimed.
+
+## Network-initiated USSD
+
+`make verify-radio-network-ussd` starts from the registered idle phone and uses
+the ordinary IMSI paging, Paging Response and dedicated SAPI-0 path. It covers
+the two network-originated operations separately:
+
+- An `UnstructuredSS-Request` (`0x3c`) REGISTER with the phase-2 SS-version
+  indicator is rejected by NSE-8 v6.00 with RELEASE COMPLETE cause `0x60`.
+  This is retained as an exact product-capability negative; no reply editor is
+  synthesized.
+- An `UnstructuredSS-Notify` (`0x3d`) REGISTER without the optional version IE
+  is accepted. Firmware displays `01 Message: Nokia test network`, sends the
+  empty ReturnResult FACILITY `8b 7a 05 a2 03 02 01 01`, accepts the network's
+  RELEASE COMPLETE and returns to the idle common-control channel.
+
+The notification result and transaction ownership match the network-initiated
+procedure in [ETSI TS 124 090](https://www.etsi.org/deliver/etsi_ts/124000_124099/124090/10.00.00_60/ts_124090v100000p.pdf).
+The exact displayed frame, request/reply bytes, paging order and RR release are
+all acceptance predicates. The laboratory network constructs Layer 3 messages;
+it does not post firmware messages or write handset state.

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 251 gates: 141 generated from typed steps, 110 copied verbatim (shell).
+# 252 gates: 141 generated from typed steps, 111 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -104,11 +104,12 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-call-divert verify-radio-call-divert-lifecycle \
 	verify-radio-call-divert-incoming verify-radio-call-divert-busy \
 	verify-radio-call-divert-unreachable verify-radio-call-divert-no-reply \
-	verify-radio-ussd verify-radio-ussd-outcomes verify-radio-two-call-negatives \
-	verify-radio-a5-1-incoming-call verify-radio-a5-1-state \
-	verify-radio-a5-1-sdcch-state verify-radio-a5-1-outgoing-call \
-	verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state \
-	verify-radio-outgoing-call-busy verify-radio-outgoing-call-no-answer \
+	verify-radio-ussd verify-radio-ussd-outcomes verify-radio-network-ussd \
+	verify-radio-two-call-negatives verify-radio-a5-1-incoming-call \
+	verify-radio-a5-1-state verify-radio-a5-1-sdcch-state \
+	verify-radio-a5-1-outgoing-call verify-radio-outgoing-call-lifecycle \
+	verify-radio-outgoing-call-state verify-radio-outgoing-call-busy \
+	verify-radio-outgoing-call-no-answer \
 	verify-radio-outgoing-call-no-answer-state \
 	verify-radio-outgoing-call-service-reject \
 	verify-radio-outgoing-call-delayed-decision-state \
@@ -1280,6 +1281,19 @@ verify-radio-ussd-outcomes: build
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_ussd_silence' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=25 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000' || exit; \
 	$(PYTHON) tools/radio_ussd_trace_check.py "$$out/error.log" "$$out" --outcome silence --require-state-roundtrip
+
+# shell: network-initiated USSD request rejection and notification acknowledgement
+verify-radio-network-ussd: ERASED_IDENTITY_SECURITY_CODE=12345
+verify-radio-network-ussd: build
+	@set -e; \
+	for outcome in request notify; do \
+		case "$$outcome" in request) fixture=radio_network_ussd_request ;; notify) fixture=radio_network_ussd ;; esac; \
+		out="$(RUN_DIR)_$$outcome"; \
+		$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR="$$out" SECONDS=40 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
+			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" \
+			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)' || exit; \
+		$(PYTHON) tools/radio_network_ussd_trace_check.py "$$out/error.log" "$$out" --outcome "$$outcome" || exit; \
+	done
 
 # shell: duplicate and malformed call-waiting compositions
 verify-radio-two-call-negatives: ERASED_IDENTITY_SECURITY_CODE=12345

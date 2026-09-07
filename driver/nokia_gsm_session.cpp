@@ -468,6 +468,19 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_state = u8(state::awaiting_supplementary_response);
 		return downlink_kind::none;
 	}
+	if (m_state == u8(state::awaiting_network_ussd_register_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::supplementary_register))
+	{
+		clear_pending_downlink();
+		m_state = u8(state::awaiting_network_ussd_response);
+		return downlink_kind::none;
+	}
+	if (m_state == u8(state::awaiting_network_ussd_release_acknowledgement) &&
+			m_pending_downlink.kind ==
+				u8(downlink_kind::supplementary_release_complete))
+	{
+		return begin_channel_release();
+	}
 
 	if (m_state == u8(state::awaiting_call_proceeding_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::call_proceeding))
@@ -602,6 +615,25 @@ nokia_gsm_session_device::downlink_acknowledged()
 			m_state = u8(state::awaiting_sms_sapi3_establishment);
 			return queue_downlink(downlink_kind::sapi3_establishment,
 					nullptr, 0, 3);
+		}
+		if (m_incoming_service == u8(incoming_service::ussd_request) ||
+				m_incoming_service == u8(incoming_service::ussd_notification))
+		{
+			const bool notification = m_incoming_service ==
+					u8(incoming_service::ussd_notification);
+			const auto request = notification ?
+					gsm::ss::network_unstructured_uss_notify(
+							0x0b, 1, "Nokia test network") :
+					gsm::ss::network_unstructured_uss_request(
+							0x0b, 1, "Enter reply");
+			m_state = u8(state::awaiting_network_ussd_register_acknowledgement);
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_ss: network_initiated operation=%s transaction=0b "
+					"invoke=1 dcs=0f t=%.6f\n",
+					notification ? "notify" : "request",
+					machine().time().as_double());
+			return queue_downlink(downlink_kind::supplementary_register,
+					request.data.data(), request.length);
 		}
 		if (m_mobile_originated_call)
 		{
@@ -1063,6 +1095,27 @@ nokia_gsm_session_device::receive_layer3(
 				"data=%s t=%.6f\n", message_type, length,
 				information_hex.c_str(),
 				machine().time().as_double());
+		if (message_type == 0x2a)
+			return begin_channel_release();
+		return downlink_kind::none;
+	}
+	if (sapi == 0 && m_state == u8(state::awaiting_network_ussd_response) &&
+			protocol_discriminator == 0x0b)
+	{
+		std::string information_hex;
+		for (unsigned index = 0; index < length; ++index)
+			information_hex += util::string_format("%02x", information[index]);
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_ss: network_initiated handset_response message=%02x "
+				"length=%u data=%s t=%.6f\n", message_type, length,
+				information_hex.c_str(), machine().time().as_double());
+		if (message_type == 0x3a)
+		{
+			const auto release = gsm::ss::network_release_complete(0x0b);
+			m_state = u8(state::awaiting_network_ussd_release_acknowledgement);
+			return queue_downlink(downlink_kind::supplementary_release_complete,
+					release.data.data(), release.length);
+		}
 		if (message_type == 0x2a)
 			return begin_channel_release();
 		return downlink_kind::none;

@@ -455,6 +455,82 @@ message unstructured_uss_request(const request &request,
 	return result;
 }
 
+namespace
+{
+
+message network_unstructured_uss(
+		std::uint8_t transaction, std::uint8_t invoke_id,
+		operation operation_code, const char *text, bool version_indicator)
+{
+	message result;
+	std::array<std::uint8_t, maximum_ussd_length> packed{};
+	const unsigned packed_length = pack_gsm7(text, packed.data(), packed.size());
+	if (!packed_length)
+		return result;
+	const unsigned parameter_length = 3 + 2 + packed_length;
+	const unsigned component_length = 3 + 3 + 2 + parameter_length;
+	const unsigned facility_length = 2 + component_length;
+	const unsigned version_length = version_indicator ? 3 : 0;
+	if (4 + facility_length + version_length > result.data.size())
+		return message{};
+
+	unsigned offset = 0;
+	result.data[offset++] = transaction;
+	result.data[offset++] = 0x3b;
+	result.data[offset++] = 0x1c;
+	result.data[offset++] = facility_length;
+	result.data[offset++] = 0xa1;
+	result.data[offset++] = component_length;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = invoke_id;
+	result.data[offset++] = 0x02;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = std::uint8_t(operation_code);
+	result.data[offset++] = 0x30;
+	result.data[offset++] = parameter_length;
+	result.data[offset++] = 0x04;
+	result.data[offset++] = 0x01;
+	result.data[offset++] = 0x0f;
+	result.data[offset++] = 0x04;
+	result.data[offset++] = packed_length;
+	for (unsigned index = 0; index < packed_length; ++index)
+		result.data[offset++] = packed[index];
+	if (version_indicator)
+	{
+		result.data[offset++] = 0x7f;
+		result.data[offset++] = 0x01;
+		result.data[offset++] = 0x00;
+	}
+	result.length = offset;
+	return result;
+}
+
+} // anonymous namespace
+
+message network_unstructured_uss_request(
+		std::uint8_t transaction, std::uint8_t invoke_id, const char *text)
+{
+	return network_unstructured_uss(transaction, invoke_id,
+			operation::unstructured_uss_request, text, true);
+}
+
+message network_unstructured_uss_notify(
+		std::uint8_t transaction, std::uint8_t invoke_id, const char *text)
+{
+	return network_unstructured_uss(transaction, invoke_id,
+			operation::unstructured_uss_notify, text, false);
+}
+
+message network_release_complete(std::uint8_t transaction)
+{
+	message result;
+	result.data[0] = transaction;
+	result.data[1] = 0x2a;
+	result.length = 2;
+	return result;
+}
+
 message interrogate_result(const request &request, bool active)
 {
 	return interrogate_result(request, active, active, nullptr, 0);

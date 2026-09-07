@@ -1207,7 +1207,7 @@ void nokia_dct3_state::machine_reset()
 			m_product.external_service_transport && BIT(hardware, 3));
 	m_radio_peer->set_enabled(m_product.radio.enabled() && BIT(hardware, 4));
 	m_mad2_pcm->set_enabled(BIT(hardware, 5));
-	const u8 network = m_network_config.read_safe(0x00);
+	const u16 network = m_network_config.read_safe(0x00);
 	apply_sms_config();
 	m_gsm_network->set_ussd_outcome(
 			nokia_gsm_network_device::ussd_outcome(
@@ -1335,12 +1335,13 @@ void nokia_dct3_state::machine_reset()
 			m_gsm_network->cipher_algorithm() != gsm::a5::algorithm::a5_0);
 	m_radio_peer->set_page_after_registration(
 			BIT(network, 0) || BIT(network, 1) || BIT(network, 2) ||
-			BIT(network, 3));
+			BIT(network, 3) || ((network >> 8) & 0x03) != 0);
 	m_radio_peer->set_page_requires_reselection(
 			BIT(m_page_config.read_safe(0x00), 2));
 	m_radio_peer->set_incoming_call_after_registration(BIT(network, 1));
 	m_radio_peer->set_incoming_sms_after_registration(BIT(network, 2));
 	m_radio_peer->set_incoming_smart_message_after_registration(BIT(network, 3));
+	m_radio_peer->set_incoming_ussd_profile((network >> 8) & 0x03);
 	m_radio_peer->set_call_waiting_profile(
 			nokia_radio_peer_device::call_waiting_profile(
 					(m_outgoing_call_config.read_safe(0x00) >> 2) & 0x03));
@@ -2138,6 +2139,10 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x80, 0x00, "Four-burst uplink TCH fade per six multiframes")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x80, DEF_STR(On))
+	PORT_CONFNAME(0x300, 0x00, "Queue one network-initiated USSD operation")
+	PORT_CONFSETTING(0x000, DEF_STR(Off))
+	PORT_CONFSETTING(0x100, "Interactive request")
+	PORT_CONFSETTING(0x200, "Notification")
 
 	PORT_START("SMSCFG")
 	PORT_CONFNAME(0x07, 0x00, "Incoming ordinary SMS profile") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sms_config_changed), 0)

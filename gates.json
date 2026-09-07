@@ -5691,6 +5691,27 @@
       ]
     },
     {
+      "name": "verify-radio-network-ussd",
+      "prerequisites": [
+        "build"
+      ],
+      "variables": {
+        "ERASED_IDENTITY_SECURITY_CODE": "12345"
+      },
+      "unstructured": "network-initiated USSD request rejection and notification acknowledgement",
+      "recipe": [
+        "\t@set -e; \\",
+        "\tfor outcome in request notify; do \\",
+        "\t\tcase \"$$outcome\" in request) fixture=radio_network_ussd_request ;; notify) fixture=radio_network_ussd ;; esac; \\",
+        "\t\tout=\"$(RUN_DIR)_$$outcome\"; \\",
+        "\t\t$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR=\"$$out\" SECONDS=40 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
+        "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/$$fixture\" \\",
+        "\t\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)' || exit; \\",
+        "\t\t$(PYTHON) tools/radio_network_ussd_trace_check.py \"$$out/error.log\" \"$$out\" --outcome \"$$outcome\" || exit; \\",
+        "\tdone"
+      ]
+    },
+    {
       "name": "verify-radio-two-call-negatives",
       "prerequisites": [
         "build"

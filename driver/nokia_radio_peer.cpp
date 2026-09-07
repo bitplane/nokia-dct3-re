@@ -2401,8 +2401,12 @@ void nokia_radio_peer_device::emit_report()
 					nokia_gsm_session_device::incoming_service::status_report :
 				m_incoming_smart_message_after_registration ?
 					nokia_gsm_session_device::incoming_service::smart_message :
-					m_incoming_sms_after_registration ?
+				m_incoming_sms_after_registration ?
 					nokia_gsm_session_device::incoming_service::sms :
+				m_incoming_ussd_profile == 1 ?
+					nokia_gsm_session_device::incoming_service::ussd_request :
+				m_incoming_ussd_profile == 2 ?
+					nokia_gsm_session_device::incoming_service::ussd_notification :
 					(m_incoming_call_after_registration ||
 					 m_host_incoming_call_pending) ?
 					nokia_gsm_session_device::incoming_service::call :

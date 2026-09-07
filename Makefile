@@ -607,6 +607,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_unreachable_forward_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_no_reply_forward_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_ussd_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_radio_network_ussd_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_two_call_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_two_call_negative_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_second_outgoing_call_trace_check.py

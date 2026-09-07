@@ -106,6 +106,10 @@ public:
 	{
 		m_incoming_smart_message_after_registration = enabled;
 	}
+	void set_incoming_ussd_profile(unsigned profile)
+	{
+		m_incoming_ussd_profile = profile;
+	}
 	void set_call_waiting_profile(call_waiting_profile profile)
 	{
 		m_call_waiting_profile = u8(profile);
@@ -339,6 +343,7 @@ private:
 	bool m_incoming_call_after_registration = false;
 	bool m_incoming_sms_after_registration = false;
 	bool m_incoming_smart_message_after_registration = false;
+	u8 m_incoming_ussd_profile = 0;
 	bool m_host_incoming_call_pending = false;
 	u8 m_last_host_forwarding_condition = u8(
 			nokia_gsm_network_device::forwarding_condition::count);
