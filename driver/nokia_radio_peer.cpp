@@ -161,6 +161,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_traffic_channel_active));
 	save_item(NAME(m_downlink_offset));
 	save_item(NAME(m_followup_downlink_opportunity));
+	save_item(NAME(m_lapdm_retransmission_queued));
 	save_item(NAME(m_downlink_speech));
 	save_item(NAME(m_downlink_speech_good));
 	save_item(NAME(m_uplink_speech));
@@ -318,6 +319,7 @@ void nokia_radio_peer_device::device_reset()
 	m_traffic_channel_active = false;
 	m_downlink_offset = 0;
 	m_followup_downlink_opportunity = false;
+	m_lapdm_retransmission_queued = false;
 	clear_speech_queues();
 	m_uplink_speech_received = 0;
 	m_tdma_frame_number = 0;
@@ -556,6 +558,27 @@ void nokia_radio_peer_device::reset_l1_pipeline()
 TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 {
 	const u32 frame_number = m_tdma_frame_number++;
+	const auto expiry = m_lapdm_link->advance_frame();
+	if (expiry.kind == nokia_lapdm_link_device::expiry_kind::retransmission)
+	{
+		m_lapdm_retransmission_queued = true;
+		m_reports_remaining = 1;
+		m_report_deferred = true;
+		LOGMASKED(LOG_RADIO,
+				"radio_peer: LAPDm T200 retransmission sapi=%u fn=%u t=%.6f\n",
+				expiry.sapi, frame_number, machine().time().as_double());
+	}
+	else if (expiry.kind != nokia_lapdm_link_device::expiry_kind::none)
+	{
+		LOGMASKED(LOG_RADIO,
+				"radio_peer: LAPDm transaction expired kind=%u sapi=%u fn=%u t=%.6f\n",
+				u8(expiry.kind), expiry.sapi, frame_number,
+				machine().time().as_double());
+		m_lapdm_retransmission_queued = false;
+		m_gsm_session->radio_link_failed();
+		m_traffic_channel_active = false;
+		enter_release_deconfigure();
+	}
 	if (!speech_channel_active())
 	{
 		if (m_l1_traffic_active)
@@ -2371,7 +2394,13 @@ void nokia_radio_peer_device::emit_report()
 		payload[6] = report_arfcn >> 8;
 		payload[7] = report_arfcn;
 
-		if (current_phase() == phase::contention_resolution)
+		if (m_lapdm_retransmission_queued)
+		{
+			const auto frame = m_lapdm_link->take_retransmission();
+			deliver_lapdm_downlink(frame, payload + 10, frame_number);
+			m_lapdm_retransmission_queued = false;
+		}
+		else if (current_phase() == phase::contention_resolution)
 		{
 			const auto frame = m_lapdm_link->build_ua();
 			deliver_lapdm_downlink(frame, payload + 10, frame_number);

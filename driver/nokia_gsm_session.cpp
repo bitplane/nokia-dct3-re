@@ -221,6 +221,20 @@ void nokia_gsm_session_device::clear_dedicated_cipher()
 	m_cipher_command_pending = false;
 }
 
+void nokia_gsm_session_device::radio_link_failed()
+{
+	// A network-side LAPDm N200 failure retires only the dedicated-channel
+	// transaction. The registered mobile identity and serving cell belong to
+	// idle MM state and survive the link, just as they do after Channel Release.
+	const auto identity = m_registered_mobile_identity;
+	const unsigned identity_length = m_registered_mobile_identity_length;
+	const u16 serving_arfcn = m_serving_arfcn;
+	device_reset();
+	m_registered_mobile_identity = identity;
+	m_registered_mobile_identity_length = identity_length;
+	m_serving_arfcn = serving_arfcn;
+}
+
 bool nokia_gsm_session_device::establish_layer3(
 		const u8 *information, unsigned length, u16 serving_arfcn)
 {

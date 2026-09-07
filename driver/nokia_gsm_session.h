@@ -134,6 +134,7 @@ public:
 	downlink_kind receive_layer3(
 			u8 sapi, const u8 *information, unsigned length);
 	bool begin_traffic_assignment();
+	void radio_link_failed();
 	bool begin_handover(u16 target_arfcn, u8 target_bsic, u8 reference);
 	bool handover_channel_configured(u16 target_arfcn, u8 reference);
 	bool handover_rollback_completed(u16 restored_arfcn);

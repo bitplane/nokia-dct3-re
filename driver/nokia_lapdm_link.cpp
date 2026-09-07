@@ -29,6 +29,11 @@ void nokia_lapdm_link_device::device_start()
 	save_item(NAME(m_downlink_segmentation_pending));
 	save_item(NAME(m_downlink_acknowledgement_pending));
 	save_item(NAME(m_uplink_final_response_pending));
+	save_item(NAME(m_transaction_frames));
+	save_item(NAME(m_transaction_attempts));
+	save_item(NAME(m_retransmission_pending));
+	save_item(NAME(m_last_downlink_frame));
+	save_item(NAME(m_reassembly_frames));
 }
 
 void nokia_lapdm_link_device::device_reset()
@@ -47,6 +52,12 @@ void nokia_lapdm_link_device::device_reset()
 	m_downlink_segmentation_pending.fill(false);
 	m_downlink_acknowledgement_pending.fill(false);
 	m_uplink_final_response_pending.fill(false);
+	m_transaction_frames.fill(0);
+	m_transaction_attempts.fill(0);
+	m_retransmission_pending.fill(false);
+	for (auto &frame : m_last_downlink_frame)
+		frame.fill(0x2b);
+	m_reassembly_frames = 0;
 	m_last_downlink_acknowledged = false;
 }
 
@@ -82,6 +93,7 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 		m_layer3_length = information_length;
 		m_layer3_more_data = false;
 		m_uplink_segmentation_active = false;
+		m_reassembly_frames = 0;
 		m_downlink_send_sequence[sapi] = 0;
 		m_next_uplink_receive_sequence[sapi] = 0;
 		m_pending_receive_sequence[sapi] = 0;
@@ -91,6 +103,7 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 		m_downlink_segmentation_pending[sapi] = false;
 		m_downlink_acknowledgement_pending[sapi] = false;
 		m_uplink_final_response_pending[sapi] = false;
+		clear_transaction(sapi);
 		return uplink_result::establish_indication;
 	}
 
@@ -100,6 +113,7 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 		m_sapi = sapi;
 		m_established[sapi] = true;
 		m_awaiting_establishment[sapi] = false;
+		clear_transaction(sapi);
 		return uplink_result::establish_confirmation;
 	}
 
@@ -111,10 +125,12 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 		m_layer3_length = 0;
 		m_layer3_more_data = false;
 		m_uplink_segmentation_active = false;
+		m_reassembly_frames = 0;
 		m_established[sapi] = false;
 		m_downlink_segmentation_pending[sapi] = false;
 		m_downlink_acknowledgement_pending[sapi] = false;
 		m_uplink_final_response_pending[sapi] = false;
+		clear_transaction(sapi);
 		return uplink_result::release_indication;
 	}
 
@@ -159,6 +175,7 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 			m_layer3_length += information_length;
 			m_layer3_more_data = bool(frame[2] & 0x02);
 			m_uplink_segmentation_active = m_layer3_more_data;
+			m_reassembly_frames = m_layer3_more_data ? t200_control_frames : 0;
 			completed_information = !m_layer3_more_data;
 			m_next_uplink_receive_sequence[sapi] =
 					(m_next_uplink_receive_sequence[sapi] + 1) & 0x07;
@@ -171,6 +188,7 @@ nokia_lapdm_link_device::uplink_result nokia_lapdm_link_device::receive_uplink(
 	{
 		m_sapi = sapi;
 		m_downlink_acknowledgement_pending[sapi] = false;
+		clear_transaction(sapi);
 		m_last_downlink_acknowledged = true;
 	}
 
@@ -195,6 +213,7 @@ void nokia_lapdm_link_device::begin_mobile_establishment(u8 sapi)
 	m_downlink_segmentation_pending[sapi] = false;
 	m_downlink_acknowledgement_pending[sapi] = false;
 	m_uplink_final_response_pending[sapi] = false;
+	clear_transaction(sapi);
 }
 
 std::array<u8, nokia_lapdm_link_device::frame_length>
@@ -241,6 +260,7 @@ nokia_lapdm_link_device::build_sabm_command(u8 sapi)
 	frame[0] = (sapi << 2) | 0x03;
 	frame[1] = 0x3f;
 	frame[2] = 0x01;
+	arm_transaction(sapi, frame);
 	return frame;
 }
 
@@ -280,7 +300,89 @@ nokia_lapdm_link_device::build_information_frame(
 	m_pending_receive_sequence[sapi] = m_downlink_send_sequence[sapi];
 	m_downlink_segmentation_pending[sapi] = more_data;
 	m_downlink_acknowledgement_pending[sapi] = true;
+	arm_transaction(sapi, frame);
 	return frame;
+}
+
+void nokia_lapdm_link_device::arm_transaction(
+		u8 sapi, const std::array<u8, frame_length> &frame)
+{
+	m_last_downlink_frame[sapi] = frame;
+	m_transaction_frames[sapi] = t200_control_frames;
+	m_transaction_attempts[sapi] = 1;
+	m_retransmission_pending[sapi] = false;
+}
+
+void nokia_lapdm_link_device::clear_transaction(u8 sapi)
+{
+	m_transaction_frames[sapi] = 0;
+	m_transaction_attempts[sapi] = 0;
+	m_retransmission_pending[sapi] = false;
+}
+
+void nokia_lapdm_link_device::clear_link(u8 sapi)
+{
+	clear_transaction(sapi);
+	m_established[sapi] = false;
+	m_awaiting_establishment[sapi] = false;
+	m_downlink_segmentation_pending[sapi] = false;
+	m_downlink_acknowledgement_pending[sapi] = false;
+	m_uplink_final_response_pending[sapi] = false;
+}
+
+nokia_lapdm_link_device::expiry_result
+nokia_lapdm_link_device::advance_frame()
+{
+	if (m_uplink_segmentation_active && m_reassembly_frames != 0 &&
+			--m_reassembly_frames == 0)
+	{
+		m_layer3_information.fill(0);
+		m_layer3_length = 0;
+		m_layer3_more_data = false;
+		m_uplink_segmentation_active = false;
+		return { expiry_kind::reassembly_failure, m_sapi };
+	}
+
+	for (u8 sapi = 0; sapi < link_count; ++sapi)
+	{
+		if (m_transaction_frames[sapi] == 0 ||
+				--m_transaction_frames[sapi] != 0)
+			continue;
+		if (m_transaction_attempts[sapi] < n200_control_attempts)
+		{
+			++m_transaction_attempts[sapi];
+			m_transaction_frames[sapi] = t200_control_frames;
+			m_retransmission_pending[sapi] = true;
+			return { expiry_kind::retransmission, sapi };
+		}
+		const auto failure = m_awaiting_establishment[sapi] ?
+				expiry_kind::establishment_failure :
+				expiry_kind::acknowledgement_failure;
+		clear_link(sapi);
+		return { failure, sapi };
+	}
+	return {};
+}
+
+bool nokia_lapdm_link_device::retransmission_pending() const
+{
+	return std::any_of(m_retransmission_pending.begin(),
+			m_retransmission_pending.end(), [](bool pending) { return pending; });
+}
+
+std::array<u8, nokia_lapdm_link_device::frame_length>
+nokia_lapdm_link_device::take_retransmission()
+{
+	for (u8 sapi = 0; sapi < link_count; ++sapi)
+	{
+		if (!m_retransmission_pending[sapi])
+			continue;
+		m_retransmission_pending[sapi] = false;
+		return m_last_downlink_frame[sapi];
+	}
+	std::array<u8, frame_length> fill;
+	fill.fill(0x2b);
+	return fill;
 }
 
 std::array<u8, nokia_lapdm_link_device::frame_length>

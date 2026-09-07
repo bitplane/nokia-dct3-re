@@ -383,6 +383,7 @@ private:
 	bool m_traffic_channel_active = false;
 	unsigned m_downlink_offset = 0;
 	bool m_followup_downlink_opportunity = false;
+	bool m_lapdm_retransmission_queued = false;
 	std::array<speech_frame, speech_queue_depth> m_downlink_speech{};
 	std::array<u8, speech_queue_depth> m_downlink_speech_good{};
 	std::array<speech_frame, speech_queue_depth> m_uplink_speech{};
