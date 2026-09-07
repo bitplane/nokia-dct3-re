@@ -313,6 +313,16 @@ and repeat the ordinary EF-phase initialization after reinsertion.
 `make verify-sim-hotplug-toolkit` repeats the lifecycle with a Phase-2+ card
 and requires a new TERMINAL PROFILE exchange. The save-state variant snapshots
 the absent-card interval before completing the same reinsertion sequence.
+`make verify-sim-toolkit-sms` enters the installed card menu through physical
+keys, selects its SMS item, and requires the proactive FETCH and successful
+TERMINAL RESPONSE around one exact firmware-generated SMS-SUBMIT. The same gate
+requires the existing GSM peer to complete SAPI-3 CP/RP acknowledgement and RR
+release; it therefore tests composition rather than a card-local APDU script.
+`make verify-sim-toolkit-call` similarly selects a standards-shaped `SET UP
+CALL`, accepts the firmware's confirmation with a physical key, and requires
+the ordinary `5551234` CC setup, traffic assignment, connect, physical end,
+CC release and RR release lifecycle. It deliberately does not duplicate the
+separate speech-media oracle.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

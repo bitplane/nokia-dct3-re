@@ -1362,7 +1362,7 @@ void nokia_dct3_state::machine_reset()
 							forbidden_plmn);
 	m_sim_card->set_cached_location(false);
 	m_sim_card->set_toolkit_profile(nokia_sim_card_device::toolkit_profile(
-			m_sim_toolkit_config.read_safe(0x00) & 0x07));
+			m_sim_toolkit_config.read_safe(0x00) & 0x0f));
 	// The removable laboratory subscriber explicitly selects 3GPP TS 55.205
 	// section 5's AES-based example A3/A8 profile.  A3/A8 is operator-owned;
 	// this key is synthetic fixture provisioning, not handset identity.
@@ -2109,12 +2109,14 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 
 	PORT_START("SATCFG")
-	PORT_CONFNAME(0x07, 0x00, "SIM Application Toolkit card profile")
+	PORT_CONFNAME(0x0f, 0x00, "SIM Application Toolkit card profile")
 	PORT_CONFSETTING(0x00, "Phase 2 (no toolkit)")
 	PORT_CONFSETTING(0x01, "Phase 2+ with one DISPLAY TEXT command")
 	PORT_CONFSETTING(0x02, "Phase 2+ with DISPLAY TEXT and GET INKEY")
 	PORT_CONFSETTING(0x03, "Phase 2+ with DISPLAY TEXT, GET INKEY and GET INPUT")
 	PORT_CONFSETTING(0x04, "Phase 2+ with interactive commands and SET UP MENU")
+	PORT_CONFSETTING(0x05, "Phase 2+ menu sending one SMS")
+	PORT_CONFSETTING(0x06, "Phase 2+ menu setting up one call")
 
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.

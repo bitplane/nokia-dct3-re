@@ -233,6 +233,21 @@ remains unchanged; wrong reference, total and destination port also leave it
 free. Thus the card owns neither temporary multipart retention nor the
 received-ringtone parser state at this frontier.
 
+The opt-in Phase-2+ application also exercises the opposite direction through
+the handset rather than implementing SMS inside the card. A physical menu
+selection makes the card advertise and serve a `SEND SHORT MESSAGE` proactive
+command. The firmware converts its TPDU into the ordinary SAPI-3
+`CP-DATA/RP-DATA/SMS-SUBMIT` path; the laboratory network acknowledges CP and
+RP, the handset returns a successful TERMINAL RESPONSE, and RR releases the
+dedicated channel. `make verify-sim-toolkit-sms` protects that complete
+SIMI/FIQ6-to-radio composition.
+The adjacent `SET UP CALL` profile supplies the same destination as a proactive
+address TLV. Firmware presents its own confirmation UI, originates the normal
+CC SETUP, completes assignment/alerting/connect, and returns the command result
+to the card. `make verify-sim-toolkit-call` then physically ends the call and
+requires CC and RR release. Speech media remains covered by the ordinary call
+gates rather than being implied by this signalling-focused toolkit fixture.
+
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
 causes initialization to restart. Unsupported SELECT returns GSM 11.11 `94 04` (file ID not

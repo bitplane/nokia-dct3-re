@@ -10895,6 +10895,32 @@
       ]
     },
     {
+      "name": "verify-sim-toolkit-sms",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "card menu and proactive SMS through the physical GSM stack",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\tmkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_sms/noki3210.cfg $(RUN_DIR)/cfg/; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=50 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter,wait1200,4,2,wait500,enter,wait1500,enter,down,down,down,down,down,down,down,down,down,wait1000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_sms_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
+      "name": "verify-sim-toolkit-call",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "card menu and proactive call through physical GSM call control",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\tmkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_call/noki3210.cfg $(RUN_DIR)/cfg/; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=60 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter,wait1200,4,2,wait500,enter,wait1500,enter,down,down,down,down,down,down,down,down,down,wait1000,enter,wait1000,enter,wait1500,enter,wait10000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_call_trace_check.py $(RUN_DIR)/error.log"
+      ]
+    },
+    {
       "name": "verify-sim-hotplug",
       "prerequisites": [],
       "variables": {},

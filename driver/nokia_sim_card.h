@@ -16,7 +16,9 @@ public:
 		display_text,
 		display_text_get_inkey,
 		display_text_get_inkey_get_input,
-		display_text_get_inkey_get_input_setup_menu
+		display_text_get_inkey_get_input_setup_menu,
+		interactive_menu_send_sms,
+		interactive_menu_setup_call
 	};
 
 	nokia_sim_card_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
@@ -146,6 +148,7 @@ private:
 	bool m_proactive_pending = false;
 	bool m_proactive_fetched = false;
 	u8 m_proactive_command = 0;
+	u8 m_proactive_command_number = 0;
 	u8 m_menu_selection = 0;
 	emu_timer *m_toolkit_timer = nullptr;
 	u8 m_adn[50 * 32] = { 0 };
