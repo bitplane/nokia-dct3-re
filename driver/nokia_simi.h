@@ -9,6 +9,12 @@ class nokia_sim_card_device;
 class nokia_simi_device : public device_t
 {
 public:
+	enum class serial_fault : u8
+	{
+		parity_or_framing,
+		work_waiting_timeout,
+		unclassified_80
+	};
 	nokia_simi_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
 	auto irq_cb() { return m_irq_cb.bind(); }
@@ -33,6 +39,7 @@ public:
 	u8 tx_count_r() const { return m_uart_tx_count; }
 
 	void card_rx_w(u8 data);
+	void signal_serial_fault(serial_fault fault);
 
 protected:
 	virtual void device_start() override;

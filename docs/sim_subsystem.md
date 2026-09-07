@@ -129,10 +129,10 @@ The implemented surface is classified by ownership and evidence:
 | --- | --- | --- |
 | SIMI register window and FIQ6 route | Extracted partial hardware | `nokia_simi_device` owns offsets `0x36..0x3f`, the decoded IIR cascade, timing and FIQ6; firmware traffic executes through it in both mapped 3210 ROMs. |
 | TX FIFO, live fill, and `0x3e` chunk progression | Partial hardware | The 16-byte FIFO and multi-chunk ordering are required by coherent firmware traffic. Exact FIFO-control semantics remain inferred. |
-| IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Timeout/error causes `0x02`, `0x20`, and `0x80` remain unmodeled. |
+| IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Decoded causes `0x02`, `0x20`, and `0x80` have a typed, activity-gated ingress for a future electrical/card backend, but normal traffic never synthesizes them because their physical trigger conditions and timing remain unknown. |
 | Socket detect status bit 3 and FIQ7 | Validated hardware contract | Physical removal deactivates transport/card state and posts the firmware removal result; reinsertion organically reactivates SIMI, ATR and file initialization in v6.00 and v5.01. Phase 2+, removal and save/load variants are independently gated. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
-| SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. Invalidation, broader errors and removal remain incomplete. |
+| SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. INVALIDATE, REHABILITATE, SEEK and broader error behavior remain unsupported: no retained firmware trace issues those commands, including the organic REFRESH lifecycle. |
 | UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
 | Cyclic EF_ACM and INCREASE | Standards-derived dormant contract | The descriptor, CHV1 access conditions, checked 24-bit addition, `98 50` overflow result, six-byte delayed response and append-only persistence follow GSM 11.11. NSE-3 constructs the exact `A0 32 00 00 03` APDU, but no product firmware acceptance trace currently exercises it. |
 | RUN GSM ALGORITHM | Organic authenticated registration | The card accepts only `A0 88 00 00 10`, consumes the 16-byte RAND and exposes `SRES || Kc` through the immediately following twelve-byte GET RESPONSE. A3/A8 remains explicitly operator-selectable: the card defaults to no algorithm, while the synthetic laboratory subscriber selects TS 55.205 section 5's AES example and a separately provisioned test key. The AES projection has an independent FIPS-derived vector gate. With authentication explicitly enabled, both 3210 v6.00 and 3310 v6.39 organically execute the command, fetch all twelve bytes, require typed result `0x0066`, copy Kc, publish SRES and emit MM Authentication Response. Both then accept Location Updating Accept, persist EF_LOCI, release the dedicated channel and return to camp. |
@@ -141,8 +141,9 @@ The implemented surface is classified by ownership and evidence:
 
 The model does not force firmware state or inject RTOS messages. Controller and
 card ownership are separate; remaining fidelity debt is ATR start/turnaround
-timing, unmodeled controller timeout/parity signaling, and card protocol mixed
-with subscriber provisioning. Physical socket edges use SIMI status bit 3 and
+timing and the physical sources/timing of controller timeout and serial-error
+signals. Subscriber identity and subscription data now come from the shared
+typed profile documented in `subscriber_profile.md`. Physical socket edges use SIMI status bit 3 and
 MAD2 FIQ7; firmware owns removal handling, reactivation and the repeated file
 initialization after reinsertion.
 
@@ -418,8 +419,9 @@ credential unchanged.
 
 The frontier and focused gates protect organic SIM-enabled state, persistent
 security state, save-state resumption, and physical removal/reinsertion through
-FIQ7. FIFO reset/fill behavior plus timeout and parity/error causes remain the
-controller fidelity frontier.
+FIQ7. FIFO reset/fill behavior is covered. Timeout and parity/error cause bits
+are decoded and exposed through an inactive typed ingress, but remain the
+controller fidelity frontier until a physical source establishes when they fire.
 
 CHV command/status semantics follow ETSI GSM 11.11 v5.1.0, sections 9.4 and
 9.5: <https://www.etsi.org/deliver/etsi_gts/11/1111/05.01.00_60/gsmts_1111v050100p.pdf>.

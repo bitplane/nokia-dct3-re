@@ -12,7 +12,10 @@ DEFINE_DEVICE_TYPE(NOKIA_SIMI, nokia_simi_device, "nokia_simi", "Nokia MAD2 SIMI
 
 namespace {
 constexpr u8 SIMI_INT_TX_EMPTY = 0x10;
+constexpr u8 SIMI_INT_SERIAL_ERROR = 0x02;
+constexpr u8 SIMI_INT_WORK_WAITING_TIMEOUT = 0x20;
 constexpr u8 SIMI_INT_RX_READY = 0x40;
+constexpr u8 SIMI_INT_UNCLASSIFIED_80 = 0x80;
 // The firmware answers ATR TA1=0x05 with PPS ff 00 ff, retaining default
 // parameters. Model one ten-bit character at 9,600 bit/s throughout.
 const attotime SIMI_CHARACTER_TIME = attotime::from_hz(960);
@@ -147,6 +150,28 @@ void nokia_simi_device::card_rx_w(u8 data)
 	m_rx_fifo[m_rx_tail] = data;
 	m_rx_tail = (m_rx_tail + 1) % std::size(m_rx_fifo);
 	m_rx_count++;
+}
+
+void nokia_simi_device::signal_serial_fault(serial_fault fault)
+{
+	if (!m_enabled || !m_clock_enabled || !BIT(m_control, 7))
+		return;
+	u8 cause = 0;
+	switch (fault)
+	{
+	case serial_fault::parity_or_framing:
+		cause = SIMI_INT_SERIAL_ERROR;
+		break;
+	case serial_fault::work_waiting_timeout:
+		cause = SIMI_INT_WORK_WAITING_TIMEOUT;
+		break;
+	case serial_fault::unclassified_80:
+		cause = SIMI_INT_UNCLASSIFIED_80;
+		break;
+	}
+	m_iir |= cause;
+	m_irq_cb(1);
+	m_irq_cb(0);
 }
 
 void nokia_simi_device::schedule_card_bytes(

@@ -78,6 +78,36 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn("m_mad2->simi_clock_cb().set(m_simi", self.phone)
         self.assertIn("m_simi_clock_cb(BIT(m_regs[offset], 5))", self.mad2)
 
+    def test_simi_fault_causes_are_typed_inactive_ingress(self):
+        for token in (
+            "parity_or_framing",
+            "work_waiting_timeout",
+            "unclassified_80",
+            "SIMI_INT_SERIAL_ERROR = 0x02",
+            "SIMI_INT_WORK_WAITING_TIMEOUT = 0x20",
+            "SIMI_INT_UNCLASSIFIED_80 = 0x80",
+        ):
+            self.assertIn(token, self.simi + self.simi_header)
+        fault = self.simi.split(
+            "void nokia_simi_device::signal_serial_fault", 1
+        )[1].split(
+            "void nokia_simi_device::schedule_card_bytes", 1
+        )[0]
+        self.assertIn(
+            "if (!m_enabled || !m_clock_enabled || !BIT(m_control, 7))",
+            fault,
+        )
+        self.assertIn("m_iir |= cause", fault)
+        self.assertIn("m_irq_cb(1)", fault)
+        self.assertIn("m_irq_cb(0)", fault)
+        # Fault causes are an entrance for a future electrical/card backend;
+        # ordinary byte transport must not fabricate them.
+        self.assertEqual(
+            2,
+            (self.simi + self.simi_header).count("signal_serial_fault("),
+        )
+        self.assertIn("void iir_w(u8 data) { m_iir &= ~data; }", self.simi_header)
+
     def test_card_owns_persistent_linear_fixed_adn(self):
         self.assertIn("public device_nvram_interface", self.card_header)
         self.assertIn("{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true }", self.card)

@@ -179,10 +179,15 @@ with `6a80`.
 Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
 
-- SEEK, invalidation and additional access-condition/error semantics;
+- SEEK, INVALIDATE, REHABILITATE and additional access-condition/error
+  semantics. GSM 11.11 defines them, but no retained product trace issues the
+  corresponding APDUs; the organic REFRESH lifecycle also does not do so;
 - supplying coherent FPLMN and optional EFs beyond the current matched
   IMSI/SST/PLMN-selector/SPN profile;
-- testing timeout and parity/error behavior. Physical removal and reinsertion
+- establishing the physical sources and timing of timeout and parity/error
+  behavior. SIMI exposes the decoded `0x02`, `0x20`, and `0x80` causes through
+  a typed, inactive fault ingress; ordinary traffic does not synthesize them.
+  Physical removal and reinsertion
   now use the recovered SIMI status-bit-3/FIQ7 socket-detect contract and are
   covered across both 3210 ROMs, including Phase-2+ and save/load variants;
 - extending the validated Phase-2+ lifecycle beyond DISPLAY TEXT, GET INKEY,
@@ -191,9 +196,10 @@ establishes a concrete requirement. Later work includes:
   in the transport.
 
 The implementation tracks current DF separately from selected EF and declares
-file parent, size, structure and record length as profile metadata. Remaining
-architectural work is to stabilize controller/card timing and errors and move
-the remaining subscriber constants into reusable profiles.
+file parent, size, structure and record length as profile metadata. Subscriber
+identity, PLMN, operator presentation, access class and A3/A8 material now come
+from the reusable profile in `subscriber_profile.md`. Remaining architectural
+work is to establish controller/card timing and electrical error sources.
 
 The organically requested initialization pass is complete for a non-CPHS
 synthetic card. Unsupported optional files return `94 04` (file ID not found)
