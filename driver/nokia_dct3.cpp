@@ -2125,6 +2125,7 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x0c, "Phase 2+ menu calling and sending DTMF")
 	PORT_CONFSETTING(0x0d, "Phase 2+ menu launching a browser")
 	PORT_CONFSETTING(0x0e, "Phase 2+ menu starting a toolkit timer")
+	PORT_CONFSETTING(0x0f, "Phase 2+ menu sending an unknown required TLV")
 
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.

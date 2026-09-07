@@ -350,6 +350,10 @@ capability boundary without supplying a browser outside firmware.
 `make verify-sim-toolkit-timer` delivers TIMER MANAGEMENT start with timer-id
 and timer-value TLVs. The exact result-`31` response proves the old terminal
 rejects the command family rather than silently starting a timer.
+`make verify-sim-toolkit-malformed` appends an unknown
+comprehension-required TLV to valid DISPLAY TEXT data and requires terminal
+result `32`, keeping malformed-data rejection distinct from capability result
+`31`.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

@@ -348,6 +348,11 @@ commands travel through `91xx`, FETCH and TERMINAL RESPONSE normally. Result
 `31` is therefore firmware capability rejection, not a missing card
 transaction and not a reason to synthesize DTMF, browser, or SAT-timer behavior
 for this product.
+
+An unknown comprehension-required TLV (`7e`) appended to an otherwise valid
+DISPLAY TEXT command returns general result `32` (command data not understood),
+distinct from the result-`31` capability responses above. This validates the
+firmware parser's mandatory-TLV failure path through the normal card transport.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract

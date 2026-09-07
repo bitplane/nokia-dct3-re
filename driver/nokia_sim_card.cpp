@@ -692,9 +692,21 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 		0xa4, 0x01, 0x01,
 		0xa5, 0x03, 0x00, 0x00, 0x05
 	};
+	static constexpr u8 malformed_tlv[] = {
+		0xd0, 0x12,
+		0x81, 0x03, 0x10, 0x21, 0x80,
+		0x82, 0x02, 0x81, 0x02,
+		0x8d, 0x04, 0x04, 'B', 'a', 'd',
+		0xfe, 0x01, 0x00
+	};
 	const u8 *command = nullptr;
 	unsigned command_length = 0;
-	if (m_proactive_command == 0x21)
+	if (m_proactive_command == 0x21 && m_proactive_command_number == 16)
+	{
+		command = malformed_tlv;
+		command_length = std::size(malformed_tlv);
+	}
+	else if (m_proactive_command == 0x21)
 	{
 		command = display_text;
 		command_length = std::size(display_text);
@@ -803,6 +815,7 @@ void nokia_sim_card_device::accept_terminal_response()
 	}
 	m_proactive_fetched = false;
 	if (m_proactive_command == 0x21 &&
+			m_proactive_command_number != 16 &&
 			m_toolkit_profile >= toolkit_profile::display_text_get_inkey)
 	{
 		m_proactive_command = 0x22;
@@ -868,7 +881,7 @@ u8 nokia_sim_card_device::proactive_command_length() const
 {
 	switch (m_proactive_command)
 	{
-	case 0x21: return 22;
+	case 0x21: return m_proactive_command_number == 16 ? 20 : 22;
 	case 0x22: return 21;
 	case 0x23: return 26;
 	case 0x25: return 40;
@@ -991,6 +1004,15 @@ void nokia_sim_card_device::accept_envelope()
 		m_proactive_command_number = 15;
 		m_proactive_pending = true;
 		LOGMASKED(LOG_SIM, "sim_device: proactive TIMER MANAGEMENT ready t=%.8f\n",
+				machine().time().as_double());
+	}
+	else if (m_toolkit_profile == toolkit_profile::interactive_menu_malformed_tlv &&
+			m_menu_selection == 1)
+	{
+		m_proactive_command = 0x21;
+		m_proactive_command_number = 16;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive UNKNOWN REQUIRED TLV ready t=%.8f\n",
 				machine().time().as_double());
 	}
 	queue_status(0x90, 0x00);
