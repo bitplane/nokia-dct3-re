@@ -1277,6 +1277,7 @@ void nokia_dct3_state::machine_reset()
 	const bool host_call_adapter =
 			BIT(m_outgoing_call_host_config.read_safe(0x00), 0);
 	m_gsm_session->set_outgoing_fallback_enabled(!host_call_adapter);
+	m_gsm_session->set_outgoing_sms_fallback_enabled(!host_call_adapter);
 	m_gsm_call_adapter->set_enabled(host_call_adapter);
 	m_radio_peer->set_host_voice_peer(host_call_adapter);
 	static constexpr std::array CIPHER_ALGORITHMS = {

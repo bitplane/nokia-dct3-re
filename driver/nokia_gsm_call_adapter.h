@@ -33,6 +33,8 @@ private:
 	TIMER_CALLBACK_MEMBER(poll_host);
 	void postload();
 	void publish_request();
+	void publish_sms_request();
+	void publish_sms_state(const char *phase);
 	void publish_ready();
 	void publish_state(const char *phase);
 	void publish_incoming_state(const char *phase,
@@ -50,6 +52,7 @@ private:
 	emu_timer *m_poll_timer = nullptr;
 	bool m_enabled = false;
 	u32 m_last_published_request_id = 0;
+	u32 m_last_published_sms_request_id = 0;
 	bool m_last_published_connected = false;
 	bool m_last_published_alerting = false;
 	u32 m_incoming_request_id = 0;

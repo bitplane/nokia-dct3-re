@@ -87,10 +87,17 @@ public:
 	{
 		m_outgoing_fallback_enabled = enabled;
 	}
+	void set_outgoing_sms_fallback_enabled(bool enabled)
+	{
+		m_outgoing_sms_fallback_enabled = enabled;
+	}
 	bool submit_outgoing_decision(
 			u32 request_id,
 			nokia_gsm_network_device::outgoing_call_outcome outcome);
 	bool submit_outgoing_termination(u32 request_id, u8 cause = 0x10);
+	bool submit_outgoing_sms_decision(
+			u32 request_id,
+			nokia_gsm_network_device::outgoing_sms_outcome outcome);
 	bool submit_incoming_termination(u8 cause = 0x10);
 	bool set_incoming_caller(const u8 *digits, unsigned length);
 	bool queue_waiting_call(
@@ -134,6 +141,35 @@ public:
 	unsigned outgoing_called_digits_length() const
 	{
 		return m_outgoing_called_digits_length;
+	}
+	bool outgoing_sms_request_pending() const
+	{
+		return m_outgoing_sms_request_pending;
+	}
+	u32 outgoing_sms_request_id() const { return m_outgoing_sms_request_id; }
+	const std::array<u8, 20> &outgoing_sms_recipient() const
+	{
+		return m_sms_submit_recipient;
+	}
+	unsigned outgoing_sms_recipient_length() const
+	{
+		return m_sms_submit_recipient_length;
+	}
+	gsm::sms::alphabet outgoing_sms_alphabet() const
+	{
+		return gsm::sms::alphabet(m_outgoing_sms_alphabet);
+	}
+	const std::array<u8, maximum_layer3_length> &outgoing_sms_user_data() const
+	{
+		return m_outgoing_sms_user_data;
+	}
+	unsigned outgoing_sms_user_data_octets() const
+	{
+		return m_outgoing_sms_user_data_octets;
+	}
+	unsigned outgoing_sms_user_data_length() const
+	{
+		return m_outgoing_sms_user_data_length;
 	}
 	bool idle() const { return m_state == u8(state::idle); }
 	bool incoming_service_queued() const
@@ -259,6 +295,7 @@ private:
 		awaiting_mobile_sms_sapi3_establishment,
 		awaiting_mobile_sms_submit,
 		awaiting_mobile_sms_cp_ack_acknowledgement,
+		awaiting_mobile_sms_host_decision,
 		awaiting_mobile_sms_final_cp_ack,
 		awaiting_mobile_sms_timeout,
 		awaiting_handover_result,
@@ -347,6 +384,7 @@ private:
 	u8 m_outgoing_termination_cause = 0x10;
 	unsigned m_outgoing_decision_delay_ms = 0;
 	bool m_outgoing_fallback_enabled = true;
+	bool m_outgoing_sms_fallback_enabled = true;
 	emu_timer *m_outgoing_decision_timer = nullptr;
 	emu_timer *m_no_reply_timer = nullptr;
 	bool m_incoming_call_forwarded = false;
@@ -360,6 +398,15 @@ private:
 	u8 m_sms_submit_message_reference = 0;
 	std::array<u8, 20> m_sms_submit_recipient{};
 	u8 m_sms_submit_recipient_length = 0;
+	bool m_outgoing_sms_request_pending = false;
+	u32 m_outgoing_sms_request_id = 0;
+	bool m_outgoing_sms_decision_accepted = false;
+	u8 m_outgoing_sms_decision =
+			u8(nokia_gsm_network_device::outgoing_sms_outcome::accept);
+	u8 m_outgoing_sms_alphabet = u8(gsm::sms::alphabet::gsm_7bit);
+	std::array<u8, maximum_layer3_length> m_outgoing_sms_user_data{};
+	u8 m_outgoing_sms_user_data_octets = 0;
+	u8 m_outgoing_sms_user_data_length = 0;
 	bool m_incoming_service_completed = false;
 	u16 m_handover_target_arfcn = 0;
 	u8 m_handover_reference = 0;

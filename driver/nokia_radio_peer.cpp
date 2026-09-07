@@ -3037,6 +3037,16 @@ void nokia_radio_peer_device::tick()
 		m_wait_ticks = 0;
 		m_report_deferred = true;
 	}
+	if (!m_traffic_channel_active &&
+			current_phase() == phase::service_uplink_wait &&
+			m_gsm_session->pending_downlink_kind() !=
+					nokia_gsm_session_device::downlink_kind::none)
+	{
+		set_phase(phase::service_downlink);
+		m_reports_remaining = 1;
+		m_wait_ticks = 0;
+		m_report_deferred = true;
+	}
 
 	if (m_reports_remaining != 0 && phase_waits())
 		--m_wait_ticks;

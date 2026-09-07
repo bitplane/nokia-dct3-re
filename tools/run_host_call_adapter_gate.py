@@ -15,7 +15,8 @@ async def connect(port: int, process: asyncio.subprocess.Process):
             )
         try:
             return await websockets.connect(
-                f"ws://127.0.0.1:{port}/nokia/dct3/calls"
+                f"ws://127.0.0.1:{port}/nokia/dct3/calls",
+                ping_interval=None,
             )
         except (OSError, websockets.exceptions.InvalidHandshake):
             await asyncio.sleep(0.1)

@@ -1,7 +1,7 @@
-# External call bridge
+# External telephony bridge
 
-The optional MAME host-call adapter exposes firmware-owned mobile-originated
-and mobile-terminated calls at `ws://127.0.0.1:18080/nokia/dct3/calls`. It carries call decisions and
+The optional MAME host adapter exposes firmware-owned calls and mobile-originated
+SMS at `ws://127.0.0.1:18080/nokia/dct3/calls`. It carries call decisions and
 the conventional 33-octet GSM 06.10 full-rate frame; it does not bypass CC/RR,
 DSP speech control, MAD2 PCM or COBBA audio routing.
 
@@ -58,12 +58,22 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | MAME to host | `*_call_media_uplink` | identity, sequence, emulation timestamp, good/BFI flag, 33-octet GSM-FR frame as 66 lowercase hex characters |
 | Host to MAME | `*_call_media_downlink` | identity, host sequence, source timestamp, and one encoded GSM-FR frame |
 | Host to MAME | `*_call_terminate` | identity and GSM cause in `1..127` |
+| MAME to host | `outgoing_sms` | identity, decimal `recipient`, `alphabet`, TP user-data length and packed user data as lowercase hex |
+| Host to MAME | `outgoing_sms_decision` | identity plus `decision`: `accept`, `rp_error`, or `rp_silence` |
+| MAME to host | `outgoing_sms_state` | identity and `phase`: `accepted`, `rejected`, or `ended` |
 
 The `*` is direction-specific (`incoming` or `outgoing`) and must match the
 call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
 does not own paging, CC/RR state, radio timing, keypad decisions, codec routing
 or release completion. Queue overflow, stale epochs, duplicate decisions and
 wrong-direction media are rejected without changing emulated call state.
+
+The SMS payload stays in its GSM representation. `gsm7` reports septet count
+in `user_data_length` and carries the packed octets in `user_data`; `8bit` and
+`ucs2` report octet count. The adapter does not reinterpret binary UDH or lose
+alphabet information. `verify-radio-outgoing-sms-host-adapter` proves an
+organic composer-to-host request and the correlated RP result through the
+ordinary SAPI-3 transaction.
 
 The forwarding reason is one of `unconditional`, `busy`, `no-reply` or
 `not-reachable`. It records the network subscription which made the routing
