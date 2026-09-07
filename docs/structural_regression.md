@@ -335,6 +335,10 @@ command across firmware-owned SIM reinitialization.
 `make verify-sim-toolkit-polling` requires `POLL INTERVAL` to return the
 effective five-second duration, chains `POLLING OFF`, and rejects any subsequent
 periodic STATUS within the run. Both commands travel through ordinary SIMI/FIQ6.
+`make verify-sim-toolkit-tone` requires a proactive general beep to program and
+stop a distinct 1750 Hz DSP tone, then uses physical Select to obtain terminal
+result `11`. Automatic successful completion remains unproved and is not part
+of this cancellation-focused gate.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

@@ -664,6 +664,14 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 		0x81, 0x03, 0x0b, 0x04, 0x00,
 		0x82, 0x02, 0x81, 0x82
 	};
+	static constexpr u8 play_tone[] = {
+		0xd0, 0x1a,
+		0x81, 0x03, 0x0c, 0x20, 0x00,
+		0x82, 0x02, 0x81, 0x03,
+		0x85, 0x08, 'S', 'A', 'T', ' ', 't', 'o', 'n', 'e',
+		0x8e, 0x01, 0x10,
+		0x84, 0x02, 0x01, 0x02
+	};
 	const u8 *command = nullptr;
 	unsigned command_length = 0;
 	if (m_proactive_command == 0x21)
@@ -720,6 +728,11 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 	{
 		command = polling_off;
 		command_length = std::size(polling_off);
+	}
+	else if (m_proactive_command == 0x20)
+	{
+		command = play_tone;
+		command_length = std::size(play_tone);
 	}
 	if (m_toolkit_profile == toolkit_profile::none || !m_terminal_profile_received ||
 			!m_proactive_pending || requested != command_length)
@@ -822,6 +835,7 @@ u8 nokia_sim_card_device::proactive_command_length() const
 	case 0x01: return 11;
 	case 0x03: return 15;
 	case 0x04: return 11;
+	case 0x20: return 28;
 	default: return 0;
 	}
 }
@@ -902,6 +916,15 @@ void nokia_sim_card_device::accept_envelope()
 		m_proactive_command_number = 10;
 		m_proactive_pending = true;
 		LOGMASKED(LOG_SIM, "sim_device: proactive POLL INTERVAL ready t=%.8f\n",
+				machine().time().as_double());
+	}
+	else if (m_toolkit_profile == toolkit_profile::interactive_menu_play_tone &&
+			m_menu_selection == 1)
+	{
+		m_proactive_command = 0x20;
+		m_proactive_command_number = 12;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive PLAY TONE ready t=%.8f\n",
 				machine().time().as_double());
 	}
 	queue_status(0x90, 0x00);

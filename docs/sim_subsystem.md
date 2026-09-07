@@ -271,6 +271,13 @@ STATUS occurs in the bounded run. `make verify-sim-toolkit-polling` protects the
 echoed duration and the absence after disable, rather than treating a bare
 success result as proof that polling changed.
 
+`PLAY TONE` reaches the modeled DSP audio boundary: general-beep tone `10`
+produces an organic 1750 Hz start and stop. With an alpha identifier, physical
+Select clears the presentation and the ME returns result `11` (user cleared
+down before end). The bounded unattended variant stops audio but has not
+produced a successful terminal response, so the gate claims playback and
+cancellation only, not automatic command completion.
+
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
 causes initialization to restart. Unsupported SELECT returns GSM 11.11 `94 04` (file ID not
