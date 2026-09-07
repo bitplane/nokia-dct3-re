@@ -122,6 +122,13 @@ public:
 	};
 	host_incoming_result queue_host_incoming_call(
 			const u8 *digits, unsigned length);
+	bool queue_host_incoming_sms(const u8 *sender, unsigned sender_length,
+			gsm::sms::alphabet alphabet, const u8 *user_data,
+			unsigned user_data_octets, unsigned user_data_length);
+	bool host_incoming_sms_pending() const
+	{
+		return m_host_incoming_sms_pending || m_host_incoming_sms_active;
+	}
 	nokia_gsm_network_device::forwarding_condition
 			last_host_forwarding_condition() const
 	{
@@ -345,6 +352,8 @@ private:
 	bool m_incoming_smart_message_after_registration = false;
 	u8 m_incoming_ussd_profile = 0;
 	bool m_host_incoming_call_pending = false;
+	bool m_host_incoming_sms_pending = false;
+	bool m_host_incoming_sms_active = false;
 	u8 m_last_host_forwarding_condition = u8(
 			nokia_gsm_network_device::forwarding_condition::count);
 	u8 m_call_waiting_profile = u8(call_waiting_profile::none);

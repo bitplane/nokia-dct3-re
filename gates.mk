@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 270 gates: 141 generated from typed steps, 129 copied verbatim (shell).
+# 271 gates: 141 generated from typed steps, 130 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -142,9 +142,10 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-a5-1-degraded verify-radio-physical-uplink \
 	verify-radio-outgoing-call-host-physical-media \
 	verify-3310-radio-physical-duplex verify-radio-physical-uplink-one \
-	verify-radio-outgoing-sms-host-adapter verify-radio-outgoing-sms \
-	verify-radio-outgoing-sms-reject verify-radio-outgoing-sms-smsc \
-	verify-radio-outgoing-sms-timeout verify-radio-outgoing-sms-timeout-state \
+	verify-radio-incoming-sms-host-adapter verify-radio-outgoing-sms-host-adapter \
+	verify-radio-outgoing-sms verify-radio-outgoing-sms-reject \
+	verify-radio-outgoing-sms-smsc verify-radio-outgoing-sms-timeout \
+	verify-radio-outgoing-sms-timeout-state \
 	verify-radio-outgoing-sms-delivery-report verify-radio-outgoing-sms-v501 \
 	verify-3310-radio-outgoing-sms verify-3330-radio-outgoing-sms \
 	verify-3410-radio-outgoing-sms verify-radio-incoming-sms \
@@ -2096,6 +2097,26 @@ verify-3310-radio-physical-duplex:
 
 verify-radio-physical-uplink-one:
 	RUN_DIR=$(RUN_DIR) BIOS=$(BIOS) ROM=$(ROM) EEPROM_BASENAME='$(EEPROM_BASENAME)' AUDIO_CONTROL_CHECKER='$(AUDIO_CONTROL_CHECKER)' tools/run_physical_uplink_gate.sh
+
+# shell: embedded host transport runner
+verify-radio-incoming-sms-host-adapter:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) \
+		PROVISIONED_IMEI_PREFIX=49015420323751; \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env NOKIA_DCT3_LUA_QUIET=1 NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		$(VENV)/bin/python tools/run_host_incoming_sms_gate.py \
+			--port $(HOST_SMS_PORT) --cwd $(MAME_DIR) -- \
+			./mame noki3210 -rompath roms -log -video none -sound none \
+			-keyboardprovider none -mouseprovider none -lightgunprovider none \
+			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
+			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
+			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
+			-http_port $(HOST_SMS_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
+			-seconds_to_run 55; \
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	$(PYTHON) tools/radio_incoming_host_sms_trace_check.py $(RUN_DIR)/error.log
 
 # shell: embedded host transport runner
 verify-radio-outgoing-sms-host-adapter:

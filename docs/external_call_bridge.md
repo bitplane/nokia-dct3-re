@@ -61,6 +61,8 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | MAME to host | `outgoing_sms` | identity, decimal `recipient`, `alphabet`, TP user-data length and packed user data as lowercase hex |
 | Host to MAME | `outgoing_sms_decision` | identity plus `decision`: `accept`, `rp_error`, or `rp_silence` |
 | MAME to host | `outgoing_sms_state` | identity and `phase`: `accepted`, `rejected`, or `ended` |
+| Host to MAME | `incoming_sms` | identity, decimal `sender`, `alphabet`, user-data length and packed user data |
+| MAME to host | `incoming_sms_state` | identity and `phase`: `queued` or `delivered` |
 
 The `*` is direction-specific (`incoming` or `outgoing`) and must match the
 call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
@@ -74,6 +76,19 @@ in `user_data_length` and carries the packed octets in `user_data`; `8bit` and
 alphabet information. `verify-radio-outgoing-sms-host-adapter` proves an
 organic composer-to-host request and the correlated RP result through the
 ordinary SAPI-3 transaction.
+
+For a text-only command-line ingress test, the standalone endpoint packs GSM
+7-bit text and submits it after the handset has registered:
+
+```sh
+.venv/bin/python tools/dct3_call_bridge.py --incoming-sms hello --once
+```
+
+The generic wire message also admits `8bit` and `ucs2`; callers must supply the
+already encoded TP user data and its alphabet-specific logical length. The
+network constructs SMS-DELIVER and owns only the external network side.
+`verify-radio-incoming-sms-host-adapter` requires paging, firmware CP/RP
+acknowledgement and SIM-backed storage before reporting `delivered`.
 
 The forwarding reason is one of `unconditional`, `busy`, `no-reply` or
 `not-reachable`. It records the network subscription which made the routing

@@ -19,6 +19,7 @@ PROTOCOL_VERSION = 1
 @dataclass
 class BridgeStats:
     calls: int = 0
+    sms: int = 0
     uplink_frames: int = 0
     downlink_frames: int = 0
     bad_frames: int = 0
@@ -37,6 +38,7 @@ class LoopbackProtocol:
         self.next_downlink_sequence = 0
         self.stats = BridgeStats()
         self.direction = "outgoing"
+        self.sms_request_id: int | None = None
 
     @property
     def active(self) -> bool:
@@ -63,6 +65,18 @@ class LoopbackProtocol:
             return []
         if kind == "outgoing_call":
             return self._request(message)
+        if kind == "outgoing_sms":
+            identity = self._identity(message)
+            if identity is None:
+                return []
+            self.sms_request_id = identity[1]
+            self.stats.sms += 1
+            return [{
+                "type": "outgoing_sms_decision",
+                "epoch": identity[0],
+                "request_id": identity[1],
+                "decision": "accept",
+            }]
         if kind == "outgoing_call_state":
             self._state(message)
             return []
@@ -94,6 +108,38 @@ class LoopbackProtocol:
             "epoch": self.epoch,
             "request_id": request_id,
             "caller": caller,
+        }
+
+    def incoming_sms_request(
+            self, sender: str, text: str, request_id: int = 1
+    ) -> dict[str, Any] | None:
+        if self.epoch is None:
+            return None
+        # CLI text is deliberately ASCII/GSM-basic for now. The wire protocol
+        # itself accepts packed GSM7, 8-bit and UCS-2 payloads.
+        septets = text.encode("ascii")
+        accumulator = 0
+        bits = 0
+        packed = bytearray()
+        for value in septets:
+            if value > 0x7f:
+                return None
+            accumulator |= value << bits
+            bits += 7
+            while bits >= 8:
+                packed.append(accumulator & 0xff)
+                accumulator >>= 8
+                bits -= 8
+        if bits:
+            packed.append(accumulator & 0xff)
+        return {
+            "type": "incoming_sms",
+            "epoch": self.epoch,
+            "request_id": request_id,
+            "sender": sender,
+            "alphabet": "gsm7",
+            "user_data_length": len(septets),
+            "user_data": packed.hex(),
         }
 
     @staticmethod
@@ -207,18 +253,23 @@ async def connected_session(args: argparse.Namespace, websocket: Any,
             hangup_deadline = None
             continue
         message = json.loads(payload)
-        if (args.incoming_caller is not None and
+        if ((args.incoming_caller is not None or args.incoming_sms is not None) and
                 message.get("type") == "call_adapter_ready" and
                 protocol.request_id is None):
             protocol.handle(message)
-            request = protocol.incoming_request(args.incoming_caller)
+            request = (protocol.incoming_request(args.incoming_caller)
+                       if args.incoming_caller is not None else
+                       protocol.incoming_sms_request(
+                           args.incoming_sms_sender, args.incoming_sms))
             if request is not None:
                 await websocket.send(json.dumps(request))
-                print(
-                    f"incoming call requested from {args.incoming_caller}",
-                    flush=True,
-                )
+                print(f"{request['type']} requested", flush=True)
             continue
+        if (message.get("type") == "incoming_sms_state" and
+                message.get("phase") == "delivered"):
+            protocol.stats.sms += 1
+            print("incoming SMS delivered", flush=True)
+            return args.once
         old_phase = protocol.phase
         for reply in protocol.handle(message):
             await websocket.send(json.dumps(reply))
@@ -268,6 +319,8 @@ def main() -> int:
         "--url", default="ws://127.0.0.1:18080/nokia/dct3/calls")
     parser.add_argument("--hangup-after", type=float)
     parser.add_argument("--incoming-caller")
+    parser.add_argument("--incoming-sms")
+    parser.add_argument("--incoming-sms-sender", default="5551234")
     parser.add_argument("--cause", type=int, default=16)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--retry-delay", type=float, default=0.5)
@@ -280,6 +333,12 @@ def main() -> int:
             (not args.incoming_caller.isdigit() or
              not 1 <= len(args.incoming_caller) <= 20)):
         parser.error("--incoming-caller must contain 1..20 decimal digits")
+    if args.incoming_caller is not None and args.incoming_sms is not None:
+        parser.error("choose either --incoming-caller or --incoming-sms")
+    if (args.incoming_sms_sender is not None and
+            (not args.incoming_sms_sender.isdigit() or
+             not 1 <= len(args.incoming_sms_sender) <= 20)):
+        parser.error("--incoming-sms-sender must contain 1..20 decimal digits")
     if not 1 <= args.cause <= 0x7f:
         parser.error("--cause must be in the GSM range 1..127")
     if args.report_every <= 0:

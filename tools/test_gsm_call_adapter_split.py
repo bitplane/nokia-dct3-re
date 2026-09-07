@@ -79,7 +79,7 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         )
 
     def test_protocol_is_bounded_and_excludes_mm_admission(self):
-        self.assertIn("MAXIMUM_HOST_MESSAGE = 256", self.source)
+        self.assertIn("MAXIMUM_HOST_MESSAGE = 512", self.source)
         self.assertIn('message.HasMember("epoch")', self.source)
         self.assertIn("m_transport_epoch", self.header)
         self.assertNotIn("save_item(NAME(m_transport_epoch))", self.source)

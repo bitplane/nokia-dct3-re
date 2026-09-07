@@ -120,6 +120,31 @@ class Dct3CallBridgeTest(unittest.TestCase):
         })
         self.assertIsNone(protocol.incoming_request("447700900123"))
 
+    def test_outgoing_sms_is_accepted_without_claiming_call_state(self):
+        protocol = LoopbackProtocol()
+        self.assertEqual(protocol.handle({
+            "type": "outgoing_sms", "epoch": 3, "request_id": 4,
+            "recipient": "5551234", "alphabet": "gsm7",
+            "user_data_length": 2, "user_data": "c824",
+        }), [{
+            "type": "outgoing_sms_decision", "epoch": 3,
+            "request_id": 4, "decision": "accept",
+        }])
+        self.assertEqual(protocol.stats.sms, 1)
+        self.assertIsNone(protocol.request_id)
+
+    def test_incoming_sms_text_is_packed_at_the_boundary(self):
+        protocol = LoopbackProtocol()
+        protocol.handle({
+            "type": "call_adapter_ready", "protocol_version": 1,
+            "epoch": 9,
+        })
+        self.assertEqual(protocol.incoming_sms_request("5551234", "hello"), {
+            "type": "incoming_sms", "epoch": 9, "request_id": 1,
+            "sender": "5551234", "alphabet": "gsm7",
+            "user_data_length": 5, "user_data": "e8329bfd06",
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

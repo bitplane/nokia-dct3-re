@@ -26,7 +26,8 @@ DEFINE_DEVICE_TYPE(NOKIA_GSM_CALL_ADAPTER, nokia_gsm_call_adapter_device,
 namespace {
 
 constexpr char ENDPOINT[] = "/nokia/dct3/calls";
-constexpr unsigned MAXIMUM_HOST_MESSAGE = 256;
+// A maximum-length SMS carries 280 hexadecimal characters plus JSON framing.
+constexpr unsigned MAXIMUM_HOST_MESSAGE = 512;
 constexpr unsigned MAXIMUM_QUEUED_EVENTS = 16;
 
 int hex_nibble(char value)
@@ -72,6 +73,17 @@ struct nokia_gsm_call_adapter_device::host_state
 		std::array<u8, 20> digits{};
 		unsigned length = 0;
 	};
+	struct queued_incoming_sms
+	{
+		u32 epoch = 0;
+		u32 request_id = 0;
+		std::array<u8, 20> sender{};
+		u8 sender_length = 0;
+		gsm::sms::alphabet alphabet = gsm::sms::alphabet::gsm_7bit;
+		std::array<u8, nokia_gsm_session_device::maximum_layer3_length> data{};
+		u8 data_octets = 0;
+		u8 data_length = 0;
+	};
 	struct queued_media
 	{
 		u32 epoch = 0;
@@ -92,6 +104,7 @@ struct nokia_gsm_call_adapter_device::host_state
 	std::deque<queued_termination> terminations;
 	std::deque<queued_media> media;
 	std::deque<queued_incoming> incoming;
+	std::deque<queued_incoming_sms> incoming_sms;
 	bool republish = false;
 	bool ready_pending = false;
 	unsigned dropped_events = 0;
@@ -119,6 +132,7 @@ void nokia_gsm_call_adapter_device::device_start()
 	save_item(NAME(m_enabled));
 	save_item(NAME(m_last_published_request_id));
 	save_item(NAME(m_last_published_sms_request_id));
+	save_item(NAME(m_incoming_sms_request_id));
 	save_item(NAME(m_last_published_connected));
 	save_item(NAME(m_last_published_alerting));
 	save_item(NAME(m_incoming_request_id));
@@ -190,6 +204,55 @@ void nokia_gsm_call_adapter_device::device_start()
 							m_host->decisions.size() + m_host->media.size() <
 									MAXIMUM_QUEUED_EVENTS)
 						m_host->incoming.push_back(item);
+					else
+						++m_host->dropped_events;
+					return;
+				}
+				if (type == "incoming_sms")
+				{
+					if (!message.HasMember("sender") || !message["sender"].IsString() ||
+							!message.HasMember("alphabet") || !message["alphabet"].IsString() ||
+							!message.HasMember("user_data_length") ||
+							!message["user_data_length"].IsUint() ||
+							!message.HasMember("user_data") || !message["user_data"].IsString())
+						return;
+					host_state::queued_incoming_sms item;
+					item.epoch = message["epoch"].GetUint();
+					item.request_id = message["request_id"].GetUint();
+					const std::string_view sender(message["sender"].GetString(),
+							message["sender"].GetStringLength());
+					if (!item.request_id || sender.empty() || sender.size() > item.sender.size())
+						return;
+					for (char digit : sender)
+					{
+						if (digit < '0' || digit > '9')
+							return;
+						item.sender[item.sender_length++] = u8(digit - '0');
+					}
+					const std::string_view alphabet(message["alphabet"].GetString(),
+							message["alphabet"].GetStringLength());
+					if (alphabet == "gsm7") item.alphabet = gsm::sms::alphabet::gsm_7bit;
+					else if (alphabet == "8bit") item.alphabet = gsm::sms::alphabet::eight_bit;
+					else if (alphabet == "ucs2") item.alphabet = gsm::sms::alphabet::ucs2;
+					else return;
+					const std::string_view encoded(message["user_data"].GetString(),
+							message["user_data"].GetStringLength());
+					if (encoded.empty() || (encoded.size() & 1) ||
+							encoded.size() / 2 > item.data.size() ||
+							message["user_data_length"].GetUint() > 255)
+						return;
+					for (unsigned index = 0; index < encoded.size() / 2; ++index)
+					{
+						const int high = hex_nibble(encoded[2 * index]);
+						const int low = hex_nibble(encoded[2 * index + 1]);
+						if (high < 0 || low < 0) return;
+						item.data[item.data_octets++] = u8((high << 4) | low);
+					}
+					item.data_length = u8(message["user_data_length"].GetUint());
+					std::lock_guard<std::mutex> lock(m_host->mutex);
+					if (m_host->incoming_sms.size() + m_host->incoming.size() +
+							m_host->decisions.size() < MAXIMUM_QUEUED_EVENTS)
+						m_host->incoming_sms.push_back(item);
 					else
 						++m_host->dropped_events;
 					return;
@@ -335,6 +398,7 @@ void nokia_gsm_call_adapter_device::device_reset()
 {
 	m_last_published_request_id = 0;
 	m_last_published_sms_request_id = 0;
+	m_incoming_sms_request_id = 0;
 	m_last_published_connected = false;
 	m_last_published_alerting = false;
 	m_incoming_request_id = 0;
@@ -352,6 +416,7 @@ void nokia_gsm_call_adapter_device::device_reset()
 	m_host->terminations.clear();
 	m_host->media.clear();
 	m_host->incoming.clear();
+	m_host->incoming_sms.clear();
 	m_host->republish = false;
 	m_host->ready_pending = false;
 	m_host->dropped_events = 0;
@@ -372,6 +437,7 @@ void nokia_gsm_call_adapter_device::postload()
 	m_host->terminations.clear();
 	m_host->media.clear();
 	m_host->incoming.clear();
+	m_host->incoming_sms.clear();
 	m_host->republish = true;
 	m_host->ready_pending = true;
 	m_host->dropped_events = 0;
@@ -394,6 +460,7 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	std::deque<host_state::queued_termination> terminations;
 	std::deque<host_state::queued_media> media;
 	std::deque<host_state::queued_incoming> incoming;
+	std::deque<host_state::queued_incoming_sms> incoming_sms;
 	bool republish;
 	bool ready_pending;
 	unsigned dropped_events;
@@ -404,6 +471,7 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		terminations.swap(m_host->terminations);
 		media.swap(m_host->media);
 		incoming.swap(m_host->incoming);
+		incoming_sms.swap(m_host->incoming_sms);
 		republish = m_host->republish;
 		ready_pending = m_host->ready_pending;
 		m_host->republish = false;
@@ -417,6 +485,30 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 				dropped_events, machine().time().as_double());
 	if (ready_pending)
 		publish_ready();
+	if (republish && m_incoming_sms_request_id)
+		publish_incoming_sms_state("queued");
+	for (const auto &item : incoming_sms)
+	{
+		const bool accepted = item.epoch == m_transport_epoch.load() &&
+				m_incoming_sms_request_id == 0 &&
+				m_radio_peer->queue_host_incoming_sms(
+						item.sender.data(), item.sender_length, item.alphabet,
+						item.data.data(), item.data_octets, item.data_length);
+		LOGMASKED(LOG_CALL_ADAPTER,
+				"gsm_call_adapter: incoming sms id=%u result=%s t=%.6f\n",
+				item.request_id, accepted ? "accepted" : "rejected",
+				machine().time().as_double());
+		if (accepted)
+		{
+			m_incoming_sms_request_id = item.request_id;
+			publish_incoming_sms_state("queued");
+		}
+	}
+	if (m_incoming_sms_request_id && !m_radio_peer->host_incoming_sms_pending())
+	{
+		publish_incoming_sms_state("delivered");
+		m_incoming_sms_request_id = 0;
+	}
 	for (const auto &item : incoming)
 	{
 		const bool busy_forwarding =
@@ -706,6 +798,29 @@ void nokia_gsm_call_adapter_device::publish_sms_state(const char *phase)
 			"gsm_call_adapter: sms state id=%u epoch=%u phase=%s t=%.6f\n",
 			m_session->outgoing_sms_request_id(), m_transport_epoch.load(),
 			phase, machine().time().as_double());
+}
+
+void nokia_gsm_call_adapter_device::publish_incoming_sms_state(const char *phase)
+{
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	writer.StartObject();
+	writer.Key("type");
+	writer.String("incoming_sms_state");
+	writer.Key("request_id");
+	writer.Uint(m_incoming_sms_request_id);
+	writer.Key("epoch");
+	writer.Uint(m_transport_epoch.load());
+	writer.Key("phase");
+	writer.String(phase);
+	writer.EndObject();
+	std::lock_guard<std::mutex> lock(m_host->mutex);
+	for (const auto &connection : m_host->connections)
+		connection->send_message(buffer.GetString(), 1);
+	LOGMASKED(LOG_CALL_ADAPTER,
+			"gsm_call_adapter: incoming sms state id=%u epoch=%u phase=%s t=%.6f\n",
+			m_incoming_sms_request_id, m_transport_epoch.load(), phase,
+			machine().time().as_double());
 }
 
 void nokia_gsm_call_adapter_device::publish_sms_request()

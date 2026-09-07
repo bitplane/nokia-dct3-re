@@ -61,6 +61,20 @@ nokia_radio_peer_device::queue_host_incoming_call(
 	return host_incoming_result::paging;
 }
 
+bool nokia_radio_peer_device::queue_host_incoming_sms(
+		const u8 *sender, unsigned sender_length, gsm::sms::alphabet alphabet,
+		const u8 *user_data, unsigned user_data_octets, unsigned user_data_length)
+{
+	if (!m_enabled || !m_registered || !m_gsm_session->idle() ||
+			m_host_incoming_sms_pending || m_host_incoming_sms_active ||
+			!m_gsm_network->set_host_incoming_sms(sender, sender_length, alphabet,
+					user_data, user_data_octets, user_data_length))
+		return false;
+	m_page_transmitted = false;
+	m_host_incoming_sms_pending = true;
+	return true;
+}
+
 nokia_radio_peer_device::nokia_radio_peer_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_RADIO_PEER, tag, owner, clock),
@@ -120,6 +134,8 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_pch_fill_delivered));
 	save_item(NAME(m_page_transmitted));
 	save_item(NAME(m_host_incoming_call_pending));
+	save_item(NAME(m_host_incoming_sms_pending));
+	save_item(NAME(m_host_incoming_sms_active));
 	save_item(NAME(m_last_host_forwarding_condition));
 	save_item(NAME(m_call_waiting_profile));
 	save_item(NAME(m_call_waiting_sent));
@@ -273,6 +289,8 @@ void nokia_radio_peer_device::device_reset()
 	m_pch_fill_delivered = false;
 	m_page_transmitted = false;
 	m_host_incoming_call_pending = false;
+	m_host_incoming_sms_pending = false;
+	m_host_incoming_sms_active = false;
 	m_last_host_forwarding_condition = u8(
 			nokia_gsm_network_device::forwarding_condition::count);
 	m_call_waiting_sent = false;
@@ -2100,6 +2118,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			const auto action = acknowledge_downlink();
 			if (action == nokia_gsm_session_device::downlink_kind::release_complete)
 			{
+				if (m_host_incoming_sms_active &&
+						m_gsm_session->incoming_service_completed())
+				{
+					m_host_incoming_sms_active = false;
+					m_gsm_network->clear_host_incoming_sms();
+				}
 				m_registered =
 						m_gsm_session->registered_mobile_identity_length() == 8;
 				enter_release_deconfigure();
@@ -2401,7 +2425,7 @@ void nokia_radio_peer_device::emit_report()
 					nokia_gsm_session_device::incoming_service::status_report :
 				m_incoming_smart_message_after_registration ?
 					nokia_gsm_session_device::incoming_service::smart_message :
-				m_incoming_sms_after_registration ?
+				(m_incoming_sms_after_registration || m_host_incoming_sms_pending) ?
 					nokia_gsm_session_device::incoming_service::sms :
 				m_incoming_ussd_profile == 1 ?
 					nokia_gsm_session_device::incoming_service::ussd_request :
@@ -2413,6 +2437,7 @@ void nokia_radio_peer_device::emit_report()
 					nokia_gsm_session_device::incoming_service::none;
 			const bool page_requested =
 					m_page_after_registration || m_host_incoming_call_pending ||
+					m_host_incoming_sms_pending ||
 					m_gsm_session->delivery_report_pending();
 			const bool service_admissible =
 					m_gsm_session->incoming_service_admissible(service);
@@ -2465,7 +2490,14 @@ void nokia_radio_peer_device::emit_report()
 			std::copy(block.begin(), block.end(), std::begin(payload) + 10);
 			transmitted_page = monitored_page;
 			if (monitored_page)
+			{
 				m_host_incoming_call_pending = false;
+				if (m_host_incoming_sms_pending)
+				{
+					m_host_incoming_sms_pending = false;
+					m_host_incoming_sms_active = true;
+				}
+			}
 			off_group_page = transmit_page && !monitored_page;
 		}
 		else if (payload[0] == 0x60)

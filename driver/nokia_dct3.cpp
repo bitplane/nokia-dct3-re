@@ -2302,7 +2302,7 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x01, "Deferred by 3 emulated seconds")
 
 	PORT_START("CALLHOST")
-	PORT_CONFNAME(0x01, 0x00, "Host outgoing-call adapter")
+	PORT_CONFNAME(0x01, 0x00, "Host telephony adapter")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
 

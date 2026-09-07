@@ -252,6 +252,10 @@ public:
 	std::array<u8, 3> physical_information(u8 timing_advance) const;
 	unsigned incoming_sms_message_count() const;
 	layer3_message incoming_sms_cp_data(unsigned message_index) const;
+	bool set_host_incoming_sms(const u8 *sender, unsigned sender_length,
+			gsm::sms::alphabet alphabet, const u8 *user_data,
+			unsigned user_data_octets, unsigned user_data_length);
+	void clear_host_incoming_sms() { m_host_sms_pending = false; }
 	layer3_message sms_status_report_cp_data(u8 message_reference,
 			const u8 *recipient_digits, unsigned recipient_digit_count) const;
 	bool incoming_sms_admissible(unsigned message_index) const;
@@ -343,6 +347,13 @@ private:
 			smart_message_profile::valid;
 	sms_profile m_sms_profile = sms_profile::valid;
 	ems_profile m_ems_profile = ems_profile::none;
+	bool m_host_sms_pending = false;
+	std::array<u8, 20> m_host_sms_sender{};
+	u8 m_host_sms_sender_length = 0;
+	u8 m_host_sms_alphabet = u8(gsm::sms::alphabet::gsm_7bit);
+	std::array<u8, maximum_layer3_length> m_host_sms_user_data{};
+	u8 m_host_sms_user_data_octets = 0;
+	u8 m_host_sms_user_data_length = 0;
 	ussd_outcome m_ussd_outcome = ussd_outcome::success;
 	bool m_stable_camp_seen = false;
 	bool m_neighbour_bcch_seen = false;

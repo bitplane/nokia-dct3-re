@@ -64,6 +64,13 @@ void nokia_gsm_network_device::device_start()
 	save_item(NAME(m_forwarding_basic_service));
 	save_item(NAME(m_forwarding_basic_service_code));
 	save_item(NAME(m_forwarding_no_reply_time));
+	save_item(NAME(m_host_sms_pending));
+	save_item(NAME(m_host_sms_sender));
+	save_item(NAME(m_host_sms_sender_length));
+	save_item(NAME(m_host_sms_alphabet));
+	save_item(NAME(m_host_sms_user_data));
+	save_item(NAME(m_host_sms_user_data_octets));
+	save_item(NAME(m_host_sms_user_data_length));
 }
 
 void nokia_gsm_network_device::register_forwarding(
@@ -912,6 +919,8 @@ gsm::cell_broadcast::page nokia_gsm_network_device::cell_broadcast_page() const
 
 unsigned nokia_gsm_network_device::incoming_sms_message_count() const
 {
+	if (m_host_sms_pending)
+		return 1;
 	if (m_sms_profile == sms_profile::fill_capacity)
 		return 11;
 	return m_sms_profile == sms_profile::two_sequential ||
@@ -921,6 +930,48 @@ unsigned nokia_gsm_network_device::incoming_sms_message_count() const
 nokia_gsm_network_device::layer3_message
 nokia_gsm_network_device::incoming_sms_cp_data(unsigned message_index) const
 {
+	if (m_host_sms_pending)
+	{
+		layer3_message result;
+		if (message_index != 0)
+			return result;
+		auto &data = result.data;
+		data[0] = 0x09;
+		data[1] = 0x01;
+		data[3] = 0x01;
+		data[4] = 0x40;
+		data[5] = 0x06;
+		const std::array<u8, 6> smsc = { 0x91, 0x21, 0x43, 0x65, 0x87, 0x09 };
+		std::copy(smsc.begin(), smsc.end(), data.begin() + 6);
+		data[12] = 0x00;
+		unsigned offset = 14;
+		data[offset++] = 0x04;
+		data[offset++] = m_host_sms_sender_length;
+		data[offset++] = 0x81;
+		for (unsigned index = 0; index < m_host_sms_sender_length; index += 2)
+		{
+			const u8 low = m_host_sms_sender[index];
+			const u8 high = index + 1 < m_host_sms_sender_length ?
+					m_host_sms_sender[index + 1] : 0x0f;
+			data[offset++] = low | (high << 4);
+		}
+		data[offset++] = 0x00;
+		data[offset++] = m_host_sms_alphabet == u8(gsm::sms::alphabet::gsm_7bit) ?
+				0x00 : m_host_sms_alphabet == u8(gsm::sms::alphabet::eight_bit) ?
+						0x04 : 0x08;
+		const std::array<u8, 7> timestamp =
+				{ 0x62, 0x70, 0x42, 0x21, 0x00, 0x00, 0x00 };
+		std::copy(timestamp.begin(), timestamp.end(), data.begin() + offset);
+		offset += timestamp.size();
+		data[offset++] = m_host_sms_user_data_length;
+		std::copy_n(m_host_sms_user_data.begin(), m_host_sms_user_data_octets,
+				data.begin() + offset);
+		offset += m_host_sms_user_data_octets;
+		data[13] = u8(offset - 14);
+		data[2] = u8(offset - 3);
+		result.length = offset;
+		return result;
+	}
 	// GSM 04.11/03.40 mobile-terminated CP-DATA containing RP-DATA and one
 	// SMS-DELIVER. The deterministic fixture is text "hello" from 5551234,
 	// via service centre +1234567890, timestamped 2026-07-24 12:00:00 UTC.
@@ -1001,6 +1052,32 @@ nokia_gsm_network_device::incoming_sms_cp_data(unsigned message_index) const
 		break;
 	}
 	return result;
+}
+
+bool nokia_gsm_network_device::set_host_incoming_sms(
+		const u8 *sender, unsigned sender_length, gsm::sms::alphabet alphabet,
+		const u8 *user_data, unsigned user_data_octets, unsigned user_data_length)
+{
+	if (!sender || !user_data || sender_length == 0 ||
+			sender_length > m_host_sms_sender.size() || user_data_octets == 0 ||
+			user_data_octets > 140 ||
+			m_host_sms_pending)
+		return false;
+	if ((alphabet == gsm::sms::alphabet::gsm_7bit &&
+			(user_data_length * 7 + 7) / 8 != user_data_octets) ||
+			(alphabet != gsm::sms::alphabet::gsm_7bit &&
+			 user_data_length != user_data_octets))
+		return false;
+	m_host_sms_sender.fill(0);
+	std::copy_n(sender, sender_length, m_host_sms_sender.begin());
+	m_host_sms_sender_length = u8(sender_length);
+	m_host_sms_alphabet = u8(alphabet);
+	m_host_sms_user_data.fill(0);
+	std::copy_n(user_data, user_data_octets, m_host_sms_user_data.begin());
+	m_host_sms_user_data_octets = u8(user_data_octets);
+	m_host_sms_user_data_length = u8(user_data_length);
+	m_host_sms_pending = true;
+	return true;
 }
 
 bool nokia_gsm_network_device::incoming_sms_admissible(
