@@ -672,6 +672,12 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 		0x8e, 0x01, 0x10,
 		0x84, 0x02, 0x01, 0x02
 	};
+	static constexpr u8 send_dtmf[] = {
+		0xd0, 0x0d,
+		0x81, 0x03, 0x0d, 0x14, 0x00,
+		0x82, 0x02, 0x81, 0x83,
+		0xac, 0x02, 0x21, 0xfb
+	};
 	const u8 *command = nullptr;
 	unsigned command_length = 0;
 	if (m_proactive_command == 0x21)
@@ -733,6 +739,11 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 	{
 		command = play_tone;
 		command_length = std::size(play_tone);
+	}
+	else if (m_proactive_command == 0x14)
+	{
+		command = send_dtmf;
+		command_length = std::size(send_dtmf);
 	}
 	if (m_toolkit_profile == toolkit_profile::none || !m_terminal_profile_received ||
 			!m_proactive_pending || requested != command_length)
@@ -812,6 +823,15 @@ void nokia_sim_card_device::accept_terminal_response()
 		LOGMASKED(LOG_SIM, "sim_device: proactive POLLING OFF ready t=%.8f\n",
 				machine().time().as_double());
 	}
+	else if (m_proactive_command == 0x10 &&
+			m_toolkit_profile == toolkit_profile::interactive_menu_call_dtmf)
+	{
+		m_proactive_command = 0x14;
+		m_proactive_command_number = 13;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive SEND DTMF ready t=%.8f\n",
+				machine().time().as_double());
+	}
 	else
 	{
 		m_proactive_command = 0;
@@ -836,6 +856,7 @@ u8 nokia_sim_card_device::proactive_command_length() const
 	case 0x03: return 15;
 	case 0x04: return 11;
 	case 0x20: return 28;
+	case 0x14: return 15;
 	default: return 0;
 	}
 }
@@ -873,7 +894,8 @@ void nokia_sim_card_device::accept_envelope()
 		LOGMASKED(LOG_SIM, "sim_device: proactive SEND SHORT MESSAGE ready t=%.8f\n",
 				machine().time().as_double());
 	}
-	else if (m_toolkit_profile == toolkit_profile::interactive_menu_setup_call &&
+	else if ((m_toolkit_profile == toolkit_profile::interactive_menu_setup_call ||
+			m_toolkit_profile == toolkit_profile::interactive_menu_call_dtmf) &&
 			m_menu_selection == 1)
 	{
 		m_proactive_command = 0x10;

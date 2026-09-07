@@ -339,6 +339,10 @@ periodic STATUS within the run. Both commands travel through ordinary SIMI/FIQ6.
 stop a distinct 1750 Hz DSP tone, then uses physical Select to obtain terminal
 result `11`. Automatic successful completion remains unproved and is not part
 of this cancellation-focused gate.
+`make verify-sim-toolkit-dtmf` establishes a proactive call through Connect
+Acknowledge before issuing `SEND DTMF`. NSE-8 v6.00 must return result `31`,
+then the physically ended call must complete CC release. This is an active-call
+capability negative, not an out-of-context command probe.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

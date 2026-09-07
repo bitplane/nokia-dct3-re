@@ -278,6 +278,12 @@ down before end). The bounded unattended variant stops audio but has not
 produced a successful terminal response, so the gate claims playback and
 cancellation only, not automatic command completion.
 
+`SEND DTMF` is not supported by this 3210 firmware's terminal profile. The
+negative fixture first establishes and connects the same proactive call, then
+supplies `12#`; the ME returns result `31` while the call is demonstrably active
+and subsequently releases it normally. This rules out “no active call” as the
+cause without inventing a DTMF transport the handset does not expose.
+
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
 causes initialization to restart. Unsupported SELECT returns GSM 11.11 `94 04` (file ID not
