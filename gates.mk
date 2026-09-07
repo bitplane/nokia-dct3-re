@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 266 gates: 141 generated from typed steps, 125 copied verbatim (shell).
+# 267 gates: 141 generated from typed steps, 126 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -178,14 +178,14 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-toolkit-event-list verify-sim-toolkit-refresh \
 	verify-sim-toolkit-polling verify-sim-toolkit-tone verify-sim-toolkit-dtmf \
 	verify-sim-toolkit-browser verify-sim-toolkit-timer \
-	verify-sim-toolkit-malformed verify-sim-hotplug verify-sim-hotplug-v501 \
-	verify-sim-hotplug-toolkit verify-sim-hotplug-state-roundtrip \
-	verify-sim-toolkit-v501 verify-sim-toolkit-state-roundtrip \
-	verify-sim-toolkit-removal verify-sim-phonebook verify-sim-pin \
-	verify-sim-pin-unblock verify-sim-pin-state-roundtrip verify-sim-pin-removal \
-	verify-sim-pin-toggle verify-sim-pin-change verify-sim-pin-change-reject \
-	verify-sim-pin-v501 verify-frontier-stability verify-structure-subset \
-	verify-structure
+	verify-sim-toolkit-malformed verify-sim-toolkit-timeout verify-sim-hotplug \
+	verify-sim-hotplug-v501 verify-sim-hotplug-toolkit \
+	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
+	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
+	verify-sim-phonebook verify-sim-pin verify-sim-pin-unblock \
+	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
+	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
+	verify-frontier-stability verify-structure-subset verify-structure
 
 verify-gsm-fr-codec: $(LIBGSM_ARCHIVE)
 	$(CXX) -std=c++17 -O2 driver/nokia_gsm_fr_codec.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o $(LIBGSM_DIR)/lib/test_gsm_fr_codec
@@ -2854,6 +2854,14 @@ verify-sim-toolkit-malformed:
 	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_malformed/noki3210.cfg $(RUN_DIR)/cfg/; \
 	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=48 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter,wait1200,4,2,wait500,enter,wait1500,enter,down,down,down,down,down,down,down,down,down,wait1000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500'; \
 	$(PYTHON) tools/sim_toolkit_malformed_trace_check.py $(RUN_DIR)/error.log
+
+# shell: firmware-owned unattended DISPLAY TEXT timeout
+verify-sim-toolkit-timeout:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=85 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg'; \
+	$(PYTHON) tools/sim_toolkit_timeout_trace_check.py $(RUN_DIR)/error.log
 
 # shell: physical Phase-2 card removal and reinsertion fixture
 verify-sim-hotplug:

@@ -354,6 +354,10 @@ rejects the command family rather than silently starting a timer.
 comprehension-required TLV to valid DISPLAY TEXT data and requires terminal
 result `32`, keeping malformed-data rejection distinct from capability result
 `31`.
+`make verify-sim-toolkit-timeout` supplies no keypad input after DISPLAY TEXT
+FETCH. It requires result `12` and bounds the firmware-owned response delay to
+55-65 seconds, proving that unattended cancellation is neither card-generated
+nor an injected UI event.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

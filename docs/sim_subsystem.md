@@ -353,6 +353,11 @@ An unknown comprehension-required TLV (`7e`) appended to an otherwise valid
 DISPLAY TEXT command returns general result `32` (command data not understood),
 distinct from the result-`31` capability responses above. This validates the
 firmware parser's mandatory-TLV failure path through the normal card transport.
+
+DISPLAY TEXT qualifier `80` also has a measured unattended lifecycle. With no
+key input, v6.00 returns result `12` (no response from user) about 58.38 seconds
+after FETCH. The timer is firmware-owned; the card retains the fetched command
+until that ordinary TERMINAL RESPONSE arrives.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract
