@@ -653,6 +653,17 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 		0x81, 0x03, 0x09, 0x01, 0x00,
 		0x82, 0x02, 0x81, 0x82
 	};
+	static constexpr u8 poll_interval[] = {
+		0xd0, 0x0d,
+		0x81, 0x03, 0x0a, 0x03, 0x00,
+		0x82, 0x02, 0x81, 0x82,
+		0x84, 0x02, 0x01, 0x05
+	};
+	static constexpr u8 polling_off[] = {
+		0xd0, 0x09,
+		0x81, 0x03, 0x0b, 0x04, 0x00,
+		0x82, 0x02, 0x81, 0x82
+	};
 	const u8 *command = nullptr;
 	unsigned command_length = 0;
 	if (m_proactive_command == 0x21)
@@ -699,6 +710,16 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 	{
 		command = refresh;
 		command_length = std::size(refresh);
+	}
+	else if (m_proactive_command == 0x03)
+	{
+		command = poll_interval;
+		command_length = std::size(poll_interval);
+	}
+	else if (m_proactive_command == 0x04)
+	{
+		command = polling_off;
+		command_length = std::size(polling_off);
 	}
 	if (m_toolkit_profile == toolkit_profile::none || !m_terminal_profile_received ||
 			!m_proactive_pending || requested != command_length)
@@ -769,6 +790,15 @@ void nokia_sim_card_device::accept_terminal_response()
 		// overlap.
 		m_toolkit_timer->adjust(attotime::from_seconds(8));
 	}
+	else if (m_proactive_command == 0x03 &&
+			m_toolkit_profile == toolkit_profile::interactive_menu_polling)
+	{
+		m_proactive_command = 0x04;
+		m_proactive_command_number = 11;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive POLLING OFF ready t=%.8f\n",
+				machine().time().as_double());
+	}
 	else
 	{
 		m_proactive_command = 0;
@@ -790,6 +820,8 @@ u8 nokia_sim_card_device::proactive_command_length() const
 	case 0x24: return 34;
 	case 0x05: return 15;
 	case 0x01: return 11;
+	case 0x03: return 15;
+	case 0x04: return 11;
 	default: return 0;
 	}
 }
@@ -861,6 +893,15 @@ void nokia_sim_card_device::accept_envelope()
 		m_proactive_command_number = 9;
 		m_proactive_pending = true;
 		LOGMASKED(LOG_SIM, "sim_device: proactive REFRESH ready t=%.8f\n",
+				machine().time().as_double());
+	}
+	else if (m_toolkit_profile == toolkit_profile::interactive_menu_polling &&
+			m_menu_selection == 1)
+	{
+		m_proactive_command = 0x03;
+		m_proactive_command_number = 10;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive POLL INTERVAL ready t=%.8f\n",
 				machine().time().as_double());
 	}
 	queue_status(0x90, 0x00);

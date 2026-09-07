@@ -21,7 +21,8 @@ public:
 		interactive_menu_setup_call,
 		interactive_menu_select_item,
 		interactive_menu_event_list,
-		interactive_menu_refresh
+		interactive_menu_refresh,
+		interactive_menu_polling
 	};
 
 	nokia_sim_card_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);

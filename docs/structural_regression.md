@@ -332,6 +332,9 @@ subscription and must not subsequently emit an Event Download envelope.
 TERMINAL PROFILE before its successful TERMINAL RESPONSE. It then requires the
 card application to resume only after that response, protecting the in-flight
 command across firmware-owned SIM reinitialization.
+`make verify-sim-toolkit-polling` requires `POLL INTERVAL` to return the
+effective five-second duration, chains `POLLING OFF`, and rejects any subsequent
+periodic STATUS within the run. Both commands travel through ordinary SIMI/FIQ6.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

@@ -264,6 +264,13 @@ delayed completion, and only then schedule the new application session.
 `make verify-sim-toolkit-refresh` protects this ordering and catches both lost
 completion state and overlapping proactive commands.
 
+`POLL INTERVAL` and `POLLING OFF` are both supported. For a requested
+five-second interval the firmware returns result `00` plus an effective-duration
+TLV of five seconds, then accepts the chained off command. No later periodic
+STATUS occurs in the bounded run. `make verify-sim-toolkit-polling` protects the
+echoed duration and the absence after disable, rather than treating a bare
+success result as proof that polling changed.
+
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
 causes initialization to restart. Unsupported SELECT returns GSM 11.11 `94 04` (file ID not
