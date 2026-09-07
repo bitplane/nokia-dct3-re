@@ -31,6 +31,7 @@ distinction.
 | `upstream_architecture.md` | Target MAME device graph, DSP substitution seam, ROM policy, and upstream staging. |
 | `product_configuration_audit.md` | Post-refactor product-contract dependency audit and next bounded refactor. |
 | `external_call_bridge.md` | Versioned host telephony API for network state, calls, GSM-FR media, SMS and USSD. |
+| `subscriber_profile.md` | Shared immutable SIM/network identity and authentication contract. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
 | `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |

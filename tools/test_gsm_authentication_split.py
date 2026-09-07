@@ -13,6 +13,7 @@ class GsmAuthenticationSplitTest(unittest.TestCase):
         cls.session = (ROOT / "driver/nokia_gsm_session.cpp").read_text()
         cls.session_header = (ROOT / "driver/nokia_gsm_session.h").read_text()
         cls.card = (ROOT / "driver/nokia_sim_card.cpp").read_text()
+        cls.subscriber = (ROOT / "driver/gsm_subscriber.h").read_text()
         cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         cls.radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
 
@@ -20,7 +21,7 @@ class GsmAuthenticationSplitTest(unittest.TestCase):
         for token in (
             "authentication_request() const",
             "authentication_response_valid(",
-            "gsm::a3a8::aes_example(laboratory_ki(), rand)",
+            "gsm::a3a8::aes_example(m_subscriber.ki, rand)",
             "authentication_reject() const",
         ):
             self.assertIn(token, self.network + self.network_header)
@@ -39,9 +40,11 @@ class GsmAuthenticationSplitTest(unittest.TestCase):
     def test_policy_is_opt_in_and_card_key_matches_network(self):
         self.assertIn("bool m_authentication_required = false", self.session_header)
         self.assertIn('m_authentication_config(*this, "AUTHCFG")', self.phone)
-        self.assertIn(
-            "nokia_gsm_network_device::laboratory_ki()", self.phone
+        self.assertIn("gsm::subscriber::profile subscriber", self.phone)
+        self.assertEqual(
+            self.phone.count("set_subscriber_profile(product.subscriber)"), 2
         )
+        self.assertIn("authentication_algorithm::aes_example", self.subscriber)
         self.assertNotIn("noki6110", self.card)
 
     def test_radio_does_not_promote_rejected_registration(self):

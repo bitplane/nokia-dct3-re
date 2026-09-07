@@ -10,6 +10,7 @@ class SimDeviceSplitTest(unittest.TestCase):
     def setUpClass(cls):
         cls.card = (ROOT / "driver/nokia_sim_card.cpp").read_text()
         cls.card_header = (ROOT / "driver/nokia_sim_card.h").read_text()
+        cls.subscriber = (ROOT / "driver/gsm_subscriber.h").read_text()
         cls.simi = (ROOT / "driver/nokia_simi.cpp").read_text()
         cls.simi_header = (ROOT / "driver/nokia_simi.h").read_text()
         cls.mad2 = (ROOT / "driver/nokia_mad2.cpp").read_text()
@@ -91,7 +92,8 @@ class SimDeviceSplitTest(unittest.TestCase):
     def test_registration_files_form_a_coherent_phase2_profile(self):
         self.assertIn("{ 0x6fad, 0x7f20, 4, 0", self.card)
         self.assertIn("administrative_data[] = { 0x00, 0xff, 0xff, 0x02 }", self.card)
-        self.assertIn("plmn_selector[] = { 0x00, 0xf1, 0x10 }", self.card)
+        self.assertIn("preferred_plmn", self.subscriber)
+        self.assertIn("{ 0x00, 0xf1, 0x10 }", self.subscriber)
         self.assertIn("{ 0x6f20, 0x7f20, 9, 0, file_structure::transparent, true }", self.card)
         self.assertIn("{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, true }", self.card)
         self.assertIn("{ 0x6f7e, 0x7f20, 11, 0, file_structure::transparent, true }", self.card)
@@ -172,9 +174,8 @@ class SimDeviceSplitTest(unittest.TestCase):
             "queue_status(0x9f, m_pending_response_len)",
         ):
             self.assertIn(token, self.card + self.card_header)
-        self.assertIn(
-            "authentication_profile::gsm_aes_example", self.phone
-        )
+        self.assertIn("set_subscriber_profile(product.subscriber)", self.phone)
+        self.assertIn("authentication_algorithm::aes_example", self.subscriber)
         self.assertNotIn("noki6110", self.card + self.card_header)
 
     def test_toolkit_profile_is_card_owned_and_opt_in(self):

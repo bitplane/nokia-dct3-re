@@ -108,8 +108,12 @@ void nokia_sim_card_device::nvram_default()
 	std::fill(std::begin(m_acm), std::end(m_acm), 0x00);
 	if (m_cached_location)
 	{
-		const u8 loci[] = { 0xff, 0xff, 0xff, 0xff, 0x00, 0xf1, 0x10, 0x00, 0x01, 0x00, 0x01 };
-		std::copy(std::begin(loci), std::end(loci), std::begin(m_loci));
+		std::copy(m_subscriber.home_location.plmn.begin(),
+				m_subscriber.home_location.plmn.end(), m_loci + 4);
+		m_loci[7] = m_subscriber.home_location.lac >> 8;
+		m_loci[8] = m_subscriber.home_location.lac;
+		m_loci[9] = 0x00;
+		m_loci[10] = 0x01;
 		std::fill(std::begin(m_bcch), std::end(m_bcch), 0x00);
 		m_bcch[15] = 0x01;
 	}
@@ -1511,13 +1515,11 @@ bool nokia_sim_card_device::is_known_file(u16 fid) const
 
 u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 {
-	static constexpr u8 iccid[] = { 0x98, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0 };
 	static constexpr u8 ecc[] = { 0x11, 0xf2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	static constexpr u8 language_preference[] = { 0x01, 0xff, 0xff, 0xff };
 	// GSM 11.11 EF_ACC: allocate one ordinary subscriber class (class 0).
 	// Erased bytes would allocate every class and set reserved byte-1 bit 3.
-	static constexpr u8 access_control_class[] = { 0x00, 0x01 };
 	// The base card advertises only services backed by this profile.  The
 	// opt-in CPHS AoC profile additionally advertises GSM 11.11 service 5,
 	// keeping EF_CSP and EF_SST consistent and causing the ME to read ACM,
@@ -1535,20 +1537,6 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	// information in this phase-2 profile.  Erased 0xff bytes select no valid
 	// operation mode and make the subscriber profile internally inconsistent.
 	static constexpr u8 administrative_data[] = { 0x00, 0xff, 0xff, 0x02 };
-	// IMSI 001010123456789 belongs to the reserved laboratory PLMN advertised
-	// by the serving cell. The remaining digits are deterministic test data.
-	static constexpr u8 imsi[] = { 0x08, 0x09, 0x10, 0x10, 0x10, 0x32, 0x54, 0x76, 0x98 };
-	// Prefer the subscriber's home PLMN 001-01, also advertised by the
-	// laboratory serving cell.  Keeping EF_PLMNsel on a different PLMN makes
-	// the firmware legitimately leave the serving cell and resume selection.
-	static constexpr u8 plmn_selector[] = { 0x00, 0xf1, 0x10 };
-	// GSM 11.11 EF_SPN: display the service-provider name on the registered
-	// home PLMN. Byte zero is the display-condition octet; the remaining
-	// sixteen bytes are the name padded with erased bytes.
-	static constexpr u8 service_provider_name[] = {
-		0x00, 'D', 'C', 'T', '3', ' ', 'L', 'A', 'B',
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-	};
 	// CPHS phase 2 with only the Customer Service Profile allocated and
 	// activated.  The CSP contains its mandatory nine group entries and makes
 	// only Advice of Charge (group 03, bit 6) customer-accessible.
@@ -1558,7 +1546,7 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 		0x04, 0x00, 0x05, 0x00, 0x06, 0x00,
 		0x07, 0x00, 0x08, 0x00, 0x09, 0x00
 	};
-	if (fid == 0x2fe2 && offset < std::size(iccid)) return iccid[offset];
+	if (fid == 0x2fe2 && offset < m_subscriber.iccid.size()) return m_subscriber.iccid[offset];
 	if (fid == 0x6f3a && offset < sizeof(m_adn)) return m_adn[offset];
 	if (fid == 0x6f3c && offset < sizeof(m_sms)) return m_sms[offset];
 	if (fid == 0x6f42 && offset < sizeof(m_smsp)) return m_smsp[offset];
@@ -1574,11 +1562,11 @@ u8 nokia_sim_card_device::ef_byte(u16 fid, unsigned offset) const
 	}
 	if (fid == 0x6fb7 && offset < std::size(ecc)) return ecc[offset];
 	if (fid == 0x6fad && offset < std::size(administrative_data)) return administrative_data[offset];
-	if (fid == 0x6f07 && offset < std::size(imsi)) return imsi[offset];
+	if (fid == 0x6f07 && offset < m_subscriber.imsi.size()) return m_subscriber.imsi[offset];
 	if (fid == 0x6f20 && offset < std::size(m_kc)) return m_kc[offset];
-	if (fid == 0x6f30 && offset < std::size(plmn_selector)) return plmn_selector[offset];
-	if (fid == 0x6f46 && offset < std::size(service_provider_name)) return service_provider_name[offset];
-	if (fid == 0x6f78 && offset < std::size(access_control_class)) return access_control_class[offset];
+	if (fid == 0x6f30 && offset < m_subscriber.preferred_plmn.size()) return m_subscriber.preferred_plmn[offset];
+	if (fid == 0x6f46 && offset < m_subscriber.service_provider_name.size()) return m_subscriber.service_provider_name[offset];
+	if (fid == 0x6f78 && offset < m_subscriber.access_control_class.size()) return m_subscriber.access_control_class[offset];
 	if (fid == 0x6f7b && m_forbidden_test_plmn)
 	{
 		static constexpr u8 forbidden_plmn[] = { 0x13, 0x00, 0x62 };

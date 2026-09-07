@@ -11,6 +11,7 @@
 #include "gsm_sms_transport.h"
 #include "gsm_mobility.h"
 #include "gsm_supplementary.h"
+#include "gsm_subscriber.h"
 
 #include <array>
 
@@ -142,6 +143,8 @@ public:
 	nokia_gsm_network_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 
+	void set_subscriber_profile(const gsm::subscriber::profile &profile);
+
 	void set_cell_profile(cell_profile profile);
 	void set_neighbour_cell_profile(cell_profile profile);
 	void set_cell(unsigned index, const gsm::mobility::cell &cell)
@@ -239,7 +242,6 @@ public:
 	bool authentication_response_valid(
 			const u8 *information, unsigned length) const;
 	gsm::a3a8::result authentication_result() const;
-	static const gsm::a3a8::block &laboratory_ki();
 	std::array<u8, 3> cipher_mode_command() const;
 	std::array<u8, 2> cm_service_accept() const;
 	std::array<u8, 3> cm_service_reject() const;
@@ -347,6 +349,7 @@ private:
 	gsm::a5::algorithm m_cipher_algorithm = gsm::a5::algorithm::a5_0;
 	gsm::mobility::periodic_update_timer m_periodic_update_timer;
 	gsm::mobility::topology m_cells;
+	gsm::subscriber::profile m_subscriber = gsm::subscriber::laboratory;
 	mobility_profile m_mobility_profile = mobility_profile::single_cell;
 	smart_message_profile m_smart_message_profile =
 			smart_message_profile::valid;

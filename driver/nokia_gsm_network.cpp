@@ -47,6 +47,17 @@ nokia_gsm_network_device::nokia_gsm_network_device(
 {
 }
 
+void nokia_gsm_network_device::set_subscriber_profile(
+		const gsm::subscriber::profile &profile)
+{
+	m_subscriber = profile;
+	for (unsigned index = 0; index < m_cells.size(); ++index)
+		if (auto *cell = m_cells.at(index))
+			cell->location.plmn = profile.home_location.plmn;
+	if (auto *primary = m_cells.at(0))
+		primary->location.lac = profile.home_location.lac;
+}
+
 void nokia_gsm_network_device::device_start()
 {
 	m_delayed_loss_timer = timer_alloc(
@@ -260,6 +271,7 @@ void nokia_gsm_network_device::set_mobility_profile(mobility_profile profile)
 	}
 
 	gsm::mobility::cell primary;
+	primary.location = m_subscriber.home_location;
 	gsm::mobility::cell neighbour = primary;
 	neighbour.arfcn = 2;
 	neighbour.bsic = 0x22;
@@ -760,15 +772,6 @@ std::array<u8, 17> nokia_gsm_network_device::location_update_accept(
 	return message;
 }
 
-const gsm::a3a8::block &nokia_gsm_network_device::laboratory_ki()
-{
-	static constexpr gsm::a3a8::block key = {
-		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
-	};
-	return key;
-}
-
 std::array<u8, 19> nokia_gsm_network_device::authentication_request() const
 {
 	// GSM 04.08 9.2.2: MM header, key sequence 0, and a 128-bit RAND.
@@ -796,7 +799,10 @@ gsm::a3a8::result nokia_gsm_network_device::authentication_result() const
 	const auto request = authentication_request();
 	gsm::a3a8::block rand;
 	std::copy(request.begin() + 3, request.end(), rand.begin());
-	return gsm::a3a8::aes_example(laboratory_ki(), rand);
+	if (m_subscriber.authentication !=
+			gsm::subscriber::authentication_algorithm::aes_example)
+		return {};
+	return gsm::a3a8::aes_example(m_subscriber.ki, rand);
 }
 
 std::array<u8, 3> nokia_gsm_network_device::cipher_mode_command() const

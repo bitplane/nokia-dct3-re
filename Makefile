@@ -35,6 +35,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/gsm_mm_authentication.cpp driver/gsm_mm_authentication.h \
 	driver/gsm_sms_transport.cpp driver/gsm_sms_transport.h \
 	driver/gsm_supplementary.cpp driver/gsm_supplementary.h \
+	driver/gsm_subscriber.h \
 	driver/gsm_tch_f_l1.cpp driver/gsm_tch_f_l1.h \
 	driver/gsm_xcch_l1.cpp driver/gsm_xcch_l1.h \
 	driver/nokia_gsm_fr_codec.cpp driver/nokia_gsm_fr_codec.h \

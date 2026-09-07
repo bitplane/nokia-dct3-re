@@ -5,6 +5,7 @@
 #define MAME_NOKIA_NOKIA_SIM_CARD_H
 
 #include "gsm_a3a8.h"
+#include "gsm_subscriber.h"
 
 class nokia_sim_card_device : public device_t, public device_nvram_interface
 {
@@ -41,11 +42,15 @@ public:
 	{
 		m_forbidden_test_plmn = enabled;
 	}
-	void set_authentication(authentication_profile profile,
-			const gsm::a3a8::block &ki)
+	void set_subscriber_profile(const gsm::subscriber::profile &profile)
 	{
-		m_authentication_profile = profile;
-		m_ki = ki;
+		m_subscriber = profile;
+		m_authentication_profile =
+				profile.authentication ==
+						gsm::subscriber::authentication_algorithm::aes_example ?
+					authentication_profile::gsm_aes_example :
+					authentication_profile::none;
+		m_ki = profile.ki;
 	}
 	void set_atr(const u8 *data, unsigned length);
 	void activate();
@@ -136,6 +141,7 @@ private:
 	authentication_profile m_authentication_profile =
 			authentication_profile::none;
 	gsm::a3a8::block m_ki{};
+	gsm::subscriber::profile m_subscriber = gsm::subscriber::laboratory;
 	bool m_trace = false;
 	u8 m_atr[40] = { 0x3b, 0x10, 0x05 };
 	u8 m_atr_len = 3;

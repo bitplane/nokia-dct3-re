@@ -151,6 +151,7 @@ struct nokia_product_config
 	nokia_external_service_peer_device::application_contract external_service;
 	nokia_dsp_hle_device::service_control_contract dsp_service_control;
 	nokia_radio_peer_device::protocol_contract radio;
+	gsm::subscriber::profile subscriber = gsm::subscriber::laboratory;
 	bool ccont_wddisx_grounded = false;
 	nokia_dsp_hle_device::bootstrap_contract dsp_bootstrap;
 	std::optional<bootstrap_bios_override> dsp_bootstrap_override;
@@ -1126,6 +1127,8 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	// control transport; MCU speech state must never mutate this fallback.
 	m_cobba->set_hle_voice_profile(product.cobba_hle_voice);
 	m_external_service_peer->set_application_contract(product.external_service);
+	m_sim_card->set_subscriber_profile(product.subscriber);
+	m_gsm_network->set_subscriber_profile(product.subscriber);
 	m_external_service_peer->set_enabled(product.external_service_transport);
 	m_radio_peer->set_protocol_contract(product.radio);
 	m_radio_peer->set_enabled(product.radio.enabled());
@@ -1377,12 +1380,6 @@ void nokia_dct3_state::machine_reset()
 	m_sim_card->set_cached_location(false);
 	m_sim_card->set_toolkit_profile(nokia_sim_card_device::toolkit_profile(
 			m_sim_toolkit_config.read_safe(0x00) & 0x0f));
-	// The removable laboratory subscriber explicitly selects 3GPP TS 55.205
-	// section 5's AES-based example A3/A8 profile.  A3/A8 is operator-owned;
-	// this key is synthetic fixture provisioning, not handset identity.
-	m_sim_card->set_authentication(
-			nokia_sim_card_device::authentication_profile::gsm_aes_example,
-			nokia_gsm_network_device::laboratory_ki());
 	const u8 atr[] = { 0x3b, 0x10, 0x05 };
 	m_sim_card->set_atr(atr, std::size(atr));
 	if (m_eeprom)
