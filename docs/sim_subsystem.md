@@ -263,8 +263,29 @@ completion returns `91 16`, task 21 posts `0x120c`, task 20 sends FETCH
 (`A0 12`), and the returned D0 BER-TLV reaches the firmware's `0x177x`
 router. The MMI renders `DCT3 SAT`; Left Softkey dismissal produces TERMINAL
 RESPONSE (`A0 14`) with general result `00`. v5.01 and v6.00 both complete the
-same transaction through SIMI/FIQ6. This route remains separate from ordinary
-registration.
+same transaction through SIMI/FIQ6.
+
+A second opt-in card application proves that proactive commands can be
+sequenced rather than merely demonstrated in isolation. The successful DISPLAY
+TEXT response returns `91 15`, the firmware immediately FETCHes a GET INKEY
+command (`0x22`), renders `Press 5`, and accepts a physical `5` followed by the
+OK softkey. Its TERMINAL RESPONSE contains success and Text String
+`0d 02 04 35` (8-bit DCS plus the entered digit). The card validates the fetched
+command number and type before accepting either response. This route remains
+separate from ordinary registration.
+
+The third opt-in profile continues with GET INPUT (`0x23`). Its command asks
+for one or two digits; the firmware renders `Enter 42`, edits the value through
+the ordinary keypad path, and returns success with Text String
+`0d 03 04 34 32`. This validates variable-length input and a three-command
+`91xx`/FETCH/TERMINAL RESPONSE sequence without card-side knowledge of the MMI.
+
+The fourth profile appends SET UP MENU (`0x25`). The firmware installs `DCT3
+menu` as top-level item 10 and renders the supplied `Continue` and `Exit`
+items. Selecting `Continue` organically sends ENVELOPE (`A0 C2`) body
+`d3 07 02 02 01 81 10 01 01`; the card validates the menu-selection BER-TLV,
+records item 1 and returns `90 00`. Invalid, unknown, or out-of-sequence menu
+selections return `6a 80`.
 Validated DSP RX families do not feed this SAT path. Service-5's callback is already
 registered and organically receives (`0x05f3`, `0x05e2`), while its `0x05e8`
 branch remains dormant downstream. Do not replace this firmware contract

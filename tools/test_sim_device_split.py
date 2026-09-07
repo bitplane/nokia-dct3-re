@@ -179,8 +179,8 @@ class SimDeviceSplitTest(unittest.TestCase):
 
     def test_toolkit_profile_is_card_owned_and_opt_in(self):
         for token in (
-            "void set_toolkit_profile(bool enabled)",
-            "m_toolkit_profile ? 0x03 : 0x02",
+            "void set_toolkit_profile(toolkit_profile profile)",
+            "m_toolkit_profile != toolkit_profile::none ? 0x03 : 0x02",
             "void nokia_sim_card_device::accept_terminal_profile()",
             "void nokia_sim_card_device::queue_proactive_command",
             "void nokia_sim_card_device::accept_terminal_response()",
@@ -190,6 +190,10 @@ class SimDeviceSplitTest(unittest.TestCase):
             "0x81, 0x03, 0x01, 0x21, 0x80",
         ):
             self.assertIn(token, self.card + self.card_header)
+        self.assertIn("toolkit_profile::display_text_get_inkey", self.card)
+        self.assertIn("toolkit_profile::display_text_get_inkey_get_input", self.card)
+        self.assertIn("toolkit_profile::display_text_get_inkey_get_input_setup_menu", self.card)
+        self.assertIn("0x81, 0x03, 0x03, 0x23, 0x00", self.card)
         self.assertIn('m_sim_toolkit_config(*this, "SATCFG")', self.phone)
         self.assertIn("m_sim_card->set_toolkit_profile", self.phone)
         self.assertNotIn("0x120c", self.card + self.card_header)
@@ -206,12 +210,13 @@ class SimDeviceSplitTest(unittest.TestCase):
             "void nokia_sim_card_device::run_gsm_algorithm", 1
         )[0]
         self.assertIn("queue_status(0x93, 0x00)", proactive)
-        self.assertIn("requested != std::size(display_text)", proactive)
+        self.assertIn("requested != command_length", proactive)
         self.assertIn("queue_status(0x6a, 0x80)", terminal_response)
         self.assertIn("!m_proactive_fetched", terminal_response)
-        # ENVELOPE is outside the admitted one-command profile and therefore
-        # falls through the generic instruction-not-supported response.
-        self.assertNotIn("m_ins == 0xc2", self.card)
+        self.assertIn("void nokia_sim_card_device::accept_envelope()", self.card)
+        self.assertIn("m_ins == 0xc2", self.card)
+        self.assertIn("m_tx[0] == 0xd3", self.card)
+        self.assertIn("queue_status(0x6a, 0x80)", self.card)
         self.assertIn("queue_status(0x6d, 0x00)", self.card)
 
 

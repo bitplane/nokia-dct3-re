@@ -10,6 +10,14 @@ class nokia_sim_card_device : public device_t, public device_nvram_interface
 {
 public:
 	enum class authentication_profile : u8 { none, gsm_aes_example };
+	enum class toolkit_profile : u8
+	{
+		none,
+		display_text,
+		display_text_get_inkey,
+		display_text_get_inkey_get_input,
+		display_text_get_inkey_get_input_setup_menu
+	};
 
 	nokia_sim_card_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
@@ -17,7 +25,7 @@ public:
 
 	void set_cphs_aoc(bool enabled) { m_cphs_aoc = enabled; }
 	void set_cached_location(bool enabled) { m_cached_location = enabled; }
-	void set_toolkit_profile(bool enabled) { m_toolkit_profile = enabled; }
+	void set_toolkit_profile(toolkit_profile profile) { m_toolkit_profile = profile; }
 	void set_forbidden_test_plmn(bool enabled)
 	{
 		m_forbidden_test_plmn = enabled;
@@ -88,6 +96,8 @@ private:
 	void accept_terminal_profile();
 	void queue_proactive_command(unsigned requested);
 	void accept_terminal_response();
+	void accept_envelope();
+	u8 proactive_command_length() const;
 	void process_chv();
 	void initialize_chv();
 	bool chv_matches(unsigned index, const u8 *value) const;
@@ -110,7 +120,7 @@ private:
 	devcb_write8 m_response_cb;
 	bool m_cphs_aoc = false;
 	bool m_cached_location = false;
-	bool m_toolkit_profile = false;
+	toolkit_profile m_toolkit_profile = toolkit_profile::none;
 	bool m_forbidden_test_plmn = false;
 	authentication_profile m_authentication_profile =
 			authentication_profile::none;
@@ -135,6 +145,8 @@ private:
 	bool m_terminal_profile_received = false;
 	bool m_proactive_pending = false;
 	bool m_proactive_fetched = false;
+	u8 m_proactive_command = 0;
+	u8 m_menu_selection = 0;
 	emu_timer *m_toolkit_timer = nullptr;
 	u8 m_adn[50 * 32] = { 0 };
 	u8 m_loci[11] = { 0 };

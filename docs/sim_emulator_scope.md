@@ -156,10 +156,25 @@ card NVRAM. The CPHS AoC fixture advertises the service, but no handset has yet
 organically issued INCREASE, so this is standards-conformance coverage rather
 than a promoted product-runtime claim.
 
-The opt-in Phase-2+ profile admits one proactive DISPLAY TEXT transaction.
-FETCH without a pending command returns `9300`, a malformed or out-of-sequence
-TERMINAL RESPONSE returns `6a80`, and ENVELOPE remains explicitly unsupported
-through the generic `6d00` instruction response.
+The first opt-in Phase-2+ profile admits one proactive DISPLAY TEXT transaction.
+FETCH without a pending command returns `9300`, and a malformed or
+out-of-sequence TERMINAL RESPONSE returns `6a80`.
+
+The second opt-in profile sequences DISPLAY TEXT into GET INKEY. The firmware
+renders the card-provided prompt, reads a digit through the physical keypad and
+returns it in the TERMINAL RESPONSE Text String TLV. Each command is announced
+by the preceding APDU's `91xx` status; no task message or MMI state is injected.
+
+The third profile appends GET INPUT with a one-to-two-digit response contract.
+The handset organically returns the entered `42`, proving that the same card
+state machine supports variable-length input and more than two consecutive
+proactive commands.
+
+The fourth profile installs a two-item SET UP MENU. The firmware exposes it as
+a normal top-level menu and sends a GSM 11.14 Menu Selection ENVELOPE when the
+user chooses an item. The card accepts only the two installed identifiers in
+the expected BER-TLV shape and rejects malformed or out-of-sequence envelopes
+with `6a80`.
 
 Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
@@ -170,8 +185,8 @@ establishes a concrete requirement. Later work includes:
 - testing timeout and parity/error behavior. Physical removal and reinsertion
   now use the recovered SIMI status-bit-3/FIQ7 socket-detect contract and are
   covered across both 3210 ROMs, including Phase-2+ and save/load variants;
-- extending the validated Phase-2+ TERMINAL PROFILE/FETCH/TERMINAL RESPONSE
-  lifecycle beyond one DISPLAY TEXT command, including ENVELOPE;
+- extending the validated Phase-2+ lifecycle beyond DISPLAY TEXT, GET INKEY,
+  GET INPUT and SET UP MENU/menu-selection ENVELOPE;
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 

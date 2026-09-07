@@ -10856,6 +10856,45 @@
       ]
     },
     {
+      "name": "verify-sim-toolkit-inkey",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "provisioned card application and physical-key fixture",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\tmkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit_inkey/default.cfg fixtures/sim_toolkit_inkey/noki3210.cfg $(RUN_DIR)/cfg/; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=24 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_inkey_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)"
+      ]
+    },
+    {
+      "name": "verify-sim-toolkit-input",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "three-command card application and physical-key fixture",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\tmkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_input/noki3210.cfg $(RUN_DIR)/cfg/; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=28 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter,wait1200,4,2,wait500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_input_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)"
+      ]
+    },
+    {
+      "name": "verify-sim-toolkit-menu",
+      "prerequisites": [],
+      "variables": {},
+      "unstructured": "four-command card application and top-level menu fixture",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(DCT3_EEPROM_GUARD) \\",
+        "\tmkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_menu/noki3210.cfg $(RUN_DIR)/cfg/; \\",
+        "\t$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=42 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter,wait1200,4,2,wait500,enter,wait1500,enter,down,down,down,down,down,down,down,down,down,wait1000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_menu_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)"
+      ]
+    },
+    {
       "name": "verify-sim-hotplug",
       "prerequisites": [],
       "variables": {},

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 252 gates: 141 generated from typed steps, 111 copied verbatim (shell).
+# 255 gates: 141 generated from typed steps, 114 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -172,7 +172,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-vibrator verify-dsp-tone verify-ccont-rtc verify-ccont-mask \
 	verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 \
 	verify-charger-lifecycle verify-charger-wake verify-frontier verify-mmi-menu \
-	verify-mmi-menu-501 verify-sim-toolkit verify-sim-hotplug \
+	verify-mmi-menu-501 verify-sim-toolkit verify-sim-toolkit-inkey \
+	verify-sim-toolkit-input verify-sim-toolkit-menu verify-sim-hotplug \
 	verify-sim-hotplug-v501 verify-sim-hotplug-toolkit \
 	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
 	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
@@ -2736,6 +2737,30 @@ verify-sim-toolkit:
 	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
 	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=24 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
 	$(PYTHON) tools/sim_toolkit_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+
+# shell: provisioned card application and physical-key fixture
+verify-sim-toolkit-inkey:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit_inkey/default.cfg fixtures/sim_toolkit_inkey/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=24 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	$(PYTHON) tools/sim_toolkit_inkey_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+
+# shell: three-command card application and physical-key fixture
+verify-sim-toolkit-input:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_input/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=28 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter,wait1200,4,2,wait500,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
+	$(PYTHON) tools/sim_toolkit_input_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+
+# shell: four-command card application and top-level menu fixture
+verify-sim-toolkit-menu:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_menu/noki3210.cfg $(RUN_DIR)/cfg/; \
+	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=42 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait14000,enter,wait1200,5,wait500,enter,wait1200,4,2,wait500,enter,wait1500,enter,down,down,down,down,down,down,down,down,down,wait1000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=500 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500'; \
+	$(PYTHON) tools/sim_toolkit_menu_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
 
 # shell: physical Phase-2 card removal and reinsertion fixture
 verify-sim-hotplug:

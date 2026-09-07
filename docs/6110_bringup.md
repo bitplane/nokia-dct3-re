@@ -277,8 +277,8 @@ persist EF_LOCI, release the channel and resume camp. That cross-product
 completion does not establish
 NSE-3 command ordering and does not promote 6110 runtime coverage.
 
-The generic card implements TERMINAL PROFILE, FETCH and TERMINAL RESPONSE for
-its opt-in Phase-2+ DISPLAY TEXT profile; ENVELOPE remains unsupported and
+The generic card implements TERMINAL PROFILE, FETCH, TERMINAL RESPONSE and a
+menu-selection ENVELOPE for its opt-in Phase-2+ application profiles; other ENVELOPE types remain unsupported and
 returns `6d 00`. This does not promote NSE-3 runtime coverage: an organic 6110
 trace must still establish which commands it issues, their parameters and
 status progression. Missing commands belong in the generic GSM SIM contract,
