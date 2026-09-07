@@ -30,7 +30,7 @@ distinction.
 | `driver_vision.md` | Current modularization path and configuration taxonomy. |
 | `upstream_architecture.md` | Target MAME device graph, DSP substitution seam, ROM policy, and upstream staging. |
 | `product_configuration_audit.md` | Post-refactor product-contract dependency audit and next bounded refactor. |
-| `external_call_bridge.md` | Standalone organic-call and bidirectional GSM-FR bridge operation. |
+| `external_call_bridge.md` | Versioned host telephony API for network state, calls, GSM-FR media, SMS and USSD. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
 | `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |
@@ -67,8 +67,8 @@ distinction.
 | `network_scouting.md` | Validated camp, Location Updating, channel-release and operator-presentation contract. |
 | `cell_broadcast_and_ems.md` | NSE-8 EMS application boundary and Cell Broadcast page/CBCH contract. |
 | `supplementary_call_control.md` | Validated NSE-8 DTMF and hold/retrieve call-control lifecycle. |
-| `gsm_supplementary_services.md` | Call-independent GSM 04.80 and call-divert contract. |
-| `grey_salamander_integration.md` | Knowledge-integration catalogue and dependency order for LAPDm, paging, calls, SMS and SIM extensions. |
+| `gsm_supplementary_services.md` | Call-independent GSM 04.80, call-divert and host USSD contracts. |
+| `grey_salamander_integration.md` | Current LAPDm/GSM capability catalogue and retained external-reference boundaries. |
 | `dsp_interface.md` | Detailed MCU/DSP transport and later lower-radio maps. |
 | `dsp_shared_memory_inventory.md` | Generated two-ROM inventory of reachable firmware reads from DSP shared RAM. |
 | `dsp_shared_memory_transitions.md` | Generated two-ROM transaction census for DSP-owned shared-RAM scalar state. |

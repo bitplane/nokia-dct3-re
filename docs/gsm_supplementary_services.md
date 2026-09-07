@@ -182,3 +182,19 @@ procedure in [ETSI TS 124 090](https://www.etsi.org/deliver/etsi_ts/124000_12409
 The exact displayed frame, request/reply bytes, paging order and RR release are
 all acceptance predicates. The laboratory network constructs Layer 3 messages;
 it does not post firmware messages or write handset state.
+
+## Host boundary
+
+When the optional host telephony adapter is enabled, an organic mobile request
+is published with its transaction identity, DCS and unchanged packed data. A
+correlated host success, ReturnError or Reject is converted into the same GSM
+04.80 component used by the deterministic profiles; stale identities and
+pre-restore epochs cannot mutate the session. Save/load republishes the pending
+request under a new transport epoch.
+
+The reverse direction accepts a packed host notification only while registered
+and idle. The radio peer then owns paging and dedicated-channel admission, and
+the host sees `delivered` only after the firmware ReturnResult and ordinary
+channel release. Interactive network-originated requests remain unsupported
+because this firmware rejects the tested standards-shaped form. The complete
+wire contract and gates are in `external_call_bridge.md`.

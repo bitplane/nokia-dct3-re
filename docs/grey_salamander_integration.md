@@ -39,7 +39,7 @@ Nokia firmware
             <-> nokia_lapdm_link_device
                 <-> nokia_gsm_session_device
                     <-> nokia_gsm_network_device cell/profile data
-                    <-> optional host call/SMS backend
+                    <-> optional host telephony adapter
 ```
 
 Ownership is:
@@ -52,11 +52,12 @@ Ownership is:
 | `nokia_lapdm_link_device` | decoded link establishment, SAPI state, N(S)/N(R), acknowledgements and segmentation; future link expiry | Nokia packet types, RF policy or application routing |
 | `nokia_gsm_network_device` | immutable facade-cell identity, broadcast data and network-side message encoding | per-handset transactions, DSPIF transport or firmware state |
 | `nokia_gsm_session_device` | per-handset Layer-3 request and acknowledgement-gated bounded MM/CC/SMS transaction state plus queued network actions | LAPDm sequence state, RF scheduling or backend policy |
-| future host backend | accept/reject/connect/terminate decisions and external message endpoints | emulated protocol sequencing |
+| host telephony adapter | asynchronous call/SMS/USSD decisions, GSM-FR media and external message endpoints | emulated protocol sequencing |
 
-The link and GSM session may grow independently. Call signalling does not imply
-traffic-channel audio, and SMS signalling does not imply an external messaging
-service.
+The link and GSM session may grow independently. Call signalling, traffic audio
+and host decisions remain separate contracts even though all three now compose
+in the acceptance suite. SMS protocol completion likewise remains distinct from
+the optional external endpoint.
 
 The upstream `PROTOCOL-COVERAGE.md` explicitly excludes traffic-channel
 allocation, speech channel coding, transcoding, and RF audio. It therefore
@@ -82,13 +83,13 @@ Status terms:
 | GS-03 | MM Information can carry network name and NITZ after registration or connection establishment | GSM MM session state plus LAPDm downlink queue | A deterministic time-only MM Information is acknowledgement-gated ahead of incoming SETUP because the v6.00 ROM otherwise acknowledges but ignores SETUP; network-name and idle clock/operator effects remain independent work | **landed for active connection** |
 | GS-04 | Keep an idle PCH alive with no-identity fill and calculate the subscriber paging group | network cell scheduler through `nokia_radio_peer_device` | After registration, channel-`0x60` no-identity Paging Request Type 1 blocks are interleaved with channel-`0x50` BCCH and RSSI reports at the paging group derived from the registered IMSI; the ordinary registration gate requires return to PCH fill | **landed** |
 | GS-05 | Incoming service begins with paging, RACH correlation, Immediate Assignment and Paging Response | radio peer scheduler -> LAPDm -> GSM MM session | A named network-event fixture sends exactly one IMSI page requesting SDCCH; the phone organically emits RACH, accepts an assignment carrying its exact request reference, establishes LAPDm with Paging Response, receives bounded Channel Release, and returns to PCH fill | **landed** |
-| GS-06 | Minimal cipher-mode command/complete exchange can exercise firmware control flow without implementing A5 | GSM RR/MM session | After organic Paging Response, the acknowledgement-gated SC=0 command makes the ROM publish DSP TX type `0x14` and organically emit Cipher Mode Complete without a DSP reply. Calls and both SMS fixtures continue afterwards. A quarantined SC=1 probe carried the SIM Kc in the same packet, but was removed because decoded radio blocks remain clear and no A5 bitstream processing is modeled | **landed for unciphered control flow; A5 out of scope** |
-| GS-07 | Mobile-originated call ordering from CM Service Request through Setup, Connect and Release | GSM call-control session and optional backend request | Physical dialing proves the Nokia random-access entrance, CM Service Request/Accept, firmware SETUP and called-party BCD digits, Call Proceeding, one TCH/F assignment, Alerting, Connect/Acknowledge, bidirectional speech, physical clearing and restored PCH cadence across NSE-8, NHM-5, NHM-6 and NHM-2. A valid SETUP now creates a saved monotonic request ID with retained digits. NSE-8 additionally proves network busy before TCH, no-answer with local clearing (including alerting save/load), and CM service rejection before SETUP. | **landed through the saved decision seam; external host adapter pending** |
+| GS-06 | Cipher-mode command/complete and an independent burst-cipher boundary | GSM RR/MM session and generic xCCH/TCH Layer 1 | A5/0 and authenticated A5/1 now cross organic Cipher Mode Command/Complete, ciphered SDCCH, SACCH, TCH/F/FACCH, handover and save/load. A5 operates on the 114-bit post-interleave burst seam; unsupported A5/2 is rejected rather than silently sent clear. | **A5/0 and A5/1 landed** |
+| GS-07 | Mobile-originated call ordering from CM Service Request through Setup, Connect and Release | GSM call-control session and optional backend request | Physical dialing proves the Nokia random-access entrance, CM Service Request/Accept, firmware SETUP and called-party BCD digits, Call Proceeding, one TCH/F assignment, Alerting, Connect/Acknowledge, bidirectional speech, physical clearing and restored PCH cadence across NSE-8, NHM-5, NHM-6 and NHM-2. A valid SETUP creates a saved monotonic request ID with retained digits. The host adapter proves asynchronous connect/busy/no-answer decisions, remote and local release, sequential calls, reconnect, restore and GSM-FR media. | **landed through the host decision and media seam** |
 | GS-08 | Mobile-terminated call ordering from paging through Setup, Alerting, Connect and clearing | incoming-service queue and GSM call-control session | The bounded fixture proves page, SC=0 cipher control/complete, MM Information, SETUP, Call Confirmed/Alerting, TCH/F Assignment, organic Nokia channel configuration, new-link SABM/UA, Assignment Complete and DISC/UA clearing. A separate deterministic physical-input fixture proves PUP ringing, Answer, CC Connect/Connect Ack and a stable TCH/F interval. Its post-answer packet census contains only empty TCH polls and a known external-service poll. A lower changed-write census proves answer-only shared-control command `0x08/0x060b` plus a separate bounded acknowledgement tone. The resulting speech path now crosses GSM-FR, timed TCH/F Layer 1 and the documented product-configured MAD2/COBBA PCM bus in both directions; only DSP-local COBBA mux/register programming remains unrecovered | **landed through organic bidirectional speech and teardown; analogue-control encoding remains open** |
-| GS-09 | Mobile-originated SMS uses CP-DATA/ACK and RP-DATA/ACK/error, with GSM-7 and UCS-2 decoding | GSM SMS session and host request event | NSE-8 physical composition reaches MM service type 4, mobile SAPI-3 establishment, uplink reassembly, parsed SMS-SUBMIT, CP/RP acknowledgement, `Message sent`, and final SAPI-0 RR release. RP rejection, CP timeout/retry/save-load, physical SMSC editing and a requested TP-MR-correlated SMS-STATUS-REPORT are independently gated. Host requests and cross-product evidence remain open. | **NSE-8 submit, failure and delivery-report lifecycles landed** |
+| GS-09 | Mobile-originated SMS uses CP-DATA/ACK and RP-DATA/ACK/error, with GSM-7 and UCS-2 decoding | GSM SMS session and host request event | Physical composition reaches MM service type 4, mobile SAPI-3 establishment, uplink reassembly, parsed SMS-SUBMIT, CP/RP acknowledgement, success UI and final SAPI-0 RR release. RP rejection, CP timeout/retry/save-load, physical SMSC editing and a requested TP-MR-correlated SMS-STATUS-REPORT are independently gated. The host receives the original packed alphabet/data and returns a correlated RP outcome. | **submit, failure, delivery-report and host lifecycles landed** |
 | GS-10 | Mobile-terminated SMS uses paging, SAPI 3, SMS-DELIVER, timestamps and CP/RP acknowledgements | incoming-service queue and GSM SMS session | The ordinary-text fixture proves independent SAPI-3 establishment and the firmware's exact persistent unread `EF_SMS` record. The port-addressed multipart fixture additionally proves the handset's five-byte CP-DATA/RP-ACK, network CP-ACK, acknowledged RR release and return to PCH. A generic GSM 04.11 parser derives the CP transaction and RP reference from the actual downlink and rejects malformed or mismatched closure | **landed through persistent text delivery and independent CP/RP transport closure** |
 | GS-11 | A usable legacy SMS profile needs EF_SMSP and 176-byte linear-fixed EF_SMS records | `nokia_sim_card_device` and NVRAM schema | `EF_SMSP` and ten 176-byte `EF_SMS` records are declared under `DF_TELECOM`, advertised by `EF_SST`, covered by save state/card NVRAM and exercised by organic select/read/update traffic. Existing 32-byte/50-record ADN geometry is unchanged | **landed** |
-| GS-12 | Port-addressed 8-bit SMS and concatenation carry Nokia Smart Messaging payloads | SMS TPDU/user-data codec above GS-10 | The bounded 251-byte RTPL tone uses 128-byte multipart capacity, shared reference `7a`, two queued parts and independent RP references. Both parts pass exact stop-and-wait SAPI-3 delivery, handset CP/RP response, network CP-ACK and RR release through separate pages on NSE-8, NHM-5, NHM-6 and NHM-2. NSE-8 then proves RAM-owned reference/count reassembly across RR release, port dispatch, named receipt and physical Options/Play with note-varying PUP output. Commandless RTPL reaches the ringtone UI but cannot play; wrong reference/total/port cannot reach the completion transition. NHM-2 and NHM-5 independently corroborate playback. `EF_SMS` stays free; save/discard and persistence remain open | **multipart transport, reassembly, dispatch and RTPL playback landed** |
+| GS-12 | Port-addressed 8-bit SMS and concatenation carry Nokia Smart Messaging payloads | SMS TPDU/user-data codec above GS-10 | The bounded 251-byte RTPL tone uses 128-byte multipart capacity, shared reference `7a`, two queued parts and independent RP references. Both parts pass exact stop-and-wait SAPI-3 delivery, handset CP/RP response, network CP-ACK and RR release through separate pages on NSE-8, NHM-5, NHM-6 and NHM-2. NSE-8 then proves RAM-owned reference/count reassembly across RR release, port dispatch, named receipt and physical Options/Play with note-varying PUP output. Commandless RTPL reaches the ringtone UI but cannot play; wrong reference/total/port cannot reach the completion transition. Product-specific Save, persistent storage, cold-boot listing and replay are independently gated on NSE-8, NHM-5 and NHM-2. | **multipart transport, application dispatch and persistent playback landed** |
 | GS-13 | One identity/profile should generate IMSI, PLMN, LAI, paging identity, operator data and SIM contents consistently | typed subscriber/cell configuration shared by SIM and GSM devices | Extract current constants without changing the validated 001-01 profile; add consistency checks before exposing alternate profiles | **queued, independent** |
 | GS-14 | Calls, SMS and USSD should produce asynchronous request objects and accept later host decisions | backend-neutral session submission seam plus optional WebSocket adapter | MO calls expose a saved monotonic request ID and decoded called digits. MT calls accept one correlated caller identity, defer paging until registration, and retain physical Answer/End ownership. MO SMS exposes a separate saved request identity, recipient, alphabet and packed TP user data and accepts a correlated RP outcome. Host-originated SMS supplies sender and encoded TP user data, then crosses ordinary paging, SAPI-3 and firmware SIM storage before completion. Mobile and network-originated USSD preserve DCS and packed data while firmware owns the supplementary transaction. The optional adapter moves bounded decisions, termination and correlated GSM-FR/SMS/USSD events from the HTTP thread to emulation-owned GSM state. Epoch/cursor snapshots cover reconnect and restore; live gates cover both call directions, both SMS directions, USSD restore, stale input, local/remote clear and physical non-silent loopback. | **host telephony lifecycle landed** |
 | GS-15 | Paging and dedicated-channel work require deadlines and ordered queues | radio scheduler and LAPDm timers | Paging groups and the one-page fixture now use emulated frame/scheduler time and save-state fields; add explicit expiry and mid-transaction save/load coverage when an unanswered or queued service is admitted | **queued for expiry coverage** |
@@ -141,17 +142,16 @@ DSP/L1 boundary and cannot supply that mapping.
 
 ### Phase C: Layer-3 services
 
-1. Keep the current call entrance explicitly unciphered through SC=0. DSP
-   type `0x14` and Cipher Mode Complete are organic checkpoints; actual A5
-   bitstream processing remains a separate backend boundary.
-2. Add mobile-originated call signalling first if the dormant post-dial Nokia
-   path is recovered before paging.
+1. A5/0 remains the default composition. Separately named A5/1 gates require
+   organic authentication, DSP type `0x14`, Cipher Mode Complete and ciphered
+   xCCH/TCH bursts through the generic Layer-1 boundary.
+2. Mobile-originated call signalling is landed from physical dialling through
+   host-decided setup, traffic assignment, audio and clearing.
 3. Mobile-terminated call signalling is landed through organic TCH/F
-   Assignment Complete and bounded clearing. Deterministic answering and
-   speech-frame/codec behavior remain separate work.
-4. SIM SMS files, bounded ordinary MT text delivery and one successful
-   physical NSE-8 SMS-SUBMIT/CP/RP/RR lifecycle are landed. Originated-SMS
-   failure policy, host decisions and sibling-product evidence remain work.
+   Assignment Complete and bounded clearing. Physical answering, GSM-FR media,
+   local/remote release and restore are independently gated.
+4. SIM SMS files and bidirectional ordinary SMS are landed through physical
+   UI, CP/RP/RR, persistent storage, failures, save/load and the host boundary.
 5. The bounded long-ringtone codec and queue are landed after the ordinary
    persisted-delivery oracle. Both parts are proved through separate pages and
    complete stop-and-wait SAPI-3/CP/RP/RR transactions. Do not infer firmware
@@ -181,19 +181,21 @@ The following upstream choices are useful comparison points, not local changes:
   separate from immutable cell data and organized into reviewable,
   save-state-aware transitions rather than one monolithic method.
 
-## Explicit non-goals
+## Remaining non-goals
 
-Grey Salamander does not provide, and this catalogue does not infer:
+Grey Salamander did not supply the lower Nokia/DSP boundary. Local evidence and
+standards work have since added authentication, A5/1, coded control and traffic
+bursts, GSM-FR media, handover, multi-cell mobility, supplementary services and
+the host interface. The remaining exclusions are narrower:
 
-- Ki/RAND/SRES authentication or a real VLR/HLR;
-- A5 cipher generation;
-- burst coding, interleaving, equalization or RF;
-- traffic-channel allocation, speech coding or transcoding;
-- handover, hopping, GPRS, USSD or supplementary services; or
-- multi-cell/multi-subscriber network simulation.
-
-Those require separate evidence and architecture decisions. Successful
-call-control signalling must not be described as working call audio.
+- no real VLR/HLR or multiple concurrently emulated subscribers;
+- no operator COMP128 profile beyond the explicitly configured laboratory
+  A3/A8 algorithm and key;
+- no A5/2;
+- no frequency hopping, propagation/equalization or analogue RF;
+- no GPRS/WAP data bearer; and
+- no SIP/RTP/SMSC/USSD service implementation inside MAME. Those belong behind
+  the host telephony interface.
 
 ## Per-change checklist
 

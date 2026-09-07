@@ -28,8 +28,10 @@ For an admitted message the required order is:
 The SIM card owns ten 176-byte `EF_SMS` records. The firmware writes status
 `03` for unread, changes only the status to `01` when read, and changes it to
 `00` when erased while leaving the old payload bytes in the freed record.
-There is no host inbox, card-side SMS parser or synthetic storage
-acknowledgement.
+There is no parallel emulator inbox, card-side SMS parser or synthetic storage
+acknowledgement. The optional host adapter can supply or accept messages at the
+network boundary, but received messages still exist on the handset only after
+firmware writes `EF_SMS`.
 
 `SMSCFG` selects a laboratory-network incoming delivery profile and an
 independent outgoing outcome: acceptance, permanent RP rejection, no CP
@@ -143,7 +145,9 @@ thus the capacity condition is proved at both RP and application/UI boundaries.
 
 The machine image saves the active service, message index, CP transaction,
 RP reference, CP/RP acknowledgement flags, pending downlink, LAPDm state and
-radio/RR phase. It does not save a host-side message or inbox.
+radio/RR phase. It does not save an external service's inbox. Accepted host
+work is represented by the emulated transaction, while restore changes the
+transport epoch and republishes any still-pending host request.
 
 `verify-radio-sms-inbox-state` restores during the firmware storage
 transaction, before and after RP completion, at the unread notification,
