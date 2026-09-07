@@ -323,6 +323,11 @@ CALL`, accepts the firmware's confirmation with a physical key, and requires
 the ordinary `5551234` CC setup, traffic assignment, connect, physical end,
 CC release and RR release lifecycle. It deliberately does not duplicate the
 separate speech-media oracle.
+`make verify-sim-toolkit-select-item` requires a card-supplied two-entry list
+and the physical selection of item 2 to return identifier `02` through TERMINAL
+RESPONSE. `make verify-sim-toolkit-event-list` is its negative capability
+companion: NSE-8 v6.00 must return general result `31` for the requested event
+subscription and must not subsequently emit an Event Download envelope.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

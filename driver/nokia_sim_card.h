@@ -18,7 +18,9 @@ public:
 		display_text_get_inkey_get_input,
 		display_text_get_inkey_get_input_setup_menu,
 		interactive_menu_send_sms,
-		interactive_menu_setup_call
+		interactive_menu_setup_call,
+		interactive_menu_select_item,
+		interactive_menu_event_list
 	};
 
 	nokia_sim_card_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);

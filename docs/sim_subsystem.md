@@ -248,6 +248,15 @@ to the card. `make verify-sim-toolkit-call` then physically ends the call and
 requires CC and RR release. Speech media remains covered by the ordinary call
 gates rather than being implied by this signalling-focused toolkit fixture.
 
+`SELECT ITEM` is also supported: the card supplies two item TLVs, physical Down
+and Select choose the second firmware-rendered entry, and the ME returns item
+identifier `02` in TERMINAL RESPONSE. Conversely, NSE-8 v6.00 returns general
+result `31` (command beyond ME capabilities) for `SET UP EVENT LIST` requesting
+User Activity and Idle Screen Available. The card accepts that result and does
+not expect or synthesize an Event Download envelope. These are separate
+positive and negative gates because event download is not an applicable 3210
+capability under this terminal profile.
+
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
 causes initialization to restart. Unsupported SELECT returns GSM 11.11 `94 04` (file ID not

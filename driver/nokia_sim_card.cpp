@@ -624,6 +624,20 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 		0x85, 0x08, 'S', 'A', 'T', ' ', 'c', 'a', 'l', 'l',
 		0x86, 0x05, 0x81, 0x55, 0x15, 0x32, 0xf4
 	};
+	static constexpr u8 select_item[] = {
+		0xd0, 0x20,
+		0x81, 0x03, 0x07, 0x24, 0x00,
+		0x82, 0x02, 0x81, 0x82,
+		0x85, 0x06, 'C', 'h', 'o', 'o', 's', 'e',
+		0x8f, 0x06, 0x01, 'A', 'l', 'p', 'h', 'a',
+		0x8f, 0x05, 0x02, 'B', 'e', 't', 'a'
+	};
+	static constexpr u8 setup_event_list[] = {
+		0xd0, 0x0d,
+		0x81, 0x03, 0x08, 0x05, 0x00,
+		0x82, 0x02, 0x81, 0x82,
+		0x99, 0x02, 0x04, 0x05
+	};
 	const u8 *command = nullptr;
 	unsigned command_length = 0;
 	if (m_proactive_command == 0x21)
@@ -655,6 +669,16 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 	{
 		command = setup_call;
 		command_length = std::size(setup_call);
+	}
+	else if (m_proactive_command == 0x24)
+	{
+		command = select_item;
+		command_length = std::size(select_item);
+	}
+	else if (m_proactive_command == 0x05)
+	{
+		command = setup_event_list;
+		command_length = std::size(setup_event_list);
 	}
 	if (m_toolkit_profile == toolkit_profile::none || !m_terminal_profile_received ||
 			!m_proactive_pending || requested != command_length)
@@ -734,6 +758,8 @@ u8 nokia_sim_card_device::proactive_command_length() const
 	case 0x25: return 40;
 	case 0x13: return 36;
 	case 0x10: return 28;
+	case 0x24: return 34;
+	case 0x05: return 15;
 	default: return 0;
 	}
 }
@@ -778,6 +804,24 @@ void nokia_sim_card_device::accept_envelope()
 		m_proactive_command_number = 6;
 		m_proactive_pending = true;
 		LOGMASKED(LOG_SIM, "sim_device: proactive SET UP CALL ready t=%.8f\n",
+				machine().time().as_double());
+	}
+	else if (m_toolkit_profile == toolkit_profile::interactive_menu_select_item &&
+			m_menu_selection == 1)
+	{
+		m_proactive_command = 0x24;
+		m_proactive_command_number = 7;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive SELECT ITEM ready t=%.8f\n",
+				machine().time().as_double());
+	}
+	else if (m_toolkit_profile == toolkit_profile::interactive_menu_event_list &&
+			m_menu_selection == 1)
+	{
+		m_proactive_command = 0x05;
+		m_proactive_command_number = 8;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive SET UP EVENT LIST ready t=%.8f\n",
 				machine().time().as_double());
 	}
 	queue_status(0x90, 0x00);
