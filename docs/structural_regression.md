@@ -328,6 +328,10 @@ and the physical selection of item 2 to return identifier `02` through TERMINAL
 RESPONSE. `make verify-sim-toolkit-event-list` is its negative capability
 companion: NSE-8 v6.00 must return general result `31` for the requested event
 subscription and must not subsequently emit an Event Download envelope.
+`make verify-sim-toolkit-refresh` requires qualifier-0 REFRESH to cause a new
+TERMINAL PROFILE before its successful TERMINAL RESPONSE. It then requires the
+card application to resume only after that response, protecting the in-flight
+command across firmware-owned SIM reinitialization.
 `make verify-sim-pin-toggle` disables CHV1 through the firmware settings UI,
 reboots with the same card NVRAM, proves startup VERIFY is absent while
 disabled, then re-enables CHV1 and requires the persistent bit to return.

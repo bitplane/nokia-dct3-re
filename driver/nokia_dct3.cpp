@@ -2119,6 +2119,7 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFSETTING(0x06, "Phase 2+ menu setting up one call")
 	PORT_CONFSETTING(0x07, "Phase 2+ menu presenting SELECT ITEM")
 	PORT_CONFSETTING(0x08, "Phase 2+ menu installing event downloads")
+	PORT_CONFSETTING(0x09, "Phase 2+ menu requesting SIM refresh")
 
 	// External network-event fixtures may queue a bounded incoming service.
 	// The default cell remains passive after registration.

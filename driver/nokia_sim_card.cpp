@@ -549,16 +549,26 @@ void nokia_sim_card_device::accept_terminal_profile()
 		return;
 	}
 
+	// REFRESH qualifier 00 makes this firmware download a new terminal profile
+	// before returning the command's TERMINAL RESPONSE. That re-profiling does
+	// not cancel the command which caused it, so preserve the outstanding
+	// details until its delayed completion arrives.
+	const bool refresh_completion_pending =
+			m_proactive_fetched && m_proactive_command == 0x01;
 	m_terminal_profile_received = true;
-	m_proactive_pending = false;
-	m_proactive_fetched = false;
-	m_proactive_command = 0x21;
-	m_proactive_command_number = 1;
+	if (!refresh_completion_pending)
+	{
+		m_proactive_pending = false;
+		m_proactive_fetched = false;
+		m_proactive_command = 0x21;
+		m_proactive_command_number = 1;
+	}
 	// This laboratory SIM application issues its one command after startup,
 	// rather than racing the handset's boot-time UI construction. Application
 	// policy owns this delay; the ME still discovers it only through a later
 	// GSM 11.14 status word on the ordinary SIM transport.
-	m_toolkit_timer->adjust(attotime::from_seconds(8));
+	if (!refresh_completion_pending)
+		m_toolkit_timer->adjust(attotime::from_seconds(8));
 	// TERMINAL PROFILE itself completes normally. Once the ME has accepted
 	// that completion and armed its SAT latch, a subsequent command response
 	// advertises the pending proactive command with 91xx.
@@ -638,6 +648,11 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 		0x82, 0x02, 0x81, 0x82,
 		0x99, 0x02, 0x04, 0x05
 	};
+	static constexpr u8 refresh[] = {
+		0xd0, 0x09,
+		0x81, 0x03, 0x09, 0x01, 0x00,
+		0x82, 0x02, 0x81, 0x82
+	};
 	const u8 *command = nullptr;
 	unsigned command_length = 0;
 	if (m_proactive_command == 0x21)
@@ -679,6 +694,11 @@ void nokia_sim_card_device::queue_proactive_command(unsigned requested)
 	{
 		command = setup_event_list;
 		command_length = std::size(setup_event_list);
+	}
+	else if (m_proactive_command == 0x01)
+	{
+		command = refresh;
+		command_length = std::size(refresh);
 	}
 	if (m_toolkit_profile == toolkit_profile::none || !m_terminal_profile_received ||
 			!m_proactive_pending || requested != command_length)
@@ -740,6 +760,15 @@ void nokia_sim_card_device::accept_terminal_response()
 		LOGMASKED(LOG_SIM, "sim_device: proactive SET UP MENU ready t=%.8f\n",
 				machine().time().as_double());
 	}
+	else if (m_proactive_command == 0x01)
+	{
+		m_proactive_command = 0;
+		m_proactive_command_number = 0;
+		// Re-profiling above completed a new application session. Start it only
+		// after REFRESH itself is closed so the two proactive transactions cannot
+		// overlap.
+		m_toolkit_timer->adjust(attotime::from_seconds(8));
+	}
 	else
 	{
 		m_proactive_command = 0;
@@ -760,6 +789,7 @@ u8 nokia_sim_card_device::proactive_command_length() const
 	case 0x10: return 28;
 	case 0x24: return 34;
 	case 0x05: return 15;
+	case 0x01: return 11;
 	default: return 0;
 	}
 }
@@ -822,6 +852,15 @@ void nokia_sim_card_device::accept_envelope()
 		m_proactive_command_number = 8;
 		m_proactive_pending = true;
 		LOGMASKED(LOG_SIM, "sim_device: proactive SET UP EVENT LIST ready t=%.8f\n",
+				machine().time().as_double());
+	}
+	else if (m_toolkit_profile == toolkit_profile::interactive_menu_refresh &&
+			m_menu_selection == 1)
+	{
+		m_proactive_command = 0x01;
+		m_proactive_command_number = 9;
+		m_proactive_pending = true;
+		LOGMASKED(LOG_SIM, "sim_device: proactive REFRESH ready t=%.8f\n",
 				machine().time().as_double());
 	}
 	queue_status(0x90, 0x00);

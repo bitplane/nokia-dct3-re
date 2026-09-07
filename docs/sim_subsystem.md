@@ -257,6 +257,13 @@ not expect or synthesize an Event Download envelope. These are separate
 positive and negative gates because event download is not an applicable 3210
 capability under this terminal profile.
 
+Qualifier-0 `REFRESH` takes a distinct but successful path. NSE-8 re-downloads
+TERMINAL PROFILE before returning the REFRESH TERMINAL RESPONSE. The card must
+therefore preserve that in-flight command across re-profiling, accept its one
+delayed completion, and only then schedule the new application session.
+`make verify-sim-toolkit-refresh` protects this ordering and catches both lost
+completion state and overlapping proactive commands.
+
 `6F14` is the optional CPHS Operator Name String; the card does not advertise CPHS and need not
 provide it. Caution: a card that accepts every unknown SELECT and advertises a zero-byte EF
 causes initialization to restart. Unsupported SELECT returns GSM 11.11 `94 04` (file ID not
