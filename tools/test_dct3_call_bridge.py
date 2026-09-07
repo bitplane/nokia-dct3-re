@@ -161,6 +161,29 @@ class Dct3CallBridgeTest(unittest.TestCase):
         })
         self.assertTrue(protocol.network_registered)
 
+    def test_outgoing_ussd_gets_a_correlated_packed_response(self):
+        protocol = LoopbackProtocol()
+        replies = protocol.handle({
+            "type": "outgoing_ussd", "epoch": 3, "request_id": 8,
+            "dcs": 0x0f, "data": "aa986c3602",
+        })
+        self.assertEqual(replies, [{
+            "type": "outgoing_ussd_response", "epoch": 3,
+            "request_id": 8, "outcome": "success", "dcs": 0x0f,
+            "data": "c8f79c0e7297e9f7b77c0d",
+        }])
+
+    def test_incoming_ussd_is_packed_at_the_boundary(self):
+        protocol = LoopbackProtocol()
+        protocol.handle({
+            "type": "call_adapter_ready", "protocol_version": 1,
+            "epoch": 4,
+        })
+        self.assertEqual(protocol.incoming_ussd_request("Host notice"), {
+            "type": "incoming_ussd", "epoch": 4, "request_id": 1,
+            "dcs": 0x0f, "data": "c8f79c0e72bfe9e97119",
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

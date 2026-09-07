@@ -1,7 +1,7 @@
 # External telephony bridge
 
-The optional MAME host adapter exposes firmware-owned calls and mobile-originated
-SMS at `ws://127.0.0.1:18080/nokia/dct3/calls`. It carries call decisions and
+The optional MAME host adapter exposes firmware-owned calls, bidirectional SMS
+and bidirectional USSD at `ws://127.0.0.1:18080/nokia/dct3/calls`. It carries call decisions and
 the conventional 33-octet GSM 06.10 full-rate frame; it does not bypass CC/RR,
 DSP speech control, MAD2 PCM or COBBA audio routing.
 
@@ -41,8 +41,12 @@ The WebSocket endpoint speaks protocol version 1. On connection and after a
 save-state restore, MAME publishes:
 
 ```json
-{"type":"call_adapter_ready","protocol_version":1,"epoch":1}
+{"type":"call_adapter_ready","protocol_version":1,"epoch":1,"capabilities":["network_state","calls","gsm_fr_media","sms","ussd"]}
 ```
+
+The additive `capabilities` array lets hosts discover the services implemented
+by this adapter without inferring them from the phone profile. Hosts written
+against the earlier version-1 ready message may ignore it.
 
 Every host-to-MAME message carries the current `epoch` and a positive
 `request_id`. A restore increments the epoch, invalidates queued host input and
@@ -64,6 +68,11 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | Host to MAME | `incoming_sms` | identity, decimal `sender`, `alphabet`, user-data length and packed user data |
 | MAME to host | `incoming_sms_state` | identity and `phase`: `queued` or `delivered` |
 | MAME to host | `network_state` | `epoch`, registration status and, while registered, serving-cell identity and signal level |
+| MAME to host | `outgoing_ussd` | identity, DCS and packed USSD request data |
+| Host to MAME | `outgoing_ussd_response` | identity, outcome and either DCS plus packed response data or an error/problem code |
+| MAME to host | `outgoing_ussd_state` | identity and `phase`: `accepted` or `ended` |
+| Host to MAME | `incoming_ussd` | identity, DCS and packed notification data |
+| MAME to host | `incoming_ussd_state` | identity and `phase`: `queued` or `delivered` |
 
 The `*` is direction-specific (`incoming` or `outgoing`) and must match the
 call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
@@ -96,6 +105,20 @@ already encoded TP user data and its alphabet-specific logical length. The
 network constructs SMS-DELIVER and owns only the external network side.
 `verify-radio-incoming-sms-host-adapter` requires paging, firmware CP/RP
 acknowledgement and SIM-backed storage before reporting `delivered`.
+
+The USSD host contract preserves the BER-decoded DCS and packed payload. A
+`success` response carries `dcs` and hexadecimal `data`; `return_error` and
+`reject` may carry `error_code`. The session builds the correlated GSM
+supplementary-service component, and `verify-radio-ussd-host-adapter` requires
+the handset's organic `*123#` request, host response acceptance, firmware UI
+delivery and the ordinary LAPDm channel release.
+
+Host-originated `incoming_ussd` is deliberately a notification, matching the
+network-initiated form this firmware accepts. It enters through registered-idle
+paging and is reported `delivered` only after the handset ReturnResult and
+channel release. The standalone bridge can exercise it with
+`--incoming-ussd 'Host notice' --once`; the generic wire contract accepts
+already packed data rather than assuming a text alphabet.
 
 The forwarding reason is one of `unconditional`, `busy`, `no-reply` or
 `not-reachable`. It records the network subscription which made the routing

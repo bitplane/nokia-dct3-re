@@ -50,7 +50,22 @@ async def run(args: argparse.Namespace) -> None:
                 for _ in range(64):
                     await websocket.send(early_termination)
                 await asyncio.sleep(0.5)
-            event = json.loads(await asyncio.wait_for(websocket.recv(), 45))
+            ready_epoch = None
+            while True:
+                event = json.loads(await asyncio.wait_for(websocket.recv(), 45))
+                if event.get("type") == "call_adapter_ready":
+                    if event.get("protocol_version") != 1:
+                        raise RuntimeError("unsupported call adapter protocol")
+                    capabilities = event.get("capabilities", [])
+                    if capabilities and "calls" not in capabilities:
+                        raise RuntimeError("call adapter did not advertise calls")
+                    ready_epoch = event.get("epoch")
+                    continue
+                if event.get("type") == "network_state":
+                    continue
+                if event.get("type") == "outgoing_call":
+                    break
+                raise RuntimeError(f"unexpected pre-call event {event!r}")
             expected = {
                 "type": "outgoing_call",
                 "request_id": 1,
@@ -62,6 +77,8 @@ async def run(args: argparse.Namespace) -> None:
                     f"unexpected outgoing request {event!r}, expected {expected!r}"
                 )
             epoch = event["epoch"]
+            if ready_epoch is not None and epoch != ready_epoch:
+                raise RuntimeError("outgoing call used a stale transport epoch")
 
             # These exercise parser and correlation failures without changing
             # emulated state. Only the final matching decision may be accepted.

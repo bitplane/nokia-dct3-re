@@ -63,6 +63,12 @@ public:
 		supplementary_facility,
 		supplementary_register
 	};
+	enum class host_ussd_outcome : u8
+	{
+		success,
+		return_error,
+		reject
+	};
 
 	struct downlink_message
 	{
@@ -91,6 +97,10 @@ public:
 	{
 		m_outgoing_sms_fallback_enabled = enabled;
 	}
+	void set_ussd_fallback_enabled(bool enabled)
+	{
+		m_ussd_fallback_enabled = enabled;
+	}
 	bool submit_outgoing_decision(
 			u32 request_id,
 			nokia_gsm_network_device::outgoing_call_outcome outcome);
@@ -98,6 +108,17 @@ public:
 	bool submit_outgoing_sms_decision(
 			u32 request_id,
 			nokia_gsm_network_device::outgoing_sms_outcome outcome);
+	bool submit_ussd_response(u32 request_id, host_ussd_outcome outcome,
+			u8 data_coding_scheme, const u8 *data, unsigned length,
+			u8 error_code = 0x22);
+	bool ussd_request_pending() const { return m_ussd_request_pending; }
+	u32 ussd_request_id() const { return m_ussd_request_id; }
+	u8 ussd_data_coding_scheme() const { return m_ussd_data_coding_scheme; }
+	const std::array<u8, gsm::ss::maximum_ussd_length> &ussd_data() const
+	{
+		return m_ussd_data;
+	}
+	u8 ussd_data_length() const { return m_ussd_data_length; }
 	bool submit_incoming_termination(u8 cause = 0x10);
 	bool set_incoming_caller(const u8 *digits, unsigned length);
 	bool queue_waiting_call(
@@ -301,6 +322,7 @@ private:
 		awaiting_handover_result,
 		awaiting_supplementary_facility_acknowledgement,
 		awaiting_supplementary_response,
+		awaiting_mobile_ussd_host_response,
 		awaiting_network_ussd_register_acknowledgement,
 		awaiting_network_ussd_response,
 		awaiting_network_ussd_release_acknowledgement
@@ -385,6 +407,7 @@ private:
 	unsigned m_outgoing_decision_delay_ms = 0;
 	bool m_outgoing_fallback_enabled = true;
 	bool m_outgoing_sms_fallback_enabled = true;
+	bool m_ussd_fallback_enabled = true;
 	emu_timer *m_outgoing_decision_timer = nullptr;
 	emu_timer *m_no_reply_timer = nullptr;
 	bool m_incoming_call_forwarded = false;
@@ -407,6 +430,14 @@ private:
 	std::array<u8, maximum_layer3_length> m_outgoing_sms_user_data{};
 	u8 m_outgoing_sms_user_data_octets = 0;
 	u8 m_outgoing_sms_user_data_length = 0;
+	bool m_ussd_request_pending = false;
+	u32 m_ussd_request_id = 0;
+	u32 m_ussd_policy_request_id = 0;
+	u8 m_ussd_transaction = 0;
+	u8 m_ussd_invoke_id = 0;
+	u8 m_ussd_data_coding_scheme = 0;
+	std::array<u8, gsm::ss::maximum_ussd_length> m_ussd_data{};
+	u8 m_ussd_data_length = 0;
 	bool m_incoming_service_completed = false;
 	u16 m_handover_target_arfcn = 0;
 	u8 m_handover_reference = 0;

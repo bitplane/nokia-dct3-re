@@ -59,6 +59,16 @@ int main()
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");
+	const std::uint8_t packed_host_response[] = { 0xcf, 0x25 };
+	auto packed_response = gsm::ss::process_uss_request_result(
+			request, 0x0f, packed_host_response, sizeof(packed_host_response));
+	if (packed_response.length != response.length ||
+			packed_response.data[18] != 0x0f ||
+			packed_response.data[19] != 0x04 ||
+			packed_response.data[20] != 2 ||
+			packed_response.data[21] != 0xcf ||
+			packed_response.data[22] != 0x25)
+		return 27;
 	response = gsm::ss::unstructured_uss_request(request, 2, "Enter reply");
 	if (response.length != 29 || response.data[1] != 0x3a ||
 			response.data[4] != 0xa1 || response.data[8] != 2 ||

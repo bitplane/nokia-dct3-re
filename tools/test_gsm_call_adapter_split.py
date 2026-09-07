@@ -34,6 +34,8 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         self.assertIn("m_host->terminations.push_back", callback)
         self.assertIn("m_host->media.push_back", callback)
         self.assertIn("m_host->incoming.push_back", callback)
+        self.assertIn("m_host->ussd_responses.push_back", callback)
+        self.assertIn("m_host->incoming_ussd.push_back", callback)
         self.assertIn("outgoing_call_terminate", callback)
         self.assertIn("outgoing_call_media_downlink", callback)
         self.assertNotIn("submit_outgoing_decision", callback)
@@ -48,6 +50,7 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         self.assertIn("m_session->submit_outgoing_decision", poll)
         self.assertIn("m_session->submit_outgoing_termination", poll)
         self.assertIn("m_session->submit_incoming_termination", poll)
+        self.assertIn("m_session->submit_ussd_response", poll)
         self.assertIn("m_radio_peer->queue_host_incoming_call", poll)
         self.assertIn("m_voice_peer->submit_host_downlink", poll)
         self.assertIn("m_voice_peer->take_host_uplink", poll)
@@ -88,6 +91,17 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
             self.assertIn(decision, self.source)
         self.assertNotIn('decision == "service_reject"', self.source)
 
+    def test_ready_message_advertises_host_telephony_capabilities(self):
+        ready = self.source.split(
+            "void nokia_gsm_call_adapter_device::publish_ready()", 1
+        )[1].split(
+            "void nokia_gsm_call_adapter_device::publish_sms_state", 1
+        )[0]
+        for capability in (
+            "network_state", "calls", "gsm_fr_media", "sms", "ussd"
+        ):
+            self.assertIn(f'writer.String("{capability}")', ready)
+
     def test_restore_discards_transport_input_and_forces_resynchronization(self):
         postload = self.source.split(
             "void nokia_gsm_call_adapter_device::postload()", 1
@@ -95,7 +109,8 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
             "void nokia_gsm_call_adapter_device::device_stop", 1
         )[0]
         self.assertIn("m_transport_epoch.fetch_add(1)", postload)
-        for queue in ("decisions", "terminations", "media", "incoming"):
+        for queue in ("decisions", "terminations", "media", "incoming",
+                      "ussd_responses", "incoming_ussd"):
             self.assertIn(f"m_host->{queue}.clear()", postload)
         self.assertIn("m_host->republish = true", postload)
         self.assertIn('writer.Key("epoch")', self.source)
@@ -113,6 +128,10 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
     def test_host_mode_explicitly_disables_fallback(self):
         self.assertIn(
             "m_gsm_session->set_outgoing_fallback_enabled(!host_call_adapter)",
+            self.driver,
+        )
+        self.assertIn(
+            "m_gsm_session->set_ussd_fallback_enabled(!host_call_adapter)",
             self.driver,
         )
         self.assertIn(

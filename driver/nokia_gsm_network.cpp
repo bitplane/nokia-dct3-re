@@ -71,6 +71,33 @@ void nokia_gsm_network_device::device_start()
 	save_item(NAME(m_host_sms_user_data));
 	save_item(NAME(m_host_sms_user_data_octets));
 	save_item(NAME(m_host_sms_user_data_length));
+	save_item(NAME(m_host_ussd_pending));
+	save_item(NAME(m_host_ussd_data_coding_scheme));
+	save_item(NAME(m_host_ussd_data));
+	save_item(NAME(m_host_ussd_data_length));
+}
+
+bool nokia_gsm_network_device::set_host_incoming_ussd(
+		u8 data_coding_scheme, const u8 *data, unsigned length)
+{
+	if (!data || !length || length > m_host_ussd_data.size() ||
+			m_host_ussd_pending)
+		return false;
+	m_host_ussd_data.fill(0);
+	std::copy_n(data, length, m_host_ussd_data.begin());
+	m_host_ussd_data_coding_scheme = data_coding_scheme;
+	m_host_ussd_data_length = u8(length);
+	m_host_ussd_pending = true;
+	return true;
+}
+
+gsm::ss::message nokia_gsm_network_device::host_incoming_ussd() const
+{
+	if (!m_host_ussd_pending)
+		return {};
+	return gsm::ss::network_unstructured_uss_notify(
+			0x0b, 1, m_host_ussd_data_coding_scheme,
+			m_host_ussd_data.data(), m_host_ussd_data_length);
 }
 
 void nokia_gsm_network_device::register_forwarding(

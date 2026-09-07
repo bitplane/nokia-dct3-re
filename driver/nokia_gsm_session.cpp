@@ -97,6 +97,14 @@ void nokia_gsm_session_device::device_start()
 	save_item(NAME(m_outgoing_sms_user_data));
 	save_item(NAME(m_outgoing_sms_user_data_octets));
 	save_item(NAME(m_outgoing_sms_user_data_length));
+	save_item(NAME(m_ussd_request_pending));
+	save_item(NAME(m_ussd_request_id));
+	save_item(NAME(m_ussd_policy_request_id));
+	save_item(NAME(m_ussd_transaction));
+	save_item(NAME(m_ussd_invoke_id));
+	save_item(NAME(m_ussd_data_coding_scheme));
+	save_item(NAME(m_ussd_data));
+	save_item(NAME(m_ussd_data_length));
 	save_item(NAME(m_incoming_service_completed));
 	save_item(NAME(m_incoming_call_forwarded));
 	save_item(NAME(m_handover_target_arfcn));
@@ -187,6 +195,14 @@ void nokia_gsm_session_device::device_reset()
 	m_outgoing_sms_user_data.fill(0);
 	m_outgoing_sms_user_data_octets = 0;
 	m_outgoing_sms_user_data_length = 0;
+	m_ussd_request_pending = false;
+	m_ussd_request_id = 0;
+	m_ussd_policy_request_id = 0;
+	m_ussd_transaction = 0;
+	m_ussd_invoke_id = 0;
+	m_ussd_data_coding_scheme = 0;
+	m_ussd_data.fill(0);
+	m_ussd_data_length = 0;
 	m_incoming_service_completed = false;
 	m_incoming_call_forwarded = false;
 	m_no_reply_timer->adjust(attotime::never);
@@ -636,8 +652,10 @@ nokia_gsm_session_device::downlink_acknowledged()
 			const bool notification = m_incoming_service ==
 					u8(incoming_service::ussd_notification);
 			const auto request = notification ?
-					gsm::ss::network_unstructured_uss_notify(
-							0x0b, 1, "Nokia test network") :
+					(m_network->host_incoming_ussd_pending() ?
+							m_network->host_incoming_ussd() :
+							gsm::ss::network_unstructured_uss_notify(
+									0x0b, 1, "Nokia test network")) :
 					gsm::ss::network_unstructured_uss_request(
 							0x0b, 1, "Enter reply");
 			m_state = u8(state::awaiting_network_ussd_register_acknowledgement);
@@ -868,6 +886,7 @@ nokia_gsm_session_device::downlink_acknowledged()
 		m_outgoing_sms_request_pending = false;
 		m_outgoing_sms_decision_accepted = false;
 		m_mobile_originated_supplementary = false;
+		m_ussd_request_pending = false;
 		m_call_transaction = 0;
 		m_outgoing_request_pending = false;
 		clear_outgoing_call_state();
@@ -988,6 +1007,25 @@ nokia_gsm_session_device::receive_layer3(
 		else if (request.operation_code ==
 				gsm::ss::operation::process_uss_request)
 		{
+			if (!m_ussd_fallback_enabled)
+			{
+				m_ussd_request_pending = true;
+				m_ussd_request_id = ++m_ussd_policy_request_id;
+				m_ussd_transaction = request.transaction;
+				m_ussd_invoke_id = request.invoke_id;
+				m_ussd_data_coding_scheme = request.data_coding_scheme;
+				m_ussd_data.fill(0);
+				std::copy_n(request.ussd.data(), request.ussd_length,
+						m_ussd_data.begin());
+				m_ussd_data_length = u8(request.ussd_length);
+				m_state = u8(state::awaiting_mobile_ussd_host_response);
+				LOGMASKED(LOG_GSM_SESSION,
+						"gsm_ss: request=ussd_host id=%u transaction=%02x invoke=%u dcs=%02x packed_length=%u t=%.6f\n",
+						m_ussd_request_id, request.transaction, request.invoke_id,
+						request.data_coding_scheme, request.ussd_length,
+						machine().time().as_double());
+				return downlink_kind::none;
+			}
 			const auto outcome = m_network->configured_ussd_outcome();
 			switch (outcome)
 			{
@@ -1589,6 +1627,7 @@ nokia_gsm_session_device::receive_layer3(
 		m_mobile_originated_call = false;
 		m_mobile_originated_sms = false;
 		m_mobile_originated_supplementary = false;
+		m_ussd_request_pending = false;
 		m_incoming_call_answered = false;
 		m_release_complete_received = false;
 		m_call_transaction = 0;
@@ -1746,6 +1785,42 @@ bool nokia_gsm_session_device::submit_outgoing_sms_decision(
 	queue_downlink(downlink_kind::outgoing_sms_rp_ack,
 			acknowledge.data(), acknowledge.size(), 3);
 	return true;
+}
+
+bool nokia_gsm_session_device::submit_ussd_response(
+		u32 request_id, host_ussd_outcome outcome, u8 data_coding_scheme,
+		const u8 *data, unsigned length, u8 error_code)
+{
+	if (m_ussd_fallback_enabled || !m_ussd_request_pending ||
+			request_id == 0 || request_id != m_ussd_request_id ||
+			m_state != u8(state::awaiting_mobile_ussd_host_response))
+		return false;
+
+	gsm::ss::request request;
+	request.valid = true;
+	request.transaction = m_ussd_transaction;
+	request.invoke_id = m_ussd_invoke_id;
+	request.operation_code = gsm::ss::operation::process_uss_request;
+	request.data_coding_scheme = m_ussd_data_coding_scheme;
+	gsm::ss::message response;
+	switch (outcome)
+	{
+	case host_ussd_outcome::success:
+		response = gsm::ss::process_uss_request_result(
+				request, data_coding_scheme, data, length);
+		break;
+	case host_ussd_outcome::return_error:
+		response = gsm::ss::error_result(request, error_code);
+		break;
+	case host_ussd_outcome::reject:
+		response = gsm::ss::reject_result(request, error_code);
+		break;
+	}
+	if (!response.length)
+		return false;
+	m_state = u8(state::awaiting_supplementary_release_acknowledgement);
+	return queue_downlink(downlink_kind::supplementary_release_complete,
+			response.data.data(), response.length) != downlink_kind::none;
 }
 
 bool nokia_gsm_session_device::submit_outgoing_decision(

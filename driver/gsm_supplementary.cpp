@@ -364,15 +364,23 @@ message reject_result(const request &request, std::uint8_t problem_code)
 
 message process_uss_request_result(const request &request, const char *response)
 {
-	message result;
-	if (!request.valid ||
-			request.operation_code != operation::process_uss_request)
-		return result;
-
 	std::array<std::uint8_t, maximum_ussd_length> packed{};
 	const unsigned packed_length = pack_gsm7(
 			response, packed.data(), packed.size());
 	if (!packed_length)
+		return message{};
+	return process_uss_request_result(request, request.data_coding_scheme,
+			packed.data(), packed_length);
+}
+
+message process_uss_request_result(const request &request,
+		std::uint8_t data_coding_scheme, const std::uint8_t *packed,
+		unsigned packed_length)
+{
+	message result;
+	if (!request.valid ||
+			request.operation_code != operation::process_uss_request ||
+			!packed || !packed_length || packed_length > maximum_ussd_length)
 		return result;
 
 	const unsigned result_sequence_length = 3 + 2 + packed_length;
@@ -402,7 +410,7 @@ message process_uss_request_result(const request &request, const char *response)
 	result.data[offset++] = result_sequence_length;
 	result.data[offset++] = 0x04;
 	result.data[offset++] = 0x01;
-	result.data[offset++] = request.data_coding_scheme;
+	result.data[offset++] = data_coding_scheme;
 	result.data[offset++] = 0x04;
 	result.data[offset++] = packed_length;
 	for (unsigned index = 0; index < packed_length; ++index)
@@ -460,12 +468,12 @@ namespace
 
 message network_unstructured_uss(
 		std::uint8_t transaction, std::uint8_t invoke_id,
-		operation operation_code, const char *text, bool version_indicator)
+		operation operation_code, std::uint8_t data_coding_scheme,
+		const std::uint8_t *packed, unsigned packed_length,
+		bool version_indicator)
 {
 	message result;
-	std::array<std::uint8_t, maximum_ussd_length> packed{};
-	const unsigned packed_length = pack_gsm7(text, packed.data(), packed.size());
-	if (!packed_length)
+	if (!packed || !packed_length || packed_length > maximum_ussd_length)
 		return result;
 	const unsigned parameter_length = 3 + 2 + packed_length;
 	const unsigned component_length = 3 + 3 + 2 + parameter_length;
@@ -491,7 +499,7 @@ message network_unstructured_uss(
 	result.data[offset++] = parameter_length;
 	result.data[offset++] = 0x04;
 	result.data[offset++] = 0x01;
-	result.data[offset++] = 0x0f;
+	result.data[offset++] = data_coding_scheme;
 	result.data[offset++] = 0x04;
 	result.data[offset++] = packed_length;
 	for (unsigned index = 0; index < packed_length; ++index)
@@ -511,15 +519,31 @@ message network_unstructured_uss(
 message network_unstructured_uss_request(
 		std::uint8_t transaction, std::uint8_t invoke_id, const char *text)
 {
+	std::array<std::uint8_t, maximum_ussd_length> packed{};
+	const unsigned packed_length = pack_gsm7(text, packed.data(), packed.size());
 	return network_unstructured_uss(transaction, invoke_id,
-			operation::unstructured_uss_request, text, true);
+			operation::unstructured_uss_request, 0x0f,
+			packed.data(), packed_length, true);
 }
 
 message network_unstructured_uss_notify(
 		std::uint8_t transaction, std::uint8_t invoke_id, const char *text)
 {
+	std::array<std::uint8_t, maximum_ussd_length> packed{};
+	const unsigned packed_length = pack_gsm7(text, packed.data(), packed.size());
 	return network_unstructured_uss(transaction, invoke_id,
-			operation::unstructured_uss_notify, text, false);
+			operation::unstructured_uss_notify, 0x0f,
+			packed.data(), packed_length, false);
+}
+
+message network_unstructured_uss_notify(
+		std::uint8_t transaction, std::uint8_t invoke_id,
+		std::uint8_t data_coding_scheme, const std::uint8_t *packed,
+		unsigned packed_length)
+{
+	return network_unstructured_uss(transaction, invoke_id,
+			operation::unstructured_uss_notify, data_coding_scheme,
+			packed, packed_length, false);
 }
 
 message network_release_complete(std::uint8_t transaction)

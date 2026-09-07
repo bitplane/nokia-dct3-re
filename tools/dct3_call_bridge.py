@@ -16,6 +16,28 @@ FRAME_HEX_LENGTH = 66
 PROTOCOL_VERSION = 1
 
 
+def pack_gsm7(text: str) -> str | None:
+    try:
+        septets = text.encode("ascii")
+    except UnicodeEncodeError:
+        return None
+    if any(value > 0x7f for value in septets):
+        return None
+    accumulator = 0
+    bits = 0
+    packed = bytearray()
+    for value in septets:
+        accumulator |= value << bits
+        bits += 7
+        while bits >= 8:
+            packed.append(accumulator & 0xff)
+            accumulator >>= 8
+            bits -= 8
+    if bits:
+        packed.append(accumulator & 0xff)
+    return packed.hex()
+
+
 @dataclass
 class BridgeStats:
     calls: int = 0
@@ -82,6 +104,19 @@ class LoopbackProtocol:
                 "request_id": identity[1],
                 "decision": "accept",
             }]
+        if kind == "outgoing_ussd":
+            identity = self._identity(message)
+            response = pack_gsm7("Host network")
+            if identity is None or response is None:
+                return []
+            return [{
+                "type": "outgoing_ussd_response",
+                "epoch": identity[0],
+                "request_id": identity[1],
+                "outcome": "success",
+                "dcs": 0x0f,
+                "data": response,
+            }]
         if kind == "outgoing_call_state":
             self._state(message)
             return []
@@ -122,29 +157,33 @@ class LoopbackProtocol:
             return None
         # CLI text is deliberately ASCII/GSM-basic for now. The wire protocol
         # itself accepts packed GSM7, 8-bit and UCS-2 payloads.
-        septets = text.encode("ascii")
-        accumulator = 0
-        bits = 0
-        packed = bytearray()
-        for value in septets:
-            if value > 0x7f:
-                return None
-            accumulator |= value << bits
-            bits += 7
-            while bits >= 8:
-                packed.append(accumulator & 0xff)
-                accumulator >>= 8
-                bits -= 8
-        if bits:
-            packed.append(accumulator & 0xff)
+        packed = pack_gsm7(text)
+        if packed is None:
+            return None
         return {
             "type": "incoming_sms",
             "epoch": self.epoch,
             "request_id": request_id,
             "sender": sender,
             "alphabet": "gsm7",
-            "user_data_length": len(septets),
-            "user_data": packed.hex(),
+            "user_data_length": len(text),
+            "user_data": packed,
+        }
+
+    def incoming_ussd_request(
+            self, text: str, request_id: int = 1
+    ) -> dict[str, Any] | None:
+        if self.epoch is None:
+            return None
+        packed = pack_gsm7(text)
+        if packed is None:
+            return None
+        return {
+            "type": "incoming_ussd",
+            "epoch": self.epoch,
+            "request_id": request_id,
+            "dcs": 0x0f,
+            "data": packed,
         }
 
     @staticmethod
@@ -262,12 +301,16 @@ async def connected_session(args: argparse.Namespace, websocket: Any,
         old_phase = protocol.phase
         for reply in protocol.handle(message):
             await websocket.send(json.dumps(reply))
-        if ((args.incoming_caller is not None or args.incoming_sms is not None) and
+        if ((args.incoming_caller is not None or args.incoming_sms is not None or
+                args.incoming_ussd is not None) and
                 protocol.network_registered and not ingress_sent):
-            request = (protocol.incoming_request(args.incoming_caller)
-                       if args.incoming_caller is not None else
-                       protocol.incoming_sms_request(
-                           args.incoming_sms_sender, args.incoming_sms))
+            if args.incoming_caller is not None:
+                request = protocol.incoming_request(args.incoming_caller)
+            elif args.incoming_sms is not None:
+                request = protocol.incoming_sms_request(
+                    args.incoming_sms_sender, args.incoming_sms)
+            else:
+                request = protocol.incoming_ussd_request(args.incoming_ussd)
             if request is not None:
                 await websocket.send(json.dumps(request))
                 print(f"{request['type']} requested", flush=True)
@@ -277,6 +320,10 @@ async def connected_session(args: argparse.Namespace, websocket: Any,
                 message.get("phase") == "delivered"):
             protocol.stats.sms += 1
             print("incoming SMS delivered", flush=True)
+            return args.once
+        if (message.get("type") == "incoming_ussd_state" and
+                message.get("phase") == "delivered"):
+            print("incoming USSD delivered", flush=True)
             return args.once
         if protocol.phase != old_phase:
             print(f"call {protocol.request_id} {protocol.phase}: {status(protocol)}",
@@ -325,6 +372,7 @@ def main() -> int:
     parser.add_argument("--hangup-after", type=float)
     parser.add_argument("--incoming-caller")
     parser.add_argument("--incoming-sms")
+    parser.add_argument("--incoming-ussd")
     parser.add_argument("--incoming-sms-sender", default="5551234")
     parser.add_argument("--cause", type=int, default=16)
     parser.add_argument("--once", action="store_true")
@@ -338,8 +386,9 @@ def main() -> int:
             (not args.incoming_caller.isdigit() or
              not 1 <= len(args.incoming_caller) <= 20)):
         parser.error("--incoming-caller must contain 1..20 decimal digits")
-    if args.incoming_caller is not None and args.incoming_sms is not None:
-        parser.error("choose either --incoming-caller or --incoming-sms")
+    if sum(value is not None for value in (
+            args.incoming_caller, args.incoming_sms, args.incoming_ussd)) > 1:
+        parser.error("choose one incoming call, SMS or USSD request")
     if (args.incoming_sms_sender is not None and
             (not args.incoming_sms_sender.isdigit() or
              not 1 <= len(args.incoming_sms_sender) <= 20)):

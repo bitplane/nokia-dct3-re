@@ -82,12 +82,19 @@ message error_result(const request &request, std::uint8_t error_code);
 message reject_result(const request &request, std::uint8_t problem_code);
 message process_uss_request_result(const request &request,
 		const char *response);
+message process_uss_request_result(const request &request,
+		std::uint8_t data_coding_scheme, const std::uint8_t *packed,
+		unsigned packed_length);
 message unstructured_uss_request(const request &request,
 		std::uint8_t invoke_id, const char *text);
 message network_unstructured_uss_request(
 		std::uint8_t transaction, std::uint8_t invoke_id, const char *text);
 message network_unstructured_uss_notify(
 		std::uint8_t transaction, std::uint8_t invoke_id, const char *text);
+message network_unstructured_uss_notify(
+		std::uint8_t transaction, std::uint8_t invoke_id,
+		std::uint8_t data_coding_scheme, const std::uint8_t *packed,
+		unsigned packed_length);
 message network_release_complete(std::uint8_t transaction);
 
 } // namespace gsm::ss
