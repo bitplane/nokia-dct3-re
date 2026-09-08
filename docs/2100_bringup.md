@@ -91,12 +91,30 @@ The display, DSP bootstrap, service discovery, application-registration, keypad
 wiring, MBUS controller-start contract, transmit echo and 423.1 Hz FIQ3 source
 are established for v5.84. Two external evidence inputs now bound progress. The
 supplied v5.84 archive has no matching `0x3f0000..0x3fffff` EEPROM/PMM partition.
-Substituting the populated tail from the complete v5.21 image changes early
-state but does not settle the v5.84 initializer, so that version-mismatched donor
-is rejected. The remaining M2BUS uncertainty is the expected external endpoint
+Substituting the populated tail from the complete v5.21 image and recomputing
+the v5.84 firmware's 16-bit checksum over the `0x3fc026` calibration record
+changes early state but does not settle the v5.84 initializer, so that
+version-mismatched donor is rejected. Extending the first post-frame FIQ3 delay
+from one 423.1 Hz interval to a complete eight-bit interval also leaves the same
+predicate false, excluding a simple task-7 scheduling race. The remaining M2BUS
+uncertainty is the expected external endpoint
 plus exact oscillator phase and differing-line collision behavior. A matching
 v5.84 product-state capture and a physical NAM-2 M2BUS trace or primary MAD2
 evidence would distinguish these independently; neither a borrowed PMM nor a
 timed responder is retained.
 SIM remains dormant at this boundary; its controller and card profiles must not
 be promoted until execution reaches their firmware consumers.
+
+## Public evidence availability
+
+Contemporary service references independently identify the NAM-2 partition map
+and the need for product PMM data. An archived repair discussion names a
+`2100FuBu0584` full backup, but its attachment is no longer available. Another
+archive records that a donated virgin EEPROM still produced `CONTACT SERVICE`,
+consistent with the requirement to rebuild handset-specific FAID/identity data
+after grafting. These sources prove that suitable captures existed; they do not
+provide bytes that can be used as the v5.84 oracle.
+
+- [DCT3 flash address table](https://www.nokia-tuning.net/index.php?s=flashadress)
+- [Archived NAM-2 EEPROM discussion](https://nokiafree.org/forums/archive/index.php/t-17045.html)
+- [Archived `2100FuBu0584` reference](https://gsmforum.ru/threads/podskazhite-kak-podnyat-ufsom-nokia-2100.6670/)
