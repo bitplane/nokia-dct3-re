@@ -43,6 +43,12 @@ class MbusDeviceSplitTest(unittest.TestCase):
         self.assertIn("product.mbus_timer_enabled", self.phone)
         self.assertNotIn("BIT(data, 7))\n\t\t\tm_fiq3_timer", self.device)
 
+    def test_transmit_completion_samples_the_single_wire_line(self):
+        self.assertIn("m_data = m_tx_data", self.device)
+        self.assertIn("m_rx_ready = true", self.device)
+        self.assertIn("detect a", self.device)
+        self.assertIn("collision when another endpoint", self.device)
+
 
 if __name__ == "__main__":
     unittest.main()

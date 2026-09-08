@@ -17,6 +17,9 @@ contract is inherited merely because its values appear compatible.
 
 - The normalized stock image occupies `0x200000..0x3effff` and executes from the
   ordinary DCT3 flash mapping in a 16-Mbit device window.
+- Public NAM-2 flash maps reserve `0x3f0000..0x3fffff` for EEPROM/PMM. The
+  supplied v5.84 MCU+PPM package ends before that partition, so it is not a
+  complete product-state image.
 - Direct static analysis resolves 652 MAD2 accesses from 326 literal seeds and
   recovers the familiar PUP, keypad GPIO and UIF register regions.
 - The 18-entry CCONT descriptor vocabulary is byte-for-byte identical to the
@@ -66,8 +69,9 @@ contract is inherited merely because its values appear compatible.
   transport acknowledgements, terminal startup `D0/04`, and phone response
   `D0/05`. A diagnostic-only run supplied those bytes through RX/FIQ2 and NAM-2
   organically emitted the documented `D0/05`, validating the application
-  exchange. It did not settle reproducibly because MBUSTIM phase and
-  single-wire echo/collision arbitration remain unresolved; no responder from
+  exchange. The controller now presents transmitted bytes as physical
+  single-wire echo and firmware consumes them organically; absence of the
+  external acknowledgement still causes the expected retry. No responder from
   that trial is retained.
 - NAM-2 performs an organic five-row keypad scan. Its column mask remains `0x3f`
   at the blank frontier, so an injected host key reaches the physical matrix but
@@ -84,12 +88,15 @@ therefore established bounded absence only.
 ## First unresolved boundary
 
 The display, DSP bootstrap, service discovery, application-registration, keypad
-wiring, MBUS controller-start contract and 423.1 Hz FIQ3 source are established
-for v5.84. The first unresolved boundary is now the electrical contract needed
-to carry the known physical M2BUS startup exchange: timer phase, line echo,
-collision detection, arbitration and retry timing. Primary MAD2 documentation
-or a physical NAM-2 trace is required to distinguish these behaviors; the
-disproven DSP-framed reply and timing-calibrated responders must not be retained
-as shims.
+wiring, MBUS controller-start contract, transmit echo and 423.1 Hz FIQ3 source
+are established for v5.84. Two external evidence inputs now bound progress. The
+supplied v5.84 archive has no matching `0x3f0000..0x3fffff` EEPROM/PMM partition.
+Substituting the populated tail from the complete v5.21 image changes early
+state but does not settle the v5.84 initializer, so that version-mismatched donor
+is rejected. The remaining M2BUS uncertainty is the expected external endpoint
+plus exact oscillator phase and differing-line collision behavior. A matching
+v5.84 product-state capture and a physical NAM-2 M2BUS trace or primary MAD2
+evidence would distinguish these independently; neither a borrowed PMM nor a
+timed responder is retained.
 SIM remains dormant at this boundary; its controller and card profiles must not
 be promoted until execution reaches their firmware consumers.

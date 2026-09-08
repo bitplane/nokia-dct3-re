@@ -37,8 +37,14 @@ contract therefore run that source while firmware leaves FIQ3 unmasked;
 status bit 7 only resets the serial bit counter. The 3210 profiles retain the
 established no-FIQ3 ordinary-boot behavior until their clock gate is identified.
 
-The precise oscillator phase, collision, line echo, framing errors, overrun
-behavior, and multi-byte buffering are not modeled.
+M2BUS is a single-wire half-duplex bus, so a transmitted byte is also sampled
+by the receiver. The controller now exposes each completed TX byte through its
+RX holding state; NAM-2 consumes and compares that echo through its ordinary
+FIQ2 handler before sending the next byte. Public protocol documentation also
+specifies 3 ms of idle bus before an ordinary frame, 2.5 ms before an ACK and a
+200 ms ACK timeout. The precise oscillator phase, representation of a collision
+when another endpoint drives a different line value, framing errors, overrun
+behavior, and multi-byte buffering remain unmodeled.
 The lower service/test protocol behind task 7 is mapped separately; ordinary
 boot provides no evidence that it is an always-present MBUS peer. A future
 tool or peer must attach through the byte callbacks and may respond only to
@@ -61,12 +67,12 @@ terminal startup request `1f 00 1d d0 00 01 04 <seq> <xor>` followed by phone
 response `1f 1d 00 d0 00 01 05 <seq> <xor>`. A diagnostic trial delivered that
 documented `D0/04` frame through the real RX/FIQ2 path and NAM-2 organically
 returned `D0/05`, proving the application semantics. It did not settle the
-startup transaction reproducibly because the current controller couples FIQ3
-start, inter-frame timeout and retry timing and does not model the documented
-single-wire echo/collision behavior. The trial code is not retained.
+startup transaction reproducibly. Adding physical transmit echo makes firmware
+compare every byte but, correctly, does not manufacture the missing terminal
+acknowledgement. The trial code is not retained.
 
-The remaining evidence requirement is therefore narrower than a missing peer
-protocol: recover MBUSTIM oscillator phase and the TX/RX line-arbitration
-contract, either from primary MAD2 material or a physical NAM-2 trace. Until
-then, a peer that merely schedules the known bytes would encode an unevidenced
-electrical shim.
+The remaining wire evidence is the MBUSTIM oscillator phase and differing-line
+collision representation. Closing NAM-2 startup additionally requires evidence
+for the external terminal or service fixture expected during this transaction;
+a peer must attach at the byte callback and follow the public timing and ACK
+grammar rather than schedule firmware-specific state changes.

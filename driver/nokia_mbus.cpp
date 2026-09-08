@@ -168,6 +168,11 @@ TIMER_CALLBACK_MEMBER(nokia_mbus_device::byte_complete)
 	{
 		m_tx_pending = false;
 		m_tx_cb(m_tx_data);
+		// M2BUS is a single-wire bus. The controller samples its own driven byte
+		// so firmware can compare it with the transmit buffer and detect a
+		// collision when another endpoint holds the line low.
+		m_data = m_tx_data;
+		m_rx_ready = true;
 		trace_event("tx_complete", m_tx_data);
 	}
 	if (m_control & CTRL_TX_ENABLE)
