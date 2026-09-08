@@ -23,6 +23,25 @@ def records(address, payload):
 
 
 class ExtractDct3WinteslaTest(unittest.TestCase):
+    def test_full_flash_mode_extracts_one_contiguous_stream(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            payload = b"F" * 0x2100
+            (root / "full").write_bytes(records(0x200000, payload))
+            output = root / "flash"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--full", str(root / "full"),
+                    "--flash-output", str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(payload, output.read_bytes())
+
     def test_flash_only_mode_preserves_gap_and_needs_no_pmm(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)

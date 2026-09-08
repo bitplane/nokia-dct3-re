@@ -114,6 +114,7 @@ ORACLE_3410_MESSAGES_SHA ?= d4500eddc39090d3604fd9c79a974242f484d16e8a490cb0d4cb
 ORACLE_3410_RETURN_IDLE_SHA ?= 14c1f25e86f21ea7b52909b37fb624fcc9940668f9df19831a1f64b16913fd87
 ORACLE_3330_DSP_MISSING_SHA ?= 7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d1024ab91c1e55c1f8e
 ORACLE_3410_DSP_MISSING_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
+ORACLE_2100_POST_SERVICE_SHA ?= 28b1f0c642a34dfcf5206859ced058646b115c908d0b05b5ef6201f796180c21
 
 # The acquired virgin NHM-6 PMM legitimately requests its stored 12345 phone
 # code, then a time and date. These are physical keypad transactions through
@@ -218,7 +219,7 @@ INTERACTIVE_MAME_ARGS := $(PHONE) -rompath roms -window -resolution 672x384 \
 INTERACTIVE_NVRAM_DIR ?= $(abspath run_interactive/nvram)
 INTERACTIVE_EXTRA_ARGS ?=
 
-.PHONY: help venv download-mame overlay eeprom-profile normalize-3330 normalize-3410 normalize-5210 roms build swap16 census gates gate-parity controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census board-io-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive call-bridge smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms audit-dsp-rom4 check-dsp-rom4-cosim frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-cell-broadcast-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
+.PHONY: help venv download-mame overlay eeprom-profile normalize-2100 normalize-3330 normalize-3410 normalize-5210 roms build swap16 census gates gate-parity controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census board-io-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive call-bridge smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms audit-dsp-rom4 check-dsp-rom4-cosim frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-cell-broadcast-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
 .PHONY: check-c54x-core prepare-c54x-rom4-fixture check-c54x-rom4-execute check-c54x-rom4-cold-execute check-c54x-rom4-coherent check-c54x-rom4-rf-boundary verify-5110-menu verify-5110-save-state check-c54x-rom4-transform check-c54x-rom4-snapshot check-c54x-opcode-coverage
 .PHONY: storage-static-census mad2-residual-census
@@ -234,6 +235,9 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
+.PHONY: normalize-3610
+.PHONY: smoke-2100
+.PHONY: verify-2100-frontier
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
 .PHONY: verify-radio-a5-1-outgoing-call
 .PHONY: verify-radio-a5-1-sdcch-state
@@ -296,6 +300,8 @@ help:
 	@echo "make verify-6110-bootstrap-capture validate a physical NSE-3 trace (CAPTURE=... RAW_TRACE=...)"
 	@echo "make run-manifest-* reproduce named default/deep-gsm/contact/3330 evidence runs"
 	@echo "make eeprom-profile build the synthetic 3210 24C128 image used by the oracle"
+	@echo "make normalize-2100 extract the hash-pinned NAM-2 v5.84 MCU/PPM-E candidate"
+	@echo "make normalize-3610 extract the hash-pinned NAM-1 v5.11 MCU/PPM-E candidate"
 	@echo "make normalize-3330 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make normalize-3410 extract the local Wintesla MCU/PPM/PMM record streams"
 	@echo "make normalize-5210 extract the local Wintesla MCU/PPM/PMM record streams"
@@ -303,6 +309,7 @@ help:
 	@echo "make run-interactive open the provisioned 3210 in a persistent MAME window"
 	@echo "make call-bridge    answer and loop GSM-FR for a host-adapter MAME run"
 	@echo "make smoke-3310-639 bounded local 3310 v6.39 portability spike"
+	@echo "make smoke-2100 bounded local NAM-2 v5.84 PPM-E bring-up"
 	@echo "make smoke-5210e bounded local 5210 v5.40 PPM E portability spike"
 	@echo "make verify         check the explicit missing-hardware semantic profile"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
@@ -470,6 +477,30 @@ eeprom-profile:
 	$(PYTHON) tools/make_eeprom_profile.py --flash $(ROM) --output "roms/noki3210/$(EEPROM_BASENAME)" \
 		$(if $(PROVISIONED_IMEI_PREFIX),--provisioned-imei-prefix $(PROVISIONED_IMEI_PREFIX)) \
 		$(if $(ERASED_IDENTITY_SECURITY_CODE),--erased-identity-security-code $(ERASED_IDENTITY_SECURITY_CODE))
+
+normalize-2100:
+	@test "$$(sha256sum roms/2100-nam2-v584/NAM205.840 | cut -d' ' -f1)" = "6382beb1f8ba2d768f53ccc3111586657f26eff961900249c69061cb710db283"
+	@test "$$(sha256sum roms/2100-nam2-v584/NAM205.84E | cut -d' ' -f1)" = "0e2f2d90d297946522934cfbefe180ce2b7727e331b04f972e48f5a1231502be"
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--mcu roms/2100-nam2-v584/NAM205.840 \
+		--ppm roms/2100-nam2-v584/NAM205.84E \
+		--flash-output roms/noki2100/2100f584e.fls \
+		--expect-flash-sha1 10795e5b5a8186df5571e661833ed5887061c21f
+	@test "$$(sha256sum roms/2100-nam2-v584/2100sharp.pmm | cut -d' ' -f1)" = "4e30a95c44b2c3b7ca79a3e020ab38c24571e0de18a9572ce730c7f7173a3ece"
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--full roms/2100-nam2-v584/2100sharp.pmm \
+		--flash-output roms/noki2100/2100f521sharp.fls \
+		--expect-flash-sha1 b7e30deb4393a76d509f843d25ecf20881bc25bb
+	cp roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki2100/
+
+normalize-3610:
+	@test "$$(sha256sum roms/3610-nam1-v511/NAM105.110 | cut -d' ' -f1)" = "016b279283464a9f46d2790a292f84e420c9062d8025cdaca7321cfe5ada3caf"
+	@test "$$(sha256sum roms/3610-nam1-v511/NAM105.11E | cut -d' ' -f1)" = "7304283589a7493f544279c3c78911679b3c21f7a97e7408926dd1911740d170"
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--mcu roms/3610-nam1-v511/NAM105.110 \
+		--ppm roms/3610-nam1-v511/NAM105.11E \
+		--flash-output roms/noki3610-candidate/3610f511e.fls \
+		--expect-flash-sha1 429bc32afe0a554887ba7539cf9ba3c9a67e7043
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \
@@ -748,6 +779,16 @@ smoke: build
 
 smoke-3310-639:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
+
+smoke-2100: normalize-2100
+	@$(MAKE) --no-print-directory smoke PHONE=noki2100 BIOS=584e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
+
+verify-2100-frontier: normalize-2100
+	@$(MAKE) --no-print-directory run PHONE=noki2100 BIOS=584e RUN_DIR=$(RUN_DIR) SECONDS=10
+	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)/boot_summary.txt --reject-fiq0
+	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+		test -n "$$f" || { echo "2100 frontier: no LCD frame"; exit 1; }; \
+		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_2100_POST_SERVICE_SHA)
 
 smoke-3330e: normalize-3330
 	@$(MAKE) --no-print-directory smoke PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)

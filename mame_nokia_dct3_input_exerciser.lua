@@ -19,13 +19,15 @@ local quiet = os.getenv("NOKIA_DCT3_LUA_QUIET") == "1"
 local bios = machine.options.entries.bios:value()
 local v501 = bios == "501"
 local is_3410 = machine.system.name == "noki3410"
+local is_2100 = machine.system.name == "noki2100"
 local is_early_serial = machine.system.name == "noki5110" or
 		machine.system.name == "noki6110"
 local dsp_cpu = machine.devices[":dsp_c54x:cpu"]
-local lcd_controller_width = is_3410 and 102 or 84
-local lcd_controller_banks = is_3410 and 9 or 6
-local lcd_visible_width = is_3410 and 96 or 84
-local lcd_visible_height = is_3410 and 65 or 48
+local lcd_controller_width = is_3410 and 102 or (is_2100 and 96 or 84)
+local lcd_controller_banks = (is_3410 or is_2100) and 9 or 6
+local lcd_visible_width = (is_3410 or is_2100) and 96 or 84
+local lcd_visible_height = (is_3410 or is_2100) and 65 or 48
+local lcd_x_mirror = is_2100
 local lcd_data_port = is_early_serial and 0x2b or 0x2e
 local lcd_command_port = is_early_serial and 0x2c or 0x6e
 
@@ -164,7 +166,8 @@ local function field_by_name(tag, name)
 	return port and port.fields[name] or nil
 end
 
-local is_five_row_product = machine.system.name == "noki3310" or machine.system.name == "noki3330" or is_3410
+local is_five_row_product = machine.system.name == "noki2100" or
+		machine.system.name == "noki3310" or machine.system.name == "noki3330" or is_3410
 local key_fields
 if machine.system.name == "noki5110" then
 	key_fields = {
@@ -387,7 +390,8 @@ local function write_lcd_dump()
 	for y = 0, lcd_visible_height - 1 do
 		local row, bit = y >> 3, y & 7
 		for x = 0, lcd_visible_width - 1 do
-			local on = (pending.vram[(row * lcd_controller_width) + x] >> bit) & 1
+			local source_x = lcd_x_mirror and (lcd_visible_width - 1 - x) or x
+			local on = (pending.vram[(row * lcd_controller_width) + source_x] >> bit) & 1
 			if (pending.control & 1) ~= 0 then on = 1 - on end
 			f:write(string.char(on ~= 0 and 0 or 255))
 		end

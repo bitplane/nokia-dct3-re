@@ -92,7 +92,10 @@ bool nokia_external_service_peer_device::queue_transport_ack(const u8 *payload, 
 
 void nokia_external_service_peer_device::receive_frame(const u8 *payload, unsigned length)
 {
-	if (!application_enabled() || length < 9 || length > 75 || payload[0] != 0x1e)
+	// Discovery and transport acknowledgements are derived from the received
+	// frame and do not require a product application profile. Unsolicited
+	// registration/channel-map traffic remains gated by application_enabled().
+	if (!m_enabled || length < 9 || length > 75 || payload[0] != 0x1e)
 		return;
 
 	const u8 frame_class = payload[3];

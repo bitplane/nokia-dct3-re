@@ -117,12 +117,22 @@ constexpr nokia_ccont_board_profile ADC_5110 = {
 	{ 2, 0 }, 1, 3, 4, 5
 };
 
+// NAM-2 service material specifies 0.5 V at the BSI node in the service jig.
+// With CCONT's 2.8 V ADC reference this is 0.5 / 2.8 * 1023 ~= 0x0b6.
+// Other channels remain conservative until their NAM-2 electrical contract
+// is recovered independently.
+constexpr nokia_ccont_board_profile ADC_2100 = {
+	{ 0x000, 0x3ff, 0x3ff, 0x0b6, 0x200, 0x000, 0x200, 0x000 },
+	{ 2, 0 }, 1, 3, 4, 5
+};
+
 struct display_geometry_contract
 {
 	u8 controller_width = 84;
 	u8 controller_height = 48;
 	u8 visible_width = 84;
 	u8 visible_height = 48;
+	bool x_mirror = false;
 
 	constexpr bool valid() const
 	{
@@ -257,6 +267,9 @@ constexpr nokia_dsp_hle_device::speech_control_contract
 constexpr display_geometry_contract DISPLAY_3410 = {
 	102, 72, 96, 65
 };
+constexpr display_geometry_contract DISPLAY_2100 = {
+	96, 72, 96, 65, true
+};
 static_assert(display_geometry_contract{}.valid());
 static_assert(DISPLAY_3410.valid());
 
@@ -281,12 +294,14 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE3 = { 5, 0x01 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NAM2 = { 5, 0x04 };
 static_assert(KEYPAD_NSE8.valid());
 static_assert(KEYPAD_NSE1.valid());
 static_assert(KEYPAD_NHM5.valid());
 static_assert(KEYPAD_NHM6.valid());
 static_assert(KEYPAD_NHM2.valid());
 static_assert(KEYPAD_NSE3.valid());
+static_assert(KEYPAD_NAM2.valid());
 
 // These values currently match but remain separate evidence: NSE-8 and NHM-5
 // have independent organic startup and call gates. A new product must supply
@@ -317,6 +332,16 @@ constexpr nokia_external_service_peer_device::application_contract
 		EXTERNAL_SERVICE_NHM2 = {
 	36, 0x01, 0x41,
 	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x42
+};
+
+// NAM-2 v5.84 independently completes the compact DSP service-control
+// transaction before accepting this class-0x40 application sequence. Keep
+// the profile separate even where its channel resources coincide with older
+// products: acceptance and subsequent lifecycle behavior are product-local.
+constexpr nokia_external_service_peer_device::application_contract
+		EXTERNAL_SERVICE_NAM2 = {
+	36, 0x01, 0x42,
+	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
 };
 
 constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_READY_64 = {
@@ -649,6 +674,39 @@ constexpr nokia_product_config make_5210_config()
 	return result;
 }
 
+constexpr nokia_product_config make_2100_config()
+{
+	nokia_product_config result = make_conservative_config();
+	// NAM-2 v5.84 drives five distinct row bits during its organic matrix scan;
+	// the cold-start input is observed on column bit 2.
+	result.keypad_wiring = KEYPAD_NAM2;
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
+	// NAM-2 v5.84 organically writes control 0x22 at offset 0x2d, transfers
+	// the CCONT byte through 0x2c and polls receive-ready at 0x6d. This is an
+	// independent observation of the register placement used by NSM-5; it
+	// does not imply shared keypad, display or peer contracts.
+	result.gensio_wiring = GENSIO_NSM5;
+	// After its 64-exchange upload, NAM-2 repeatedly rings DSP command 4 with
+	// service-pending value 2. Acknowledge that observed transport transaction;
+	// no application payload or sibling-handset service contract is implied.
+	result.dsp_service = true;
+	// Its type-05 D0/01 frame supplies the complete discovery reply correlation.
+	// Enable request-derived transport handling and the independently retained
+	// NAM-2 application contract.
+	result.external_service_transport = true;
+	result.external_service = EXTERNAL_SERVICE_NAM2;
+	// NAM-2 organically follows discovery with type-70 payload 0d00. The
+	// protocol completion is the compact type-74 echo of that exact body.
+	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	// NAM-2 addresses banks 0..8 and transfers exactly 96 bytes per ordinary
+	// bank. Primary board material specifies a 96x65 display; the recovered
+	// frame establishes reversed segment order rather than a software rotation.
+	result.display = DISPLAY_2100;
+	result.ccont_board = ADC_2100;
+	return result;
+}
+
 constexpr nokia_product_config PRODUCT_3210 = make_3210_config();
 constexpr nokia_product_config PRODUCT_3310 = make_3310_config();
 constexpr nokia_product_config PRODUCT_3330 = make_3330_config();
@@ -656,6 +714,7 @@ constexpr nokia_product_config PRODUCT_3410 = make_3410_config();
 constexpr nokia_product_config PRODUCT_5110 = make_5110_config();
 constexpr nokia_product_config PRODUCT_6110 = make_6110_config();
 constexpr nokia_product_config PRODUCT_5210 = make_5210_config();
+constexpr nokia_product_config PRODUCT_2100 = make_2100_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
 constexpr nokia_product_config PRODUCT_8XXX =
 		make_conservative_config({ 4, 0x10 });
@@ -782,6 +841,7 @@ public:
 
 	void noki3330(machine_config &config);
 	void noki3410(machine_config &config);
+	void noki2100(machine_config &config);
 	void noki5110(machine_config &config);
 	void noki6110(machine_config &config);
 	void noki7110(machine_config &config);
@@ -1106,6 +1166,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_lcd->set_geometry(product.display.controller_width,
 			product.display.controller_height, product.display.visible_width,
 			product.display.visible_height);
+	m_lcd->set_x_mirror(product.display.x_mirror);
 	screen_device *const screen = subdevice<screen_device>("screen");
 	screen->set_size(product.display.visible_width, product.display.visible_height);
 	screen->set_visarea(0, product.display.visible_width - 1,
@@ -2693,6 +2754,15 @@ void nokia_dct3_state::noki3310(machine_config &config)
 	apply_product_config(PRODUCT_3310);
 }
 
+void nokia_dct3_state::noki2100(machine_config &config)
+{
+	// NAM-2's normalized image fits a 16-Mbit flash and its static census
+	// establishes the later MAD2 register surface. All promoted peripheral and
+	// peer contracts below are independently evidenced on the v5.84 image.
+	dct3_base(config);
+	apply_product_config(PRODUCT_2100);
+}
+
 void nokia_dct3_state::dct3_32mbit_flash_base(machine_config &config)
 {
 	dct3_base(config);
@@ -2824,6 +2894,18 @@ ROM_START( noki3210 )
 	ROM_REGION(0x04000, "eeprom", ROMREGION_ERASEFF)
 	ROMX_LOAD("3210 v600 eeprom.bin", 0x00000, 0x04000, CRC(e236395f) SHA1(14f207b6b6e04945d26049df404723830bc765e7), ROM_BIOS(0))
 	ROMX_LOAD("3210 v501 eeprom.bin", 0x00000, 0x04000, CRC(82dc441c) SHA1(4cbc156da79d49610dd0018d3eaf8f8cbcbc05bf), ROM_BIOS(1))
+ROM_END
+
+ROM_START( noki2100 )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF)
+	ROM_SYSTEM_BIOS(0, "584e", "v5.84 PPM E candidate")
+	ROM_SYSTEM_BIOS(1, "521sharp", "v5.21 complete Sharp-labelled image")
+	ROMX_LOAD("2100f584e.fls", 0x000000, 0x1f0000,
+			CRC(cfb2d95c) SHA1(10795e5b5a8186df5571e661833ed5887061c21f), ROM_BIOS(0))
+	ROMX_LOAD("2100f521sharp.fls", 0x000000, 0x200000,
+			CRC(2d3f027e) SHA1(b7e30deb4393a76d509f843d25ecf20881bc25bb), ROM_BIOS(1))
 ROM_END
 
 ROM_START( noki5110 )
@@ -3006,6 +3088,7 @@ ROM_END
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
 SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empty_init, "Nokia", "Nokia 3210", 0 )
+SYST( 2003, noki2100, 0,      0,      noki2100, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 2100 (NAM-2 candidate)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

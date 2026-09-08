@@ -135,6 +135,103 @@ Additional firmware is used only as local validation material. Put each complete
 own ignored directory (`roms/noki3330/`, and so on), run `make audit-roms PHONE=<set>`, and never
 commit an image or extracted archive.
 
+### DCT3 archive coverage
+
+The firmware.center Nokia index contains directories for many DCT3 products,
+but most of those directories are empty placeholders.  As checked on
+2026-09-08, the two populated sets not already represented locally were:
+
+#### Nokia 2100 NAM-2 v5.84
+
+Source:
+`https://firmware.center/firmware/Nokia/2100%20%28NAM-2%29/Flash%20Files/NAM-2%20v.05.84%202100.rar`
+
+Place the untouched archive and extracted members in
+`roms/2100-nam2-v584/`:
+
+| file | bytes | SHA-256 |
+| --- | ---: | --- |
+| `NAM-2 v.05.84 2100.rar` | 2,329,827 | `7305eaa8453c2e98eea63d169ee02ca16e3c349a271dd738ffe6eff0523c6f0d` |
+| `NAM205.840` | 1,443,376 | `6382beb1f8ba2d768f53ccc3111586657f26eff961900249c69061cb710db283` |
+| `NAM205.84E` | 590,472 | `0e2f2d90d297946522934cfbefe180ce2b7727e331b04f972e48f5a1231502be` |
+| `2100sharp.pmm` | 2,099,456 | `4e30a95c44b2c3b7ca79a3e020ab38c24571e0de18a9572ce730c7f7173a3ece` |
+
+`NAM205.840` and `NAM205.84E` are contiguous Wintesla MCU and PPM-E streams:
+
+| member | target range | extracted bytes |
+| --- | --- | ---: |
+| `NAM205.840` | `0x200000..0x35ffff` | `0x160000` |
+| `NAM205.84E` | `0x360000..0x3effff` | `0x090000` |
+
+`make normalize-2100` validates both source hashes and reconstructs
+`roms/noki2100/2100f584e.fls`. The resulting `0x1f0000`-byte stock
+candidate has SHA-1 `10795e5b5a8186df5571e661833ed5887061c21f` and SHA-256
+`5e489a47db0a5529711f6dca8a822f920830363085dc0101ca62da64eaedf69f`.
+
+Despite its filename, `2100sharp.pmm` is not PMM or EEPROM data. It is a complete
+Wintesla flash stream covering `0x200000..0x3fffff`. Its extracted 2 MiB image
+has SHA-1 `b7e30deb4393a76d509f843d25ecf20881bc25bb` and SHA-256
+`c774f3e100663307a66a11c811c5b98f3101004a73ff4ae74b40403873d8e742`,
+and differs from the stock MCU+PPM composition from image offset `0x22`. Keep it
+as a separately labelled alternative/custom image; do not use it as persistent
+storage or silently combine it with the stock members.
+
+A static audit of the stock candidate recovered 652 direct MAD2 accesses from
+326 literal seeds and the familiar sparse PUP, keypad GPIO and UIF regions. It
+also recovered the exact 18-entry CCONT descriptor vocabulary at `0x0033e4f8`
+(literal references at `0x002ffec8` and `0x0030704c`). This establishes useful
+later-MAD2 family evidence, but not the fitted display, memory map, interrupt
+routing, DSP contract or nonvolatile-storage policy. The `noki2100` declaration
+therefore uses the conservative later-MAD2 composition only. It is a bounded
+bring-up instrument, not a supported product profile.
+
+#### Nokia 3610 NAM-1 v5.11
+
+Source:
+`https://firmware.center/firmware/Nokia/3610%20%28NAM-1%29/Flash%20Files/NAM-01%20v.05.11%203610.rar`
+
+Place the untouched archive and extracted members in
+`roms/3610-nam1-v511/`:
+
+| file | bytes | SHA-256 |
+| --- | ---: | --- |
+| `NAM-01 v.05.11 3610.rar` | 3,600,924 | `6d6b479153cd61f6bc448c79d2ce62546477446d60320ac7c98098c099ae2ab2` |
+| `NAM105.110` | 2,689,928 | `016b279283464a9f46d2790a292f84e420c9062d8025cdaca7321cfe5ada3caf` |
+| `NAM105.11A` | 787,296 | `c7624ed644d31e3346f06d7f1ff82d0d6c0b1fdf8e2e3b1bf89f9b57a61b7d84` |
+| `NAM105.11B` | 787,296 | `d4b81873b06452d2cf2f2d0794b4f33183247dee03689ec42185709bdf52f4e2` |
+| `NAM105.11C` | 787,296 | `c4350f0bec54ed589371acc747b21846fdfac82f94a878e9cff4ee7f256b5ac2` |
+| `NAM105.11D` | 787,296 | `55b2dbaf75a46792519ada9eb7cc0c6a7331362c927ca052c98875d36f1bfd7f` |
+| `NAM105.11E` | 787,296 | `7304283589a7493f544279c3c78911679b3c21f7a97e7408926dd1911740d170` |
+| `NAM105.11F` | 787,296 | `08d5c75f4bb5f712148ead898993661ff0ee19bb9bba23c0f3d4ea7fa1a832cd` |
+
+`NAM105.110` is the common component and `A` through `F` are alternative PPM
+members. All seven streams validate cleanly. The common MCU covers
+`0x200000..0x48ffff` (`0x290000` bytes), and every PPM variant covers
+`0x490000..0x54ffff` (`0x0c0000` bytes). No EEPROM/PMM member is present.
+
+`make normalize-3610` selects PPM E as the representative comparison image,
+validates both source hashes, and reconstructs
+`roms/noki3610-candidate/3610f511e.fls`. The `0x350000`-byte result has SHA-1
+`429bc32afe0a554887ba7539cf9ba3c9a67e7043` and SHA-256
+`bcb22f093746b14cd55503abff72f7e3c043fc226e0bcc0b6972b03d9d635c89`.
+The other PPM members remain equally valid source material; E is not asserted
+to have a privileged hardware role.
+
+The representative image yields 670 direct MAD2 accesses from 274 literal
+seeds. Of those, 78 address PUP, 30 keypad GPIO and 29 UIF; the conservative
+scan recovers no direct GENSIO SELECT access. The byte-lane-correct CCONT scan
+finds the same 18-entry descriptor vocabulary at `0x00489b74` (literal
+references at `0x003d7a70` and `0x003ec8f8`). These results establish a strong
+MAD2-family relationship while also exposing an unresolved product-specific
+serial/control path. No executable machine profile is declared from them.
+
+The nominal firmware.center directories for 3390, 5510, 6130, 6150, 6250,
+7110, 8210, 8250, 8290, 8810, 8850, 8855 and 8890 were empty at that date.
+Two misleading directories were rejected: `5130 (NSK-1)` contains RM-495
+XpressMusic firmware, and `6210 (NPE-3)` contains RM-367 Navigator firmware.
+Neither is a DCT3 input.  This list records archive availability, not an
+exhaustive assertion about every regional DCT3 product.
+
 ### Nokia 3330 NHM-6 v4.50
 
 The first portability target is the 3330. Firmware.center provides service-format archive

@@ -39,6 +39,7 @@ distinction.
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `5210_bringup.md` | Bounded NSM-5 v5.40 portability frontier and resumption contract. |
+| `2100_bringup.md` | Bounded NAM-2 v5.84 portability frontier and display resumption contract. |
 | `6110_bootstrap_capture.md` | Physical NSE-3 DSP-bootstrap capture format and acceptance contract. |
 | `structural_regression.md` | Acceptance profiles, semantic predicates, and frame oracles. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |
