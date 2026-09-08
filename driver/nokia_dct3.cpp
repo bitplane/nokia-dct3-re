@@ -696,6 +696,9 @@ constexpr nokia_product_config make_2100_config()
 	// NAM-2 application contract.
 	result.external_service_transport = true;
 	result.external_service = EXTERNAL_SERVICE_NAM2;
+	// The NAM-2 MBUS start routine acknowledges FIQ3, unmasks bit 3 and waits
+	// for the controller edge; its FIQ3 handler remasks the source on completion.
+	result.mbus_kick_on_unmask = true;
 	// NAM-2 organically follows discovery with type-70 payload 0d00. The
 	// protocol completion is the compact type-74 echo of that exact body.
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;

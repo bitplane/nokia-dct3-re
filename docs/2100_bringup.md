@@ -51,6 +51,16 @@ contract is inherited merely because its values appear compatible.
   set before querying object `0x79`. Firmware reduces the mask from `0xff` to
   `0xe0` by 0.208 seconds and never restores bit 3, so this mask predicate is the
   first established failing condition.
+- The four bit-3 setter regions belong to the MBUS lifecycle. `0x2f7f90`
+  initializes the controller, `0x2f7c24` acknowledges FIQ3 and unmasks it to
+  start activity, `0x2f7d2a` handles FIQ3 and remasks it, and `0x307758`
+  services per-byte FIQ2 events. Enabling the controller's already modeled
+  idle-to-active FIQ3 edge makes this firmware-owned sequence run.
+- The resulting transmitter emits the checksum-valid physical MBUS frame
+  `1f ff 00 d0 00 01 01 01 31` at 9,600 baud. With no peer it retries the
+  same frame. Reusing the DSP-framed D0 acknowledgement/completion semantics,
+  including corrected service-node addressing, is rejected and still retries;
+  packet-family resemblance is therefore insufficient evidence for a reply.
 - NAM-2 performs an organic five-row keypad scan. Its column mask remains `0x3f`
   at the blank frontier, so an injected host key reaches the physical matrix but
   is intentionally ignored by firmware. This is evidence that application/MMI
@@ -65,11 +75,10 @@ therefore established bounded absence only.
 
 ## First unresolved boundary
 
-The display, DSP bootstrap, service discovery, application-registration and keypad
-wiring contracts are established for v5.84. The next pass must classify the four
-recovered FIQ-mask-bit-3 setter regions (`0x2f7cce`, `0x2f7d6e`, `0x2f8018`, and
-`0x307766`), establish which hardware lifecycle owns FIQ3, and determine why its
-masking completion is absent. Existing handset response constants must not be
-inherited on packet-shape similarity alone. SIM remains dormant at this boundary;
-its controller and card profiles must not be promoted until execution reaches
-their firmware consumers.
+The display, DSP bootstrap, service discovery, application-registration, keypad
+wiring and MBUS controller-start contracts are established for v5.84. The first
+unresolved boundary is now the external counterparty for the organic physical
+MBUS D0 frame. Its response framing and semantics require product-local firmware,
+protocol, or hardware evidence; the disproven DSP-framed reply must not be retained
+as a compatibility shim. SIM remains dormant at this boundary; its controller and
+card profiles must not be promoted until execution reaches their firmware consumers.

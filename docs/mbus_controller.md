@@ -37,3 +37,13 @@ The lower service/test protocol behind task 7 is mapped separately; ordinary
 boot provides no evidence that it is an always-present MBUS peer. A future
 tool or peer must attach through the byte callbacks and may respond only to
 organic transmitted frames.
+
+NAM-2 v5.84 supplies the first organic startup use of this controller. Its
+initializer at `0x2f7f90`, start routine at `0x2f7c24`, FIQ3 handler at
+`0x2f7d2a`, and FIQ2 handler at `0x307758` establish the idle-to-active FIQ3
+edge and byte-completion split independently of the ROM4 firmware. The product
+therefore enables `mbus_kick_on_unmask` and transmits
+`1f ff 00 d0 00 01 01 01 31` with a valid zero XOR over the frame. No peer is
+modeled: a trial using the superficially similar DSP-service D0 state-1/state-4
+reply was consumed byte-for-byte but rejected by firmware. This closes the
+controller behavior while leaving the external MBUS protocol explicitly open.
