@@ -137,6 +137,12 @@
       "predicate": "After organic Location Updating, the unobscured idle screen presents the registered laboratory-network identity through firmware-owned resources",
       "current": "A provisioned coherent run completes one Location Updating exchange, accepts result 0x48, updates EF_LOCI, releases channel 0x60, returns to serving BCCH, publishes task-11 resource 0x5031 with live PLMN 00f110, posts event 0x1399, and renders numeric operator 01. Firmware also selects and reads standards-valid EF_SPN service 17, but the v6.00 idle resource retains its PLMN-table result; the radio peer supplies no display string or firmware state. The trace and stable operator glyph crop are protected together by make verify-radio-operator.",
       "evidence": ["docs/network_scouting.md", "docs/structural_regression.md", "tools/radio_registration_trace_check.py", "tools/check_lcd_frame.py"]
+    },
+    {
+      "id": "nam2_global_init_first_predicate", "owner": "nam2_firmware", "status": "unresolved",
+      "predicate": "Nokia 2100 v5.84 completes the first predicate in its seven-member global initialization checklist without firmware-state forcing",
+      "current": "The checklist at 0x2f8396..0x2f83ca stops after 0x3003c8 returns zero and spins at 0x2f83e6. Its queue-empty half 0x2be6c0 and the RAM conditions in lower-idle check 0x2fd208 are satisfied. The remaining prerequisite is MAD2 FIQ-mask offset 0x0a bit 3, which firmware clears while reducing the mask from 0xff to 0xe0 and does not restore. Four static setter regions exist at 0x2f7cce, 0x2f7d6e, 0x2f8018 and 0x307766; their hardware ownership and missing lifecycle are the next bounded boundary. The earlier inference that RAM 0x13fdb3 bit 7 was missing is falsified: firmware sets and deliberately clears it during normal initialization, matching the instruction-equivalent interactive 3210 lifecycle.",
+      "evidence": ["docs/2100_bringup.md"]
     }
   ]
 }

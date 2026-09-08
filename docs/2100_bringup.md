@@ -34,13 +34,23 @@ contract is inherited merely because its values appear compatible.
   `CONTACT SERVICE` frame under the v5.84 service contract. Populated PMM content
   alone therefore does not supply a cross-version service contract.
 - NAM-2 v5.84 publishes its command-`0x64` application status only after accepting
-  the peer registration. The status byte derived from RAM `0x13fdb3` bit 7 remains
-  zero (`...64 03 00 4f...`), whereas established interactive profiles publish
-  the corresponding ready value as one (`...64 03 01 4f...`).
-- The command-`0x64` constructor at `0x258ce0` reads that bit directly. The seven
-  literal-pool references resolve to eleven consumers; the mapped consumers gate
-  service dispatch, transport notification and lower configuration work. No
-  product-local setter has yet been established.
+  the peer registration. The constructor at `0x258ce0` derives its status byte
+  from RAM `0x13fdb3` bit 7.
+- Runtime write observation closes that bit's lifecycle: initialization sets it
+  through `0x40`, `0xc0`, `0xc4`, `0x84` and `0x80`, then the global initializer
+  deliberately clears it at `0x2e1b18`. The instruction-equivalent 3210 routine
+  at `0x29bc70` clears the corresponding bit, and an interactive 3210 settles
+  with that bit clear. A set bit is therefore not an application-readiness
+  requirement.
+- The global initializer then evaluates seven predicates at `0x2f8396..0x2f83ca`
+  and spins at `0x2f83e6` while any predicate is false. The first predicate,
+  `0x3003c8`, is the only one reached in the coherent run and returns zero.
+- `0x3003c8` composes lower-idle check `0x2fd208` with queue-empty check
+  `0x2be6c0`. The queue state is empty. The lower-idle check's RAM predicates are
+  also clear, but it requires MAD2 FIQ-mask register offset `0x0a` bit 3 to be
+  set before querying object `0x79`. Firmware reduces the mask from `0xff` to
+  `0xe0` by 0.208 seconds and never restores bit 3, so this mask predicate is the
+  first established failing condition.
 - NAM-2 performs an organic five-row keypad scan. Its column mask remains `0x3f`
   at the blank frontier, so an injected host key reaches the physical matrix but
   is intentionally ignored by firmware. This is evidence that application/MMI
@@ -56,8 +66,10 @@ therefore established bounded absence only.
 ## First unresolved boundary
 
 The display, DSP bootstrap, service discovery, application-registration and keypad
-wiring contracts are established for v5.84. The next pass must enumerate every
-writer of `0x13fdb3` bit 7 and identify the product-local completion that owns it.
-Existing handset response constants must not be inherited on packet-shape
-similarity alone. SIM remains dormant at this boundary; its controller and card
-profiles must not be promoted until execution reaches their firmware consumers.
+wiring contracts are established for v5.84. The next pass must classify the four
+recovered FIQ-mask-bit-3 setter regions (`0x2f7cce`, `0x2f7d6e`, `0x2f8018`, and
+`0x307766`), establish which hardware lifecycle owns FIQ3, and determine why its
+masking completion is absent. Existing handset response constants must not be
+inherited on packet-shape similarity alone. SIM remains dormant at this boundary;
+its controller and card profiles must not be promoted until execution reaches
+their firmware consumers.
