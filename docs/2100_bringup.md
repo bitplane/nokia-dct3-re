@@ -115,6 +115,17 @@ consistent with the requirement to rebuild handset-specific FAID/identity data
 after grafting. These sources prove that suitable captures existed; they do not
 provide bytes that can be used as the v5.84 oracle.
 
+The surviving v5.84 download trail was checked by exact archive name and object
+identifier. Its mirrors all resolve to
+`proshivki.org__nam_2_v5.84.rar` (Shareflare object
+`8272.89d0d3c4a214639b1e8d3eba69`, also mirrored by Letitbit) and consistently
+describe a 1.11 MB `mcu+ppm(e)` package. That is the already-held Wintesla
+payload, not a two-megabyte full flash. No indexed copy of the missing PMM tail
+or the named `2100FuBu0584` backup was found. The Internet Archive CDX endpoint
+was also unreachable during the check, so archive recovery remains a possible
+external follow-up rather than negative proof that no capture survives.
+
 - [DCT3 flash address table](https://www.nokia-tuning.net/index.php?s=flashadress)
 - [Archived NAM-2 EEPROM discussion](https://nokiafree.org/forums/archive/index.php/t-17045.html)
 - [Archived `2100FuBu0584` reference](https://gsmforum.ru/threads/podskazhite-kak-podnyat-ufsom-nokia-2100.6670/)
+- [Surviving v5.84 MCU+PPM listing](https://www.shram.kiev.ua/mob/proshnokia.shtml)
