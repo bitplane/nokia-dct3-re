@@ -69,7 +69,7 @@
     },
     {
       "id": "mad2_mbus_controller", "subsystem": "mbus", "status": "partial", "confidence": "strong",
-      "boundary": "The extracted nokia_mbus_device owns MAD2 PUP offsets 0x18..0x1a, RX/TX holding state and FIQ2/FIQ3 callbacks; v6.00/v5.01 share receive-mode initialization and no organic boot TX, while an external-byte fixture validates RX-ready, firmware consumption and FIQ2 acknowledgement; baud, FIQ3 timing, collision and electrical behavior remain unknown",
+      "boundary": "The extracted nokia_mbus_device owns MAD2 PUP offsets 0x18..0x1a, RX/TX holding state and FIQ2/FIQ3 callbacks. The controller runs at the documented 9,600 baud; v6.00/v5.01 share receive-mode initialization and an external-byte fixture validates RX-ready, firmware consumption and FIQ2 acknowledgement. NAM-2 independently proves FIQ3-started physical TX and emits checksum-valid M2BUS registration; public terminal D0/04 makes firmware organically return D0/05. Exact FIQ3 clock/phase and single-wire echo, collision, arbitration and retry behavior remain unknown and prevent reproducible closure.",
       "evidence": ["docs/mbus_controller.md", "docs/mad2_fidelity.md", "tools/mbus_trace_check.py"]
     },
     {

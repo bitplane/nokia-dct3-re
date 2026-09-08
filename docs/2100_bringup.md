@@ -61,6 +61,13 @@ contract is inherited merely because its values appear compatible.
   same frame. Reusing the DSP-framed D0 acknowledgement/completion semantics,
   including corrected service-node addressing, is rejected and still retries;
   packet-family resemblance is therefore insufficient evidence for a reply.
+- Public M2BUS documentation establishes terminal node `0x1d`, type-`0x7f`
+  transport acknowledgements, terminal startup `D0/04`, and phone response
+  `D0/05`. A diagnostic-only run supplied those bytes through RX/FIQ2 and NAM-2
+  organically emitted the documented `D0/05`, validating the application
+  exchange. It did not settle reproducibly because MAD2 FIQ3 timing and
+  single-wire echo/collision arbitration remain unresolved; no responder from
+  that trial is retained.
 - NAM-2 performs an organic five-row keypad scan. Its column mask remains `0x3f`
   at the blank frontier, so an injected host key reaches the physical matrix but
   is intentionally ignored by firmware. This is evidence that application/MMI
@@ -77,8 +84,10 @@ therefore established bounded absence only.
 
 The display, DSP bootstrap, service discovery, application-registration, keypad
 wiring and MBUS controller-start contracts are established for v5.84. The first
-unresolved boundary is now the external counterparty for the organic physical
-MBUS D0 frame. Its response framing and semantics require product-local firmware,
-protocol, or hardware evidence; the disproven DSP-framed reply must not be retained
-as a compatibility shim. SIM remains dormant at this boundary; its controller and
-card profiles must not be promoted until execution reaches their firmware consumers.
+unresolved boundary is now the MAD2 electrical/timing contract needed to carry
+the known physical M2BUS startup exchange: FIQ3 clock and phase, line echo,
+collision detection, arbitration and retry timing. Primary MAD2 documentation or
+a physical NAM-2 trace is required to distinguish these behaviors; the disproven
+DSP-framed reply and timing-calibrated responders must not be retained as shims.
+SIM remains dormant at this boundary; its controller and card profiles must not
+be promoted until execution reaches their firmware consumers.

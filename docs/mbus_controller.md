@@ -47,3 +47,19 @@ therefore enables `mbus_kick_on_unmask` and transmits
 modeled: a trial using the superficially similar DSP-service D0 state-1/state-4
 reply was consumed byte-for-byte but rejected by firmware. This closes the
 controller behavior while leaving the external MBUS protocol explicitly open.
+
+Public [Gammu/Gnokii Nokia protocol documentation](https://docs.gammu.org/protocol/nokia.html)
+closes the wire-level application vocabulary. M2BUS uses terminal node `0x1d`,
+requires a type-`0x7f` transport acknowledgement for normal frames, and defines
+terminal startup request `1f 00 1d d0 00 01 04 <seq> <xor>` followed by phone
+response `1f 1d 00 d0 00 01 05 <seq> <xor>`. A diagnostic trial delivered that
+documented `D0/04` frame through the real RX/FIQ2 path and NAM-2 organically
+returned `D0/05`, proving the application semantics. It did not settle the
+startup transaction reproducibly because the current controller couples FIQ3
+start, inter-frame timeout and retry timing and does not model the documented
+single-wire echo/collision behavior. The trial code is not retained.
+
+The remaining evidence requirement is therefore narrower than a missing peer
+protocol: recover the MAD2 FIQ3 clock/phase and TX/RX line-arbitration contract,
+either from primary MAD2 material or a physical NAM-2 trace. Until then, a peer
+that merely schedules the known bytes would encode an unevidenced timing shim.
