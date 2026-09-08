@@ -18,6 +18,7 @@ public:
 	void write(offs_t offset, u8 data);
 	void fiq_mask_w(u8 old_mask, u8 new_mask);
 	bool receive_byte(u8 data);
+	void set_timer_clock_enabled(bool enabled) { m_timer_clock_enabled = enabled; }
 
 	u8 control() const { return m_control; }
 	u8 status() const;
@@ -41,6 +42,7 @@ private:
 	emu_timer *m_byte_timer = nullptr;
 	emu_timer *m_fiq3_timer = nullptr;
 	attotime m_byte_delay = attotime::from_hz(960); // 10 bits at 9,600 baud
+	attotime m_fiq3_period = attotime::from_ticks(10, 4231); // MADos FIQ_MBUSTIM: 423.1 Hz
 	u8 m_control = 0;
 	u8 m_status_latch = 0;
 	u8 m_data = 0;
@@ -48,6 +50,7 @@ private:
 	bool m_rx_ready = false;
 	bool m_tx_ready = false;
 	bool m_tx_pending = false;
+	bool m_timer_clock_enabled = false;
 	bool m_trace = false;
 	u32 m_trace_count = 0;
 };

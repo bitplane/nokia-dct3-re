@@ -175,7 +175,7 @@ struct nokia_product_config
 	nokia_mad2_device::dsp_reset_wiring_contract dsp_reset_wiring;
 	display_geometry_contract display;
 	u8 pup_eeprom_scl_bit = 3;
-	bool mbus_kick_on_unmask = false;
+	bool mbus_timer_enabled = false;
 	bool mad2_clock_stop = true;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
@@ -631,6 +631,7 @@ constexpr nokia_product_config make_6110_config()
 	// NSE-3 v4.06's bit-banged 24C64 routines drive GenIO signal bit 2
 	// as SCL; SDA is signal/direction bit 0.
 	result.pup_eeprom_scl_bit = 2;
+	result.mbus_timer_enabled = true;
 	return result;
 }
 
@@ -644,7 +645,6 @@ constexpr nokia_product_config make_5110_config()
 	// NSE-1 bit-bangs its external 24C16 through PUP GenIO: signal
 	// bit 0 is SDA, signal bit 2 is SCL, and direction bit 0 releases SDA.
 	result.pup_eeprom_scl_bit = 2;
-	result.mbus_kick_on_unmask = true;
 	// ROM4's clock-gate write is mapped, but its wake protocol is not yet
 	// recovered. Do not project the later ROM6 CPU-suspend contract onto NSE-1.
 	result.mad2_clock_stop = false;
@@ -696,9 +696,7 @@ constexpr nokia_product_config make_2100_config()
 	// NAM-2 application contract.
 	result.external_service_transport = true;
 	result.external_service = EXTERNAL_SERVICE_NAM2;
-	// The NAM-2 MBUS start routine acknowledges FIQ3, unmasks bit 3 and waits
-	// for the controller edge; its FIQ3 handler remasks the source on completion.
-	result.mbus_kick_on_unmask = true;
+	result.mbus_timer_enabled = true;
 	// NAM-2 organically follows discovery with type-70 payload 0d00. The
 	// protocol completion is the compact type-74 echo of that exact body.
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
@@ -1157,6 +1155,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 		m_dsp_hle->set_bootstrap_contract(product.dsp_bootstrap);
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
 	m_mad2->set_clock_stop_enabled(product.mad2_clock_stop);
+	m_mbus->set_timer_clock_enabled(product.mbus_timer_enabled);
 	m_kbgpio->set_wiring_contract(product.keypad_wiring);
 	m_gensio->set_wiring_contract(product.gensio_wiring);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
@@ -1936,7 +1935,7 @@ void nokia_dct3_state::mad2_io_w(offs_t offset, uint8_t data)
 {
 	const uint8_t old_data = mad2_register_peek(offset);
 	mad2_register_w(offset, data);
-	if (offset == MAD2_FIQ_MASK && m_product.mbus_kick_on_unmask)
+	if (offset == MAD2_FIQ_MASK)
 		m_mbus->fiq_mask_w(old_data, data);
 	trace_mad2_write(offset, data, old_data);
 }

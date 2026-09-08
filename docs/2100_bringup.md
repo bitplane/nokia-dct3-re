@@ -54,8 +54,9 @@ contract is inherited merely because its values appear compatible.
 - The four bit-3 setter regions belong to the MBUS lifecycle. `0x2f7f90`
   initializes the controller, `0x2f7c24` acknowledges FIQ3 and unmasks it to
   start activity, `0x2f7d2a` handles FIQ3 and remasks it, and `0x307758`
-  services per-byte FIQ2 events. Enabling the controller's already modeled
-  idle-to-active FIQ3 edge makes this firmware-owned sequence run.
+  services per-byte FIQ2 events. Public MADos material identifies FIQ3 as the
+  independent 423.1 Hz `FIQ_MBUSTIM` source; modeling that clock makes this
+  firmware-owned sequence run without a product-specific kick.
 - The resulting transmitter emits the checksum-valid physical MBUS frame
   `1f ff 00 d0 00 01 01 01 31` at 9,600 baud. With no peer it retries the
   same frame. Reusing the DSP-framed D0 acknowledgement/completion semantics,
@@ -65,7 +66,7 @@ contract is inherited merely because its values appear compatible.
   transport acknowledgements, terminal startup `D0/04`, and phone response
   `D0/05`. A diagnostic-only run supplied those bytes through RX/FIQ2 and NAM-2
   organically emitted the documented `D0/05`, validating the application
-  exchange. It did not settle reproducibly because MAD2 FIQ3 timing and
+  exchange. It did not settle reproducibly because MBUSTIM phase and
   single-wire echo/collision arbitration remain unresolved; no responder from
   that trial is retained.
 - NAM-2 performs an organic five-row keypad scan. Its column mask remains `0x3f`
@@ -83,11 +84,12 @@ therefore established bounded absence only.
 ## First unresolved boundary
 
 The display, DSP bootstrap, service discovery, application-registration, keypad
-wiring and MBUS controller-start contracts are established for v5.84. The first
-unresolved boundary is now the MAD2 electrical/timing contract needed to carry
-the known physical M2BUS startup exchange: FIQ3 clock and phase, line echo,
-collision detection, arbitration and retry timing. Primary MAD2 documentation or
-a physical NAM-2 trace is required to distinguish these behaviors; the disproven
-DSP-framed reply and timing-calibrated responders must not be retained as shims.
+wiring, MBUS controller-start contract and 423.1 Hz FIQ3 source are established
+for v5.84. The first unresolved boundary is now the electrical contract needed
+to carry the known physical M2BUS startup exchange: timer phase, line echo,
+collision detection, arbitration and retry timing. Primary MAD2 documentation
+or a physical NAM-2 trace is required to distinguish these behaviors; the
+disproven DSP-framed reply and timing-calibrated responders must not be retained
+as shims.
 SIM remains dormant at this boundary; its controller and card profiles must not
 be promoted until execution reaches their firmware consumers.

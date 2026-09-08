@@ -120,11 +120,8 @@ void nokia_mbus_device::write(offs_t offset, u8 data)
 	}
 	case 1:
 		m_status_latch = data & 0x0f;
-		// Both recovered 3210 initializers set the low status bits and bit 7
-		// before entering receive mode. The source clock for this FIQ3 event is
-		// not recovered, so preserve the observed calibrated delay explicitly.
-		if (BIT(data, 7))
-			m_fiq3_timer->adjust(m_byte_delay);
+		// Bit 7 resets the serial bit counter; FIQ3 is the independent periodic
+		// MBUSTIM source and is controlled through the MAD2 FIQ mask.
 		trace_event("status", data);
 		break;
 	case 2:
@@ -151,11 +148,13 @@ bool nokia_mbus_device::receive_byte(u8 data)
 
 void nokia_mbus_device::fiq_mask_w(u8 old_mask, u8 new_mask)
 {
-	// ROM4 and later firmware starts an outbound frame by unmasking the MBUS
-	// timer FIQ while the transmitter is idle. Once the first byte is loaded,
-	// TX_ENABLE guards the per-byte mask changes from restarting the frame.
-	if (BIT(old_mask, 3) && !BIT(new_mask, 3) && !(m_control & CTRL_TX_ENABLE))
-		m_fiq3_timer->adjust(m_byte_delay);
+	if (!m_timer_clock_enabled)
+		return;
+
+	if (BIT(old_mask, 3) && !BIT(new_mask, 3))
+		m_fiq3_timer->adjust(m_fiq3_period, 0, m_fiq3_period);
+	else if (!BIT(old_mask, 3) && BIT(new_mask, 3))
+		m_fiq3_timer->adjust(attotime::never);
 }
 
 void nokia_mbus_device::schedule_byte()
@@ -181,9 +180,8 @@ TIMER_CALLBACK_MEMBER(nokia_mbus_device::byte_complete)
 
 TIMER_CALLBACK_MEMBER(nokia_mbus_device::fiq3_event)
 {
-	// The calibrated source event is delayed.  Firmware can enable the
-	// transmitter before it expires, in which case the pending idle/start edge
-	// is stale and must not interrupt the active per-byte FIQ2 sequence.
+	// FIQ3 is the 423.1 Hz MBUS bit timer. Firmware normally masks it while a
+	// byte is shifting; do not turn a late timer edge into a second TX event.
 	if (m_control & CTRL_TX_ENABLE)
 	{
 		trace_event("fiq3_suppressed_tx_active");

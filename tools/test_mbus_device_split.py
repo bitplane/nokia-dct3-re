@@ -35,6 +35,14 @@ class MbusDeviceSplitTest(unittest.TestCase):
         self.assertNotIn("MBUS_BYTE_DELAY_MS", self.phone)
         self.assertNotIn("set_byte_delay", self.header)
 
+    def test_mbus_timer_is_physical_not_a_product_kick(self):
+        self.assertIn("attotime::from_ticks(10, 4231)", self.header)
+        self.assertIn("m_fiq3_timer->adjust(m_fiq3_period, 0, m_fiq3_period)", self.device)
+        self.assertNotIn("mbus_kick_on_unmask", self.phone)
+        self.assertIn("set_timer_clock_enabled", self.header)
+        self.assertIn("product.mbus_timer_enabled", self.phone)
+        self.assertNotIn("BIT(data, 7))\n\t\t\tm_fiq3_timer", self.device)
+
 
 if __name__ == "__main__":
     unittest.main()
