@@ -7,20 +7,100 @@
     "v5.01_address": "0x2d7770",
     "source_to_channel": [0, 4, 5, 6, 7, 3, 2, 1]
   },
+  "board_source": {
+    "document": "Nokia NSE-8/9 System Module Service Manual, issue 1, 07/99",
+    "table": "Table 23, NSE-8/9 CCONT ADC Usage",
+    "url": "https://manualmachine.com/nokia/3210/8179317-service-manual/"
+  },
   "channels": [
-    {"channel": 0, "signal": "vbatt", "confidence": "strong", "consumer": "early five-sample battery reader 0x2a84b0 and task-18 accepted window 0x2be..0x314"},
-    {"channel": 1, "signal": "vbatt", "confidence": "strong", "consumer": "source-7 monitor, voltage calibration and 2100-unit shutdown floor; scalar reader 0x2a68c4 has 11 classified callers"},
-    {"channel": 2, "signal": "unresolved", "confidence": "unknown", "consumer": "logical source 6 route only"},
-    {"channel": 3, "signal": "bsi", "confidence": "moderate", "consumer": "independent battery-size input reader at 0x2a90b4"},
-    {"channel": 4, "signal": "btemp", "confidence": "moderate", "consumer": "five classified init-mode callers plus independent charge-fault reader 0x2a90ac"},
-    {"channel": 5, "signal": "vchar", "confidence": "strong", "consumer": "six-sample charger debounce at 0x2b084c with raw threshold 0x64"},
-    {"channel": 6, "signal": "unresolved", "confidence": "unknown", "consumer": "logical source 3 route only"},
-    {"channel": 7, "signal": "unresolved", "confidence": "unknown", "consumer": "one early initialization sample; no organic charger-edge reread"}
+    {
+      "channel": 0,
+      "signal": "battery_voltage",
+      "ccont_pin": "RSSI",
+      "board_signal": "Vb",
+      "default_raw": 704,
+      "typical_scale": "4.7 mV/bit; the default represents about 3.31 V",
+      "confidence": "strong",
+      "consumer": "early five-sample reader 0x2a84b0 and task-18 accepted window 0x2be..0x314"
+    },
+    {
+      "channel": 1,
+      "signal": "battery_sample",
+      "ccont_pin": "unresolved",
+      "board_signal": "unresolved",
+      "default_raw": 704,
+      "confidence": "firmware-strong, physical-unresolved",
+      "consumer": "source-7 monitor, voltage calibration and 2100-unit shutdown floor; scalar reader 0x2a68c4 has 11 classified callers",
+      "constraint": "the corresponding standard-DCT3 source uses selector 2/VBAT, but NSE-8 routes it to selector 1 even though the service manual does not identify a second battery pin"
+    },
+    {
+      "channel": 2,
+      "signal": "switcher_output",
+      "ccont_pin": "Vbat",
+      "board_signal": "Vdc_out",
+      "default_raw": 508,
+      "typical_scale": "6.5 mV/bit; the default represents about 3.3 V",
+      "confidence": "strong",
+      "consumer": "logical source 6 route"
+    },
+    {
+      "channel": 3,
+      "signal": "pscc_output",
+      "ccont_pin": "BSI",
+      "board_signal": "Vchout",
+      "default_raw": 575,
+      "typical_scale": "4.7 mV/bit; manual uncalibrated reading at 2.7 V",
+      "confidence": "strong",
+      "consumer": "independent reader at 0x2a90b4; this is not a battery-pack BSI resistor on NSE-8"
+    },
+    {
+      "channel": 4,
+      "signal": "btemp",
+      "ccont_pin": "BTEMP",
+      "board_signal": "BTEMP",
+      "default_raw": 327,
+      "typical_scale": "manual NTC table reading at 25 C",
+      "confidence": "strong",
+      "consumer": "five classified init-mode callers plus independent charge-fault reader 0x2a90ac"
+    },
+    {
+      "channel": 5,
+      "signal": "vchar",
+      "ccont_pin": "Vchar",
+      "board_signal": "V_charge_in",
+      "default_raw": 0,
+      "connected_raw": 521,
+      "typical_scale": "manual uncalibrated reading at 8.4 V",
+      "confidence": "strong",
+      "consumer": "six-sample charger debounce at 0x2b084c with raw threshold 0x64"
+    },
+    {
+      "channel": 6,
+      "signal": "rf_temperature",
+      "ccont_pin": "VCXOTEMP",
+      "board_signal": "RF_temp",
+      "default_raw": 512,
+      "confidence": "strong identity, unscaled value",
+      "consumer": "logical source 3 route and direct service/measurement readers"
+    },
+    {
+      "channel": 7,
+      "signal": "external_analog",
+      "ccont_pin": "EAD",
+      "board_signal": "EAD",
+      "default_raw": 0,
+      "confidence": "strong identity, external circuit unspecified",
+      "consumer": "logical source 4 route and one early initialization sample; no organic charger-edge reread"
+    }
   ],
   "timing": {
     "firmware_contract": "write control, poll GENSIO status, read result registers",
+    "sample_contract": "the control write latches one ten-bit result for the subsequent LSB/MSB reads",
+    "hardware_synchronization": "the service manual says CCONT conversion is synchronized to TXP",
     "conversion_irq": false,
     "required_nonzero_delay": false,
-    "physical_duration": null
+    "firmware_visible_busy": false,
+    "physical_duration": null,
+    "closure": "physical conversion duration is not recoverable from these ROMs: the helper observes only GENSIO transfer readiness and has no ADC-ready status, interrupt or delay operation"
   }
 }

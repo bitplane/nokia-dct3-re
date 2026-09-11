@@ -3,7 +3,7 @@
 This is the detailed 3210 v6.00 firmware map for the battery ADC and classifier.
 The ordinary-boot investigation is closed: current inputs select a safe monitor
 state and do not block the interactive UI. Remaining work is physical: identify
-selector nets and units from board evidence, then model battery dynamics only
+selector 1's internal mux and units from board evidence, then model battery dynamics only
 when an organic application or charging path requires them.
 
 ## Signal path
@@ -22,10 +22,15 @@ source 7
 
 The swap16-correct source-to-selector table is `0 4 5 6 7 3 2 1` for sources
 0 through 7. Runtime tracing confirms source 7 selects physical channel 1.
-Channel 1 is a second VBATT input: it uses the same voltage-calibration fields
-as the direct battery path, scales the result by `1500/313`, and applies a
-2100-unit shutdown floor. Channel 3 is consumed separately by the battery-size
-input reader. This corrects the former BSI hypothesis for channel 1.
+Channel 1 is a firmware battery quantity: it uses voltage-calibration fields,
+scales the result by `1500/313`, and applies a 2100-unit shutdown floor. Its
+physical CCONT mux input remains unresolved. Nokia's NSE-8 service manual
+establishes that channel 0's conventional `RSSI` input carries battery `Vb`,
+while channel 3's conventional `BSI` input carries PSCC output `Vchout`; the
+latter is not a battery-pack identification resistor. This corrects the earlier
+BSI label without inventing a second physical battery connection. The other
+previously unnamed selectors are now classified from the conventional CCONT
+order and NSE-8 table: selector 6 is `RF_temp`/VCXOTEMP and selector 7 is EAD.
 
 The calibration/scaling performed by `0x27cc74` is:
 
@@ -38,10 +43,12 @@ sample = floor(calibrated * 1500 / 313)
 to zero. A second logical sample can enter through source 8, but the cold-boot
 safety average and the classifier's primary voltage sample both use source 7.
 
-The separate early power-on check at `0x2a84b0` directly reads physical channel
-0 and task 18 accepts raw `0x02be..0x0314`; this is the other 3210 VBATT path.
-The product profile therefore routes one stable battery input to channels 0 and
-1 while retaining independent BSI, BTEMP and VCHAR inputs on channels 3, 4 and 5.
+The separate early power-on check at `0x2a84b0` directly reads selector 0 and
+task 18 accepts raw `0x02be..0x0314`; this is the physical Vb/RSSI path. The
+product profile retains the same proven safe raw sample for selector 1 because
+its firmware semantics are also battery-voltage-like, without asserting a
+second VBATT net. Selectors 2/3/4/5 model the manual-identified Vdc_out, Vchout,
+BTEMP and VCHAR signals.
 
 ## Calibration records
 
@@ -180,11 +187,11 @@ selector-4 consumer at `0x2a90ac` treats values below 26 as its non-fault path,
 clears state `0x112448`, and posts task-19 event `0x44`. This supports a
 temperature-like interpretation but does not prove the PCB net name.
 
-The independent selector-3 read at `0x2a90b4`, together with the standard
-DCT3 channel assignment, identifies it as BSI with moderate confidence.
-Selector 4 is correspondingly retained as BTEMP with moderate confidence.
-Selectors 2, 6 and 7 remain unnamed because their recovered consumers do not
-establish a board-level electrical quantity.
+The independent selector-3 read at `0x2a90b4` consumes PSCC output `Vchout`;
+its former BSI label was an invalid import from conventional DCT3 wiring.
+Selector 2 is switcher output `Vdc_out`, and selector 4 is BTEMP. Selectors 6
+and 7 remain unnamed because their recovered consumers do not establish a
+board-level electrical quantity.
 
 Mode 4 has a distinct, external completion contract. Its event `0x43` has one
 recovered poster, `0x2a6880`, selected only by payload 3 of incoming class-`0x40`

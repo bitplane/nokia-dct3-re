@@ -254,12 +254,18 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0xf` | interrupt mask | |
 
 **ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver deliberately exposes raw selectors
-`0..7`; on NSE-8, selectors 0/1 are VBATT, 3 is BSI, 4 is BTEMP and 5 is VCHAR, while the remaining board-level
-signal names remain incomplete.
+`0..7`. Nokia's NSE-8 service manual establishes its non-standard wiring:
+selector 0 measures battery `Vb` through the CCONT `RSSI` input, selector 2
+measures switcher `Vdc_out` through `Vbat`, selector 3 measures PSCC `Vchout`
+through `BSI`, selectors 4/5 are BTEMP/VCHAR, selector 6 is RF temperature on
+VCXOTEMP and selector 7 is EAD. Selector 1 has a proven firmware battery role
+but its physical mux input remains unresolved.
 Firmware boot reader `0x2a84b0` directly samples selector 0, whereas the later ADC-monitor source 7
-maps through ROM table `0x2e2d74` to selector 1. Both are voltage paths; selector 1 uses voltage calibration and the 2100-unit shutdown floor. The complete logical-source table is identical in
+maps through ROM table `0x2e2d74` to selector 1. Both have battery semantics in firmware; selector 1 uses voltage calibration and the 2100-unit shutdown floor. The complete logical-source table is identical in
 3210 v5.01. Values come from the product's typed ADC tuple; electrical
-scaling and PCB net names remain open.
+nominal scaling for the five manual-tabulated signals is documented in
+`ccont_subsystem.md`; selector 1's mux, selector 6's temperature scale and
+selector 7's external attachment remain open.
 
 A physical charger edge establishes selector 5 more narrowly: CCONT source bit 3 wakes the
 firmware, which continues sampling selector 5 for the connected state. The MAME input now drives

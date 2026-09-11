@@ -38,9 +38,9 @@ The device boundary is classified by evidence level:
 | Surface | Classification | Basis and limitation |
 | --- | --- | --- |
 | CCONT selection and command grammar | Derived contract | Both 3210 ROMs select endpoint `0x25`, send the same command/address grammar, and use instruction-equivalent helpers. GENSIO status belongs to the separate serial controller, not CCONT. |
-| Registers `0x2`/`0x3` ADC result | Tested partial hardware | The focused trace validates LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; immediate completion remains inferred. |
+| Registers `0x2`/`0x3` ADC result | Tested partial hardware | The control write latches one ten-bit sample, and the focused trace validates stable LSB and `0xb0 | high-two-bits` packing for all eight deterministic selectors; no separate firmware-visible busy/IRQ contract exists in either 3210 ROM. |
 | Registers `0xe`/`0xf` status, mask, write-one-clear, IRQ | Tested partial hardware | Both 3210 ROMs read reset status `0x03`: persistent ready bit 0 plus clearable PWRONX cause bit 1. Charger-originated restart exposes cause bit 2, while an operational charger edge uses source bit 3 and MAD2 IRQ2. Firmware reads and clears both forms through register `0x0e`. |
-| ADC selector values | Product configuration | Firmware-visible routing identifies 3210 channels 0/1 as VBATT, 3 as BSI, 4 as BTEMP and 5 as VCHAR. Each product supplies named board wiring plus reviewed raw defaults; this is not a battery simulation. |
+| ADC selector values | Product configuration | The NSE-8 service manual identifies the non-standard board wiring: Vb uses the CCONT RSSI input, Vdc_out uses Vbat, Vchout uses BSI, and BTEMP/VCHAR retain their named inputs. Each product supplies reviewed raw defaults; this is not a battery simulation. |
 | RTC counters and alarm (`0x07..0x0c`) | Tested partial hardware | Deterministic binary counters produce second/minute sources; ROM arithmetic establishes binary encoding. Physical `0x07..0x0a` are second/minute/hour/day. A controller fixture proves the comparator and IRQ route; an organic keypad workflow programs a user alarm, receives the CCONT IRQ, and starts the ringtone. Month/calendar persistence remains outside the recovered interface. |
 | Watchdog/power register `0x5` | Partial hardware | The documented eight-bit seconds counter, reload and power-off behavior are modeled. WDDISX is an explicit device input and is released in the 3210 profile; both ROMs survive beyond the maximum window through organic reloads. |
 | Other register storage | Compatibility behavior | Registers `0x1`, `0x4`, `0x6` and `0xd` retain organic firmware writes so later reads compose. Five-ROM traces establish traffic but no modeled side effect; storage is not a proved hardware contract. |
@@ -82,7 +82,7 @@ not prove that physical GENSIO or CCONT has zero latency.
 
 | Register | Role | Current fidelity |
 | --- | --- | --- |
-| `0x0` | ADC control/channel request | Inferred; conversion currently completes immediately. |
+| `0x0` | ADC control/channel request | Proven channel-control role; conversion is latched immediately because the ROM exposes no separate completion state. |
 | `0x1` | unidentified control | Compatibility storage. Both 3210 ROMs write `0x40,0x00`; 3310/3330/3410 write `0x70,0x00`. No downstream effect is established. |
 | `0x2` | ADC result LSB | Proven role. |
 | `0x3` | ADC result MSB/status | Proven role; upper returned bits are inferred. |
@@ -174,8 +174,15 @@ explicit boot calibration, not a claim that their PCB nets are identical.
 
 The 3210 v6.00 firmware directly calls `0x2b52cc` with selector `0` in boot
 battery reader `0x2a84b0`, while the later ADC monitor maps logical source 7
-through ROM table `0x2e2d74` to selector 1. Those are distinct paths; the
-electrical signal attached to each selector remains under validation.
+through ROM table `0x2e2d74` to selector 1. Those are distinct firmware paths.
+The conventional CCONT selector order is RSSI, ICHAR, VBAT, BSI, BTEMP, VCHAR,
+VCXOTEMP and EAD. Combined with the NSE-8 board table, it identifies selector 0
+as battery voltage on the repurposed RSSI input, selector 6 as `RF_temp` on
+VCXOTEMP and selector 7 as EAD. Selector 1 has equally strong battery semantics
+in firmware, but its physical CCONT input remains unresolved and must not be
+invented. The corresponding standard-DCT3 logical source routes to selector
+2/VBAT; the 3210 route table redirects it to selector 1 despite the service
+manual not naming a second battery input.
 
 The eight-byte route table is byte-identical in both firmware versions:
 v6.00 `0x2e2d74` and v5.01 `0x2d7770` contain
@@ -184,14 +191,14 @@ the two 3210 builds, but it does not name the PCB nets behind the selectors.
 
 | Selector | Board-level interpretation |
 | ---: | --- |
-| 0 | VBATT; consumed by the early five-sample reader and task-18 raw acceptance window `0x02be..0x0314` |
-| 1 | VBATT; source-7 monitor and scalar reader use voltage calibration and the 2100-unit shutdown floor |
-| 2 | unresolved |
-| 3 | BSI; independently consumed by the battery-size input reader `0x2a90b4` |
-| 4 | BTEMP; selects battery-init mode and feeds the independent charge-fault reader |
-| 5 | VCHAR/charger voltage. `0x2b084c` takes six samples, separates them at raw `0x64`, averages a stable-side set, and publishes the debounced present state. |
-| 6 | unresolved |
-| 7 | unresolved; observed once during early initialization, but not consumed by the organic connect/remove lifecycle. |
+| 0 | Battery voltage `Vb` on the CCONT `RSSI` input; consumed by the early five-sample reader and task-18 raw acceptance window `0x02be..0x0314`. |
+| 1 | Firmware battery sample; source-7 monitor and scalar reader use voltage calibration and the 2100-unit shutdown floor. Physical input unresolved. |
+| 2 | DC/DC switcher output `Vdc_out` on the conventional `Vbat` input. |
+| 3 | PSCC output `Vchout` on the conventional `BSI` input. This is not a pack-identification resistor on NSE-8. |
+| 4 | `BTEMP`; selects battery-init mode and feeds the independent charge-fault reader. |
+| 5 | `VCHAR`/charger voltage. `0x2b084c` takes six samples, separates them at raw `0x64`, averages a stable-side set, and publishes the debounced present state. |
+| 6 | `RF_temp` on the conventional `VCXOTEMP` input. Identity is closed; raw-to-temperature scaling is not recovered. |
+| 7 | `EAD`, the external analog input. Its attached external circuit is unspecified; observed once during early initialization and not consumed by the organic connect/remove lifecycle. |
 
 Static audit proves that selector 1 passes
 through affine calibration at `0x2a68c4`, while selector 4 independently selects
@@ -201,11 +208,24 @@ electrical naming and scaling remain open. Product configuration supplies raw
 ten-bit defaults; these are board inputs, not a finished physical battery model.
 The machine-readable coverage record is `docs/data/ccont_adc_channels.json`.
 
-Firmware's ADC helper writes the control byte, polls GENSIO status and reads the
-two result registers. It does not wait for a CCONT interrupt. Neither 3210 ROM
-requires a nonzero conversion interval, and no independent source establishes
-a physical duration, so completion remains immediate rather than replacing one
-calibration with another. A conversion-complete IRQ remains explicitly excluded.
+The physical mapping comes from Nokia's NSE-8/9 System Module Service Manual,
+issue 1 (07/99), Table 23. Its transfer tables also ground the 3210 defaults:
+selector 0's raw `704` is about 3.31 V at the typical 4.7 mV/bit battery scale;
+selector 2 uses raw `508` for the ordinary 3.3 V switcher level; selector 3 uses
+the documented uncalibrated raw `575` at 2.7 V; selector 4 uses the documented
+25 C NTC value `327`; and connected selector 5 uses the documented uncalibrated
+8.4 V charger value `521`. These are nominal electrical inputs, not values
+searched to obtain firmware state.
+
+Firmware's ADC helper writes the control byte, polls ordinary GENSIO transfer
+status and reads the two result registers. The device latches one ten-bit
+conversion at the control write, so a changing input cannot tear across
+separate LSB/MSB reads. Exhaustive helper decoding in both 3210 ROMs finds no
+ADC-ready status bit, conversion interrupt or delay primitive. The manual says
+conversion is synchronized to TXP but supplies no duration. That physical
+duration is therefore not observable through the recovered firmware contract;
+completion remains immediate rather than replacing an unknowable interval with
+a calibration. A conversion-complete IRQ is explicitly excluded.
 
 ## Interrupt-to-firmware behavior
 
@@ -350,7 +370,7 @@ IRQ contract.
 | --- | --- | --- |
 | Serial grammar | Validated across five ROMs; 90/90 descriptor entries decoded and identical | Physical GENSIO busy duration |
 | Register surface | All 16 addresses classified as descriptor-backed, direct-special, or compatibility-only | Side effects of `0x1`, `0x4`, `0x6`, `0xd` |
-| ADC | All eight channels exercised; NSE-8 VBATT/BSI/BTEMP/VCHAR routes classified | Electrical units and channels 2/6/7 |
+| ADC | All eight channels exercised; NSE-8 Vb/Vdc_out/Vchout/BTEMP/VCHAR/RF_temp/EAD identities classified; conversion latching and lack of firmware-visible busy/IRQ closed | Physical mux identity of selector 1; RF-temperature scale and EAD external circuit |
 | Interrupts | Bits 3/4/5/7 mapped; status bits 0/1/2 separated from IRQ latches | Physical owner and stimulus for bit 6 |
 | Reset/retention | Cold, software, MAD2/CCONT watchdog, rail-off and charger wake distinguished | Physical rail transition delays |
 | Watchdog | One-second eight-bit reload, WDDISX, expiry and zero-data power-off covered | Oscillator tolerance |
@@ -360,12 +380,14 @@ IRQ contract.
 
 ## Hardware-measurement backlog
 
-1. Measure GENSIO select-to-ready and ADC request-to-result latency; firmware
-   proves polling but no nonzero lower bound.
+1. Measure GENSIO serial transfer latency independently. ADC conversion duration
+   is TXP-synchronized in hardware but has no recovered firmware-visible busy
+   contract.
 2. Capture registers `0x1`, `0x4`, `0x6` and `0xd` while changing charger,
    sleep and RTC states, and stimulate interrupt bit 6 if possible.
-3. Correlate ADC channels 2, 6 and 7 with board nets and measure raw-to-unit
-   transfer functions for VBATT, BSI, BTEMP and VCHAR.
+3. Correlate selector 1 with the internal NSE-8 mux, recover the RF-temperature
+   transfer function for selector 6, and identify any external circuit attached
+   to selector 7/EAD.
 4. Measure baseband rail transition delay and watchdog oscillator tolerance.
    Model CHAPS current and battery evolution only after both a firmware
    consumer and physical relationship are established.

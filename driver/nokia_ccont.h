@@ -38,6 +38,8 @@ private:
 	uint8_t m_watchdog = 0;
 	uint8_t m_regs[0x10] = {0};
 	uint16_t m_adc_source[8] = {0};
+	uint16_t m_adc_result = 0;
+	uint8_t m_adc_channel = 0;
 	bool m_data_cycle = false;
 	bool m_ready = true;
 	bool m_powered = true;

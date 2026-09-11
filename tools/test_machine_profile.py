@@ -389,17 +389,24 @@ class MachineProfileTest(unittest.TestCase):
             self.driver,
         )
 
-    def test_3210_board_profile_routes_both_voltage_inputs(self):
+    def test_3210_board_profile_uses_evidenced_nse8_inputs(self):
         profile = self.driver.split(
             "constexpr nokia_ccont_board_profile ADC_3210", 1
         )[1].split("constexpr nokia_ccont_board_profile ADC_STANDARD", 1)[0]
-        self.assertIn("{ 0x2c0, 0x2c0, 0x2d0, 0x280, 0x200, 0x000, 0x200, 0x000 }", profile)
-        self.assertIn("{ 0, 1 }, 2, 3, 4, 5", profile)
+        for value in (
+            "NSE8_VDC_OUT_3V3",
+            "NSE8_VCHOUT_2V7",
+            "NSE8_BTEMP_25C",
+            "NSE8_VCHAR_8V4",
+        ):
+            self.assertIn(value, self.driver)
+        self.assertIn("5, NSE8_VCHAR_8V4", profile)
         census = json.loads((ROOT / "docs/data/ccont_adc_channels.json").read_text())
         signals = {item["channel"]: item["signal"] for item in census["channels"]}
-        self.assertEqual("vbatt", signals[0])
-        self.assertEqual("vbatt", signals[1])
-        self.assertEqual("bsi", signals[3])
+        self.assertEqual("battery_voltage", signals[0])
+        self.assertEqual("battery_sample", signals[1])
+        self.assertEqual("switcher_output", signals[2])
+        self.assertEqual("pscc_output", signals[3])
         self.assertEqual("btemp", signals[4])
         self.assertEqual("vchar", signals[5])
         self.assertFalse(census["timing"]["conversion_irq"])
@@ -485,8 +492,8 @@ class MachineProfileTest(unittest.TestCase):
     def test_charger_input_updates_vchar_and_latches_both_edges(self):
         body = self.driver.split("INPUT_CHANGED_MEMBER( nokia_dct3_state::charger_irq )", 1)[1]
         body = body.split("static INPUT_PORTS_START", 1)[0]
-        self.assertIn("set_charger_input(m_product.ccont_board.vchar_channel", body)
-        self.assertIn("m_product.ccont_board.vchar_connected_raw", body)
+        self.assertIn("set_charger_input(m_product.ccont_board.charger_voltage_channel", body)
+        self.assertIn("m_product.ccont_board.charger_connected_raw", body)
         self.assertNotIn("latch_irq_sources", body)
         self.assertNotIn("if (newval)", body)
 
@@ -495,6 +502,33 @@ class MachineProfileTest(unittest.TestCase):
         )[1].split("void nokia_ccont_device::select_w", 1)[0]
         self.assertIn("set_adc_source(channel, connected ? vchar : 0)", ccont_body)
         self.assertIn("latch_irq_sources(0x08)", ccont_body)
+
+    def test_ccont_adc_conversion_latches_one_result(self):
+        header = (ROOT / "driver/nokia_ccont.h").read_text()
+        self.assertIn("uint16_t m_adc_result", header)
+        self.assertIn("uint8_t m_adc_channel", header)
+        conversion = self.ccont.split("case ADC_CTRL:", 1)[1].split(
+            "case WATCHDOG:", 1
+        )[0]
+        self.assertIn("m_adc_result = m_adc_source[channel]", conversion)
+        self.assertIn("m_regs[ADC_LSB] = m_adc_result & 0xff", conversion)
+        self.assertIn(
+            "m_regs[ADC_MSB] = (m_adc_result >> 8) & 0x03", conversion
+        )
+
+    def test_3210_adc_manifest_closes_named_board_inputs(self):
+        import json
+
+        manifest = json.loads(
+            (ROOT / "docs/data/ccont_adc_channels.json").read_text()
+        )
+        channels = {entry["channel"]: entry for entry in manifest["channels"]}
+        self.assertEqual("RSSI", channels[0]["ccont_pin"])
+        self.assertEqual("VCXOTEMP", channels[6]["ccont_pin"])
+        self.assertEqual("EAD", channels[7]["ccont_pin"])
+        self.assertEqual("unresolved", channels[1]["ccont_pin"])
+        self.assertFalse(manifest["timing"]["firmware_visible_busy"])
+        self.assertFalse(manifest["timing"]["conversion_irq"])
 
     def test_charger_wake_resets_the_digital_baseband_domain(self):
         ccont_body = self.ccont.split(

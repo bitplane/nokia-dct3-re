@@ -51,6 +51,8 @@ void nokia_ccont_device::device_start()
 	save_item(NAME(m_watchdog));
 	save_item(NAME(m_regs));
 	save_item(NAME(m_adc_source));
+	save_item(NAME(m_adc_result));
+	save_item(NAME(m_adc_channel));
 	save_item(NAME(m_data_cycle));
 	save_item(NAME(m_powered));
 	save_item(NAME(m_charger_connected));
@@ -62,6 +64,8 @@ void nokia_ccont_device::device_reset()
 {
 	m_cmd = 0;
 	m_watchdog = 0;
+	m_adc_result = 0;
+	m_adc_channel = 0;
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
 	// Ordinary cold start exposes the persistent CCONT-ready bit together with
 	// the PWRONX reset cause. Both 3210 ROMs require this 0x03 reset value.
@@ -205,13 +209,17 @@ void nokia_ccont_device::serial_w(uint8_t data)
 		case ADC_CTRL:
 		{
 			const unsigned channel = (data >> 4) & 0x07;
-			const uint16_t value = m_adc_source[channel];
 			m_regs[address] = data;
-			m_regs[ADC_LSB] = value & 0xff;
-			m_regs[ADC_MSB] = (value >> 8) & 0x03;
+			// A conversion captures one ten-bit sample. Keep that value stable
+			// across the firmware's separate LSB and MSB transactions even if
+			// the external source changes between them.
+			m_adc_channel = channel;
+			m_adc_result = m_adc_source[channel];
+			m_regs[ADC_LSB] = m_adc_result & 0xff;
+			m_regs[ADC_MSB] = (m_adc_result >> 8) & 0x03;
 			if (m_adc_trace)
 				LOGMASKED(LOG_CCONT, "ccont_input: adc_select=%u raw=%03x ctrl=%02x t=%.9f\n",
-					channel, value, data, machine().time().as_double());
+					m_adc_channel, m_adc_result, data, machine().time().as_double());
 			break;
 		}
 		case WATCHDOG:

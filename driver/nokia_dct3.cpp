@@ -81,32 +81,35 @@ namespace {
 struct nokia_ccont_board_profile
 {
 	std::array<u16, 8> channel_defaults;
-	std::array<u8, 2> vbatt_channels;
-	u8 vbatt_channel_count;
-	u8 bsi_channel;
-	u8 btemp_channel;
-	u8 vchar_channel;
-	u16 vchar_connected_raw = 0x03ff;
+	u8 charger_voltage_channel;
+	u16 charger_connected_raw = 0x03ff;
 };
 
 constexpr nokia_ccont_board_profile ADC_DEFAULT = {
 	{ 0x000, 0x3ff, 0x3ff, 0x280, 0x200, 0x000, 0x200, 0x000 },
-	{ 2, 0 }, 1, 3, 4, 5
+	5, 0x03ff
 };
 
-// NSE-8 routes the early battery input to channel 0 and the monitored battery
-// quantity to channel 1. Both paths consume voltage calibration and voltage
-// thresholds; BSI remains the independent channel-3 input.
+// NSE-8 repurposes the conventional DCT3 ADC pins. The service manual gives
+// typical uncalibrated transfer points for Vdc_out, Vchout, BTEMP and VCHAR.
+// Selectors 0/1 retain the firmware-proven safe battery samples. Selector 0 is
+// the documented RSSI/Vb input; selector 1 is a second firmware battery path
+// whose physical mux remains unresolved.
+constexpr u16 NSE8_VDC_OUT_3V3 = 508; // 3.3 V at 6.5 mV/bit
+constexpr u16 NSE8_VCHOUT_2V7 = 575;  // manual's uncalibrated 2.7 V point
+constexpr u16 NSE8_BTEMP_25C = 327;   // 47 kohm NTC at 25 C
+constexpr u16 NSE8_VCHAR_8V4 = 521;   // manual's uncalibrated 8.4 V point
 constexpr nokia_ccont_board_profile ADC_3210 = {
-	{ 0x2c0, 0x2c0, 0x2d0, 0x280, 0x200, 0x000, 0x200, 0x000 },
-	{ 0, 1 }, 2, 3, 4, 5
+	{ 0x2c0, 0x2c0, NSE8_VDC_OUT_3V3, NSE8_VCHOUT_2V7,
+		NSE8_BTEMP_25C, 0x000, 0x200, 0x000 },
+	5, NSE8_VCHAR_8V4
 };
 // Standard 3310 routing: channel 2 is VBATT, 3 is the BMC-3 pack's BSI
 // resistor and 4 is battery temperature. This tuple clears the firmware's
 // ordinary pack/self-test path; it is product input, not a state fixture.
 constexpr nokia_ccont_board_profile ADC_STANDARD = {
 	{ 0x000, 0x3ff, 0x220, 0x026, 0x200, 0x000, 0x200, 0x000 },
-	{ 2, 0 }, 1, 3, 4, 5
+	5, 0x03ff
 };
 
 // NSE-1 uses the standard CCONT channel placement with a BMC-3-class pack.
@@ -114,7 +117,7 @@ constexpr nokia_ccont_board_profile ADC_STANDARD = {
 // state; the firmware retains all pack, temperature and voltage decisions.
 constexpr nokia_ccont_board_profile ADC_5110 = {
 	{ 0x000, 0x3ff, 0x2c0, 0x150, 0x140, 0x000, 0x200, 0x000 },
-	{ 2, 0 }, 1, 3, 4, 5
+	5, 0x03ff
 };
 
 // NAM-2 service material specifies 0.5 V at the BSI node in the service jig.
@@ -123,7 +126,7 @@ constexpr nokia_ccont_board_profile ADC_5110 = {
 // is recovered independently.
 constexpr nokia_ccont_board_profile ADC_2100 = {
 	{ 0x000, 0x3ff, 0x3ff, 0x0b6, 0x200, 0x000, 0x200, 0x000 },
-	{ 2, 0 }, 1, 3, 4, 5
+	5, 0x03ff
 };
 
 struct display_geometry_contract
@@ -2150,8 +2153,8 @@ INPUT_CHANGED_MEMBER( nokia_dct3_state::key_irq )
 
 INPUT_CHANGED_MEMBER( nokia_dct3_state::charger_irq )
 {
-	m_ccont->set_charger_input(m_product.ccont_board.vchar_channel, newval != 0,
-		m_product.ccont_board.vchar_connected_raw);
+	m_ccont->set_charger_input(m_product.ccont_board.charger_voltage_channel, newval != 0,
+		m_product.ccont_board.charger_connected_raw);
 }
 
 INPUT_CHANGED_MEMBER( nokia_dct3_state::mbus_rx_byte )

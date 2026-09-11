@@ -28,8 +28,8 @@
       "evidence": ["docs/ccont_subsystem.md", "tools/charger_lifecycle_check.py"]
     },
     {
-      "id": "ccont_adc_scenario_inputs", "subsystem": "ccont", "status": "prototype", "confidence": "moderate",
-      "boundary": "The phone supplies eight deterministic raw ten-bit selector fixtures; logical-source routing is ROM-proved but electrical signal names, units, calibration and physical battery relationships are unresolved",
+      "id": "ccont_adc_scenario_inputs", "subsystem": "ccont", "status": "partial", "confidence": "strong",
+      "boundary": "The phone supplies eight deterministic raw ten-bit selector inputs and latches each conversion across separate result-byte reads. Both 3210 ROMs prove logical-source routing; Nokia board documentation identifies Vb/RSSI, Vdc_out/VBAT, Vchout/BSI, BTEMP, VCHAR, RF_temp/VCXOTEMP and EAD. Selector 1's internal NSE-8 mux, several transfer scales and physical battery dynamics remain unresolved",
       "evidence": ["docs/ccont_subsystem.md", "docs/battery_classifier_analysis.md"]
     },
     {
@@ -214,7 +214,7 @@
     },
     {
       "id": "nse8_ccont_adc_board_wiring", "subsystem": "ccont", "status": "partial", "confidence": "strong",
-      "boundary": "The paired 3210 firmware routes early battery sampling to CCONT channel 0 and source-7 monitoring to channel 1. Both paths consume voltage thresholds, channel 1 uses the voltage-calibration fields and 1500/313 scaling, and its 2100-unit floor is an undervoltage shutdown predicate. Channel 3 is the independent BSI input, channel 4 is BTEMP and channel 5 is VCHAR; channels 2, 6 and 7 remain electrically unnamed. Product configuration owns this board wiring while CCONT remains an eight-channel converter",
+      "boundary": "The paired 3210 firmware routes early battery sampling to CCONT selector 0 and source-7 monitoring to selector 1. Both consume voltage thresholds; selector 1 uses voltage calibration, 1500/313 scaling and a 2100-unit undervoltage floor, although its internal NSE-8 mux remains unresolved. The service manual and conventional CCONT order identify selector 0 as Vb on RSSI, selector 2 as Vdc_out on VBAT, selector 3 as Vchout on BSI, selectors 4/5 as BTEMP/VCHAR, selector 6 as RF_temp on VCXOTEMP and selector 7 as EAD. The ADC helper exposes no conversion-ready bit, IRQ or delay operation, so TXP-synchronized physical conversion duration is not firmware-observable",
       "evidence": ["docs/battery_classifier_analysis.md", "docs/ccont_subsystem.md", "docs/data/ccont_adc_channels.json"]
     },
     {
