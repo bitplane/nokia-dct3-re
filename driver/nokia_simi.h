@@ -4,8 +4,6 @@
 #ifndef MAME_NOKIA_NOKIA_SIMI_H
 #define MAME_NOKIA_NOKIA_SIMI_H
 
-class nokia_sim_card_device;
-
 class nokia_simi_device : public device_t
 {
 public:
@@ -19,6 +17,10 @@ public:
 
 	auto irq_cb() { return m_irq_cb.bind(); }
 	auto card_detect_cb() { return m_card_detect_cb.bind(); }
+	// Replaceable card peer: activation level and transmitted bytes leave
+	// through callbacks so the controller owns no card topology or tag.
+	auto card_activate_cb() { return m_card_activate_cb.bind(); }
+	auto card_tx_cb() { return m_card_tx_cb.bind(); }
 
 	void set_enabled(bool enabled) { m_enabled = enabled; }
 	bool enabled() const { return m_enabled; }
@@ -50,7 +52,8 @@ private:
 	void clear_transfer_state();
 	void schedule_card_bytes(bool tx_complete, bool response_added);
 
-	required_device<nokia_sim_card_device> m_card;
+	devcb_write_line m_card_activate_cb;
+	devcb_write8 m_card_tx_cb;
 	devcb_write_line m_irq_cb;
 	devcb_write_line m_card_detect_cb;
 	emu_timer *m_rx_timer = nullptr;

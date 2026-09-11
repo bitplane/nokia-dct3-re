@@ -34,6 +34,10 @@ class SimDeviceSplitTest(unittest.TestCase):
         self.assertIn("required_device<nokia_simi_device> m_simi", self.phone)
         self.assertIn("m_simi->irq_cb().set", self.phone)
         self.assertIn("m_sim_card->response_cb().set(m_simi", self.phone)
+        self.assertIn("m_simi->card_activate_cb().set(m_sim_card", self.phone)
+        self.assertIn("m_simi->card_tx_cb().set(m_sim_card", self.phone)
+        self.assertNotIn("required_device<nokia_sim_card_device>", self.simi_header)
+        self.assertNotIn("m_card->", self.simi)
         for method in (
             "rxd_r", "iir_r", "control_r", "rx_count_r", "tx_count_r",
             "txd_w", "iir_w", "control_w", "rx_fifo_control_w",

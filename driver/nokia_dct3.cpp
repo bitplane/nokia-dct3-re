@@ -2743,6 +2743,8 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_SIM_CARD(config, m_sim_card);
 	m_simi->irq_cb().set(FUNC(nokia_dct3_state::sim_irq_w));
 	m_simi->card_detect_cb().set(FUNC(nokia_dct3_state::sim_detect_w));
+	m_simi->card_activate_cb().set(m_sim_card, FUNC(nokia_sim_card_device::activate_w));
+	m_simi->card_tx_cb().set(m_sim_card, FUNC(nokia_sim_card_device::rx_w));
 	m_sim_card->response_cb().set(m_simi, FUNC(nokia_simi_device::card_rx_w));
 }
 

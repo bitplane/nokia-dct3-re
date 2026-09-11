@@ -426,6 +426,8 @@ controller fidelity frontier until a physical source establishes when they fire.
 CHV command/status semantics follow ETSI GSM 11.11 v5.1.0, sections 9.4 and
 9.5: <https://www.etsi.org/deliver/etsi_gts/11/1111/05.01.00_60/gsmts_1111v050100p.pdf>.
 
-The controller currently locates the card through the sibling tag
-`^sim_card`. Replace this with a configurable finder or transmit callback before
-reusing SIMI in a machine whose card topology or tag differs.
+The controller holds no card finder. Activation level and transmitted bytes
+leave through `card_activate_cb` and `card_tx_cb`, and the card's responses
+return through its own `response_cb`; the phone wires the pair in its machine
+configuration. A machine with a different card topology or tag rebinds the
+callbacks without touching the controller.

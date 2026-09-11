@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "nokia_simi.h"
 
-#include "nokia_sim_card.h"
 
 #include <algorithm>
 
@@ -24,7 +23,8 @@ const attotime SIMI_CHARACTER_TIME = attotime::from_hz(960);
 nokia_simi_device::nokia_simi_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_SIMI, tag, owner, clock),
-	m_card(*this, "^sim_card"),
+	m_card_activate_cb(*this),
+	m_card_tx_cb(*this),
 	m_irq_cb(*this),
 	m_card_detect_cb(*this)
 {
@@ -90,7 +90,7 @@ void nokia_simi_device::set_card_present(bool present)
 		// and reset volatile card protocol state, but do not synthesize the
 		// still-unmapped SIMI 0x80 interrupt cause.
 		clear_transfer_state();
-		m_card->deactivate();
+		m_card_activate_cb(0);
 	}
 	// MAD2 exposes socket insertion/removal separately from SIMI UART traffic.
 	// Both mapped NSE-8 ROMs service that edge on FIQ7 and sample status bit 3
@@ -137,7 +137,7 @@ void nokia_simi_device::control_w(u8 data)
 	m_tx_ready_pending = false;
 	m_uart_tx_count = 0;
 	if (m_card_present)
-		m_card->activate();
+		m_card_activate_cb(1);
 	// Deliver ATR outside the control-register write so its FIQ cannot
 	// re-enter the firmware's activation routine.
 	schedule_card_bytes(false, m_card_present);
@@ -274,7 +274,7 @@ void nokia_simi_device::tx_fifo_control_w(u8 data)
 	const u16 rx_count_before = m_rx_count;
 	if (m_card_present)
 		for (unsigned i = 0; i < m_uart_tx_count; i++)
-			m_card->rx_w(m_uart_tx_fifo[i]);
+			m_card_tx_cb(m_uart_tx_fifo[i]);
 	m_uart_tx_count = 0;
 	schedule_card_bytes(true, m_rx_count != rx_count_before);
 }
