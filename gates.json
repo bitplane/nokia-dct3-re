@@ -2140,6 +2140,89 @@
       ]
     },
     {
+      "name": "verify-flash-pmm",
+      "prerequisites": [
+        "normalize-3410"
+      ],
+      "variables": {},
+      "steps": [
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": [
+            "--no-print-directory"
+          ],
+          "run_target": "run",
+          "tokens": [
+            "$(DCT3_RUN_3410)",
+            "RUN_DIR=$(RUN_DIR)_flash_pmm_first",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_flash_pmm_nvram)",
+            "PRESERVE_NVRAM=0",
+            "SECONDS=22",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_flash_pmm_first",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_flash_pmm_nvram)",
+            "PRESERVE_NVRAM": "0",
+            "SECONDS": "22",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": true,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/flash_pmm_persistence_check.py",
+          "arguments": [
+            "$(RUN_DIR)_flash_pmm_nvram/noki3410/flash",
+            "roms/noki3410/3410f546e.fls",
+            "\"roms/noki3410/3410 virgin eeprom 005f0000.fls\""
+          ],
+          "options": []
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": [
+            "--no-print-directory"
+          ],
+          "run_target": "run",
+          "tokens": [
+            "$(DCT3_RUN_3410)",
+            "RUN_DIR=$(RUN_DIR)_flash_pmm_reload",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_flash_pmm_nvram)",
+            "PRESERVE_NVRAM=1",
+            "SECONDS=22",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_flash_pmm_reload",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_flash_pmm_nvram)",
+            "PRESERVE_NVRAM": "1",
+            "SECONDS": "22",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          }
+        },
+        {
+          "step": "shell",
+          "silent": true,
+          "command": "frame=$$(find $(RUN_DIR)_flash_pmm_reload -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 3410 PMM-reload frame produced\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_3410_IDLE_SHA)"
+        },
+        {
+          "step": "shell",
+          "silent": true,
+          "command": "grep -Fqx 'soft_resets=0' $(RUN_DIR)_flash_pmm_first/boot_summary.txt"
+        },
+        {
+          "step": "announce",
+          "silent": true,
+          "command": "echo \"OK \u2014 3410 v5.46 flash-backed PMM changed without touching firmware and reloaded from NVRAM to the idle frame\""
+        }
+      ]
+    },
+    {
       "name": "verify-model-frontier-state",
       "prerequisites": [
         "normalize-3330",

@@ -1,0 +1,4396 @@
+{
+  "schema_version": 1,
+  "method": "bounded first-read/first-write MAD2 ledger from organic two-second boots",
+  "limitations": "one record per direction/register/reset; values are first observations, not frequency counts",
+  "coverage": {
+    "roms": 5,
+    "records": 409,
+    "observed_offsets": [
+      0,
+      1,
+      2,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      21,
+      22,
+      24,
+      25,
+      26,
+      27,
+      32,
+      36,
+      40,
+      42,
+      44,
+      45,
+      46,
+      49,
+      50,
+      51,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      168,
+      169,
+      171,
+      173,
+      174,
+      175,
+      176,
+      177,
+      178,
+      179,
+      237,
+      238,
+      239
+    ],
+    "unobserved_offsets": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      20,
+      23,
+      28,
+      29,
+      30,
+      31,
+      33,
+      34,
+      35,
+      37,
+      38,
+      39,
+      41,
+      43,
+      47,
+      48,
+      52,
+      53,
+      54,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127,
+      128,
+      129,
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      148,
+      149,
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164,
+      165,
+      166,
+      167,
+      170,
+      172,
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      193,
+      194,
+      195,
+      196,
+      197,
+      198,
+      199,
+      200,
+      201,
+      202,
+      203,
+      204,
+      205,
+      206,
+      207,
+      208,
+      209,
+      210,
+      211,
+      212,
+      213,
+      214,
+      215,
+      216,
+      217,
+      218,
+      219,
+      220,
+      221,
+      222,
+      223,
+      224,
+      225,
+      226,
+      227,
+      228,
+      229,
+      230,
+      231,
+      232,
+      233,
+      234,
+      235,
+      236,
+      240,
+      241,
+      242,
+      243,
+      244,
+      245,
+      246,
+      247,
+      248,
+      249,
+      250,
+      251,
+      252,
+      253,
+      254,
+      255
+    ]
+  },
+  "roms": [
+    {
+      "label": "3210-v6.00",
+      "source": "organic two-second verbose boot log (generated, not retained)",
+      "records": 94,
+      "registers": [
+        {
+          "direction": "R",
+          "offset": 0,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x002afc1e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 1,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0023060c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 2,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00290a6e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 2,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x00290a72"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 8,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00290a9a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 8,
+          "values": [
+            16
+          ],
+          "pcs": [
+            "0x002aa93e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 9,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00290a9a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 9,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002b30f0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002aa9b4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0020012c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002b3112"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200130"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 12,
+          "values": [
+            5
+          ],
+          "pcs": [
+            "0x002aa904"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 12,
+          "values": [
+            10
+          ],
+          "pcs": [
+            "0x0026a910"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 13,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b643e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 13,
+          "values": [
+            12
+          ],
+          "pcs": [
+            "0x002b6442"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 14,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00270876"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 15,
+          "values": [
+            246
+          ],
+          "pcs": [
+            "0x002aa8d0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 15,
+          "values": [
+            249
+          ],
+          "pcs": [
+            "0x002aa93a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 16,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002aa954"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 17,
+          "values": [
+            21
+          ],
+          "pcs": [
+            "0x002aa954"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 18,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002aa970"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 18,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002aa962"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 19,
+          "values": [
+            23
+          ],
+          "pcs": [
+            "0x002aa970"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 19,
+          "values": [
+            23
+          ],
+          "pcs": [
+            "0x002aa962"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x002aafce"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x002aafc6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 22,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002af538"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002aafdc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002aafc2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 25,
+          "values": [
+            192
+          ],
+          "pcs": [
+            "0x002ab050"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 25,
+          "values": [
+            199
+          ],
+          "pcs": [
+            "0x002ab054"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 26,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ab046"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 27,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a68fc"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 32,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002b1d08"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 32,
+          "values": [
+            5
+          ],
+          "pcs": [
+            "0x002b1d0e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 36,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b1cf4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 36,
+          "values": [
+            4
+          ],
+          "pcs": [
+            "0x002b1cfa"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 40,
+          "values": [
+            240
+          ],
+          "pcs": [
+            "0x002af48e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 40,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b30e0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 42,
+          "values": [
+            254
+          ],
+          "pcs": [
+            "0x002b2fce"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 42,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x002b30c8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 44,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002afb28"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x002b52e0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 45,
+          "values": [
+            33
+          ],
+          "pcs": [
+            "0x002b1cea"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 46,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b1d82"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 49,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a6668"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 49,
+          "values": [
+            2
+          ],
+          "pcs": [
+            "0x002a666c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 50,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a11ce"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 50,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a11d4"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 51,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a3236"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 51,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a3246"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 55,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a01be"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 56,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x002a0562"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 56,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002a05e0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 57,
+          "values": [
+            50
+          ],
+          "pcs": [
+            "0x002a01d2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 57,
+          "values": [
+            50
+          ],
+          "pcs": [
+            "0x002a063c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 58,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x002a060a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 59,
+          "values": [
+            96
+          ],
+          "pcs": [
+            "0x002a020a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 60,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002a04de"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 61,
+          "values": [
+            24
+          ],
+          "pcs": [
+            "0x002a0620"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 62,
+          "values": [
+            26
+          ],
+          "pcs": [
+            "0x002a062e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 104,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002b30e4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 105,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002b30e8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 106,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002b30c2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 107,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b30b4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 107,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002b30b8"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 108,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002afba6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 109,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x002b642c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 110,
+          "values": [
+            36
+          ],
+          "pcs": [
+            "0x002b1d4e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 111,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a147c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 111,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000b0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 112,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00200068"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 113,
+          "values": [
+            2
+          ],
+          "pcs": [
+            "0x00200070"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 114,
+          "values": [
+            129
+          ],
+          "pcs": [
+            "0x002b51ca"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 114,
+          "values": [
+            129
+          ],
+          "pcs": [
+            "0x00200078"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 115,
+          "values": [
+            35
+          ],
+          "pcs": [
+            "0x00200080"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 168,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002af482"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 168,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002b30da"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 169,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002b30ec"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 171,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002b30d4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 173,
+          "values": [
+            196
+          ],
+          "pcs": [
+            "0x002afbfa"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 174,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002afc06"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 175,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a320e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 175,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000a8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 176,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200088"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 177,
+          "values": [
+            253
+          ],
+          "pcs": [
+            "0x00200090"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 178,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002b51f2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 178,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200098"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 179,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x002a3222"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 179,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x002000a0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 237,
+          "values": [
+            33
+          ],
+          "pcs": [
+            "0x002afc00"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 238,
+          "values": [
+            128
+          ],
+          "pcs": [
+            "0x002afc0c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 239,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000b8"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3210-v5.01",
+      "source": "organic two-second verbose boot log (generated, not retained)",
+      "records": 93,
+      "registers": [
+        {
+          "direction": "R",
+          "offset": 0,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x002ad04a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 1,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002302dc"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 2,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0029042a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 2,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0029042e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 8,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0029044c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 8,
+          "values": [
+            16
+          ],
+          "pcs": [
+            "0x002a75ce"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 9,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0029044c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 9,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002b0368"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002a7644"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0020012c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002b038a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200130"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 12,
+          "values": [
+            5
+          ],
+          "pcs": [
+            "0x002a7594"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 12,
+          "values": [
+            10
+          ],
+          "pcs": [
+            "0x002659f0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 13,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b381a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 13,
+          "values": [
+            12
+          ],
+          "pcs": [
+            "0x002b381e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 15,
+          "values": [
+            246
+          ],
+          "pcs": [
+            "0x002a7560"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 15,
+          "values": [
+            249
+          ],
+          "pcs": [
+            "0x002a75ca"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 16,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a75e4"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 17,
+          "values": [
+            23
+          ],
+          "pcs": [
+            "0x002a75e4"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 18,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a7600"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 18,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a75f2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 19,
+          "values": [
+            25
+          ],
+          "pcs": [
+            "0x002a7600"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 19,
+          "values": [
+            25
+          ],
+          "pcs": [
+            "0x002a75f2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x002a805a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x002a8052"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 22,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ac964"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a8068"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a804e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 25,
+          "values": [
+            192
+          ],
+          "pcs": [
+            "0x002a80dc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 25,
+          "values": [
+            199
+          ],
+          "pcs": [
+            "0x002a80e0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 26,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a80d2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 27,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a3dc4"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 32,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002ad752"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 32,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002ad756"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 36,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ad758"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 36,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002ad75c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 40,
+          "values": [
+            240
+          ],
+          "pcs": [
+            "0x002ac8ba"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 40,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b0358"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 42,
+          "values": [
+            254
+          ],
+          "pcs": [
+            "0x002b0246"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 42,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x002b0340"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 44,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002acf54"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x002b2694"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x002aceee"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 46,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002af1ae"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 49,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a3b30"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 49,
+          "values": [
+            2
+          ],
+          "pcs": [
+            "0x002a3b34"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 50,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0029e6f2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 50,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0029e6f8"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 51,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a070a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 51,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a071a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 55,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0029d6fe"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 56,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x0029daa2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 56,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0029db20"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 57,
+          "values": [
+            50
+          ],
+          "pcs": [
+            "0x0029d712"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 57,
+          "values": [
+            50
+          ],
+          "pcs": [
+            "0x0029db7c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 58,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x0029db4a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 59,
+          "values": [
+            96
+          ],
+          "pcs": [
+            "0x0029d74a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 60,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0029da1e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 61,
+          "values": [
+            24
+          ],
+          "pcs": [
+            "0x0029db60"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 62,
+          "values": [
+            26
+          ],
+          "pcs": [
+            "0x0029db6e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 104,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002b035c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 105,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002b0360"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 106,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002b033a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 107,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002b032c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 107,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002b0330"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 108,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002acfd2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 109,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x002acf42"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 110,
+          "values": [
+            36
+          ],
+          "pcs": [
+            "0x002af17a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 111,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0029e9a0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 111,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000b0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 112,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00200068"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 113,
+          "values": [
+            2
+          ],
+          "pcs": [
+            "0x00200070"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 114,
+          "values": [
+            129
+          ],
+          "pcs": [
+            "0x002b257e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 114,
+          "values": [
+            129
+          ],
+          "pcs": [
+            "0x00200078"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 115,
+          "values": [
+            35
+          ],
+          "pcs": [
+            "0x00200080"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 168,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002ac8ae"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 168,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002b0352"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 169,
+          "values": [
+            15
+          ],
+          "pcs": [
+            "0x002b0364"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 171,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002b034c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 173,
+          "values": [
+            196
+          ],
+          "pcs": [
+            "0x002ad026"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 174,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002ad032"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 175,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002a06e2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 175,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000a8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 176,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200088"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 177,
+          "values": [
+            253
+          ],
+          "pcs": [
+            "0x00200090"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 178,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002b25a6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 178,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200098"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 179,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x002a06f6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 179,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x002000a0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 237,
+          "values": [
+            33
+          ],
+          "pcs": [
+            "0x002ad02c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 238,
+          "values": [
+            128
+          ],
+          "pcs": [
+            "0x002ad038"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 239,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000b8"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3310-v6.39",
+      "source": "organic two-second verbose boot log (generated, not retained)",
+      "records": 78,
+      "registers": [
+        {
+          "direction": "R",
+          "offset": 0,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x002bd19e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 1,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x00223c36"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 2,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002bc8e2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 2,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002bc8e6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 8,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ea7a6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 8,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002bcaae"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 9,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ea7a6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 9,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002e9af6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002e4fdc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0020012c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002e9b18"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200130"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 12,
+          "values": [
+            5
+          ],
+          "pcs": [
+            "0x002e4f70"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 12,
+          "values": [
+            10
+          ],
+          "pcs": [
+            "0x002f1bee"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 13,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002f1a82"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 13,
+          "values": [
+            12
+          ],
+          "pcs": [
+            "0x002f1a86"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 14,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00291b28"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 15,
+          "values": [
+            250
+          ],
+          "pcs": [
+            "0x002e4f3c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 15,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002e4fa6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 16,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e4fb0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 17,
+          "values": [
+            28
+          ],
+          "pcs": [
+            "0x002e4fb0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 18,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e4f62"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 19,
+          "values": [
+            27
+          ],
+          "pcs": [
+            "0x002e4f62"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x002e467c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x002e4674"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 22,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e81d4"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e468a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e4670"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 25,
+          "values": [
+            192
+          ],
+          "pcs": [
+            "0x002e46fe"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 25,
+          "values": [
+            199
+          ],
+          "pcs": [
+            "0x002e4702"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 26,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e46f4"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 27,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002d80d0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 32,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002e4136"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 32,
+          "values": [
+            9
+          ],
+          "pcs": [
+            "0x002e413a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 36,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e4124"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 36,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x002e4128"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 40,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e9ae6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 42,
+          "values": [
+            251
+          ],
+          "pcs": [
+            "0x002e993e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 42,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x002e9ad0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 44,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ea804"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x002f0394"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x002ea79e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 46,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ecea6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 50,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002ece5a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 50,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002ece60"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 51,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002d68dc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 51,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002d68e0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 56,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x002d41d8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 57,
+          "values": [
+            50
+          ],
+          "pcs": [
+            "0x002d4234"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 58,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x002d4202"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 61,
+          "values": [
+            24
+          ],
+          "pcs": [
+            "0x002d4218"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 62,
+          "values": [
+            26
+          ],
+          "pcs": [
+            "0x002d4226"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 104,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002e9aea"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 105,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002e9aee"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 106,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002e9aca"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 107,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002e9abc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 107,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002e9ac0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 108,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x002ea882"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 109,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x002ea7f2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 110,
+          "values": [
+            36
+          ],
+          "pcs": [
+            "0x002ece72"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 111,
+          "values": [
+            4
+          ],
+          "pcs": [
+            "0x002000b0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 112,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00200068"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 113,
+          "values": [
+            2
+          ],
+          "pcs": [
+            "0x00200070"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 114,
+          "values": [
+            160
+          ],
+          "pcs": [
+            "0x00200078"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 115,
+          "values": [
+            107
+          ],
+          "pcs": [
+            "0x00200080"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 168,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002e9ae0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 169,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002e9af2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 171,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x002e9adc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 173,
+          "values": [
+            207
+          ],
+          "pcs": [
+            "0x002ea8d6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 174,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002ea8e0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 175,
+          "values": [
+            96
+          ],
+          "pcs": [
+            "0x002000a8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 176,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200088"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 177,
+          "values": [
+            253
+          ],
+          "pcs": [
+            "0x00200090"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 178,
+          "values": [
+            95
+          ],
+          "pcs": [
+            "0x00200098"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 179,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000a0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 237,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x002ea8dc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 238,
+          "values": [
+            128
+          ],
+          "pcs": [
+            "0x002ea8e6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 239,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000b8"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3330-v4.50",
+      "source": "organic two-second verbose boot log (generated, not retained)",
+      "records": 72,
+      "registers": [
+        {
+          "direction": "R",
+          "offset": 0,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x0030cbfe"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 1,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0022a0f6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 2,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0030c32a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 2,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0030c32e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 8,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002001aa"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 8,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0030c510"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 9,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002001aa"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 9,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0038cf5a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0013e634"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0020012c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0013e64c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200130"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 12,
+          "values": [
+            5
+          ],
+          "pcs": [
+            "0x0037bdc4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 12,
+          "values": [
+            10
+          ],
+          "pcs": [
+            "0x003a519e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 13,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003a4f7a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 13,
+          "values": [
+            12
+          ],
+          "pcs": [
+            "0x003a4f7e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 15,
+          "values": [
+            250
+          ],
+          "pcs": [
+            "0x0037bd90"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 15,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0037bdfa"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 16,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0037be04"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 17,
+          "values": [
+            219
+          ],
+          "pcs": [
+            "0x0037be04"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 18,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0037bdb6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 19,
+          "values": [
+            218
+          ],
+          "pcs": [
+            "0x0037bdb6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x0037953e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x00379536"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 22,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0013e63c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0037954c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00379532"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 25,
+          "values": [
+            192
+          ],
+          "pcs": [
+            "0x003795cc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 25,
+          "values": [
+            199
+          ],
+          "pcs": [
+            "0x003795d0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 26,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003795c2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 27,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00354cb4"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 32,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x00377f4c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 32,
+          "values": [
+            9
+          ],
+          "pcs": [
+            "0x00377f50"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 36,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00377f3a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 36,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x00377f3e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 40,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0038cf4a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 42,
+          "values": [
+            251
+          ],
+          "pcs": [
+            "0x0038cda2"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 42,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x0038cf34"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 44,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0038f8ac"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x003a1cb8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x0038f846"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 46,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00396da6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 50,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00396d5a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 50,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x00396d60"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 51,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00351b20"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 51,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x00351b24"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 104,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x0038cf4e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 105,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x0038cf52"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 106,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x0038cf2e"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 107,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0038cf20"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 107,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x0038cf24"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 108,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x0038f92a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 109,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x0038f89a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 110,
+          "values": [
+            36
+          ],
+          "pcs": [
+            "0x00396d72"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 111,
+          "values": [
+            4
+          ],
+          "pcs": [
+            "0x002000b0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 112,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00200068"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 113,
+          "values": [
+            2
+          ],
+          "pcs": [
+            "0x00200070"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 114,
+          "values": [
+            160
+          ],
+          "pcs": [
+            "0x00200078"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 115,
+          "values": [
+            99
+          ],
+          "pcs": [
+            "0x00200080"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 168,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x0038cf44"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 169,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x0038cf56"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 171,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x0038cf40"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 173,
+          "values": [
+            207
+          ],
+          "pcs": [
+            "0x0038f97e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 174,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x0038f988"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 175,
+          "values": [
+            96
+          ],
+          "pcs": [
+            "0x002000a8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 176,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200088"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 177,
+          "values": [
+            253
+          ],
+          "pcs": [
+            "0x00200090"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 178,
+          "values": [
+            95
+          ],
+          "pcs": [
+            "0x00200098"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 179,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000a0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 237,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x0038f984"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 238,
+          "values": [
+            128
+          ],
+          "pcs": [
+            "0x0038f98e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 239,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000b8"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "3410-v5.46",
+      "source": "organic two-second verbose boot log (generated, not retained)",
+      "records": 72,
+      "registers": [
+        {
+          "direction": "R",
+          "offset": 0,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x00348c76"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 1,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x00240f34"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 2,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x003cbac8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 2,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x003cbac2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 8,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00200192"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 8,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x003485ac"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 9,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00200192"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 9,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x003deff2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0017d348"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 10,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0020012c"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x0017d360"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 11,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200130"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 12,
+          "values": [
+            5
+          ],
+          "pcs": [
+            "0x003cb5d4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 12,
+          "values": [
+            10
+          ],
+          "pcs": [
+            "0x003f9f3a"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 13,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003f9cf0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 13,
+          "values": [
+            12
+          ],
+          "pcs": [
+            "0x003f9cf6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 15,
+          "values": [
+            250
+          ],
+          "pcs": [
+            "0x003cb59a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 15,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x003cb608"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 16,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003cb610"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 17,
+          "values": [
+            180
+          ],
+          "pcs": [
+            "0x003cb610"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 18,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003cb5c6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 19,
+          "values": [
+            179
+          ],
+          "pcs": [
+            "0x003cb5c6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x003c6ecc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 21,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x003c6ec6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 22,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x0017d350"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003c6edc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 24,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003c6ec2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 25,
+          "values": [
+            192
+          ],
+          "pcs": [
+            "0x003c6f5c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 25,
+          "values": [
+            199
+          ],
+          "pcs": [
+            "0x003c6f62"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 26,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003c6f46"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 27,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003944f8"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 32,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x003b5a82"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 32,
+          "values": [
+            9
+          ],
+          "pcs": [
+            "0x003b5a86"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 36,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003b5a72"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 36,
+          "values": [
+            8
+          ],
+          "pcs": [
+            "0x003b5a76"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 40,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003defe2"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 42,
+          "values": [
+            253
+          ],
+          "pcs": [
+            "0x003dee60"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 42,
+          "values": [
+            63
+          ],
+          "pcs": [
+            "0x003defcc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 44,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003de2c0"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x003f4a7c"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 45,
+          "values": [
+            37
+          ],
+          "pcs": [
+            "0x003de248"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 46,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003e7d70"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 50,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003e7d3e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 50,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x003e7d44"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 51,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00386ef0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 51,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x00386ef6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 104,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x003defe6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 105,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x003defea"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 106,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x003defc6"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 107,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x003defb6"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 107,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x003defbc"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 108,
+          "values": [
+            1
+          ],
+          "pcs": [
+            "0x003de346"
+          ]
+        },
+        {
+          "direction": "R",
+          "offset": 109,
+          "values": [
+            3
+          ],
+          "pcs": [
+            "0x003de2a4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 110,
+          "values": [
+            64
+          ],
+          "pcs": [
+            "0x003e7d5e"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 111,
+          "values": [
+            4
+          ],
+          "pcs": [
+            "0x002000b0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 112,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x00200068"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 113,
+          "values": [
+            2
+          ],
+          "pcs": [
+            "0x00200070"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 114,
+          "values": [
+            160
+          ],
+          "pcs": [
+            "0x00200078"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 115,
+          "values": [
+            99
+          ],
+          "pcs": [
+            "0x00200080"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 168,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x003defdc"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 169,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x003defee"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 171,
+          "values": [
+            31
+          ],
+          "pcs": [
+            "0x003defd8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 173,
+          "values": [
+            207
+          ],
+          "pcs": [
+            "0x003de39a"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 174,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x003de3a4"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 175,
+          "values": [
+            96
+          ],
+          "pcs": [
+            "0x002000a8"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 176,
+          "values": [
+            255
+          ],
+          "pcs": [
+            "0x00200088"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 177,
+          "values": [
+            253
+          ],
+          "pcs": [
+            "0x00200090"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 178,
+          "values": [
+            95
+          ],
+          "pcs": [
+            "0x00200098"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 179,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000a0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 237,
+          "values": [
+            32
+          ],
+          "pcs": [
+            "0x003de3a0"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 238,
+          "values": [
+            128
+          ],
+          "pcs": [
+            "0x003de3aa"
+          ]
+        },
+        {
+          "direction": "W",
+          "offset": 239,
+          "values": [
+            0
+          ],
+          "pcs": [
+            "0x002000b8"
+          ]
+        }
+      ]
+    }
+  ]
+}

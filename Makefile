@@ -652,6 +652,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_radio_handover_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_make_sim_card_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_board_io_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_sim_security_trace_check.py tools/test_sim_toolkit_trace_check.py tools/test_sim_toolkit_inkey_trace_check.py tools/test_sim_toolkit_input_trace_check.py tools/test_sim_hotplug_trace_check.py tools/test_gsm_authentication_split.py tools/test_gsm_cell_broadcast.py tools/test_cell_broadcast_static_check.py tools/test_gsm_ems.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_rom4_candidate_check.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_uif_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_outgoing_call_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_outgoing_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_application_trace_check.py
+	$(VENV)/bin/python -m unittest tools/test_mad2_runtime_census.py tools/test_storage_runtime_census.py tools/test_flash_pmm_persistence_check.py
 	$(VENV)/bin/python -m unittest tools/test_sim_toolkit_menu_trace_check.py tools/test_sim_toolkit_sms_trace_check.py tools/test_sim_toolkit_call_trace_check.py tools/test_sim_toolkit_selection_trace_check.py tools/test_sim_toolkit_refresh_trace_check.py tools/test_sim_toolkit_polling_trace_check.py tools/test_sim_toolkit_tone_trace_check.py tools/test_sim_toolkit_dtmf_trace_check.py tools/test_sim_toolkit_browser_trace_check.py tools/test_sim_toolkit_timer_trace_check.py tools/test_sim_toolkit_malformed_trace_check.py tools/test_sim_toolkit_timeout_trace_check.py tools/test_sim_toolkit_cross_rom_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_ems_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_radio_supplementary_call_trace_check.py
@@ -1078,6 +1079,22 @@ mad2-static-census:
 	$(VENV)/bin/python tools/mad2_static_census.py --check \
 		--json run_census/mad2_static_access.json --markdown docs/mad2_static_access.md
 
+mad2-runtime-census:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_3210v6 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v6/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR)_3210v5 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v5/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_3310 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3310/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_3330 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3330/error.log
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_3410 SECONDS=2 RUN_VERBOSE=1
+	cp $(MAME_DIR)/error.log $(RUN_DIR)_3410/error.log
+	$(VENV)/bin/python tools/mad2_runtime_census.py --check --json docs/data/mad2_runtime_census.json \
+		--log 3210-v6.00 $(RUN_DIR)_3210v6/error.log --log 3210-v5.01 $(RUN_DIR)_3210v5/error.log \
+		--log 3310-v6.39 $(RUN_DIR)_3310/error.log --log 3330-v4.50 $(RUN_DIR)_3330/error.log \
+		--log 3410-v5.46 $(RUN_DIR)_3410/error.log
+
 mad2-residual-census:
 	$(VENV)/bin/python tools/mad2_residual_census.py --check \
 		--json docs/data/mad2_residual_census.json \
@@ -1092,6 +1109,20 @@ storage-static-census:
 	$(VENV)/bin/python tools/storage_static_census.py --check \
 		--json docs/data/storage_static_census.json \
 		--markdown docs/storage_static_census.md
+
+storage-runtime-census:
+	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_3210v6 SECONDS=2
+	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR)_3210v5 SECONDS=2
+	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_3310 SECONDS=2
+	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_3330 SECONDS=2
+	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_3410 SECONDS=2
+	$(VENV)/bin/python tools/storage_runtime_census.py --check \
+		--json docs/data/storage_runtime_census.json \
+		--summary 3210-v6.00 $(RUN_DIR)_3210v6/boot_summary.txt \
+		--summary 3210-v5.01 $(RUN_DIR)_3210v5/boot_summary.txt \
+		--summary 3310-v6.39 $(RUN_DIR)_3310/boot_summary.txt \
+		--summary 3330-v4.50 $(RUN_DIR)_3330/boot_summary.txt \
+		--summary 3410-v5.46 $(RUN_DIR)_3410/boot_summary.txt
 
 # Acceptance gates are generated from gates.json; see tools/gate_generate.py.
 # The rule below lets make rebuild gates.mk and restart when it is missing or

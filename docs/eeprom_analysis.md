@@ -49,6 +49,10 @@ conservatively follows literal-derived pointers in both 3210 revisions and the
 3310/3330/3410 controls. It finds no executable direct consumer of the removed
 16 KiB alias. Apparent sibling accesses are classified separately from code.
 This does not exclude dynamic pointers or future products.
+`make storage-runtime-census` separately observes the physical PUP lines during
+five bounded organic boots: both 3210 revisions drive hundreds of START edges
+and tens of thousands of signal writes, while the 3310, 3330 and 3410 leave the
+serial EEPROM lines idle because their permanent memory is flash-backed.
 
 ## Firmware transport
 

@@ -120,6 +120,13 @@
     external-status and FIQ8 access shapes across those five ROMs. `make
     mad2-residual-census` regenerates its compact JSON and Markdown artifacts;
     it deliberately stops at the boundary where physical evidence is needed.
+  - `mad2_runtime_census.py` and `storage_runtime_census.py` summarize five
+    bounded organic boots: first-access MAD2 register observations and
+    sustained physical SDA/SCL activity respectively. `make
+    mad2-runtime-census` and `make storage-runtime-census` regenerate their
+    checked JSON under `docs/data/`; the boot logs themselves are not retained.
+  - `flash_pmm_persistence_check.py` proves that a flash-backed PMM changed
+    without modifying the firmware prefix (`make verify-flash-pmm`).
   - `test_message_census.py`, `test_find_thumb_signature.py`,
     `test_make_eeprom_profile.py`, and `test_mad2_access_census.py` cover byte
     lanes, signature relocation masks, runtime-manifest isolation, generated

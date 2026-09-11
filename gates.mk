@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 277 gates: 141 generated from typed steps, 136 copied verbatim (shell).
+# 278 gates: 142 generated from typed steps, 136 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -60,7 +60,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-registration-preserved verify-3410-radio-registration-state \
 	verify-3410-radio-unsuitable-cells verify-3310-frontier verify-3310-menu \
 	verify-3310-navigation verify-3330-frontier verify-3330-navigation \
-	verify-3410-frontier verify-3410-menu verify-3410-navigation \
+	verify-3410-frontier verify-3410-menu verify-3410-navigation verify-flash-pmm \
 	verify-model-frontier-state verify-model-frontier-negative verify-radio-camp \
 	verify-radio-registration verify-radio-reselection-same-lac \
 	verify-radio-reselection-different-lac verify-radio-reselection-state \
@@ -463,6 +463,14 @@ verify-3410-navigation: normalize-3410
 	@grep -Fqx 'soft_resets=0' $(RUN_DIR)_menu/boot_summary.txt
 	@grep -Fqx 'soft_resets=0' $(RUN_DIR)_return/boot_summary.txt
 	@echo "OK — 3410 v5.46 opened Messages and returned to idle through physical keys"
+
+verify-flash-pmm: normalize-3410
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_flash_pmm_first RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_flash_pmm_nvram) PRESERVE_NVRAM=0 SECONDS=22 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@$(PYTHON) tools/flash_pmm_persistence_check.py $(RUN_DIR)_flash_pmm_nvram/noki3410/flash roms/noki3410/3410f546e.fls "roms/noki3410/3410 virgin eeprom 005f0000.fls"
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_flash_pmm_reload RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_flash_pmm_nvram) PRESERVE_NVRAM=1 SECONDS=22 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=200 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	@frame=$$(find $(RUN_DIR)_flash_pmm_reload -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z918_*' ! -name '*_ff918_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 3410 PMM-reload frame produced"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3410_IDLE_SHA)
+	@grep -Fqx 'soft_resets=0' $(RUN_DIR)_flash_pmm_first/boot_summary.txt
+	@echo "OK — 3410 v5.46 flash-backed PMM changed without touching firmware and reloaded from NVRAM to the idle frame"
 
 verify-model-frontier-state: normalize-3330 normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_3330 SECONDS=8 RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=3'

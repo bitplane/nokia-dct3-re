@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "method": "physical PUP SDA/SCL transition counters from bounded organic boots",
+  "limitations": "a START-shaped edge alone is not a decoded I2C transaction; activity requires both repeated START edges and substantial serial line traffic",
+  "roms": [
+    {
+      "label": "3210-v6.00",
+      "source": "organic two-second boot structural summary",
+      "eeprom_starts": 522,
+      "eeprom_signal_writes": 72729,
+      "serial_eeprom_active": true
+    },
+    {
+      "label": "3210-v5.01",
+      "source": "organic two-second boot structural summary",
+      "eeprom_starts": 558,
+      "eeprom_signal_writes": 73633,
+      "serial_eeprom_active": true
+    },
+    {
+      "label": "3310-v6.39",
+      "source": "organic two-second boot structural summary",
+      "eeprom_starts": 1,
+      "eeprom_signal_writes": 14,
+      "serial_eeprom_active": false
+    },
+    {
+      "label": "3330-v4.50",
+      "source": "organic two-second boot structural summary",
+      "eeprom_starts": 0,
+      "eeprom_signal_writes": 10,
+      "serial_eeprom_active": false
+    },
+    {
+      "label": "3410-v5.46",
+      "source": "organic two-second boot structural summary",
+      "eeprom_starts": 0,
+      "eeprom_signal_writes": 10,
+      "serial_eeprom_active": false
+    }
+  ]
+}

@@ -483,6 +483,11 @@ composition so registered signal/operator pixels cannot be mistaken for an
 MMI regression. Default-hardware registration is proven by the separate
 NHM-2 radio gates below.
 
+`make verify-flash-pmm` starts from that same virgin input in isolated NVRAM,
+checks that the complete flash image kept its firmware prefix byte-for-byte
+while the permanent-memory region changed, then reloads that NVRAM in a second
+process and requires the exact idle frame again with zero soft resets.
+
 `make verify-3410-radio-registration-preserved` extends that physical
 fresh-PMM prefix through NHM-2's autonomous scan, ARFCN-1 SI1–SI4, SDCCH
 Location Updating, EF_LOCI persistence, release and steady camp, then repeats

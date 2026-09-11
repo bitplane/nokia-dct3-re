@@ -202,7 +202,9 @@ contract and produces JSON plus Markdown through `make mad2-census
 MAD2_LOG=...`. The trace captures reset/UIF setup from `0x200068`, GENSIO/LCD
 initialization, CCONT selection, timer-0 setup, MBUS status, interrupt activity,
 watchdog service and the complete boot SIMI setup. Offset `0x31` is classified
-as CTRL-I/O signal register 1.
+as CTRL-I/O signal register 1. `make mad2-runtime-census` aggregates
+the same parser over five bounded organic two-second boots into the checked
+first-access census `docs/data/mad2_runtime_census.json`.
 
 The `0x31` literal census is exhaustive: six loads, all followed by byte
 read-modify-write operations on bit 1. Five are in the power subsystem's
