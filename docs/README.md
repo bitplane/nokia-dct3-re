@@ -61,6 +61,9 @@ distinction.
 | `scheduler_delivery.md` | Reusable scheduler message/event encoding contract. |
 | `eeprom_analysis.md` | EEPROM usage map, checksum contracts and the generated provisioning fixture. |
 | `storage_static_census.md` | Five-ROM direct EEPROMSelX and PUP access absence/ownership census. |
+| `dct3_type_1f.md` | Cross-model status-2 type-`0x1f` envelope shared by 3210, 3310 and 6110 images. |
+| `gate_migration.md` | How acceptance gates are authored in `gates.json` and generated into `gates.mk`. |
+| `gate_parity_audit.md` | Generated audit of where sibling product gates differ. |
 
 ## Active protocol and HLE boundaries
 
@@ -78,6 +81,10 @@ distinction.
 | `dsp_service_transport_contract.md` | DSP/generic-service ownership and acceptance contract. |
 | `cobba_control_boundary.md` | Opaque DSP-to-COBBA control ownership, capture seam, and promotion requirements. |
 | `rom4_dsp_loader.md` | Recovered ROM4 DSP block descriptor, reset and demand-load contract. |
+| `djr_dsp_integration.md` | DSP architectural knowledge reviewed from the parallel `djr-747` emulator without importing its code. |
+| `gsm_a5_ciphering.md` | Standards-owned A5 keystream boundary, `COUNT` derivation and ciphering lifecycle. |
+| `gsm_tch_f_l1_completion.md` | Audit of the generic GSM full-rate traffic-channel Layer 1 milestone against evidence. |
+| `ordinary_sms.md` | Authoritative boundary for ordinary `SMS-DELIVER` and `SMS-SUBMIT`. |
 
 ## Address-level reverse-engineering references
 
