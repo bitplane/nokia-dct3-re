@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 302 gates: 165 generated from typed steps, 137 copied verbatim (shell).
+# 303 gates: 165 generated from typed steps, 138 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -62,7 +62,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-registration verify-5210-menu \
 	verify-5210-radio-authentication verify-5210-radio-a5-1-incoming-call \
 	verify-5210-radio-call-state verify-5210-power-lifecycle \
-	verify-5210-charger-wake verify-5210-radio-paging \
+	verify-5210-charger-wake verify-5210-sim-phonebook verify-5210-radio-paging \
 	verify-5210-radio-incoming-sms verify-5210-messages \
 	verify-5210-radio-incoming-call-ringing \
 	verify-5210-radio-incoming-call-answered \
@@ -477,6 +477,20 @@ verify-5210-charger-wake: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=25 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
 	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	@$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt --boundary-only
+
+# shell: persistent SIM application fixture
+verify-5210-sim-phonebook: normalize-5210
+	@set -e; \
+	save_dir="$(RUN_DIR)_save"; reload_dir="$(RUN_DIR)_reload"; \
+	$(RM) -r "$$save_dir" "$$reload_dir"; \
+	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$save_dir" SECONDS=34 PRESERVE_NVRAM=0 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
+	cp "$(MAME_DIR)/error.log" "$$save_dir/error.log"; \
+	$(PYTHON) tools/sim_phonebook_check.py "$$save_dir/error.log" "$$save_dir/nvram/$(NVRAM_SYSTEM_5210)/sim_card" --expected-name Ada; \
+	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$reload_dir" SECONDS=25 PRESERVE_NVRAM=1 RUN_NVRAM_DIR="$(abspath $(RUN_DIR)_save/nvram)" RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,enter,wait700,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
+	frame=$$(find "$$reload_dir" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	test -n "$$frame" || { echo "no reloaded 5210 phonebook frame produced"; exit 1; }; \
+	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_PHONEBOOK_SHA)
+	@echo "OK — 5210 firmware saved Ada/123 to EF_ADN and rendered it after a cold reload"
 
 verify-5210-radio-paging: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'

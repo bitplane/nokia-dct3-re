@@ -303,6 +303,9 @@ firmware to issue an absolute 32-byte `UPDATE RECORD` for `EF_ADN`, validates
 that only record 1 changed, then restarts with the same SIM NVRAM and matches
 the stable pixels of the firmware-rendered `ADA` search result. It does not
 inject an APDU or conflate card storage with the handset EEPROM.
+`make verify-5210-sim-phonebook` applies the same semantic card check through
+the 5210's distinct right-softkey Names route. It protects the firmware's
+product-specific `Ada` casing and a cold-reload search-result frame.
 `make verify-sim-pin`, `make verify-sim-pin-unblock`, and
 `make verify-sim-pin-state-roundtrip` cover the card-security lifecycle through
 physical keypad input and firmware-issued APDUs. They require successful PIN

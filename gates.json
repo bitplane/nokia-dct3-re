@@ -1871,6 +1871,25 @@
       ]
     },
     {
+      "name": "verify-5210-sim-phonebook",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "unstructured": "persistent SIM application fixture",
+      "recipe": [
+        "\t@set -e; \\",
+        "\tsave_dir=\"$(RUN_DIR)_save\"; reload_dir=\"$(RUN_DIR)_reload\"; \\",
+        "\t$(RM) -r \"$$save_dir\" \"$$reload_dir\"; \\",
+        "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$save_dir\" SECONDS=34 PRESERVE_NVRAM=0 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \\",
+        "\tcp \"$(MAME_DIR)/error.log\" \"$$save_dir/error.log\"; \\",
+        "\t$(PYTHON) tools/sim_phonebook_check.py \"$$save_dir/error.log\" \"$$save_dir/nvram/$(NVRAM_SYSTEM_5210)/sim_card\" --expected-name Ada; \\",
+        "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$reload_dir\" SECONDS=25 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=\"$(abspath $(RUN_DIR)_save/nvram)\" RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,enter,wait700,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \\",
+        "\tframe=$$(find \"$$reload_dir\" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); \\",
+        "\ttest -n \"$$frame\" || { echo \"no reloaded 5210 phonebook frame produced\"; exit 1; }; \\",
+        "\t$(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_PHONEBOOK_SHA)",
+        "\t@echo \"OK — 5210 firmware saved Ada/123 to EF_ADN and rendered it after a cold reload\""
+      ]
+    },
+    {
       "name": "verify-5210-radio-paging",
       "prerequisites": ["normalize-5210"],
       "variables": {},

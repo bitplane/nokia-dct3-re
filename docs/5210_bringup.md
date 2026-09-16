@@ -78,6 +78,11 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   charger edge restores the CCONT-powered baseband with cause `0x04`, firmware
   reads that cause and samples charger-present VCHAR. Product-local task RAM is
   deliberately not interpreted through the 3210 summary addresses.
+- `make verify-5210-sim-phonebook` opens the product's `Names` menu with its
+  right softkey, saves `Ada`/`123` through the firmware's editor and absolute
+  `EF_ADN` update, then cold-boots with the same card image and renders the
+  stored contact through Search. This proves a non-SMS application write and
+  removable-card persistence without importing the 3210 menu route.
 - `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
   Paging Response, contention resolution, clean release and return to the
   subscriber's paging group.
@@ -129,7 +134,7 @@ NSM-5 differs from the other validated products at explicit device boundaries:
 The gates validate v5.40 PPM E, board bring-up, authenticated and
 unauthenticated registration, operator presentation, save/load, the main menu,
 application entry, clean return navigation, idle mobility, RF loss/recovery,
-and paging after reselection. They do not yet validate call media/audio, non-SMS persistent
-application writes, or another 5210 firmware revision. The unexercised external-service
+and paging after reselection. They do not yet validate call media/audio,
+handset-local application writes, or another 5210 firmware revision. The unexercised external-service
 channel and placeholder MAD2 inputs must not be promoted to cross-product
 facts.

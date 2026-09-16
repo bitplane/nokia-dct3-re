@@ -103,7 +103,9 @@ unresolved hardware or protocol boundary.
   storage, notification, physical reading and the read-status update. Calls
   are covered through incoming presentation, physical Answer/End, physical
   outgoing dial/End and DSP speech-control selection. The physical message
-  composer additionally completes SMS-SUBMIT and its success UI. Same- and
+  composer additionally completes SMS-SUBMIT and its success UI. The
+  right-softkey Names route independently saves a contact to SIM `EF_ADN`
+  and renders it after a cold restart with the same card image. Same- and
   different-LAC reselection, serving/all-cell loss, RF recovery and paging
   after reselection are covered on the product's ARFCN-86/87 laboratory pair;
   a focused authenticated incoming-call gate adds organic A5/1 control and

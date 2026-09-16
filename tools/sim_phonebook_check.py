@@ -21,7 +21,7 @@ SUPPORTED_NVRAM_LENGTHS = {
 }
 
 
-def validate_phonebook(trace: str, data: bytes) -> None:
+def validate_phonebook(trace: str, data: bytes, expected_name: bytes = b"ADA") -> None:
     if len(data) not in SUPPORTED_NVRAM_LENGTHS:
         expected = ", ".join(str(length) for length in sorted(SUPPORTED_NVRAM_LENGTHS))
         raise ValueError(
@@ -33,11 +33,16 @@ def validate_phonebook(trace: str, data: bytes) -> None:
         raise ValueError("card did not commit the firmware's EF_ADN update")
 
     expected = bytearray([0xff] * RECORD_LENGTH)
-    expected[0:3] = b"ADA"
+    if not expected_name or len(expected_name) > 18:
+        raise ValueError("expected contact name must contain 1 to 18 bytes")
+    expected[0 : len(expected_name)] = expected_name
     expected[18:22] = bytes((0x03, 0x81, 0x21, 0xF3))
     if data[:RECORD_LENGTH] != expected:
         actual = data[:RECORD_LENGTH].hex(" ")
-        raise ValueError(f"record 1 is not the expected GSM 11.11 ADA/123 record: {actual}")
+        label = expected_name.decode("ascii", errors="replace")
+        raise ValueError(
+            f"record 1 is not the expected GSM 11.11 {label}/123 record: {actual}"
+        )
     adn = data[:ADN_LENGTH]
     if adn[RECORD_LENGTH:] != bytes([0xff]) * (ADN_LENGTH - RECORD_LENGTH):
         raise ValueError("the fixture modified more than one ADN record")
@@ -47,13 +52,21 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("trace", type=Path)
     parser.add_argument("nvram", type=Path)
+    parser.add_argument("--expected-name", default="ADA")
     args = parser.parse_args()
     try:
-        validate_phonebook(args.trace.read_text(errors="replace"), args.nvram.read_bytes())
+        validate_phonebook(
+            args.trace.read_text(errors="replace"),
+            args.nvram.read_bytes(),
+            args.expected_name.encode("ascii"),
+        )
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    print("OK - EF_ADN record 1 contains ADA/123 and the remaining 49 records are erased")
+    print(
+        f"OK - EF_ADN record 1 contains {args.expected_name}/123 and the remaining "
+        "49 records are erased"
+    )
     return 0
 
 

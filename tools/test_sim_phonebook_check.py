@@ -24,6 +24,16 @@ class SimPhonebookCheckTest(unittest.TestCase):
         trace, data = self.fixture()
         validate_phonebook(trace, bytes(data))
 
+    def test_accepts_product_specific_name_case(self):
+        trace, data = self.fixture()
+        data[0:3] = b"Ada"
+        validate_phonebook(trace, bytes(data), b"Ada")
+
+    def test_rejects_invalid_expected_name(self):
+        trace, data = self.fixture()
+        with self.assertRaisesRegex(ValueError, "1 to 18"):
+            validate_phonebook(trace, bytes(data), b"")
+
     def test_rejects_second_modified_record(self):
         trace, data = self.fixture()
         data[RECORD_LENGTH] = 0
