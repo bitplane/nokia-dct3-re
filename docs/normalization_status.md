@@ -109,7 +109,9 @@ unresolved hardware or protocol boundary.
   a focused authenticated incoming-call gate adds organic A5/1 control and
   bidirectional ciphered SDCCH/traffic bursts. Save/load is also covered during
   an active answered call through restored physical teardown. NSM-5 PCM/media
-  and other firmware revisions remain outside that claim.
+  remains outside that claim. Its independently recovered power-column wiring
+  covers the firmware power menu, sustained CCONT rail-off and charger-originated
+  baseband restart without borrowing 3210 task-RAM addresses.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
   and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu

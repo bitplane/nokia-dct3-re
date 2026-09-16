@@ -38,7 +38,8 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   the fault screen even after the DSP self-test had passed.
 - The 84-by-48 display uses reversed segment order. This is a product display
   property, not a capture-only mirror.
-- The five-row NSM Family-A keypad uses power mask `0x02` and a dedicated MAME
+- The five-row NSM Family-A keypad uses operational power-column mask `0x10`
+  and a dedicated MAME
   matrix containing softkeys, scroll, call, end, volume, digits, star and hash.
 - NSM-5 emits the ROM6 type-`0x56`, 160-byte candidate-window request. Its
   virgin PMM supplies ARFCN 86 (`0x56`), which the product-owned direct-octet
@@ -68,6 +69,15 @@ NSM-5 differs from the other validated products at explicit device boundaries:
 - `make verify-5210-radio-call-state` saves and restores while an answered call
   is active, resumes the restored branch, then uses physical End to complete
   CC/RR and speech-control teardown and return to exact registered standby.
+- `make verify-5210-power-lifecycle` proves the corrected physical power-column
+  contract: a short press opens the firmware-rendered profile/power menu, while
+  a sustained press is repeatedly scanned by firmware and ends at CCONT digital-baseband
+  rail-off. The earlier `0x02` assignment produced IRQ edges but no lifecycle
+  transition and is retired.
+- `make verify-5210-charger-wake` continues from organic rail-off: a physical
+  charger edge restores the CCONT-powered baseband with cause `0x04`, firmware
+  reads that cause and samples charger-present VCHAR. Product-local task RAM is
+  deliberately not interpreted through the 3210 summary addresses.
 - `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
   Paging Response, contention resolution, clean release and return to the
   subscriber's paging group.

@@ -27,6 +27,18 @@ ccont_input: adc_select=5 raw=3ff ctrl=58 t=13.2
         self.assertIn("CCONT never removed baseband power", errors)
         self.assertIn("charger edge never restored CCONT baseband power with cause 04", errors)
 
+    def test_boundary_only_ignores_product_local_ram_fields(self):
+        log = """
+ccont_power: event=off t=22.0
+ccont_power: event=wake cause=04 t=25.0
+ccont_power: event=cause_read data=0d t=25.1
+ccont_input: adc_select=5 raw=3ff ctrl=58 t=25.2
+"""
+        summary = parse_summary(
+            "startup_modes=0000\nfinal_startup_mode=0000\n"
+            "final_sim_enable=00\nlcd_data_writes=10\n")
+        self.assertEqual([], check(log, summary, boundary_only=True))
+
 
 if __name__ == "__main__":
     unittest.main()

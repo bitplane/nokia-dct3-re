@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 300 gates: 163 generated from typed steps, 137 copied verbatim (shell).
+# 302 gates: 165 generated from typed steps, 137 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -61,7 +61,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-unsuitable-cells verify-5210-frontier \
 	verify-5210-radio-registration verify-5210-menu \
 	verify-5210-radio-authentication verify-5210-radio-a5-1-incoming-call \
-	verify-5210-radio-call-state verify-5210-radio-paging \
+	verify-5210-radio-call-state verify-5210-power-lifecycle \
+	verify-5210-charger-wake verify-5210-radio-paging \
 	verify-5210-radio-incoming-sms verify-5210-messages \
 	verify-5210-radio-incoming-call-ringing \
 	verify-5210-radio-incoming-call-answered \
@@ -462,6 +463,20 @@ verify-5210-radio-call-state: normalize-5210
 	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log --require-state-roundtrip
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-restore 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
+
+verify-5210-power-lifecycle: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_short SECONDS=20 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)_short/error.log
+	@$(PYTHON) tools/power_5210_trace_check.py short $(RUN_DIR)_short/error.log
+	@frame=$$(find $(RUN_DIR)_short -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no short-power 5210 frame produced"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_POWER_MENU_SHA)
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_long SECONDS=25 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)_long/error.log
+	@$(PYTHON) tools/power_5210_trace_check.py long $(RUN_DIR)_long/error.log
+
+verify-5210-charger-wake: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=25 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt --boundary-only
 
 verify-5210-radio-paging: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'

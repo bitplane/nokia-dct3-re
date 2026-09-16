@@ -1847,6 +1847,30 @@
       ]
     },
     {
+      "name": "verify-5210-power-lifecycle",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_short SECONDS=20 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_short/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/power_5210_trace_check.py short $(RUN_DIR)_short/error.log" },
+        { "step": "shell", "silent": true, "command": "frame=$$(find $(RUN_DIR)_short -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no short-power 5210 frame produced\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_POWER_MENU_SHA)" },
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_long SECONDS=25 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_long/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/power_5210_trace_check.py long $(RUN_DIR)_long/error.log" }
+      ]
+    },
+    {
+      "name": "verify-5210-charger-wake",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=25 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt --boundary-only" }
+      ]
+    },
+    {
       "name": "verify-5210-radio-paging",
       "prerequisites": ["normalize-5210"],
       "variables": {},

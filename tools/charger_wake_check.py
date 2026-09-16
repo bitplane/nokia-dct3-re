@@ -11,7 +11,7 @@ def parse_summary(text):
     return dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
 
 
-def check(log_text, values):
+def check(log_text, values, boundary_only=False):
     errors = []
     modes = set(filter(None, values.get("startup_modes", "").split(",")))
 
@@ -47,13 +47,14 @@ def check(log_text, values):
         if not any(time >= wake_time and raw >= 0x64 for raw, time in charger_samples):
             errors.append("firmware never sampled charger-present VCHAR after restart")
 
-    for wanted in ("0004", "000C", "0005"):
-        if wanted not in modes:
-            errors.append(f"wake lifecycle never observed startup mode {wanted}")
-    if values.get("final_startup_mode") != "0005":
-        errors.append("charger-originated restart did not settle in acting-dead mode 0005")
-    if values.get("final_sim_enable") != "00":
-        errors.append("acting-dead restart did not leave SIM disabled")
+    if not boundary_only:
+        for wanted in ("0004", "000C", "0005"):
+            if wanted not in modes:
+                errors.append(f"wake lifecycle never observed startup mode {wanted}")
+        if values.get("final_startup_mode") != "0005":
+            errors.append("charger-originated restart did not settle in acting-dead mode 0005")
+        if values.get("final_sim_enable") != "00":
+            errors.append("acting-dead restart did not leave SIM disabled")
     if int(values.get("lcd_data_writes", "0")) == 0:
         errors.append("charger-originated restart produced no LCD traffic")
     return errors
@@ -63,8 +64,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("summary", type=pathlib.Path)
+    parser.add_argument("--boundary-only", action="store_true")
     args = parser.parse_args(argv)
-    errors = check(args.log.read_text(errors="replace"), parse_summary(args.summary.read_text()))
+    errors = check(
+        args.log.read_text(errors="replace"), parse_summary(args.summary.read_text()),
+        args.boundary_only)
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)

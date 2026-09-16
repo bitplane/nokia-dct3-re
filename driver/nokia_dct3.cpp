@@ -320,7 +320,7 @@ constexpr nokia_gensio_device::wiring_contract GENSIO_NSM5 = {
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
-constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSM5 = { 5, 0x02 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSM5 = { 5, 0x10 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE3 = { 5, 0x01 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NAM2 = { 5, 0x04 };
 static_assert(KEYPAD_NSE8.valid());
