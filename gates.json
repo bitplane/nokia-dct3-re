@@ -1974,6 +1974,33 @@
       ]
     },
     {
+      "name": "verify-5210-radio-outgoing-call-lifecycle",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=36 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_5210_outgoing_call_trace_check.py $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no post-call 5210 frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — 5210 physically dialled, connected, ended and returned to registered standby\""
+        }
+      ]
+    },
+    {
       "name": "verify-5210-radio-incoming-sms-read",
       "prerequisites": ["normalize-5210"],
       "variables": {},

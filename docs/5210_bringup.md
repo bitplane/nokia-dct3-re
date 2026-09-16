@@ -80,13 +80,19 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   teardown, ARFCN-86 channel release, DSP wire `0x840a`/control `0x040a`, and
   exact return to registered standby. No NSM-5 PCM clock or analogue route has
   been recovered, so this gate proves call and speech control rather than media.
+- `make verify-5210-radio-outgoing-call-lifecycle` physically enters
+  `5551234`, starts CM Service and emits the firmware's called-party SETUP. It
+  then proves Call Proceeding, one traffic assignment, Alerting, Connect,
+  physical End, CC/RR teardown, the NSM-5 `0x860b`/`0x840a` speech-control
+  pair, and exact return to registered standby. As above, it deliberately makes
+  no PCM/media claim.
 
 ## Remaining scope
 
 The gates validate v5.40 PPM E, board bring-up, authenticated and
 unauthenticated registration, operator presentation, save/load, the main menu,
 application entry, and clean return navigation. They do not yet validate
-mobility loss/recovery, outgoing calls, outgoing SMS, call media/audio, non-SMS persistent
+mobility loss/recovery, outgoing SMS, call media/audio, non-SMS persistent
 application writes, or another 5210 firmware revision. The unexercised external-service
 channel and placeholder MAD2 inputs must not be promoted to cross-product
 facts.

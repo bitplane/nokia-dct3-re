@@ -65,7 +65,10 @@ standards-shaped Call Proceeding/Alerting/Connect, exactly one traffic
 assignment, Connect Acknowledge, sustained non-silent GSM-FR, physical End,
 CC/RR teardown and a new post-release PCH fill. The 3310, preserved-PMM 3330
 and 3410 variants retain their independently checked radio, PCM and release
-contracts. `make verify-radio-outgoing-call-state` additionally requires exact
+contracts. `make verify-5210-radio-outgoing-call-lifecycle` covers the same
+physical dial and signalling lifecycle through NSM-5's independently observed
+channel and speech-control values, but makes no media claim while that
+product's PCM contract remains unknown. `make verify-radio-outgoing-call-state` additionally requires exact
 active-call digital replay across save/load before ordinary physical teardown.
 The `verify-radio-outgoing-call-busy`,
 `verify-radio-outgoing-call-no-answer` and

@@ -101,8 +101,8 @@ unresolved hardware or protocol boundary.
   return cleanly to registered standby, and repeat application entry after a
   save/load. IMSI paging and ordinary MT SMS additionally reach persistent SIM
   storage, notification, physical reading and the read-status update. Calls
-  are covered through incoming presentation, physical Answer/End and DSP
-  speech-control selection, but NSM-5 PCM/media, outgoing calls/SMS, mobility
+  are covered through incoming presentation, physical Answer/End, physical
+  outgoing dial/End and DSP speech-control selection, but NSM-5 PCM/media, outgoing SMS, mobility
   loss/recovery and other firmware revisions remain outside that claim.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
