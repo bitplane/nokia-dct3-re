@@ -76,6 +76,11 @@ The `verify-radio-outgoing-call-busy`,
 lifecycle invariants rather than a changed final screen. Busy must not assign
 TCH; no-answer must not Connect; service rejection must not accept CM, observe
 SETUP or create request state. All three return to a newly observed PCH fill.
+
+`make verify-5210-radio-outgoing-sms` adds the NSM-5 physical composer to the
+shared SMS-SUBMIT contract. It deliberately uses the handset's own modal-menu
+and predictive-text behavior, then requires CP/RP closure, RR release and the
+firmware-rendered `Message sent` acknowledgement.
 `verify-radio-outgoing-call-no-answer-state` repeats local clearing after an
 exact save/load while Alerting.
 `verify-radio-outgoing-call-delayed-decision-state` saves before a delayed

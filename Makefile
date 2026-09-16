@@ -333,6 +333,7 @@ help:
 	@echo "make verify-5210-radio-incoming-call-answered validate physical Answer UI"
 	@echo "make verify-5210-radio-incoming-call-lifecycle validate Answer-to-End control"
 	@echo "make verify-5210-radio-outgoing-call-lifecycle validate physical dial-to-End control"
+	@echo "make verify-5210-radio-outgoing-sms validate the physical composer and SMS-SUBMIT"
 	@echo "make verify-5210-save-state restore registered idle and enter Messages"
 	@echo "make verify         check the explicit missing-hardware semantic profile"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"

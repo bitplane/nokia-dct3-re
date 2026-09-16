@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 292 gates: 156 generated from typed steps, 136 copied verbatim (shell).
+# 293 gates: 156 generated from typed steps, 137 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -65,16 +65,17 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-incoming-call-ringing \
 	verify-5210-radio-incoming-call-answered \
 	verify-5210-radio-incoming-call-lifecycle \
-	verify-5210-radio-outgoing-call-lifecycle verify-5210-radio-incoming-sms-read \
-	verify-5210-navigation verify-5210-save-state verify-3310-frontier \
-	verify-3310-menu verify-3310-navigation verify-3330-frontier \
-	verify-3330-navigation verify-3410-frontier verify-3410-menu \
-	verify-3410-navigation verify-flash-pmm verify-model-frontier-state \
-	verify-model-frontier-negative verify-radio-camp verify-radio-registration \
-	verify-radio-reselection-same-lac verify-radio-reselection-different-lac \
-	verify-radio-reselection-state verify-radio-reselection-preserved \
-	verify-radio-loss-recovery verify-radio-loss-recovery-state \
-	verify-radio-all-cell-loss verify-radio-reselection-unsuitable-neighbours \
+	verify-5210-radio-outgoing-call-lifecycle verify-5210-radio-outgoing-sms \
+	verify-5210-radio-incoming-sms-read verify-5210-navigation \
+	verify-5210-save-state verify-3310-frontier verify-3310-menu \
+	verify-3310-navigation verify-3330-frontier verify-3330-navigation \
+	verify-3410-frontier verify-3410-menu verify-3410-navigation verify-flash-pmm \
+	verify-model-frontier-state verify-model-frontier-negative verify-radio-camp \
+	verify-radio-registration verify-radio-reselection-same-lac \
+	verify-radio-reselection-different-lac verify-radio-reselection-state \
+	verify-radio-reselection-preserved verify-radio-loss-recovery \
+	verify-radio-loss-recovery-state verify-radio-all-cell-loss \
+	verify-radio-reselection-unsuitable-neighbours \
 	verify-radio-reselection-paging verify-3310-radio-reselection-same-lac \
 	verify-3310-radio-reselection-different-lac \
 	verify-3310-radio-reselection-state verify-3310-radio-reselection-preserved \
@@ -490,6 +491,14 @@ verify-5210-radio-outgoing-call-lifecycle: normalize-5210
 	@$(PYTHON) tools/radio_5210_outgoing_call_trace_check.py $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-call 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 physically dialled, connected, ended and returned to registered standby"
+
+# shell: NSM-5 physical predictive-text composer route
+verify-5210-radio-outgoing-sms: normalize-5210
+	@set -e; \
+	$(MAKE) --no-print-directory run-captured PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=48 RUN_VERBOSE=1 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter,wait1000,enter,wait1000,2,wait2000,enter,wait2000,enter,wait2000,5,5,5,1,2,3,4,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=500 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \
+	$(PYTHON) tools/radio_outgoing_sms_product_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
+	@echo "OK - physical 5210 outgoing SMS completed"
 
 verify-5210-radio-incoming-sms-read: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1200,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=20000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'

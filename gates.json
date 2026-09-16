@@ -2001,6 +2001,19 @@
       ]
     },
     {
+      "name": "verify-5210-radio-outgoing-sms",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "unstructured": "NSM-5 physical predictive-text composer route",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run-captured PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=48 RUN_VERBOSE=1 \\",
+        "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter,wait1000,enter,wait1000,2,wait2000,enter,wait2000,enter,wait2000,5,5,5,1,2,3,4,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=500 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \\",
+        "\t$(PYTHON) tools/radio_outgoing_sms_product_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)",
+        "\t@echo \"OK - physical 5210 outgoing SMS completed\""
+      ]
+    },
+    {
       "name": "verify-5210-radio-incoming-sms-read",
       "prerequisites": ["normalize-5210"],
       "variables": {},

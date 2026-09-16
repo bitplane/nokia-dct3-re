@@ -86,13 +86,19 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   physical End, CC/RR teardown, the NSM-5 `0x860b`/`0x840a` speech-control
   pair, and exact return to registered standby. As above, it deliberately makes
   no PCM/media claim.
+- `make verify-5210-radio-outgoing-sms` uses only physical keys to enter
+  Messages, compose the predictive-text character `a`, select Send, and enter
+  destination `5551234`. The gate requires the firmware's CM Service Request,
+  SAPI-3 establishment and SMS-SUBMIT, network CP/RP acknowledgements, handset
+  final CP-ACK, clean channel release, and the firmware-rendered `Message sent`
+  acknowledgement.
 
 ## Remaining scope
 
 The gates validate v5.40 PPM E, board bring-up, authenticated and
 unauthenticated registration, operator presentation, save/load, the main menu,
 application entry, and clean return navigation. They do not yet validate
-mobility loss/recovery, outgoing SMS, call media/audio, non-SMS persistent
+mobility loss/recovery, call media/audio, non-SMS persistent
 application writes, or another 5210 firmware revision. The unexercised external-service
 channel and placeholder MAD2 inputs must not be promoted to cross-product
 facts.
