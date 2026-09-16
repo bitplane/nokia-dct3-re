@@ -94,6 +94,10 @@ NSM-5 differs from the other validated products at explicit device boundaries:
 - `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
   Paging Response, contention resolution, clean release and return to the
   subscriber's paging group.
+- `make verify-5210-radio-paging-negatives` proves the registered handset
+  ignores its own IMSI on the wrong DRX frame, another subscriber's valid
+  identity, and a malformed identity LV. Each composition continues PCH fill
+  without RR access, Paging Response, or EF_LOCI mutation.
 - `make verify-5210-radio-incoming-sms` carries an ordinary `hello` SMS through
   paging, SAPI 3, segmented CP-DATA and SIM EF_SMS storage, then pins the
   firmware's `1 message received` frame. The NSM-5 DSP cipher-control

@@ -111,6 +111,7 @@ unresolved hardware or protocol boundary.
   its nine-byte TERMINAL PROFILE and proactive DISPLAY TEXT lifecycle. Same- and
   different-LAC reselection, serving/all-cell loss, RF recovery and paging
   after reselection are covered on the product's ARFCN-86/87 laboratory pair;
+  wrong-group, unmatched and malformed pages are rejected without RR access;
   a focused authenticated incoming-call gate adds organic A5/1 control and
   bidirectional ciphered SDCCH/traffic bursts. Save/load is also covered during
   an active answered call through restored physical teardown. NSM-5 PCM/media

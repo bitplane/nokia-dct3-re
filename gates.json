@@ -1931,6 +1931,20 @@
       ]
     },
     {
+      "name": "verify-5210-radio-paging-negatives",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "unstructured": "NSM-5 DRX, identity and malformed-page rejection",
+      "recipe": [
+        "\t@for profile in wrong_group unmatched malformed; do \\",
+        "\t\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_$$profile SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/radio_paging_$$profile\" || exit; \\",
+        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \\",
+        "\t\tcheck_profile=$$(echo $$profile | tr _ -); \\",
+        "\t\t$(PYTHON) tools/radio_paging_negative_trace_check.py $(RUN_DIR)_$$profile/error.log --profile $$check_profile || exit; \\",
+        "\tdone"
+      ]
+    },
+    {
       "name": "verify-5210-radio-incoming-sms",
       "prerequisites": ["normalize-5210"],
       "variables": {},

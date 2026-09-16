@@ -149,6 +149,9 @@ proves that a page sent in another DRX group is not exposed at the handset's
 decoded-PCH boundary, and that a valid page for another IMSI or an invalid
 Mobile Identity LV cannot trigger RR access. A barred cell cannot reach paging
 at all.
+The 5210 negative gate independently exercises the same three paging profiles
+after NSM-5 registration, confirming that the rejection behavior is shared
+network/session logic rather than an NHM-5/NHM-6 artifact.
 
 The subsequent cleanup made that distinction structural: the radio peer asks
 for explicitly named monitored or transmitted schedules, and derives page

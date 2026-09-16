@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 305 gates: 165 generated from typed steps, 140 copied verbatim (shell).
+# 306 gates: 165 generated from typed steps, 141 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -64,8 +64,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-call-state verify-5210-power-lifecycle \
 	verify-5210-charger-wake verify-5210-sim-phonebook \
 	verify-5210-radio-supplementary verify-5210-radio-paging \
-	verify-5210-radio-incoming-sms verify-5210-messages \
-	verify-5210-radio-incoming-call-ringing \
+	verify-5210-radio-paging-negatives verify-5210-radio-incoming-sms \
+	verify-5210-messages verify-5210-radio-incoming-call-ringing \
 	verify-5210-radio-incoming-call-answered \
 	verify-5210-radio-incoming-call-lifecycle \
 	verify-5210-radio-outgoing-call-lifecycle verify-5210-radio-outgoing-sms \
@@ -511,6 +511,15 @@ verify-5210-radio-paging: normalize-5210
 	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 	@echo "OK — 5210 completed IMSI paging and returned to PCH"
+
+# shell: NSM-5 DRX, identity and malformed-page rejection
+verify-5210-radio-paging-negatives: normalize-5210
+	@for profile in wrong_group unmatched malformed; do \
+		$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_$$profile SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_paging_$$profile" || exit; \
+		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		check_profile=$$(echo $$profile | tr _ -); \
+		$(PYTHON) tools/radio_paging_negative_trace_check.py $(RUN_DIR)_$$profile/error.log --profile $$check_profile || exit; \
+	done
 
 verify-5210-radio-incoming-sms: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'

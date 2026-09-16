@@ -514,6 +514,8 @@ registration. `make verify-3410-radio-paging-state` replays before page
 delivery and during the assigned exchange. The negative paging gate requires
 continued idle fill without RR access for wrong-group, unmatched and malformed
 pages, while the unsuitable-cell composition must never reach paging.
+`make verify-5210-radio-paging-negatives` applies the same shared negative
+contract after an independent NSM-5 registration; it adds no handset branch.
 
 `make verify-model-frontier-state` performs isolated mid-frontier save/load
 round trips for both products. The positive frontier summaries require FIQ0,
