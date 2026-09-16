@@ -66,11 +66,16 @@ The load-bearing board correction is the BLB-2 CCONT tuple. Nominal BSI
 `0x150` and BTEMP `0x140` lie inside this product's recovered recognition
 windows, after which firmware organically renders the Nokia startup animation
 and standby UI. The product also owns an 84-by-48 reversed-segment display and
-the five-row NSM Family-A keypad. Exact-frame gates validate unattended
-standby, physical Menu entry, entry into Messages at its Write messages screen,
-and two physical Back operations returning cleanly to standby. Radio
-registration, persistent application writes, and another firmware revision
-remain outside these gates.
+the five-row NSM Family-A keypad. Its independent ROM6 type-`0x56`
+candidate-window request selects PMM candidate ARFCN 86. Product-owned radio
+framing then reaches random access, SDCCH, ordinary or SIM-authenticated
+Location Updating, EF_LOCI update, channel release, steady camp and
+firmware-rendered `DCT3 LAB`. Exact-frame gates validate registered standby,
+physical Menu entry, entry into Messages at its Write messages screen, two
+physical Back operations returning cleanly to standby, and a save/load followed
+by further application navigation. Paging, calls, SMS, mobility loss/recovery,
+persistent application writes, and another firmware revision remain outside
+these gates.
 
 ## Nokia 3410 NHM-2 v5.46
 

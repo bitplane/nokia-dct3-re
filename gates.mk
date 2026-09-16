@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 282 gates: 146 generated from typed steps, 136 copied verbatim (shell).
+# 285 gates: 149 generated from typed steps, 136 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -58,16 +58,18 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3330-radio-registration-preserved verify-3330-radio-registration-state \
 	verify-3330-radio-unsuitable-cells verify-3410-radio-registration \
 	verify-3410-radio-registration-preserved verify-3410-radio-registration-state \
-	verify-3410-radio-unsuitable-cells verify-5210-frontier verify-5210-menu \
-	verify-5210-messages verify-5210-navigation verify-3310-frontier \
-	verify-3310-menu verify-3310-navigation verify-3330-frontier \
-	verify-3330-navigation verify-3410-frontier verify-3410-menu \
-	verify-3410-navigation verify-flash-pmm verify-model-frontier-state \
-	verify-model-frontier-negative verify-radio-camp verify-radio-registration \
-	verify-radio-reselection-same-lac verify-radio-reselection-different-lac \
-	verify-radio-reselection-state verify-radio-reselection-preserved \
-	verify-radio-loss-recovery verify-radio-loss-recovery-state \
-	verify-radio-all-cell-loss verify-radio-reselection-unsuitable-neighbours \
+	verify-3410-radio-unsuitable-cells verify-5210-frontier \
+	verify-5210-radio-registration verify-5210-menu \
+	verify-5210-radio-authentication verify-5210-messages verify-5210-navigation \
+	verify-5210-save-state verify-3310-frontier verify-3310-menu \
+	verify-3310-navigation verify-3330-frontier verify-3330-navigation \
+	verify-3410-frontier verify-3410-menu verify-3410-navigation verify-flash-pmm \
+	verify-model-frontier-state verify-model-frontier-negative verify-radio-camp \
+	verify-radio-registration verify-radio-reselection-same-lac \
+	verify-radio-reselection-different-lac verify-radio-reselection-state \
+	verify-radio-reselection-preserved verify-radio-loss-recovery \
+	verify-radio-loss-recovery-state verify-radio-all-cell-loss \
+	verify-radio-reselection-unsuitable-neighbours \
 	verify-radio-reselection-paging verify-3310-radio-reselection-same-lac \
 	verify-3310-radio-reselection-different-lac \
 	verify-3310-radio-reselection-state verify-3310-radio-reselection-preserved \
@@ -415,14 +417,28 @@ verify-3410-radio-unsuitable-cells: normalize-3410
 		$(RUN_DIR)_assignment/error.log --profile assignment
 
 verify-5210-frontier: normalize-5210
-	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=16
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 5210 LCD frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 v5.40 product profile reached its standby frame"
+
+verify-5210-radio-registration: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nsm5
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no registered 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
+	@echo "OK — 5210 completed Location Updating and displayed the operator"
 
 verify-5210-menu: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 5210 menu frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_MENU_SHA)
 	@echo "OK — 5210 physical Menu key reached the firmware-owned Messages item"
+
+verify-5210-radio-authentication: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_AUTHENTICATION_ARGS)'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_authentication_boundary_trace_check.py $(RUN_DIR)/error.log --profile nsm5
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no authenticated 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
+	@echo "OK — 5210 completed authenticated Location Updating and displayed the operator"
 
 verify-5210-messages: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=22 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
@@ -433,6 +449,13 @@ verify-5210-navigation: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter,wait1000,c,wait1000,c NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 5210 return frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 returned cleanly from Messages to standby"
+
+verify-5210-save-state: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=15 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=menu,wait1000,enter NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@grep -q 'state_roundtrip: result=pass' $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-restore 5210 Messages frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_MESSAGES_SHA)
+	@echo "OK — 5210 restored registered state and entered Messages"
 
 verify-3310-frontier:
 	@$(MAKE) --no-print-directory smoke-3310-639 RUN_DIR=$(RUN_DIR) SECONDS=15

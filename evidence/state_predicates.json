@@ -4,9 +4,9 @@
   "entries": [
     {
       "id": "nsm5_5210_standby", "owner": "product_profile", "status": "satisfied",
-      "predicate": "Nokia 5210 v5.40 completes board bring-up and renders a stable standby screen through product-owned device contracts",
-      "current": "The forcing-free NSM-5 profile completes organic DSP bootstrap and compact service control, external-service discovery and application registration, SIMI initialization, and BLB-2 pack recognition. Read-only self-test values agree at 0x9c49. With the product's 84x48 reversed-segment display and five-row Family-A keypad, exact-frame gates reproduce unattended standby, open the firmware-owned Messages menu item, enter the Write messages application screen, and return through two physical Back operations to standby.",
-      "evidence": ["docs/5210_bringup.md", "docs/cross_rom_confidence.md", "tools/test_machine_profile.py", "tools/test_keypad_input.py"]
+      "predicate": "Nokia 5210 v5.40 completes board bring-up, GSM registration and interactive application entry through product-owned device contracts",
+      "current": "The forcing-free NSM-5 profile completes organic DSP bootstrap and compact service control, external-service discovery and application registration, SIMI initialization, BLB-2 pack recognition, candidate-window acquisition and ordinary Location Updating. Firmware updates EF_LOCI, releases SDCCH, returns to camp and renders DCT3 LAB. A separate network fixture proves SIM-backed MM authentication before the same promotion. Exact-frame gates reproduce registered standby, open the firmware-owned Messages menu item, enter Write messages, return through two physical Back operations, and preserve registered state across save/load before further physical navigation.",
+      "evidence": ["docs/5210_bringup.md", "docs/cross_rom_confidence.md", "tools/test_machine_profile.py", "tools/test_keypad_input.py", "tools/radio_registration_trace_check.py", "tools/radio_authentication_boundary_trace_check.py"]
     },
     {
       "id": "lower_service_idle", "owner": "startup", "status": "modeled",

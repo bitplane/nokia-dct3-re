@@ -1736,7 +1736,7 @@
         {
           "step": "shell",
           "silent": true,
-          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=16"
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20"
         },
         {
           "step": "shell",
@@ -1747,6 +1747,33 @@
           "step": "announce",
           "silent": true,
           "command": "echo \"OK — 5210 v5.40 product profile reached its standby frame\""
+        }
+      ]
+    },
+    {
+      "name": "verify-5210-radio-registration",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nsm5"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no registered 5210 frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — 5210 completed Location Updating and displayed the operator\""
         }
       ]
     },
@@ -1766,6 +1793,33 @@
         {
           "step": "announce", "silent": true,
           "command": "echo \"OK — 5210 physical Menu key reached the firmware-owned Messages item\""
+        }
+      ]
+    },
+    {
+      "name": "verify-5210-radio-authentication",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_AUTHENTICATION_ARGS)'"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_authentication_boundary_trace_check.py $(RUN_DIR)/error.log --profile nsm5"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no authenticated 5210 frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — 5210 completed authenticated Location Updating and displayed the operator\""
         }
       ]
     },
@@ -1804,6 +1858,33 @@
         {
           "step": "announce", "silent": true,
           "command": "echo \"OK — 5210 returned cleanly from Messages to standby\""
+        }
+      ]
+    },
+    {
+      "name": "verify-5210-save-state",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=15 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=menu,wait1000,enter NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "grep -q 'state_roundtrip: result=pass' $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no post-restore 5210 Messages frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_MESSAGES_SHA)"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — 5210 restored registered state and entered Messages\""
         }
       ]
     },

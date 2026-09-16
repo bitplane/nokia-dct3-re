@@ -63,6 +63,14 @@ NHM2_GOOD = NHM5_GOOD.replace(
     "data=041202000000001a600000010000000f00000000",
 )
 
+NSM5_GOOD = NHM5_GOOD.replace(
+    "00580000030045050200f110",
+    "00560000030045050200f110",
+).replace(
+    "data=041202000000001a600000580000000f00000000",
+    "data=040000000000001a600000560000000f00000000",
+)
+
 NHM6_PRESERVED_GOOD = NHM6_GOOD.replace(
     "4905087000f000fffe",
     "4905087200f1100001",
@@ -95,6 +103,9 @@ class RegistrationTraceCheckTest(unittest.TestCase):
 
     def test_complete_nhm2_registration(self):
         verify(NHM2_GOOD, "nhm2")
+
+    def test_complete_nsm5_registration(self):
+        verify(NSM5_GOOD, "nsm5")
 
     def test_complete_nhm2_preserved_registration_without_redundant_loci_write(self):
         verify(NHM2_PRESERVED_GOOD, "nhm2", preserved=True)

@@ -63,6 +63,18 @@ class AuthenticationBoundaryTraceCheckTest(unittest.TestCase):
                 "data=1000 pc=0026eb44", ""
             ))
 
+    def test_nsm5_uses_protocol_boundaries_not_foreign_pc_taps(self):
+        text = GOOD.replace(
+            "sim_authentication_consumer: pc=00206914 get_status=0066 accepted=01 task=14\n",
+            "",
+        ).replace(
+            "radio_pending_primitive: address=0010d12c old=0000 data=1000 pc=0026eb44\n",
+            "",
+        )
+        result = verify(text, "nsm5")
+        self.assertIsNone(result["firmware_results_accepted"])
+        self.assertIsNone(result["sres_primitives_queued"])
+
 
 if __name__ == "__main__":
     unittest.main()

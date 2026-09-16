@@ -2,13 +2,14 @@
 
 ## Validated result
 
-The local v5.40 PPM E Wintesla set reaches a stable, interactive standby
-screen through the normal firmware lifecycle. `make verify-5210-frontier`
-checks the unattended firmware-rendered standby frame against an exact
-stable-pixel oracle. The separate menu, Messages and navigation gates use only
-physical matrix keys to open the main menu, enter the Messages application,
-and return through both Back levels to standby. No firmware RAM, message,
-rendered pixel, or completion flag is injected.
+The local v5.40 PPM E Wintesla set reaches a stable, registered and interactive
+standby screen through the normal firmware lifecycle. `make
+verify-5210-frontier` checks the unattended firmware-rendered operator frame
+against an exact stable-pixel oracle. The separate menu, Messages and
+navigation gates use only physical matrix keys to open the main menu, enter the
+Messages application, and return through both Back levels to registered
+standby. No firmware RAM, message, rendered pixel, or completion flag is
+injected.
 
 The archive members, normalization command, and image hashes are recorded in
 `roms/README.md`. The shared MAD2 inputs remain documented placeholders; this
@@ -39,12 +40,33 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   property, not a capture-only mirror.
 - The five-row NSM Family-A keypad uses power mask `0x02` and a dedicated MAME
   matrix containing softkeys, scroll, call, end, volume, digits, star and hash.
+- NSM-5 emits the ROM6 type-`0x56`, 160-byte candidate-window request. Its
+  virgin PMM supplies ARFCN 86 (`0x56`), which the product-owned direct-octet
+  radio contract carries through candidate acquisition, random access and the
+  assigned-channel confirmation. Firmware then emits its own Location Updating
+  Request, accepts the laboratory network, updates EF_LOCI, releases SDCCH and
+  returns to the serving paging channel. The idle UI renders `DCT3 LAB`.
+
+## Acceptance gates
+
+- `make verify-5210-radio-registration` proves candidate selection, ordinary
+  Location Updating, both EF_LOCI writes, channel release, steady camp and the
+  exact registered operator frame.
+- `make verify-5210-radio-authentication` repeats registration with network
+  authentication enabled. The phone issues RUN GSM ALGORITHM to the removable
+  SIM, fetches `SRES || Kc`, emits MM Authentication Response, then completes
+  the same registration lifecycle. Internal PC-keyed consumer taps remain
+  product-local; NSM-5 is checked at the SIM and GSM protocol boundaries.
+- `make verify-5210-save-state` saves registered standby, restores it, and uses
+  physical Menu/Enter keys to reach the exact Messages frame. This protects the
+  radio, SIM, UI and product-device state across serialization.
 
 ## Remaining scope
 
-The gates validate v5.40 PPM E, board bring-up, standby rendering, the main
-menu, application entry, and clean return navigation. They do not yet validate
-network registration, calls, audio, persistent application writes, or another
-5210 firmware revision. The radio peer therefore remains disabled. The
-unexercised external-service channel and placeholder MAD2 inputs must not be
-promoted to cross-product facts.
+The gates validate v5.40 PPM E, board bring-up, authenticated and
+unauthenticated registration, operator presentation, save/load, the main menu,
+application entry, and clean return navigation. They do not yet validate
+mobility loss/recovery, paging, calls, SMS, audio, persistent application
+writes, or another 5210 firmware revision. The unexercised external-service
+channel and placeholder MAD2 inputs must not be promoted to cross-product
+facts.

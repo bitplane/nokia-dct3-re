@@ -400,6 +400,7 @@ class MachineProfileTest(unittest.TestCase):
                 "dsp_service_control": "DSP_SERVICE_CONTROL_COMPACT",
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
+                "radio": "RADIO_NSM5",
                 "ccont_board": "ADC_5210",
                 "display": "DISPLAY_5210",
             },

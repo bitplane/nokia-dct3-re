@@ -57,6 +57,11 @@ PROFILE_CHECKPOINTS = {
             r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
             r"030045050200f11000011708")),
     ),
+    "nsm5": (
+        ("Location Updating Accept", re.compile(
+            r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
+            r"030045050200f11000011708")),
+    ),
 }
 
 PROFILE_ARFCN = {
@@ -64,6 +69,15 @@ PROFILE_ARFCN = {
     "nhm5": "0058",
     "nhm6": "0337",
     "nhm2": "0001",
+    "nsm5": "0056",
+}
+
+PROFILE_DECONFIG_PREFIX = {
+    "nse8": "041202",
+    "nhm5": "041202",
+    "nhm6": "041202",
+    "nhm2": "041202",
+    "nsm5": "040000",
 }
 
 COMMON_POST_ACCEPT_CHECKPOINTS = (
@@ -93,7 +107,8 @@ def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
         + after_accept
         + (("RR channel deconfiguration", re.compile(
             r"TX packet type=02 .*radio_phase=release_channel_change "
-            rf"data=041202000000001a6000{PROFILE_ARFCN[profile]}"
+            rf"data={PROFILE_DECONFIG_PREFIX[profile]}000000001a6000"
+            rf"{PROFILE_ARFCN[profile]}"
             r"0000000f00000000")),)
         + COMMON_POST_ACCEPT_CHECKPOINTS
     )
@@ -121,7 +136,7 @@ def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
             r"sim_device: update-binary fid=6f7e", text):
         raise ValueError("NHM-2 redundantly mutated persisted EF_LOCI")
 
-    if profile in ("nhm5", "nhm6", "nhm2"):
+    if profile in ("nhm5", "nhm6", "nhm2", "nsm5"):
         assigned_confirmation = re.search(
             r"radio_phase=assigned_channel_change[^\n]*"
             r"(?:\n.*)*?RX enqueue type=89 payload=8 .*data=0100000000000000",

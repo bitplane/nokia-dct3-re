@@ -10,7 +10,7 @@ from pathlib import Path
 REQUEST = "05120023553cbe9637a89d218ae64dae47bf35"
 
 
-def verify(text: str) -> dict:
+def verify(text: str, profile: str = "nse8") -> dict:
     request_lines = [
         line for line in text.splitlines()
         if "RX enqueue type=80" in line and REQUEST in line
@@ -39,24 +39,31 @@ def verify(text: str) -> dict:
         raise ValueError("expected one complete RUN GSM ALGORITHM transaction")
     if len(get_responses) != 1 or len(results) != 1:
         raise ValueError("expected one complete twelve-byte GET RESPONSE")
-    consumers = [
-        line for line in text.splitlines()
-        if "sim_authentication_consumer:" in line
-        and "get_status=0066 accepted=01" in line
-    ]
-    if len(consumers) != 1:
-        raise ValueError(
-            f"expected one firmware-accepted authentication result, found {len(consumers)}"
-        )
-    queued_primitives = [
-        line for line in text.splitlines()
-        if "radio_pending_primitive:" in line
-        and "old=0000 data=1000" in line
-    ]
-    if len(queued_primitives) != 1:
-        raise ValueError(
-            f"expected one queued SRES radio primitive, found {len(queued_primitives)}"
-        )
+    consumers = []
+    queued_primitives = []
+    if profile != "nsm5":
+        # These two taps are firmware-address diagnostics, not protocol
+        # boundaries.  Retain them for the ROMs whose addresses are mapped;
+        # other products prove consumption by the resulting MM response.
+        consumers = [
+            line for line in text.splitlines()
+            if "sim_authentication_consumer:" in line
+            and "get_status=0066 accepted=01" in line
+        ]
+        if len(consumers) != 1:
+            raise ValueError(
+                "expected one firmware-accepted authentication result, found "
+                f"{len(consumers)}"
+            )
+        queued_primitives = [
+            line for line in text.splitlines()
+            if "radio_pending_primitive:" in line
+            and "old=0000 data=1000" in line
+        ]
+        if len(queued_primitives) != 1:
+            raise ValueError(
+                f"expected one queued SRES radio primitive, found {len(queued_primitives)}"
+            )
 
     authentication_responses = [
         line for line in text.splitlines()
@@ -93,8 +100,8 @@ def verify(text: str) -> dict:
         "authentication_requests": 1,
         "run_gsm_algorithm_commands": 1,
         "result_bytes_fetched": 12,
-        "firmware_results_accepted": 1,
-        "sres_primitives_queued": 1,
+        "firmware_results_accepted": len(consumers) if consumers else None,
+        "sres_primitives_queued": len(queued_primitives) if queued_primitives else None,
         "mm_authentication_responses": len(authentication_responses),
         "registration_promotion": True,
     }
@@ -103,15 +110,16 @@ def verify(text: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=Path)
+    parser.add_argument("--profile", choices=("nse8", "nhm5", "nsm5"), default="nse8")
     args = parser.parse_args()
-    result = verify(args.log.read_text(errors="replace"))
+    result = verify(args.log.read_text(errors="replace"), args.profile)
     print(
         "authentication boundary: "
         f"requests={result['authentication_requests']} "
         f"SIM-runs={result['run_gsm_algorithm_commands']} "
         f"fetched={result['result_bytes_fetched']} "
-        f"accepted={result['firmware_results_accepted']} "
-        f"queued={result['sres_primitives_queued']} "
+        f"accepted={result['firmware_results_accepted'] or 'protocol'} "
+        f"queued={result['sres_primitives_queued'] or 'protocol'} "
         f"MM-responses={result['mm_authentication_responses']} "
         "promotion=yes"
     )

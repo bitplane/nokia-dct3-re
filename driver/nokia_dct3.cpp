@@ -212,6 +212,16 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };
 
+// NSM-5 v5.40 independently emits the ROM6 0x56/160 candidate-window
+// request (its virgin PMM starts with ARFCN 86). Keep the contract product-
+// owned while subsequent channel-confirmation and idle behavior are observed.
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM5 = {
+	nokia_radio_peer_device::acquisition_strategy::candidate_window,
+	0x14, 0x01, 0x01, 0, true, 0, true, false,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::direct
+};
+
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
 	nokia_radio_peer_device::acquisition_strategy::autonomous_band_scan,
 	// NHM-2 v5.46 organically publishes 0x14 in byte 15 of its TCH/F
@@ -715,6 +725,7 @@ constexpr nokia_product_config make_5210_config()
 	// card through that physical boundary; card contents remain external input.
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
+	result.radio = RADIO_NSM5;
 	result.ccont_board = ADC_5210;
 	result.display = DISPLAY_5210;
 	return result;
