@@ -19,6 +19,13 @@ class A5TraceCheckTest(unittest.TestCase):
     def test_accepts_semantic_trace(self):
         self.assertEqual(check(GOOD), [])
 
+    def test_accepts_decoded_cipher_command(self):
+        semantic = GOOD.replace(
+            "dspif_transport: RX enqueue type=80 payload=34 producer=0d9 "
+            "data=801200000635012b",
+            "dsp_hle: GSM service downlink kind=7 sapi=0 pd=06 message=35 length=3")
+        self.assertEqual(check(semantic), [])
+
     def test_rejects_missing_direction(self):
         self.assertTrue(check(GOOD.replace(
             "radio_l1: kind=cipher direction=downlink", "other")))

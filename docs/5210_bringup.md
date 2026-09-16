@@ -57,6 +57,11 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   SIM, fetches `SRES || Kc`, emits MM Authentication Response, then completes
   the same registration lifecycle. Internal PC-keyed consumer taps remain
   product-local; NSM-5 is checked at the SIM and GSM protocol boundaries.
+- `make verify-5210-radio-a5-1-incoming-call` extends authenticated service
+  through a network Cipher Mode Command, redacted product-local DSP key
+  publication, organic Cipher Mode Complete, bidirectional ciphered SDCCH and
+  traffic bursts, and the complete physical Answer/End lifecycle. The default
+  regression composition remains A5/0.
 - `make verify-5210-save-state` saves registered standby, restores it, and uses
   physical Menu/Enter keys to reach the exact Messages frame. This protects the
   radio, SIM, UI and product-device state across serialization.

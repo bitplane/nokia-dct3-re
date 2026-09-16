@@ -42,6 +42,10 @@ class Radio5210IncomingCallTraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cipher-control"):
             verify(GOOD.replace("00ebffffffff", "00f4ffffffff"))
 
+    def test_accepts_redacted_a5_1_control(self):
+        verify(GOOD.replace(
+            "data=00ebffffffffffffffff0000", "data=<redacted>"), a5_1=True)
+
     def test_rejects_missing_speech_release(self):
         with self.assertRaisesRegex(ValueError, "speech release"):
             verify(GOOD.replace(

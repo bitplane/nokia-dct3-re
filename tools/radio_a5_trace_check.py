@@ -11,7 +11,9 @@ from pathlib import Path
 def check(text: str) -> list[str]:
     errors: list[str] = []
     required = {
-        "A5/1 Cipher Mode Command": r"data=8012[0-9a-f]*063501",
+        "A5/1 Cipher Mode Command":
+            r"(?:data=8012[0-9a-f]*063501|"
+            r"GSM service downlink .*pd=06 message=35)",
         "redacted DSP key publication":
             r"TX packet type=14 payload=(?:10|12) .*data=<redacted>",
         "organic Cipher Mode Complete":

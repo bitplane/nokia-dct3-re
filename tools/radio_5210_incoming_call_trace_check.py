@@ -38,7 +38,7 @@ from tools.radio_call_lifecycle_common import (
 )
 
 
-CHECKPOINTS = (
+BASE_CHECKPOINTS = (
     ("registration release", REGISTRATION_RELEASE),
     ("IMSI page", IMSI_PAGE),
     ("Paging Response", PAGING_RESPONSE),
@@ -77,8 +77,13 @@ CHECKPOINTS = (
 )
 
 
-def verify(text: str) -> None:
-    require_ordered(text, CHECKPOINTS, "NSM-5")
+def verify(text: str, a5_1: bool = False) -> None:
+    checkpoints = list(BASE_CHECKPOINTS)
+    if a5_1:
+        checkpoints[5] = (
+            "redacted NSM-5 A5/1 cipher-control publication",
+            re.compile(r"TX packet type=14 payload=12 .*data=<redacted>"))
+    require_ordered(text, checkpoints, "NSM-5")
     require_count(
         text, CONNECT, 1,
         "NSM-5 must emit exactly one Connect before acknowledgement")
@@ -90,9 +95,10 @@ def verify(text: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=Path)
+    parser.add_argument("--a5-1", action="store_true")
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors="replace"))
+        verify(args.log.read_text(errors="replace"), args.a5_1)
     except ValueError as error:
         raise SystemExit(str(error)) from None
     print(
