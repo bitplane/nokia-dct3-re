@@ -107,7 +107,8 @@ unresolved hardware or protocol boundary.
   right-softkey Names route independently saves a contact to SIM `EF_ADN`
   and renders it after a cold restart with the same card image. Physical
   USSD and call-divert interrogation additionally cross the shared GSM 04.80
-  boundary through NSM-5's dedicated Send key. Same- and
+  boundary through NSM-5's dedicated Send key. A Phase-2+ fixture also proves
+  its nine-byte TERMINAL PROFILE and proactive DISPLAY TEXT lifecycle. Same- and
   different-LAC reselection, serving/all-cell loss, RF recovery and paging
   after reselection are covered on the product's ARFCN-86/87 laboratory pair;
   a focused authenticated incoming-call gate adds organic A5/1 control and

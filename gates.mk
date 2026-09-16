@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 304 gates: 165 generated from typed steps, 139 copied verbatim (shell).
+# 305 gates: 165 generated from typed steps, 140 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -200,7 +200,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-toolkit-malformed verify-sim-toolkit-timeout verify-sim-hotplug \
 	verify-sim-hotplug-v501 verify-sim-hotplug-toolkit \
 	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
-	verify-sim-toolkit-3310 verify-sim-toolkit-3330 \
+	verify-sim-toolkit-3310 verify-sim-toolkit-3330 verify-sim-toolkit-5210 \
 	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
 	verify-sim-phonebook verify-sim-pin verify-sim-pin-unblock \
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
@@ -3297,6 +3297,14 @@ verify-sim-toolkit-3330:
 	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_3330/noki3330.cfg $(RUN_DIR)/cfg/; \
 	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg'; \
 	$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome screen-busy
+
+# shell: NSM-5 Phase-2+ DISPLAY TEXT corroboration
+verify-sim-toolkit-5210: normalize-5210
+	@set -e; \
+	$(RM) -r "$(RUN_DIR)"; mkdir -p "$(RUN_DIR)/cfg"; \
+	cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_5210/noki5210.cfg "$(RUN_DIR)/cfg/"; \
+	$(MAKE) --no-print-directory run-captured PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait19000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \
+	$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome success --terminal-profile-length 9
 
 # shell: provisioned card application and machine-state fixture
 verify-sim-toolkit-state-roundtrip:

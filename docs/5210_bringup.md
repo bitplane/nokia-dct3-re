@@ -87,6 +87,10 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   the physical keypad and submits them with the product's dedicated Send key.
   The resulting processUnstructuredSS-Request and InterrogateSS transactions
   complete through GSM 04.80, render the network response, and release RR.
+- `make verify-sim-toolkit-5210` supplies a Phase-2+ card, observes the
+  product's nine-byte TERMINAL PROFILE, then requires `91xx`, FETCH, rendered
+  `DCT3 SAT`, physical OK and a successful TERMINAL RESPONSE. The profile
+  length is product evidence rather than a borrowed 3210 constant.
 - `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
   Paging Response, contention resolution, clean release and return to the
   subscriber's paging group.

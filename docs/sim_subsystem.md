@@ -325,6 +325,12 @@ NHM-6 v4.50 (3330) reaches the same FETCH boundary but returns `20 01`
 lifecycle. That result is preserved as a product limitation, not rewritten as
 card or transport failure.
 
+NSM-5 v5.40 (5210) independently submits a nine-byte TERMINAL PROFILE, FETCHes
+the same DISPLAY TEXT command, renders `DCT3 SAT`, and returns result `00`
+after a physical left-softkey press. The longer profile is an observed
+product-owned capability declaration; the cross-ROM checker therefore accepts
+an explicit expected profile length rather than normalizing it to five bytes.
+
 A second opt-in card application proves that proactive commands can be
 sequenced rather than merely demonstrated in isolation. The successful DISPLAY
 TEXT response returns `91 15`, the firmware immediately FETCHes a GET INKEY

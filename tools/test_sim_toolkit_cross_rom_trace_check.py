@@ -24,6 +24,12 @@ class ToolkitCrossRomTraceCheckTest(unittest.TestCase):
     def test_screen_busy(self):
         check.verify(PREFIX + "\nterminal-response data=81030121800202828103022001\nSIM status ins=14 sw=9000", "screen-busy")
 
+    def test_product_specific_terminal_profile_length(self):
+        profile9 = PREFIX.replace("p3=05", "p3=09")
+        check.verify(
+            profile9 + "\nterminal-response data=810301218002028281030100\nSIM status ins=14 sw=9000",
+            "success", 9)
+
     def test_outcomes_are_distinct(self):
         with self.assertRaises(ValueError):
             check.verify(PREFIX + "\nterminal-response data=81030121800202828103022001\nSIM status ins=14 sw=9000", "success")

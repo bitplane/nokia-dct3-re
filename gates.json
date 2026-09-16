@@ -11934,6 +11934,19 @@
       ]
     },
     {
+      "name": "verify-sim-toolkit-5210",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "unstructured": "NSM-5 Phase-2+ DISPLAY TEXT corroboration",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(RM) -r \"$(RUN_DIR)\"; mkdir -p \"$(RUN_DIR)/cfg\"; \\",
+        "\tcp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_5210/noki5210.cfg \"$(RUN_DIR)/cfg/\"; \\",
+        "\t$(MAKE) --no-print-directory run-captured PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=wait19000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \\",
+        "\t$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome success --terminal-profile-length 9"
+      ]
+    },
+    {
       "name": "verify-sim-toolkit-state-roundtrip",
       "prerequisites": [],
       "variables": {},
