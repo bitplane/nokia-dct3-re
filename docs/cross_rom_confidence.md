@@ -66,10 +66,11 @@ The load-bearing board correction is the BLB-2 CCONT tuple. Nominal BSI
 `0x150` and BTEMP `0x140` lie inside this product's recovered recognition
 windows, after which firmware organically renders the Nokia startup animation
 and standby UI. The product also owns an 84-by-48 reversed-segment display and
-the five-row NSM Family-A keypad. `make verify-5210-frontier` applies one
-physical left-softkey cycle and reproduces the exact standby-frame oracle.
-Radio registration, menu navigation, and another firmware revision remain
-outside this gate.
+the five-row NSM Family-A keypad. Exact-frame gates validate unattended
+standby, physical Menu entry, entry into Messages at its Write messages screen,
+and two physical Back operations returning cleanly to standby. Radio
+registration, persistent application writes, and another firmware revision
+remain outside these gates.
 
 ## Nokia 3410 NHM-2 v5.46
 

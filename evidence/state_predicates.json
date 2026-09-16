@@ -5,7 +5,7 @@
     {
       "id": "nsm5_5210_standby", "owner": "product_profile", "status": "satisfied",
       "predicate": "Nokia 5210 v5.40 completes board bring-up and renders a stable standby screen through product-owned device contracts",
-      "current": "The forcing-free NSM-5 profile completes organic DSP bootstrap and compact service control, external-service discovery and application registration, SIMI initialization, and BLB-2 pack recognition. Read-only self-test values agree at 0x9c49. With the product's 84x48 reversed-segment display and five-row Family-A keypad, one physical left-softkey cycle redraws the firmware-owned standby frame and reproduces the exact stable-pixel oracle.",
+      "current": "The forcing-free NSM-5 profile completes organic DSP bootstrap and compact service control, external-service discovery and application registration, SIMI initialization, and BLB-2 pack recognition. Read-only self-test values agree at 0x9c49. With the product's 84x48 reversed-segment display and five-row Family-A keypad, exact-frame gates reproduce unattended standby, open the firmware-owned Messages menu item, enter the Write messages application screen, and return through two physical Back operations to standby.",
       "evidence": ["docs/5210_bringup.md", "docs/cross_rom_confidence.md", "tools/test_machine_profile.py", "tools/test_keypad_input.py"]
     },
     {

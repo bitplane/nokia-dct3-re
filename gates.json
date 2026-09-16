@@ -1736,7 +1736,7 @@
         {
           "step": "shell",
           "silent": true,
-          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=16 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220'"
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=16"
         },
         {
           "step": "shell",
@@ -1747,6 +1747,63 @@
           "step": "announce",
           "silent": true,
           "command": "echo \"OK — 5210 v5.40 product profile reached its standby frame\""
+        }
+      ]
+    },
+    {
+      "name": "verify-5210-menu",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 5210 menu frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_MENU_SHA)"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — 5210 physical Menu key reached the firmware-owned Messages item\""
+        }
+      ]
+    },
+    {
+      "name": "verify-5210-messages",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=22 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 5210 Messages frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_MESSAGES_SHA)"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — 5210 entered the firmware-owned Messages application\""
+        }
+      ]
+    },
+    {
+      "name": "verify-5210-navigation",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter,wait1000,c,wait1000,c NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 5210 return frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — 5210 returned cleanly from Messages to standby\""
         }
       ]
     },

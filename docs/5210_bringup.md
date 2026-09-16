@@ -4,10 +4,11 @@
 
 The local v5.40 PPM E Wintesla set reaches a stable, interactive standby
 screen through the normal firmware lifecycle. `make verify-5210-frontier`
-boots a fresh normalized image, applies one physical left-softkey cycle after
-startup, and checks the resulting firmware-rendered standby frame against an
-exact stable-pixel oracle. No firmware RAM, message, rendered pixel, or
-completion flag is injected.
+checks the unattended firmware-rendered standby frame against an exact
+stable-pixel oracle. The separate menu, Messages and navigation gates use only
+physical matrix keys to open the main menu, enter the Messages application,
+and return through both Back levels to standby. No firmware RAM, message,
+rendered pixel, or completion flag is injected.
 
 The archive members, normalization command, and image hashes are recorded in
 `roms/README.md`. The shared MAD2 inputs remain documented placeholders; this
@@ -41,8 +42,9 @@ NSM-5 differs from the other validated products at explicit device boundaries:
 
 ## Remaining scope
 
-The gate validates v5.40 PPM E, board bring-up, standby rendering, and one
-physical input/redraw cycle. It does not yet validate menu navigation, network
-registration, calls, audio, or another 5210 firmware revision. The radio peer
-therefore remains disabled. The unexercised external-service channel and
-placeholder MAD2 inputs must not be promoted to cross-product facts.
+The gates validate v5.40 PPM E, board bring-up, standby rendering, the main
+menu, application entry, and clean return navigation. They do not yet validate
+network registration, calls, audio, persistent application writes, or another
+5210 firmware revision. The radio peer therefore remains disabled. The
+unexercised external-service channel and placeholder MAD2 inputs must not be
+promoted to cross-product facts.

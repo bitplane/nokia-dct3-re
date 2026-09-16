@@ -132,6 +132,14 @@ class KeypadInputTest(unittest.TestCase):
             self.harness,
         )
         self.assertIn("local lcd_x_mirror = is_2100 or is_5210", self.harness)
+        fixture = self.harness.split("elseif is_5210 then", 1)[1]
+        fixture = fixture.split("elseif is_3410 then", 1)[0]
+        self.assertIn('enter = field_by_mask("COL.1", 0x02)', fixture)
+        self.assertIn('up = field_by_mask("COL.1", 0x04)', fixture)
+        self.assertIn('down = field_by_mask("COL.1", 0x08)', fixture)
+        self.assertIn('c = field_by_mask("COL.1", 0x10)', fixture)
+        self.assertIn('send = field_by_mask("COL.0", 0x04)', fixture)
+        self.assertIn('["end"] = field_by_mask("COL.0", 0x08)', fixture)
 
     def test_3310_navigation_gate_uses_only_physical_key_sequences(self):
         makefile = ((ROOT / "Makefile").read_text() + "\n"

@@ -95,8 +95,9 @@ unresolved hardware or protocol boundary.
   treated as cross-product evidence.
 - The 5210 v5.40 PPM E image is a validated interactive product profile. Its
   exact standby gate depends on product-owned GENSIO, service, BLB-2 CCONT,
-  display-orientation and Family-A keypad contracts; radio behavior and other
-  firmware revisions remain outside that claim.
+  display-orientation and Family-A keypad contracts. Physical-key gates open
+  the main menu, enter Messages, and return cleanly to standby; radio behavior
+  and other firmware revisions remain outside that claim.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
   and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu
