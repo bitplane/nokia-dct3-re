@@ -52,6 +52,30 @@ class IncomingSmsTraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "EF_SMS record 1"):
             verify(GOOD, bytes(SMS_NVRAM_OFFSET + 176 + 88))
 
+    def test_nsm5_cipher_control_contract(self):
+        text = GOOD.replace(
+            "data=00f4ffffffffffffffff0000",
+            "data=00ebffffffffffffffff0000",
+        )
+        verify(text, nvram_with_message(), "nsm5")
+
+    def test_nsm5_rejects_foreign_cipher_control(self):
+        with self.assertRaisesRegex(ValueError, "DSP cipher-control"):
+            verify(GOOD, nvram_with_message(), "nsm5")
+
+    def test_accepts_physically_read_message(self):
+        nvram = bytearray(nvram_with_message())
+        nvram[SMS_NVRAM_OFFSET] = 0x01
+        verify(
+            GOOD + "sim_device: update fid=6f3c record=1 length=176\n",
+            bytes(nvram), read=True)
+
+    def test_read_message_requires_status_update(self):
+        nvram = bytearray(nvram_with_message())
+        nvram[SMS_NVRAM_OFFSET] = 0x01
+        with self.assertRaisesRegex(ValueError, "delivery and read-status"):
+            verify(GOOD, bytes(nvram), read=True)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 285 gates: 149 generated from typed steps, 136 copied verbatim (shell).
+# 291 gates: 155 generated from typed steps, 136 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -60,16 +60,20 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-registration-preserved verify-3410-radio-registration-state \
 	verify-3410-radio-unsuitable-cells verify-5210-frontier \
 	verify-5210-radio-registration verify-5210-menu \
-	verify-5210-radio-authentication verify-5210-messages verify-5210-navigation \
-	verify-5210-save-state verify-3310-frontier verify-3310-menu \
-	verify-3310-navigation verify-3330-frontier verify-3330-navigation \
-	verify-3410-frontier verify-3410-menu verify-3410-navigation verify-flash-pmm \
-	verify-model-frontier-state verify-model-frontier-negative verify-radio-camp \
-	verify-radio-registration verify-radio-reselection-same-lac \
-	verify-radio-reselection-different-lac verify-radio-reselection-state \
-	verify-radio-reselection-preserved verify-radio-loss-recovery \
-	verify-radio-loss-recovery-state verify-radio-all-cell-loss \
-	verify-radio-reselection-unsuitable-neighbours \
+	verify-5210-radio-authentication verify-5210-radio-paging \
+	verify-5210-radio-incoming-sms verify-5210-messages \
+	verify-5210-radio-incoming-call-ringing \
+	verify-5210-radio-incoming-call-answered \
+	verify-5210-radio-incoming-call-lifecycle verify-5210-radio-incoming-sms-read \
+	verify-5210-navigation verify-5210-save-state verify-3310-frontier \
+	verify-3310-menu verify-3310-navigation verify-3330-frontier \
+	verify-3330-navigation verify-3410-frontier verify-3410-menu \
+	verify-3410-navigation verify-flash-pmm verify-model-frontier-state \
+	verify-model-frontier-negative verify-radio-camp verify-radio-registration \
+	verify-radio-reselection-same-lac verify-radio-reselection-different-lac \
+	verify-radio-reselection-state verify-radio-reselection-preserved \
+	verify-radio-loss-recovery verify-radio-loss-recovery-state \
+	verify-radio-all-cell-loss verify-radio-reselection-unsuitable-neighbours \
 	verify-radio-reselection-paging verify-3310-radio-reselection-same-lac \
 	verify-3310-radio-reselection-different-lac \
 	verify-3310-radio-reselection-state verify-3310-radio-reselection-preserved \
@@ -440,10 +444,51 @@ verify-5210-radio-authentication: normalize-5210
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no authenticated 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 completed authenticated Location Updating and displayed the operator"
 
+verify-5210-radio-paging: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
+	@echo "OK — 5210 completed IMSI paging and returned to PCH"
+
+verify-5210-radio-incoming-sms: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@sim=$$(find $(RUN_DIR)/nvram -type f -name sim_card -print -quit); test -n "$$sim" || { echo "no 5210 SIM NVRAM produced"; exit 1; }; $(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log "$$sim" --profile nsm5
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 SMS notification frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_INCOMING_SMS_SHA)
+	@echo "OK — 5210 received and stored an unread SMS and displayed its notification"
+
 verify-5210-messages: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=22 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 5210 Messages frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_MESSAGES_SHA)
 	@echo "OK — 5210 entered the firmware-owned Messages application"
+
+verify-5210-radio-incoming-call-ringing: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ARGS)'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@grep -q 'GSM service uplink sapi=0 pd=03 message=01 length=2' $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 ringing frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_RINGING_SHA)
+	@echo "OK — 5210 presented caller 5551234 and remained ringing"
+
+verify-5210-radio-incoming-call-answered: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=24 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@grep -q 'doorbell .*wire=860b speech_control=060b' $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 answered-call frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_ANSWERED_SHA)
+	@echo "OK — 5210 physical Send answered the call and selected speech control"
+
+verify-5210-radio-incoming-call-lifecycle: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-call 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
+	@echo "OK — 5210 completed incoming-call Answer/End and returned to registered standby"
+
+verify-5210-radio-incoming-sms-read: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1200,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=20000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@sim=$$(find $(RUN_DIR)/nvram -type f -name sim_card -print -quit); test -n "$$sim" || { echo "no 5210 SIM NVRAM produced"; exit 1; }; $(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log "$$sim" --profile nsm5 --read
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 SMS read frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_SMS_READ_SHA)
+	@echo "OK — 5210 physically opened hello and marked the SIM record read"
 
 verify-5210-navigation: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter,wait1000,c,wait1000,c NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'

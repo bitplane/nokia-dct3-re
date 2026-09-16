@@ -73,9 +73,14 @@ Location Updating, EF_LOCI update, channel release, steady camp and
 firmware-rendered `DCT3 LAB`. Exact-frame gates validate registered standby,
 physical Menu entry, entry into Messages at its Write messages screen, two
 physical Back operations returning cleanly to standby, and a save/load followed
-by further application navigation. Paging, calls, SMS, mobility loss/recovery,
-persistent application writes, and another firmware revision remain outside
-these gates.
+by further application navigation. IMSI paging also completes organically. An
+ordinary MT SMS traverses SAPI 3 and segmented CP-DATA, persists as unread in
+EF_SMS, displays the receipt notification, and can be physically opened as
+`hello`, changing the record to read. An incoming call reaches caller
+presentation, physical Answer, traffic assignment, NSM-5 speech-control
+request/release, physical End and registered idle. NSM-5 PCM/media, outgoing
+calls/SMS, mobility loss/recovery, other persistent application writes, and
+another firmware revision remain outside these gates.
 
 ## Nokia 3410 NHM-2 v5.46
 

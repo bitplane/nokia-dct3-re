@@ -401,6 +401,7 @@ class MachineProfileTest(unittest.TestCase):
                 "simi_controller": "true",
                 "synthetic_sim_card": "true",
                 "radio": "RADIO_NSM5",
+                "dsp_speech_control": "DSP_SPEECH_CONTROL_NSM5",
                 "ccont_board": "ADC_5210",
                 "display": "DISPLAY_5210",
             },

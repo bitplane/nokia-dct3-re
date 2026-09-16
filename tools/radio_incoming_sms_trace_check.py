@@ -6,7 +6,7 @@ import re
 import sys
 
 
-CHECKPOINTS = (
+COMMON_CHECKPOINTS = (
     ("registration release", re.compile(
         r"LAPDm Channel Release acknowledged nr=2")),
     ("IMSI page", re.compile(
@@ -18,9 +18,6 @@ CHECKPOINTS = (
     ("no-cipher Cipher Mode Command", re.compile(
         r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
         r"03000d063500")),
-    ("DSP cipher-control publication", re.compile(
-        r"TX packet type=14 payload=12 .*"
-        r"data=00f4ffffffffffffffff0000")),
     ("MM Information", re.compile(
         r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
         r"03[0-9a-f]{2}2905324762704221000000")),
@@ -45,6 +42,13 @@ CHECKPOINTS = (
         r"sim_device: update fid=6f3c record=1 length=176")),
 )
 
+CIPHER_CONTROL = {
+    "nse8": re.compile(
+        r"TX packet type=14 payload=12 .*data=00f4ffffffffffffffff0000"),
+    "nsm5": re.compile(
+        r"TX packet type=14 payload=12 .*data=00ebffffffffffffffff0000"),
+}
+
 SMS_NVRAM_OFFSET = 50 * 32 + 11 + 9 + 16
 STORED_RECORD_PREFIX = bytes.fromhex(
     "03"
@@ -56,9 +60,16 @@ STORED_RECORD_PREFIX = bytes.fromhex(
 )
 
 
-def verify(text: str, sim_nvram: bytes) -> None:
+def verify(
+        text: str,
+        sim_nvram: bytes,
+        profile: str = "nse8",
+        read: bool = False) -> None:
     cursor = 0
-    for label, pattern in CHECKPOINTS:
+    checkpoints = COMMON_CHECKPOINTS[:5] + (
+        ("DSP cipher-control publication", CIPHER_CONTROL[profile]),
+    ) + COMMON_CHECKPOINTS[5:]
+    for label, pattern in checkpoints:
         match = pattern.search(text, cursor)
         if not match:
             raise ValueError(
@@ -76,28 +87,40 @@ def verify(text: str, sim_nvram: bytes) -> None:
         raise ValueError(
             f"expected exactly one SAPI 3 SABM, observed {len(sabms)}")
 
+    expected = (b"\x01" + STORED_RECORD_PREFIX[1:]) if read else STORED_RECORD_PREFIX
     stored = sim_nvram[
         SMS_NVRAM_OFFSET:SMS_NVRAM_OFFSET + len(STORED_RECORD_PREFIX)]
-    if stored != STORED_RECORD_PREFIX:
+    if stored != expected:
         raise ValueError(
-            "EF_SMS record 1 does not contain the expected unread "
+            "EF_SMS record 1 does not contain the expected "
+            f"{'read' if read else 'unread'} "
             'SMS-DELIVER for "hello"')
+    updates = text.count("sim_device: update fid=6f3c record=1 length=176")
+    if read and updates != 2:
+        raise ValueError(
+            "expected delivery and read-status EF_SMS updates, observed "
+            f"{updates}")
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        raise SystemExit(
-            "usage: radio_incoming_sms_trace_check.py "
-            "MAME_ERROR_LOG SIM_CARD_NVRAM")
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("log", type=pathlib.Path)
+    parser.add_argument("sim_nvram", type=pathlib.Path)
+    parser.add_argument("--profile", choices=tuple(CIPHER_CONTROL), default="nse8")
+    parser.add_argument("--read", action="store_true")
+    args = parser.parse_args()
     try:
         verify(
-            pathlib.Path(sys.argv[1]).read_text(),
-            pathlib.Path(sys.argv[2]).read_bytes())
+            args.log.read_text(), args.sim_nvram.read_bytes(),
+            args.profile, args.read)
     except ValueError as error:
         raise SystemExit(str(error)) from None
+    state = "read through physical UI" if args.read else "persistent unread"
     print(
         'OK - page, SC=0 DSP cipher control/complete, SAPI 3 segmented '
-        'SMS-DELIVER and persistent unread "hello" record completed organically')
+        f'SMS-DELIVER and {state} "hello" record completed organically')
     return 0
 
 

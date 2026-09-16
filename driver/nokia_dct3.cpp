@@ -269,6 +269,9 @@ constexpr nokia_dsp_hle_device::speech_control_contract
 constexpr nokia_dsp_hle_device::speech_control_contract
 		DSP_SPEECH_CONTROL_NHM2 = make_dct3_speech_control_contract();
 
+constexpr nokia_dsp_hle_device::speech_control_contract
+		DSP_SPEECH_CONTROL_NSM5 = make_dct3_speech_control_contract();
+
 // NSE-8 and NHM-5 independently publish this ROM-family tone mailbox. The
 // oscillator words are quarter-Hz values; interpreting them belongs to the
 // DSP HLE rather than the shared-memory transport or handset driver. Other
@@ -726,6 +729,10 @@ constexpr nokia_product_config make_5210_config()
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.radio = RADIO_NSM5;
+	// Physical Answer and End independently publish wire values 0x860b and
+	// 0x840a. Decode that evidenced control field without claiming a product
+	// PCM clock or analogue route.
+	result.dsp_speech_control = DSP_SPEECH_CONTROL_NSM5;
 	result.ccont_board = ADC_5210;
 	result.display = DISPLAY_5210;
 	return result;

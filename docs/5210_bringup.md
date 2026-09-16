@@ -60,13 +60,33 @@ NSM-5 differs from the other validated products at explicit device boundaries:
 - `make verify-5210-save-state` saves registered standby, restores it, and uses
   physical Menu/Enter keys to reach the exact Messages frame. This protects the
   radio, SIM, UI and product-device state across serialization.
+- `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
+  Paging Response, contention resolution, clean release and return to the
+  subscriber's paging group.
+- `make verify-5210-radio-incoming-sms` carries an ordinary `hello` SMS through
+  paging, SAPI 3, segmented CP-DATA and SIM EF_SMS storage, then pins the
+  firmware's `1 message received` frame. The NSM-5 DSP cipher-control
+  publication begins `00eb`, independently of the NSE-8 `00f4` encoding.
+- `make verify-5210-radio-incoming-sms-read` uses physical softkey presses to
+  open sender `5551234`, display `hello`, and make firmware change the EF_SMS
+  record status from unread `0x03` to read `0x01`.
+- `make verify-5210-radio-incoming-call-ringing` pins the firmware-rendered
+  caller `5551234` and ringing UI after paging, CC SETUP and traffic assignment.
+- `make verify-5210-radio-incoming-call-answered` proves physical Send emits
+  CC Connect, accepts Connect Acknowledge, displays `Call 1`, and publishes the
+  independently observed NSM-5 DSP wire value `0x860b` as speech control
+  `0x060b`.
+- `make verify-5210-radio-incoming-call-lifecycle` adds physical End, CC/RR
+  teardown, ARFCN-86 channel release, DSP wire `0x840a`/control `0x040a`, and
+  exact return to registered standby. No NSM-5 PCM clock or analogue route has
+  been recovered, so this gate proves call and speech control rather than media.
 
 ## Remaining scope
 
 The gates validate v5.40 PPM E, board bring-up, authenticated and
 unauthenticated registration, operator presentation, save/load, the main menu,
 application entry, and clean return navigation. They do not yet validate
-mobility loss/recovery, paging, calls, SMS, audio, persistent application
-writes, or another 5210 firmware revision. The unexercised external-service
+mobility loss/recovery, outgoing calls, outgoing SMS, call media/audio, non-SMS persistent
+application writes, or another 5210 firmware revision. The unexercised external-service
 channel and placeholder MAD2 inputs must not be promoted to cross-product
 facts.

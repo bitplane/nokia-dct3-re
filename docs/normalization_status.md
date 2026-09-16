@@ -99,8 +99,11 @@ unresolved hardware or protocol boundary.
   SIM-authenticated Location Updating reach steady camp, update EF_LOCI and
   render the operator; physical-key gates open the main menu, enter Messages,
   return cleanly to registered standby, and repeat application entry after a
-  save/load. Paging, calls, SMS, mobility loss/recovery and other firmware
-  revisions remain outside that claim.
+  save/load. IMSI paging and ordinary MT SMS additionally reach persistent SIM
+  storage, notification, physical reading and the read-status update. Calls
+  are covered through incoming presentation, physical Answer/End and DSP
+  speech-control selection, but NSM-5 PCM/media, outgoing calls/SMS, mobility
+  loss/recovery and other firmware revisions remain outside that claim.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
   and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu
