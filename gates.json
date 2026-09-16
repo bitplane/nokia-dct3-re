@@ -1836,6 +1836,17 @@
       ]
     },
     {
+      "name": "verify-5210-radio-call-state",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=23 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=end NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log --require-state-roundtrip" },
+        { "step": "shell", "silent": true, "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no post-restore 5210 frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)" }
+      ]
+    },
+    {
       "name": "verify-5210-radio-paging",
       "prerequisites": ["normalize-5210"],
       "variables": {},

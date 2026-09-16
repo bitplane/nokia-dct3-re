@@ -46,6 +46,18 @@ class Radio5210IncomingCallTraceCheckTest(unittest.TestCase):
         verify(GOOD.replace(
             "data=00ebffffffffffffffff0000", "data=<redacted>"), a5_1=True)
 
+    def test_accepts_active_call_roundtrip(self):
+        verify(GOOD.replace(
+            "GSM service uplink sapi=0 pd=03 message=25 length=5",
+            "state_roundtrip: result=pass\n"
+            "GSM service uplink sapi=0 pd=03 message=25 length=5"),
+            require_state_roundtrip=True)
+
+    def test_rejects_roundtrip_before_active_call(self):
+        with self.assertRaisesRegex(ValueError, "save-state"):
+            verify("state_roundtrip: result=pass\n" + GOOD,
+                   require_state_roundtrip=True)
+
     def test_rejects_missing_speech_release(self):
         with self.assertRaisesRegex(ValueError, "speech release"):
             verify(GOOD.replace(

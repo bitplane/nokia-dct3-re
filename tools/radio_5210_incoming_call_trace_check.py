@@ -77,12 +77,23 @@ BASE_CHECKPOINTS = (
 )
 
 
-def verify(text: str, a5_1: bool = False) -> None:
+STATE_ROUNDTRIP = re.compile(r"state_roundtrip: result=pass")
+
+
+def verify(
+        text: str, a5_1: bool = False,
+        require_state_roundtrip: bool = False) -> None:
     checkpoints = list(BASE_CHECKPOINTS)
     if a5_1:
         checkpoints[5] = (
             "redacted NSM-5 A5/1 cipher-control publication",
             re.compile(r"TX packet type=14 payload=12 .*data=<redacted>"))
+    if require_state_roundtrip:
+        disconnect = next(
+            index for index, (label, _) in enumerate(checkpoints)
+            if label == "physical End Disconnect")
+        checkpoints.insert(
+            disconnect, ("active-call save-state roundtrip", STATE_ROUNDTRIP))
     require_ordered(text, checkpoints, "NSM-5")
     require_count(
         text, CONNECT, 1,
@@ -96,9 +107,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=Path)
     parser.add_argument("--a5-1", action="store_true")
+    parser.add_argument("--require-state-roundtrip", action="store_true")
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors="replace"), args.a5_1)
+        verify(
+            args.log.read_text(errors="replace"), args.a5_1,
+            args.require_state_roundtrip)
     except ValueError as error:
         raise SystemExit(str(error)) from None
     print(

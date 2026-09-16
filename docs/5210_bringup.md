@@ -65,6 +65,9 @@ NSM-5 differs from the other validated products at explicit device boundaries:
 - `make verify-5210-save-state` saves registered standby, restores it, and uses
   physical Menu/Enter keys to reach the exact Messages frame. This protects the
   radio, SIM, UI and product-device state across serialization.
+- `make verify-5210-radio-call-state` saves and restores while an answered call
+  is active, resumes the restored branch, then uses physical End to complete
+  CC/RR and speech-control teardown and return to exact registered standby.
 - `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
   Paging Response, contention resolution, clean release and return to the
   subscriber's paging group.

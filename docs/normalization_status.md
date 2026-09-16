@@ -107,8 +107,9 @@ unresolved hardware or protocol boundary.
   different-LAC reselection, serving/all-cell loss, RF recovery and paging
   after reselection are covered on the product's ARFCN-86/87 laboratory pair;
   a focused authenticated incoming-call gate adds organic A5/1 control and
-  bidirectional ciphered SDCCH/traffic bursts. NSM-5 PCM/media and other
-  firmware revisions remain outside that claim.
+  bidirectional ciphered SDCCH/traffic bursts. Save/load is also covered during
+  an active answered call through restored physical teardown. NSM-5 PCM/media
+  and other firmware revisions remain outside that claim.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
   and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu
