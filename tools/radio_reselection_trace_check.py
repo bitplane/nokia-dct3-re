@@ -25,7 +25,7 @@ def verify_same_lac(
         allow_post_reselection_paging_access: bool = False) -> None:
     cursor = 0
     candidate = f"{neighbour_arfcn:04x}"
-    if radio_profile in ("nhm5", "nhm6"):
+    if radio_profile in ("nhm5", "nhm6", "nsm5"):
         cursor = require_after(
             text,
             rf"neighbour measurement instruction arfcn={neighbour_arfcn} "
@@ -89,7 +89,7 @@ def verify_different_lac(
 
     cursor = 0
     candidate = f"{neighbour_arfcn:04x}"
-    if radio_profile in ("nhm5", "nhm6"):
+    if radio_profile in ("nhm5", "nhm6", "nsm5"):
         cursor = require_after(
             text,
             rf"neighbour measurement instruction arfcn={neighbour_arfcn} "
@@ -157,25 +157,30 @@ def verify_different_lac(
 
 def verify_loss_recovery(text: str, radio_profile: str = "nse8") -> None:
     cursor = 0
+    serving_arfcn = 86 if radio_profile == "nsm5" else 1
+    serving = f"{serving_arfcn:04x}"
+    if radio_profile == "nsm5":
+        cursor = require_after(
+            text, r"neighbour measurement instruction arfcn=87 .*accepted=1",
+            cursor, "firmware-published neighbour instruction before loss")
+    else:
+        cursor = require_after(
+            text, r"neighbour measurement list .*first=0002", cursor,
+            "firmware-published neighbour list before loss")
     cursor = require_after(
-        text, r"neighbour measurement list .*first=0002", cursor,
-        "firmware-published neighbour list before loss",
-    )
-    cursor = require_after(
-        text, r"DOWNLINK_SIGNALLING_FAIL arfcn=1", cursor,
+        text, rf"DOWNLINK_SIGNALLING_FAIL arfcn={serving_arfcn}", cursor,
         "standards-counter serving-cell loss",
     )
     loss = cursor
-    if radio_profile == "nhm2":
+    if radio_profile in ("nhm2", "nsm5"):
         cursor = require_after(
             text,
             r"TX packet type=02 payload=20 .*"
-            r"data=0412020900000010600000011000000007297000",
+            r"data=0412020900000010600000(?:01|56)1000000007297000",
             cursor, "firmware-owned serving-channel reconfiguration",
         )
         cursor = require_after(
-            text,
-            r"TX packet type=57 payload=2 .*data=0305",
+            text, r"TX packet type=57 payload=(?:2|4) .*data=0305(?:0000)?",
             cursor, "NHM-2 serving-cell SCH request",
         )
     else:
@@ -187,16 +192,16 @@ def verify_loss_recovery(text: str, radio_profile: str = "nse8") -> None:
     cursor = require_after(
         text,
         r"RX enqueue type=80 payload=14 .*"
-        r"data=401200[0-9a-f]{6}00010000[0-9a-f]{8}",
+        rf"data=401200[0-9a-f]{{6}}{serving}[0-9a-f]{{12}}",
         cursor, "valid standards-encoded SCH after carrier recovery",
     )
     require_after(
         text,
-        r"RX enqueue type=80 payload=34 .*data=6012[0-9a-f]{8}0001",
+        rf"RX enqueue type=80 payload=34 .*data=6012[0-9a-f]{{8}}{serving}",
         cursor, "PCH monitoring after recovery",
     )
 
-    if text.count("DOWNLINK_SIGNALLING_FAIL arfcn=1") != 1:
+    if text.count(f"DOWNLINK_SIGNALLING_FAIL arfcn={serving_arfcn}") != 1:
         raise ValueError("recovered serving carrier produced another loss report")
     if LOCATION_UPDATE.search(text[loss:]):
         raise ValueError("same-cell recovery emitted a spurious Location Updating Request")
@@ -206,19 +211,24 @@ def verify_loss_recovery(text: str, radio_profile: str = "nse8") -> None:
 
 def verify_all_cell_loss(text: str, radio_profile: str = "nse8") -> None:
     cursor = 0
+    serving_arfcn = 86 if radio_profile == "nsm5" else 1
+    if radio_profile == "nsm5":
+        cursor = require_after(
+            text, r"neighbour measurement instruction arfcn=87 .*accepted=1",
+            cursor, "firmware-published neighbour instruction before loss")
+    else:
+        cursor = require_after(
+            text, r"neighbour measurement list .*first=0002", cursor,
+            "firmware-published neighbour list before loss")
     cursor = require_after(
-        text, r"neighbour measurement list .*first=0002", cursor,
-        "firmware-published neighbour list before loss",
-    )
-    cursor = require_after(
-        text, r"DOWNLINK_SIGNALLING_FAIL arfcn=1", cursor,
+        text, rf"DOWNLINK_SIGNALLING_FAIL arfcn={serving_arfcn}", cursor,
         "standards-counter serving-cell loss",
     )
     loss = cursor
-    if radio_profile == "nhm2":
+    if radio_profile in ("nhm2", "nsm5"):
         cursor = require_after(
-            text, r"TX packet type=57 payload=2 .*data=0305", cursor,
-            "NHM-2 serving-cell SCH request",
+            text, r"TX packet type=57 payload=(?:2|4) .*data=0305(?:0000)?", cursor,
+            "serving-cell SCH request",
         )
         cursor = require_after(
             text, r"RX enqueue type=8a payload=8", cursor,
@@ -260,7 +270,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--radio-profile",
-        choices=("nse8", "nhm5", "nhm6", "nhm2"), default="nse8")
+        choices=("nse8", "nhm5", "nhm6", "nhm2", "nsm5"), default="nse8")
     parser.add_argument("--serving-arfcn", type=int, default=1)
     parser.add_argument("--neighbour-arfcn", type=int, default=2)
     parser.add_argument(

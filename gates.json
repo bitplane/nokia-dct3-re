@@ -2014,6 +2014,57 @@
       ]
     },
     {
+      "name": "verify-5210-radio-reselection-same-lac",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_same_lac'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87" }
+      ]
+    },
+    {
+      "name": "verify-5210-radio-reselection-different-lac",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_different_lac'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87" }
+      ]
+    },
+    {
+      "name": "verify-5210-radio-loss-recovery",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_loss_recovery'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile loss-recovery --radio-profile nsm5" }
+      ]
+    },
+    {
+      "name": "verify-5210-radio-all-cell-loss",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nsm5" }
+      ]
+    },
+    {
+      "name": "verify-5210-radio-reselection-paging",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_paging'" },
+        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87 --paging-after-reselection" },
+        { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log" }
+      ]
+    },
+    {
       "name": "verify-5210-radio-incoming-sms-read",
       "prerequisites": ["normalize-5210"],
       "variables": {},

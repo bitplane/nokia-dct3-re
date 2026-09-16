@@ -217,7 +217,7 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM6 = {
 // owned while subsequent channel-confirmation and idle behavior are observed.
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM5 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x14, 0x01, 0x01, 0, true, 0, true, false,
+	0x14, 0x01, 0x01, 0, true, 0x57, true, false,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::direct
 };
@@ -1450,6 +1450,8 @@ void nokia_dct3_state::machine_reset()
 	default:
 		break;
 	}
+	if (BIT(m_neighbour_config.read_safe(0x00), 5))
+		m_gsm_network->set_cell_carriers(86, 87);
 	if (BIT(m_neighbour_config.read_safe(0x00), 4))
 		m_gsm_network->set_neighbour_bsic(0);
 	static constexpr std::array NEIGHBOUR_FAULT_PROFILES = {
@@ -2399,6 +2401,9 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x10, 0x00, "Laboratory neighbour BSIC")
 	PORT_CONFSETTING(0x00, "BSIC 0x22")
 	PORT_CONFSETTING(0x10, "BSIC 0x00")
+	PORT_CONFNAME(0x20, 0x00, "NSM-5 laboratory carrier pair")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x20, "GSM 900 (ARFCN 86/87)")
 
 	PORT_START("NEIGHBORFAULT")
 	PORT_CONFNAME(0x07, 0x00, "Neighbour validation fault")

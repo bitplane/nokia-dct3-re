@@ -92,13 +92,26 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   SAPI-3 establishment and SMS-SUBMIT, network CP/RP acknowledgements, handset
   final CP-ACK, clean channel release, and the firmware-rendered `Message sent`
   acknowledgement.
+- `make verify-5210-radio-reselection-same-lac` and
+  `verify-5210-radio-reselection-different-lac` exercise the NSM-5 direct-octet
+  neighbour contract on an evidenced GSM-900 pair (ARFCN 86/87, BSIC 0).
+  Firmware either resumes PCH without subscriber mutation or performs a fresh
+  Location Update and EF_LOCI write when the LAC changes.
+- `make verify-5210-radio-loss-recovery` proves standards-counter serving-cell
+  loss, the product's padded `03 05 00 00` SCH request, synchronization after
+  RF recovery, and resumed PCH without a spurious Location Update.
+- `make verify-5210-radio-all-cell-loss` proves the finite NSM-5 synchronization
+  search reports no usable cell and stops PCH without falsely selecting a cell
+  or mutating EF_LOCI.
+- `make verify-5210-radio-reselection-paging` proves an IMSI page can still be
+  answered and released after same-LAC reselection.
 
 ## Remaining scope
 
 The gates validate v5.40 PPM E, board bring-up, authenticated and
 unauthenticated registration, operator presentation, save/load, the main menu,
-application entry, and clean return navigation. They do not yet validate
-mobility loss/recovery, call media/audio, non-SMS persistent
+application entry, clean return navigation, idle mobility, RF loss/recovery,
+and paging after reselection. They do not yet validate call media/audio, non-SMS persistent
 application writes, or another 5210 firmware revision. The unexercised external-service
 channel and placeholder MAD2 inputs must not be promoted to cross-product
 facts.

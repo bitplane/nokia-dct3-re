@@ -1400,7 +1400,8 @@ bool nokia_radio_peer_device::decode_serving_sch_request(
 	if (!m_serving_loss_pending ||
 			m_protocol.serving_sch_request_type == 0 ||
 			packet.type != m_protocol.serving_sch_request_type ||
-			packet.length != 2 ||
+			packet.length < 2 ||
+			packet.payload[0] != 0x03 || packet.payload[1] != 0x05 ||
 			current_phase() != phase::serving_bcch)
 		return false;
 

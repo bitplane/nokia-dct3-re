@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 293 gates: 156 generated from typed steps, 137 copied verbatim (shell).
+# 298 gates: 161 generated from typed steps, 137 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -66,6 +66,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-incoming-call-answered \
 	verify-5210-radio-incoming-call-lifecycle \
 	verify-5210-radio-outgoing-call-lifecycle verify-5210-radio-outgoing-sms \
+	verify-5210-radio-reselection-same-lac \
+	verify-5210-radio-reselection-different-lac verify-5210-radio-loss-recovery \
+	verify-5210-radio-all-cell-loss verify-5210-radio-reselection-paging \
 	verify-5210-radio-incoming-sms-read verify-5210-navigation \
 	verify-5210-save-state verify-3310-frontier verify-3310-menu \
 	verify-3310-navigation verify-3330-frontier verify-3330-navigation \
@@ -499,6 +502,32 @@ verify-5210-radio-outgoing-sms: normalize-5210
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu,wait1000,enter,wait1000,enter,wait1000,2,wait2000,enter,wait2000,enter,wait2000,5,5,5,1,2,3,4,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=500 NOKIA_DCT3_POST_READY_KEY_GAP_MS=500 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'; \
 	$(PYTHON) tools/radio_outgoing_sms_product_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)
 	@echo "OK - physical 5210 outgoing SMS completed"
+
+verify-5210-radio-reselection-same-lac: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_same_lac'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87
+
+verify-5210-radio-reselection-different-lac: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_different_lac'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87
+
+verify-5210-radio-loss-recovery: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_loss_recovery'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile loss-recovery --radio-profile nsm5
+
+verify-5210-radio-all-cell-loss: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nsm5
+
+verify-5210-radio-reselection-paging: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_paging'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87 --paging-after-reselection
+	@$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-5210-radio-incoming-sms-read: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1200,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=20000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'
