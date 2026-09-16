@@ -93,6 +93,10 @@ unresolved hardware or protocol boundary.
 - The 3330 is a validated third interactive product profile. Its acceptance is
   UI/device-boundary based; the 3210-specific structural RAM summary is not
   treated as cross-product evidence.
+- The 5210 v5.40 PPM E image is a validated interactive product profile. Its
+  exact standby gate depends on product-owned GENSIO, service, BLB-2 CCONT,
+  display-orientation and Family-A keypad contracts; radio behavior and other
+  firmware revisions remain outside that claim.
 - The 3210 v5.01 full flash is a same-product runtime control. Its structural
   oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
   and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu

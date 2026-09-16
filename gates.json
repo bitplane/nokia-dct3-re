@@ -1727,6 +1727,30 @@
       ]
     },
     {
+      "name": "verify-5210-frontier",
+      "prerequisites": [
+        "normalize-5210"
+      ],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell",
+          "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=16 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220'"
+        },
+        {
+          "step": "shell",
+          "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 5210 LCD frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)"
+        },
+        {
+          "step": "announce",
+          "silent": true,
+          "command": "echo \"OK — 5210 v5.40 product profile reached its standby frame\""
+        }
+      ]
+    },
+    {
       "name": "verify-3310-frontier",
       "prerequisites": [],
       "variables": {},

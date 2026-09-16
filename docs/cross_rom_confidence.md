@@ -53,6 +53,24 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
   contract reproduces CONTACT SERVICE, which identified the regression without
   changing the PMM or oracle.
 
+## Nokia 5210 NSM-5 v5.40
+
+The normalized PPM E image has a forcing-free product profile and dedicated
+standby gate. NSM-5 independently completes its DSP bootstrap, compact
+`0x70`/`0x74` service-control exchange, D0/01 discovery, and class-`0x40`
+registration/channel-map exchange. Read-only observations show the DSP
+self-test expected and actual values both equal `0x9c49`; the former fault
+screen was not evidence of a missing DSP result.
+
+The load-bearing board correction is the BLB-2 CCONT tuple. Nominal BSI
+`0x150` and BTEMP `0x140` lie inside this product's recovered recognition
+windows, after which firmware organically renders the Nokia startup animation
+and standby UI. The product also owns an 84-by-48 reversed-segment display and
+the five-row NSM Family-A keypad. `make verify-5210-frontier` applies one
+physical left-softkey cycle and reproduces the exact standby-frame oracle.
+Radio registration, menu navigation, and another firmware revision remain
+outside this gate.
+
 ## Nokia 3410 NHM-2 v5.46
 
 The acquired Wintesla MCU, PPM E and virgin PMM streams normalize to a

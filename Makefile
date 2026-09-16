@@ -112,6 +112,7 @@ ORACLE_3410_MESSAGES_SHA ?= d4500eddc39090d3604fd9c79a974242f484d16e8a490cb0d4cb
 # Returning from Messages reaches a different centisecond animation phase from
 # the unattended boot-idle capture. Keep the two lifecycle points explicit.
 ORACLE_3410_RETURN_IDLE_SHA ?= 14c1f25e86f21ea7b52909b37fb624fcc9940668f9df19831a1f64b16913fd87
+ORACLE_5210_IDLE_SHA ?= fd9895b3ed26863e51addaf05d56293ff78d752fcaadfb7399e40879c5f72887
 ORACLE_3330_DSP_MISSING_SHA ?= 7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d1024ab91c1e55c1f8e
 ORACLE_3410_DSP_MISSING_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 ORACLE_2100_POST_SERVICE_SHA ?= 28b1f0c642a34dfcf5206859ced058646b115c908d0b05b5ef6201f796180c21
@@ -311,6 +312,7 @@ help:
 	@echo "make smoke-3310-639 bounded local 3310 v6.39 portability spike"
 	@echo "make smoke-2100 bounded local NAM-2 v5.84 PPM-E bring-up"
 	@echo "make smoke-5210e bounded local 5210 v5.40 PPM E portability spike"
+	@echo "make verify-5210-frontier boot the 5210 v5.40 profile to standby"
 	@echo "make verify         check the explicit missing-hardware semantic profile"
 	@echo "make verify-ccont   check the organic GENSIO/CCONT transaction contract"
 	@echo "make ccont-static-census check the five-ROM CCONT descriptor surface"

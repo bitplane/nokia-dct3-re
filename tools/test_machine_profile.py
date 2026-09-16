@@ -389,6 +389,37 @@ class MachineProfileTest(unittest.TestCase):
             self.driver,
         )
 
+    def test_5210_owns_its_board_and_peer_contracts(self):
+        self.assert_profile_fields(
+            "make_5210_config",
+            {
+                "gensio_wiring": "GENSIO_NSM5",
+                "dsp_service": "true",
+                "external_service_transport": "true",
+                "external_service": "EXTERNAL_SERVICE_NSM5",
+                "dsp_service_control": "DSP_SERVICE_CONTROL_COMPACT",
+                "simi_controller": "true",
+                "synthetic_sim_card": "true",
+                "ccont_board": "ADC_5210",
+                "display": "DISPLAY_5210",
+            },
+        )
+        profile = self.function_body(
+            "constexpr nokia_product_config make_5210_config()",
+            "constexpr nokia_product_config",
+        )
+        self.assertIn("make_conservative_config(KEYPAD_NSM5)", profile)
+        self.assertIn(
+            "{ 0x000, 0x3ff, 0x2c0, 0x150, 0x140, 0x000, 0x200, 0x000 }",
+            self.driver,
+        )
+        self.assertIn("constexpr display_geometry_contract DISPLAY_5210", self.driver)
+        self.assertIn("84, 48, 84, 48, true", self.driver)
+        self.assertIn(
+            "0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43",
+            self.driver,
+        )
+
     def test_3210_board_profile_uses_evidenced_nse8_inputs(self):
         profile = self.driver.split(
             "constexpr nokia_ccont_board_profile ADC_3210", 1

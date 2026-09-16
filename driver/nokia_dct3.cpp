@@ -120,6 +120,14 @@ constexpr nokia_ccont_board_profile ADC_5110 = {
 	5, 0x03ff
 };
 
+// NSM-5 uses the standard channel placement with a BLB-2 Li-ion pack.  Its
+// recovered recognition windows are BSI 0x13e..0x172 and BTEMP 0x133..0x157;
+// use their nominal midpoints and an ordinary charged-pack VBATT sample.
+constexpr nokia_ccont_board_profile ADC_5210 = {
+	{ 0x000, 0x3ff, 0x2c0, 0x150, 0x140, 0x000, 0x200, 0x000 },
+	5, 0x03ff
+};
+
 // NAM-2 service material specifies 0.5 V at the BSI node in the service jig.
 // With CCONT's 2.8 V ADC reference this is 0.5 / 2.8 * 1023 ~= 0x0b6.
 // Other channels remain conservative until their NAM-2 electrical contract
@@ -273,6 +281,9 @@ constexpr display_geometry_contract DISPLAY_3410 = {
 constexpr display_geometry_contract DISPLAY_2100 = {
 	96, 72, 96, 65, true
 };
+constexpr display_geometry_contract DISPLAY_5210 = {
+	84, 48, 84, 48, true
+};
 static_assert(display_geometry_contract{}.valid());
 static_assert(DISPLAY_3410.valid());
 
@@ -296,6 +307,7 @@ constexpr nokia_gensio_device::wiring_contract GENSIO_NSM5 = {
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSM5 = { 5, 0x02 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE3 = { 5, 0x01 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NAM2 = { 5, 0x04 };
 static_assert(KEYPAD_NSE8.valid());
@@ -303,6 +315,7 @@ static_assert(KEYPAD_NSE1.valid());
 static_assert(KEYPAD_NHM5.valid());
 static_assert(KEYPAD_NHM6.valid());
 static_assert(KEYPAD_NHM2.valid());
+static_assert(KEYPAD_NSM5.valid());
 static_assert(KEYPAD_NSE3.valid());
 static_assert(KEYPAD_NAM2.valid());
 
@@ -335,6 +348,16 @@ constexpr nokia_external_service_peer_device::application_contract
 		EXTERNAL_SERVICE_NHM2 = {
 	36, 0x01, 0x41,
 	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x42
+};
+
+// NSM-5 independently closes its D0 discovery exchange with sequence 0x41,
+// accepts registration sequence 0x42 and channel-map sequence 0x43, then
+// organically exercises channel 0x5f. Channel 0x62 is accepted but has not
+// yet been exercised independently, so keep the complete map product-owned.
+constexpr nokia_external_service_peer_device::application_contract
+		EXTERNAL_SERVICE_NSM5 = {
+	36, 0x01, 0x42,
+	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
 };
 
 // NAM-2 v5.84 independently completes the compact DSP service-control
@@ -669,11 +692,31 @@ constexpr nokia_product_config make_conservative_config(
 
 constexpr nokia_product_config make_5210_config()
 {
-	nokia_product_config result = make_conservative_config({ 4, 0x10 });
+	nokia_product_config result = make_conservative_config(KEYPAD_NSM5);
 	// NSM-5 selects CCONT with control 0x22 (bit 2 clear), writes a command,
 	// and then polls receive-ready. The reply therefore cannot be conditional
 	// on the NSE-8 control-bit convention.
 	result.gensio_wiring = GENSIO_NSM5;
+	// NSM-5 organically issues DSP command 4 with pending value 2 after upload.
+	// Complete that observed transport request without supplying any
+	// higher-level service payload.
+	result.dsp_service = true;
+	// NSM-5 then sends a checksum-valid D0/01 discovery frame. Enable its
+	// request-derived transport reply and independently accepted application
+	// sequences; neither path fabricates a firmware-side completion.
+	result.external_service_transport = true;
+	result.external_service = EXTERNAL_SERVICE_NSM5;
+	// Its next organic request is type 0x70 payload 0d00. Complete that exact
+	// control transaction with the compact type-0x74 echo; no other type-0x70
+	// payload is accepted by this contract.
+	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	// After accepting that completion NSM-5 organically programs the standard
+	// SIMI register block. Expose the controller and an ordinary removable GSM
+	// card through that physical boundary; card contents remain external input.
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
+	result.ccont_board = ADC_5210;
+	result.display = DISPLAY_5210;
 	return result;
 }
 
@@ -2463,6 +2506,55 @@ static INPUT_PORTS_START( noki3210 )
 
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki5210 )
+	PORT_INCLUDE(dct3_network_config)
+
+	// NSM Family-A matrix: key index = row * 5 + column.  Row zero is
+	// reserved for the separate power scan; column zero carries the side and
+	// call keys fitted to the 5210.
+	PORT_START("COL.0")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Volume Down") PORT_CODE(KEYCODE_PGDN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Send") PORT_CODE(KEYCODE_S) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("End") PORT_CODE(KEYCODE_E) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Volume Up") PORT_CODE(KEYCODE_PGUP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.1")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Left Softkey / Menu") PORT_CODE(KEYCODE_ENTER) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Scroll Up") PORT_CODE(KEYCODE_UP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Scroll Down") PORT_CODE(KEYCODE_DOWN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Right Softkey / C") PORT_CODE(KEYCODE_BACKSPACE) PORT_CODE(KEYCODE_DEL) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.2")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 1") PORT_CODE(KEYCODE_1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 4") PORT_CODE(KEYCODE_4) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 7") PORT_CODE(KEYCODE_7) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad *") PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.3")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 2") PORT_CODE(KEYCODE_2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 5") PORT_CODE(KEYCODE_5) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 8") PORT_CODE(KEYCODE_8) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 0") PORT_CODE(KEYCODE_0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.4")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 3") PORT_CODE(KEYCODE_3) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 6") PORT_CODE(KEYCODE_6) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 9") PORT_CODE(KEYCODE_9) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad #") PORT_CODE(KEYCODE_MINUS) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("PWR")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Power") PORT_CODE(KEYCODE_SPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x1e, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki3310 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3108,4 +3200,4 @@ SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empt
 SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2002, noki5210, 0,      0,      noki5210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

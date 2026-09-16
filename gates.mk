@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 278 gates: 142 generated from typed steps, 136 copied verbatim (shell).
+# 279 gates: 143 generated from typed steps, 136 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -58,15 +58,15 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3330-radio-registration-preserved verify-3330-radio-registration-state \
 	verify-3330-radio-unsuitable-cells verify-3410-radio-registration \
 	verify-3410-radio-registration-preserved verify-3410-radio-registration-state \
-	verify-3410-radio-unsuitable-cells verify-3310-frontier verify-3310-menu \
-	verify-3310-navigation verify-3330-frontier verify-3330-navigation \
-	verify-3410-frontier verify-3410-menu verify-3410-navigation verify-flash-pmm \
-	verify-model-frontier-state verify-model-frontier-negative verify-radio-camp \
-	verify-radio-registration verify-radio-reselection-same-lac \
-	verify-radio-reselection-different-lac verify-radio-reselection-state \
-	verify-radio-reselection-preserved verify-radio-loss-recovery \
-	verify-radio-loss-recovery-state verify-radio-all-cell-loss \
-	verify-radio-reselection-unsuitable-neighbours \
+	verify-3410-radio-unsuitable-cells verify-5210-frontier verify-3310-frontier \
+	verify-3310-menu verify-3310-navigation verify-3330-frontier \
+	verify-3330-navigation verify-3410-frontier verify-3410-menu \
+	verify-3410-navigation verify-flash-pmm verify-model-frontier-state \
+	verify-model-frontier-negative verify-radio-camp verify-radio-registration \
+	verify-radio-reselection-same-lac verify-radio-reselection-different-lac \
+	verify-radio-reselection-state verify-radio-reselection-preserved \
+	verify-radio-loss-recovery verify-radio-loss-recovery-state \
+	verify-radio-all-cell-loss verify-radio-reselection-unsuitable-neighbours \
 	verify-radio-reselection-paging verify-3310-radio-reselection-same-lac \
 	verify-3310-radio-reselection-different-lac \
 	verify-3310-radio-reselection-state verify-3310-radio-reselection-preserved \
@@ -412,6 +412,11 @@ verify-3410-radio-unsuitable-cells: normalize-3410
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_assignment/error.log
 	$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \
 		$(RUN_DIR)_assignment/error.log --profile assignment
+
+verify-5210-frontier: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=16 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=menu NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220'
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 5210 LCD frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
+	@echo "OK — 5210 v5.40 product profile reached its standby frame"
 
 verify-3310-frontier:
 	@$(MAKE) --no-print-directory smoke-3310-639 RUN_DIR=$(RUN_DIR) SECONDS=15

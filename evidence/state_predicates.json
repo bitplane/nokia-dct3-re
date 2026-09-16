@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm5_5210_standby", "owner": "product_profile", "status": "satisfied",
+      "predicate": "Nokia 5210 v5.40 completes board bring-up and renders a stable standby screen through product-owned device contracts",
+      "current": "The forcing-free NSM-5 profile completes organic DSP bootstrap and compact service control, external-service discovery and application registration, SIMI initialization, and BLB-2 pack recognition. Read-only self-test values agree at 0x9c49. With the product's 84x48 reversed-segment display and five-row Family-A keypad, one physical left-softkey cycle redraws the firmware-owned standby frame and reproduces the exact stable-pixel oracle.",
+      "evidence": ["docs/5210_bringup.md", "docs/cross_rom_confidence.md", "tools/test_machine_profile.py", "tools/test_keypad_input.py"]
+    },
+    {
       "id": "lower_service_idle", "owner": "startup", "status": "modeled",
       "predicate": "service_context_ready_2b03d8 returns nonzero after the lower transmit queue drains",
       "current": "Satisfied in the coherent contact profile; the DSP service model drains the observed pending counter and supplies recurring IRQ-4 completion while the request-driven external-service peer handles the distinct ring and external-session transactions", "evidence": ["docs/service_bootstrap.md", "docs/external_service_topology.md"]

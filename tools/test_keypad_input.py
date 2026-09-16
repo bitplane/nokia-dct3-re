@@ -115,6 +115,24 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn('send = field_by_mask("COL.4", 0x02)', fixture)
         self.assertIn('["end"] = field_by_mask("COL.1", 0x02)', fixture)
 
+    def test_5210_uses_family_a_matrix_and_capture_orientation(self):
+        ports = self.driver.split("static INPUT_PORTS_START( noki5210 )", 1)[1]
+        ports = ports.split("INPUT_PORTS_END", 1)[0]
+        for name in (
+            "Left Softkey / Menu", "Right Softkey / C", "Scroll Up",
+            "Scroll Down", "Send", "End", "Volume Up", "Volume Down",
+        ):
+            self.assertIn(f'PORT_NAME("{name}")', ports)
+        self.assertIn(
+            "SYST( 2002, noki5210, 0,      0,      noki5210, noki5210,",
+            self.driver,
+        )
+        self.assertIn(
+            'local is_5210 = machine.system.name == "noki5210"',
+            self.harness,
+        )
+        self.assertIn("local lcd_x_mirror = is_2100 or is_5210", self.harness)
+
     def test_3310_navigation_gate_uses_only_physical_key_sequences(self):
         makefile = ((ROOT / "Makefile").read_text() + "\n"
                      + (ROOT / "gates.mk").read_text())
