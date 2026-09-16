@@ -1890,6 +1890,24 @@
       ]
     },
     {
+      "name": "verify-5210-radio-supplementary",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "unstructured": "physical NSM-5 GSM 04.80 transactions",
+      "recipe": [
+        "\t@set -e; \\",
+        "\tussd_dir=\"$(RUN_DIR)_ussd\"; divert_dir=\"$(RUN_DIR)_divert\"; \\",
+        "\t$(RM) -r \"$$ussd_dir\" \"$$divert_dir\"; \\",
+        "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$ussd_dir\" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,1,2,3,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \\",
+        "\tcp \"$(MAME_DIR)/error.log\" \"$$ussd_dir/error.log\"; \\",
+        "\t$(PYTHON) tools/radio_ussd_trace_check.py \"$$ussd_dir/error.log\" \"$$ussd_dir\" --result-frame $(ORACLE_5210_USSD_RAW_SHA); \\",
+        "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$divert_dir\" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,hash,2,1,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \\",
+        "\tcp \"$(MAME_DIR)/error.log\" \"$$divert_dir/error.log\"; \\",
+        "\t$(PYTHON) tools/radio_call_divert_trace_check.py \"$$divert_dir/error.log\" \"$$divert_dir\"",
+        "\t@echo \"OK — 5210 firmware completed physical USSD and call-divert interrogation\""
+      ]
+    },
+    {
       "name": "verify-5210-radio-paging",
       "prerequisites": ["normalize-5210"],
       "variables": {},

@@ -31,7 +31,8 @@ RESULT_FRAME = "cf2e4a3461da27d5c49c2077810f57cc2caf6e295b089021c25157000b6324b7
 
 
 def verify(text: str, frame_dir: pathlib.Path, outcome: str = "success",
-           require_frame: bool = True, require_state_roundtrip: bool = False) -> dict:
+           require_frame: bool = True, require_state_roundtrip: bool = False,
+           result_frame: str = RESULT_FRAME) -> dict:
     request = REQUEST.search(text)
     if not request:
         raise ValueError("missing exact processUnstructuredSS-Request for *123#")
@@ -84,7 +85,7 @@ def verify(text: str, frame_dir: pathlib.Path, outcome: str = "success",
         hashlib.sha256(path.read_bytes()).hexdigest()
         for path in frame_dir.glob("*.pgm")
     }
-    if outcome == "success" and require_frame and RESULT_FRAME not in hashes:
+    if outcome == "success" and require_frame and result_frame not in hashes:
         raise ValueError("missing exact firmware-rendered Nokia test network frame")
     return {"frames": len(hashes)}
 
@@ -97,10 +98,12 @@ def main() -> int:
         "success", "error", "reject", "silence", "continued-rejected"),
                         default="success")
     parser.add_argument("--require-state-roundtrip", action="store_true")
+    parser.add_argument("--result-frame", default=RESULT_FRAME)
     args = parser.parse_args()
     try:
         verify(args.log.read_text(errors="replace"), args.frame_dir,
-               args.outcome, require_state_roundtrip=args.require_state_roundtrip)
+               args.outcome, require_state_roundtrip=args.require_state_roundtrip,
+               result_frame=args.result_frame)
     except ValueError as error:
         raise SystemExit(str(error)) from None
     print(f"OK - organic *123# completed the {args.outcome} USSD contract")

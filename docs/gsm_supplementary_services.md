@@ -22,9 +22,11 @@ not active** for the first form and the decoded destination for the second. The
 ordinary RR release path returns to the serving BCCH. No UI event or firmware
 state is synthesized.
 
-`make verify-radio-call-divert` requires the exact handset request, decoded
+`make verify-radio-call-divert` requires the exact NSE-8 handset request, decoded
 operation and identifiers, response boundary, subsequent RR release and exact
 firmware-rendered result frame. Codec unit tests reject malformed BER lengths.
+`make verify-5210-radio-supplementary` independently requires NSM-5 v5.40 to
+emit the same semantic transaction after physical `*#21#` plus Send input.
 
 The Nokia single-Star registration form `*21*5551234#` produces `RegisterSS`
 (`0x0a`) for service `0x21` with a tagged BCD forwarded-to number. Registration
@@ -130,9 +132,11 @@ Back softkey, acknowledges the release and returns to the serving BCCH. The
 codec bounds both the Layer-3 and USSD payloads and rejects malformed or trailing
 BER parameter data.
 
-`make verify-radio-ussd` requires the exact organic request, semantic decode,
+`make verify-radio-ussd` requires the exact NSE-8 organic request, semantic decode,
 response, RR release, and exact firmware-rendered response frame. Other data
 coding schemes remain separate contracts.
+The 5210 supplementary gate independently pins NSM-5's rendering of the same
+network result; product-specific UI pixels are not treated as protocol data.
 
 The laboratory network also exposes three deterministic terminal outcomes for
 the same organic request. It can return a correlated `ReturnError` with GSM

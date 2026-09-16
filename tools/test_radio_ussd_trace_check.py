@@ -1,4 +1,5 @@
 import pathlib
+import hashlib
 import tempfile
 import unittest
 
@@ -39,6 +40,16 @@ class RadioUssdTraceCheckTest(unittest.TestCase):
             self.assertEqual(
                 {"frames": 0},
                 verify(GOOD, pathlib.Path(directory), require_frame=False))
+
+    def test_accepts_product_specific_result_frame(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory)
+            frame = path / "result.pgm"
+            frame.write_bytes(b"product frame")
+            digest = hashlib.sha256(frame.read_bytes()).hexdigest()
+            self.assertEqual(
+                {"frames": 1},
+                verify(GOOD, path, result_frame=digest))
 
     def test_accepts_error_and_reject_components(self):
         with tempfile.TemporaryDirectory() as directory:

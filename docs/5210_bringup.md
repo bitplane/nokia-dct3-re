@@ -83,6 +83,10 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   `EF_ADN` update, then cold-boots with the same card image and renders the
   stored contact through Search. This proves a non-SMS application write and
   removable-card persistence without importing the 3210 menu route.
+- `make verify-5210-radio-supplementary` enters `*123#` and `*#21#` through
+  the physical keypad and submits them with the product's dedicated Send key.
+  The resulting processUnstructuredSS-Request and InterrogateSS transactions
+  complete through GSM 04.80, render the network response, and release RR.
 - `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
   Paging Response, contention resolution, clean release and return to the
   subscriber's paging group.

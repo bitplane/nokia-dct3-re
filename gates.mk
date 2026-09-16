@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 303 gates: 165 generated from typed steps, 138 copied verbatim (shell).
+# 304 gates: 165 generated from typed steps, 139 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -62,7 +62,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-registration verify-5210-menu \
 	verify-5210-radio-authentication verify-5210-radio-a5-1-incoming-call \
 	verify-5210-radio-call-state verify-5210-power-lifecycle \
-	verify-5210-charger-wake verify-5210-sim-phonebook verify-5210-radio-paging \
+	verify-5210-charger-wake verify-5210-sim-phonebook \
+	verify-5210-radio-supplementary verify-5210-radio-paging \
 	verify-5210-radio-incoming-sms verify-5210-messages \
 	verify-5210-radio-incoming-call-ringing \
 	verify-5210-radio-incoming-call-answered \
@@ -491,6 +492,19 @@ verify-5210-sim-phonebook: normalize-5210
 	test -n "$$frame" || { echo "no reloaded 5210 phonebook frame produced"; exit 1; }; \
 	$(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_PHONEBOOK_SHA)
 	@echo "OK — 5210 firmware saved Ada/123 to EF_ADN and rendered it after a cold reload"
+
+# shell: physical NSM-5 GSM 04.80 transactions
+verify-5210-radio-supplementary: normalize-5210
+	@set -e; \
+	ussd_dir="$(RUN_DIR)_ussd"; divert_dir="$(RUN_DIR)_divert"; \
+	$(RM) -r "$$ussd_dir" "$$divert_dir"; \
+	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$ussd_dir" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,1,2,3,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \
+	cp "$(MAME_DIR)/error.log" "$$ussd_dir/error.log"; \
+	$(PYTHON) tools/radio_ussd_trace_check.py "$$ussd_dir/error.log" "$$ussd_dir" --result-frame $(ORACLE_5210_USSD_RAW_SHA); \
+	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$divert_dir" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,hash,2,1,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \
+	cp "$(MAME_DIR)/error.log" "$$divert_dir/error.log"; \
+	$(PYTHON) tools/radio_call_divert_trace_check.py "$$divert_dir/error.log" "$$divert_dir"
+	@echo "OK — 5210 firmware completed physical USSD and call-divert interrogation"
 
 verify-5210-radio-paging: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
