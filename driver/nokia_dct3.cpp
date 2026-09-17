@@ -397,6 +397,15 @@ constexpr nokia_external_service_peer_device::application_contract
 	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
 };
 
+// NAM-1 independently acknowledges discovery sequence 0x41. Its application
+// candidate therefore continues the same service grammar at sequence 0x42;
+// acceptance and the channel resources must be established by NAM-1 itself.
+constexpr nokia_external_service_peer_device::application_contract
+		EXTERNAL_SERVICE_NAM1 = {
+	36, 0x01, 0x42,
+	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
+};
+
 constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_READY_64 = {
 	nokia_dsp_hle_device::bootstrap_exchange_strategy::zero_acknowledge,
 	64,
@@ -851,6 +860,7 @@ constexpr nokia_product_config make_3610_config()
 	// NAM-1 independently emits the exact compact 0d00 service-control
 	// request. Complete only that observed transaction.
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	result.external_service = EXTERNAL_SERVICE_NAM1;
 	return result;
 }
 

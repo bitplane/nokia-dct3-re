@@ -37,6 +37,15 @@ one-way type-`0x70` follow-up `0a09`. `make verify-3610-service-control`
 protects this complete observed transition. The external application remains
 disabled at this checkpoint.
 
+NAM-1 acknowledges peer registration sequence `0x42`, accepts channel-map
+sequence `0x43`, and then organically exercises channel `0x5f`. Its first
+status report contains `EXIT ANYSTATE`; subsequent reports identify periodic
+connection checks and charger states. `make verify-3610-application` protects
+the exact registration acknowledgement, channel-map acknowledgement and first
+channel-`0x5f` report. The generic transport currently acknowledges each
+report and the firmware continues publishing channel-`0x5f` status, so the
+steady-state service lifecycle is not yet claimed complete.
+
 ## Established inputs
 
 - MCU/PPM normalization and hashes are recorded in `roms/README.md`.
@@ -50,7 +59,7 @@ disabled at this checkpoint.
 
 ## Open boundary
 
-Recover NAM-1's application registration contract at the now-live external
-service boundary.
+Classify and settle the repeating channel-`0x5f` status lifecycle, then map the
+next hardware boundary exposed by the application startup.
 Keypad, SIM, persistent storage, external-service and radio contracts remain
 disabled until product-local evidence establishes each one.
