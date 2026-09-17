@@ -174,6 +174,22 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("cobba_hle_voice.microphone", nhm2)
         self.assertNotIn("cobba_hle_voice.output", nhm2)
 
+    def test_nsm5_call_control_is_not_promoted_to_media(self):
+        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        nsm5 = phone[
+            phone.index("constexpr nokia_product_config make_5210_config()"):
+            phone.index("constexpr nokia_product_config make_2100_config()")
+        ]
+        machine = phone[
+            phone.index("void nokia_dct3_state::noki5210"):
+            phone.index("void nokia_dct3_state::noki8xxx")
+        ]
+        self.assertIn("dsp_speech_control = DSP_SPEECH_CONTROL_NSM5", nsm5)
+        self.assertNotIn("cobba_pcm.", nsm5)
+        self.assertNotIn("cobba_hle_voice.", nsm5)
+        self.assertNotIn('MICROPHONE(config, "microphone", 1)', machine)
+        self.assertNotIn("m_cobba->add_route", machine)
+
     def test_audio_profiles_are_grouped_and_configuration_only(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         pcm = (ROOT / "driver/nokia_mad2_pcm.h").read_text()
