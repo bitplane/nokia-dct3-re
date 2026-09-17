@@ -46,6 +46,14 @@ channel-`0x5f` report. The generic transport currently acknowledges each
 report and the firmware continues publishing channel-`0x5f` status, so the
 steady-state service lifecycle is not yet claimed complete.
 
+With the physical 423.1 Hz M2BUS timer enabled, NAM-1 independently transmits
+the checksum-valid terminal discovery frame
+`1f ff 00 d0 00 01 01 01 31`. The common terminal derives its transport fields
+from that request; firmware accepts the ACK and D0/04, emits D0/05, and accepts
+the final ACK. `make verify-3610-mbus` protects the complete byte-boundary
+exchange. This is independent product evidence for the shared physical
+protocol, not inheritance from NAM-2.
+
 ## Established inputs
 
 - MCU/PPM normalization and hashes are recorded in `roms/README.md`.
@@ -59,7 +67,7 @@ steady-state service lifecycle is not yet claimed complete.
 
 ## Open boundary
 
-Classify and settle the repeating channel-`0x5f` status lifecycle, then map the
-next hardware boundary exposed by the application startup.
+Identify the missing product-state/PMM contract that retains the diagnostic
+service mode after the terminal exchange.
 Keypad, SIM, persistent storage, external-service and radio contracts remain
 disabled until product-local evidence establishes each one.

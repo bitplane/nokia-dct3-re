@@ -252,7 +252,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
-.PHONY: normalize-3610 smoke-3610 verify-3610-frontier verify-3610-dsp-service verify-3610-discovery verify-3610-service-control verify-3610-application
+.PHONY: normalize-3610 smoke-3610 verify-3610-frontier verify-3610-dsp-service verify-3610-discovery verify-3610-service-control verify-3610-application verify-3610-mbus
 .PHONY: smoke-2100
 .PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
@@ -332,6 +332,7 @@ help:
 	@echo "make verify-3610-discovery verify NAM-1 request-derived D0 discovery"
 	@echo "make verify-3610-service-control verify NAM-1 compact service completion"
 	@echo "make verify-3610-application verify NAM-1 service registration and channel map"
+	@echo "make verify-3610-mbus verify NAM-1 physical terminal startup exchange"
 	@echo "make smoke-5210e bounded local 5210 v5.40 PPM E portability spike"
 	@echo "make verify-5210-frontier boot the 5210 v5.40 profile to standby"
 	@echo "make verify-5210-menu exercise the 5210 physical Menu key"
@@ -595,6 +596,12 @@ verify-3610-application: normalize-3610 build
 	@grep -q 'TX pending type=05 payload=12 data=1e0200400006010170010143' $(MAME_DIR)/error.log
 	@grep -q 'TX pending type=05 payload=30 data=1e020000001701015f00005e010d4558495420414e59535441544501c400' $(MAME_DIR)/error.log
 	@echo 'NAM-1 application registration, channel map and channel-5f use: PASS'
+
+verify-3610-mbus: normalize-3610 build
+	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
+		RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_EXTRA_ARGS=-verbose
+	$(PYTHON) tools/mbus_2100_terminal_trace_check.py $(MAME_DIR)/error.log
+	@echo 'NAM-1 physical M2BUS terminal exchange: PASS'
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \

@@ -861,6 +861,11 @@ constexpr nokia_product_config make_3610_config()
 	// request. Complete only that observed transaction.
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	result.external_service = EXTERNAL_SERVICE_NAM1;
+	// The timer makes NAM-1 independently emit the checksum-valid physical
+	// startup frame 1f ff 00 d0 00 01 01 01 31. Its request-derived terminal
+	// exchange is therefore enabled independently of NAM-2.
+	result.mbus_timer_enabled = true;
+	result.mbus_terminal = true;
 	return result;
 }
 
