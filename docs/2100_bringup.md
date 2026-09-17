@@ -9,9 +9,8 @@ service discovery transaction, accepts a class-0x40 application registration,
 and completes its physical M2BUS terminal startup exchange. The compact type-74
 completion clears the initial `CONTACT SERVICE` frame. The current frontier is
 the blank firmware-owned frame that follows registration. The next task batch is
-held back by an early readiness decision made before task 2 validates the
-product-state partition. The erased partition is a real defect, but it is not by
-itself an explanation for the one-shot release ordering.
+held back after task 2 validates the product-state partition and clears its
+readiness bit. The erased partition is the first demonstrated missing input.
 
 This is a bounded portability frontier, not a boot or interactive promotion.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
@@ -70,18 +69,19 @@ contract is inherited merely because its values appear compatible.
   the byte boundary using the documented 2.5/3 ms idle periods and request-
   derived ACK fields. NAM-2 accepts both transport ACKs and organically emits
   `D0/05`; `make verify-2100-mbus` fixes that complete exchange as an acceptance
-  gate. Modeling peer-byte occupancy on status bit 6 also moves the first
-  accepted `D0/01` from 0.249605 s to 0.204747 s; the gate protects that
-  pre-210 ms phase as well as eventual packet order.
+  gate. Modeling peer-byte occupancy on status bit 6 prevents the controller
+  from starting a frame over the terminal's character. Exact absolute phase is
+  not gated: repeated clean runs place the first D0/01 at 0.222849 s, and the
+  preempted supervisor does not consume that timestamp as a deadline.
 - Closing M2BUS advances the first global-initializer predicate. The second
   predicate also passes; the third routine `0x2c9780` returns false because byte
   `0x10f206` is zero. The NAM-2 creation table at `0x330ef4` identifies
-  `0x21d114` as task 18. Its descriptor has the same scheduler shape as the
-  independently mapped 3210 task 18, and its straight-line initializer posts
-  readiness report `0x12` at `0x21d218`. The coherent run leaves its entire
+  `0x21d114` as task 18. Its initializer posts readiness report `0x12` at
+  `0x21d218`. Two direct event producers at `0x2b7e7c` and `0x2b833a` construct
+  status `0x120c` after SIM status word `0x91`, identifying it as the SIM
+  proactive-command/SAT task. The coherent run leaves its entire
   state block `0x10f1d8..0x10f207` zero: task 18 remains unstarted rather than
-  failing a transaction after initialization. Its broader ownership remains
-  unresolved.
+  failing a transaction after initialization.
 - Supervisor `0x2f80b6` contains the missing release explicitly. Its second
   batch starts tasks 10, 11, 13, 12, 14, 19, 18, 15 and 16 through scheduler
   entry `0x2ac3b0`. The coherent run takes the preceding failure branch at
@@ -90,7 +90,9 @@ contract is inherited merely because its values appear compatible.
   `0x13fdb3` bit 6 has been cleared. The same shift/carry audit establishes that
   the helper's preceding spin tests original bit 2, not bit 3.
 - The first batch resumes task 2 at `0x2f8204..0x2f8206`, then calls helper
-  `0x2e18a8` at `0x2f822a` without an explicit scheduler yield. The failure
+  `0x2e18a8` at `0x2f822a`. Scheduler resume preempts the supervisor: it enters
+  at 0.184789 s but does not reach the helper result branch until 1.197912 s,
+  after task 2 and the service exchange have run. The failure
   branch calls `0x2f1c1c`, which publishes startup tuple `0x11/0x44` and returns;
   it does not register a deferred release. An exhaustive scan of all 28 Thumb
   calls to scheduler entry `0x2ac3b0` finds no other task-18 resume site.
@@ -109,17 +111,17 @@ contract is inherited merely because its values appear compatible.
   selector and publishes final reply 4 on chunk 134. Re-publishing selector 1
   is incorrect because it restarts the transfer at its descriptor head.
 - This later transfer is not the missing release timing. With the readable
-  donor catalogue, supervisor `0x2f80b6` enters at 0.201823 s with DSP result
-  zero and task 18 parked. The first code-block reply appears at 0.213180 s.
-  A diagnostic 50 us peer cadence completes all 134 chunks by 0.228037 s, but
-  task 2 does not validate the PMM records until 0.378353–0.383172 s and task
-  18 remains parked. This excludes both the generic 5 ms delay and code-block
-  throughput as the cause; an earlier DSP readiness lifecycle is still absent.
-- A write-watch fixes the ordering independently of the static decode. The
-  supervisor makes its decision at 0.201823 s. Task 2 starts at 0.353336 s,
+  donor catalogue, supervisor `0x2f80b6` enters at 0.201823 s and the first
+  code-block reply appears at 0.213180 s. A diagnostic 50 us peer cadence
+  completes all 134 chunks by 0.228037 s without releasing task 18. The later
+  supervisor trace proves scheduler preemption, rather than linear execution,
+  gives task 2 time to validate product state before the branch; transfer
+  throughput is therefore independently excluded.
+- A write-watch fixes the ordering independently of the static decode. Task 2
+  starts at 0.353336 s,
   sets readiness bits 6 and 7 at 0.353350..0.353352 s, and clears bit 6 at
-  0.358995 s in `0x256a84`. The supervisor therefore cannot observe either the
-  provisional or validated task-2 result during its cold-start decision.
+  0.358995 s in `0x256a84`. At its eventual branch the stock run has service 1,
+  mode 2 and readiness byte `0x81`, so the cleared bit is observed directly.
 - The post-map class-`0x00`/command-`0x5f` `EXIT ANYSTATE` stream continues while
   the initializer spins. It is the already-classified periodic external-service
   channel, not proof that the missing task is advancing. A 120-second run still
@@ -142,12 +144,10 @@ therefore established bounded absence only.
 The display, DSP bootstrap, service discovery, application registration, keypad
 wiring, MBUS controller, terminal timing, arbitration and complete startup
 exchange are established for v5.84. The first unresolved boundary is now the
-readiness lifecycle that must satisfy the supervisor before its one-shot
-second-batch decision. A matching `0x3f0000..0x3fffff` EEPROM/PMM partition
-omitted by the supplied v5.84 MCU+PPM archive is also required: erased records
-`0x0190` and `0x0270` later fail task 2's reference check and clear readiness
-bit 6. Because task 2 runs only after the supervisor's decision, that later
-validation cannot be the original source of the pre-release state.
+matching `0x3f0000..0x3fffff` EEPROM/PMM partition omitted by the supplied
+v5.84 MCU+PPM archive. Erased records `0x0190` and `0x0270` fail task 2's
+reference check and clear readiness bit 6 before the preempted supervisor
+resumes and makes its second-batch decision.
 
 Substituting the populated tail from the complete v5.21 image and recomputing
 the v5.84 firmware's 16-bit checksum over the `0x3fc026` calibration record
@@ -155,16 +155,16 @@ changes early state but does not settle the v5.84 initializer, so that
 version-mismatched donor is rejected as the final product input. A corrected
 full-region experiment proves the donor catalogue is nevertheless readable:
 firmware computes `0x933d`, reads nonzero record `0x0190`, finds matching record
-`0x0270 == 0x933d`, and retains readiness bit 6. Task 18 still remains in
-scheduler state 5 because the supervisor made its one-shot release decision
-before task 2 published that validated result. The earlier experiment that
+`0x0270 == 0x933d`, and transiently retains readiness bit 6. Under the corrected
+MBUS timing, later v5.84 lifecycle processing reaches the supervisor branch with
+readiness byte `0x01`, still takes the `0x11/0x44` failure route, and leaves task
+18 parked. The earlier experiment that
 reported erased donor records loaded only the MCU+PPM length and never mapped
 the final 64 KiB; that result is discarded.
 
-The faithful frontier therefore has two inputs: a matching v5.84 product-state
-capture and the DSP readiness exchange that must be visible before supervisor
-entry. The later selector-1 code-block upload is fully bounded and cannot
-retroactively satisfy that first release decision.
+The faithful frontier is a matching v5.84 product-state capture. The later
+selector-1 code-block upload is fully bounded and is not a substitute for that
+version-specific catalogue and lifecycle state.
 
 Historical repair archives identify
 `eeprom2100.fls` and 64 KiB 2100 PMM attachments, but no retrievable copy has yet

@@ -25,10 +25,6 @@ class Mbus2100TerminalTraceCheckTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             check("\n".join(lines[:2] + lines[3:] + lines[2:3]))
 
-    def test_rejects_late_registration_phase(self):
-        with self.assertRaises(SystemExit):
-            check(GOOD.replace("t=0.204747", "t=0.249605"))
-
 
 if __name__ == "__main__":
     unittest.main()

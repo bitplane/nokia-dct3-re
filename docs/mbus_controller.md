@@ -46,10 +46,9 @@ specifies 3 ms of idle bus before an ordinary frame, 2.5 ms before an ACK and a
 wired-AND rule. Status bit 6 is the sampled clock/idle line: a peer byte keeps
 it low for one physical character time, preventing firmware from starting a
 retry over an occupied wire. Before that state was modeled, the status register
-always claimed idle and shifted NAM-2's first accepted registration from
-0.204747 s to 0.249605 s through avoidable retries. The precise oscillator
-phase within a bit, differing-bit arbitration, framing errors, overrun behavior
-and electrical timing remain unmodeled.
+always claimed idle and permitted avoidable retries over peer traffic. The
+precise oscillator phase within a bit, differing-bit arbitration, framing
+errors, overrun behavior and electrical timing remain unmodeled.
 The lower service/test protocol behind task 7 is mapped separately; ordinary
 boot provides no evidence that it is an always-present MBUS peer. A future
 tool or peer must attach through the byte callbacks and may respond only to
@@ -75,8 +74,7 @@ response `1f 1d 00 d0 00 01 05 <seq> <xor>`. NAM-2 attaches
 waits the specified idle periods, derives ACK endpoints, sequence and XOR from
 the received frame, gates transmission on the controller's one-byte holding
 register, and restarts a pre-empted frame after the phone wins the single wire.
-`make verify-2100-mbus` proves both the recovered pre-210 ms registration phase
-and the ordered organic exchange: phone `D0/01`,
+`make verify-2100-mbus` proves the ordered organic exchange: phone `D0/01`,
 terminal ACK, terminal `D0/04`, phone `D0/05`, terminal ACK. No firmware
 address, RAM state or sibling-handset timing appears in the peer.
 
