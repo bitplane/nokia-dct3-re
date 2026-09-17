@@ -151,7 +151,7 @@ The runtime GENSIO observation supersedes the conservative static census's zero
 direct SELECT sites. That census excluded dynamic/table-derived addressing and
 therefore established bounded absence only.
 
-## First unresolved boundary
+## Interactive donor-profile boundary
 
 The display, DSP bootstrap, service discovery, application registration, keypad
 wiring, MBUS controller, terminal timing, arbitration and complete startup
@@ -162,20 +162,36 @@ with its v5.84-observed block checksum corrected, passes both task-2 validation
 stages and retains readiness byte `0xc1`.
 
 With that fixture, the supervisor resumes its first batch through tasks 6, 22,
-23, 21 and 5 with readiness `0xc1`. Task 5 then preempts the supervisor and does
-not return during the bounded run, so execution never reaches the second-batch
-task-18 call and the LCD remains blank. The next question is therefore which
-task-5 initialization dependency prevents the scheduler return after
-`0x2f8228`; it is not another task-2 PMM comparison. The version-mismatched
-donor remains a diagnostic input rather than a distributable v5.84 product
-profile. The earlier experiment that reported erased donor locations loaded
-only the MCU+PPM length and never mapped the final 64 KiB; that result is
-discarded.
+23, 21 and 5 with readiness `0xc1`. Task 5 processes statuses `0x012e`,
+`0x071d` and `0x14b5`, then yields. The supervisor resumes the complete second
+batch through task 16. Status `0x14b5` enters the task-5 service-completion
+handler at `0x274210`, clears its local state and runs the resource-availability
+initializer at `0x2fcb60`. Task 2 subsequently accepts the peer's 64-byte
+command-`0x70` channel map and emits its normal acknowledgement.
 
-The faithful frontier is the task-5 preemption boundary under validated product
-state, followed by a matching v5.84 product-state capture for final promotion.
-The later selector-1 code-block upload is fully bounded and is not a substitute
-for either requirement.
+The remaining blank state was a board-input error, not a missing MMI message.
+The provisional profile supplied full-scale `0x3ff` on CCONT selector 2. The
+firmware diagnostic channel named the resulting lifecycle directly: `BOOT UP
+CHARGE`, `INITIALIZE`, then `WAIT CHARGER VOLTAGE`. Supplying the ordinary
+charged-pack sample `0x2c0` lets firmware leave that lifecycle, execute the
+firmware keypad-unmask site, and present its security-code editor. Physical
+digit presses cross the five-row matrix and repaint the editor with masked
+digits. `make verify-2100-interactive` reproduces this path without firmware RAM
+or scheduler injection.
+
+The version-mismatched donor remains a diagnostic input rather than a
+distributable v5.84 product profile. Its stored security identity is not assumed
+to use v5.84's factory code, so remaining in the editor after `12345` is not a
+driver failure. The supplied archive `2100sharp.pmm` is also not v5.84 PMM data:
+it consists of 256 nine-byte flasher headers followed by 0x2000-byte payload
+chunks, and stripping those headers produces the byte-identical v5.21 Sharp
+full image catalogued as `2100f521sharp.fls`. The earlier experiment that loaded
+only the MCU+PPM length and reported erased donor locations is discarded.
+
+The emulation frontier is interactive MMI under a bounded donor fixture. Final
+product promotion still requires a matching v5.84 product-state capture; the
+later selector-1 code-block upload is fully bounded and is not a substitute for
+that input.
 
 Historical repair archives identify
 `eeprom2100.fls` and 64 KiB 2100 PMM attachments, but no retrievable copy has yet

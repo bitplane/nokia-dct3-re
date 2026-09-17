@@ -13,15 +13,21 @@ VERSION_REFERENCE_OFFSET = 0x270
 
 
 def make_profile(donor: bytes) -> bytes:
-    magic = donor.find(EEPROM_MAGIC)
-    if magic < 6:
-        raise ValueError("EEPROM catalog missing")
-    catalog = magic - 6
-    logical = catalog + LOGICAL_DATA_OFFSET
-    if logical + VERSION_REFERENCE_OFFSET + 2 > len(donor):
-        raise ValueError("EEPROM logical data exceeds image")
-    if donor[logical + VERSION_REFERENCE_OFFSET:logical + VERSION_REFERENCE_OFFSET + 2] != bytes.fromhex("933d"):
-        raise ValueError("expected v5.21 reference 0x933d is absent")
+    logical = None
+    search = 0
+    while True:
+        magic = donor.find(EEPROM_MAGIC, search)
+        if magic < 0:
+            break
+        candidate = magic - 6 + LOGICAL_DATA_OFFSET
+        if (magic >= 6 and candidate + VERSION_REFERENCE_OFFSET + 2 <= len(donor)
+                and donor[candidate + VERSION_REFERENCE_OFFSET:candidate + VERSION_REFERENCE_OFFSET + 2]
+                == bytes.fromhex("933d")):
+            logical = candidate
+            break
+        search = magic + 1
+    if logical is None:
+        raise ValueError("expected v5.21 EEPROM catalog reference 0x933d is absent")
 
     result = bytearray(donor)
     checksum = sum(result[logical:logical + IDENTITY_CHECKSUM_OFFSET]) & 0xffffffff

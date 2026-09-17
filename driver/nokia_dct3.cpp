@@ -131,10 +131,11 @@ constexpr nokia_ccont_board_profile ADC_5210 = {
 
 // NAM-2 service material specifies 0.5 V at the BSI node in the service jig.
 // With CCONT's 2.8 V ADC reference this is 0.5 / 2.8 * 1023 ~= 0x0b6.
-// Other channels remain conservative until their NAM-2 electrical contract
-// is recovered independently.
+// Full-scale selector 2 is rejected into the firmware's BOOT UP CHARGE / WAIT
+// CHARGER VOLTAGE lifecycle. Use the ordinary charged-pack sample shared by
+// the independently grounded DCT3 profiles until NAM-2 scaling is recovered.
 constexpr nokia_ccont_board_profile ADC_2100 = {
-	{ 0x000, 0x3ff, 0x3ff, 0x0b6, 0x200, 0x000, 0x200, 0x000 },
+	{ 0x000, 0x3ff, 0x2c0, 0x0b6, 0x200, 0x000, 0x200, 0x000 },
 	5, 0x03ff
 };
 

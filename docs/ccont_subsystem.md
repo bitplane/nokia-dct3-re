@@ -208,6 +208,14 @@ electrical naming and scaling remain open. Product configuration supplies raw
 ten-bit defaults; these are board inputs, not a finished physical battery model.
 The machine-readable coverage record is `docs/data/ccont_adc_channels.json`.
 
+NAM-2 supplies a useful negative and positive boundary for selector 2. The
+initial full-scale placeholder `0x3ff` drives v5.84 into firmware-named `BOOT UP
+CHARGE` / `WAIT CHARGER VOLTAGE` states and leaves the keypad masked. The
+ordinary charged-pack sample `0x2c0`, already grounded on other DCT3 products,
+lets the same firmware leave that lifecycle and enable its interactive MMI.
+This establishes that selector 2 is a load-bearing battery input on NAM-2; its
+exact raw-to-voltage transfer remains unmeasured.
+
 The physical mapping comes from Nokia's NSE-8/9 System Module Service Manual,
 issue 1 (07/99), Table 23. Its transfer tables also ground the 3210 defaults:
 selector 0's raw `704` is about 3.31 V at the typical 4.7 mV/bit battery scale;

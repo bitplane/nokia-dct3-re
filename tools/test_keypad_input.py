@@ -39,6 +39,18 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn('string.match(name, "^wait(%d+)$")', self.harness)
         self.assertIn("emu.wait(tonumber(wait_ms) / 1000)", self.harness)
 
+    def test_harness_records_firmware_keypad_mask_changes(self):
+        self.assertIn('if reg == 0x6b then', self.harness)
+        self.assertIn('"kbgpio-mask-write: value=%02x', self.harness)
+
+    def test_2100_gate_uses_a_bounded_profile_and_physical_digits(self):
+        makefile = (ROOT / "Makefile").read_text()
+        target = makefile.split("verify-2100-interactive:", 1)[1].split("\n\n", 1)[0]
+        self.assertIn("tools/make_2100_pmm_profile.py", target)
+        self.assertIn("NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5", target)
+        self.assertIn("kbgpio-mask-write: value=20", target)
+        self.assertNotIn("space:write_", target)
+
     def test_sequence_can_wait_for_organic_buzzer_before_physical_answer(self):
         self.assertIn('name == "waitbuzzer"', self.harness)
         self.assertIn("space:read_u8(0x20015) & 0x20", self.harness)

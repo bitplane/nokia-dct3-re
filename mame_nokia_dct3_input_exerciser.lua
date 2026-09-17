@@ -305,6 +305,12 @@ local eeprom_scl = 0
 
 local function record_mmio(address, value)
 	local reg = address & 0xff
+	if reg == 0x6b then
+		machine:logerror(string.format(
+				"kbgpio-mask-write: value=%02x pc=%08x lr=%08x t=%.9f\n",
+				value, cpu.state["PC"].value, cpu.state["R14"].value,
+				emulation_seconds()))
+	end
 	if reg == 0x01 and (value & 0x04) ~= 0 then
 		structural.soft_resets = structural.soft_resets + 1
 	elseif reg == 0x20 or reg == 0x24 then
