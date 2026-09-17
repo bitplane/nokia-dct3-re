@@ -9,8 +9,9 @@ service discovery transaction, accepts a class-0x40 application registration,
 and completes its physical M2BUS terminal startup exchange. The compact type-74
 completion clears the initial `CONTACT SERVICE` frame. The current frontier is
 the blank firmware-owned frame that follows registration. The next task batch is
-held back because the supplied v5.84 package has an erased product-state
-partition; this is now measured at the firmware's own validation branch.
+held back by an early readiness decision made before task 2 validates the
+product-state partition. The erased partition is a real defect, but it is not by
+itself an explanation for the one-shot release ordering.
 
 This is a bounded portability frontier, not a boot or interactive promotion.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
@@ -88,6 +89,11 @@ contract is inherited merely because its values appear compatible.
   zero, and mode byte `0x10fd24` is 2, but helper `0x2e18a8` returns zero because
   `0x13fdb3` bit 6 has been cleared. The same shift/carry audit establishes that
   the helper's preceding spin tests original bit 2, not bit 3.
+- The first batch resumes task 2 at `0x2f8204..0x2f8206`, then calls helper
+  `0x2e18a8` at `0x2f822a` without an explicit scheduler yield. The failure
+  branch calls `0x2f1c1c`, which publishes startup tuple `0x11/0x44` and returns;
+  it does not register a deferred release. An exhaustive scan of all 28 Thumb
+  calls to scheduler entry `0x2ac3b0` finds no other task-18 resume site.
 - Task 2's initializer at `0x256720` owns the readiness-byte transition. It sets
   bit 6, reads two product-state records through `0x306e78`, and retains bit 6
   only when the live computed reference equals record `0x0270` and the reference
@@ -109,6 +115,11 @@ contract is inherited merely because its values appear compatible.
   task 2 does not validate the PMM records until 0.378353–0.383172 s and task
   18 remains parked. This excludes both the generic 5 ms delay and code-block
   throughput as the cause; an earlier DSP readiness lifecycle is still absent.
+- A write-watch fixes the ordering independently of the static decode. The
+  supervisor makes its decision at 0.201823 s. Task 2 starts at 0.353336 s,
+  sets readiness bits 6 and 7 at 0.353350..0.353352 s, and clears bit 6 at
+  0.358995 s in `0x256a84`. The supervisor therefore cannot observe either the
+  provisional or validated task-2 result during its cold-start decision.
 - The post-map class-`0x00`/command-`0x5f` `EXIT ANYSTATE` stream continues while
   the initializer spins. It is the already-classified periodic external-service
   channel, not proof that the missing task is advancing. A 120-second run still
@@ -131,10 +142,12 @@ therefore established bounded absence only.
 The display, DSP bootstrap, service discovery, application registration, keypad
 wiring, MBUS controller, terminal timing, arbitration and complete startup
 exchange are established for v5.84. The first unresolved boundary is now the
-matching `0x3f0000..0x3fffff` EEPROM/PMM partition omitted by the supplied
-v5.84 MCU+PPM archive. Firmware proves this dependency directly: erased records
-`0x0190` and `0x0270` fail task 2's reference check, clear readiness bit 6 and
-prevent the second task batch, including task 18, from starting.
+readiness lifecycle that must satisfy the supervisor before its one-shot
+second-batch decision. A matching `0x3f0000..0x3fffff` EEPROM/PMM partition
+omitted by the supplied v5.84 MCU+PPM archive is also required: erased records
+`0x0190` and `0x0270` later fail task 2's reference check and clear readiness
+bit 6. Because task 2 runs only after the supervisor's decision, that later
+validation cannot be the original source of the pre-release state.
 
 Substituting the populated tail from the complete v5.21 image and recomputing
 the v5.84 firmware's 16-bit checksum over the `0x3fc026` calibration record
@@ -159,6 +172,14 @@ been recovered. The correct next input is a matching virgin or handset capture,
 not a driver-side value synthesized to satisfy the comparison.
 SIM and radio remain dormant at this boundary; their behavior must not be
 promoted until execution reaches their firmware consumers.
+
+The strongest surviving retrieval leads are exact but account-gated. The
+GSMHosting thread exposes attachments `2100[1].pmm.txt` and
+`2100_edited_bestcool.pmm.txt` (64.1 KiB each). The Elektroda archive lists
+`2100fubu511pl.zip` (1.18 MiB), described as a v5.11 full backup. The historical
+`ALL_PM_PMM_by_xTroy.zip` inventory names `eeprom2100.fls`, but its surviving
+MCRF URL now returns 404. None of these bytes has been recovered, so they remain
+retrieval leads rather than evidence inputs.
 
 ## Public evidence availability
 
@@ -186,5 +207,6 @@ external follow-up rather than negative proof that no capture survives.
 - [Archived NAM-2 EEPROM discussion](https://nokiafree.org/forums/archive/index.php/t-17045.html)
 - [Archived PMM collection inventory](https://www.mcrf.ru/forum/archive/index.php/t-22889.html)
 - [2100 PMM attachment record](https://forum.gsmhosting.com/vbb/f131/2100-contact-service-234791/)
+- [2100 v5.11 full-backup attachment record](https://www.elektroda.pl/rtvforum/topic162542.html)
 - [Archived `2100FuBu0584` reference](https://gsmforum.ru/threads/podskazhite-kak-podnyat-ufsom-nokia-2100.6670/)
 - [Surviving v5.84 MCU+PPM listing](https://www.shram.kiev.ua/mob/proshnokia.shtml)
