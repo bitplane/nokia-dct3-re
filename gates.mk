@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 306 gates: 165 generated from typed steps, 141 copied verbatim (shell).
+# 308 gates: 167 generated from typed steps, 141 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -67,7 +67,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-paging-negatives verify-5210-radio-incoming-sms \
 	verify-5210-messages verify-5210-radio-incoming-call-ringing \
 	verify-5210-radio-incoming-call-answered \
-	verify-5210-radio-incoming-call-lifecycle \
+	verify-5210-radio-incoming-call-lifecycle verify-5210-radio-media-resilience \
 	verify-5210-radio-outgoing-call-lifecycle verify-5210-radio-outgoing-sms \
 	verify-5210-radio-reselection-same-lac \
 	verify-5210-radio-reselection-different-lac verify-5210-radio-loss-recovery \
@@ -156,11 +156,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-pcm-missing verify-radio-degraded-speech \
 	verify-radio-a5-1-degraded verify-radio-physical-uplink \
 	verify-radio-outgoing-call-host-physical-media \
-	verify-3310-radio-physical-duplex verify-radio-physical-uplink-one \
-	verify-radio-incoming-sms-host-adapter verify-radio-incoming-sms-host-restore \
-	verify-radio-outgoing-sms-host-adapter verify-radio-outgoing-sms-host-restore \
-	verify-radio-ussd-host-adapter verify-radio-ussd-host-restore \
-	verify-radio-incoming-ussd-host-adapter \
+	verify-3310-radio-physical-duplex verify-5210-radio-physical-duplex \
+	verify-radio-physical-uplink-one verify-radio-incoming-sms-host-adapter \
+	verify-radio-incoming-sms-host-restore verify-radio-outgoing-sms-host-adapter \
+	verify-radio-outgoing-sms-host-restore verify-radio-ussd-host-adapter \
+	verify-radio-ussd-host-restore verify-radio-incoming-ussd-host-adapter \
 	verify-radio-incoming-ussd-host-restore verify-radio-outgoing-sms \
 	verify-radio-outgoing-sms-reject verify-radio-outgoing-sms-smsc \
 	verify-radio-outgoing-sms-timeout verify-radio-outgoing-sms-timeout-state \
@@ -554,12 +554,8 @@ verify-5210-radio-incoming-call-lifecycle: normalize-5210
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-call 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 completed incoming-call Answer/End and returned to registered standby"
 
-# shell: NSM-5 digital media, degradation and save-state composition
 verify-5210-radio-media-resilience: normalize-5210
-	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e \
-		RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \
-		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800 NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800 NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'
 	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log
@@ -2320,6 +2316,9 @@ verify-radio-outgoing-call-host-physical-media:
 
 verify-3310-radio-physical-duplex:
 	$(DCT3_RUN_3310) ROM=roms/noki3310/3310f639e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=28 POST_READY_KEYS=navi,wait5000,navi POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=200 POST_READY_GAP_MS=200 AUDIO_CONTROL_CHECKER=tools/radio_3310_speech_control_trace_check.py PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
+
+verify-5210-radio-physical-duplex:
+	PHONE=noki5210 BIOS=540e ROM=roms/noki5210/5210_5.40_ppm_e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=30 POST_READY_KEYS=send,wait5000,end POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=220 POST_READY_GAP_MS=280 AUDIO_CONTROL_CHECKER=tools/radio_5210_incoming_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
 
 verify-radio-physical-uplink-one:
 	RUN_DIR=$(RUN_DIR) BIOS=$(BIOS) ROM=$(ROM) EEPROM_BASENAME='$(EEPROM_BASENAME)' AUDIO_CONTROL_CHECKER='$(AUDIO_CONTROL_CHECKER)' tools/run_physical_uplink_gate.sh

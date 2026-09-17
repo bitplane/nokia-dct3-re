@@ -2072,6 +2072,45 @@
       ]
     },
     {
+      "name": "verify-5210-radio-media-resilience",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell", "silent": true,
+          "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800 NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "shell", "silent": true,
+          "command": "$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "announce", "silent": true,
+          "command": "echo \"OK — NSM-5 media survived FACCH, bidirectional BFIs and save-state replay\""
+        }
+      ]
+    },
+    {
       "name": "verify-5210-radio-outgoing-call-lifecycle",
       "prerequisites": ["normalize-5210"],
       "variables": {},
@@ -7943,6 +7982,18 @@
           "step": "shell",
           "silent": false,
           "command": "$(DCT3_RUN_3310) ROM=roms/noki3310/3310f639e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=28 POST_READY_KEYS=navi,wait5000,navi POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=200 POST_READY_GAP_MS=200 AUDIO_CONTROL_CHECKER=tools/radio_3310_speech_control_trace_check.py PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh"
+        }
+      ]
+    },
+    {
+      "name": "verify-5210-radio-physical-duplex",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell",
+          "silent": false,
+          "command": "PHONE=noki5210 BIOS=540e ROM=roms/noki5210/5210_5.40_ppm_e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=30 POST_READY_KEYS=send,wait5000,end POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=220 POST_READY_GAP_MS=280 AUDIO_CONTROL_CHECKER=tools/radio_5210_incoming_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh"
         }
       ]
     },

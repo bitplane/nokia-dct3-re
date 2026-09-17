@@ -174,7 +174,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("cobba_hle_voice.microphone", nhm2)
         self.assertNotIn("cobba_hle_voice.output", nhm2)
 
-    def test_nsm5_uses_its_documented_digital_pcm_without_analogue_routes(self):
+    def test_nsm5_uses_its_documented_pcm_and_analogue_routes(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         nsm5 = phone[
             phone.index("constexpr nokia_product_config make_5210_config()"):
@@ -191,9 +191,16 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("cobba_pcm.sync_clocks = 1", nsm5)
         self.assertIn("cobba_pcm.word_clocks = 16", nsm5)
         self.assertIn("cobba_pcm.msb_first = true", nsm5)
-        self.assertNotIn("cobba_hle_voice.", nsm5)
-        self.assertNotIn('MICROPHONE(config, "microphone", 1)', machine)
-        self.assertNotIn("m_cobba->add_route", machine)
+        self.assertIn(
+            "cobba_hle_voice.microphone = nokia_cobba_device::mic2", nsm5
+        )
+        self.assertIn(
+            "cobba_hle_voice.output = nokia_cobba_device::ear", nsm5
+        )
+        self.assertIn('MICROPHONE(config, "microphone", 1)', machine)
+        self.assertIn("m_cobba->add_route", machine)
+        self.assertNotIn("microphone_gain_db", nsm5)
+        self.assertNotIn("output_gain_db", nsm5)
 
     def test_audio_profiles_are_grouped_and_configuration_only(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()

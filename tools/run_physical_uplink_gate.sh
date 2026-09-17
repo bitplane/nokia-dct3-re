@@ -10,6 +10,7 @@ bios=${BIOS:-}
 rom=${ROM:-roms/3210f600a.fls}
 eeprom_basename=${EEPROM_BASENAME:-3210 v600 eeprom.bin}
 audio_control_checker=${AUDIO_CONTROL_CHECKER:-tools/radio_answered_call_lifecycle_trace_check.py}
+facch_checker=${FACCH_CHECKER-tools/radio_facch_interruption_trace_check.py}
 fixture=${FIXTURE:-fixtures/radio_incoming_call_answered}
 run_seconds=${RUN_SECONDS:-38}
 post_ready_keys=${POST_READY_KEYS:-1,2,3,4,5,enter,wait500,waitbuzzer,enter,wait5000,enter}
@@ -173,5 +174,7 @@ else
 	python3 tools/radio_physical_downlink_check.py "$run_dir/downlink.wav"
 	python3 tools/radio_speech_media_trace_check.py \
 		"$run_dir/error.log" "${pcm_check_args[@]}"
-	python3 tools/radio_facch_interruption_trace_check.py "$run_dir/error.log"
+	if [[ -n "$facch_checker" ]]; then
+		python3 "$facch_checker" "$run_dir/error.log"
+	fi
 fi

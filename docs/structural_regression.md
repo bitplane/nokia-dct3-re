@@ -197,8 +197,11 @@ profile leaves speech blocked.
 call lifecycle with its documented 1 MHz/8 kHz, 125-clock COBBA-GJP PCM bus.
 It requires non-silent bidirectional media, impaired-frame concealment and
 recovery, FACCH stealing, SACCH coexistence, exact active-call save/load replay
-and physical End teardown. It does not claim an analogue microphone or
-receiver route.
+and physical End teardown. That gate does not itself require analogue host
+audio. `make verify-5210-radio-physical-duplex` separately uses the
+NSM-5 schematic and troubleshooting component chains to isolate host capture
+on COBBA MIC2 and playback on EAR; protocol/UI injection or acoustic loopback
+cannot satisfy it.
 `make verify-radio-call-state-roundtrip` additionally saves during the stable
 speech interval under both v6.00 and independently relocated v5.01, records
 two seconds of DSP/network media evolution, restores the save, and records the

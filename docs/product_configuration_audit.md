@@ -240,5 +240,10 @@ NSM-5 is independently documented by Nokia's *NSM-5 System Module*, issue 1,
 Its COBBA-GJP derives 1 MHz `PCMDClk` from 13 MHz / 13 and 8 kHz `PCMSClk`
 by /125, carrying a sign-extended 13-bit sample in a 16-bit serial word. The
 NSM-5 profile therefore owns the same numeric bus shape through independent
-primary evidence; it does not inherit NHM-5 firmware semantics or analogue
-routing.
+primary evidence; it does not inherit NHM-5 firmware semantics. The matching
+troubleshooting guide and DF7 schematic independently tie the internal
+microphone fault chain to MIC2P/MIC2N and the receiver fault chain to
+EARP/EARN. Those routes use neutral host gains because no NSM-5 gain contract
+has been recovered. Its troubleshooting test-point table's conflicting
+512-kHz/direction label is retained as a source discrepancy, not merged into
+the explicit system-module divider contract.

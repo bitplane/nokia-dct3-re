@@ -120,8 +120,19 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   sample in a 16-bit word. The coherent gate proves bidirectional GSM-FR,
   non-silent downlink, FACCH stealing, degraded-frame concealment, SACCH
   coexistence, exact active-call save/load replay and physical End teardown.
-  The fitted analogue microphone and receiver selections remain unproved, so
-  physical host duplex is not promoted.
+  Nokia's matching troubleshooting guide traces the internal microphone
+  components `R268/C274/C263/C278/C262` to COBBA MIC2P/MIC2N and the receiver
+  components `C292/C291/L272/L271` to EARP/EARN. Consequently,
+  `make verify-5210-radio-physical-duplex` can require isolated host capture
+  and playback through those exact routes: all 250 microphone blocks reach the
+  network non-silently and the captured receiver output contains a sustained
+  1 kHz downlink. Analogue gains remain neutral rather than guessed.
+
+The troubleshooting test-point table labels `PCMDCLK` as 512 kHz and reverses
+its documented direction, conflicting with both the system-module divider
+description and circuit diagram. The profile follows the explicit COBBA-GJP
+13 MHz / 13 and /125 architecture; the conflicting test-point label is not
+silently combined with it.
 - `make verify-5210-radio-outgoing-call-lifecycle` physically enters
   `5551234`, starts CM Service and emits the firmware's called-party SETUP. It
   then proves Call Proceeding, one traffic assignment, Alerting, Connect,

@@ -744,6 +744,11 @@ constexpr nokia_product_config make_5210_config()
 	result.cobba_pcm.msb_first = true;
 	result.cobba_pcm.data_edge =
 			nokia_mad2_pcm_device::clock_edge::falling;
+	// NSM-5 troubleshooting issue 1 02/2002 traces the internal microphone
+	// through R268/C274/C263/C278/C262 to MIC2P/MIC2N, and the receiver through
+	// C292/C291/L272/L271 to EARP/EARN. Gains remain neutral until recovered.
+	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	result.cobba_hle_voice.output = nokia_cobba_device::ear;
 	result.ccont_board = ADC_5210;
 	result.display = DISPLAY_5210;
 	return result;
@@ -2940,6 +2945,11 @@ void nokia_dct3_state::noki3210(machine_config &config)
 void nokia_dct3_state::noki5210(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
+	// NSM-5's fitted internal microphone and receiver terminate on COBBA
+	// MIC2P/MIC2N and EARP/EARN respectively. Keep host routes product-local.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(PRODUCT_5210);
 }
 
