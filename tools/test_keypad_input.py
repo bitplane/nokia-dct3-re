@@ -47,8 +47,10 @@ class KeypadInputTest(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text()
         target = makefile.split("verify-2100-interactive:", 1)[1].split("\n\n", 1)[0]
         self.assertIn("tools/make_2100_pmm_profile.py", target)
-        self.assertIn("NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5", target)
+        self.assertIn("NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,select", target)
         self.assertIn("NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000", target)
+        self.assertIn("NOKIA_DCT3_POST_READY_KEY_DURATION_MS=50", target)
+        self.assertIn("NOKIA_DCT3_POST_READY_KEY_GAP_MS=100", target)
         self.assertIn("SECONDS=15", target)
         self.assertIn("kbgpio-mask-write: value=20", target)
         self.assertNotIn("space:write_", target)

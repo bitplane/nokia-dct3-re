@@ -153,7 +153,7 @@
     {
       "id": "nam2_donor_fixture_interactive_mmi", "owner": "nam2_firmware", "status": "satisfied",
       "predicate": "A bounded donor-derived product-state fixture reaches an interactive Nokia 2100 v5.84 MMI through organic device and firmware paths",
-      "current": "With CCONT selector 2 modeled as an ordinary charged-pack sample, firmware leaves its named charging-only lifecycle, writes keypad mask 0x20, paints the Security code editor and accepts physical digit presses through the five-row matrix. The fixture changes external flash/product data and board ADC input only; it does not write firmware RAM, post RTOS messages or force scheduler state. make verify-2100-interactive gates the unmask, five key presses and exact edited frame. Security verification and idle settlement are not claimed.",
+      "current": "With CCONT selector 2 modeled as an ordinary charged-pack sample, firmware leaves its named charging-only lifecycle, writes keypad mask 0x20, paints the Security code editor and accepts physical input through the five-row matrix. A bounded 50 ms press/100 ms gap sequence delivers all five digits of 12345 plus Navi before the keypad-active interval closes. Firmware completes the decision and paints Wrong code, proving the organic reject lifecycle. The fixture changes external flash/product data and board ADC input only; it does not write firmware RAM, post RTOS messages or force scheduler state. Matching v5.84 verifier/product state remains unavailable, so acceptance and idle settlement are not claimed.",
       "evidence": ["docs/2100_bringup.md", "Makefile"]
     }
   ]

@@ -743,7 +743,7 @@
     {
       "id": "nam2_identity_block_has_single_byte_lock_disable", "status": "disproven",
       "hypothesis": "One independently selectable byte in the checksum-protected NAM-2 v5.21 identity/security block disables the v5.84 startup security editor",
-      "conclusion": "A bounded census changed each of the 281 bytes before the block checksum independently, recomputed the checksum and booted v5.84 with otherwise identical hardware inputs. Every variant reached the exact same security editor. The prior Wrong code result was also invalid evidence because its early fixture dropped the first digit and entered only 2345. The visible 123450 BCD field remains a candidate credential, but idle requires a multi-field verifier contract, another product-state record or matching v5.84 PMM rather than a one-byte lock toggle.",
+      "conclusion": "A bounded census changed each of the 281 bytes before the block checksum independently, recomputed the checksum and booted v5.84 with otherwise identical hardware inputs. Every variant reached the exact same security editor. Correcting the input cadence then delivered all five digits of 12345 plus Navi before firmware masked the matrix; v5.84 completed the transaction and painted Wrong code. Three further fixtures changed the donor BCD field to 00000, 11111 and 54321, repaired the checksum and physically submitted the matching value; all produced the identical rejection frame. The three-byte credential is therefore insufficient without version-matched multi-field verifier/product state.",
       "evidence": ["docs/2100_bringup.md", "tools/make_2100_pmm_profile.py"]
     }
   ]

@@ -10,9 +10,10 @@ and completes its physical M2BUS terminal startup exchange. The compact type-74
 completion clears the initial `CONTACT SERVICE` frame. A checksum-corrected,
 v5.21-derived product-state fixture lets v5.84 finish its application batches,
 leave the charger-wait lifecycle and present an interactive security editor.
-The donor stores the ordinary BCD candidate `12 34 50` (`12345`). Entering it
-reliably fills the editor, but neither proves acceptance nor reaches idle. The
-security decision and subsequent MMI lifecycle are the current frontier.
+The donor stores the ordinary BCD candidate `12 34 50` (`12345`). A correctly
+timed physical entry and Navi submission completes the editor transaction and
+v5.84 rejects it with `Wrong code!`. The rejection proves the complete input
+and decision lifecycle, but not an accepted credential or idle settlement.
 
 This is a bounded interactive promotion, not a default boot profile.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
@@ -187,22 +188,28 @@ an inherited or transposed sibling-handset layout. The identical
 v5.84/v5.21 ROM key maps at flash offsets `0x13e420/0x13dbf0` establish the
 NAM-2 numeric, star/hash, softkey and scroll positions independently of the
 3310 layout that the prototype previously inherited. The donor security block
-contains `12 34 50`, and entering `12345` fills all five editor positions. An earlier
-7-second fixture submitted before the editor was ready, dropped the first digit,
-and therefore entered only `2345`; its rejection was not evidence about the
-donor credential. The delayed fixture protects physical delivery of all five
-digits, while the unchanged editor records the open decision problem. A bounded
+contains `12 34 50`. The editor is available only during a bounded startup
+interval: the former 220 ms key cadence let that interval close before all
+digits and Navi were scanned. A 50 ms press and 100 ms gap delivers `12345`
+plus Navi before firmware masks the matrix, and firmware then paints
+`Wrong code!`. This is a real v5.84 rejection of the v5.21-derived security
+state, not the earlier incomplete-input artifact. A bounded
 checksum-correct brute-force census changed each of the 281 non-checksum bytes
 in the recovered identity block independently. Every variant reached the same
 editor, proving there is no independent one-byte lock-disable selector in that
-block; multi-field semantics or another product-state record own the decision.
+block. Three additional fixtures changed the visible BCD credential to `00000`,
+`11111`, and `54321`, repaired the checksum, and physically submitted the
+corresponding value; all produced the identical rejection frame. The decision
+therefore depends on version-bound multi-field verifier state or another
+product-state record, not that three-byte field alone.
 `make verify-2100-interactive` reproduces this path without firmware RAM or
 scheduler injection.
 
 The version-mismatched donor remains a diagnostic input rather than a
-distributable v5.84 product profile. The visible BCD value is a strong candidate,
-not proof of v5.84's verifier contract. Reaching idle requires decoding that
-contract or obtaining matching v5.84 product state. The supplied archive
+distributable v5.84 product profile. The visible BCD value is disproven as a
+sufficient v5.84 credential under the donor state. Reaching idle requires
+matching v5.84 verifier/product state; inventing a replacement record from the
+rejection branch would be state forcing. The supplied archive
 `2100sharp.pmm` is also not v5.84 PMM data:
 it consists of 256 nine-byte flasher headers followed by 0x2000-byte payload
 chunks, and stripping those headers produces the byte-identical v5.21 Sharp

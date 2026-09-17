@@ -130,7 +130,7 @@ ORACLE_5210_USSD_RAW_SHA ?= db9fb15970ea4c4a833c19c133030955305ade650c48f25c37ec
 ORACLE_3330_DSP_MISSING_SHA ?= 7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d1024ab91c1e55c1f8e
 ORACLE_3410_DSP_MISSING_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 ORACLE_2100_POST_SERVICE_SHA ?= 28b1f0c642a34dfcf5206859ced058646b115c908d0b05b5ef6201f796180c21
-ORACLE_2100_SECURITY_INPUT_SHA ?= 8e4f1885a0c4cdc31d3e15b6a685007ccf8db31b1ee27893b2f2086c793adf26
+ORACLE_2100_SECURITY_REJECT_SHA ?= 2b8b3e2b6cd7cfd8f6066bd98e8a996750aee9c056e40faeb8235a36df5d8f92
 
 # The acquired virgin NHM-6 PMM legitimately requests its stored 12345 phone
 # code, then a time and date. These are physical keypad transactions through
@@ -856,14 +856,14 @@ verify-2100-interactive: normalize-2100 build
 	@rm -f "$(RUN_NVRAM_DIR)/noki2100/sim_card"
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki2100 BIOS=584e \
 		RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) SECONDS=15 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,select NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=50 NOKIA_DCT3_POST_READY_KEY_GAP_MS=100'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	@grep -q 'kbgpio-mask-write: value=20' $(RUN_DIR)/error.log
-	@for key in 1 2 3 4 5; do grep -q "input-press: .* name=$$key" $(RUN_DIR)/error.log; done
+	@for key in 1 2 3 4 5 select; do grep -q "input-press: .* name=$$key" $(RUN_DIR)/error.log; done
 	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 		test -n "$$f" || { echo "2100 interactive: no LCD frame"; exit 1; }; \
-		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_2100_SECURITY_INPUT_SHA)
-	@echo 'NAM-2 donor-profile security editor and physical keypad input: PASS'
+		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_2100_SECURITY_REJECT_SHA)
+	@echo 'NAM-2 donor-profile security verifier rejection lifecycle: PASS'
 
 smoke-3330e: normalize-3330
 	@$(MAKE) --no-print-directory smoke PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
