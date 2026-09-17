@@ -192,6 +192,11 @@ impairment, FACCH/BFI recovery, SACCH coexistence and exact active-call
 save-state replay before the same physical teardown. The fixture can enable
 only the product-owned PCM component; removing or invalidating its typed
 profile leaves speech blocked.
+`make verify-3330-radio-physical-duplex` and
+`make verify-3330-radio-outgoing-physical-duplex` add isolated host capture
+and playback after a separate physical PMM-provisioning run. The generic
+runner must reuse that firmware-owned NVRAM; it cannot replace the security
+and time editors with state injection.
 
 `make verify-5210-radio-media-resilience` independently composes the NSM-5
 call lifecycle with its documented 1 MHz/8 kHz, 125-clock COBBA-GJP PCM bus.

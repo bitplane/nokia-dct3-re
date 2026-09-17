@@ -50,7 +50,11 @@ CHECKPOINTS = (
      r"GSM service uplink sapi=0 pd=03 message=08 length=11"),
     ("Alerting", ALERTING),
     ("traffic configuration",
-     r"TX packet type=02 payload=20 .*data=041202000271012fc1"),
+     # The same v4.50 image organically emits selector byte 0x12 in the
+     # unthrottled lifecycle gate and 0x00 when the host-audio stream paces
+     # execution. The remaining channel descriptor is invariant and the peer
+     # consumes only its evidenced channel-id field at byte eight.
+     r"TX packet type=02 payload=20 .*data=04(?:00|12)02000271012fc1"),
     ("traffic SABM", TRAFFIC_SABM),
     ("traffic UA", TRAFFIC_UA),
     ("Assignment Complete", ASSIGNMENT_COMPLETE),
@@ -62,8 +66,8 @@ CHECKPOINTS = (
     ("Release Complete", RELEASE_COMPLETE),
     ("traffic release UA", TRAFFIC_RELEASE_UA),
     ("NHM-6 release transaction",
-     r"TX packet type=02 payload=20 .*"
-     r"data=04[0-9a-f]{2}02001117001a6000[0-9a-f]{4}0000001400000001"),
+     r"TX packet type=02 payload=20 .*data="
+     r"(?:04120200|04000000)1117001a6000[0-9a-f]{4}0000001400000001"),
     ("release confirmation", RELEASE_CONFIRMATION),
     ("speech release", r"wire=840a speech_control=040a"),
     ("idle PCH", IDLE_PCH),

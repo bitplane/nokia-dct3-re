@@ -19,6 +19,8 @@ post_ready_duration_ms=${POST_READY_DURATION_MS:-220}
 post_ready_gap_ms=${POST_READY_GAP_MS:-280}
 read -r -a pcm_check_args <<< "${PCM_CHECK_ARGS:-}"
 host_media_port=${HOST_MEDIA_PORT:-}
+preserve_nvram=${PRESERVE_NVRAM:-0}
+run_nvram_dir=${RUN_NVRAM_DIR:-}
 input_sink_name="nokia_dct3_uplink_$$"
 output_sink_name="nokia_dct3_downlink_$$"
 input_module_id=
@@ -143,9 +145,16 @@ if [[ -n "$host_media_port" ]]; then
 	wait "$mame_pid"
 	mame_pid=
 else
+	nvram_args=()
+	if [[ "$preserve_nvram" == 1 ]]; then
+		[[ -n "$run_nvram_dir" ]] ||
+			{ echo "PRESERVE_NVRAM=1 requires RUN_NVRAM_DIR" >&2; exit 1; }
+		nvram_args=(PRESERVE_NVRAM=1 RUN_NVRAM_DIR="$run_nvram_dir")
+	fi
 	make --no-print-directory run JOBS=4 PHONE="$phone" BIOS="$bios" ROM="$rom" \
 		RUN_DIR="$run_dir" SECONDS="$run_seconds" \
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
+		"${nvram_args[@]}" \
 		RUN_EXTRA_ARGS="-cfg_directory ../$fixture -sound pulse -throttle" \
 		RUN_ENV="PULSE_SOURCE=$input_sink_name.monitor NOKIA_DCT3_POST_READY_KEYS=$post_ready_keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$post_ready_delay_ms NOKIA_DCT3_POST_READY_KEY_DURATION_MS=$post_ready_duration_ms NOKIA_DCT3_POST_READY_KEY_GAP_MS=$post_ready_gap_ms"
 fi

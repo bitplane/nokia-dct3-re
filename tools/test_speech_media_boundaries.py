@@ -156,6 +156,28 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("microphone_gain_db", nhm5)
         self.assertNotIn("output_gain_db", nhm5)
 
+    def test_nhm6_uses_documented_analogue_routes_without_guessed_gains(self):
+        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        nhm6 = phone[
+            phone.index("constexpr nokia_product_config make_3330_config()"):
+            phone.index("constexpr nokia_product_config make_3410_config()")
+        ]
+        self.assertIn(
+            "cobba_hle_voice.microphone = nokia_cobba_device::mic2", nhm6
+        )
+        self.assertIn(
+            "cobba_hle_voice.output = nokia_cobba_device::ear", nhm6
+        )
+        self.assertNotIn("microphone_gain_db", nhm6)
+        self.assertNotIn("output_gain_db", nhm6)
+
+        machine = phone[
+            phone.index("void nokia_dct3_state::noki3330"):
+            phone.index("void nokia_dct3_state::noki3210")
+        ]
+        self.assertIn('MICROPHONE(config, "microphone", 1)', machine)
+        self.assertIn("m_cobba->add_route", machine)
+
     def test_nhm2_uses_independent_speech_and_digital_pcm_contracts(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
         nhm2 = phone[

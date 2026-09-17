@@ -266,8 +266,19 @@ repeats the preserved-PMM call with independent uplink/downlink burst
 impairments and an active-call save/load replay. It requires exact replay of
 the digital speech records, handset and network concealment, FACCH stealing in
 both directions, four-phase SACCH/TF reservation, subsequent good-frame
-recovery, physical End and clean PCH return. This promotes internal media only;
-no host microphone or receiver route is enabled.
+recovery, physical End and clean PCH return.
+
+Nokia's combined NHM-2/5/6 repair guide independently assigns NHM-6 the
+common N100 microphone chain through `L402/C120` and receiver chain through
+`R119/R120`; the matching COBBA schematic identifies MIC2 and EAR endpoints.
+`make verify-3330-radio-physical-duplex` and
+`make verify-3330-radio-outgoing-physical-duplex` provision the ordinary PMM,
+cold-boot it, and then prove isolated host microphone and receiver audio in
+both call directions. Pulse-paced execution organically selects channel-change
+prefixes `04 00`/`04 00 00 00` where the unthrottled lifecycle selects
+`04 12`/`04 12 02 00`; the complete descriptors and peer-consumed channel ID
+remain invariant, and the checker accepts only those two observed forms.
+Analogue gains remain neutral rather than guessed.
 
 `make verify-3410-radio-incoming-call-lifecycle` applies the same standards-
 level session and LAPDm owners to NHM-2 while retaining its packet grammar and

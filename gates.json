@@ -8026,6 +8026,32 @@
       ]
     },
     {
+      "name": "verify-3330-radio-physical-duplex",
+      "prerequisites": [
+        "normalize-3330"
+      ],
+      "variables": {},
+      "unstructured": "physical audio after product-owned PMM provisioning",
+      "recipe": [
+        "\t@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'",
+        "\t@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0",
+        "\t$(DCT3_RUN_3330) ROM=roms/noki3330/3330f450e.fls PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_DIR=$(RUN_DIR)_call FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=22 POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter POST_READY_DELAY_MS=6000 POST_READY_DURATION_MS=220 POST_READY_GAP_MS=280 AUDIO_CONTROL_CHECKER=tools/radio_3330_incoming_call_boundary_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh"
+      ]
+    },
+    {
+      "name": "verify-3330-radio-outgoing-physical-duplex",
+      "prerequisites": [
+        "normalize-3330"
+      ],
+      "variables": {},
+      "unstructured": "physical audio after product-owned PMM provisioning",
+      "recipe": [
+        "\t@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'",
+        "\t@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0",
+        "\t$(DCT3_RUN_3330) ROM=roms/noki3330/3330f450e.fls PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_DIR=$(RUN_DIR)_call FIXTURE=fixtures/radio_outgoing_call RUN_SECONDS=32 POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter POST_READY_DELAY_MS=6000 POST_READY_DURATION_MS=70 POST_READY_GAP_MS=200 AUDIO_CONTROL_CHECKER=tools/radio_outgoing_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh"
+      ]
+    },
+    {
       "name": "verify-5210-radio-outgoing-physical-duplex",
       "prerequisites": [],
       "variables": {},

@@ -234,9 +234,9 @@ profiles even though their values match NHM-5. Neither inherits NHM-5's
 analogue routes or gains. NHM-2's fitted topology is now bounded by Nokia's
 combined NHM-2/5/6 repair guide: its common N100 microphone chain runs through
 `L402/C120` and its receiver through `R119/R120`. The matching COBBA schematic
-identifies MIC2 and EAR as the endpoints, and independent incoming/outgoing
-physical-duplex gates validate them. NHM-6 remains unpromoted until its own
-host-audio gates pass; neither product inherits analogue gains. The primary
+identifies MIC2 and EAR as the endpoints. Independent incoming/outgoing
+physical-duplex gates now validate those routes on both NHM-2 and NHM-6;
+neither product inherits analogue gains. The primary
 source is Nokia's *NHM-2/5/6 Repairhints*, version 4.0, 20.11.2002
 ([archived copy](https://manualmachine.com/nokia/3310/8180135-service-manual/)).
 

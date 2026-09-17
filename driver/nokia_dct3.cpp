@@ -550,6 +550,12 @@ constexpr nokia_product_config make_3330_config()
 	result.cobba_pcm.word_clocks = 16;
 	result.cobba_pcm.msb_first = true;
 	result.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
+	// The combined NHM-2/5/6 repair guide assigns NHM-6 the common N100
+	// microphone path through L402/C120 and receiver path through R119/R120.
+	// The matching COBBA schematic terminates them on MIC2P/MIC2N and
+	// EARP/EARN.  Keep gains neutral pending product-specific measurements.
+	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	result.cobba_hle_voice.output = nokia_cobba_device::ear;
 	result.ccont_board = ADC_STANDARD;
 	return result;
 }
@@ -2917,6 +2923,11 @@ void nokia_dct3_state::dct3_32mbit_flash_base(machine_config &config)
 void nokia_dct3_state::noki3330(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
+	// NHM-6's fitted microphone and receiver use the common N100 MIC2/EAR
+	// chains.  These neutral host routes express connectivity only.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(PRODUCT_3330);
 }
 

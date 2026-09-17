@@ -18,6 +18,8 @@ def trace(omit=None):
                 "[0-9a-f]*", "").replace("[0-9a-f]{18}", "000000000000000000")
                 .replace("[0-9a-f]{4}", "0000")
                 .replace("[0-9a-f]{2}", "00").replace("[01]", "0")
+                .replace("(?:00|12)", "12")
+                .replace("(?:04120200|04000000)", "04120200")
                 .replace("\\", ""))
     return "\n".join(lines)
 
@@ -29,6 +31,11 @@ class Radio3330IncomingCallBoundaryCheckTest(unittest.TestCase):
     def test_rejects_missing_release_transaction(self):
         with self.assertRaisesRegex(ValueError, "release transaction"):
             verify(trace("NHM-6 release transaction"))
+
+    def test_accepts_physically_observed_paced_selector(self):
+        verify(trace()
+               .replace("041202000271012fc1", "040002000271012fc1")
+               .replace("041202001117001a", "040000001117001a"))
 
     def test_rejects_duplicate_connect(self):
         text = trace()
