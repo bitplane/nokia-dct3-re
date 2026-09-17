@@ -320,6 +320,12 @@ constexpr nokia_gensio_device::wiring_contract GENSIO_NSE1 = {
 constexpr nokia_gensio_device::wiring_contract GENSIO_NSM5 = {
 	0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true
 };
+// NAM-1 v5.11 independently writes control 0x22 at 0x2d, transfers CCONT
+// bytes through 0x2c and polls 0x6d after each byte. Since bit 2 remains
+// clear, receive-ready must follow the byte write rather than that bit.
+constexpr nokia_gensio_device::wiring_contract GENSIO_NAM1 = {
+	0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true
+};
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
@@ -823,6 +829,13 @@ constexpr nokia_product_config make_2100_config()
 	return result;
 }
 
+constexpr nokia_product_config make_3610_config()
+{
+	nokia_product_config result = make_conservative_config();
+	result.gensio_wiring = GENSIO_NAM1;
+	return result;
+}
+
 constexpr nokia_product_config PRODUCT_3210 = make_3210_config();
 constexpr nokia_product_config PRODUCT_3310 = make_3310_config();
 constexpr nokia_product_config PRODUCT_3330 = make_3330_config();
@@ -831,6 +844,7 @@ constexpr nokia_product_config PRODUCT_5110 = make_5110_config();
 constexpr nokia_product_config PRODUCT_6110 = make_6110_config();
 constexpr nokia_product_config PRODUCT_5210 = make_5210_config();
 constexpr nokia_product_config PRODUCT_2100 = make_2100_config();
+constexpr nokia_product_config PRODUCT_3610 = make_3610_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
 constexpr nokia_product_config PRODUCT_8XXX =
 		make_conservative_config({ 4, 0x10 });
@@ -3009,7 +3023,7 @@ void nokia_dct3_state::noki3610(machine_config &config)
 	// decode. All peripheral contracts remain conservative until they are
 	// established on this firmware rather than inherited from another handset.
 	dct3_32mbit_flash_base(config);
-	apply_product_config(PRODUCT_DEFAULT);
+	apply_product_config(PRODUCT_3610);
 }
 
 void nokia_dct3_state::noki3210(machine_config &config)
