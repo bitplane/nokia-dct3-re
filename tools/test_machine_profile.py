@@ -127,6 +127,7 @@ class MachineProfileTest(unittest.TestCase):
             "constexpr nokia_product_config PRODUCT_3210",
         )
         self.assertIn("result.gensio_wiring = GENSIO_NAM1;", product)
+        self.assertIn("result.display = DISPLAY_3610;", product)
         self.assertNotIn("result.dsp_service = true", product)
         self.assertNotIn("result.simi_controller = true", product)
 

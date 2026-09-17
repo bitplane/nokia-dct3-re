@@ -131,6 +131,7 @@ ORACLE_3330_DSP_MISSING_SHA ?= 7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d102
 ORACLE_3410_DSP_MISSING_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 ORACLE_2100_POST_SERVICE_SHA ?= 28b1f0c642a34dfcf5206859ced058646b115c908d0b05b5ef6201f796180c21
 ORACLE_2100_SECURITY_REJECT_SHA ?= 2b8b3e2b6cd7cfd8f6066bd98e8a996750aee9c056e40faeb8235a36df5d8f92
+ORACLE_3610_CONTACT_SERVICE_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 
 # The acquired virgin NHM-6 PMM legitimately requests its stored 12345 phone
 # code, then a time and date. These are physical keypad transactions through
@@ -251,7 +252,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
-.PHONY: normalize-3610 smoke-3610
+.PHONY: normalize-3610 smoke-3610 verify-3610-frontier
 .PHONY: smoke-2100
 .PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
@@ -326,6 +327,7 @@ help:
 	@echo "make call-bridge    answer and loop GSM-FR for a host-adapter MAME run"
 	@echo "make smoke-3310-639 bounded local 3310 v6.39 portability spike"
 	@echo "make smoke-2100 bounded local NAM-2 v5.84 PPM-E bring-up"
+	@echo "make verify-3610-frontier reproduce the NAM-1 v5.11 CONTACT SERVICE boundary"
 	@echo "make smoke-5210e bounded local 5210 v5.40 PPM E portability spike"
 	@echo "make verify-5210-frontier boot the 5210 v5.40 profile to standby"
 	@echo "make verify-5210-menu exercise the 5210 physical Menu key"
@@ -544,6 +546,15 @@ normalize-3610:
 
 smoke-3610: normalize-3610
 	@$(MAKE) --no-print-directory smoke PHONE=noki3610 BIOS=511e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
+
+verify-3610-frontier: normalize-3610 build
+	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
+		RUN_DIR=$(RUN_DIR) SECONDS=3
+	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)/boot_summary.txt --reject-fiq0
+	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+		test -n "$$f" || { echo "3610 frontier: no LCD frame"; exit 1; }; \
+		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_3610_CONTACT_SERVICE_SHA)
+	@echo 'NAM-1 GENSIO/CCONT and 96x65 display frontier: PASS'
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \

@@ -297,6 +297,11 @@ constexpr display_geometry_contract DISPLAY_3410 = {
 constexpr display_geometry_contract DISPLAY_2100 = {
 	96, 72, 96, 65, true
 };
+// NAM-1 v5.11 independently writes nine banks of 96 bytes and renders its
+// text in reverse segment order under the non-mirrored controller view.
+constexpr display_geometry_contract DISPLAY_3610 = {
+	96, 72, 96, 65, true
+};
 constexpr display_geometry_contract DISPLAY_5210 = {
 	84, 48, 84, 48, true
 };
@@ -833,6 +838,7 @@ constexpr nokia_product_config make_3610_config()
 {
 	nokia_product_config result = make_conservative_config();
 	result.gensio_wiring = GENSIO_NAM1;
+	result.display = DISPLAY_3610;
 	return result;
 }
 

@@ -155,6 +155,12 @@
       "predicate": "A bounded donor-derived product-state fixture reaches an interactive Nokia 2100 v5.84 MMI through organic device and firmware paths",
       "current": "With CCONT selector 2 modeled as an ordinary charged-pack sample, firmware leaves its named charging-only lifecycle, writes keypad mask 0x20, paints the Security code editor and accepts physical input through the five-row matrix. A bounded 50 ms press/100 ms gap sequence delivers all five digits of 12345 plus Navi before the keypad-active interval closes. Firmware completes the decision and paints Wrong code, proving the organic reject lifecycle. The fixture changes external flash/product data and board ADC input only; it does not write firmware RAM, post RTOS messages or force scheduler state. Matching v5.84 verifier/product state remains unavailable, so acceptance and idle settlement are not claimed.",
       "evidence": ["docs/2100_bringup.md", "Makefile"]
+    },
+    {
+      "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
+      "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
+      "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. The focused gate rejects soft resets and any DSP FIQ0 completion, so this is a display/CCONT frontier rather than a claimed service unlock.",
+      "evidence": ["docs/3610_bringup.md", "Makefile"]
     }
   ]
 }
