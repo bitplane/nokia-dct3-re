@@ -52,6 +52,13 @@ class MbusDeviceSplitTest(unittest.TestCase):
         self.assertIn("m_rx_ready = true", self.device)
         self.assertIn("tx_collision", self.device)
 
+    def test_peer_transfer_drives_the_sampled_idle_line(self):
+        source = self.device + self.header
+        self.assertIn("m_peer_tx_active", source)
+        self.assertIn("peer_byte_complete", source)
+        self.assertIn("m_peer_byte_timer->adjust(m_byte_delay)", self.device)
+        self.assertIn("m_peer_tx_active || m_tx_pending", self.device)
+
     def test_terminal_is_protocol_peer_not_controller_logic(self):
         source = self.terminal + self.terminal_header
         self.assertIn("Nokia M2BUS terminal", source)

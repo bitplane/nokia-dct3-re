@@ -17,7 +17,8 @@ constexpr u8 CTRL_TX_ENABLE = 0x20;
 constexpr u8 CTRL_RX_ENABLE = 0x40;
 constexpr u8 STATUS_TX_READY = 0x10;
 constexpr u8 STATUS_RX_READY = 0x20;
-constexpr u8 STATUS_LINE_IDLE = 0xc0;
+constexpr u8 STATUS_DATA_HIGH = 0x80;
+constexpr u8 STATUS_CLOCK_HIGH = 0x40;
 }
 
 nokia_mbus_device::nokia_mbus_device(
@@ -33,6 +34,7 @@ void nokia_mbus_device::device_start()
 {
 	m_trace = machine().options().verbose();
 	m_byte_timer = timer_alloc(FUNC(nokia_mbus_device::byte_complete), this);
+	m_peer_byte_timer = timer_alloc(FUNC(nokia_mbus_device::peer_byte_complete), this);
 	m_fiq3_timer = timer_alloc(FUNC(nokia_mbus_device::fiq3_event), this);
 	save_item(NAME(m_control));
 	save_item(NAME(m_status_latch));
@@ -41,6 +43,7 @@ void nokia_mbus_device::device_start()
 	save_item(NAME(m_rx_ready));
 	save_item(NAME(m_tx_ready));
 	save_item(NAME(m_tx_pending));
+	save_item(NAME(m_peer_tx_active));
 }
 
 void nokia_mbus_device::device_reset()
@@ -52,8 +55,10 @@ void nokia_mbus_device::device_reset()
 	m_rx_ready = false;
 	m_tx_ready = false;
 	m_tx_pending = false;
+	m_peer_tx_active = false;
 	m_trace_count = 0;
 	m_byte_timer->adjust(attotime::never);
+	m_peer_byte_timer->adjust(attotime::never);
 	m_fiq3_timer->adjust(attotime::never);
 }
 
@@ -62,7 +67,12 @@ u8 nokia_mbus_device::status() const
 	// Firmware writes the serial-counter field while acknowledging byte
 	// service, but reads zero at the completed-byte boundary. Echoing the write
 	// makes the ROM4 ISR re-enter its partial-byte/error path.
-	return STATUS_LINE_IDLE |
+	// Bit 6 is the sampled bus-clock/idle indication. Keep the data-line bit
+	// high in this byte-level model, but expose an occupied clock while either
+	// endpoint is shifting a character so firmware cannot start a second frame
+	// over its peer's transmission.
+	return STATUS_DATA_HIGH |
+			(m_peer_tx_active || m_tx_pending ? 0 : STATUS_CLOCK_HIGH) |
 			(m_tx_ready ? STATUS_TX_READY : 0) |
 			(m_rx_ready ? STATUS_RX_READY : 0);
 }
@@ -102,7 +112,9 @@ void nokia_mbus_device::write(offs_t offset, u8 data)
 			m_rx_ready = false;
 			m_tx_ready = false;
 			m_tx_pending = false;
+			m_peer_tx_active = false;
 			m_byte_timer->adjust(attotime::never);
+			m_peer_byte_timer->adjust(attotime::never);
 			m_fiq2_cb(0);
 		}
 		else
@@ -141,9 +153,16 @@ bool nokia_mbus_device::receive_byte(u8 data)
 		return false;
 	m_data = data;
 	m_rx_ready = true;
+	m_peer_tx_active = true;
+	m_peer_byte_timer->adjust(m_byte_delay);
 	trace_event("rx_ready", data);
 	m_fiq2_cb(1);
 	return true;
+}
+
+TIMER_CALLBACK_MEMBER(nokia_mbus_device::peer_byte_complete)
+{
+	m_peer_tx_active = false;
 }
 
 void nokia_mbus_device::fiq_mask_w(u8 old_mask, u8 new_mask)

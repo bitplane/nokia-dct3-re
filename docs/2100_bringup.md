@@ -69,7 +69,9 @@ contract is inherited merely because its values appear compatible.
   the byte boundary using the documented 2.5/3 ms idle periods and request-
   derived ACK fields. NAM-2 accepts both transport ACKs and organically emits
   `D0/05`; `make verify-2100-mbus` fixes that complete exchange as an acceptance
-  gate.
+  gate. Modeling peer-byte occupancy on status bit 6 also moves the first
+  accepted `D0/01` from 0.249605 s to 0.204747 s; the gate protects that
+  pre-210 ms phase as well as eventual packet order.
 - Closing M2BUS advances the first global-initializer predicate. The second
   predicate also passes; the third routine `0x2c9780` returns false because byte
   `0x10f206` is zero. The NAM-2 creation table at `0x330ef4` identifies

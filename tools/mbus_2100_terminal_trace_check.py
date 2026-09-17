@@ -8,15 +8,18 @@ from pathlib import Path
 
 PHONE = re.compile(
     r"mbus_terminal: phone_frame type=([0-9a-f]{2}) command=([0-9a-f]{2}) "
-    r"length=(\d+) sequence=([0-9a-f]{2})")
+    r"length=(\d+) sequence=([0-9a-f]{2}).* t=([0-9.]+)")
 TX = re.compile(r"mbus_terminal: tx_complete type=([0-9a-f]{2}) length=(\d+)")
 
 
 def check(text: str) -> None:
     events: list[tuple[str, str, str, int]] = []
+    first_registration_time: float | None = None
     for line in text.splitlines():
         if match := PHONE.search(line):
             events.append(("phone", match[1], match[2], int(match[3])))
+            if match.group(1, 2) == ("d0", "01") and first_registration_time is None:
+                first_registration_time = float(match[5])
         elif match := TX.search(line):
             events.append(("terminal", match[1], "", int(match[2])))
 
@@ -35,6 +38,10 @@ def check(text: str) -> None:
             raise SystemExit(
                 f"NAM-2 M2BUS exchange missing ordered event {expected}; "
                 f"observed {events[:20]}") from error
+    if first_registration_time is None or first_registration_time >= 0.210:
+        raise SystemExit(
+            "NAM-2 M2BUS registration missed the recovered pre-210ms bus phase; "
+            f"first D0/01 at {first_registration_time}")
 
 
 def main() -> None:

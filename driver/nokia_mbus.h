@@ -32,6 +32,7 @@ protected:
 
 private:
 	TIMER_CALLBACK_MEMBER(byte_complete);
+	TIMER_CALLBACK_MEMBER(peer_byte_complete);
 	TIMER_CALLBACK_MEMBER(fiq3_event);
 	void schedule_byte();
 	void trace_event(const char *event, u8 data = 0);
@@ -40,6 +41,7 @@ private:
 	devcb_write_line m_fiq2_cb;
 	devcb_write_line m_fiq3_cb;
 	emu_timer *m_byte_timer = nullptr;
+	emu_timer *m_peer_byte_timer = nullptr;
 	emu_timer *m_fiq3_timer = nullptr;
 	attotime m_byte_delay = attotime::from_hz(960); // 10 bits at 9,600 baud
 	attotime m_fiq3_period = attotime::from_ticks(10, 4231); // MADos FIQ_MBUSTIM: 423.1 Hz
@@ -50,6 +52,7 @@ private:
 	bool m_rx_ready = false;
 	bool m_tx_ready = false;
 	bool m_tx_pending = false;
+	bool m_peer_tx_active = false;
 	bool m_timer_clock_enabled = false;
 	bool m_trace = false;
 	u32 m_trace_count = 0;
