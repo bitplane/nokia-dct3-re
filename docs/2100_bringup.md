@@ -44,8 +44,8 @@ contract is inherited merely because its values appear compatible.
   through `0x40`, `0xc0`, `0xc4`, `0x84` and `0x80`, then the global initializer
   deliberately clears it at `0x2e1b18`. The instruction-equivalent 3210 routine
   at `0x29bc70` clears the corresponding bit, and an interactive 3210 settles
-  with that bit clear. A set bit is therefore not an application-readiness
-  requirement.
+  with that bit clear. The clear is therefore an intentional phase transition,
+  not proof that NAM-2 never requires the bit again.
 - The global initializer then evaluates seven predicates at `0x2f8396..0x2f83ca`
   and spins at `0x2f83e6` while any predicate is false. Before the terminal
   model, its first predicate `0x3003c8` returned zero.
@@ -82,6 +82,15 @@ contract is inherited merely because its values appear compatible.
   state block `0x10f1d8..0x10f207` zero: task 18 remains unstarted rather than
   failing a transaction after initialization. Its broader ownership remains
   unresolved.
+- Supervisor `0x2f80b6` contains the missing release explicitly. Its second
+  batch starts tasks 10, 11, 13, 12, 14, 19, 18, 15 and 16 through scheduler
+  entry `0x2ac3b0`. The coherent run takes the preceding failure branch at
+  `0x2f8290`: service byte `0x10ec50` is already 1, startup byte `0x10fea1` is
+  zero, and mode byte `0x10fd24` is 2, but helper `0x2e18a8` returns zero because
+  `0x13fdb3` bit 7 remains clear. In that case firmware publishes event
+  `0x187d`. This is now the sole mapped task-18 release prerequisite; it must be
+  followed to its organic service response rather than setting the bit or
+  starting the task directly.
 - The post-map class-`0x00`/command-`0x5f` `EXIT ANYSTATE` stream continues while
   the initializer spins. It is the already-classified periodic external-service
   channel, not proof that the missing task is advancing. A 120-second run still
@@ -105,8 +114,10 @@ The display, DSP bootstrap, service discovery, application registration, keypad
 wiring, MBUS controller, terminal timing, arbitration and complete startup
 exchange are established for v5.84. The next software boundary is the service-
 gated release of task 18: the task identity and readiness-report role are
-established, while the missing resume condition is not. That condition must be
-recovered before enabling another peer or SIM/radio behavior. Separately, two
+established, and the release is narrowed to the firmware-owned `0x187d` service
+request which must re-establish `0x13fdb3` bit 7. Its transport and reply remain
+unclassified. They must be recovered before enabling another peer or SIM/radio
+behavior. Separately, two
 external evidence inputs continue to bound
 product-state fidelity. The
 supplied v5.84 archive has no matching `0x3f0000..0x3fffff` EEPROM/PMM partition.
