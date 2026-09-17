@@ -29,13 +29,13 @@ The common service transport derives both D0 responses from that first packet:
 an unnotified correlation frame and a notified D0/04 completion. NAM-1 consumes
 them and emits four type-`0x70` setup blocks followed by the exact compact
 service-control request `0d00`. `make verify-3610-discovery` protects this
-request-derived exchange. No unsolicited application responder is enabled.
+request-derived exchange independently of the later application gate.
 
 The compact type-`0x74` echo of that exact request is consumed organically.
 Firmware then emits two type-`0x3c` blocks, eight type-`0x0d` blocks and the
 one-way type-`0x70` follow-up `0a09`. `make verify-3610-service-control`
-protects this complete observed transition. The external application remains
-disabled at this checkpoint.
+protects this complete observed transition independently of application
+registration.
 
 NAM-1 acknowledges peer registration sequence `0x42`, accepts channel-map
 sequence `0x43`, and then organically exercises channel `0x5f`. Its first
@@ -69,5 +69,9 @@ protocol, not inheritance from NAM-2.
 
 Identify the missing product-state/PMM contract that retains the diagnostic
 service mode after the terminal exchange.
-Keypad, SIM, persistent storage, external-service and radio contracts remain
-disabled until product-local evidence establishes each one.
+Keypad scanning, SIMI initialization and radio startup remain dormant at this
+frontier. Persistent storage is the first unresolved input because the supplied
+MCU/PPM package ends at `0x350000` inside its 4 MiB flash region and contains no
+matching product-state tail. Do not enable SIM or radio peers merely because
+later handsets share those devices; first establish which NAM-1 product-state
+validation keeps the firmware in diagnostic service mode.
