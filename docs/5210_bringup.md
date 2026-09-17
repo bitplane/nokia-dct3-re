@@ -126,7 +126,10 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   `make verify-5210-radio-physical-duplex` can require isolated host capture
   and playback through those exact routes: all 250 microphone blocks reach the
   network non-silently and the captured receiver output contains a sustained
-  1 kHz downlink. Analogue gains remain neutral rather than guessed.
+  1 kHz downlink. `make verify-5210-radio-outgoing-physical-duplex` repeats
+  that proof after physical number entry and Send, so neither call direction
+  is inferred from the other. Analogue gains remain neutral rather than
+  guessed.
 
 The troubleshooting test-point table labels `PCMDCLK` as 512 kHz and reverses
 its documented direction, conflicting with both the system-module divider
