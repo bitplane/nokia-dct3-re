@@ -8,7 +8,9 @@ bootstrap, acknowledges DSP service command 4, completes the type-05 external-
 service discovery transaction, accepts a class-0x40 application registration,
 and completes its physical M2BUS terminal startup exchange. The compact type-74
 completion clears the initial `CONTACT SERVICE` frame. The current frontier is
-the blank firmware-owned frame that follows registration.
+the blank firmware-owned frame that follows registration. The next task batch is
+held back because the supplied v5.84 package has an erased product-state
+partition; this is now measured at the firmware's own validation branch.
 
 This is a bounded portability frontier, not a boot or interactive promotion.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
@@ -39,13 +41,8 @@ contract is inherited merely because its values appear compatible.
   alone therefore does not supply a cross-version service contract.
 - NAM-2 v5.84 publishes its command-`0x64` application status only after accepting
   the peer registration. The constructor at `0x258ce0` derives its status byte
-  from RAM `0x13fdb3` bit 7.
-- Runtime write observation closes that bit's lifecycle: initialization sets it
-  through `0x40`, `0xc0`, `0xc4`, `0x84` and `0x80`, then the global initializer
-  deliberately clears it at `0x2e1b18`. The instruction-equivalent 3210 routine
-  at `0x29bc70` clears the corresponding bit, and an interactive 3210 settles
-  with that bit clear. The clear is therefore an intentional phase transition,
-  not proof that NAM-2 never requires the bit again.
+  from RAM `0x13fdb3` bit 6. Earlier notes called this bit 7 by reading
+  `lsrs #7` as a direct index; the following carry branch tests original bit 6.
 - The global initializer then evaluates seven predicates at `0x2f8396..0x2f83ca`
   and spins at `0x2f83e6` while any predicate is false. Before the terminal
   model, its first predicate `0x3003c8` returned zero.
@@ -87,10 +84,23 @@ contract is inherited merely because its values appear compatible.
   entry `0x2ac3b0`. The coherent run takes the preceding failure branch at
   `0x2f8290`: service byte `0x10ec50` is already 1, startup byte `0x10fea1` is
   zero, and mode byte `0x10fd24` is 2, but helper `0x2e18a8` returns zero because
-  `0x13fdb3` bit 7 remains clear. In that case firmware publishes event
-  `0x187d`. This is now the sole mapped task-18 release prerequisite; it must be
-  followed to its organic service response rather than setting the bit or
-  starting the task directly.
+  `0x13fdb3` bit 6 has been cleared. The same shift/carry audit establishes that
+  the helper's preceding spin tests original bit 2, not bit 3.
+- Task 2's initializer at `0x256720` owns the readiness-byte transition. It sets
+  bit 6, reads two product-state records through `0x306e78`, and retains bit 6
+  only when the live computed reference equals record `0x0270` and the reference
+  or record `0x0190` is nonzero. The coherent erased-tail run computes `0x4cb2`
+  while both records read `0xffff`, so firmware deliberately clears bit 6 at
+  `0x25689e`.
+- Timer slot `0x18` belongs to task 2: its runtime descriptor names owner task 2,
+  state 2 and delay `0x007d`. Expiry is delivered through task 2's ordinary
+  timer/message queue. It is neither event `0x187d`, a service request, nor
+  evidence of a supervisor retry.
+- The apparent timing race is therefore closed. The supervisor resumes task 2,
+  which performs the product-state check before control returns; delaying DSP
+  service completion changes ordering but does not start task 18. A firmware
+  state seed is equally invalid because task 2 overwrites the byte from the
+  product-state result.
 - The post-map class-`0x00`/command-`0x5f` `EXIT ANYSTATE` stream continues while
   the initializer spins. It is the already-classified periodic external-service
   channel, not proof that the missing task is advancing. A 120-second run still
@@ -101,7 +111,7 @@ contract is inherited merely because its values appear compatible.
   is intentionally ignored by firmware. This is evidence that application/MMI
   initialization has not completed, not a keypad-device failure.
 - Primary NAM-2 service material specifies 0.5 V at BSI. Modeling the corresponding
-  CCONT sample (`0x0b6` with a 2.8 V reference) changes neither bit 7 nor the blank
+  CCONT sample (`0x0b6` with a 2.8 V reference) changes neither bit 6 nor the blank
   frontier, excluding BSI alone as the missing readiness condition.
 
 The runtime GENSIO observation supersedes the conservative static census's zero
@@ -112,27 +122,28 @@ therefore established bounded absence only.
 
 The display, DSP bootstrap, service discovery, application registration, keypad
 wiring, MBUS controller, terminal timing, arbitration and complete startup
-exchange are established for v5.84. The next software boundary is the service-
-gated release of task 18: the task identity and readiness-report role are
-established, and the release is narrowed to the firmware-owned `0x187d` service
-request which must re-establish `0x13fdb3` bit 7. Its transport and reply remain
-unclassified. They must be recovered before enabling another peer or SIM/radio
-behavior. Separately, two
-external evidence inputs continue to bound
-product-state fidelity. The
-supplied v5.84 archive has no matching `0x3f0000..0x3fffff` EEPROM/PMM partition.
+exchange are established for v5.84. The first unresolved boundary is now the
+matching `0x3f0000..0x3fffff` EEPROM/PMM partition omitted by the supplied
+v5.84 MCU+PPM archive. Firmware proves this dependency directly: erased records
+`0x0190` and `0x0270` fail task 2's reference check, clear readiness bit 6 and
+prevent the second task batch, including task 18, from starting.
+
 Substituting the populated tail from the complete v5.21 image and recomputing
 the v5.84 firmware's 16-bit checksum over the `0x3fc026` calibration record
 changes early state but does not settle the v5.84 initializer, so that
-version-mismatched donor is rejected. A matching v5.84 product-state capture
-would still distinguish legitimate provisioning from erased-tail fallbacks.
+version-mismatched donor is rejected. Historical repair archives identify
+`eeprom2100.fls` and 64 KiB 2100 PMM attachments, but no retrievable copy has yet
+been recovered. The correct next input is a matching virgin or handset capture,
+not a driver-side value synthesized to satisfy the comparison.
 SIM and radio remain dormant at this boundary; their behavior must not be
 promoted until execution reaches their firmware consumers.
 
 ## Public evidence availability
 
 Contemporary service references independently identify the NAM-2 partition map
-and the need for product PMM data. An archived repair discussion names a
+and the need for product PMM data. Repair tooling describes PMM as the virgin
+EEPROM input used after MCU+PPM flashing, and one surviving archive inventory
+explicitly lists `eeprom2100.fls`. An archived repair discussion names a
 `2100FuBu0584` full backup, but its attachment is no longer available. Another
 archive records that a donated virgin EEPROM still produced `CONTACT SERVICE`,
 consistent with the requirement to rebuild handset-specific FAID/identity data
@@ -151,5 +162,7 @@ external follow-up rather than negative proof that no capture survives.
 
 - [DCT3 flash address table](https://www.nokia-tuning.net/index.php?s=flashadress)
 - [Archived NAM-2 EEPROM discussion](https://nokiafree.org/forums/archive/index.php/t-17045.html)
+- [Archived PMM collection inventory](https://www.mcrf.ru/forum/archive/index.php/t-22889.html)
+- [2100 PMM attachment record](https://forum.gsmhosting.com/vbb/f131/2100-contact-service-234791/)
 - [Archived `2100FuBu0584` reference](https://gsmforum.ru/threads/podskazhite-kak-podnyat-ufsom-nokia-2100.6670/)
 - [Surviving v5.84 MCU+PPM listing](https://www.shram.kiev.ua/mob/proshnokia.shtml)
