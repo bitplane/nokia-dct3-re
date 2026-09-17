@@ -96,11 +96,17 @@ contract is inherited merely because its values appear compatible.
   state 2 and delay `0x007d`. Expiry is delivered through task 2's ordinary
   timer/message queue. It is neither event `0x187d`, a service request, nor
   evidence of a supervisor retry.
-- The apparent timing race is therefore closed. The supervisor resumes task 2,
-  which performs the product-state check before control returns; delaying DSP
-  service completion changes ordering but does not start task 18. A firmware
-  state seed is equally invalid because task 2 overwrites the byte from the
-  product-state result.
+- Shared selector `0x100e2=1` starts a finite ROM-owned DSP code-block transfer.
+  Firmware publishes 133 intermediate replies `0x100e4=2`, then clears the
+  selector and publishes final reply 4 on chunk 134. Re-publishing selector 1
+  is incorrect because it restarts the transfer at its descriptor head.
+- This later transfer is not the missing release timing. With the readable
+  donor catalogue, supervisor `0x2f80b6` enters at 0.201823 s with DSP result
+  zero and task 18 parked. The first code-block reply appears at 0.213180 s.
+  A diagnostic 50 us peer cadence completes all 134 chunks by 0.228037 s, but
+  task 2 does not validate the PMM records until 0.378353–0.383172 s and task
+  18 remains parked. This excludes both the generic 5 ms delay and code-block
+  throughput as the cause; an earlier DSP readiness lifecycle is still absent.
 - The post-map class-`0x00`/command-`0x5f` `EXIT ANYSTATE` stream continues while
   the initializer spins. It is the already-classified periodic external-service
   channel, not proof that the missing task is advancing. A 120-second run still
@@ -131,7 +137,21 @@ prevent the second task batch, including task 18, from starting.
 Substituting the populated tail from the complete v5.21 image and recomputing
 the v5.84 firmware's 16-bit checksum over the `0x3fc026` calibration record
 changes early state but does not settle the v5.84 initializer, so that
-version-mismatched donor is rejected. Historical repair archives identify
+version-mismatched donor is rejected as the final product input. A corrected
+full-region experiment proves the donor catalogue is nevertheless readable:
+firmware computes `0x933d`, reads nonzero record `0x0190`, finds matching record
+`0x0270 == 0x933d`, and retains readiness bit 6. Task 18 still remains in
+scheduler state 5 because the supervisor made its one-shot release decision
+before task 2 published that validated result. The earlier experiment that
+reported erased donor records loaded only the MCU+PPM length and never mapped
+the final 64 KiB; that result is discarded.
+
+The faithful frontier therefore has two inputs: a matching v5.84 product-state
+capture and the DSP readiness exchange that must be visible before supervisor
+entry. The later selector-1 code-block upload is fully bounded and cannot
+retroactively satisfy that first release decision.
+
+Historical repair archives identify
 `eeprom2100.fls` and 64 KiB 2100 PMM attachments, but no retrievable copy has yet
 been recovered. The correct next input is a matching virgin or handset capture,
 not a driver-side value synthesized to satisfy the comparison.
