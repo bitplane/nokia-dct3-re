@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 309 gates: 168 generated from typed steps, 141 copied verbatim (shell).
+# 311 gates: 170 generated from typed steps, 141 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -157,6 +157,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-a5-1-degraded verify-radio-physical-uplink \
 	verify-radio-outgoing-call-host-physical-media \
 	verify-3310-radio-physical-duplex verify-5210-radio-physical-duplex \
+	verify-3410-radio-physical-duplex verify-3410-radio-outgoing-physical-duplex \
 	verify-5210-radio-outgoing-physical-duplex verify-radio-physical-uplink-one \
 	verify-radio-incoming-sms-host-adapter verify-radio-incoming-sms-host-restore \
 	verify-radio-outgoing-sms-host-adapter verify-radio-outgoing-sms-host-restore \
@@ -2320,6 +2321,12 @@ verify-3310-radio-physical-duplex:
 
 verify-5210-radio-physical-duplex:
 	PHONE=noki5210 BIOS=540e ROM=roms/noki5210/5210_5.40_ppm_e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=30 POST_READY_KEYS=send,wait5000,end POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=220 POST_READY_GAP_MS=280 AUDIO_CONTROL_CHECKER=tools/radio_5210_incoming_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
+
+verify-3410-radio-physical-duplex: normalize-3410
+	$(DCT3_RUN_3410) ROM=roms/noki3410/3410f546e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=40 POST_READY_KEYS=end,waitalerting,send,wait5000,end POST_READY_DELAY_MS=1000 POST_READY_DURATION_MS=200 POST_READY_GAP_MS=300 AUDIO_CONTROL_CHECKER=tools/radio_3410_incoming_call_lifecycle_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
+
+verify-3410-radio-outgoing-physical-duplex: normalize-3410
+	$(DCT3_RUN_3410) ROM=roms/noki3410/3410f546e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_outgoing_call RUN_SECONDS=45 POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send,waitalerting,wait5000,end POST_READY_DELAY_MS=16000 POST_READY_DURATION_MS=120 POST_READY_GAP_MS=240 AUDIO_CONTROL_CHECKER=tools/radio_outgoing_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
 
 verify-5210-radio-outgoing-physical-duplex:
 	PHONE=noki5210 BIOS=540e ROM=roms/noki5210/5210_5.40_ppm_e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_outgoing_call RUN_SECONDS=36 POST_READY_KEYS=5,5,5,1,2,3,4,send,waitalerting,wait5000,end POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=220 POST_READY_GAP_MS=280 AUDIO_CONTROL_CHECKER=tools/radio_5210_outgoing_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh

@@ -243,7 +243,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-radio-periodic-location-update-state verify-3410-radio-periodic-location-update
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
 .PHONY: verify-3330-radio-incoming-call-lifecycle
-.PHONY: verify-3410-radio-incoming-call-lifecycle verify-3410-radio-a5-1-incoming-call
+.PHONY: verify-3410-radio-incoming-call-lifecycle verify-3410-radio-a5-1-incoming-call verify-3410-radio-physical-duplex verify-3410-radio-outgoing-physical-duplex
 .PHONY: verify-3330-radio-media-resilience verify-5210-radio-media-resilience verify-5210-radio-physical-duplex verify-5210-radio-outgoing-physical-duplex
 .PHONY: verify-3410-radio-registration verify-3410-radio-registration-preserved
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
@@ -395,6 +395,8 @@ help:
 	@echo "make verify-5210-radio-media-resilience check NSM-5 media, degradation and save-state replay"
 	@echo "make verify-5210-radio-physical-duplex check isolated NSM-5 microphone and receiver paths"
 	@echo "make verify-5210-radio-outgoing-physical-duplex check the same paths during physical dialling"
+	@echo "make verify-3410-radio-physical-duplex check isolated NHM-2 microphone and receiver paths"
+	@echo "make verify-3410-radio-outgoing-physical-duplex check those paths during physical dialling"
 	@echo "make verify-radio-incoming-call check organic MT SETUP, Alerting and bounded clearing"
 	@echo "make verify-radio-incoming-call-answered check physical Answer, ringing and post-answer DSP traffic"
 	@echo "make verify-radio-incoming-call-lifecycle check physical Answer-to-End CC and DSP-control teardown"

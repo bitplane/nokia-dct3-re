@@ -171,8 +171,21 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("cobba_pcm.sync_clocks = 1", nhm2)
         self.assertIn("cobba_pcm.word_clocks = 16", nhm2)
         self.assertIn("cobba_pcm.msb_first = true", nhm2)
-        self.assertNotIn("cobba_hle_voice.microphone", nhm2)
-        self.assertNotIn("cobba_hle_voice.output", nhm2)
+        self.assertIn(
+            "cobba_hle_voice.microphone = nokia_cobba_device::mic2", nhm2
+        )
+        self.assertIn(
+            "cobba_hle_voice.output = nokia_cobba_device::ear", nhm2
+        )
+        self.assertNotIn("microphone_gain_db", nhm2)
+        self.assertNotIn("output_gain_db", nhm2)
+
+        machine = phone[
+            phone.index("void nokia_dct3_state::noki3410"):
+            phone.index("void nokia_dct3_state::noki5110")
+        ]
+        self.assertIn('MICROPHONE(config, "microphone", 1)', machine)
+        self.assertIn("m_cobba->add_route", machine)
 
     def test_nsm5_uses_its_documented_pcm_and_analogue_routes(self):
         phone = (ROOT / "driver/nokia_dct3.cpp").read_text()

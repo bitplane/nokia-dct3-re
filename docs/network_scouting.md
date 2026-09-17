@@ -282,7 +282,14 @@ COBBA-GJP link, and carries non-silent downlink PCM. NHM-2 removes the active
 TCH before its later `0x040a` publication, so the generic media gate accepts
 channel-owned shutdown only after physical End and before route clearing.
 This ordering does not weaken the requirement that both release boundaries
-occur. No analogue microphone or receiver route is inferred.
+occur. Nokia's combined NHM-2/5/6 level-3/4 repair guide assigns the common
+N100 microphone chain through `L402/C120` and receiver chain through
+`R119/R120`; the matching COBBA schematic identifies the endpoints as
+MIC2P/MIC2N and EARP/EARN. `make verify-3410-radio-physical-duplex` proves
+isolated host microphone and receiver audio through those routes during the
+incoming lifecycle. `make verify-3410-radio-outgoing-physical-duplex` repeats
+the proof after physical dialling and Send. Gains remain neutral rather than
+being inherited from another product.
 
 `make verify-radio-outgoing-call-lifecycle` proves the complementary mobile-
 originated path from physical number entry. The handset issues its own random

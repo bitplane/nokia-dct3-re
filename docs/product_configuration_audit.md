@@ -231,8 +231,14 @@ identifies the common COBBA-GJP N100 audio boundary, while the COBBA-GJP system
 documentation fixes its codec SIO at 1 MHz/8 kHz with 125 clocks per frame and
 a sign-extended 13-in-16 word. Both products own independently declared
 profiles even though their values match NHM-5. Neither inherits NHM-5's
-analogue routes or gains. Physical duplex remains pending identification of
-each fitted microphone input and receiver topology.
+analogue routes or gains. NHM-2's fitted topology is now bounded by Nokia's
+combined NHM-2/5/6 repair guide: its common N100 microphone chain runs through
+`L402/C120` and its receiver through `R119/R120`. The matching COBBA schematic
+identifies MIC2 and EAR as the endpoints, and independent incoming/outgoing
+physical-duplex gates validate them. NHM-6 remains unpromoted until its own
+host-audio gates pass; neither product inherits analogue gains. The primary
+source is Nokia's *NHM-2/5/6 Repairhints*, version 4.0, 20.11.2002
+([archived copy](https://manualmachine.com/nokia/3310/8180135-service-manual/)).
 
 NSM-5 is independently documented by Nokia's *NSM-5 System Module*, issue 1,
 02/2002, page 24

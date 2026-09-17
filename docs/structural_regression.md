@@ -203,6 +203,11 @@ NSM-5 schematic and troubleshooting component chains to isolate host capture
 on COBBA MIC2 and playback on EAR; protocol/UI injection or acoustic loopback
 cannot satisfy it. `make verify-5210-radio-outgoing-physical-duplex` repeats
 the isolated media proof after physical dialling and Send.
+`make verify-3410-radio-physical-duplex` and
+`make verify-3410-radio-outgoing-physical-duplex` apply the same isolated
+host-audio standard to NHM-2's independently documented N100 MIC2/EAR board
+chains. Each direction must cross the product's own call-control and typed PCM
+contracts; matching route declarations alone cannot promote coverage.
 `make verify-radio-call-state-roundtrip` additionally saves during the stable
 speech interval under both v6.00 and independently relocated v5.01, records
 two seconds of DSP/network media evolution, restores the save, and records the

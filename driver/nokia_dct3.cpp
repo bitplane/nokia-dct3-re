@@ -593,6 +593,13 @@ constexpr nokia_product_config make_3410_config()
 	result.cobba_pcm.msb_first = true;
 	result.cobba_pcm.data_edge =
 			nokia_mad2_pcm_device::clock_edge::falling;
+	// Nokia's combined NHM-2/5/6 level-3/4 repair guide assigns all three
+	// products the same N100 COBBA microphone path through L402/C120 and the
+	// receiver path through R119/R120.  The matching NHM-5 schematic names
+	// those common endpoints MIC2P/MIC2N and EARP/EARN.  Record connectivity
+	// only; no NHM-2 analogue gain is inferred.
+	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	result.cobba_hle_voice.output = nokia_cobba_device::ear;
 	result.flash_b3_block_lock = true;
 	result.dsp_reset_wiring = DSP_RESET_WIRING_3410;
 	result.display = DISPLAY_3410;
@@ -2963,6 +2970,11 @@ void nokia_dct3_state::noki3410(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
 	ST_M28W320ECT(config.replace(), "flash");
+	// NHM-2's fitted microphone and receiver follow the common NHM-2/5/6
+	// N100 MIC2/EAR chains.  Host routes remain product-local and neutral.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(PRODUCT_3410);
 }
 
