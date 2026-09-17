@@ -130,7 +130,7 @@ ORACLE_5210_USSD_RAW_SHA ?= db9fb15970ea4c4a833c19c133030955305ade650c48f25c37ec
 ORACLE_3330_DSP_MISSING_SHA ?= 7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d1024ab91c1e55c1f8e
 ORACLE_3410_DSP_MISSING_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 ORACLE_2100_POST_SERVICE_SHA ?= 28b1f0c642a34dfcf5206859ced058646b115c908d0b05b5ef6201f796180c21
-ORACLE_2100_SECURITY_INPUT_SHA ?= 233d0bc0cfee71da7aba391cc65e0a3a62cc0e4182afec34eaec26ed468646b7
+ORACLE_2100_SECURITY_INPUT_SHA ?= 8e4f1885a0c4cdc31d3e15b6a685007ccf8db31b1ee27893b2f2086c793adf26
 
 # The acquired virgin NHM-6 PMM legitimately requests its stored 12345 phone
 # code, then a time and date. These are physical keypad transactions through
@@ -253,7 +253,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
 .PHONY: normalize-3610
 .PHONY: smoke-2100
-.PHONY: verify-2100-frontier verify-2100-interactive
+.PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
 .PHONY: verify-radio-a5-1-outgoing-call
 .PHONY: verify-radio-a5-1-sdcch-state
@@ -840,14 +840,23 @@ verify-2100-mbus: normalize-2100
 		RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_EXTRA_ARGS=-verbose
 	$(PYTHON) tools/mbus_2100_terminal_trace_check.py $(MAME_DIR)/error.log
 
+verify-2100-v521-bootstrap: normalize-2100 build
+	@$(MAKE) --no-print-directory run PHONE=noki2100 BIOS=521sharp \
+		RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_EXTRA_ARGS=-verbose
+	@grep -q 'bootstrap completion exchanges=992' $(MAME_DIR)/error.log
+	@grep -q 'bootstrap publication offset=000 value=0001' $(MAME_DIR)/error.log
+	@grep -q 'bootstrap publication offset=002 value=0001' $(MAME_DIR)/error.log
+	@grep -q 'bootstrap publication offset=004 value=0001' $(MAME_DIR)/error.log
+	@echo 'NAM-2 v5.21 DSP ping-pong bootstrap and verdict publication: PASS'
+
 verify-2100-interactive: normalize-2100 build
 	@mkdir -p "$(RUN_NVRAM_DIR)/noki2100"
 	$(PYTHON) tools/make_2100_pmm_profile.py \
 		roms/noki2100/2100f521sharp.fls "$(RUN_NVRAM_DIR)/noki2100/flash"
 	@rm -f "$(RUN_NVRAM_DIR)/noki2100/sim_card"
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki2100 BIOS=584e \
-		RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) SECONDS=11 \
-		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=7000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'
+		RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) SECONDS=15 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5 NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
 	@grep -q 'kbgpio-mask-write: value=20' $(RUN_DIR)/error.log
 	@for key in 1 2 3 4 5; do grep -q "input-press: .* name=$$key" $(RUN_DIR)/error.log; done

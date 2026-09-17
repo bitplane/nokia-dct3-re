@@ -7,12 +7,14 @@ profile. The firmware completes CCONT and LCD traffic, performs a 64-exchange DS
 bootstrap, acknowledges DSP service command 4, completes the type-05 external-
 service discovery transaction, accepts a class-0x40 application registration,
 and completes its physical M2BUS terminal startup exchange. The compact type-74
-completion clears the initial `CONTACT SERVICE` frame. The current frontier is
-the blank firmware-owned frame that follows registration. The next task batch is
-held back after task 2 validates the product-state partition and clears its
-readiness bit. The erased partition is the first demonstrated missing input.
+completion clears the initial `CONTACT SERVICE` frame. A checksum-corrected,
+v5.21-derived product-state fixture lets v5.84 finish its application batches,
+leave the charger-wait lifecycle and present an interactive security editor.
+The donor stores the ordinary BCD candidate `12 34 50` (`12345`). Entering it
+reliably fills the editor, but neither proves acceptance nor reaches idle. The
+security decision and subsequent MMI lifecycle are the current frontier.
 
-This is a bounded portability frontier, not a boot or interactive promotion.
+This is a bounded interactive promotion, not a default boot profile.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
 contract is inherited merely because its values appear compatible.
 
@@ -36,9 +38,13 @@ contract is inherited merely because its values appear compatible.
   exactly 96 bytes. Board documentation specifies a 96x65 display, while the
   recovered text establishes reversed segment order. The modeled controller RAM
   is therefore 96x72 with a 96x65 viewport and mirrored X scan.
-- The separately acquired complete v5.21 NAM-2 image converges on the same final
-  `CONTACT SERVICE` frame under the v5.84 service contract. Populated PMM content
-  alone therefore does not supply a cross-version service contract.
+- The separately acquired complete v5.21 NAM-2 image uses a distinct DSP
+  bootstrap: 992 alternating zero-valued handoffs on shared cells
+  `0x0fe/0x100`, followed by reads of verdict cells `0x000/0x002/0x004`.
+  Publishing those verdicts only after the measured count closes its DSP upload
+  and yields the same service-control and discovery traffic as v5.84. It still
+  converges on `CONTACT SERVICE`, so populated PMM alone does not supply its
+  remaining version-local startup contract.
 - NAM-2 v5.84 publishes its command-`0x64` application status only after accepting
   the peer registration. The constructor at `0x258ce0` derives its status byte
   from RAM `0x13fdb3` bit 6. Earlier notes called this bit 7 by reading
@@ -175,14 +181,29 @@ firmware diagnostic channel named the resulting lifecycle directly: `BOOT UP
 CHARGE`, `INITIALIZE`, then `WAIT CHARGER VOLTAGE`. Supplying the ordinary
 charged-pack sample `0x2c0` lets firmware leave that lifecycle, execute the
 firmware keypad-unmask site, and present its security-code editor. Physical
-digit presses cross the five-row matrix and repaint the editor with masked
-digits. `make verify-2100-interactive` reproduces this path without firmware RAM
-or scheduler injection.
+digit presses cross the five-row matrix and repaint the editor. Exhaustively
+sampling the exposed matrix cells confirms the row-major map below rather than
+an inherited or transposed sibling-handset layout. The identical
+v5.84/v5.21 ROM key maps at flash offsets `0x13e420/0x13dbf0` establish the
+NAM-2 numeric, star/hash, softkey and scroll positions independently of the
+3310 layout that the prototype previously inherited. The donor security block
+contains `12 34 50`, and entering `12345` fills all five editor positions. An earlier
+7-second fixture submitted before the editor was ready, dropped the first digit,
+and therefore entered only `2345`; its rejection was not evidence about the
+donor credential. The delayed fixture protects physical delivery of all five
+digits, while the unchanged editor records the open decision problem. A bounded
+checksum-correct brute-force census changed each of the 281 non-checksum bytes
+in the recovered identity block independently. Every variant reached the same
+editor, proving there is no independent one-byte lock-disable selector in that
+block; multi-field semantics or another product-state record own the decision.
+`make verify-2100-interactive` reproduces this path without firmware RAM or
+scheduler injection.
 
 The version-mismatched donor remains a diagnostic input rather than a
-distributable v5.84 product profile. Its stored security identity is not assumed
-to use v5.84's factory code, so remaining in the editor after `12345` is not a
-driver failure. The supplied archive `2100sharp.pmm` is also not v5.84 PMM data:
+distributable v5.84 product profile. The visible BCD value is a strong candidate,
+not proof of v5.84's verifier contract. Reaching idle requires decoding that
+contract or obtaining matching v5.84 product state. The supplied archive
+`2100sharp.pmm` is also not v5.84 PMM data:
 it consists of 256 nine-byte flasher headers followed by 0x2000-byte payload
 chunks, and stripping those headers produces the byte-identical v5.21 Sharp
 full image catalogued as `2100f521sharp.fls`. The earlier experiment that loaded

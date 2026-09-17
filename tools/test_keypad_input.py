@@ -48,8 +48,26 @@ class KeypadInputTest(unittest.TestCase):
         target = makefile.split("verify-2100-interactive:", 1)[1].split("\n\n", 1)[0]
         self.assertIn("tools/make_2100_pmm_profile.py", target)
         self.assertIn("NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5", target)
+        self.assertIn("NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000", target)
+        self.assertIn("SECONDS=15", target)
         self.assertIn("kbgpio-mask-write: value=20", target)
         self.assertNotIn("space:write_", target)
+
+    def test_2100_uses_its_rom_derived_key_matrix(self):
+        driver = (ROOT / "driver" / "nokia_dct3.cpp").read_text()
+        ports = driver.split("static INPUT_PORTS_START( noki2100 )", 1)[1]
+        ports = ports.split("INPUT_PORTS_END", 1)[0]
+        self.assertIn('PORT_START("COL.0")', ports)
+        self.assertIn('PORT_NAME("Left Softkey / Menu")', ports)
+        self.assertIn('PORT_NAME("Keypad 1")', ports)
+        self.assertIn('PORT_NAME("Keypad 0")', ports)
+        self.assertIn("noki2100, noki2100, nokia_dct3_state", driver)
+
+        branch = self.harness.split("elseif is_2100 then", 1)[1]
+        branch = branch.split("elseif is_3410 then", 1)[0]
+        self.assertIn('enter = field_by_mask("COL.1", 0x02)', branch)
+        self.assertIn('["1"] = field_by_mask("COL.2", 0x02)', branch)
+        self.assertIn('["0"] = field_by_mask("COL.3", 0x10)', branch)
 
     def test_sequence_can_wait_for_organic_buzzer_before_physical_answer(self):
         self.assertIn('name == "waitbuzzer"', self.harness)

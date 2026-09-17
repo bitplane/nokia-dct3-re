@@ -100,6 +100,14 @@ class MachineProfileTest(unittest.TestCase):
             },
         )
 
+    def test_2100_v521_owns_its_observed_ping_pong_bootstrap(self):
+        body = self.function_body(
+            "constexpr nokia_product_config make_2100_config",
+            "constexpr nokia_product_config PRODUCT_3210",
+        )
+        self.assertIn("2, BOOTSTRAP_PING_PONG_READY_992", body)
+        self.assertIn("system_bios() uses ROM's one-based BIOS flag", body)
+
     def test_6110_profile_contains_only_documented_hardware_contracts(self):
         self.assert_profile_fields(
             "make_6110_config",

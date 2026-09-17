@@ -206,6 +206,18 @@ elseif is_5210 then
 		star = field_by_mask("COL.2", 0x10), send = field_by_mask("COL.0", 0x04),
 		["end"] = field_by_mask("COL.0", 0x08), power = field_by_mask("PWR", 0x01),
 	}
+elseif is_2100 then
+	key_fields = {
+		enter = field_by_mask("COL.1", 0x02), up = field_by_mask("COL.1", 0x04),
+		down = field_by_mask("COL.1", 0x08), ["0"] = field_by_mask("COL.3", 0x10),
+		["1"] = field_by_mask("COL.2", 0x02), ["2"] = field_by_mask("COL.3", 0x02),
+		["3"] = field_by_mask("COL.4", 0x02), ["4"] = field_by_mask("COL.2", 0x04),
+		["5"] = field_by_mask("COL.3", 0x04), ["6"] = field_by_mask("COL.4", 0x04),
+		["7"] = field_by_mask("COL.2", 0x08), ["8"] = field_by_mask("COL.3", 0x08),
+		["9"] = field_by_mask("COL.4", 0x08), del = field_by_mask("COL.1", 0x10),
+		c = field_by_mask("COL.1", 0x10), minus = field_by_mask("COL.4", 0x10),
+		star = field_by_mask("COL.2", 0x10), power = field_by_mask("PWR", 0x01),
+	}
 elseif is_3410 then
 	key_fields = {
 		enter = field_by_mask("COL.4", 0x01), up = field_by_mask("COL.3", 0x10),

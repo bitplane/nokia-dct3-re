@@ -409,6 +409,16 @@ constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_PING_PONG = {
 	0x0001
 };
 
+// NAM-2 v5.21 performs 992 alternating zero-valued handoffs on each shared
+// cell before reading the three DSP-owned startup verdicts.
+constexpr nokia_dsp_hle_device::bootstrap_contract
+		BOOTSTRAP_PING_PONG_READY_992 = {
+	nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+	992,
+	{{ { 0x000, 0x0001 }, { 0x002, 0x0001 }, { 0x004, 0x0001 } }},
+	3, std::nullopt, std::nullopt, 0
+};
+
 constexpr nokia_dsp_hle_device::bootstrap_contract
 		BOOTSTRAP_FLASH_VERIFICATION_PARTIAL = {
 	nokia_dsp_hle_device::bootstrap_exchange_strategy::zero_acknowledge,
@@ -787,6 +797,14 @@ constexpr nokia_product_config make_2100_config()
 	// service-pending value 2. Acknowledge that observed transport transaction;
 	// no application payload or sibling-handset service contract is implied.
 	result.dsp_service = true;
+	// The complete v5.21 image seeds shared words 0x0fe and 0x100 with one
+	// and alternates ownership between them.  That is the observed ping-pong
+	// bootstrap, distinct from v5.84's bounded 64-exchange zero-ack dialogue.
+	// system_bios() uses ROM's one-based BIOS flag, so the second declaration
+	// is selected as 2 here.
+	result.dsp_bootstrap_override = nokia_product_config::bootstrap_bios_override {
+		2, BOOTSTRAP_PING_PONG_READY_992
+	};
 	// Its type-05 D0/01 frame supplies the complete discovery reply correlation.
 	// Enable request-derived transport handling and the independently retained
 	// NAM-2 application contract.
@@ -2658,6 +2676,50 @@ static INPUT_PORTS_START( noki3310 )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki2100 )
+	PORT_INCLUDE(dct3_network_config)
+
+	// NAM-2 v5.84 table at flash offset 0x13e420 (v5.21: 0x13dbf0),
+	// indexed as row * 5 + column.  Both ROMs contain the same map.
+	PORT_START("COL.0")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("COL.1")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Left Softkey / Menu") PORT_CODE(KEYCODE_ENTER) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Scroll Up") PORT_CODE(KEYCODE_UP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Scroll Down") PORT_CODE(KEYCODE_DOWN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Right Softkey / C") PORT_CODE(KEYCODE_BACKSPACE) PORT_CODE(KEYCODE_DEL) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.2")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 1") PORT_CODE(KEYCODE_1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 4") PORT_CODE(KEYCODE_4) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 7") PORT_CODE(KEYCODE_7) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad *") PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.3")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 2") PORT_CODE(KEYCODE_2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 5") PORT_CODE(KEYCODE_5) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 8") PORT_CODE(KEYCODE_8) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 0") PORT_CODE(KEYCODE_0) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("COL.4")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 3") PORT_CODE(KEYCODE_3) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 6") PORT_CODE(KEYCODE_6) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad 9") PORT_CODE(KEYCODE_9) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad #") PORT_CODE(KEYCODE_MINUS) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+
+	PORT_START("PWR")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Power") PORT_CODE(KEYCODE_SPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x1e, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki5110 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3263,7 +3325,7 @@ ROM_END
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
 SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empty_init, "Nokia", "Nokia 3210", 0 )
-SYST( 2003, noki2100, 0,      0,      noki2100, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 2100 (NAM-2 candidate)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empty_init, "Nokia", "Nokia 2100 (NAM-2 candidate)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

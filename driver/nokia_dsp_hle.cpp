@@ -325,6 +325,10 @@ void nokia_dsp_hle_device::handle_bootstrap_exchange_write(u16 offset)
 		m_transport->peer_shared_w(offset / 2, 0);
 		m_transport->peer_shared_w(
 				peer_offset / 2, token != 0 ? token : 1);
+		if (token == 0 && offset == 0x100 &&
+				m_bootstrap.exchange_limit != 0 &&
+				++m_bootstrap_exchange_count == m_bootstrap.exchange_limit)
+			publish_bootstrap_completion();
 	}
 	else if (m_bootstrap.exchange ==
 				bootstrap_exchange_strategy::zero_acknowledge &&
