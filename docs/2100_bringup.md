@@ -97,11 +97,23 @@ contract is inherited merely because its values appear compatible.
   it does not register a deferred release. An exhaustive scan of all 28 Thumb
   calls to scheduler entry `0x2ac3b0` finds no other task-18 resume site.
 - Task 2's initializer at `0x256720` owns the readiness-byte transition. It sets
-  bit 6, reads two product-state records through `0x306e78`, and retains bit 6
-  only when the live computed reference equals record `0x0270` and the reference
-  or record `0x0190` is nonzero. The coherent erased-tail run computes `0x4cb2`
-  while both records read `0xffff`, so firmware deliberately clears bit 6 at
-  `0x25689e`.
+  bit 6, reads two logical product-state locations through `0x306e78`, and
+  retains bit 6 only when the live computed reference equals `0x0270` and the
+  reference or `0x0190` is nonzero. The coherent erased-tail run computes
+  `0x4cb2` while both locations read `0xffff`, so firmware deliberately clears
+  bit 6 at `0x25689e`.
+- The product-state reader exposes a linked catalog, not two physical records.
+  The v5.21 donor has five `PMMCAT` segments plus an `EEPROM` segment whose
+  logical payload begins at tail offset `0xc026`; logical address `N` is stored
+  at `0xc026 + N`. The catalog entry type and family-local index must not be
+  confused with the logical addresses consumed by `0x306e78`.
+- Task 2 separately validates logical block `0x0000..0x011f`. It sums bytes
+  `0x0000..0x011b` and compares the result with the big-endian dword at
+  `0x011c`. The unmodified v5.21 donor stores `0x99a6`, while v5.84 computes
+  `0xa0aa`; this is why the donor's pending-status slot `0x12` remained live.
+  Correcting only that integrity dword preserves the donor-derived reference
+  `0x933d` at `0x0270`, keeps nonzero `0x2d10` at `0x0190`, and retains
+  readiness bit 6 without changing firmware RAM.
 - Timer slot `0x18` belongs to task 2: its runtime descriptor names owner task 2,
   state 2 and delay `0x007d`. Expiry is delivered through task 2's ordinary
   timer/message queue. It is neither event `0x187d`, a service request, nor
@@ -143,28 +155,27 @@ therefore established bounded absence only.
 
 The display, DSP bootstrap, service discovery, application registration, keypad
 wiring, MBUS controller, terminal timing, arbitration and complete startup
-exchange are established for v5.84. The first unresolved boundary is now the
-matching `0x3f0000..0x3fffff` EEPROM/PMM partition omitted by the supplied
-v5.84 MCU+PPM archive. Erased records `0x0190` and `0x0270` fail task 2's
-reference check and clear readiness bit 6 before the preempted supervisor
-resumes and makes its second-batch decision.
+exchange are established for v5.84. Matching product state is required for an
+ordinary boot, but it is no longer the first unmapped control-flow boundary.
+An externally generated research fixture based on the readable v5.21 catalog,
+with its v5.84-observed block checksum corrected, passes both task-2 validation
+stages and retains readiness byte `0xc1`.
 
-Substituting the populated tail from the complete v5.21 image and recomputing
-the v5.84 firmware's 16-bit checksum over the `0x3fc026` calibration record
-changes early state but does not settle the v5.84 initializer, so that
-version-mismatched donor is rejected as the final product input. A corrected
-full-region experiment proves the donor catalogue is nevertheless readable:
-firmware computes `0x933d`, reads nonzero record `0x0190`, finds matching record
-`0x0270 == 0x933d`, and transiently retains readiness bit 6. Under the corrected
-MBUS timing, later v5.84 lifecycle processing reaches the supervisor branch with
-readiness byte `0x01`, still takes the `0x11/0x44` failure route, and leaves task
-18 parked. The earlier experiment that
-reported erased donor records loaded only the MCU+PPM length and never mapped
-the final 64 KiB; that result is discarded.
+With that fixture, the supervisor resumes its first batch through tasks 6, 22,
+23, 21 and 5 with readiness `0xc1`. Task 5 then preempts the supervisor and does
+not return during the bounded run, so execution never reaches the second-batch
+task-18 call and the LCD remains blank. The next question is therefore which
+task-5 initialization dependency prevents the scheduler return after
+`0x2f8228`; it is not another task-2 PMM comparison. The version-mismatched
+donor remains a diagnostic input rather than a distributable v5.84 product
+profile. The earlier experiment that reported erased donor locations loaded
+only the MCU+PPM length and never mapped the final 64 KiB; that result is
+discarded.
 
-The faithful frontier is a matching v5.84 product-state capture. The later
-selector-1 code-block upload is fully bounded and is not a substitute for that
-version-specific catalogue and lifecycle state.
+The faithful frontier is the task-5 preemption boundary under validated product
+state, followed by a matching v5.84 product-state capture for final promotion.
+The later selector-1 code-block upload is fully bounded and is not a substitute
+for either requirement.
 
 Historical repair archives identify
 `eeprom2100.fls` and 64 KiB 2100 PMM attachments, but no retrievable copy has yet

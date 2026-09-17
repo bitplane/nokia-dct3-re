@@ -679,6 +679,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
+	$(VENV)/bin/python -m unittest tools/test_dct3_pmm_catalog.py tools/test_make_2100_pmm_profile.py
 	$(VENV)/bin/python -m unittest tools/test_eeprom_trace_check.py tools/test_storage_static_census.py
 	$(VENV)/bin/python -m unittest tools/test_mbus_2100_terminal_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_extract_dct3_wintesla.py
