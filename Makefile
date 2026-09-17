@@ -251,7 +251,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
-.PHONY: normalize-3610
+.PHONY: normalize-3610 smoke-3610
 .PHONY: smoke-2100
 .PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
@@ -538,8 +538,12 @@ normalize-3610:
 	$(PYTHON) tools/extract_dct3_wintesla.py \
 		--mcu roms/3610-nam1-v511/NAM105.110 \
 		--ppm roms/3610-nam1-v511/NAM105.11E \
-		--flash-output roms/noki3610-candidate/3610f511e.fls \
+		--flash-output roms/noki3610/3610f511e.fls \
 		--expect-flash-sha1 429bc32afe0a554887ba7539cf9ba3c9a67e7043
+	cp roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3610/
+
+smoke-3610: normalize-3610
+	@$(MAKE) --no-print-directory smoke PHONE=noki3610 BIOS=511e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \

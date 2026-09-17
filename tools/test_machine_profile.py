@@ -108,6 +108,20 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("2, BOOTSTRAP_PING_PONG_READY_992", body)
         self.assertIn("system_bios() uses ROM's one-based BIOS flag", body)
 
+    def test_3610_starts_as_a_fail_closed_executable_profile(self):
+        profile = self.driver.split(
+            "void nokia_dct3_state::noki3610(machine_config &config)", 1
+        )[1].split("void nokia_dct3_state::noki3210", 1)[0]
+        self.assertIn("dct3_32mbit_flash_base(config);", profile)
+        self.assertIn("apply_product_config(PRODUCT_DEFAULT);", profile)
+        rom = self.driver.split("ROM_START( noki3610 )", 1)[1].split(
+            "ROM_END", 1
+        )[0]
+        self.assertIn('ROM_REGION16_BE(0x0400000, "flash"', rom)
+        self.assertIn('ROMX_LOAD("3610f511e.fls"', rom)
+        self.assertIn("429bc32afe0a554887ba7539cf9ba3c9a67e7043", rom)
+        self.assertIn("smoke-3610:", self.makefile)
+
     def test_6110_profile_contains_only_documented_hardware_contracts(self):
         self.assert_profile_fields(
             "make_6110_config",

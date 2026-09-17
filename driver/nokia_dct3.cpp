@@ -966,6 +966,7 @@ public:
 	void dct3_base(machine_config &config);
 	void dct3_32mbit_flash_base(machine_config &config);
 	void noki3310(machine_config &config);
+	void noki3610(machine_config &config);
 	void noki3210(machine_config &config);
 	void noki5210(machine_config &config);
 	void noki8xxx(machine_config &config);
@@ -3002,6 +3003,15 @@ void nokia_dct3_state::noki3330(machine_config &config)
 	apply_product_config(PRODUCT_3330);
 }
 
+void nokia_dct3_state::noki3610(machine_config &config)
+{
+	// NAM-1's normalized MCU/PPM image requires the later 32-Mbit flash
+	// decode. All peripheral contracts remain conservative until they are
+	// established on this firmware rather than inherited from another handset.
+	dct3_32mbit_flash_base(config);
+	apply_product_config(PRODUCT_DEFAULT);
+}
+
 void nokia_dct3_state::noki3210(machine_config &config)
 {
 	dct3_base(config);
@@ -3232,6 +3242,15 @@ ROM_START( noki3330 )
 	ROM_LOAD("3330 virgin eeprom 005f0000.fls", 0x3f0000, 0x010000, CRC(23459c10) SHA1(68481effb39d90a1639e8f261009c66e97d3e668))
 ROM_END
 
+ROM_START( noki3610 )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+
+	ROM_REGION16_BE(0x0400000, "flash", ROMREGION_ERASEFF)
+	ROM_SYSTEM_BIOS(0, "511e", "v5.11 PPM E bring-up candidate")
+	ROMX_LOAD("3610f511e.fls", 0x000000, 0x350000,
+			CRC(e36e3a07) SHA1(429bc32afe0a554887ba7539cf9ba3c9a67e7043), ROM_BIOS(0))
+ROM_END
+
 ROM_START( noki3410 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -3332,6 +3351,7 @@ SYST( 1999, noki7110, 0,      0,      noki7110, noki3310, nokia_dct3_state, empt
 SYST( 1999, noki8210, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6210, 0,      0,      noki6210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

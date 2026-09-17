@@ -211,11 +211,16 @@ members. All seven streams validate cleanly. The common MCU covers
 
 `make normalize-3610` selects PPM E as the representative comparison image,
 validates both source hashes, and reconstructs
-`roms/noki3610-candidate/3610f511e.fls`. The `0x350000`-byte result has SHA-1
+`roms/noki3610/3610f511e.fls`. The `0x350000`-byte result has SHA-1
 `429bc32afe0a554887ba7539cf9ba3c9a67e7043` and SHA-256
 `bcb22f093746b14cd55503abff72f7e3c043fc226e0bcc0b6972b03d9d635c89`.
 The other PPM members remain equally valid source material; E is not asserted
 to have a privileged hardware role.
+
+The normalized image is declared as the fail-closed `noki3610` bring-up
+machine using only the established later-MAD2 address map and 32-Mbit flash
+extent. No sibling product's keypad, display, CCONT, storage or peer contracts
+are enabled by that declaration.
 
 The representative image yields 670 direct MAD2 accesses from 274 literal
 seeds. Of those, 78 address PUP, 30 keypad GPIO and 29 UIF; the conservative
