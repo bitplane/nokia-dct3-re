@@ -848,6 +848,9 @@ constexpr nokia_product_config make_3610_config()
 	// Enable only the generic request-derived discovery reply; unsolicited
 	// registration remains disabled until NAM-1 supplies its own contract.
 	result.external_service_transport = true;
+	// NAM-1 independently emits the exact compact 0d00 service-control
+	// request. Complete only that observed transaction.
+	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	return result;
 }
 

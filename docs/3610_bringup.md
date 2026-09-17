@@ -31,6 +31,12 @@ them and emits four type-`0x70` setup blocks followed by the exact compact
 service-control request `0d00`. `make verify-3610-discovery` protects this
 request-derived exchange. No unsolicited application responder is enabled.
 
+The compact type-`0x74` echo of that exact request is consumed organically.
+Firmware then emits two type-`0x3c` blocks, eight type-`0x0d` blocks and the
+one-way type-`0x70` follow-up `0a09`. `make verify-3610-service-control`
+protects this complete observed transition. The external application remains
+disabled at this checkpoint.
+
 ## Established inputs
 
 - MCU/PPM normalization and hashes are recorded in `roms/README.md`.
@@ -44,7 +50,7 @@ request-derived exchange. No unsolicited application responder is enabled.
 
 ## Open boundary
 
-Complete the observed compact service-control request, then recover NAM-1's
-own application registration contract from the next organic traffic.
+Recover NAM-1's application registration contract at the now-live external
+service boundary.
 Keypad, SIM, persistent storage, external-service and radio contracts remain
 disabled until product-local evidence establishes each one.
