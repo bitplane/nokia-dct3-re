@@ -159,7 +159,7 @@
     {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
-      "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. A separate gate proves its 64-exchange bootstrap and transport-level IRQ4 service completion; the display gate claims neither an application response nor service unlock.",
+      "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove its 64-exchange bootstrap, transport-level IRQ4 service completion, request-derived D0 discovery and the next compact 0d00 control request; no unsolicited application response is claimed.",
       "evidence": ["docs/3610_bringup.md", "Makefile"]
     }
   ]

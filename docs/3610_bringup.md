@@ -23,7 +23,13 @@ It then raises six command-4 doorbells with service-pending value `2` and
 control words `0x900f`, `0x8002`, and `0x7000`. Completing that observed IRQ4
 request advances firmware into seven type-`0x05` D0 discovery publications.
 `make verify-3610-dsp-service` protects the bootstrap count, doorbell, IRQ4 and
-first exact discovery packet. It does not enable an application responder.
+first exact discovery packet.
+
+The common service transport derives both D0 responses from that first packet:
+an unnotified correlation frame and a notified D0/04 completion. NAM-1 consumes
+them and emits four type-`0x70` setup blocks followed by the exact compact
+service-control request `0d00`. `make verify-3610-discovery` protects this
+request-derived exchange. No unsolicited application responder is enabled.
 
 ## Established inputs
 
@@ -38,7 +44,7 @@ first exact discovery packet. It does not enable an application responder.
 
 ## Open boundary
 
-Recover the request-derived D0 discovery response and subsequent application
-registration contract reached behind the now-gated DSP service boundary.
+Complete the observed compact service-control request, then recover NAM-1's
+own application registration contract from the next organic traffic.
 Keypad, SIM, persistent storage, external-service and radio contracts remain
 disabled until product-local evidence establishes each one.

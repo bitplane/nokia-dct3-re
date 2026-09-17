@@ -844,6 +844,10 @@ constexpr nokia_product_config make_3610_config()
 	// IRQ4 completion for that observed request; no packet/application peer is
 	// implied by this contract.
 	result.dsp_service = true;
+	// The first organic packet is a checksum-valid D0/01 discovery frame.
+	// Enable only the generic request-derived discovery reply; unsolicited
+	// registration remains disabled until NAM-1 supplies its own contract.
+	result.external_service_transport = true;
 	return result;
 }
 
