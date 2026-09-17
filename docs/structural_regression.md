@@ -192,6 +192,13 @@ impairment, FACCH/BFI recovery, SACCH coexistence and exact active-call
 save-state replay before the same physical teardown. The fixture can enable
 only the product-owned PCM component; removing or invalidating its typed
 profile leaves speech blocked.
+
+`make verify-5210-radio-media-resilience` independently composes the NSM-5
+call lifecycle with its documented 1 MHz/8 kHz, 125-clock COBBA-GJP PCM bus.
+It requires non-silent bidirectional media, impaired-frame concealment and
+recovery, FACCH stealing, SACCH coexistence, exact active-call save/load replay
+and physical End teardown. It does not claim an analogue microphone or
+receiver route.
 `make verify-radio-call-state-roundtrip` additionally saves during the stable
 speech interval under both v6.00 and independently relocated v5.01, records
 two seconds of DSP/network media evolution, restores the save, and records the

@@ -554,6 +554,20 @@ verify-5210-radio-incoming-call-lifecycle: normalize-5210
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-call 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 completed incoming-call Answer/End and returned to registered standby"
 
+# shell: NSM-5 digital media, degradation and save-state composition
+verify-5210-radio-media-resilience: normalize-5210
+	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e \
+		RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \
+		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800 NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'
+	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+	@$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log
+	@$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)/error.log
+	@echo "OK — NSM-5 media survived FACCH, bidirectional BFIs and save-state replay"
+
 verify-5210-radio-outgoing-call-lifecycle: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=36 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'
 	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log

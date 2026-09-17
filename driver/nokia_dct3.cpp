@@ -730,9 +730,20 @@ constexpr nokia_product_config make_5210_config()
 	result.synthetic_sim_card = true;
 	result.radio = RADIO_NSM5;
 	// Physical Answer and End independently publish wire values 0x860b and
-	// 0x840a. Decode that evidenced control field without claiming a product
-	// PCM clock or analogue route.
+	// 0x840a. Decode that evidenced control field independently of the PCM bus.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NSM5;
+	// NSM-5 System Module issue 1 02/2002, page 24: COBBA-GJP divides
+	// RFIClk 13 MHz by 13 for a 1.000 MHz PCMDClk and by 125 again for an
+	// 8.0 kHz PCMSClk. The timing chart specifies a sign-extended 13-bit
+	// linear sample in a 16-bit, MSB-first serial word.
+	result.cobba_pcm.data_clock = 1'000'000;
+	result.cobba_pcm.frame_clock = 8'000;
+	result.cobba_pcm.sample_bits = 13;
+	result.cobba_pcm.sync_clocks = 1;
+	result.cobba_pcm.word_clocks = 16;
+	result.cobba_pcm.msb_first = true;
+	result.cobba_pcm.data_edge =
+			nokia_mad2_pcm_device::clock_edge::falling;
 	result.ccont_board = ADC_5210;
 	result.display = DISPLAY_5210;
 	return result;

@@ -114,6 +114,8 @@ local state_roundtrip_wait_release =
 		os.getenv("NOKIA_DCT3_STATE_ROUNDTRIP_WAIT_RELEASE") == "1"
 local state_roundtrip_end_delay = env_number(
 		"NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS", -1) / 1000
+local state_roundtrip_end_key =
+		os.getenv("NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY") or "enter"
 local state_roundtrip_replay = env_number(
 		"NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS", 0) / 1000
 local state_roundtrip_keys = {}
@@ -1082,9 +1084,9 @@ if state_roundtrip_at >= 0 then
 		-- coroutine timers are outside MAME's machine save image.
 		if state_roundtrip_end_delay >= 0 then
 			emu.wait(state_roundtrip_end_delay)
-			press("enter")
+			press(state_roundtrip_end_key)
 			emu.wait(post_duration)
-			release("enter")
+			release(state_roundtrip_end_key)
 		end
 	end)
 	assert(coroutine.resume(state_timer))

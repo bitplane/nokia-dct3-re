@@ -244,7 +244,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-cobba-control verify-gsm-a3a8 verify-radio-authentication-boundary verify-3310-radio-authentication-boundary normalize-6110 normalize-6110-v548 verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture
 .PHONY: verify-3330-radio-incoming-call-lifecycle
 .PHONY: verify-3410-radio-incoming-call-lifecycle verify-3410-radio-a5-1-incoming-call
-.PHONY: verify-3330-radio-media-resilience
+.PHONY: verify-3330-radio-media-resilience verify-5210-radio-media-resilience
 .PHONY: verify-3410-radio-registration verify-3410-radio-registration-preserved
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
@@ -392,6 +392,7 @@ help:
 	@echo "make verify-3330-radio-incoming-call-lifecycle check NHM-6 through physical Answer/End"
 	@echo "make verify-3410-radio-incoming-call-lifecycle check NHM-2 through physical Answer/End"
 	@echo "make verify-3330-radio-media-resilience check NHM-6 media, degradation and save-state replay"
+	@echo "make verify-5210-radio-media-resilience check NSM-5 media, degradation and save-state replay"
 	@echo "make verify-radio-incoming-call check organic MT SETUP, Alerting and bounded clearing"
 	@echo "make verify-radio-incoming-call-answered check physical Answer, ringing and post-answer DSP traffic"
 	@echo "make verify-radio-incoming-call-lifecycle check physical Answer-to-End CC and DSP-control teardown"

@@ -113,14 +113,21 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   `0x060b`.
 - `make verify-5210-radio-incoming-call-lifecycle` adds physical End, CC/RR
   teardown, ARFCN-86 channel release, DSP wire `0x840a`/control `0x040a`, and
-  exact return to registered standby. No NSM-5 PCM clock or analogue route has
-  been recovered, so this gate proves call and speech control rather than media.
+  exact return to registered standby.
+- `make verify-5210-radio-media-resilience` applies the independent NSM-5
+  System Module PCM contract: COBBA-GJP derives 1.000 MHz `PCMDClk` from
+  13 MHz / 13 and 8.0 kHz `PCMSClk` by /125, carrying a sign-extended 13-bit
+  sample in a 16-bit word. The coherent gate proves bidirectional GSM-FR,
+  non-silent downlink, FACCH stealing, degraded-frame concealment, SACCH
+  coexistence, exact active-call save/load replay and physical End teardown.
+  The fitted analogue microphone and receiver selections remain unproved, so
+  physical host duplex is not promoted.
 - `make verify-5210-radio-outgoing-call-lifecycle` physically enters
   `5551234`, starts CM Service and emits the firmware's called-party SETUP. It
   then proves Call Proceeding, one traffic assignment, Alerting, Connect,
   physical End, CC/RR teardown, the NSM-5 `0x860b`/`0x840a` speech-control
-  pair, and exact return to registered standby. As above, it deliberately makes
-  no PCM/media claim.
+  pair, and exact return to registered standby. The media-resilience gate owns
+  the separate digital PCM claim.
 - `make verify-5210-radio-outgoing-sms` uses only physical keys to enter
   Messages, compose the predictive-text character `a`, select Send, and enter
   destination `5551234`. The gate requires the firmware's CM Service Request,

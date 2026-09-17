@@ -233,3 +233,12 @@ a sign-extended 13-in-16 word. Both products own independently declared
 profiles even though their values match NHM-5. Neither inherits NHM-5's
 analogue routes or gains. Physical duplex remains pending identification of
 each fitted microphone input and receiver topology.
+
+NSM-5 is independently documented by Nokia's *NSM-5 System Module*, issue 1,
+02/2002, page 24
+([archived PDF](https://nnty.fun/downloads/books/cdn.preterhuman.net/texts/manuals/cellular/nokia/5210/3-nsm5sys.pdf)).
+Its COBBA-GJP derives 1 MHz `PCMDClk` from 13 MHz / 13 and 8 kHz `PCMSClk`
+by /125, carrying a sign-extended 13-bit sample in a 16-bit serial word. The
+NSM-5 profile therefore owns the same numeric bus shape through independent
+primary evidence; it does not inherit NHM-5 firmware semantics or analogue
+routing.
