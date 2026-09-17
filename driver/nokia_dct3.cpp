@@ -45,6 +45,7 @@
 #include "nokia_mad2.h"
 #include "nokia_mad2_pcm.h"
 #include "nokia_mbus.h"
+#include "nokia_mbus_terminal.h"
 #include "nokia_pup.h"
 #include "nokia_radio_peer.h"
 #include "nokia_sim_card.h"
@@ -187,6 +188,7 @@ struct nokia_product_config
 	display_geometry_contract display;
 	u8 pup_eeprom_scl_bit = 3;
 	bool mbus_timer_enabled = false;
+	bool mbus_terminal = false;
 	bool mad2_clock_stop = true;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
@@ -790,6 +792,7 @@ constexpr nokia_product_config make_2100_config()
 	result.external_service_transport = true;
 	result.external_service = EXTERNAL_SERVICE_NAM2;
 	result.mbus_timer_enabled = true;
+	result.mbus_terminal = true;
 	// NAM-2 organically follows discovery with type-70 payload 0d00. The
 	// protocol completion is the compact type-74 echo of that exact body.
 	result.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
@@ -893,6 +896,7 @@ public:
 		m_kbgpio(*this, "kbgpio"),
 		m_uif(*this, "uif"),
 		m_mbus(*this, "mbus"),
+		m_mbus_terminal(*this, "mbus_terminal"),
 		m_pup(*this, "pup"),
 		m_dspif(*this, "dspif"),
 		m_dsp_c54x(*this, "dsp_c54x"),
@@ -1040,6 +1044,7 @@ private:
 	required_device<nokia_kbgpio_device> m_kbgpio;
 	required_device<nokia_uif_device> m_uif;
 	required_device<nokia_mbus_device> m_mbus;
+	required_device<nokia_mbus_terminal_device> m_mbus_terminal;
 	required_device<nokia_pup_device> m_pup;
 	required_device<nokia_dspif_device> m_dspif;
 	nokia_dsp_backend_interface *m_dsp_backend = nullptr;
@@ -1249,6 +1254,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
 	m_mad2->set_clock_stop_enabled(product.mad2_clock_stop);
 	m_mbus->set_timer_clock_enabled(product.mbus_timer_enabled);
+	m_mbus_terminal->set_enabled(product.mbus_terminal);
 	m_kbgpio->set_wiring_contract(product.keypad_wiring);
 	m_gensio->set_wiring_contract(product.gensio_wiring);
 	m_pup->set_eeprom_scl_bit(product.pup_eeprom_scl_bit);
@@ -1795,6 +1801,7 @@ void nokia_dct3_state::mbus_fiq3_w(int state)
 
 void nokia_dct3_state::mbus_tx_w(u8 data)
 {
+	m_mbus_terminal->receive_phone_byte(data);
 	if (m_trace_enabled && m_mbus_trace_count++ < 8192)
 		LOGMASKED(LOG_MBUS, "mbus: event=TX data=%02x pc=%08x t=%.9f\n", data,
 				m_maincpu->pc(), machine().time().as_double());
@@ -2843,6 +2850,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_kbgpio->irq_cb().set(FUNC(nokia_dct3_state::kbgpio_irq_w));
 	NOKIA_UIF(config, m_uif);
 	NOKIA_MBUS(config, m_mbus);
+	NOKIA_MBUS_TERMINAL(config, m_mbus_terminal);
 	m_mbus->tx_cb().set(FUNC(nokia_dct3_state::mbus_tx_w));
 	m_mbus->fiq2_cb().set(FUNC(nokia_dct3_state::mbus_fiq2_w));
 	m_mbus->fiq3_cb().set(FUNC(nokia_dct3_state::mbus_fiq3_w));

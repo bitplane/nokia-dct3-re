@@ -59,9 +59,9 @@ void nokia_mbus_device::device_reset()
 
 u8 nokia_mbus_device::status() const
 {
-	// The low three bits are the live serial bit counter. Firmware writes 7
-	// while acknowledging the ISR, but an idle controller reads the counter as
-	// zero; echoing the write makes the ROM4 ISR re-enter its partial-byte path.
+	// Firmware writes the serial-counter field while acknowledging byte
+	// service, but reads zero at the completed-byte boundary. Echoing the write
+	// makes the ROM4 ISR re-enter its partial-byte/error path.
 	return STATUS_LINE_IDLE |
 			(m_tx_ready ? STATUS_TX_READY : 0) |
 			(m_rx_ready ? STATUS_RX_READY : 0);
@@ -120,8 +120,8 @@ void nokia_mbus_device::write(offs_t offset, u8 data)
 	}
 	case 1:
 		m_status_latch = data & 0x0f;
-		// Bit 7 resets the serial bit counter; FIQ3 is the independent periodic
-		// MBUSTIM source and is controlled through the MAD2 FIQ mask.
+		// Bit 7 resets the serial bit counter. FIQ3 is armed separately when
+		// firmware unmasks the MBUSTIM terminal event.
 		trace_event("status", data);
 		break;
 	case 2:
@@ -152,7 +152,7 @@ void nokia_mbus_device::fiq_mask_w(u8 old_mask, u8 new_mask)
 		return;
 
 	if (BIT(old_mask, 3) && !BIT(new_mask, 3))
-		m_fiq3_timer->adjust(m_fiq3_period, 0, m_fiq3_period);
+		m_fiq3_timer->adjust(m_fiq3_period);
 	else if (!BIT(old_mask, 3) && BIT(new_mask, 3))
 		m_fiq3_timer->adjust(attotime::never);
 }
@@ -169,29 +169,34 @@ TIMER_CALLBACK_MEMBER(nokia_mbus_device::byte_complete)
 		m_tx_pending = false;
 		m_tx_cb(m_tx_data);
 		// M2BUS is a single-wire bus. The controller samples its own driven byte
-		// so firmware can compare it with the transmit buffer and detect a
-		// collision when another endpoint holds the line low.
-		m_data = m_tx_data;
+		// so firmware can compare it with the transmit buffer. Its open-drain
+		// electrical result is the AND of simultaneous drivers: a peer holding
+		// any bit low wins over the phone's released/high bit.
+		const u8 wire_data = m_rx_ready ? (m_data & m_tx_data) : m_tx_data;
+		if (wire_data != m_tx_data)
+			trace_event("tx_collision", wire_data);
+		m_data = wire_data;
 		m_rx_ready = true;
 		trace_event("tx_complete", m_tx_data);
 	}
 	if (m_control & CTRL_TX_ENABLE)
 	{
 		m_tx_ready = true;
-		m_status_latch &= ~0x07;
 		m_fiq2_cb(1);
 	}
 }
 
 TIMER_CALLBACK_MEMBER(nokia_mbus_device::fiq3_event)
 {
-	// FIQ3 is the 423.1 Hz MBUS bit timer. Firmware normally masks it while a
-	// byte is shifting; do not turn a late timer edge into a second TX event.
+	// FIQ3 is the MBUSTIM terminal event one 423.1 Hz period after unmask.
+	// Firmware normally masks it while a byte is shifting; do not turn a late
+	// timer edge into a second TX event.
 	if (m_control & CTRL_TX_ENABLE)
 	{
 		trace_event("fiq3_suppressed_tx_active");
 		return;
 	}
+	m_status_latch &= ~0x07;
 	trace_event("fiq3");
 	m_fiq3_cb(1);
 }

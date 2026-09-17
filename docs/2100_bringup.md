@@ -5,9 +5,10 @@
 The hash-pinned v5.84 MCU and PPM-E streams execute through a product-local NAM-2
 profile. The firmware completes CCONT and LCD traffic, performs a 64-exchange DSP
 bootstrap, acknowledges DSP service command 4, completes the type-05 external-
-service discovery transaction and accepts a class-0x40 application registration.
-The compact type-74 completion clears the initial `CONTACT SERVICE` frame. The
-current frontier is the blank firmware-owned frame that follows registration.
+service discovery transaction, accepts a class-0x40 application registration,
+and completes its physical M2BUS terminal startup exchange. The compact type-74
+completion clears the initial `CONTACT SERVICE` frame. The current frontier is
+the blank firmware-owned frame that follows registration.
 
 This is a bounded portability frontier, not a boot or interactive promotion.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
@@ -46,8 +47,8 @@ contract is inherited merely because its values appear compatible.
   with that bit clear. A set bit is therefore not an application-readiness
   requirement.
 - The global initializer then evaluates seven predicates at `0x2f8396..0x2f83ca`
-  and spins at `0x2f83e6` while any predicate is false. The first predicate,
-  `0x3003c8`, is the only one reached in the coherent run and returns zero.
+  and spins at `0x2f83e6` while any predicate is false. Before the terminal
+  model, its first predicate `0x3003c8` returned zero.
 - `0x3003c8` composes lower-idle check `0x2fd208` with queue-empty check
   `0x2be6c0`. The queue state is empty. The lower-idle check's RAM predicates are
   also clear, but it requires MAD2 FIQ-mask register offset `0x0a` bit 3 to be
@@ -67,12 +68,25 @@ contract is inherited merely because its values appear compatible.
   packet-family resemblance is therefore insufficient evidence for a reply.
 - Public M2BUS documentation establishes terminal node `0x1d`, type-`0x7f`
   transport acknowledgements, terminal startup `D0/04`, and phone response
-  `D0/05`. A diagnostic-only run supplied those bytes through RX/FIQ2 and NAM-2
-  organically emitted the documented `D0/05`, validating the application
-  exchange. The controller now presents transmitted bytes as physical
-  single-wire echo and firmware consumes them organically; absence of the
-  external acknowledgement still causes the expected retry. No responder from
-  that trial is retained.
+  `D0/05`. The retained product-local terminal answers the organic request at
+  the byte boundary using the documented 2.5/3 ms idle periods and request-
+  derived ACK fields. NAM-2 accepts both transport ACKs and organically emits
+  `D0/05`; `make verify-2100-mbus` fixes that complete exchange as an acceptance
+  gate.
+- Closing M2BUS advances the first global-initializer predicate. The second
+  predicate also passes; the third routine `0x2c9780` returns false because byte
+  `0x10f206` is zero. The NAM-2 creation table at `0x330ef4` identifies
+  `0x21d114` as task 18. Its descriptor has the same scheduler shape as the
+  independently mapped 3210 task 18, and its straight-line initializer posts
+  readiness report `0x12` at `0x21d218`. The coherent run leaves its entire
+  state block `0x10f1d8..0x10f207` zero: task 18 remains unstarted rather than
+  failing a transaction after initialization. Its broader ownership remains
+  unresolved.
+- The post-map class-`0x00`/command-`0x5f` `EXIT ANYSTATE` stream continues while
+  the initializer spins. It is the already-classified periodic external-service
+  channel, not proof that the missing task is advancing. A 120-second run still
+  has the same blank frame and zero task state, bounding out a short scheduling
+  delay.
 - NAM-2 performs an organic five-row keypad scan. Its column mask remains `0x3f`
   at the blank frontier, so an injected host key reaches the physical matrix but
   is intentionally ignored by firmware. This is evidence that application/MMI
@@ -87,23 +101,22 @@ therefore established bounded absence only.
 
 ## First unresolved boundary
 
-The display, DSP bootstrap, service discovery, application-registration, keypad
-wiring, MBUS controller-start contract, transmit echo and 423.1 Hz FIQ3 source
-are established for v5.84. Two external evidence inputs now bound progress. The
+The display, DSP bootstrap, service discovery, application registration, keypad
+wiring, MBUS controller, terminal timing, arbitration and complete startup
+exchange are established for v5.84. The next software boundary is the service-
+gated release of task 18: the task identity and readiness-report role are
+established, while the missing resume condition is not. That condition must be
+recovered before enabling another peer or SIM/radio behavior. Separately, two
+external evidence inputs continue to bound
+product-state fidelity. The
 supplied v5.84 archive has no matching `0x3f0000..0x3fffff` EEPROM/PMM partition.
 Substituting the populated tail from the complete v5.21 image and recomputing
 the v5.84 firmware's 16-bit checksum over the `0x3fc026` calibration record
 changes early state but does not settle the v5.84 initializer, so that
-version-mismatched donor is rejected. Extending the first post-frame FIQ3 delay
-from one 423.1 Hz interval to a complete eight-bit interval also leaves the same
-predicate false, excluding a simple task-7 scheduling race. The remaining M2BUS
-uncertainty is the expected external endpoint
-plus exact oscillator phase and differing-line collision behavior. A matching
-v5.84 product-state capture and a physical NAM-2 M2BUS trace or primary MAD2
-evidence would distinguish these independently; neither a borrowed PMM nor a
-timed responder is retained.
-SIM remains dormant at this boundary; its controller and card profiles must not
-be promoted until execution reaches their firmware consumers.
+version-mismatched donor is rejected. A matching v5.84 product-state capture
+would still distinguish legitimate provisioning from erased-tail fallbacks.
+SIM and radio remain dormant at this boundary; their behavior must not be
+promoted until execution reaches their firmware consumers.
 
 ## Public evidence availability
 

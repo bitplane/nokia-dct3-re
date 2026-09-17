@@ -10,6 +10,8 @@ class MbusDeviceSplitTest(unittest.TestCase):
     def setUpClass(cls):
         cls.device = (ROOT / "driver/nokia_mbus.cpp").read_text()
         cls.header = (ROOT / "driver/nokia_mbus.h").read_text()
+        cls.terminal = (ROOT / "driver/nokia_mbus_terminal.cpp").read_text()
+        cls.terminal_header = (ROOT / "driver/nokia_mbus_terminal.h").read_text()
         cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
 
     def test_device_owns_controller_state(self):
@@ -28,7 +30,8 @@ class MbusDeviceSplitTest(unittest.TestCase):
         source = self.device + self.header
         self.assertNotIn("pc()", source)
         self.assertNotRegex(source, r"0x2[0-9a-f]{5}")
-        self.assertNotIn("service", source.lower())
+        for token in ("startup_request", "channel_map", "service_reply", "frame_checksum"):
+            self.assertNotIn(token, source.lower())
 
     def test_character_timing_is_physical_not_an_environment_knob(self):
         self.assertIn("attotime::from_hz(960)", self.header)
@@ -37,17 +40,33 @@ class MbusDeviceSplitTest(unittest.TestCase):
 
     def test_mbus_timer_is_physical_not_a_product_kick(self):
         self.assertIn("attotime::from_ticks(10, 4231)", self.header)
-        self.assertIn("m_fiq3_timer->adjust(m_fiq3_period, 0, m_fiq3_period)", self.device)
+        self.assertIn("m_fiq3_timer->adjust(m_fiq3_period)", self.device)
+        self.assertNotIn("m_fiq3_period, 0, m_fiq3_period", self.device)
         self.assertNotIn("mbus_kick_on_unmask", self.phone)
         self.assertIn("set_timer_clock_enabled", self.header)
         self.assertIn("product.mbus_timer_enabled", self.phone)
         self.assertNotIn("BIT(data, 7))\n\t\t\tm_fiq3_timer", self.device)
 
     def test_transmit_completion_samples_the_single_wire_line(self):
-        self.assertIn("m_data = m_tx_data", self.device)
+        self.assertIn("m_data & m_tx_data", self.device)
         self.assertIn("m_rx_ready = true", self.device)
-        self.assertIn("detect a", self.device)
-        self.assertIn("collision when another endpoint", self.device)
+        self.assertIn("tx_collision", self.device)
+
+    def test_terminal_is_protocol_peer_not_controller_logic(self):
+        source = self.terminal + self.terminal_header
+        self.assertIn("Nokia M2BUS terminal", source)
+        self.assertIn("attotime::from_hz(960)", source)
+        self.assertIn("attotime::from_usec(2'500)", source)
+        self.assertIn("attotime::from_msec(3)", source)
+        self.assertIn("m_mbus->receive_byte", source)
+        self.assertNotIn("pc()", source)
+        self.assertNotRegex(source, r"0x2[0-9a-f]{5}")
+
+    def test_nam2_terminal_reply_is_request_derived(self):
+        self.assertIn("m_rx[length - 2]", self.terminal)
+        self.assertIn("ack[std::size(ack) - 1] = checksum", self.terminal)
+        self.assertIn("0x01, 0x04, 0x08", self.terminal)
+        self.assertNotIn("0x05, 0x02, 0xd4", self.terminal)
 
 
 if __name__ == "__main__":
