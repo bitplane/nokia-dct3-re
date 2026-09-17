@@ -839,6 +839,11 @@ constexpr nokia_product_config make_3610_config()
 	nokia_product_config result = make_conservative_config();
 	result.gensio_wiring = GENSIO_NAM1;
 	result.display = DISPLAY_3610;
+	// NAM-1 completes its 64-exchange bootstrap, then raises command-4
+	// doorbells with service-pending value 2. Enable only the transport-level
+	// IRQ4 completion for that observed request; no packet/application peer is
+	// implied by this contract.
+	result.dsp_service = true;
 	return result;
 }
 

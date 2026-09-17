@@ -128,7 +128,7 @@ class MachineProfileTest(unittest.TestCase):
         )
         self.assertIn("result.gensio_wiring = GENSIO_NAM1;", product)
         self.assertIn("result.display = DISPLAY_3610;", product)
-        self.assertNotIn("result.dsp_service = true", product)
+        self.assertIn("result.dsp_service = true;", product)
         self.assertNotIn("result.simi_controller = true", product)
 
     def test_6110_profile_contains_only_documented_hardware_contracts(self):

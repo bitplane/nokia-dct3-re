@@ -252,7 +252,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
-.PHONY: normalize-3610 smoke-3610 verify-3610-frontier
+.PHONY: normalize-3610 smoke-3610 verify-3610-frontier verify-3610-dsp-service
 .PHONY: smoke-2100
 .PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
@@ -328,6 +328,7 @@ help:
 	@echo "make smoke-3310-639 bounded local 3310 v6.39 portability spike"
 	@echo "make smoke-2100 bounded local NAM-2 v5.84 PPM-E bring-up"
 	@echo "make verify-3610-frontier reproduce the NAM-1 v5.11 CONTACT SERVICE boundary"
+	@echo "make verify-3610-dsp-service verify NAM-1 bootstrap and IRQ4 completion"
 	@echo "make smoke-5210e bounded local 5210 v5.40 PPM E portability spike"
 	@echo "make verify-5210-frontier boot the 5210 v5.40 profile to standby"
 	@echo "make verify-5210-menu exercise the 5210 physical Menu key"
@@ -550,11 +551,20 @@ smoke-3610: normalize-3610
 verify-3610-frontier: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=3
-	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)/boot_summary.txt --reject-fiq0
+	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)/boot_summary.txt
 	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 		test -n "$$f" || { echo "3610 frontier: no LCD frame"; exit 1; }; \
 		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_3610_CONTACT_SERVICE_SHA)
 	@echo 'NAM-1 GENSIO/CCONT and 96x65 display frontier: PASS'
+
+verify-3610-dsp-service: normalize-3610 build
+	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
+		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_EXTRA_ARGS=-verbose
+	@grep -q 'bootstrap completion exchanges=64 publications=3' $(MAME_DIR)/error.log
+	@grep -q 'doorbell command=0004 pending=0002' $(MAME_DIR)/error.log
+	@grep -q 'IRQ4 service-complete request=0000' $(MAME_DIR)/error.log
+	@grep -q 'TX pending type=05 payload=10 data=1eff00d000030101e000' $(MAME_DIR)/error.log
+	@echo 'NAM-1 64-exchange bootstrap, command-4 IRQ4 and D0 discovery: PASS'
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \

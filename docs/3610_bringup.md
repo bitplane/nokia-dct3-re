@@ -15,8 +15,15 @@ nine banks of 96 bytes through GENSIO offsets `0x6e/0x2e`; the conservative
 84x48 presentation clipped and reversed the rendered text. A 96x72 controller
 with a 96x65 visible area and reversed segment order presents the complete
 firmware `CONTACT SERVICE` frame. `make verify-3610-frontier` protects that
-exact frame together with organic LCD activity, absence of soft resets and the
-absence of a fabricated DSP-to-MCU completion.
+exact frame together with organic LCD activity and absence of soft resets.
+
+The DSP transport is independently bounded. NAM-1 performs exactly 64
+zero-acknowledged exchanges and consumes three `0001` startup publications.
+It then raises six command-4 doorbells with service-pending value `2` and
+control words `0x900f`, `0x8002`, and `0x7000`. Completing that observed IRQ4
+request advances firmware into seven type-`0x05` D0 discovery publications.
+`make verify-3610-dsp-service` protects the bootstrap count, doorbell, IRQ4 and
+first exact discovery packet. It does not enable an application responder.
 
 ## Established inputs
 
@@ -31,7 +38,7 @@ absence of a fabricated DSP-to-MCU completion.
 
 ## Open boundary
 
-Identify the first DSP bootstrap or service transaction reached behind the
-now-gated display boundary.
+Recover the request-derived D0 discovery response and subsequent application
+registration contract reached behind the now-gated DSP service boundary.
 Keypad, SIM, persistent storage, external-service and radio contracts remain
 disabled until product-local evidence establishes each one.
