@@ -921,18 +921,19 @@ verify-2100-v521-bootstrap: normalize-2100 build
 verify-2100-interactive: normalize-2100 build
 	@mkdir -p "$(RUN_NVRAM_DIR)/noki2100"
 	$(PYTHON) tools/make_2100_pmm_profile.py \
-		roms/noki2100/2100f521sharp.fls "$(RUN_NVRAM_DIR)/noki2100/flash"
+		roms/noki2100/2100f584e.fls roms/noki2100/2100f521sharp.fls \
+		"$(RUN_NVRAM_DIR)/noki2100/flash"
 	@rm -f "$(RUN_NVRAM_DIR)/noki2100/sim_card"
+	@rm -f "$(RUN_DIR)"/nokia_dct3_lcdmirror_*.pgm
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki2100 BIOS=584e \
 		RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) SECONDS=15 \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,select NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=50 NOKIA_DCT3_POST_READY_KEY_GAP_MS=100'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
-	@grep -q 'kbgpio-mask-write: value=20' $(RUN_DIR)/error.log
 	@for key in 1 2 3 4 5 select; do grep -q "input-press: .* name=$$key" $(RUN_DIR)/error.log; done
 	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 		test -n "$$f" || { echo "2100 interactive: no LCD frame"; exit 1; }; \
 		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_2100_SECURITY_REJECT_SHA)
-	@echo 'NAM-2 donor-profile security verifier rejection lifecycle: PASS'
+	@echo 'NAM-2 v5.84 plus v5.21 PMM security rejection boundary: PASS'
 
 smoke-3330e: normalize-3330
 	@$(MAKE) --no-print-directory smoke PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)

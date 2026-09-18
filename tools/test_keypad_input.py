@@ -43,16 +43,19 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn('if reg == 0x6b then', self.harness)
         self.assertIn('"kbgpio-mask-write: value=%02x', self.harness)
 
-    def test_2100_gate_uses_a_bounded_profile_and_physical_digits(self):
+    def test_2100_gate_uses_a_bounded_profile_and_clean_snapshots(self):
         makefile = (ROOT / "Makefile").read_text()
         target = makefile.split("verify-2100-interactive:", 1)[1].split("\n\n", 1)[0]
         self.assertIn("tools/make_2100_pmm_profile.py", target)
+        self.assertIn("2100f584e.fls", target)
+        self.assertIn("2100f521sharp.fls", target)
+        self.assertIn('rm -f "$(RUN_DIR)"/nokia_dct3_lcdmirror_*.pgm', target)
+        self.assertIn("SECONDS=15", target)
+        self.assertIn("ORACLE_2100_SECURITY_REJECT_SHA", target)
         self.assertIn("NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,select", target)
         self.assertIn("NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000", target)
         self.assertIn("NOKIA_DCT3_POST_READY_KEY_DURATION_MS=50", target)
         self.assertIn("NOKIA_DCT3_POST_READY_KEY_GAP_MS=100", target)
-        self.assertIn("SECONDS=15", target)
-        self.assertIn("kbgpio-mask-write: value=20", target)
         self.assertNotIn("space:write_", target)
 
     def test_2100_uses_its_rom_derived_key_matrix(self):

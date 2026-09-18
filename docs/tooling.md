@@ -41,9 +41,11 @@
     `PMMCAT` segment in a flash-backed product-state image without assigning
     unproved semantics to entry types or indices.
   - `make_2100_pmm_profile.py` — builds the bounded NAM-2 v5.84 research
-    fixture described in `2100_bringup.md` from the separately acquired v5.21
-    donor. It validates the donor reference and recomputes the logical identity
-    block checksum; it is not a replacement for a matching v5.84 capture.
+    fixture described in `2100_bringup.md` by preserving the v5.84 MCU/PPM
+    partition and attaching only the separately acquired v5.21 donor's 64 KiB
+    PMM tail. It validates the donor reference and recomputes the logical
+    identity block checksum; it is not a replacement for a matching v5.84
+    capture.
   - `cobba_control_trace_check.py` — validates the mapped COBBA control-device
     conformance fixture: reset handshake plus the ordered serial-control trace,
     latched 12-bit writes, non-destructive addressed reads and select masking.

@@ -741,10 +741,10 @@
       "evidence": ["docs/cell_broadcast_and_ems.md", "tools/cell_broadcast_static_check.py"]
     },
     {
-      "id": "nam2_identity_block_has_single_byte_lock_disable", "status": "disproven",
-      "hypothesis": "One independently selectable byte in the checksum-protected NAM-2 v5.21 identity/security block disables the v5.84 startup security editor",
-      "conclusion": "A bounded census changed each of the 281 bytes before the block checksum independently, recomputed the checksum and booted v5.84 with otherwise identical hardware inputs. Every variant reached the exact same security editor. Correcting the input cadence then delivered all five digits of 12345 plus Navi before firmware masked the matrix; v5.84 completed the transaction and painted Wrong code. Three further fixtures changed the donor BCD field to 00000, 11111 and 54321, repaired the checksum and physically submitted the matching value; all produced the identical rejection frame. The three-byte credential is therefore insufficient without version-matched multi-field verifier/product state.",
-      "evidence": ["docs/2100_bringup.md", "tools/make_2100_pmm_profile.py"]
+      "id": "nam2_full_donor_fixture_executes_selected_v584_bios", "status": "disproven",
+      "hypothesis": "Selecting BIOS 584e while restoring a complete v5.21 donor flash image executes v5.84 code with only donor product state",
+      "conclusion": "MAME restores persistent flash NVRAM over the selected BIOS, so the original full-donor fixture executed v5.21 code. The 281-byte and alternate-credential censuses performed with that composition do not establish v5.84 semantics. The corrected generator preserves the complete v5.84 MCU/PPM region and imports only the donor's 64 KiB PMM partition. The first corrected gate selected a stale frame, but a subsequently isolated fresh-fixture run independently executed both v5.84 cipher calls and reproduced the physical Wrong code result.",
+      "evidence": ["docs/2100_bringup.md", "tools/make_2100_pmm_profile.py", "tools/test_make_2100_pmm_profile.py"]
     }
   ]
 }

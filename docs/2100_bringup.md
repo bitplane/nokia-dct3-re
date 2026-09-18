@@ -7,15 +7,14 @@ profile. The firmware completes CCONT and LCD traffic, performs a 64-exchange DS
 bootstrap, acknowledges DSP service command 4, completes the type-05 external-
 service discovery transaction, accepts a class-0x40 application registration,
 and completes its physical M2BUS terminal startup exchange. The compact type-74
-completion clears the initial `CONTACT SERVICE` frame. A checksum-corrected,
-v5.21-derived product-state fixture lets v5.84 finish its application batches,
-leave the charger-wait lifecycle and present an interactive security editor.
-The donor stores the ordinary BCD candidate `12 34 50` (`12345`). A correctly
-timed physical entry and Navi submission completes the editor transaction and
-v5.84 rejects it with `Wrong code!`. The rejection proves the complete input
-and decision lifecycle, but not an accepted credential or idle settlement.
+completion clears the initial `CONTACT SERVICE` frame. A checksum-corrected
+fixture that preserves the v5.84 MCU/PPM bytes and attaches only the v5.21
+donor's 64 KiB PMM partition does not make that foreign catalogue valid for
+v5.84. On a freshly seeded fixture the phone clears the service frame, presents
+the security editor and consumes physical `12345` plus Navi, but rejects it
+because the identity-derived verifier changes during the same boot.
 
-This is a bounded interactive promotion, not a default boot profile.
+This is a bounded interactive compatibility result, not a default boot profile.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
 contract is inherited merely because its values appear compatible.
 
@@ -158,66 +157,65 @@ The runtime GENSIO observation supersedes the conservative static census's zero
 direct SELECT sites. That census excluded dynamic/table-derived addressing and
 therefore established bounded absence only.
 
-## Interactive donor-profile boundary
+## Donor-profile boundary
 
-The display, DSP bootstrap, service discovery, application registration, keypad
-wiring, MBUS controller, terminal timing, arbitration and complete startup
-exchange are established for v5.84. Matching product state is required for an
-ordinary boot, but it is no longer the first unmapped control-flow boundary.
-An externally generated research fixture based on the readable v5.21 catalog,
-with its v5.84-observed block checksum corrected, passes both task-2 validation
-stages and retains readiness byte `0xc1`.
+The display, DSP bootstrap, service discovery, application registration,
+keypad wiring, MBUS controller, terminal timing, arbitration and startup
+exchange are established for v5.84. Matching product state remains the first
+unclosed input to ordinary MMI settlement. The bounded research fixture
+preserves every v5.84 executable byte and borrows only the v5.21 PMM partition.
 
-With that fixture, the supervisor resumes its first batch through tasks 6, 22,
-23, 21 and 5 with readiness `0xc1`. Task 5 processes statuses `0x012e`,
-`0x071d` and `0x14b5`, then yields. The supervisor resumes the complete second
-batch through task 16. Status `0x14b5` enters the task-5 service-completion
-handler at `0x274210`, clears its local state and runs the resource-availability
-initializer at `0x2fcb60`. Task 2 subsequently accepts the peer's 64-byte
-command-`0x70` channel map and emits its normal acknowledgement.
+The corrected composition establishes these negative facts:
 
-The remaining blank state was a board-input error, not a missing MMI message.
-The provisional profile supplied full-scale `0x3ff` on CCONT selector 2. The
-firmware diagnostic channel named the resulting lifecycle directly: `BOOT UP
-CHARGE`, `INITIALIZE`, then `WAIT CHARGER VOLTAGE`. Supplying the ordinary
-charged-pack sample `0x2c0` lets firmware leave that lifecycle, execute the
-firmware keypad-unmask site, and present its security-code editor. Physical
-digit presses cross the five-row matrix and repaint the editor. Exhaustively
-sampling the exposed matrix cells confirms the row-major map below rather than
-an inherited or transposed sibling-handset layout. The identical
-v5.84/v5.21 ROM key maps at flash offsets `0x13e420/0x13dbf0` establish the
-NAM-2 numeric, star/hash, softkey and scroll positions independently of the
-3310 layout that the prototype previously inherited. The donor security block
-contains `12 34 50`. The editor is available only during a bounded startup
-interval: the former 220 ms key cadence let that interval close before all
-digits and Navi were scanned. A 50 ms press and 100 ms gap delivers `12345`
-plus Navi before firmware masks the matrix, and firmware then paints
-`Wrong code!`. This is a real v5.84 rejection of the v5.21-derived security
-state, not the earlier incomplete-input artifact. A bounded
-checksum-correct brute-force census changed each of the 281 non-checksum bytes
-in the recovered identity block independently. Every variant reached the same
-editor, proving there is no independent one-byte lock-disable selector in that
-block. Three additional fixtures changed the visible BCD credential to `00000`,
-`11111`, and `54321`, repaired the checksum, and physically submitted the
-corresponding value; all produced the identical rejection frame. The decision
-therefore depends on version-bound multi-field verifier state or another
-product-state record, not that three-byte field alone.
-`make verify-2100-interactive` reproduces this path without firmware RAM or
-scheduler injection.
+- the v5.84 logical-PMM reader returns erased data for the security-code record
+  at logical `0x110..0x112` and the eight-byte verifier record at
+  `0x668..0x66f`;
+- the credential reader therefore takes its ROM fallback, `12345`, rather than
+  reading the donor's visible BCD field;
+- verifier initialization at `0x2ccaf0` calls the firmware cipher at `0x2fe780`
+  with packed digits `05 12 34 50`;
+- the identity preparation path `0x2e1918 -> 0x291528 -> 0x306f36` supplies the
+  sixteen-byte string `00115<<00004014\0`, including two non-decimal nibbles;
+- initialization derives verifier `d3 34 3e d8` from identity string
+  `00115<<00004014\0`; physical submission later derives `d7 36 3b df` from
+  `00116=000000243\0`. Both cipher calls use packed `05 12 34 50`, so the
+  mismatch is identity/FAID state rather than a different entered code;
+- the comparison at `0x2fe992` rejects the derived bytes and paints
+  `Wrong code!` organically.
+
+Those observations quantify the missing input without inventing it: v5.84
+requires its own PMM catalogue/descriptors, logical records `0x110` and `0x668`,
+and coherent identity/FAID material consumed by `0x2e1918`. The held archives
+contain none of those v5.84 product bytes. Their values cannot be derived from
+the v5.21 donor or from the reject branch; a matching PMM/full-flash capture is
+required.
+
+An earlier version of the fixture copied the donor's complete two-megabyte
+flash image into MAME's persistent flash NVRAM. Because restored flash NVRAM
+overrides the selected BIOS, those experiments silently executed v5.21 code
+despite selecting BIOS `584e`. Their 281-byte identity-block census and
+alternate-credential results therefore do not establish v5.84 verifier
+semantics and are retired. The corrected generator rejects unexpected image
+sizes, preserves bytes `0x000000..0x1effff` from v5.84 verbatim and imports only
+the donor PMM partition at `0x1f0000..0x1fffff`. Unit tests protect that
+composition. The first corrected run accidentally selected a stale
+higher-numbered frame from the shared run directory, so it did not independently
+prove the result. The gate now removes old snapshots; a fresh isolated run
+reproduces both cipher calls and the same `Wrong code!` frame.
+`make verify-2100-interactive` reproduces this bounded compatibility failure
+through physical keypad input without firmware-state forcing.
 
 The version-mismatched donor remains a diagnostic input rather than a
-distributable v5.84 product profile. The visible BCD value is disproven as a
-sufficient v5.84 credential under the donor state. Reaching idle requires
-matching v5.84 verifier/product state; inventing a replacement record from the
-rejection branch would be state forcing. The supplied archive
+distributable v5.84 product profile. Inventing replacement state from the
+invalid initialization result would be state forcing. The supplied archive
 `2100sharp.pmm` is also not v5.84 PMM data:
 it consists of 256 nine-byte flasher headers followed by 0x2000-byte payload
 chunks, and stripping those headers produces the byte-identical v5.21 Sharp
 full image catalogued as `2100f521sharp.fls`. The earlier experiment that loaded
 only the MCU+PPM length and reported erased donor locations is discarded.
 
-The emulation frontier is interactive MMI under a bounded donor fixture. Final
-product promotion still requires a matching v5.84 product-state capture; the
+The emulation frontier is accepted product-state validation before idle MMI.
+Promotion still requires a matching v5.84 product-state capture; the
 later selector-1 code-block upload is fully bounded and is not a substitute for
 that input.
 
