@@ -88,7 +88,7 @@ and 7 at `0x269696..0x26969e`. Two calibration checks then fail:
   `0x000..0x11b` of a `0x120`-byte calibration record and compares the result
   with the big-endian stored checksum at `0x11c`;
 - item 12 is reported as `0x0c` by the independent calibration path at
-  `0x2694e4..0x26974c`.
+  `0x2694e4..0x26974c`. The complete predicate is recovered below.
 
 The result scan clears service-status bit 6 at `0x269754`. Supervisor selector
 `0x378784` therefore omits its second resume batch, including task 19
@@ -109,6 +109,31 @@ The remaining calibration is product-specific. Do not ship a sibling PMM or
 recompute checksums over foreign values; faithful progress requires a NAM-1
 PMM dump, preferably the complete `0x5f0000..0x5fffff` active block (or the
 wider `0x550000..0x5fffff` product-state region).
+
+### Item-12 calibration predicate
+
+Function `0x2694e4` registers object `0x6509`, then reads and sums the
+`0x154`-byte logical calibration block `0x120..0x273`. Accessor `0x36f6e6`
+independently reads the big-endian 16-bit word at logical offset `0x174`.
+The function subtracts each byte of that embedded word from the block sum,
+modulo 16 bits, and publishes the resulting residual through `0x6509`.
+
+Startup then reads two more big-endian words directly:
+
+- `expected = logical_word(0x274)`;
+- `guard = logical_word(0x190)` (inside the summed block).
+
+Item 12 passes only when `residual == expected` and `(guard | residual) != 0`.
+Otherwise `0x26974c` stores result `0x0c` and `0x269754` clears service-status
+bit 6. This is intentionally stronger than a conventional trailing checksum:
+an erased or fabricated all-zero calibration block fails the nonzero guard even
+though its arithmetic residual is zero.
+
+For a recovered NAM-1 PMM, the acceptance recipe is therefore deterministic:
+load it through the normal PMM catalogue, verify item 18's `0x000..0x11f`
+record, then verify the item-12 predicate above before attempting a boot. The
+values themselves remain opaque analogue/product calibration and must not be
+borrowed from another handset merely because its checksums can be repaired.
 
 Sources for the physical partition bounds and service-tool interpretation:
 
