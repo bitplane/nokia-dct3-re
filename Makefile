@@ -252,7 +252,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells
 .PHONY: verify-3410-radio-paging verify-3410-radio-paging-preserved
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
-.PHONY: normalize-3610 smoke-3610 verify-3610-frontier verify-3610-dsp-service verify-3610-discovery verify-3610-service-control verify-3610-application verify-3610-mbus
+.PHONY: normalize-3610 smoke-3610 verify-3610-frontier verify-3610-dsp-service verify-3610-discovery verify-3610-service-control verify-3610-application verify-3610-mbus verify-3610-storage-boundary
 .PHONY: smoke-2100
 .PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
@@ -333,6 +333,7 @@ help:
 	@echo "make verify-3610-service-control verify NAM-1 compact service completion"
 	@echo "make verify-3610-application verify NAM-1 service registration and channel map"
 	@echo "make verify-3610-mbus verify NAM-1 physical terminal startup exchange"
+	@echo "make verify-3610-storage-boundary prove NAM-1 has not reached flash product state"
 	@echo "make smoke-5210e bounded local 5210 v5.40 PPM E portability spike"
 	@echo "make verify-5210-frontier boot the 5210 v5.40 profile to standby"
 	@echo "make verify-5210-menu exercise the 5210 physical Menu key"
@@ -603,6 +604,12 @@ verify-3610-mbus: normalize-3610 build
 	$(PYTHON) tools/mbus_2100_terminal_trace_check.py $(MAME_DIR)/error.log
 	@echo 'NAM-1 physical M2BUS terminal exchange: PASS'
 
+verify-3610-storage-boundary: normalize-3610 build
+	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
+		RUN_DIR=$(RUN_DIR) SECONDS=4 RUN_EXTRA_ARGS=-verbose
+	$(PYTHON) tools/flash_persistent_trace_check.py $(MAME_DIR)/error.log
+	@echo 'NAM-1 application frontier precedes persistent-flash access: PASS'
+
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \
 		--mcu roms/3330-nhm6-v450/NHM6NX04.500 \
@@ -743,7 +750,7 @@ evidence-check:
 
 test-tools:
 	$(VENV)/bin/python -m unittest tools/test_dct3_pmm_catalog.py tools/test_make_2100_pmm_profile.py
-	$(VENV)/bin/python -m unittest tools/test_eeprom_trace_check.py tools/test_storage_static_census.py
+	$(VENV)/bin/python -m unittest tools/test_eeprom_trace_check.py tools/test_storage_static_census.py tools/test_flash_persistent_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_mbus_2100_terminal_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_extract_dct3_wintesla.py
 	$(VENV)/bin/python -m unittest tools/test_nse3_v406_static_check.py

@@ -191,6 +191,7 @@ struct nokia_product_config
 	bool mbus_timer_enabled = false;
 	bool mbus_terminal = false;
 	bool mad2_clock_stop = true;
+	u32 flash_persistent_start = 0;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
 
@@ -866,6 +867,10 @@ constexpr nokia_product_config make_3610_config()
 	// exchange is therefore enabled independently of NAM-2.
 	result.mbus_timer_enabled = true;
 	result.mbus_terminal = true;
+	// NAM-1's MCU/PPM image ends at 0x54ffff. Public flash maps place its
+	// flash-backed product state in the remaining 0x550000..0x5fffff range.
+	// Keep this as an observation boundary until a matching PMM is recovered.
+	result.flash_persistent_start = 0x00550000;
 	return result;
 }
 
@@ -1167,6 +1172,7 @@ private:
 	bool          m_dspif_trace_read[4] = {false};
 	bool          m_dspif_trace_write[4] = {false};
 	std::unordered_map<uint64_t, uint16_t> m_dsp_shared_trace_reads;
+	std::unordered_set<uint64_t> m_flash_persistent_trace_reads;
 	bool          m_mcuif_trace_read[4] = {false};
 	bool          m_mcuif_trace_write[4] = {false};
 	uint8_t       m_mcuif_regs[4] = {0};
@@ -1993,11 +1999,35 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 	const u32 pc = m_maincpu->pc();
 	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
 	flash_firmware_traces(pc, addr);
-	return m_b3_flash->read(offset, mem_mask);
+	const u16 data = m_b3_flash->read(offset, mem_mask);
+	if (m_trace_enabled && m_product.flash_persistent_start &&
+			addr >= m_product.flash_persistent_start)
+	{
+		// One record per caller/page captures catalogue scans and checksum
+		// walks without logging every halfword in a large erased partition.
+		const u64 key = (u64(pc) << 24) | ((addr >> 8) & 0x00ffffff);
+		if (m_flash_persistent_trace_reads.insert(key).second)
+			LOGMASKED(LOG_GENERAL,
+					"flash_persistent_read: pc=%08x page=%08x first=%08x "
+					"data=%04x mask=%04x task=%02x t=%.6f\n",
+					pc, addr & ~u32(0xff), addr, data, mem_mask,
+					fw_byte(FW_SCHED_RUNNING_TASK_ID),
+					machine().time().as_double());
+	}
+	return data;
 }
 
 void nokia_dct3_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
+	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
+	if (m_trace_enabled && m_product.flash_persistent_start &&
+			addr >= m_product.flash_persistent_start)
+		LOGMASKED(LOG_GENERAL,
+				"flash_persistent_write: pc=%08x address=%08x data=%04x "
+				"mask=%04x task=%02x t=%.6f\n",
+				m_maincpu->pc(), addr, data, mem_mask,
+				fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				machine().time().as_double());
 	m_b3_flash->write(offset, data, mem_mask);
 }
 

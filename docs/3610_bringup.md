@@ -67,11 +67,30 @@ protocol, not inheritance from NAM-2.
 
 ## Open boundary
 
-Identify the missing product-state/PMM contract that retains the diagnostic
-service mode after the terminal exchange.
-Keypad scanning, SIMI initialization and radio startup remain dormant at this
-frontier. Persistent storage is the first unresolved input because the supplied
-MCU/PPM package ends at `0x350000` inside its 4 MiB flash region and contains no
-matching product-state tail. Do not enable SIM or radio peers merely because
-later handsets share those devices; first establish which NAM-1 product-state
-validation keeps the firmware in diagnostic service mode.
+The supplied image ends at CPU address `0x54ffff`. Public DCT3 flash maps place
+NAM-1's broad EEPROM/PMM partition at `0x550000..0x5fffff`; service tools expose
+either the final 128 KiB (`0x5e0000..0x5fffff`) or a smaller active upload
+window. A preserved Twister service-software collection contains NAM-1 firmware
+installers and virgin EEPROMs for many adjacent DCT3 products, but no 3610
+EEPROM. A matching artifact therefore remains valuable archival input.
+
+It is not the current execution boundary. A passive product-owned flash census
+observes no read or write in `0x550000..0x5fffff` during a 20-second coherent
+run, despite the firmware completing the application registration, channel map,
+channel-`0x5f` reporting and M2BUS terminal exchange. The focused
+`make verify-3610-storage-boundary` gate protects the shorter reproducible form
+of that result. Consequently a synthetic PMM cannot honestly repair the current
+frontier: the firmware has not reached its product-state loader.
+
+The immediate question is now pre-storage: which service/self-test lifecycle
+must complete before the firmware starts ordinary application initialization
+and accesses persistent state? Keypad scanning, SIMI initialization and radio
+startup remain dormant. Continue backward from those dormant consumers and the
+service-status lifecycle; do not enable their peers or borrow another product's
+PMM merely because later handsets share those components.
+
+Sources for the physical partition bounds and service-tool interpretation:
+
+- [Nokia DCT3 flash-address table](https://www.nokia-tuning.net/index.php?s=flashadress)
+- [UFSx/Tornado service manual](https://www.gsm-support.net/download/UFSxTornado_Manual_GSM-Support.pdf)
+- [Preserved Twister service-software collection](https://archive.org/details/Twister_Mobile_Phone_Flashing_Box)
