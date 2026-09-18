@@ -12,6 +12,11 @@ namespace {
 constexpr offs_t FW_SCHED_RUNNING_TASK_ID = 0x100022;
 }
 
+u8 nokia_dct3_state::trace_running_task() const
+{
+	return fw_byte(FW_SCHED_RUNNING_TASK_ID);
+}
+
 uint16_t nokia_dct3_state::fw_word(offs_t address) const
 {
 	if (address < NOKIA_RAM_BASE || address >= NOKIA_RAM_END)

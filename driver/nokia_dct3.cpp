@@ -867,6 +867,17 @@ constexpr nokia_product_config make_3610_config()
 	// exchange is therefore enabled independently of NAM-2.
 	result.mbus_timer_enabled = true;
 	result.mbus_terminal = true;
+	// NAM-1 uses the BLB-2 Li-ion pack family on the standard CCONT battery
+	// inputs. Reuse the independently recovered NSM-5 BLB-2 nominal tuple;
+	// this supplies physical board inputs while firmware retains recognition,
+	// temperature and voltage decisions.
+	result.ccont_board = ADC_5210;
+	// The ROM contains the complete later-MAD2 SIMI register driver and reads
+	// live control/status before its transaction task activates the interface.
+	// Compose the physical controller and the ordinary removable lab card;
+	// firmware remains responsible for clocking, activation and all APDUs.
+	result.simi_controller = true;
+	result.synthetic_sim_card = true;
 	// NAM-1's MCU/PPM image ends at 0x54ffff. Public flash maps place its
 	// flash-backed product state in the remaining 0x550000..0x5fffff range.
 	// Keep this as an observation boundary until a matching PMM is recovered.
@@ -1057,6 +1068,7 @@ private:
 	void dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t flash_r(offs_t offset, uint16_t mem_mask = ~0);
 	void flash_firmware_traces(u32 pc, u32 addr);
+	u8 trace_running_task() const;
 	void flash_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint32_t rom2_mirror_r(offs_t offset, uint32_t mem_mask = ~0);
 	void rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
@@ -2011,7 +2023,7 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 					"flash_persistent_read: pc=%08x page=%08x first=%08x "
 					"data=%04x mask=%04x task=%02x t=%.6f\n",
 					pc, addr & ~u32(0xff), addr, data, mem_mask,
-					fw_byte(FW_SCHED_RUNNING_TASK_ID),
+					trace_running_task(),
 					machine().time().as_double());
 	}
 	return data;
@@ -2026,7 +2038,7 @@ void nokia_dct3_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 				"flash_persistent_write: pc=%08x address=%08x data=%04x "
 				"mask=%04x task=%02x t=%.6f\n",
 				m_maincpu->pc(), addr, data, mem_mask,
-				fw_byte(FW_SCHED_RUNNING_TASK_ID),
+				trace_running_task(),
 				machine().time().as_double());
 	m_b3_flash->write(offset, data, mem_mask);
 }

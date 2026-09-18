@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that a bounded boot reaches its frontier before persistent flash."""
+"""Check direct persistent-flash bus activity in a bounded NAM-1 boot."""
 
 import sys
 from pathlib import Path
@@ -21,7 +21,7 @@ def main() -> None:
 		check(Path(sys.argv[1]).read_text(errors="replace"))
 	except ValueError as error:
 		raise SystemExit(f"persistent-flash boundary failed: {error}") from error
-	print("persistent-flash boundary: application reached; no product-state access")
+	print("persistent-flash bus: application reached; no direct product-state access")
 
 
 if __name__ == "__main__":

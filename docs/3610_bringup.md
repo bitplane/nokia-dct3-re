@@ -54,6 +54,14 @@ the final ACK. `make verify-3610-mbus` protects the complete byte-boundary
 exchange. This is independent product evidence for the shared physical
 protocol, not inheritance from NAM-2.
 
+The board composition now also includes the ordinary later-MAD2 SIMI
+controller and removable lab card. A static ROM census finds the complete
+controller driver, including its live control/status reads, and the fitted
+BLB-2 battery is represented by the independently recovered NSM-5 nominal
+CCONT tuple. These are physical inputs, not startup assists. In the current
+run the firmware does not activate SIMI because an earlier product-calibration
+gate excludes its task.
+
 ## Established inputs
 
 - MCU/PPM normalization and hashes are recorded in `roms/README.md`.
@@ -65,29 +73,42 @@ protocol, not inheritance from NAM-2.
 - The byte-write-ready contract advances beyond that loop and produces
   ordinary LCD writes with no soft reset.
 
-## Open boundary
+## Current boundary
 
 The supplied image ends at CPU address `0x54ffff`. Public DCT3 flash maps place
-NAM-1's broad EEPROM/PMM partition at `0x550000..0x5fffff`; service tools expose
-either the final 128 KiB (`0x5e0000..0x5fffff`) or a smaller active upload
-window. A preserved Twister service-software collection contains NAM-1 firmware
-installers and virgin EEPROMs for many adjacent DCT3 products, but no 3610
-EEPROM. A matching artifact therefore remains valuable archival input.
+NAM-1's PMM at `0x5f0000`; the wider product-state allocation begins at
+`0x550000`. The firmware archive contains MCU and PPM streams but no PMM.
 
-It is not the current execution boundary. A passive product-owned flash census
-observes no read or write in `0x550000..0x5fffff` during a 20-second coherent
-run, despite the firmware completing the application registration, channel map,
-channel-`0x5f` reporting and M2BUS terminal exchange. The focused
-`make verify-3610-storage-boundary` gate protects the shorter reproducible form
-of that result. Consequently a synthetic PMM cannot honestly repair the current
-frontier: the firmware has not reached its product-state loader.
+That missing product-matched data is the present boundary. Service init creates
+a 24-byte result table at `0x17fbe0` and initially sets service-status bits 6
+and 7 at `0x269696..0x26969e`. Two calibration checks then fail:
 
-The immediate question is now pre-storage: which service/self-test lifecycle
-must complete before the firmware starts ordinary application initialization
-and accesses persistent state? Keypad scanning, SIMI initialization and radio
-startup remain dormant. Continue backward from those dormant consumers and the
-service-status lifecycle; do not enable their peers or borrow another product's
-PMM merely because later handsets share those components.
+- item 18 is reported as `0x12` through `0x387030 -> 0x2696dc`. Validator
+  `0x38701e` calls logical-storage reader `0x2c6b2c`, which sums bytes
+  `0x000..0x11b` of a `0x120`-byte calibration record and compares the result
+  with the big-endian stored checksum at `0x11c`;
+- item 12 is reported as `0x0c` by the independent calibration path at
+  `0x2694e4..0x26974c`.
+
+The result scan clears service-status bit 6 at `0x269754`. Supervisor selector
+`0x378784` therefore omits its second resume batch, including task 19
+(`0x13`). The dormant chain is now bounded from that selector through the SIM
+task entry at `0x2fb194` and SIMI initializer at `0x2fa6d0`; keypad and radio
+application work are excluded by the same product-readiness decision.
+
+A passive flash-bus census still observes no *direct CPU* read or write in
+`0x550000..0x5fffff` during the bounded run. This remains a useful observation
+and is protected by `make verify-3610-storage-boundary`, but it is not evidence
+that persistent state is unused: the validators read a firmware-owned logical
+cache through `0x333438` rather than directly addressing flash.
+
+A deliberately noncanonical NHM-6 PMM experiment confirmed both sides of the
+boundary. Loading it at `0x5f0000` makes item 18 pass, proving the placement,
+record form and loader path, but item 12 still fails and the handset resets.
+The remaining calibration is product-specific. Do not ship a sibling PMM or
+recompute checksums over foreign values; faithful progress requires a NAM-1
+PMM dump, preferably the complete `0x5f0000..0x5fffff` active block (or the
+wider `0x550000..0x5fffff` product-state region).
 
 Sources for the physical partition bounds and service-tool interpretation:
 

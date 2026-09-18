@@ -333,7 +333,7 @@ help:
 	@echo "make verify-3610-service-control verify NAM-1 compact service completion"
 	@echo "make verify-3610-application verify NAM-1 service registration and channel map"
 	@echo "make verify-3610-mbus verify NAM-1 physical terminal startup exchange"
-	@echo "make verify-3610-storage-boundary prove NAM-1 has not reached flash product state"
+	@echo "make verify-3610-storage-boundary verify no direct NAM-1 product-flash bus access"
 	@echo "make smoke-5210e bounded local 5210 v5.40 PPM E portability spike"
 	@echo "make verify-5210-frontier boot the 5210 v5.40 profile to standby"
 	@echo "make verify-5210-menu exercise the 5210 physical Menu key"
@@ -595,7 +595,7 @@ verify-3610-application: normalize-3610 build
 	@grep -q 'external_service: response command=64 result=01 sequence=42' $(MAME_DIR)/error.log
 	@grep -q 'TX pending type=05 payload=20 data=1e020040000e01016403004f0d0101011b580142' $(MAME_DIR)/error.log
 	@grep -q 'TX pending type=05 payload=12 data=1e0200400006010170010143' $(MAME_DIR)/error.log
-	@grep -q 'TX pending type=05 payload=30 data=1e020000001701015f00005e010d4558495420414e59535441544501c400' $(MAME_DIR)/error.log
+	@grep -q 'TX pending type=05 payload=30 data=1e020000001701015f00006a010d4558495420414e59535441544501c400' $(MAME_DIR)/error.log
 	@echo 'NAM-1 application registration, channel map and channel-5f use: PASS'
 
 verify-3610-mbus: normalize-3610 build
@@ -608,7 +608,7 @@ verify-3610-storage-boundary: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=4 RUN_EXTRA_ARGS=-verbose
 	$(PYTHON) tools/flash_persistent_trace_check.py $(MAME_DIR)/error.log
-	@echo 'NAM-1 application frontier precedes persistent-flash access: PASS'
+	@echo 'NAM-1 application frontier has no direct persistent-flash bus access: PASS'
 
 normalize-3330:
 	$(PYTHON) tools/extract_dct3_wintesla.py \

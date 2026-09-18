@@ -12,7 +12,8 @@ class B3FlashDeviceSplitTest(unittest.TestCase):
         cls.device = (ROOT / "driver/nokia_b3_flash.cpp").read_text()
 
     def test_phone_only_routes_and_configures_b3_flash(self):
-        self.assertIn("return m_b3_flash->read(offset, mem_mask);", self.phone)
+        self.assertIn("const u16 data = m_b3_flash->read(offset, mem_mask);", self.phone)
+        self.assertIn("return data;", self.phone)
         self.assertIn("m_b3_flash->write(offset, data, mem_mask);", self.phone)
         self.assertIn("m_b3_flash->set_enabled(product.flash_b3_block_lock);", self.phone)
         for state in (

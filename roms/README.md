@@ -218,17 +218,24 @@ The other PPM members remain equally valid source material; E is not asserted
 to have a privileged hardware role.
 
 The normalized image is declared as the fail-closed `noki3610` bring-up
-machine using only the established later-MAD2 address map and 32-Mbit flash
-extent. No sibling product's keypad, display, CCONT, storage or peer contracts
-are enabled by that declaration.
+machine using the established later-MAD2 address map, 32-Mbit flash extent,
+product display/GENSIO contracts, the ordinary later-MAD2 SIMI controller and
+nominal BLB-2 CCONT inputs. No sibling product storage image is enabled.
+
+Public NAM-1 flash maps place the active PMM at `0x5f0000`, but it is absent
+from this MCU/PPM archive. Firmware validates at least two product-calibration
+records before resuming its second application-task batch. A diagnostic load
+of NHM-6 PMM data made the common `0x120`-byte checksum pass but failed the
+second product-specific calibration and reset; it is therefore not retained.
+A matching NAM-1 PMM dump is required to advance this profile faithfully.
 
 The representative image yields 670 direct MAD2 accesses from 274 literal
 seeds. Of those, 78 address PUP, 30 keypad GPIO and 29 UIF; the conservative
 scan recovers no direct GENSIO SELECT access. The byte-lane-correct CCONT scan
 finds the same 18-entry descriptor vocabulary at `0x00489b74` (literal
-references at `0x003d7a70` and `0x003ec8f8`). These results establish a strong
-MAD2-family relationship while also exposing an unresolved product-specific
-serial/control path. No executable machine profile is declared from them.
+references at `0x003d7a70` and `0x003ec8f8`). Subsequent runtime evidence
+established the product serial/control and display paths; see
+`docs/3610_bringup.md` for the current PMM boundary.
 
 The nominal firmware.center directories for 3390, 5510, 6130, 6150, 6250,
 7110, 8210, 8250, 8290, 8810, 8850, 8855 and 8890 were empty at that date.
