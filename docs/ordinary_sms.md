@@ -166,7 +166,7 @@ reference and record.
 | Nokia 3210 NSE-8 v6.00 | Complete receipt, notification, preserved cold-boot listing, physical read, read status, erase/cancel, capacity, duplicate/malformed and two-message isolation. |
 | Nokia 3310 NHM-5 v6.39 | Independent localized notification, exact `hello`, SIM read status, erase confirmation and durable deletion. Preserved-NVRAM boot reaches the message through its firmware time/date setup and Menu 2-2 path. |
 | Nokia 3410 NHM-2 v5.46E | Independent preserved-PMM receipt, notification, ordinary Messages → Inbox listing, exact `hello`, read status, erase confirmation and durable deletion. Virgin-PMM setup is completed in a separate physical preparation run. |
-| Nokia 3330 NHM-6 v4.50E | Paging, exact SIM storage, CP/RP closure and RR release pass after physical fresh-PMM provisioning. A preserved cold boot re-enters the firmware security/time editor, so physical inbox/read/delete promotion remains pending and is not bypassed. |
+| Nokia 3330 NHM-6 v4.50E | Paging, exact SIM storage, CP/RP closure and RR release pass after physical fresh-PMM provisioning. A preserved cold boot completes the firmware security/time editors through physical keys, then ordinary Messages -> Inbox navigation renders the exact text, marks EF_SMS read and erases it through the physical Options/confirmation path. The held PMM still requires those editors; the application gate does not bypass them. |
 
 The cross-product gates share only standards-level transport and record
 checks through `tools/radio_sms_acceptance_common.py`. Menu grammar, localized
@@ -193,6 +193,7 @@ JOBS=4 make verify-radio-sms-inbox-negatives
 JOBS=4 make verify-radio-sms-sequential
 JOBS=4 make verify-3310-radio-sms-inbox
 JOBS=4 make verify-3330-radio-sms-transport
+JOBS=4 make verify-3330-radio-sms-inbox
 JOBS=4 make verify-3410-radio-sms-inbox
 ```
 

@@ -258,8 +258,23 @@ the saved melody's pitch remains DSP-local; the comparison therefore proves
 durable listing and physical non-silence but not note-pitch-correlated playback.
 Neither product inherits NSE-8's EEPROM offset or promptless one-slot policy.
 
-That fixture makes the identity comparison succeed and removes the Security-code
-editor. It paints the idle frame (SHA-256 prefix `dbf2704cb945d56b`) without
+NHM-6 v4.50E has a separately bounded provisioning limitation. A fresh PMM
+accepts physical `12345`, 12:00 and 01.01.2002 and reaches idle, but a later
+cold process again presents the Security-code, Time and Date editors. The
+ordinary Menu 6-3-5 Security level path reaches its Mode selector; entering
+the same five digits is visibly accepted by the editor and then rejected as
+`Code error`. Therefore the first-boot unlock verifier and the settings
+verifier do not establish one interchangeable default-code record. No
+prompt-free PMM profile is synthesized from that ambiguity. Product gates
+which require a cold boot replay those physical editors, while the unresolved
+inventory remains the NHM-6 settings-verifier input and the PMM/identity field
+which makes it valid. This does not affect PMM ownership evidence: the received
+ringtone Save comparison changes only offsets at or above `0x350000`, and the
+preserved cold process lists and plays that object.
+
+The NSE-8 identity/security fixture makes its identity comparison succeed and
+removes the Security-code editor. It paints the idle frame (SHA-256 prefix
+`dbf2704cb945d56b`) without
 moving task 1 out of mode `0x0004`. A physical left-softkey fixture opens the
 firmware-owned `Phone book` menu from that frame, proving the UI is interactive
 and mode `0x0004` is not a blocked startup state. The provisioned profile and

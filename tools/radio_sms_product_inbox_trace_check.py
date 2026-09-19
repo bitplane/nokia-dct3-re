@@ -23,10 +23,16 @@ except ModuleNotFoundError:
     )
 
 PRODUCT_HASHES = {
-    # NHM-6 currently proves transport and SIM ownership only. Its preserved-
-    # PMM cold boot re-enters firmware time/date provisioning before ordinary
-    # inbox navigation, so no application/UI promotion is implied here.
-    "3330": {"transport": set()},
+    "3330": {
+        # Receipt completes while the locked cold boot is still in its security
+        # editor; transport and the unread SIM record are the semantic evidence.
+        "transport": set(),
+        "received": set(),
+        "read": {
+            "0dfb0e58ff397aa8cf7891c395deb4fef442d5050606464ee9ab70aa131ae8c4"},
+        "deleted": {
+            "80f824d05fbb9d3e4592c57aa5091b24891e106dd0fe00770e2864398b0f39ff"},
+    },
     "3310": {
         "received": {
             "5b59a304d1f24eef14559a0fa7ce17f1c40975f3dd105a7934114a6a69911af2"},

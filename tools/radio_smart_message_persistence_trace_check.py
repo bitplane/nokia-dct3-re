@@ -30,12 +30,16 @@ NHM5_COLD_LISTING_SCREEN_SHA256 = frozenset({
     "9a3860263374ebe67d0a1e8af995e079538b224c6f21fc1ffead6655a7ea3362",
     "85b23d7e6553c188132bbae3243b512b5dbe32079b182e9bddb42277d133e940",
 })
+NHM6_COLD_LISTING_SCREEN_SHA256 = frozenset({
+    "ed31a5fc72ca20177bda966e828a4566e61fd6f702dda68eb787cf3d6d0e2e78",
+})
 
 # NHM-2 and NHM-5 fit their product-management data into the flash device,
 # unlike NSE-8's separate received-tone EEPROM object.  The lower bounds are
 # product layout evidence; they are deliberately not a shared DCT3 offset.
 NHM2_PMM_START = 0x360000
 NHM5_PMM_START = 0x1E0000
+NHM6_PMM_START = 0x350000
 
 DOWNLINK = re.compile(
     r"GSM service downlink kind=16 sapi=3 pd=09 message=01 .*t=([0-9.]+)")
@@ -139,6 +143,7 @@ def verify_pmm_product(
     profiles = {
         "nhm2": (NHM2_PMM_START, NHM2_COLD_LISTING_SCREEN_SHA256, 5),
         "nhm5": (NHM5_PMM_START, NHM5_COLD_LISTING_SCREEN_SHA256, 0),
+        "nhm6": (NHM6_PMM_START, NHM6_COLD_LISTING_SCREEN_SHA256, 5),
     }
     if product not in profiles:
         raise ValueError(f"unsupported PMM persistence product {product!r}")
@@ -188,7 +193,7 @@ def verify_pmm_product(
 
 
 def main() -> int:
-    if len(sys.argv) == 11 and sys.argv[1] in ("nhm2", "nhm5"):
+    if len(sys.argv) == 11 and sys.argv[1] in ("nhm2", "nhm5", "nhm6"):
         def optional_bytes(path: str) -> bytes:
             candidate = pathlib.Path(path)
             return candidate.read_bytes() if candidate.exists() else b""
@@ -217,7 +222,7 @@ def main() -> int:
             "MAME_ERROR_LOG SNAPSHOT_DIR EEPROM FLASH REFERENCE_FLASH "
             "saved|cold|discarded\n"
             "   or: radio_smart_message_persistence_trace_check.py "
-            "nhm2|nhm5 MAME_ERROR_LOG SNAPSHOT_DIR FLASH REFERENCE_FLASH "
+            "nhm2|nhm5|nhm6 MAME_ERROR_LOG SNAPSHOT_DIR FLASH REFERENCE_FLASH "
             "EEPROM REFERENCE_EEPROM SIM REFERENCE_SIM saved|cold")
     try:
         verify(

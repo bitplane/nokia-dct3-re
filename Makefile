@@ -138,6 +138,11 @@ ORACLE_3610_CONTACT_SERVICE_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321
 # firmware editors; keeping the sequence named makes the lengthy first-boot
 # precondition reviewable in every 3330 gate.
 NOKI3330_FIRST_BOOT_KEYS := 1,2,3,4,5,enter,wait8000,1,2,0,0,enter,wait1200,0,1,0,1,2,0,0,2,wait600,enter
+NOKI3330_COLD_SETUP_KEYS := $(NOKI3330_FIRST_BOOT_KEYS)
+NOKI3330_SMS_READ_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,down,wait800,enter,wait800,down,wait800,enter,wait800,enter
+NOKI3330_SMS_DELETE_KEYS := $(NOKI3330_SMS_READ_KEYS),wait1000,enter,wait800,enter,wait800,enter
+NOKI3330_SMART_SAVE_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,down,wait800,enter,wait1200,enter,wait1200,enter,wait1200,enter
+NOKI3330_SMART_PLAY_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,5,wait800,4,wait1000,enter,wait1200,enter,wait1200,enter
 NOKI3330_FIRST_BOOT_INPUT := NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
 	NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280
 
@@ -284,9 +289,9 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-radio-outgoing-sms
 .PHONY: verify-3410-radio-sms-inbox
 .PHONY: verify-3310-radio-sms-inbox
-.PHONY: verify-3330-radio-sms-transport
+.PHONY: verify-3330-radio-sms-transport verify-3330-radio-sms-inbox
 .PHONY: verify-3310-radio-incoming-smart-message
-.PHONY: verify-3330-radio-incoming-smart-message
+.PHONY: verify-3330-radio-incoming-smart-message verify-3330-radio-smart-message-persistence
 .PHONY: verify-3410-radio-incoming-smart-message
 .PHONY: verify-3310-radio-outgoing-call-host-termination
 .PHONY: verify-3330-radio-outgoing-call-host-termination

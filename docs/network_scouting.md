@@ -541,9 +541,14 @@ outcomes without normalizing them into one generic rejection.
 NHM-2 v5.46E independently renders `Ringing tone received`, and physical
 Options/Playback produces the same note-varying payload through its own UI and
 PUP path. NHM-5 v6.39 independently reaches its localized receive menu and
-plays the tone. Preserved-PMM NHM-6 produces its distinct completion tone, but
-its cold-boot time editor still obscures a reproducible physical Play oracle;
-that comparison is not promoted beyond application notification.
+plays the tone. Preserved-PMM NHM-6 produces its distinct completion tone and
+its physical Options -> Save path selects and confirms a PMM-backed user slot.
+An ordinary cold process then lists `Test for Dhiram` at Tones 5-4-1 and
+Options -> Play replays the reconstructed note stream through PUP. The gate
+compares a no-save reference and confines durable changes to NHM-6's
+product-management flash region; its setup editors are completed physically,
+not bypassed. This lifecycle is gated by
+`make verify-3330-radio-smart-message-persistence`.
 
 The NSE-8 persistence continuation is now independently gated by `make
 verify-radio-smart-message-persistence`. Physical Options → Save immediately

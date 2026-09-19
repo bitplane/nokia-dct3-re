@@ -112,6 +112,19 @@ class SmartMessagePersistenceTraceCheckTest(unittest.TestCase):
                 DELIVERIES, self._snapshots("unused"), bytes(saved), reference,
                 b"eeprom", b"eeprom", b"sim", b"sim", "nhm2", "saved")
 
+    def test_nhm6_cold_listing_and_pup_playback(self):
+        reference = b"\xff" * 0x350100
+        saved = bytearray(reference)
+        saved[0x350000:0x350080] = b"\x55" * 0x80
+        with mock.patch(
+                "tools.radio_smart_message_persistence_trace_check."
+                "_frame_hashes", return_value={
+                    "ed31a5fc72ca20177bda966e828a4566e61fd6f702dda68eb"
+                    "787cf3d6d0e2e78"}):
+            verify_pmm_product(
+                NOTES, self._snapshots("unused"), bytes(saved), reference,
+                b"eeprom", b"eeprom", b"sim", b"sim", "nhm6", "cold")
+
     def test_pmm_product_keeps_other_nonvolatile_stores_unchanged(self):
         reference = b"\xff" * 0x1E0100
         saved = bytearray(reference)

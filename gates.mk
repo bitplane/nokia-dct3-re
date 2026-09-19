@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 313 gates: 170 generated from typed steps, 143 copied verbatim (shell).
+# 315 gates: 172 generated from typed steps, 143 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -173,8 +173,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-incoming-ems verify-radio-sms-inbox verify-radio-sms-inbox-state \
 	verify-radio-sms-inbox-negatives verify-radio-sms-sequential \
 	verify-3410-radio-sms-inbox verify-3310-radio-sms-inbox \
-	verify-3330-radio-sms-transport verify-radio-incoming-smart-message \
-	verify-radio-incoming-smart-message-state \
+	verify-3330-radio-sms-transport verify-3330-radio-sms-inbox \
+	verify-radio-incoming-smart-message verify-radio-incoming-smart-message-state \
 	verify-radio-smart-message-application \
 	verify-radio-smart-message-application-state \
 	verify-radio-smart-message-invalid-rtpl \
@@ -188,6 +188,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-smart-message-application \
 	verify-3310-radio-incoming-smart-message \
 	verify-3330-radio-incoming-smart-message \
+	verify-3330-radio-smart-message-persistence \
 	verify-3410-radio-incoming-smart-message verify-radio-operator verify-mad2 \
 	verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep \
 	verify-mad2-timer1 verify-mad2-reset verify-mbus verify-buzzer \
@@ -2772,6 +2773,15 @@ verify-3330-radio-sms-transport: normalize-3330
 	@$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_receive SECONDS=40 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'
 	$(PYTHON) tools/radio_sms_product_inbox_trace_check.py 3330 transport $(RUN_DIR)_receive/error.log $(RUN_DIR)_receive $(RUN_DIR)_provision/nvram/noki3330_1/sim_card
 
+verify-3330-radio-sms-inbox: normalize-3330
+	@$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_receive SECONDS=40 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'
+	$(PYTHON) tools/radio_sms_product_inbox_trace_check.py 3330 received $(RUN_DIR)_receive/error.log $(RUN_DIR)_receive $(RUN_DIR)_provision/nvram/noki3330_1/sim_card
+	@$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_read SECONDS=62 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMS_READ_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	$(PYTHON) tools/radio_sms_product_inbox_trace_check.py 3330 read $(RUN_DIR)_read/error.log $(RUN_DIR)_read $(RUN_DIR)_provision/nvram/noki3330_1/sim_card
+	@$(MAKE) --no-print-directory run-prebuilt-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_delete SECONDS=68 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMS_DELETE_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'
+	$(PYTHON) tools/radio_sms_product_inbox_trace_check.py 3330 deleted $(RUN_DIR)_delete/error.log $(RUN_DIR)_delete $(RUN_DIR)_provision/nvram/noki3330_1/sim_card
+
 verify-radio-incoming-smart-message:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
@@ -2971,6 +2981,15 @@ verify-3330-radio-incoming-smart-message: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_sms SECONDS=35 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
 	cp $(MAME_DIR)/error.log $(RUN_DIR)_sms/error.log
 	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py $(RUN_DIR)_sms/error.log $(RUN_DIR)_provision/nvram/noki3330_1/sim_card
+
+verify-3330-radio-smart-message-persistence: normalize-3330
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_reference_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_save_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_reference SECONDS=58 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_reference_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_COLD_SETUP_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'
+	@$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_save SECONDS=75 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_save_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMART_SAVE_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'
+	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py nhm6 $(RUN_DIR)_save/error.log $(RUN_DIR)_save $(RUN_DIR)_save_provision/nvram/noki3330_1/flash $(RUN_DIR)_reference_provision/nvram/noki3330_1/flash $(RUN_DIR)_save_provision/nvram/noki3330_1/eeprom $(RUN_DIR)_reference_provision/nvram/noki3330_1/eeprom $(RUN_DIR)_save_provision/nvram/noki3330_1/sim_card $(RUN_DIR)_reference_provision/nvram/noki3330_1/sim_card saved
+	@$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_cold SECONDS=74 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_save_provision/nvram) RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMART_PLAY_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'
+	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py nhm6 $(RUN_DIR)_cold/error.log $(RUN_DIR)_cold $(RUN_DIR)_save_provision/nvram/noki3330_1/flash $(RUN_DIR)_reference_provision/nvram/noki3330_1/flash $(RUN_DIR)_save_provision/nvram/noki3330_1/eeprom $(RUN_DIR)_reference_provision/nvram/noki3330_1/eeprom $(RUN_DIR)_save_provision/nvram/noki3330_1/sim_card $(RUN_DIR)_reference_provision/nvram/noki3330_1/sim_card cold
 
 verify-3410-radio-incoming-smart-message: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'

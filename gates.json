@@ -9270,6 +9270,128 @@
       ]
     },
     {
+      "name": "verify-3330-radio-sms-inbox",
+      "prerequisites": [
+        "normalize-3330"
+      ],
+      "variables": {},
+      "steps": [
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run-captured",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_provision",
+            "SECONDS=44",
+            "RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_provision",
+            "SECONDS": "44",
+            "RUN_ENV": "'$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+          }
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run-prebuilt-captured",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_receive",
+            "SECONDS=40",
+            "RUN_VERBOSE=1",
+            "PRESERVE_NVRAM=1",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram)",
+            "RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_receive",
+            "SECONDS": "40",
+            "RUN_VERBOSE": "1",
+            "PRESERVE_NVRAM": "1",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_provision/nvram)",
+            "RUN_EXTRA_ARGS": "'$(RADIO_INCOMING_SMS_ARGS)'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_sms_product_inbox_trace_check.py",
+          "arguments": ["3330", "received", "$(RUN_DIR)_receive/error.log", "$(RUN_DIR)_receive", "$(RUN_DIR)_provision/nvram/noki3330_1/sim_card"],
+          "options": []
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run-prebuilt-captured",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_read",
+            "SECONDS=62",
+            "RUN_VERBOSE=1",
+            "PRESERVE_NVRAM=1",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram)",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMS_READ_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_read",
+            "SECONDS": "62",
+            "RUN_VERBOSE": "1",
+            "PRESERVE_NVRAM": "1",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_provision/nvram)",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMS_READ_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_sms_product_inbox_trace_check.py",
+          "arguments": ["3330", "read", "$(RUN_DIR)_read/error.log", "$(RUN_DIR)_read", "$(RUN_DIR)_provision/nvram/noki3330_1/sim_card"],
+          "options": []
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run-prebuilt-captured",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_delete",
+            "SECONDS=68",
+            "RUN_VERBOSE=1",
+            "PRESERVE_NVRAM=1",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram)",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMS_DELETE_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_delete",
+            "SECONDS": "68",
+            "RUN_VERBOSE": "1",
+            "PRESERVE_NVRAM": "1",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_provision/nvram)",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMS_DELETE_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1200'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_sms_product_inbox_trace_check.py",
+          "arguments": ["3330", "deleted", "$(RUN_DIR)_delete/error.log", "$(RUN_DIR)_delete", "$(RUN_DIR)_provision/nvram/noki3330_1/sim_card"],
+          "options": []
+        }
+      ]
+    },
+    {
       "name": "verify-radio-incoming-smart-message",
       "prerequisites": [],
       "variables": {},
@@ -10297,6 +10419,140 @@
             "$(RUN_DIR)_sms/error.log",
             "$(RUN_DIR)_provision/nvram/noki3330_1/sim_card"
           ],
+          "options": []
+        }
+      ]
+    },
+    {
+      "name": "verify-3330-radio-smart-message-persistence",
+      "prerequisites": [
+        "normalize-3330"
+      ],
+      "variables": {},
+      "steps": [
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_reference_provision",
+            "SECONDS=44",
+            "RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_reference_provision",
+            "SECONDS": "44",
+            "RUN_ENV": "'$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+          }
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_save_provision",
+            "SECONDS=44",
+            "RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_save_provision",
+            "SECONDS": "44",
+            "RUN_ENV": "'$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+          }
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_reference",
+            "SECONDS=58",
+            "RUN_VERBOSE=1",
+            "PRESERVE_NVRAM=1",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_reference_provision/nvram)",
+            "RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_COLD_SETUP_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_reference",
+            "SECONDS": "58",
+            "RUN_VERBOSE": "1",
+            "PRESERVE_NVRAM": "1",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_reference_provision/nvram)",
+            "RUN_EXTRA_ARGS": "'$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_COLD_SETUP_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'"
+          }
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run-captured",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_save",
+            "SECONDS=75",
+            "RUN_VERBOSE=1",
+            "PRESERVE_NVRAM=1",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_save_provision/nvram)",
+            "RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMART_SAVE_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_save",
+            "SECONDS": "75",
+            "RUN_VERBOSE": "1",
+            "PRESERVE_NVRAM": "1",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_save_provision/nvram)",
+            "RUN_EXTRA_ARGS": "'$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMART_SAVE_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_smart_message_persistence_trace_check.py",
+          "arguments": ["nhm6", "$(RUN_DIR)_save/error.log", "$(RUN_DIR)_save", "$(RUN_DIR)_save_provision/nvram/noki3330_1/flash", "$(RUN_DIR)_reference_provision/nvram/noki3330_1/flash", "$(RUN_DIR)_save_provision/nvram/noki3330_1/eeprom", "$(RUN_DIR)_reference_provision/nvram/noki3330_1/eeprom", "$(RUN_DIR)_save_provision/nvram/noki3330_1/sim_card", "$(RUN_DIR)_reference_provision/nvram/noki3330_1/sim_card", "saved"],
+          "options": []
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": ["--no-print-directory"],
+          "run_target": "run-captured",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)_cold",
+            "SECONDS=74",
+            "RUN_VERBOSE=1",
+            "PRESERVE_NVRAM=1",
+            "RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_save_provision/nvram)",
+            "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMART_PLAY_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)_cold",
+            "SECONDS": "74",
+            "RUN_VERBOSE": "1",
+            "PRESERVE_NVRAM": "1",
+            "RUN_NVRAM_DIR": "$(abspath $(RUN_DIR)_save_provision/nvram)",
+            "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SMART_PLAY_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=3000'"
+          }
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/radio_smart_message_persistence_trace_check.py",
+          "arguments": ["nhm6", "$(RUN_DIR)_cold/error.log", "$(RUN_DIR)_cold", "$(RUN_DIR)_save_provision/nvram/noki3330_1/flash", "$(RUN_DIR)_reference_provision/nvram/noki3330_1/flash", "$(RUN_DIR)_save_provision/nvram/noki3330_1/eeprom", "$(RUN_DIR)_reference_provision/nvram/noki3330_1/eeprom", "$(RUN_DIR)_save_provision/nvram/noki3330_1/sim_card", "$(RUN_DIR)_reference_provision/nvram/noki3330_1/sim_card", "cold"],
           "options": []
         }
       ]
