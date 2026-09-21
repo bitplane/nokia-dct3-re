@@ -70,6 +70,20 @@ void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 {
 	if (!m_trace_enabled)
 		return;
+	// NHM-6 relocates the NSE-8 five-digit phone-code verifier. Observe its
+	// transformed attempt and four-byte PMM-derived comparison record.
+	if (pc == addr && addr == 0x003894da)
+	{
+		const u32 sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
+		LOGMASKED(LOG_FLASH,
+				"nhm6_security_verify: stage=compare transformed="
+				"%02x%02x%02x%02x stored=%02x%02x%02x%02x "
+				"task=%02x t=%.6f\n",
+				fw_byte(sp), fw_byte(sp + 1), fw_byte(sp + 2), fw_byte(sp + 3),
+				fw_byte(0x001265d0), fw_byte(0x001265d1),
+				fw_byte(0x001265d2), fw_byte(0x001265d3),
+				fw_byte(FW_SCHED_RUNNING_TASK_ID), machine().time().as_double());
+	}
 	// NSE-1 reset-reason boundary. This is a temporary ROM4 bring-up probe;
 	// the reset itself remains entirely firmware-owned.
 	if (pc == addr && addr == 0x002927a6)

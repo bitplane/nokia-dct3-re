@@ -258,19 +258,25 @@ the saved melody's pitch remains DSP-local; the comparison therefore proves
 durable listing and physical non-silence but not note-pitch-correlated playback.
 Neither product inherits NSE-8's EEPROM offset or promptless one-slot policy.
 
-NHM-6 v4.50E has a separately bounded provisioning limitation. A fresh PMM
-accepts physical `12345`, 12:00 and 01.01.2002 and reaches idle, but a later
-cold process again presents the Security-code, Time and Date editors. The
-ordinary Menu 6-3-5 Security level path reaches its Mode selector; entering
-the same five digits is visibly accepted by the editor and then rejected as
-`Code error`. Therefore the first-boot unlock verifier and the settings
-verifier do not establish one interchangeable default-code record. No
-prompt-free PMM profile is synthesized from that ambiguity. Product gates
-which require a cold boot replay those physical editors, while the unresolved
-inventory remains the NHM-6 settings-verifier input and the PMM/identity field
-which makes it valid. This does not affect PMM ownership evidence: the received
-ringtone Save comparison changes only offsets at or above `0x350000`, and the
-preserved cold process lists and plays that object.
+NHM-6 v4.50E uses the same five-digit verifier shape but the acquired virgin
+PMM is internally unsettled. Its bulk load maps PMM `0x0026` to RAM `0x100044`,
+placing verifier bytes `d4 35 37 dc` from PMM offset `0x069a` at RAM
+`0x1006b8`. The firmware copies those bytes to active state `0x1265d0`, then
+its own identity transform at `0x389294` derives `d8 3b 30 d8`. Relocated
+verifier `0x3894b0` accepts physical `12345` against that derived value during
+first boot. A later catalogue reload restores the stale virgin bytes, which is
+why the identical Settings entry previously produced `Code error`.
+
+`tools/make_3330_pmm_profile.py` is a fail-closed research fixture: it requires
+the exact acquired PMM SHA-256 and original four bytes, preserves every other
+firmware/PMM byte, and substitutes only the firmware-derived verifier. `make
+verify-3330-security-profile` proves both organic comparisons use
+`d83b30d8` and reach the Security level selector. This is an evidenced
+consistency repair, not a claim that the resulting image is a factory dump or
+a prompt-free configured handset. The canonical product ROM remains the
+unmodified acquired PMM. Ringtone persistence remains independent: its Save
+comparison changes only offsets at or above `0x350000` and preserved cold boot
+lists and plays the object.
 
 The NSE-8 identity/security fixture makes its identity comparison succeed and
 removes the Security-code editor. It paints the idle frame (SHA-256 prefix

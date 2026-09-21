@@ -108,8 +108,9 @@ ORACLE_3310_IDLE_SHA ?= 5871dd93badb1fa410dd22a6b7a12cf2d3b8f938e1514e989858dd45
 ORACLE_3310_MENU_SHA ?= e0890d021f0e11de1978f9ecbcfa0321191ac3741da1379f82337c715079851a
 ORACLE_3310_PHONEBOOK_NAV_SHA ?= 06ea6abd47a1c603fc60382a2ba7e78d7a1247de2a13079374b48fd6796e793e
 ORACLE_3310_ANSWERED_UI_SHA ?= a9330101aff6ef85f7bc8625794c707a3a7a45f9b426be0548b2af1a86dfb0f5
-ORACLE_3330_IDLE_SHA ?= f40de8661baf671706ad626bb89a7e2aece9c391597318248ffd592c7cfd867d
+ORACLE_3330_IDLE_SHA ?= 04ee0e57cce0070de4651e58e7a8a4e3e6a559ee6496c47483d1fa2fcff00339
 ORACLE_3330_MESSAGES_SHA ?= 61d28951699e81a78dbafa8b094cc2690b53f41ec2f61bbb5599e0bb61d569a0
+ORACLE_3330_SECURITY_LEVEL_SHA ?= 534136e65c9684159088e4762302388de9fa9c778fcb63e0712a246ab836cdbb
 ORACLE_3410_IDLE_SHA ?= f8301b6c4314a28056c16234e2561fa6d48eeb2d13e946353eb7d3ccbc28f767
 ORACLE_3410_MESSAGES_SHA ?= d4500eddc39090d3604fd9c79a974242f484d16e8a490cb0d4cb0e91b2d4d89e
 # Returning from Messages reaches a different centisecond animation phase from
@@ -139,6 +140,7 @@ ORACLE_3610_CONTACT_SERVICE_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321
 # precondition reviewable in every 3330 gate.
 NOKI3330_FIRST_BOOT_KEYS := 1,2,3,4,5,enter,wait8000,1,2,0,0,enter,wait1200,0,1,0,1,2,0,0,2,wait600,enter
 NOKI3330_COLD_SETUP_KEYS := $(NOKI3330_FIRST_BOOT_KEYS)
+NOKI3330_SECURITY_SETTINGS_KEYS := $(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait700,6,wait700,3,wait700,5,wait700,enter,wait700,1,2,3,4,5,enter
 NOKI3330_SMS_READ_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,down,wait800,enter,wait800,down,wait800,enter,wait800,enter
 NOKI3330_SMS_DELETE_KEYS := $(NOKI3330_SMS_READ_KEYS),wait1000,enter,wait800,enter,wait800,enter
 NOKI3330_SMART_SAVE_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,down,wait800,enter,wait1200,enter,wait1200,enter,wait1200,enter
@@ -393,6 +395,7 @@ help:
 	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
 	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
 	@echo "make verify-3330-frontier complete virgin-PMM setup and reach v4.50 idle"
+	@echo "make verify-3330-security-profile validate the derived phone-code PMM record"
 	@echo "make verify-3330-navigation navigate v4.50 to Messages and return to idle"
 	@echo "make verify-3410-frontier compact the virgin PMM and wake the v5.46 idle UI"
 	@echo "make verify-3410-menu open the v5.46 Messages menu through the physical keypad"
@@ -754,7 +757,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_dct3_pmm_catalog.py tools/test_make_2100_pmm_profile.py
+	$(VENV)/bin/python -m unittest tools/test_dct3_pmm_catalog.py tools/test_make_2100_pmm_profile.py tools/test_make_3330_pmm_profile.py tools/test_nhm6_security_profile_check.py
 	$(VENV)/bin/python -m unittest tools/test_eeprom_trace_check.py tools/test_storage_static_census.py tools/test_flash_persistent_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_mbus_2100_terminal_trace_check.py
 	$(VENV)/bin/python -m unittest tools/test_extract_dct3_wintesla.py

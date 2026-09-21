@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 315 gates: 172 generated from typed steps, 143 copied verbatim (shell).
+# 316 gates: 173 generated from typed steps, 143 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -74,14 +74,14 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-all-cell-loss verify-5210-radio-reselection-paging \
 	verify-5210-radio-incoming-sms-read verify-5210-navigation \
 	verify-5210-save-state verify-3310-frontier verify-3310-menu \
-	verify-3310-navigation verify-3330-frontier verify-3330-navigation \
-	verify-3410-frontier verify-3410-menu verify-3410-navigation verify-flash-pmm \
-	verify-model-frontier-state verify-model-frontier-negative verify-radio-camp \
-	verify-radio-registration verify-radio-reselection-same-lac \
-	verify-radio-reselection-different-lac verify-radio-reselection-state \
-	verify-radio-reselection-preserved verify-radio-loss-recovery \
-	verify-radio-loss-recovery-state verify-radio-all-cell-loss \
-	verify-radio-reselection-unsuitable-neighbours \
+	verify-3310-navigation verify-3330-frontier verify-3330-security-profile \
+	verify-3330-navigation verify-3410-frontier verify-3410-menu \
+	verify-3410-navigation verify-flash-pmm verify-model-frontier-state \
+	verify-model-frontier-negative verify-radio-camp verify-radio-registration \
+	verify-radio-reselection-same-lac verify-radio-reselection-different-lac \
+	verify-radio-reselection-state verify-radio-reselection-preserved \
+	verify-radio-loss-recovery verify-radio-loss-recovery-state \
+	verify-radio-all-cell-loss verify-radio-reselection-unsuitable-neighbours \
 	verify-radio-reselection-paging verify-3310-radio-reselection-same-lac \
 	verify-3310-radio-reselection-different-lac \
 	verify-3310-radio-reselection-state verify-3310-radio-reselection-preserved \
@@ -650,6 +650,14 @@ verify-3330-frontier: normalize-3330
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 3330 idle frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_IDLE_SHA)
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)/boot_summary.txt --require-fiq0
 	@echo "OK — 3330 v4.50 completed virgin-PMM setup and reached idle"
+
+verify-3330-security-profile: normalize-3330 build
+	$(PYTHON) tools/make_3330_pmm_profile.py roms/noki3330/3330f450e.fls "roms/noki3330/3330 virgin eeprom 005f0000.fls" "$(RUN_NVRAM_DIR)/noki3330_1/flash"
+	@$(MAKE) --no-print-directory run-prebuilt $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) PRESERVE_NVRAM=1 SECONDS=56 RUN_VERBOSE=1 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SECURITY_SETTINGS_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
+	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	$(PYTHON) tools/nhm6_security_profile_check.py $(RUN_DIR)/error.log
+	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 3330 security-level frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_SECURITY_LEVEL_SHA)
+	@echo "OK — 3330 v4.50 derived PMM accepts the same phone code at first boot and in Settings"
 
 verify-3330-navigation: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_forward SECONDS=49 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait900,down NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'

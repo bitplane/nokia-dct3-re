@@ -6,12 +6,18 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 38
-Differences found: 62
+Families with more than one product: 40
+Differences found: 66
 
 ## ROM normalisation reachability
 
-Every product gate reaches its own ROM normalisation step.
+A gate listed here never reaches its product's ROM
+normalisation step, so it passes only when an earlier
+invocation left the extracted images behind.
+
+- **normalize-5210** not reached by:
+  - `verify-5210-radio-outgoing-physical-duplex`
+  - `verify-5210-radio-physical-duplex`
 
 ## Family membership
 
@@ -40,12 +46,14 @@ absent product is a coverage question, not a drifted gate.
 | `radio-outgoing-call-host-media` | yes | — | — | yes | — |
 | `radio-outgoing-call-host-termination` | yes | yes | yes | yes | — |
 | `radio-outgoing-call-lifecycle` | yes | yes | yes | yes | — |
+| `radio-outgoing-physical-duplex` | — | — | yes | yes | — |
 | `radio-outgoing-sms` | yes | yes | yes | yes | — |
 | `radio-paging` | yes | yes | yes | yes | — |
 | `radio-paging-negatives` | — | — | yes | yes | — |
 | `radio-paging-preserved` | — | — | yes | yes | — |
 | `radio-paging-state` | — | — | yes | yes | — |
 | `radio-periodic-location-update` | yes | — | — | yes | — |
+| `radio-physical-duplex` | — | yes | yes | yes | — |
 | `radio-registration` | yes | yes | yes | yes | — |
 | `radio-registration-preserved` | — | — | yes | yes | — |
 | `radio-registration-state` | — | — | yes | yes | — |
@@ -55,8 +63,8 @@ absent product is a coverage question, not a drifted gate.
 | `radio-reselection-same-lac` | yes | yes | yes | yes | — |
 | `radio-reselection-state` | yes | yes | yes | yes | — |
 | `radio-smart-message-application` | yes | yes | — | yes | — |
-| `radio-smart-message-persistence` | yes | yes | — | yes | — |
-| `radio-sms-inbox` | yes | yes | — | yes | — |
+| `radio-smart-message-persistence` | yes | yes | yes | yes | — |
+| `radio-sms-inbox` | yes | yes | yes | yes | — |
 | `radio-unsuitable-cells` | — | — | yes | yes | — |
 
 ## Different checker scripts
@@ -143,6 +151,12 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: _(none)_
 - shared: `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
 
+### `radio-outgoing-physical-duplex`
+
+- **3330**: `tools/check_model_frontier_summary.py`
+- **3410**: _(none)_
+- shared: `tools/radio_outgoing_call_trace_check.py`, `tools/run_physical_uplink_gate.sh`
+
 ### `radio-outgoing-sms`
 
 - **3210**: `tools/radio_outgoing_sms_trace_check.py`
@@ -169,10 +183,18 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `tools/radio_periodic_location_update_trace_check.py`
 - **3410**: `tools/radio_3410_periodic_location_update_trace_check.py`
 
+### `radio-physical-duplex`
+
+- **3310**: `tools/radio_3310_speech_control_trace_check.py`
+- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_3330_incoming_call_boundary_check.py`
+- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
+- shared: `tools/run_physical_uplink_gate.sh`
+
 ### `radio-smart-message-persistence`
 
 - **3210**: `tools/radio_smart_message_envelope_trace_check.py`
 - **3310**: _(none)_
+- **3330**: _(none)_
 - **3410**: _(none)_
 - shared: `tools/radio_smart_message_persistence_trace_check.py`
 
@@ -180,6 +202,7 @@ absent product is a coverage question, not a drifted gate.
 
 - **3210**: `tools/radio_sms_inbox_trace_check.py`
 - **3310**: `tools/radio_sms_product_inbox_trace_check.py`
+- **3330**: `tools/radio_sms_product_inbox_trace_check.py`
 - **3410**: `tools/radio_sms_product_inbox_trace_check.py`
 
 ### `radio-unsuitable-cells`
@@ -245,6 +268,7 @@ absent product is a coverage question, not a drifted gate.
 
 - **3210**: `build`
 - **3310**: _(none)_
+- **3330**: _(none)_
 - **3410**: _(none)_
 
 ## Different run duration
@@ -289,6 +313,11 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `35`, `44`
 - **3410**: `45`
 
+### `radio-outgoing-physical-duplex`
+
+- **3330**: `44`
+- **3410**: _(none)_
+
 ### `radio-paging`
 
 - **3210**: `32`
@@ -300,6 +329,12 @@ absent product is a coverage question, not a drifted gate.
 
 - **3330**: `28`
 - **3410**: `30`
+
+### `radio-physical-duplex`
+
+- **3310**: _(none)_
+- **3330**: `44`
+- **3410**: _(none)_
 
 ### `radio-registration`
 
@@ -351,12 +386,14 @@ absent product is a coverage question, not a drifted gate.
 
 - **3210**: `42`, `50`, `52`
 - **3310**: `48`, `58`
+- **3330**: `44`, `58`, `74`, `75`
 - **3410**: `52`, `55`
 
 ### `radio-sms-inbox`
 
 - **3210**: `42`, `55`, `65`
 - **3310**: `45`, `50`, `55`
+- **3330**: `40`, `44`, `62`, `68`
 - **3410**: `35`, `40`, `45`
 
 ## Not comparable — a member hides its steps in shell

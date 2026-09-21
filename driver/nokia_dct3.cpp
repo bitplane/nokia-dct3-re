@@ -70,11 +70,12 @@
 #define LOG_MAD2_LEDGER             (1U << 14)
 #define LOG_MAD2_TIMERS             (1U << 15)
 #define LOG_MBUS                    (1U << 16)
+#define LOG_FLASH                   (1U << 17)
 
 #define VERBOSE (LOG_CCONT_RTC | LOG_CCONT_WATCHDOG | LOG_DISPLAY | LOG_DISPLAY_IO | \
 		LOG_DISPLAY_PROFILE | LOG_DSP_BOUNDARY | LOG_DSP_SHARED | LOG_GENSIO | \
 		LOG_MAD2_CLOCKS | LOG_MAD2_INTERRUPTS | LOG_MAD2_LEDGER | \
-		LOG_MAD2_TIMERS | LOG_MBUS)
+		LOG_MAD2_TIMERS | LOG_MBUS | LOG_FLASH)
 #include "logmacro.h"
 
 namespace {
@@ -591,6 +592,11 @@ constexpr nokia_product_config make_3330_config()
 	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
 	result.cobba_hle_voice.output = nokia_cobba_device::ear;
 	result.ccont_board = ADC_STANDARD;
+	// NHM-6's supplied PMM image is loaded at flash offset 0x3f0000,
+	// CPU address 0x5f0000. Firmware-created objects may use earlier erased
+	// sectors, but they are not part of the static PMM catalogue boundary.
+	// This only enables attribution; the flash device still owns all storage.
+	result.flash_persistent_start = 0x005f0000;
 	return result;
 }
 
@@ -2019,7 +2025,7 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 		// walks without logging every halfword in a large erased partition.
 		const u64 key = (u64(pc) << 24) | ((addr >> 8) & 0x00ffffff);
 		if (m_flash_persistent_trace_reads.insert(key).second)
-			LOGMASKED(LOG_GENERAL,
+			LOGMASKED(LOG_FLASH,
 					"flash_persistent_read: pc=%08x page=%08x first=%08x "
 					"data=%04x mask=%04x task=%02x t=%.6f\n",
 					pc, addr & ~u32(0xff), addr, data, mem_mask,
@@ -2034,7 +2040,7 @@ void nokia_dct3_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
 	if (m_trace_enabled && m_product.flash_persistent_start &&
 			addr >= m_product.flash_persistent_start)
-		LOGMASKED(LOG_GENERAL,
+		LOGMASKED(LOG_FLASH,
 				"flash_persistent_write: pc=%08x address=%08x data=%04x "
 				"mask=%04x task=%02x t=%.6f\n",
 				m_maincpu->pc(), addr, data, mem_mask,

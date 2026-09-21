@@ -46,6 +46,11 @@
     PMM tail. It validates the donor reference and recomputes the logical
     identity block checksum; it is not a replacement for a matching v5.84
     capture.
+  - `make_3330_pmm_profile.py` — builds the bounded NHM-6 v4.50
+    settled-security fixture. It validates the exact acquired virgin PMM and
+    replaces only the four verifier bytes that firmware derives during first
+    boot. `nhm6_security_profile_check.py` requires matching first-boot and
+    Settings comparisons under `make verify-3330-security-profile`.
   - `cobba_control_trace_check.py` — validates the mapped COBBA control-device
     conformance fixture: reset handshake plus the ordered serial-control trace,
     latched 12-bit writes, non-destructive addressed reads and select masking.

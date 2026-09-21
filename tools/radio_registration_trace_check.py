@@ -75,7 +75,10 @@ PROFILE_ARFCN = {
 PROFILE_DECONFIG_PREFIX = {
     "nse8": "041202",
     "nhm5": "041202",
-    "nhm6": "041202",
+    # NHM-6's ordinary registration release publishes the same zeroed
+    # header observed in its candidate/serving channel-change family.  The
+    # older 0x041202 expectation was borrowed from NHM-5 packet grammar.
+    "nhm6": "040000",
     "nhm2": "041202",
     "nsm5": "040000",
 }

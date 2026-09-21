@@ -2445,6 +2445,72 @@
       ]
     },
     {
+      "name": "verify-3330-security-profile",
+      "prerequisites": [
+        "normalize-3330",
+        "build"
+      ],
+      "variables": {},
+      "steps": [
+        {
+          "step": "prepare",
+          "silent": false,
+          "command": "$(PYTHON) tools/make_3330_pmm_profile.py roms/noki3330/3330f450e.fls \"roms/noki3330/3330 virgin eeprom 005f0000.fls\" \"$(RUN_NVRAM_DIR)/noki3330_1/flash\""
+        },
+        {
+          "step": "run",
+          "silent": true,
+          "make_flags": [
+            "--no-print-directory"
+          ],
+          "run_target": "run-prebuilt",
+          "tokens": [
+            "$(DCT3_RUN_3330)",
+            "RUN_DIR=$(RUN_DIR)",
+            "RUN_NVRAM_DIR=$(RUN_NVRAM_DIR)",
+            "PRESERVE_NVRAM=1",
+            "SECONDS=56",
+            "RUN_VERBOSE=1",
+            "RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SECURITY_SETTINGS_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'"
+          ],
+          "parameters": {
+            "RUN_DIR": "$(RUN_DIR)",
+            "RUN_NVRAM_DIR": "$(RUN_NVRAM_DIR)",
+            "PRESERVE_NVRAM": "1",
+            "SECONDS": "56",
+            "RUN_VERBOSE": "1",
+            "RUN_ENV": "'$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SECURITY_SETTINGS_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'"
+          }
+        },
+        {
+          "step": "capture_log",
+          "silent": false,
+          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+        },
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/nhm6_security_profile_check.py",
+          "arguments": [
+            "$(RUN_DIR)/error.log"
+          ],
+          "options": []
+        },
+        {
+          "step": "shell",
+          "silent": true,
+          "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no informative 3330 security-level frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_3330_SECURITY_LEVEL_SHA)"
+        },
+        {
+          "step": "announce",
+          "silent": true,
+          "command": "echo \"OK — 3330 v4.50 derived PMM accepts the same phone code at first boot and in Settings\""
+        }
+      ]
+    },
+    {
       "name": "verify-3330-navigation",
       "prerequisites": [
         "normalize-3330"

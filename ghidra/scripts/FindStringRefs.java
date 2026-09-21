@@ -18,6 +18,9 @@ public class FindStringRefs extends GhidraScript {
 		"Snake",
 		"Welcome",
 		"Insert SIM",
+		"Code error",
+		"Security level",
+		"security code",
 	};
 
 	@Override

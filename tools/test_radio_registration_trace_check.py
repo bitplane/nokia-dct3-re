@@ -52,7 +52,7 @@ NHM6_GOOD = NHM5_GOOD.replace(
     "03370000030045050200f110",
 ).replace(
     "data=041202000000001a600000580000000f00000000",
-    "data=041202000000001a600003370000000f00000000",
+    "data=040000000000001a600003370000000f00000000",
 )
 
 NHM2_GOOD = NHM5_GOOD.replace(
@@ -123,6 +123,13 @@ class RegistrationTraceCheckTest(unittest.TestCase):
                 "data=0100000000000000",
                 "data=0000000000000000",
                 1,
+            ), "nhm6")
+
+    def test_nhm6_rejects_borrowed_nhm5_release_prefix(self):
+        with self.assertRaisesRegex(ValueError, "RR channel deconfiguration"):
+            verify(NHM6_GOOD.replace(
+                "data=040000000000001a600003370000000f00000000",
+                "data=041202000000001a600003370000000f00000000",
             ), "nhm6")
 
     def test_nhm5_rejects_nse8_channel_deconfiguration(self):
