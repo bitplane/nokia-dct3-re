@@ -7,7 +7,7 @@ product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
 Families with more than one product: 47
-Differences found: 86
+Differences found: 87
 
 ## ROM normalisation reachability
 
@@ -25,7 +25,7 @@ absent product is a coverage question, not a drifted gate.
 | `mbus` | yes | yes | — | — | — | yes | — | — | — |
 | `menu` | — | — | yes | — | yes | — | yes | yes | — |
 | `navigation` | — | — | yes | yes | yes | — | — | yes | — |
-| `power-lifecycle` | — | yes | — | — | — | — | — | yes | — |
+| `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — |
 | `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — |
 | `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — |
 | `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | yes | — |
@@ -96,6 +96,7 @@ absent product is a coverage question, not a drifted gate.
 ### `power-lifecycle`
 
 - **3210**: `tools/power_lifecycle_check.py`
+- **5110**: `tools/make_5110_eeprom_profile.py`, `tools/power_5110_trace_check.py`
 - **5210**: `tools/check_lcd_frame.py`, `tools/power_5210_trace_check.py`
 
 ### `radio-a5-1-handover`
@@ -361,6 +362,12 @@ absent product is a coverage question, not a drifted gate.
 - **5110**: `build`
 - **5210**: _(none)_
 
+### `power-lifecycle`
+
+- **3210**: _(none)_
+- **5110**: `build`
+- **5210**: _(none)_
+
 ### `radio-media-resilience`
 
 - **3310**: _(none)_
@@ -408,11 +415,6 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `49`, `51`
 - **3410**: `22`, `24`
 - **5210**: `25`
-
-### `power-lifecycle`
-
-- **3210**: `18`, `22`
-- **5210**: `20`, `25`
 
 ### `radio-all-cell-loss`
 
@@ -533,6 +535,12 @@ absent product is a coverage question, not a drifted gate.
 
 - **3310**: `structured`
 - **3410**: `structured`
+- **5110**: `shell`
+- **5210**: `structured`
+
+### `power-lifecycle`
+
+- **3210**: `structured`
 - **5110**: `shell`
 - **5210**: `structured`
 

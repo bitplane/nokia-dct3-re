@@ -114,21 +114,23 @@ NSE-1 uses KBGPIO data/command ports `0x2b`/`0x2c` and a five-row matrix.
 Firmware temporarily masks all columns while changing row drive and consumes
 the cold-start power indication as a one-shot. MAD2 IRQ0 acknowledgement must
 therefore clear that latch and adopt the released matrix as its new baseline;
-retaining it as a held key makes column 1 permanently low and hides subsequent
+retaining it as a held key makes column 4 permanently low and hides subsequent
 physical input transitions.
 
-Cold-start and operational power-button ownership are not interchangeable on
-this ROM. The NSE-1 board contract places the power indication on special
-column mask `0x02`; both the reset latch and live input sampling use that mask.
-A physical post-boot press consequently reaches IRQ0 and the scanner at
-`0x290c2c`, which records raw special value `0x81` at `0x10b6c8`. The active
-firmware key-map variant remains zero, however, and its table at `0x2ab518`
-maps that value to `0x3e` (no key), not semantic key `0x0d`. A one- and
-four-second hold therefore produces no shutdown transaction. The neighboring
-variant does contain `0x0d`, but no observed or statically direct writer selects
-it; forcing that selector would not establish the operational power circuit.
-NSE-1 shutdown input ownership remains unresolved rather than being assigned
-to KBGPIO from the cold-start evidence alone.
+The first NSE-1 wiring hypothesis used special column mask `0x02`. It reached
+IRQ0 and scanner `0x290c2c`, but yielded raw `0x81` and no shutdown. The
+translation at `0x291ba0` reads selector byte `0x10b5ba` (zero throughout the
+observed boot) and indexes the five-byte special-key table at `0x2ab518`.
+The active table maps `0x81` to `0x3e` (no key), but `0x84` to `0x0d` (power).
+The former claim that a neighboring key-map variant was needed was wrong:
+`0x0d` is in the active variant, at special column 4.
+
+With NSE-1 power wired to column mask `0x10`, the cold-entry/menu oracle still
+passes. A physical press at 8 s produces semantic `0x0d`; a 220 ms press
+releases without rail-off, while a sustained hold reaches CCONT rail-off at
+9.363 s. `make verify-5110-power-lifecycle` checks both paths without a
+firmware-state write or injected key event. This establishes a ROM-consistent
+input contract; the exact board trace still awaits physical-board evidence.
 
 At about 8.54 seconds this ROM writes clock-control value `0x0e` from
 `0x292868`. The ROM4 wake protocol after that request remains unresolved, so

@@ -245,7 +245,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 
 .PHONY: help venv download-mame overlay eeprom-profile normalize-2100 normalize-3330 normalize-3410 normalize-5210 roms build swap16 census gates gate-parity controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census board-io-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive call-bridge smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms audit-dsp-rom4 check-dsp-rom4-cosim frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-cell-broadcast-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-2100-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
-.PHONY: check-c54x-core prepare-c54x-rom4-fixture check-c54x-rom4-execute check-c54x-rom4-cold-execute check-c54x-rom4-coherent check-c54x-rom4-rf-boundary verify-5110-menu verify-5110-save-state check-c54x-rom4-transform check-c54x-rom4-snapshot check-c54x-opcode-coverage
+.PHONY: check-c54x-core prepare-c54x-rom4-fixture check-c54x-rom4-execute check-c54x-rom4-cold-execute check-c54x-rom4-coherent check-c54x-rom4-rf-boundary verify-5110-menu verify-5110-save-state verify-5110-power-lifecycle check-c54x-rom4-transform check-c54x-rom4-snapshot check-c54x-opcode-coverage
 .PHONY: storage-static-census mad2-residual-census
 .PHONY: verify-eeprom
 .PHONY: smoke-5210e
@@ -391,6 +391,7 @@ help:
 	@echo "make verify-3410-radio-paging check NHM-2 PCH access and Paging Response"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
 	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu"
+	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses"
 	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu"
 	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
 	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
@@ -1017,6 +1018,28 @@ verify-5110-menu: build
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
 		echo 'NSE-1 ROM4 unassisted Phone book menu: PASS'
+
+verify-5110-power-lifecycle: build
+	@set -eu; for kind in short long; do \
+		tmp="$$(mktemp -d /tmp/noki5110-power.XXXXXX)"; \
+		mkdir -p "$$tmp/nvram/noki5110"; \
+		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
+			--eeprom $(abspath roms/noki5110/nse-1.bin) \
+			--flash $(abspath roms/noki5110/5110f530.fls) \
+			--output "$$tmp/nvram/noki5110/eeprom"; \
+		if test "$$kind" = short; then duration=220; seconds=11; else duration=4000; seconds=14; fi; \
+		(cd "$$tmp"; \
+			NOKIA_DCT3_POST_READY_KEYS=power \
+			NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
+			NOKIA_DCT3_POST_READY_KEY_DURATION_MS="$$duration" \
+			$(abspath $(MAME_DIR))/mame noki5110 \
+				-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
+				-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
+				-seconds_to_run "$$seconds" \
+				-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null); \
+		$(PYTHON) tools/power_5110_trace_check.py "$$kind" "$$tmp/error.log"; \
+		rm -rf "$$tmp"; \
+	done
 
 verify-5110-save-state: build
 	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-state.XXXXXX)"; \

@@ -54,7 +54,7 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
         for field in ("row_signal", "column_input", "column_irq_mask", "row_direction"):
             self.assertIn(f"offset == m_wiring.{field}", self.device)
         self.assertIn("KEYPAD_NSE1", self.phone)
-        self.assertIn("5, 0x02, 0x31, 0x30, 0x33, 0x2f", self.phone)
+        self.assertIn("5, 0x10, 0x31, 0x30, 0x33, 0x2f", self.phone)
 
     def test_device_is_save_state_safe_and_firmware_agnostic(self):
         source = self.device + self.header

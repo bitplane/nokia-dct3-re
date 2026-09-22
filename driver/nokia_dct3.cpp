@@ -318,8 +318,9 @@ static_assert(nokia_mad2_device::dsp_reset_wiring_contract{}.valid());
 static_assert(DSP_RESET_WIRING_3410.valid());
 
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE8 = { 4, 0x01 };
+// ROM4's active special-key table maps raw 0x84 (column 4) to power 0x0d.
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE1 = {
-	5, 0x02, 0x31, 0x30, 0x33, 0x2f
+	5, 0x10, 0x31, 0x30, 0x33, 0x2f
 };
 constexpr nokia_gensio_device::wiring_contract GENSIO_NSE1 = {
 	0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true
