@@ -36,6 +36,12 @@ class AcceptanceRunIsolationTest(unittest.TestCase):
             body = self.makefile.split(f"{target}:", 1)[1].split("\n\n", 1)[0]
             self.assertIn("prepare_host_run", body, target)
 
+    def test_host_gate_processes_use_the_isolated_runner(self):
+        gates = (ROOT / "gates.mk").read_text()
+        self.assertNotIn("--cwd $(MAME_DIR)", gates)
+        self.assertNotIn("\t\t\t./mame ", gates)
+        self.assertIn("tools/run_mame_isolated.py", gates)
+
     def test_preserved_3330_call_cleans_artifacts_without_reseeding(self):
         body = self.makefile.split(
             "verify-3330-radio-outgoing-call-host-termination:", 1

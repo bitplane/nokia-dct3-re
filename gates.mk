@@ -1411,8 +1411,8 @@ verify-radio-call-divert-incoming: build
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_diverted_call_gate.py \
-			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1436,8 +1436,8 @@ verify-radio-call-divert-busy: build
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_busy_forward_gate.py \
-			--port $(HOST_CALL_BUSY_FORWARD_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_BUSY_FORWARD_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1461,8 +1461,8 @@ verify-radio-call-divert-unreachable: build
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_unreachable_forward_gate.py \
-			--port $(HOST_CALL_UNREACHABLE_FORWARD_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_UNREACHABLE_FORWARD_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1486,8 +1486,8 @@ verify-radio-call-divert-no-reply: build
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_no_reply_forward_gate.py \
-			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1677,8 +1677,8 @@ verify-radio-incoming-call-host-adapter:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_incoming_call_gate.py \
-			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) --frames 40 -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd . --frames 40 -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1706,9 +1706,9 @@ verify-radio-incoming-call-host-restore:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_incoming_call_gate.py \
-			--port $(HOST_CALL_INCOMING_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_INCOMING_PORT) --cwd . \
 			--frames 80 --require-restore -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1734,9 +1734,9 @@ verify-radio-outgoing-call-host-adapter:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_ADAPTER_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_ADAPTER_PORT) --cwd . \
 			$(HOST_CALL_ADAPTER_RUNNER_ARGS) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			$(HOST_CALL_ADAPTER_THROTTLE) \
@@ -1771,8 +1771,8 @@ verify-radio-outgoing-call-host-local-end:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_local_end_gate.py \
-			--port $(HOST_CALL_ADAPTER_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_ADAPTER_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-throttle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1800,9 +1800,9 @@ verify-radio-outgoing-call-host-termination:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_TERMINATION_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_TERMINATION_PORT) --cwd . \
 			--decision connect --terminate -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1828,9 +1828,9 @@ verify-radio-outgoing-call-host-alerting-termination:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_ALERTING_TERMINATION_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_ALERTING_TERMINATION_PORT) --cwd . \
 			--decision no_answer --terminate -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1856,9 +1856,9 @@ verify-radio-outgoing-call-host-media:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_MEDIA_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_MEDIA_PORT) --cwd . \
 			--decision connect --media-frames 200 -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1886,8 +1886,8 @@ verify-radio-outgoing-call-host-reconnect:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_reconnect_gate.py \
-			--port $(HOST_CALL_RECONNECT_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_RECONNECT_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1914,8 +1914,8 @@ verify-radio-outgoing-call-host-alerting-reconnect:
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_reconnect_gate.py \
 			--port $(HOST_CALL_ALERTING_TERMINATION_PORT) \
-			--cwd $(MAME_DIR) --phase alerting -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--cwd . --phase alerting -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1943,8 +1943,8 @@ verify-radio-outgoing-call-host-media-restore:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_media_restore_gate.py \
-			--port $(HOST_CALL_RECONNECT_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_RECONNECT_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -1973,9 +1973,9 @@ verify-radio-outgoing-call-host-release-restore:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_MEDIA_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_MEDIA_PORT) --cwd . \
 			--decision connect --media-frames 200 -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2005,8 +2005,8 @@ verify-radio-outgoing-call-host-two-calls:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_two_calls_gate.py \
-			--port $(HOST_CALL_TWO_CALLS_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_CALL_TWO_CALLS_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo \
 			-nothrottle -autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2034,9 +2034,9 @@ verify-3410-radio-outgoing-call-host-termination: normalize-3410
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_3410_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_3410_PORT) --cwd . \
 			--decision connect --terminate -- \
-			./mame noki3410 -bios 546e -rompath roms -log \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3410 -bios 546e -rompath roms -log \
 			-video none -sound none -keyboardprovider none \
 			-mouseprovider none -lightgunprovider none -joystickprovider none \
 			-midiprovider none -skip_gameinfo -nothrottle \
@@ -2061,9 +2061,9 @@ verify-3410-radio-outgoing-call-host-media: normalize-3410
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_3410_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_3410_PORT) --cwd . \
 			--decision connect --media-frames 200 -- \
-			./mame noki3410 -bios 546e -rompath roms -log \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3410 -bios 546e -rompath roms -log \
 			-video none -sound none -keyboardprovider none \
 			-mouseprovider none -lightgunprovider none -joystickprovider none \
 			-midiprovider none -skip_gameinfo -nothrottle \
@@ -2088,9 +2088,9 @@ verify-3310-radio-outgoing-call-host-termination:
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_3310_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_3310_PORT) --cwd . \
 			--decision connect --terminate -- \
-			./mame noki3310 -bios 639 -rompath roms -log \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3310 -bios 639 -rompath roms -log \
 			-video none -sound none -keyboardprovider none \
 			-mouseprovider none -lightgunprovider none -joystickprovider none \
 			-midiprovider none -skip_gameinfo -nothrottle \
@@ -2122,9 +2122,9 @@ verify-3330-radio-outgoing-call-host-termination: normalize-3330
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)_call) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR)_call)/boot_summary.txt \
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
-			--port $(HOST_CALL_3330_PORT) --cwd $(MAME_DIR) \
+			--port $(HOST_CALL_3330_PORT) --cwd . \
 			--decision connect --terminate -- \
-			./mame noki3330 -bios 450e -rompath roms -log \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3330 -bios 450e -rompath roms -log \
 			-video none -sound none -keyboardprovider none \
 			-mouseprovider none -lightgunprovider none -joystickprovider none \
 			-midiprovider none -skip_gameinfo -nothrottle \
@@ -2365,8 +2365,8 @@ verify-radio-incoming-sms-host-adapter:
 	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		$(VENV)/bin/python tools/run_host_incoming_sms_gate.py \
-			--port $(HOST_SMS_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_SMS_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2387,8 +2387,8 @@ verify-radio-incoming-sms-host-restore:
 		NOKIA_DCT3_STATE_ROUNDTRIP_AT=16.5 \
 		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
 		$(VENV)/bin/python tools/run_host_incoming_sms_gate.py --require-restore \
-			--port $(HOST_INCOMING_SMS_RESTORE_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_INCOMING_SMS_RESTORE_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2410,8 +2410,8 @@ verify-radio-outgoing-sms-host-adapter:
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
 		$(DCT3_PRESS_180_300) \
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
-		$(VENV)/bin/python tools/run_host_sms_gate.py --port $(HOST_SMS_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+		$(VENV)/bin/python tools/run_host_sms_gate.py --port $(HOST_SMS_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2435,8 +2435,8 @@ verify-radio-outgoing-sms-host-restore:
 		NOKIA_DCT3_STATE_ROUNDTRIP_AT=35.0 \
 		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
-		$(VENV)/bin/python tools/run_host_sms_gate.py --require-restore --port $(HOST_SMS_RESTORE_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+		$(VENV)/bin/python tools/run_host_sms_gate.py --require-restore --port $(HOST_SMS_RESTORE_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2458,8 +2458,8 @@ verify-radio-ussd-host-adapter:
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
 		$(DCT3_PRESS_220_280) \
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
-		$(VENV)/bin/python tools/run_host_ussd_gate.py --port $(HOST_USSD_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+		$(VENV)/bin/python tools/run_host_ussd_gate.py --port $(HOST_USSD_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2483,8 +2483,8 @@ verify-radio-ussd-host-restore:
 		NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.3 \
 		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
-		$(VENV)/bin/python tools/run_host_ussd_gate.py --require-restore --port $(HOST_USSD_RESTORE_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+		$(VENV)/bin/python tools/run_host_ussd_gate.py --require-restore --port $(HOST_USSD_RESTORE_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2503,8 +2503,8 @@ verify-radio-incoming-ussd-host-adapter:
 	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		$(VENV)/bin/python tools/run_host_incoming_ussd_gate.py \
-			--port $(HOST_INCOMING_USSD_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_INCOMING_USSD_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -2525,8 +2525,8 @@ verify-radio-incoming-ussd-host-restore:
 		NOKIA_DCT3_STATE_ROUNDTRIP_AT=16.5 \
 		NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 \
 		$(VENV)/bin/python tools/run_host_incoming_ussd_gate.py --require-restore \
-			--port $(HOST_INCOMING_USSD_RESTORE_PORT) --cwd $(MAME_DIR) -- \
-			./mame noki3210 -rompath roms -log -video none -sound none \
+			--port $(HOST_INCOMING_USSD_RESTORE_PORT) --cwd . -- \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
