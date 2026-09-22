@@ -247,6 +247,17 @@ channel activation is a plausible interpretation, not yet an established name.
 The next static target is the initializer/dispatcher that assigns `0x121f` and
 the `0x18xx/0x19xx` block; do not synthesize port-`0x38/0x39` readiness before
 that firmware-owned mode transition is identified.
+One scheduling layer above that dispatcher is now bounded. Routine `0x9a56`
+calls `0x771c`; the recovered data ROM contains `0x9a56` in 17 terminated
+function-list records between `0xedf7` and `0xeee6`. A temporary program-fetch
+counter recorded zero executions of `0x771c` in 30 seconds. At the same point,
+the type-`0x1a` handler's state was live (`0x0284=0x0001`,
+`0x0287=0x7fff`), while `0x121f`, `0x1974` and the downstream mode block were
+zero. Therefore neither the dispatcher nor its port-facing child is merely
+rejecting an active search value: the DROM function list containing `0x9a56`
+has not been scheduled. The next bounded question is which list selector and
+event install those `0xedxx/0xeexx` records into the frame schedule. This is a
+firmware scheduling contract, upstream of COBBA or SCU response semantics.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory
