@@ -234,6 +234,19 @@ removed. This excludes a missed live call into this cluster during that boot;
 it does not identify the dormant MCU request, establish SCU register ownership,
 or decode a port-`0x27` sample word. DSP I/O ports `0x38/0x39` must not be confused
 with MCU MAD2 offsets `0x38/0x39`, which are SIMI registers in this driver.
+The callers are guarded by a second, compact control block rather than one
+isolated enable. Static decoding shows the `0x50b6` caller selects values
+`0x0070`, `0x0080`, `0x00b0` or `0x00b1` from DSP data word `0x121f`; the
+neighboring callers consume words in `0x18df..0x1973`. A read-only terminal
+snapshot after the same 30-second run found `0x121f` and all 16 referenced
+words in that range still zero. This excludes a final missed edge into an
+otherwise initialized `0x7b0a` path: the operating-mode state consumed by the
+whole caller family was never established. It also weakens the assumption that
+this family is the ordinary cell-search entrance. Traffic-channel or dedicated-
+channel activation is a plausible interpretation, not yet an established name.
+The next static target is the initializer/dispatcher that assigns `0x121f` and
+the `0x18xx/0x19xx` block; do not synthesize port-`0x38/0x39` readiness before
+that firmware-owned mode transition is identified.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory
@@ -260,9 +273,10 @@ after the handler returns; the existing port-`0x27` cadence continues and the
 `0x32/0x38/0x39` counts remain zero. Temporary write/read taps used for this
 classification were removed. Thus the observed search-list packet is accepted
 and stored, but does not by itself enter the dormant parallel receive path or
-establish an RF acquisition. The next software-side question is what activates
-the separately mapped `0x7b0a` routine or consumes this stored workspace;
-injecting a reply or waveform at type-`0x1a` would skip that missing boundary.
+establish an RF acquisition. The next software-side question is what consumes
+this stored workspace and which DSP path owns ordinary acquisition. Separately,
+the `0x7b0a` mode initializer remains useful for later dedicated-channel work;
+injecting a reply or waveform at type-`0x1a` would skip both boundaries.
 
 The next evidence should compare a no-cell boot with a real NSE-1 receiving
 one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
