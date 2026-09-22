@@ -103,8 +103,8 @@ DSPIF backing array for the mapped HPI view. It is retired.
 
 `make verify-5110-menu` extends that result through the handset UI. It creates
 a fresh NSE-1 EEPROM profile, boots v5.30 with the C54x backend, and applies a
-physical Menu-key transition before the firmware's unresolved idle clock-stop
-request. The key reaches MAD2 IRQ0 and the ROM4 five-by-five matrix scanner;
+physical Menu-key transition during ordinary awake idle. The key reaches
+MAD2 IRQ0 and the ROM4 five-by-five matrix scanner;
 firmware renders the Phone book menu with deterministic frame SHA-256
 `d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5`.
 The gate rejects baseband resets and illegal DSP instructions. It uses no HLE
