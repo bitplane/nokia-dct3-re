@@ -247,17 +247,34 @@ channel activation is a plausible interpretation, not yet an established name.
 The next static target is the initializer/dispatcher that assigns `0x121f` and
 the `0x18xx/0x19xx` block; do not synthesize port-`0x38/0x39` readiness before
 that firmware-owned mode transition is identified.
-One scheduling layer above that dispatcher is now bounded. Routine `0x9a56`
-calls `0x771c`; the recovered data ROM contains `0x9a56` in 17 terminated
-function-list records between `0xedf7` and `0xeee6`. A temporary program-fetch
-counter recorded zero executions of `0x771c` in 30 seconds. At the same point,
-the type-`0x1a` handler's state was live (`0x0284=0x0001`,
-`0x0287=0x7fff`), while `0x121f`, `0x1974` and the downstream mode block were
-zero. Therefore neither the dispatcher nor its port-facing child is merely
-rejecting an active search value: the DROM function list containing `0x9a56`
-has not been scheduled. The next bounded question is which list selector and
-event install those `0xedxx/0xeexx` records into the frame schedule. This is a
-firmware scheduling contract, upstream of COBBA or SCU response semantics.
+The DROM function-list mechanism is an immediate call walker, not a persistent
+frame schedule. Routine `0x9a56` calls `0x771c`; the recovered data ROM contains
+`0x9a56` in 17 `0x00ff`-terminated lists between `0xedf7` and `0xeee6`.
+Callers in `0xa280..0xa47f` use AR2 to select a branch, put the chosen list
+address in AR5, then call `0x9903`. That routine reads a function address from
+AR5, preserves AR5 on the stack, calls the function through `CALA A` at
+`0x9905`, restores AR5 and repeats until the terminator. The separate
+mode-dependent callback at DSP word `0x07fb` is called through another
+`CALA A` at `0x5eef`. The ROM sets `0x07fb` to `0x98b7`, `0xa27d`,
+`0xa2cf` or `0xa436` in the `0x55xx/0x57xx` control paths. The `0x57xx`
+selection reads mode word `0x1835`.
+
+Read-only probes in the 30-second no-cell boot saw no call to `0x9903`,
+`0x9a56`, `0x771c`, `0x5eef`, `0x5514`, `0x5e62` or the list-selecting entry
+points. Neither `0x07fb` nor `0x1835` changed; both ended at zero. The
+type-`0x1a` handler's state was live (`0x0284=0x0001`, `0x0287=0x7fff`),
+while `0x121f`, `0x1974` and the downstream mode block were zero. Thus this
+control path is not active in the observed search lifecycle. Its first missing
+boundary is the command or mode transition that sets `0x1835` and `0x07fb`;
+the evidence does not yet establish that this path owns ordinary acquisition.
+The temporary probes were removed.
+
+Both indirect calls use `CALA A` (`f4e3`), which the C54x core previously
+lacked. The core now implements `CALA[D]` for A and B, with focused return-
+address and delay-slot tests. This is required for these list and callback
+paths when firmware enters them, but it does not activate them by itself.
+The opcode and return semantics follow the
+[TI C54x CPU reference](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory
