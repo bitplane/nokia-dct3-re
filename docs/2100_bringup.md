@@ -234,6 +234,16 @@ GSMHosting thread exposes attachments `2100[1].pmm.txt` and
 MCRF URL now returns 404. None of these bytes has been recovered, so they remain
 retrieval leads rather than evidence inputs.
 
+A collection audit on 2026-09-22 scanned all 39 local raw `.fls`, `.bin`, and
+`.pmm` images with the PMMCAT parser. The only 2100 catalogues are the five
+segments in `2100f521sharp.fls` and the same five segments inside
+`2100sharp.pmm`'s flasher container. The v5.84 archive lists only
+`NAM205.840`, `NAM205.84E`, and that v5.21 Sharp container. No untested local
+2100 PMM candidate exists, so this audit does not authorize a new boot fixture.
+An additional public listing advertises a 2 MB NAM-2 v5.84 service-box file,
+but the download is subscriber-gated and its contents are unknown; size and
+version label alone do not establish that it contains a matching PMM tail.
+
 ## Public evidence availability
 
 Contemporary service references independently identify the NAM-2 partition map
@@ -263,3 +273,4 @@ external follow-up rather than negative proof that no capture survives.
 - [2100 v5.11 full-backup attachment record](https://www.elektroda.pl/rtvforum/topic162542.html)
 - [Archived `2100FuBu0584` reference](https://gsmforum.ru/threads/podskazhite-kak-podnyat-ufsom-nokia-2100.6670/)
 - [Surviving v5.84 MCU+PPM listing](https://www.shram.kiev.ua/mob/proshnokia.shtml)
+- [Subscriber-gated 2 MB v5.84 service-box listing](https://www.telecelula.com.br/new/download_Procurar.asp?cod_categoria=7&cod_fabricante=2&pg=63)
