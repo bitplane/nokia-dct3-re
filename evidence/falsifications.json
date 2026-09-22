@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "rom4_type51_packets_are_radio_configuration",
+      "status": "disproven",
+      "hypothesis": "The seven ROM4 MCU-to-DSP type-0x51 packets at 2.065-2.071 seconds configure the radio receiver",
+      "conclusion": "Their payloads are segmented command-0x22 DSP memory uploads with successive destination words 0x2286 through 0x2370. The separately observed type-0x1a packet at 1.511395 seconds is the MCU search-list publication. This corrects the packet classification but does not establish the SCU tuning register, DSP response, or sample encoding.",
+      "evidence": ["docs/rom4_dsp_loader.md", "docs/dsp_packet_semantics.md"]
+    },
+    {
       "id": "rom4_ports_31_32_are_confirmed_synth_tune_pair",
       "status": "disproven",
       "hypothesis": "ROM4 DSP writes to ports 0x31 and 0x32 are an established synthesizer tuning pair",

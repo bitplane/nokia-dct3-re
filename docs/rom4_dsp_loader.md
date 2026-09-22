@@ -152,7 +152,7 @@ parallel control path at COBBA. Frames retain their recovered opaque form:
 bits 15--12 select one of 16 registers and bits 11--0 carry data. The coherent
 ROM organically emits register-C transitions `0x008 -> 0x0c8` during codec
 bring-up and writes codec serial port `0x21`. A corrected twelve-second
-interface census originally recorded zero reads from RF sample port `0x27`
+interface census originally recorded zero reads from DSP sample port `0x27`
 and zero writes to port `0x32`. That absence is now
 explained by the ROM4 cold-entry interrupt-mask contract rather than RF data.
 The recovered code ORs `0x0204` and then `0x015a` into retained IMR state, and
@@ -163,13 +163,15 @@ INT3 reaches only an empty `RETF` handler.
 A 30-second run now schedules more than 6,000 CTSI frame edges and services
 the receiver continuously. Ports
 `0x31` and `0x32` are retained as saved, passive port-write observations and
-port `0x27` remains connected to deterministic unattached RF input. The
-receiver reads 32 words per frame after a 21-frame startup offset: the 12-second
+port `0x27` remains connected to deterministic unattached input. The active
+INT0 loop reads 32 words per frame after a 21-frame startup offset: the 12-second
 census measured 82,432 reads over 2,597 frame expiries, and the 30-second gate
 measured 207,232 reads over 6,497 expiries. Four unrolled reads at ROM word
 addresses `0x3249/0x324f/0x3255/0x325b` repeat in the active loop. These are
-DSP-facing sample words; their exact bit packing and I/Q ordering are not yet
-established. Supplying valid FCCH/SCH/BCCH input is therefore still open.
+DSP-facing sample words; their source, electrical scaling, bit packing and
+I/Q ordering are not established. The repeated FIR operations establish a
+sample-processing path, not that port `0x27` is the RF burst interface.
+Supplying valid FCCH/SCH/BCCH input is therefore still open.
 The cadence is only 32 words per 4.615 ms GSM TDMA frame, so it is not
 evidence that this loop transfers an entire radio burst. The recovered ROM
 also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
@@ -230,15 +232,22 @@ passed with 6,497 frame expiries and 207,232 port-`0x27` reads, but no
 port-`0x38/0x39` reads or port-`0x32` writes. The temporary watch hooks were
 removed. This excludes a missed live call into this cluster during that boot;
 it does not identify the dormant MCU request, establish SCU register ownership,
-or decode an RF sample word. DSP I/O ports `0x38/0x39` must not be confused
+or decode a port-`0x27` sample word. DSP I/O ports `0x38/0x39` must not be confused
 with MCU MAD2 offsets `0x38/0x39`, which are SIMI registers in this driver.
-The twelve-second verbose MCU trace does contain seven type-`0x51` DSP
-configuration packets between 2.065 and 2.071 seconds, followed by ordinary
-receiver activity. Their presence disproves a blanket "no MCU configuration"
-explanation, but neither their contents nor the current MAD2 register map
+The twelve-second verbose MCU trace contains a type-`0x1a` search-list
+publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
+type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory
+uploads: their destination words advance from `0x2286` through `0x2370`.
+Calling them radio configuration was wrong. The search-list publication proves
+an MCU-side search request, but neither it nor the current MAD2 register map
 establishes an SCU synthesizer write or a request that enters `0x7b0a`.
+A conservative NSE-1 swap16 literal-seeded MMIO census resolved 562 direct
+accesses from 235 seeds; all resolved offsets are below `0x40`. This does not
+exclude dynamic/table-derived accesses or identify the SCU register. The
+coherent first-access ledger likewise shows no offset above `0x3f` by 12 s.
 Neither `0x27` nor `0x39` is established as the complete FCCH/SCH sample
-stream. No valid signal fixture follows yet.
+stream. The sibling emulator supplies only a constant for port `0x27`, so it
+offers no independent sample-format evidence. No valid signal fixture follows yet.
 
 The next evidence should compare a no-cell boot with a real NSE-1 receiving
 one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
