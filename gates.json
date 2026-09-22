@@ -236,7 +236,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -282,7 +282,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -523,7 +523,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log"
+          "command": "test -f $(RUN_DIR)_v600/error.log"
         },
         {
           "step": "check",
@@ -560,7 +560,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log"
+          "command": "test -f $(RUN_DIR)_v501/error.log"
         },
         {
           "step": "check",
@@ -624,7 +624,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -664,7 +664,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_irq/error.log"
+          "command": "test -f $(RUN_DIR)_irq/error.log"
         },
         {
           "step": "check",
@@ -713,7 +713,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -760,7 +760,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v600/error.log"
+          "command": "test -f $(RUN_DIR)_gensio_v600/error.log"
         },
         {
           "step": "check",
@@ -803,7 +803,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v501/error.log"
+          "command": "test -f $(RUN_DIR)_gensio_v501/error.log"
         },
         {
           "step": "check",
@@ -854,7 +854,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v600/error.log"
+          "command": "test -f $(RUN_DIR)_display_v600/error.log"
         },
         {
           "step": "check",
@@ -904,7 +904,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v501/error.log"
+          "command": "test -f $(RUN_DIR)_display_v501/error.log"
         },
         {
           "step": "check",
@@ -955,7 +955,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_conformance/error.log"
+          "command": "test -f $(RUN_DIR)_dsp_conformance/error.log"
         },
         {
           "step": "check",
@@ -992,7 +992,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp/error.log"
+          "command": "test -f $(RUN_DIR)_dsp/error.log"
         },
         {
           "step": "check",
@@ -1034,7 +1034,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_v501/error.log"
+          "command": "test -f $(RUN_DIR)_dsp_v501/error.log"
         },
         {
           "step": "check",
@@ -1111,7 +1111,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cobba_conformance/error.log"
+          "command": "test -f $(RUN_DIR)_cobba_conformance/error.log"
         },
         {
           "step": "check",
@@ -1153,7 +1153,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -1206,7 +1206,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -1262,7 +1262,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -1304,7 +1304,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -1352,7 +1352,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -1408,7 +1408,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -1460,7 +1460,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -1510,7 +1510,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_barred/error.log"
+          "command": "test -f $(RUN_DIR)_barred/error.log"
         },
         {
           "step": "check",
@@ -1551,7 +1551,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_rxlev/error.log"
+          "command": "test -f $(RUN_DIR)_rxlev/error.log"
         },
         {
           "step": "check",
@@ -1601,7 +1601,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -1659,7 +1659,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -1693,7 +1693,7 @@
         "\t\t$(MAKE) --no-print-directory run $(DCT3_RUN_3410) \\",
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=30 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_registration_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log --profile nhm2 || exit; \\",
         "\tdone"
@@ -1713,7 +1713,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$profile SECONDS=30 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/$$fixture\" \\",
         "\t\t\tRUN_ENV='$(NOKI3410_RADIO_INPUT)' || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$profile/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$profile/error.log --profile $$profile || exit; \\",
         "\tdone",
@@ -1721,7 +1721,7 @@
         "\t\tRUN_DIR=$(RUN_DIR)_assignment SECONDS=30 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_assignment_mismatch' \\",
         "\t\tRUN_ENV='$(NOKI3410_RADIO_INPUT)'",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_assignment/error.log",
+        "\ttest -f $(RUN_DIR)_assignment/error.log",
         "\t$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \\",
         "\t\t$(RUN_DIR)_assignment/error.log --profile assignment"
       ]
@@ -1761,7 +1761,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -1807,7 +1807,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -1829,7 +1829,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log --a5-1" },
         { "step": "shell", "silent": true, "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no post-call 5210 frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)" }
@@ -1841,7 +1841,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=23 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=end NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log --require-state-roundtrip" },
         { "step": "shell", "silent": true, "command": "frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no post-restore 5210 frame produced in $(RUN_DIR)\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_IDLE_SHA)" }
       ]
@@ -1852,11 +1852,11 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_short SECONDS=20 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_short/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)_short/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/power_5210_trace_check.py short $(RUN_DIR)_short/error.log" },
         { "step": "shell", "silent": true, "command": "frame=$$(find $(RUN_DIR)_short -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n \"$$frame\" || { echo \"no short-power 5210 frame produced\"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py \"$$frame\" --sha256 $(ORACLE_5210_POWER_MENU_SHA)" },
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_long SECONDS=25 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_long/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)_long/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/power_5210_trace_check.py long $(RUN_DIR)_long/error.log" }
       ]
     },
@@ -1866,7 +1866,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=25 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt --boundary-only" }
       ]
     },
@@ -1880,7 +1880,7 @@
         "\tsave_dir=\"$(RUN_DIR)_save\"; reload_dir=\"$(RUN_DIR)_reload\"; \\",
         "\t$(RM) -r \"$$save_dir\" \"$$reload_dir\"; \\",
         "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$save_dir\" SECONDS=34 PRESERVE_NVRAM=0 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \\",
-        "\tcp \"$(MAME_DIR)/error.log\" \"$$save_dir/error.log\"; \\",
+        "\ttest -f \"$$save_dir/error.log\"; \\",
         "\t$(PYTHON) tools/sim_phonebook_check.py \"$$save_dir/error.log\" \"$$save_dir/nvram/$(NVRAM_SYSTEM_5210)/sim_card\" --expected-name Ada; \\",
         "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$reload_dir\" SECONDS=25 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=\"$(abspath $(RUN_DIR)_save/nvram)\" RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,enter,wait700,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \\",
         "\tframe=$$(find \"$$reload_dir\" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); \\",
@@ -1899,10 +1899,10 @@
         "\tussd_dir=\"$(RUN_DIR)_ussd\"; divert_dir=\"$(RUN_DIR)_divert\"; \\",
         "\t$(RM) -r \"$$ussd_dir\" \"$$divert_dir\"; \\",
         "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$ussd_dir\" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,1,2,3,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \\",
-        "\tcp \"$(MAME_DIR)/error.log\" \"$$ussd_dir/error.log\"; \\",
+        "\ttest -f \"$$ussd_dir/error.log\"; \\",
         "\t$(PYTHON) tools/radio_ussd_trace_check.py \"$$ussd_dir/error.log\" \"$$ussd_dir\" --result-frame $(ORACLE_5210_USSD_RAW_SHA); \\",
         "\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=\"$$divert_dir\" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,hash,2,1,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \\",
-        "\tcp \"$(MAME_DIR)/error.log\" \"$$divert_dir/error.log\"; \\",
+        "\ttest -f \"$$divert_dir/error.log\"; \\",
         "\t$(PYTHON) tools/radio_call_divert_trace_check.py \"$$divert_dir/error.log\" \"$$divert_dir\"",
         "\t@echo \"OK — 5210 firmware completed physical USSD and call-divert interrogation\""
       ]
@@ -1918,7 +1918,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -1938,7 +1938,7 @@
       "recipe": [
         "\t@for profile in wrong_group unmatched malformed; do \\",
         "\t\t$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_$$profile SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/radio_paging_$$profile\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$profile/error.log || exit; \\",
         "\t\tcheck_profile=$$(echo $$profile | tr _ -); \\",
         "\t\t$(PYTHON) tools/radio_paging_negative_trace_check.py $(RUN_DIR)_$$profile/error.log --profile $$check_profile || exit; \\",
         "\tdone"
@@ -1955,7 +1955,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2001,7 +2001,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2028,7 +2028,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2055,7 +2055,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2082,7 +2082,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2121,7 +2121,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2156,7 +2156,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_same_lac'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87" }
       ]
     },
@@ -2166,7 +2166,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_different_lac'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87" }
       ]
     },
@@ -2176,7 +2176,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_loss_recovery'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile loss-recovery --radio-profile nsm5" }
       ]
     },
@@ -2186,7 +2186,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nsm5" }
       ]
     },
@@ -2196,7 +2196,7 @@
       "variables": {},
       "steps": [
         { "step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_paging'" },
-        { "step": "shell", "silent": true, "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log" },
+        { "step": "shell", "silent": true, "command": "test -f $(RUN_DIR)/error.log" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87 --paging-after-reselection" },
         { "step": "shell", "silent": true, "command": "$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log" }
       ]
@@ -2212,7 +2212,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2258,7 +2258,7 @@
         },
         {
           "step": "shell", "silent": true,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell", "silent": true,
@@ -2485,7 +2485,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3036,7 +3036,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3077,7 +3077,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3121,7 +3121,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3184,7 +3184,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3217,7 +3217,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=70 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log --profile different-lac || exit; \\",
         "\tdone"
@@ -3262,7 +3262,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -3306,7 +3306,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3356,7 +3356,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log --profile loss-recovery \\",
         "\t\t\t--radio-profile nse8 || exit; \\",
@@ -3392,7 +3392,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3441,14 +3441,14 @@
         "\t\t$(MAKE) --no-print-directory run $(DCT3_RUN_3210) \\",
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$profile SECONDS=45 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/radio_reselection_neighbour_$$profile\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$profile/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_negative_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$profile/error.log --profile $$profile || exit; \\",
         "\tdone",
         "\t@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) \\",
         "\t\tRUN_DIR=$(RUN_DIR)_unsupported_band SECONDS=45 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_neighbour_unsupported_band'",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_unsupported_band/error.log",
+        "\ttest -f $(RUN_DIR)_unsupported_band/error.log",
         "\t$(PYTHON) tools/radio_reselection_negative_trace_check.py \\",
         "\t\t$(RUN_DIR)_unsupported_band/error.log --profile unsupported-band \\",
         "\t\t--neighbour-arfcn 823",
@@ -3458,7 +3458,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_3410_$$profile SECONDS=50 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/radio_reselection_neighbour_$$profile\" \\",
         "\t\t\tRUN_ENV='$(NOKI3410_RADIO_INPUT)' || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_3410_$$profile/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_3410_$$profile/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_negative_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_3410_$$profile/error.log \\",
         "\t\t\t--profile $$check_profile || exit; \\",
@@ -3494,7 +3494,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3555,7 +3555,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3627,7 +3627,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3668,7 +3668,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=70 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log --profile different-lac \\",
         "\t\t\t--radio-profile nhm5 --serving-arfcn 88 \\",
@@ -3715,7 +3715,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -3766,7 +3766,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3838,7 +3838,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3912,7 +3912,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -3955,7 +3955,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=35 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log --profile different-lac \\",
         "\t\t\t--radio-profile nhm6 --serving-arfcn 823 \\",
@@ -4004,7 +4004,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -4057,7 +4057,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4131,7 +4131,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4201,7 +4201,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4239,7 +4239,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=90 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log --profile different-lac \\",
         "\t\t\t--radio-profile nhm2 || exit; \\",
@@ -4289,7 +4289,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -4340,7 +4340,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4408,7 +4408,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4460,7 +4460,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log --profile loss-recovery \\",
         "\t\t\t--radio-profile nhm2 || exit; \\",
@@ -4500,7 +4500,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4565,7 +4565,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4609,7 +4609,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4652,7 +4652,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4696,7 +4696,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4742,7 +4742,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -4796,7 +4796,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -4861,7 +4861,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_before/error.log"
+          "command": "test -f $(RUN_DIR)_before/error.log"
         },
         {
           "step": "check",
@@ -4900,7 +4900,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_assigned/error.log"
+          "command": "test -f $(RUN_DIR)_assigned/error.log"
         },
         {
           "step": "check",
@@ -4927,7 +4927,7 @@
         "\t\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) \\",
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$profile SECONDS=24 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/radio_paging_$$profile\"; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log; \\",
+        "\t\ttest -f $(RUN_DIR)_$$profile/error.log; \\",
         "\t\tcheck_profile=$$(echo $$profile | tr _ -); \\",
         "\t\t$(PYTHON) tools/radio_paging_negative_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$profile/error.log --profile $$check_profile || exit 1; \\",
@@ -4935,7 +4935,7 @@
         "\t@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) \\",
         "\t\tRUN_DIR=$(RUN_DIR)_unsuitable SECONDS=18 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_paging_unsuitable'",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_unsuitable/error.log",
+        "\ttest -f $(RUN_DIR)_unsuitable/error.log",
         "\t$(PYTHON) tools/radio_3330_unsuitable_cell_trace_check.py \\",
         "\t\t$(RUN_DIR)_unsuitable/error.log --profile barred"
       ]
@@ -4973,7 +4973,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -5044,7 +5044,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -5090,7 +5090,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$boundary SECONDS=35 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_paging_state_roundtrip_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\tdone"
@@ -5110,7 +5110,7 @@
         "\t\t\tRUN_DIR=$(RUN_DIR)_$$profile SECONDS=30 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/radio_paging_$$profile\" \\",
         "\t\t\tRUN_ENV='$(NOKI3410_RADIO_INPUT)' || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$profile/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_paging_negative_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$profile/error.log --profile $$fixture || exit; \\",
         "\tdone",
@@ -5118,7 +5118,7 @@
         "\t\tRUN_DIR=$(RUN_DIR)_unsuitable SECONDS=30 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_paging_unsuitable' \\",
         "\t\tRUN_ENV='$(NOKI3410_RADIO_INPUT)'",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_unsuitable/error.log",
+        "\ttest -f $(RUN_DIR)_unsuitable/error.log",
         "\t$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \\",
         "\t\t$(RUN_DIR)_unsuitable/error.log --profile barred"
       ]
@@ -5152,7 +5152,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -5198,7 +5198,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -5257,7 +5257,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -5373,7 +5373,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log"
+          "command": "test -f $(RUN_DIR)_call/error.log"
         },
         {
           "step": "check",
@@ -5438,7 +5438,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -5503,7 +5503,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -5578,7 +5578,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_degraded/error.log"
+          "command": "test -f $(RUN_DIR)_degraded/error.log"
         },
         {
           "step": "check",
@@ -5668,7 +5668,7 @@
         "\t\tRUN_DIR=$(RUN_DIR) SECONDS=28 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=19.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log",
+        "\ttest -f $(RUN_DIR)/error.log",
         "\t$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py \\",
         "\t\t$(RUN_DIR)/error.log --ended",
         "\t$(PYTHON) tools/radio_3310_speech_control_trace_check.py \\",
@@ -5713,7 +5713,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -5749,7 +5749,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_incoming_ringing_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_answered_call_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_answered_audio_boundary_trace_check.py $(RUN_DIR)/error.log; \\",
@@ -5768,7 +5768,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
       ]
@@ -5785,7 +5785,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
@@ -5803,7 +5803,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state"
       ]
     },
@@ -5817,7 +5817,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait9000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --serving-arfcn 88 --target-arfcn 89; \\",
         "\t$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered; \\",
         "\t$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log; \\",
@@ -5834,7 +5834,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=16.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 88 --target-arfcn 89"
       ]
     },
@@ -5850,7 +5850,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=22 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \\",
         "\t\tRUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
+        "\ttest -f $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome success --serving-arfcn 823 --target-arfcn 824; \\",
         "\t$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)"
@@ -5868,7 +5868,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=18 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \\",
         "\t\tRUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=12.45 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
+        "\ttest -f $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome failure --require-state --serving-arfcn 823 --target-arfcn 824"
       ]
     },
@@ -5882,7 +5882,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --serving-arfcn 1 --target-arfcn 2; \\",
         "\t$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)"
@@ -5898,7 +5898,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=18 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=14.60 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 1 --target-arfcn 2"
       ]
     },
@@ -5913,7 +5913,7 @@
         "\t$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \\",
@@ -5931,7 +5931,7 @@
         "\t$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=19.55 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1"
       ]
@@ -5946,7 +5946,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait9000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1 --serving-arfcn 88 --target-arfcn 89; \\",
         "\t$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered; \\",
@@ -5964,7 +5964,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=17.25 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 88 --target-arfcn 89"
       ]
@@ -5981,7 +5981,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=22 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \\",
         "\t\tRUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
+        "\ttest -f $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome success --require-a5-1 --serving-arfcn 823 --target-arfcn 824; \\",
         "\t$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log; \\",
@@ -6000,7 +6000,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=18 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \\",
         "\t\tRUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=12.90 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
+        "\ttest -f $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 823 --target-arfcn 824"
       ]
@@ -6015,7 +6015,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1 --serving-arfcn 1 --target-arfcn 2; \\",
         "\t$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log; \\",
@@ -6032,7 +6032,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=19 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=15.18 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 1 --target-arfcn 2"
       ]
@@ -6209,7 +6209,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_CALL_INCOMING_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_call_divert_incoming_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -6242,7 +6242,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_CALL_BUSY_FORWARD_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 65; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_busy_forward_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -6275,7 +6275,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_unreachable_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_CALL_UNREACHABLE_FORWARD_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 70; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_unreachable_forward_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -6308,7 +6308,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_CALL_INCOMING_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_no_reply_forward_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -6440,7 +6440,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
@@ -6458,7 +6458,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.5 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log; \\",
@@ -6479,7 +6479,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=24.16 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=50 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=5000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_state_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log"
       ]
@@ -6496,7 +6496,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
@@ -6514,7 +6514,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
       ]
@@ -6531,7 +6531,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
@@ -6573,7 +6573,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_OUTGOING_NO_ANSWER_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --outcome no-answer --require-state-roundtrip"
       ]
@@ -6602,7 +6602,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_OUTGOING_DELAYED_BUSY_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --outcome busy --require-state-roundtrip \\",
         "\t\t--require-deferred-decision"
@@ -6635,7 +6635,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_CALL_INCOMING_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_incoming_host_adapter_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
       ]
@@ -6670,7 +6670,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_CALL_INCOMING_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 52; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_incoming_host_adapter_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --require-restore"
       ]
@@ -6704,7 +6704,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_ADAPTER_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --outcome busy; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_adapter_trace_check.py \\",
@@ -6754,7 +6754,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_ADAPTER_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_local_end_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
       ]
@@ -6789,7 +6789,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_TERMINATION_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --require-state-roundtrip"
       ]
@@ -6822,7 +6822,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_ALERTING_TERMINATION_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --phase alerting"
       ]
@@ -6855,7 +6855,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_MEDIA_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_media_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --frames 200"
       ]
@@ -6889,7 +6889,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_RECONNECT_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_reconnect_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
       ]
@@ -6922,7 +6922,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_ALERTING_TERMINATION_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_reconnect_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --phase alerting"
       ]
@@ -6956,7 +6956,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_RECONNECT_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_media_restore_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --frames 80"
       ]
@@ -6992,7 +6992,7 @@
         "\t\t\t-verbose $(HOST_CALL_CONFIG_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_MEDIA_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(HOST_RELEASE_SECURITY_CHECK); \\",
         "\t$(PYTHON) tools/radio_outgoing_host_release_restore_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
@@ -7038,7 +7038,7 @@
         "\t\t\t-verbose $(HOST_CALL_CONFIG_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_TWO_CALLS_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(HOST_TWO_CALL_SECURITY_CHECK); \\",
         "\t$(PYTHON) tools/radio_outgoing_host_two_calls_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
@@ -7086,7 +7086,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_3410_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
       ]
@@ -7120,7 +7120,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_3410_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_media_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log --frames 200"
       ]
@@ -7152,7 +7152,7 @@
         "\t\t\t-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \\",
         "\t\t\t-http_port $(HOST_CALL_3310_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log"
       ]
@@ -7194,7 +7194,7 @@
         "\t\t\t-http_port $(HOST_CALL_3330_PORT) \\",
         "\t\t\t-nvram_directory $(abspath $(RUN_DIR)_provision/nvram) \\",
         "\t\t\t-seconds_to_run 32; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \\",
+        "\ttest -f $(RUN_DIR)_call/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \\",
         "\t\t$(RUN_DIR)_call/error.log"
       ]
@@ -7230,7 +7230,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -7288,7 +7288,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -7371,7 +7371,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -7479,7 +7479,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log"
+          "command": "test -f $(RUN_DIR)_call/error.log"
         },
         {
           "step": "check",
@@ -7576,7 +7576,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log"
+          "command": "test -f $(RUN_DIR)_call/error.log"
         },
         {
           "step": "check",
@@ -7684,7 +7684,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log"
+          "command": "test -f $(RUN_DIR)_call/error.log"
         },
         {
           "step": "check",
@@ -7755,7 +7755,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -7819,7 +7819,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -7874,7 +7874,7 @@
         "\t\tRUN_DIR=$(RUN_DIR) SECONDS=45 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
         "\t\tRUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_call_audio_wire_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log"
       ]
@@ -7892,7 +7892,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \\",
         "\t\tRUN_ENV=\"$$replay_env\"; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log; \\",
+        "\ttest -f $(RUN_DIR)_v600/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
         "\t\t$(RUN_DIR)_v600/error.log; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \\",
@@ -7907,7 +7907,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \\",
         "\t\tRUN_ENV=\"$$replay_env\"; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log; \\",
+        "\ttest -f $(RUN_DIR)_v501/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
         "\t\t$(RUN_DIR)_v501/error.log; \\",
         "\t$(PYTHON) tools/radio_call_audio_wire_trace_check.py \\",
@@ -7931,7 +7931,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_PCM_MISSING_ARGS)' \\",
         "\t\tRUN_ENV=\"$$pcm_missing_env\"; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log; \\",
+        "\ttest -f $(RUN_DIR)_v600/error.log; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \\",
         "\t\t$(RUN_DIR)_v600/error.log; \\",
         "\t$(PYTHON) tools/radio_pcm_missing_trace_check.py \\",
@@ -7942,7 +7942,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_PCM_MISSING_ARGS)' \\",
         "\t\tRUN_ENV=\"$$pcm_missing_env\"; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log; \\",
+        "\ttest -f $(RUN_DIR)_v501/error.log; \\",
         "\t$(PYTHON) tools/radio_call_audio_wire_trace_check.py \\",
         "\t\t$(RUN_DIR)_v501/error.log; \\",
         "\t$(PYTHON) tools/radio_pcm_missing_trace_check.py \\",
@@ -7962,7 +7962,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \\",
         "\t\tRUN_ENV=\"$$degraded_env\"; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log; \\",
+        "\ttest -f $(RUN_DIR)_v600/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
         "\t\t$(RUN_DIR)_v600/error.log; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \\",
@@ -7975,7 +7975,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \\",
         "\t\tRUN_ENV=\"$$degraded_env\"; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log; \\",
+        "\ttest -f $(RUN_DIR)_v501/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
         "\t\t$(RUN_DIR)_v501/error.log; \\",
         "\t$(PYTHON) tools/radio_call_audio_wire_trace_check.py \\",
@@ -7997,7 +7997,7 @@
         "\t\tERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' \\",
         "\t\tRUN_ENV=\"$$degraded_env\"; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log; \\",
@@ -8162,7 +8162,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_SMS_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 55; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_incoming_host_sms_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -8189,7 +8189,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_INCOMING_SMS_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 58; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_incoming_host_sms_trace_check.py $(RUN_DIR)/error.log --require-restore"
       ]
     },
@@ -8217,7 +8217,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_SMS_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 48; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_sms_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -8247,7 +8247,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_SMS_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 52; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_outgoing_host_sms_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -8275,7 +8275,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_USSD_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 40; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_host_ussd_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -8305,7 +8305,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_USSD_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 42; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_host_ussd_trace_check.py $(RUN_DIR)/error.log --require-restore"
       ]
     },
@@ -8330,7 +8330,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_INCOMING_USSD_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 45; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_host_incoming_ussd_trace_check.py $(RUN_DIR)/error.log"
       ]
     },
@@ -8357,7 +8357,7 @@
         "\t\t\t-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \\",
         "\t\t\t-http_port $(HOST_INCOMING_USSD_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \\",
         "\t\t\t-seconds_to_run 48; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_host_incoming_ussd_trace_check.py $(RUN_DIR)/error.log --require-restore"
       ]
     },
@@ -8544,7 +8544,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -9485,7 +9485,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -9517,7 +9517,7 @@
         "\t\t\tSECONDS=40 RUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=1000\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \\",
+        "\t\ttest -f $(RUN_DIR)_$$boundary/error.log || exit; \\",
         "\t\t$(PYTHON) tools/radio_incoming_smart_message_state_trace_check.py \\",
         "\t\t\t$(RUN_DIR)_$$boundary/error.log \\",
         "\t\t\t$(RUN_DIR)_$$boundary/nvram/noki3210/sim_card || exit; \\",
@@ -9556,7 +9556,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell",
@@ -9582,7 +9582,7 @@
         "\t\t\tRUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log \"$$out/error.log\" || exit; \\",
+        "\t\ttest -f \"$$out/error.log\" || exit; \\",
         "\t\t$(PYTHON) tools/radio_incoming_smart_message_state_trace_check.py \\",
         "\t\t\t\"$$out/error.log\" \"$$out/nvram/noki3210/sim_card\" || exit; \\",
         "\t\t$(PYTHON) tools/radio_smart_message_envelope_trace_check.py \\",
@@ -9592,7 +9592,7 @@
         "\t\tRUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
         "\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=35 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_accepted/error.log",
+        "\ttest -f $(RUN_DIR)_accepted/error.log",
         "\t@frame=$$(find $(RUN_DIR)_accepted -maxdepth 1 \\",
         "\t\t-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\\n' | \\",
         "\t\tsort -n | tail -1 | cut -d' ' -f2-); \\",
@@ -9602,7 +9602,7 @@
         "\t\tRUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
         "\t\tRUN_EXTRA_ARGS='-cfg_directory ../fixtures/smart_message_invalid_rtpl' \\",
         "\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=30 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)_rejected/error.log",
+        "\ttest -f $(RUN_DIR)_rejected/error.log",
         "\t@frame=$$(find $(RUN_DIR)_rejected -maxdepth 1 \\",
         "\t\t-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\\n' | \\",
         "\t\tsort -n | tail -1 | cut -d' ' -f2-); \\",
@@ -9642,7 +9642,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell",
@@ -9666,7 +9666,7 @@
         "\t\t\tRUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
         "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/$$fixture\" \\",
         "\t\t\tRUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000' || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log \"$$out/error.log\" || exit; \\",
+        "\t\ttest -f \"$$out/error.log\" || exit; \\",
         "\t\tframe=$$(find \"$$out\" -maxdepth 1 \\",
         "\t\t\t-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\\n' | \\",
         "\t\t\tsort -n | tail -1 | cut -d' ' -f2-); \\",
@@ -9698,7 +9698,7 @@
         "\t\t$(MAKE) --no-print-directory run RUN_DIR=\"$$out\" SECONDS=40 \\",
         "\t\t\tRUN_VERBOSE=1 \\",
         "\t\t\tRUN_EXTRA_ARGS=\"-cfg_directory ../fixtures/$$fixture\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log \"$$out/error.log\" || exit; \\",
+        "\t\ttest -f \"$$out/error.log\" || exit; \\",
         "\t\t$(PYTHON) tools/radio_smart_message_envelope_trace_check.py \\",
         "\t\t\t\"$$out/error.log\" \"$$out/nvram/noki3210/sim_card\" \\",
         "\t\t\t\"$$profile\" || exit; \\",
@@ -9737,7 +9737,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_save/error.log"
+          "command": "test -f $(RUN_DIR)_save/error.log"
         },
         {
           "step": "check",
@@ -9795,7 +9795,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -9840,7 +9840,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_discard/error.log"
+          "command": "test -f $(RUN_DIR)_discard/error.log"
         },
         {
           "step": "check",
@@ -9890,7 +9890,7 @@
         "\t\t\tRUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \\",
         "\t\t\tRUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \\",
         "\t\t\tRUN_ENV=\"NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,down,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500\" || exit; \\",
-        "\t\tcp $(MAME_DIR)/error.log \"$$out/error.log\" || exit; \\",
+        "\t\ttest -f \"$$out/error.log\" || exit; \\",
         "\t\t$(PYTHON) tools/radio_smart_message_persistence_trace_check.py \\",
         "\t\t\t\"$$out/error.log\" \"$$out\" \\",
         "\t\t\t\"$$out/nvram/noki3210/eeprom\" \\",
@@ -9931,7 +9931,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cancel/error.log"
+          "command": "test -f $(RUN_DIR)_cancel/error.log"
         },
         {
           "step": "check",
@@ -10002,7 +10002,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_duplicate-second/error.log"
+          "command": "test -f $(RUN_DIR)_duplicate-second/error.log"
         },
         {
           "step": "check",
@@ -10078,7 +10078,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_save/error.log"
+          "command": "test -f $(RUN_DIR)_save/error.log"
         },
         {
           "step": "check",
@@ -10128,7 +10128,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -10204,7 +10204,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_save/error.log"
+          "command": "test -f $(RUN_DIR)_save/error.log"
         },
         {
           "step": "check",
@@ -10254,7 +10254,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log"
+          "command": "test -f $(RUN_DIR)_cold/error.log"
         },
         {
           "step": "check",
@@ -10311,7 +10311,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell",
@@ -10351,7 +10351,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "shell",
@@ -10389,7 +10389,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -10473,7 +10473,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_sms/error.log"
+          "command": "test -f $(RUN_DIR)_sms/error.log"
         },
         {
           "step": "check",
@@ -10656,7 +10656,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -10683,7 +10683,7 @@
         "\t$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=105 \\",
         "\t\tPROVISIONED_IMEI_PREFIX=49015420323751 \\",
         "\t\tRUN_VERBOSE=1; \\",
-        "\tcp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \\",
+        "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log; \\",
         "\tframe=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \\",
         "\t\t! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\\n' | sort -n | tail -1 | cut -d' ' -f2-); \\",
@@ -10719,7 +10719,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -10797,7 +10797,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_overlap/error.log"
+          "command": "test -f $(RUN_DIR)_overlap/error.log"
         },
         {
           "step": "check",
@@ -10838,7 +10838,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_mask/error.log"
+          "command": "test -f $(RUN_DIR)_mask/error.log"
         },
         {
           "step": "check",
@@ -10875,7 +10875,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_fiq8/error.log"
+          "command": "test -f $(RUN_DIR)_fiq8/error.log"
         },
         {
           "step": "check",
@@ -10922,7 +10922,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log"
+          "command": "test -f $(RUN_DIR)_v600/error.log"
         },
         {
           "step": "check",
@@ -10960,7 +10960,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log"
+          "command": "test -f $(RUN_DIR)_v501/error.log"
         },
         {
           "step": "check",
@@ -11008,7 +11008,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v600/error.log"
+          "command": "test -f $(RUN_DIR)_sleep_v600/error.log"
         },
         {
           "step": "check",
@@ -11055,7 +11055,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v501/error.log"
+          "command": "test -f $(RUN_DIR)_sleep_v501/error.log"
         },
         {
           "step": "check",
@@ -11098,7 +11098,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_keypad/error.log"
+          "command": "test -f $(RUN_DIR)_sleep_keypad/error.log"
         },
         {
           "step": "check",
@@ -11138,7 +11138,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_fiq8/error.log"
+          "command": "test -f $(RUN_DIR)_sleep_fiq8/error.log"
         },
         {
           "step": "check",
@@ -11188,7 +11188,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log"
+          "command": "test -f $(RUN_DIR)/error.log"
         },
         {
           "step": "check",
@@ -11236,7 +11236,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_software/error.log"
+          "command": "test -f $(RUN_DIR)_software/error.log"
         },
         {
           "step": "check",
@@ -11282,7 +11282,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_watchdog/error.log"
+          "command": "test -f $(RUN_DIR)_watchdog/error.log"
         },
         {
           "step": "check",
@@ -11325,7 +11325,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_ccont_watchdog/error.log"
+          "command": "test -f $(RUN_DIR)_ccont_watchdog/error.log"
         },
         {
           "step": "check",
@@ -11371,7 +11371,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v600/error.log"
+          "command": "test -f $(RUN_DIR)_mbus_v600/error.log"
         },
         {
           "step": "check",
@@ -11410,7 +11410,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v501/error.log"
+          "command": "test -f $(RUN_DIR)_mbus_v501/error.log"
         },
         {
           "step": "check",
@@ -11447,7 +11447,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_rx/error.log"
+          "command": "test -f $(RUN_DIR)_mbus_rx/error.log"
         },
         {
           "step": "check",
@@ -11496,7 +11496,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_buzzer/error.log"
+          "command": "test -f $(RUN_DIR)_buzzer/error.log"
         },
         {
           "step": "check",
@@ -11539,7 +11539,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_vibrator/error.log"
+          "command": "test -f $(RUN_DIR)_vibrator/error.log"
         },
         {
           "step": "check",
@@ -11580,7 +11580,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v600/error.log"
+          "command": "test -f $(RUN_DIR)_dsp_tone_v600/error.log"
         },
         {
           "step": "check",
@@ -11618,7 +11618,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v501/error.log"
+          "command": "test -f $(RUN_DIR)_dsp_tone_v501/error.log"
         },
         {
           "step": "check",
@@ -11661,7 +11661,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_rtc/error.log"
+          "command": "test -f $(RUN_DIR)_rtc/error.log"
         },
         {
           "step": "check",
@@ -11704,7 +11704,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_ccont_mask/error.log"
+          "command": "test -f $(RUN_DIR)_ccont_mask/error.log"
         },
         {
           "step": "check",
@@ -11749,7 +11749,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_alarm/error.log"
+          "command": "test -f $(RUN_DIR)_alarm/error.log"
         },
         {
           "step": "check",
@@ -11792,7 +11792,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_power_short/error.log"
+          "command": "test -f $(RUN_DIR)_power_short/error.log"
         },
         {
           "step": "check",
@@ -11833,7 +11833,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_power_long/error.log"
+          "command": "test -f $(RUN_DIR)_power_long/error.log"
         },
         {
           "step": "shell",
@@ -11904,7 +11904,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_connected/error.log"
+          "command": "test -f $(RUN_DIR)_charger_connected/error.log"
         },
         {
           "step": "check",
@@ -11960,7 +11960,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_acting_dead/error.log"
+          "command": "test -f $(RUN_DIR)_acting_dead/error.log"
         },
         {
           "step": "check",
@@ -12009,7 +12009,7 @@
         {
           "step": "capture_log",
           "silent": false,
-          "command": "cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_wake/error.log"
+          "command": "test -f $(RUN_DIR)_charger_wake/error.log"
         },
         {
           "step": "check",
@@ -12438,7 +12438,7 @@
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=\"$$save_dir\" SECONDS=32 \\",
         "\t\tPRESERVE_NVRAM=0 PROVISIONED_IMEI_PREFIX=49015420323751 \\",
         "\t\tRUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_70_180) NOKIA_DCT3_POST_READY_KEYS=enter,wait700,enter,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \\",
-        "\tcp \"$(MAME_DIR)/error.log\" \"$$save_dir/error.log\"; \\",
+        "\ttest -f \"$$save_dir/error.log\"; \\",
         "\t$(PYTHON) tools/sim_phonebook_check.py \"$$save_dir/error.log\" \\",
         "\t\t\"$$save_dir/nvram/$(NVRAM_SYSTEM)/sim_card\"; \\",
         "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=\"$$reload_dir\" SECONDS=24 \\",

@@ -17,7 +17,7 @@ class AcceptanceRunIsolationTest(unittest.TestCase):
         )[0]
         self.assertIn('mkdir -p "$(RUN_DIR)"', preparation)
         self.assertIn("nokia_dct3_lcdmirror_*.pgm", preparation)
-        self.assertIn('truncate -s 0 "$(MAME_DIR)/error.log"', preparation)
+        self.assertIn('truncate -s 0 "$(RUN_DIR)/error.log"', preparation)
         self.assertIn('"$(PRESERVE_NVRAM)" != "1"', preparation)
 
     def test_direct_host_targets_use_common_preparation(self):

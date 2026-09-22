@@ -121,7 +121,7 @@ if [[ -n "$host_media_port" ]]; then
 	if [[ -n "$bios" ]]; then
 		bios_args=(-bios "$bios")
 	fi
-	( cd mame && env PULSE_SOURCE="$input_sink_name.monitor" \
+	( env PULSE_SOURCE="$input_sink_name.monitor" \
 		NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS="$post_ready_keys" \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS="$post_ready_delay_ms" \
@@ -129,7 +129,8 @@ if [[ -n "$host_media_port" ]]; then
 		NOKIA_DCT3_POST_READY_KEY_GAP_MS="$post_ready_gap_ms" \
 		NOKIA_DCT3_SNAPSHOT_DIR="$(realpath "$run_dir")" \
 		NOKIA_DCT3_BOOT_SUMMARY="$(realpath "$run_dir")/boot_summary.txt" \
-		./mame "$phone" -rompath roms -log -video none -sound pulse \
+		python3 tools/run_mame_isolated.py --mame-dir mame --run-dir "$run_dir" -- \
+			"$phone" -rompath roms -log -video none -sound pulse \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -throttle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
@@ -159,7 +160,7 @@ else
 		RUN_ENV="PULSE_SOURCE=$input_sink_name.monitor NOKIA_DCT3_POST_READY_KEYS=$post_ready_keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$post_ready_delay_ms NOKIA_DCT3_POST_READY_KEY_DURATION_MS=$post_ready_duration_ms NOKIA_DCT3_POST_READY_KEY_GAP_MS=$post_ready_gap_ms"
 fi
 
-cp mame/error.log "$run_dir/error.log"
+test -f "$run_dir/error.log"
 kill "$router_pid" >/dev/null 2>&1 || true
 wait "$router_pid" >/dev/null 2>&1 || true
 router_pid=

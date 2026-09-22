@@ -247,12 +247,12 @@ verify-gsm-sms-transport:
 
 verify-radio-periodic-location-update:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=450 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_periodic_location_update'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_periodic_location_update_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-periodic-location-update-state:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=450 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_periodic_location_update' RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=398 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=12000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_periodic_location_update_state_trace_check.py $(RUN_DIR)/error.log
 
 verify-3410-radio-periodic-location-update: normalize-3410
@@ -281,10 +281,10 @@ verify-3210-v501: smoke-3210-v501
 
 verify-dsp-memory-upload:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR)_v600 SECONDS=4 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log
+	test -f $(RUN_DIR)_v600/error.log
 	$(PYTHON) tools/dsp_memory_upload_trace_check.py $(RUN_DIR)_v600/error.log
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210_V501) ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR)_v501 SECONDS=4 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log
+	test -f $(RUN_DIR)_v501/error.log
 	$(PYTHON) tools/dsp_memory_upload_trace_check.py $(RUN_DIR)_v501/error.log
 
 verify: PHONE=noki3210
@@ -295,44 +295,44 @@ verify: run
 
 verify-ccont:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)/error.log --adc-profile sane
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_irq SECONDS=4 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=2.0'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_irq/error.log
+	test -f $(RUN_DIR)_irq/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_irq/error.log --require-charger-irq --summary $(RUN_DIR)_irq/boot_summary.txt
 
 verify-ccont-watchdog:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=55 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/ccont_watchdog_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
 	@echo "OK — enabled CCONT watchdog is serviced organically beyond its 49-second window"
 
 verify-gensio:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v600 SECONDS=1 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v600/error.log
+	test -f $(RUN_DIR)_gensio_v600/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v600/error.log --require-select-contract --require-ccont-boot-status
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_gensio_v501 SECONDS=1 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_gensio_v501/error.log
+	test -f $(RUN_DIR)_gensio_v501/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_gensio_v501/error.log --require-select-contract --require-ccont-boot-status
 	@echo "OK — GENSIO endpoint/status and SELECT-latch contracts reproduced across both 3210 ROMs"
 
 verify-display:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_display_v600 SECONDS=3 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v600/error.log
+	test -f $(RUN_DIR)_display_v600/error.log
 	$(PYTHON) tools/display_trace_check.py $(RUN_DIR)_display_v600/error.log --firmware v600 --rom roms/3210f600a_swap16.bin --eeprom "roms/noki3210/3210 v600 eeprom.bin" --require-profile-boundary
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_display_v501 SECONDS=1 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_display_v501/error.log
+	test -f $(RUN_DIR)_display_v501/error.log
 	$(PYTHON) tools/display_trace_check.py $(RUN_DIR)_display_v501/error.log --firmware v501 --rom roms/nokia_3210_nse-8_v05_01_full_hu_swap16.bin --eeprom "roms/noki3210/3210 v501 eeprom.bin"
 
 verify-dsp-transport:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_conformance SECONDS=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/dspif_conformance'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_conformance/error.log
+	test -f $(RUN_DIR)_dsp_conformance/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_conformance/error.log --conformance
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp SECONDS=4 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp/error.log
+	test -f $(RUN_DIR)_dsp/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp/error.log --expected-bootstrap-exchanges 64
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_v501 SECONDS=2 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_v501/error.log
+	test -f $(RUN_DIR)_dsp_v501/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)_dsp_v501/error.log --bootstrap-only --expected-bootstrap-exchanges 64
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_state SECONDS=2 RUN_ENV='$(FRONTIER_ENV) NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.4'
 	@grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_dsp_state/boot_summary.txt
@@ -340,64 +340,64 @@ verify-dsp-transport:
 
 verify-cobba-control:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_cobba_conformance RUN_VERBOSE=1 SECONDS=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/cobba_conformance'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cobba_conformance/error.log
+	test -f $(RUN_DIR)_cobba_conformance/error.log
 	$(PYTHON) tools/cobba_control_trace_check.py $(RUN_DIR)_cobba_conformance/error.log
 
 verify-dsp-bootstrap-3310:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/dsp_transport_trace_check.py $(RUN_DIR)/error.log --completion-only --expected-bootstrap-exchanges 58
 	@echo "OK — 3310 v6.39 completed its product-calibrated DSP bootstrap"
 
 verify-3310-radio-boundary:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=7 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/dsp_radio_profile_trace_check.py $(RUN_DIR)/error.log --profile nhm5-search --rom roms/noki3310/3310f639e.fls
 	@echo "OK — 3310 v6.39 completed its evidenced serving-BCCH acquisition boundary"
 
 verify-3330-radio-boundary: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=12 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3330_boundary_trace_check.py $(RUN_DIR)/error.log
 
 verify-3310-radio-registration:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=12 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm5
 
 verify-3330-radio-registration: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=18 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm6
 
 verify-3330-radio-registration-preserved:
 	@$(MAKE) --no-print-directory verify-3330-radio-registration RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_cold SECONDS=18 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram)
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)_cold/error.log --profile nhm6 --preserved
 
 verify-3330-radio-registration-state: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=10.45 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_state_roundtrip_trace_check.py $(RUN_DIR)/error.log --profile nhm6
 
 verify-3330-radio-unsuitable-cells: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_barred SECONDS=18 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_cell_barred'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_barred/error.log
+	test -f $(RUN_DIR)_barred/error.log
 	$(PYTHON) tools/radio_3330_unsuitable_cell_trace_check.py $(RUN_DIR)_barred/error.log --profile barred
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_rxlev SECONDS=18 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_cell_rxlev'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_rxlev/error.log
+	test -f $(RUN_DIR)_rxlev/error.log
 	$(PYTHON) tools/radio_3330_unsuitable_cell_trace_check.py $(RUN_DIR)_rxlev/error.log --profile rxlev
 
 verify-3410-radio-registration: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm2
 
 verify-3410-radio-registration-preserved:
 	@$(MAKE) --no-print-directory verify-3410-radio-registration RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_cold SECONDS=30 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)_cold/error.log --profile nhm2 --preserved
 
 # shell: embedded shell control flow
@@ -407,7 +407,7 @@ verify-3410-radio-registration-state: normalize-3410
 		$(MAKE) --no-print-directory run $(DCT3_RUN_3410) \
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=30 RUN_VERBOSE=1 \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_registration_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log --profile nhm2 || exit; \
 	done
@@ -420,7 +420,7 @@ verify-3410-radio-unsuitable-cells: normalize-3410
 			RUN_DIR=$(RUN_DIR)_$$profile SECONDS=30 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" \
 			RUN_ENV='$(NOKI3410_RADIO_INPUT)' || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		test -f $(RUN_DIR)_$$profile/error.log || exit; \
 		$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \
 			$(RUN_DIR)_$$profile/error.log --profile $$profile || exit; \
 	done
@@ -428,7 +428,7 @@ verify-3410-radio-unsuitable-cells: normalize-3410
 		RUN_DIR=$(RUN_DIR)_assignment SECONDS=30 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_assignment_mismatch' \
 		RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_assignment/error.log
+	test -f $(RUN_DIR)_assignment/error.log
 	$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \
 		$(RUN_DIR)_assignment/error.log --profile assignment
 
@@ -439,7 +439,7 @@ verify-5210-frontier: normalize-5210
 
 verify-5210-radio-registration: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nsm5
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no registered 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 completed Location Updating and displayed the operator"
@@ -451,36 +451,36 @@ verify-5210-menu: normalize-5210
 
 verify-5210-radio-authentication: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_AUTHENTICATION_ARGS)'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_authentication_boundary_trace_check.py $(RUN_DIR)/error.log --profile nsm5
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no authenticated 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 completed authenticated Location Updating and displayed the operator"
 
 verify-5210-radio-a5-1-incoming-call: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log --a5-1
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-call 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 
 verify-5210-radio-call-state: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_STATE_ROUNDTRIP_AT=23 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=end NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log --require-state-roundtrip
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-restore 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 
 verify-5210-power-lifecycle: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_short SECONDS=20 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)_short/error.log
+	@test -f $(RUN_DIR)_short/error.log
 	@$(PYTHON) tools/power_5210_trace_check.py short $(RUN_DIR)_short/error.log
 	@frame=$$(find $(RUN_DIR)_short -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no short-power 5210 frame produced"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_POWER_MENU_SHA)
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_long SECONDS=25 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)_long/error.log
+	@test -f $(RUN_DIR)_long/error.log
 	@$(PYTHON) tools/power_5210_trace_check.py long $(RUN_DIR)_long/error.log
 
 verify-5210-charger-wake: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=25 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt --boundary-only
 
 # shell: persistent SIM application fixture
@@ -489,7 +489,7 @@ verify-5210-sim-phonebook: normalize-5210
 	save_dir="$(RUN_DIR)_save"; reload_dir="$(RUN_DIR)_reload"; \
 	$(RM) -r "$$save_dir" "$$reload_dir"; \
 	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$save_dir" SECONDS=34 PRESERVE_NVRAM=0 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
-	cp "$(MAME_DIR)/error.log" "$$save_dir/error.log"; \
+	test -f "$$save_dir/error.log"; \
 	$(PYTHON) tools/sim_phonebook_check.py "$$save_dir/error.log" "$$save_dir/nvram/$(NVRAM_SYSTEM_5210)/sim_card" --expected-name Ada; \
 	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$reload_dir" SECONDS=25 PRESERVE_NVRAM=1 RUN_NVRAM_DIR="$(abspath $(RUN_DIR)_save/nvram)" RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=c,wait700,enter,wait700,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=180 NOKIA_DCT3_POST_READY_KEY_GAP_MS=260 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
 	frame=$$(find "$$reload_dir" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
@@ -503,16 +503,16 @@ verify-5210-radio-supplementary: normalize-5210
 	ussd_dir="$(RUN_DIR)_ussd"; divert_dir="$(RUN_DIR)_divert"; \
 	$(RM) -r "$$ussd_dir" "$$divert_dir"; \
 	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$ussd_dir" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,1,2,3,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \
-	cp "$(MAME_DIR)/error.log" "$$ussd_dir/error.log"; \
+	test -f "$$ussd_dir/error.log"; \
 	$(PYTHON) tools/radio_ussd_trace_check.py "$$ussd_dir/error.log" "$$ussd_dir" --result-frame $(ORACLE_5210_USSD_RAW_SHA); \
 	$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR="$$divert_dir" SECONDS=38 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=star,hash,2,1,hash,wait800,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=15000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'; \
-	cp "$(MAME_DIR)/error.log" "$$divert_dir/error.log"; \
+	test -f "$$divert_dir/error.log"; \
 	$(PYTHON) tools/radio_call_divert_trace_check.py "$$divert_dir/error.log" "$$divert_dir"
 	@echo "OK — 5210 firmware completed physical USSD and call-divert interrogation"
 
 verify-5210-radio-paging: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 	@echo "OK — 5210 completed IMSI paging and returned to PCH"
 
@@ -520,14 +520,14 @@ verify-5210-radio-paging: normalize-5210
 verify-5210-radio-paging-negatives: normalize-5210
 	@for profile in wrong_group unmatched malformed; do \
 		$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR)_$$profile SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_paging_$$profile" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		test -f $(RUN_DIR)_$$profile/error.log || exit; \
 		check_profile=$$(echo $$profile | tr _ -); \
 		$(PYTHON) tools/radio_paging_negative_trace_check.py $(RUN_DIR)_$$profile/error.log --profile $$check_profile || exit; \
 	done
 
 verify-5210-radio-incoming-sms: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@sim=$$(find $(RUN_DIR)/nvram -type f -name sim_card -print -quit); test -n "$$sim" || { echo "no 5210 SIM NVRAM produced"; exit 1; }; $(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log "$$sim" --profile nsm5
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 SMS notification frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_INCOMING_SMS_SHA)
 	@echo "OK — 5210 received and stored an unread SMS and displayed its notification"
@@ -539,28 +539,28 @@ verify-5210-messages: normalize-5210
 
 verify-5210-radio-incoming-call-ringing: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ARGS)'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@grep -q 'GSM service uplink sapi=0 pd=03 message=01 length=2' $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 ringing frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_RINGING_SHA)
 	@echo "OK — 5210 presented caller 5551234 and remained ringing"
 
 verify-5210-radio-incoming-call-answered: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=24 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@grep -q 'doorbell .*wire=860b speech_control=060b' $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 answered-call frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_ANSWERED_SHA)
 	@echo "OK — 5210 physical Send answered the call and selected speech control"
 
 verify-5210-radio-incoming-call-lifecycle: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-call 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 completed incoming-call Answer/End and returned to registered standby"
 
 verify-5210-radio-media-resilience: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800 NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -570,7 +570,7 @@ verify-5210-radio-media-resilience: normalize-5210
 
 verify-5210-radio-outgoing-call-lifecycle: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=36 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1800'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_5210_outgoing_call_trace_check.py $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-call 5210 frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_IDLE_SHA)
 	@echo "OK — 5210 physically dialled, connected, ended and returned to registered standby"
@@ -585,33 +585,33 @@ verify-5210-radio-outgoing-sms: normalize-5210
 
 verify-5210-radio-reselection-same-lac: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_same_lac'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87
 
 verify-5210-radio-reselection-different-lac: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_different_lac'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87
 
 verify-5210-radio-loss-recovery: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_loss_recovery'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile loss-recovery --radio-profile nsm5
 
 verify-5210-radio-all-cell-loss: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=65 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nsm5
 
 verify-5210-radio-reselection-paging: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_paging'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nsm5 --serving-arfcn 86 --neighbour-arfcn 87 --paging-after-reselection
 	@$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-5210-radio-incoming-sms-read: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1200,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=20000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@sim=$$(find $(RUN_DIR)/nvram -type f -name sim_card -print -quit); test -n "$$sim" || { echo "no 5210 SIM NVRAM produced"; exit 1; }; $(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log "$$sim" --profile nsm5 --read
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no 5210 SMS read frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_SMS_READ_SHA)
 	@echo "OK — 5210 physically opened hello and marked the SIM record read"
@@ -623,7 +623,7 @@ verify-5210-navigation: normalize-5210
 
 verify-5210-save-state: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=15 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_KEYS=menu,wait1000,enter NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=1000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	@cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 	@grep -q 'state_roundtrip: result=pass' $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no post-restore 5210 Messages frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_5210_MESSAGES_SHA)
 	@echo "OK — 5210 restored registered state and entered Messages"
@@ -654,7 +654,7 @@ verify-3330-frontier: normalize-3330
 verify-3330-security-profile: normalize-3330 build
 	$(PYTHON) tools/make_3330_pmm_profile.py roms/noki3330/3330f450e.fls "roms/noki3330/3330 virgin eeprom 005f0000.fls" "$(RUN_NVRAM_DIR)/noki3330_1/flash"
 	@$(MAKE) --no-print-directory run-prebuilt $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) PRESERVE_NVRAM=1 SECONDS=56 RUN_VERBOSE=1 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_SECURITY_SETTINGS_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/nhm6_security_profile_check.py $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' ! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no informative 3330 security-level frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3330_SECURITY_LEVEL_SHA)
 	@echo "OK — 3330 v4.50 derived PMM accepts the same phone code at first boot and in Settings"
@@ -713,23 +713,23 @@ verify-model-frontier-negative: normalize-3330 normalize-3410
 
 verify-radio-camp:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_camp_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-registration:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-reselection-same-lac:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nse8
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac
 
 verify-radio-reselection-different-lac:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac
 
 # shell: embedded shell control flow
@@ -742,7 +742,7 @@ verify-radio-reselection-state:
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=70 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log --profile different-lac || exit; \
 	done
@@ -750,12 +750,12 @@ verify-radio-reselection-state:
 verify-radio-reselection-preserved:
 	@$(MAKE) --no-print-directory verify-radio-reselection-different-lac RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR)_cold SECONDS=70 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_reselection_preserved_trace_check.py $(RUN_DIR)_cold/error.log
 
 verify-radio-loss-recovery:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nse8
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile loss-recovery --radio-profile nse8
 
@@ -768,7 +768,7 @@ verify-radio-loss-recovery-state:
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log --profile loss-recovery \
 			--radio-profile nse8 || exit; \
@@ -776,7 +776,7 @@ verify-radio-loss-recovery-state:
 
 verify-radio-all-cell-loss:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nse8
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nse8
 
@@ -786,14 +786,14 @@ verify-radio-reselection-unsuitable-neighbours: normalize-3410
 		$(MAKE) --no-print-directory run $(DCT3_RUN_3210) \
 			RUN_DIR=$(RUN_DIR)_$$profile SECONDS=45 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_reselection_neighbour_$$profile" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		test -f $(RUN_DIR)_$$profile/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_negative_trace_check.py \
 			$(RUN_DIR)_$$profile/error.log --profile $$profile || exit; \
 	done
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) \
 		RUN_DIR=$(RUN_DIR)_unsupported_band SECONDS=45 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_neighbour_unsupported_band'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_unsupported_band/error.log
+	test -f $(RUN_DIR)_unsupported_band/error.log
 	$(PYTHON) tools/radio_reselection_negative_trace_check.py \
 		$(RUN_DIR)_unsupported_band/error.log --profile unsupported-band \
 		--neighbour-arfcn 823
@@ -803,7 +803,7 @@ verify-radio-reselection-unsuitable-neighbours: normalize-3410
 			RUN_DIR=$(RUN_DIR)_3410_$$profile SECONDS=50 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_reselection_neighbour_$$profile" \
 			RUN_ENV='$(NOKI3410_RADIO_INPUT)' || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_3410_$$profile/error.log || exit; \
+		test -f $(RUN_DIR)_3410_$$profile/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_negative_trace_check.py \
 			$(RUN_DIR)_3410_$$profile/error.log \
 			--profile $$check_profile || exit; \
@@ -811,19 +811,19 @@ verify-radio-reselection-unsuitable-neighbours: normalize-3410
 
 verify-radio-reselection-paging:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --paging-after-reselection
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3310-radio-reselection-same-lac:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm5
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nhm5 --serving-arfcn 88 --neighbour-arfcn 89
 
 verify-3310-radio-reselection-different-lac:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac --radio-profile nhm5 --serving-arfcn 88 --neighbour-arfcn 89
 
 # shell: embedded shell control flow
@@ -835,7 +835,7 @@ verify-3310-radio-reselection-state:
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=70 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log --profile different-lac \
 			--radio-profile nhm5 --serving-arfcn 88 \
@@ -845,24 +845,24 @@ verify-3310-radio-reselection-state:
 verify-3310-radio-reselection-preserved:
 	@$(MAKE) --no-print-directory verify-3310-radio-reselection-different-lac RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR)_cold SECONDS=70 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_reselection_preserved_trace_check.py $(RUN_DIR)_cold/error.log --serving-arfcn 88 --neighbour-arfcn 89
 
 verify-3310-radio-reselection-paging:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nhm5 --serving-arfcn 88 --neighbour-arfcn 89 --paging-after-reselection
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3330-radio-reselection-same-lac: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm6
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nhm6 --serving-arfcn 823 --neighbour-arfcn 824
 
 verify-3330-radio-reselection-different-lac: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac --radio-profile nhm6 --serving-arfcn 823 --neighbour-arfcn 824
 
 # shell: embedded shell control flow
@@ -874,7 +874,7 @@ verify-3330-radio-reselection-state: normalize-3330
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=35 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log --profile different-lac \
 			--radio-profile nhm6 --serving-arfcn 823 \
@@ -884,24 +884,24 @@ verify-3330-radio-reselection-state: normalize-3330
 verify-3330-radio-reselection-preserved: normalize-3330
 	@$(MAKE) --no-print-directory verify-3330-radio-reselection-different-lac RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_cold SECONDS=35 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_reselection_preserved_trace_check.py $(RUN_DIR)_cold/error.log --serving-arfcn 823 --neighbour-arfcn 824
 
 verify-3330-radio-reselection-paging: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nhm6 --serving-arfcn 823 --neighbour-arfcn 824 --paging-after-reselection
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3410-radio-reselection-same-lac: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_SAME_LAC_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm2
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nhm2
 
 verify-3410-radio-reselection-different-lac: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=90 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile different-lac --radio-profile nhm2
 
 # shell: embedded shell control flow
@@ -914,7 +914,7 @@ verify-3410-radio-reselection-state: normalize-3410
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=90 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log --profile different-lac \
 			--radio-profile nhm2 || exit; \
@@ -923,18 +923,18 @@ verify-3410-radio-reselection-state: normalize-3410
 verify-3410-radio-reselection-preserved: normalize-3410
 	@$(MAKE) --no-print-directory verify-3410-radio-reselection-different-lac RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_cold SECONDS=90 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) RUN_EXTRA_ARGS='$(RADIO_RESELECTION_DIFFERENT_LAC_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_reselection_preserved_trace_check.py $(RUN_DIR)_cold/error.log --allow-pre-update-invalidation
 
 verify-3410-radio-reselection-paging: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=50 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_PAGING_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile same-lac --radio-profile nhm2 --paging-after-reselection
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3410-radio-loss-recovery: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm2
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile loss-recovery --radio-profile nhm2
 
@@ -947,7 +947,7 @@ verify-3410-radio-loss-recovery-state: normalize-3410
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=45 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_RESELECTION_LOSS_RECOVERY_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_reselection_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log --profile loss-recovery \
 			--radio-profile nhm2 || exit; \
@@ -955,48 +955,48 @@ verify-3410-radio-loss-recovery-state: normalize-3410
 
 verify-3410-radio-all-cell-loss: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_reselection_persistent_loss' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm2
 	$(PYTHON) tools/radio_reselection_trace_check.py $(RUN_DIR)/error.log --profile all-cell-loss --radio-profile nhm2
 
 verify-radio-authentication-boundary:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_AUTHENTICATION_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_authentication_boundary_trace_check.py $(RUN_DIR)/error.log
 
 verify-3310-radio-authentication-boundary:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=22 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_AUTHENTICATION_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_authentication_boundary_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-paging:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=32 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3310-radio-paging:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=20 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3330-radio-paging: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=28 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3330-radio-paging-preserved:
 	@$(MAKE) --no-print-directory verify-3330-radio-paging RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_cold SECONDS=28 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)_cold/error.log --profile nhm6 --preserved
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)_cold/error.log
 
 verify-3330-radio-paging-state: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_before SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=11.80 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_before/error.log
+	test -f $(RUN_DIR)_before/error.log
 	$(PYTHON) tools/radio_paging_state_roundtrip_trace_check.py $(RUN_DIR)_before/error.log
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_assigned SECONDS=30 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=13.40 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=700'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_assigned/error.log
+	test -f $(RUN_DIR)_assigned/error.log
 	$(PYTHON) tools/radio_paging_state_roundtrip_trace_check.py $(RUN_DIR)_assigned/error.log
 
 # shell: embedded shell control flow
@@ -1005,7 +1005,7 @@ verify-3330-radio-paging-negatives: normalize-3330
 		$(MAKE) --no-print-directory run $(DCT3_RUN_3330) \
 			RUN_DIR=$(RUN_DIR)_$$profile SECONDS=24 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_paging_$$profile"; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log; \
+		test -f $(RUN_DIR)_$$profile/error.log; \
 		check_profile=$$(echo $$profile | tr _ -); \
 		$(PYTHON) tools/radio_paging_negative_trace_check.py \
 			$(RUN_DIR)_$$profile/error.log --profile $$check_profile || exit 1; \
@@ -1013,20 +1013,20 @@ verify-3330-radio-paging-negatives: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) \
 		RUN_DIR=$(RUN_DIR)_unsuitable SECONDS=18 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_paging_unsuitable'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_unsuitable/error.log
+	test -f $(RUN_DIR)_unsuitable/error.log
 	$(PYTHON) tools/radio_3330_unsuitable_cell_trace_check.py \
 		$(RUN_DIR)_unsuitable/error.log --profile barred
 
 verify-3410-radio-paging: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log --profile nhm2
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)/error.log
 
 verify-3410-radio-paging-preserved:
 	@$(MAKE) --no-print-directory verify-3410-radio-paging RUN_DIR=$(RUN_DIR)_fresh
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_cold SECONDS=30 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_fresh/nvram) RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)_cold/error.log --profile nhm2 --preserved
 	$(PYTHON) tools/radio_paging_trace_check.py $(RUN_DIR)_cold/error.log
 
@@ -1038,7 +1038,7 @@ verify-3410-radio-paging-state: normalize-3410
 			RUN_DIR=$(RUN_DIR)_$$boundary SECONDS=35 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_PAGING_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay $(NOKI3410_RADIO_INPUT)" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_paging_state_roundtrip_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log || exit; \
 	done
@@ -1051,7 +1051,7 @@ verify-3410-radio-paging-negatives: normalize-3410
 			RUN_DIR=$(RUN_DIR)_$$profile SECONDS=30 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/radio_paging_$$profile" \
 			RUN_ENV='$(NOKI3410_RADIO_INPUT)' || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$profile/error.log || exit; \
+		test -f $(RUN_DIR)_$$profile/error.log || exit; \
 		$(PYTHON) tools/radio_paging_negative_trace_check.py \
 			$(RUN_DIR)_$$profile/error.log --profile $$fixture || exit; \
 	done
@@ -1059,25 +1059,25 @@ verify-3410-radio-paging-negatives: normalize-3410
 		RUN_DIR=$(RUN_DIR)_unsuitable SECONDS=30 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_paging_unsuitable' \
 		RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_unsuitable/error.log
+	test -f $(RUN_DIR)_unsuitable/error.log
 	$(PYTHON) tools/radio_3410_registration_negative_trace_check.py \
 		$(RUN_DIR)_unsuitable/error.log --profile barred
 
 verify-3310-radio-incoming-call-boundary:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=16 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log
 
 verify-3310-radio-incoming-call-ui:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=24 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); test -n "$$frame" || { echo "no answered 3310 call frame produced in $(RUN_DIR)"; exit 1; }; $(PYTHON) tools/check_lcd_frame.py "$$frame" --sha256 $(ORACLE_3310_ANSWERED_UI_SHA)
 	@echo "OK — NHM-5 completed Connect/Connect Ack and physical Answer changed the UI to End"
 
 verify-3310-radio-incoming-call-lifecycle:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=28 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait3000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --ended
 	$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -1087,28 +1087,28 @@ verify-3330-radio-incoming-call-lifecycle: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=22 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
+	test -f $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	@echo "OK — NHM-6 carried bidirectional GSM-FR media and returned call control to idle"
 
 verify-3410-radio-incoming-call-lifecycle: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	@echo "OK — NHM-2 carried internal GSM-FR media through physical Answer/End and returned to PCH"
 
 verify-3410-radio-a5-1-incoming-call: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
 verify-3330-radio-media-resilience: verify-3330-radio-incoming-call-lifecycle
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_degraded SECONDS=24 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=13.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_degraded/error.log
+	test -f $(RUN_DIR)_degraded/error.log
 	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_degraded/error.log
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)_degraded/error.log
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)_degraded/error.log --data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16
@@ -1122,7 +1122,7 @@ verify-3310-radio-media-resilience:
 		RUN_DIR=$(RUN_DIR) SECONDS=28 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=19.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py \
 		$(RUN_DIR)/error.log --ended
 	$(PYTHON) tools/radio_3310_speech_control_trace_check.py \
@@ -1140,7 +1140,7 @@ verify-3310-radio-media-resilience:
 
 verify-radio-incoming-call:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=36 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_call_trace_check.py $(RUN_DIR)/error.log
 
 # shell: empty recipe
@@ -1154,7 +1154,7 @@ verify-radio-incoming-call-answered:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_incoming_ringing_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_answered_call_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_answered_audio_boundary_trace_check.py $(RUN_DIR)/error.log; \
@@ -1168,7 +1168,7 @@ verify-radio-incoming-call-lifecycle:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
@@ -1180,7 +1180,7 @@ verify-radio-handover:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
@@ -1193,7 +1193,7 @@ verify-radio-handover-failure-state:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state
 
 # shell: NHM-5 dedicated-mode handover success lifecycle
@@ -1202,7 +1202,7 @@ verify-3310-radio-handover:
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait9000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --serving-arfcn 88 --target-arfcn 89; \
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered; \
 	$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log; \
@@ -1214,7 +1214,7 @@ verify-3310-radio-handover-failure-state:
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=16.85 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 88 --target-arfcn 89
 
 # shell: NHM-6 dedicated-mode handover success lifecycle
@@ -1225,7 +1225,7 @@ verify-3330-radio-handover: normalize-3330
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=22 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	test -f $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome success --serving-arfcn 823 --target-arfcn 824; \
 	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -1238,7 +1238,7 @@ verify-3330-radio-handover-failure-state: normalize-3330
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=18 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=12.45 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	test -f $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome failure --require-state --serving-arfcn 823 --target-arfcn 824
 
 # shell: NHM-2 dedicated-mode handover success lifecycle
@@ -1247,7 +1247,7 @@ verify-3410-radio-handover: normalize-3410
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --serving-arfcn 1 --target-arfcn 2; \
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -1258,7 +1258,7 @@ verify-3410-radio-handover-failure-state: normalize-3410
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=18 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=14.60 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --serving-arfcn 1 --target-arfcn 2
 
 # shell: NSE-8 A5/1 dedicated-mode handover success
@@ -1268,7 +1268,7 @@ verify-radio-a5-1-handover:
 	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
@@ -1281,7 +1281,7 @@ verify-radio-a5-1-handover-failure-state:
 	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=30 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=19.55 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1
 
@@ -1291,7 +1291,7 @@ verify-3310-radio-a5-1-handover:
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=30 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait9000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1 --serving-arfcn 88 --target-arfcn 89; \
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --answered; \
@@ -1304,7 +1304,7 @@ verify-3310-radio-a5-1-handover-failure-state:
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=17.25 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=4000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 88 --target-arfcn 89
 
@@ -1316,7 +1316,7 @@ verify-3330-radio-a5-1-handover: normalize-3330
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=22 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	test -f $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome success --require-a5-1 --serving-arfcn 823 --target-arfcn 824; \
 	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log; \
@@ -1330,7 +1330,7 @@ verify-3330-radio-a5-1-handover-failure-state: normalize-3330
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=18 RUN_VERBOSE=1 PRESERVE_NVRAM=1 \
 		RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=12.90 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	test -f $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)_call/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 823 --target-arfcn 824
 
@@ -1340,7 +1340,7 @@ verify-3410-radio-a5-1-handover: normalize-3410
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=25 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome success --require-a5-1 --serving-arfcn 1 --target-arfcn 2; \
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log; \
@@ -1352,7 +1352,7 @@ verify-3410-radio-a5-1-handover-failure-state: normalize-3410
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=19 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_handover_failure' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=15.18 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_handover_trace_check.py $(RUN_DIR)/error.log --outcome failure --require-state --require-a5-1 --serving-arfcn 1 --target-arfcn 2
 
@@ -1419,7 +1419,7 @@ verify-radio-call-divert-incoming: build
 			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
 			-http_port $(HOST_CALL_INCOMING_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_divert_incoming_trace_check.py $(RUN_DIR)/error.log
 
 # shell: host adapter plus organic CFB registration and active outgoing call
@@ -1444,7 +1444,7 @@ verify-radio-call-divert-busy: build
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_CALL_BUSY_FORWARD_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 65; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_busy_forward_trace_check.py $(RUN_DIR)/error.log
 
 # shell: host adapter plus organic CFNRc registration and persistent cell loss
@@ -1469,7 +1469,7 @@ verify-radio-call-divert-unreachable: build
 			-verbose -cfg_directory ../fixtures/radio_unreachable_host_adapter -http \
 			-http_port $(HOST_CALL_UNREACHABLE_FORWARD_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 70; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_unreachable_forward_trace_check.py $(RUN_DIR)/error.log
 
 # shell: host adapter plus organic CFNRy registration and timeout
@@ -1494,7 +1494,7 @@ verify-radio-call-divert-no-reply: build
 			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
 			-http_port $(HOST_CALL_INCOMING_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_no_reply_forward_trace_check.py $(RUN_DIR)/error.log
 
 verify-radio-ussd: ERASED_IDENTITY_SECURITY_CODE=12345
@@ -1557,7 +1557,7 @@ verify-radio-a5-1-incoming-call:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
@@ -1570,7 +1570,7 @@ verify-radio-a5-1-state:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=21.5 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
 		$(RUN_DIR)/error.log; \
@@ -1586,7 +1586,7 @@ verify-radio-a5-1-sdcch-state:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=24.16 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=50 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=5000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_state_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 
@@ -1598,7 +1598,7 @@ verify-radio-a5-1-outgoing-call:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
@@ -1611,7 +1611,7 @@ verify-radio-outgoing-call-lifecycle:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
@@ -1623,7 +1623,7 @@ verify-radio-outgoing-call-state:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
 		$(RUN_DIR)/error.log
@@ -1642,7 +1642,7 @@ verify-radio-outgoing-call-no-answer-state:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_NO_ANSWER_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=2000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \
 		$(RUN_DIR)/error.log --outcome no-answer --require-state-roundtrip
 
@@ -1657,7 +1657,7 @@ verify-radio-outgoing-call-delayed-decision-state:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_OUTGOING_DELAYED_BUSY_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_OUTGOING_DIAL_KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=26.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \
 		$(RUN_DIR)/error.log --outcome busy --require-state-roundtrip \
 		--require-deferred-decision
@@ -1685,7 +1685,7 @@ verify-radio-incoming-call-host-adapter:
 			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
 			-http_port $(HOST_CALL_INCOMING_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_incoming_host_adapter_trace_check.py \
 		$(RUN_DIR)/error.log
 
@@ -1715,7 +1715,7 @@ verify-radio-incoming-call-host-restore:
 			-verbose -cfg_directory ../fixtures/radio_incoming_host_adapter -http \
 			-http_port $(HOST_CALL_INCOMING_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 52; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_incoming_host_adapter_trace_check.py \
 		$(RUN_DIR)/error.log --require-restore
 
@@ -1744,7 +1744,7 @@ verify-radio-outgoing-call-host-adapter:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_ADAPTER_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \
 		$(RUN_DIR)/error.log --outcome busy; \
 	$(PYTHON) tools/radio_outgoing_host_adapter_trace_check.py \
@@ -1779,7 +1779,7 @@ verify-radio-outgoing-call-host-local-end:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_ADAPTER_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_local_end_trace_check.py \
 		$(RUN_DIR)/error.log
 
@@ -1809,7 +1809,7 @@ verify-radio-outgoing-call-host-termination:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_TERMINATION_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
 		$(RUN_DIR)/error.log --require-state-roundtrip
 
@@ -1837,7 +1837,7 @@ verify-radio-outgoing-call-host-alerting-termination:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_ALERTING_TERMINATION_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
 		$(RUN_DIR)/error.log --phase alerting
 
@@ -1865,7 +1865,7 @@ verify-radio-outgoing-call-host-media:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_MEDIA_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_media_trace_check.py \
 		$(RUN_DIR)/error.log --frames 200
 
@@ -1894,7 +1894,7 @@ verify-radio-outgoing-call-host-reconnect:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_RECONNECT_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_reconnect_trace_check.py \
 		$(RUN_DIR)/error.log
 
@@ -1922,7 +1922,7 @@ verify-radio-outgoing-call-host-alerting-reconnect:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_ALERTING_TERMINATION_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_reconnect_trace_check.py \
 		$(RUN_DIR)/error.log --phase alerting
 
@@ -1951,7 +1951,7 @@ verify-radio-outgoing-call-host-media-restore:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_RECONNECT_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_media_restore_trace_check.py \
 		$(RUN_DIR)/error.log --frames 80
 
@@ -1982,7 +1982,7 @@ verify-radio-outgoing-call-host-release-restore:
 			-verbose $(HOST_CALL_CONFIG_ARGS) -http \
 			-http_port $(HOST_CALL_MEDIA_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(HOST_RELEASE_SECURITY_CHECK); \
 	$(PYTHON) tools/radio_outgoing_host_release_restore_trace_check.py \
 		$(RUN_DIR)/error.log
@@ -2013,7 +2013,7 @@ verify-radio-outgoing-call-host-two-calls:
 			-verbose $(HOST_CALL_CONFIG_ARGS) -http \
 			-http_port $(HOST_CALL_TWO_CALLS_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 55; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(HOST_TWO_CALL_SECURITY_CHECK); \
 	$(PYTHON) tools/radio_outgoing_host_two_calls_trace_check.py \
 		$(RUN_DIR)/error.log
@@ -2044,7 +2044,7 @@ verify-3410-radio-outgoing-call-host-termination: normalize-3410
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_3410_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
 		$(RUN_DIR)/error.log
 
@@ -2071,7 +2071,7 @@ verify-3410-radio-outgoing-call-host-media: normalize-3410
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_3410_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 48; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_media_trace_check.py \
 		$(RUN_DIR)/error.log --frames 200
 
@@ -2098,7 +2098,7 @@ verify-3310-radio-outgoing-call-host-termination:
 			-verbose $(RADIO_OUTGOING_HOST_ADAPTER_ARGS) -http \
 			-http_port $(HOST_CALL_3310_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
 		$(RUN_DIR)/error.log
 
@@ -2133,19 +2133,19 @@ verify-3330-radio-outgoing-call-host-termination: normalize-3330
 			-http_port $(HOST_CALL_3330_PORT) \
 			-nvram_directory $(abspath $(RUN_DIR)_provision/nvram) \
 			-seconds_to_run 32; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log; \
+	test -f $(RUN_DIR)_call/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_termination_trace_check.py \
 		$(RUN_DIR)_call/error.log
 
 verify-3310-radio-outgoing-call-lifecycle:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_70_200)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
 verify-3310-radio-a5-1-incoming-call:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi,wait3000,navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --ended
 	$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log
@@ -2153,7 +2153,7 @@ verify-3310-radio-a5-1-incoming-call:
 
 verify-3310-radio-a5-1-outgoing-call:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=42 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_70_200)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -2162,7 +2162,7 @@ verify-3330-radio-outgoing-call-lifecycle: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=32 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_70_200)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
+	test -f $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
@@ -2170,7 +2170,7 @@ verify-3330-radio-a5-1-incoming-call: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=28 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,waitalerting,enter,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
+	test -f $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -2179,20 +2179,20 @@ verify-3330-radio-a5-1-outgoing-call: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=32 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_70_200)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_call/error.log
+	test -f $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
 verify-3410-radio-outgoing-call-lifecycle: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_OUTGOING_CALL_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_120_240)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log --release-complete optional
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
 verify-3410-radio-a5-1-outgoing-call: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send,waitalerting,wait5000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_120_240)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log --release-complete optional
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -2206,7 +2206,7 @@ verify-radio-incoming-call-lifecycle-v501:
 		RUN_DIR=$(RUN_DIR) SECONDS=45 ERASED_IDENTITY_SECURITY_CODE=12345 \
 		RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(NOKI3210_INCOMING_READY_KEYS),enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_audio_wire_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log
 
@@ -2219,7 +2219,7 @@ verify-radio-call-state-roundtrip:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
 		RUN_ENV="$$replay_env"; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log; \
+	test -f $(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
 		$(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \
@@ -2234,7 +2234,7 @@ verify-radio-call-state-roundtrip:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_ANSWERED_ARGS)' \
 		RUN_ENV="$$replay_env"; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log; \
+	test -f $(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
 		$(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_call_audio_wire_trace_check.py \
@@ -2253,7 +2253,7 @@ verify-radio-pcm-missing:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_PCM_MISSING_ARGS)' \
 		RUN_ENV="$$pcm_missing_env"; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log; \
+	test -f $(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \
 		$(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_pcm_missing_trace_check.py \
@@ -2264,7 +2264,7 @@ verify-radio-pcm-missing:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_PCM_MISSING_ARGS)' \
 		RUN_ENV="$$pcm_missing_env"; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log; \
+	test -f $(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_call_audio_wire_trace_check.py \
 		$(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_pcm_missing_trace_check.py \
@@ -2279,7 +2279,7 @@ verify-radio-degraded-speech:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
 		RUN_ENV="$$degraded_env"; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log; \
+	test -f $(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
 		$(RUN_DIR)_v600/error.log; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \
@@ -2292,7 +2292,7 @@ verify-radio-degraded-speech:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_CALL_DEGRADED_ARGS)' \
 		RUN_ENV="$$degraded_env"; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log; \
+	test -f $(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
 		$(RUN_DIR)_v501/error.log; \
 	$(PYTHON) tools/radio_call_audio_wire_trace_check.py \
@@ -2309,7 +2309,7 @@ verify-radio-a5-1-degraded:
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' \
 		RUN_ENV="$$degraded_env"; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
 		$(RUN_DIR)/error.log; \
@@ -2373,7 +2373,7 @@ verify-radio-incoming-sms-host-adapter:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_SMS_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 55; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_incoming_host_sms_trace_check.py $(RUN_DIR)/error.log
 
 # shell: embedded host transport runner
@@ -2395,7 +2395,7 @@ verify-radio-incoming-sms-host-restore:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_INCOMING_SMS_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 58; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_incoming_host_sms_trace_check.py $(RUN_DIR)/error.log --require-restore
 
 # shell: embedded host transport runner
@@ -2418,7 +2418,7 @@ verify-radio-outgoing-sms-host-adapter:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_SMS_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 48; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_sms_trace_check.py $(RUN_DIR)/error.log
 
 # shell: embedded host transport runner
@@ -2443,7 +2443,7 @@ verify-radio-outgoing-sms-host-restore:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_SMS_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 52; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_host_sms_trace_check.py $(RUN_DIR)/error.log
 
 # shell: embedded host transport runner
@@ -2466,7 +2466,7 @@ verify-radio-ussd-host-adapter:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_USSD_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 40; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_host_ussd_trace_check.py $(RUN_DIR)/error.log
 
 # shell: embedded host transport runner
@@ -2491,7 +2491,7 @@ verify-radio-ussd-host-restore:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_USSD_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 42; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_host_ussd_trace_check.py $(RUN_DIR)/error.log --require-restore
 
 # shell: embedded host transport runner
@@ -2511,7 +2511,7 @@ verify-radio-incoming-ussd-host-adapter:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_INCOMING_USSD_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 45; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_host_incoming_ussd_trace_check.py $(RUN_DIR)/error.log
 
 # shell: embedded host transport runner
@@ -2533,7 +2533,7 @@ verify-radio-incoming-ussd-host-restore:
 			-verbose -cfg_directory ../fixtures/radio_outgoing_host_adapter -http \
 			-http_port $(HOST_INCOMING_USSD_RESTORE_PORT) -nvram_directory $(abspath $(RUN_DIR))/nvram \
 			-seconds_to_run 48; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_host_incoming_ussd_trace_check.py $(RUN_DIR)/error.log --require-restore
 
 # shell: embedded EEPROM restoration guard
@@ -2639,7 +2639,7 @@ verify-3410-radio-outgoing-sms: normalize-3410
 
 verify-radio-incoming-sms:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMS_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_sms_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
 
 # shell: three exact application-boundary compositions
@@ -2792,7 +2792,7 @@ verify-3330-radio-sms-inbox: normalize-3330
 
 verify-radio-incoming-smart-message:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3210/sim_card
 
 # shell: embedded shell control flow
@@ -2807,7 +2807,7 @@ verify-radio-incoming-smart-message-state:
 			SECONDS=40 RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=$$replay NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=1000" || exit; \
-		cp $(MAME_DIR)/error.log $(RUN_DIR)_$$boundary/error.log || exit; \
+		test -f $(RUN_DIR)_$$boundary/error.log || exit; \
 		$(PYTHON) tools/radio_incoming_smart_message_state_trace_check.py \
 			$(RUN_DIR)_$$boundary/error.log \
 			$(RUN_DIR)_$$boundary/nvram/noki3210/sim_card || exit; \
@@ -2815,7 +2815,7 @@ verify-radio-incoming-smart-message-state:
 
 verify-radio-smart-message-application:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=50 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); $(PYTHON) tools/radio_smart_message_application_trace_check.py $(RUN_DIR)/error.log "$$frame" accepted
 
 # shell: embedded shell control flow
@@ -2831,7 +2831,7 @@ verify-radio-smart-message-application-state:
 			RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500" || exit; \
-		cp $(MAME_DIR)/error.log "$$out/error.log" || exit; \
+		test -f "$$out/error.log" || exit; \
 		$(PYTHON) tools/radio_incoming_smart_message_state_trace_check.py \
 			"$$out/error.log" "$$out/nvram/noki3210/sim_card" || exit; \
 		$(PYTHON) tools/radio_smart_message_envelope_trace_check.py \
@@ -2841,7 +2841,7 @@ verify-radio-smart-message-application-state:
 		RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
 		RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=35 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_accepted/error.log
+	test -f $(RUN_DIR)_accepted/error.log
 	@frame=$$(find $(RUN_DIR)_accepted -maxdepth 1 \
 		-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | \
 		sort -n | tail -1 | cut -d' ' -f2-); \
@@ -2851,7 +2851,7 @@ verify-radio-smart-message-application-state:
 		RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
 		RUN_EXTRA_ARGS='-cfg_directory ../fixtures/smart_message_invalid_rtpl' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=30 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_rejected/error.log
+	test -f $(RUN_DIR)_rejected/error.log
 	@frame=$$(find $(RUN_DIR)_rejected -maxdepth 1 \
 		-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | \
 		sort -n | tail -1 | cut -d' ' -f2-); \
@@ -2860,7 +2860,7 @@ verify-radio-smart-message-application-state:
 
 verify-radio-smart-message-invalid-rtpl:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/smart_message_invalid_rtpl' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); $(PYTHON) tools/radio_smart_message_application_trace_check.py $(RUN_DIR)/error.log "$$frame" rejected
 
 # shell: embedded shell control flow
@@ -2874,7 +2874,7 @@ verify-radio-smart-message-parser-quirks:
 			RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" \
 			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000' || exit; \
-		cp $(MAME_DIR)/error.log "$$out/error.log" || exit; \
+		test -f "$$out/error.log" || exit; \
 		frame=$$(find "$$out" -maxdepth 1 \
 			-name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | \
 			sort -n | tail -1 | cut -d' ' -f2-); \
@@ -2901,7 +2901,7 @@ verify-radio-smart-message-envelopes:
 		$(MAKE) --no-print-directory run RUN_DIR="$$out" SECONDS=40 \
 			RUN_VERBOSE=1 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" || exit; \
-		cp $(MAME_DIR)/error.log "$$out/error.log" || exit; \
+		test -f "$$out/error.log" || exit; \
 		$(PYTHON) tools/radio_smart_message_envelope_trace_check.py \
 			"$$out/error.log" "$$out/nvram/noki3210/sim_card" \
 			"$$profile" || exit; \
@@ -2909,14 +2909,14 @@ verify-radio-smart-message-envelopes:
 
 verify-radio-smart-message-persistence:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_save SECONDS=52 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,down,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_save/error.log
+	test -f $(RUN_DIR)_save/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py $(RUN_DIR)_save/error.log $(RUN_DIR)_save $(RUN_DIR)_save/nvram/noki3210/eeprom $(RUN_DIR)_save/nvram/noki3210/flash roms/3210f600a.fls saved
 	$(PYTHON) tools/radio_smart_message_envelope_trace_check.py $(RUN_DIR)_save/error.log $(RUN_DIR)_save/nvram/noki3210/sim_card valid
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_cold SECONDS=42 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_save/nvram) RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,9,wait500,2,wait1000,up,up,up,up,up,up,up,up NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_180_300) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py $(RUN_DIR)_cold/error.log $(RUN_DIR)_cold $(RUN_DIR)_save/nvram/noki3210/eeprom $(RUN_DIR)_save/nvram/noki3210/flash roms/3210f600a.fls cold
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_discard SECONDS=50 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,down,down,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_discard/error.log
+	test -f $(RUN_DIR)_discard/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py $(RUN_DIR)_discard/error.log $(RUN_DIR)_discard $(RUN_DIR)_discard/nvram/noki3210/eeprom $(RUN_DIR)_discard/nvram/noki3210/flash roms/3210f600a.fls discarded
 	$(PYTHON) tools/radio_smart_message_envelope_trace_check.py $(RUN_DIR)_discard/error.log $(RUN_DIR)_discard/nvram/noki3210/sim_card valid
 
@@ -2933,7 +2933,7 @@ verify-radio-smart-message-persistence-state:
 			RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
 			RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' \
 			RUN_ENV="NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,down,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000 NOKIA_DCT3_STATE_ROUNDTRIP_AT=$$at NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=500" || exit; \
-		cp $(MAME_DIR)/error.log "$$out/error.log" || exit; \
+		test -f "$$out/error.log" || exit; \
 		$(PYTHON) tools/radio_smart_message_persistence_trace_check.py \
 			"$$out/error.log" "$$out" \
 			"$$out/nvram/noki3210/eeprom" \
@@ -2943,51 +2943,51 @@ verify-radio-smart-message-persistence-state:
 
 verify-radio-smart-message-persistence-negatives:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_cancel SECONDS=50 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,c NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cancel/error.log
+	test -f $(RUN_DIR)_cancel/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py $(RUN_DIR)_cancel/error.log $(RUN_DIR)_cancel $(RUN_DIR)_cancel/nvram/noki3210/eeprom $(RUN_DIR)_cancel/nvram/noki3210/flash roms/3210f600a.fls cancelled
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_duplicate-first SECONDS=52 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,down,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_duplicate-second SECONDS=52 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_duplicate-first/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait9000,enter,wait1000,down,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_duplicate-second/error.log
+	test -f $(RUN_DIR)_duplicate-second/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py $(RUN_DIR)_duplicate-second/error.log $(RUN_DIR)_duplicate-second $(RUN_DIR)_duplicate-first/nvram/noki3210/eeprom $(RUN_DIR)_duplicate-first/nvram/noki3210/flash roms/3210f600a.fls saved
 
 verify-3410-radio-smart-message-persistence: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_reference SECONDS=52 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_save SECONDS=52 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait5000,enter,wait1200,down,wait1200,enter,wait3000,enter,wait3000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_240_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_save/error.log
+	test -f $(RUN_DIR)_save/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py nhm2 $(RUN_DIR)_save/error.log $(RUN_DIR)_save $(RUN_DIR)_save/nvram/noki3410/flash $(RUN_DIR)_reference/nvram/noki3410/flash $(RUN_DIR)_save/nvram/noki3410/eeprom $(RUN_DIR)_reference/nvram/noki3410/eeprom $(RUN_DIR)_save/nvram/noki3410/sim_card $(RUN_DIR)_reference/nvram/noki3410/sim_card saved
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR)_cold SECONDS=55 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_save/nvram) RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait5000,enter,wait1000,3,wait1000,enter,wait1000,down,wait1000,enter,wait1000,enter,wait1000,up,up,up,up,up,up,up,up,up,up,up,up,up,up,up,up,up,up,up NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py nhm2 $(RUN_DIR)_cold/error.log $(RUN_DIR)_cold $(RUN_DIR)_save/nvram/noki3410/flash $(RUN_DIR)_reference/nvram/noki3410/flash $(RUN_DIR)_save/nvram/noki3410/eeprom $(RUN_DIR)_reference/nvram/noki3410/eeprom $(RUN_DIR)_save/nvram/noki3410/sim_card $(RUN_DIR)_reference/nvram/noki3410/sim_card cold
 
 verify-3310-radio-smart-message-persistence:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR)_reference SECONDS=58 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR)_save SECONDS=58 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,down,wait1000,enter,wait1000,enter,wait1000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_220_300) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_save/error.log
+	test -f $(RUN_DIR)_save/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py nhm5 $(RUN_DIR)_save/error.log $(RUN_DIR)_save $(RUN_DIR)_save/nvram/noki3310_3/flash $(RUN_DIR)_reference/nvram/noki3310_3/flash $(RUN_DIR)_save/nvram/noki3310_3/eeprom $(RUN_DIR)_reference/nvram/noki3310_3/eeprom $(RUN_DIR)_save/nvram/noki3310_3/sim_card $(RUN_DIR)_reference/nvram/noki3310_3/sim_card saved
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR)_cold SECONDS=48 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_save/nvram) RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,0,0,enter,wait1000,0,1,0,1,2,0,2,6,enter,wait5000,enter,wait1000,5,wait1000,enter,wait1000,up,up,up,up,up,up,up,up NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_350) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_cold/error.log
+	test -f $(RUN_DIR)_cold/error.log
 	$(PYTHON) tools/radio_smart_message_persistence_trace_check.py nhm5 $(RUN_DIR)_cold/error.log $(RUN_DIR)_cold $(RUN_DIR)_save/nvram/noki3310_3/flash $(RUN_DIR)_reference/nvram/noki3310_3/flash $(RUN_DIR)_save/nvram/noki3310_3/eeprom $(RUN_DIR)_reference/nvram/noki3310_3/eeprom $(RUN_DIR)_save/nvram/noki3310_3/sim_card $(RUN_DIR)_reference/nvram/noki3310_3/sim_card cold
 
 verify-3410-radio-smart-message-application: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait5000,enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_200_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); $(PYTHON) tools/radio_smart_message_application_trace_check.py $(RUN_DIR)/error.log "$$frame" accepted-3410
 
 verify-3310-radio-smart-message-application:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=enter,wait1000,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_280) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	@frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); $(PYTHON) tools/radio_smart_message_application_trace_check.py $(RUN_DIR)/error.log "$$frame" accepted-3310
 
 verify-3310-radio-incoming-smart-message:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3310_3/sim_card
 
 verify-3330-radio-incoming-smart-message: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_sms SECONDS=35 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_sms/error.log
+	test -f $(RUN_DIR)_sms/error.log
 	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py $(RUN_DIR)_sms/error.log $(RUN_DIR)_provision/nvram/noki3330_1/sim_card
 
 verify-3330-radio-smart-message-persistence: normalize-3330
@@ -3001,7 +3001,7 @@ verify-3330-radio-smart-message-persistence: normalize-3330
 
 verify-3410-radio-incoming-smart-message: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='$(RADIO_INCOMING_SMART_MESSAGE_ARGS)' RUN_ENV='$(NOKI3410_RADIO_INPUT)'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_incoming_smart_message_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/nvram/noki3410/sim_card
 
 # shell: embedded shell control flow
@@ -3011,7 +3011,7 @@ verify-radio-operator:
 	$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=105 \
 		PROVISIONED_IMEI_PREFIX=49015420323751 \
 		RUN_VERBOSE=1; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_registration_trace_check.py $(RUN_DIR)/error.log; \
 	frame=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
@@ -3022,7 +3022,7 @@ verify-radio-operator:
 
 verify-mad2:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/mad2_timer_trace_check.py $(RUN_DIR)/error.log --summary $(RUN_DIR)/boot_summary.txt --expected-line 4
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_state SECONDS=1 RUN_ENV='NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.4'
 	@grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_state/boot_summary.txt
@@ -3030,110 +3030,110 @@ verify-mad2:
 
 verify-mad2-interrupts:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_overlap SECONDS=4 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_IRQ_OVERLAP_AT=2.0'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_overlap/error.log
+	test -f $(RUN_DIR)_overlap/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py overlap $(RUN_DIR)_overlap/error.log --summary $(RUN_DIR)_overlap/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mask SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_IRQ_MASK_FIXTURE_AT=0.2'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_mask/error.log
+	test -f $(RUN_DIR)_mask/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py mask $(RUN_DIR)_mask/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_fiq8 SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_FIQ8_FIXTURE_AT=0.2'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_fiq8/error.log
+	test -f $(RUN_DIR)_fiq8/error.log
 	$(PYTHON) tools/mad2_interrupt_trace_check.py fiq8 $(RUN_DIR)_fiq8/error.log
 	@echo "OK — MAD2 simultaneous, masked-pending and extended-FIQ routing contracts reproduced"
 
 verify-mad2-clocks:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v600 SECONDS=12 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v600/error.log
+	test -f $(RUN_DIR)_v600/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_v501 SECONDS=12 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_v501/error.log
+	test -f $(RUN_DIR)_v501/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_v501/error.log
 	@echo "OK — MAD2 reset-cause, SIM clock-gate and conditional-watchdog contracts reproduced across both 3210 ROMs"
 
 verify-mad2-sleep:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v600 SECONDS=35 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v600/error.log
+	test -f $(RUN_DIR)_sleep_v600/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_v600/error.log --source timer1 --summary $(RUN_DIR)_sleep_v600/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_v501 SECONDS=35 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.01 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=timer1 NOKIA_DCT3_STATE_ROUNDTRIP_AT=0.015'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_v501/error.log
+	test -f $(RUN_DIR)_sleep_v501/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_v501/error.log --source timer1 --summary $(RUN_DIR)_sleep_v501/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_keypad SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=keypad'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_keypad/error.log
+	test -f $(RUN_DIR)_sleep_keypad/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_keypad/error.log --source keypad
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_sleep_fiq8 SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_SLEEP_FIXTURE_AT=0.2005 NOKIA_DCT3_MAD2_SLEEP_FIXTURE_SOURCE=fiq8'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_sleep_fiq8/error.log
+	test -f $(RUN_DIR)_sleep_fiq8/error.log
 	$(PYTHON) tools/mad2_sleep_trace_check.py $(RUN_DIR)_sleep_fiq8/error.log --source fiq8
 	@echo "OK — MAD2 clock stop, Timer-1/FIQ8/keypad wake and sleep-state restore reproduced"
 
 verify-mad2-timer1:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	$(PYTHON) tools/mad2_timer1_trace_check.py $(RUN_DIR)/error.log
 	@echo "OK — MAD2 Timer-1 reached 0x7fff, asserted FIQ5 and was acknowledged"
 
 verify-mad2-reset:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_software SECONDS=4 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_RESET_FIXTURE_AT=2.0'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_software/error.log
+	test -f $(RUN_DIR)_software/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_software/error.log --require-software-reset --allow-no-watchdog
 	@grep -Eq '^soft_resets=[1-9][0-9]*$$' $(RUN_DIR)_software/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_watchdog SECONDS=3 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MAD2_WATCHDOG_FIXTURE_AT=0.2'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_watchdog/error.log
+	test -f $(RUN_DIR)_watchdog/error.log
 	$(PYTHON) tools/mad2_clock_trace_check.py $(RUN_DIR)_watchdog/error.log --require-watchdog-reset --allow-no-watchdog --allow-incomplete-clock-lifecycle
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_ccont_watchdog SECONDS=6 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_WATCHDOG_FIXTURE_AT=2.0'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_ccont_watchdog/error.log
+	test -f $(RUN_DIR)_ccont_watchdog/error.log
 	$(PYTHON) tools/ccont_watchdog_expiry_check.py $(RUN_DIR)_ccont_watchdog/error.log
 	@echo "OK — software, MAD2-watchdog and CCONT-watchdog baseband reset contracts reproduced"
 
 verify-mbus:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v600 SECONDS=1 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v600/error.log
+	test -f $(RUN_DIR)_mbus_v600/error.log
 	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_v501 SECONDS=1 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_v501/error.log
+	test -f $(RUN_DIR)_mbus_v501/error.log
 	$(PYTHON) tools/mbus_trace_check.py boot $(RUN_DIR)_mbus_v501/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_mbus_rx SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_MBUS_RX_FIXTURE=0xa5 NOKIA_DCT3_MBUS_RX_FIXTURE_AT_MS=300'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_mbus_rx/error.log
+	test -f $(RUN_DIR)_mbus_rx/error.log
 	$(PYTHON) tools/mbus_trace_check.py rx $(RUN_DIR)_mbus_rx/error.log
 	@echo "OK — MBUS initialization, idle TX and external RX/FIQ2 contracts reproduced"
 
 verify-buzzer:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_buzzer SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_BUZZER_FIXTURE_AT=0.3'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_buzzer/error.log
+	test -f $(RUN_DIR)_buzzer/error.log
 	$(PYTHON) tools/buzzer_trace_check.py $(RUN_DIR)_buzzer/error.log
 
 verify-vibrator:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_vibrator SECONDS=1 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_VIBRATOR_FIXTURE_AT=0.3'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_vibrator/error.log
+	test -f $(RUN_DIR)_vibrator/error.log
 	$(PYTHON) tools/vibrator_trace_check.py $(RUN_DIR)_vibrator/error.log
 
 verify-dsp-tone:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v600 SECONDS=3 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v600/error.log
+	test -f $(RUN_DIR)_dsp_tone_v600/error.log
 	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_dsp_tone_v501 SECONDS=3 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_dsp_tone_v501/error.log
+	test -f $(RUN_DIR)_dsp_tone_v501/error.log
 	$(PYTHON) tools/dsp_tone_trace_check.py $(RUN_DIR)_dsp_tone_v501/error.log
 
 verify-ccont-rtc:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_rtc SECONDS=19 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_RTC_FIXTURE_AT=15'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_rtc/error.log
+	test -f $(RUN_DIR)_rtc/error.log
 	$(PYTHON) tools/ccont_rtc_trace_check.py $(RUN_DIR)_rtc/error.log
 
 verify-ccont-mask:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_ccont_mask SECONDS=6 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_MASK_FIXTURE_AT=2'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_ccont_mask/error.log
+	test -f $(RUN_DIR)_ccont_mask/error.log
 	$(PYTHON) tools/ccont_mask_pending_check.py $(RUN_DIR)_ccont_mask/error.log
 
 verify-alarm:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_alarm SECONDS=135 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_70_180) NOKIA_DCT3_POST_READY_KEYS=enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,1,wait400,2,wait400,0,wait400,1,wait400,enter,wait700,enter,wait700,0,wait400,1,wait400,0,wait400,1,wait400,1,wait400,9,wait400,9,wait400,9,wait400,enter,wait900,c,wait900,enter,wait700,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,down,wait400,enter,wait700,enter,wait700,1,wait400,2,wait400,0,wait400,2,wait400,enter'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_alarm/error.log
+	test -f $(RUN_DIR)_alarm/error.log
 	$(PYTHON) tools/alarm_trace_check.py $(RUN_DIR)_alarm/error.log
 
 verify-power-lifecycle:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_short SECONDS=18 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=250 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_power_short/error.log
+	test -f $(RUN_DIR)_power_short/error.log
 	$(PYTHON) tools/power_lifecycle_check.py short $(RUN_DIR)_power_short/boot_summary.txt --log $(RUN_DIR)_power_short/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_power_long SECONDS=22 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=2000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 NOKIA_DCT3_STATE_ROUNDTRIP_AT=10.0 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_power_long/error.log
+	test -f $(RUN_DIR)_power_long/error.log
 	grep -Fqx 'state_roundtrip=pass' $(RUN_DIR)_power_long/boot_summary.txt
 	$(PYTHON) tools/power_lifecycle_check.py long $(RUN_DIR)_power_long/boot_summary.txt --log $(RUN_DIR)_power_long/error.log
 	@echo "OK — physical power-key short/long firmware lifecycles reproduced"
@@ -3143,17 +3143,17 @@ verify-power-lifecycle-v501:
 
 verify-charger-lifecycle:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_connected SECONDS=18 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_CHARGER_INITIAL=1'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_connected/error.log
+	test -f $(RUN_DIR)_charger_connected/error.log
 	$(PYTHON) tools/gensio_trace_check.py $(RUN_DIR)_charger_connected/error.log --require-charger-irq --charger-present-only --summary $(RUN_DIR)_charger_connected/boot_summary.txt
 	$(PYTHON) tools/charger_lifecycle_check.py connected $(RUN_DIR)_charger_connected/boot_summary.txt
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_acting_dead SECONDS=22 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_CCONT_CHARGER_INITIAL=1 NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_acting_dead/error.log
+	test -f $(RUN_DIR)_acting_dead/error.log
 	$(PYTHON) tools/charger_lifecycle_check.py acting-dead $(RUN_DIR)_acting_dead/boot_summary.txt
 	@echo "OK — charger-present startup and acting-dead lifecycle reproduced"
 
 verify-charger-wake:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_charger_wake SECONDS=35 RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=power NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 NOKIA_DCT3_CCONT_CHARGER_PULSE_AT=16 NOKIA_DCT3_CCONT_CHARGER_PULSE_DURATION=30'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_charger_wake/error.log
+	test -f $(RUN_DIR)_charger_wake/error.log
 	$(PYTHON) tools/charger_wake_check.py $(RUN_DIR)_charger_wake/error.log $(RUN_DIR)_charger_wake/boot_summary.txt
 	@echo "OK — powered-off charger edge restarted the digital baseband into acting-dead mode"
 
@@ -3404,7 +3404,7 @@ verify-sim-phonebook:
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR="$$save_dir" SECONDS=32 \
 		PRESERVE_NVRAM=0 PROVISIONED_IMEI_PREFIX=49015420323751 \
 		RUN_VERBOSE=1 RUN_ENV='NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_70_180) NOKIA_DCT3_POST_READY_KEYS=enter,wait700,enter,wait700,down,wait400,enter,wait700,2,3,2,wait1200,enter,wait800,1,2,3,wait800,enter NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=2500'; \
-	cp "$(MAME_DIR)/error.log" "$$save_dir/error.log"; \
+	test -f "$$save_dir/error.log"; \
 	$(PYTHON) tools/sim_phonebook_check.py "$$save_dir/error.log" \
 		"$$save_dir/nvram/$(NVRAM_SYSTEM)/sim_card"; \
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3210) RUN_DIR="$$reload_dir" SECONDS=24 \

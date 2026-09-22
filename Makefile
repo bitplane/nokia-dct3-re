@@ -573,49 +573,49 @@ verify-3610-frontier: normalize-3610 build
 verify-3610-dsp-service: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_EXTRA_ARGS=-verbose
-	@grep -q 'bootstrap completion exchanges=64 publications=3' $(MAME_DIR)/error.log
-	@grep -q 'doorbell command=0004 pending=0002' $(MAME_DIR)/error.log
-	@grep -q 'IRQ4 service-complete request=0000' $(MAME_DIR)/error.log
-	@grep -q 'TX pending type=05 payload=10 data=1eff00d000030101e000' $(MAME_DIR)/error.log
+	@grep -q 'bootstrap completion exchanges=64 publications=3' $(RUN_DIR)/error.log
+	@grep -q 'doorbell command=0004 pending=0002' $(RUN_DIR)/error.log
+	@grep -q 'IRQ4 service-complete request=0000' $(RUN_DIR)/error.log
+	@grep -q 'TX pending type=05 payload=10 data=1eff00d000030101e000' $(RUN_DIR)/error.log
 	@echo 'NAM-1 64-exchange bootstrap, command-4 IRQ4 and D0 discovery: PASS'
 
 verify-3610-discovery: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=1 RUN_EXTRA_ARGS=-verbose
-	@grep -q 'TX pending type=05 payload=10 data=1eff00d000030101e000' $(MAME_DIR)/error.log
-	@grep -q 'RX enqueue type=8e payload=10 .* data=1e0002d000030101e000' $(MAME_DIR)/error.log
-	@grep -q 'RX enqueue type=8e payload=10 .* data=1e0002d000030401c100' $(MAME_DIR)/error.log
-	@grep -q 'TX pending type=70 payload=2 data=0d00' $(MAME_DIR)/error.log
+	@grep -q 'TX pending type=05 payload=10 data=1eff00d000030101e000' $(RUN_DIR)/error.log
+	@grep -q 'RX enqueue type=8e payload=10 .* data=1e0002d000030101e000' $(RUN_DIR)/error.log
+	@grep -q 'RX enqueue type=8e payload=10 .* data=1e0002d000030401c100' $(RUN_DIR)/error.log
+	@grep -q 'TX pending type=70 payload=2 data=0d00' $(RUN_DIR)/error.log
 	@echo 'NAM-1 request-derived D0 discovery and compact control request: PASS'
 
 verify-3610-service-control: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_EXTRA_ARGS=-verbose
-	@grep -q 'TX pending type=70 payload=2 data=0d00' $(MAME_DIR)/error.log
-	@grep -q 'RX enqueue type=74 payload=2 .* data=0d00' $(MAME_DIR)/error.log
-	@test $$(grep -c 'TX pending type=0d payload=66' $(MAME_DIR)/error.log) -eq 8
-	@grep -q 'TX pending type=70 payload=2 data=0a09' $(MAME_DIR)/error.log
+	@grep -q 'TX pending type=70 payload=2 data=0d00' $(RUN_DIR)/error.log
+	@grep -q 'RX enqueue type=74 payload=2 .* data=0d00' $(RUN_DIR)/error.log
+	@test $$(grep -c 'TX pending type=0d payload=66' $(RUN_DIR)/error.log) -eq 8
+	@grep -q 'TX pending type=70 payload=2 data=0a09' $(RUN_DIR)/error.log
 	@echo 'NAM-1 compact completion, eight type-0d blocks and follow-up: PASS'
 
 verify-3610-application: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=4 RUN_EXTRA_ARGS=-verbose
-	@grep -q 'external_service: response command=64 result=01 sequence=42' $(MAME_DIR)/error.log
-	@grep -q 'TX pending type=05 payload=20 data=1e020040000e01016403004f0d0101011b580142' $(MAME_DIR)/error.log
-	@grep -q 'TX pending type=05 payload=12 data=1e0200400006010170010143' $(MAME_DIR)/error.log
-	@grep -q 'TX pending type=05 payload=30 data=1e020000001701015f00006a010d4558495420414e59535441544501c400' $(MAME_DIR)/error.log
+	@grep -q 'external_service: response command=64 result=01 sequence=42' $(RUN_DIR)/error.log
+	@grep -q 'TX pending type=05 payload=20 data=1e020040000e01016403004f0d0101011b580142' $(RUN_DIR)/error.log
+	@grep -q 'TX pending type=05 payload=12 data=1e0200400006010170010143' $(RUN_DIR)/error.log
+	@grep -q 'TX pending type=05 payload=30 data=1e020000001701015f00006a010d4558495420414e59535441544501c400' $(RUN_DIR)/error.log
 	@echo 'NAM-1 application registration, channel map and channel-5f use: PASS'
 
 verify-3610-mbus: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_EXTRA_ARGS=-verbose
-	$(PYTHON) tools/mbus_2100_terminal_trace_check.py $(MAME_DIR)/error.log
+	$(PYTHON) tools/mbus_2100_terminal_trace_check.py $(RUN_DIR)/error.log
 	@echo 'NAM-1 physical M2BUS terminal exchange: PASS'
 
 verify-3610-storage-boundary: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=4 RUN_EXTRA_ARGS=-verbose
-	$(PYTHON) tools/flash_persistent_trace_check.py $(MAME_DIR)/error.log
+	$(PYTHON) tools/flash_persistent_trace_check.py $(RUN_DIR)/error.log
 	@echo 'NAM-1 application frontier has no direct persistent-flash bus access: PASS'
 
 normalize-3330:
@@ -811,6 +811,7 @@ test-tools:
 	$(VENV)/bin/python -m unittest tools/test_pulse_route_mame.py
 	$(VENV)/bin/python -m unittest tools/test_gsm_sms_session_invariants.py
 	$(VENV)/bin/python -m unittest tools/test_gate_matrix.py tools/test_gate_parity_audit.py tools/test_gate_render.py tools/test_gate_generate.py tools/test_gate_database_diff.py
+	$(VENV)/bin/python -m unittest tools/test_run_mame_isolated.py
 
 verify-cell-broadcast-static:
 	$(VENV)/bin/python tools/cell_broadcast_static_check.py roms/3210f600a_swap16.bin
@@ -820,15 +821,15 @@ ccont-static-census:
 
 ccont-runtime-census:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_3210v6 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v6/error.log
+	test -f $(RUN_DIR)_3210v6/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR)_3210v5 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v5/error.log
+	test -f $(RUN_DIR)_3210v5/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_3310 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3310/error.log
+	test -f $(RUN_DIR)_3310/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_3330 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3330/error.log
+	test -f $(RUN_DIR)_3330/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_3410 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3410/error.log
+	test -f $(RUN_DIR)_3410/error.log
 	$(VENV)/bin/python tools/ccont_runtime_census.py --check --json docs/data/ccont_runtime_census.json \
 		--log 3210-v6.00 $(RUN_DIR)_3210v6/error.log --log 3210-v5.01 $(RUN_DIR)_3210v5/error.log \
 		--log 3310-v6.39 $(RUN_DIR)_3310/error.log --log 3330-v4.50 $(RUN_DIR)_3330/error.log \
@@ -837,7 +838,7 @@ ccont-runtime-census:
 prepare-run-files:
 	@mkdir -p "$(RUN_DIR)"
 	@find "$(RUN_DIR)" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -delete
-	@truncate -s 0 "$(MAME_DIR)/error.log"
+	@truncate -s 0 "$(RUN_DIR)/error.log"
 	@mkdir -p "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)"
 	@if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
 		rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/flash" \
@@ -854,22 +855,24 @@ prepare-run-files:
 prepare-run-nvram: build prepare-run-files
 
 run: prepare-run-nvram
-	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+	env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
-		./mame $(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
+		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
+		$(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
 run-prebuilt: prepare-run-files
-	cd $(MAME_DIR) && env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+	env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
-		./mame $(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
+		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
+		$(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
 run-captured: run
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 
 run-prebuilt-captured: run-prebuilt
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	@test -f $(RUN_DIR)/error.log
 
 run-frontier:
 	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) RUN_ENV='$(FRONTIER_ENV)'
@@ -884,17 +887,18 @@ run-interactive:
 	$(MAKE) --no-print-directory prepare-run-nvram PHONE=noki3210 BIOS=$(BIOS) ROM=$(ROM) \
 		PROVISIONED_IMEI_PREFIX=49015420323751 PRESERVE_NVRAM=1 \
 		RUN_NVRAM_DIR=$(INTERACTIVE_NVRAM_DIR); \
-	( cd $(MAME_DIR) && env $(BOOT_ENV) $(FRONTIER_ENV) $(RUN_ENV) \
-		./mame $(INTERACTIVE_MAME_ARGS) -nvram_directory $(INTERACTIVE_NVRAM_DIR) \
-			$(INTERACTIVE_EXTRA_ARGS) )
+	env $(BOOT_ENV) $(FRONTIER_ENV) $(RUN_ENV) \
+		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
+		$(INTERACTIVE_MAME_ARGS) -nvram_directory $(INTERACTIVE_NVRAM_DIR) \
+			$(INTERACTIVE_EXTRA_ARGS)
 
 call-bridge:
 	$(VENV)/bin/python tools/dct3_call_bridge.py $(CALL_BRIDGE_ARGS)
 
-smoke: build
-	@mkdir -p $(RUN_DIR)
-	cd $(MAME_DIR) && env $(BOOT_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
-		./mame $(MAME_ARGS) -seconds_to_run $(SECONDS)
+smoke: build prepare-run-files
+	env $(BOOT_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
+		$(MAME_ARGS) -seconds_to_run $(SECONDS)
 
 smoke-3310-639:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
@@ -912,15 +916,15 @@ verify-2100-frontier: normalize-2100
 verify-2100-mbus: normalize-2100
 	@$(MAKE) --no-print-directory run PHONE=noki2100 BIOS=584e \
 		RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_EXTRA_ARGS=-verbose
-	$(PYTHON) tools/mbus_2100_terminal_trace_check.py $(MAME_DIR)/error.log
+	$(PYTHON) tools/mbus_2100_terminal_trace_check.py $(RUN_DIR)/error.log
 
 verify-2100-v521-bootstrap: normalize-2100 build
 	@$(MAKE) --no-print-directory run PHONE=noki2100 BIOS=521sharp \
 		RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_EXTRA_ARGS=-verbose
-	@grep -q 'bootstrap completion exchanges=992' $(MAME_DIR)/error.log
-	@grep -q 'bootstrap publication offset=000 value=0001' $(MAME_DIR)/error.log
-	@grep -q 'bootstrap publication offset=002 value=0001' $(MAME_DIR)/error.log
-	@grep -q 'bootstrap publication offset=004 value=0001' $(MAME_DIR)/error.log
+	@grep -q 'bootstrap completion exchanges=992' $(RUN_DIR)/error.log
+	@grep -q 'bootstrap publication offset=000 value=0001' $(RUN_DIR)/error.log
+	@grep -q 'bootstrap publication offset=002 value=0001' $(RUN_DIR)/error.log
+	@grep -q 'bootstrap publication offset=004 value=0001' $(RUN_DIR)/error.log
 	@echo 'NAM-2 v5.21 DSP ping-pong bootstrap and verdict publication: PASS'
 
 verify-2100-interactive: normalize-2100 build
@@ -933,7 +937,7 @@ verify-2100-interactive: normalize-2100 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki2100 BIOS=584e \
 		RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) SECONDS=15 \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,select NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=50 NOKIA_DCT3_POST_READY_KEY_GAP_MS=100'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log
+	test -f $(RUN_DIR)/error.log
 	@for key in 1 2 3 4 5 select; do grep -q "input-press: .* name=$$key" $(RUN_DIR)/error.log; done
 	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
 		test -n "$$f" || { echo "2100 interactive: no LCD frame"; exit 1; }; \
@@ -1166,7 +1170,7 @@ define verify_3210_outgoing_outcome
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		RUN_EXTRA_ARGS='$(2)' \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(3) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280'; \
-	cp $(MAME_DIR)/error.log $(RUN_DIR)/error.log; \
+	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_outgoing_call_outcome_trace_check.py \
 		$(RUN_DIR)/error.log --outcome $(4)
 endef
@@ -1175,11 +1179,11 @@ endef
 dsp-census:
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v600 SECONDS=20 \
 		RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log run_dsp_census_v600/error.log
+	test -f run_dsp_census_v600/error.log
 	@$(MAKE) --no-print-directory run RUN_DIR=run_dsp_census_v501 SECONDS=20 BIOS=501 \
 		ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls \
 		RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log run_dsp_census_v501/error.log
+	test -f run_dsp_census_v501/error.log
 	$(VENV)/bin/python tools/dsp_shared_read_census.py \
 		v600=run_dsp_census_v600/error.log v501=run_dsp_census_v501/error.log \
 		--json evidence/runtime/dsp_shared_reads.json --report docs/dsp_shared_memory_inventory.md --check
@@ -1206,12 +1210,12 @@ verify-eeprom:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_eeprom SECONDS=4 \
 		PRESERVE_NVRAM=0 \
 		RUN_ENV='NOKIA_DCT3_EEPROM_FIXTURE_AT=2.5 NOKIA_DCT3_EEPROM_FIXTURE_MODE=write'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_eeprom/write.log
+	cp $(RUN_DIR)_eeprom/error.log $(RUN_DIR)_eeprom/write.log
 	$(PYTHON) tools/eeprom_trace_check.py $(RUN_DIR)_eeprom/write.log --mode write
 	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_eeprom SECONDS=4 \
 		PRESERVE_NVRAM=1 \
 		RUN_ENV='NOKIA_DCT3_EEPROM_FIXTURE_AT=2.5 NOKIA_DCT3_EEPROM_FIXTURE_MODE=read'
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_eeprom/read.log
+	cp $(RUN_DIR)_eeprom/error.log $(RUN_DIR)_eeprom/read.log
 	$(PYTHON) tools/eeprom_trace_check.py $(RUN_DIR)_eeprom/read.log --mode read
 	@echo "OK — 24C128 page wrap, busy ACK polling and cross-process persistence reproduced"
 
@@ -1230,15 +1234,15 @@ mad2-static-census:
 
 mad2-runtime-census:
 	@$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR)_3210v6 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v6/error.log
+	test -f $(RUN_DIR)_3210v6/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3210 BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls RUN_DIR=$(RUN_DIR)_3210v5 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3210v5/error.log
+	test -f $(RUN_DIR)_3210v5/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR)_3310 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3310/error.log
+	test -f $(RUN_DIR)_3310/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3330 BIOS=450e RUN_DIR=$(RUN_DIR)_3330 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3330/error.log
+	test -f $(RUN_DIR)_3330/error.log
 	@$(MAKE) --no-print-directory run PHONE=noki3410 BIOS=546e RUN_DIR=$(RUN_DIR)_3410 SECONDS=2 RUN_VERBOSE=1
-	cp $(MAME_DIR)/error.log $(RUN_DIR)_3410/error.log
+	test -f $(RUN_DIR)_3410/error.log
 	$(VENV)/bin/python tools/mad2_runtime_census.py --check --json docs/data/mad2_runtime_census.json \
 		--log 3210-v6.00 $(RUN_DIR)_3210v6/error.log --log 3210-v5.01 $(RUN_DIR)_3210v5/error.log \
 		--log 3310-v6.39 $(RUN_DIR)_3310/error.log --log 3330-v4.50 $(RUN_DIR)_3330/error.log \
