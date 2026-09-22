@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_port_census import census
+from tools.c54x_rom4_port_census import census, direct_callers
 
 
 def words(*values):
@@ -25,6 +25,15 @@ class C54xRom4PortCensusTest(unittest.TestCase):
     def test_rejects_partial_word(self):
         with self.assertRaisesRegex(ValueError, "complete 16-bit words"):
             census(b"\x74")
+
+    def test_direct_callers_include_delayed_calls_only_to_target(self):
+        result = direct_callers(words(
+            0xf074, 0x7b0a,
+            0xf274, 0x7b0a,
+            0xf073, 0x7b0a,
+            0xf274, 0x410e,
+        ), 0x7b0a)
+        self.assertEqual(result, [(0, False), (2, True)])
 
 
 if __name__ == "__main__":

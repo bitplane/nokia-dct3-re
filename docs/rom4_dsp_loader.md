@@ -205,9 +205,29 @@ parallel-interface routines; `0x7b0a` calls `0x410e` and `0x4185` in order.
 The latter can read one port-`0x39` word at `0x41a4`. In the coherent
 12-second run, port `0x27` is read 82,432 times, while ports `0x38` and
 `0x39` are never read; both firmware mode words `0x00aa/0x00ac` remain zero.
-This locates a dormant path, but not its MCU request owner or the semantics of
-its sample word. In particular, neither `0x27` nor `0x39` is established as
-the complete FCCH/SCH sample stream. No valid signal fixture follows yet.
+`tools/c54x_rom4_port_census.py --call-target 0x7b0a` finds seven candidate
+direct `CALLD` sites: `0x50b6`, `0x77a0`, `0x77af`, `0x7843`, `0x7ac2`,
+`0x7ad9` and `0x7bc0`. The first sits behind conditional branches at
+`0x50ac/0x50b0/0x50b4`; the other six are in the `0x77xx--0x7bxx` routine
+cluster. These are two-word opcode matches in a mixed code/data ROM, not a
+closed call graph or proof of execution.
+
+A read-only 30-second no-signal watch of those seven sites and `0x7b0a`
+recorded zero hits; a changed-write watch on DSP data words
+`0x00aa/0x00ac/0x00b0/0x00b1` also recorded zero. The existing RF gate still
+passed with 6,497 frame expiries and 207,232 port-`0x27` reads, but no
+port-`0x38/0x39` reads or port-`0x32` writes. The temporary watch hooks were
+removed. This excludes a missed live call into this cluster during that boot;
+it does not identify the dormant MCU request, establish SCU register ownership,
+or decode an RF sample word. DSP I/O ports `0x38/0x39` must not be confused
+with MCU MAD2 offsets `0x38/0x39`, which are SIMI registers in this driver.
+The twelve-second verbose MCU trace does contain seven type-`0x51` DSP
+configuration packets between 2.065 and 2.071 seconds, followed by ordinary
+receiver activity. Their presence disproves a blanket "no MCU configuration"
+explanation, but neither their contents nor the current MAD2 register map
+establishes an SCU synthesizer write or a request that enters `0x7b0a`.
+Neither `0x27` nor `0x39` is established as the complete FCCH/SCH sample
+stream. No valid signal fixture follows yet.
 
 The next evidence should compare a no-cell boot with a real NSE-1 receiving
 one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
