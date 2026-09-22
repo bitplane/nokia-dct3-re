@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "rom4_type1a_directly_activates_rf_acquisition",
+      "status": "disproven",
+      "hypothesis": "The organic NSE-1 type-0x1a search-list packet directly activates the ROM4 parallel RF receive path",
+      "conclusion": "The resident DSP consumes the packet at PC 0x3909 and runs handler 0x3d70..0x3db6, which initializes a local workspace and increments word 0x06e3 without accessing an I/O port. None of the identified control words is read again in the established 30-second gate; port 0x27's pre-existing cadence continues while ports 0x32/0x38/0x39 remain dormant. The packet is accepted state, not the missing hardware activation edge.",
+      "evidence": ["docs/rom4_dsp_loader.md", "tools/c54x_rom4_rf_boundary_check.py"]
+    },
+    {
       "id": "rom4_type51_packets_are_radio_configuration",
       "status": "disproven",
       "hypothesis": "The seven ROM4 MCU-to-DSP type-0x51 packets at 2.065-2.071 seconds configure the radio receiver",

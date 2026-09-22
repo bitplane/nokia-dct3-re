@@ -249,6 +249,21 @@ Neither `0x27` nor `0x39` is established as the complete FCCH/SCH sample
 stream. The sibling emulator supplies only a constant for port `0x27`, so it
 offers no independent sample-format evidence. No valid signal fixture follows yet.
 
+A focused consumer trace closes the direct type-`0x1a` activation hypothesis.
+The resident host-command dispatcher advances the transmit-ring consumer at
+C54x PC `0x3909`. The selected handler spans `0x3d70..0x3db6`: it derives
+local value `0x0010`, initializes workspace `0x1200..0x1219`, updates control
+words `0x0284/0x0286/0x0287`, sets bit 3 at `0x06bc`, and increments `0x06e3`
+from zero to one before returning. It performs no I/O-port access. Across the
+same 30-second receiver gate, none of those identified control words is read
+after the handler returns; the existing port-`0x27` cadence continues and the
+`0x32/0x38/0x39` counts remain zero. Temporary write/read taps used for this
+classification were removed. Thus the observed search-list packet is accepted
+and stored, but does not by itself enter the dormant parallel receive path or
+establish an RF acquisition. The next software-side question is what activates
+the separately mapped `0x7b0a` routine or consumes this stored workspace;
+injecting a reply or waveform at type-`0x1a` would skip that missing boundary.
+
 The next evidence should compare a no-cell boot with a real NSE-1 receiving
 one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
 DSP-to-MCU response words, DSP program counter around `0x407c`, `0x410e`,
