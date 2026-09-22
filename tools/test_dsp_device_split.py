@@ -223,16 +223,16 @@ class DspDeviceSplitTest(unittest.TestCase):
         ):
             self.assertNotIn(semantic, self.c54x_backend)
 
-    def test_rom4_rf_synthesizer_activity_is_observed_not_invented(self):
+    def test_rom4_rf_port_activity_is_observed_not_invented(self):
         for token in (
             "else if (port == 0x31)",
             "else if (port == 0x32)",
-            "m_rf_synth_low = data",
-            "++m_rf_synth_pairs",
-            "rom4_rf_tune:",
+            "m_rf_port31 = data",
+            "++m_rf_port32_writes",
+            "rom4_rf_port32:",
         ):
             self.assertIn(token, self.c54x_backend)
-        self.assertNotIn("m_rf_synth_pairs = 1", self.c54x_backend)
+        self.assertNotIn("m_rf_port32_writes = 1", self.c54x_backend)
 
     def test_mad2_drives_product_reset_level_into_backend(self):
         self.assertIn("auto dsp_reset_cb()", self.mad2)

@@ -1025,7 +1025,7 @@ check-c54x-rom4-coherent: build
 		grep -q "rom4_port_write: port=2c" error.log; \
 		grep -q "cobba: parallel .* address=c data=008" error.log; \
 		grep -q "cobba: parallel .* address=c data=0c8" error.log; \
-		grep -q "rom4_interface_summary: .* rf_reads=0 rf_tune_pairs=0" error.log; \
+		grep -Eq "rom4_interface_summary: .* rf_reads=[1-9][0-9]* rf_port32_writes=0" error.log; \
 		! grep -q "rom4_reset_request: reason=00000004" error.log
 	@grep -q "ROM4 DSP coherent execution: PASS completion=1074" \
 		/tmp/tms320c54x-rom4-coherent-check.log

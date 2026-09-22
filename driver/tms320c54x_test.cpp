@@ -979,7 +979,10 @@ private:
 			expect(data.read_word(0x0a10) == 0xcafe,
 					"maskable interrupt vector execution");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-					"interrupt-vector terminal IDLE3");
+					"fast-interrupt return continuation");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
+					"RETF restores the fast return and interrupt-mask state");
 			m_cpu->set_input_line(2, CLEAR_LINE);
 			m_phase = 1;
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
@@ -1101,8 +1104,9 @@ private:
 		// vector through PMST.IPTR and preserve the return address on stack.
 		program.write_word(0x0048, 0x7680);
 		program.write_word(0x0049, 0xcafe);
-		program.write_word(0x004a, 0xf5e1);
+		program.write_word(0x004a, 0xf49b); // RETF
 		program.write_word(0x0400, 0xf5e1);
+		program.write_word(0x0401, 0xf5e1);
 		m_phase = 3;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0400);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);

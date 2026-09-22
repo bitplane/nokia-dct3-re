@@ -79,9 +79,11 @@ private:
 	u64 m_frame_timer_expiries = 0;
 	u32 m_io_trace_count = 0;
 	u32 m_rf_trace_count = 0;
-	u16 m_rf_synth_low = 0;
-	u16 m_rf_synth_high = 0;
-	u32 m_rf_synth_pairs = 0;
+	u32 m_rf_port38_reads = 0;
+	u32 m_rf_port39_reads = 0;
+	u16 m_rf_port31 = 0;
+	u16 m_rf_port32 = 0;
+	u32 m_rf_port32_writes = 0;
 	u32 m_completion_strobes = 0;
 	u32 m_boot_mailbox_writes = 0;
 };

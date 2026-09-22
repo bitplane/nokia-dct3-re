@@ -11,7 +11,8 @@ import sys
 
 SUMMARY_RE = re.compile(
     r"rom4_interface_summary: .*?frame_expiries=(\d+) .*?"
-    r"rf_reads=(\d+) rf_tune_pairs=(\d+) .*?"
+    r"rf_reads=(\d+) rf_port32_writes=(\d+) "
+    r"rf_port38_reads=(\d+) rf_port39_reads=(\d+) .*?"
     r"ifr=([0-9a-fA-F]{4}) imr=([0-9a-fA-F]{4})"
 )
 
@@ -24,22 +25,32 @@ def check(text: str, minimum_frames: int = 6000) -> dict[str, int]:
     result = {
         "frame_expiries": int(match.group(1)),
         "rf_reads": int(match.group(2)),
-        "rf_tune_pairs": int(match.group(3)),
-        "ifr": int(match.group(4), 16),
-        "imr": int(match.group(5), 16),
+        "rf_port32_writes": int(match.group(3)),
+        "rf_port38_reads": int(match.group(4)),
+        "rf_port39_reads": int(match.group(5)),
+        "ifr": int(match.group(6), 16),
+        "imr": int(match.group(7), 16),
     }
     if result["frame_expiries"] < minimum_frames:
         raise ValueError(
             f"only {result['frame_expiries']} frame expiries; expected at least {minimum_frames}"
         )
-    if result["rf_reads"] != 0 or result["rf_tune_pairs"] != 0:
-        raise ValueError("receiver became active; the documented boundary has changed")
-    if result["imr"] != 0x035E:
+    if result["rf_reads"] < 1000:
+        raise ValueError(f"only {result['rf_reads']} RF reads; receiver did not become active")
+    expected_reads = 32 * (result["frame_expiries"] - 21)
+    if result["rf_reads"] != expected_reads:
+        raise ValueError(
+            f"RF read cadence changed: {result['rf_reads']} reads, "
+            f"expected {expected_reads} for {result['frame_expiries']} frames"
+        )
+    if result["rf_port32_writes"] != 0:
+        raise ValueError("receiver activation unexpectedly wrote RF port 0x32")
+    if result["rf_port38_reads"] or result["rf_port39_reads"]:
+        raise ValueError("ROM4 parallel burst path unexpectedly became active")
+    if result["imr"] != 0x035F:
         raise ValueError(f"unexpected terminal IMR {result['imr']:04x}")
-    if not (result["ifr"] & 0x0001):
-        raise ValueError(f"INT0 is not pending in terminal IFR {result['ifr']:04x}")
-    if result["imr"] & 0x0001:
-        raise ValueError("INT0 is not masked")
+    if result["ifr"] & 0x0001:
+        raise ValueError(f"INT0 remains pending in terminal IFR {result['ifr']:04x}")
     return result
 
 
@@ -56,7 +67,8 @@ def main() -> int:
     print(
         "ROM4 RF activation boundary: PASS "
         f"frames={result['frame_expiries']} ifr={result['ifr']:04x} "
-        f"imr={result['imr']:04x} rf_reads=0 rf_tune_pairs=0"
+        f"imr={result['imr']:04x} rf_reads={result['rf_reads']} "
+        "rf_port32_writes=0 rf_port38_reads=0 rf_port39_reads=0"
     )
     return 0
 

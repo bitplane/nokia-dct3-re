@@ -258,8 +258,11 @@ preserved as an investigation journal.
   listing and payload-correlated PUP replay. NHM-5 independently proves its
   localized chooser, PMM-backed flash ownership, cold-boot listing and
   sustained DSP output; fixed-frequency DSP HLE prevents promotion of its
-  playback to pitch-correlated. NHM-6 remains at notification because its
-  preserved-PMM setup editor obscures a reproducible physical Save path.
+  playback to pitch-correlated. NHM-6 independently proves physical Save into
+  product-local PMM flash, preserved cold-boot listing and payload-correlated
+  PUP replay. Its acquired virgin PMM still presents security/time editors,
+  but the gate completes them through physical keypad input rather than
+  bypassing them.
   Dedicated-mode handover is independently gated on NSE-8, NHM-5, NHM-6 and
   NHM-2 for success, rollback and mid-procedure save/load. NHM-2 additionally
   proves physical Answer/End and sustained media across successful retuning.

@@ -23,6 +23,10 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 void nokia_dsp_c54x_device::device_add_mconfig(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, clock());
+	// ROM4 ORs its operational masks into retained IMR state and assigns its
+	// CTSI receiver to INT0. The MAD2/Lead cold-entry contract supplies bit 0;
+	// subsequent reset pulses preserve firmware-written IMR in the CPU core.
+	m_cpu->set_power_on_imr(0x0001);
 	m_cpu->set_addrmap(AS_PROGRAM, &nokia_dsp_c54x_device::program_map);
 	m_cpu->set_addrmap(AS_DATA, &nokia_dsp_c54x_device::data_map);
 	m_cpu->set_addrmap(AS_IO, &nokia_dsp_c54x_device::io_map);
@@ -48,9 +52,11 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_frame_timer_expiries));
 	save_item(NAME(m_io_trace_count));
 	save_item(NAME(m_rf_trace_count));
-	save_item(NAME(m_rf_synth_low));
-	save_item(NAME(m_rf_synth_high));
-	save_item(NAME(m_rf_synth_pairs));
+	save_item(NAME(m_rf_port38_reads));
+	save_item(NAME(m_rf_port39_reads));
+	save_item(NAME(m_rf_port31));
+	save_item(NAME(m_rf_port32));
+	save_item(NAME(m_rf_port32_writes));
 	save_item(NAME(m_completion_strobes));
 	save_item(NAME(m_boot_mailbox_writes));
 }
@@ -67,9 +73,11 @@ void nokia_dsp_c54x_device::device_reset()
 	m_frame_timer_expiries = 0;
 	m_io_trace_count = 0;
 	m_rf_trace_count = 0;
-	m_rf_synth_low = 0;
-	m_rf_synth_high = 0;
-	m_rf_synth_pairs = 0;
+	m_rf_port38_reads = 0;
+	m_rf_port39_reads = 0;
+	m_rf_port31 = 0;
+	m_rf_port32 = 0;
+	m_rf_port32_writes = 0;
 	m_completion_strobes = 0;
 	m_boot_mailbox_writes = 0;
 	m_slot_timer->adjust(attotime::never);
@@ -80,11 +88,13 @@ void nokia_dsp_c54x_device::device_reset()
 void nokia_dsp_c54x_device::device_stop()
 {
 	machine().logerror("rom4_interface_summary: completion_strobes=%u mailbox_writes=%u "
-			"slot_expiries=%llu frame_expiries=%llu rf_reads=%u rf_tune_pairs=%u "
+			"slot_expiries=%llu frame_expiries=%llu rf_reads=%u rf_port32_writes=%u "
+			"rf_port38_reads=%u rf_port39_reads=%u "
 			"pc=%04x pmst=%04x ifr=%04x imr=%04x mode_aa=%04x mode_ac=%04x\n",
 			m_completion_strobes, m_boot_mailbox_writes,
 			m_slot_timer_expiries, m_frame_timer_expiries,
-			m_rf_trace_count, m_rf_synth_pairs,
+			m_rf_trace_count, m_rf_port32_writes,
+			m_rf_port38_reads, m_rf_port39_reads,
 			u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 			u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
 			u16(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
@@ -328,6 +338,12 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 					u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 					machine().time().as_double());
 		return m_cobba->rf_receive_sample();
+	case 0x38:
+		++m_rf_port38_reads;
+		return m_io[0x38];
+	case 0x39:
+		++m_rf_port39_reads;
+		return m_io[0x39];
 	case 0x2d:
 		return m_cobba->control_data_r();
 	default:
@@ -371,6 +387,10 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	{
 		m_cobba->codec_serial_transmit(data);
 	}
+	else if (port == 0x27)
+	{
+		m_cobba->rf_transmit_sample(data);
+	}
 	else if (port == 0x0e)
 	{
 		m_slot_frame_length = data;
@@ -389,16 +409,16 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	}
 	else if (port == 0x31)
 	{
-		m_rf_synth_low = data;
+		m_rf_port31 = data;
 	}
 	else if (port == 0x32)
 	{
-		m_rf_synth_high = data;
-		++m_rf_synth_pairs;
-		if (m_rf_synth_pairs <= 16)
+		m_rf_port32 = data;
+		++m_rf_port32_writes;
+		if (m_rf_port32_writes <= 16)
 			machine().logerror(
-					"rom4_rf_tune: sequence=%u low=%04x high=%04x pc=%04x t=%.6f\n",
-					m_rf_synth_pairs, m_rf_synth_low, m_rf_synth_high,
+					"rom4_rf_port32: sequence=%u port31=%04x port32=%04x pc=%04x t=%.6f\n",
+					m_rf_port32_writes, m_rf_port31, m_rf_port32,
 					u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 					machine().time().as_double());
 	}

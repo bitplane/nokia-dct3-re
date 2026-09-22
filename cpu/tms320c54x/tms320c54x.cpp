@@ -52,6 +52,7 @@ std::unique_ptr<util::disasm_interface> tms320c54x_device::create_disassembler()
 
 void tms320c54x_device::device_start()
 {
+	m_imr = m_power_on_imr;
 	m_opcode_first_pc.fill(0xffff);
 	m_timer = timer_alloc(FUNC(tms320c54x_device::timer_expired), this);
 	space(AS_PROGRAM).cache(m_cache);
@@ -94,6 +95,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_bk));
 	save_item(NAME(m_rsa));
 	save_item(NAME(m_rea));
+	save_item(NAME(m_rtn));
 	save_item(NAME(m_rptc));
 	save_item(NAME(m_rpt_address));
 	save_item(NAME(m_rpt_end));
@@ -142,6 +144,7 @@ void tms320c54x_device::device_reset()
 	m_bk = 0;
 	m_rsa = 0;
 	m_rea = 0;
+	m_rtn = 0;
 	m_rptc = 0;
 	m_rpt_address = 0;
 	m_rpt_end = 0xffff;
@@ -505,6 +508,7 @@ bool tms320c54x_device::service_interrupt()
 	while (!BIT(pending, source))
 		++source;
 	m_ifr &= ~(u16(1) << source);
+	m_rtn = m_pc;
 	push(m_pc);
 	m_st1 |= 0x0800;
 	m_pc = (m_pmst & 0xff80) | ((source + 16) << 2);
@@ -1401,6 +1405,12 @@ void tms320c54x_device::execute_one(u16 op)
 		m_pc = pop();
 		m_st1 &= ~0x0800;
 		m_icount -= 4;
+		return;
+	case 0xf49b: // RETF
+		m_pc = m_rtn;
+		pop();
+		m_st1 &= ~0x0800;
+		m_icount -= 2;
 		return;
 	case 0xfc30: // RETC TC
 		if (m_st0 & 0x1000)

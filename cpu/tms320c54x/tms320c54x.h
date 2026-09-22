@@ -11,6 +11,7 @@ class tms320c54x_device : public cpu_device
 public:
 	tms320c54x_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock);
+	void set_power_on_imr(u16 value) { m_power_on_imr = value; }
 
 	enum : unsigned
 	{
@@ -101,6 +102,7 @@ private:
 	u16 m_bk = 0;
 	u16 m_rsa = 0;
 	u16 m_rea = 0;
+	u16 m_rtn = 0;
 	u16 m_rptc = 0;
 	u16 m_rpt_address = 0;
 	u16 m_rpt_end = 0xffff;
@@ -111,6 +113,7 @@ private:
 	u8 m_xc_guard = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
+	u16 m_power_on_imr = 0;
 	u16 m_clkmd = 0;
 	u16 m_tim = 0xffff;
 	u16 m_prd = 0xffff;

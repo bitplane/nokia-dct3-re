@@ -141,43 +141,65 @@ parallel control path at COBBA. Frames retain their recovered opaque form:
 bits 15--12 select one of 16 registers and bits 11--0 carry data. The coherent
 ROM organically emits register-C transitions `0x008 -> 0x0c8` during codec
 bring-up and writes codec serial port `0x21`. A corrected twelve-second
-interface census records zero reads from RF sample port `0x27` and zero
-synthesizer pairs on ports `0x31`/`0x32`. An earlier gate appeared to require
-an RF read but lacked shell fail-fast behavior, so that observation is retired.
-These results establish audio-interface initialization only; receiver
-activation, tuning, decoded analog register meanings and a completed speech
-call remain outside the demonstrated lifecycle.
+interface census originally recorded zero reads from RF sample port `0x27`
+and zero writes to port `0x32`. That absence is now
+explained by the ROM4 cold-entry interrupt-mask contract rather than RF data.
+The recovered code ORs `0x0204` and then `0x015a` into retained IMR state, and
+the INT0 vector at `0x3204` owns the receiver. Supplying cold-entry bit 0 yields
+terminal `IMR=0x035f` and organic sample reads; routing the same frame edge to
+INT3 reaches only an empty `RETF` handler.
 
-The absence persists across a 30-second unassisted run: the backend schedules
-6,497 CTSI frame edges while recording `rf_reads=0` and `rf_tune_pairs=0`.
-The DSP has `IMR=0x035e`, so INT0 is pending but masked; these are clock
-expiries, not serviced frame ISRs. Thus the immediate missing contract is the
-state transition that enables the ROM4 receiver, not an I/Q waveform. Ports
-`0x31` and `0x32` are retained as a saved, passive low/high-pair census and
-port `0x27` remains connected to deterministic unattached RF input. Supplying
-FCCH/SCH/BCCH samples before the DSP reads that port would be unobservable and
-is not an admissible registration fix.
+A 30-second run now schedules more than 6,000 CTSI frame edges and services
+the receiver continuously. Ports
+`0x31` and `0x32` are retained as saved, passive port-write observations and
+port `0x27` remains connected to deterministic unattached RF input. The
+receiver reads 32 words per frame after a 21-frame startup offset: the 12-second
+census measured 82,432 reads over 2,597 frame expiries, and the 30-second gate
+measured 207,232 reads over 6,497 expiries. Four unrolled reads at ROM word
+addresses `0x3249/0x324f/0x3255/0x325b` repeat in the active loop. These are
+DSP-facing sample words; their exact bit packing and I/Q ordering are not yet
+established. Supplying valid FCCH/SCH/BCCH input is therefore still open.
+The cadence is only 32 words per 4.615 ms GSM TDMA frame, so it is not
+evidence that this loop transfers an entire radio burst. The recovered ROM
+also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
+port-`0x38` status reads. A coherent 12-second run records zero reads on both
+`0x38` and `0x39`; those sites are dormant while the `0x27` loop runs. Their
+activation and sample encoding must be recovered before a controlled GSM
+burst can be meaningfully attached.
+
+Port `0x27` is bidirectional in ROM4: seven static `PORTW` sites at
+`0x4248/0x424d/0x4258/0x425d/0x4267/0x426c/0x4271` belong to a separate
+transmit routine. The driver now forwards those writes to a replaceable COBBA
+transmit callback, as it already did for receive reads; no transmit activity
+has been observed in the coherent boot. The port-write sites on
+`0x31/0x32` are `0x36f7/0x36fb/0x370c/0x3710/0x4020/0x4025/0xa23a/0xa23e`.
+None ran in the 12-second census (`rf_port32_writes=0`), so the payload and
+trigger remain unresolved. Calling these ports a synthesizer pair was
+premature: Nokia's NSE-1 manual assigns synthesizer control to MAD2's SCU,
+while COBBA produces analog TXC and AFC signals. The manual also describes
+the COBBA parallel interface as carrying control and receive/transmit samples
+over a 12-data-bit bus; that corroborates the boundary, not the sample encoding:
+<https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251>.
 
 The SIM transaction ending near 8.51 seconds is not a stalled initialization
 sequence: the firmware has read all ten configured ADN records. At 31.002
 seconds it organically issues `A0 F2` STATUS as its periodic card-presence
 monitor while the UI also refreshes the LCD. The long quiet interval is a
-healthy maintenance cadence and does not explain the absent receiver
-activation. A 40-second run still records zero RF reads and zero completed
-synthesizer pairs.
+healthy maintenance cadence and was unrelated to the former masked-INT0
+receiver boundary.
 
 TI's C54x CPU guide places an important limit on this result: hardware reset
-clears IFR and sets INTM, but does not initialise IMR or SP. The clean core now
-preserves IMR across MAD2 reset pulses instead of inventing zero on every
-reset. Its deterministic power-on value remains zero until ROM code writes it;
-the observed firmware writes produce `0x0204` and then `0x035e`. The available
+clears IFR and sets INTM, but does not initialise IMR or SP. The clean core
+preserves IMR across MAD2 reset pulses. The recovered ROM's OR-mask sequence,
+its INT0 receiver vector and the one-bit A/B result establish a product cold
+entry value of `0x0001`; firmware then produces `0x0205` and `0x035f`. The available
 external co-sim instead starts from `IMR=0x52fd`, an imported post-handshake
 processor snapshot rather than a ROM4 power-on capture, and consequently
 reaches `0x53ff`, executes `0x3065` (`IMR |= 1`), services INT0 at `0x3204`,
 and reads port `0x27`. An A/B run with its optional RF model disabled still
 takes that path with zero-valued samples, proving that the RF model supplies
-sample contents rather than activation. It does not prove that `0x52fd` is the
-NSE-1 power-on value. No register seed is admitted without ROM4/MAD2 evidence.
+sample contents rather than activation. It does not prove that the unrelated
+bits in `0x52fd` belong to NSE-1.
 
 An aligned-word census closes the literal variant of that question. Neither
 the recovered `dsp_full.bin` nor the transform-entry program snapshot contains
@@ -190,20 +212,15 @@ provenance. The reference implementation's own source describes `0x52fd` as a
 post-bootloader Osmocom/Calypso register snapshot. It is therefore cross-silicon
 differential evidence, not a Nokia MAD2 reset contract.
 
-The remaining acquisition boundary is explicit: obtain a MAD2 ROM4 DSP
-register capture before the operational firmware OR-mask sequence, recover an
-earlier MAD2 mask-ROM write that establishes the missing bits, or observe an
-organic Nokia hardware transition that does so. Until one of those exists,
-zero is the deterministic unknown power-on value and receiver activation is
-not promoted.
-
 `make check-c54x-rom4-coherent` protects the short coherent boot and interface
 initialization. `make check-c54x-rom4-rf-boundary` separately runs for 30
-emulated seconds and treats the receiver absence as a quantified boundary: it
-requires at least 6,000 CTSI frame expiries, terminal `IMR=0x035e`, pending but
-masked INT0, and zero RF reads or synthesizer pairs. A receiver transition now
-fails that boundary gate deliberately so the new behavior must be investigated
-and re-banked rather than silently passing an obsolete absence assertion.
+emulated seconds and protects the newly reached receiver boundary: it requires
+at least 6,000 CTSI frame expiries, terminal `IMR=0x035f`, serviced INT0, more
+than 1,000 RF reads and no port-`0x32`, `0x38` or `0x39` activity. This is a
+receiver-activity gate, not a synthesizer-tuning or acquisition gate. With
+the current evidence, a generated FCCH signal would require guessing both
+the active receive interface and the COBBA sample representation; neither
+is admitted as a hardware model.
 
 `make verify-5110-save-state` saves the running real-DSP composition at seven
 seconds, restores it, verifies MAD2 and C54x idle state, and then opens the same

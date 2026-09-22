@@ -13,7 +13,8 @@ nokia_cobba_device::nokia_cobba_device(
 		device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_COBBA, tag, owner, clock),
 	device_sound_interface(mconfig, *this),
-	m_rf_receive_cb(*this, 0)
+	m_rf_receive_cb(*this, 0),
+	m_rf_transmit_cb(*this)
 {
 }
 
@@ -54,6 +55,7 @@ void nokia_cobba_device::device_start()
 	save_item(NAME(m_codec_serial_receive_ready));
 	save_item(NAME(m_codec_serial_loopbacks));
 	save_item(NAME(m_rf_receive_samples));
+	save_item(NAME(m_rf_transmit_samples));
 }
 
 void nokia_cobba_device::device_reset()
@@ -90,15 +92,21 @@ void nokia_cobba_device::device_reset()
 	m_codec_serial_receive_ready = false;
 	m_codec_serial_loopbacks = 0;
 	m_rf_receive_samples = 0;
+	m_rf_transmit_samples = 0;
 }
 
 u16 nokia_cobba_device::rf_receive_sample()
 {
-	// ROM4 consumes interleaved signed I/Q components, one per port read.
-	// An unattached RF front end is deterministic silence; all filtering and
+	// An unattached RF front end is deterministic silence; filtering and
 	// measurement decisions remain inside the emulated DSP.
 	++m_rf_receive_samples;
 	return m_rf_receive_cb();
+}
+
+void nokia_cobba_device::rf_transmit_sample(u16 data)
+{
+	++m_rf_transmit_samples;
+	m_rf_transmit_cb(data);
 }
 
 void nokia_cobba_device::parallel_control_w(u16 frame)

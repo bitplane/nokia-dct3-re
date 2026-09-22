@@ -30,8 +30,11 @@ public:
 	nokia_cobba_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 	auto rf_receive_cb() { return m_rf_receive_cb.bind(); }
+	auto rf_transmit_cb() { return m_rf_transmit_cb.bind(); }
 	u16 rf_receive_sample();
+	void rf_transmit_sample(u16 data);
 	u64 rf_receive_samples() const { return m_rf_receive_samples; }
+	u64 rf_transmit_samples() const { return m_rf_transmit_samples; }
 
 	void set_pcm_sample_bits(u8 bits) { m_pcm_sample_bits = bits; }
 	// Temporary HLE selection used only until a DSP backend drives the opaque
@@ -93,7 +96,9 @@ private:
 
 	sound_stream *m_stream = nullptr;
 	devcb_read16 m_rf_receive_cb;
+	devcb_write16 m_rf_transmit_cb;
 	u64 m_rf_receive_samples = 0;
+	u64 m_rf_transmit_samples = 0;
 	std::array<s16, queue_samples> m_earpiece_queue{};
 	std::array<s16, queue_samples> m_microphone_queue{};
 	u16 m_earpiece_head = 0;

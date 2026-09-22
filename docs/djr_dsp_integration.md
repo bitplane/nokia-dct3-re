@@ -339,15 +339,10 @@ qualified findings above. `dsp_rom4_cosim_check.py` extracts these counters so
 later runs can be compared without preserving an interpretation in code.
 
 The local real-DSP composition still has no demonstrated network or call
-scenario. More specifically, a 30-second unassisted NSE-1 run schedules 6,497
-CTSI frame edges but the DSP leaves INT0 masked, performs no RF sample-port read
-and commits no `0x31`/`0x32` synthesizer pair. The external co-sim services the
-same ISR without its optional RF sample model, but begins from an imported
-`IMR=0x52fd` register snapshot that is not ROM4 reset evidence. The next
-recoverable boundary is therefore the ROM4/MAD2 power-on register contract or
-an organic DSP state transition that activates receiver work. Attaching the
-existing decoded-block GSM peer, or generating air-interface samples, before
-that transition would bypass rather than explain the inactive receiver.
+scenario. Its earlier 30-second boundary scheduled 6,497 CTSI frame edges but
+left INT0 masked and performed no RF reads. The one-bit cold-entry contract
+below now activates that receiver organically; synthesizer programming and a
+sample-level GSM input remain unproved.
 
 A post-loader differential also found and removed one local CPU artifact:
 `RPTB` was tracked only in private core state, leaving architectural
@@ -355,9 +350,37 @@ A post-loader differential also found and removed one local CPU artifact:
 reached its second task scan with `ST1=0x6101` rather than the reference's
 `0x2101`. The core now asserts BRAF on `RPTB`, clears it on the terminal
 retirement and tests that contract directly. Menu, save-state and coherent DSP
-gates remain unchanged, and the corrected run still leaves INT0 masked with
-zero RF reads. BRAF was therefore a real CPU defect but not the receiver-enable
-boundary.
+gates remained unchanged, and the corrected run still left INT0 masked until
+the independent cold-entry contract below was recovered. BRAF was therefore a
+real CPU defect but not the receiver-enable boundary.
+
+The remaining interrupt boundary is now reduced to one bit. Runtime records
+only two operational writes to `IMR`: mask-ROM code ORs `0x0204` into the
+incoming value, then the uploaded operational block ORs `0x015a`. Starting
+from the emulator's zero-initialised member therefore produces `0x035e`; the
+firmware does not overwrite a pre-existing bit 0. The recovered vector table
+independently assigns INT0 to the receiver handler at `0x3204`, while INT3
+branches to a one-instruction `RETF` handler at `0x241a`. Routing CTSI frames
+to INT3 services and discards them without one RF read, so INT3 is disproven
+as the receiver clock route.
+
+That comparison exposed a generic CPU omission rather than a Nokia contract:
+`0xf49b` is TI's fast interrupt return (`RETF`). The clean-room core now saves
+the internal `RTN` latch on interrupt entry and implements `RETF` as RTN-to-PC,
+stack discard and interrupt re-enable, with an isolated conformance check.
+The ordinary ROM4 gates remain green after the correction.
+
+A separate diagnostic seeded only `IMR.bit0`, leaving every other reset and
+firmware value unchanged. The two organic OR operations then produced
+`0x035f`; INT0 entered `0x3204` and performed 33,888 RF sample-port reads in a
+five-second run, versus zero at `0x035e`. No port-`0x32` write appeared. Because
+hardware reset preserves IMR, the ROM deliberately uses OR operations, the
+recovered vector assigns the receiver to INT0 and the alternative INT3 route
+is disproven, the backend now retains exactly this one-bit ROM4 cold-entry
+contract. It does not import any unrelated bit from the external `0x52fd`
+snapshot. A real reset capture can still refine where MAD2 establishes the
+retained bit, but is no longer required to keep the receiver artificially
+disabled.
 
 One diagnostic-only causality run substituted `0x52fd` when ROM4 wrote its
 local `0x0204` mask. With BRAF corrected, that run organically scheduled task
@@ -375,7 +398,7 @@ distance, delayed ANEQ branch, and accumulator negate. Each is now implemented
 from the TI instruction definition with an isolated conformance fixture. After
 the final correction, a four-second diagnostic run completed the normal
 MCU/DSP handshake without an illegal opcode and performed 26,944 RF sample-port
-reads before returning to `0x31a5`; it emitted no synthesizer pair. The mask
+reads before returning to `0x31a5`; it emitted no port-`0x32` write. The mask
 substitution was removed before the normal gates. This proves the newly
 reachable receive/FIR instruction surface, not RF acquisition or a power-on
 mask value.

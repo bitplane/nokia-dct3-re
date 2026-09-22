@@ -3,6 +3,20 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "rom4_ports_31_32_are_confirmed_synth_tune_pair",
+      "status": "disproven",
+      "hypothesis": "ROM4 DSP writes to ports 0x31 and 0x32 are an established synthesizer tuning pair",
+      "conclusion": "The recovered ROM has eight static PORTW sites to these ports but none executes in the coherent 12- or 30-second receiver runs. Nokia's NSE-1 manual assigns synthesizer control to MAD2's SCU and analog TXC/AFC generation to COBBA. The observed port sites establish only an opaque DSP I/O write pair; they neither identify the SCU programming path nor its word format. The driver and gates now count port-0x32 writes without calling them tune events.",
+      "evidence": ["docs/rom4_dsp_loader.md", "driver/nokia_dsp_c54x.cpp", "tools/c54x_rom4_rf_boundary_check.py"]
+    },
+    {
+      "id": "rom4_ctsi_frame_uses_int3_fast_return",
+      "status": "disproven",
+      "hypothesis": "The ROM4 CTSI frame edge belongs on C54x TINT/INT3, and the inactive receiver is caused by routing it to masked INT0",
+      "conclusion": "The recovered INT3 vector branches to a one-instruction RETF handler. After implementing TI's missing RETF/RTN core contract, routing all CTSI frame edges to INT3 services and discards them with zero RF reads. Restoring INT0 and diagnostically seeding only IMR bit 0 enters the distinct receiver vector at 0x3204 and produces 33,888 organic RF reads in five seconds. INT3 is an acknowledged empty fast interrupt, not the receiver clock route.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "driver/nokia_dsp_c54x.cpp", "docs/djr_dsp_integration.md"]
+    },
+    {
       "id": "lower_result_0fc3", "status": "disproven",
       "hypothesis": "The lower-radio result selected by event 0x102f is 0x0fc3",
       "conclusion": "The event branch loads 0x0fbf at 0x24788e and enters the dispatcher call at 0x246ad6 with that value intact; swap16-aware table decoding maps it to 0x245cb2 -> 0x253610",
