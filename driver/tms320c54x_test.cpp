@@ -937,6 +937,68 @@ private:
 					((u64(1) << 40) - 5) &&
 					!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
 					"accumulator negate result and carry");
+			program.write_word(0x0448, 0xf4e3); // CALA A
+			program.write_word(0x0449, 0xf5e1);
+			program.write_word(0x0450, 0x76f8);
+			program.write_word(0x0451, 0x0944);
+			program.write_word(0x0452, 0xbeef);
+			program.write_word(0x0453, 0xfc00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0448);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0450);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 42;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 42)
+		{
+			expect(data.read_word(0x0944) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x044a &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
+					"CALA A target and return address");
+			program.write_word(0x0460, 0xf5e3); // CALA B
+			program.write_word(0x0461, 0xf5e1);
+			program.write_word(0x0468, 0x76f8);
+			program.write_word(0x0469, 0x0945);
+			program.write_word(0x046a, 0xcafe);
+			program.write_word(0x046b, 0xfc00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0460);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0468);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 43;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 43)
+		{
+			expect(data.read_word(0x0945) == 0xcafe &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0462 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
+					"CALA B target and return address");
+			program.write_word(0x0470, 0xf6e3); // CALAD A
+			program.write_word(0x0471, 0xe801);
+			program.write_word(0x0472, 0xe902);
+			program.write_word(0x0473, 0xf5e1);
+			program.write_word(0x0478, 0x76f8);
+			program.write_word(0x0479, 0x0946);
+			program.write_word(0x047a, 0x1234);
+			program.write_word(0x047b, 0xfc00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0470);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0478);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 44;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 44)
+		{
+			expect(data.read_word(0x0946) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0474 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
+					"CALAD delay slots and return address");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

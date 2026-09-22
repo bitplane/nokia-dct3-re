@@ -1503,6 +1503,19 @@ void tms320c54x_device::execute_one(u16 op)
 		m_pc = u16(accumulator(BIT(op, 8)));
 		m_icount -= 5;
 		return;
+	case 0xf4e3: // CALA A
+	case 0xf5e3: // CALA B
+		push(m_pc);
+		m_pc = u16(accumulator(BIT(op, 8)));
+		m_icount -= 5;
+		return;
+	case 0xf6e3: // CALAD A
+	case 0xf7e3: // CALAD B
+		push(u16(m_pc + 2));
+		m_delayed_target = u16(accumulator(BIT(op, 8)));
+		m_delayed_words = 2;
+		m_icount -= 3;
+		return;
 	case 0xf493: // CMPL source accumulator, destination accumulator
 	case 0xf593:
 	case 0xf693:
