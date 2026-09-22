@@ -757,61 +757,7 @@ evidence-check:
 	$(PYTHON) tools/validate_evidence.py
 
 test-tools:
-	$(VENV)/bin/python -m unittest tools/test_dct3_pmm_catalog.py tools/test_make_2100_pmm_profile.py tools/test_make_3330_pmm_profile.py tools/test_nhm6_security_profile_check.py
-	$(VENV)/bin/python -m unittest tools/test_eeprom_trace_check.py tools/test_storage_static_census.py tools/test_flash_persistent_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_mbus_2100_terminal_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_extract_dct3_wintesla.py
-	$(VENV)/bin/python -m unittest tools/test_nse3_v406_static_check.py
-	$(VENV)/bin/python -m unittest tools/test_nse3_v548_static_check.py
-	$(VENV)/bin/python -m unittest tools/test_dct3_type_1f_static_check.py
-	$(VENV)/bin/python -m unittest tools/test_mad2_residual_census.py
-	$(VENV)/bin/python -m unittest tools/test_dsp_rom4_cosim_check.py
-	$(VENV)/bin/python -m unittest tools/test_c54x_rom4_rf_boundary_check.py tools/test_c54x_rom4_port_census.py
-	$(VENV)/bin/python -m unittest tools/test_radio_handover_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_message_census.py tools/test_find_thumb_signature.py tools/test_make_eeprom_profile.py tools/test_make_sim_card_profile.py tools/test_mad2_access_census.py tools/test_mad2_static_census.py tools/test_board_io_static_census.py tools/test_ccont_static_census.py tools/test_ccont_runtime_census.py tools/test_ccont_mask_pending_check.py tools/test_sim_device_split.py tools/test_sim_phonebook_check.py tools/test_sim_security_trace_check.py tools/test_sim_toolkit_trace_check.py tools/test_sim_toolkit_inkey_trace_check.py tools/test_sim_toolkit_input_trace_check.py tools/test_sim_hotplug_trace_check.py tools/test_gsm_authentication_split.py tools/test_gsm_cell_broadcast.py tools/test_cell_broadcast_static_check.py tools/test_gsm_ems.py tools/test_radio_authentication_boundary_trace_check.py tools/test_nse3_bootstrap_capture_check.py tools/test_b3_flash_device_split.py tools/test_mad2_device_split.py tools/test_mbus_device_split.py tools/test_dsp_device_split.py tools/test_dsp_rom_audit.py tools/test_dsp_rom4_candidate_check.py tools/test_dsp_upload_extract.py tools/test_dsp_memory_upload_trace_check.py tools/test_dsp_speech_control_static_check.py tools/test_speech_media_boundaries.py tools/test_gensio_device_split.py tools/test_kbgpio_device_split.py tools/test_pup_device_split.py tools/test_uif_device_split.py tools/test_display_path.py tools/test_mame_patch_hygiene.py tools/test_mame_source_compliance.py tools/test_check_lcd_frame.py tools/test_keypad_input.py tools/test_machine_profile.py tools/test_model_frontier_summary.py tools/test_ccont_watchdog.py tools/test_ccont_watchdog_trace_check.py tools/test_ccont_watchdog_expiry_check.py tools/test_ccont_rtc_trace_check.py tools/test_alarm_trace_check.py tools/test_power_lifecycle_check.py tools/test_charger_lifecycle_check.py tools/test_charger_wake_check.py tools/test_display_trace_check.py tools/test_gensio_trace_check.py tools/test_mad2_timer_trace_check.py tools/test_mad2_timer1_trace_check.py tools/test_mad2_interrupt_trace_check.py tools/test_mad2_clock_trace_check.py tools/test_mad2_sleep_trace_check.py tools/test_mbus_trace_check.py tools/test_dsp_transport_trace_check.py tools/test_dsp_tone_trace_check.py tools/test_dsp_shared_read_census.py tools/test_dsp_shared_transition_census.py tools/test_dsp_packet_semantics_census.py tools/test_dsp_radio_profile_trace_check.py tools/test_radio_camp_trace_check.py tools/test_radio_3330_boundary_trace_check.py tools/test_radio_3330_unsuitable_cell_trace_check.py tools/test_radio_mobile_identity.py tools/test_radio_registration_trace_check.py tools/test_radio_registration_state_roundtrip_trace_check.py tools/test_radio_paging_trace_check.py tools/test_radio_paging_state_roundtrip_trace_check.py tools/test_radio_paging_negative_trace_check.py tools/test_radio_3310_incoming_call_boundary_check.py tools/test_radio_3310_speech_control_trace_check.py tools/test_radio_5210_incoming_call_trace_check.py tools/test_radio_5210_outgoing_call_trace_check.py tools/test_radio_incoming_call_trace_check.py tools/test_radio_incoming_ringing_trace_check.py tools/test_radio_answered_call_trace_check.py tools/test_radio_answered_audio_boundary_trace_check.py tools/test_radio_answered_call_lifecycle_trace_check.py tools/test_radio_call_audio_wire_trace_check.py tools/test_radio_outgoing_call_trace_check.py tools/test_radio_speech_media_trace_check.py tools/test_radio_facch_interruption_trace_check.py tools/test_radio_sacch_coexistence_trace_check.py tools/test_radio_call_state_roundtrip_trace_check.py tools/test_radio_pcm_missing_trace_check.py tools/test_radio_degraded_speech_trace_check.py tools/test_radio_physical_uplink_trace_check.py tools/test_radio_incoming_sms_trace_check.py tools/test_radio_outgoing_sms_trace_check.py tools/test_radio_incoming_smart_message_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_application_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_mad2_runtime_census.py tools/test_storage_runtime_census.py tools/test_flash_pmm_persistence_check.py
-	$(VENV)/bin/python -m unittest tools/test_c54x_opcode_coverage.py tools/test_c54x_rom4_snapshot_check.py tools/test_c54x_rom4_transform_check.py tools/test_dsp_rom4_upload_trace_check.py tools/test_make_c54x_rom4_cold_data.py
-	$(VENV)/bin/python -m unittest tools/test_find_scalar_uses.py tools/test_gsm_subscriber_profile.py tools/test_lapdm_expiry_contract.py tools/test_make_5110_eeprom_profile.py
-	$(VENV)/bin/python -m unittest tools/test_radio_host_incoming_ussd_trace_check.py tools/test_radio_host_ussd_trace_check.py tools/test_radio_incoming_host_sms_trace_check.py tools/test_radio_outgoing_host_sms_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_sim_toolkit_menu_trace_check.py tools/test_sim_toolkit_sms_trace_check.py tools/test_sim_toolkit_call_trace_check.py tools/test_sim_toolkit_selection_trace_check.py tools/test_sim_toolkit_refresh_trace_check.py tools/test_sim_toolkit_polling_trace_check.py tools/test_sim_toolkit_tone_trace_check.py tools/test_sim_toolkit_dtmf_trace_check.py tools/test_sim_toolkit_browser_trace_check.py tools/test_sim_toolkit_timer_trace_check.py tools/test_sim_toolkit_malformed_trace_check.py tools/test_sim_toolkit_timeout_trace_check.py tools/test_sim_toolkit_cross_rom_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_ems_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_supplementary_call_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_gsm_supplementary.py
-	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_lifecycle_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_call_divert_incoming.py
-	$(VENV)/bin/python -m unittest tools/test_radio_busy_forward_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_unreachable_forward_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_no_reply_forward_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_ussd_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_network_ussd_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_two_call_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_two_call_negative_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_second_outgoing_call_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_envelope_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_smart_message_persistence_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_sms_inbox_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_sms_sequence_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_sms_product_inbox_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_sms_negative_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_sms_two_message_ui_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_outgoing_sms_trace_check.py tools/test_radio_outgoing_sms_reject_trace_check.py tools/test_radio_outgoing_sms_smsc_trace_check.py tools/test_radio_outgoing_sms_timeout_trace_check.py tools/test_radio_outgoing_sms_timeout_state_trace_check.py tools/test_radio_outgoing_sms_delivery_report_trace_check.py tools/test_radio_outgoing_sms_product_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_3410_registration_negative_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_3330_incoming_call_boundary_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_call_lifecycle_common.py tools/test_gsm_session_call_invariants.py tools/test_gsm_call_adapter_split.py tools/test_dct3_call_bridge.py tools/test_acceptance_run_isolation.py tools/test_radio_outgoing_call_outcome_trace_check.py tools/test_radio_outgoing_host_adapter_trace_check.py tools/test_radio_outgoing_host_termination_trace_check.py tools/test_radio_outgoing_host_media_trace_check.py tools/test_radio_outgoing_host_reconnect_trace_check.py tools/test_radio_outgoing_host_two_calls_trace_check.py tools/test_radio_outgoing_host_hostile_trace_check.py tools/test_radio_outgoing_host_local_end_trace_check.py tools/test_radio_outgoing_host_media_restore_trace_check.py tools/test_radio_outgoing_host_release_restore_trace_check.py tools/test_radio_incoming_host_adapter_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_cobba_control_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_a5_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_a5_state_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_a5_two_calls_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_periodic_location_update_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_periodic_location_update_state_trace_check.py
-	$(VENV)/bin/python -m unittest tools/test_radio_3410_periodic_location_update_trace_check.py tools/test_dsp_code_block_lifecycle.py
-	$(VENV)/bin/python -m unittest tools/test_radio_physical_downlink_check.py
-	$(VENV)/bin/python -m unittest tools/test_pulse_route_mame.py
-	$(VENV)/bin/python -m unittest tools/test_gsm_sms_session_invariants.py
-	$(VENV)/bin/python -m unittest tools/test_gate_matrix.py tools/test_gate_parity_audit.py tools/test_gate_render.py tools/test_gate_generate.py tools/test_gate_database_diff.py
-	$(VENV)/bin/python -m unittest tools/test_run_mame_isolated.py
+	$(VENV)/bin/python -m unittest discover -s tools -p 'test_*.py'
 
 verify-cell-broadcast-static:
 	$(VENV)/bin/python tools/cell_broadcast_static_check.py roms/3210f600a_swap16.bin

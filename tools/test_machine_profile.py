@@ -339,8 +339,8 @@ class MachineProfileTest(unittest.TestCase):
         prepare = self.makefile.split("prepare-run-files:", 1)[1].split(
             "\nprepare-run-nvram:", 1
         )[0]
-        for phone in ("noki3310", "noki3330", "noki3410"):
-            self.assertIn(f'[ "$(PHONE)" = "{phone}" ]', prepare)
+        self.assertIn('if [ "$(PRESERVE_NVRAM)" != "1" ]; then', prepare)
+        self.assertIn('NVRAM_SYSTEM :=', self.makefile)
         for store in ("flash", "sim_card", "eeprom"):
             self.assertIn(
                 f'"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/{store}"',
