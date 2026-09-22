@@ -13,7 +13,9 @@ BASE_CHECKPOINTS = (
 )
 SERVICE_CHECKPOINTS = (
     re.compile(r"GSM service downlink kind=16 sapi=3 pd=09 message=01"),
-    re.compile(r"GSM service uplink sapi=3 pd=09 message=01"),
+    re.compile(r"GSM service uplink sapi=3 pd=09 message=04 length=2"),
+    re.compile(r"GSM service uplink sapi=3 pd=09 message=01 length=5"),
+    re.compile(r"GSM service downlink kind=17 sapi=3 pd=09 message=04"),
 )
 
 
