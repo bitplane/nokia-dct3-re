@@ -11,13 +11,7 @@ Differences found: 86
 
 ## ROM normalisation reachability
 
-A gate listed here never reaches its product's ROM
-normalisation step, so it passes only when an earlier
-invocation left the extracted images behind.
-
-- **normalize-5210** not reached by:
-  - `verify-5210-radio-outgoing-physical-duplex`
-  - `verify-5210-radio-physical-duplex`
+Every product gate reaches its own ROM normalisation step.
 
 ## Family membership
 

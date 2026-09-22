@@ -2329,7 +2329,7 @@ verify-radio-outgoing-call-host-physical-media:
 verify-3310-radio-physical-duplex:
 	$(DCT3_RUN_3310) ROM=roms/noki3310/3310f639e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=28 POST_READY_KEYS=navi,wait5000,navi POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=200 POST_READY_GAP_MS=200 AUDIO_CONTROL_CHECKER=tools/radio_3310_speech_control_trace_check.py PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
 
-verify-5210-radio-physical-duplex:
+verify-5210-radio-physical-duplex: normalize-5210
 	PHONE=noki5210 BIOS=540e ROM=roms/noki5210/5210_5.40_ppm_e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_incoming_call_answered RUN_SECONDS=30 POST_READY_KEYS=send,wait5000,end POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=220 POST_READY_GAP_MS=280 AUDIO_CONTROL_CHECKER=tools/radio_5210_incoming_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
 
 verify-3410-radio-physical-duplex: normalize-3410
@@ -2350,7 +2350,7 @@ verify-3330-radio-outgoing-physical-duplex: normalize-3330
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
 	$(DCT3_RUN_3330) ROM=roms/noki3330/3330f450e.fls PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_DIR=$(RUN_DIR)_call FIXTURE=fixtures/radio_outgoing_call RUN_SECONDS=32 POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter,waitalerting,wait5000,enter POST_READY_DELAY_MS=6000 POST_READY_DURATION_MS=70 POST_READY_GAP_MS=200 AUDIO_CONTROL_CHECKER=tools/radio_outgoing_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
 
-verify-5210-radio-outgoing-physical-duplex:
+verify-5210-radio-outgoing-physical-duplex: normalize-5210
 	PHONE=noki5210 BIOS=540e ROM=roms/noki5210/5210_5.40_ppm_e.fls RUN_DIR=$(RUN_DIR) FIXTURE=fixtures/radio_outgoing_call RUN_SECONDS=36 POST_READY_KEYS=5,5,5,1,2,3,4,send,waitalerting,wait5000,end POST_READY_DELAY_MS=18000 POST_READY_DURATION_MS=220 POST_READY_GAP_MS=280 AUDIO_CONTROL_CHECKER=tools/radio_5210_outgoing_call_trace_check.py FACCH_CHECKER= PCM_CHECK_ARGS='--data-clock 1000000 --frame-clock 8000 --frame-clocks 125 --sync-clocks 1 --word-clocks 16' tools/run_physical_uplink_gate.sh
 
 verify-radio-physical-uplink-one:

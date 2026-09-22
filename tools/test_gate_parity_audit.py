@@ -156,10 +156,7 @@ class RealMakefileTest(unittest.TestCase):
         cls.names = {gate["name"] for gate in matrix["gates"]}
 
     def test_every_gate_reaches_its_rom_normalisation(self):
-        self.assertEqual(self.result["normalisation_gaps"], {
-            "normalize-5210": ["verify-5210-radio-outgoing-physical-duplex",
-                               "verify-5210-radio-physical-duplex"],
-        })
+        self.assertEqual(self.result["normalisation_gaps"], {})
 
     def test_main_makefile_gates_are_included(self):
         self.assertIn("verify-5110-menu", self.names)

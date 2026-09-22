@@ -8053,7 +8053,9 @@
     },
     {
       "name": "verify-5210-radio-physical-duplex",
-      "prerequisites": [],
+      "prerequisites": [
+        "normalize-5210"
+      ],
       "variables": {},
       "steps": [
         {
@@ -8119,7 +8121,9 @@
     },
     {
       "name": "verify-5210-radio-outgoing-physical-duplex",
-      "prerequisites": [],
+      "prerequisites": [
+        "normalize-5210"
+      ],
       "variables": {},
       "steps": [
         {
