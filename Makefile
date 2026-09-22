@@ -502,14 +502,14 @@ download-mame:
 
 # Overlay the local driver and component sources onto the upstream tree (MAME is not vendored).
 overlay: download-mame
-	@for patch in $(MAME_PATCHES); do \
+	@set -e; for patch in $(MAME_PATCHES); do \
 		if git -C $(MAME_DIR) apply --reverse --check "../$$patch" >/dev/null 2>&1; then :; \
 		else git -C $(MAME_DIR) apply "../$$patch"; fi; \
 	done
 	install -C -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp
-	@for src in $(DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
-	@for src in $(TEST_DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
-	@for src in $(CPU_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/devices/$$src"; done
+	@set -e; for src in $(DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
+	@set -e; for src in $(TEST_DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
+	@set -e; for src in $(CPU_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/devices/$$src"; done
 
 $(LIBGSM_TARBALL):
 	mkdir -p third_party
