@@ -838,20 +838,17 @@ prepare-run-files:
 	@mkdir -p "$(RUN_DIR)"
 	@find "$(RUN_DIR)" -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -delete
 	@truncate -s 0 "$(MAME_DIR)/error.log"
+	@mkdir -p "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)"
+	@if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
+		rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/flash" \
+			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card" \
+			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
+	fi
 	@if [ "$(PHONE)" = "noki3210" ]; then \
-		mkdir -p "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)"; \
-		if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
-			rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card"; \
-		fi; \
 		if [ "$(PRESERVE_NVRAM)" != "1" ] || [ ! -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom" ]; then \
 			cp "$(MAME_DIR)/roms/noki3210/$(EEPROM_BASENAME)" \
 				"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 		fi; \
-	elif { [ "$(PHONE)" = "noki3310" ] || [ "$(PHONE)" = "noki3330" ] || \
-			[ "$(PHONE)" = "noki3410" ]; } && [ "$(PRESERVE_NVRAM)" != "1" ]; then \
-		rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/flash" \
-			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card" \
-			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 	fi
 
 prepare-run-nvram: build prepare-run-files
