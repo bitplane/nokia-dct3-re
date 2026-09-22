@@ -188,6 +188,41 @@ monitor while the UI also refreshes the LCD. The long quiet interval is a
 healthy maintenance cadence and was unrelated to the former masked-INT0
 receiver boundary.
 
+## RF ownership and capture target
+
+`tools/c54x_rom4_port_census.py` inventories candidate `PORTR`/`PORTW` sites
+in the recovered big-endian ROM image. It accounts for the extra Smem address
+word in absolute `74f8`/`75f8` instructions; treating that word as the port
+would mislabel sites. The static counts are 16 reads and seven writes on
+`0x27`, six reads and four writes on `0x38`, three reads and five writes on
+`0x39`, and four writes each on `0x31`/`0x32`. These are opcode-pattern
+candidate sites, not proof that every word is executed code.
+
+The `0x38/0x39` cluster has a polling routine at `0x41ad`: it rereads
+port `0x38` while bit 7 is set, then returns the low `0x60` status bits.
+ROM functions reached from `0x5074/0x5078` and `0x7b0c/0x7b10` call nearby
+parallel-interface routines; `0x7b0a` calls `0x410e` and `0x4185` in order.
+The latter can read one port-`0x39` word at `0x41a4`. In the coherent
+12-second run, port `0x27` is read 82,432 times, while ports `0x38` and
+`0x39` are never read; both firmware mode words `0x00aa/0x00ac` remain zero.
+This locates a dormant path, but not its MCU request owner or the semantics of
+its sample word. In particular, neither `0x27` nor `0x39` is established as
+the complete FCCH/SCH sample stream. No valid signal fixture follows yet.
+
+The next evidence should compare a no-cell boot with a real NSE-1 receiving
+one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
+DSP-to-MCU response words, DSP program counter around `0x407c`, `0x410e`,
+`0x4185` and `0x7b0a`, and reads/writes of DSP I/O ports `0x27`, `0x38`,
+`0x39`, `0x31` and `0x32` with timestamps. To establish electrical sample
+packing and tuning, also capture the COBBA parallel address/data, read/write
+and data-available strobes and MAD2 `SynthEna/SynthClk/SynthData` pins (or
+equivalent DSP/MMIO instrumentation). Record the 13 MHz reference and TDMA
+frame edges so data order and latency can be aligned. An HPI RAM snapshot
+alone cannot establish DSP I/O-port traffic or 12-bit bus sign extension.
+The pin names and bus width come from Nokia's NSE-1 service manual cited
+above; the requested trace contents are an experiment specification, not a
+claim that any particular request or encoding has been recovered.
+
 TI's C54x CPU guide places an important limit on this result: hardware reset
 clears IFR and sets INTM, but does not initialise IMR or SP. The clean core
 preserves IMR across MAD2 reset pulses. The recovered ROM's OR-mask sequence,
