@@ -2,7 +2,7 @@
 """Report where sibling product gates assert different things.
 
 The acceptance gates were written per product by copying a sibling and editing
-it. That is why 27 capability families exist in two or three near-identical
+it. That is why many capability families exist in near-identical
 copies. It also means a family can drift: one product's gate may check fewer
 predicates than its sibling without anything recording that the difference was
 intended.
@@ -33,11 +33,11 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import gate_matrix
+from dct3_products import product_ids
 
 
 # The unprefixed gates are the Nokia 3210 NSE-8 originals; the others carry an
-# explicit product token. 6110 is static-only and has no sibling families.
-PRODUCT_RE = re.compile(r"^verify-(3210|3310|3330|3410|6110)-(.+)$")
+# explicit product token from the MAME system declarations.
 DEFAULT_PRODUCT = "3210"
 
 # Gates that belong to no product: the native codec and protocol unit tests,
@@ -49,8 +49,8 @@ NEUTRAL_PREFIXES = ("gsm-",)
 
 def family_of(name: str) -> tuple[str, str] | None:
     """Split a gate name into (product, capability family)."""
-    match = PRODUCT_RE.match(name)
-    if match:
+    match = re.match(r"^verify-(\d+)-(.+)$", name)
+    if match and match.group(1) in product_ids():
         return match.group(1), match.group(2)
     body = name[len("verify-"):] if name.startswith("verify-") else name
     if not body or body.startswith(NEUTRAL_PREFIXES):
@@ -377,10 +377,15 @@ def main() -> int:
     parser.add_argument("--report", type=pathlib.Path)
     arguments = parser.parse_args()
 
-    source = arguments.makefile or gate_matrix.gate_source()
-    matrix = gate_matrix.check_round_trip(source.read_text())
-    result = audit(matrix, source.read_text() + "\n"
-                   + gate_matrix.MAKEFILE.read_text())
+    source_text = (arguments.makefile.read_text() if arguments.makefile
+                   else gate_matrix.acceptance_source_text())
+    matrix = gate_matrix.check_round_trip(source_text)
+    expected = set(re.findall(r"^(verify[a-z0-9-]*)\s*:(?!=)",
+                              source_text, re.MULTILINE))
+    actual = {gate["name"] for gate in matrix["gates"]}
+    if actual != expected:
+        raise ValueError(f"acceptance targets omitted: {sorted(expected - actual)}")
+    result = audit(matrix, source_text)
 
     if arguments.json:
         arguments.json.parent.mkdir(parents=True, exist_ok=True)

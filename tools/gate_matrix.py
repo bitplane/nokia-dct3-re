@@ -43,6 +43,14 @@ def gate_source() -> pathlib.Path:
     """
     return GATES_MK if GATES_MK.exists() else MAKEFILE
 
+
+def acceptance_source_text() -> str:
+    """Read every acceptance target, including rules still in the Makefile."""
+    sources = [MAKEFILE]
+    if GATES_MK.exists():
+        sources.append(GATES_MK)
+    return "\n".join(source.read_text() for source in sources)
+
 TARGET_RE = re.compile(r"^(verify[a-z0-9-]*)\s*:(?!=)(.*)$")
 VAR_ASSIGN_RE = re.compile(r"^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$")
 

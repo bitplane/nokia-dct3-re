@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 40
-Differences found: 66
+Families with more than one product: 47
+Differences found: 86
 
 ## ROM normalisation reachability
 
@@ -24,57 +24,85 @@ invocation left the extracted images behind.
 Which products have a gate in each shared capability family. An
 absent product is a coverage question, not a drifted gate.
 
-| Family | 3210 | 3310 | 3330 | 3410 | 6110 |
-| --- | --- | --- | --- | --- | --- |
-| `frontier` | yes | yes | yes | yes | — |
-| `menu` | — | yes | — | yes | — |
-| `navigation` | — | yes | yes | yes | — |
-| `radio-a5-1-handover` | yes | yes | yes | yes | — |
-| `radio-a5-1-handover-failure-state` | yes | yes | yes | yes | — |
-| `radio-a5-1-incoming-call` | yes | yes | yes | yes | — |
-| `radio-a5-1-outgoing-call` | yes | yes | yes | yes | — |
-| `radio-all-cell-loss` | yes | — | — | yes | — |
-| `radio-authentication-boundary` | yes | yes | — | — | — |
-| `radio-boundary` | — | yes | yes | — | — |
-| `radio-handover` | yes | yes | yes | yes | — |
-| `radio-handover-failure-state` | yes | yes | yes | yes | — |
-| `radio-incoming-call-lifecycle` | yes | yes | yes | yes | — |
-| `radio-incoming-smart-message` | yes | yes | yes | yes | — |
-| `radio-loss-recovery` | yes | — | — | yes | — |
-| `radio-loss-recovery-state` | yes | — | — | yes | — |
-| `radio-media-resilience` | — | yes | yes | — | — |
-| `radio-outgoing-call-host-media` | yes | — | — | yes | — |
-| `radio-outgoing-call-host-termination` | yes | yes | yes | yes | — |
-| `radio-outgoing-call-lifecycle` | yes | yes | yes | yes | — |
-| `radio-outgoing-physical-duplex` | — | — | yes | yes | — |
-| `radio-outgoing-sms` | yes | yes | yes | yes | — |
-| `radio-paging` | yes | yes | yes | yes | — |
-| `radio-paging-negatives` | — | — | yes | yes | — |
-| `radio-paging-preserved` | — | — | yes | yes | — |
-| `radio-paging-state` | — | — | yes | yes | — |
-| `radio-periodic-location-update` | yes | — | — | yes | — |
-| `radio-physical-duplex` | — | yes | yes | yes | — |
-| `radio-registration` | yes | yes | yes | yes | — |
-| `radio-registration-preserved` | — | — | yes | yes | — |
-| `radio-registration-state` | — | — | yes | yes | — |
-| `radio-reselection-different-lac` | yes | yes | yes | yes | — |
-| `radio-reselection-paging` | yes | yes | yes | yes | — |
-| `radio-reselection-preserved` | yes | yes | yes | yes | — |
-| `radio-reselection-same-lac` | yes | yes | yes | yes | — |
-| `radio-reselection-state` | yes | yes | yes | yes | — |
-| `radio-smart-message-application` | yes | yes | — | yes | — |
-| `radio-smart-message-persistence` | yes | yes | yes | yes | — |
-| `radio-sms-inbox` | yes | yes | yes | yes | — |
-| `radio-unsuitable-cells` | — | — | yes | yes | — |
+| Family | 2100 | 3210 | 3310 | 3330 | 3410 | 3610 | 5110 | 5210 | 6110 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `charger-wake` | — | yes | — | — | — | — | — | yes | — |
+| `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — |
+| `mbus` | yes | yes | — | — | — | yes | — | — | — |
+| `menu` | — | — | yes | — | yes | — | yes | yes | — |
+| `navigation` | — | — | yes | yes | yes | — | — | yes | — |
+| `power-lifecycle` | — | yes | — | — | — | — | — | yes | — |
+| `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-a5-1-outgoing-call` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-all-cell-loss` | — | yes | — | — | yes | — | — | yes | — |
+| `radio-authentication-boundary` | — | yes | yes | — | — | — | — | — | — |
+| `radio-boundary` | — | — | yes | yes | — | — | — | — | — |
+| `radio-handover` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-incoming-call-answered` | — | yes | — | — | — | — | — | yes | — |
+| `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-incoming-sms` | — | yes | — | — | — | — | — | yes | — |
+| `radio-loss-recovery` | — | yes | — | — | yes | — | — | yes | — |
+| `radio-loss-recovery-state` | — | yes | — | — | yes | — | — | — | — |
+| `radio-media-resilience` | — | — | yes | yes | — | — | — | yes | — |
+| `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — |
+| `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | yes | — |
+| `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-paging` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-paging-negatives` | — | — | — | yes | yes | — | — | yes | — |
+| `radio-paging-preserved` | — | — | — | yes | yes | — | — | — | — |
+| `radio-paging-state` | — | — | — | yes | yes | — | — | — | — |
+| `radio-periodic-location-update` | — | yes | — | — | yes | — | — | — | — |
+| `radio-physical-duplex` | — | — | yes | yes | yes | — | — | yes | — |
+| `radio-registration` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-registration-preserved` | — | — | — | yes | yes | — | — | — | — |
+| `radio-registration-state` | — | — | — | yes | yes | — | — | — | — |
+| `radio-reselection-different-lac` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-reselection-paging` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-reselection-preserved` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-reselection-same-lac` | — | yes | yes | yes | yes | — | — | yes | — |
+| `radio-reselection-state` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-smart-message-application` | — | yes | yes | — | yes | — | — | — | — |
+| `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — |
+| `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — |
+| `save-state` | — | — | — | — | — | — | yes | yes | — |
+| `sim-phonebook` | — | yes | — | — | — | — | — | yes | — |
 
 ## Different checker scripts
 
 ### `frontier`
 
+- **2100**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **3210**: _(none)_
 - **3310**: `tools/check_lcd_frame.py`
 - **3330**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **3410**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
+- **3610**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
+- **5210**: `tools/check_lcd_frame.py`
+
+### `mbus`
+
+- **2100**: `tools/mbus_2100_terminal_trace_check.py`
+- **3210**: `tools/mbus_trace_check.py`
+- **3610**: `tools/mbus_2100_terminal_trace_check.py`
+
+### `menu`
+
+- **3310**: `tools/check_lcd_frame.py`
+- **3410**: `tools/check_lcd_frame.py`
+- **5110**: `tools/make_5110_eeprom_profile.py`
+- **5210**: `tools/check_lcd_frame.py`
+
+### `power-lifecycle`
+
+- **3210**: `tools/power_lifecycle_check.py`
+- **5210**: `tools/check_lcd_frame.py`, `tools/power_5210_trace_check.py`
 
 ### `radio-a5-1-handover`
 
@@ -86,11 +114,12 @@ absent product is a coverage question, not a drifted gate.
 
 ### `radio-a5-1-incoming-call`
 
-- **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`
-- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
-- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_3330_incoming_call_boundary_check.py`
-- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
-- shared: `tools/radio_a5_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_3330_incoming_call_boundary_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`, `tools/radio_speech_media_trace_check.py`
+- **5210**: `tools/check_lcd_frame.py`, `tools/radio_5210_incoming_call_trace_check.py`
+- shared: `tools/radio_a5_trace_check.py`
 
 ### `radio-a5-1-outgoing-call`
 
@@ -99,6 +128,13 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `tools/check_model_frontier_summary.py`
 - **3410**: _(none)_
 - shared: `tools/radio_a5_trace_check.py`, `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+
+### `radio-all-cell-loss`
+
+- **3210**: `tools/radio_registration_trace_check.py`
+- **3410**: `tools/radio_registration_trace_check.py`
+- **5210**: _(none)_
+- shared: `tools/radio_reselection_trace_check.py`
 
 ### `radio-boundary`
 
@@ -113,13 +149,18 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
 - shared: `tools/radio_handover_trace_check.py`, `tools/radio_speech_media_trace_check.py`
 
+### `radio-incoming-call-answered`
+
+- **3210**: `tools/radio_answered_audio_boundary_trace_check.py`, `tools/radio_answered_call_trace_check.py`, `tools/radio_incoming_ringing_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **5210**: `tools/check_lcd_frame.py`
+
 ### `radio-incoming-call-lifecycle`
 
-- **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`
-- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
-- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_3330_incoming_call_boundary_check.py`
-- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
-- shared: `tools/radio_speech_media_trace_check.py`
+- **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_3330_incoming_call_boundary_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`, `tools/radio_speech_media_trace_check.py`
+- **5210**: `tools/check_lcd_frame.py`, `tools/radio_5210_incoming_call_trace_check.py`
 
 ### `radio-incoming-smart-message`
 
@@ -129,10 +170,24 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: _(none)_
 - shared: `tools/radio_incoming_smart_message_trace_check.py`
 
+### `radio-incoming-sms`
+
+- **3210**: _(none)_
+- **5210**: `tools/check_lcd_frame.py`
+- shared: `tools/radio_incoming_sms_trace_check.py`
+
+### `radio-loss-recovery`
+
+- **3210**: `tools/radio_registration_trace_check.py`
+- **3410**: `tools/radio_registration_trace_check.py`
+- **5210**: _(none)_
+- shared: `tools/radio_reselection_trace_check.py`
+
 ### `radio-media-resilience`
 
 - **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
 - **3330**: `tools/radio_3330_incoming_call_boundary_check.py`
+- **5210**: `tools/radio_5210_incoming_call_trace_check.py`
 - shared: `tools/radio_call_state_roundtrip_trace_check.py`, `tools/radio_degraded_speech_trace_check.py`, `tools/radio_facch_interruption_trace_check.py`, `tools/radio_sacch_coexistence_trace_check.py`
 
 ### `radio-outgoing-call-host-termination`
@@ -145,17 +200,18 @@ absent product is a coverage question, not a drifted gate.
 
 ### `radio-outgoing-call-lifecycle`
 
-- **3210**: _(none)_
-- **3310**: _(none)_
-- **3330**: `tools/check_model_frontier_summary.py`
-- **3410**: _(none)_
-- shared: `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3210**: `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3310**: `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **3410**: `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
+- **5210**: `tools/check_lcd_frame.py`, `tools/radio_5210_outgoing_call_trace_check.py`
 
 ### `radio-outgoing-physical-duplex`
 
-- **3330**: `tools/check_model_frontier_summary.py`
-- **3410**: _(none)_
-- shared: `tools/radio_outgoing_call_trace_check.py`, `tools/run_physical_uplink_gate.sh`
+- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_outgoing_call_trace_check.py`
+- **3410**: `tools/radio_outgoing_call_trace_check.py`
+- **5210**: `tools/radio_5210_outgoing_call_trace_check.py`
+- shared: `tools/run_physical_uplink_gate.sh`
 
 ### `radio-outgoing-sms`
 
@@ -163,6 +219,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `tools/radio_outgoing_sms_delivery_report_trace_check.py`, `tools/radio_outgoing_sms_product_trace_check.py`
 - **3330**: `tools/radio_outgoing_sms_product_trace_check.py`
 - **3410**: `tools/radio_outgoing_sms_product_trace_check.py`
+- **5210**: `tools/radio_outgoing_sms_product_trace_check.py`
 
 ### `radio-paging`
 
@@ -170,12 +227,14 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: _(none)_
 - **3330**: _(none)_
 - **3410**: `tools/radio_registration_trace_check.py`
+- **5210**: _(none)_
 - shared: `tools/radio_paging_trace_check.py`
 
 ### `radio-paging-negatives`
 
 - **3330**: `tools/radio_3330_unsuitable_cell_trace_check.py`
 - **3410**: `tools/radio_3410_registration_negative_trace_check.py`
+- **5210**: _(none)_
 - shared: `tools/radio_paging_negative_trace_check.py`
 
 ### `radio-periodic-location-update`
@@ -188,7 +247,26 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `tools/radio_3310_speech_control_trace_check.py`
 - **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_3330_incoming_call_boundary_check.py`
 - **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
+- **5210**: `tools/radio_5210_incoming_call_trace_check.py`
 - shared: `tools/run_physical_uplink_gate.sh`
+
+### `radio-registration`
+
+- **3210**: _(none)_
+- **3310**: _(none)_
+- **3330**: _(none)_
+- **3410**: _(none)_
+- **5210**: `tools/check_lcd_frame.py`
+- shared: `tools/radio_registration_trace_check.py`
+
+### `radio-reselection-same-lac`
+
+- **3210**: `tools/radio_registration_trace_check.py`
+- **3310**: `tools/radio_registration_trace_check.py`
+- **3330**: `tools/radio_registration_trace_check.py`
+- **3410**: `tools/radio_registration_trace_check.py`
+- **5210**: _(none)_
+- shared: `tools/radio_reselection_trace_check.py`
 
 ### `radio-smart-message-persistence`
 
@@ -210,7 +288,17 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `tools/radio_3330_unsuitable_cell_trace_check.py`
 - **3410**: `tools/radio_3410_registration_negative_trace_check.py`
 
+### `save-state`
+
+- **5110**: `tools/make_5110_eeprom_profile.py`
+- **5210**: `tools/check_lcd_frame.py`
+
 ## Same checker, different options
+
+### `charger-wake` — `tools/charger_wake_check.py`
+
+- **3210**: _(none)_
+- **5210**: `--boundary-only`
 
 ### `radio-registration` — `tools/radio_registration_trace_check.py`
 
@@ -218,6 +306,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `--profile`
 - **3330**: `--profile`
 - **3410**: `--profile`
+- **5210**: `--profile`
 
 ### `radio-reselection-different-lac` — `tools/radio_reselection_trace_check.py`
 
@@ -225,6 +314,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - **3330**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - **3410**: `--radio-profile`
+- **5210**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - shared: `--profile`
 
 ### `radio-reselection-paging` — `tools/radio_reselection_trace_check.py`
@@ -233,6 +323,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - **3330**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - **3410**: `--radio-profile`
+- **5210**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - shared: `--paging-after-reselection`, `--profile`
 
 ### `radio-reselection-preserved` — `tools/radio_reselection_preserved_trace_check.py`
@@ -248,21 +339,39 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - **3330**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - **3410**: `--radio-profile`
+- **5210**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - shared: `--profile`
 
 ## Different prerequisites
 
 ### `frontier`
 
+- **2100**: _(none)_
 - **3210**: `run-frontier`
 - **3310**: _(none)_
 - **3330**: _(none)_
 - **3410**: _(none)_
+- **3610**: `build`
+- **5210**: _(none)_
+
+### `mbus`
+
+- **2100**: _(none)_
+- **3210**: _(none)_
+- **3610**: `build`
+
+### `menu`
+
+- **3310**: _(none)_
+- **3410**: _(none)_
+- **5110**: `build`
+- **5210**: _(none)_
 
 ### `radio-media-resilience`
 
 - **3310**: _(none)_
 - **3330**: `verify-3330-radio-incoming-call-lifecycle`
+- **5210**: _(none)_
 
 ### `radio-sms-inbox`
 
@@ -271,30 +380,51 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: _(none)_
 - **3410**: _(none)_
 
+### `save-state`
+
+- **5110**: `build`
+- **5210**: _(none)_
+
 ## Different run duration
+
+### `charger-wake`
+
+- **3210**: `35`
+- **5210**: `38`
 
 ### `frontier`
 
+- **2100**: `10`
 - **3210**: _(none)_
 - **3310**: _(none)_
 - **3330**: `44`
 - **3410**: `22`
+- **3610**: `3`
+- **5210**: `20`
 
-### `menu`
+### `mbus`
 
-- **3310**: `11`
-- **3410**: `22`
+- **2100**: `2`
+- **3210**: `1`
+- **3610**: `2`
 
 ### `navigation`
 
 - **3310**: `13`, `16`
 - **3330**: `49`, `51`
 - **3410**: `22`, `24`
+- **5210**: `25`
+
+### `power-lifecycle`
+
+- **3210**: `18`, `22`
+- **5210**: `20`, `25`
 
 ### `radio-all-cell-loss`
 
 - **3210**: `40`
 - **3410**: `35`
+- **5210**: `65`
 
 ### `radio-authentication-boundary`
 
@@ -317,6 +447,7 @@ absent product is a coverage question, not a drifted gate.
 
 - **3330**: `44`
 - **3410**: _(none)_
+- **5210**: _(none)_
 
 ### `radio-paging`
 
@@ -324,6 +455,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `20`
 - **3330**: `28`
 - **3410**: `35`
+- **5210**: `25`
 
 ### `radio-paging-preserved`
 
@@ -335,6 +467,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: _(none)_
 - **3330**: `44`
 - **3410**: _(none)_
+- **5210**: _(none)_
 
 ### `radio-registration`
 
@@ -342,6 +475,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `12`
 - **3330**: `18`
 - **3410**: `30`
+- **5210**: `20`
 
 ### `radio-registration-preserved`
 
@@ -354,6 +488,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `70`
 - **3330**: `35`
 - **3410**: `90`
+- **5210**: `65`
 
 ### `radio-reselection-paging`
 
@@ -361,6 +496,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `40`
 - **3330**: `40`
 - **3410**: `50`
+- **5210**: `42`
 
 ### `radio-reselection-preserved`
 
@@ -375,6 +511,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `35`
 - **3330**: `35`
 - **3410**: `40`
+- **5210**: `40`
 
 ### `radio-smart-message-application`
 
@@ -398,6 +535,13 @@ absent product is a coverage question, not a drifted gate.
 
 ## Not comparable — a member hides its steps in shell
 
+### `menu`
+
+- **3310**: `structured`
+- **3410**: `structured`
+- **5110**: `shell`
+- **5210**: `structured`
+
 ### `radio-a5-1-handover`
 
 - **3210**: `shell`
@@ -418,6 +562,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `structured`
 - **3330**: `structured`
 - **3410**: `structured`
+- **5210**: `structured`
 
 ### `radio-a5-1-outgoing-call`
 
@@ -440,12 +585,18 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `shell`
 - **3410**: `shell`
 
+### `radio-incoming-call-answered`
+
+- **3210**: `shell`
+- **5210**: `structured`
+
 ### `radio-incoming-call-lifecycle`
 
 - **3210**: `shell`
 - **3310**: `structured`
 - **3330**: `structured`
 - **3410**: `structured`
+- **5210**: `structured`
 
 ### `radio-loss-recovery-state`
 
@@ -456,6 +607,7 @@ absent product is a coverage question, not a drifted gate.
 
 - **3310**: `shell`
 - **3330**: `structured`
+- **5210**: `structured`
 
 ### `radio-outgoing-call-host-media`
 
@@ -475,6 +627,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `structured`
 - **3330**: `structured`
 - **3410**: `structured`
+- **5210**: `structured`
 
 ### `radio-outgoing-sms`
 
@@ -482,11 +635,13 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `shell`
 - **3330**: `shell`
 - **3410**: `shell`
+- **5210**: `shell`
 
 ### `radio-paging-negatives`
 
 - **3330**: `shell`
 - **3410**: `shell`
+- **5210**: `shell`
 
 ### `radio-paging-state`
 
@@ -509,4 +664,14 @@ absent product is a coverage question, not a drifted gate.
 
 - **3330**: `structured`
 - **3410**: `shell`
+
+### `save-state`
+
+- **5110**: `shell`
+- **5210**: `structured`
+
+### `sim-phonebook`
+
+- **3210**: `shell`
+- **5210**: `shell`
 

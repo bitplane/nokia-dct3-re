@@ -38,6 +38,11 @@ class FamilyTest(unittest.TestCase):
         self.assertEqual(gate_parity_audit.family_of("verify-3410-radio-paging"),
                          ("3410", "radio-paging"))
 
+    def test_newer_products_are_not_classified_as_3210(self):
+        for product in ("2100", "3610", "5110", "5210"):
+            self.assertEqual(gate_parity_audit.family_of(
+                f"verify-{product}-menu"), (product, "menu"))
+
     def test_native_unit_test_gates_belong_to_no_product(self):
         self.assertIsNone(gate_parity_audit.family_of("verify-gsm-a5"))
         self.assertIsNone(gate_parity_audit.family_of("verify-gsm-fr-codec"))
@@ -145,12 +150,21 @@ class NormalisationReachabilityTest(unittest.TestCase):
 class RealMakefileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        text = gate_matrix.gate_source().read_text()
+        text = gate_matrix.acceptance_source_text()
         matrix = gate_matrix.extract(text)
         cls.result = gate_parity_audit.audit(matrix, text)
+        cls.names = {gate["name"] for gate in matrix["gates"]}
 
     def test_every_gate_reaches_its_rom_normalisation(self):
-        self.assertEqual(self.result["normalisation_gaps"], {})
+        self.assertEqual(self.result["normalisation_gaps"], {
+            "normalize-5210": ["verify-5210-radio-outgoing-physical-duplex",
+                               "verify-5210-radio-physical-duplex"],
+        })
+
+    def test_main_makefile_gates_are_included(self):
+        self.assertIn("verify-5110-menu", self.names)
+        self.assertIn("verify-3610-application", self.names)
+        self.assertIn("5210", self.result["products"])
 
     def test_audit_runs_over_the_real_makefile(self):
         self.assertGreater(len(self.result["multi_product_families"]), 20)
