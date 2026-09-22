@@ -132,11 +132,20 @@ releases without rail-off, while a sustained hold reaches CCONT rail-off at
 firmware-state write or injected key event. This establishes a ROM-consistent
 input contract; the exact board trace still awaits physical-board evidence.
 
-At about 8.54 seconds this ROM writes clock-control value `0x0e` from
-`0x292868`. The ROM4 wake protocol after that request remains unresolved, so
-the later-ROM ARM-suspension rule is not projected onto NSE-1. The menu gate
-deliberately presses at 8 seconds and is keypad/UI evidence, not ROM4 idle-wake
-evidence.
+The former claim that ROM4 ordinary idle writes clock-control `0x0e` around
+8.54 s was wrong. A focused register trace over 35 unattended seconds instead
+observes `0x2c` at `0x27f0d6` and `0x0c` at `0x27f10a` around that interval;
+both leave clock-stop bit 1 clear. The direct callsite scan for helper
+`0x29284c` found a setter call at `0x23193c` in a teardown branch and a
+clearer at `0x28664e`, not an ordinary idle entry. This scan covers direct
+Thumb BL sites, not indirect dispatch.
+
+`make verify-5110-late-input` presses physical Menu at 12 s and reproduces
+the Phone book frame while checking every traced MAD2 clock-control write
+before the press for a bit-1 request. This proves later idle responsiveness,
+not wake from suspended ARM execution. The NSE-1 profile still disables the
+ROM6-derived clock-stop action until a ROM4 path actually requesting it and
+its wake contract are characterized.
 
 The backend also terminates the distinct C54x memory-mapped `0x22`/`0x32`
 parallel control path at COBBA. Frames retain their recovered opaque form:

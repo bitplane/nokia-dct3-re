@@ -161,14 +161,14 @@ physical inputs; they do not write firmware RAM or messages. The current
 normalized boot does not naturally execute task 0's stop request, so this gate
 proves controller semantics rather than claiming an observed idle duty cycle.
 
-ROM4 NSE-1 is outside that projection for now. Its v5.30 firmware issues
-clock-control `0x0e` at roughly 8.54 seconds, while the recovered interrupt
-state does not establish a safe wake rule. Broad experiments that woke on any
-pending source or routed sources while stopped admitted unrelated FIQ state
-and did not advance the handset. The NSE-1 product profile therefore leaves
-ARM clock stop disabled until its wake protocol is recovered. The focused
-5110 menu gate applies its physical key before this request and must not be
-cited as idle-wake validation.
+ROM4 NSE-1 is outside that projection for now. A focused 35-second unattended
+trace corrected the former `0x0e`-at-idle claim: the ordinary clock-control
+sequence uses `0x2c`/`0x0c`, with clock-stop bit 1 clear. The distinct bit-1
+setter at `0x29284c` is directly called from a teardown branch; its wake
+contract is not established. The NSE-1 profile therefore leaves ARM clock
+stop disabled. `make verify-5110-late-input` confirms a physical Menu press
+after the earlier alleged idle-stop time reaches the same menu frame, but
+that is awake-state responsiveness, not proof of a suspended-ARM wake.
 
 `make verify-mad2-timer1` proves destination `0x7fff`, FIQ5/status `0x020` and
 firmware acknowledgement. `make verify-mad2-reset` runs two mapped-MMIO

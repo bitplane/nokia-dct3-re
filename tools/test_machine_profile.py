@@ -550,6 +550,10 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn('config.device_remove("dsp_hle")', profile)
         self.assertIn("NOKIA_DSP_C54X(config, m_dsp_c54x", profile)
         self.assertIn("apply_product_config(PRODUCT_5110);", profile)
+        self.assertLess(
+            profile.index("apply_product_config(PRODUCT_5110);"),
+            profile.index('config.device_remove("dsp_hle")'),
+        )
         self.assertIn("result.keypad_wiring = KEYPAD_NSE1", self.driver)
         self.assertIn("result.gensio_wiring = GENSIO_NSE1", self.driver)
         self.assertIn("0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true",

@@ -38,7 +38,11 @@ speech-request predicate are likewise one atomic product contract; DSPIF
 carries no DSP-behavior configuration. Both sides meet through the semantic-free
 `nokia_dsp_backend_interface` contract, so runtime driver wiring does not depend on
 the HLE implementation. HLE-only product setup remains conditional and can be
-omitted by a real-DSP machine composition. The NSE-1 research configuration
+omitted by a real-DSP machine composition. A product replacing the HLE must
+apply its product configuration before `machine_config::device_remove`:
+during config construction, an `optional_device` finder can still resolve to
+the removed object, making later setter calls a use-after-free. The NSE-1
+research configuration
 selects the clean-room C54x backend, recovered program/data ROMs and
 product-specific MAD2 reset, GENSIO and keyboard wiring;
 `nokia_external_service_peer_device` owns the separate class-`0x40` service

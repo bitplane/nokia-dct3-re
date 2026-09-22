@@ -180,6 +180,10 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 		update_irq_line();
 		break;
 	case 0x0d:
+		if (m_clock_trace)
+			LOGMASKED(LOG_MAD2, "mad2_clock_ctrl: data=%02x old=%02x fiq=%03x fmask=%02x irq=%03x imask=%02x ctrl=%02x t=%.9f\n",
+					data, old, m_fiq_status, m_regs[0x0a], m_irq_status,
+					m_regs[0x0b], m_regs[0x0c], machine().time().as_double());
 		// Both 3210 ROMs use bit 1 as a one-shot clock-stop request. It is
 		// written from task 0 only after the scheduler's idle predicates and
 		// sleep-timer update; the shutdown path issues the same request after

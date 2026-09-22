@@ -738,8 +738,8 @@ constexpr nokia_product_config make_5110_config()
 	// NSE-1 bit-bangs its external 24C16 through PUP GenIO: signal
 	// bit 0 is SDA, signal bit 2 is SCL, and direction bit 0 releases SDA.
 	result.pup_eeprom_scl_bit = 2;
-	// ROM4's clock-gate write is mapped, but its wake protocol is not yet
-	// recovered. Do not project the later ROM6 CPU-suspend contract onto NSE-1.
+	// Coherent ROM4 idle writes 0x2c/0x0c, not the bit-1 clock-stop request.
+	// The separate teardown setter has no validated wake contract yet.
 	result.mad2_clock_stop = false;
 	result.ccont_board = ADC_5110;
 	result.boot_rom_hle = true;
@@ -3175,13 +3175,15 @@ void nokia_dct3_state::noki5110(machine_config &config)
 	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
 	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
 	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
+	// Configure the base composition while its HLE finder is still valid.
+	// A finder lookup after device_remove can refer to the deleted device.
+	apply_product_config(PRODUCT_5110);
 	config.device_remove("dsp_hle");
 	// The independently reproduced co-simulation advances four DSP cycles per
 	// 13 MHz MCU hardware cycle. Keep this as an explicit ROM4 pacing result
 	// until the MAD2 clock tree is recovered from primary hardware material.
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
-	apply_product_config(PRODUCT_5110);
 }
 
 void nokia_dct3_state::noki6110(machine_config &config)
