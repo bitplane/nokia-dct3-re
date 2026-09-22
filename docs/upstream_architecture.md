@@ -19,7 +19,7 @@ environment variables.
 | persistent storage | generic flash and I2C EEPROM devices, with a temporary B3 adapter where the generic flash core lacks partition behavior | present, partly transitional |
 | display | geometry-configured PCD8544-family device | present |
 | SIM | SIMI controller plus replaceable card-side protocol device | present |
-| DSP execution | a future generic TMS320C54x core and product-correct internal ROMs | absent |
+| DSP execution | clean-room TMS320C54x core and product-correct internal ROMs | selected by the 5110; other handsets retain HLE pending their own ROMs and integration |
 | DSP backend contract | `nokia_dsp_backend_interface` | present; transport-facing substitution seam |
 | DSP compatibility backend | `nokia_dsp_hle_device` | present and explicitly provisional implementation of that seam |
 | laboratory cellular network | radio/link/session/network peer devices beyond the DSP boundary | present; deterministic test infrastructure rather than RF hardware |
@@ -51,7 +51,8 @@ retains a separately typed optional finder only while applying HLE-specific
 product contracts. Runtime transport, reset and tone paths use the abstract
 backend.
 
-The real backend must implement that same endpoint and supply:
+The 5110 real-DSP backend implements that endpoint. Full product coverage still
+requires the following contracts to be validated or completed:
 
 1. TMS320C54x program, data and I/O address spaces;
 2. MAD2 reset, release and interrupt wiring;
@@ -62,12 +63,12 @@ The real backend must implement that same endpoint and supply:
 7. the parallel MFI/control plane used for radio and codec control; and
 8. bidirectional PCM clocks, framing and sample data.
 
-The pinned MAME tree contains a `tms320c5x` core but no TMS320C54x core. The
-C54x is not a device variant that can be enabled by adding a type alias: its
+Stock MAME has a `tms320c5x` core but no TMS320C54x core. This repository's
+MAME overlay adds a clean-room C54x core. The C54x is not a variant of C5x: its
 instruction encoding, 40-bit accumulator behavior, repeat-block machinery,
 memory overlay rules and on-chip peripherals differ materially. The real
-backend therefore requires a new clean-room MAME CPU device based on TI's
-public architecture manuals. The related C5x core is useful as a MAME CPU
+backend therefore uses the new MAME CPU device based on TI's public
+architecture manuals. The related C5x core is useful as a MAME CPU
 device-API reference only, not as an execution base whose results can be
 treated as C54x behavior.
 
@@ -75,20 +76,19 @@ The HLE and real core are alternatives. A real core must not run concurrently
 with HLE code that writes the same shared words, advances the same ring cursors
 or drives the same COBBA interface.
 
-The clean-room core has now started under `cpu/tms320c54x`. Its first checkpoint
-is intentionally an execution scaffold, not a claimed emulator: it registers
-the three word-addressed spaces, 40-bit accumulators, auxiliary/status/repeat
-state, debugger state and save-state data, but stops on every undecoded opcode.
-This makes unsupported semantics visible while the independently captured ROM4
-transform fixture grows the generic instruction implementation. Nokia mailbox,
-COBBA and product-profile behavior remain outside this CPU directory.
+The clean-room core lives under `cpu/tms320c54x`. It implements the ROM4
+instruction surface needed for the 5110's observed startup and menu path, while
+still stopping visibly on unsupported opcodes. Nokia mailbox, COBBA and product
+profile behavior remain outside the CPU directory. The 5110 machine removes
+`dsp_hle` and instantiates `NOKIA_DSP_C54X` with its own ROM4 images; other
+handsets do not inherit that ROM or execution contract.
 
 The first semantic tranche covers the generic encodings exercised at the
 transform boundary for CALL/RET, RPT/RPTB, immediate auxiliary-register loads,
 auxiliary-register moves, ordinary indirect pre/post addressing, accumulator
 loads/logical operations and low-word stores. Stack growth and block-repeat
-termination follow the TI CPU guide. This is still below the 628-opcode ROM4
-boot surface and is not yet selected by any handset configuration.
+termination follow the TI CPU guide. Focused CPU conformance tests and the
+unassisted 5110 handset gates cover different levels of this implementation.
 
 `make check-c54x-core` executes distributable synthetic programs on the MAME
 CPU device itself. It currently checks the downward-growing CALL/RET stack,
@@ -105,20 +105,13 @@ from independently observed workspace operands. Its six output words reproduce
 pointers, low-word stores and the RPTB/CALL interaction in the MAME core; it
 does not yet claim that the preceding transform routines execute.
 
-`make check-c54x-rom4-execute` is the private-input companion gate. It copies
-the ignored transform-entry program/data snapshots into MAME's ROM path,
-verifies their declared hashes through ordinary ROM loading, restores the
-captured architectural registers, and executes from `0x4b73`. The current core
-constructs challenge header `3532 0000` organically, proceeds through the
-transform that subsequently mutates that workspace, and stops after fetching
-unsupported conditional branch `f820` at `0x3810` (`PC=0x3811`). Reaching it executes
-the complete `0x4b82` block-repeat copy, its `0x3900` status helper, and the
-`0x7f2d` transform helper through its indirect/direct transfers, mixing stages,
-and nested CRC-style carry loops. It also executes the delayed `0x37ce` call
-through its measurement setup and first DSP port write.
-That address is now
-the measured implementation frontier; expanding the core must move it forward
-while preserving the synthetic and transform-tail gates.
+`make check-c54x-rom4-execute` retains the private transform-entry fixture as a
+focused regression, not the full-phone frontier. `make check-c54x-rom4-coherent`
+checks the 5110's organic DSP service completion, and `make verify-5110-menu`
+checks an unassisted boot through a physical Menu key to an exact Phone book
+frame. `make verify-5110-save-state` repeats that UI path after restoring the
+running DSP composition. These gates establish useful ROM4 execution, not
+complete RF acquisition or speech behavior.
 
 ## DSP ROM policy
 
@@ -169,8 +162,8 @@ The likely reviewable sequence is:
 1. generic flash and PCD8544-family corrections;
 2. independently useful Nokia hardware devices;
 3. the Nokia DCT3 family driver with explicit HLE status;
-4. a clean-room, MAME-compatible TMS320C54x CPU core;
-5. real-DSP machine configurations as ROM provenance permits; and
+4. the clean-room, MAME-compatible TMS320C54x CPU core now exercised by 5110;
+5. additional real-DSP machine configurations as ROM provenance permits; and
 6. further handset profiles promoted by product-specific gates.
 
 Research traces, firmware-address symbol maps, raw captures and exploratory
@@ -191,8 +184,11 @@ minimum it must reproduce, without HLE writes on the same boundary:
 - call setup and teardown; and
 - bidirectional speech PCM under save/load.
 
-Until those gates pass, the HLE remains the supported compatibility backend and
-the real core remains experimental.
+The 5110 already selects the real core and passes bootstrap, idle/menu and
+save/load gates. RF acquisition and bidirectional speech PCM remain incomplete,
+so its real-DSP path is experimental for full phone operation. HLE remains the
+compatibility backend for the other handsets until their own ROM and boundary
+gates justify promotion.
 
 Before full-phone promotion, the new CPU core must pass smaller deterministic
 ROM4 gates for the instructions already known to be load-bearing: OVLY-aware
@@ -206,13 +202,11 @@ An observation-only 30-million-MCU-instruction run through interactive ROM4
 idle executed 628 distinct 16-bit opcode words spanning 112 high-byte groups;
 the sorted opcode-set SHA-256 is
 `63ae45c872ccea39112898bfde7f5926acd675701675a860d765a66a35815d34`.
-This is broad functional coverage, not evidence that a transform-only decoder
-can boot the phone. `tools/c54x_opcode_coverage.py` preserves that baseline and
-will measure the clean-room core's implemented/executed surface. Development
-should still begin with the deterministic loader and challenge fixtures, then
-expand against the 628-word boot set before claiming full ROM4 execution.
+This is a reference trace, not a coverage claim for the current core.
+`tools/c54x_opcode_coverage.py` preserves the opcode-set baseline; the
+unassisted handset gates establish current execution reachability.
 
-The clean MAME NSE-1 composition currently reaches 437 distinct opcode words
+An earlier 12-second clean MAME NSE-1 checkpoint reached 437 distinct opcode words
 across 80 high-byte groups in twelve seconds (sorted-set SHA-256
 `523cd6019736d1fb7bb09cae8a0f96124a97a768f00e40df7c3933be6ba7c7bd`).
 The original 191-word count difference was a reachability delta rather than a
