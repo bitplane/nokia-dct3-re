@@ -45,6 +45,7 @@ DEFAULT_PRODUCT = "3210"
 # such as `verify-6110-static` are not neutral; 6110 is a product that
 # currently has one family, which the membership view reports as such.
 NEUTRAL_PREFIXES = ("gsm-",)
+INFRASTRUCTURE_SCRIPTS = {"tools/run_mame_isolated.py"}
 
 
 def family_of(name: str) -> tuple[str, str] | None:
@@ -59,7 +60,7 @@ def family_of(name: str) -> tuple[str, str] | None:
 
 
 def _scripts(gate: dict) -> set[str]:
-    return set(gate.get("scripts_mentioned", []))
+    return set(gate.get("scripts_mentioned", [])) - INFRASTRUCTURE_SCRIPTS
 
 
 def _seconds(gate: dict) -> set[str]:

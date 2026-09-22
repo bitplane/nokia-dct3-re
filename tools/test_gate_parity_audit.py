@@ -70,6 +70,11 @@ class AuditTest(unittest.TestCase):
         self.assertEqual(finding["detail"]["3310"], ["tools/extra_check.py"])
         self.assertEqual(finding["detail"]["3210"], [])
 
+    def test_mame_launcher_is_not_a_checker(self):
+        self.assertEqual(gate_parity_audit._scripts({
+            "scripts_mentioned": ["tools/check.py", "tools/run_mame_isolated.py"],
+        }), {"tools/check.py"})
+
     def test_differing_options_on_a_shared_checker_are_reported(self):
         finding = next(f for f in self.result["findings"]
                        if f["kind"] == "checker_options")
