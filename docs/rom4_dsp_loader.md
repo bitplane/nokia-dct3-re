@@ -195,7 +195,11 @@ for the callees. ROM `0x4414..0x4460` is an initializer that stores `0x00ac`
 and `0x00af`; direct call sites include `0x09a4`, `0x0ab8`, `0x4de3`,
 `0x4e00`, and `0x9b62/0x9b9f/0x9bb0`. Which host request reaches this
 initializer in ordinary acquisition, and whether later frames take a different
-route, remain unproved. No firmware or DSP state was forced for this census.
+route, remain unproved. A focused 30-second coherent no-cell run recorded zero
+executions at `0x4414/0x4428/0x4433/0x4460` while servicing 6,497 frame
+expiries and 207,232 port-`0x27` reads. Thus the observed baseline loop does
+not itself establish that this mode initializer or its result-publication
+branches are reached. No firmware or DSP state was forced for this census.
 The recovered ROM
 also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
 port-`0x38` status reads. A coherent 12-second run records zero reads on both
@@ -332,7 +336,9 @@ injecting a reply or waveform at type-`0x1a` would skip both boundaries.
 The next evidence should compare a no-cell boot with a real NSE-1 receiving
 one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
 DSP-to-MCU response words, DSP program counter around `0x407c`, `0x410e`,
-`0x4185` and `0x7b0a`, and reads/writes of DSP I/O ports `0x27`, `0x38`,
+`0x4185`, `0x4414`, `0x3268..0x32c3` and `0x7b0a`, and DSP data words
+`0x00ac/0x00ad/0x00af` before and after each INT0 frame. Capture reads/writes
+of DSP I/O ports `0x27`, `0x38`,
 `0x39`, `0x31` and `0x32` with timestamps. To establish electrical sample
 packing and tuning, also capture the COBBA parallel address/data, read/write
 and data-available strobes and MAD2 `SynthEna/SynthClk/SynthData` pins (or
