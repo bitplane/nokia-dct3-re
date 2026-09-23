@@ -174,6 +174,17 @@ sample-processing path, not that port `0x27` is the RF burst interface.
 Supplying valid FCCH/SCH/BCCH input is therefore still open.
 The cadence is only 32 words per 4.615 ms GSM TDMA frame, so it is not
 evidence that this loop transfers an entire radio burst. The recovered ROM
+branches on control words `0x00ac/0x00ad/0x00af` after the unrolled reads;
+one branch calls `0x48d0` and another reaches `0x42f6` before returning to
+the frame handler. A temporary write watch in a five-second coherent NSE-1
+run found no post-upload changes to candidate processing words `0x2180`,
+`0x21a9`, or `0x21c2`, and no receiver-driven advance of the MCU receive-ring
+producer at `0x08e4`. Those words were each initialized once by the DSP
+upload at PC `0x31d7`; the four ring advances observed were startup traffic
+at PC `0x3805`. This is a negative result for the unattached-input run, not
+proof that the processing branches cannot publish results with real samples.
+The branch conditions and sample format remain the next receiver questions.
+The recovered ROM
 also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
 port-`0x38` status reads. A coherent 12-second run records zero reads on both
 `0x38` and `0x39`; those sites are dormant while the `0x27` loop runs. Their
