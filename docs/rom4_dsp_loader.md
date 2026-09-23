@@ -184,6 +184,18 @@ upload at PC `0x31d7`; the four ring advances observed were startup traffic
 at PC `0x3805`. This is a negative result for the unattached-input run, not
 proof that the processing branches cannot publish results with real samples.
 The branch conditions and sample format remain the next receiver questions.
+An instruction-PC census of the coherent no-cell run resolves the default
+route more tightly. `0x00ac=0` fails both mode comparisons at `0x322e/0x3232`,
+so INT0 runs the four-read block at `0x3249..0x325b` eight times. It then
+reaches `0x3268`, tests `0x00af` at `0x326b..0x3272`, and branches directly
+to `0x32c3` and the common exit at `0x33f3`. The `0x3274..0x32c2` work,
+including calls to `0x48d0`, `0x42f6`, and `0x44b6`, does not execute on that
+first zero-input frame. These are observed branch PCs, not decoded purposes
+for the callees. ROM `0x4414..0x4460` is an initializer that stores `0x00ac`
+and `0x00af`; direct call sites include `0x09a4`, `0x0ab8`, `0x4de3`,
+`0x4e00`, and `0x9b62/0x9b9f/0x9bb0`. Which host request reaches this
+initializer in ordinary acquisition, and whether later frames take a different
+route, remain unproved. No firmware or DSP state was forced for this census.
 The recovered ROM
 also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
 port-`0x38` status reads. A coherent 12-second run records zero reads on both
